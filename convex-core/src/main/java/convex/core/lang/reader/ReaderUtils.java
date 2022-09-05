@@ -58,6 +58,11 @@ public class ReaderUtils {
 		return quotingSymbols.get(s);
 	}
 
+	/**
+	 * Unescapes a string according to Java rules
+	 * @param s String to unescape
+	 * @return Unescaped string
+	 */
 	public static String unescapeString(String s) {
 		return StringEscapeUtils.unescapeJava(s);
 	}

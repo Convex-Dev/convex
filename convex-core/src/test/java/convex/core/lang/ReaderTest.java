@@ -290,12 +290,28 @@ public class ReaderTest {
 		doReadPrintTest("\\newline"); // Literal escaped character
 		doReadPrintTest("\\space"); // Literal escaped character
 		doReadPrintTest("\"\""); // empty string
-		doReadPrintTest("\"\\\\\""); // escaped string containing backslash
-		doReadPrintTest("\"\\n\""); // escaped string containing newline
+		doReadPrintTest("\"[\""); // string containing a single square bracket should be OK
 		doReadPrintTest("1.0");
 		doReadPrintTest("[:foo bar]");
 		doReadPrintTest("^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6");
 	}
+	
+	/**
+	 * Test cases that should read and print identically
+	 */
+	@Test public void testReadPrintStringEscapes() {
+		doReadPrintTest("\"\\\\\""); // backslash
+		doReadPrintTest("\"\\n\""); // newline		
+	}
+	
+	/**
+	 * Tests for special escape sequences in strings (octal, unicode)
+	 */
+	@Test public void testStringSpecialEscapes() {
+		assertEquals("S", Reader.read("\"\\123\"").toString()); // S = 83 dec
+		assertEquals("S", Reader.read("\"\\u0053\"").toString()); // S = 53 hex
+	}
+
 
 	private void doReadPrintTest(String js) {
 		AString s=Strings.create(js);

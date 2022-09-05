@@ -125,7 +125,20 @@ fragment
 STRING_CHAR: ~["\\\r\n] | STRING_ESCAPE;
 
 fragment
-STRING_ESCAPE: '\\' [btnfr"'\\];
+STRING_ESCAPE: '\\' ([btnfr"'\\] | OCTAL_BYTE | UNICODE_ESCAPE);
+
+fragment
+OCTAL_BYTE
+	:	OCTAL_DIGIT
+	|	OCTAL_DIGIT OCTAL_DIGIT
+	|	[0-3] OCTAL_DIGIT OCTAL_DIGIT
+	;
+	
+fragment
+UNICODE_ESCAPE: 'u' HEX_BYTE HEX_BYTE;
+
+fragment
+OCTAL_DIGIT : [0-7];
 
 // Quoting
 
