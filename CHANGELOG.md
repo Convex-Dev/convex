@@ -7,17 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.7] - Unreleased
 ### Added 
+- REST API Server
 - Support for parameterised asset paths in `convex.asset` as per CAD19
 - Multi-token reference implementation for single actor supporting many fungible assets
 - Add missing `double?` predicate
-- REST API Server
 - OpenAPI REST specification
 
 ### Changed
 - Static compilation enabled for `convex.core` functions
+- Better JSON utility support
 
 ### Fixed
 - Correct handling for negative zero in min and max 
+- Fixed handling for octal and unicode escape sequences in Reader
 
 ## [0.7.6] - 2022-05-24
 ### Added 
