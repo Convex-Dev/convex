@@ -199,7 +199,8 @@ public class Constants {
 	/**
 	 * Option for static compilation support. Set to true for static inlines on core
 	 */
-	public static final boolean OPT_STATIC = true;
+	// TODO: Should ultimately be true for production usage
+	public static final boolean OPT_STATIC = false;
 
 	/**
 	 * Char to represent bad Unicode characters in printing
