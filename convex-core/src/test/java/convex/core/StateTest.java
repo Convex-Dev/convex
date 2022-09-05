@@ -47,9 +47,6 @@ public class StateTest {
 	@Test
 	public void testRoundTrip() throws BadFormatException {
 		State s = INIT_STATE;
-		// TODO: fix this
-		// s=s.store(Keywords.STATE);
-		// assertEquals(1,s.getStore().size());
 
 		assertEquals(0,s.getRef().getStatus());
 

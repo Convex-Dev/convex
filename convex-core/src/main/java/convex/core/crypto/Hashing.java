@@ -128,7 +128,7 @@ public class Hashing {
 		});
 	}
 	/**
-	 * Threadlocal store for MessageDigets instances. TODO: figure out if this is
+	 * Threadlocal store for MessageDigest instances. TODO: figure out if this is
 	 * useful for performance. Probably not since digest initialisation is the
 	 * bottleneck anyway?
 	 */

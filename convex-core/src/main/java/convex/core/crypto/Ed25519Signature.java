@@ -123,8 +123,7 @@ public class Ed25519Signature extends ASignature {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// TODO Auto-generated method stub
-
+		if (signatureBytes.length!=SIGNATURE_LENGTH) throw new InvalidDataException("Bad signature array length?",this);
 	}
 
 	@Override
