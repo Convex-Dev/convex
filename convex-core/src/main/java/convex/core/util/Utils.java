@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -1357,19 +1358,25 @@ public class Utils {
 	}
 
 	// ExecutorService for concurrent thread usage.
-	private static final ExecutorService executor = Executors.newFixedThreadPool(100);
-	static {
-		Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
-			// Try a gentle termination. If not fast enough, terminate with extreme prejudice
-			executor.shutdown();
-			try {
-			    if (!executor.awaitTermination(200, TimeUnit.MILLISECONDS)) {
-			    	executor.shutdownNow();
-			    } 
-			} catch (InterruptedException e) {
-				executor.shutdownNow();
-			}
-		});
+	private static ExecutorService executor = null;
+
+	private static ExecutorService getExecutor() {
+		if (executor==null) {
+			ExecutorService ex = Executors.newFixedThreadPool(100);
+			Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
+				// Try a gentle termination. If not fast enough, terminate with extreme prejudice
+				ex.shutdown();
+				try {
+				    if (!ex.awaitTermination(200, TimeUnit.MILLISECONDS)) {
+				    	ex.shutdownNow();
+				    } 
+				} catch (InterruptedException e) {
+					ex.shutdownNow();
+				}
+			});
+			executor=ex;
+		}
+		return executor;
 	}
 	
 	/**
@@ -1383,10 +1390,11 @@ public class Utils {
 	public static <R,T> ArrayList<CompletableFuture<R>> futureMap(Function<T,R> func, Collection<T> items) {
 		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
 		for (T item: items) {
-			futures.add(CompletableFuture.supplyAsync(()->func.apply(item),executor));
+			futures.add(CompletableFuture.supplyAsync(()->func.apply(item),getExecutor()));
 		}
 		return futures;
 	}
+
 
 	public static <R> void awaitAll(Collection<CompletableFuture<R>> cfutures) throws InterruptedException, ExecutionException {
 		CompletableFuture.allOf(cfutures.toArray(new CompletableFuture[cfutures.size()])).get();
