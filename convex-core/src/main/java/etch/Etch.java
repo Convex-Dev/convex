@@ -5,6 +5,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileChannel.MapMode;
@@ -244,7 +245,8 @@ public class Etch {
 		}
 		int mapIndex=Utils.checkedInt(position/MAX_REGION_SIZE); // 1GB chunks
 
-		MappedByteBuffer mbb=(MappedByteBuffer) getInternalBuffer(mapIndex).duplicate();
+		ByteBuffer bb=getInternalBuffer(mapIndex).duplicate();
+		MappedByteBuffer mbb=(MappedByteBuffer) bb;
 		mbb.position(Utils.checkedInt(position-MAX_REGION_SIZE*(long)mapIndex));
 		return mbb;
 	}
