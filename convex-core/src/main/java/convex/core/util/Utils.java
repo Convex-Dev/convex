@@ -1360,7 +1360,7 @@ public class Utils {
 	// ExecutorService for concurrent thread usage.
 	private static ExecutorService executor = null;
 
-	private static ExecutorService getExecutor() {
+	private synchronized static ExecutorService getExecutor() {
 		if (executor==null) {
 			ExecutorService ex = Executors.newFixedThreadPool(100);
 			Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
