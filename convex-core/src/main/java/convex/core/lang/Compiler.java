@@ -359,6 +359,7 @@ public class Compiler {
 
 			// compile quoted elements
 			context = compileAllQuasiQuoted(context, seq, depth);
+			if (context.isExceptional()) return (Context<AOp<T>>) context;
 			ASequence<AOp<ACell>> rSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = (seq instanceof AList) ? Core.LIST : Core.VECTOR;
@@ -377,6 +378,7 @@ public class Compiler {
 
 			// compile quoted elements
 			context = compileAllQuasiQuoted(context, rSeq,depth);
+			if (context.isExceptional()) return (Context<AOp<T>>) context;
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = Core.HASHMAP;
@@ -392,6 +394,7 @@ public class Compiler {
 
 			// compile quoted elements
 			context = compileAllQuasiQuoted(context, rSeq,depth);
+			if (context.isExceptional()) return (Context<AOp<T>>) context;
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = Core.HASHSET;
@@ -418,7 +421,7 @@ public class Compiler {
 	 * @param form
 	 * @return Context with complied sequence of ops as result
 	 */
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static <T extends ACell> Context<ASequence<AOp<T>>> compileAllQuasiQuoted(Context<?> context, ASequence<ACell> forms, int depth) {
 		int n = forms.size();
 		// create a list of ops producing each sub-element
@@ -434,6 +437,7 @@ public class Compiler {
 				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
 			} else {
 				Context<AOp<T>> rctx= compileQuasiQuoted(context, subSyntax,depth);
+				if (rctx.isExceptional()) return (Context)rctx;
 				rSeq = (ASequence<AOp<T>>) (rSeq.conj(rctx.getResult()));
 			}
 		}
