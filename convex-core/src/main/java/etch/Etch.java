@@ -245,8 +245,8 @@ public class Etch {
 		}
 		int mapIndex=Utils.checkedInt(position/MAX_REGION_SIZE); // 1GB chunks
 
-		ByteBuffer bb=getInternalBuffer(mapIndex).duplicate();
-		MappedByteBuffer mbb=(MappedByteBuffer) bb;
+		MappedByteBuffer mbb=(MappedByteBuffer)((ByteBuffer)getInternalBuffer(mapIndex)).duplicate();
+
 		mbb.position(Utils.checkedInt(position-MAX_REGION_SIZE*(long)mapIndex));
 		return mbb;
 	}
