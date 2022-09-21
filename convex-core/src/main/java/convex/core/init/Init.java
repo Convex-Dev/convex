@@ -311,6 +311,7 @@ public class Init {
 	private static BlobMap<AccountKey, PeerStatus> addPeer(BlobMap<AccountKey, PeerStatus> peers, AccountKey peerKey,
 			Address owner, long initialStake) {
 		PeerStatus ps = PeerStatus.create(owner, initialStake, null);
+		if (peers.containsKey(peerKey)) throw new IllegalArgumentException("Duplicate peer key");
 		return peers.assoc(peerKey, ps);
 	}
 
