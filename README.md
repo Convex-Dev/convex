@@ -1,6 +1,8 @@
 # Convex
 
 [![Maven Central](https://img.shields.io/maven-central/v/world.convex/convex.svg?label=Maven%20Central)](https://search.maven.org/search?q=world.convex)
+![Workflow](https://github.com/convex-dev/convex/actions/workflows/tests.yml/badge.svg)
+
 
 Convex is a decentralised network and execution engine for the Internet of Value. It can be seen as an implementation of a "Stateful Internet" where the network itself securely hosts and executes code and data.
 
