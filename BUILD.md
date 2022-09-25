@@ -49,3 +49,9 @@ mvn clean deploy -DperformRelease
 ## Repeatable Builds
 
 It is the intention that builds should be repeatable. Any issues, please report!
+
+## Known Issues and Fixes
+
+### ANTLR Generated Sources
+
+Some IDEs (including Eclipse) may not automatically recognise the source directory for generated ANTLR4 source files. A manual fix is to add "target/generated-sources/antlr4" as a source directory in the project build path.

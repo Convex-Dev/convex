@@ -6,6 +6,12 @@
 		<artifactId>convex</artifactId>
 		<version>0.7.10-SNAPSHOT</version>
 	</parent>
+	
+	<properties>
+	  <antlr.version>4.11.1</antlr.version>
+	  <bc.version>1.69</bc.version>
+	</properties>
+
 
 	<modelVersion>4.0.0</modelVersion>
 
@@ -20,7 +26,7 @@
 			<plugin>
 				<groupId>org.antlr</groupId>
 				<artifactId>antlr4-maven-plugin</artifactId>
-				<version>4.9.2</version>
+				<version>${antlr.version}</version>
 				<configuration>
 					<libDirectory>${basedir}/lib/src/main/antlr4/convex/core/lang/reader/antlr</libDirectory>
 				</configuration>
@@ -74,12 +80,12 @@
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcprov-jdk15on</artifactId>
-			<version>1.69</version>
+			<version>${bc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcpkix-jdk15on</artifactId>
-			<version>1.69</version>
+			<version>${bc.version}</version>
 		</dependency>
 
 		<dependency>
@@ -133,7 +139,7 @@
 		<dependency>
 			<groupId>org.antlr</groupId>
 			<artifactId>antlr4-runtime</artifactId>
-			<version>4.9.2</version>
+			<version>${antlr.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
