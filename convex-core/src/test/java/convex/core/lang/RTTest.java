@@ -61,6 +61,12 @@ public class RTTest {
 		assertNull(RT.castAddress(CVMLong.create(-1))); // negative ints not allowed
 		assertNull(RT.castAddress(Strings.create("xyz2030405060708090a0b0c0d0e0f1011121314"))); // bad format
 	}
+	
+	@Test
+	public void testPrint() {
+		assertEquals(Strings.create("\"'\""),RT.print(Strings.create("'"))); // See #407
+	}
+
 
 	@Test
 	public void testSequence() {

@@ -302,6 +302,7 @@ public class ReaderTest {
 	@Test public void testReadPrintStringEscapes() {
 		doReadPrintTest("\"\\\\\""); // backslash
 		doReadPrintTest("\"\\n\""); // newline		
+		doReadPrintTest("\"Can't convert value of type Long to type Sequence\""); // single quote see #407		
 	}
 	
 	/**

@@ -171,6 +171,7 @@ public class ANTLRTest {
 	@Test public void testStrings() {
 		assertSame(Strings.empty(), read("\"\""));
 		assertEquals(Strings.create("a"), read("\"a\""));
+		assertEquals(Strings.create("'"), read("\"'\"")); // Single quote See #407
 		assertEquals(Strings.create("bar"), read("\"bar\""));
 		assertEquals(Strings.create("ba\nr"), read("\"ba\\nr\""));
 	}

@@ -82,7 +82,7 @@ public class Text {
 		switch (c) {
 		    case '"': sb.append('\\'); sb.append('"'); return;
 		    case '\\': sb.append('\\'); sb.append('\\'); return;
-		    case '\'': sb.append('\\'); sb.append('\''); return;
+		    // case '\'': sb.append('\\'); sb.append('\''); return; See #407
 		    case '\t': sb.append('\\'); sb.append('t'); return;
 		    case '\b': sb.append('\\'); sb.append('b'); return;
 		    case '\n': sb.append('\\'); sb.append('n'); return;
