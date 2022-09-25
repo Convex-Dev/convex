@@ -45,3 +45,7 @@ mvn clean deploy -DperformRelease
 - Merge `master` back into `develop`
 - Create new CHANGELOG "Unreleased" section for next version
 - Run `mvn versions:set -DnewVersion='0.7.4-SNAPSHOT'` for next snapshot version as required 
+
+## Repeatable Builds
+
+It is the intention that builds should be repeatable. Any issues, please report!
