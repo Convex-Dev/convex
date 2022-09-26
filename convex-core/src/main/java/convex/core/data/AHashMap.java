@@ -149,7 +149,8 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	
 	/**
 	 * Gets the keys in this Map as a Vector
-	 * @return
+	 * 
+	 * @return Vector of keys in map defined order
 	 */
 	public AVector<K> getKeys() {
 		int n=Utils.checkedInt(count);

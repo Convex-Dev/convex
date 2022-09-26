@@ -95,8 +95,8 @@ public class API {
 	}
 	
 	/**
-	 * Launches a peer with a default configurtion. Mainly for testing.
-	 * @return
+	 * Launches a peer with a default configuration. Mainly for testing.
+	 * @return Newly launched Server instance
 	 */
 	public static Server launchPeer() {
 		AKeyPair kp=AKeyPair.generate();

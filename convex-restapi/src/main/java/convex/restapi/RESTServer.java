@@ -362,7 +362,7 @@ public class RESTServer {
 	 * Defaults to using the Peer Controller account.
 	 * 
 	 * @param server Server instance
-	 * @return
+	 * @return New {@link RESTServer} instance
 	 */
 	public static RESTServer create(Server server) {
 		RESTServer newServer = new RESTServer();
@@ -376,7 +376,7 @@ public class RESTServer {
 	 * the Peer Controller account.
 	 * 
 	 * @param convex Convex client connection instance
-	 * @return
+	 * @return New {@link RESTServer} instance
 	 */
 	public static RESTServer create(Convex convex) {
 		RESTServer newServer = new RESTServer();
@@ -403,7 +403,7 @@ public class RESTServer {
 	/**
 	 * Gets the local Server instance, or null if not a local connection.
 	 * 
-	 * @return
+	 * @return Server instance, or null if not available.
 	 */
 	public Server getServer() {
 		return server;

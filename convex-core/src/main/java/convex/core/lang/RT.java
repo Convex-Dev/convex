@@ -1010,10 +1010,10 @@ public class RT {
 	/**
 	 * Prints a value with a reasonable print limit.
 	 * WARNING: May return null, not for use in CVM code
-	 * @return Printed String, or null if limit exceed
+	 * @param a Cell value to print
+	 * @return Printed String, or null if print limit exceed
 	 */
 	public static AString print(ACell a) {
-		// TODO Auto-generated method stub
 		return print(a,Constants.PRINT_LIMIT);
 	}
 	/**

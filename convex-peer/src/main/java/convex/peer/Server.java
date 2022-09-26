@@ -772,6 +772,7 @@ public class Server implements Closeable {
 	/**
 	 * Queues a message for processing by this Server. May block briefly.
 	 * @param m Message to queue
+	 * @throws InterruptedException If thread is interrupted
 	 */
 	public void queueMessage(Message m) throws InterruptedException {
 		receiveQueue.put(m);

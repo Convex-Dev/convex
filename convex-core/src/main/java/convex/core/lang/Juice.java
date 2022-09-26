@@ -345,7 +345,7 @@ public class Juice {
 	 * Computes the data build cost of a countable structure of given length 
 	 * @param counted Counted data structure, used for type
 	 * @param n Element count of data structure constructed
-	 * @return
+	 * @return Calculated juice cost
 	 */
 	public static long buildCost(ACountable<ACell> counted, long n) {
 		long elementCost=elementCost(counted);

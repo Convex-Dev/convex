@@ -61,7 +61,7 @@ public class CharTest {
 
 	/**
 	 * Test for and valid CVMChar
-	 * @param c
+	 * @param c Character value to test
 	 */
 	public void doCharTests(CVMChar c) {
 		// Should round trip as a readable character

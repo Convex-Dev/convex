@@ -209,8 +209,8 @@ public abstract class ACVMTest {
 	/**
 	 * Compiles source code to a CVM Op
 	 * 
-	 * @param <T>
-	 * @param source
+	 * @param <T> Type of compiled Op
+	 * @param source Source to compile
 	 * @return CVM Op
 	 */
 	public <T extends AOp<?>> T comp(String source) {
@@ -283,7 +283,7 @@ public abstract class ACVMTest {
 	/**
 	 * Compiles source code to a CVM Op
 	 * 
-	 * @param <T>
+	 * @param <T> Type of compiled Op
 	 * @param code Source code to compile as a form
 	 * @return CVM Op
 	 */
