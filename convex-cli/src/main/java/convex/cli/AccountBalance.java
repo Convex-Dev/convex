@@ -64,7 +64,7 @@ public class AccountBalance implements Runnable {
 		Address address = Address.create(addressNumber);
 
 		convex = mainParent.connectToSessionPeer(hostname, port, address, null);
-		String queryCommand = String.format("(balance #%d)", address.longValue());
+		String queryCommand = "(balance "+address+")";
 		ACell message = Reader.read(queryCommand);
 		
 		try {

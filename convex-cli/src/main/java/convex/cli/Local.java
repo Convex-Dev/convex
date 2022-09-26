@@ -29,7 +29,7 @@ public class Local implements Runnable {
 
 	@Override
 	public void run() {
-		// sub command run with no command provided
+		// run with no command provided
 		CommandLine.usage(new Local(), System.out);
 	}
 }
