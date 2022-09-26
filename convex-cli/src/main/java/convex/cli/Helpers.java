@@ -30,18 +30,17 @@ public class Helpers {
 	 *
 	 */
 	public static String expandTilde(String path) {
-		if (path!=null) {
-			String userHome=System.getProperty("user.home");
-			String separator=File.separator;
-			String regex = (separator.equals("\\")) ? "\\\\" : "/";
-			userHome=userHome.replaceAll(regex, "/");
-			return path.replaceFirst("^~", userHome);
-		}
-		return null;
+		if (path==null) return null;
+		
+		String userHome=System.getProperty("user.home");
+		String separator=File.separator;
+		String regex = (separator.equals("\\")) ? "\\\\" : "/";
+		userHome=userHome.replaceAll(regex, "/");
+		return path.replaceFirst("^~", userHome);
 	}
 
 	/**
-	 * Create a path from a File object. This is to provide a feature to add the
+	 * Create a path if necessary to a File object. This is used to provide a feature to add the
 	 * default `.convex` folder if it does not exist.
 	 *
 	 * @param file File object to see if the path part of the filename exists, if not then create it.
