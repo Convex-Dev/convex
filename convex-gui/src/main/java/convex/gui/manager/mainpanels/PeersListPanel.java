@@ -51,8 +51,7 @@ public class PeersListPanel extends JPanel {
 			int N=PeerGUI.KEYPAIRS.size();
 			List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
 			for (Server server: serverList) {
-				PeerView peer = new PeerView();
-				peer.peerServer = server;
+				PeerView peer = new PeerView(server);
 				// InetSocketAddress sa = server.getHostAddress();
 				addPeer(peer);
 			}
@@ -77,8 +76,7 @@ public class PeersListPanel extends JPanel {
 		Server server=API.launchPeer(config);
 		// server.
 		
-		PeerView peer = new PeerView();
-		peer.peerServer = server;
+		PeerView peer = new PeerView(server);
 		addPeer(peer);
 	}
 
@@ -133,8 +131,7 @@ public class PeersListPanel extends JPanel {
 			try {
 				// TODO: we want to receive anything?
 				pc = Convex.connect(hostAddress, null,null);
-				PeerView pv = new PeerView();
-				pv.peerConnection = pc;
+				PeerView pv = new PeerView(pc);
 				addPeer(pv);
 			} catch (Throwable e1) {
 				JOptionPane.showMessageDialog(this, "Connect failed: " + e1.toString());

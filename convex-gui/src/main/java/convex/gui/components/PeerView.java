@@ -26,6 +26,14 @@ public class PeerView {
 	public StateModel<Peer> peerModel = new StateModel<>(null);
 	public StateModel<State> stateModel = new StateModel<>(null);
 
+	public PeerView(Server server) {
+		peerServer=server;
+	}
+
+	public PeerView(Convex pc) {
+		peerConnection=pc;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
