@@ -83,8 +83,10 @@ public class Tag {
 	public static final byte INVOKE = (byte) 0xD0;
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
+	
+	// 0xE? = Reserved for future extension
 
-	// F? Illegal / reserved
+	// 0xF? = Illegal / reserved
 	public static final byte ILLEGAL = (byte) 0xFF;
 
 }

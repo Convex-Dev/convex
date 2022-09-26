@@ -39,6 +39,9 @@ public class CollectionsTest {
 		// Out of range assocs should return null
 		assertNull( a.assoc(-2, null));
 		assertNull( a.assoc(n + 2, null));
+		
+		// TODO: should always be invalid slice = null??
+ 		// assertNull(a.slice(-1,n));
 
 		ListIterator<T> it = a.listIterator();
 		assertThrows(UnsupportedOperationException.class, () -> it.set(null));
@@ -69,7 +72,7 @@ public class CollectionsTest {
 			assertEquals(first,a.getElementRef(0).getValue());
 			assertNotSame(empty,a);
 		}
-		
+ 		
 		ObjectsTest.doAnyValueTests(a);
 	}
 	
