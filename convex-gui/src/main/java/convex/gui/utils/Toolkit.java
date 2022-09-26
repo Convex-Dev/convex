@@ -92,9 +92,9 @@ public class Toolkit {
 	/**
 	 * Scale an image with interpolation / AA for nicer effects
 	 * 
-	 * @param src
-	 * @param w
-	 * @param h
+	 * @param src Source image
+	 * @param w Width of new image
+	 * @param h Height of new image
 	 * @return A new, resized image
 	 */
 	public static BufferedImage smoothResize(BufferedImage src, int w, int h) {

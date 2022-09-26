@@ -44,7 +44,7 @@ public class StateModel<T> {
 	 * Sets the value for this state model, firing any relevant property change
 	 * listeners.
 	 * 
-	 * @param newValue
+	 * @param newValue New value for state
 	 */
 	public void setValue(T newValue) {
 		T oldValue = this.value;

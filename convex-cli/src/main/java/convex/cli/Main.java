@@ -125,6 +125,7 @@ public class Main implements Runnable {
 	/**
 	 * Java main(...) entry point when run as a Java application.
 	 * Exits JVM process with specified exit code
+	 * @param args Command line arguments 
 	 */
 	public static void main(String[] args) {
 		Main mainApp = new Main();

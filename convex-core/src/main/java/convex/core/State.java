@@ -436,7 +436,7 @@ public class State extends ARecord {
 	 *
 	 * There are three phases in application of a transaction:
 	 * <ol>
-	 * <li>Preparation for accounting, with {@link #prepareTransaction(Address, ATransaction) prepareTransaction}</li>
+	 * <li>Preparation for accounting, with {@link #prepareTransaction(ATransaction) prepareTransaction}</li>
 	 * <li>Functional application of the transaction with ATransaction.apply(....)</li>
 	 * <li>Completion of accounting, with completeTransaction</li>
 	 * </ol>

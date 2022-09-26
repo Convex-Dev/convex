@@ -105,7 +105,7 @@ public class PEMTools {
 	/**
 	 * Decrypt a PEM string to a private key. The PEM string must contain the "ENCRYPTED PRIVATE KEY" type.
 	 *
-	 * @param PEM PEM string to decode
+	 * @param pemText PEM string to decode
 	 *
 	 * @param password Password that was used to encrypt the priavte key
 	 *

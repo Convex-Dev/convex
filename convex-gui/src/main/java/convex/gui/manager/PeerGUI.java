@@ -76,9 +76,8 @@ public class PeerGUI extends JPanel {
 	/**
 	 * Launch the application.
 	 * @param args Command line args
-	 * @throws IOException
 	 */
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) {
 		// TODO: Store config
 		// Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
 
@@ -281,7 +280,7 @@ public class PeerGUI extends JPanel {
 	 *
 	 * @param we Wallet to use
 	 * @param trans Transaction to execute
-	 * @param receiveAction
+	 * @param receiveAction Action to invoke when result is received
 	 */
 	public static void execute(WalletEntry we, ATransaction trans, Consumer<Result> receiveAction) {
 		execute(we,trans).thenAcceptAsync(receiveAction);

@@ -83,7 +83,9 @@ public final class CVMChar extends APrimitive {
 	}
 	
 	/**
-	 * Gets a code point value from bytes encoded in a Java integer (starting from high byte
+	 * Gets a code point value from bytes encoded in a Java integer (starting from high byte)
+	 * @param utf UTF-8 encoded value in an integer, first byte in high byte.
+	 * @return Unicode code point, or -1 if not valid UTF-8
 	 */
 	public static int codepointFromUTFInt(int utf) {
 		byte b = (byte)(utf>>24);
@@ -254,6 +256,7 @@ public final class CVMChar extends APrimitive {
 	 *  Gets the Java char value of this CVM Character. 
 	 *  
 	 *  Not all Unicode code points fit in a JVM char, a "bad character" value is used as replacement if this is not possible.
+	 * @return Java Char, or a special bad character if not valid.
 	 */
 	public char charValue() {
 		if (Character.isBmpCodePoint(value)) {

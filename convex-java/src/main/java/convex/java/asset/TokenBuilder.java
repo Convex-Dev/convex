@@ -29,7 +29,7 @@ public class TokenBuilder {
 	
 	/**
 	 * Creates a TokenBuilder from the current config specifying the given amount of token supply
-	 * @param supply
+	 * @param supply Supply for new token
 	 * @return Updated TokenBuilder
 	 */
 	public TokenBuilder withSupply(long supply) {

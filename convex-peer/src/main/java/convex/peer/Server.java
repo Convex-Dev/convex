@@ -317,7 +317,6 @@ public class Server implements Closeable {
 	 *
 	 * @param config Server configuration map. Will be defensively copied.
 	 *
-	 * @param event Event interface where the server will send information about the peer
 	 * @return New Server instance
 	 * @throws IOException If an IO Error occurred establishing the Peer
 	 * @throws TimeoutException If Peer creation timed out

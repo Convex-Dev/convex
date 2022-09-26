@@ -22,7 +22,7 @@ public class TestApplications {
 	
 	/**
 	 * Test main class for launch
-	 * @param args
+	 * @param args Command line arguments
 	 */
 	public static void main(String[] args) {
 		System.exit(args.length);

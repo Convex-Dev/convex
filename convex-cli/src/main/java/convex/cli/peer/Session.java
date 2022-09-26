@@ -19,7 +19,7 @@ public class Session {
 	 *
 	 * @param filename Filename of the session file to load.
 	 *
-	 * @throws IOException
+	 * @throws IOException If IO fails
 	 */
 	public void load(File filename) throws IOException  {
 		items.clear();

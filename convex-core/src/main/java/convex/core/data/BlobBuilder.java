@@ -124,8 +124,8 @@ public class BlobBuilder {
 	
 	/**
 	 * Takes a slice of the Blob currently under construction. May be more efficient than toBLob().slice(...).
-	 * @param start Start index of slice
-	 * @param length Length of slice
+	 * @param start Start index of slice (inclusive)
+	 * @param end End index of slice (exclusive)
 	 * @return Slice of Blob under construction
 	 */
 	public ABlob slice(long start, long end) {

@@ -13,8 +13,8 @@ public class Testing {
 
 	/**
 	 * Runs all tests in a forked context
-	 * @param ctx
-	 * @param resourceName
+	 * @param ctx Context in which to execute test code
+	 * @param resourceName Path to resource
 	 * @return Updates context after all test are run. This will be a new fork.
 	 */
 	public static Context<?> runTests(Context<?> ctx, String resourceName) {
