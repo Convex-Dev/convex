@@ -2514,6 +2514,10 @@ public class CoreTest extends ACVMTest {
 
 		// double-deploy should get different addresses
 		assertFalse(evalB("(let [cfn '(do 1)] (= (deploy cfn) (deploy cfn)))"));
+		
+		// Deploy failure should propagate out 
+		assertCastError(step("(deploy '(+ 1 :foo))"));
+		assertArityError(step("(deploy '(count))"));
 	}
 
 	@Test
