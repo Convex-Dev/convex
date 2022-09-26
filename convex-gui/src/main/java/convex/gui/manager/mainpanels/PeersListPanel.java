@@ -151,7 +151,11 @@ public class PeersListPanel extends JPanel {
 		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
 			PeerView p = peerList.getElementAt(i);
-			p.peerServer.close();
+			try {
+				p.peerServer.close();
+			} catch (Exception e) {
+				// ignore
+			}
 		}
 	}
 

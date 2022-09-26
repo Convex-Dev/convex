@@ -140,4 +140,9 @@ public class ConvexLocal extends Convex {
 		return getState().getAccount(addr).getSequence();
 	}
 
+	@Override
+	public String toString() {
+		return "Local Convex instance on "+server.getHostAddress();
+	}
+
 }

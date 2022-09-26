@@ -843,5 +843,8 @@ public abstract class Convex {
 	 * @throws TimeoutException If initial status request times out
 	 */
 	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
+	
+	@Override 
+	public abstract String toString();
 
 }

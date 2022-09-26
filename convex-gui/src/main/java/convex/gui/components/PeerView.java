@@ -2,6 +2,7 @@ package convex.gui.components;
 
 import java.net.InetSocketAddress;
 
+import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Peer;
 import convex.core.State;
@@ -19,7 +20,7 @@ import convex.peer.Server;
  * Peer may be either a local Server or remote.
  */
 public class PeerView {
-	public ConvexRemote peerConnection = null;
+	public Convex peerConnection = null;
 	public Server peerServer = null;
 
 	public StateModel<Peer> peerModel = new StateModel<>(null);
@@ -44,7 +45,7 @@ public class PeerView {
 			sb.append("\n");
 			sb.append("Connections: "+cm.getConnectionCount());
 		} else if (peerConnection != null) {
-			sb.append("Remote peer at: " + peerConnection.getRemoteAddress()+"\n");
+			sb.append(peerConnection.toString());
 		} else {
 			sb.append("Unknown");
 		}
@@ -73,12 +74,16 @@ public class PeerView {
 		if (peerConnection != null) peerConnection.close();
 	}
 
+	/**
+	 * Gets host Address, or null if not available
+	 * @return Host socket address
+	 */
 	public InetSocketAddress getHostAddress() {
 		// this is direct connection to a peer, so get its host address
 		if (peerServer != null) return peerServer.getHostAddress();
 
 		// need to get the remote address from the PeerConnection
-		return (InetSocketAddress) peerConnection.getRemoteAddress();
+		return ((ConvexRemote) peerConnection).getRemoteAddress();
 	}
 
 	public boolean isLocal() {

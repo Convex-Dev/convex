@@ -35,7 +35,7 @@ public class PeerWindow extends BaseWindow {
 	@Override
 	public String getTitle() {
 		try {
-			return "Peer view - " + peer.peerConnection.getRemoteAddress();
+			return "Peer view - " + peer.getHostAddress();
 		} catch (Exception e) {
 			return "Peer view - Unknown";
 		}

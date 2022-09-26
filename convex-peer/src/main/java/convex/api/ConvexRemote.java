@@ -281,4 +281,9 @@ public class ConvexRemote extends Convex {
 		convex.setConnection(c);
 		return convex;
 	}
+	
+	@Override
+	public String toString() {
+		return "Remote Convex instance at "+getRemoteAddress();
+	}
 }
