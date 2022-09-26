@@ -929,7 +929,7 @@ public class Etch {
 	/**
 	 * Writes the root data hash to the Store
 	 * @param h Hash value to write
-	 * @throws IOException
+	 * @throws IOException If IO Error occurs
 	 */
 	public synchronized void setRootHash(Hash h) throws IOException {
 		MappedByteBuffer mbb=seekMap(OFFSET_ROOT_HASH);

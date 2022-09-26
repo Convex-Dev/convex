@@ -107,7 +107,7 @@ public class PeersListPanel extends JPanel {
 
 	/**
 	 * Create the panel.
-	 * @param manager
+	 * @param manager PeerGUI instance
 	 */
 	public PeersListPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));

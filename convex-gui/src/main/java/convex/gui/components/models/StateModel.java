@@ -13,7 +13,7 @@ import javax.swing.SwingUtilities;
  * Fires a property changed event for the property "value" whenever it is
  * updated.
  * 
- * @param <T>
+ * @param <T> Type of State value
  */
 public class StateModel<T> {
 	

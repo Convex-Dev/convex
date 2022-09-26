@@ -7,15 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
-import java.security.SignatureException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
@@ -127,14 +122,10 @@ public class Ed25519Test {
 
 	/**
 	 * Example test values from: https://stackoverflow.com/questions/53921655/rebuild-of-ed25519-keys-with-bouncy-castle-java
-	 * @throws NoSuchAlgorithmException
-	 * @throws IOException
-	 * @throws InvalidKeySpecException
-	 * @throws InvalidKeyException
-	 * @throws SignatureException
+	 * @throws Exception on unexpected error
 	 */
 	@Test
-	public void testExample() throws NoSuchAlgorithmException, IOException, InvalidKeySpecException, InvalidKeyException, SignatureException {
+	public void testExample() throws Exception {
 
 		byte [] msg = "eyJhbGciOiJFZERTQSJ9.RXhhbXBsZSBvZiBFZDI1NTE5IHNpZ25pbmc".getBytes(StandardCharsets.UTF_8);
 

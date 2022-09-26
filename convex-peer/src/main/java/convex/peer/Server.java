@@ -762,7 +762,7 @@ public class Server implements Closeable {
 	/**
 	 * Adds an event to the inbound server event queue. May block.
 	 * @param event Signed event to add to inbound event queue
-	 * @throws InterruptedException
+	 * @throws InterruptedException If interrupted while waiting
 	 */
 	public void queueEvent(SignedData<?> event) throws InterruptedException {
 		eventQueue.put(event);

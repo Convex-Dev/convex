@@ -137,7 +137,7 @@ public class Convex {
 
 	/**
 	 * Sets this connection instance to use the specified keypair
-	 * @param keyPair
+	 * @param keyPair Key pair to use for this connection.
 	 */
 	public void setKeyPair(AKeyPair keyPair) {
 		this.keyPair=keyPair;

@@ -719,8 +719,8 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Gets the balance for the specified Address
-	 * @param address
-	 * @return BAlance in Convex Coins
+	 * @param address Address to check balance for
+	 * @return Balance in Convex Coins
 	 */
 	public long getBalance(Address address) {
 		AccountStatus as=getAccountStatus(address);

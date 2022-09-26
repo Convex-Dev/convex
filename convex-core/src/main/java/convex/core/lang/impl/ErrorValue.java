@@ -89,7 +89,7 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Stores the CVM local log at the point of the error
-	 * @param log
+	 * @param log Sets the CVM log value for this error
 	 */
 	public void addLog(ACell log) {
 		this.log=log;

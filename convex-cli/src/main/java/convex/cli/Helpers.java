@@ -62,7 +62,7 @@ public class Helpers {
 	 * @param sessionFilename Session filename to open and get the random port nummber.
 	 *
 	 * @return A random hostname or null if none can be found
-	 * @throws IOException
+	 * @throws IOException If IO error occurs
 	 *
 	 */
 	public static SessionItem getSessionItem(String sessionFilename) throws IOException {

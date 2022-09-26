@@ -233,8 +233,8 @@ public class PeerGUI extends JPanel {
 	 * @param address Address for connection
 	 * @param kp Key Pair for connection
 	 * @return Convex connection instance
-	 * @throws IOException
-	 * @throws TimeoutException 
+	 * @throws IOException If IO error occurs during connection attempt
+	 * @throws TimeoutException If attempt to connect times out
 	 */
 	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException {
 		InetSocketAddress host = getDefaultPeer().getHostAddress();

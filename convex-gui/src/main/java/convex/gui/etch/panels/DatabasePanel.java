@@ -33,7 +33,7 @@ public class DatabasePanel extends JPanel {
 	
 	/**
 	 * Create the panel.
-	 * @param explorer 
+	 * @param explorer EtchExplorer instance
 	 */
 	public DatabasePanel(EtchExplorer explorer) {
 		setPreferredSize(new Dimension(800,600));
