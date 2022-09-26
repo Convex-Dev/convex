@@ -2508,6 +2508,9 @@ public class CoreTest extends ACVMTest {
 		AccountStatus as = ctx.getAccountStatus(ca);
 		assertNotNull(as);
 		assertEquals(ca, eval(ctx, "ctr")); // defined address in environment
+		
+		// deployer is *caller* in deployed code
+		assertTrue(evalB("(= *address* (let [ad (deploy '(def c *caller*))] ad/c))"));
 
 		// initial deployed state
 		assertEquals(0L, as.getBalance());
