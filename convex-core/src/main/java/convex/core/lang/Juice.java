@@ -184,6 +184,18 @@ public class Juice {
 	 * Juice for a transfer execution. Some account updates
 	 */
 	public static final long TRANSFER = 200;
+	
+	/**
+	 * Base juice for any signed transaction
+	 */
+	public static final long TRANSACTION_BASE = 1000;
+	
+	/**
+	 * Juice per byte for any signed transaction
+	 */
+	public static final long TRANSACTION_PER_BYTE = 5;
+
+
 
 	public static final long SIMPLE_MACRO = 200;
 
