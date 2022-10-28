@@ -75,7 +75,7 @@ public class LocalStart implements Runnable {
 				keyPairList.add(keyPair);
 			}
 		}
-		int left=keyPairList.size()-n;
+		int left=n-keyPairList.size();
 		if (left>0) {
 			log.warn("Insufficient key pairs specified. Additional keypairs will be generated");
 		
