@@ -16,7 +16,7 @@ import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 
 /**
- * Op for executing a sequence of child operations in order
+ * Op for executing a sequence of child operations in order in query mode (no state changes)
  *
  * "Design is to take things apart in such a way that they can be put back
  * together" 
