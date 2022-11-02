@@ -15,11 +15,14 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
@@ -34,6 +37,7 @@ import convex.core.lang.ops.Lambda;
 import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Set;
 import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
 
@@ -148,6 +152,15 @@ public class OpsTest extends ACVMTest {
 		Context<Address> c2 = c.execute(op);
 		assertEquals(c2.getAddress(), c2.getResult());
 
+		doOpTest(op);
+	}
+	
+	@Test
+	public void testSet() throws BadFormatException {
+		AOp<Address> op = Set.create(45, Constant.nil());
+		Blob expectedEncoding=Blob.fromHex("cc0c2dcc0100");
+		assertEquals(expectedEncoding,op.getEncoding());
+		assertEquals(op,Format.read(expectedEncoding));
 		doOpTest(op);
 	}
 

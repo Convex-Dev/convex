@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fix for printing of single quotes (see #407)
 - Fixed most Javadoc warnings
+- Fixed issue with encoding of `set!` Op
 
 ## [0.7.9] - 2022-09-22
 ### Fixed

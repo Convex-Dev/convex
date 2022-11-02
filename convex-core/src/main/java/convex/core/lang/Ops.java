@@ -14,6 +14,7 @@ import convex.core.lang.ops.Let;
 import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
+import convex.core.lang.ops.Set;
 import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
 
@@ -78,6 +79,8 @@ public class Ops {
 			return Let.read(bb,true);
 		case Ops.LOCAL:
 			return Local.read(bb);
+		case Ops.SET:
+			return Set.read(bb);
 
 		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
 		default:

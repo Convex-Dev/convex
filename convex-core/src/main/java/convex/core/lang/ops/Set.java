@@ -18,7 +18,7 @@ import convex.core.lang.Ops;
 import convex.core.util.Errors;
 
 /**
- * Op to set a lexical value in the local execution context.
+ * Op to set a lexical value in the local execution context. i.e. `set!`
  *
  * @param <T> Result type of Op
  */
@@ -40,7 +40,7 @@ public class Set<T extends ACell> extends AOp<T> {
 	}
 
 	/**
-	 * Creates special Op for the given opCode
+	 * Creates Set Op for the given opCode
 	 * 
 	 * @param position Position in lexical value vector
 	 * @param op Op to calculate new value
@@ -77,6 +77,7 @@ public class Set<T extends ACell> extends AOp<T> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLCLong(bs, pos, position);
+		pos = op.encode(bs,pos);
 		return pos;
 	}
 
@@ -119,7 +120,7 @@ public class Set<T extends ACell> extends AOp<T> {
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("(set! %");
-		sb.append(Long.toString(limit));
+		sb.append(Long.toString(position));
 		sb.append(' ');
 		if (!op.getValue().print(sb, limit)) return false;
 		sb.append(')');
