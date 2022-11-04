@@ -408,9 +408,9 @@ public class Belief extends ARecord {
 	}
 
 	/**
-	 * Gets an ordered list of new blocks from a collection of Chains. Ordering is a
+	 * Gets an ordered list of new blocks from a collection of orderings. Ordering is a
 	 * partial order based on when a block is first observed. This is an important
-	 * heuristic (thou to avoid re-ordering new blocks from the same peer.
+	 * heuristic (to avoid re-ordering new blocks from the same peer).
 	 */
 	private static ArrayList<SignedData<Block>> collectNewBlocks(Collection<AVector<SignedData<Block>>> orders, long consensusPoint) {
 		// We want to preserve order, remove duplicates
@@ -612,7 +612,7 @@ public class Belief extends ARecord {
 	 * Gets the Order for the current peer specified by a MergeContext in this
 	 * Belief
 	 * 
-	 * @param mc
+	 * @param mc Merge context
 	 * @return Order for current Peer, or null if not found
 	 * @throws BadSignatureException 
 	 */
