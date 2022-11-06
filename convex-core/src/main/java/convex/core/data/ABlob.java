@@ -162,7 +162,7 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	 */
 	public final Hash computeHash(MessageDigest digest) {
 		updateDigest(digest);
-		return Hash.createFromDigest(digest);
+		return Hash.wrap(digest.digest());
 	}
 
 	protected abstract void updateDigest(MessageDigest digest);

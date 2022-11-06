@@ -103,15 +103,6 @@ public class Hash extends AArrayBlob {
 	}
 	
 	/**
-	 * Creates a Hash instance from the given message digest. 
-	 * @param digest MessageDigest instance. Will be reset.
-	 * @return New Hash instance
-	 */
-	public static Hash createFromDigest(MessageDigest digest) {
-		return wrap(digest.digest());
-	}
-	
-	/**
 	 * Get the first 32 bits of this Hash. Used for Java hashCodes
 	 * @return Int representing the first 32 bits
 	 */
