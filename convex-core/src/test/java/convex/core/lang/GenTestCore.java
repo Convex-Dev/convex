@@ -1,13 +1,12 @@
 package convex.core.lang;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import static convex.test.Assertions.*;
 
 import org.junit.runner.RunWith;
 
@@ -33,7 +32,6 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMByte;
-import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.test.generators.AddressGen;
@@ -171,7 +169,6 @@ public class GenTestCore {
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(ca).toString());
 		assertSame(CVMByte.create(v),RT.castByte(ca));
-		assertCVMEquals(CVMChar.create(v),RT.toCharacter(ca));
 		assertCVMEquals(v+1,RT.inc(ca));
 		assertCVMEquals(v-1,RT.dec(ca));
 		assertCVMEquals(0,RT.compare(a,(Long)v));

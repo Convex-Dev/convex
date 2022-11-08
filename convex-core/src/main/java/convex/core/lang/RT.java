@@ -713,21 +713,6 @@ public class RT {
 		return CVMByte.create((byte) l.longValue());
 	}
 
-	/**
-	 * Casts a value to a Character via a Long to get a Unicode 32-bit code point
-	 * 
-	 * @param a Value to cast
-	 * @return CVMChar value, or null if cast fails
-	 */
-	public static CVMChar toCharacter(ACell a) {
-		if (a instanceof CVMChar)
-			return (CVMChar) a;
-		CVMLong l = castLong(a);
-		if (l == null)
-			return null;
-		return CVMChar.create(l.longValue());
-	}
-
 	private static long longValue(ACell a) {
 		if (a instanceof APrimitive)
 			return ((APrimitive) a).longValue();

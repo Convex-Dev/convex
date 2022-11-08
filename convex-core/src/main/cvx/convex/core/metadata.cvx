@@ -364,7 +364,8 @@
 
  char
  {:doc {:description "Casts a value to a Character. Discards high bits of larger integer types."
-        :errors      {:CAST "If the argument is not castable to a character."}
+        :errors      {:CAST "If the argument type is not castable to a character."
+                      :ARGUMENT "If the character is outside valid Unicode range"}
         :examples    [{:code "(char 97)"}]
         :signature   [{:params [x]
                        :return Character}]}}

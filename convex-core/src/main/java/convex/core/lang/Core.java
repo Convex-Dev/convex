@@ -1696,9 +1696,18 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMChar result = RT.toCharacter(a);
-			if (result == null) return context.withCastError(0,args, Types.CHARACTER);
-
+			CVMChar result;
+			if (a instanceof CVMChar) {
+				result= (CVMChar) a;
+			} else {
+				CVMLong l = RT.ensureLong(a);
+				if (l == null)
+					return context.withCastError(0,args, Types.CHARACTER);
+				long cp=l.longValue();
+				result=CVMChar.create(cp);
+				if (result == null) 
+					return context.withArgumentError("Invalid Unicode code point: "+cp);
+			}
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
