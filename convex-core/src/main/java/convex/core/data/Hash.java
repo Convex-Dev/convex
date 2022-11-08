@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
 
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
@@ -139,10 +138,6 @@ public class Hash extends AArrayBlob {
 	 */
 	public static Hash parse(String s) {
 		return wrap(Blobs.parse(s));
-	}
-
-	public static Hash wrap(AArrayBlob data, int offset, int length) {
-		return wrap(data.store, data.offset + offset);
 	}
 	
 	/**
