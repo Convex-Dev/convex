@@ -293,13 +293,13 @@ public class State extends ARecord {
 			state = state.withGlobals(newGlbs);
 		}
 
-		state = state.applyScheduledTransactions(b);
+		state = state.applyScheduledTransactions();
 
 		return state;
 	}
 
 	@SuppressWarnings("unchecked")
-	private State applyScheduledTransactions(Block b) {
+	private State applyScheduledTransactions() {
 		long tcount = 0;
 		BlobMap<ABlob, AVector<ACell>> sched = this.schedule;
 		CVMLong timestamp = this.getTimeStamp();
