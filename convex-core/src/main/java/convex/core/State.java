@@ -285,6 +285,13 @@ public class State extends ARecord {
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;
+		state = applyTimeUpdate(b);
+		state = state.applyScheduledTransactions();
+		return state;
+	}
+	
+	private State applyTimeUpdate(Block b) {
+		State state = this;
 		AVector<ACell> glbs = state.globals;
 		long ts=((CVMLong)glbs.get(0)).longValue();
 		long bts = b.getTimeStamp();
@@ -292,9 +299,6 @@ public class State extends ARecord {
 			AVector<ACell> newGlbs=glbs.assoc(0,CVMLong.create(bts));
 			state = state.withGlobals(newGlbs);
 		}
-
-		state = state.applyScheduledTransactions();
-
 		return state;
 	}
 
