@@ -1640,7 +1640,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.of(1L,3L),eval("(merge {1 2} {1 3})"));
 		assertEquals(Maps.of(1L,3L),eval("(merge nil {1 2} nil {1 3} nil)"));
 		
+		// Blobmap handling
 		assertEquals(BlobMaps.empty(), eval("(merge (blob-map) nil)"));
+		assertEquals(BlobMaps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge (blob-map 0x01 1) (blob-map 0x01 2))"));
+		assertEquals(Maps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge {0x01 1} (blob-map 0x01 2))"));
+		assertEquals(BlobMaps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge (blob-map 0x01 1) {0x01 2})"));
 
 		assertCastError(step("(merge [])"));
 		assertCastError(step("(merge {} [1 2 3])"));
