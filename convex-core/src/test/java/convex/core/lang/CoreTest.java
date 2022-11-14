@@ -164,6 +164,8 @@ public class CoreTest extends ACVMTest {
 		
 		assertCastError(step("(byte nil)"));
 		assertCastError(step("(byte :foo)"));
+		assertCastError(step("(byte 0x)")); // can't cast empty blob
+		assertCastError(step("(byte #13)"));
 
 		assertArityError(step("(byte)"));
 		assertArityError(step("(byte nil nil)")); // arity before cast
@@ -1672,11 +1674,14 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testDouble() {
 		assertEquals(-13.0,evalD("(double -13)"));
-		assertEquals(1.0,evalD("(double true)")); // ?? cast risky? see #344
+		// TODO: double check with #344
+		// assertEquals(1.0,evalD("(double true)")); 
 
 		assertEquals(255.0,evalD("(double (byte -1))")); // byte should be 0-255
 
 		assertCastError(step("(double :foo)"));
+		assertCastError(step("(double #7)"));
+		assertCastError(step("(double true)")); // doesn't transitively cast
 
 		assertArityError(step("(double)"));
 		assertArityError(step("(double :foo :bar)"));
@@ -1789,10 +1794,16 @@ public class CoreTest extends ACVMTest {
 
 		// add values, indexing into map entries as vectors
 		assertEquals(10.0, evalD("(reduce (fn [acc me] (+ acc (me 1))) 0.0 {:a 1, :b 2, 107 3, nil 4})"));
+		
 		// reduce over map, destructuring keys and values
 		assertEquals(100.0, evalD(
 				"(reduce (fn [acc [k v]] (let [x (double (v nil))] (+ acc (* x x)))) 0.0 {true {nil 10}})"));
 
+		// reduce over BlobMap should be in order
+		assertEquals(12.0, evalD(
+				"(reduce (fn [acc [k v]] (let [x (double v)] (+ (* acc acc) x))) 0.0 (blob-map 0x 1 0x01 2 0x02 3))"));
+		
+		
 		assertEquals(Lists.of(3,2,1), eval("(reduce conj '() '(1 2 3))"));
 
 		// 2-arg reduce forms

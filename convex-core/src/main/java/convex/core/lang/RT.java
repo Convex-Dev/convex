@@ -631,7 +631,7 @@ public class RT {
 		if (a instanceof CVMDouble)
 			return (CVMDouble) a;
 
-		CVMLong l = castLong(a);
+		CVMLong l = ensureLong(a);
 		if (l == null)
 			return null;
 		return l.toDouble();
@@ -699,7 +699,7 @@ public class RT {
 	/**
 	 * Explicitly converts a numerical value to a CVM Byte.
 	 * 
-	 * Doubles and floats will be converted if possible.
+	 * Doubles and floats will be converted if possible. Takes last byte of Blobs
 	 * 
 	 * @param a Value to cast
 	 * @return Long value, or null if not convertible
@@ -707,7 +707,14 @@ public class RT {
 	public static CVMByte castByte(ACell a) {
 		if (a instanceof CVMByte)
 			return (CVMByte) a;
-		CVMLong l = castLong(a);
+		if (a instanceof ABlob) {
+			ABlob b=(ABlob) a;
+			if (!b.isRegularBlob()) return null; // bail on Address etc.
+			long n=b.count();
+			if (n<=0) return null;
+			return b.get(n-1);
+		}
+		CVMLong l = ensureLong(a);
 		if (l == null)
 			return null;
 		return CVMByte.create((byte) l.longValue());
