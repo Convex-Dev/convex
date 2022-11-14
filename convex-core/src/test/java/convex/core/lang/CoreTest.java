@@ -132,7 +132,9 @@ public class CoreTest extends ACVMTest {
 		// Blob from characters
 		assertEquals(eval("0x0000000000001234"),eval("(blob (long \\u1234))")); // blob literal
 
-
+		// Address converts to regular Blob
+		assertEquals(eval("0x0000000000000013"),eval("(blob #19)")); 
+		
 		// Account key should be a Blob
 		assertEquals(eval("*key*"),eval("(blob *key*)"));
 		
@@ -345,6 +347,10 @@ public class CoreTest extends ACVMTest {
 		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
 		assertEquals(1L, evalL("(long true)"));
 		assertEquals(0L, evalL("(long false)"));
+		
+		// Address casts to equivalent Long value. See #431
+		assertEquals(1L, evalL("(long #1)"));
+		assertEquals(999L, evalL("(long #999)"));
 
 		assertArityError(step("(long)"));
 		assertArityError(step("(long 1 2)")); 
