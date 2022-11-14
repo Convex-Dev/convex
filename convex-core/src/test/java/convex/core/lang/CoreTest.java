@@ -1639,6 +1639,8 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Maps.of(1L,3L),eval("(merge {1 2} {1 3})"));
 		assertEquals(Maps.of(1L,3L),eval("(merge nil {1 2} nil {1 3} nil)"));
+		
+		assertEquals(BlobMaps.empty(), eval("(merge (blob-map) nil)"));
 
 		assertCastError(step("(merge [])"));
 		assertCastError(step("(merge {} [1 2 3])"));

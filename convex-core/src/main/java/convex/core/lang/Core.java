@@ -2296,13 +2296,13 @@ public class Core {
 			// TODO: handle blobmaps?
 
 			ACell arg0=args[0];
-			AHashMap<ACell,ACell> result=RT.ensureHashMap(arg0);
+			AMap<ACell,ACell> result=RT.ensureMap(arg0);
 			if (result == null) return context.withCastError(arg0, Types.MAP);
 
 			long juice=Juice.BUILD_DATA;
 			for (int i=1; i<n; i++) {
 				ACell argi=args[i];
-				AHashMap<ACell,ACell> argMap=RT.ensureHashMap(argi);
+				AMap<ACell,ACell> argMap=RT.ensureMap(argi);
 				if (argMap == null) return context.withCastError(argi, Types.MAP);
 
 				long size=argMap.count();
@@ -2311,6 +2311,7 @@ public class Core {
 				if (!context.checkJuice(juice)) return context.withJuiceError();
 
 				result=result.merge(argMap);
+				if (result == null) return context.withError(ErrorCodes.CAST,"Unable to merge");
 			}
 
 			return context.withResult(juice, result);

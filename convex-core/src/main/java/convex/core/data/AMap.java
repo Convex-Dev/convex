@@ -297,6 +297,26 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		return reduceEntries((acc, e) -> acc.conj(e), Vectors.empty());
 	}
 	
+	/**
+	 * Merge another map into this map. Replaces existing entries if they are
+	 * different.
+	 * 
+	 * O(n) in size of map to merge. Preserves the type of the current map.
+	 * 
+	 * @param m A map to merge into this map
+	 * @return The updated map, or null if convesrion fails
+	 */
+	public AMap<K, V> merge(AMap<K, V> m) {
+		AMap<K, V> result = this;
+		long n = m.count();
+		for (int i = 0; i < n; i++) {
+			result = result.assocEntry(m.entryAt(i));
+			if (result==null) return null;
+		}
+		return result;
+	}
+
+	
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override

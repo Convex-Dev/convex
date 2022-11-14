@@ -56,6 +56,12 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		}
 		return result;
 	}
+	
+	@Override
+	public AHashMap<K, V> merge(AMap<K, V> m) {
+		if (m instanceof AHashMap) return merge((AHashMap<K,V>)m);
+		return (AHashMap<K, V>) super.merge(m);
+	}
 
 	/**
 	 * Merge this map with another map, using the given function for each key that
