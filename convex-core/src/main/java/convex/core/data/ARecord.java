@@ -82,7 +82,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 	
 	/**
-	 * Gets a vector of values for this record, in format-determined order
+	 * Gets a vector of values for this Record, in format-determined order
 	 * 
 	 * @return Vector of Values
 	 */
