@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Better support for CI builds
+- Allow `merge` to work with BlobMaps
 
 ### Changed
 - General update of dependencies to most recent versions as of Sep 2022
