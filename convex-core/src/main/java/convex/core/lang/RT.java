@@ -26,6 +26,7 @@ import convex.core.data.Address;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
+import convex.core.data.IAssociative;
 import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
@@ -1543,7 +1544,7 @@ public class RT {
 	public static ADataStructure<?> ensureAssociative(ACell o) {
 		if (o == null)
 			return Maps.empty();
-		if (o instanceof ADataStructure)
+		if (o instanceof IAssociative)
 			return (ADataStructure<?>) o;
 		return null;
 	}

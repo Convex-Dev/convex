@@ -1294,6 +1294,7 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(disj [] 1)"));
 		assertCastError(step("(disj (blob-map) 0x)"));
+		
 		assertArityError(step("(disj)"));
 	}
 

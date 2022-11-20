@@ -28,7 +28,7 @@ import convex.core.util.Utils;
  * @param <V> Type of values
  */
 public abstract class AMap<K extends ACell, V extends ACell> extends ADataStructure<MapEntry<K, V>>
-		implements Map<K, V> {
+		implements Map<K, V>, IAssociative<K,V> {
 
 	protected AMap(long count) {
 		super(count);

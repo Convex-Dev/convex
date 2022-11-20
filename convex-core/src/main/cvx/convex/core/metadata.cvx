@@ -481,14 +481,14 @@
 
 
  disj
- {:doc {:description "Removes the specified key(s) from a set. Nil is treated as the empty Set."
+ {:doc {:description "Removes the specified key(s) from a set. `nil` is treated as the empty Set."
         :errors      {:CAST "If the first argument is not a set."}
         :examples    [{:code "(disj #{1 2 3} 1)"}]
         :signature   [{:params [coll key]}]}}
 
 
  dissoc
- {:doc {:description "Removes entries with the specified key(s) from a Map (including BlobMaps)."
+ {:doc {:description "Removes entries with the specified key(s) from a Map (including BlobMaps). `nil` is treated as the empty Map."
         :errors      {:CAST "If the first argument is not a Map."}
         :examples    [{:code "(dissoc {1 2 3 4} 3)"}]
         :signature   [{:params [coll & keys]

@@ -18,7 +18,7 @@ import convex.core.lang.RT;
  * Tests for general collection types
  */
 public class CollectionsTest {
-
+	
 	/**
 	 * Generic tests for any sequence
 	 * @param a Any Sequence Value
