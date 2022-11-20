@@ -285,18 +285,17 @@ public class State extends ARecord {
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;
-		state = applyTimeUpdate(b);
+		state = applyTimeUpdate(b.getTimeStamp());
 		state = state.applyScheduledTransactions();
 		return state;
 	}
 	
-	private State applyTimeUpdate(Block b) {
+	private State applyTimeUpdate(long newTimestamp) {
 		State state = this;
 		AVector<ACell> glbs = state.globals;
 		long ts=((CVMLong)glbs.get(0)).longValue();
-		long bts = b.getTimeStamp();
-		if (bts > ts) {
-			AVector<ACell> newGlbs=glbs.assoc(0,CVMLong.create(bts));
+		if (newTimestamp > ts) {
+			AVector<ACell> newGlbs=glbs.assoc(0,CVMLong.create(newTimestamp));
 			state = state.withGlobals(newGlbs);
 		}
 		return state;
