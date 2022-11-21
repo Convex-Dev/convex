@@ -1290,6 +1290,7 @@ public class CoreTest extends ACVMTest {
 		
 		// nil is treated as empty set
 		assertSame(Sets.empty(), eval("(disj nil 1)"));
+		assertSame(Sets.empty(), eval("(disj nil 1 2 3)"));
 		assertSame(Sets.empty(), eval("(disj nil nil)"));
 
 		assertCastError(step("(disj [] 1)"));
