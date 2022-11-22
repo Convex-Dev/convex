@@ -217,6 +217,7 @@ public class Init {
 			s = doActorDeploy(s, "asset/box.cvx");
 			s = doActorDeploy(s, "asset/multi-token.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
+			s = doActorDeploy(s, "convex/did.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")

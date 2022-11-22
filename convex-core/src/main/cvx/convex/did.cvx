@@ -1,0 +1,8 @@
+'convex.did
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Gets a DID document for a given account."
+                :signature   [{:params [addr]}]}}
+  resolve
+  [addr])

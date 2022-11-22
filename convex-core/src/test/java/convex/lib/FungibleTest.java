@@ -23,8 +23,6 @@ import convex.core.lang.TestState;
 
 public class FungibleTest extends ACVMTest {
 
-	static final AKeyPair TEST_KEYPAIR=AKeyPair.generate();
-	
 	private Address VILLAIN=InitTest.VILLAIN;
 
 	private Address fungible;
