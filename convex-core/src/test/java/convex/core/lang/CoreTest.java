@@ -2192,14 +2192,23 @@ public class CoreTest extends ACVMTest {
 			assertUndeclaredError(step(ctx2, "mylib/bar"));
 			assertTrue(evalB(ctx2,"(map? (lookup-meta mylib 'foo))"));
 		}
+		
+		{ // tests with a named import
+			assertUndeclaredError(step(ctx, "convex.core"));
+			Context<?> ctx2=step(ctx,"(import convex.core)");
+			assertEquals(Init.CORE_ADDRESS ,ctx2.getResult());
+			assertEquals(Init.CORE_ADDRESS, eval(ctx2, "convex.core"));
+		}
 
 		{ // test deploy and CNS import in a single form. See #107
 			Context<?> ctx2=step(ctx,"(do (let [addr (deploy nil)] (call *registry* (cns-update 'foo addr)) (import foo :as foo2)))");
 			assertNotError(ctx2);
 		}
+		
+		// can't import 1-arity unless a symbol
+		assertAssertError(step(ctx,"(import #10)"));
 
 		assertArityError(step(ctx,"(import)"));
-		assertArityError(step(ctx,"(import ~lib)"));
 		assertArityError(step(ctx,"(import ~lib :as)"));
 		assertArityError(step(ctx,"(import ~lib :as mylib :blah)"));
 	}

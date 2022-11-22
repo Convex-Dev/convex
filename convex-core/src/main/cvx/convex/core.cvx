@@ -554,7 +554,12 @@
           :examples    [{:code "(import some.library :as alias)"}]
           :signature   [{:params [& args]}]}}
 
-  [addr as sym]
+  ([addr]
+    (if (symbol? addr)
+      `(import ~addr :as ~addr)
+      (fail "import: alias must be a symbol")))
+  
+  ([addr as sym]
 
   (let [code (cond (symbol? addr)
                `(or (call* *registry*
@@ -571,7 +576,7 @@
     (assert (= :as
                as))
     `(def ~sym
-          ~code)))
+          ~code))))
 
 
 

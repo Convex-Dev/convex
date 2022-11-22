@@ -10,7 +10,7 @@ import convex.core.lang.ACVMTest;
 public class DIDTest extends ACVMTest {
 
 	@Test public void testLibrary() {
-		Address did=eval("(import convex.did :as did)");
+		Address did=eval("(import convex.did)");
 		assertNotNull(did);
 	}
 }

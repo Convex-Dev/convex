@@ -66,7 +66,6 @@ public class AliasTest {
 		assertNotNull(lib);
 		
 		assertArityError(step(ctx,"(import)"));
-		assertArityError(step(ctx,"(import ~lib)"));
 		assertArityError(step(ctx,"(import ~lib :as)"));
 		assertArityError(step(ctx,"(import ~lib :as foo bar)"));
 		
