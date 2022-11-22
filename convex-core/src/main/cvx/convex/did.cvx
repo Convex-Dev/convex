@@ -5,4 +5,7 @@
     :doc       {:description "Gets a DID document for a given account."
                 :signature   [{:params [addr]}]}}
   resolve
-  [addr])
+  [addr]
+  (if-let [rec (get-holding addr)]
+    (let [[ddoc cont] rec]
+      ddo)))
