@@ -1,0 +1,12 @@
+;; Deploy a new token 
+
+(def my-token (deploy (fungible/build-token {:supply 1000000})))
+
+;; Create new new markey
+
+(torus/create-market my-token)
+
+
+;; Buy
+
+(torus/buy USD 10000 my-token)
