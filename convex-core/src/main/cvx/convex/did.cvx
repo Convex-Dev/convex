@@ -1,11 +1,34 @@
 'convex.did
 
+(import convex.trust :as trust)
+
+;; A map of ID to [ddo-document controller]
+(def dids {})
+
+(def counter 1)
+
 (defn 
   ^{:callable? true
     :doc       {:description "Gets a DID document for a given account."
                 :signature   [{:params [addr]}]}}
   resolve
-  [addr]
-  (if-let [rec (get-holding addr)]
+  [id]
+  (if-let [rec (get dids id)]
     (let [[ddoc cont] rec]
-      ddo)))
+      ddoc)))
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Creates a new DID. Controller will be caller unless otherwise specified."
+                :signature   [{:params []}
+                              {:params [controller]}]}}
+  create
+  ([]
+    (recur *caller*))
+  ([controller]
+    (let [id counter
+          controller (address controller)
+          rec ["" controller]]
+      (def dids (assoc dids id rec))
+      (def counter (inc counter))
+      id)))
