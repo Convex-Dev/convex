@@ -9,7 +9,7 @@
 
 (defn 
   ^{:callable? true
-    :doc       {:description "Gets a DID document for a given account."
+    :doc       {:description "Gets a DID document for a given account. Returns nil if ID is invalid or DDO does not exist."
                 :signature   [{:params [addr]}]}}
   resolve
   [id]
@@ -32,3 +32,34 @@
       (def dids (assoc dids id rec))
       (def counter (inc counter))
       id)))
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Creates a new DID. Controller will be caller unless otherwise specified."
+                :signature   [{:params []}
+                              {:params [controller]}]}}
+  create
+  ([]
+    (recur *caller*))
+  ([controller]
+    (let [id counter
+          controller (address controller)
+          rec ["" controller]]
+      (def dids (assoc dids id rec))
+      (def counter (inc counter))
+      id)))
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Updates a DDO for a DID."
+                :signature   [{:params [id ddo]}]}}
+  update
+ ([id ddo]
+   (assert (or (nil? ddo) (str? ddo)))
+     (let [rec (get dids id)
+           _ (or rec (error "Invalid DID"))
+           cont (get rec 1)
+           _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
+           rec (assoc rec 0 ddo)]
+       (def dids (assoc dids id rec))
+       rec)))

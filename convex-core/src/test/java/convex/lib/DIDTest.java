@@ -1,5 +1,6 @@
 package convex.lib;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -8,11 +9,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 
 public class DIDTest extends ACVMTest {
 
@@ -34,13 +39,22 @@ public class DIDTest extends ACVMTest {
 		CVMLong id=(CVMLong) ctx.getResult();
 		assertNotNull(id);
 		ACell dids=eval(ctx,"did/dids");
-		assertTrue(evalB(ctx,"(contains-key? did/dids "+id.longValue()+")"));
+		assertTrue(dids instanceof AMap);
+		assertTrue(evalB(ctx,"(contains-key? did/dids "+id+")"));
 		
 		// check another DID created is different
 		assertNotEquals(id,eval(ctx,"(call did (create))"));
 		
-		ctx=step(ctx,"(call did (resolve "+id.longValue()+"))");
-		assertSame(Strings.EMPTY,ctx.getResult()); // should be initially empty
+		// should be initially empty
+		ctx=step(ctx,"(call did (resolve "+id+"))");
+		assertSame(Strings.EMPTY,ctx.getResult()); 
+		
+		// should be initially empty
+		AString ddo=Strings.create("{}");
+		ctx=step(ctx,"(call did (update "+id.longValue()+" "+RT.print(ddo)+"))");
+		assertTrue(ctx.getResult() instanceof AVector);
+		ctx=step(ctx,"(call did (resolve "+id+"))");
+		assertEquals(ddo,ctx.getResult()); 
 		
 	}
 
