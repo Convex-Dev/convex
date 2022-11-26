@@ -1,11 +1,18 @@
 'convex.did
 
 ;; This is an implementation of the W3C DID specification for a Verifiable Data Registry on Convex
-;; The required methods are Create, Read, Update and Deactivate
+;;
+;; This registry can be used to implement a DID method such as "did:convex:101"
+;;
+;; Notes
+;; - IDs are sequentially allocated integers. mapping human readable names to ID is possible but outside of scope of this library
+;; - The required operations Create, Read, Update and Deactivate are implemeted on-chain
+;; - We regard a nil DDO as deactivated
+;; - Records are internally stored as a Vector [ddo-document controller created updated]
 
 (import convex.trust :as trust)
 
-;; A map of ID to [ddo-document controller created updated]
+;; A map of ID to record vectors
 (def dids {})
 
 (def counter 1)
