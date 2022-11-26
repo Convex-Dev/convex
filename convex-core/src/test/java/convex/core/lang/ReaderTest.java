@@ -51,6 +51,8 @@ public class ReaderTest {
 		// : is currently a valid symbol character
 		assertEquals(Keyword.create("foo:bar"), Reader.read(":foo:bar"));
 
+		// keywords can start with more than one colon
+		assertEquals(Keyword.create(":foo"), Reader.read("::foo"));
 	}
 
 	@Test

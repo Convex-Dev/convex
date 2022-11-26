@@ -148,7 +148,7 @@ QUOTING: '\'' | '`' | '~' | '~@';
 
 
 KEYWORD:
-   ':' NAME;
+   ':'+ NAME;
 
 SYMBOL
     : NAME
