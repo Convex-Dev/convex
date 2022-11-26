@@ -1,6 +1,7 @@
 package convex.lib;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -82,8 +83,4 @@ public class DIDTest extends ACVMTest {
 	}
 
 
-	private void assertNotEquals(CVMLong id, ACell eval) {
-		// TODO Auto-generated method stub
-		
-	}
 }
