@@ -18,6 +18,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
+import convex.test.Assertions;
 
 public class DIDTest extends ACVMTest {
 
@@ -51,12 +52,35 @@ public class DIDTest extends ACVMTest {
 		
 		// should be initially empty
 		AString ddo=Strings.create("{}");
-		ctx=step(ctx,"(call did (update "+id.longValue()+" "+RT.print(ddo)+"))");
+		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
 		assertTrue(ctx.getResult() instanceof AVector);
 		ctx=step(ctx,"(call did (resolve "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
 		
 	}
+	
+	@Test public void testUpdateMonitor() {
+		Context<ACell> ctx=step("(import convex.did :as did)");
+		
+		// Set up DDO controlled by HERO
+		ctx=step(ctx,"(call did (create))");
+		CVMLong id=(CVMLong) ctx.getResult();
+		AString ddo=Strings.create("{}");
+		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
+		
+		// Switch to VILLAIN
+		ctx=ctx.forkWithAddress(VILLAIN);
+		ctx=step(ctx,"(import convex.did :as did)");
+		
+		// Attempt to change DDO
+		ctx=step(ctx,"(call did (update "+id+" \"PWND\"))");
+		Assertions.assertError(ctx);
+		
+		// Original DDO should be unchanged
+		ctx=step(ctx,"(call did (resolve "+id+"))");
+		assertEquals(ddo,ctx.getResult()); 
+	}
+
 
 	private void assertNotEquals(CVMLong id, ACell eval) {
 		// TODO Auto-generated method stub
