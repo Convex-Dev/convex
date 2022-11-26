@@ -487,9 +487,9 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test
 	public void testMultiColonKeyword () {
-		// TODO see #436 for regression case
-		// assertNotEquals(eval("'foo"),eval("'::foo"));
-		// assertNotEquals(eval("'foo"),eval("'::foo"));
+		// see #436 for regression case
+		assertNotEquals(eval("'foo"),eval("::foo"));
+		assertNotEquals(eval(":foo"),eval("::foo"));
 	}
 
 	@Test
