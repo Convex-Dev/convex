@@ -1,5 +1,8 @@
 'convex.did
 
+;; This is an implementation of the W3C DID specification for a Verifiable Data Registry on Convex
+;; The required methods are Create, Read, Update and Deactivate
+
 (import convex.trust :as trust)
 
 ;; A map of ID to [ddo-document controller]
@@ -11,7 +14,7 @@
   ^{:callable? true
     :doc       {:description "Gets a DID document for a given account. Returns nil if ID is invalid or DDO does not exist."
                 :signature   [{:params [addr]}]}}
-  resolve
+  read
   [id]
   (if-let [rec (get dids id)]
     (let [[ddoc cont] rec]
@@ -63,3 +66,11 @@
            rec (assoc rec 0 ddo)]
        (def dids (assoc dids id rec))
        rec)))
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Deactivates a DID."
+                :signature   [{:params [id]}]}}
+  deactivate
+  ([id]
+    (update id nil)))

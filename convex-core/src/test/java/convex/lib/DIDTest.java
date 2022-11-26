@@ -30,7 +30,7 @@ public class DIDTest extends ACVMTest {
 	
 	@Test public void testResolveNotThere() {
 		Context<ACell> ctx=step("(import convex.did :as did)");
-		assertNull(eval(ctx,"(did/resolve 5875875865)"));
+		assertNull(eval(ctx,"(call did (read 5875875865))"));
 	}
 	
 	@Test public void testCreate() {
@@ -48,14 +48,14 @@ public class DIDTest extends ACVMTest {
 		assertNotEquals(id,eval(ctx,"(call did (create))"));
 		
 		// should be initially empty
-		ctx=step(ctx,"(call did (resolve "+id+"))");
+		ctx=step(ctx,"(call did (read "+id+"))");
 		assertSame(Strings.EMPTY,ctx.getResult()); 
 		
 		// should be initially empty
 		AString ddo=Strings.create("{}");
 		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
 		assertTrue(ctx.getResult() instanceof AVector);
-		ctx=step(ctx,"(call did (resolve "+id+"))");
+		ctx=step(ctx,"(call did (read "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
 		
 	}
@@ -78,8 +78,28 @@ public class DIDTest extends ACVMTest {
 		Assertions.assertError(ctx);
 		
 		// Original DDO should be unchanged
-		ctx=step(ctx,"(call did (resolve "+id+"))");
+		ctx=step(ctx,"(call did (read "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
+	}
+	
+	@Test public void testDeactivate() {
+		Context<ACell> ctx=step("(import convex.did :as did)");
+		
+		// Set up DDO controlled by HERO
+		ctx=step(ctx,"(call did (create))");
+		CVMLong id=(CVMLong) ctx.getResult();
+		AString ddo=Strings.create("{}");
+		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
+		
+		// DDO should exist
+		assertNotNull(eval(ctx,"(call did (read "+id+"))"));
+		
+		// Deactivate
+		ctx=step(ctx,"(call did (deactivate "+id+"))");
+		
+		// Original DDO should be unchanged
+		ctx=step(ctx,"(call did (read "+id+"))");
+		assertNull(ctx.getResult()); 
 	}
 
 
