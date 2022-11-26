@@ -5,7 +5,7 @@
 
 (import convex.trust :as trust)
 
-;; A map of ID to [ddo-document controller]
+;; A map of ID to [ddo-document controller created updated]
 (def dids {})
 
 (def counter 1)
@@ -17,8 +17,7 @@
   read
   [id]
   (if-let [rec (get dids id)]
-    (let [[ddoc cont] rec]
-      ddoc)))
+    (nth rec 0)))
 
 (defn 
   ^{:callable? true
@@ -31,23 +30,7 @@
   ([controller]
     (let [id counter
           controller (address controller)
-          rec ["" controller]]
-      (def dids (assoc dids id rec))
-      (def counter (inc counter))
-      id)))
-
-(defn 
-  ^{:callable? true
-    :doc       {:description "Creates a new DID. Controller will be caller unless otherwise specified."
-                :signature   [{:params []}
-                              {:params [controller]}]}}
-  create
-  ([]
-    (recur *caller*))
-  ([controller]
-    (let [id counter
-          controller (address controller)
-          rec ["" controller]]
+          rec ["" controller *timestamp* *timestamp*]]
       (def dids (assoc dids id rec))
       (def counter (inc counter))
       id)))
@@ -63,7 +46,9 @@
            _ (or rec (error "Invalid DID"))
            cont (get rec 1)
            _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
-           rec (assoc rec 0 ddo)]
+           rec (assoc rec 0 ddo)         ;; update DDO
+           rec (assoc rec 3 *timestamp*) ;; update timestamp
+           ]
        (def dids (assoc dids id rec))
        rec)))
 
