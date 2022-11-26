@@ -11,6 +11,7 @@ import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -482,6 +483,13 @@ public class CompilerTest extends ACVMTest {
 		// TODO: should we allow this? Technically just one vararg...
 		assertEquals (Vectors.of(1,2,3),eval("(let [[& &] [1 2 3]] &)"));
 
+	}
+	
+	@Test
+	public void testMultiColonKeyword () {
+		// TODO see #436 for regression case
+		// assertNotEquals(eval("'foo"),eval("'::foo"));
+		// assertNotEquals(eval("'foo"),eval("'::foo"));
 	}
 
 	@Test
