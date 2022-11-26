@@ -1103,7 +1103,7 @@ public class RT {
 	 */
 	public static <T extends ACell> AList<T> cons(T x, T y, T z, ACell xs) {
 		ASequence<T> nxs = RT.sequence(xs);
-		return nxs.cons(y).cons(x).cons(z);
+		return nxs.cons(z).cons(y).cons(x);
 	}
 
 	/**
