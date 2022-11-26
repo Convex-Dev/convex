@@ -30,15 +30,16 @@ public class DIDTest extends ACVMTest {
 		Context<ACell> ctx=step("(import convex.did :as did)");
 		
 		// create an id, should be entered in registry
-		ctx=step(ctx,"(did/create *address*)");
+		ctx=step(ctx,"(call did (create *address*))");
 		CVMLong id=(CVMLong) ctx.getResult();
 		assertNotNull(id);
-		assertTrue(evalB(ctx,"(contains-key? did/dids "+id+")"));
+		ACell dids=eval(ctx,"did/dids");
+		assertTrue(evalB(ctx,"(contains-key? did/dids "+id.longValue()+")"));
 		
 		// check another DID created is different
-		assertNotEquals(id,eval(ctx,"(did/create)"));
+		assertNotEquals(id,eval(ctx,"(call did (create))"));
 		
-		ctx=step(ctx,"(did/resolve "+id.longValue()+")");
+		ctx=step(ctx,"(call did (resolve "+id.longValue()+"))");
 		assertSame(Strings.EMPTY,ctx.getResult()); // should be initially empty
 		
 	}
