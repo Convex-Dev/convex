@@ -1,12 +1,21 @@
 package convex.core.lang.reader;
 
 import java.io.IOException;
+import java.io.Reader;
+import java.io.PushbackReader;
 import java.util.ArrayList;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.CommonTokenFactory;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.UnbufferedCharStream;
+import org.antlr.v4.runtime.UnbufferedTokenStream;
+import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.TokenSource;
+import org.antlr.v4.runtime.IntStream;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
@@ -433,31 +442,38 @@ public class AntlrReader {
 	}
 
 	public static ACell read(String s) {
-		return read(CharStreams.fromString(s));
+		return read(new PushbackReader(new java.io.StringReader(s)));
 	}
-	
-	public static ACell read(java.io.Reader r) throws IOException {
-		return read(CharStreams.fromReader(r));
-	}
-	
-	public static ACell read(CharStream cs) {
-		ConvexLexer lexer=new ConvexLexer(cs);
-		lexer.removeErrorListeners();
-		CommonTokenStream tokens = new CommonTokenStream(lexer);
-		ConvexParser parser = new ConvexParser(tokens);
-		parser.removeErrorListeners();
-		
-		ParseTree tree = parser.singleForm();
-		
-		CRListener visitor=new CRListener();
-		ParseTreeWalker.DEFAULT.walk(visitor, tree);
-		
-		ArrayList<ACell> top=visitor.popList();
-		if (top.size()!=1) {
-			throw new ParseException("Bad parse output: "+top);
-		}
-		
-		return top.get(0);
+
+
+	public static ACell read(PushbackReader rdr) {
+            try {
+			CharStream cs = new InteractiveCharStream(rdr);
+			ConvexLexer lexer=new ConvexLexer(cs);
+			lexer.removeErrorListeners();
+			lexer.setTokenFactory(new CommonTokenFactory(true));
+			TokenStream tokens = new InteractiveTokenStream(lexer);
+			ConvexParser parser = new ConvexParser(tokens);
+			parser.removeErrorListeners();
+
+			ParseTree tree = parser.form();
+
+			rdr.unread(cs.LA(1));
+
+			CRListener visitor=new CRListener();
+			ParseTreeWalker.DEFAULT.walk(visitor, tree);
+
+			ArrayList<ACell> top=visitor.popList();
+			if (top.size()!=1) {
+				throw new ParseException("Bad parse output: "+top);
+			}
+
+			return top.get(0);
+
+            } catch (IOException e) {
+				throw Utils.sneakyThrow(e);
+			}
+
 	}
 	
 	public static AList<ACell> readAll(String source) {
@@ -479,4 +495,62 @@ public class AntlrReader {
 		return Lists.create(top);
 	}
 
+
+}
+
+class InteractiveCharStream extends UnbufferedCharStream {
+
+	InteractiveCharStream(Reader input)
+	{
+		super(input);
+	}
+
+	@Override
+	public void consume() {
+
+		if (LA(1) == IntStream.EOF) {
+			throw new IllegalStateException("cannot consume EOF");
+		}
+
+		// buf always has at least data[p==0] in this method due to ctor
+		lastChar = data[p];   // track last char for LA(-1)
+		if (p == n-1 && numMarkers==0) {
+			n = 0;
+			p = -1; // p++ will leave this at 0
+			lastCharBufferStart = lastChar;
+		}
+
+		p++;
+		currentCharIndex++;
+		//sync(1);
+	}
+}
+
+class InteractiveTokenStream extends UnbufferedTokenStream<Token> {
+
+	InteractiveTokenStream(TokenSource tokenSource)
+	{
+		super(tokenSource);
+	}
+
+	@Override
+	public void consume() {
+		if (LA(1) == Token.EOF) {
+			throw new IllegalStateException("cannot consume EOF");
+		}
+
+		// buf always has at least tokens[p==0] in this method due to ctor
+		lastToken = tokens[p];   // track last token for LT(-1)
+
+		// if we're at last token and no markers, opportunity to flush buffer
+		if ( p == n-1 && numMarkers==0 ) {
+			n = 0;
+			p = -1; // p++ will leave this at 0
+			lastTokenBufferStart = lastToken;
+		}
+
+		p++;
+		currentTokenIndex++;
+		//sync(1);
+	}
 }

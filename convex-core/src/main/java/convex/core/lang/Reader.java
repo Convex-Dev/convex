@@ -60,7 +60,7 @@ public class Reader {
 	 * @param source Reader instance to get expression from
 	 * @return Parsed form (may be nil)
 	 */
-	public static ACell read(java.io.Reader source) throws IOException {
+	public static ACell read(java.io.PushbackReader source) throws IOException {
 		return AntlrReader.read(source);
 	}
 	

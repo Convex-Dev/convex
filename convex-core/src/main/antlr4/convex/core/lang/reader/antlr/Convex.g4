@@ -203,6 +203,6 @@ fragment
 COMMENT: ';' ~[\r\n]* ;
 
 TRASH
-    : ( WS | COMMENT ) -> channel(HIDDEN)
+    : ( WS | COMMENT ) -> skip
     ;
 
