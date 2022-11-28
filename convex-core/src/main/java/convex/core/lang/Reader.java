@@ -55,12 +55,13 @@ public class Reader {
 	}
 
 	/**
-	 * Parses an expression and returns a form as an Object
+	 * Parses an expression and returns a form as an Object, consuming the
+	 * entire source
 	 * 
 	 * @param source Reader instance to get expression from
 	 * @return Parsed form (may be nil)
 	 */
-	public static ACell read(java.io.PushbackReader source) throws IOException {
+	public static ACell read(java.io.Reader source) throws IOException {
 		return AntlrReader.read(source);
 	}
 	
@@ -74,5 +75,17 @@ public class Reader {
 	public static <R extends ACell> R read(String source) {
 		return (R) AntlrReader.read(source);
 	}
+
+    	/**
+	 * Parses an expression and returns a form as an Object. Leaves
+	 * remaining input on the source.
+	 * 
+	 * @param source PushbackReader instance to get expression from
+	 * @return Parsed form (may be nil)
+	 */
+	public static ACell readOne(java.io.PushbackReader source) throws IOException {
+		return AntlrReader.readOne(source);
+	}
+
 
 }

@@ -1,8 +1,6 @@
 package convex.core.lang.reader;
 
 import java.io.IOException;
-import java.io.Reader;
-import java.io.PushbackReader;
 import java.util.ArrayList;
 
 import org.antlr.v4.runtime.CharStream;
@@ -442,40 +440,33 @@ public class AntlrReader {
 	}
 
 	public static ACell read(String s) {
-		return read(new PushbackReader(new java.io.StringReader(s)));
+		return read(CharStreams.fromString(s));
 	}
 
-
-	public static ACell read(PushbackReader rdr) {
-            try {
-			CharStream cs = new InteractiveCharStream(rdr);
-			ConvexLexer lexer=new ConvexLexer(cs);
-			lexer.removeErrorListeners();
-			lexer.setTokenFactory(new CommonTokenFactory(true));
-			TokenStream tokens = new InteractiveTokenStream(lexer);
-			ConvexParser parser = new ConvexParser(tokens);
-			parser.removeErrorListeners();
-
-			ParseTree tree = parser.form();
-
-			rdr.unread(cs.LA(1));
-
-			CRListener visitor=new CRListener();
-			ParseTreeWalker.DEFAULT.walk(visitor, tree);
-
-			ArrayList<ACell> top=visitor.popList();
-			if (top.size()!=1) {
-				throw new ParseException("Bad parse output: "+top);
-			}
-
-			return top.get(0);
-
-            } catch (IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
-
+	public static ACell read(java.io.Reader r) throws IOException {
+		return read(CharStreams.fromReader(r));
 	}
-	
+
+	public static ACell read(CharStream cs) {
+		ConvexLexer lexer=new ConvexLexer(cs);
+		lexer.removeErrorListeners();
+		CommonTokenStream tokens = new CommonTokenStream(lexer);
+		ConvexParser parser = new ConvexParser(tokens);
+		parser.removeErrorListeners();
+
+		ParseTree tree = parser.singleForm();
+
+		CRListener visitor=new CRListener();
+		ParseTreeWalker.DEFAULT.walk(visitor, tree);
+
+		ArrayList<ACell> top=visitor.popList();
+		if (top.size()!=1) {
+			throw new ParseException("Bad parse output: "+top);
+		}
+
+		return top.get(0);
+	}
+
 	public static AList<ACell> readAll(String source) {
 		return readAll(CharStreams.fromString(source));
 	}
@@ -487,20 +478,51 @@ public class AntlrReader {
 		ConvexParser parser = new ConvexParser(tokens);
 		parser.removeErrorListeners();
 		ParseTree tree = parser.forms();
-		
+
 		CRListener visitor=new CRListener();
 		ParseTreeWalker.DEFAULT.walk(visitor, tree);
-		
+
 		ArrayList<ACell> top=visitor.popList();
 		return Lists.create(top);
 	}
+
+	public static ACell readOne(java.io.PushbackReader r) {
+		try {
+			CharStream cs = new InteractiveCharStream(r);
+			ConvexLexer lexer=new ConvexLexer(cs);
+			lexer.removeErrorListeners();
+			lexer.setTokenFactory(new CommonTokenFactory(true));
+			TokenStream tokens = new InteractiveTokenStream(lexer);
+			ConvexParser parser = new ConvexParser(tokens);
+			parser.removeErrorListeners();
+
+			ParseTree tree = parser.form();
+
+			r.unread(cs.LA(1));
+
+			CRListener visitor=new CRListener();
+			ParseTreeWalker.DEFAULT.walk(visitor, tree);
+
+			ArrayList<ACell> top=visitor.popList();
+			if (top.size()!=1) {
+				throw new ParseException("Bad parse output: "+top);
+			}
+
+			return top.get(0);
+
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+
+	}
+
 
 
 }
 
 class InteractiveCharStream extends UnbufferedCharStream {
 
-	InteractiveCharStream(Reader input)
+	InteractiveCharStream(java.io.Reader input)
 	{
 		super(input);
 	}
