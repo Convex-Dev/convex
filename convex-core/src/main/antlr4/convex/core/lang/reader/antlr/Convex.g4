@@ -92,18 +92,10 @@ BOOL : 'true' | 'false' ;
 
 DOUBLE:
   (DIGITS | SIGNED_DIGITS) DOUBLE_TAIL;
-  
-fragment  
-DOUBLE_TAIL:
-  DECIMAL EPART | DECIMAL | EPART;
 
-fragment  
-DECIMAL:
-  '.' DIGITS;
-  
-fragment 
-EPART:
-  [eE] (DIGITS | SIGNED_DIGITS);  
+fragment
+DOUBLE_TAIL:
+  [.eE] [-0-9.eE]*;
 
 DIGITS:
   [0-9]+;
@@ -148,7 +140,7 @@ QUOTING: '\'' | '`' | '~' | '~@';
 
 
 KEYWORD:
-   ':' NAME;
+   ':' NAME?;
 
 SYMBOL
     : NAME

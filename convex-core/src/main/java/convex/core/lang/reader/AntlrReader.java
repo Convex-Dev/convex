@@ -235,7 +235,11 @@ public class AntlrReader {
 		@Override
 		public void exitDoubleValue(DoubleValueContext ctx) {
 			String s=ctx.getText();
-			push( CVMDouble.parse(s));
+			try {
+				push( CVMDouble.parse(s));
+			} catch (NumberFormatException x) {
+				throw new ParseException("Unparseable double value: "+s,x);
+			}
 		}
 
 		@Override
