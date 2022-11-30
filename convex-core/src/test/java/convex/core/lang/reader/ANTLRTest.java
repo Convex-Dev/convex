@@ -42,6 +42,11 @@ public class ANTLRTest {
 		return (R) AntlrReader.readAll(s);
 	}
 
+    @SuppressWarnings("unchecked")
+	private <R extends ACell> R readOne(String s) {
+		return (R) AntlrReader.readOne(new java.io.PushbackReader(new java.io.StringReader(s)));
+	}
+
 	@Test public void testNil() {
 		assertNull(read("nil"));
 	}
@@ -314,6 +319,15 @@ public class ANTLRTest {
 		assertEquals(dst,a.print().toString());
 		
 		doRoundTripTest(dst); // final value should round trip normally
+	}
+
+    @Test public void testReadOne() {
+        assertEquals(Lists.of(1,2),readOne("(1 2) 3"));
+        assertEquals(Lists.of(1,2),readOne("(1 2)(3 4)"));
+        assertEquals(Lists.of(1,2),readOne("(1 2))))"));
+        assertThrows(ParseException.class,()->readOne(")"));
+        assertThrows(ParseException.class,()->readOne("1.0e0.1234"));
+        assertThrows(ParseException.class,()->readOne(":"));
 	}
 
 
