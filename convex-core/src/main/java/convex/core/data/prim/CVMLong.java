@@ -46,9 +46,13 @@ public final class CVMLong extends APrimitive implements INumeric {
 
 	public static CVMLong create(long value) {
 		if ((value<CACHE_SIZE)&&(value>=0)) {
-			return CACHE[(int)value];
+			return forByte((byte)value);
 		}
 		return new CVMLong(value);
+	}
+	
+	public static CVMLong forByte(byte b) {
+		return CACHE[0xff&b];
 	}
 	
 	@Override
