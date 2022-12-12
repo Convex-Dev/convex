@@ -151,6 +151,7 @@ public class Blob extends AArrayBlob {
 	public static Blob fromHex(String hexString) {
 		byte[] bs=Utils.hexToBytes(hexString);
 		if (bs==null) return null;
+		if (bs.length==0) return EMPTY;
 		return wrap(bs);
 	}
 

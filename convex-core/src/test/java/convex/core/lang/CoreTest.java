@@ -125,11 +125,11 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals("cafebabe", evalS("(str (blob \"Cafebabe\"))"));
 
-		assertEquals(eval("0x"),eval("(blob (str))")); // blob literal
+		assertSame(eval("0x"),eval("(blob (str))")); // blob literal
 
 		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
 		
-		// Blob from characters
+		// Blob from a long
 		assertEquals(eval("0x0000000000001234"),eval("(blob (long \\u1234))")); // blob literal
 
 		// Address converts to regular Blob
@@ -1073,10 +1073,13 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(assoc (blob-map) 1 2)"));
 		assertArgumentError(step("(assoc [1 2 3] :foo 7)"));
 	
-		// Non-associative values
+		// Definitiely Non-associative values
 		assertCastError(step("(assoc 1 2 3)"));
 		assertCastError(step("(assoc :foo 2 3)"));
+		
+		// TODO: Not currently associative, but maybe should be?
 		assertCastError(step("(assoc \"abc\" 2 \\d)"));
+		assertCastError(step("(assoc 0xabcdef 2 12)"));
 		
 		assertArityError(step("(assoc :foo 1 2 3)"));
 		assertArityError(step("(assoc :baz 1)"));
