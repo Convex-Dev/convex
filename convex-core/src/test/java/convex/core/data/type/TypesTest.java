@@ -20,7 +20,6 @@ import org.junit.jupiter.params.provider.ArgumentsSource;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.ObjectsTest;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -108,7 +107,6 @@ public class TypesTest {
 		AType t=Types.NUMBER;
 		assertFalse(t.check(null));
 		assertTrue(t.check(CVMLong.ONE));
-		assertTrue(t.check(CVMByte.ONE));
 		assertTrue(t.check(CVMDouble.ONE));
 	}
 	

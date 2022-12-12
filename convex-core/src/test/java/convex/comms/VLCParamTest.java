@@ -14,7 +14,6 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
 import convex.core.data.Tag;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -31,7 +30,7 @@ public class VLCParamTest {
 	@Parameterized.Parameters(name = "{0}")
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] { { 0L }, { 63L }, { 64L }, { -63L }, { -64L }, { -65L }, { 1234L },
-				{ 1234578 }, { -1234578 }, { CVMByte.create(1) }, { CVMByte.create(255) }, { Long.MAX_VALUE }, { Long.MIN_VALUE },
+				{ 1234578 }, { -1234578 }, { CVMLong.create(1) }, { CVMLong.create(255) }, { Long.MAX_VALUE }, { Long.MIN_VALUE },
 				{ Integer.MAX_VALUE }, { Integer.MIN_VALUE },
 //			{ BigInteger.valueOf(Long.MAX_VALUE).multiply(BigInteger.TEN) },
 //			{ BigInteger.valueOf(Long.MIN_VALUE).multiply(BigInteger.TEN) },

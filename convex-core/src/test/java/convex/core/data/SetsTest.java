@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -45,7 +45,7 @@ public class SetsTest {
 	@Test
 	public void testPrimitiveEquality() {
 		// different primitive objects with same numeric value should not collide in set
-		CVMByte b=CVMByte.create(1);
+		CVMDouble b=CVMDouble.create(1);
 		ASet<ACell> s=Sets.of(1L).include(b);
 		assertEquals(2L,s.count());
 		

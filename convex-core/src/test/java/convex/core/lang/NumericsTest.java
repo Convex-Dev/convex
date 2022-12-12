@@ -11,8 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 
 /**
  * 
@@ -272,7 +272,7 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(3L, evalL("(+ (long 0x01) (byte 0x02))"));
 		
 		// byte cast wraps over
-		assertSame(CVMByte.create(-1), eval("(byte 0xFF)"));
+		assertSame(CVMLong.forByte((byte)-1), eval("(byte 0xFF)"));
 		
 		// check we are treating blobs as unsigned values
 		assertEquals(510L, evalL("(+ (long 0xFF) (long 0xFF))"));
@@ -297,7 +297,7 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(1L, evalL("(long 1)"));
 		assertCVMEquals('a', eval("(char 97)"));
 		assertEquals(97L, evalL("(long \\a)"));
-		assertSame(CVMByte.create(1), eval("(byte 1)"));
+		assertSame(CVMLong.create(1), eval("(byte 1)"));
 	}
 
 	@Test

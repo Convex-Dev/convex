@@ -31,7 +31,6 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
 import convex.test.generators.AddressGen;
@@ -125,7 +124,7 @@ public class GenTestCore {
 		assertEquals(a.toHexString(),b.toHexString());
 		
 		// Check a byte in the Address
-		assertSame(CVMByte.create(a.byteAt(6)),RT.nth(a, 6));
+		assertSame(CVMLong.forByte(a.byteAt(6)),RT.nth(a, 6));
 		
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,-1));
 		assertThrows(IndexOutOfBoundsException.class,()->RT.nth(a,n));
@@ -168,7 +167,7 @@ public class GenTestCore {
 		
 		long v=a;
 		assertEquals(Long.toString(v),RT.str(ca).toString());
-		assertSame(CVMByte.create(v),RT.castByte(ca));
+		assertSame(CVMLong.create(0xff&v),RT.castByte(ca));
 		assertCVMEquals(v+1,RT.inc(ca));
 		assertCVMEquals(v-1,RT.dec(ca));
 		assertCVMEquals(0,RT.compare(a,(Long)v));

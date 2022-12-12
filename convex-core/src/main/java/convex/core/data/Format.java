@@ -12,7 +12,6 @@ import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -621,7 +620,6 @@ public class Format {
 	private static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
 		try {
 			if (tag == Tag.NULL) return null;
-			if (tag == Tag.BYTE) return (T) CVMByte.create(bb.get());
 			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
 			
 			// Double is special, we enforce a canonical NaN

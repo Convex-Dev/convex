@@ -40,7 +40,6 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -705,9 +704,7 @@ public class RT {
 	 * @param a Value to cast
 	 * @return Long value, or null if not convertible
 	 */
-	public static CVMByte castByte(ACell a) {
-		if (a instanceof CVMByte)
-			return (CVMByte) a;
+	public static CVMLong castByte(ACell a) {
 		if (a instanceof ABlob) {
 			ABlob b=(ABlob) a;
 			if (!b.isRegularBlob()) return null; // bail on Address etc.
@@ -718,7 +715,7 @@ public class RT {
 		CVMLong l = ensureLong(a);
 		if (l == null)
 			return null;
-		return CVMByte.create((byte) l.longValue());
+		return CVMLong.forByte((byte) l.longValue());
 	}
 
 	private static long longValue(ACell a) {
@@ -1673,8 +1670,6 @@ public class RT {
 			return (T) (Long) ((CVMLong) o).longValue();
 		if (o instanceof CVMDouble)
 			return (T) (Double) ((CVMDouble) o).doubleValue();
-		if (o instanceof CVMByte)
-			return (T) (Byte) (byte) ((CVMByte) o).longValue();
 		if (o instanceof CVMBool)
 			return (T) (Boolean) ((CVMBool) o).booleanValue();
 		if (o instanceof CVMChar)
@@ -1702,8 +1697,6 @@ public class RT {
 			return (T) (Long) ((CVMLong) o).longValue();
 		if (o instanceof CVMDouble)
 			return (T) (Double) ((CVMDouble) o).doubleValue();
-		if (o instanceof CVMByte)
-			return (T) (Byte) (byte) ((CVMByte) o).longValue();
 		if (o instanceof CVMBool)
 			return (T) (Boolean) ((CVMBool) o).booleanValue();
 		if (o instanceof CVMChar)

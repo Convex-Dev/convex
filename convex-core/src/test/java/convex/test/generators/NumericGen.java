@@ -5,7 +5,6 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.APrimitive;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -23,7 +22,7 @@ public class NumericGen extends Generator<APrimitive> {
 		int type = r.nextInt(3);
 		switch (type) {
 		case 0:
-			return CVMByte.create(r.nextLong());
+			return CVMLong.forByte((byte)r.nextLong());
 		case 1:
 			return CVMLong.create(r.nextLong());
 		case 2:

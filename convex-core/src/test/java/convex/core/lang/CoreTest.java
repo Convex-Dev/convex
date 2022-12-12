@@ -60,7 +60,6 @@ import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -155,14 +154,14 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testByte() {
-		assertSame(CVMByte.create(0x01), eval("(byte 1)"));
-		assertSame(CVMByte.create(0xff), eval("(byte 255)"));
-		assertSame(CVMByte.create(0xff), eval("(byte -1)"));
-		assertSame(CVMByte.create(0xff), eval("(byte (byte -1))"));
+		assertSame(CVMLong.create(0x01), eval("(byte 1)"));
+		assertSame(CVMLong.create(0xff), eval("(byte 255)"));
+		assertSame(CVMLong.create(0xff), eval("(byte -1)"));
+		assertSame(CVMLong.create(0xff), eval("(byte (byte -1))"));
 
 		// Byte extracts last byte from Blob a default (similar behaviour to Long)
-		assertSame(CVMByte.create(0xff), eval("(byte 0xff)"));
-		assertSame(CVMByte.create(0xff), eval("(byte 0xeeff)"));
+		assertSame(CVMLong.create(0xff), eval("(byte 0xff)"));
+		assertSame(CVMLong.create(0xff), eval("(byte 0xeeff)"));
 		
 		assertCastError(step("(byte nil)"));
 		assertCastError(step("(byte :foo)"));
@@ -271,7 +270,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(get [1 2] -1)"));
 		assertNull(eval("(get [1 2] 1.0)"));
 
-		assertNull(eval("(get [1 2 3] (byte 1))")); // TODO: is this sane?
+		assertEquals(2L,evalL("(get [1 2 3] (byte 1))")); // TODO: is this sane? Assumes byte works as index
 
 		assertNull(eval("(get nil nil)"));
 		assertNull(eval("(get nil 10)"));
@@ -984,7 +983,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(nth [1 2] 1)"));
 		assertEquals(2L, evalL("(nth [1 2] (byte 1))"));
 		assertCVMEquals('c', eval("(nth \"abc\" 2)"));
-		assertEquals(CVMByte.create(10), eval("(nth 0xff0a0b 1)")); // Blob nth byte
+		assertEquals(CVMLong.create(10), eval("(nth 0xff0a0b 1)")); // Blob nth byte
 
 		assertArityError(step("(nth)"));
 		assertArityError(step("(nth [])"));
@@ -992,8 +991,8 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(nth 1 1 2)")); // arity > cast
 
 		// nth on Blobs
-		assertEquals(CVMByte.create(255),eval("(nth 0xFF 0)"));
-		assertFalse (evalB("(= 16 (nth 0x0010 1))"));
+		assertEquals(CVMLong.create(255),eval("(nth 0xFF 0)"));
+		assertTrue(evalB("(= 16 (nth 0x0010 1))"));
 		assertTrue(evalB("(== 16 (nth 0x0010 1))"));
 
 		// cast errors for bad indexes
@@ -1452,7 +1451,7 @@ public class CoreTest extends ACVMTest {
 		
 		// Not data structures, but are countable
 		assertEquals(CVMChar.create('a'), eval("(first \"abc\")"));
-		assertEquals(CVMByte.create(0x12), eval("(first 0x1234)"));
+		assertEquals(CVMLong.create(0x12), eval("(first 0x1234)"));
 		assertBoundsError(step("(first \"\")"));
 		assertBoundsError(step("(first 0x)"));
 	}
@@ -1470,7 +1469,7 @@ public class CoreTest extends ACVMTest {
 		
 		// Not data structures, but are countable
 		assertEquals(CVMChar.create('b'), eval("(second \"abc\")"));
-		assertEquals(CVMByte.create(0x34), eval("(second 0x1234)"));
+		assertEquals(CVMLong.create(0x34), eval("(second 0x1234)"));
 		assertBoundsError(step("(second \"a\")"));
 		assertBoundsError(step("(second 0x01)"));
 
@@ -1490,7 +1489,7 @@ public class CoreTest extends ACVMTest {
 		
 		// Not data structures, but are countable
 		assertEquals(CVMChar.create('c'), eval("(last \"abc\")"));
-		assertEquals(CVMByte.create(0x34), eval("(last 0x1234)"));
+		assertEquals(CVMLong.create(0x34), eval("(last 0x1234)"));
 		assertBoundsError(step("(last \"\")"));
 		assertBoundsError(step("(last 0x)"));
 	}
@@ -3376,7 +3375,7 @@ public class CoreTest extends ACVMTest {
 	public void testLongPred() {
 		assertTrue(evalB("(long? 1)"));
 		assertTrue(evalB("(long? (long *balance*))")); // TODO: is this sane?
-		assertFalse(evalB("(long? (byte 1))"));
+		assertTrue(evalB("(long? (byte 1))"));
 		assertFalse(evalB("(long? nil)"));
 		assertFalse(evalB("(long? 0xFF)"));
 		assertFalse(evalB("(long? [1 2])"));

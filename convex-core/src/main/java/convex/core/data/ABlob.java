@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
 import convex.core.crypto.Hashing;
-import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * lazily computed on demand
  * 
  */
-public abstract class ABlob extends ACountable<CVMByte> implements Comparable<ABlob> {
+public abstract class ABlob extends ACountable<CVMLong> implements Comparable<ABlob> {
 	/**
 	 * Cached hash of the Blob data. Might be null.
 	 */
@@ -47,12 +47,12 @@ public abstract class ABlob extends ACountable<CVMByte> implements Comparable<AB
 	public abstract long count();
 	
 	@Override
-	public CVMByte get(long ix) {
-		return CVMByte.create(byteAt(ix));
+	public CVMLong get(long ix) {
+		return CVMLong.forByte(byteAt(ix));
 	}
 	
 	@Override
-	public Ref<CVMByte> getElementRef(long index) {
+	public Ref<CVMLong> getElementRef(long index) {
 		return get(index).getRef();
 	}
 	

@@ -13,7 +13,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.prim.CVMByte;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -479,7 +479,7 @@ public class BlobsTest {
 			
 			assertEquals(a.slice(n/2,n),b.slice(n/2, n));
 			
-			assertEquals(a.get(n-1),CVMByte.create(a.byteAt(n-1)));
+			assertEquals(a.get(n-1),CVMLong.forByte(a.byteAt(n-1)));
 			
 			// Reconstruct first and last bytes via hex digits
 			assertEquals(a.get(0).longValue(),a.getHexDigit(0)*16+a.getHexDigit(1));

@@ -41,7 +41,6 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -1712,15 +1711,15 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMByte> BYTE = reg(new CoreFn<>(Symbols.BYTE) {
+	public static final CoreFn<CVMLong> BYTE = reg(new CoreFn<>(Symbols.BYTE) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<CVMByte> invoke(Context context, ACell[] args) {
+		public  Context<CVMLong> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMByte result = RT.castByte(a);
-			if (result == null) return context.withCastError(0,args, Types.BYTE);
+			CVMLong result = RT.castByte(a);
+			if (result == null) return context.withCastError(0,args, Types.LONG);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});

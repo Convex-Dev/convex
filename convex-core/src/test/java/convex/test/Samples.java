@@ -49,7 +49,6 @@ import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -304,7 +303,7 @@ public class Samples {
 			CVMDouble.NaN,
 			CVMLong.MAX_VALUE,
 			CVMLong.MIN_VALUE,
-			CVMByte.ZERO,
+			CVMLong.ZERO,
 			CVMBool.TRUE,
 			CVMBool.FALSE,
 			MAX_SHORT_STRING,

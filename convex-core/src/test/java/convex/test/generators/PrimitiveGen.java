@@ -7,7 +7,6 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -33,7 +32,7 @@ public class PrimitiveGen extends Generator<ACell> {
 		case 0:
 			return null;
 		case 1:
-			return CVMByte.create(r.nextLong());
+			return CVMLong.forByte((byte)r.nextLong());
 		case 2:
 			return CVMChar.create(r.nextLong()&0x1fffff); // 21-bit unicode space
 		case 3:

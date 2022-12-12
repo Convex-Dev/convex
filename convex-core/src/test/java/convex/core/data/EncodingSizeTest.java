@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMBool;
-import convex.core.data.prim.CVMByte;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
@@ -26,13 +25,6 @@ public class EncodingSizeTest {
 		assertEquals(CVMLong.MAX_ENCODING_LENGTH,size(a));
 		assertEquals(CVMLong.MAX_ENCODING_LENGTH,size(b));
 		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,CVMLong.MAX_ENCODING_LENGTH);
-	}
-	
-	@Test public void testByte() {
-		CVMByte a=CVMByte.create(0);
-		CVMByte b=CVMByte.create(255);
-		assertEquals(CVMByte.MAX_ENCODING_LENGTH,size(a));
-		assertEquals(CVMByte.MAX_ENCODING_LENGTH,size(b));
 	}
 	
 	@Test public void testNull() {
