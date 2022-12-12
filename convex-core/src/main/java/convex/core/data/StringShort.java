@@ -11,7 +11,7 @@ import convex.core.util.Utils;
 /**
  * Class representing a short CVM string, backed by a flat Blob
  * 
- * USed for most small strings, and acts as the leaf chunk for StringTrees
+ * Used for most small strings, and acts as the leaf chunk for StringTrees
  */
 public class StringShort extends AString {
 

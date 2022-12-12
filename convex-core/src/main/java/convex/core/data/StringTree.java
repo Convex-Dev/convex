@@ -7,6 +7,11 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Text;
 
+/**
+ * String implementation class wrapping a BlobTree.
+ * 
+ * This String implementation is used to represent long strings.
+ */
 public class StringTree extends AString {
 	
 	public static final int MINIMUM_LENGTH=StringShort.MAX_LENGTH+1;

@@ -11,7 +11,7 @@ import convex.core.data.type.Types;
 import convex.core.util.Utils;
 
 /**
- * Class representing a CVM String. 
+ * Abstract base Class representing a CVM String. 
  * 
  * CVM Strings are UTF-8 byte strings with an immutable, fixed count in bytes. 
  * 
@@ -21,7 +21,6 @@ import convex.core.util.Utils;
  */
 public abstract class AString extends ACountable<CVMChar> implements Comparable<AString> {
 
-	
 	protected long length;
 	
 	protected AString(long length) {
@@ -234,7 +233,7 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	}
 
 	/**
-	 * Converts this String to a Blob byte representation. Must round trip all values.
+	 * Converts this String to a Blob representation. Must round trip all values.
 	 * @return Blob representation of UTF-8 String
 	 */
 	public abstract ABlob toBlob();
