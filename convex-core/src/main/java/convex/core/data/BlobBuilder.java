@@ -113,6 +113,13 @@ public class BlobBuilder {
 		tail=newTail;
 	}
 	
+	/**
+	 * Gets a blob representing the current contents of this BlobBuilder. 
+	 * 
+	 * O(log n) but quite high overhead, avoid calling too frequently
+	 * 
+	 * @return Blob contents of this BlobBuilder
+	 */
 	public ABlob toBlob() {
 		ABlob result=acc;
 		if (tail==null) return acc;
@@ -129,8 +136,8 @@ public class BlobBuilder {
 	 * @return Slice of Blob under construction
 	 */
 	public ABlob slice(long start, long end) {
-		if ((start<0)||(start>count)) throw new IllegalArgumentException("Invalid start: "+start);
-		if ((end<start)||(end>count)) throw new IllegalArgumentException("Invalid end: "+end);
+		if ((start<0)||(start>count)) throw new IndexOutOfBoundsException("Invalid start: "+start);
+		if ((end<start)||(end>count)) throw new IndexOutOfBoundsException("Invalid end: "+end);
 		long length=end-start;
 		if (length==count) return toBlob();
 		

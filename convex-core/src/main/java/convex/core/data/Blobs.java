@@ -147,4 +147,8 @@ public class Blobs {
 		children[n-1]=lastSize==subSize?fullChild:Blobs.createFilled(fillByte, lastSize);
 		return BlobTree.createWithChildren(children);
 	}
+
+	public static Blob empty() {
+		return Blob.EMPTY;
+	}
 }

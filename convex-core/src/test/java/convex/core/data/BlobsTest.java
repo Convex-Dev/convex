@@ -179,6 +179,12 @@ public class BlobsTest {
 		assertEquals("abcde",Strings.create(r.slice(n-5,n)).toString());
 		assertEquals(Blob.class,r.slice(0,4096).getClass());
 		assertEquals(BlobTree.class,r.slice(0,4097).getClass());
+		
+		final long fn=bb.count();
+		assertThrows(IndexOutOfBoundsException.class,()->bb.slice(-1, fn));
+		assertThrows(IndexOutOfBoundsException.class,()->bb.slice(fn, fn+1));
+		assertSame(Blobs.empty(),bb.slice(0, 0));
+		assertSame(Blobs.empty(),bb.slice(fn, fn));
 	}
 	
 	@Test
