@@ -256,12 +256,11 @@
 
   [[sym exp] & body]
 
-  (let [dobody (cons 'do
+  (let [dobody (cons 'let [sym 'test#]
                      body)]
-    `(let [~sym ~exp]
-       (if ~sym
-         ~dobody
-         nil))))
+    `(let [test# ~exp]
+       (cond test#
+         ~dobody))))
 
 
 

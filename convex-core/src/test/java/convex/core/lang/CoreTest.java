@@ -2085,6 +2085,9 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(when-let [a false] 1)")); // null on false branch
 		assertNull(eval("(when-let [a false])")); // null on false branch
 
+		// See #442, shouldn't destructure on falsey case
+		assertNull(eval("(when-let [[a] nil] a)")); 
+
 		assertCompileError(step("(when-let [:foo 1])"));
 
 		// TODO: needs to fix / check?
