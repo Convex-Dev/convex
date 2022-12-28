@@ -48,7 +48,7 @@ public class ReaderTest {
 		assertEquals(Samples.FOO, Reader.read(":foo"));
 		assertEquals(Keyword.create("foo.bar"), Reader.read(":foo.bar"));
 		
-		// : is currently a valid symbol character
+		// : is currently a valid inner Keyword character
 		assertEquals(Keyword.create("foo:bar"), Reader.read(":foo:bar"));
 
 		// keywords can start with more than one colon
@@ -58,6 +58,11 @@ public class ReaderTest {
 	@Test
 	public void testBadKeywords() {
 		assertThrows(ParseException.class, () -> Reader.read(":"));
+		assertThrows(ParseException.class, () -> Reader.read(" : "));
+		
+		// TODO: fix Case spotted in #441
+		// ACell a=Reader.readAll("() : ()"); // Getting a null here?
+		//assertThrows(ParseException.class, () -> Reader.readAll("() : ()"));
 	}
 
 	@Test
