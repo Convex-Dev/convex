@@ -249,7 +249,7 @@
 
 (defmacro when-let
 
-  ^{:doc {:description ["Executes the body with the symbol bound to the value of evaluating a given expression, if and only if the result of the expression is truthy."
+  ^{:doc {:description ["Evaluates a binding expression. If truthy, executes the body with the symbol bound to the result."
                         "Returns nil otherwise."]
           :examples    [{:code "(when-let [addr (some-function)] (transfer addr 1000))"}]
           :signature   [{:params [[sym exp] & body]}]}}
