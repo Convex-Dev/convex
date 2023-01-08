@@ -228,7 +228,7 @@ public class Context<T extends ACell> extends AObject {
 
 	}
 
-	private Context(ChainState chainState, long juice, AVector<ACell> localBindings2, T result,int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
+	protected Context(ChainState chainState, long juice, AVector<ACell> localBindings2, T result,int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
