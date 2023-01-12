@@ -85,6 +85,15 @@ public class CVMBenchmark {
 		Context<ACell> ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
+	
+	@Benchmark
+	public void minimalTransaction() {
+		State s=STATE;
+		Address addr=HERO;
+		ATransaction trans=Invoke.create(addr,1, Constant.of(null));
+		Context<ACell> ctx=s.applyTransaction(trans);
+		ctx.getValue();
+	}
 
 	@Benchmark
 	public void defInEnvironment() {
