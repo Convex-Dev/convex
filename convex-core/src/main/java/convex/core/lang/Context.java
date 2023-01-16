@@ -33,6 +33,7 @@ import convex.core.exceptions.TODOException;
 import convex.core.init.Init;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ATrampoline;
+import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.ErrorValue;
 import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.RecurValue;
@@ -990,8 +991,10 @@ public class Context<T extends ACell> extends AObject {
 			}
 
 			if (v instanceof ErrorValue) {
-				ErrorValue ev=(ErrorValue)v;
-				ev.addTrace("In function: "+RT.str(fn));
+				if (fn instanceof CoreFn) {
+					ErrorValue ev=(ErrorValue)v;
+					ev.addTrace("In core function: "+RT.str(fn));
+				}
 			}
 		}
 		return ctx;

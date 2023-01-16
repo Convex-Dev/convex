@@ -15,6 +15,8 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
+import convex.core.lang.impl.CoreFn;
+import convex.core.lang.impl.ErrorValue;
 
 /**
  * Op representing the invocation of a function.
@@ -81,6 +83,11 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		}
 
 		ctx = ctx.invoke(fn, args);
+		if (ctx.isError()) {
+			// getError()must be non-null at this point
+			ctx.getError().addTrace("In expression: "+RT.print(this));
+		}
+
 		return (Context<T>) ctx;
 	}
 
