@@ -8,6 +8,7 @@ import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
 import convex.core.data.ABlob;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 
 /**
  * Convex provider class for Sodium
@@ -30,6 +31,11 @@ public class SodiumProvider extends AProvider {
 		byte[] sigBytes=signature.getBytes();
 		boolean verified = SodiumProvider.SODIUM_SIGN.cryptoSignVerifyDetached(sigBytes, message.getBytes(), (int)message.count(), publicKey.getBytes());
 		return verified;
+	}
+	
+	@Override
+	public SodiumKeyPair generate(Blob seed) {
+		return SodiumKeyPair.create(seed);
 	}
 
 }

@@ -1,7 +1,5 @@
 package convex.core.crypto.sodium;
 
-import java.security.SecureRandom;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
@@ -43,30 +41,9 @@ public class SodiumKeyPair extends AKeyPair {
 		return new SodiumKeyPair(publicKey,seed,secretKeyBytes);
 	}
 
-	/**
-	 * Generates a new, secure random key pair. Uses a Java SecureRandom instance.
-	 *
-	 * @return New Key Pair instance.
-	 */
-	public static SodiumKeyPair generate() {
-		return generate(new SecureRandom());
-	}
-
-
-
 	@Override
 	public Blob getSeed() {
 		return seed;
-	}
-	
-	/**
-	 * Generates a secure random key pair
-	 * @param random A secure random instance
-	 * @return New key pair
-	 */
-	public static SodiumKeyPair generate(SecureRandom random) {
-		Blob seed=Blob.createRandom(random, 32);
-		return create(seed);
 	}
 
 	@Override

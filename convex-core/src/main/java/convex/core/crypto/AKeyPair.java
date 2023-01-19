@@ -19,7 +19,6 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 
-import convex.core.crypto.sodium.SodiumKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -109,7 +108,7 @@ public abstract class AKeyPair {
 	 * @return New Key Pair instance.
 	 */
 	public static AKeyPair generate() {
-		return SodiumKeyPair.generate();
+		return Providers.generate();
 	}
 
 	/**
@@ -130,8 +129,7 @@ public abstract class AKeyPair {
 	 * @return A new key pair using the given seed
 	 */
 	public static AKeyPair create(Blob seed) {
-		// TODO: make switchable
-		return SodiumKeyPair.create(seed);
+		return Providers.generate(seed);
 	}
 
 	/**
@@ -194,7 +192,7 @@ public abstract class AKeyPair {
 	 * @param privateKey An PrivateKey item for private key
 	 * @return A new key pair using the given private key
 	 */
-	public static SodiumKeyPair create(PrivateKey privateKey) {
+	public static AKeyPair create(PrivateKey privateKey) {
 		Ed25519PrivateKeyParameters privateKeyParam = new Ed25519PrivateKeyParameters(privateKey.getEncoded(), 16);
 		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
 		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
@@ -208,7 +206,7 @@ public abstract class AKeyPair {
 	 * @param privateKey Private key
 	 * @return Key Pair instance
 	 */
-	public static SodiumKeyPair create(PublicKey publicKey, PrivateKey privateKey) {
+	public static AKeyPair create(PublicKey publicKey, PrivateKey privateKey) {
 		KeyPair keyPair=new KeyPair(publicKey,privateKey);
 		return create(keyPair);
 	}
@@ -218,9 +216,9 @@ public abstract class AKeyPair {
 	 * @param keyPair JCA KeyPair
 	 * @return AKeyPair instance
 	 */
-	public static SodiumKeyPair create(KeyPair keyPair) {
+	public static AKeyPair create(KeyPair keyPair) {
 		Blob seed=extractSeed(keyPair.getPrivate());
-		return SodiumKeyPair.create(seed);
+		return Providers.generate(seed);
 	}
 
 	/**

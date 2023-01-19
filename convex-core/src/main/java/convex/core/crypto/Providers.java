@@ -7,6 +7,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import convex.core.crypto.sodium.SodiumProvider;
 import convex.core.data.ABlob;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 
 
 /**
@@ -34,5 +35,13 @@ public class Providers {
 
 	public static boolean verify(ASignature signature, ABlob message, AccountKey publicKey) {
 		return currentProvider.verify(signature, message, publicKey);
+	}
+
+	public static AKeyPair generate() {
+		return currentProvider.generate();
+	}
+
+	public static AKeyPair generate(Blob seed) {
+		return currentProvider.generate(seed);
 	}
 }

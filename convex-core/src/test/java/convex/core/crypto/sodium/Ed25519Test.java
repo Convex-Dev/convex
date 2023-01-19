@@ -26,6 +26,8 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
 public class Ed25519Test {
+	
+	SodiumProvider PROVIDER=new SodiumProvider();
 
 	@Test
 	public void testKeyGen() {
@@ -36,7 +38,7 @@ public class Ed25519Test {
 
 	@Test
 	public void testPublicKeyBytes() {
-		SodiumKeyPair kp1=SodiumKeyPair.generate();
+		AKeyPair kp1=PROVIDER.generate();
 		byte[] publicBytes=kp1.getPublicKeyBytes();
 		byte[] addressBytes=kp1.getAccountKey().getBytes();
 		assertArrayEquals(publicBytes,addressBytes);
@@ -44,7 +46,7 @@ public class Ed25519Test {
 
 	@Test
 	public void testKeyRebuilding() {
-		SodiumKeyPair kp1=SodiumKeyPair.generate();
+		AKeyPair kp1=PROVIDER.generate();
 		SodiumKeyPair kp2=SodiumKeyPair.create(kp1.getSeed());
 		assertEquals(kp1,kp2);
 		assertEquals(kp1.getAccountKey(),kp2.getAccountKey());
@@ -58,7 +60,7 @@ public class Ed25519Test {
 
 	@Test
 	public void testPrivateKeyBytes() {
-		SodiumKeyPair kp1=SodiumKeyPair.generate();
+		AKeyPair kp1=PROVIDER.generate();
 		PrivateKey priv=kp1.getPrivate();
 		PublicKey pub=kp1.getPublic();
 		AccountKey address=kp1.getAccountKey();
@@ -69,7 +71,7 @@ public class Ed25519Test {
 
 		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
 
-		SodiumKeyPair kp2=AKeyPair.create(pub,priv);
+		AKeyPair kp2=AKeyPair.create(pub,priv);
 		assertEquals(address,kp2.getAccountKey());
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 
@@ -85,11 +87,11 @@ public class Ed25519Test {
 
 	@Test
 	public void testCreateFromPrivateKey() {
-		SodiumKeyPair kp1=SodiumKeyPair.generate();
+		AKeyPair kp1=PROVIDER.generate();
 		PrivateKey priv=kp1.getPrivate();
 		// PublicKey pub=kp1.getPublic();
 
-		SodiumKeyPair kp2 = AKeyPair.create(priv);
+		AKeyPair kp2 = AKeyPair.create(priv);
 		assertTrue(kp1.equals(kp2));
 	}
 
