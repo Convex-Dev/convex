@@ -69,16 +69,16 @@ public class Ed25519Test {
 
 		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
 
-
-		SodiumKeyPair kp2=SodiumKeyPair.create(pub,priv);
+		SodiumKeyPair kp2=AKeyPair.create(pub,priv);
 		assertEquals(address,kp2.getAccountKey());
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 
 		SignedData<ACell> sd2=kp2.signData(data);
 		assertTrue(sd2.checkSignature());
 
-		Blob pkb=SodiumKeyPair.extractPrivateKey(priv);
-		AKeyPair kp3=SodiumKeyPair.create(address, pkb);
+		Blob pkb=Blob.wrap(priv.getEncoded());
+		long n=pkb.count();
+		AKeyPair kp3=SodiumKeyPair.create(pkb.slice(n-32, n));
 
 		assertEquals(sd2,kp3.signData(data));
 	}
@@ -89,7 +89,7 @@ public class Ed25519Test {
 		PrivateKey priv=kp1.getPrivate();
 		// PublicKey pub=kp1.getPublic();
 
-		SodiumKeyPair kp2 = SodiumKeyPair.create(priv);
+		SodiumKeyPair kp2 = AKeyPair.create(priv);
 		assertTrue(kp1.equals(kp2));
 	}
 
@@ -118,7 +118,7 @@ public class Ed25519Test {
 		// Address should round trip to a Ed25519 public key and back again
 		AccountKey a=AccountKey.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
 		PublicKey pk=SodiumKeyPair.publicKeyFromBytes(a.getBytes());
-		AccountKey b=SodiumKeyPair.extractAccountKey(pk);
+		AccountKey b=AKeyPair.extractAccountKey(pk);
 		assertEquals(a,b);
 	}
 
@@ -137,7 +137,7 @@ public class Ed25519Test {
         assertEquals(32,publicKeyBytes.length);
 
         PublicKey publicKey=SodiumKeyPair.publicKeyFromBytes(publicKeyBytes);
-        PrivateKey privateKey=SodiumKeyPair.privateKeyFromBytes(privateKeyBytes);
+        PrivateKey privateKey=AKeyPair.privateKeyFromBytes(privateKeyBytes);
 
         // Sign
         Signature signer = Signature.getInstance("EdDSA");

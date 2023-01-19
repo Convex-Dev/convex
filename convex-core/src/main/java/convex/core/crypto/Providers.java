@@ -16,17 +16,23 @@ import convex.core.data.AccountKey;
  */
 public class Providers {
 	
+	private static AProvider currentProvider;
+	
 	static {
+		// Initialise BC provider
 		Security.addProvider(new BouncyCastleProvider());
+		
+		// Initialise Sodium provider
+		SodiumProvider sp=new SodiumProvider();
+		currentProvider=sp; 
+		Security.addProvider(sp);
 	}
 	
 	public static void init() {
-		// static method to ensure static initialisation happens
+		// Call this method from anywhere to ensure static initialisation happens
 	}
 
 	public static boolean verify(ASignature signature, ABlob message, AccountKey publicKey) {
-		byte[] sigBytes=signature.getBytes();
-		boolean verified = SodiumProvider.SODIUM_SIGN.cryptoSignVerifyDetached(sigBytes, message.getBytes(), (int)message.count(), publicKey.getBytes());
-		return verified;
+		return currentProvider.verify(signature, message, publicKey);
 	}
 }

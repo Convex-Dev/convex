@@ -27,8 +27,6 @@ import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
 import org.bouncycastle.pkcs.PKCSException;
 import org.bouncycastle.util.io.pem.PemObject;
 
-import convex.core.crypto.sodium.SodiumKeyPair;
-
 public class PEMTools {
 	// private static String encryptionAlgorithm="AES-128-CBC";
 
@@ -74,7 +72,7 @@ public class PEMTools {
 		PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(bs);
 		PrivateKey priv=keyFactory.generatePrivate(keySpec);
 		PublicKey pub=keyFactory.generatePublic(keySpec);
-		return SodiumKeyPair.create(pub, priv);
+		return AKeyPair.create(pub, priv);
 	}
 
 	/**

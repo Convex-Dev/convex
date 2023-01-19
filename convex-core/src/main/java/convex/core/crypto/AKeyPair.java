@@ -8,11 +8,16 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
+import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 
 import convex.core.crypto.sodium.SodiumKeyPair;
 import convex.core.data.ACell;
@@ -20,6 +25,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for key pairs in Convex.
@@ -30,6 +36,9 @@ public abstract class AKeyPair {
 	public static final int SEED_LENGTH=32;
 
 	protected static final String ED25519 = "Ed25519";
+	
+	private KeyPair keyPair=null;
+
 
 
 	/**
@@ -46,12 +55,6 @@ public abstract class AKeyPair {
 	 */
 	public abstract AccountKey getAccountKey();
 	
-	/**
-	 * Gets the Private key encoded as a Blob
-	 * @return Blob Private key data encoding
-	 */
-	public abstract Blob getEncodedPrivateKey();
-
 	/**
 	 * Signs a value with this key pair 
 	 * @param <R> Type of Value
@@ -95,18 +98,6 @@ public abstract class AKeyPair {
 		Blob seedBlob=Blob.createRandom(r, 32);
 		return create(seedBlob);
 	}
-
-	
-	/**
-	 * Create a key pair with the given Address and encoded private key
-	 * 
-	 * @param publicKey Public Key
-	 * @param encodedPrivateKey Encoded private key
-	 * @return New key pair
-	 */
-	public static AKeyPair create(AccountKey publicKey, Blob encodedPrivateKey) {
-		return SodiumKeyPair.create(publicKey,encodedPrivateKey);
-	}
 	
 	static {
 		Providers.init();
@@ -147,7 +138,9 @@ public abstract class AKeyPair {
 	 * Gets the JCA PrivateKey
 	 * @return Private Key
 	 */
-	public abstract PrivateKey getPrivate();
+	public PrivateKey getPrivate() {
+		return getJCAKeyPair().getPrivate();
+	}
 
 	/**
 	 * Gets the JCA PublicKey
@@ -159,14 +152,34 @@ public abstract class AKeyPair {
 	
 	@Override
 	public String toString() {
-		return getAccountKey()+":"+getEncodedPrivateKey();
+		return getAccountKey()+":"+getSeed();
 	}
 
 	/**
 	 * Gets the JCA representation of this Key Pair
 	 * @return JCA KepPair
 	 */
-	public abstract KeyPair getJCAKeyPair();
+	public KeyPair getJCAKeyPair() {
+		if (keyPair==null) {
+			PublicKey pub=publicKeyFromBytes(getAccountKey().getBytes());
+			PrivateKey priv=privateKeyFromBytes(getSeed().getBytes());
+			keyPair=new KeyPair(pub,priv);
+		}
+		return keyPair;
+	}
+	
+	/**
+	 * Gets the seed from a JCA Private Key.
+	 * Should always be last 32 bytes of the encoding
+	 * @param priv Private Key in JCA format
+	 * @return
+	 */
+	protected static Blob extractSeed(PrivateKey priv) {
+		byte[] data=priv.getEncoded();
+		int n=data.length;
+		Blob seed=Blob.wrap(data,n-SEED_LENGTH,SEED_LENGTH);
+		return seed;
+	}
 
 	/**
 	 * Gets the Ed25519 seed for this key pair
@@ -174,6 +187,102 @@ public abstract class AKeyPair {
 	 */
 	public abstract Blob getSeed();
 	
+	/**
+	 * Create a KeyPair from given private key. Public key is generated
+	 * automatically from the private key
+	 *
+	 * @param privateKey An PrivateKey item for private key
+	 * @return A new key pair using the given private key
+	 */
+	public static SodiumKeyPair create(PrivateKey privateKey) {
+		Ed25519PrivateKeyParameters privateKeyParam = new Ed25519PrivateKeyParameters(privateKey.getEncoded(), 16);
+		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
+		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
+		// PrivateKey generatedPrivateKey = privateFromBytes(privateKeyParam.getEncoded());
+		return create(generatedPublicKey, privateKey);
+	}
+
+	/**
+	 * Creates an Ed25519 Key Pair with the specified keys
+	 * @param publicKey Public key
+	 * @param privateKey Private key
+	 * @return Key Pair instance
+	 */
+	public static SodiumKeyPair create(PublicKey publicKey, PrivateKey privateKey) {
+		KeyPair keyPair=new KeyPair(publicKey,privateKey);
+		return create(keyPair);
+	}
+
+	/**
+	 * Create a KeyPair from a JCA KeyPair
+	 * @param keyPair JCA KeyPair
+	 * @return AKeyPair instance
+	 */
+	public static SodiumKeyPair create(KeyPair keyPair) {
+		Blob seed=extractSeed(keyPair.getPrivate());
+		return SodiumKeyPair.create(seed);
+	}
+
+	/**
+	 * Creates a private key using the given raw bytes.
+	 * @param key 32 bytes private key data
+	 * @return Ed25519 Private Key instance
+	 */
+	public static PrivateKey privateKeyFromBytes(byte[] key) {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
+					new DEROctetString(key));
+			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
+			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
+			return privateKey;
+		} catch (Exception e) {
+			throw new Error(e);
+		}
+	}
+
+	/**
+	 * Extracts an Address from an Ed25519 public key
+	 * @param publicKey Public key
+	 * @return
+	 */
+	public static AccountKey extractAccountKey(PublicKey publicKey) {
+		byte[] bytes=publicKey.getEncoded();
+		int n=bytes.length;
+		// take the bytes at the end of the encoding
+		return AccountKey.wrap(bytes,n-AccountKey.LENGTH);
+	}
+
+	public static PrivateKey privateKeyFromBlob(Blob encodedKey) {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
+			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
+			return privateKey;
+		} catch (Exception e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+
+	/**
+	 * Gets a Ed25519 Private Key from a 32-byte array.
+	 * @param privKey
+	 * @return
+	 */
+	public static PrivateKey privateFromBytes(byte[] privKey) {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), new DEROctetString(privKey));
+	
+			var pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
+	
+	        PrivateKey result = keyFactory.generatePrivate(pkcs8KeySpec);
+	        return result;
+		} catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+
 	public static PublicKey publicKeyFromBytes(byte[] key) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);

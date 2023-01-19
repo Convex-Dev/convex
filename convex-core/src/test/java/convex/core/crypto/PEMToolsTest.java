@@ -7,7 +7,6 @@ import java.security.SecureRandom;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.sodium.SodiumKeyPair;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.util.Utils;
@@ -41,7 +40,7 @@ public class PEMToolsTest {
 			throw e;
 		}
 
-		AKeyPair importKeyPair = SodiumKeyPair.create(privateKey);
+		AKeyPair importKeyPair = AKeyPair.create(privateKey);
 		AString data = Strings.create(generateRandomHex(1024));
 		ASignature leftSignature = keyPair.sign(data.getHash());
 		ASignature rightSignature = importKeyPair.sign(data.getHash());

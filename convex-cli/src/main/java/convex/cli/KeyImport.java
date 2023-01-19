@@ -12,7 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.crypto.sodium.SodiumKeyPair;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -75,7 +74,7 @@ public class KeyImport implements Runnable {
 		}
 
 		PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
-		AKeyPair keyPair = SodiumKeyPair.create(privateKey);
+		AKeyPair keyPair = AKeyPair.create(privateKey);
 		mainParent.addKeyPairToStore(keyPair);
 		mainParent.saveKeyStore();
 		mainParent.println(keyPair.getAccountKey().toHexString());
