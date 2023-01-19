@@ -3,6 +3,7 @@ package convex.core.crypto;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.SecureRandom;
 
 import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ACell;
@@ -39,7 +40,20 @@ public abstract class AKeyPair {
 	public abstract <R extends ACell> SignedData<R> signData(R value);
 
 	@Override
-	public abstract boolean equals(Object a);
+	public final boolean equals(Object a) {
+		if (!(a instanceof AKeyPair)) return false;	
+		return equals((AKeyPair)a);
+	}
+	
+	/**
+	 * Tests if this keypair is equal to another key pair. Generally, a key pair
+	 * should be considered equal if it has the same public key and produces identical signatures
+	 * in all cases.
+	 * 
+	 * @param kp Other key pair to compare with
+	 * @return True if key pairs are equal
+	 */
+	public abstract boolean equals(AKeyPair kp);
 
 	/**
 	 * Signs a hash value with this key pair, producing a signature of the appropriate type.
@@ -56,8 +70,11 @@ public abstract class AKeyPair {
 	 * @return New key pair
 	 */
 	public static AKeyPair createSeeded(long seed) {
-		return Ed25519KeyPair.createSeeded(seed);
+		SecureRandom r = new InsecureRandom(seed);
+		Blob seedBlob=Blob.createRandom(r, 32);
+		return create(seedBlob);
 	}
+
 	
 	/**
 	 * Create a key pair with the given Address and encoded private key
@@ -90,7 +107,19 @@ public abstract class AKeyPair {
 	 * @return New key pair
 	 */
 	public static AKeyPair create(byte[] keyMaterial) {
-		return Ed25519KeyPair.create(keyMaterial);
+		return create(Blob.wrap(keyMaterial));
+	}
+	
+	/**
+	 * Create a key pair with the given seed. Public key is generated
+	 * automatically from the private key
+	 *
+	 * @param seed 32 bytes of seed material
+	 * @return A new key pair using the given seed
+	 */
+	public static AKeyPair create(Blob seed) {
+		// TODO: make switchable
+		return Ed25519KeyPair.create(seed);
 	}
 
 	/**
@@ -115,4 +144,11 @@ public abstract class AKeyPair {
 	 * @return JCA KepPair
 	 */
 	public abstract KeyPair getJCAKeyPair();
+
+	/**
+	 * Gets the Ed25519 seed for this key pair
+	 * @return Seed blob of 32 bytes
+	 */
+	public abstract Blob getSeed();
+
 }

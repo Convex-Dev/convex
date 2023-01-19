@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.HashMap;
 
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
@@ -285,7 +284,7 @@ public class Mnemonic {
 		}
 		ABlob b=bb.toBlob();
 		Hash h = b.getContentHash();
-		Ed25519KeyPair kp = Ed25519KeyPair.create(h.getBytes());
+		AKeyPair kp = AKeyPair.create(h.getBytes());
 		return (T) kp;
 	}
 }

@@ -22,7 +22,6 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
-import convex.core.crypto.InsecureRandom;
 import convex.core.crypto.Providers;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -111,6 +110,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		return create(publicKey,privateKey);
 	}
 
+	@Override
 	public Blob getSeed() {
 		return seed;
 	}
@@ -123,30 +123,6 @@ public class Ed25519KeyPair extends AKeyPair {
 	public static Ed25519KeyPair generate(SecureRandom random) {
 		Blob seed=Blob.createRandom(random, 32);
 		return create(seed);
-	}
-
-	/**
-	 * Create a deterministic key pair with a specified seed.
-	 *
-	 * SECURITY: Use for testing purpose only
-	 * @param seed See to use for generation
-	 * @return Key Pair instance
-	 */
-	public static Ed25519KeyPair createSeeded(long seed) {
-		SecureRandom r = new InsecureRandom(seed);
-		Blob seedBlob=Blob.createRandom(r, 32);
-		return create(seedBlob);
-	}
-
-	/**
-	 * Create a SignKeyPair from given private key material. Public key is generated
-	 * automatically from the private key
-	 *
-	 * @param keyMaterial An array of 32 bytes of random material to use for private key
-	 * @return A new key pair using the given private key
-	 */
-	public static Ed25519KeyPair create(byte[] keyMaterial) {
-		return create(Blob.create(keyMaterial));
 	}
 
 	/**
@@ -327,7 +303,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 
 	@Override
-	public boolean equals(Object o) {
+	public boolean equals(AKeyPair o) {
 		if (!(o instanceof Ed25519KeyPair)) return false;
 		return equals((Ed25519KeyPair) o);
 	}
