@@ -14,7 +14,6 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -43,7 +42,7 @@ public class BeliefMergeTest {
 	public static final int NUM_INITIAL_TRANS = 10;
 	public static final int ROUNDS = 20;
 
-	public static final AKeyPair[] KEY_PAIRS = new Ed25519KeyPair[NUM_PEERS];
+	public static final AKeyPair[] KEY_PAIRS = new AKeyPair[NUM_PEERS];
 	public static final Address[] ADDRESSES = new Address[NUM_PEERS];
 	public static final AccountKey[] KEYS = new AccountKey[NUM_PEERS];
 	public static final State INITIAL_STATE;

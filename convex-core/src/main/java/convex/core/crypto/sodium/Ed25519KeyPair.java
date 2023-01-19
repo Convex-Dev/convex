@@ -303,9 +303,9 @@ public class Ed25519KeyPair extends AKeyPair {
 	}
 
 	@Override
-	public boolean equals(AKeyPair o) {
-		if (!(o instanceof Ed25519KeyPair)) return false;
-		return equals((Ed25519KeyPair) o);
+	public boolean equals(AKeyPair kp) {
+		if (!(kp instanceof Ed25519KeyPair)) return false;
+		return equals((Ed25519KeyPair) kp);
 	}
 
 	boolean equals(Ed25519KeyPair other) {

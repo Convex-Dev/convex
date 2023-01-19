@@ -8,7 +8,6 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.Blob;
 
 public class MnemonicTest {
@@ -68,13 +67,13 @@ public class MnemonicTest {
 	@Test 
 	public void testKeyPair() {
 		String mnem = "TROD MUTE TAIL WARM CHAR KONG HAAG CITY BORE O TEAL AWL";
-		Ed25519KeyPair kp=Mnemonic.decodeKeyPair(mnem);
+		AKeyPair kp=Mnemonic.decodeKeyPair(mnem);
 		assertEquals(kp,Mnemonic.decodeKeyPair(mnem, null));
 		assertEquals(kp,Mnemonic.decodeKeyPair(mnem, ""));
 		
 		assertEquals("a76c88c207db1c0d7f58cfdbcc6e706f0fd304c4e27443ae35719d9d76ba7b57",kp.getSeed().toHexString());
 	
-		Ed25519KeyPair kpfoo=Mnemonic.decodeKeyPair(mnem,"foo");
+		AKeyPair kpfoo=Mnemonic.decodeKeyPair(mnem,"foo");
 		assertNotEquals(kp,kpfoo);
 		assertEquals("9f3af5e0f93dfb236b6aac71933f0b8b1993fd327610b692dbb3a4a212d97fbc",kpfoo.getSeed().toHexString());
 	}

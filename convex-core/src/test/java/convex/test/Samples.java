@@ -13,7 +13,6 @@ import org.junit.jupiter.params.provider.ArgumentsProvider;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
@@ -75,7 +74,7 @@ public class Samples {
 	public static final AccountKey BAD_ACCOUNTKEY = AccountKey.dummy("bbbb");
 	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.dummy("0");
 	
-	public static final AKeyPair KEY_PAIR=Ed25519KeyPair.createSeeded(13371337L);
+	public static final AKeyPair KEY_PAIR=AKeyPair.createSeeded(13371337L);
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
 	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());

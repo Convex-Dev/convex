@@ -109,7 +109,7 @@ public class PEMTools {
 	 *
 	 * @param pemText PEM string to decode
 	 *
-	 * @param password Password that was used to encrypt the priavte key
+	 * @param password Password that was used to encrypt the private key
 	 *
 	 * @return PrivateKey stored in the PEM
 	 *

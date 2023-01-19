@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -35,13 +34,13 @@ import convex.core.util.Utils;
  */
 public class StateTransitionsTest {
 
-	final AKeyPair KEYPAIR_A = Ed25519KeyPair.createSeeded(1001);
-	final AKeyPair KEYPAIR_B = Ed25519KeyPair.createSeeded(1002);
-	final AKeyPair KEYPAIR_C = Ed25519KeyPair.createSeeded(1003);
-	final AKeyPair KEYPAIR_NIKI = Ed25519KeyPair.createSeeded(1004);
-	final AKeyPair KEYPAIR_ROBB = Ed25519KeyPair.createSeeded(1005);
+	final AKeyPair KEYPAIR_A = AKeyPair.createSeeded(1001);
+	final AKeyPair KEYPAIR_B = AKeyPair.createSeeded(1002);
+	final AKeyPair KEYPAIR_C = AKeyPair.createSeeded(1003);
+	final AKeyPair KEYPAIR_NIKI = AKeyPair.createSeeded(1004);
+	final AKeyPair KEYPAIR_ROBB = AKeyPair.createSeeded(1005);
 
-	final AKeyPair KEYPAIR_PEER = Ed25519KeyPair.createSeeded(1006);
+	final AKeyPair KEYPAIR_PEER = AKeyPair.createSeeded(1006);
 	final AccountKey FIRST_PEER_KEY=KEYPAIR_PEER.getAccountKey();
 
 	final Address ADDRESS_A = Address.create(0); // initial account

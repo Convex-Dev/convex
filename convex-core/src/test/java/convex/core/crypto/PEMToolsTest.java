@@ -23,7 +23,7 @@ public class PEMToolsTest {
 
 	@Test
 	public void testPEMPrivateKey() {
-		AKeyPair keyPair = Ed25519KeyPair.generate();
+		AKeyPair keyPair = AKeyPair.generate();
 
 		String testPassword = generateRandomHex(32);
 		String pemText = null;

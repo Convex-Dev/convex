@@ -14,7 +14,6 @@ import java.security.UnrecoverableKeyException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
-import convex.core.crypto.sodium.Ed25519KeyPair;
 
 /**
  * Utility class for working with Java Key Stores
@@ -105,7 +104,7 @@ public class PFXTools {
 		char[] pwdArray = passphrase.toCharArray();
 
 		Key sk=ks.getKey(alias,pwdArray);
-		return Ed25519KeyPair.create(sk.getEncoded());
+		return AKeyPair.create(sk.getEncoded());
 	}
 
 	/**
@@ -137,7 +136,7 @@ public class PFXTools {
 		if (passPhrase == null) throw new IllegalArgumentException("Password is mandatory for private key");
 		char[] pwdArray = passPhrase.toCharArray();
 
-		byte[] bs=((Ed25519KeyPair)kp).getSeed().getBytes();
+		byte[] bs=((AKeyPair)kp).getSeed().getBytes();
 		SecretKey secretKeyPrivate = new SecretKeySpec(bs, "Ed25519");
 		ks.setKeyEntry(alias, secretKeyPrivate, pwdArray, null);
 
