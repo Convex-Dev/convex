@@ -2,7 +2,7 @@ package convex.core.crypto;
 
 import java.nio.ByteBuffer;
 
-import convex.core.data.ABlob;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
@@ -102,7 +102,7 @@ public class Ed25519Signature extends ASignature {
 	//}
 	
 	@Override
-	public boolean verify(ABlob message, AccountKey publicKey) {
+	public boolean verify(AArrayBlob message, AccountKey publicKey) {
 	    return Providers.verify(this,message,publicKey);
 	}
 	

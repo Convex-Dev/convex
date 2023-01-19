@@ -3,9 +3,11 @@ package convex.core.crypto.sodium;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 
@@ -57,11 +59,11 @@ public class SodiumKeyPair extends AKeyPair {
 	}
 
 	@Override
-	public ASignature sign(Hash hash) {
+	public ASignature sign(AArrayBlob hash) {
 		byte[] signature=new byte[Ed25519Signature.SIGNATURE_LENGTH];
 		if (SodiumProvider.SODIUM_SIGN.cryptoSignDetached(
 				signature,
-				hash.getBytes(),
+				Blobs.zeroBasedArray(hash),
 				Hash.LENGTH,
 				secretKeyBytes)) {;
 				return Ed25519Signature.wrap(signature);

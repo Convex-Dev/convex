@@ -3,7 +3,7 @@ package convex.core.crypto;
 import java.security.Provider;
 import java.security.SecureRandom;
 
-import convex.core.data.ABlob;
+import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 
@@ -24,10 +24,12 @@ public abstract class AProvider extends Provider {
 	 * @param publicKey Public Key
 	 * @return true if verified, false otherwise
 	 */
-	public abstract boolean verify(ASignature signature, ABlob message, AccountKey publicKey);
+	public abstract boolean verify(ASignature signature, AArrayBlob message, AccountKey publicKey);
 
 	/**
-	 * Generates a secure random key pair for this provider
+	 * Generates a secure random key pair. Uses the default SecureRandom
+	 * provider as provided by the current JVM environment.
+	 * 
 	 * @return New key pair
 	 */
 	public AKeyPair generate() {
@@ -35,13 +37,17 @@ public abstract class AProvider extends Provider {
 	}
 
 	/**
-	 * Generates a secure random key pair
+	 * Generates a key pair using the provided source of randomness. 
+	 * 
+	 * SECURITY WARNING: Security of the key pair depends on security of the source of 
+	 * randomness
+	 * 
 	 * @param random A secure random instance
 	 * @return New key pair
 	 */
 	public AKeyPair generate(SecureRandom random) {
 		Blob seed=Blob.createRandom(random, 32);
-		return generate(seed);
+		return create(seed);
 	}
 
 	/**
@@ -49,6 +55,6 @@ public abstract class AProvider extends Provider {
 	 * @param seed
 	 * @return
 	 */
-	protected abstract AKeyPair generate(Blob seed);
+	protected abstract AKeyPair create(Blob seed);
 
 }

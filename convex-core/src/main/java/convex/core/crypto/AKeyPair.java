@@ -19,10 +19,10 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 
+import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
 
@@ -83,7 +83,7 @@ public abstract class AKeyPair {
 	 * @param hash Hash of value to sign
 	 * @return A Signature compatible with the key pair.
 	 */
-	public abstract ASignature sign(Hash hash);
+	public abstract ASignature sign(AArrayBlob hash);
 
 	/**
 	 * Create a deterministic key pair with the given seed.

@@ -25,14 +25,14 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
-public class Ed25519Test {
+public class SodiumTest {
 	
 	SodiumProvider PROVIDER=new SodiumProvider();
 
 	@Test
 	public void testKeyGen() {
-		AKeyPair kp1=SodiumKeyPair.generate();
-		AKeyPair kp2=SodiumKeyPair.generate();
+		AKeyPair kp1=PROVIDER.generate();
+		AKeyPair kp2=PROVIDER.generate();
 		assertNotEquals(kp1,kp2);
 	}
 
@@ -47,7 +47,7 @@ public class Ed25519Test {
 	@Test
 	public void testKeyRebuilding() {
 		AKeyPair kp1=PROVIDER.generate();
-		SodiumKeyPair kp2=SodiumKeyPair.create(kp1.getSeed());
+		AKeyPair kp2=PROVIDER.create(kp1.getSeed());
 		assertEquals(kp1,kp2);
 		assertEquals(kp1.getAccountKey(),kp2.getAccountKey());
 
@@ -119,7 +119,7 @@ public class Ed25519Test {
 	public void testAccountKeyRoundTrip() {
 		// Address should round trip to a Ed25519 public key and back again
 		AccountKey a=AccountKey.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
-		PublicKey pk=SodiumKeyPair.publicKeyFromBytes(a.getBytes());
+		PublicKey pk=AKeyPair.publicKeyFromBytes(a.getBytes());
 		AccountKey b=AKeyPair.extractAccountKey(pk);
 		assertEquals(a,b);
 	}
@@ -138,7 +138,7 @@ public class Ed25519Test {
         assertEquals(32,privateKeyBytes.length);
         assertEquals(32,publicKeyBytes.length);
 
-        PublicKey publicKey=SodiumKeyPair.publicKeyFromBytes(publicKeyBytes);
+        PublicKey publicKey=AKeyPair.publicKeyFromBytes(publicKeyBytes);
         PrivateKey privateKey=AKeyPair.privateKeyFromBytes(privateKeyBytes);
 
         // Sign

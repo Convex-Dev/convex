@@ -2,10 +2,9 @@ package convex.core.crypto;
 
 import java.security.Security;
 
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-
+import convex.core.crypto.bc.BCProvider;
 import convex.core.crypto.sodium.SodiumProvider;
-import convex.core.data.ABlob;
+import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 
@@ -21,7 +20,7 @@ public class Providers {
 	
 	static {
 		// Initialise BC provider
-		Security.addProvider(new BouncyCastleProvider());
+		Security.addProvider(BCProvider.BC);
 		
 		// Initialise Sodium provider
 		SodiumProvider sp=new SodiumProvider();
@@ -33,7 +32,7 @@ public class Providers {
 		// Call this method from anywhere to ensure static initialisation happens
 	}
 
-	public static boolean verify(ASignature signature, ABlob message, AccountKey publicKey) {
+	public static boolean verify(ASignature signature, AArrayBlob message, AccountKey publicKey) {
 		return currentProvider.verify(signature, message, publicKey);
 	}
 
@@ -42,6 +41,6 @@ public class Providers {
 	}
 
 	public static AKeyPair generate(Blob seed) {
-		return currentProvider.generate(seed);
+		return currentProvider.create(seed);
 	}
 }

@@ -6,7 +6,7 @@ import com.goterl.lazysodium.interfaces.Sign;
 
 import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
-import convex.core.data.ABlob;
+import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 
@@ -27,14 +27,22 @@ public class SodiumProvider extends AProvider {
 	}
 	
 	@Override
-	public boolean verify(ASignature signature, ABlob message, AccountKey publicKey) {
+	public boolean verify(ASignature signature, AArrayBlob message, AccountKey publicKey) {
 		byte[] sigBytes=signature.getBytes();
-		boolean verified = SodiumProvider.SODIUM_SIGN.cryptoSignVerifyDetached(sigBytes, message.getBytes(), (int)message.count(), publicKey.getBytes());
+		byte[] msgBytes;
+		int mlength=(int)message.count();
+		if (message.getInternalOffset()==0) {
+			msgBytes=message.getInternalArray();
+		} else {
+			// need to copy into0 new zero-based array
+			msgBytes=message.getBytes();
+		}
+		boolean verified = SodiumProvider.SODIUM_SIGN.cryptoSignVerifyDetached(sigBytes, msgBytes, mlength, publicKey.getBytes());
 		return verified;
 	}
 	
 	@Override
-	public SodiumKeyPair generate(Blob seed) {
+	public SodiumKeyPair create(Blob seed) {
 		return SodiumKeyPair.create(seed);
 	}
 

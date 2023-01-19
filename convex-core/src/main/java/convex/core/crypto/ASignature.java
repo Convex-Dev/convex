@@ -2,6 +2,7 @@ package convex.core.crypto;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
@@ -20,7 +21,7 @@ public abstract class ASignature extends ACell {
 	 * @param publicKey Public key of signer
 	 * @return True if signature is valid, false otherwise
 	 */
-	public abstract boolean verify(ABlob message, AccountKey publicKey);
+	public abstract boolean verify(AArrayBlob message, AccountKey publicKey);
 	
 	/**
 	 * Reads a Signature from the given ByteBuffer. Assumes tag byte already read.

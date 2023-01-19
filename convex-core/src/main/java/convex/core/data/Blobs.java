@@ -151,4 +151,19 @@ public class Blobs {
 	public static Blob empty() {
 		return Blob.EMPTY;
 	}
+
+	/** 
+	 * Gets a zero-based array containing the contents of the given Blob.
+	 * MAY use current internal array if possible.
+	 * 
+	 * @param b Blob to get array for
+	 * @return byte array containing the blob contents starting at offset zero
+	 */
+	public static byte[] zeroBasedArray(AArrayBlob b) {
+		if (b.getInternalOffset()==0) {
+			return b.getInternalArray();
+		} else {
+			return b.getBytes();
+		}
+	}
 }
