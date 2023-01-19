@@ -25,7 +25,7 @@ public class BCKeyPair extends AKeyPair {
 	/**
 	 * Secret key in the specific format that Sodium expects, we wrap this complexity in this class
 	 */
-	private final Ed25519PrivateKeyParameters priv;
+	protected final Ed25519PrivateKeyParameters priv;
 
 	private BCKeyPair(AccountKey pk, Blob seed, Ed25519PrivateKeyParameters priv) {
 		this.publicKey=pk;

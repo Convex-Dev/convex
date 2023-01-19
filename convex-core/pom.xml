@@ -9,7 +9,7 @@
 	
 	<properties>
 	  <antlr.version>4.11.1</antlr.version>
-	  <bc.version>1.69</bc.version>
+	  <bc.version>1.70</bc.version>
 	</properties>
 
 
