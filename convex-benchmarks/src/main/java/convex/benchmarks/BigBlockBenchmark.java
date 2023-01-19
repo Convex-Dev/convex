@@ -11,7 +11,6 @@ import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -33,7 +32,7 @@ public class BigBlockBenchmark {
 
 	static {
 		for (int i = 0; i < NUM_ACCOUNTS; i++) {
-			AKeyPair kp = Ed25519KeyPair.generate();
+			AKeyPair kp = AKeyPair.generate();
 			keyPairs.add(kp);
 
 			// Create synthetic accounts

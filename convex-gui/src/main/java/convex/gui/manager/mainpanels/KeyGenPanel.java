@@ -15,7 +15,6 @@ import javax.swing.border.EmptyBorder;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Mnemonic;
 import convex.core.crypto.WalletEntry;
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.util.Utils;
@@ -80,7 +79,7 @@ public class KeyGenPanel extends JPanel {
 		String s = privateKeyArea.getText();
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
-			AKeyPair kp = Ed25519KeyPair.create(b.getBytes());
+			AKeyPair kp = AKeyPair.create(b.getBytes());
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
 			publicKeyArea.setText(kp.getAccountKey().toChecksumHex());
 			addWalletButton.setEnabled(true);

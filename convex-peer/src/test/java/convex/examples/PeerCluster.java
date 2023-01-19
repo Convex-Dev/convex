@@ -3,13 +3,13 @@ package convex.examples;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -38,7 +38,7 @@ public class PeerCluster {
 	static {
 		// create a key pair for each peer
 		for (int i = 0; i < NUM_PEERS; i++) {
-			PEER_KEYPAIRS.add(Ed25519KeyPair.createSeeded(1000+i));
+			PEER_KEYPAIRS.add(AKeyPair.createSeeded(1000+i));
 		}
 
 		// create configuration maps for each peer
