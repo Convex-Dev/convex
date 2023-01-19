@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.HashMap;
 
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;

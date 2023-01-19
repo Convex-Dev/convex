@@ -27,6 +27,8 @@ import org.bouncycastle.pkcs.PKCS8EncryptedPrivateKeyInfo;
 import org.bouncycastle.pkcs.PKCSException;
 import org.bouncycastle.util.io.pem.PemObject;
 
+import convex.core.crypto.sodium.Ed25519KeyPair;
+
 public class PEMTools {
 	// private static String encryptionAlgorithm="AES-128-CBC";
 

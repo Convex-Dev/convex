@@ -7,8 +7,8 @@ import java.io.File;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.PEMTools;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 
 public class CLICommandKeyImportTest {
 

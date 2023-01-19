@@ -11,8 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.PEMTools;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;

@@ -82,7 +82,7 @@ public abstract class ASignature extends ACell {
 	 * 
 	 * @return Blob containing signature bytes
 	 */
-	protected abstract ABlob getSignatureBlob();
+	public abstract ABlob getSignatureBlob();
 
 	
 

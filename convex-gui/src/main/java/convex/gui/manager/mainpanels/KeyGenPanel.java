@@ -13,9 +13,9 @@ import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Mnemonic;
 import convex.core.crypto.WalletEntry;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.util.Utils;

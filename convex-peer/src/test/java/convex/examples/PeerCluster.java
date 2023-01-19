@@ -9,7 +9,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Ed25519KeyPair;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;

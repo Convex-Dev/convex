@@ -1,4 +1,4 @@
-package convex.core.crypto;
+package convex.core.crypto.sodium;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -15,6 +15,9 @@ import java.util.Base64;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
+import convex.core.crypto.Providers;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;

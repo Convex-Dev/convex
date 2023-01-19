@@ -4,6 +4,7 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;

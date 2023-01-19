@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Ed25519KeyPair;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;

@@ -1,4 +1,4 @@
-package convex.core.crypto;
+package convex.core.crypto.sodium;
 
 import java.io.IOException;
 import java.security.KeyFactory;
@@ -19,6 +19,11 @@ import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.ASignature;
+import convex.core.crypto.Ed25519Signature;
+import convex.core.crypto.InsecureRandom;
+import convex.core.crypto.Providers;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;

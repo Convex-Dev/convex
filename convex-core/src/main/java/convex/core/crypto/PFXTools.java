@@ -14,6 +14,8 @@ import java.security.UnrecoverableKeyException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import convex.core.crypto.sodium.Ed25519KeyPair;
+
 /**
  * Utility class for working with Java Key Stores
  */

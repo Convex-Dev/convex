@@ -15,8 +15,6 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.impl.CoreFn;
-import convex.core.lang.impl.ErrorValue;
 
 /**
  * Op representing the invocation of a function.

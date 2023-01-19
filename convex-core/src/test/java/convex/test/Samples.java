@@ -12,8 +12,8 @@ import org.junit.jupiter.params.provider.ArgumentsProvider;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.crypto.Ed25519KeyPair;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;

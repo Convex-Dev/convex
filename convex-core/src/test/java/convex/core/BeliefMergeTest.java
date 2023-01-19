@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
-import convex.core.crypto.Ed25519KeyPair;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;

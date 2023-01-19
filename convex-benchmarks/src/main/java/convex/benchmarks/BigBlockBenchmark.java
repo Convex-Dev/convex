@@ -11,7 +11,7 @@ import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Ed25519KeyPair;
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;

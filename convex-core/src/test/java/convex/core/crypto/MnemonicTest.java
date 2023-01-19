@@ -8,6 +8,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.sodium.Ed25519KeyPair;
 import convex.core.data.Blob;
 
 public class MnemonicTest {
