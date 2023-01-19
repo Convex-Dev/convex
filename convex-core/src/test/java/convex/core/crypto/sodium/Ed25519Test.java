@@ -17,7 +17,6 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.crypto.Providers;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -179,13 +178,13 @@ public class Ed25519Test {
 		
 		byte [] sodiumPK=new byte[32];
 		byte [] sodiumSK=new byte[64];
-		Providers.SODIUM_SIGN.cryptoSignSeedKeypair(sodiumPK, sodiumSK, seed.getBytes());
+		SodiumProvider.SODIUM_SIGN.cryptoSignSeedKeypair(sodiumPK, sodiumSK, seed.getBytes());
 		
 		assertEquals(pk,Blob.wrap(sodiumPK));
 		
 		byte [] sodiumSig=new byte[64];
 		// ABlob ssk=Blob.wrap(sodiumPK).append(Blob.wrap(sodiumSK));
-		Providers.SODIUM_SIGN.cryptoSignDetached(sodiumSig, msg.getBytes(), (int)msg.count(), sodiumSK);
+		SodiumProvider.SODIUM_SIGN.cryptoSignDetached(sodiumSig, msg.getBytes(), (int)msg.count(), sodiumSK);
 		
 		// TODO: figure out how to get LazySodium to replicate test vectors
 		assertArrayEquals(sig.getBytes(),sodiumSig);

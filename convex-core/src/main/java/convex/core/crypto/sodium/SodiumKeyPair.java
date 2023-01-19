@@ -20,7 +20,6 @@ import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
-import convex.core.crypto.Providers;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -51,7 +50,7 @@ public class SodiumKeyPair extends AKeyPair {
 
 		byte[] secretKeyBytes=new byte[SECRET_LENGTH];
 		byte[] pkBytes=new byte[AccountKey.LENGTH];
-		Providers.SODIUM_SIGN.cryptoSignSeedKeypair(pkBytes, secretKeyBytes, seed.getBytes());
+		SodiumProvider.SODIUM_SIGN.cryptoSignSeedKeypair(pkBytes, secretKeyBytes, seed.getBytes());
 		AccountKey publicKey=AccountKey.wrap(pkBytes);
 		return new SodiumKeyPair(publicKey,seed,secretKeyBytes);
 	}
@@ -244,7 +243,7 @@ public class SodiumKeyPair extends AKeyPair {
 	@Override
 	public ASignature sign(Hash hash) {
 		byte[] signature=new byte[Ed25519Signature.SIGNATURE_LENGTH];
-		if (Providers.SODIUM_SIGN.cryptoSignDetached(
+		if (SodiumProvider.SODIUM_SIGN.cryptoSignDetached(
 				signature,
 				hash.getBytes(),
 				Hash.LENGTH,
