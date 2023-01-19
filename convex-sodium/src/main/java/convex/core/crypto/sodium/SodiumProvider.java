@@ -6,6 +6,7 @@ import com.goterl.lazysodium.interfaces.Sign;
 
 import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
+import convex.core.crypto.Providers;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -44,6 +45,10 @@ public class SodiumProvider extends AProvider {
 	@Override
 	public SodiumKeyPair create(Blob seed) {
 		return SodiumKeyPair.create(seed);
+	}
+	
+	public static void install() {
+		Providers.setProvider(new SodiumProvider());
 	}
 
 }

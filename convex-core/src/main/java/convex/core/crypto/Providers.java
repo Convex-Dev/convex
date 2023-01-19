@@ -3,7 +3,6 @@ package convex.core.crypto;
 import java.security.Security;
 
 import convex.core.crypto.bc.BCProvider;
-import convex.core.crypto.sodium.SodiumProvider;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -22,10 +21,7 @@ public class Providers {
 		// Initialise BC provider
 		Security.addProvider(BCProvider.BC);
 		
-		// Initialise Sodium provider
-		SodiumProvider sp=new SodiumProvider();
-		currentProvider=sp; 
-		Security.addProvider(sp);
+		setProvider(new BCProvider());
 	}
 	
 	public static void init() {
@@ -40,6 +36,10 @@ public class Providers {
 		return currentProvider.generate();
 	}
 
+	public static void setProvider(AProvider provider) {
+		currentProvider=provider;
+	}
+	
 	public static AKeyPair generate(Blob seed) {
 		return currentProvider.create(seed);
 	}

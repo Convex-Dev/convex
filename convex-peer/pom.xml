@@ -27,6 +27,11 @@
 			<artifactId>convex-core</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-sodium</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>

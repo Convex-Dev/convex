@@ -8,4 +8,46 @@
   <artifactId>convex-sodium</artifactId>
   <name>Sodium integration for Convex</name>
   <description>This project makes the Sodium crypto library available for use in Conex via native dependencies.</description>
+
+
+	<dependencies>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-core</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-engine</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.vintage</groupId>
+			<artifactId>junit-vintage-engine</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-params</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		
+		
+		<dependency>
+			<groupId>com.goterl</groupId>
+			<artifactId>lazysodium-java</artifactId>
+			<version>5.1.1</version>
+		</dependency>
+
+		<dependency>
+			<groupId>net.java.dev.jna</groupId>
+			<artifactId>jna</artifactId>
+			<version>5.12.1</version>
+		</dependency>
+
+	</dependencies>
 </project>

@@ -27,6 +27,10 @@ import convex.core.lang.RT;
 
 public class SodiumTest {
 	
+	static {
+		SodiumProvider.install();
+	}
+	
 	SodiumProvider PROVIDER=new SodiumProvider();
 
 	@Test

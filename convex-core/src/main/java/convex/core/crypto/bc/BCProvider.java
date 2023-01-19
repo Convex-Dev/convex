@@ -8,6 +8,7 @@ import convex.core.crypto.ASignature;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.util.Utils;
 
 /**
  * Convex provider class for Sodium
@@ -23,8 +24,9 @@ public class BCProvider extends AProvider {
 	
 	@Override
 	public boolean verify(ASignature signature, AArrayBlob message, AccountKey publicKey) {
+		int mlength=Utils.checkedInt(message.count());
 		byte[] sigBytes=signature.getBytes();
-		boolean verified = Ed25519.verify(sigBytes, 0, publicKey.getInternalArray(), publicKey.getInternalOffset(), message.getBytes(), 0, 0);
+		boolean verified = Ed25519.verify(sigBytes, 0, publicKey.getInternalArray(), publicKey.getInternalOffset(), message.getInternalArray(), message.getInternalOffset(), mlength);
 		return verified;
 	}
 	

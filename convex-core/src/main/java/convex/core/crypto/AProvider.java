@@ -55,6 +55,6 @@ public abstract class AProvider extends Provider {
 	 * @param seed
 	 * @return
 	 */
-	protected abstract AKeyPair create(Blob seed);
+	public abstract AKeyPair create(Blob seed);
 
 }

@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.crypto.sodium.SodiumKeyPair;
+import convex.core.crypto.sodium.SodiumKeyPair; 
 
 public class CLICommandKeyImportTest {
 

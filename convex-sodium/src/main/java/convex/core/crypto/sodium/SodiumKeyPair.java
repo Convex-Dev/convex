@@ -10,6 +10,7 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.util.Utils;
 
 /**
  * Class representing an Ed25519 Key Pair using Sodium library
@@ -60,11 +61,12 @@ public class SodiumKeyPair extends AKeyPair {
 
 	@Override
 	public ASignature sign(AArrayBlob hash) {
+		int mlength=Utils.checkedInt(hash.count());
 		byte[] signature=new byte[Ed25519Signature.SIGNATURE_LENGTH];
 		if (SodiumProvider.SODIUM_SIGN.cryptoSignDetached(
 				signature,
 				Blobs.zeroBasedArray(hash),
-				Hash.LENGTH,
+				mlength,
 				secretKeyBytes)) {;
 				return Ed25519Signature.wrap(signature);
 		} else {
