@@ -30,14 +30,14 @@ public class Ed25519Test {
 
 	@Test
 	public void testKeyGen() {
-		AKeyPair kp1=Ed25519KeyPair.generate();
-		AKeyPair kp2=Ed25519KeyPair.generate();
+		AKeyPair kp1=SodiumKeyPair.generate();
+		AKeyPair kp2=SodiumKeyPair.generate();
 		assertNotEquals(kp1,kp2);
 	}
 
 	@Test
 	public void testPublicKeyBytes() {
-		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		SodiumKeyPair kp1=SodiumKeyPair.generate();
 		byte[] publicBytes=kp1.getPublicKeyBytes();
 		byte[] addressBytes=kp1.getAccountKey().getBytes();
 		assertArrayEquals(publicBytes,addressBytes);
@@ -45,8 +45,8 @@ public class Ed25519Test {
 
 	@Test
 	public void testKeyRebuilding() {
-		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
-		Ed25519KeyPair kp2=Ed25519KeyPair.create(kp1.getSeed());
+		SodiumKeyPair kp1=SodiumKeyPair.generate();
+		SodiumKeyPair kp2=SodiumKeyPair.create(kp1.getSeed());
 		assertEquals(kp1,kp2);
 		assertEquals(kp1.getAccountKey(),kp2.getAccountKey());
 
@@ -59,7 +59,7 @@ public class Ed25519Test {
 
 	@Test
 	public void testPrivateKeyBytes() {
-		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		SodiumKeyPair kp1=SodiumKeyPair.generate();
 		PrivateKey priv=kp1.getPrivate();
 		PublicKey pub=kp1.getPublic();
 		AccountKey address=kp1.getAccountKey();
@@ -71,34 +71,34 @@ public class Ed25519Test {
 		byte[] privateKeyBytes=kp1.getPrivate().getEncoded();
 
 
-		Ed25519KeyPair kp2=Ed25519KeyPair.create(pub,priv);
+		SodiumKeyPair kp2=SodiumKeyPair.create(pub,priv);
 		assertEquals(address,kp2.getAccountKey());
 		assertArrayEquals(privateKeyBytes,kp2.getPrivate().getEncoded());
 
 		SignedData<ACell> sd2=kp2.signData(data);
 		assertTrue(sd2.checkSignature());
 
-		Blob pkb=Ed25519KeyPair.extractPrivateKey(priv);
-		AKeyPair kp3=Ed25519KeyPair.create(address, pkb);
+		Blob pkb=SodiumKeyPair.extractPrivateKey(priv);
+		AKeyPair kp3=SodiumKeyPair.create(address, pkb);
 
 		assertEquals(sd2,kp3.signData(data));
 	}
 
 	@Test
 	public void testCreateFromPrivateKey() {
-		Ed25519KeyPair kp1=Ed25519KeyPair.generate();
+		SodiumKeyPair kp1=SodiumKeyPair.generate();
 		PrivateKey priv=kp1.getPrivate();
 		// PublicKey pub=kp1.getPublic();
 
-		Ed25519KeyPair kp2 = Ed25519KeyPair.create(priv);
+		SodiumKeyPair kp2 = SodiumKeyPair.create(priv);
 		assertTrue(kp1.equals(kp2));
 	}
 
 	@Test
 	public void testSeededKeyGen() {
-		AKeyPair kp1=Ed25519KeyPair.createSeeded(1337);
-		AKeyPair kp2=Ed25519KeyPair.createSeeded(1337);
-		AKeyPair kp3=Ed25519KeyPair.createSeeded(13378);
+		AKeyPair kp1=SodiumKeyPair.createSeeded(1337);
+		AKeyPair kp2=SodiumKeyPair.createSeeded(1337);
+		AKeyPair kp3=SodiumKeyPair.createSeeded(13378);
 		assertTrue(kp1.equals(kp2));
 		assertFalse(kp2.equals(kp3));
 	}
@@ -118,8 +118,8 @@ public class Ed25519Test {
 	public void testAccountKeyRoundTrip() {
 		// Address should round trip to a Ed25519 public key and back again
 		AccountKey a=AccountKey.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
-		PublicKey pk=Ed25519KeyPair.publicKeyFromBytes(a.getBytes());
-		AccountKey b=Ed25519KeyPair.extractAccountKey(pk);
+		PublicKey pk=SodiumKeyPair.publicKeyFromBytes(a.getBytes());
+		AccountKey b=SodiumKeyPair.extractAccountKey(pk);
 		assertEquals(a,b);
 	}
 
@@ -137,8 +137,8 @@ public class Ed25519Test {
         assertEquals(32,privateKeyBytes.length);
         assertEquals(32,publicKeyBytes.length);
 
-        PublicKey publicKey=Ed25519KeyPair.publicKeyFromBytes(publicKeyBytes);
-        PrivateKey privateKey=Ed25519KeyPair.privateKeyFromBytes(privateKeyBytes);
+        PublicKey publicKey=SodiumKeyPair.publicKeyFromBytes(publicKeyBytes);
+        PrivateKey privateKey=SodiumKeyPair.privateKeyFromBytes(privateKeyBytes);
 
         // Sign
         Signature signer = Signature.getInstance("EdDSA");
@@ -188,7 +188,7 @@ public class Ed25519Test {
 		Providers.SODIUM_SIGN.cryptoSignDetached(sodiumSig, msg.getBytes(), (int)msg.count(), sodiumSK);
 		
 		// TODO: figure out how to get LazySodium to replicate test vectors
-		assertEquals(sig.getSignatureBlob(),Blob.wrap(sodiumSig));
+		assertArrayEquals(sig.getBytes(),sodiumSig);
 
 	}
 

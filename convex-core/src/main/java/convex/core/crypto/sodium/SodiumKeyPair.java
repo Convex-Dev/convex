@@ -9,13 +9,11 @@ import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.security.spec.X509EncodedKeySpec;
 
 import org.bouncycastle.asn1.DEROctetString;
 import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
-import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
 import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
 import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
 
@@ -31,11 +29,10 @@ import convex.core.data.SignedData;
 import convex.core.util.Utils;
 
 /**
- * Class representing an Ed25519 Key Pair
+ * Class representing an Ed25519 Key Pair using Sodium library
  */
-public class Ed25519KeyPair extends AKeyPair {
+public class SodiumKeyPair extends AKeyPair {
 	private static final int SECRET_LENGTH=64;
-	private static final int SEED_LENGTH=32;
 
 	private final AccountKey publicKey;
 	private KeyPair keyPair=null;
@@ -43,22 +40,20 @@ public class Ed25519KeyPair extends AKeyPair {
 	
 	private final byte[] secretKeyBytes;
 
-	private static final String ED25519 = "Ed25519";
-
-	private Ed25519KeyPair(AccountKey pk, Blob seed, byte[] skBytes) {
+	private SodiumKeyPair(AccountKey pk, Blob seed, byte[] skBytes) {
 		this.publicKey=pk;
 		this.seed=seed;
 		this.secretKeyBytes=skBytes;
 	}
 	
-	public static Ed25519KeyPair create(Blob seed) {
+	public static SodiumKeyPair create(Blob seed) {
 		if (seed.count() != SEED_LENGTH) throw new IllegalArgumentException("256 bit private key material expected as seed!");
 
 		byte[] secretKeyBytes=new byte[SECRET_LENGTH];
 		byte[] pkBytes=new byte[AccountKey.LENGTH];
 		Providers.SODIUM_SIGN.cryptoSignSeedKeypair(pkBytes, secretKeyBytes, seed.getBytes());
 		AccountKey publicKey=AccountKey.wrap(pkBytes);
-		return new Ed25519KeyPair(publicKey,seed,secretKeyBytes);
+		return new SodiumKeyPair(publicKey,seed,secretKeyBytes);
 	}
 
 	/**
@@ -66,7 +61,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	 *
 	 * @return New Key Pair instance.
 	 */
-	public static Ed25519KeyPair generate() {
+	public static SodiumKeyPair generate() {
 		return generate(new SecureRandom());
 	}
 
@@ -75,7 +70,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @param keyPair JCA KeyPair
 	 * @return AKeyPair instance
 	 */
-	protected static Ed25519KeyPair create(KeyPair keyPair) {
+	protected static SodiumKeyPair create(KeyPair keyPair) {
 		Blob seed=extractSeed(keyPair.getPrivate());
 		return create(seed);
 	}
@@ -93,7 +88,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @param privateKey Private key
 	 * @return Key Pair instance
 	 */
-	public static Ed25519KeyPair create(PublicKey publicKey, PrivateKey privateKey) {
+	public static SodiumKeyPair create(PublicKey publicKey, PrivateKey privateKey) {
 		KeyPair keyPair=new KeyPair(publicKey,privateKey);
 		return create(keyPair);
 	}
@@ -104,7 +99,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @param encodedPrivateKey Encoded PKCS8 Private key
 	 * @return AKeyPair instance
 	 */
-	public static Ed25519KeyPair create(AccountKey accountKey, Blob encodedPrivateKey) {
+	public static SodiumKeyPair create(AccountKey accountKey, Blob encodedPrivateKey) {
 		PublicKey publicKey= publicKeyFromBytes(accountKey.getBytes());
 		PrivateKey privateKey=privateKeyFromBlob(encodedPrivateKey);
 		return create(publicKey,privateKey);
@@ -120,7 +115,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @param random A secure random instance
 	 * @return New key pair
 	 */
-	public static Ed25519KeyPair generate(SecureRandom random) {
+	public static SodiumKeyPair generate(SecureRandom random) {
 		Blob seed=Blob.createRandom(random, 32);
 		return create(seed);
 	}
@@ -132,7 +127,7 @@ public class Ed25519KeyPair extends AKeyPair {
 	 * @param privateKey An PrivateKey item for private key
 	 * @return A new key pair using the given private key
 	 */
-	public static Ed25519KeyPair create(PrivateKey privateKey) {
+	public static SodiumKeyPair create(PrivateKey privateKey) {
 		Ed25519PrivateKeyParameters privateKeyParam = new Ed25519PrivateKeyParameters(privateKey.getEncoded(), 16);
 		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
 		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
@@ -189,14 +184,6 @@ public class Ed25519KeyPair extends AKeyPair {
 		return Blob.wrap(bytes);
 	}
 
-	/**
-	 * Gets a byte array representation of the public key
-	 * @return Bytes of public key
-	 */
-	public byte[] getPublicKeyBytes() {
-		return getAccountKey().getBytes();
-	}
-
 	private static PrivateKey privateKeyFromBlob(Blob encodedKey) {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
@@ -226,23 +213,7 @@ public class Ed25519KeyPair extends AKeyPair {
 		}
 	}
 
-	static PublicKey publicKeyFromBytes(byte[] key) {
-		try {
-			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
-			SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(
-					new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), key);
-			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
-			PublicKey publicKey = keyFactory.generatePublic(x509KeySpec);
-			return publicKey;
-		} catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-			throw new Error(e);
-		}
-	}
 
-	@Override
-	public PublicKey getPublic() {
-		return getJCAKeyPair().getPublic();
-	}
 
 	@Override
 	public KeyPair getJCAKeyPair() {
@@ -277,7 +248,7 @@ public class Ed25519KeyPair extends AKeyPair {
 				signature,
 				hash.getBytes(),
 				Hash.LENGTH,
-				getSecretKeyBytes())) {;
+				secretKeyBytes)) {;
 				return Ed25519Signature.wrap(signature);
 		} else {
 			throw new Error("Signing failed!");
@@ -294,21 +265,13 @@ public class Ed25519KeyPair extends AKeyPair {
 //		}
 	}
 
-	/**
-	 * Secret key bytes for LazySodium
-	 * @return Private key byte array
-	 */
-	byte[] getSecretKeyBytes() {
-		return secretKeyBytes;
-	}
-
 	@Override
 	public boolean equals(AKeyPair kp) {
-		if (!(kp instanceof Ed25519KeyPair)) return false;
-		return equals((Ed25519KeyPair) kp);
+		if (!(kp instanceof SodiumKeyPair)) return false;
+		return equals((SodiumKeyPair) kp);
 	}
 
-	boolean equals(Ed25519KeyPair other) {
+	public boolean equals(SodiumKeyPair other) {
 		if (!this.seed.equals(other.seed)) return false;
 		if (!this.publicKey.equals(other.publicKey)) return false;
 		return true;

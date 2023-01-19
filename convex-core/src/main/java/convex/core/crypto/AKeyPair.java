@@ -1,11 +1,20 @@
 package convex.core.crypto;
 
+import java.io.IOException;
+import java.security.KeyFactory;
 import java.security.KeyPair;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 
-import convex.core.crypto.sodium.Ed25519KeyPair;
+import org.bouncycastle.asn1.edec.EdECObjectIdentifiers;
+import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
+import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+
+import convex.core.crypto.sodium.SodiumKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -18,6 +27,18 @@ import convex.core.data.SignedData;
  * Intended as a lightweight container for underlying crypto primitives.
  */
 public abstract class AKeyPair {
+	public static final int SEED_LENGTH=32;
+
+	protected static final String ED25519 = "Ed25519";
+
+
+	/**
+	 * Gets a new byte array representation of the public key
+	 * @return Bytes of public key
+	 */
+	public final byte[] getPublicKeyBytes() {
+		return getAccountKey().getBytes();
+	}
 
 	/**
 	 * Gets the Account Public Key of this KeyPair
@@ -84,7 +105,7 @@ public abstract class AKeyPair {
 	 * @return New key pair
 	 */
 	public static AKeyPair create(AccountKey publicKey, Blob encodedPrivateKey) {
-		return Ed25519KeyPair.create(publicKey,encodedPrivateKey);
+		return SodiumKeyPair.create(publicKey,encodedPrivateKey);
 	}
 	
 	static {
@@ -97,7 +118,7 @@ public abstract class AKeyPair {
 	 * @return New Key Pair instance.
 	 */
 	public static AKeyPair generate() {
-		return Ed25519KeyPair.generate();
+		return SodiumKeyPair.generate();
 	}
 
 	/**
@@ -119,7 +140,7 @@ public abstract class AKeyPair {
 	 */
 	public static AKeyPair create(Blob seed) {
 		// TODO: make switchable
-		return Ed25519KeyPair.create(seed);
+		return SodiumKeyPair.create(seed);
 	}
 
 	/**
@@ -132,7 +153,9 @@ public abstract class AKeyPair {
 	 * Gets the JCA PublicKey
 	 * @return Public Key
 	 */
-	public abstract PublicKey getPublic();
+	public PublicKey getPublic() {
+		return getJCAKeyPair().getPublic();
+	}
 	
 	@Override
 	public String toString() {
@@ -150,5 +173,18 @@ public abstract class AKeyPair {
 	 * @return Seed blob of 32 bytes
 	 */
 	public abstract Blob getSeed();
+	
+	public static PublicKey publicKeyFromBytes(byte[] key) {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(
+					new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), key);
+			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
+			PublicKey publicKey = keyFactory.generatePublic(x509KeySpec);
+			return publicKey;
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
+			throw new Error(e);
+		}
+	}
 
 }

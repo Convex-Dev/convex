@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.crypto.sodium.Ed25519KeyPair;
+import convex.core.crypto.sodium.SodiumKeyPair;
 
 public class CLICommandKeyImportTest {
 
@@ -25,7 +25,7 @@ public class CLICommandKeyImportTest {
 	@Test
 	public void testKeyImport() {
 	
-		AKeyPair keyPair = Ed25519KeyPair.generate();
+		AKeyPair keyPair = SodiumKeyPair.generate();
 		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSWORD.toCharArray());
  
 		// command key.list

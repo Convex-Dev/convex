@@ -6,7 +6,6 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
-import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
@@ -104,8 +103,7 @@ public class Ed25519Signature extends ASignature {
 	
 	@Override
 	public boolean verify(ABlob message, AccountKey publicKey) {
-	    boolean verified = Providers.SODIUM_SIGN.cryptoSignVerifyDetached(signatureBytes, message.getBytes(), (int)message.count(), publicKey.getBytes());
-	    return verified;
+	    return Providers.verify(this,message,publicKey);
 	}
 	
 //	private boolean verify(Hash hash, PublicKey publicKey) {
@@ -140,14 +138,9 @@ public class Ed25519Signature extends ASignature {
 	public String toHexString() {
 		return Utils.toHexString(signatureBytes);
 	}
-
+	
 	@Override
-	public Blob getSignatureBlob() {
-		return Blob.wrap(signatureBytes);
+	public byte[] getBytes() {
+		return signatureBytes;
 	}
-
-
-
-
-
 }

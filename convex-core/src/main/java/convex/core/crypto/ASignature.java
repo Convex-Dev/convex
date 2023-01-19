@@ -78,12 +78,10 @@ public abstract class ASignature extends ACell {
 	}
 
 	/**
-	 * Gets a Blob containing the raw bytes of this digital signature
-	 * 
-	 * @return Blob containing signature bytes
+	 * Gets the raw bytes representing this signature
+	 * @return
 	 */
-	public abstract ABlob getSignatureBlob();
+	public abstract byte[] getBytes();
 
-	
 
 }

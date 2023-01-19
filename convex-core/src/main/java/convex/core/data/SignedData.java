@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.crypto.Providers;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -196,7 +197,7 @@ public class SignedData<T extends ACell> extends ACell {
 		if ((flags&Ref.VERIFIED_MASK)!=0) return true;
 
 		Hash hash=valueRef.getHash();
-		boolean check = signature.verify(hash, publicKey);
+		boolean check = Providers.verify(signature,hash, publicKey);
 
 		if (check) {
 			markValidated();
