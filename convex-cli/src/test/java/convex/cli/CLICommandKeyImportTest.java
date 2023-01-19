@@ -24,7 +24,7 @@ public class CLICommandKeyImportTest {
 
 	@Test
 	public void testKeyImport() {
-	
+	 
 		AKeyPair keyPair = SodiumKeyPair.generate();
 		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSWORD.toCharArray());
  
