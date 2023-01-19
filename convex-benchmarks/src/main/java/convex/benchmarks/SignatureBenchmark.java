@@ -5,7 +5,10 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.AProvider;
 import convex.core.crypto.ASignature;
+import convex.core.crypto.bc.BCProvider;
+import convex.core.crypto.sodium.SodiumProvider;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blobs;
@@ -13,8 +16,11 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 
 public class SignatureBenchmark {
+	protected static final AProvider SDPROVIDER=new SodiumProvider();
+	protected static final AProvider BCPROVIDER=new BCProvider();
+	protected static final AProvider PROVIDER=SDPROVIDER;
 
-	private static final AKeyPair KEYPAIR=AKeyPair.generate();
+	private static final AKeyPair KEYPAIR=PROVIDER.generate();
 	private static final SignedData<ABlob> SIGNED=makeSigned();
 
 	private static SignedData<ABlob> makeSigned() {
@@ -43,7 +49,7 @@ public class SignatureBenchmark {
 	@Benchmark
 	public void verify() {
 		ASignature sig=SIGNATURE;
-		sig.verify(SIGNED.getValue().getHash(), KEYPAIR.getAccountKey());
+		PROVIDER.verify(sig,SIGNED.getValue().getHash(), KEYPAIR.getAccountKey());
 	}
 	
 	@SuppressWarnings("unchecked")
