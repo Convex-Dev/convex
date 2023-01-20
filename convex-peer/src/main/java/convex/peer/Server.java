@@ -426,7 +426,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Process a message received from a peer or client. We know at this point that the
-	 * message parsed successfully, not much else.....
+	 * message decoded successfully, not much else.....
 	 * 
 	 * SECURITY: Should anticipate malicious messages
 	 *
