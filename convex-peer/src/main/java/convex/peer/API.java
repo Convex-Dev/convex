@@ -33,7 +33,7 @@ import convex.core.util.Utils;
  */
 public class API {
 
-	private static final Logger log = LoggerFactory.getLogger(API.class.getName());
+	protected static final Logger log = LoggerFactory.getLogger(API.class.getName());
 
 	/**
 	 * <p>Launches a Peer Server with a supplied configuration.</p>
@@ -88,8 +88,6 @@ public class API {
 			server.launch();
 			return server;
 		} catch (Throwable t) {
-			log.error("Error launching peer: ",t);
-			t.printStackTrace();
 			throw Utils.sneakyThrow(t);
 		}
 	}

@@ -8,7 +8,6 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
-import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.util.Utils;
 
