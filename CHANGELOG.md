@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - General update of dependencies to most recent versions as of Sep 2022
+- Refactoring of Sodium crypto libraries to separate convex-sodium module
 
 ### Fixed
 - Fix for printing of single quotes (see #407)
