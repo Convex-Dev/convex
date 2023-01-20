@@ -607,16 +607,7 @@ public class Connection {
 	/**
 	 * Selector object for all client connections
 	 */
-	private static final Selector selector;
-
-	static {
-		try {
-			// System.err.println("Initialising Client selector");
-			selector = Selector.open();
-		} catch (IOException e) {
-			throw new Error("Error initialising client selector",e);
-		}
-	}
+	private static Selector selector;
 
 	private static Thread selectorThread;
 
@@ -625,6 +616,12 @@ public class Connection {
 		if (selectorThread==null) {
 			synchronized(Connection.class) {
 				if (selectorThread==null) {
+					try {
+						// System.err.println("Initialising Client selector");
+						selector = Selector.open();
+					} catch (IOException e) {
+						throw new Error("Error initialising client selector",e);
+					}
 					selectorThread = new Thread(selectorLoop, "Connection NIO client selector loop");
 					// make this a daemon thread so it shuts down if everything else exits
 					selectorThread.setDaemon(true);
