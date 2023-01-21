@@ -3,6 +3,7 @@ package etch.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.Random;
@@ -95,6 +96,7 @@ public class TestEtch {
 		// write the Ref
 		Ref<ACell> r2=etch.write(key, r);
 		assertEquals(key,r2.getHash());
+		assertTrue(etch.getDataLength() > 0);
 		// System.out.println(i + " " +  COUNT);
 	}
 }

@@ -577,6 +577,14 @@ public class Etch {
 		}
 	}
 
+
+	/**
+	 * @return Current data size in bytes
+	 */
+	public long getDataLength() {
+		return dataLength;
+	}
+
 	/**
 	 * Writes the data length field for the Etch file. S
 	 * @throws IOException
