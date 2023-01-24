@@ -17,7 +17,7 @@ import convex.core.lang.reader.ReaderUtils;
 /**
  * Class for CVM Character values.
  * 
- * Characters are Unicode code point, and can be used to construct Strings on the CVM.
+ * Characters are Unicode code points, and can be used to construct Strings on the CVM.
  * Limited to range 0 .. 0x10ffff as per Unicode standard
  */
 public final class CVMChar extends APrimitive {

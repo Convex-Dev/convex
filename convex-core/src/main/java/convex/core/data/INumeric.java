@@ -9,9 +9,16 @@ import convex.core.data.prim.CVMLong;
  */
 public interface INumeric {
 
-	
+	/**
+	 * Casts to a CVM Long value. Takes last 64 bits.
+	 * @return
+	 */
 	public CVMLong toLong();
 	
+	/**
+	 * Casts to a CVM Double value. 
+	 * @return Double value
+	 */
 	public CVMDouble toDouble();
 
 	public double doubleValue();
