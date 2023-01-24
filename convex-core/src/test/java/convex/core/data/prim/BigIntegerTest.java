@@ -23,6 +23,15 @@ public class BigIntegerTest {
 		
 		doBigTest(bi);
 	}
+	
+	@Test public void testOne() {
+		CVMBigInteger bi=CVMBigInteger.create(new byte[] {1});
+		assertEquals(1,bi.longValue());
+		assertEquals(1.0,bi.doubleValue());
+		assertEquals(BigInteger.ONE,bi.getBigInteger());
+		
+		doBigTest(bi);
+	}
 
 	private void doBigTest(CVMBigInteger bi) {
 		// BigInteger value should be cached
