@@ -17,7 +17,7 @@ import convex.core.lang.RT;
  * 
  * Longs are signed 64-bit integers, and are the primary fixed point integer type on the CVM.
  */
-public final class CVMLong extends APrimitive implements INumeric {
+public final class CVMLong extends AInteger {
 
 	private static final int CACHE_SIZE = 256;
 	private static final CVMLong[] CACHE= new CVMLong[CACHE_SIZE];

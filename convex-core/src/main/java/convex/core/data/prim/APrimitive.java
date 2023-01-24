@@ -5,9 +5,8 @@ import convex.core.data.Ref;
 import convex.core.data.RefDirect;
 
 /**
- * Abstract base class for small CVM primitive values.
+ * Abstract base class for CVM primitive values.
  * 
- * Primitives never contain Refs, are always embedded, and are always canonical
  */
 public abstract  class APrimitive extends ACell {
 	@Override
