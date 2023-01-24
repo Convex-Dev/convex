@@ -44,6 +44,11 @@ public final class CVMLong extends AInteger {
 		this.value=value;
 	}
 
+	/**
+	 * Creates a CVMLong wrapping the given Java long value. Always succeeds.
+	 * @param value Java long
+	 * @return CVMLong instance.
+	 */
 	public static CVMLong create(long value) {
 		if ((value<CACHE_SIZE)&&(value>=0)) {
 			return forByte((byte)value);

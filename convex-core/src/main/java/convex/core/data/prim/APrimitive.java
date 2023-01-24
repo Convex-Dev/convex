@@ -44,13 +44,13 @@ public abstract  class APrimitive extends ACell {
 	}
 	
 	/**
-	 * @return long value representing primitive
+	 * @return Java long value representing this primitive CVM value
 	 */
 	public abstract long longValue();
 	
 	
 	/**
-	 * @return double value representing primitive
+	 * @return Java double value representing this primitive CVM value
 	 */
 	public abstract double doubleValue();
 	

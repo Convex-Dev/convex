@@ -2,23 +2,60 @@ package convex.core.data.prim;
 
 import java.math.BigInteger;
 
+import convex.core.data.ABlob;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Utils;
 
+/**
+ * Arbitrary precision integer implementation for the CVM
+ */
 public class CVMBigInteger extends AInteger {
 
+	private ABlob blob;
 	private BigInteger data;
+	
+	public CVMBigInteger(ABlob blob, BigInteger value) {
+		this.blob=blob;
+		this.data=value;
+	}
+
+	public static CVMBigInteger create(byte[] bs) {
+		bs=Utils.trimBigIntegerLeadingBytes(bs);
+		return new CVMBigInteger(Blob.wrap(bs),null);
+	}
+	
+	public static CVMBigInteger create(BigInteger value) {
+		return new CVMBigInteger(null,value);
+	}
+
 	
 	@Override
 	public CVMLong toLong() {
-		// TODO Auto-generated method stub
 		return CVMLong.create(big().longValue());
 	}
 
-	private BigInteger big() {
+	protected BigInteger big() {
+		if (data==null) data=buildBigInteger();
 		return data;
+	}
+	
+	protected ABlob blob() {
+		if (blob==null) blob=buildBlob();
+		return blob;
+	}
+
+	protected ABlob buildBlob() {
+		return Blob.wrap(data.toByteArray());
+	}
+
+	protected BigInteger buildBigInteger() {
+		long n=blob.count();
+		if (n==0) return BigInteger.ZERO;
+		return new BigInteger(blob.getBytes());
 	}
 
 	@Override
@@ -51,8 +88,7 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public long longValue() {
-		// TODO Auto-generated method stub
-		return 0;
+		return big().longValue();
 	}
 
 	@Override
@@ -88,6 +124,14 @@ public class CVMBigInteger extends AInteger {
 	public boolean print(BlobBuilder sb, long limit) {
 		// TODO Auto-generated method stub
 		return false;
+	}
+
+	/**
+	 * Gets the Java BigInteger representing this number
+	 * @return Java BigInteger
+	 */
+	public BigInteger getBigInteger() {
+		return big();
 	}
 
 }

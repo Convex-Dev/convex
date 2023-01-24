@@ -1399,6 +1399,29 @@ public class Utils {
 		CompletableFuture.allOf(cfutures.toArray(new CompletableFuture[cfutures.size()])).get();
 	}
 
+	/**
+	 * Trims unnecessary leading bytes from a BigInteger representation.
+	 * @param bs Big endian twos complement representation of Big Integer
+	 * @return trimmed bytes (may be same array)
+	 */
+	public static byte[] trimBigIntegerLeadingBytes(byte[] bs) {
+		int n=bs.length;
+		int i=0;
+		for (; i<n; i++) {
+			byte b=bs[i];
+			if ((b==0)||(b==-1)) {
+				// TODO
+				
+			} else {
+				break;
+			}
+		}
+		if (i>0) {
+			bs=Arrays.copyOfRange(bs, i, n);
+		}
+		return bs;
+	}
+
 
 
 
