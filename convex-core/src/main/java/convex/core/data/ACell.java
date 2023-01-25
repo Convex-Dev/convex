@@ -37,7 +37,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	private long memorySize=-1;
 	
 	/**
-	 * Cached Ref. This is useful to manage persistence
+	 * Cached Ref. This is useful to manage persistence. Also cached Ref MUST refer to canonical value
 	 */
 	protected Ref<ACell> cachedRef=null;
 
@@ -131,7 +131,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @return A Blob representing this cell in encoded form
 	 */
-	public ACell getCanonical() {
+	public final ACell getCanonical() {
 		if (isCanonical()) return this;
 		Ref<ACell> ref=getRef().ensureCanonical();
 		if (cachedRef!=ref) cachedRef=ref;
@@ -381,7 +381,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	@SuppressWarnings("unchecked")
 	public final <R extends ACell> Ref<R> getRef() {
 		if (cachedRef!=null) return (Ref<R>) cachedRef;
-		return createRef();
+		Ref<R> newRef=createRef();
+		cachedRef=(Ref<ACell>) newRef;
+		return newRef;
 	}
 	
 	/**
@@ -391,7 +393,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	@SuppressWarnings("unchecked")
 	protected <R extends ACell> Ref<R> createRef() {
-		Ref<ACell> newRef= RefDirect.create(this,cachedHash());
+		Ref<ACell> newRef= RefDirect.create(toCanonical(),cachedHash());
 		cachedRef=newRef;
 		return (Ref<R>) newRef;
 	}

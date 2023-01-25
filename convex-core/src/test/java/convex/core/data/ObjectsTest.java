@@ -224,7 +224,11 @@ public class ObjectsTest {
 		Ref<ACell> ref=a.getRef();
 		if (cachedRef!=null) assertSame(ref,cachedRef);
 		
+		assertTrue(ref.getValue().isCanonical());
+		
+		// Repeated getRef should return same object
 		assertSame(ref,a.getRef());
+		
 		assertEquals(a.isEmbedded(),ref.isEmbedded());
 		
 		ACell c=a.getCanonical();
