@@ -1407,14 +1407,13 @@ public class Utils {
 	public static byte[] trimBigIntegerLeadingBytes(byte[] bs) {
 		int n=bs.length;
 		int i=0;
-		for (; i<n; i++) {
+		for (; i<n-1; i++) {
 			byte b=bs[i];
 			if ((b==0)||(b==-1)) {
-				// TODO
-				
-			} else {
-				break;
+				// potentially first byte is just sign that can be dropped
+				if ((b==0)^((bs[i+1]&0x80)!=0)) continue;
 			}
+			break;
 		}
 		if (i>0) {
 			bs=Arrays.copyOfRange(bs, i, n);

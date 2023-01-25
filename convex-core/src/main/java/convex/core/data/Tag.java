@@ -18,7 +18,7 @@ public class Tag {
 	//public static final byte INT = (byte) 0x07;
 	public static final byte LONG = (byte) 0x09;
 
-	//public static final byte BIG_INTEGER = (byte) 0x0a; // Arbitrary length integer
+	public static final byte INTEGER = (byte) 0x0a; // Arbitrary length integer
 	public static final byte DOUBLE = (byte) 0x0d;
 	//public static final byte FLOAT = (byte) 0x0f;
 	//public static final byte BIG_DECIMAL = (byte) 0x0e; // E notation precise decimal

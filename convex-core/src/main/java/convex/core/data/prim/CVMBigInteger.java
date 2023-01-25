@@ -24,8 +24,9 @@ public class CVMBigInteger extends AInteger {
 	}
 
 	public static CVMBigInteger create(byte[] bs) {
-		bs=Utils.trimBigIntegerLeadingBytes(bs);
-		return new CVMBigInteger(Blob.wrap(bs),null);
+		byte[] tbs=Utils.trimBigIntegerLeadingBytes(bs);
+		if (tbs==bs) tbs=tbs.clone(); // Defensive copy just in case
+		return new CVMBigInteger(Blob.wrap(tbs),null);
 	}
 	
 	public static CVMBigInteger create(BigInteger value) {
@@ -104,26 +105,30 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public byte getTag() {
-		// TODO Needs a separate tag?
-		return Tag.LONG;
+		return Tag.INTEGER;
 	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		// TODO Auto-generated method stub
-		return 0;
+		bs[pos++]=Tag.INTEGER;
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
 	protected int encodeRaw(byte[] bs, int pos) {
-		// TODO Auto-generated method stub
-		return 0;
+		ABlob b=blob();
+		return b.encodeRaw(bs, pos);
 	}
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		// TODO Auto-generated method stub
 		return false;
+	}
+	
+	@Override
+	public String toString() {
+		return big().toString();
 	}
 
 	/**

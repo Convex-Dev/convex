@@ -16,7 +16,7 @@ public class BigIntegerTest {
 	}
 	
 	@Test public void testZero() {
-		CVMBigInteger bi=CVMBigInteger.create(new byte[0]);
+		CVMBigInteger bi=CVMBigInteger.create(new byte[] {0});
 		assertEquals(0,bi.longValue());
 		assertEquals(0.0,bi.doubleValue());
 		assertEquals(BigInteger.ZERO,bi.getBigInteger());
@@ -32,6 +32,16 @@ public class BigIntegerTest {
 		
 		doBigTest(bi);
 	}
+	
+	@Test public void testSmallestPositive() {
+		CVMBigInteger bi=CVMBigInteger.create(new byte[] {0,-128,0,0,0,0,0,0,0});
+		assertEquals(Long.MIN_VALUE,bi.longValue());
+		
+		// Extra leading zeros should get ignored
+		assertEquals(bi,CVMBigInteger.create(new byte[] {0,0,0,-128,0,0,0,0,0,0,0}));
+		
+		doBigTest(bi);
+	}
 
 	private void doBigTest(CVMBigInteger bi) {
 		// BigInteger value should be cached
@@ -39,6 +49,7 @@ public class BigIntegerTest {
 		assertSame(big,bi.getBigInteger());
 		
 		CVMBigInteger bi2=CVMBigInteger.create(big);
+		assertEquals(bi.getEncoding(),bi2.getEncoding());
 		assertEquals(bi,bi2);
 	}
 }
