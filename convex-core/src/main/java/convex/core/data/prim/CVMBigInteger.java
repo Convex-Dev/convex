@@ -5,7 +5,6 @@ import java.math.BigInteger;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
-import convex.core.data.INumeric;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -66,19 +65,20 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public Class<?> numericType() {
-		// TODO Auto-generated method stub
-		return null;
+		// TODO Specific INTEGER type
+		return Long.class;
 	}
 
 	@Override
 	public APrimitive signum() {
-		// TODO Auto-generated method stub
-		return null;
+		if (data!=null) return CVMLong.forSignum(data.signum());
+		return CVMLong.forSignum(blob.byteAt(0));
 	}
 
 	@Override
-	public INumeric toStandardNumber() {
-		return this;
+	public ANumeric toStandardNumber() {
+		if (isCanonical()) return this;
+		return (ANumeric) getCanonical();
 	}
 
 	@Override
@@ -137,6 +137,17 @@ public class CVMBigInteger extends AInteger {
 	 */
 	public BigInteger getBigInteger() {
 		return big();
+	}
+
+	@Override
+	public boolean isCanonical() {
+		return (blob().count()>8);
+	}
+	
+	@Override
+	public ANumeric toCanonical() {
+		if (isCanonical()) return this;
+		return CVMLong.create(big().longValue());
 	}
 
 }

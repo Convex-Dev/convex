@@ -1,7 +1,7 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
-import convex.core.data.INumeric;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -35,8 +35,8 @@ public class Number extends AType {
 	}
 
 	@Override
-	public APrimitive implicitCast(ACell a) {
-		if (a instanceof INumeric) return (APrimitive)a;
+	public ANumeric implicitCast(ACell a) {
+		if (a instanceof ANumeric) return (ANumeric)a;
 		return null;
 	}
 	

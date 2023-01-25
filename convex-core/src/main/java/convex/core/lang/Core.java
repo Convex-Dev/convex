@@ -28,7 +28,6 @@ import convex.core.data.Address;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
@@ -39,6 +38,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -2565,7 +2565,7 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			if (!RT.isNumber(val)) return false;
-			INumeric n = RT.ensureNumber(val);
+			ANumeric n = RT.ensureNumber(val);
 
 			// According to the IEEE 754 standard, negative zero and positive zero should
 			// compare as equal with the usual (numerical) comparison operators

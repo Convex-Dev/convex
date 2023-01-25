@@ -3,7 +3,6 @@ package convex.core.data.prim;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.BlobBuilder;
-import convex.core.data.INumeric;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
@@ -17,7 +16,7 @@ import convex.core.util.Utils;
  * 
  * Follows the Java standard / IEEE 784 spec.
  */
-public final class CVMDouble extends APrimitive implements INumeric {
+public final class CVMDouble extends ANumeric {
 
 	public static final CVMDouble ZERO = CVMDouble.create(0.0);
 	public static final CVMDouble NEGATIVE_ZERO = CVMDouble.create(-0.0);
@@ -138,7 +137,7 @@ public final class CVMDouble extends APrimitive implements INumeric {
 	}
 
 	@Override
-	public INumeric toStandardNumber() {
+	public CVMDouble toStandardNumber() {
 		return this;
 	}
 

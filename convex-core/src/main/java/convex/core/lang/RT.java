@@ -27,7 +27,6 @@ import convex.core.data.BlobBuilder;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.IAssociative;
-import convex.core.data.INumeric;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.LongBlob;
@@ -38,6 +37,7 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -277,8 +277,8 @@ public class RT {
 	 * @return Long.class or Double.class if cast possible, or null if not numeric.
 	 */
 	public static Class<?> numericType(ACell a) {
-		if (a instanceof INumeric) {
-			return ((INumeric) a).numericType();
+		if (a instanceof ANumeric) {
+			return ((ANumeric) a).numericType();
 		}
 		return null;
 	}
@@ -488,7 +488,7 @@ public class RT {
 	 * @return Absolute value, or null if not a numeric value
 	 */
 	public static APrimitive abs(ACell a) {
-		INumeric x = RT.ensureNumber(a);
+		ANumeric x = RT.ensureNumber(a);
 		if (x == null)
 			return null;
 		if (x instanceof CVMLong)
@@ -504,7 +504,7 @@ public class RT {
 	 *         is not numeric
 	 */
 	public static ACell signum(ACell a) {
-		INumeric x = RT.ensureNumber(a);
+		ANumeric x = RT.ensureNumber(a);
 		if (x == null)
 			return null;
 		return x.signum();
@@ -572,12 +572,12 @@ public class RT {
 	 * @param a Value to convert to numeric representation
 	 * @return The number value, or null if cannot be converted
 	 */
-	public static INumeric ensureNumber(ACell a) {
+	public static ANumeric ensureNumber(ACell a) {
 		if (a == null)
 			return null;
 
-		if (a instanceof INumeric) {
-			return ((INumeric) a).toStandardNumber();
+		if (a instanceof ANumeric) {
+			return ((ANumeric) a).toStandardNumber();
 		}
 
 		return null;
@@ -592,7 +592,7 @@ public class RT {
 	 * @return True if a number, false otherwise
 	 */
 	public static boolean isNumber(ACell val) {
-		return (val instanceof INumeric);
+		return (val instanceof ANumeric);
 	}
 
 	/**
@@ -644,8 +644,8 @@ public class RT {
 	 * @return CVMDouble value, or null if not convertible
 	 */
 	public static CVMDouble ensureDouble(ACell a) {
-		if (a instanceof INumeric) {
-			INumeric ap = (INumeric) a;
+		if (a instanceof ANumeric) {
+			ANumeric ap = (ANumeric) a;
 			return ap.toDouble();
 		}
 		return null;
@@ -661,7 +661,7 @@ public class RT {
 	public static CVMLong castLong(ACell a) {
 		if (a instanceof CVMLong)
 			return (CVMLong) a;
-		INumeric n = ensureNumber(a);
+		ANumeric n = ensureNumber(a);
 		if (n != null) {
 			return n.toLong();
 		}
@@ -688,8 +688,8 @@ public class RT {
 	public static CVMLong ensureLong(ACell a) {
 		if (a instanceof CVMLong)
 			return (CVMLong) a;
-		if (a instanceof INumeric) {
-			INumeric ap = (INumeric) a;
+		if (a instanceof ANumeric) {
+			ANumeric ap = (ANumeric) a;
 			if (ap.numericType() == Long.class)
 				return ap.toLong();
 		}

@@ -4,7 +4,6 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
-import convex.core.data.INumeric;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
@@ -163,7 +162,7 @@ public final class CVMLong extends AInteger {
 	}
 
 	@Override
-	public INumeric toStandardNumber() {
+	public CVMLong toStandardNumber() {
 		return this;
 	}
 
@@ -176,6 +175,17 @@ public final class CVMLong extends AInteger {
 	@Override
 	public String toString() {
 		return Long.toString(value);
+	}
+
+	public static final CVMLong forSignum(long value) {
+		if (value>0) return CVMLong.ONE;
+		if (value<0) return CVMLong.MINUS_ONE;
+		return CVMLong.ZERO;
+	}
+
+	@Override
+	public boolean isCanonical() {
+		return true; // always canonical
 	}
 
 }

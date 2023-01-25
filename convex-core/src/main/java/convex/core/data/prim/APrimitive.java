@@ -10,7 +10,7 @@ import convex.core.data.RefDirect;
  */
 public abstract  class APrimitive extends ACell {
 	@Override
-	public final boolean isCanonical() {
+	public boolean isCanonical() {
 		return true;
 	}
 	
