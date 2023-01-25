@@ -43,7 +43,7 @@ public class BigIntegerTest {
 		doBigTest(bi);
 	}
 
-	private void doBigTest(CVMBigInteger bi) {
+	public static void doBigTest(CVMBigInteger bi) {
 		// BigInteger value should be cached
 		BigInteger big=bi.getBigInteger();
 		assertSame(big,bi.getBigInteger());
@@ -51,5 +51,8 @@ public class BigIntegerTest {
 		CVMBigInteger bi2=CVMBigInteger.create(big);
 		assertEquals(bi.getEncoding(),bi2.getEncoding());
 		assertEquals(bi,bi2);
+		
+		String s=bi.toString();
+		assertEquals(big,new BigInteger(s));
 	}
 }

@@ -3,8 +3,10 @@ package convex.core.data.prim;
 import java.math.BigInteger;
 
 import convex.core.data.ABlob;
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -122,10 +124,23 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
-		// TODO Auto-generated method stub
-		return false;
+		long blen=byteLength();
+		if (blen>limit*2) return false;
+		AString s=Strings.create(big().toString());
+		if (s.count()>limit) return false;
+		sb.append(s);
+		return true;
 	}
 	
+	/**
+	 * Number of bytes in minimal representation of this Integer
+	 * @return Number of bytes
+	 */
+	public long byteLength() {
+		if (blob!=null) return blob.count();
+		return ((data.bitLength())/8)+1;
+	}
+
 	@Override
 	public String toString() {
 		return big().toString();
