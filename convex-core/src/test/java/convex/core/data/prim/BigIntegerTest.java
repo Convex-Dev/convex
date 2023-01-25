@@ -8,6 +8,8 @@ import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ObjectsTest;
+
 public class BigIntegerTest {
 
 	@Test public void testBigIntegerAssumptions() {
@@ -54,5 +56,7 @@ public class BigIntegerTest {
 		
 		String s=bi.toString();
 		assertEquals(big,new BigInteger(s));
+		
+		ObjectsTest.doAnyValueTests(bi);
 	}
 }

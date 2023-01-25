@@ -1,13 +1,16 @@
 package convex.core.data.prim;
 
 import java.math.BigInteger;
+import java.nio.ByteBuffer;
 
 import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
+import convex.core.data.Blobs;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
@@ -19,7 +22,7 @@ public class CVMBigInteger extends AInteger {
 	private ABlob blob;
 	private BigInteger data;
 	
-	public CVMBigInteger(ABlob blob, BigInteger value) {
+	private CVMBigInteger(ABlob blob, BigInteger value) {
 		this.blob=blob;
 		this.data=value;
 	}
@@ -32,6 +35,24 @@ public class CVMBigInteger extends AInteger {
 	
 	public static CVMBigInteger create(BigInteger value) {
 		return new CVMBigInteger(null,value);
+	}
+	
+	/**
+	 * Create a big integer from a valid blob representation. Can be non-canonical.
+	 * @param data Blob data containing minimal BigInteger twos complement representation
+	 * @return Big Integer value or null if not valid.
+	 */
+	public static CVMBigInteger create(ABlob data) {
+		long n=data.count();
+		if (n==0) return null;
+		if (n>1) {
+			byte bs=data.byteAt(0);
+			if ((bs==0)||(bs==-1)) {
+				byte bs2=data.byteAt(1);
+				if ((bs&0x80)==(bs2&0x80)) return null; // excess leading byte not allowed
+			}
+		}
+		return new CVMBigInteger(data,null);
 	}
 
 	
@@ -107,7 +128,7 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public byte getTag() {
-		return Tag.INTEGER;
+		return isCanonical()?Tag.INTEGER:Tag.LONG;
 	}
 
 	@Override
@@ -163,6 +184,14 @@ public class CVMBigInteger extends AInteger {
 	public ANumeric toCanonical() {
 		if (isCanonical()) return this;
 		return CVMLong.create(big().longValue());
+	}
+
+	public static CVMBigInteger read(ByteBuffer bb) throws BadFormatException {
+		ABlob b=Blobs.read(bb);
+		if (b.count()<=8) throw new BadFormatException("Non-canonical size of big integer");
+		CVMBigInteger bi= create(b);
+		if (bi==null) throw new BadFormatException("Invalid blob representation of big integer");
+		return bi;
 	}
 
 }

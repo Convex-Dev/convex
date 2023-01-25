@@ -11,6 +11,7 @@ import convex.core.BlockResult;
 import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -621,6 +622,7 @@ public class Format {
 		try {
 			if (tag == Tag.NULL) return null;
 			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
+			if (tag == Tag.INTEGER) return (T) CVMBigInteger.read(bb);
 			
 			// Double is special, we enforce a canonical NaN
 			if (tag == Tag.DOUBLE) return (T) CVMDouble.read(bb.getDouble());
