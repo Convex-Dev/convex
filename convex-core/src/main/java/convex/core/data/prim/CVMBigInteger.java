@@ -19,6 +19,8 @@ import convex.core.util.Utils;
  */
 public class CVMBigInteger extends AInteger {
 
+	public static final CVMBigInteger MIN_POSITIVE = create(new byte[] {0,-128,0,0,0,0,0,0,0});
+	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
 	private ABlob blob;
 	private BigInteger data;
@@ -193,6 +195,13 @@ public class CVMBigInteger extends AInteger {
 		CVMBigInteger bi= create(b);
 		if (bi==null) throw new BadFormatException("Invalid blob representation of big integer");
 		return bi;
+	}
+
+	@Override
+	public APrimitive abs() {
+		BigInteger bi=big();
+		if (bi.signum()>=0) return this;
+		return create(bi.abs());
 	}
 
 }

@@ -188,4 +188,11 @@ public final class CVMLong extends AInteger {
 		return true; // always canonical
 	}
 
+	@Override
+	public AInteger abs() {
+		if (value>=0) return this;
+		if (value==Long.MIN_VALUE) return CVMBigInteger.MIN_POSITIVE;
+		return create(-value);
+	}
+
 }

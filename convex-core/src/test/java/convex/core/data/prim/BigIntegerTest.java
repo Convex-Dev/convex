@@ -40,6 +40,8 @@ public class BigIntegerTest {
 	
 	@Test public void testSmallestPositive() {
 		CVMBigInteger bi=CVMBigInteger.create(new byte[] {0,-128,0,0,0,0,0,0,0});
+		assertEquals(CVMBigInteger.MIN_POSITIVE,bi);
+
 		assertEquals(Long.MIN_VALUE,bi.longValue());
 		
 		// Should be canonical, since too large for a CVMLong

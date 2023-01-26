@@ -37,6 +37,7 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
@@ -491,9 +492,7 @@ public class RT {
 		ANumeric x = RT.ensureNumber(a);
 		if (x == null)
 			return null;
-		if (x instanceof CVMLong)
-			return CVMLong.create(Math.abs(((CVMLong) x).longValue()));
-		return CVMDouble.create(Math.abs(x.toDouble().doubleValue()));
+		return x.abs();
 	}
 
 	/**
@@ -573,13 +572,9 @@ public class RT {
 	 * @return The number value, or null if cannot be converted
 	 */
 	public static ANumeric ensureNumber(ACell a) {
-		if (a == null)
-			return null;
-
 		if (a instanceof ANumeric) {
-			return ((ANumeric) a).toStandardNumber();
+			return (ANumeric) a;
 		}
-
 		return null;
 	}
 
@@ -688,6 +683,51 @@ public class RT {
 	public static CVMLong ensureLong(ACell a) {
 		if (a instanceof CVMLong)
 			return (CVMLong) a;
+		if (a instanceof ANumeric) {
+			ANumeric ap = (ANumeric) a;
+			if (ap.numericType() == Long.class)
+				return ap.toLong();
+		}
+		return null;
+	}
+	
+	/**
+	 * Converts a numerical value to a CVM Long. Doubles and floats will be
+	 * converted if possible.
+	 * 
+	 * @param a Value to cast
+	 * @return Long value, or null if not convertible
+	 */
+	public static AInteger castInteger(ACell a) {
+		if (a instanceof AInteger)
+			return (AInteger) a;
+		ANumeric n = ensureNumber(a);
+		if (n != null) {
+			return n.toLong();
+		}
+		;
+
+		if (a instanceof APrimitive) {
+			return CVMLong.create(((APrimitive) a).longValue());
+		}
+
+		if (a instanceof ABlob) {
+			long lv = ((ABlob) a).toLong();
+			return CVMLong.create(lv);
+		}
+
+		return null;
+	}
+
+	/**
+	 * Ensures the argument is a CVM Integer value.
+	 * 
+	 * @param a Value to cast
+	 * @return AInteger value, or null if not convertible
+	 */
+	public static AInteger ensureInteger(ACell a) {
+		if (a instanceof AInteger)
+			return (AInteger) a;
 		if (a instanceof ANumeric) {
 			ANumeric ap = (ANumeric) a;
 			if (ap.numericType() == Long.class)

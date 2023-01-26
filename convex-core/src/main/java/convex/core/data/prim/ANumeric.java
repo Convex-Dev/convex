@@ -33,4 +33,10 @@ public abstract class ANumeric extends APrimitive {
 	public abstract APrimitive signum();
 
 	public abstract ANumeric toStandardNumber();
+
+	/**
+	 * Gets the absolute value of this number. May be ##NaN for Doubles.
+	 * @return Absolute value of the numeric value
+	 */
+	public abstract APrimitive abs();
 }

@@ -59,6 +59,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -922,7 +923,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ -1 0))"));
 
 		// long overflow case
-		assertEquals(Long.MIN_VALUE,evalL("(abs -9223372036854775808)"));
+		assertEquals(CVMBigInteger.MIN_POSITIVE,eval("(abs -9223372036854775808)"));
 		assertEquals(Long.MAX_VALUE,evalL("(abs -9223372036854775807)"));
 
 		// Needs a numeric type, else CAST error

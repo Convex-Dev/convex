@@ -162,4 +162,10 @@ public final class CVMDouble extends ANumeric {
 		return ((a instanceof CVMDouble)&&(Double.compare(((CVMDouble)a).value,value)==0));
 	}
 
+	@Override
+	public APrimitive abs() {
+		if (value>=0) return this;
+		return create(-value);
+	}
+
 }
