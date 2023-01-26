@@ -1,8 +1,10 @@
 package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigInteger;
 
@@ -22,6 +24,7 @@ public class BigIntegerTest {
 		assertEquals(0,bi.longValue());
 		assertEquals(0.0,bi.doubleValue());
 		assertEquals(BigInteger.ZERO,bi.getBigInteger());
+		assertFalse(bi.isCanonical());
 		
 		doBigTest(bi);
 	}
@@ -38,6 +41,10 @@ public class BigIntegerTest {
 	@Test public void testSmallestPositive() {
 		CVMBigInteger bi=CVMBigInteger.create(new byte[] {0,-128,0,0,0,0,0,0,0});
 		assertEquals(Long.MIN_VALUE,bi.longValue());
+		
+		// Should be canonical, since too large for a CVMLong
+		assertTrue(bi.isCanonical());
+
 		
 		// Extra leading zeros should get ignored
 		assertEquals(bi,CVMBigInteger.create(new byte[] {0,0,0,-128,0,0,0,0,0,0,0}));

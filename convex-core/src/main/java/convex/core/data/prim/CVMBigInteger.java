@@ -15,10 +15,11 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
 /**
- * Arbitrary precision integer implementation for the CVM
+ * Arbitrary precision Integer implementation for the CVM.
  */
 public class CVMBigInteger extends AInteger {
 
+	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
 	private ABlob blob;
 	private BigInteger data;
 	
@@ -106,8 +107,8 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// TODO Auto-generated method stub
-		return 0;
+		if (blob!=null) return blob.estimatedEncodingSize();
+		return (int) Math.min(Blob.MAX_ENCODING_LENGTH,byteLength()+10);
 	}
 
 	@Override
