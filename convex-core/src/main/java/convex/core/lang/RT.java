@@ -413,7 +413,7 @@ public class RT {
 	}
 
 	/**
-	 * Gets the ceiling a number after casting to a double. Equivalent to
+	 * Gets the ceiling of a number after casting to a Double. Equivalent to
 	 * java.lang.StrictMath.ceil(...)
 	 * 
 	 * @param a Numerical Value
@@ -427,7 +427,7 @@ public class RT {
 	}
 
 	/**
-	 * Gets the exact positive square root of a number after casting to a double.
+	 * Gets the exact positive square root of a number after casting to a Double.
 	 * Returns NaN for negative numbers.
 	 * 
 	 * @param a Numerical Value
@@ -752,7 +752,7 @@ public class RT {
 			if (n<=0) return null;
 			return b.get(n-1);
 		}
-		CVMLong l = ensureLong(a);
+		AInteger l = ensureInteger(a);
 		if (l == null)
 			return null;
 		return CVMLong.forByte((byte) l.longValue());
@@ -1028,7 +1028,7 @@ public class RT {
 	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes
 	 * @param a Cell to print (may be nil)
 	 * @param limit Limit of printing in bytes
-	 * @return Printed String, or null if limit exceed
+	 * @return Printed String, or null if limit exceeded
 	 */
 	public static AString print(ACell a, long limit) {
 		if (a==null) return Strings.NIL;
@@ -1041,7 +1041,7 @@ public class RT {
 	 * Prints a value with a reasonable print limit.
 	 * WARNING: May return null, not for use in CVM code
 	 * @param a Cell value to print
-	 * @return Printed String, or null if print limit exceed
+	 * @return Printed String, or null if print limit exceeded
 	 */
 	public static AString print(ACell a) {
 		return print(a,Constants.PRINT_LIMIT);
