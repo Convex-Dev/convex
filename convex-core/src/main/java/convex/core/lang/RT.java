@@ -284,7 +284,7 @@ public class RT {
 		return null;
 	}
 
-	public static APrimitive plus(ACell[] args) {
+	public static ANumeric plus(ACell[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null)
 			return null;
@@ -305,7 +305,7 @@ public class RT {
 		return CVMDouble.create(result);
 	}
 
-	public static APrimitive minus(ACell[] args) {
+	public static ANumeric minus(ACell[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null)
 			return null;
@@ -321,7 +321,7 @@ public class RT {
 		return CVMLong.create(result);
 	}
 
-	public static APrimitive minusDouble(ACell[] args) {
+	public static ANumeric minusDouble(ACell[] args) {
 		int n = args.length;
 		double result = doubleValue(args[0]);
 		if (n == 1)
@@ -332,7 +332,7 @@ public class RT {
 		return CVMDouble.create(result);
 	}
 
-	public static APrimitive times(ACell[] args) {
+	public static ANumeric times(ACell[] args) {
 		Class<?> type = commonNumericType(args);
 		if (type == null)
 			return null;
@@ -345,7 +345,7 @@ public class RT {
 		return CVMLong.create(result);
 	}
 
-	public static APrimitive timesDouble(ACell[] args) {
+	public static CVMDouble timesDouble(ACell[] args) {
 		double result = 1;
 		for (int i = 0; i < args.length; i++) {
 			result *= RT.doubleValue(args[i]);
@@ -563,7 +563,7 @@ public class RT {
 	 * Converts a CVM value to the standard numeric representation. Result will be
 	 * one of:
 	 * <ul>
-	 * <li>Long for Byte, Long</li>
+	 * <li>Long for Long</li>
 	 * <li>Double for Double</li>
 	 * <li>null for any non-numeric value</li>
 	 * </ul>
@@ -591,29 +591,29 @@ public class RT {
 	}
 
 	/**
-	 * Increments a Long value
+	 * Increments an Integer value
 	 * 
 	 * @param x Value to increment
-	 * @return Long Value, or null if conversion fails
+	 * @return Integer Value, or null if conversion fails
 	 */
-	public static CVMLong inc(ACell x) {
-		CVMLong n = ensureLong(x);
+	public static AInteger inc(ACell x) {
+		AInteger n = ensureInteger(x);
 		if (n == null)
 			return null;
-		return CVMLong.create(n.longValue() + 1L);
+		return n.inc();
 	}
 
 	/**
-	 * Decrements a Long value
+	 * Decrements an Integer value
 	 * 
 	 * @param x Value to decrement
-	 * @return Long Value, or null if conversion fails
+	 * @return Integer Value, or null if conversion fails
 	 */
-	public static CVMLong dec(ACell x) {
-		CVMLong n = ensureLong(x);
+	public static AInteger dec(ACell x) {
+		AInteger n = ensureInteger(x);
 		if (n == null)
 			return null;
-		return CVMLong.create(n.longValue() - 1L);
+		return n.dec();
 	}
 
 	/**

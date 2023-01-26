@@ -20,6 +20,7 @@ import convex.core.util.Utils;
 public class CVMBigInteger extends AInteger {
 
 	public static final CVMBigInteger MIN_POSITIVE = create(new byte[] {0,-128,0,0,0,0,0,0,0});
+	public static final CVMBigInteger MIN_NEGATIVE = create(new byte[] {-1,127,-1,-1,-1,-1,-1,-1,-1});
 	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
 	private ABlob blob;
@@ -184,7 +185,7 @@ public class CVMBigInteger extends AInteger {
 	}
 	
 	@Override
-	public ANumeric toCanonical() {
+	public AInteger toCanonical() {
 		if (isCanonical()) return this;
 		return CVMLong.create(big().longValue());
 	}
@@ -202,6 +203,18 @@ public class CVMBigInteger extends AInteger {
 		BigInteger bi=big();
 		if (bi.signum()>=0) return this;
 		return create(bi.abs());
+	}
+
+	@Override
+	public AInteger inc() {
+		BigInteger bi=big().add(BigInteger.ONE);
+		return (AInteger) create(bi).getCanonical();
+	}
+
+	@Override
+	public AInteger dec() {
+		BigInteger bi=big().subtract(BigInteger.ONE);
+		return (AInteger) create(bi).getCanonical();
 	}
 
 }

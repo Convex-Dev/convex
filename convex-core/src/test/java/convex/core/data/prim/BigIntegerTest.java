@@ -10,6 +10,7 @@ import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Blob;
 import convex.core.data.ObjectsTest;
 
 public class BigIntegerTest {
@@ -43,6 +44,7 @@ public class BigIntegerTest {
 		assertEquals(CVMBigInteger.MIN_POSITIVE,bi);
 
 		assertEquals(Long.MIN_VALUE,bi.longValue());
+		assertEquals(Long.MAX_VALUE,bi.dec().longValue());
 		
 		// Should be canonical, since too large for a CVMLong
 		assertTrue(bi.isCanonical());
@@ -50,6 +52,19 @@ public class BigIntegerTest {
 		
 		// Extra leading zeros should get ignored
 		assertEquals(bi,CVMBigInteger.create(new byte[] {0,0,0,-128,0,0,0,0,0,0,0}));
+		
+		doBigTest(bi);
+	}
+	
+	@Test public void testSmallestNegiative() {
+		CVMBigInteger bi=CVMBigInteger.create(Blob.fromHex("ff7fffffffffffffff"));
+		assertEquals(CVMBigInteger.MIN_NEGATIVE,bi);
+
+		assertEquals(Long.MAX_VALUE,bi.longValue());
+		assertEquals(Long.MIN_VALUE,bi.inc().longValue());
+		
+		// Should be canonical, since too large for a CVMLong
+		assertTrue(bi.isCanonical());
 		
 		doBigTest(bi);
 	}
@@ -62,6 +77,8 @@ public class BigIntegerTest {
 		CVMBigInteger bi2=CVMBigInteger.create(big);
 		assertEquals(bi.getEncoding(),bi2.getEncoding());
 		assertEquals(bi,bi2);
+		
+		assertEquals(bi,bi.inc().dec());
 		
 		String s=bi.toString();
 		assertEquals(big,new BigInteger(s));

@@ -195,4 +195,16 @@ public final class CVMLong extends AInteger {
 		return create(-value);
 	}
 
+	@Override
+	public AInteger inc() {
+		if (value==Long.MAX_VALUE) return CVMBigInteger.MIN_POSITIVE;
+		return create(value+1);
+	}
+
+	@Override
+	public AInteger dec() {
+		if (value==Long.MIN_VALUE) return CVMBigInteger.MIN_NEGATIVE;
+		return create(value-1);
+	}
+
 }

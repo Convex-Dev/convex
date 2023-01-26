@@ -38,6 +38,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMBool;
@@ -1606,7 +1607,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMLong result = RT.inc(a);
+			AInteger result = RT.inc(a);
 			if (result == null) return context.withCastError(0,args, Types.LONG);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1619,7 +1620,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			CVMLong result = RT.dec(a);
+			AInteger result = RT.dec(a);
 			if (result == null) return context.withCastError(0,args, Types.LONG);
 
 			return context.withResult(Juice.ARITHMETIC, result);
