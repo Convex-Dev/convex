@@ -591,32 +591,6 @@ public class RT {
 	}
 
 	/**
-	 * Increments an Integer value
-	 * 
-	 * @param x Value to increment
-	 * @return Integer Value, or null if conversion fails
-	 */
-	public static AInteger inc(ACell x) {
-		AInteger n = ensureInteger(x);
-		if (n == null)
-			return null;
-		return n.inc();
-	}
-
-	/**
-	 * Decrements an Integer value
-	 * 
-	 * @param x Value to decrement
-	 * @return Integer Value, or null if conversion fails
-	 */
-	public static AInteger dec(ACell x) {
-		AInteger n = ensureInteger(x);
-		if (n == null)
-			return null;
-		return n.dec();
-	}
-
-	/**
 	 * Converts a numerical value to a CVM Double.
 	 * 
 	 * @param a Value to cast

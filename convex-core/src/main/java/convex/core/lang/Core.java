@@ -1607,8 +1607,10 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			AInteger result = RT.inc(a);
+			AInteger result = RT.ensureInteger(a);
 			if (result == null) return context.withCastError(0,args, Types.LONG);
+			result=result.inc();
+			
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1620,9 +1622,10 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			AInteger result = RT.dec(a);
+			AInteger result = RT.ensureInteger(a);
 			if (result == null) return context.withCastError(0,args, Types.LONG);
-
+			result=result.dec();
+			
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
