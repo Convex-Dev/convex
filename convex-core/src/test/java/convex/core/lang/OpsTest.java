@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -297,6 +298,12 @@ public class OpsTest extends ACVMTest {
 	public void testLambdaString() {
 		Fn<ACell> fn = Fn.create(Vectors.empty(), Constant.nil());
 		assertEquals("(fn [] nil)",fn.toString());
+	}
+	
+	@Test 
+	public void testLocalRegression() throws BadFormatException {
+		Blob enc=Blob.fromHex("cc0bf554"); // Local with negative index
+		assertThrows(BadFormatException.class,()->Format.read(enc));
 	}
 
 	public <T extends ACell> void doOpTest(AOp<T> op) {
