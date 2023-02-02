@@ -20,8 +20,9 @@ import convex.core.lang.reader.ReaderUtils;
  * Characters are Unicode code points, and can be used to construct Strings on the CVM.
  * Limited to range 0 .. 0x10ffff as per Unicode standard
  */
-public final class CVMChar extends APrimitive {
-	public static int MAX_VALUE=0x10ffff; // 21 bits max Unicode value
+public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
+	public static int MAX_CODEPOINT=0x10ffff; // 21 bits max Unicode value
+	public static CVMChar MAX_VALUE=create(MAX_CODEPOINT); // 21 bits max Unicode value
 	
 	private static final CVMChar[] cache=new CVMChar[128];
 	
@@ -60,7 +61,7 @@ public final class CVMChar extends APrimitive {
 	public static CVMChar create(long value) {
 		if (value<0) return null; // invalid negative number
 		if (value<128) return cache[(int)value];
-		if (value>MAX_VALUE) return null;
+		if (value>MAX_CODEPOINT) return null;
 		return new CVMChar((int)value);
 	}
 	
@@ -139,7 +140,7 @@ public final class CVMChar extends APrimitive {
 		if (c<=0x7f) return 1;
 		if (c<=0x7ff) return 2;
 		if (c<=0xffff) return 3;
-		if (c<=MAX_VALUE) return 4;
+		if (c<=MAX_CODEPOINT) return 4;
 		return -1;
 	}
 	
@@ -305,6 +306,11 @@ public final class CVMChar extends APrimitive {
 	 */
 	public int getCodePoint() {
 		return value;
+	}
+
+	@Override
+	public int compareTo(CVMChar o) {
+		return Integer.compare(value, o.value);
 	}
 
 

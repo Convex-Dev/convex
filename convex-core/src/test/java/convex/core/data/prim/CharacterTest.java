@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 
@@ -40,7 +41,7 @@ public class CharacterTest {
 	
 	@Test 
 	public void testMaxValue() throws BadFormatException {
-		CVMChar a=CVMChar.create(CVMChar.MAX_VALUE);
+		CVMChar a=CVMChar.create(CVMChar.MAX_CODEPOINT);
 		doValidCharTests(a);
 		assertEquals("3e10ffff",a.getEncoding().toHexString());
 		assertEquals("f48fbfbf",a.toUTFBlob().toHexString());
@@ -50,7 +51,7 @@ public class CharacterTest {
 	public void testBadUnicode() throws BadFormatException {
 		assertNull(CVMChar.create(0x12345678));          // Out of Unicode range, too big
 		assertNull(CVMChar.create(-1));                  // Out of Unicode range, negative
-		assertNull(CVMChar.create(CVMChar.MAX_VALUE+1)); // Out of Unicode range by one
+		assertNull(CVMChar.create(CVMChar.MAX_CODEPOINT+1)); // Out of Unicode range by one
 	}
 	
 	@Test 
@@ -81,9 +82,15 @@ public class CharacterTest {
 		assertEquals(bs.length,CVMChar.utfLength(a.getCodePoint()));
 		assertEquals(a.getCodePoint(),a.longValue());
 		
+		assertEquals(0,a.compareTo(a));
+		
 		assertEquals(a.toCVMString(10),Strings.create(new BlobBuilder().append(a).toBlob()));
 		
 		ObjectsTest.doAnyValueTests(a);
+	}
+	
+	@Test public void testCompare() {
+		assertTrue(CVMChar.MAX_VALUE.compareTo(CVMChar.ZERO)>0);
 	}
 
 
