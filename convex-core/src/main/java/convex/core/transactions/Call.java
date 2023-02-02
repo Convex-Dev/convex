@@ -41,7 +41,7 @@ public class Call extends ATransaction {
 	}
 	
 	public static Call create(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
-		return new Call(address,sequence,target,0,functionName,args);
+		return new Call(address,sequence,target,offer,functionName,args);
 	}
 
 	
