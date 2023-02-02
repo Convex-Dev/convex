@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,5 +21,21 @@ public class DoubleTest {
 		Blob BAD_NAN=Blob.fromHex("0d7ff8000000ffffff");
 		
 		assertThrows(BadFormatException.class,()->Format.read(BAD_NAN));
+	}
+	
+	@Test public void testCompares() {
+		assertTrue(CVMDouble.ZERO.compareTo(CVMDouble.ZERO)==0);
+		assertTrue(CVMDouble.ZERO.compareTo(CVMDouble.ONE)==-1);
+		assertTrue(CVMDouble.ONE.compareTo(CVMDouble.ZERO)==1);
+		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMDouble.ZERO)>0);
+		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMDouble.ZERO)<0);
+	}
+	
+	@Test public void testIntegerCompares() {
+		assertTrue(CVMDouble.ZERO.compareTo(CVMLong.ZERO)==0);
+		assertTrue(CVMDouble.ZERO.compareTo(CVMLong.ONE)==-1);
+		assertTrue(CVMDouble.ONE.compareTo(CVMLong.ZERO)==1);
+		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMLong.MAX_VALUE)>0);
+		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMLong.MIN_VALUE)<0);
 	}
 }

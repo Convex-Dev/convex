@@ -207,4 +207,11 @@ public final class CVMLong extends AInteger {
 		return create(value-1);
 	}
 
+	@Override
+	public int compareTo(ANumeric o) {
+		if (o instanceof CVMLong) return Long.compare(value, o.longValue());
+		if (o instanceof CVMBigInteger) return -((CVMBigInteger)o).compareTo(this);
+		return Double.compare(doubleValue(), o.doubleValue());
+	}
+
 }

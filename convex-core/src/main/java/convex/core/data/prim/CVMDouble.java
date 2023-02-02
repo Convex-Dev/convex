@@ -167,5 +167,10 @@ public final class CVMDouble extends ANumeric {
 		if (value>=0) return this;
 		return create(-value);
 	}
+	
+	@Override
+	public int compareTo(ANumeric o) {
+		return Double.compare(doubleValue(), o.doubleValue());
+	}
 
 }

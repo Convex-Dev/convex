@@ -20,4 +20,6 @@ public abstract class AInteger extends ANumeric {
 	 * @return Decremented value
 	 */
 	public abstract AInteger dec();
+	
+
 }

@@ -46,6 +46,9 @@ public class BigIntegerTest {
 		assertEquals(Long.MIN_VALUE,bi.longValue());
 		assertEquals(Long.MAX_VALUE,bi.dec().longValue());
 		
+		assertEquals(CVMBigInteger.MIN_POSITIVE,CVMLong.MAX_VALUE.inc());
+
+		
 		// Should be canonical, since too large for a CVMLong
 		assertTrue(bi.isCanonical());
 
@@ -56,12 +59,14 @@ public class BigIntegerTest {
 		doBigTest(bi);
 	}
 	
-	@Test public void testSmallestNegiative() {
+	@Test public void testSmallestNegative() {
 		CVMBigInteger bi=CVMBigInteger.create(Blob.fromHex("ff7fffffffffffffff"));
 		assertEquals(CVMBigInteger.MIN_NEGATIVE,bi);
 
 		assertEquals(Long.MAX_VALUE,bi.longValue());
 		assertEquals(Long.MIN_VALUE,bi.inc().longValue());
+		
+		assertEquals(CVMBigInteger.MIN_NEGATIVE,CVMLong.MIN_VALUE.dec());
 		
 		// Should be canonical, since too large for a CVMLong
 		assertTrue(bi.isCanonical());
@@ -84,5 +89,19 @@ public class BigIntegerTest {
 		assertEquals(big,new BigInteger(s));
 		
 		ObjectsTest.doAnyValueTests(bi);
+	}
+	
+	@Test public void testCompares() {
+		assertTrue(CVMBigInteger.MIN_POSITIVE.compareTo(CVMBigInteger.MIN_POSITIVE)==0);
+		assertTrue(CVMBigInteger.MIN_NEGATIVE.compareTo(CVMBigInteger.MIN_POSITIVE)==-1);
+		assertTrue(CVMBigInteger.MIN_POSITIVE.compareTo(CVMBigInteger.MIN_NEGATIVE)==1);
+		assertTrue(CVMBigInteger.MIN_POSITIVE.compareTo(CVMLong.MAX_VALUE)>0);
+		assertTrue(CVMBigInteger.MIN_NEGATIVE.compareTo(CVMLong.MIN_VALUE)<0);
+	}
+	
+	@Test public void testDoubleCompares() {
+		assertTrue(CVMDouble.ZERO.compareTo(CVMBigInteger.create(BigInteger.ZERO))==0);
+		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMBigInteger.MIN_POSITIVE)>0);
+		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMBigInteger.MIN_NEGATIVE)<0);
 	}
 }

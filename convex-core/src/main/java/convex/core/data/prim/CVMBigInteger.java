@@ -16,6 +16,8 @@ import convex.core.util.Utils;
 
 /**
  * Arbitrary precision Integer implementation for the CVM.
+ * 
+ * A CVMBigInteger is a canonical CVM value if and only if it represents a number that cannot be a CVMLong
  */
 public class CVMBigInteger extends AInteger {
 
@@ -215,6 +217,20 @@ public class CVMBigInteger extends AInteger {
 	public AInteger dec() {
 		BigInteger bi=big().subtract(BigInteger.ONE);
 		return (AInteger) create(bi).getCanonical();
+	}
+	
+	@Override
+	public int compareTo(ANumeric o) {
+		if (o instanceof CVMLong) {
+			if (!isCanonical()) {
+				// Not canonical, therefore inside long range
+				return Long.compare(longValue(), o.longValue());
+			}
+			if (big().compareTo(MIN_POSITIVE.big())>=0) return 1; // Big integer above long range
+			return -1; // big integer must be more neative than Long range
+		};
+		if (o instanceof CVMBigInteger) return big().compareTo(((CVMBigInteger)o).big());
+		return Double.compare(doubleValue(), o.doubleValue());
 	}
 
 }

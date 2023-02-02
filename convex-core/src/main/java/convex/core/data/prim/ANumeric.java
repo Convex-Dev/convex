@@ -3,7 +3,7 @@ package convex.core.data.prim;
 /**
  * BAse class for CVM numeric types
  */
-public abstract class ANumeric extends APrimitive {
+public abstract class ANumeric extends APrimitive implements Comparable<ANumeric> {
 
 
 	/**

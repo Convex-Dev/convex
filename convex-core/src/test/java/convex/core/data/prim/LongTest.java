@@ -33,6 +33,14 @@ public class LongTest {
 		doLongTest(CVMLong.create(1L+Integer.MAX_VALUE));
 	}
 	
+	@Test public void testCompares() {
+		assertTrue(CVMLong.ZERO.compareTo(CVMLong.ZERO)==0);
+		assertTrue(CVMLong.ZERO.compareTo(CVMLong.ONE)==-1);
+		assertTrue(CVMLong.ONE.compareTo(CVMLong.ZERO)==1);
+		assertTrue(CVMLong.MAX_VALUE.compareTo(CVMLong.ZERO)>0);
+		assertTrue(CVMLong.MIN_VALUE.compareTo(CVMLong.ZERO)<0);
+	}
+	
 	public void doLongTest(CVMLong a) {
 		long val=a.longValue();
 		
