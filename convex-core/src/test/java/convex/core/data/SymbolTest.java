@@ -35,6 +35,13 @@ public class SymbolTest {
 		assertTrue(s.isEmbedded());
 	}
 	
+	@Test 
+	public void testComparable() {
+		assertEquals(0,Symbols.FOO.compareTo(Symbols.FOO));
+		assertEquals(-1,Symbols.BAR.compareTo(Symbols.FOO));
+		assertEquals(1,Symbols.FOO.compareTo(Symbols.BAR));
+	}
+	
 	@Test
 	public void testPrint() {
 		Symbol s=Symbol.create("foobar");
