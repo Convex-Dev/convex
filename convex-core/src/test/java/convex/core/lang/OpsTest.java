@@ -274,6 +274,9 @@ public class OpsTest extends ACVMTest {
 		Local<?> op=Local.create(0);
 		c=c.execute(op);
 		assertEquals(RT.cvm(1337),c.getResult());
+		
+		// Negative local index should be invalid
+		assertNull(Local.create(-1));
 
 		doOpTest(op);
 	}
