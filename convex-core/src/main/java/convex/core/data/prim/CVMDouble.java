@@ -127,6 +127,12 @@ public final class CVMDouble extends ANumeric {
 		return value;
 	}
 
+	/**
+	 * Parses a CVM Double value. 
+	 * @param s String to parse
+	 * @return CVMDouble value
+	 * @throws NumberFormatException If number format is invalid
+	 */
 	public static CVMDouble parse(String s) {
 		return create(Double.parseDouble(s));
 	}
