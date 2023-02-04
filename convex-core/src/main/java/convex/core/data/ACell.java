@@ -69,8 +69,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Gets the tag byte for this cell. The tag byte is always written as the 
-	 * first byte of the Cell's canonical Encoding
+	 * Gets the tag byte for this cell. The tag byte is always equal to the 
+	 * first byte of the Cell's canonical Encoding, and is sufficient to distinguish 
+	 * how to read the rest of the encoding.
 	 * 
 	 * @return Tag byte for this Cell
 	 */

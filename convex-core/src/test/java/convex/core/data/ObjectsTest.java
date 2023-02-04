@@ -167,6 +167,9 @@ public class ObjectsTest {
 		assertEquals(a.getEncodingLength(),enc.count());
 		assertTrue(len<=Format.LIMIT_ENCODING_LENGTH);
 		
+		// Tag must equal first byte of encoding
+		assertEquals(a.getTag(),enc.byteAt(0));
+		
 		if (a.isCompletelyEncoded()) {
 			doCompleteEncodingTests(a);
 		}
