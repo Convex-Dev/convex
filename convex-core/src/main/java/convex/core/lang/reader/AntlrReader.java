@@ -25,13 +25,12 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.lang.RT; 
+import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
@@ -215,15 +214,11 @@ public class AntlrReader {
 		public void exitLongValue(LongValueContext ctx) {
 			String s=ctx.getText();
 			try {	
-				push( CVMLong.parse(s));
-			} catch (Throwable t) {
-				try {
-					CVMBigInteger bi=CVMBigInteger.parse(s);
-					push(bi);
+				push( AInteger.parse(s));
+			
 				} catch (NumberFormatException x2) {
 					throw new ParseException("Unparseable long value: "+s,x2);
 				}
-			}
 		}
 		
 		@Override

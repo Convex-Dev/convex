@@ -22,8 +22,10 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.test.Samples;
 
@@ -154,6 +156,15 @@ public class ReaderTest {
 
 		// metadata ignored
 		assertEquals(Syntax.create(RT.cvm(3.23),Maps.of(Keywords.FOO, CVMBool.TRUE)), Reader.read("^:foo 3.23"));
+	}
+	
+	@Test
+	public void testIntegers() {
+		assertEquals(CVMLong.ONE,Reader.read("1"));
+		assertEquals(CVMBigInteger.MIN_POSITIVE,Reader.read("9223372036854775808"));
+		assertEquals(CVMLong.MAX_VALUE,Reader.read("9223372036854775807"));
+		assertEquals(CVMLong.MIN_VALUE,Reader.read("-9223372036854775808"));
+		assertEquals(CVMBigInteger.MIN_NEGATIVE,Reader.read("-9223372036854775809"));
 	}
 	
 	@Test
