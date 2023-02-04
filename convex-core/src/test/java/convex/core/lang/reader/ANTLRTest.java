@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.math.BigInteger;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
@@ -22,6 +24,7 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -56,9 +59,19 @@ public class ANTLRTest {
 		assertEquals(CVMLong.create(-2),read("-2"));
 		assertSame(CVMLong.ZERO,read("0"));
 		
+		// assertParseError("-999999999999999999999999999999999999999999999");
+		// assertParseError("999999999999999999999999999999999999999999999");
+	}
+	
+	@Test public  void testBigInts() {
+		String s="999999999999999999999999999999999999999999999";
+		BigInteger bi=new BigInteger(s);
 		
-		assertParseError("-999999999999999999999999999999999999999999999");
-		assertParseError("999999999999999999999999999999999999999999999");
+		CVMBigInteger bint = read(s);
+		assertEquals(bi, bint.getBigInteger());
+
+		CVMBigInteger nint = read("-"+s);
+		assertEquals(bi.negate(), nint.getBigInteger());
 	}
 		
 	@Test public void testVectors() {

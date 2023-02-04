@@ -233,4 +233,14 @@ public class CVMBigInteger extends AInteger {
 		return Double.compare(doubleValue(), o.doubleValue());
 	}
 
+	/**
+	 * Parses a string as a CVMBigInteger. Might not be canonical.
+	 * @param s String containing at least one numeric digit. May have an optional sign.
+	 * @return Integer result
+	 */
+	public static CVMBigInteger parse(String s) {
+		BigInteger bi=new BigInteger(s);
+		return create(bi);
+	}
+
 }
