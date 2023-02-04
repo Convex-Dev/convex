@@ -20,6 +20,7 @@ import org.junit.jupiter.params.provider.ArgumentsSource;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.ObjectsTest;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -44,6 +45,16 @@ public class TypesTest {
 		assertFalse(t.check(null));
 		assertTrue(t.check(CVMLong.ONE));
 		assertFalse(t.check(CVMDouble.ONE));
+		assertFalse(t.check(CVMBigInteger.MIN_POSITIVE));
+	}
+	
+	@Test
+	public void testInteger() {
+		AType t=Types.INTEGER;
+		assertFalse(t.check(null));
+		assertTrue(t.check(CVMLong.ONE));
+		assertFalse(t.check(CVMDouble.ONE));
+		assertTrue(t.check(CVMBigInteger.MIN_POSITIVE));
 	}
 	
 	@Test

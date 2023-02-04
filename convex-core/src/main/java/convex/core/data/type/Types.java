@@ -19,6 +19,7 @@ public class Types {
 	
 	// Numeric types
 	public static final Long LONG=Long.INSTANCE;
+	public static final Integer INTEGER=Integer.INSTANCE;
 	public static final Double DOUBLE = Double.INSTANCE;
 	public static final Number NUMBER = Number.INSTANCE;
 	
@@ -69,6 +70,7 @@ public class Types {
 		
 		NUMBER,
 		LONG,
+		INTEGER,
 		DOUBLE,
 		
 		BOOLEAN,

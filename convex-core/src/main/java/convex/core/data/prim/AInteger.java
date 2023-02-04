@@ -1,5 +1,8 @@
 package convex.core.data.prim;
 
+import convex.core.data.type.AType;
+import convex.core.data.type.Types;
+
 /**
  * Abstract base class for CVM Integer values
  */
@@ -20,6 +23,10 @@ public abstract class AInteger extends ANumeric {
 	 * @return Decremented value
 	 */
 	public abstract AInteger dec();
+	
+	public AType getType() {
+		return Types.INTEGER;
+	}
 	
 	/**
 	 * Parse an integer value as a canonical value
