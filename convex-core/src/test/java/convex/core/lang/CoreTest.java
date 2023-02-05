@@ -3383,6 +3383,11 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(long? nil)"));
 		assertFalse(evalB("(long? 0xFF)"));
 		assertFalse(evalB("(long? [1 2])"));
+		
+		assertTrue(evalB("(long? 9223372036854775807)"));
+		assertFalse(evalB("(long? 9223372036854775808)"));
+		assertTrue(evalB("(long? -9223372036854775808)"));
+		assertFalse(evalB("(long? -9223372036854775809)"));
 	}
 
 	@Test
