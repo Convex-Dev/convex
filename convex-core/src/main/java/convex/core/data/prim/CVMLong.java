@@ -213,5 +213,10 @@ public final class CVMLong extends AInteger {
 		if (o instanceof CVMBigInteger) return -((CVMBigInteger)o).compareTo(this);
 		return Double.compare(doubleValue(), o.doubleValue());
 	}
+	
+	@Override
+	public boolean isLongInteger() {
+		return true;
+	}
 
 }

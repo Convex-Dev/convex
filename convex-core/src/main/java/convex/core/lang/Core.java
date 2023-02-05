@@ -2526,7 +2526,10 @@ public class Core {
 	public static final CorePred LONG_Q = reg(new CorePred(Symbols.LONG_Q) {
 		@Override
 		public boolean test(ACell val) {
-			return val instanceof CVMLong;
+			if (val instanceof AInteger) {
+				return ((AInteger)val).isLongInteger();
+			}
+			return false;
 		}
 	});
 	

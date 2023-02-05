@@ -23,6 +23,7 @@ public class CVMBigInteger extends AInteger {
 
 	public static final CVMBigInteger MIN_POSITIVE = create(new byte[] {0,-128,0,0,0,0,0,0,0});
 	public static final CVMBigInteger MIN_NEGATIVE = create(new byte[] {-1,127,-1,-1,-1,-1,-1,-1,-1});
+	protected static final long LONG_BYTELENGTH = 8;
 	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
 	private ABlob blob;
@@ -241,6 +242,11 @@ public class CVMBigInteger extends AInteger {
 	public static CVMBigInteger parse(String s) {
 		BigInteger bi=new BigInteger(s);
 		return create(bi);
+	}
+
+	@Override
+	public boolean isLongInteger() {
+		return byteLength()<=LONG_BYTELENGTH;
 	}
 
 }

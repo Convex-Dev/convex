@@ -179,4 +179,9 @@ public final class CVMDouble extends ANumeric {
 		return Double.compare(doubleValue(), o.doubleValue());
 	}
 
+	@Override
+	public boolean isLongInteger() {
+		return false;
+	}
+
 }

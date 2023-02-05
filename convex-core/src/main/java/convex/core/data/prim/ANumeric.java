@@ -39,4 +39,6 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return Absolute value of the numeric value
 	 */
 	public abstract APrimitive abs();
+
+	public abstract boolean isLongInteger();
 }

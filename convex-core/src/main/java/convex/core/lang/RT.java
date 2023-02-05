@@ -659,8 +659,9 @@ public class RT {
 			return (CVMLong) a;
 		if (a instanceof ANumeric) {
 			ANumeric ap = (ANumeric) a;
-			if (ap.numericType() == Long.class)
+			if (ap.isLongInteger()) {
 				return ap.toLong();
+			}
 		}
 		return null;
 	}
