@@ -44,4 +44,10 @@ public abstract class AInteger extends ANumeric {
 			return CVMBigInteger.parse(s);
 		}
 	}
+
+	/**
+	 * Number of bytes in minimal representation of this Integer. Returns 0 if and only if the integer is zero.
+	 * @return Number of bytes
+	 */
+	public abstract long byteLength();
 }

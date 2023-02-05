@@ -10,6 +10,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 /**
  * Class for CVM long values.
@@ -217,6 +218,11 @@ public final class CVMLong extends AInteger {
 	@Override
 	public boolean isLongInteger() {
 		return true;
+	}
+
+	@Override
+	public long byteLength() {
+		return Utils.byteLength(value);
 	}
 
 }

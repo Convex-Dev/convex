@@ -126,7 +126,24 @@ public class UtilsTest {
 	public void testIntLeadingZeros() {
 		assertEquals(32, Bits.leadingZeros(0x00000000));
 		assertEquals(16, Bits.leadingZeros(0x00008000));
+		assertEquals(24, Bits.leadingZeros(128));
+		assertEquals(25, Bits.leadingZeros(127));
 		assertEquals(0, Bits.leadingZeros(-1));
+	}
+	
+	@Test 
+	public void testByteLength() {
+		assertEquals(0,Utils.byteLength(0));
+		assertEquals(8,Utils.byteLength(Long.MAX_VALUE));
+		assertEquals(8,Utils.byteLength(Long.MIN_VALUE));
+
+		assertEquals(4,Utils.byteLength(Integer.MIN_VALUE));
+		assertEquals(5,Utils.byteLength(Integer.MIN_VALUE-1L));
+		
+		assertEquals(1,Utils.byteLength(127));
+		assertEquals(2,Utils.byteLength(128));
+		assertEquals(1,Utils.byteLength(-128));
+		assertEquals(2,Utils.byteLength(-129));
 	}
 
 	@Test

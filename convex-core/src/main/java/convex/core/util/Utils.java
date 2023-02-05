@@ -674,6 +674,21 @@ public class Utils {
 		long ux = (x >= 0) ? x : -x - 1;
 		return 1 + (64 - Bits.leadingZeros(ux)); // sign bit plus number of used bits in positive representation
 	}
+	
+	/**
+	 * Returns the minimal number of bytes to represent the signed twos complement
+	 * long value. Return value will be at 0-8
+	 *
+	 * @param x Long value
+	 * @return Number of bytes required for representation, in the range 0-8
+	 *         inclusive
+	 */
+	public static int byteLength(long x) {
+		if (x==0) return 0;
+		long ux = (x >= 0) ? x : -x - 1; // equivalent unsigned value
+		int bits=64 - Bits.leadingZeros(ux); // bits in unsigned representation, at least 1
+		return 1+(bits/8); // need space for sign bit
+	}
 
 	/**
 	 * Converts an object to an int value, handling Strings and arbitrary numbers.

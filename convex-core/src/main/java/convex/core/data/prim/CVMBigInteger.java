@@ -160,10 +160,7 @@ public class CVMBigInteger extends AInteger {
 		return true;
 	}
 	
-	/**
-	 * Number of bytes in minimal representation of this Integer
-	 * @return Number of bytes
-	 */
+	@Override
 	public long byteLength() {
 		if (blob!=null) return blob.count();
 		return ((data.bitLength())/8)+1;

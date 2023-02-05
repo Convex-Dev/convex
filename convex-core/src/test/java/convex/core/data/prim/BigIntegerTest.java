@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -84,6 +85,14 @@ public class BigIntegerTest {
 		assertEquals(bi,bi2);
 		
 		assertEquals(bi,bi.inc().dec());
+		
+		if (bi.isCanonical()) {
+			assertTrue(bi.byteLength()>8);
+			assertNotEquals(bi,bi.toLong());
+		} else {
+			assertTrue(bi.byteLength()<=8);
+			assertEquals(bi,bi.toLong());
+		}
 		
 		String s=bi.toString();
 		assertEquals(big,new BigInteger(s));
