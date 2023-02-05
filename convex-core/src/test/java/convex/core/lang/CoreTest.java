@@ -358,6 +358,10 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(long nil)"));
 		assertCastError(step("(long [])"));
 		assertCastError(step("(long :foo)"));
+		
+		// Long overflow and truncation
+		assertEquals(Long.MAX_VALUE,evalL("(long 9223372036854775807)"));
+		assertEquals(Long.MIN_VALUE,evalL("(long 9223372036854775808)"));
 	}
 
 	@Test

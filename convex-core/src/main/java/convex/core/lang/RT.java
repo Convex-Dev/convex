@@ -622,7 +622,7 @@ public class RT {
 
 	/**
 	 * Converts a numerical value to a CVM Long. Doubles and floats will be
-	 * converted if possible.
+	 * converted if possible. Integers are truncated to last 64 bits
 	 * 
 	 * @param a Value to cast
 	 * @return Long value, or null if not convertible
@@ -1263,11 +1263,11 @@ public class RT {
 	}
 
 	/**
-	 * Converts an object to a canonical blob representation. Handles blobs,
+	 * Converts an object to a canonical blob representation. Handles blobs, longs
 	 * addresses, hashes and hex strings
 	 * 
 	 * @param a Value to convert to a Blob
-	 * @return Blob value, or null if not convertable to a blob
+	 * @return Blob value, or null if not convertible to a blob
 	 */
 	public static ABlob castBlob(ACell a) {
 		// handle address, hash, blob instances
