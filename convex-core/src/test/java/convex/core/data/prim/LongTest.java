@@ -1,9 +1,12 @@
 package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 
@@ -31,6 +34,8 @@ public class LongTest {
 		doLongTest(CVMLong.create(666));
 		doLongTest(CVMLong.create(Integer.MAX_VALUE));
 		doLongTest(CVMLong.create(1L+Integer.MAX_VALUE));
+		doLongTest(CVMLong.create(Integer.MIN_VALUE));
+		doLongTest(CVMLong.create(Integer.MIN_VALUE-1L));
 	}
 	
 	@Test public void testCompares() {
@@ -47,7 +52,12 @@ public class LongTest {
 		assertEquals(CVMLong.create(val),a);
 		assertTrue(a.isCanonical());
 		assertTrue(a.isEmbedded());
+		assertTrue(a.byteLength()<=8);
 		
+		if (val!=0) {
+			assertEquals(BigInteger.valueOf(val).toByteArray().length,a.byteLength());
+			assertNotEquals(0,a.signum().longValue());
+		}
 		
 		ObjectsTest.doAnyValueTests(a);
 	}

@@ -677,17 +677,16 @@ public class Utils {
 	
 	/**
 	 * Returns the minimal number of bytes to represent the signed twos complement
-	 * long value. Return value will be at 0-8
+	 * long value. Return value will be at 1-8
 	 *
 	 * @param x Long value
-	 * @return Number of bytes required for representation, in the range 0-8
+	 * @return Number of bytes required for representation, in the range 1-8
 	 *         inclusive
 	 */
 	public static int byteLength(long x) {
-		if (x==0) return 0;
 		long ux = (x >= 0) ? x : -x - 1; // equivalent unsigned value
-		int bits=64 - Bits.leadingZeros(ux); // bits in unsigned representation, at least 1
-		return 1+(bits/8); // need space for sign bit
+		int bits=64 - Bits.leadingZeros(ux); // bits in unsigned representation
+		return 1+(bits/8); // need space for sign bit, so add a byte whenever full
 	}
 
 	/**

@@ -133,7 +133,7 @@ public class UtilsTest {
 	
 	@Test 
 	public void testByteLength() {
-		assertEquals(0,Utils.byteLength(0));
+		assertEquals(1,Utils.byteLength(0));
 		assertEquals(8,Utils.byteLength(Long.MAX_VALUE));
 		assertEquals(8,Utils.byteLength(Long.MIN_VALUE));
 
