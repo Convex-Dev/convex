@@ -273,7 +273,8 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(get [1 2] -1)"));
 		assertNull(eval("(get [1 2] 1.0)"));
 
-		assertEquals(2L,evalL("(get [1 2 3] (byte 1))")); // TODO: is this sane? Assumes byte works as index
+		assertEquals(2L,evalL("(get [1 2 3] (byte 1))")); 
+		assertNull(eval("(get [1 2 3] 18446744073709551616)")); // check we don't overflow to zero
 
 		assertNull(eval("(get nil nil)"));
 		assertNull(eval("(get nil 10)"));
@@ -364,6 +365,7 @@ public class CoreTest extends ACVMTest {
 		// Long overflow and truncation
 		assertEquals(Long.MAX_VALUE,evalL("(long 9223372036854775807)"));
 		assertEquals(Long.MIN_VALUE,evalL("(long 9223372036854775808)"));
+		assertEquals(0L,evalL("(long 18446744073709551616)"));
 	}
 
 	@Test

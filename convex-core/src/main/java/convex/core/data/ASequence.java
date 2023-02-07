@@ -118,6 +118,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public T get(ACell key) {
 		if (key instanceof AInteger) {
 			CVMLong longix=RT.ensureLong(key);
+			if (longix==null) return null;
 			long ix = longix.longValue();
 			if ((ix >= 0) && (ix < count())) return get(ix);
 		}
