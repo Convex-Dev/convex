@@ -2996,6 +2996,13 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(> 3.0 3.0)"));
 		assertFalse(evalB("(> 3.0 1.0 7.0)"));
 		assertTrue(evalB("(>= 3.0 3.0)"));
+		
+		// Big Integers
+		assertTrue(evalB("(== 9223372036854775808 9223372036854775808)"));
+		assertFalse(evalB("(== 9223372036854775808 -9223372036854775808)")); // check no long overflow
+		assertFalse(evalB("(< 9223372036854775808 -9223372036854775808)")); 
+		assertTrue(evalB("(>= 9223372036854775808 -9223372036854775808)")); 
+		assertTrue(evalB("(> 9999999999999999999999 9223372036854775808  2 -9223372036854775808)")); 
 
 		// assertTrue(evalB("(>= \\b \\a)")); // TODO: do we want this to work?
 

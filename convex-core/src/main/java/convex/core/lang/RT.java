@@ -527,7 +527,7 @@ public class RT {
 			return null;
 
 		if ((ca == Long.class) && (cb == Long.class))
-			return RT.compare(longValue(a), longValue(b));
+			return (long)((AInteger)a).compareTo((AInteger)b);
 
 		double da = doubleValue(a);
 		if (Double.isNaN(da)) return nanValue;
@@ -541,22 +541,6 @@ public class RT {
 			return 1L;
 
 		return nanValue;
-	}
-
-	/**
-	 * Compares two long values numerically, according to Java primitive
-	 * comparisons.
-	 * 
-	 * @param a First number
-	 * @param b Second number
-	 * @return -1 if a is less than b, 1 if greater, 0 is they are equal
-	 */
-	public static long compare(long a, long b) {
-		if (a < b)
-			return -1;
-		if (a > b)
-			return 1;
-		return 0;
 	}
 
 	/**

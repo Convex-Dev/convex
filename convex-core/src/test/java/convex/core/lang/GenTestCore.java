@@ -170,9 +170,6 @@ public class GenTestCore {
 		assertSame(CVMLong.create(0xff&v),RT.castByte(ca));
 		assertCVMEquals(v+1,ca.inc().longValue());
 		assertCVMEquals(v-1,ca.dec().longValue());
-		assertCVMEquals(0,RT.compare(a,(Long)v));
-		assertCVMEquals(-1,RT.compare((long)a,v+10));
-		assertCVMEquals(1,RT.compare((long)a,v-10));
 	
 		CVMLong[] args=new CVMLong[] {ca};
 		assertEquals(-v,RT.minus(args).longValue());
@@ -194,7 +191,6 @@ public class GenTestCore {
 	
 	@Property 
 	public void testLongMaths(@From(LongGenerator.class) Long a, @From(LongGenerator.class) Long b) {
-		assertEquals(RT.compare(a, b),-RT.compare(b,a));
 
 		CVMLong ca=CVMLong.create(a);
 		CVMLong cb=CVMLong.create(b);

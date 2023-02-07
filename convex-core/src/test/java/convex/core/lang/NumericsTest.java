@@ -181,6 +181,21 @@ public class NumericsTest extends ACVMTest {
 	}
 	
 	@Test
+	public void testNullBehaviour() {
+		assertCastError(step("(+ nil)"));
+		assertCastError(step("(- 1 2 nil)"));
+		assertCastError(step("(> 3 nil 2)"));
+		assertCastError(step("(sqrt nil)"));
+		assertCastError(step("(floor nil)"));
+		assertCastError(step("(exp nil)"));
+		assertCastError(step("(pow 2 nil)"));
+		assertCastError(step("(pow nil 2)"));
+		assertCastError(step("(signum nil)"));
+		assertCastError(step("(* nil)"));
+		assertCastError(step("(/ nil)"));
+	}
+	
+	@Test
 	public void testInfinity() {
 		assertEquals(CVMDouble.POSITIVE_INFINITY, eval("(/ 1 0)"));
 		assertEquals(CVMDouble.NEGATIVE_INFINITY, eval("(/ -1 0)"));
