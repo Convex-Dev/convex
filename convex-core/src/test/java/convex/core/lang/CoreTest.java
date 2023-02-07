@@ -102,7 +102,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
-		assertEquals(a, eval("(address "+a.longValue()+")"));
+		assertEquals(a, eval("(address "+a.toExactLong()+")"));
 
 		// bad arities
 		assertArityError(step("(address 1 2)"));
@@ -2450,7 +2450,7 @@ public class CoreTest extends ACVMTest {
 	public void testCreateAccount() {
 		Context<Address> ctx=step("(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)");
 		Address addr=ctx.getResult();
-		assertEquals(addr.longValue()+1,ctx.getState().getAccounts().count()); // should be last Address added
+		assertEquals(addr.toExactLong()+1,ctx.getState().getAccounts().count()); // should be last Address added
 		
 		// Query rollback should result in same account being created
 		assertTrue(evalB("(= (query (create-account *key*)) (query (create-account *key*)))"));
@@ -3909,7 +3909,7 @@ public class CoreTest extends ACVMTest {
 		State s = ctx.getState();
 		BlobMap<ABlob, AVector<ACell>> sched = s.getSchedule();
 		assertEquals(1L, sched.count());
-		assertEquals(expectedTS, sched.entryAt(0).getKey().longValue());
+		assertEquals(expectedTS, sched.entryAt(0).getKey().toExactLong());
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 

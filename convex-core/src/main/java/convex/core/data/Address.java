@@ -52,7 +52,7 @@ public final class Address extends ALongBlob {
 	 */
 	public static Address create(ABlob b) {
 		if (b.count()!=BYTE_LENGTH) return null;
-		return create(b.longValue());
+		return create(b.toExactLong());
 	}
 	
 	@Override
@@ -95,7 +95,7 @@ public final class Address extends ALongBlob {
 		Blob b=Blob.fromHex(hexString);
 		if (b==null) return null;
 		if (b.length!=BYTE_LENGTH) return null;
-		return create(b.longValue());
+		return create(b.toExactLong());
 	}
 	
 	/**
@@ -222,7 +222,7 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
-	public long longValue() {
+	public long toExactLong() {
 		return value;
 	}
 

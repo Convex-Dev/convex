@@ -392,16 +392,16 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	 * Converts this Blob to the corresponding long value.
 	 * 
 	 * Assumes big-endian format, as if the entire blob is interpreted as a big integer. Higher bytes 
-	 * outside the Long range will be ignored.
+	 * outside the Long range will be ignored, i.e. the lowest 64 bits are taken
 	 * 
 	 * @return long value of this blob
 	 */
-	public abstract long toLong();
+	public abstract long longValue();
 	
 	@Override
 	public int hashCode() {
 		// note: We use the Java hashcode of the last bytes for blobs
-		return Long.hashCode(toLong());
+		return Long.hashCode(longValue());
 	}
 
 	/**
@@ -410,7 +410,7 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	 * 
 	 * @return The long value represented by the Blob
 	 */
-	public abstract long longValue();
+	public abstract long toExactLong();
 
 	/**
 	 * Returns true if this object is a regular blob (i.e. not a special blob type like Address)

@@ -74,7 +74,7 @@ public class RemoteClientTest {
 		
 		// Query *address*
 		Map<String,Object> res=c.query("*address*");
-		assertEquals(addr.longValue(),res.get("value"));
+		assertEquals(addr.toExactLong(),res.get("value"));
 		
 		// Query *key*
 		res=c.query(Symbols.STAR_KEY.toString());
@@ -91,7 +91,7 @@ public class RemoteClientTest {
 		
 		// Test values for basic new account
 		Map<String,Object> res=c.queryAccount();
-		assertEquals(addr.longValue(),res.get("address"));
+		assertEquals(addr.toExactLong(),res.get("address"));
 		assertEquals(0L,res.get("balance"));
 		assertEquals(0L,res.get("sequence"));
 		assertEquals("user",res.get("type"));

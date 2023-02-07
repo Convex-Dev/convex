@@ -17,9 +17,9 @@ public class GenTestBlobs {
 	@Property
 	public void testToLong(@From(BlobGen.class) ABlob blob) {
 		long len=blob.count();
-		long lv=blob.toLong();
+		long lv=blob.longValue();
 
 		int slen=Math.min(8,Utils.checkedInt(len));
-		assertEquals(lv,blob.slice(len-slen,len).toLong());
+		assertEquals(lv,blob.slice(len-slen,len).longValue());
 	}
 }

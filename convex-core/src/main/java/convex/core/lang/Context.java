@@ -1462,7 +1462,7 @@ public class Context<T extends ACell> extends AObject {
 		AVector<AccountStatus> accounts=getState().getAccounts();
 
 		Address source=getAddress();
-		long sourceIndex=source.longValue();
+		long sourceIndex=source.toExactLong();
 		AccountStatus sourceAccount=accounts.get(sourceIndex);
 
 		long currentBalance=sourceAccount.getBalance();
@@ -1475,7 +1475,7 @@ public class Context<T extends ACell> extends AObject {
 		accounts=accounts.assoc(sourceIndex, newSourceAccount);
 
 		// new target account (note: could be source account, so we get from latest accounts)
-		long targetIndex=target.longValue();
+		long targetIndex=target.toExactLong();
 		if (targetIndex>=accounts.count()) {
 			return this.withError(ErrorCodes.NOBODY,"Target account for transfer "+target+" does not exist");
 		}
@@ -1522,7 +1522,7 @@ public class Context<T extends ACell> extends AObject {
 		AVector<AccountStatus> accounts=getState().getAccounts();
 
 		Address source=getAddress();
-		long sourceIndex=source.longValue();
+		long sourceIndex=source.toExactLong();
 		AccountStatus sourceAccount=accounts.get(sourceIndex);
 
 		long currentBalance=sourceAccount.getMemory();
@@ -1535,7 +1535,7 @@ public class Context<T extends ACell> extends AObject {
 		accounts=accounts.assoc(sourceIndex, newSourceAccount);
 
 		// new target account (note: could be source account, so we get from latest accounts)
-		long targetIndex=target.longValue();
+		long targetIndex=target.toExactLong();
 		if (targetIndex>=accounts.count()) {
 			return withError(ErrorCodes.NOBODY,"Cannot transfer memory allowance to non-existent account: "+target);
 		}
@@ -1562,7 +1562,7 @@ public class Context<T extends ACell> extends AObject {
 		if (allowance>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 
 		Address source=getAddress();
-		long sourceIndex=source.longValue();
+		long sourceIndex=source.toExactLong();
 		AccountStatus sourceAccount=accounts.get(sourceIndex);
 
 		long current=sourceAccount.getMemory();
@@ -1584,7 +1584,7 @@ public class Context<T extends ACell> extends AObject {
 
 			// Update accounts
 			AVector<AccountStatus> newAccounts=accounts.assoc(sourceIndex, sourceAccount);
-			newAccounts=newAccounts.assoc(Init.MEMORY_EXCHANGE_ADDRESS.longValue(),pool);
+			newAccounts=newAccounts.assoc(Init.MEMORY_EXCHANGE_ADDRESS.toExactLong(),pool);
 
 			return withChainState(chainState.withAccounts(newAccounts)).withResult(null);
 		} catch (IllegalArgumentException e) {

@@ -65,7 +65,14 @@ public class CVMBigInteger extends AInteger {
 	
 	@Override
 	public CVMLong toLong() {
-		return CVMLong.create(big().longValue());
+		return CVMLong.create(longValue());
+	}
+	
+
+	@Override
+	public long longValue() {
+		if (blob!=null) return blob.longValue();
+		return data.longValue();
 	}
 
 	protected BigInteger big() {
@@ -117,10 +124,6 @@ public class CVMBigInteger extends AInteger {
 		return (int) Math.min(Blob.MAX_ENCODING_LENGTH,byteLength()+10);
 	}
 
-	@Override
-	public long longValue() {
-		return big().longValue();
-	}
 
 	@Override
 	public double doubleValue() {
@@ -244,7 +247,7 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	public CVMLong asLongInteger() {
 		if (byteLength()>LONG_BYTELENGTH) return null;
-		return toLong();
+		return (CVMLong)getCanonical();
 	}
 
 }

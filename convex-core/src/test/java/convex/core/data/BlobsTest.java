@@ -126,8 +126,8 @@ public class BlobsTest {
 
 	@Test
 	public void testToLong() {
-		assertEquals(255L,Blob.fromHex("ff").toLong());
-		assertEquals(-1L,Blob.fromHex("ffffffffffffffff").toLong());
+		assertEquals(255L,Blob.fromHex("ff").longValue());
+		assertEquals(-1L,Blob.fromHex("ffffffffffffffff").longValue());
 	}
 	
 	@Test
@@ -193,8 +193,8 @@ public class BlobsTest {
 		Blob bb = Blob.fromHex("cafebabedeadbeef");
 		
 		assertEquals(b.getContentHash(),bb.getContentHash()); // same data hash		
-		assertEquals(b.longValue(),bb.longValue());
-		assertEquals(0xcafebabedeadbeefl,b.longValue());
+		assertEquals(b.toExactLong(),bb.toExactLong());
+		assertEquals(0xcafebabedeadbeefl,b.toExactLong());
 
 		assertEquals(10, b.getHexDigit(1)); // 'a'
 
@@ -218,7 +218,7 @@ public class BlobsTest {
 		assertEquals(bb, b); 
 		assertEquals(b, bb); 
 
-		doLongBlobTests(b.longValue());
+		doLongBlobTests(b.toExactLong());
 	}
 	
 	@Test
@@ -240,7 +240,7 @@ public class BlobsTest {
 		assertEquals(fb.hashCode(),b.hashCode());
 		
 		// Test Address conversion
-		if (b.longValue()>=0) {
+		if (b.toExactLong()>=0) {
 			assertEquals(b.toHexString(),Address.create(b).toHexString());
 		}
 		
@@ -250,7 +250,7 @@ public class BlobsTest {
 	@Test
 	public void testEmptyBlob() throws BadFormatException {
 		ABlob e = Blob.EMPTY;
-		assertEquals(0L,e.toLong());
+		assertEquals(0L,e.longValue());
 		assertSame(e,e.getChunk(0));
 		assertSame(e,e.slice(0,0));
 		assertSame(e,e.append(e));

@@ -416,7 +416,7 @@ public class BeliefMergeTest {
 
 		// should have correct number of transactions each
 		for (int i = 0; i < NUM_PEERS; i++) {
-			assertEquals(NUM_INITIAL_TRANS, accounts.get(ADDRESSES[i].longValue()).getSequence());
+			assertEquals(NUM_INITIAL_TRANS, accounts.get(ADDRESSES[i].toExactLong()).getSequence());
 		}
 		// should have equal balance
 		assertEquals(INITIAL_BALANCE_PROPOSER-TJUICE, finalState.getBalance(PADDRESS));

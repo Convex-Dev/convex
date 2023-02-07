@@ -625,7 +625,7 @@ public class RT {
 		}
 
 		if (a instanceof ABlob) {
-			long lv = ((ABlob) a).toLong();
+			long lv = ((ABlob) a).longValue();
 			return CVMLong.create(lv);
 		}
 
@@ -669,7 +669,7 @@ public class RT {
 		}
 
 		if (a instanceof ABlob) {
-			long lv = ((ABlob) a).toLong();
+			long lv = ((ABlob) a).longValue();
 			return CVMLong.create(lv);
 		}
 
@@ -1699,7 +1699,7 @@ public class RT {
 		if (o instanceof CVMChar)
 			return (T) ((CVMChar) o).toString();
 		if (o instanceof Address)
-			return (T) (Long)((Address) o).longValue();
+			return (T) (Long)((Address) o).toExactLong();
 		if (o instanceof AMap) {
 			AMap<?,?> m= (AMap<?,?>)o;
 			long n=m.count();

@@ -317,7 +317,7 @@ public class State extends ARecord {
 			if (sched.isEmpty()) break;
 			MapEntry<ABlob, AVector<ACell>> me = sched.entryAt(0);
 			ABlob key = me.getKey();
-			long time = key.longValue();
+			long time = key.toExactLong();
 			if (time > timestamp.longValue()) break; // exit if we are still in the future
 			AVector<ACell> trans = me.getValue();
 			long numScheduled = trans.count(); // number scheduled at this schedule timestamp
@@ -542,7 +542,7 @@ public class State extends ARecord {
 	 * @return Updates State, or this state if Account was unchanged
 	 */
 	public State putAccount(Address address, AccountStatus accountStatus) {
-		long ix=address.longValue();
+		long ix=address.toExactLong();
 		long n=accounts.count();
 		if (ix>n) {
 			throw new IndexOutOfBoundsException("Trying to add an account beyond accounts array at position: "+ix);
@@ -566,7 +566,7 @@ public class State extends ARecord {
 	 * @return The AccountStatus for the given account, or null.
 	 */
 	public AccountStatus getAccount(Address target) {
-		long ix=target.longValue();
+		long ix=target.toExactLong();
 		if ((ix<0)||(ix>=accounts.count())) return null;
 		return accounts.get(ix);
 	}

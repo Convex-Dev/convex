@@ -121,7 +121,7 @@ public class PeerCreate implements Runnable {
 			RecordOutput output=new RecordOutput();
 			
 			output.addField("Public Peer Key", keyPair.getAccountKey().toString());
-			output.addField("Address", address.longValue());
+			output.addField("Address", address.toExactLong());
 			output.addField("Balance", currentBalance);
 			output.addField("Inital stake amount", stakeAmount);
 			// System.out.println("You can now start this peer by executing the following line:\n");
@@ -133,7 +133,7 @@ public class PeerCreate implements Runnable {
 				String.format(
 					"./convex peer start --password=%s --address=%d --public-key=%s",
 					mainParent.getPassword(),
-					address.toLong(),
+					address.longValue(),
 					shortAccountKey
 				)
 			);

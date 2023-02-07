@@ -57,7 +57,7 @@ public final class BlobCache {
 	}
 
 	private int calcIndex(ABlob encoding) {
-		int hash=Long.hashCode(encoding.toLong());
+		int hash=Long.hashCode(encoding.longValue());
 		int ix=Math.floorMod(hash, size);
 		return ix;
 	}

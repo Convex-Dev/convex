@@ -97,7 +97,7 @@ public class RESTServer {
 		} catch (IOException e) {
 			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
 		}
-		ctx.result("{\"address\": " + a.toLong() + "}");
+		ctx.result("{\"address\": " + a.longValue() + "}");
 	}
 	
 	public void queryAccount(Context ctx) {
@@ -130,7 +130,7 @@ public class RESTServer {
 		// boolean isLibrary=as.getCallableFunctions().isEmpty();
 		
 		HashMap<String,Object> hm=new HashMap<>();
-		hm.put("address",addr.longValue());
+		hm.put("address",addr.toExactLong());
 		hm.put("allowance",as.getMemory());
 		hm.put("balance",as.getBalance());
 		hm.put("memorySize",as.getMemorySize());

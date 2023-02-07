@@ -308,13 +308,13 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public long longValue() {
+	public long toExactLong() {
 		if (length != 8) throw new IllegalStateException(Errors.wrongLength(8, length));
 		return Utils.readLong(store, offset);
 	}
 
 	@Override
-	public long toLong() {
+	public long longValue() {
 		if (length >= 8) {
 			return Utils.readLong(store, offset + length - 8);
 		} else {

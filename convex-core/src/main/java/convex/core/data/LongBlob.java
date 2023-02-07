@@ -78,7 +78,7 @@ public final class LongBlob extends ALongBlob {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
 		if (a instanceof Blob) {
 			Blob b=(Blob)a;
-			return ((b.count()==LENGTH)&& (b.longValue()== value));
+			return ((b.count()==LENGTH)&& (b.toExactLong()== value));
 		}
 		return false;
 	}
@@ -102,7 +102,7 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public long longValue() {
+	public long toExactLong() {
 		return value;
 	}
 

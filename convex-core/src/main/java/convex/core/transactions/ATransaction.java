@@ -36,7 +36,7 @@ public abstract class ATransaction extends ACell {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs,pos, origin.longValue());
+		pos = Format.writeVLCLong(bs,pos, origin.toExactLong());
 		pos = Format.writeVLCLong(bs,pos, sequence);
 		return pos;
 	}

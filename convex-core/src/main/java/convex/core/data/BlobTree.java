@@ -574,14 +574,14 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public long longValue() {
+	public long toExactLong() {
 		if (count != 8) throw new IllegalStateException(Errors.wrongLength(8, count));
-		return getChunk(0).longValue();
+		return getChunk(0).toExactLong();
 	}
 	
 	@Override
-	public long toLong() {
-		return slice(count-8,count).toLong();
+	public long longValue() {
+		return slice(count-8,count).longValue();
 	}
 
 	@Override
