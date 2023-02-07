@@ -359,8 +359,8 @@ public class Juice {
 	 * @param n Element count of data structure constructed
 	 * @return Calculated juice cost
 	 */
-	public static long buildCost(ACountable<ACell> counted, long n) {
-		long elementCost=elementCost(counted);
+	public static long costBuildStructure(ACountable<ACell> counted, long n) {
+		long elementCost=costAddElement(counted);
 		return addMul(Juice.BUILD_DATA,elementCost,n);
 	}
 
@@ -369,7 +369,7 @@ public class Juice {
 	 * @param counted
 	 * @return
 	 */
-	private static long elementCost(ACountable<ACell> counted) {
+	private static long costAddElement(ACountable<ACell> counted) {
 		if (counted instanceof ADataStructure) return BUILD_PER_ELEMENT;
 		if (counted==null) return BUILD_PER_ELEMENT;
 		return BUILD_PER_BYTE;

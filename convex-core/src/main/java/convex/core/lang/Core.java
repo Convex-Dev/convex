@@ -2120,7 +2120,7 @@ public class Core {
 			}
 			if (end<start) return context.withError(ErrorCodes.BOUNDS,"End before start");
 			
-			long juice=Juice.buildCost(counted,end-start);
+			long juice=Juice.costBuildStructure(counted,end-start);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
 			ACountable<ACell> result = counted.slice(start,end);
