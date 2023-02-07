@@ -159,6 +159,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(CVMLong.create(0xff), eval("(byte 255)"));
 		assertSame(CVMLong.create(0xff), eval("(byte -1)"));
 		assertSame(CVMLong.create(0xff), eval("(byte (byte -1))"));
+		
+		assertSame(CVMLong.create(0x00), eval("(byte 9223372036854775808)"));
 
 		// Byte extracts last byte from Blob a default (similar behaviour to Long)
 		assertSame(CVMLong.create(0xff), eval("(byte 0xff)"));
