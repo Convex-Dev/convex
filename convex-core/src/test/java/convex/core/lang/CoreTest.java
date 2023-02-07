@@ -389,13 +389,6 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testCharAt() {
-		// TODO Unicode char-at
-
-	}
-
-
-	@Test
 	public void testBoolean() {
 		// test precise values
 		assertSame(CVMBool.TRUE, eval("(boolean 1)"));
@@ -475,6 +468,14 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(= :bar :bar :bar)"));
 		assertFalse(evalB("(= :bar :bar :bar 2)"));
 		assertFalse(evalB("(= *juice* *juice*)"));
+		
+		assertTrue(evalB("(= [1 2] [1 2])"));
+		assertTrue(evalB("(= #{1 2 4} #{1 2 4})"));
+		assertFalse(evalB("(= #{1 2 4} [1 2 4])"));
+		
+		assertFalse(evalB("(= 9223372036854775808 -9223372036854775808)"));
+		assertTrue(evalB("(= 9223372036854775808 9223372036854775808)"));
+
 		assertTrue(evalB("(=)"));
 		assertTrue(evalB("(= = =)"));
 		assertTrue(evalB("(= nil nil)"));
