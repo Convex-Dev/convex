@@ -1013,6 +1013,10 @@ public class CoreTest extends ACVMTest {
 
 		// BOUNDS error because treated as empty sequence
 		assertBoundsError(step("(nth nil 10)"));
+		
+		// Big integer bounds are always invalid
+		assertBoundsError(step("(nth 0x1234 9223372036854775808)"));
+		assertBoundsError(step("(nth \"abc\" -9223372036854775809)"));
 
 		assertBoundsError(step("(nth 0x 0)"));
 		assertBoundsError(step("(nth nil 0)"));

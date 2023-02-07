@@ -216,8 +216,8 @@ public final class CVMLong extends AInteger {
 	}
 	
 	@Override
-	public boolean isLongInteger() {
-		return true;
+	public CVMLong asLongInteger() {
+		return this;
 	}
 
 	@Override

@@ -633,19 +633,17 @@ public class RT {
 	}
 
 	/**
-	 * Ensures the argument is a CVM Long value.
+	 * Ensures the argument is a CVM Integer within Long range.
 	 * 
 	 * @param a Value to cast
-	 * @return CVMLong value, or null if not convertible
+	 * @return CVMLong value, or null if not convertible / within long range. 
 	 */
 	public static CVMLong ensureLong(ACell a) {
 		if (a instanceof CVMLong)
 			return (CVMLong) a;
 		if (a instanceof ANumeric) {
 			ANumeric ap = (ANumeric) a;
-			if (ap.isLongInteger()) {
-				return ap.toLong();
-			}
+			return ap.asLongInteger();
 		}
 		return null;
 	}

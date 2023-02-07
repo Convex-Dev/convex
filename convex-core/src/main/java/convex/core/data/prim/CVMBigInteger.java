@@ -242,8 +242,9 @@ public class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	public boolean isLongInteger() {
-		return byteLength()<=LONG_BYTELENGTH;
+	public CVMLong asLongInteger() {
+		if (byteLength()>LONG_BYTELENGTH) return null;
+		return toLong();
 	}
 
 }

@@ -2060,9 +2060,11 @@ public class Core {
 			Long n = RT.count(arg);
 			if (n == null) return context.withCastError(arg, Types.SEQUENCE);
 
-			// Second argument should be a Long index
-			CVMLong ix = RT.ensureLong(args[1]);
-			if (ix == null) return context.withCastError(1,args, Types.LONG);
+			// Second argument should be an Integer index within long range
+			ACell iarg=args[1];
+			if (!(iarg instanceof AInteger)) return context.withCastError(1,args, Types.LONG);
+			CVMLong ix = RT.ensureLong(iarg);
+			if (ix == null) return context.withError(ErrorCodes.BOUNDS,"Excessively large index");
 
 			long i=ix.longValue();
 
@@ -2527,7 +2529,7 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
-				return ((AInteger)val).isLongInteger();
+				return ((AInteger)val).asLongInteger()!=null;
 			}
 			return false;
 		}

@@ -6,6 +6,7 @@ import java.util.ListIterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
@@ -115,8 +116,9 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 */
 	@Override
 	public T get(ACell key) {
-		if (key instanceof CVMLong) {
-			long ix = ((CVMLong) key).longValue();
+		if (key instanceof AInteger) {
+			CVMLong longix=RT.ensureLong(key);
+			long ix = longix.longValue();
 			if ((ix >= 0) && (ix < count())) return get(ix);
 		}
 		return null;

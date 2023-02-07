@@ -40,5 +40,9 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 */
 	public abstract APrimitive abs();
 
-	public abstract boolean isLongInteger();
+	/**
+	 * Gets the numeric value as a Long integer, or null if not a valid Long
+	 * @return CVMLong value, or null
+	 */
+	public abstract CVMLong asLongInteger();
 }

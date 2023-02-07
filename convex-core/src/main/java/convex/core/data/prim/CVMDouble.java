@@ -180,8 +180,9 @@ public final class CVMDouble extends ANumeric {
 	}
 
 	@Override
-	public boolean isLongInteger() {
-		return false;
+	public CVMLong asLongInteger() {
+		// TODO: possible conversion of some values?
+		return null;
 	}
 
 }
