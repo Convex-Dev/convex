@@ -1733,9 +1733,14 @@ public class Core {
 		@Override
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			// All arities OK
-
-			APrimitive result = RT.plus(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			long cost=Juice.precostNumericLinear(args);
+			if (cost<0) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context; // not not exceptional, might be something else
+			}
+			
+			ANumeric result = RT.plus(args);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1745,7 +1750,7 @@ public class Core {
 		@Override
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
-			APrimitive result = RT.minus(args);
+			ANumeric result = RT.minus(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1756,7 +1761,7 @@ public class Core {
 		@Override
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			// All arities OK
-			APrimitive result = RT.times(args);
+			ANumeric result = RT.times(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

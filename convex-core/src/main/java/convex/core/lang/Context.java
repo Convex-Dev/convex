@@ -468,7 +468,7 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Consumes juice, returning an updated context if sufficient juice remains or an exceptional JUICE error.
 	 * @param <R> Result type
-	 * @param gulp Amount of jjuice to consume
+	 * @param gulp Amount of juice to consume
 	 * @return Updated context with juice consumed
 	 */
 	@SuppressWarnings("unchecked")
@@ -968,6 +968,7 @@ public class Context<T extends ACell> extends AObject {
 					if (fn==Core.RECUR) break;
 					RecurValue rv = (RecurValue) v;
 					ACell[] newArgs = rv.getValues();
+					ctx=ctx.withValue(null); // clear value
 					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
 					v = ctx.getValue();
 				} else if (v instanceof TailcallValue) {
@@ -977,6 +978,7 @@ public class Context<T extends ACell> extends AObject {
 
 					// redirect function and invoke
 					fn = (AFn<R>) rv.getFunction();
+					ctx=ctx.withValue(null); // clear value
 					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
 					v = ctx.getValue();
 				}

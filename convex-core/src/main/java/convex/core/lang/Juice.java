@@ -4,6 +4,8 @@ import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
+import convex.core.data.prim.ANumeric;
+import convex.core.data.prim.CVMBigInteger;
 
 /**
  * Static class defining juice costs for executable operations.
@@ -316,6 +318,11 @@ public class Juice {
 	public static final long PEER_UPDATE = 1000;
 
 	/**
+	 * Minimum base cost for a numeric argument
+	 */
+	private static final int MIN_NUMERIC_COST = 8;
+
+	/**
 	 * Saturating multiply and add: result = a + (b * c)
 	 * 
 	 * Returns Long.MAX_VALUE on overflow.
@@ -411,6 +418,35 @@ public class Juice {
 	 */
 	 public static long buildDataCost(long n) {
 		return addMul(Juice.BUILD_DATA,BUILD_PER_ELEMENT,n);
+	}
+
+	 /**
+	  * Pre-costs a sequence of numeric arguments
+	  * @param args
+	  * @return Juice cost, or negative if any argument is not numeric
+	  */
+	public static long precostNumericLinear(ACell[] args) {
+		long r=0;
+		for (int i=0; i<args.length; i++) {
+			long ar=costNumeric(args[i]);
+			if (ar<0) return -1;
+			r=add(r,ar);
+		}
+		return r;
+	}
+
+	/**
+	 * Gets the base cost for a numeric argument
+	 * @param aCell
+	 * @return base cost, or negative if not numeric
+	 */
+	private static long costNumeric(ACell a) {
+		if (!(a instanceof ANumeric)) return -1;
+		if (a instanceof CVMBigInteger) {
+			long bl=((CVMBigInteger)a).byteLength();
+			return Math.max(MIN_NUMERIC_COST,bl);
+		}
+		return MIN_NUMERIC_COST;
 	}
 
 
