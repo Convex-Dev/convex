@@ -93,6 +93,11 @@
 			</resource>
 
 		</resources>
+		<testResources>
+			<resource>
+				<directory>src/test/cvx</directory>
+			</resource>
+		</testResources>
 	</build>
 
 	<dependencies>

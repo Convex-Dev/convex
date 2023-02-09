@@ -1,0 +1,28 @@
+;; A short demo of creating a fungible token and listing on Torus exchange
+
+;; ================================
+;; Token Launch
+
+(import convex.fungible :as fun)
+
+(def my-token (deploy (fun/build-token {@supply 5555555})))
+
+(fun/balance my-token *address*)
+
+
+;; ================================
+;; Exchange Listing
+
+(import torus.exchange :as torus)
+
+(call torus (create-market my-token))
+
+(torus/price my-token) ;; should be nil initially, since no liquidity
+
+(torus/add-liquidity my-token 1000 10000)
+
+(torus/price my-token)
+
+(torus/buy-quote my-token 100)
+
+(torus/buy-tokens my-token 100)
