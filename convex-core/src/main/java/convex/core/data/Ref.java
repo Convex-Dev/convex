@@ -433,38 +433,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Accumulates the set of all unique Refs in the given object.
-	 * 
-	 * Might stack overflow if nesting is too deep - not for use in on-chain code.
-	 * 
-	 * @param a Ref or Cell
-	 * @return Set containing all unique refs (accoumulated recursively) within the
-	 *         given object
-	 */
-	public static java.util.Set<Ref<?>> accumulateRefSet(Object a) {
-		HashSet<Ref<?>> hs = new HashSet<>();
-		accumulateRefSet(a, hs);
-		return hs;
-	}
-
-	private static void accumulateRefSet(Object a, HashSet<Ref<?>> hs) {
-		if (a instanceof Ref) {
-			Ref<?> ref = (Ref<?>) a;
-			if (hs.contains(ref)) return;
-			hs.add(ref);
-			accumulateRefSet(ref.getValue(), hs);
-		} else if (a instanceof ACell) {
-			ACell rc = (ACell) a;
-			rc.updateRefs(r -> {
-				accumulateRefSet(r, hs);
-				return r;
-			});
-		}
-	}
-
-
-
-	/**
 	 * Updates an array of Refs with the given function.
 	 * 
 	 * Returns the original array unchanged if no refs were changed, otherwise

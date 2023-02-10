@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.function.Consumer;
 
 import convex.core.util.Trees;
@@ -21,12 +22,7 @@ public class Refs {
 		
 		Consumer<Ref<?>> addingVisitor=r->{
 			visitor.accept(r);
-			ACell a=r.getValue();
-			// Add all child refs to stack
-			int n=a.getRefCount();
-			for (int i=n-1; i>=0; i--) {
-				al.add(a.getRef(i));
-			}
+			pushChildRefs(al,r);
 		};
 		
 		Trees.visitStack(al,addingVisitor);
@@ -60,5 +56,60 @@ public class Refs {
 		visitAllRefs(root,statVisitor);
 		
 		return rts;
+	}
+
+	/**
+	 * Accumulates the set of all unique Refs in the given object.
+	 * 
+	 * @param a Ref or Cell
+	 * @return Set containing all unique refs (accumulated recursively) within the
+	 *         given object
+	 */
+	public static java.util.Set<Ref<?>> accumulateRefSet(ACell a) {
+		return accumulateRefSet(Ref.get(a));
+	}
+	
+	public static java.util.Set<Ref<?>> accumulateRefSet(Ref<?> root) {
+		HashSet<Ref<?>> hs = new HashSet<>();
+		accumulateRefSet(root, hs);
+		return hs;
+	}
+
+	static void accumulateRefSet(Ref<?> root, HashSet<Ref<?>> hs) {
+		ArrayList<Ref<?>> al=new ArrayList<>();
+		al.add(root);
+		
+		Consumer<Ref<?>> accVisitor=r->{
+			if (!hs.contains(r)) {
+				hs.add(r);
+				
+				// Add all child refs to stack
+				pushChildRefs(al,r);
+			}
+		};
+
+		Trees.visitStack(al, accVisitor);
+	}
+	
+	static <T extends ACell> void pushChildRefs(ArrayList<Ref<?>> stack, Ref<T> r) {
+		T a=r.getValue();
+		if (a==null) return;
+		int n=a.getRefCount();
+		for (int i=n-1; i>=0; i--) {
+			stack.add(a.getRef(i));
+		}
+	}
+
+	/**
+	 * Counts the total number of Refs contained in a data object recursively. Will
+	 * count duplicate children multiple times.
+	 *
+	 * @param a Object to count Refs in
+	 * @return Total number of Refs found
+	 */
+	public static long totalRefCount(ACell a) {
+		Ref<?> r=Ref.get(a);
+		RefTreeStats rts=getRefTreeStats(r);
+		return rts.total;
 	}
 }

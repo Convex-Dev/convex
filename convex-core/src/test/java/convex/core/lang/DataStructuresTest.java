@@ -6,9 +6,9 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
+import convex.core.data.Refs;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.util.Utils;
 
 /**
  * Tests for various data structure operations.
@@ -28,10 +28,10 @@ public class DataStructuresTest extends ACVMTest {
 
 	@Test
 	public void testRefCounts() {
-		assertEquals(0, Utils.totalRefCount(Vectors.empty()));
-		assertEquals(2, Utils.totalRefCount(Vectors.of(1, 2)));
-		assertEquals(1, Utils.totalRefCount(eval("(fn [a] a)"))); // 1 Ref in params [symbol]
-		assertEquals(6, Utils.totalRefCount(eval("[[1 2] [3 4]]"))); // 6 vector element Refs
+		assertEquals(1, Refs.totalRefCount(Vectors.empty()));
+		assertEquals(3, Refs.totalRefCount(Vectors.of(1, 2)));
+		assertEquals(2, Refs.totalRefCount(eval("(fn [a] a)"))); // 1 Ref in params [symbol] plus root
+		assertEquals(7, Refs.totalRefCount(eval("[[1 2] [3 4]]"))); // 6 vector element Refs plus root
 	}
 
 }

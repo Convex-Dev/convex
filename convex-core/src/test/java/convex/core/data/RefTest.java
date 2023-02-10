@@ -19,7 +19,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class RefTest {
@@ -43,15 +42,15 @@ public class RefTest {
 	@Test
 	public void testRefSet() {
 		// 10 element refs
-		assertEquals(10, Ref.accumulateRefSet(Samples.INT_VECTOR_10).size());
-		assertEquals(10, Utils.totalRefCount(Samples.INT_VECTOR_10));
+		assertEquals(11, Refs.accumulateRefSet(Samples.INT_VECTOR_10).size());
+		assertEquals(11, Refs.totalRefCount(Samples.INT_VECTOR_10));
 
 		// 256 element refs, 16 tree branches
-		assertEquals(272, Ref.accumulateRefSet(Samples.INT_VECTOR_256).size());
-		assertEquals(272, Utils.totalRefCount(Samples.INT_VECTOR_256));
+		assertEquals(273, Refs.accumulateRefSet(Samples.INT_VECTOR_256).size());
+		assertEquals(273, Refs.totalRefCount(Samples.INT_VECTOR_256));
 
 		// 11 = 10 element refs plus one for enclosing ref
-		assertEquals(11, Ref.accumulateRefSet(Samples.INT_VECTOR_10.getRef()).size());
+		assertEquals(11, Refs.accumulateRefSet(Samples.INT_VECTOR_10.getRef()).size());
 	}
 
 	@Test
@@ -183,7 +182,7 @@ public class RefTest {
 	public void testDiabolicalWide() {
 		Ref<ACell> a = Samples.DIABOLICAL_MAP_30_30.getRef();
 		// OK since we manage de-duplication
-		Set<Ref<?>> set = Ref.accumulateRefSet(a);
+		Set<Ref<?>> set = Refs.accumulateRefSet(a);
 		assertEquals(31 + 30 * 16, set.size()); // 16 refs at each level after de-duping
 		assertFalse(a.isEmbedded());
 	}

@@ -286,7 +286,7 @@ public class ObjectsTest {
 		assertTrue(rc>=0);
 		assertEquals(rc,Utils.refCount(a));
 		if (rc>0) {
-			long tcount = Utils.totalRefCount(a);
+			long tcount = Refs.totalRefCount(a);
 			assertTrue(rc <= tcount);
 		}
 		

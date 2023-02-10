@@ -1165,29 +1165,6 @@ public class Utils {
 		return a.getRefCount();
 	}
 
-	/**
-	 * Counts the total number of Refs contained in a data object recursively. Will
-	 * count duplicate children multiple times.
-	 *
-	 * @param a Object to count Refs in
-	 * @return Total number of Refs found
-	 */
-	public static long totalRefCount(Object a) {
-		if (!(a instanceof ACell)) return 0;
-
-		ACell ra = (ACell) a;
-		long[] count = new long[] { 0L };
-
-		ACell ra2;
-		ra2 = ra.updateRefs(r -> {
-			count[0] += 1 + totalRefCount(r.getValue());
-
-			return r;
-		});
-		assert (ra == ra2); // check we didn't change anything!
-		return count[0];
-	}
-
 	public static <R extends ACell> Ref<R> getRef(ACell o, int i) {
 		if (o ==null) throw new IllegalArgumentException("Bad ref index: " + i+ " called on null");
 		return o.getRef(i);

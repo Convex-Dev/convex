@@ -32,6 +32,7 @@ import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.Refs;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -135,7 +136,7 @@ public class EtchStoreTest {
 
 			assertEquals(3,Utils.refCount(t1));
 			assertEquals(0,Utils.refCount(t2));
-			assertEquals(12,Utils.totalRefCount(belief));
+			assertEquals(13,Refs.totalRefCount(belief));
 
 
 			Consumer<Ref<ACell>> noveltyHandler=r-> {
