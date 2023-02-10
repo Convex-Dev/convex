@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
 
@@ -185,6 +186,24 @@ public class RefTest {
 		Set<Ref<?>> set = Ref.accumulateRefSet(a);
 		assertEquals(31 + 30 * 16, set.size()); // 16 refs at each level after de-duping
 		assertFalse(a.isEmbedded());
+	}
+	
+	@Test public void testAllRefsVisitor() {
+		ACell a=Samples.INT_VECTOR_10;
+		Ref<?> root=a.getRef();
+		
+		ArrayList<ACell> al=new ArrayList<>();
+		Refs.visitAllRefs(root, r->al.add(r.getValue()));
+		
+		assertEquals(11,al.size());
+		assertSame(a,al.get(0));
+		assertSame(CVMLong.ZERO,al.get(1));
+		assertSame(a.getRef(9),al.get(10).getRef());
+		
+		Refs.RefTreeStats rts=Refs.getRefTreeStats(root);
+		assertEquals(11,rts.total);
+		assertEquals(11,rts.embedded);
+		assertEquals(0,rts.persisted);
 	}
 
 	@Test
