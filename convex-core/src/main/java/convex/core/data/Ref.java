@@ -69,12 +69,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int ANNOUNCED = 4;
 	
 	/**
-	 * Ref status indicating the Ref is an internal embedded value that can be
-	 * encoded and used independently of any given store state
-	 */
-	public static final int INTERNAL = 5;
-	
-	/**
 	 * Ref status indicating the value is marked in the store for GC copying. Marked values
 	 * are retained until next GC cycle
 	 */
@@ -83,7 +77,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Maximum Ref status
 	 */
-	public static final int MAX_STATUS = INTERNAL;
+	public static final int MAX_STATUS = ANNOUNCED;
 	
 	/**
 	 * Mask for Ref flag bits representing the Status
@@ -123,7 +117,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Flags for internal constant values
 	 */
-	public static final int INTERNAL_FLAGS=INTERNAL|KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
+	public static final int INTERNAL_FLAGS=KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
 	
 	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
@@ -363,7 +357,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		// TODO is this sane?
 		if (getStatus() < VALIDATED) {
 			T o = getValue();
-			o.validate();
+			if (o!=null) {
+				o.validate();
+			}
 		}
 	}
 
@@ -668,6 +664,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		} else {
 			// Should be OK to get value, since non-missing!
 			T val=getValue();
+			if (val==null) return;
 			
 			// TODO: maybe needs to be non-stack-consuming?
 			// recursively scan for missing children

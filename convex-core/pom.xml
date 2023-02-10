@@ -94,9 +94,12 @@
 
 		</resources>
 		<testResources>
-			<resource>
+			<testResource>
 				<directory>src/test/cvx</directory>
-			</resource>
+			</testResource>
+			<testResource>
+				<directory>src/test/resources</directory>
+			</testResource>
 		</testResources>
 	</build>
 

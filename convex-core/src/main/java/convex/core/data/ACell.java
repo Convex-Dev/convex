@@ -548,7 +548,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		if (ref.isPersisted()) return ref;
 		AStore store=Stores.current();
 		ref = (Ref<T>) store.storeTopRef(ref, Ref.PERSISTED,noveltyHandler);
-		value.cachedRef=(Ref<ACell>)ref;
+		if (value!=null) value.cachedRef=(Ref<ACell>)ref;
 		return ref;
 	}
 
