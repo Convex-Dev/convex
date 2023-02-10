@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import convex.core.util.Trees;
@@ -111,5 +112,17 @@ public class Refs {
 		Ref<?> r=Ref.get(a);
 		RefTreeStats rts=getRefTreeStats(r);
 		return rts.total;
+	}
+	
+	/**
+	 * Counts the number of logically unique Refs for a Cell, i.e. the number of unique cell values
+	 * (including this Cell)
+	 *
+	 * @param a Cell to count Refs in
+	 * @return Number of Refs found
+	 */
+	public static long uniqueRefCount(ACell a) {
+		Set<Ref<?>> rs=accumulateRefSet(a);
+		return rs.size();
 	}
 }

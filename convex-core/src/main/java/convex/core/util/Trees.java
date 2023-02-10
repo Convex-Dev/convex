@@ -13,8 +13,8 @@ public class Trees {
 	 * Visitor function MAY edit the stack. Will terminate when stack is empty.
 	 * 
 	 * @param <T> Type of element to visit
-	 * @param stack Stack of values to visit
-	 * @param visitor Visitor function to call for each stack elemet.
+	 * @param stack Stack of values to visit, must be a mutable List
+	 * @param visitor Visitor function to call for each stack element.
 	 */
 	public static <T> void visitStack(List<T> stack, Consumer<T> visitor) {
 		while(!stack.isEmpty()) {
