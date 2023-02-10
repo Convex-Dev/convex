@@ -3,6 +3,8 @@ package convex.core.data;
 import java.util.ArrayList;
 import java.util.function.Consumer;
 
+import convex.core.util.Trees;
+
 /**
  * Static utilities for working with Refs
  */
@@ -13,12 +15,12 @@ public class Refs {
 	 * @param root Root of Ref tree to visit
 	 * @param visitor Visitor function to call for each Ref
 	 */
-	@SuppressWarnings("rawtypes")
 	public static void visitAllRefs(Ref<?> root, Consumer<Ref<?>> visitor) {
 		ArrayList<Ref<?>> al=new ArrayList<>();
 		al.add(root);
 		
-		Consumer<Ref> refAdder=r->{
+		Consumer<Ref<?>> addingVisitor=r->{
+			visitor.accept(r);
 			ACell a=r.getValue();
 			// Add all child refs to stack
 			int n=a.getRefCount();
@@ -27,13 +29,10 @@ public class Refs {
 			}
 		};
 		
-		while(!al.isEmpty()) {
-			int pos=al.size()-1;
-			Ref<?> r=al.remove(pos);
-			visitor.accept(r);
-			refAdder.accept(r);
-		}
+		Trees.visitStack(al,addingVisitor);
 	}
+	
+	
 	
 	public static final class RefTreeStats {
 		Ref<?> root=null;
