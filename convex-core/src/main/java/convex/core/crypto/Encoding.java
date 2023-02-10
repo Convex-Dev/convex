@@ -1,7 +1,7 @@
 package convex.core.crypto;
 
 /**
- * Class for crypto encoding constants
+ * Class for crypto encoding constants and utility functions
  */
 public class Encoding {
 	

@@ -240,9 +240,9 @@ public abstract class AKeyPair {
 	}
 
 	/**
-	 * Extracts an Address from an Ed25519 public key
+	 * Extracts an AccountKey from an Ed25519 public key
 	 * @param publicKey Public key
-	 * @return
+	 * @return AccountKey instance
 	 */
 	public static AccountKey extractAccountKey(PublicKey publicKey) {
 		byte[] bytes=publicKey.getEncoded();
