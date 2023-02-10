@@ -12,6 +12,9 @@ public class Trees {
 	 * Visits elements on a stack, popping one off from the end each time. 
 	 * Visitor function MAY edit the stack. Will terminate when stack is empty.
 	 * 
+	 * IMPORTANT: O(1) usage of JVM stack, may be necessary to use a function like this when 
+	 * visiting deeply nested trees in CVM code.
+	 * 
 	 * @param <T> Type of element to visit
 	 * @param stack Stack of values to visit, must be a mutable List
 	 * @param visitor Visitor function to call for each stack element.

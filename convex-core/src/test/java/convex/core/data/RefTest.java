@@ -60,17 +60,44 @@ public class RefTest {
 		
 		AVector<ACell> v = Vectors.of(bb,bb,bb,bb); // vector containing big blob four times. Shouldn't be embedded.
 		assertFalse(v.isEmbedded());
+		assertEquals(5,Refs.totalRefCount(v));
+		assertEquals(2,Refs.uniqueRefCount(v));
 		
 		Hash bh = bb.getHash();
 		Hash vh = v.getHash();
 		
-		Ref<AVector<ACell>> ref = v.getRef().persistShallow();
-		assertEquals(Ref.STORED, ref.getStatus());
+		// Big vector vv containing two non-embedded copies of v
+		AVector<ACell> vv=Vectors.of(v,v);
+		assertEquals(11,Refs.totalRefCount(vv));
+		assertEquals(3,Refs.uniqueRefCount(vv));
+		
+		// Shallow persist vv
+		Ref<AVector<ACell>> vvr=vv.getRef();
+		vvr=vvr.persistShallow();
+		assertEquals(Ref.STORED, vvr.getStatus());
 
+		// non-embedded child v shouldn't yet be in store
+		assertThrows(MissingDataException.class, () -> Ref.forHash(vh).getValue());
+		
+		// Shallow persist v
+		Ref<AVector<ACell>> vr=v.getRef();
+		vr = vr.persistShallow();
+		assertEquals(Ref.STORED, vr.getStatus());
+
+		// child blob shouldn't be in store
 		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
 		
-		assertFalse(v.isEmbedded());
+		// should be able to get v back from store now
 		assertEquals(v, Ref.forHash(vh).getValue());
+		
+		// Now do full persistence of vv
+		vvr=ACell.createPersisted(vv);
+		assertEquals(Ref.PERSISTED, vvr.getStatus());
+		
+		// Persistence should extend to child v
+		vr=Ref.forHash(vh);
+		assertEquals(v,vr.getValue());
+		assertEquals(Ref.PERSISTED, vr.getStatus());	
 	}
 	
 	@Test 

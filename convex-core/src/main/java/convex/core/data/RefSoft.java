@@ -93,6 +93,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		if (result == null) {
 			Ref<T> storeRef = store.refForHash(hash);
 			if (storeRef == null) throw Utils.sneakyThrow(new MissingDataException(store,hash));
+			this.flags=Ref.mergeFlags(this.flags, storeRef.flags);
 			result = storeRef.getValue();
 
 			if (storeRef instanceof RefSoft) {

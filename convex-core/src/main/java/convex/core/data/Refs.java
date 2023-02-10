@@ -13,7 +13,9 @@ import convex.core.util.Trees;
 public class Refs {
 	
 	/**
-	 * Visit all Refs in a tree of Refs, in depth first order
+	 * Visit all Refs in a tree of Refs, in depth first order.
+	 * Requires O(1) stack, O(n) time and O(depth) memory.
+	 * 
 	 * @param root Root of Ref tree to visit
 	 * @param visitor Visitor function to call for each Ref
 	 */
