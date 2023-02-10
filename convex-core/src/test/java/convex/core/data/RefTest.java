@@ -98,6 +98,17 @@ public class RefTest {
 		vr=Ref.forHash(vh);
 		assertEquals(v,vr.getValue());
 		assertEquals(Ref.PERSISTED, vr.getStatus());	
+		
+		// Now try announcing vv
+		vv.announce();
+		vvr=vv.getRef();
+		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
+		
+		// Announce should extend to child v
+		vr=Ref.forHash(vh);
+		assertEquals(v,vr.getValue());
+		assertEquals(Ref.ANNOUNCED, vr.getStatus());	
+
 	}
 	
 	@Test 
