@@ -70,6 +70,8 @@ public class RefTest {
 		AVector<ACell> vv=Vectors.of(v,v);
 		assertEquals(11,Refs.totalRefCount(vv));
 		assertEquals(3,Refs.uniqueRefCount(vv));
+		assertTrue(vv.isEmbedded()); // true because just 2 child Refs
+		assertFalse(vv.isCompletelyEncoded()); // false because has non-embedded children
 		
 		// Shallow persist vv
 		Ref<AVector<ACell>> vvr=vv.getRef();

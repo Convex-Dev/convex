@@ -345,7 +345,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isCanonical();
 	
 	/**
-	 * Converts this Cell to its canonical version. Returns this Cell if already canonical, may be O(n) in size of value otherwise.
+	 * Converts this Cell to its canonical version. Must return this Cell if already canonical, may be O(n) in size of value otherwise.
 	 * 
 	 * @return Canonical version of Cell
 	 */
@@ -570,7 +570,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if completely encoded, false otherwise
 	 */
 	public boolean isCompletelyEncoded() {
-		if (isEmbedded()) return true;
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<ACell> r=getRef(i);
