@@ -84,8 +84,6 @@ public class RefTest {
 		vr = vr.persistShallow();
 		assertEquals(Ref.STORED, vr.getStatus());
 
-		// child blob shouldn't be in store
-		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
 		
 		// should be able to get v back from store now
 		assertEquals(v, Ref.forHash(vh).getValue());
@@ -103,18 +101,25 @@ public class RefTest {
 		vv.announce();
 		vvr=vv.getRef();
 		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
+		assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
 		
 		// Announce should extend to child v
 		vr=Ref.forHash(vh);
 		assertEquals(v,vr.getValue());
 		assertEquals(Ref.ANNOUNCED, vr.getStatus());	
-
+		
+		// child blob still shouldn't be in store after everything else
+		assertThrows(MissingDataException.class, () -> Ref.forHash(bh).getValue());
 	}
 	
 	@Test 
 	public void testNonStored() throws BadFormatException {
 		Blob r=Blob.createRandom(new Random(), 2*Blob.CHUNK_LENGTH+100); // 2 chunks + an embedded Blob of length 100
+		assertEquals(4,Refs.totalRefCount(r));
+		assertEquals(4,Refs.uniqueRefCount(r));
 		Blob enc=r.getEncoding();
+		
+		// Should be able to read incomplete encoding
 		ABlob b=Format.read(enc);
 		
 		assertEquals(enc,b.getEncoding());
@@ -133,6 +138,7 @@ public class RefTest {
 		assertTrue(List.EMPTY_REF.isEmbedded()); // singleton null ref
 		assertFalse(Blob.create(new byte[Format.MAX_EMBEDDED_LENGTH]).getRef().isEmbedded()); // too big to embed
 		assertTrue(Samples.LONG_MAP_10.getRef().isEmbedded()); // a ref container
+		assertTrue(Vectors.of(Samples.NON_EMBEDDED_BLOB).isEmbedded()); // an embeddable vector with non-embedded child
 	}
 
 	@Test
