@@ -327,11 +327,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			int flags=cachedRef.flags;
 			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
 			if ((flags&Ref.NON_EMBEDDED_MASK)!=0) return false;
+		} else {
+			cachedRef=createRef();
 		}
 		boolean embedded= getEncodingLength()<=Format.MAX_EMBEDDED_LENGTH;
-		if (cachedRef!=null) {
-			cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
-		}
+		cachedRef.flags|=(embedded)?Ref.KNOWN_EMBEDDED_MASK:Ref.NON_EMBEDDED_MASK;
 		return embedded;
 	}
 	
