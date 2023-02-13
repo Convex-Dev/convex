@@ -557,6 +557,7 @@ public class Format {
 	 * @throws BadFormatException In case of encoding error
 	 */
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
+		if (blob.count()<1) throw new BadFormatException("Attempt to read from empty Blob");
 		byte tag = blob.byteAt(0);
 		return read(tag,blob);
 	}
@@ -570,7 +571,7 @@ public class Format {
 	 * @throws BadFormatException If encoding is invalid for the given tag
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T read(byte tag, Blob blob) throws BadFormatException {
+	private static <T extends ACell> T read(byte tag, Blob blob) throws BadFormatException {
 		if (tag == Tag.NULL) {
 			long len=blob.count();
 			if (len!=1) throw new BadFormatException("Bad null encoding with length"+len);

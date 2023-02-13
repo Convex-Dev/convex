@@ -98,6 +98,10 @@ public class EncodingTest {
 
 	}
 	
+	@Test public void testBlobReading() {
+		assertThrows(BadFormatException.class, ()->Format.read(Blobs.empty()));
+	}
+	
 	@Test public void testStringRegression() throws BadFormatException {
 		StringShort s=StringShort.create("��zI�&$\\ž1�����4�E4�a8�#?$wD(�#");
 		Blob b=Format.encodedBlob(s);
