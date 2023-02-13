@@ -395,7 +395,14 @@ public class BlobTree extends ABlob {
 		return new BlobTree(children, shift, count);
 	}
 
-	public static BlobTree read(Blob src, long count) throws BadFormatException {
+	/**
+	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
+	 * @param src Source data, assumed to include tag and count at start
+	 * @param count Length to read
+	 * @return BlobTree instance.
+	 * @throws BadFormatException If BlobTree encoding is invalid
+	 */
+	public static BlobTree read(AArrayBlob src, long count) throws BadFormatException {
 		int headerLength = (1 + Format.getVLCLength(count));
 		long chunks = calcChunks(count);
 		int shift = calcShift(chunks);

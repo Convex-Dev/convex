@@ -104,6 +104,13 @@ public class Blobs {
 		// TODO keep byte format representation?
 	}
 
+	/**
+	 * Reads a canonical Blob from a byte source
+	 * @param <T> Type of Blob result
+	 * @param source Source blob, containing tag
+	 * @return Canonical Blob
+	 * @throws BadFormatException if the Blob encoding format is invalid
+	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ABlob> T readFromBlob(Blob source) throws BadFormatException {
 		int sLen = source.length;

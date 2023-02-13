@@ -562,7 +562,7 @@ public class Format {
 	}
 	
 	/**
-	 * Read from a Blob with the specified tag
+	 * Read from a Blob with the specified tag, assumed to be at position 0
 	 * @param <T> Type of value to read
 	 * @param tag Tag to use for reading
 	 * @param blob Blob to read from

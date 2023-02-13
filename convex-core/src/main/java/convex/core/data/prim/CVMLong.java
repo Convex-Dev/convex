@@ -178,6 +178,11 @@ public final class CVMLong extends AInteger {
 		return Long.toString(value);
 	}
 
+	/**
+	 * Gets a CVMLong representing the signum of the given value
+	 * @param value Value to test for signum
+	 * @return 1, 0 or -1 as a CVM Long
+	 */
 	public static final CVMLong forSignum(long value) {
 		if (value>0) return CVMLong.ONE;
 		if (value<0) return CVMLong.MINUS_ONE;
