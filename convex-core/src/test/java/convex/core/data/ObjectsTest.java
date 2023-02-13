@@ -39,7 +39,7 @@ public class ObjectsTest {
 
 		Blob encoding = Format.encodedBlob(a);
 		if (a==null) {
-			assertEquals(Blob.NULL_ENCODING,encoding);
+			assertSame(Blob.NULL_ENCODING,encoding);
 		} else {
 			assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
 			assertSame(encoding,a.getEncoding()); // should be same cached encoding
@@ -213,6 +213,7 @@ public class ObjectsTest {
 	 * @param a
 	 */
 	private static void doCanonicalTests(ACell a) {
+		Blob enc=a.getEncoding();
 		if (a.isCanonical()) {
 			// Canonical objects should map to themselves
 			assertSame(a,a.getCanonical());
@@ -223,10 +224,11 @@ public class ObjectsTest {
 			assertNotSame(canon,a);
 			assertTrue(canon.isCanonical());
 			assertEquals(a,canon);
+			assertEquals(enc,canon.getEncoding());
 		}
 		
 		// Encoding of canonical object should be cached and equal to initial value
-		assertSame(a.getEncoding(), a.getCanonical().getEncoding());
+		assertSame(enc, a.getCanonical().getEncoding());
 		
 		// Canonical object itself should be cached
 		assertSame(a.getCanonical(), a.getCanonical());

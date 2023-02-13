@@ -77,6 +77,8 @@ public final class LongBlob extends ALongBlob {
 	public boolean equals(ABlob a) {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
 		if (a instanceof Blob) {
+			// Note Blob is the only other plausible representation of a LongBlob
+			// AccountKey, Hash etc. excluded because of length
 			Blob b=(Blob)a;
 			return ((b.count()==LENGTH)&& (b.toExactLong()== value));
 		}
