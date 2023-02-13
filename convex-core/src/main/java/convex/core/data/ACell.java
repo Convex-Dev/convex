@@ -366,6 +366,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
 	 * final / immutable for any given instance and is defined by the Cell encoding rules.
+	 * WARNING: may not be valid id Cell is not canonical
 	 * 
 	 * Contained Refs may be either external or embedded.
 	 * 
@@ -401,6 +402,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Gets a numbered child Ref from within this Cell.
+	 * WARNING: May be unreliable is cell is not canonical
 	 * 
 	 * @param <R> Type of referenced Cell
 	 * @param i Index of ref to get
@@ -570,12 +572,18 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if completely encoded, false otherwise
 	 */
 	public boolean isCompletelyEncoded() {
+		if (!isCanonical()) {
+			throw new Error("Checking whether a non-canonical cell is encoded. Not a good idea, any ref assumptions may be invalid: "+this.getType());
+		}
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<ACell> r=getRef(i);
 			if (!r.isEmbedded()) return false;
 			ACell child=r.getValue();
-			if ((child!=null)&&!child.isCompletelyEncoded()) return false; // Should be safe from missing?
+			if (child!=null) {
+				child=child.getCanonical();
+				if (!child.isCompletelyEncoded()) return false; // Should be safe from missing?
+			}
 		}
 		return true;
 	}

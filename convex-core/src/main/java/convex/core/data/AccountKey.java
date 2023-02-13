@@ -260,8 +260,6 @@ public class AccountKey extends AArrayBlob {
 		return 0;
 	}
 
-
-
 	@Override
 	public boolean isCanonical() {
 		return false;

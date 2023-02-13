@@ -307,6 +307,7 @@ public class BlobsTest {
 		long n=b.count();
 		assertTrue(n>Blob.CHUNK_LENGTH);
 		assertTrue(b.isCanonical());
+		assertFalse(b.isCompletelyEncoded());
 		
 		// Last chunk
 		assertEquals(Blob.class,b.slice(n-Blob.CHUNK_LENGTH,n).getClass());
@@ -314,6 +315,7 @@ public class BlobsTest {
 		doBlobTests(b);
 		
 		Blob flat=b.toFlatBlob();
+		assertThrows(Error.class,()->flat.isCompletelyEncoded());
 		doBlobTests(flat);
 	}
 		

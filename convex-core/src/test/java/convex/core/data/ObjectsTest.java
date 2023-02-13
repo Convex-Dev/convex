@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import convex.core.Constants;
+import convex.core.data.Refs.RefTreeStats;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -167,9 +168,21 @@ public class ObjectsTest {
 		assertEquals(a.getEncodingLength(),enc.count());
 		assertTrue(len<=Format.LIMIT_ENCODING_LENGTH);
 		
+		// Re=read on encoding
+		ACell b;
+		try {
+			b = Format.read(enc);
+		} catch (BadFormatException e) {
+			throw new Error("Reload from complete encoding failed for: " + a + " with encoding "+enc);
+		}
+		assertEquals(a,b);
+		assertSame(enc,b.getEncoding()); // Encoding should be cached
+		
 		// Tag must equal first byte of encoding
 		assertEquals(a.getTag(),enc.byteAt(0));
 		
+		// convert to canonical for following
+		a=a.getCanonical();
 		if (a.isCompletelyEncoded()) {
 			doCompleteEncodingTests(a);
 		}
@@ -186,18 +199,13 @@ public class ObjectsTest {
 		assertSame(h,a.getEncoding().getContentHash());
 	}
 
+	/**
+	 * Test properties of a complete encoding.
+	 * @param a
+	 */
 	private static void doCompleteEncodingTests(ACell a) {
-		Blob enc=a.getEncoding();
-		ACell b;
-		try {
-			b = Format.read(enc);
-		} catch (BadFormatException e) {
-			throw new Error("Reload from complete encoding failed for: " + a + " with encoding "+enc);
-		}
-		assertEquals(a,b);
-		if (enc!=b.getEncoding()) {
-			assertSame(enc,b.getEncoding()); // Encoding should be cached
-		}
+		RefTreeStats stats=Refs.getRefTreeStats(a.getRef());
+		assertTrue(stats.embedded==stats.total-(a.isEmbedded()?0:1));
 	}
 
 	/**
