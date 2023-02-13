@@ -195,7 +195,9 @@ public class ObjectsTest {
 			throw new Error("Reload from complete encoding failed for: " + a + " with encoding "+enc);
 		}
 		assertEquals(a,b);
-		assertSame(enc,b.getEncoding()); // Encoding should be cached
+		if (enc!=b.getEncoding()) {
+			assertSame(enc,b.getEncoding()); // Encoding should be cached
+		}
 	}
 
 	/**

@@ -108,25 +108,25 @@ public class Blobs {
 	 * Reads a canonical Blob from a byte source
 	 * @param <T> Type of Blob result
 	 * @param source Source blob, containing tag
+	 * @param pos position to read from source
 	 * @return Canonical Blob
 	 * @throws BadFormatException if the Blob encoding format is invalid
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ABlob> T readFromBlob(Blob source) throws BadFormatException {
-		int sLen = source.length;
+	public static <T extends ABlob> T readFromBlob(Blob source, int pos) throws BadFormatException {
+		int sLen = source.length-pos;
 		if (sLen < 2) throw new BadFormatException("Trying to read Blob from insufficient source of size " + sLen);
 		// read length at position 1 (skipping tag)
-		long len = Format.readVLCLong(source.store, source.offset + 1);
+		long count = Format.readVLCLong(source.store, source.offset + pos+ 1); // skip pos and tag
 
 		T result = null;
-		if (len < 0L) throw new BadFormatException("Negative blob length?");
-		if (len > Blob.CHUNK_LENGTH) {
-			result = (T) BlobTree.read(source, len);
+		if (count < 0L) throw new BadFormatException("Negative blob length?");
+		if (count > Blob.CHUNK_LENGTH) {
+			result = (T) BlobTree.read(source,pos, count);
 		} else {
-			result = (T) Blob.read(source, len);
+			result = (T) Blob.read(source,pos, count);
 		}
-		// we can attach original blob as source at this point
-		result.attachEncoding(source);
+		// encoding should be attached from Blob reads
 		return result;
 	}
 

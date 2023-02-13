@@ -178,25 +178,29 @@ public class Blob extends AArrayBlob {
 	}
 
 	/**
-	 * Fast read of a Blob from its representation insider another Blob object,
+	 * Fast read of a Blob from its representation inside another Blob object,
 	 * 
 	 * Main benefit is to avoid reconstructing via ByteBuffer allocation, enabling
 	 * retention of source Blob object as encoded data.
 	 * 
 	 * @param source Source Blob object.
-	 * @param len Length in bytes to take from the source Blob
+	 * @param count Length in bytes to take from the source Blob
 	 * @return Blob read from the source
 	 * @throws BadFormatException If encoding is invalid
 	 */
-	public static AArrayBlob read(Blob source, long len) throws BadFormatException {
+	public static Blob read(Blob source, int pos, long count) throws BadFormatException {
+		if (count>CHUNK_LENGTH) throw new BadFormatException("Trying to read flat blob with count = " +count);
+		
 		// compute data length, excluding tag and encoded length
-		int headerLength = (1 + Format.getVLCLength(len));
-		long rLen = source.count() - headerLength;
-		if (len != rLen) {
-			throw new BadFormatException("Invalid length for Blob, length field " + len + " but actual length " + rLen);
+		int headerLength = (1 + Format.getVLCLength(count));
+		long start = pos+ headerLength;
+		if (start+count>source.count()) {
+			throw new BadFormatException("Insufficient bytes to read Blob required count =" + count);
 		}
 
-		return source.slice(headerLength, headerLength+len);
+		Blob result= source.slice(start , start+count);
+		result.attachEncoding(source.slice(pos,pos+(headerLength+count)));
+		return result;
 	}
 
 	@Override

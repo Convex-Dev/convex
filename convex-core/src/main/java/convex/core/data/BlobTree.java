@@ -402,7 +402,7 @@ public class BlobTree extends ABlob {
 	 * @return BlobTree instance.
 	 * @throws BadFormatException If BlobTree encoding is invalid
 	 */
-	public static BlobTree read(AArrayBlob src, long count) throws BadFormatException {
+	public static BlobTree read(AArrayBlob src, int pos, long count) throws BadFormatException {
 		int headerLength = (1 + Format.getVLCLength(count));
 		long chunks = calcChunks(count);
 		int shift = calcShift(chunks);
@@ -412,13 +412,15 @@ public class BlobTree extends ABlob {
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
 		
 		ByteBuffer bb=src.getByteBuffer();
-		bb.position(headerLength);
+		bb.position(headerLength+pos);
 		for (int i = 0; i < numChildren; i++) {
 			Ref<ABlob> ref = Format.readRef(bb);
 			children[i] = ref;
 		}
 
 		BlobTree result= new BlobTree(children, shift, count);
+		Blob enc=src.slice(pos, bb.position());
+		result.attachEncoding(enc);
 		return result;
 	}
 

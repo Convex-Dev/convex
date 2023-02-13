@@ -557,9 +557,16 @@ public class Format {
 	 * @throws BadFormatException In case of encoding error
 	 */
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
-		if (blob.count()<1) throw new BadFormatException("Attempt to read from empty Blob");
+		long n=blob.count();
+		if (n<1) throw new BadFormatException("Attempt to read from empty Blob");
 		byte tag = blob.byteAt(0);
-		return read(tag,blob);
+		T result= read(tag,blob,0);
+		if (result==null) {
+			if (n!=1) throw new BadFormatException("Decode of null value but blob size = "+n);
+		} else {
+			if (result.getEncoding().count()!=n) throw new BadFormatException("Excess bytes in read from Blob");
+		}
+		return result;
 	}
 	
 	/**
@@ -571,28 +578,29 @@ public class Format {
 	 * @throws BadFormatException If encoding is invalid for the given tag
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T read(byte tag, Blob blob) throws BadFormatException {
+	private static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
 		if (tag == Tag.NULL) {
 			long len=blob.count();
 			if (len!=1) throw new BadFormatException("Bad null encoding with length"+len);
 			return null;
 		}
 		if (tag == Tag.BLOB) {
-			return (T) Blobs.readFromBlob(blob);
+			return (T) Blobs.readFromBlob(blob,offset);
 		} else {
 			// TODO: maybe refactor to avoid read from byte buffers?
-			ByteBuffer bb = blob.getByteBuffer().position(1);
+			ByteBuffer bb = blob.getByteBuffer().position(offset+1);
 			T result;
 
 			try {
 				result = (T) read(tag,bb);
-				if (bb.hasRemaining()) throw new BadFormatException(
-						"Blob with type " + Utils.getClass(result) + " has excess bytes: " + bb.remaining());
 			} catch (BufferUnderflowException e) {
 				throw new BadFormatException("Blob has insufficients bytes: " + blob.count(), e);
 			} 
+			long epos=bb.position();
+			if (result.cachedEncoding()==null) {
+				result.attachEncoding(blob.slice(offset,epos));
+			}
 
-			result.attachEncoding(blob);
 			return result;
 		}
 	}

@@ -11,6 +11,7 @@ import java.nio.ByteBuffer;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -71,18 +72,14 @@ public class EncodingTest {
 		assertTrue(r.isDirect());
 	}
 	
-//	@Test public void testEmbeddedBigInteger() throws BadFormatException {
-//		BigInteger one=BigInteger.ONE;
-//		assertFalse(Format.isEmbedded(one));
-//		AVector<BigInteger> v=Vectors.of(BigInteger.ONE,BigInteger.TEN);
-//		assertFalse(v.getRef(0).isEmbedded());
-//		Blob b=Format.encodedBlob(v);
-//		AVector<BigInteger> v2=Format.read(b);
-//		assertEquals(v,v2);
-//		assertEquals(b,Format.encodedBlob(v2));
-//	}
+	@Test public void testEmbeddedBigInteger() throws BadFormatException {
+		CVMBigInteger big=CVMBigInteger.MIN_POSITIVE;
+		Blob b=big.getEncoding();
+		assertTrue(big.isEmbedded());
+		assertEquals(big,Format.read(b));
+	}
 	
-	@Test public void testBadFormats() throws BadFormatException {
+	@Test public void testBadLongFormats() throws BadFormatException {
 		// test excess high order bits above the long range
 		assertEquals(-3717066608267863778L,((CVMLong)Format.read("09ccb594f3d1bde9b21e")).longValue());
 		assertThrows(BadFormatException.class,()->{

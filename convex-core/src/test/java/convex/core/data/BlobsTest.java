@@ -472,7 +472,8 @@ public class BlobsTest {
 		BlobBuilder bb=new BlobBuilder(a);
 		assertEquals(a,bb.toBlob());
 		
-		assertSame(a,a.slice(0,n));
+		// Slice should not change type
+		assertEquals(a,a.slice(0,n));
 		
 		if (n>0) {
 			assertEquals(n*2,a.commonHexPrefixLength(b));

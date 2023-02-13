@@ -30,12 +30,12 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public AArrayBlob slice(long start, long end) {
+	public Blob slice(long start, long end) {
 		if (start < 0) return null;
 		if (end > this.length) return null;
 		long length=end-start;
 		if (length<0) return null;
-		if ((start==0)&&(end==this.count())) return this;
+		if ((start==0)&&(end==this.count())) return toFlatBlob();
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
 	}
 
