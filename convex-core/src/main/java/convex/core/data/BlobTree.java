@@ -418,7 +418,8 @@ public class BlobTree extends ABlob {
 			children[i] = ref;
 		}
 
-		return new BlobTree(children, shift, count);
+		BlobTree result= new BlobTree(children, shift, count);
+		return result;
 	}
 
 	@Override

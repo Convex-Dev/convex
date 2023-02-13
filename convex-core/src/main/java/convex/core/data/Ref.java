@@ -6,6 +6,7 @@ import java.util.function.Consumer;
 
 import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -348,6 +349,23 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public static <T extends ACell> Ref<T> readRaw(ByteBuffer data) {
 		Hash h = Hash.readRaw(data);
+		Ref<T> ref=Ref.forHash(h);
+		return ref.markEmbedded(false);
+	}
+	
+	/**
+	 * Reads a ref from the given Blob position. Assumes no tag.
+	 * 
+	 * Marks as non-embedded
+	 * 
+	 * @param b Blob containing the data to read at the current position
+	 * @param pos position in Blob to read
+	 * @return Ref read from ByteBuffer
+	 * @throws BadFormatException If there are insufficient bytes to read a full Ref
+	 */
+	public static <T extends ACell> Ref<T> readRaw(Blob b, int pos) throws BadFormatException {
+		Hash h = Hash.wrap(b,pos);
+		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref as position: "+pos);
 		Ref<T> ref=Ref.forHash(h);
 		return ref.markEmbedded(false);
 	}
