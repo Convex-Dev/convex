@@ -12,7 +12,7 @@ B) Ensure effective governance of economic systems and networks based on Convex 
 As such the license has been written based on the following principles:
 
 - It is a "weak Copyleft" license, similar in spirit to the Eclipse Public License. Derivative Works must be released under the same license. However, you may freely link and utilise the Work from software using a different license.
-- When used to manage assets in a decentralised system, the Convex license places a requirement to operate the system according to the Convex Network Governance Rules. This is primarily done to prevent unauthorised forking, which would be contrary to the objective of Convex to support open, shared global public networks for the Internet of Value
+- When used to manage assets in a decentralised system, the Convex license places a requirement to operate the system according to the Convex Network Governance Rules. This is primarily done to prevent unauthorised forking, which would be harmful to the ecosystem of Convex users and contrary to the objective of Convex to create an open, shared global public network for the Internet of Value
 
 
 ==== MODIFIED FROM APACHE 2.0 LICENSE
@@ -123,10 +123,14 @@ While redistributing the Work or Derivative Works thereof, You may choose to off
 
 ## 10. Relicensing. 
 
-Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body. The Convex Foundation will ensure that the main Convex distribution is always free and open source for anyone to use with the Convex Network.
+Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body. The Governing Body will ensure that this Work is always free and open source for anyone to use with the Convex Network.
+
+## 11. Contributor Awards
+
+The Convex Foundation may, at its sole and absolute discretion, make awards of Convex Coins for contributions to the Work. To be eligible for such awards, contributor agrees to sign a contributor agreement which shall be provided separately. 
 
 <--- Licence copyright --->
 
 # Copyright
 
-Copyright The Originator 2018-2021. Includes terms adapted from the Apache 2.0 License and Eclipse Public License v2.0
+Copyright The Originator 2018-2021, Convex Foundation 2021-2023. Includes terms adapted from the Apache 2.0 License and Eclipse Public License v2.0
