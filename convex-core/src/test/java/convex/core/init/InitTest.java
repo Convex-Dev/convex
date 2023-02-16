@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
@@ -15,9 +16,12 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Ref;
+import convex.core.data.Refs;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
 
@@ -120,6 +124,29 @@ public class InitTest extends ACVMTest {
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 		assertNotEquals(HERO,VILLAIN);
+	}
+	
+	@Test
+	public void testInitRef() {
+		State s=Init.createBaseState(PEER_KEYS);
+		Ref<State> sr=s.getRef();
+		
+		Refs.RefTreeStats s1s=Refs.getRefTreeStats(sr);
+		
+		// TODO: need to work out why something already persisted,
+		// Seems to be in Core shared instance? "%2, 1, 1"
+		//ACell[] c=new ACell[2];
+		//Refs.visitAllRefs(sr, r->{
+		//	ACell v=r.getValue();
+		//	if (r.isPersisted()) {
+		//		throw new Error("Persisted: "+v.getType()+" = "+v+" after "+c[0]+","+c[1]);
+		//	}
+		//	c[0]=c[1];
+		//	c[1]=v;
+		//});
+		//assertEquals(0L,s1s.persisted);
+		
+		assertSame(s1s.root,sr);
 	}
 
 }

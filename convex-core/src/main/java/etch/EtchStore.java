@@ -165,6 +165,7 @@ public class EtchStore extends AStore {
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
+					// TODO: is updating in place dangerous here?
 					cell.attachRef(existing);
 					return existing;
 				}

@@ -34,11 +34,11 @@ public class Refs {
 	
 	
 	public static final class RefTreeStats {
-		Ref<?> root=null;
-		long total=0;
-		long embedded=0;
-		long direct=0;
-		long persisted=0;
+		public Ref<?> root=null;
+		public long total=0;
+		public long embedded=0;
+		public long direct=0;
+		public long persisted=0;
 	}
 	
 	/**
