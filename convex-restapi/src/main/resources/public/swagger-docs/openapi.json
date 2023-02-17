@@ -180,9 +180,9 @@
 		},
 		"/data/{hash}": {
 			"get": {
-				"operationId": "accountDetails",
-				"summary": "Request account details for a specific address",
-				"description": "Requests a summary of information for a specific account.",
+				"operationId": "getData",
+				"summary": "Gets data value for a given Hash",
+				"description": "Gets data and renders it in a printed representation.",
 				"parameters": [
 					{
 						"name": "hash",
