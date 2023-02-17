@@ -76,7 +76,8 @@ public class Blobs {
 	}
 	
 	/**
-	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length
+	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length.
+	 * Leading "0x" optional.
 	 * @param s String expected to contain a HasBlobh value
 	 * @return ABlob value, or null if not parseable
 	 */

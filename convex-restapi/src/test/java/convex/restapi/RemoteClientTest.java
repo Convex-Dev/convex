@@ -34,6 +34,11 @@ public class RemoteClientTest {
 		server=rs;
 	}
 	
+	@AfterAll 
+	public static void cleanShutdown() {
+		server.stop();
+	}
+	
 	@Test 
 	public void testCreateAccount() {
 		Convex c=Convex.connect("http://localhost:"+port);
@@ -123,10 +128,5 @@ public class RemoteClientTest {
 		assertTrue(c.queryBalance()<bal);
 	}
 	
-	
-	
-	@AfterAll 
-	public static void cleanShutdown() {
-		server.stop();
-	}
+
 }

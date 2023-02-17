@@ -3,6 +3,8 @@ package convex.restapi;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
@@ -28,6 +30,7 @@ import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.peer.Server;
 import io.javalin.Javalin;
@@ -77,6 +80,28 @@ public class RESTServer {
 		app.post("/api/v1/transaction/submit", this::runTransactionSubmit);
 
 		app.get("/api/v1/accounts/<addr>", this::queryAccount);
+		
+		app.get("/api/v1/data/<hash>", this::getData);
+
+	}
+	
+	public void getData(Context ctx) {
+		String hashParam=ctx.pathParam("hash");
+		Hash h=Hash.parse(hashParam);
+		if (h==null) {
+			throw new BadRequestResponse(jsonError("Invalid hash: "+hashParam));
+		}
+		
+		ACell d;
+		try {
+			d=convex.acquire(h).get(1000, TimeUnit.MILLISECONDS);
+		} catch (ExecutionException e) {
+			throw new BadRequestResponse(jsonError("Missing Data: "+e.getMessage()));
+		} catch (Exception e) {
+			throw new BadRequestResponse(jsonError("Error: "+e.getMessage()));
+		}
+		String ds=Utils.print(d);
+		ctx.result(ds);
 	}
 
 	public void createAccount(Context ctx) {

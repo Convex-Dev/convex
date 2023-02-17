@@ -178,6 +178,49 @@
 				}
 			}
 		},
+		"/data/{hash}": {
+			"get": {
+				"operationId": "accountDetails",
+				"summary": "Request account details for a specific address",
+				"description": "Requests a summary of information for a specific account.",
+				"parameters": [
+					{
+						"name": "hash",
+						"in": "path",
+						"schema": {
+							"type": "string"
+						},
+						"required": true,
+						"description": "Hash of value to query",
+						"example": "0x76000098878f6553067109ec362f496f5225cc41fbf8f41ba66375acd15905b5"
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "Normal response",
+						"content": {
+							"text/plain": {
+							}
+						}
+					},
+					"404": {
+						"description": "Value not found.",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object"
+								},
+								"example": {
+									"errorCode": "NOTFOUND",
+									"source": "Server",
+									"value": "The value requested is not available."
+								}
+							}
+						}
+					}
+				}
+			}
+		},
 		"/transaction/prepare": {
 			"post": {
 				"operationId": "prepareTransaction",

@@ -67,7 +67,7 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Wraps the Blob as a Hash if possible
 	 * @param a Any ABlob instance
-	 * @return Hash instance, or null if wrong length
+	 * @return Hash instance, or null if argument is null or wrong length
 	 */
 	public static Hash wrap(ABlob a) {
 		if (a==null) return null;
@@ -144,7 +144,8 @@ public class Hash extends AArrayBlob {
 	}
 	
 	/**
-	 * Best effort attempt to parse a Hash. Must parse as a blob of correct length
+	 * Best effort attempt to parse a Hash. Must parse as a blob of correct length.
+	 * Leading "0x" optional.
 	 * @param s String expected to contain a Hash value
 	 * @return Hash value, or null is not parseable
 	 */

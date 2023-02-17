@@ -204,7 +204,7 @@ public class ServerTest {
 
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
 			assertEquals(user,client.transactSync(Invoke.create(user, 0, "*address*")).getValue());
-
+			
 			Result r=client.requestStatus().get(1000,TimeUnit.MILLISECONDS);
 			assertFalse(r.isError());
 		}
