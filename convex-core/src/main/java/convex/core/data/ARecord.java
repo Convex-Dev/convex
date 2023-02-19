@@ -53,8 +53,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		// Should already be canonical
 		return this;
 	}
-	
-	@Override public final boolean isCVMValue() {
+
+	@Override public boolean isCVMValue() {
 		return true;
 	}
 	
