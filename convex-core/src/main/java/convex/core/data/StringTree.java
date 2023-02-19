@@ -52,8 +52,8 @@ public class StringTree extends AString {
 	}
 	
 	@Override
-	public int encodeRawData(byte[] bs, int pos) {
-		return data.encodeRawData(bs, pos);
+	public int writeRawData(byte[] bs, int pos) {
+		return data.writeToBuffer(bs, pos);
 	}
 	
 	public static StringTree read(long length, ByteBuffer bb) throws BadFormatException {

@@ -295,7 +295,7 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	}
 
 	/**
-	 * Writes the raw byte contents of this Blob to a ByteBuffer. May be big!
+	 * Writes the byte contents of this Blob to a ByteBuffer. May be big!
 	 * 
 	 * @param bb ByteBuffer to write to
 	 * @return The passed ByteBuffer, after writing byte content
@@ -303,11 +303,11 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	public abstract ByteBuffer writeToBuffer(ByteBuffer bb);
 
 	/**
-	 * Writes the raw byte contents of this blob to a byte array
+	 * Writes the byte contents of this blob to a byte array. Assumes buffer has enough space for all bytes.
 	 * 
 	 * @param bs Byte array to write to
 	 * @param pos Starting position in byte array to write to
-	 * @return The position in the array after writing
+	 * @return Updated position in the array after writing
 	 */
 	public abstract int writeToBuffer(byte[] bs, int pos);
 	
@@ -433,14 +433,5 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	 */
 	public abstract boolean equalsBytes(ABlob b);
 
-	/**
-	 * Encodes the raw data of this Blob. Assumes buffer has enough space for (length) bytes.
-	 * @param bs Byte array to write to
-	 * @param pos Position to write at
-	 * @return Updates position
-	 */
-	public int encodeRawData(byte[] bs, int pos) {
-		return toFlatBlob().encodeRawData(bs, pos);
-	}
 
 }

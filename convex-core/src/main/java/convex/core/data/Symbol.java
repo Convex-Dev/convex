@@ -117,7 +117,7 @@ public class Symbol extends ASymbolic implements Comparable<Symbol> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=(byte)(name.count());
-		return name.encodeRawData(bs, pos);
+		return name.writeRawData(bs, pos);
 	}
 
 	/**

@@ -111,8 +111,8 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	public int encodeRawData(byte[] bs, int pos) {
-		return data.encodeRawData(bs, pos);
+	public int writeRawData(byte[] bs, int pos) {
+		return data.writeToBuffer(bs, pos);
 	}
 
 	@Override

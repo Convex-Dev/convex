@@ -128,7 +128,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=(byte)(name.count());
-		return name.encodeRawData(bs, pos);
+		return name.writeRawData(bs, pos);
 	}
 
 	@Override

@@ -159,7 +159,7 @@ public class SignedData<T extends ACell> extends ACell {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = publicKey.encodeRawData(bs,pos);
+		pos = publicKey.writeToBuffer(bs,pos);
 		pos = signature.encodeRaw(bs,pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;

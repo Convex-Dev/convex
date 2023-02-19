@@ -183,7 +183,7 @@ public class Hash extends AArrayBlob {
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
 		bs[pos++]=LENGTH;
-		return encodeRawData(bs,pos);
+		return writeToBuffer(bs,pos);
 	}
 
 	@Override

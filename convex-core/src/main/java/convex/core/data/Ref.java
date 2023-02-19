@@ -585,7 +585,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 			return value.encode(bs, pos);
 		} else {
 			bs[pos++]=Tag.REF;
-			return getHash().encodeRawData(bs, pos);
+			return getHash().writeToBuffer(bs, pos);
 		}
 	}
 	
@@ -609,7 +609,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		Hash h=getHash();
 		int pos=0;
 		bs[pos++]=Tag.REF;
-		pos=h.encodeRawData(bs, pos);
+		pos=h.writeToBuffer(bs, pos);
 		return Blob.wrap(bs,0,pos);
 	}
 

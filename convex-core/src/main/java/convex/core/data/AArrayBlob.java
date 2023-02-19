@@ -128,19 +128,7 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public final int encodeRaw(byte[] bs, int pos) {
 		pos=Format.writeVLCLong(bs, pos, length);
-		return encodeRawData(bs,pos);
-	}
-	
-	/**
-	 * Encodes the raw data of this Blob. Assumes buffer has enough space for (length) bytes.
-	 * @param bs Byte array to write to
-	 * @param pos Position to write at
-	 * @return Updates position
-	 */
-	@Override
-	public int encodeRawData(byte[] bs, int pos) {
-		System.arraycopy(store, offset, bs, pos, length);
-		return pos + length;
+		return writeToBuffer(bs,pos);
 	}
 
 	@Override
