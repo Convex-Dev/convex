@@ -9,6 +9,7 @@ import convex.core.crypto.Providers;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
 
 /**
@@ -43,13 +44,18 @@ import convex.core.transactions.ATransaction;
  *
  * @param <T> The type of the signed object
  */
-public class SignedData<T extends ACell> extends ACell {
+public class SignedData<T extends ACell> extends ARecord {
 	// Encoded fields
 	private final AccountKey publicKey;
 	private final ASignature signature;
 	private final Ref<T> valueRef;
 
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.PUBLIC_KEY, Keywords.SIGNATURE, Keywords.VALUE };
+
+	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+
 	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
+		super(FORMAT);
 		this.valueRef = refToValue;
 		this.publicKey = address;
 		signature = sig;
@@ -149,6 +155,29 @@ public class SignedData<T extends ACell> extends ACell {
 	 */
 	public ASignature getSignature() {
 		return signature;
+	}
+
+	@Override
+	public ACell get(ACell key) {
+		if (Keywords.PUBLIC_KEY.equals(key)) return publicKey;
+		if (Keywords.SIGNATURE.equals(key)) return signature;
+		if (Keywords.VALUE.equals(key)) return valueRef.getValue();
+		
+		return null;
+	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected SignedData<T> updateAll(ACell[] newVals) {
+		AccountKey publicKey = (AccountKey)newVals[0];
+		ASignature signature = (ASignature)newVals[1];
+		Ref<T> valueRef = newVals[2].getRef();
+
+		if (publicKey == this.publicKey && signature == this.signature && valueRef == this.valueRef) {
+			return this;
+		}
+
+		return new SignedData<T>(valueRef, publicKey, signature);
 	}
 
 	@Override
@@ -259,14 +288,6 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 
 	@Override
-	public boolean print(BlobBuilder bb,long limit) {
-		bb.append("{");
-		bb.append(":signed "+valueRef.getHash().toString());
-		bb.append("}");
-		return bb.check(limit);
-	}
-
-	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
 	}
@@ -292,17 +313,7 @@ public class SignedData<T extends ACell> extends ACell {
 	}
 	
 	@Override
-	public String toString() {
-		return "{:signed "+getValue()+"}";
-	}
-
-	@Override
 	public byte getTag() {
 		return Tag.SIGNED_DATA;
-	}
-
-	@Override
-	public ACell toCanonical() {
-		return this;
 	}
 }
