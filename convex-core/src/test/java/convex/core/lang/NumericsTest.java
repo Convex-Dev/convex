@@ -59,6 +59,11 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(2.0, evalD("(+ 3 -1.0)"));
 		assertEquals(3.0, evalD("(+ 1.0 2)"));
 		assertEquals(4.0, evalD("(+ 0 1 2.0 1)"));
+		
+		// some odd cases with zeros
+		assertEquals(-0.0, evalD("(+ -0.0)"));
+		assertEquals(-0.0, evalD("(+ -0.0 -0.0)"));
+		assertEquals(0.0, evalD("(+ 0.0 -0.0)"));
 
 		assertCastError(step("(+ nil)"));
 		assertCastError(step("(+ 1.0 :foo)"));

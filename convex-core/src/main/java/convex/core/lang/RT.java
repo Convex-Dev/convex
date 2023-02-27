@@ -298,8 +298,10 @@ public class RT {
 	}
 
 	public static CVMDouble plusDouble(ACell[] args) {
-		double result = 0;
-		for (int i = 0; i < args.length; i++) {
+		int n=args.length;
+		if (n==0) return CVMDouble.ZERO;
+		double result = RT.doubleValue(args[0]);
+		for (int i = 1; i < n; i++) {
 			result += RT.doubleValue(args[i]);
 		}
 		return CVMDouble.create(result);
