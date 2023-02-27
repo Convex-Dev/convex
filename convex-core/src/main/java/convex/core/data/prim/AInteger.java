@@ -1,5 +1,7 @@
 package convex.core.data.prim;
 
+import java.math.BigInteger;
+
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
@@ -50,4 +52,17 @@ public abstract class AInteger extends ANumeric {
 	 * @return Number of bytes
 	 */
 	public abstract long byteLength();
+
+	/**
+	 * Adds another integer to this integer
+	 * @param a Integer value to add
+	 * @return New integer
+	 */
+	public abstract AInteger add(AInteger a);
+
+	/**
+	 * Converts this integer to a Java BigInteger. WARNING: might be O(n)
+	 * @return Java BigInteger
+	 */
+	public abstract BigInteger big();
 }

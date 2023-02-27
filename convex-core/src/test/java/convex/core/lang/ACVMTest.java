@@ -168,6 +168,11 @@ public abstract class ACVMTest {
 		return d.longValue();
 	}
 
+	/**
+	 * Evaluates source and coerces to a long value
+	 * @param source Code to execute
+	 * @return Result coerced to Java long primitive
+	 */
 	public long evalL(String source) {
 		return evalL(CONTEXT, source);
 	}

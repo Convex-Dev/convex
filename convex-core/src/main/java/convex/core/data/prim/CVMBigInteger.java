@@ -75,7 +75,8 @@ public class CVMBigInteger extends AInteger {
 		return data.longValue();
 	}
 
-	protected BigInteger big() {
+	@Override
+	public BigInteger big() {
 		if (data==null) data=buildBigInteger();
 		return data;
 	}
@@ -232,6 +233,14 @@ public class CVMBigInteger extends AInteger {
 		};
 		if (o instanceof CVMBigInteger) return big().compareTo(((CVMBigInteger)o).big());
 		return Double.compare(doubleValue(), o.doubleValue());
+	}
+	
+	@Override
+	public AInteger add(AInteger a) {
+		
+		BigInteger bi=big();
+		bi=bi.add(a.big());
+		return CVMBigInteger.create(bi).toCanonical();
 	}
 
 	/**

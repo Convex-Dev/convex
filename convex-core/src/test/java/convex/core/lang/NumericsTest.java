@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
@@ -46,13 +48,24 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(2L, evalL("(+ 3 -1)"));
 		assertEquals(3L, evalL("(+ 1 2)"));
 		assertEquals(4L, evalL("(+ 0 1 2 1)"));
+		
+		assertEquals(CVMBigInteger.MIN_POSITIVE,eval("(+ 1 9223372036854775807)"));
+		assertEquals(CVMBigInteger.MIN_POSITIVE,eval("(+ 9223372036854775807 1)"));
 
-		// long wrap round 64-bit signed
-		assertEquals(-2, evalL("(+ 9223372036854775807 9223372036854775807)"));
-		assertEquals(0, evalL("(+ -9223372036854775808 -9223372036854775808)"));
+		assertEquals(Reader.read("18446744073709551614"), eval("(+ 9223372036854775807 9223372036854775807)"));
+		assertEquals(Reader.read("-18446744073709551616"), eval("(+ -9223372036854775808 -9223372036854775808)"));
 		
 	}
 
+	@Test
+	public void testPlusCases() {
+		AInteger m=CVMLong.MAX_VALUE;
+		m=m.add(m);
+		assertEquals(Reader.read("18446744073709551614"),m);
+		assertEquals(-2,m.longValue());
+	}
+	
+	
 	@Test
 	public void testPlusDouble() {
 		assertEquals(1.0, evalD("(+ 1.0)"));

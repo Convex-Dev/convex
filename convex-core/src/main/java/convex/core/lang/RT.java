@@ -290,11 +290,17 @@ public class RT {
 			return null;
 		if (type == Double.class)
 			return plusDouble(args);
-		long result = 0;
-		for (int i = 0; i < args.length; i++) {
-			result += RT.longValue(args[i]);
+		return plusInteger(args);
+	}
+	
+	public static AInteger plusInteger(ACell[] args) {
+		int n=args.length;
+		if (n==0) return CVMLong.ZERO;
+		AInteger result = RT.ensureInteger(args[0]);
+		for (int i = 1; i < args.length; i++) {
+			result =result.add(RT.ensureInteger(args[i]));
 		}
-		return CVMLong.create(result);
+		return result;
 	}
 
 	public static CVMDouble plusDouble(ACell[] args) {

@@ -1,5 +1,7 @@
 package convex.core.data.prim;
 
+import java.math.BigInteger;
+
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.BlobBuilder;
@@ -228,6 +230,33 @@ public final class CVMLong extends AInteger {
 	@Override
 	public long byteLength() {
 		return Utils.byteLength(value);
+	}
+
+	@Override
+	public AInteger add(AInteger a) {
+		if (a instanceof CVMLong)  return add((CVMLong)a);
+		return a.add(this); // OK since commutative, and isn't a CVMLong
+	}
+	
+	public AInteger add(CVMLong b) {
+		long av=value;
+		long bv=b.value;
+		if (bv==0) return this;
+		if (av==0) return b;
+		
+		long r=av+bv;
+		if ((av>0)^(bv>0)) return CVMLong.create(r); // opposite signs can't overflow
+		if ((av>0)&&(bv>0)&&(r>0)) return CVMLong.create(r); // no overflow when adding positives
+		if ((av<0)&&(bv<0)&&(r<0)) return CVMLong.create(r); // no overflow when adding negatives
+		
+		BigInteger bi=BigInteger.valueOf(av);
+		bi=bi.add(BigInteger.valueOf(bv));
+		return CVMBigInteger.create(bi).toCanonical();
+	}
+
+	@Override
+	public BigInteger big() {
+		return BigInteger.valueOf(value);
 	}
 
 }
