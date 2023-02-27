@@ -53,12 +53,31 @@ public abstract class AInteger extends ANumeric {
 	 */
 	public abstract long byteLength();
 
+	@Override
+	public ANumeric add(ANumeric b) {
+		if (b instanceof AInteger) return add((AInteger)b);
+		return CVMDouble.create(doubleValue()+b.doubleValue());
+	}
+	
 	/**
 	 * Adds another integer to this integer
 	 * @param a Integer value to add
 	 * @return New integer
 	 */
 	public abstract AInteger add(AInteger a);
+	
+	@Override
+	public ANumeric sub(ANumeric b) {
+		if (b instanceof AInteger) return sub((AInteger)b);
+		return CVMDouble.create(doubleValue()-b.doubleValue());
+	}
+	
+	/**
+	 * Subtracts another integer from this integer
+	 * @param a Integer value to subtract
+	 * @return New integer
+	 */
+	public abstract AInteger sub(AInteger a);
 
 	/**
 	 * Converts this integer to a Java BigInteger. WARNING: might be O(n)

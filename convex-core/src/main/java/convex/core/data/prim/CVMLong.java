@@ -253,10 +253,41 @@ public final class CVMLong extends AInteger {
 		bi=bi.add(BigInteger.valueOf(bv));
 		return CVMBigInteger.create(bi).toCanonical();
 	}
+	
+	@Override
+	public AInteger sub(AInteger a) {
+		if (a instanceof CVMLong)  return sub((CVMLong)a);
+		BigInteger bi=big();
+		bi=bi.subtract(a.big());
+		return CVMBigInteger.create(bi).toCanonical();
+	}
+	
+	public AInteger sub(CVMLong b) {
+		long av=value;
+		long bv=b.value;
+		if (bv==0) return this;
+		
+		// TODO: fast paths for pure longs
+		//long r=av+bv;
+		//if ((av>0)^(bv>0)) return CVMLong.create(r); // opposite signs can't overflow
+		//if ((av>0)&&(bv>0)&&(r>0)) return CVMLong.create(r); // no overflow when adding positives
+		//if ((av<0)&&(bv<0)&&(r<0)) return CVMLong.create(r); // no overflow when adding negatives
+		
+		BigInteger bi=BigInteger.valueOf(av);
+		bi=bi.subtract(BigInteger.valueOf(bv));
+		return CVMBigInteger.create(bi).toCanonical();
+	}
 
 	@Override
 	public BigInteger big() {
 		return BigInteger.valueOf(value);
+	}
+
+	@Override
+	public ANumeric negate() {
+		if (value==Long.MIN_VALUE) return CVMBigInteger.MIN_POSITIVE;
+		if (value==0) return ZERO;
+		return create(-value);
 	}
 
 }

@@ -285,48 +285,25 @@ public class RT {
 	}
 
 	public static ANumeric plus(ACell[] args) {
-		Class<?> type = commonNumericType(args);
-		if (type == null)
-			return null;
-		if (type == Double.class)
-			return plusDouble(args);
-		return plusInteger(args);
-	}
-	
-	public static AInteger plusInteger(ACell[] args) {
 		int n=args.length;
 		if (n==0) return CVMLong.ZERO;
-		AInteger result = RT.ensureInteger(args[0]);
+		ANumeric result = RT.ensureNumber(args[0]);
 		for (int i = 1; i < args.length; i++) {
-			result =result.add(RT.ensureInteger(args[i]));
+			result =result.add(RT.ensureNumber(args[i]));
 		}
 		return result;
 	}
 
-	public static CVMDouble plusDouble(ACell[] args) {
-		int n=args.length;
-		if (n==0) return CVMDouble.ZERO;
-		double result = RT.doubleValue(args[0]);
-		for (int i = 1; i < n; i++) {
-			result += RT.doubleValue(args[i]);
-		}
-		return CVMDouble.create(result);
-	}
-
 	public static ANumeric minus(ACell[] args) {
-		Class<?> type = commonNumericType(args);
-		if (type == null)
-			return null;
-		if (type == Double.class)
-			return minusDouble(args);
 		int n = args.length;
-		long result = longValue(args[0]);
-		if (n == 1)
-			result = -result;
+		if (n==0) return CVMLong.ZERO;
+
+		ANumeric result = RT.ensureNumber(args[0]);
+		if (n==1) return result.negate();
 		for (int i = 1; i < n; i++) {
-			result -= RT.longValue(args[i]);
+			result =result.sub(RT.ensureNumber(args[i]));
 		}
-		return CVMLong.create(result);
+		return result;
 	}
 
 	public static ANumeric minusDouble(ACell[] args) {

@@ -187,4 +187,19 @@ public final class CVMDouble extends ANumeric {
 		return null;
 	}
 
+	@Override
+	public ANumeric add(ANumeric b) {
+		return CVMDouble.create(value+b.doubleValue());
+	}
+
+	@Override
+	public ANumeric sub(ANumeric b) {
+		return CVMDouble.create(value-b.doubleValue());
+	}
+
+	@Override
+	public ANumeric negate() {
+		return CVMDouble.create(-value);
+	}
+
 }

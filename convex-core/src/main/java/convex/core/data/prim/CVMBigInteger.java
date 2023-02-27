@@ -242,6 +242,20 @@ public class CVMBigInteger extends AInteger {
 		bi=bi.add(a.big());
 		return CVMBigInteger.create(bi).toCanonical();
 	}
+	
+	@Override
+	public AInteger sub(AInteger b) {
+		BigInteger bi=big();
+		bi=bi.subtract(b.big());
+		return CVMBigInteger.create(bi).toCanonical();
+	}
+	
+	@Override
+	public AInteger negate() {
+		BigInteger bi=big();
+		bi=bi.negate();
+		return CVMBigInteger.create(bi).toCanonical();
+	}
 
 	/**
 	 * Parses a string as a CVMBigInteger. Might not be canonical.

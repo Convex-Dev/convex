@@ -45,4 +45,24 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return CVMLong value, or null
 	 */
 	public abstract CVMLong asLongInteger();
+
+	/**
+	 * Adds a second numeric value to this value
+	 * @param b Second number to add
+	 * @return Result of addition
+	 */
+	public abstract ANumeric add(ANumeric b);
+	
+	/**
+	 * Subtracts a second numeric value to this value
+	 * @param b Number to subtract
+	 * @return Result of subtraction
+	 */
+	public abstract ANumeric sub(ANumeric b);
+
+	/**
+	 * Negates this numeric value
+	 * @return Negated value
+	 */
+	public abstract ANumeric negate();
 }
