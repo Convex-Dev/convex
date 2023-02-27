@@ -166,7 +166,6 @@ public class SignedData<T extends ACell> extends ARecord {
 		return null;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	protected SignedData<T> updateAll(ACell[] newVals) {
 		AccountKey publicKey = (AccountKey)newVals[0];
