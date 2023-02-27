@@ -931,6 +931,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Double.NaN,evalD("(abs ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ 1 0))"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ -1 0))"));
+		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs ##-Inf)"));
 
 		// long overflow case
 		assertEquals(CVMBigInteger.MIN_POSITIVE,eval("(abs -9223372036854775808)"));
