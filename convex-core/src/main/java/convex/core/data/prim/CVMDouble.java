@@ -170,7 +170,9 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public APrimitive abs() {
-		if (value>=0) return this;
+		// We use fast path here to save allocations in ~50% of cases
+		if (value>0) return this;
+		if (value==0) return ZERO; // note: we do this to handle -0.0
 		return create(-value);
 	}
 	

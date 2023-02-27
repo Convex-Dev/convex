@@ -927,6 +927,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Math.pow(10,100),evalD("(abs (pow 10 100))"));
 
 		// Fun Double cases
+		assertTrue(evalB("(= 0.0 (abs -0.0))"));
 		assertEquals(Double.NaN,evalD("(abs ##NaN)"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ 1 0))"));
 		assertEquals(Double.POSITIVE_INFINITY,evalD("(abs (/ -1 0))"));
@@ -957,6 +958,7 @@ public class CoreTest extends ACVMTest {
 
 		// Double cases
 		assertEquals(0.0,evalD("(signum 0.0)"));
+		assertEquals(-0.0,evalD("(signum -0.0)"));
 		assertEquals(1.0,evalD("(signum 1.0)"));
 		assertEquals(-1.0,evalD("(signum (double -13))"));
 		assertEquals(1.0,evalD("(signum (pow 10 100))"));
