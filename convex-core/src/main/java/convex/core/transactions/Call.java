@@ -4,18 +4,22 @@ import java.nio.ByteBuffer;
 
 import convex.core.Constants;
 import convex.core.data.ACell;
+import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.Tag;
+import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
-import convex.core.lang.RT;
+import convex.core.lang.impl.RecordFormat;
 
 /**
  * Transaction representing a Call to an Actor.
@@ -32,8 +36,12 @@ public class Call extends ATransaction {
 	protected final Symbol functionName;
 	protected final AVector<ACell> args;
 
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.CALL, Keywords.OFFER, Keywords.ORIGIN, Keywords.SEQUENCE,
+		                                           Keywords.TARGET };
+	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+
 	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
-		super(address,sequence);
+		super(FORMAT,address,sequence);
 		this.target=target;
 		this.functionName=functionName;
 		this.offer=offer;
@@ -47,19 +55,6 @@ public class Call extends ATransaction {
 	
 	public static Call create(Address address, long sequence, Address target, Symbol functionName,AVector<ACell> args) {
 		return create(address,sequence,target,0,functionName,args);
-	}
-
-	@Override
-	public boolean print(BlobBuilder bb, long limit) {
-		bb.append("{");
-		bb.append(":target ");
-		if (!RT.print(bb, target,limit)) return false;
-		if (offer>0) {
-			bb.append(" :offer ");
-			bb.append(Long.toString(offer));
-		}
-		bb.append('}');
-		return bb.check(limit);
 	}
 	
 	@Override
@@ -119,7 +114,7 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public ACell updateRefs(IRefFunction func) {
+	public Call updateRefs(IRefFunction func) {
 		AVector<ACell> newArgs=args.updateRefs(func);
 		if (args==newArgs) return this;
 		return new Call(origin,sequence,target,offer,functionName,newArgs);
@@ -140,5 +135,30 @@ public class Call extends ATransaction {
 	@Override
 	public byte getTag() {
 		return Tag.CALL;
+	}
+
+	@Override
+	public ACell get(ACell key) {
+		if (Keywords.CALL.equals(key)) return args.cons(functionName);
+		if (Keywords.OFFER.equals(key)) return CVMLong.create(offer);
+		if (Keywords.ORIGIN.equals(key)) return origin;
+		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
+		if (Keywords.TARGET.equals(key)) return target;
+
+		return null;
+	}
+
+	@Override
+	public Call updateAll(ACell[] newVals) {
+		AList<ACell> call = (AList)newVals[0];
+		long offer = ((CVMLong)newVals[1]).longValue();
+		Address origin = (Address)newVals[2];
+		long sequence = ((CVMLong)newVals[3]).longValue();
+		Address target = (Address)newVals[4];
+
+		Symbol functionName = (Symbol)call.get(0);
+		AVector<ACell> args = Vectors.create(call.next());
+
+		return new Call(origin, sequence, target, offer, functionName, args);
 	}
 }

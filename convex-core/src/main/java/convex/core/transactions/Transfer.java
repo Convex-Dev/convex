@@ -6,13 +6,17 @@ import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.BlobBuilder;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Format;
 import convex.core.data.Tag;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.RT;
+import convex.core.lang.impl.RecordFormat;
 
 /**
  * Transaction class representing a coin Transfer from one account to another
@@ -23,8 +27,11 @@ public class Transfer extends ATransaction {
 	protected final Address target;
 	protected final long amount;
 
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.AMOUNT, Keywords.ORIGIN, Keywords.SEQUENCE, Keywords.TARGET };
+	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+
 	protected Transfer(Address address,long nonce, Address target, long amount) {
-		super(address,nonce);
+		super(FORMAT,address,nonce);
 		this.target = target;
 		this.amount = amount;
 	}
@@ -87,22 +94,6 @@ public class Transfer extends ATransaction {
 	}
 
 	@Override
-	public boolean isCanonical() {
-		return true;
-	}
-
-	@Override
-	public boolean print(BlobBuilder bb, long limit) {
-		bb.append("{");
-		bb.append(":transfer-to ");
-		if (!target.print(bb,limit)) return false;
-		bb.append(',');
-		bb.append(":amount "+amount);
-		bb.append('}');
-		return bb.check(limit);
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((amount<0)||(amount>Constants.MAX_SUPPLY)) throw new InvalidDataException("Invalid amount", this);
 		if (target == null) throw new InvalidDataException("Null Address", this);
@@ -149,5 +140,30 @@ public class Transfer extends ATransaction {
 	@Override
 	public byte getTag() {
 		return Tag.TRANSFER;
+	}
+
+	@Override
+	public ACell get(ACell key) {
+		if (Keywords.AMOUNT.equals(key)) return CVMLong.create(amount);
+		if (Keywords.ORIGIN.equals(key)) return origin;
+		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
+		if (Keywords.TARGET.equals(key)) return target;
+
+		return null;
+	}
+
+	@Override
+	protected Transfer updateAll(ACell[] newVals) {
+		long amount = ((CVMLong)newVals[0]).longValue();
+		Address origin = (Address)newVals[1];
+		long sequence = ((CVMLong)newVals[2]).longValue();
+		Address target = (Address)newVals[3];
+
+		if (amount == this.amount && origin == this.origin && sequence == this.sequence
+			&& target == this.target) {
+			return this;
+		}
+
+		return new Transfer(origin, sequence, target, amount);
 	}
 }
