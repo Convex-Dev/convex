@@ -30,14 +30,14 @@ public class Transfer extends ATransaction {
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.AMOUNT, Keywords.ORIGIN, Keywords.SEQUENCE, Keywords.TARGET };
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	protected Transfer(Address address,long nonce, Address target, long amount) {
-		super(FORMAT,address,nonce);
+	protected Transfer(Address address,long sequence, Address target, long amount) {
+		super(FORMAT,address,sequence);
 		this.target = target;
 		this.amount = amount;
 	}
 
-	public static Transfer create(Address address,long nonce, Address target, long amount) {
-		return new Transfer(address,nonce, target, amount);
+	public static Transfer create(Address address,long sequence, Address target, long amount) {
+		return new Transfer(address,sequence, target, amount);
 	}
 
 
@@ -49,7 +49,7 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // nonce, address
+		pos = super.encodeRaw(bs,pos); // origin, sequence
 		pos = target.encodeRaw(bs,pos);
 		pos = Format.writeVLCLong(bs, pos, amount);
 		return pos;
@@ -64,11 +64,11 @@ public class Transfer extends ATransaction {
 	 */
 	public static Transfer read(ByteBuffer bb) throws BadFormatException {
 		Address address=Address.create(Format.readVLCLong(bb));
-		long nonce = Format.readVLCLong(bb);
+		long sequence = Format.readVLCLong(bb);
 		Address target = Address.readRaw(bb);
 		long amount = Format.readVLCLong(bb);
 		if (!RT.isValidAmount(amount)) throw new BadFormatException("Invalid amount: "+amount);
-		return create(address,nonce, target, amount);
+		return create(address,sequence, target, amount);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -88,7 +88,7 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// tag (1), nonce(<12) and target (33)
+		// tag (1), sequence(<12) and target (33)
 		// plus allowance for Amount
 		return 1 + 12 + 33 + Format.MAX_VLC_LONG_LENGTH;
 	}

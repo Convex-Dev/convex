@@ -66,7 +66,7 @@ public class Invoke extends ATransaction {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // nonce, address
+		pos = super.encodeRaw(bs,pos); // origin, sequence
 		pos = Format.write(bs,pos, command);
 		return pos;
 	}
@@ -110,7 +110,7 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// tag (1), nonce(<12) and target (33)
+		// tag (1), sequence(<12) and target (33)
 		// plus allowance for Amount
 		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLC_LONG_LENGTH;
 	}
