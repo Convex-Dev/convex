@@ -30,14 +30,14 @@ public class Transfer extends ATransaction {
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.AMOUNT, Keywords.ORIGIN, Keywords.SEQUENCE, Keywords.TARGET };
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	protected Transfer(Address address,long sequence, Address target, long amount) {
-		super(FORMAT,address,sequence);
+	protected Transfer(Address origin,long sequence, Address target, long amount) {
+		super(FORMAT,origin,sequence);
 		this.target = target;
 		this.amount = amount;
 	}
 
-	public static Transfer create(Address address,long sequence, Address target, long amount) {
-		return new Transfer(address,sequence, target, amount);
+	public static Transfer create(Address origin,long sequence, Address target, long amount) {
+		return new Transfer(origin,sequence, target, amount);
 	}
 
 
@@ -63,12 +63,12 @@ public class Transfer extends ATransaction {
 	 * @return The Transfer object
 	 */
 	public static Transfer read(ByteBuffer bb) throws BadFormatException {
-		Address address=Address.create(Format.readVLCLong(bb));
+		Address origin=Address.create(Format.readVLCLong(bb));
 		long sequence = Format.readVLCLong(bb);
 		Address target = Address.readRaw(bb);
 		long amount = Format.readVLCLong(bb);
 		if (!RT.isValidAmount(amount)) throw new BadFormatException("Invalid amount: "+amount);
-		return create(address,sequence, target, amount);
+		return create(origin,sequence, target, amount);
 	}
 
 	@SuppressWarnings("unchecked")
