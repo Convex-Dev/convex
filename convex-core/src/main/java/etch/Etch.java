@@ -225,7 +225,7 @@ public class Etch {
 	 */
 	public static Etch create(File file) throws IOException {
 		Etch etch= new Etch(file);
-		log.debug("Etch created on file: {} with data length: {}"+file,etch.dataLength);
+		log.debug("Etch created on file: {} with data length: {}", file, etch.dataLength);
 		return etch;
 	}
 
