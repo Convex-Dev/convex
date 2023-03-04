@@ -126,7 +126,7 @@ public abstract class AArrayBlob extends ABlob {
 	 * Encodes this Blob, excluding tag byte (will include count)
 	 */
 	@Override
-	public final int encodeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.writeVLCLong(bs, pos, length);
 		return writeToBuffer(bs,pos);
 	}
@@ -326,7 +326,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	public final byte getTag() {
+	public byte getTag() {
 		return Tag.BLOB;
 	}
 

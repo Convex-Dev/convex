@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
-import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
@@ -13,7 +12,11 @@ import convex.core.util.Utils;
 /**
  * Class representing a cryptographic signature
  */
-public abstract class ASignature extends ACell {
+public abstract class ASignature extends AArrayBlob {
+
+	protected ASignature(byte[] signature) {
+		super(signature, 0, signature.length);
+	} 
 
 	/**
 	 * Checks if the signature is valid for a given message hash
@@ -35,12 +38,6 @@ public abstract class ASignature extends ACell {
 	public static ASignature read(ByteBuffer bb) throws BadFormatException {
 		return Ed25519Signature.read(bb);
 	}
-	
-	/**
-	 * Gets the content of this Signature as a hex string
-	 * @return Hex String representation of Signature
-	 */
-	public abstract String toHexString();
 	
 	/**
 	 * Construct a Signature from a hex string
