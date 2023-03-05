@@ -10,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBigInteger;
@@ -150,6 +152,17 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(1.0, evalD("(double 1)"));
 		assertEquals(-1.0, evalD("-1.0"));
 		assertEquals(Double.NaN, evalD("(double ##NaN)"));
+	}
+	
+	@ParameterizedTest
+	@ValueSource(doubles = { 0.0, 0.3, 0.7, -1.0, 1.0, -0.6, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Long.MAX_VALUE, Long.MIN_VALUE})
+	public void testDoubleSemantics(double d) {
+		CVMDouble cd=CVMDouble.create(d);
+		assertEquals(d, evalD(cd.toString()));
+		assertEquals(d, evalD("(+ 0.0 "+cd+")"));
+		assertEquals(d, evalD("(+ 0 "+cd+")"));
+		assertEquals(d, evalD("(double "+cd+")"));
+		assertEquals((long)d, evalL("(long "+cd+")"));
 	}
 
 	@Test

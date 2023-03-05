@@ -355,7 +355,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(1L, evalL("(long #1)"));
 		assertEquals(999L, evalL("(long #999)"));
 		
-		// Doubles may cast to longs?
+		// Doubles may cast to longs - currently semantics as in Java primitive conversion
 		assertEquals(CVMLong.ZERO,eval("(long 0.0)"));
 		assertEquals(10L, evalL("(long 10.999)")); // note rounding towards zero
 		assertEquals(CVMLong.MINUS_ONE,eval("(long -1.9)")); // note rounding towards zero
