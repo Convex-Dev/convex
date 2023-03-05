@@ -124,9 +124,10 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(20L, evalL("(* 2 10)"));
 		assertEquals(120L, evalL("(* 1 2 3 4 5)"));
 
-		// long wrap round 64 bits
-		assertEquals(0L, evalL("(* 65536 65536 65536 65536)"));
-		assertEquals(Long.MIN_VALUE, evalL("(* 32768 65536 65536 65536)"));
+		// long overflow cases
+		assertEquals(CVMBigInteger.parse("18446744073709551616"), eval("(* 65536 65536 65536 65536)"));
+		assertEquals(CVMBigInteger.MIN_POSITIVE, eval("(* 32768 65536 65536 65536)"));
+		assertEquals(CVMLong.MIN_VALUE, eval("(* 32768 65536 -65536 65536)"));
 
 		assertCastError(step("(* nil)"));
 		assertCastError(step("(* :foo)"));
@@ -134,6 +135,7 @@ public class NumericsTest extends ACVMTest {
 
 	@Test
 	public void testTimesDouble() {
+		assertEquals(1.0, evalD("(* 1.0)"));
 		assertEquals(0.0, evalD("(* 0 10.0)"));
 		assertEquals(5.0, evalD("(* 0.5 10)"));
 		

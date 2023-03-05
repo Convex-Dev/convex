@@ -290,4 +290,19 @@ public final class CVMLong extends AInteger {
 		return create(-value);
 	}
 
+	@Override
+	public ANumeric multiply(ANumeric b) {
+		if (b instanceof CVMLong) {
+			long av=value;
+			long bv=((CVMLong) b).value;
+			long lo=av*bv;
+			long hi=Math.multiplyHigh(av,bv);
+			if ((hi==0)&&(lo>=0)) return CVMLong.create(lo);
+			if ((hi==-1)&&(lo<0)) return CVMLong.create(lo);
+			BigInteger result= BigInteger.valueOf(av).multiply(BigInteger.valueOf(bv));
+			return CVMBigInteger.create(result);
+		}
+		return b.multiply(this);
+	}
+
 }

@@ -6,6 +6,7 @@ import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.CVMDouble;
 
 /**
  * Static class defining juice costs for executable operations.
@@ -421,22 +422,55 @@ public class Juice {
 	}
 
 	 /**
-	  * Pre-costs a sequence of numeric arguments
-	  * @param args
+	  * Pre-costs a sequence of numeric arguments for addition / multiplication
+	  * @param args Array of arguments, assumed to be numeric
 	  * @return Juice cost, or negative if any argument is not numeric
 	  */
 	public static long precostNumericLinear(ACell[] args) {
 		long r=0;
+		long size=0;
 		for (int i=0; i<args.length; i++) {
 			long ar=costNumeric(args[i]);
 			if (ar<0) return -1;
-			r=add(r,ar);
+			size=Math.max(size, ar);
+			r=add(r,size);
 		}
 		return r;
 	}
+	
+	 /**
+	  * Pre-costs a sequence of numeric arguments for multiplication
+	  * @param args Array of arguments, assumed to be numeric
+	  * @return Juice cost, or negative if any argument is not numeric
+	  */
+	public static long precostNumericMultiply(ACell[] args) {
+		long result=0;
+		long lastSize=0;
+		boolean usedouble=false;
+		for (int i=0; i<args.length; i++) {
+			ACell a=args[i];
+			long argSize=costNumeric(a);
+			if (argSize<0) return -1;
+			
+			if (usedouble) {
+				result=add(result,argSize); // just equal to cost of new arg
+			} else {
+				if (a instanceof CVMDouble) {
+					usedouble=true; // set flag to use double maths from now on
+					result=add(result,argSize+lastSize); // include cost of conversion from previous integer (may be 0)
+					lastSize=0; // zero conversion cost for future result
+				} else {
+					long extra=lastSize*argSize; // cost of each integer multiply
+					lastSize=lastSize+argSize; // new approximate size after multiply
+					result=add(result,extra);
+				}
+			}
+		}
+		return result;
+	}
 
 	/**
-	 * Gets the base cost for a numeric argument
+	 * Gets the base cost for a numeric argument, basically the length in bytes (min 8)
 	 * @param aCell
 	 * @return base cost, or negative if not numeric
 	 */

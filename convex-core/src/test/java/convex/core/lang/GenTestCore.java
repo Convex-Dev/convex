@@ -174,7 +174,7 @@ public class GenTestCore {
 		CVMLong[] args=new CVMLong[] {ca};
 		assertEquals(-v,RT.minus(args).longValue());
 		assertEquals(v,RT.plus(args).longValue());
-		assertEquals(v,RT.times(args).longValue());
+		assertEquals(v,RT.multiply(args).longValue());
 		assertEquals(1.0/v,RT.divide(args).doubleValue());
 		
 		assertSame(CVMBool.TRUE,RT.lt(args));
@@ -198,7 +198,7 @@ public class GenTestCore {
 		
 		CVMLong[] args=new CVMLong[] {ca,cb};
 		assertEquals(a+b,RT.plus(args).longValue());
-		assertEquals(a*b,RT.times(args).longValue());
+		assertEquals(a*b,RT.multiply(args).longValue());
 		assertEquals(a-b,RT.minus(args).longValue());
 		assertEquals(((double)a)/((double)b),RT.divide(args).doubleValue());
 		

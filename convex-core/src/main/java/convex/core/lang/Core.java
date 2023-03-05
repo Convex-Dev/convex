@@ -1767,7 +1767,14 @@ public class Core {
 		@Override
 		public  Context<APrimitive> invoke(Context context, ACell[] args) {
 			// All arities OK
-			ANumeric result = RT.times(args);
+			long cost=Juice.precostNumericLinear(args);
+			if (cost<0) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (cost>0) {
+				context=context.consumeJuice(cost);
+				if (context.isExceptional()) return context; // not not exceptional, might be something else
+			}
+
+			ANumeric result = RT.multiply(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

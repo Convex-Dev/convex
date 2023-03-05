@@ -306,37 +306,16 @@ public class RT {
 		return result;
 	}
 
-	public static ANumeric minusDouble(ACell[] args) {
+	public static ANumeric multiply(ACell[] args) {
 		int n = args.length;
-		double result = doubleValue(args[0]);
-		if (n == 1)
-			result = -result;
+		if (n==0) return CVMLong.ONE;
+		ANumeric result = RT.ensureNumber(args[0]);
 		for (int i = 1; i < args.length; i++) {
-			result -= RT.doubleValue(args[i]);
+			result =result.multiply(RT.ensureNumber(args[i]));
 		}
-		return CVMDouble.create(result);
+		return result;
 	}
 
-	public static ANumeric times(ACell[] args) {
-		Class<?> type = commonNumericType(args);
-		if (type == null)
-			return null;
-		if (type == Double.class)
-			return timesDouble(args);
-		long result = 1;
-		for (int i = 0; i < args.length; i++) {
-			result *= RT.longValue(args[i]);
-		}
-		return CVMLong.create(result);
-	}
-
-	public static CVMDouble timesDouble(ACell[] args) {
-		double result = 1;
-		for (int i = 0; i < args.length; i++) {
-			result *= RT.doubleValue(args[i]);
-		}
-		return CVMDouble.create(result);
-	}
 
 	public static CVMDouble divide(ACell[] args) {
 		int n = args.length;
@@ -698,12 +677,6 @@ public class RT {
 		if (l == null)
 			return null;
 		return CVMLong.forByte((byte) l.longValue());
-	}
-
-	private static long longValue(ACell a) {
-		if (a instanceof APrimitive)
-			return ((APrimitive) a).longValue();
-		throw new IllegalArgumentException("Can't convert to long: " + Utils.getClassName(a));
 	}
 
 	private static double doubleValue(ACell a) {

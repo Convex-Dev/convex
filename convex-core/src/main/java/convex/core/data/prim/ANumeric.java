@@ -65,4 +65,11 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return Negated value
 	 */
 	public abstract ANumeric negate();
+
+	/**
+	 * Multiplies a second numeric value with this value
+	 * @param b Second number to add
+	 * @return Result of multiplication
+	 */	
+	public abstract ANumeric multiply(ANumeric b);
 }

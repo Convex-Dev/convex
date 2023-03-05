@@ -202,4 +202,9 @@ public final class CVMDouble extends ANumeric {
 		return CVMDouble.create(-value);
 	}
 
+	@Override
+	public ANumeric multiply(ANumeric b) {
+		return CVMDouble.create(value*b.doubleValue());
+	}
+
 }

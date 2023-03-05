@@ -273,4 +273,19 @@ public class CVMBigInteger extends AInteger {
 		return (CVMLong)getCanonical();
 	}
 
+	@Override
+	public ANumeric multiply(ANumeric b) {
+		if (b instanceof CVMDouble) {
+			return CVMDouble.create(big().doubleValue()*b.doubleValue());
+		} 
+		
+		BigInteger bb;
+		if (b instanceof CVMLong) {
+			bb=BigInteger.valueOf(b.longValue());
+		} else {
+			bb=((CVMBigInteger)b).getBigInteger();
+		}
+		return create(big().multiply(bb));
+	}
+
 }
