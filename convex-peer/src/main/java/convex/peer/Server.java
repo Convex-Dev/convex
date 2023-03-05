@@ -292,7 +292,7 @@ public class Server implements Closeable {
 				// Restore from storage case
 				try {
 
-					Peer peer = Peer.restorePeer(store, keyPair);
+					Peer peer = Peer.restorePeer(store, keyPair, rootKey);
 					if (peer != null) {
 						log.info("Restored Peer with root data hash: {}",store.getRootHash());
 						return peer;
