@@ -1,5 +1,8 @@
 package convex.core.data.prim;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.BlobBuilder;
@@ -205,6 +208,15 @@ public final class CVMDouble extends ANumeric {
 	@Override
 	public ANumeric multiply(ANumeric b) {
 		return CVMDouble.create(value*b.doubleValue());
+	}
+
+	@Override
+	public AInteger toInteger() {
+		if (!Double.isFinite(value))return null; // catch NaN and infinity
+		if ((value<=Long.MAX_VALUE)&&(value>=Long.MIN_VALUE)) return CVMLong.create((long)value);
+		BigDecimal bd=BigDecimal.valueOf(value);
+		BigInteger bi=bd.toBigInteger();
+		return CVMBigInteger.create(bi);
 	}
 
 }

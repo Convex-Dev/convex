@@ -304,5 +304,4 @@ public final class CVMLong extends AInteger {
 		}
 		return b.multiply(this);
 	}
-
 }

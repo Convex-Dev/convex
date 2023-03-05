@@ -624,7 +624,7 @@ public class RT {
 			return (AInteger) a;
 		ANumeric n = ensureNumber(a);
 		if (n != null) {
-			return n.toLong();
+			return n.toInteger();
 		}
 		;
 

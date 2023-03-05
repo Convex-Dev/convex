@@ -84,4 +84,9 @@ public abstract class AInteger extends ANumeric {
 	 * @return Java BigInteger
 	 */
 	public abstract BigInteger big();
+	
+	@Override
+	public AInteger toInteger() {
+		return this;
+	}
 }

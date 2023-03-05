@@ -72,4 +72,10 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return Result of multiplication
 	 */	
 	public abstract ANumeric multiply(ANumeric b);
+
+	/**
+	 * Converts this numeric value to the nearest integer
+	 * @return Integer value
+	 */
+	public abstract AInteger toInteger();
 }
