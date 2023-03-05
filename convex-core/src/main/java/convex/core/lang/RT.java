@@ -613,11 +613,11 @@ public class RT {
 	}
 	
 	/**
-	 * Converts a numerical value to a CVM Long. Doubles and floats will be
+	 * Converts a numerical value to a CVM Integer. Doubles and floats will be
 	 * converted if possible.
 	 * 
 	 * @param a Value to cast
-	 * @return Long value, or null if not convertible
+	 * @return Integer value, or null if not convertible
 	 */
 	public static AInteger castInteger(ACell a) {
 		if (a instanceof AInteger)
@@ -647,12 +647,9 @@ public class RT {
 	 * @return AInteger value, or null if not convertible
 	 */
 	public static AInteger ensureInteger(ACell a) {
-		if (a instanceof AInteger)
-			return (AInteger) a;
-		if (a instanceof ANumeric) {
-			ANumeric ap = (ANumeric) a;
-			if (ap.numericType() == Long.class)
-				return ap.toLong();
+		if (a instanceof AInteger) {
+			AInteger ap = (AInteger) a;
+			return ap;
 		}
 		return null;
 	}
