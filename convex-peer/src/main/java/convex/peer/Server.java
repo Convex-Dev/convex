@@ -1133,7 +1133,7 @@ public class Server implements Closeable {
 	 * This will overwrite any previously persisted peer data.
 	 */
 	@SuppressWarnings("unchecked")
-	public void persistPeerData() {
+	public boolean persistPeerData() {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -1147,8 +1147,10 @@ public class Server implements Closeable {
 
 			store.setRootData(rootData);
 			log.info( "Stored peer data for Server with hash: {}", rootData.getHash().toHexString());
+			return true;
 		} catch (Throwable e) {
-			log.warn("Failed to persist peer state when closing server: {}" ,e.getMessage());
+			log.warn("Failed to persist peer state: {}" ,e.getMessage());
+			return false;
 		} finally {
 			Stores.setCurrent(tempStore);
 		}
@@ -1158,11 +1160,7 @@ public class Server implements Closeable {
 	public void close() {
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
-			try {
-				persistPeerData();
-			} catch (Throwable t) {
-				log.warn("Exception persisting peer data: {}", t);
-			}
+			persistPeerData();
 		}
 
 		// TODO: not much point signing this?
