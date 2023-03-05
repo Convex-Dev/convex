@@ -354,6 +354,16 @@ public class CoreTest extends ACVMTest {
 		// Address casts to equivalent Long value. See #431
 		assertEquals(1L, evalL("(long #1)"));
 		assertEquals(999L, evalL("(long #999)"));
+		
+		// Doubles may cast to longs?
+		assertEquals(CVMLong.ZERO,eval("(long 0.0)"));
+		assertEquals(10L, evalL("(long 10.999)")); // note rounding towards zero
+		assertEquals(CVMLong.MINUS_ONE,eval("(long -1.9)")); // note rounding towards zero
+		assertEquals(CVMLong.MAX_VALUE,eval("(long 9223372036854775807.0)")); // actual max value
+		assertEquals(CVMLong.MAX_VALUE,eval("(long 9223372036854775809.0)")); // above max value
+		assertEquals(CVMLong.ZERO,eval("(long ##NaN)"));
+		assertEquals(CVMLong.MAX_VALUE,eval("(long ##Inf)"));
+		assertEquals(CVMLong.MIN_VALUE,eval("(long ##-Inf)"));
 
 		assertArityError(step("(long)"));
 		assertArityError(step("(long 1 2)")); 
