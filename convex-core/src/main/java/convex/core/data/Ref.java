@@ -653,11 +653,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		stack.add(this);
 		Consumer<Ref<?>> mf=r->{
 			if (missingSet.size()>=limit) return;
+			if (missingSet.contains(r.cachedHash())) return;
 			if (r.isMissing()) {
 				missingSet.add(r.cachedHash());
 			} else {
 				if (r.getStatus()>=Ref.PERSISTED) return; // proof we have everything below here
-				
+					
 				// Should be OK to get value, since non-missing!
 				ACell val=r.getValue();
 				if (val==null) return;
