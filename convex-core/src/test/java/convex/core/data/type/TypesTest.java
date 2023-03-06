@@ -21,6 +21,8 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.ObjectsTest;
 import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -54,6 +56,8 @@ public class TypesTest {
 		assertFalse(t.check(null));
 		assertTrue(t.check(CVMLong.ONE));
 		assertFalse(t.check(CVMDouble.ONE));
+		assertFalse(t.check(CVMBool.TRUE));
+		assertFalse(t.check(CVMChar.ZERO));
 		assertTrue(t.check(CVMBigInteger.MIN_POSITIVE));
 	}
 	
