@@ -218,19 +218,30 @@ public class RefTest {
 
 	@Test
 	public void testDiabolicalDeep() {
+		// Main purpose is to test we don't hit stack overflows
+		
 		Ref<ACell> a = Samples.DIABOLICAL_MAP_2_10000.getRef();
-		// TODO: consider if this should be possible, currently not (stack overflow)
-		// Ref.accumulateRefSet(a);
+
+		Set<Ref<?>> refs=Refs.accumulateRefSet(a);
+		assertEquals(10003,refs.size()); // 10000 levels plus two keys and top level
+		
 		assertTrue(a.isEmbedded());
+		
+		// TODO: fix this stack overflow
+		// assertEquals(Long.MAX_VALUE,a.getMemorySize());
 	}
 
 	@Test
 	public void testDiabolicalWide() {
+		// Main purpose is to test we deduplicate correctly
+		
 		Ref<ACell> a = Samples.DIABOLICAL_MAP_30_30.getRef();
 		// OK since we manage de-duplication
 		Set<Ref<?>> set = Refs.accumulateRefSet(a);
 		assertEquals(31 + 30 * 16, set.size()); // 16 refs at each level after de-duping
 		assertFalse(a.isEmbedded());
+		
+		assertEquals(Long.MAX_VALUE,a.getMemorySize());
 	}
 	
 	@Test public void testAllRefsVisitor() {
