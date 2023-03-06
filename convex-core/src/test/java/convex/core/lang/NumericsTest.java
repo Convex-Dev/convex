@@ -60,7 +60,7 @@ public class NumericsTest extends ACVMTest {
 	}
 
 	@Test
-	public void testPlusCases() {
+	public void testPlusSpecialCases() {
 		AInteger m=CVMLong.MAX_VALUE;
 		m=m.add(m);
 		assertEquals(Reader.read("18446744073709551614"),m);
@@ -192,6 +192,20 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(Double.NaN, evalD("(+ 1 ##NaN)"), 0);
 		assertEquals(Double.NaN, evalD("(/ ##NaN 2)"), 0);
 		assertEquals(Double.NaN, evalD("(* 1 ##NaN 3.0)"), 0);
+	}
+	
+	@ParameterizedTest
+	@ValueSource(longs = {0,-1,1,-4,7,100,-245,1000,-565865,Integer.MAX_VALUE, Integer.MIN_VALUE, Integer.MAX_VALUE+1L, Integer.MIN_VALUE-1L,Long.MAX_VALUE, Long.MIN_VALUE})
+	public void testLongSemantics(long a) {
+		CVMLong ca=CVMLong.create(a);
+		assertEquals(a, evalL(ca.toString()));
+		assertEquals(ca, eval("(dec (inc "+ca+"))"));
+		assertEquals(ca, eval("(long "+ca+")"));
+		assertEquals((double)a, evalD("(double "+ca+")"));
+		if (a!=0) {
+			assertEquals(CVMLong.ZERO,eval("(mod "+ca+" "+ca+")"));
+			assertEquals(1.0/a,evalD("(/ 1 "+ca+")"));
+		}
 	}
 	
 	@Test
