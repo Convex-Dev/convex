@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.function.Consumer;
 
@@ -12,6 +13,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.core.util.Trees;
 
 /**
  * Class representing a smart reference to a decentralised data value.
@@ -642,24 +644,32 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Finds all instances of missing data in this Ref, and adds them to the missing set
 	 * @param missingSet Set to add missing instances to
+	 * @param limit 
 	 */
-	public void findMissing(HashSet<Hash> missingSet) {
+	public void findMissing(HashSet<Hash> missingSet, long limit) {
 		if (getStatus()>=Ref.PERSISTED) return;
-		if (isMissing()) {
-			missingSet.add(getHash());
-		} else {
-			// Should be OK to get value, since non-missing!
-			T val=getValue();
-			if (val==null) return;
-			
-			// TODO: maybe needs to be non-stack-consuming?
-			// recursively scan for missing children
-			int n=val.getRefCount();
-			for (int i=0; i<n; i++) {
-				Ref<?> r=val.getRef(i);
-				r.findMissing(missingSet);
+
+		final ArrayList<Ref<?>> stack=new ArrayList<>();
+		stack.add(this);
+		Consumer<Ref<?>> mf=r->{
+			if (missingSet.size()>=limit) return;
+			if (r.isMissing()) {
+				missingSet.add(r.cachedHash());
+			} else {
+				if (r.getStatus()>=Ref.PERSISTED) return; // proof we have everything below here
+				
+				// Should be OK to get value, since non-missing!
+				ACell val=r.getValue();
+				if (val==null) return;
+				
+				// recursively scan for missing children
+				int n=val.getRefCount();
+				for (int i=0; i<n; i++) {
+					stack.add(val.getRef(i));
+				}
 			}
-		}
+		};
+		Trees.visitStack(stack, mf);
 	}
 
 	/**

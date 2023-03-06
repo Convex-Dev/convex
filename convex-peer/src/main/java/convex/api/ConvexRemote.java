@@ -207,6 +207,7 @@ public class ConvexRemote extends Convex {
 					HashSet<Hash> missingSet = new HashSet<>();
 
 					// Loop until future is complete or cancelled
+					long LIMIT=1000; // limit of missing data elements to query at any time
 					while (!f.isDone()) {
 						missingSet.clear();
 
@@ -218,7 +219,7 @@ public class ConvexRemote extends Convex {
 								f.complete(ref.getValue());
 								return;
 							}
-							ref.findMissing(missingSet);
+							ref.findMissing(missingSet,LIMIT);
 						}
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline

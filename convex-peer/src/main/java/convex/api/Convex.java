@@ -641,6 +641,9 @@ public abstract class Convex {
 			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Unable to get network status ", e);
+		} finally {
+			// in case the future is still running?
+			statusFuture.cancel(true);
 		}
 	}
 
@@ -760,6 +763,8 @@ public abstract class Convex {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
 			throw new Error("Not possible? Since there is no Thread for the future....", e);
+		} finally {
+			cf.cancel(true);
 		}
 		return result;
 	}

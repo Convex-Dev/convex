@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
 import convex.core.exceptions.InvalidDataException;
@@ -146,6 +148,10 @@ public class InitTest extends ACVMTest {
 		//assertEquals(0L,s1s.persisted);
 		
 		assertSame(s1s.root,sr);
+		
+		HashSet<Hash> hs=new HashSet<>();
+		sr.findMissing(hs, 100);
+		assertTrue(hs.isEmpty());
 	}
 
 }

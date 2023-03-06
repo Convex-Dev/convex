@@ -112,7 +112,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		if (result != null) return false; // still in memory, so not missing
 		
 		// check store
-		Ref<T> storeRef = Stores.current().refForHash(hash);
+		Ref<T> storeRef = store.refForHash(hash);
 		if (storeRef == null) return true; // must be missing, couldn't find in store
 
 		// We know we have in store.
@@ -122,6 +122,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		} else {
 			this.softRef = new SoftReference<T>(storeRef.getValue());
 		}
+		this.flags=Ref.mergeFlags(this.flags, storeRef.flags);
 		return false;
 	}
 

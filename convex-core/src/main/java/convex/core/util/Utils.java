@@ -1412,6 +1412,13 @@ public class Utils {
 		return bs;
 	}
 
+	// Adds for computation of memory size, saturating at Long.MAX_VALUE
+	public static long memoryAdd(long a, long b) {
+		long r=a+b;
+		if (r<a) r=Long.MAX_VALUE;
+		return r;
+	}
+
 
 
 

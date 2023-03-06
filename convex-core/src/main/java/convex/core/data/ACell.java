@@ -275,15 +275,13 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		for (int i=0; i<n; i++) {
 			Ref<?> childRef=getRef(i);
 			long childSize=childRef.getMemorySize();
-			result+=childSize;
+			result=Utils.memoryAdd(result,childSize);
 		}
 		
 		if (!isEmbedded()) {
 			// We need to count this cell's own encoding length
-			result+=getEncodingLength();
-			
-			// Add overhead for storage of non-embedded cell
-			result+=Constants.MEMORY_OVERHEAD;
+			// Plus overhead for storage of non-embedded cell
+			result=Utils.memoryAdd(result,getEncodingLength()+Constants.MEMORY_OVERHEAD);
 		} 
 		return result;
 	}
