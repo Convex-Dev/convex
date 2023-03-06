@@ -192,7 +192,13 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public ByteBuffer getByteBuffer() {
-		return ByteBuffer.wrap(store, offset, length).asReadOnlyBuffer();
+		// We need to force the ByteBuffer offset in the array to be zero
+		// Otherwise position won't be 0 at start....
+		if (offset == 0) {
+			return ByteBuffer.wrap(store, offset, length);
+		} else {
+			return ByteBuffer.wrap(this.getBytes());
+		}
 	}
 
 	@Override

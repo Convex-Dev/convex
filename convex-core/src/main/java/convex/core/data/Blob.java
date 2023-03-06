@@ -168,14 +168,7 @@ public class Blob extends AArrayBlob {
 		return Blob.wrap(bs);
 	}
 
-	@Override
-	public ByteBuffer getByteBuffer() {
-		if (offset == 0) {
-			return ByteBuffer.wrap(store, offset, length).asReadOnlyBuffer();
-		} else {
-			return ByteBuffer.wrap(this.getBytes()).asReadOnlyBuffer();
-		}
-	}
+
 
 	/**
 	 * Fast read of a Blob from its representation inside another Blob object,

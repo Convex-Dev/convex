@@ -77,6 +77,15 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public int estimatedEncodingSize() {
 		return 1+3;
 	}
+	
+	/**
+	 * Get the number of UTF-8 bytes as encoded within the encoding tag
+	 * @param tag Tag byte
+	 * @return Number of bytes in range 1-4
+	 */
+	public static int utfByteCountFromTag(byte tag) {
+		return (tag&0x03)+1;
+	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {

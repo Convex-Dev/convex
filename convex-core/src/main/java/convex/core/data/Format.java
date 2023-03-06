@@ -492,7 +492,7 @@ public class Format {
 	/**
 	 * Reads a Ref or embedded Cell value from the ByteBuffer.
 	 * 
-	 * Converts Embedded Cells to Refs automatically.
+	 * Converts Embedded Cells to Direct Refs automatically.
 	 * 
 	 * @param <T> Type of referenced value
 	 * @param bb ByteBuffer containing a ref to read
@@ -574,6 +574,7 @@ public class Format {
 	 * @param <T> Type of value to read
 	 * @param tag Tag to use for reading
 	 * @param blob Blob to read from
+	 * @param offset Offset of tag byte in blob
 	 * @return Value decoded
 	 * @throws BadFormatException If encoding is invalid for the given tag
 	 */
@@ -586,23 +587,24 @@ public class Format {
 		}
 		if (tag == Tag.BLOB) {
 			return (T) Blobs.readFromBlob(blob,offset);
-		} else {
-			// TODO: maybe refactor to avoid read from byte buffers?
-			ByteBuffer bb = blob.getByteBuffer().position(offset+1);
-			T result;
+		} 
+		
+		// Fallback to read via ByteBuffer
+		// TODO: maybe refactor to avoid read from byte buffers?
+		ByteBuffer bb = blob.getByteBuffer().position(offset+1);
+		T result;
 
-			try {
-				result = (T) read(tag,bb);
-			} catch (BufferUnderflowException e) {
-				throw new BadFormatException("Blob has insufficients bytes: " + blob.count(), e);
-			} 
-			long epos=bb.position();
-			if (result.cachedEncoding()==null) {
-				result.attachEncoding(blob.slice(offset,epos));
-			}
-
-			return result;
+		try {
+			result = (T) read(tag,bb);
+		} catch (BufferUnderflowException e) {
+			throw new BadFormatException("Blob has insufficients bytes: count=" + blob.count()+ " tag="+tag+" offset="+offset, e);
+		} 
+		long epos=bb.position();
+		if (result.cachedEncoding()==null) {
+			result.attachEncoding(blob.slice(offset,epos));
 		}
+
+		return result;
 	}
 
 	/**
@@ -651,14 +653,14 @@ public class Format {
 			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
 			
 			if ((tag&Tag.CHAR)==Tag.CHAR) {
-				int len=(tag&0x03)+1;
+				int len=CVMChar.utfByteCountFromTag(tag);
 				if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
 				return (T) CVMChar.read(len, bb);
 			}
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 		} catch (IllegalArgumentException e) {
-			throw new BadFormatException("Format error basic type with tag byte: " + tag);
+			throw new BadFormatException("Illegal format error basic type with tag byte: " + tag);
 		}
 	}
 
@@ -719,6 +721,14 @@ public class Format {
 		return read(tag,bb);
 	}
 	
+	/**
+	 * Read an arbitrary cell data from a ByteBuffer. Assumes tag already read.
+	 * @param <T>
+	 * @param tag Tag byte
+	 * @param bb ByteBuffer to read from
+	 * @return Cell value (may be null)
+	 * @throws BadFormatException If the encoding is malformed in any way
+	 */
 	@SuppressWarnings("unchecked")
 	static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
 		try {
