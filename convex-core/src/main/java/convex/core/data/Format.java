@@ -558,7 +558,7 @@ public class Format {
 	 */
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		long n=blob.count();
-		if (n<1) throw new BadFormatException("Attempt to read from empty Blob");
+		if (n<1) throw new BadFormatException("Attempt to decode from empty Blob");
 		byte tag = blob.byteAt(0);
 		T result= read(tag,blob,0);
 		if (result==null) {

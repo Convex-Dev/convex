@@ -22,8 +22,10 @@ public interface IWriteable {
 	
 	/**
 	 * Estimate the encoded data size for this Cell. Used for quickly sizing buffers.
-	 * Implementations should try to return a size that is likely to contain the entire object
-	 * when represented in binary format, including the tag byte.
+	 * Implementations should try to return a size that is highly likely to contain the entire object
+	 * when encoded, including the tag byte.
+	 * 
+	 * Should not traverse soft Refs, i.e. must be usable on arbitrary partial data structures
 	 * 
 	 * @return The estimated size for the binary representation of this object.
 	 */
