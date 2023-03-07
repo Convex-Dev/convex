@@ -194,8 +194,9 @@ public class BlobsTest {
 		ASignature sig=Samples.BAD_SIGNATURE;
 
 		Blob b=sig.toFlatBlob();
-		assertNotEquals(sig,b); // should be different types	
+		assertEquals(sig,b); // should be same types	
 		assertTrue(sig.equalsBytes(b)); // should be same bytes
+		assertEquals(b.getEncoding(),sig.getEncoding());
 		doBlobTests(sig);
 	}
 	

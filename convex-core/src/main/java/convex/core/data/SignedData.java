@@ -188,7 +188,7 @@ public class SignedData<T extends ACell> extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = publicKey.writeToBuffer(bs,pos);
-		pos = signature.encodeRaw(bs,pos);
+		pos = signature.writeToBuffer(bs, pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
@@ -208,7 +208,7 @@ public class SignedData<T extends ACell> extends ARecord {
 	public static <T extends ACell> SignedData<T> read(ByteBuffer data) throws BadFormatException {
 		// header already assumed to be consumed
 		AccountKey address = AccountKey.readRaw(data);
-		ASignature sig = ASignature.read(data);
+		ASignature sig = Ed25519Signature.readRaw(data);
 		Ref<T> value = Format.readRef(data);
 		return create(address, sig, value);
 	}

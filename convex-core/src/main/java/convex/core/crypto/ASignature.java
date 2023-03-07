@@ -15,7 +15,7 @@ import convex.core.util.Utils;
 public abstract class ASignature extends AArrayBlob {
 
 	protected ASignature(byte[] signature) {
-		super(signature, 0, signature.length);
+		super(signature, 0, Ed25519Signature.SIGNATURE_LENGTH);
 	} 
 
 	/**
@@ -72,7 +72,7 @@ public abstract class ASignature extends AArrayBlob {
 	
 	@Override
 	public byte getTag() {
-		return Tag.SIGNATURE;
+		return Tag.BLOB;
 	}
 
 	/**
@@ -83,13 +83,13 @@ public abstract class ASignature extends AArrayBlob {
 	
 	@Override
 	public boolean isRegularBlob() {
-		return false;
+		return true;
 	}
 	
 	@Override
 	public boolean equals(ABlob b) {
 		if (!(b.getTag()==getTag())) return false;
-		return equalsBytes(b);
+		return b.equalsBytes(this);
 	}
 
 

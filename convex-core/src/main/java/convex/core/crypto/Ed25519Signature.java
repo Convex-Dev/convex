@@ -10,6 +10,7 @@ import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Utils;
 
 /**
  * Immutable data value class representing an Ed25519 digital signature.
@@ -52,7 +53,7 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 	@Override public final boolean isCVMValue() {
-		// We allow signatures to exist as CVM values
+		// We allow signatures to exist as CVM values (i.e. Blobs)
 		return true;
 	}
 	
@@ -63,6 +64,18 @@ public class Ed25519Signature extends ASignature {
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static Ed25519Signature read(ByteBuffer bb) throws BadFormatException {
+		byte count=bb.get();
+		if (count!=SIGNATURE_LENGTH) throw new BadFormatException("Expected count byte of signature wrong: "+Utils.toHexString(count));
+		return readRaw(bb);
+	}
+	
+	/**
+	 * Read signature raw data from a ByteBuffer. Assumes tag and count already read if present.
+	 * @param bb ByteBuffer to read from
+	 * @return Signature instance
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public static Ed25519Signature readRaw(ByteBuffer bb) throws BadFormatException {
 		byte[] sigData=new byte[SIGNATURE_LENGTH];
 		bb.get(sigData);
 		return wrap(sigData);
@@ -70,14 +83,8 @@ public class Ed25519Signature extends ASignature {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.SIGNATURE;
+		bs[pos++]=Tag.BLOB;
 		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		System.arraycopy(store, 0, bs, pos, SIGNATURE_LENGTH);
-		return pos+SIGNATURE_LENGTH;
 	}
 
 	@Override

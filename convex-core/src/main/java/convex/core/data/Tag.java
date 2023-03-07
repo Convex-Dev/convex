@@ -27,7 +27,6 @@ public class Tag {
 	// crypto and security primitives
 	public static final byte REF = (byte) 0x20;
 	public static final byte ADDRESS = (byte) 0x21;
-	public static final byte SIGNATURE = (byte) 0x22;
 
 	// Standard supported object data types
 	public static final byte STRING = (byte) 0x30;
