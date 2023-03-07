@@ -65,10 +65,10 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	 * Converts this data object to a lowercase hex string representation
 	 * @return Hex String representation
 	 */
-	public final String toHexString() {
+	public String toHexString() {
 		return toHexString(Utils.checkedInt(count())*2);
 	}
-	
+
 	/**
 	 * Converts this data object to a hex string representation of the given length.
 	 * Equivalent to truncating the full String representation.
@@ -421,8 +421,8 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	public boolean isRegularBlob() {
 		return true;
 	}
-	
-	@Override public final boolean isCVMValue() {
+
+	@Override public boolean isCVMValue() {
 		return true;
 	}
 

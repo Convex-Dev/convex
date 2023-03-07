@@ -3,10 +3,9 @@ package convex.core.crypto;
 import java.nio.ByteBuffer;
 
 import convex.core.data.AArrayBlob;
-import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
-import convex.core.data.BlobBuilder;
+import convex.core.data.Blob;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
@@ -28,10 +27,9 @@ public class Ed25519Signature extends ASignature {
 	 */
 	public static final Ed25519Signature ZERO = wrap(new byte[SIGNATURE_LENGTH]);
 	
-	private final byte[] signatureBytes;
-	
+
 	private Ed25519Signature(byte[] signature) {
-		this.signatureBytes=signature;
+		super(signature);
 	}
 	
 	/**
@@ -50,7 +48,7 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 	@Override
-	public ACell toCanonical() {
+	public Ed25519Signature toCanonical() {
 		return this;
 	}
 	
@@ -79,16 +77,10 @@ public class Ed25519Signature extends ASignature {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		System.arraycopy(signatureBytes, 0, bs, pos, SIGNATURE_LENGTH);
+		System.arraycopy(store, 0, bs, pos, SIGNATURE_LENGTH);
 		return pos+SIGNATURE_LENGTH;
 	}
 
-	@Override
-	public boolean print(BlobBuilder bb, long limit) {
-		bb.append("{:signature 0x"+Utils.toHexString(signatureBytes)+"}");
-		return bb.check(limit);
-	}
-	
 	@Override
 	public AString toCVMString(long limit) {
 		if (limit<10) return null;
@@ -111,7 +103,7 @@ public class Ed25519Signature extends ASignature {
 //			Signature verifier = Signature.getInstance("Ed25519");
 //		    verifier.initVerify(publicKey);
 //		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
-//			return verifier.verify(signatureBytes);
+//			return verifier.verify(store);
 //		} catch (SignatureException | InvalidKeyException e) {	
 //			return false;
 //		} catch (NoSuchAlgorithmException e) {
@@ -121,26 +113,22 @@ public class Ed25519Signature extends ASignature {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (signatureBytes.length!=SIGNATURE_LENGTH) throw new InvalidDataException("Bad signature array length?",this);
+		if (store.length!=SIGNATURE_LENGTH) throw new InvalidDataException("Bad signature array length?",this);
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
 		return 1+SIGNATURE_LENGTH;
 	}
-	
+
 	@Override
-	public int getRefCount() {
-		return 0;
+	public byte[] getBytes() {
+		return store;
 	}
 
 	@Override
-	public String toHexString() {
-		return Utils.toHexString(signatureBytes);
+	public Blob getChunk(long i) {
+		return Blob.create(store).getChunk(i);
 	}
-	
-	@Override
-	public byte[] getBytes() {
-		return signatureBytes;
-	}
+
 }
