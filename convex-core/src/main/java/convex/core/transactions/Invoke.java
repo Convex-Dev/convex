@@ -5,17 +5,19 @@ import java.nio.ByteBuffer;
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.Tag;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
-import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Utils;
 
 /**
@@ -33,8 +35,11 @@ import convex.core.util.Utils;
 public class Invoke extends ATransaction {
 	protected final ACell command;
 
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.COMMAND, Keywords.ORIGIN, Keywords.SEQUENCE };
+	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+
 	protected Invoke(Address address,long sequence, ACell args) {
-		super(address,sequence);
+		super(FORMAT,address,sequence);
 		this.command = args;
 	}
 
@@ -61,7 +66,7 @@ public class Invoke extends ATransaction {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // nonce, address
+		pos = super.encodeRaw(bs,pos); // origin, sequence
 		pos = Format.write(bs,pos, command);
 		return pos;
 	}
@@ -105,23 +110,9 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// tag (1), nonce(<12) and target (33)
+		// tag (1), sequence(<12) and target (33)
 		// plus allowance for Amount
 		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLC_LONG_LENGTH;
-	}
-
-	@Override
-	public boolean isCanonical() {
-		return true;
-	}
-
-	@Override
-	public boolean print(BlobBuilder sb, long limit) {
-		sb.append("{");
-		sb.append(":invoke ");
-		if (!RT.print(sb, command,limit)) return false;;
-		sb.append('}');
-		return sb.check(limit);
 	}
 
 	@Override
@@ -172,5 +163,27 @@ public class Invoke extends ATransaction {
 	@Override
 	public byte getTag() {
 		return Tag.INVOKE;
+	}
+
+	@Override
+	public ACell get(ACell key) {
+		if (Keywords.COMMAND.equals(key)) return command;
+		if (Keywords.ORIGIN.equals(key)) return origin;
+		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
+
+		return null;
+	}
+
+	@Override
+	public Invoke updateAll(ACell[] newVals) {
+		ACell command = (ACell)newVals[0];
+		Address origin = (Address)newVals[1];
+		long sequence = ((CVMLong)newVals[2]).longValue();
+
+		if (command == this.command && origin == this.origin && sequence == this.sequence) {
+			return this;
+		}
+
+		return new Invoke(origin, sequence, command);
 	}
 }

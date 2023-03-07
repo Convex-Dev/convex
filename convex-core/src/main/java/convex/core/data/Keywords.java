@@ -94,4 +94,11 @@ public class Keywords {
 	
 	public static final Keyword PUBLIC_KEY = Keyword.create("public-key");
 	public static final Keyword SIGNATURE = Keyword.create("signature");
+
+	public static final Keyword AMOUNT = Keyword.create("amount");
+	public static final Keyword CALL = Keyword.create("call");
+	public static final Keyword COMMAND = Keyword.create("command");
+	public static final Keyword OFFER = Keyword.create("offer");
+	public static final Keyword ORIGIN = Keyword.create("origin");
+	public static final Keyword TARGET = Keyword.create("target");
 }
