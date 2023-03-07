@@ -10,7 +10,6 @@ import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Utils;
 
 /**
  * Immutable data value class representing an Ed25519 digital signature.
@@ -53,8 +52,8 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 	@Override public final boolean isCVMValue() {
-		// We don't want Signatures in the CVM itself. Should always be checked by Peer.
-		return false;
+		// We allow signatures to exist as CVM values
+		return true;
 	}
 	
 	/**

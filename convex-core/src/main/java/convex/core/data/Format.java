@@ -11,6 +11,7 @@ import convex.core.BlockResult;
 import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.crypto.Ed25519Signature;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -742,6 +743,7 @@ public class Format {
 
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(bb);
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(bb);
+			if (tag == Tag.SIGNATURE) return (T) Ed25519Signature.read(bb);
 
 			if ((tag & 0xF0) == 0x80) return readDataStructure(bb, tag);
 

@@ -13,6 +13,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.ASignature;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -185,6 +186,17 @@ public class BlobsTest {
 		assertThrows(IndexOutOfBoundsException.class,()->bb.slice(fn, fn+1));
 		assertSame(Blobs.empty(),bb.slice(0, 0));
 		assertSame(Blobs.empty(),bb.slice(fn, fn));
+	}
+	
+	@Test
+	public void testSignature() {
+		// Signature is another Blob special case
+		ASignature sig=Samples.BAD_SIGNATURE;
+
+		Blob b=sig.toFlatBlob();
+		assertNotEquals(sig,b); // should be different types	
+		assertTrue(sig.equalsBytes(b)); // should be same bytes
+		doBlobTests(sig);
 	}
 	
 	@Test
@@ -467,15 +479,16 @@ public class BlobsTest {
 		ABlob b=Blob.wrap(a.getBytes()).toCanonical();
 		assertEquals(a.count(),b.count());
 		
+		BlobBuilder bb=new BlobBuilder(a);
+
 		if (a.isRegularBlob()) {
 			assertEquals(canonical,b);
+			
+			assertEquals(a,bb.toBlob());
+			
+			// Slice should not change type
+			assertEquals(a,a.slice(0,n));
 		}
-		
-		BlobBuilder bb=new BlobBuilder(a);
-		assertEquals(a,bb.toBlob());
-		
-		// Slice should not change type
-		assertEquals(a,a.slice(0,n));
 		
 		if (n>0) {
 			assertEquals(n*2,a.commonHexPrefixLength(b));
@@ -493,13 +506,13 @@ public class BlobsTest {
 		ByteBuffer buf=a.getByteBuffer();
 		bb.clear();
 		bb.append(buf);
-		assertEquals(canonical,bb.toBlob());
+		assertTrue(canonical.equalsBytes(bb.toBlob()));
 		bb.append(a.getByteBuffer());
 		assertEquals(n*2, bb.count());
 		ABlob r=bb.toBlob();
-		assertEquals(a,r.slice(0,n));
-		assertEquals(a,r.slice(n,n*2));
-		assertEquals(a.append(a),r);
+		assertEquals(b,r.slice(0,n));
+		assertEquals(b,r.slice(n,n*2));
+		assertEquals(b.append(b),r);
 		
 		// Should pass tests for a CVM value
 		CollectionsTest.doCountableTests(a);

@@ -77,9 +77,20 @@ public abstract class ASignature extends AArrayBlob {
 
 	/**
 	 * Gets the raw bytes representing this signature
-	 * @return
+	 * @return byte array from this signature
 	 */
 	public abstract byte[] getBytes();
+	
+	@Override
+	public boolean isRegularBlob() {
+		return false;
+	}
+	
+	@Override
+	public boolean equals(ABlob b) {
+		if (!(b.getTag()==getTag())) return false;
+		return equalsBytes(b);
+	}
 
 
 }
