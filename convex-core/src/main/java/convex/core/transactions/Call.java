@@ -150,7 +150,8 @@ public class Call extends ATransaction {
 
 	@Override
 	public Call updateAll(ACell[] newVals) {
-		AList<ACell> call = (AList)newVals[0];
+		@SuppressWarnings("unchecked")
+		AList<ACell> call = (AList<ACell>)newVals[0];
 		long offer = ((CVMLong)newVals[1]).longValue();
 		Address origin = (Address)newVals[2];
 		long sequence = ((CVMLong)newVals[3]).longValue();
