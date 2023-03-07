@@ -39,6 +39,7 @@ public class Refs {
 		public long embedded=0;
 		public long direct=0;
 		public long persisted=0;
+		public long stored=0;
 	}
 	
 	/**
@@ -55,6 +56,7 @@ public class Refs {
 			if (r.isEmbedded()) rts.embedded++;
 			if (r.isDirect()) rts.direct++;
 			if (r.getStatus()>=Ref.PERSISTED) rts.persisted++;
+			if (r.getStatus()>=Ref.STORED) rts.stored++;
 		};
 		visitAllRefs(root,statVisitor);
 		
