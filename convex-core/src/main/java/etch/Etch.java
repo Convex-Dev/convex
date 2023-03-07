@@ -127,6 +127,7 @@ public class Etch {
 	private static long tempIndex=0;
 
 	private final File file;
+	private final String fileName;
 	private final RandomAccessFile data;
 
 	/**
@@ -144,6 +145,8 @@ public class Etch {
 		this.file=dataFile;
 		if (!dataFile.exists()) dataFile.createNewFile();
 		this.data=new RandomAccessFile(dataFile,"rw");
+
+		this.fileName = dataFile.getCanonicalPath();
 
 		// Try to exclusively lock the Etch database file
 		FileChannel fileChannel=this.data.getChannel();
@@ -225,7 +228,7 @@ public class Etch {
 	 */
 	public static Etch create(File file) throws IOException {
 		Etch etch= new Etch(file);
-		log.debug("Etch created on file: {} with data length: {}"+file,etch.dataLength);
+		log.debug("Etch created on file: {} with data length: {}", file, etch.dataLength);
 		return etch;
 	}
 
@@ -570,7 +573,7 @@ public class Etch {
 
 			data.close();
 
-			log.debug("Etch closed on file: "+data+" with data length: "+dataLength);
+			log.debug("Etch closed on file: "+ getFileName() +" with data length: "+dataLength);
 		} catch (IOException e) {
 			log.error("Error closing Etch file: "+file);
 			e.printStackTrace();
@@ -925,6 +928,10 @@ public class Etch {
 
 	public File getFile() {
 		return file;
+	}
+
+	public String getFileName() {
+		return fileName;
 	}
 
 	public synchronized Hash getRootHash() throws IOException {

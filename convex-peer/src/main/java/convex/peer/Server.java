@@ -259,7 +259,7 @@ public class Server implements Closeable {
 				Hash networkID=RT.ensureHash(status.get(2));
 				log.info("Attempting to sync genesis state with network: "+networkID);
 				State genF=(State) convex.acquire(networkID).get(timeout,TimeUnit.MILLISECONDS);
-				log.info("Retreived Genesis State: "+networkID);
+				log.info("Retrieved Genesis State: "+networkID);
 				
 				// Belief acquisition
 				log.info("Attempting to obtain peer Belief: "+beliefHash);
@@ -273,7 +273,7 @@ public class Server implements Closeable {
 						log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
 					}
 				}
-				log.info("Retreived Peer Signed Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
+				log.info("Retrieved Peer Signed Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 
 				Peer peer=Peer.create(keyPair, genF, belF.getValue());
 				return peer;
@@ -987,7 +987,7 @@ public class Server implements Closeable {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 
 			try {
-				log.debug("Reciever thread started for peer at {}", getHostAddress());
+				log.debug("Receiver thread started for peer at {}", getHostAddress());
 
 				while (isRunning) { // loop until server terminated
 					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
@@ -996,7 +996,7 @@ public class Server implements Closeable {
 					}
 				}
 
-				log.debug("Reciever thread terminated normally for peer {}", this);
+				log.debug("Receiver thread terminated normally for peer {}", this);
 			} catch (InterruptedException e) {
 				log.debug("Receiver thread interrupted ");
 			} catch (Throwable e) {
