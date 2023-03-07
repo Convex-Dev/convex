@@ -216,7 +216,7 @@ public class EtchStore extends AStore {
 
 	@Override
 	public String toString() {
-		return "EtchStore at: " + etch.getFile().getName();
+		return "EtchStore at: " + getFileName();
 	}
 
 	/**
@@ -225,7 +225,7 @@ public class EtchStore extends AStore {
 	 * @return File name as a String
 	 */
 	public String getFileName() {
-		return etch.getFile().toString();
+		return etch.getFileName();
 	}
 
 	public void close() {

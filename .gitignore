@@ -8,9 +8,9 @@ target/
 /checkouts/
 .nrepl-port
 .cpcache/
-/.project
-/.classpath
-/.settings/
+**/.project
+**/.classpath
+**/.settings/
 /.apt_generated/
 /myrecording.jfr
 /.apt_generated_tests/
