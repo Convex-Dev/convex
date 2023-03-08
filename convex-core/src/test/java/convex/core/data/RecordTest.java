@@ -14,6 +14,8 @@ import convex.core.lang.TestState;
 import convex.core.lang.impl.RecordFormat;
 
 public class RecordTest {
+	
+	// TODO: add all other record types
 
 	@Test
 	public void testBelief() {

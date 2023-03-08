@@ -157,11 +157,14 @@ public class RefTest {
 	public void testPersistEmbeddedLong() {
 		ACell val=RT.cvm(10001L);
 		Ref<ACell> nr = Ref.get(val);
-		assertSame(nr.getValue(), nr.persist().getValue());
+		Ref<ACell> nrp = nr.persist();
+		
+		assertSame(nr.getValue(), nrp.getValue());
 		assertTrue(nr.isEmbedded());
 		
 		RefTreeStats rs=Refs.getRefTreeStats(nr);
 		assertEquals(1,rs.embedded);
+		assertEquals(0,rs.persisted);// original ref
 		// assertEquals(1,rs.persisted); TODO: why this fail?
 	}
 	
