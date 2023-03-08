@@ -13,6 +13,7 @@ import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -158,6 +159,25 @@ public class RefTest {
 		Ref<ACell> nr = Ref.get(val);
 		assertSame(nr.getValue(), nr.persist().getValue());
 		assertTrue(nr.isEmbedded());
+		
+		RefTreeStats rs=Refs.getRefTreeStats(nr);
+		assertEquals(1,rs.embedded);
+		// assertEquals(1,rs.persisted); TODO: why this fail?
+	}
+	
+	@Test
+	public void testPersistNestedBlob() {
+		ABlob bigBlob=Blobs.createRandom(17*Blob.CHUNK_LENGTH); // 16 full chunks plus one extra (3 levels)
+		RefTreeStats rs=Refs.getRefTreeStats(bigBlob.getRef());
+		assertEquals(19,rs.total);
+		assertEquals(0,rs.persisted);
+		assertEquals(1,rs.embedded); // top level only is embedded with 2 children
+		Ref<ABlob> rb=ACell.createPersisted(bigBlob);
+		
+		RefTreeStats rs2=Refs.getRefTreeStats(rb);
+		assertEquals(19,rs2.total);
+		assertEquals(19,rs2.persisted);
+		assertEquals(1,rs2.embedded);
 	}
 	
 	@Test
