@@ -2074,9 +2074,14 @@ public class Context<T extends ACell> extends AObject {
 		// at the moment only :url is used in the data map
 		for (ACell key: data.keySet()) {
 			if (Keywords.URL.equals((Keyword) key)) {
-				AString url = (AString) data.get(Keywords.URL);
-				PeerStatus updatedPeer=ps.withHostname(url);
-				s=s.withPeer(ak, updatedPeer); // adjust peer
+				ACell url = (ACell)data.get(Keywords.URL);
+				if (url == null || url instanceof AString) {
+					PeerStatus updatedPeer=ps.withHostname((AString)url);
+					s=s.withPeer(ak, updatedPeer); // adjust peer
+				}
+				else {
+					return withArgumentError("URL must be Nil or a String");
+				}
 			}
 			else {
 				return withArityError("invalid key name " + key.toString());
