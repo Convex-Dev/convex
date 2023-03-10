@@ -7,11 +7,16 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Belief;
+import convex.core.Block;
+import convex.core.Constants;
 import convex.core.Result;
+import convex.core.State;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
 import convex.core.lang.TestState;
 import convex.core.lang.impl.RecordFormat;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Transfer;
 
 public class RecordTest {
 	
@@ -24,6 +29,23 @@ public class RecordTest {
 
 		doRecordTests(b);
 
+	}
+	
+	@Test
+	public void testBlock() {
+		Transfer tx1=Transfer.create(InitTest.HERO, 0, InitTest.VILLAIN, 1000);
+		Transfer tx2=Transfer.create(InitTest.VILLAIN, 0, InitTest.HERO, 2000);
+		SignedData<ATransaction> stx1=InitTest.HERO_KEYPAIR.signData(tx1);
+		SignedData<ATransaction> stx2=InitTest.VILLAIN_KEYPAIR.signData(tx2);
+		Block b=Block.create(Constants.INITIAL_TIMESTAMP+17, Vectors.of(stx1,stx2));
+		
+		doRecordTests(b);
+	}
+	
+	@Test
+	public void testState() {
+		State s = InitTest.STATE;
+		doRecordTests(s);
 	}
 
 	public static void doRecordTests(ARecord r) {
