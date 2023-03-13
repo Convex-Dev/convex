@@ -2928,6 +2928,8 @@ public class CoreTest extends ACVMTest {
 			assertEquals(newHostname,ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
         }
 
+		assertArgumentError(step(ctx, "(set-peer-data peer-key {:url :fail})"));
+
 		// Try to hijack with an account that isn't the first Peer
 		ctx=ctx.forkWithAddress(HERO.offset(2));
 		{
