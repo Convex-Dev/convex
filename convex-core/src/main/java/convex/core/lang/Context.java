@@ -2071,12 +2071,13 @@ public class Context<T extends ACell> extends AObject {
 		if (!ps.getController().equals(address)) return withError(ErrorCodes.STATE,"Current address "+address+" is not the controller of this peer account");
 
 		Hash lastStateHash = s.getHash();
+		// TODO: should use complete Map
 		// at the moment only :url is used in the data map
 		for (ACell key: data.keySet()) {
 			if (Keywords.URL.equals((Keyword) key)) {
 				ACell url = (ACell)data.get(Keywords.URL);
 				if (url == null || url instanceof AString) {
-					PeerStatus updatedPeer=ps.withHostname((AString)url);
+					PeerStatus updatedPeer=ps.withPeerData((AString)url);
 					s=s.withPeer(ak, updatedPeer); // adjust peer
 				}
 				else {

@@ -197,7 +197,7 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata);
 	}
 
-	public PeerStatus withHostname(AString newHostname) {
+	public PeerStatus withPeerData(AString newHostname) {
 		AHashMap<Keyword,ACell> newMeta=metadata;
 		if (newMeta==null) {
 			newMeta=Maps.create(Keywords.URL, newHostname);
