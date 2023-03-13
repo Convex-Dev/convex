@@ -35,9 +35,8 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		long n=count();
-		if (!sb.check(limit-n)) return false;
+		if (!sb.check(limit-n-2)) return false;
 		sb.append('"');
-		
 		printEscaped(sb,0,n);
 		sb.append('"');
 		return sb.check(limit);

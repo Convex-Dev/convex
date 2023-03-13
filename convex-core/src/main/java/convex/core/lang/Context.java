@@ -995,7 +995,7 @@ public class Context<T extends ACell> extends AObject {
 			if (v instanceof ErrorValue) {
 				if (fn instanceof CoreFn) {
 					ErrorValue ev=(ErrorValue)v;
-					ev.addTrace("In core function: "+RT.str(fn));
+					ev.addTrace("In core function: "+RT.str(fn)); // TODO: Core.getCoreName() ?
 				}
 			}
 		}

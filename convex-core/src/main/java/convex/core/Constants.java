@@ -4,8 +4,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Format;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 
@@ -215,4 +217,6 @@ public class Constants {
 	 * Default print limit
 	 */
 	public static final long PRINT_LIMIT = 10000;
+
+	public static final AString PRINT_EXCEEDED_MESSAGE = Strings.create("<<Print limit exceeded>>");
 }

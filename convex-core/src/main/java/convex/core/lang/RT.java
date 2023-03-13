@@ -925,7 +925,7 @@ public class RT {
 	 * @param bb BlobBuilder instance
 	 * @param a Cell to print (may be nil)
 	 * @param limit Limit of printing
-	 * @return True if within limit, false if exceeded
+	 * @return True if within limit, false if exceeded (output may still be partially written to BlobBuilder)
 	 */
 	public static boolean print(BlobBuilder bb, ACell a, long limit) {
 		if (a==null) {
@@ -938,20 +938,23 @@ public class RT {
 	
 	/**
 	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes
+	 * WARNING: May return null
 	 * @param a Cell to print (may be nil)
 	 * @param limit Limit of printing in bytes
 	 * @return Printed String, or null if limit exceeded
 	 */
 	public static AString print(ACell a, long limit) {
-		if (a==null) return Strings.NIL;
+		if (a==null) {
+			return (limit>=3)?Strings.NIL:null;
+		}
 		BlobBuilder bb=new BlobBuilder();
 		if (!print(bb,a,limit)) return null;
 		return bb.getCVMString();
 	}
 	
 	/**
-	 * Prints a value with a reasonable print limit.
-	 * WARNING: May return null, not for use in CVM code
+	 * Prints a value to a String as long as the result fits within a given print limit.
+	 * WARNING: May return null
 	 * @param a Cell value to print
 	 * @return Printed String, or null if print limit exceeded
 	 */

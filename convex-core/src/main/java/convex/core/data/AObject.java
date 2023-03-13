@@ -11,10 +11,10 @@ public abstract class AObject {
 	/**
 	 * Prints this Object to a readable String Representation. 
 	 * 
-	 * SECURITY: Must halt and return false in O(1) time if limit of printing is exceeded otherwise
+	 * SECURITY: Must halt and return false in O(1) time when limit of printing is exceeded otherwise
 	 * DoS attacks may be possible.
 	 * 
-	 * @param sb BlobBuilder to append to
+	 * @param sb BlobBuilder to append to. May be partially written if print limit exceeded
 	 * @param limit Limit of printing in string bytes
 	 * @return True if fully printed within limit, false otherwise
 	 */
@@ -41,11 +41,11 @@ public abstract class AObject {
 	 */
 	public final AString print(long limit) {
 		BlobBuilder bb = new BlobBuilder();
-		print(bb,limit);
-		AString s=bb.getCVMString();
-		if (!bb.check(limit)) {
-			s=s.append("<<Print limit exceeded>>");
+		boolean printed = print(bb,limit);
+		if (!printed) {
+			bb.append(Constants.PRINT_EXCEEDED_MESSAGE);
 		}
+		AString s=bb.getCVMString();
 		return s;
 	}
 	

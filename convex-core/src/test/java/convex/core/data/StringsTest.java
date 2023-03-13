@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
 import convex.core.data.prim.CVMChar;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
@@ -142,7 +143,16 @@ public class StringsTest {
 	@Test public void testRTPrint() {
 		AString s=Strings.create("\n");
 		assertEquals("\"\\n\"",RT.print(s, 100).toString());
+		
+		assertEquals(Strings.NIL,RT.print(null,3));
+		assertEquals(null,RT.print(null,1));
 	}
+	
+	@Test public void testPrintExceeded() {
+		AString s=Strings.create("foobar");
+		assertEquals(Constants.PRINT_EXCEEDED_MESSAGE,s.print(1));
+	}
+
 	
 	@Test public void testIntAt() {
 		AString s= Strings.create(Blob.fromHex("12345678abcd"));
