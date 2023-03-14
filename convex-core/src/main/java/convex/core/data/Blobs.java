@@ -91,7 +91,7 @@ public class Blobs {
 	/**
 	 * Reads a Blob from an Encoding in a ByteBuffer.
 	 * 
-	 * @param bb ByteBuffer starting with a blob encoding
+	 * @param bb ByteBuffer starting with a blob encoding, assumes tag already read
 	 * @return Blob read from ByteBuffer
 	 * @throws BadFormatException If format is invalid
 	 */
@@ -109,12 +109,12 @@ public class Blobs {
 	 * Reads a canonical Blob from a byte source
 	 * @param <T> Type of Blob result
 	 * @param source Source blob, containing tag
-	 * @param pos position to read from source
+	 * @param pos position to read from source, assumed to be tag
 	 * @return Canonical Blob
 	 * @throws BadFormatException if the Blob encoding format is invalid
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ABlob> T readFromBlob(Blob source, int pos) throws BadFormatException {
+	public static <T extends ABlob> T read(Blob source, int pos) throws BadFormatException {
 		int sLen = source.length-pos;
 		if (sLen < 2) throw new BadFormatException("Trying to read Blob from insufficient source of size " + sLen);
 		// read length at position 1 (skipping tag)
@@ -123,7 +123,7 @@ public class Blobs {
 		T result = null;
 		if (count < 0L) throw new BadFormatException("Negative blob length?");
 		if (count > Blob.CHUNK_LENGTH) {
-			result = (T) BlobTree.read(source,pos, count);
+			result = (T) BlobTree.read(count,source, pos);
 		} else {
 			result = (T) Blob.read(source,pos, count);
 		}

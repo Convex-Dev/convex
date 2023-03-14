@@ -388,13 +388,13 @@ public class BlobTree extends ABlob {
 
 	/**
 	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
+	 * @param count Length to read
 	 * @param src Source data, assumed to include tag and count at start
 	 * @param pos Position to read from, assumed to be tag byte
-	 * @param count Length to read
 	 * @return BlobTree instance.
 	 * @throws BadFormatException If BlobTree encoding is invalid
 	 */
-	public static BlobTree read(Blob src, int pos, long count) throws BadFormatException {
+	public static BlobTree read(long count, Blob src, int pos) throws BadFormatException {
 		int headerLength = (1 + Format.getVLCLength(count));
 		long chunks = calcChunks(count);
 		int shift = calcShift(chunks);

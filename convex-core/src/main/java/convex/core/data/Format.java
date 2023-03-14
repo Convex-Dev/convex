@@ -632,7 +632,7 @@ public class Format {
 	
 
 	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
-		if (tag == Tag.BLOB) return Blobs.readFromBlob(blob,offset);
+		if (tag == Tag.BLOB) return Blobs.read(blob,offset);
 		if (tag == Tag.STRING) return Strings.read(blob,offset);
 		if (tag == Tag.SYMBOL) return Symbol.read(blob,offset);
 		if (tag == Tag.KEYWORD) return Keyword.read(blob,offset);

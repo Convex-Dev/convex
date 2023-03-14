@@ -62,7 +62,7 @@ public class StringTree extends AString {
 	}
 	
 	public static StringTree read(long length, Blob b, int pos) throws BadFormatException {
-		BlobTree bt=BlobTree.read(b,pos,length);
+		BlobTree bt=BlobTree.read(length,b,pos);
 		StringTree result= new StringTree(bt);
 		result.attachEncoding(bt.getEncoding());
 		bt.attachEncoding(null); // invalidate this, since assumed tag will be wrong
