@@ -140,7 +140,7 @@ public class Symbol extends ASymbolic implements Comparable<Symbol> {
 		AString name=Format.readUTF8String(blob,offset+2,len);
 		Symbol sym = Symbol.create(name);
 		if (sym == null) throw new BadFormatException("Can't read symbol");
-		sym.attachEncoding(blob.slice(offset, len+2));
+		sym.attachEncoding(blob.slice(offset, offset+2+len));
 		return sym;
 	}
 

@@ -242,9 +242,10 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	@Override
 	public abstract <R extends ACell> AVector<R> assoc(long i, R value);
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public AVector<T> empty() {
-		return Vectors.empty();
+		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 	
 	@Override

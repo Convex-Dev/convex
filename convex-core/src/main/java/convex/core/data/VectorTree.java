@@ -202,15 +202,15 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	 * Assumes the header byte and count is already read.
 	 * 
 	 * @param bb ByteBuffer to read from
-	 * @param count Number of elements
+	 * @param count Number of elements, assumed to be valid
 	 * @return TreeVector instance as read from ByteBuffer
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorTree<T> read(ByteBuffer bb, long count)
 			throws BadFormatException {
-		if (count < 0) throw new BadFormatException("Negative count?");
 		int n = computeArraySize(count);
+		
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			Ref<AVector<T>> ref = Format.readRef(bb);
@@ -218,6 +218,24 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		}
 
 		return new VectorTree<T>(items, count);
+	}
+	
+
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {
+		int n = computeArraySize(count);
+		
+		int rpos=pos+1+Format.getVLCLength(count);
+		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
+		for (int i = 0; i < n; i++) {
+			Ref<AVector<T>> ref = Format.readRef(b,rpos);
+			items[i] = ref;
+			rpos+=ref.getEncodingLength();
+		}
+
+		VectorTree<T> result= new VectorTree<T>(items, count);
+		result.attachEncoding(b.slice(pos, rpos));
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -750,5 +768,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	public ACell toCanonical() {
 		return this;
 	}
+
 
 }

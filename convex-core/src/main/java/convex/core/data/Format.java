@@ -466,6 +466,22 @@ public class Format {
 		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
 		return Ref.get(cell);
 	}
+	
+	private static <T extends ACell> ADataStructure<T> readDataStructure(byte tag, Blob b, int pos) throws BadFormatException {
+		if (tag == Tag.VECTOR) return Vectors.read(b,pos);
+
+		// if (tag == Tag.MAP) return Maps.read(b,pos);
+
+		// if (tag == Tag.SYNTAX) return Syntax.read(b,pos);
+		
+		//if (tag == Tag.SET) return Sets.read(b,pos);
+
+		//if (tag == Tag.LIST) return List.read(b,pos);
+
+		//if (tag == Tag.BLOBMAP) return BlobMap.read(b,pos);
+
+		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
+	}
 
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readDataStructure(ByteBuffer bb, byte tag) throws BadFormatException {
@@ -550,17 +566,18 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (tag == Tag.NULL) {
-			long len=blob.count();
-			if (len!=1) throw new BadFormatException("Bad null encoding with length"+len);
-			return null;
-		}
+		if (tag == Tag.NULL) return null;
 		
+		try {
 		int high=(tag & 0xF0);
 		if (high == 0x00) return (T) readNumeric(tag,blob,offset);
 		if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
-
 		
+		if (tag == Tag.VECTOR) return (T) Vectors.read(blob,offset);
+		} catch (IndexOutOfBoundsException e) {
+			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
+		}
+
 		// Fallback to read via ByteBuffer
 		// TODO: maybe refactor to avoid read from byte buffers?
 		ByteBuffer bb = blob.getByteBuffer().position(offset+1);

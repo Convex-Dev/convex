@@ -95,7 +95,7 @@ public class Vectors {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> empty() {
-		return (AVector<T>) VectorLeaf.EMPTY;
+		return (VectorLeaf<T>) VectorLeaf.EMPTY;
 	}
 
 	/**
@@ -135,10 +135,21 @@ public class Vectors {
 	 */
 	public static <T extends ACell> AVector<T> read(ByteBuffer bb) throws BadFormatException {
 		long count = Format.readVLCLong(bb);
-		if ((count <= VectorLeaf.MAX_SIZE) || ((count & 0x0F) != 0)) {
+		if (count < 0) throw new BadFormatException("Negative length");
+		if (VectorLeaf.isValidCount(count)) {
 			return VectorLeaf.read(bb, count);
 		} else {
 			return VectorTree.read(bb, count);
+		}
+	}
+
+	public static <T extends ACell> AVector<T> read(Blob b, int pos) throws BadFormatException {
+		long count = Format.readVLCLong(b,pos+1);
+		if (count < 0) throw new BadFormatException("Negative length");
+		if (VectorLeaf.isValidCount(count)) {
+			return VectorLeaf.read(count,b,pos);
+		} else {
+			return VectorTree.read(count,b,pos);
 		}
 	}
 

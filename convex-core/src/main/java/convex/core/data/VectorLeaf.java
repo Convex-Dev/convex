@@ -235,13 +235,12 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	 * Assumes the header byte and count is already read.
 	 * 
 	 * @param bb ByteBuffer to read from
-	 * @param count Number of elements
+	 * @param count Number of elements, assumed to be valid
 	 * @return VectorLeaf read from ByteBuffer
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorLeaf<T> read(ByteBuffer bb, long count) throws BadFormatException {
-		if (count < 0) throw new BadFormatException("Negative length");
 		if (count == 0) return (VectorLeaf<T>) EMPTY;
 		boolean prefixPresent = count > MAX_SIZE;
 
@@ -264,6 +263,37 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 		return new VectorLeaf<T>(items, tail, count);
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> VectorLeaf<T> read(long count, Blob b, int pos) throws BadFormatException {
+		if (count == 0) return (VectorLeaf<T>)EMPTY;
+		boolean prefixPresent = count > MAX_SIZE;
+		
+		int n = ((int) count) & 0xF;
+		if (n == 0) {
+			if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
+			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
+		}
+		
+		int rpos=pos+1+Format.getVLCLength(count);
+		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
+		for (int i = 0; i < n; i++) {
+			Ref<T> ref = Format.readRef(b,rpos);
+			items[i] = ref;
+			rpos+=ref.getEncodingLength();
+		}
+		
+		Ref<AVector<T>> tail = null;
+		if (prefixPresent) {
+			tail=Format.readRef(b,rpos);
+			rpos+=tail.getEncodingLength();
+		}
+
+		VectorLeaf<T> result=new VectorLeaf<T>(items, tail, count);
+		result.attachEncoding(b.slice(pos, rpos));
+		return result;
+	}
+
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -758,5 +788,16 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public ACell toCanonical() {
 		return this;
 	}
+
+	/**
+	 * Tests if a given count should result in a VectorLeaf
+	 * @param count Count of elements in vector
+	 * @return true if vector should be a VectorLeaf, false otherwise
+	 */
+	public static final boolean isValidCount(long count) {
+		// Vector is a VectorLeaf if it is less than or equal to the max size, or has a non-empty tail
+		return (count <= VectorLeaf.MAX_SIZE) || ((count & 0x0F) != 0);
+	}
+
 
 }

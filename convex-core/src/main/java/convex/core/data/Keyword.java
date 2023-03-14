@@ -123,7 +123,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		AString name=Format.readUTF8String(blob,offset+2,len);
 		Keyword kw = Keyword.create(name);
 		if (kw == null) throw new BadFormatException("Can't read keyword");
-		kw.attachEncoding(blob.slice(offset, len+2));
+		kw.attachEncoding(blob.slice(offset, offset+2+len));
 		return kw;
 	}
 	
