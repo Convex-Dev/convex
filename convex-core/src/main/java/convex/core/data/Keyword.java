@@ -118,6 +118,15 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return kw;
 	}
 	
+	public static Keyword read(Blob blob, int offset) throws BadFormatException {
+		int len=0xff&blob.byteAt(offset+1); // skip tag
+		AString name=Format.readUTF8String(blob,offset+2,len);
+		Keyword kw = Keyword.create(name);
+		if (kw == null) throw new BadFormatException("Can't read keyword");
+		kw.attachEncoding(blob.slice(offset, len+2));
+		return kw;
+	}
+	
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.KEYWORD;

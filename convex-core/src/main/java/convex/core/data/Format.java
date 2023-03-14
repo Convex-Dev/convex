@@ -187,6 +187,11 @@ public class Format {
 	public static long vlcSignExtend(byte b) {
 		return (((long) b) << 57) >> 57;
 	}
+	
+	public static long readVLCLong(AArrayBlob blob, int pos) throws BadFormatException {
+		byte[] data=blob.getInternalArray();
+		return readVLCLong(data,pos+blob.getInternalOffset());
+	}
 
 	/**
 	 * Reads a VLC encoded long as a long from the given location in a byte byte
@@ -376,6 +381,25 @@ public class Format {
 			throw new BadFormatException("Buffer underflow", e);
 		}
 	}
+	
+	/**
+	 * Reads UTF-8 String data from a Blob. Assumes any tag has already been read
+	 * @param blob Blob data to read from
+	 * @param pos Position of first UTF-8 byte
+	 * @param len Number of UTF-8 bytes to read
+	 * @return String from ByteBuffer
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public static AString readUTF8String(Blob blob, int pos, int len) throws BadFormatException {
+		if (len == 0) return Strings.empty();
+		if (blob.count()<pos+len) throw new BadFormatException("Insufficient bytes in blob to read UTF-8 bytes");
+
+		byte[] bs = new byte[len];
+		System.arraycopy(blob.getInternalArray(), blob.getInternalOffset()+pos, bs, 0, len);
+
+		AString s = Strings.create(Blob.wrap(bs));
+		return s;
+	}
 
 	public static ByteBuffer writeLength(ByteBuffer bb, int i) {
 		bb = writeVLCLong(bb, i);
@@ -513,10 +537,8 @@ public class Format {
 		
 		int high=(tag & 0xF0);
 		if (high == 0x00) return (T) readNumeric(tag,blob,offset);
+		if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 
-		if (tag == Tag.BLOB) {
-			return (T) Blobs.readFromBlob(blob,offset);
-		} 
 		
 		// Fallback to read via ByteBuffer
 		// TODO: maybe refactor to avoid read from byte buffers?
@@ -535,6 +557,7 @@ public class Format {
 
 		return result;
 	}
+
 
 	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
 		// TODO Auto-generated method stub
@@ -577,13 +600,30 @@ public class Format {
 			if ((tag&Tag.CHAR)==Tag.CHAR) {
 				int len=CVMChar.utfByteCountFromTag(tag);
 				if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
-				return (T) CVMChar.read(len, bb);
+				return (T) CVMChar.read(len, bb); // note tag byte already read
 			}
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 		} catch (IllegalArgumentException e) {
 			throw new BadFormatException("Illegal format error basic type with tag byte: " + tag);
 		}
+	}
+	
+
+	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
+		if (tag == Tag.BLOB) return Blobs.readFromBlob(blob,offset);
+		if (tag == Tag.STRING) return Strings.read(blob,offset);
+		if (tag == Tag.SYMBOL) return Symbol.read(blob,offset);
+		if (tag == Tag.KEYWORD) return Keyword.read(blob,offset);
+		
+		if ((tag&Tag.CHAR)==Tag.CHAR) {
+			int len=CVMChar.utfByteCountFromTag(tag);
+			if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
+			return CVMChar.read(len, blob,offset); // skip tag byte
+		}
+
+		// TODO Auto-generated method stub
+		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 	}
 
 	/**

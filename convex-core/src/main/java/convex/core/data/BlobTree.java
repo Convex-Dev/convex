@@ -389,6 +389,7 @@ public class BlobTree extends ABlob {
 	/**
 	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
 	 * @param src Source data, assumed to include tag and count at start
+	 * @param pos Position to read from, assumed to be tag byte
 	 * @param count Length to read
 	 * @return BlobTree instance.
 	 * @throws BadFormatException If BlobTree encoding is invalid
@@ -402,6 +403,7 @@ public class BlobTree extends ABlob {
 		@SuppressWarnings("unchecked")
 		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
 		
+		// TODO: needs to become byte[] reads
 		ByteBuffer bb=src.getByteBuffer();
 		bb.position(headerLength+pos);
 		for (int i = 0; i < numChildren; i++) {
@@ -667,5 +669,6 @@ public class BlobTree extends ABlob {
 	public static int childCount(long length) {
 		return Utils.checkedInt(1+(length-1)/childSize(length));
 	}
+
 
 }

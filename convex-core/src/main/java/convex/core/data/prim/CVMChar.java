@@ -164,6 +164,41 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		if (result==null) throw new BadFormatException("CVMChar out of Unicode range");
 		return result;
 	}
+	
+	/**
+	 * Reads char data from Blob
+	 * @param len Length in UTF-8 bytes
+	 * @param blob Blob to read from
+	 * @param pos Position of tag
+	 * @return CVMChar instance
+	 * @throws BadFormatException if any format error
+	 */
+	public static CVMChar read(int len, Blob blob, int pos) throws BadFormatException {
+		CVMChar result=readRaw(len,blob,pos+1); // read 
+		result.attachEncoding(blob.slice(pos, pos+1+len));
+		return result;
+	}
+	
+	/**
+	 * Reads raw char data from Blob
+	 * @param len Length in UTF=8 bytes
+	 * @param blob Blob to read from
+	 * @param pos Position of first UTF-9 byte
+	 * @return CVMChar instance
+	 * @throws BadFormatException if any format error
+	 */
+	private static CVMChar readRaw(int len, Blob blob, int pos) throws BadFormatException {
+		int value=0xff000000; // High byte should be shifted away, here to catch errors
+		for (int i=0; i<len;i++) {
+			if (value==0) throw new BadFormatException("Leading zero in CVMChar encoding");
+			byte b=blob.byteAt(pos+i);
+			value=(value<<8)+(b&0xFF);
+		}
+		CVMChar result=create(value);
+		if (result==null) throw new BadFormatException("CVMChar out of Unicode range");
+		return result;
+	}
+
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -321,6 +356,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public int compareTo(CVMChar o) {
 		return Integer.compare(value, o.value);
 	}
+
 
 
 

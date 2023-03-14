@@ -34,9 +34,9 @@ public abstract class ASymbolic extends ACell {
 	}
 	
 	@Override
-	public int estimatedEncodingSize() {
-		// name length plus a bit for extra
-		return (int)(3+name.count());
+	public final int estimatedEncodingSize() {
+		// name length plus tag and 1 byte for count
+		return (int)(2+name.count());
 	}
 	
 	/**

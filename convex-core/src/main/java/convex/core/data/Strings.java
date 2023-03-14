@@ -52,6 +52,17 @@ public class Strings {
 		}
 		return StringTree.read(length,bb);
 	}
+	
+	public static ACell read(Blob blob, int offset) throws BadFormatException {
+		long length=Format.readVLCLong(blob,offset+1);
+		if (length<0) throw new BadFormatException("Negative string length!");
+		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
+		if (length<=StringShort.MAX_LENGTH) {
+			return StringShort.read(length,blob,offset);
+		}
+		return StringTree.read(length,blob,offset);
+	}
+
 
 	/**
 	 * Create a canonical CVM String from a regular Java String

@@ -153,6 +153,16 @@ public class StringShort extends AString {
 		bb.get(data);
 		return new StringShort(data);
 	}
+	
+	public static ACell read(long length, Blob blob, int pos) {
+		int len=Utils.checkedInt(length);
+		int dataOffset=pos+1+Format.getVLCLength(length);
+		byte[] data = new byte[len];
+		System.arraycopy(blob.getInternalArray(), blob.getInternalOffset()+dataOffset, data, 0, len);
+		StringShort result= new StringShort(data);
+		result.attachEncoding(blob.slice(pos,dataOffset+len));
+		return result;
+	}
 
 	@Override
 	public Blob toBlob() {
@@ -206,6 +216,7 @@ public class StringShort extends AString {
 		}
 		return;
 	}
+
 
 
 }

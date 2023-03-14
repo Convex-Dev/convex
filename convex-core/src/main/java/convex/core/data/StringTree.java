@@ -60,6 +60,15 @@ public class StringTree extends AString {
 		BlobTree bt=BlobTree.read(bb,length);
 		return new StringTree(bt);
 	}
+	
+	public static StringTree read(long length, Blob b, int pos) throws BadFormatException {
+		BlobTree bt=BlobTree.read(b,pos,length);
+		StringTree result= new StringTree(bt);
+		result.attachEncoding(bt.getEncoding());
+		bt.attachEncoding(null); // invalidate this, since assumed tag will be wrong
+		return result;
+	}
+
 
 	@Override
 	public int estimatedEncodingSize() {

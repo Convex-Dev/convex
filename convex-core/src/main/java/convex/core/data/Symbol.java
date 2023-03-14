@@ -134,6 +134,15 @@ public class Symbol extends ASymbolic implements Comparable<Symbol> {
 		if (sym == null) throw new BadFormatException("Can't read symbol");
 		return sym;
 	}
+	
+	public static ACell read(Blob blob, int offset) throws BadFormatException {
+		int len=0xff&blob.byteAt(offset+1); // skip tag
+		AString name=Format.readUTF8String(blob,offset+2,len);
+		Symbol sym = Symbol.create(name);
+		if (sym == null) throw new BadFormatException("Can't read symbol");
+		sym.attachEncoding(blob.slice(offset, len+2));
+		return sym;
+	}
 
 	@Override
 	public boolean isCanonical() {
@@ -171,4 +180,6 @@ public class Symbol extends ASymbolic implements Comparable<Symbol> {
 	public AString toCVMString(long limit) {
 		return name;
 	}
+
+
 }
