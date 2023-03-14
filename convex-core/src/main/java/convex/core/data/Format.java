@@ -573,8 +573,7 @@ public class Format {
 		try {
 			int high=(tag & 0xF0);
 			if (high == 0x00) return (T) readNumeric(tag,blob,offset);
-			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
-			
+			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);	
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
 			if ((tag & 0xF0) == 0x80) {
