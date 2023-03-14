@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Constants;
+import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.prim.CVMLong;
@@ -41,7 +42,12 @@ public class RecordTest {
 		
 		doRecordTests(b);
 	}
-	
+
+	@Test
+	public void testOrder() {
+		doRecordTests(Order.create());
+	}
+
 	@Test
 	public void testState() {
 		State s = InitTest.STATE;
