@@ -720,7 +720,7 @@ public class Server implements Closeable {
 	protected boolean maybePublishBlock() {
 		long timestamp=Utils.getCurrentTimestamp();
 		// skip if recently published a block
-		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>timestamp) return false;
+		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
 
 		Block block=null;
 		int n = newTransactions.size();

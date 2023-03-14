@@ -313,7 +313,7 @@ public class Etch {
 		return write(key,0,value,INDEX_START);
 	}
 
-	private Ref<ACell> write(AArrayBlob key, int keyOffset, Ref<ACell> value, long indexPosition) throws IOException {
+	private Ref<ACell> write(AArrayBlob key, int keyOffset, Ref<ACell> ref, long indexPosition) throws IOException {
 		if (keyOffset>=KEY_SIZE) {
 			throw new Error("Offset exceeded for key: "+key);
 		}
@@ -324,19 +324,19 @@ public class Etch {
 
 		if (slotValue==0L) {
 			// empty location, so simply write new value
-			return writeNewData(indexPosition,digit,key,value,PTR_PLAIN);
+			return writeNewData(indexPosition,digit,key,ref,PTR_PLAIN);
 
 		} else if (type==PTR_INDEX) {
 			// recursively check next level of index
 			long newIndexPosition=slotPointer(slotValue); // clear high bits
-			return write(key,keyOffset+1,value,newIndexPosition);
+			return write(key,keyOffset+1,ref,newIndexPosition);
 
 		} else if (type==PTR_PLAIN) {
 			// existing data pointer (non-zero)
 			// check if we have the same value first, otherwise need to resolve conflict
 			// This should have the current (potential collision) key in tempArray
 			if (checkMatchingKey(key,slotValue)) {
-				return updateInPlace(slotValue,value);
+				return updateInPlace(slotValue,ref);
 			}
 			byte[] temp=tempArray.get();
 
@@ -350,10 +350,10 @@ public class Etch {
 				writeSlot(indexPosition,digit,slotValue|PTR_START);
 
 				// write new data pointer to next slot
-				long newDataPointer=appendData(key,value);
+				long newDataPointer=appendData(key,ref);
 				writeSlot(indexPosition,nextDigit,newDataPointer|PTR_CHAIN);
 
-				return value;
+				return ref;
 			}
 
 			if (keyOffset>=KEY_SIZE-1) {
@@ -368,11 +368,11 @@ public class Etch {
 			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
 
 			// recursively write this key
-			return write(key,keyOffset+1,value,newIndexPosition);
+			return write(key,keyOffset+1,ref,newIndexPosition);
 		} else if (type==PTR_START) {
 			// first check if the start pointer is the right value. if so, bail out with nothing to do
 			if (checkMatchingKey(key, slotValue)) {
-				return updateInPlace(slotValue,value);
+				return updateInPlace(slotValue,ref);
 			}
 
 			// now scan slots, looking for either the right value or an empty space
@@ -382,7 +382,7 @@ public class Etch {
 
 				// if we reach an empty location simply write new value as a chain continuation (PTR_CHAIN)
 				if (slotValue==0L) {
-					return writeNewData(indexPosition,digit+i,key,value,PTR_CHAIN);
+					return writeNewData(indexPosition,digit+i,key,ref,PTR_CHAIN);
 				}
 
 				// if we are not in a chain, we have reached the maximum chain length. Exit loop and compress.
@@ -390,7 +390,7 @@ public class Etch {
 
 				// if we found the key itself, return since already stored.
 				if (checkMatchingKey(key, slotValue)) {
-					return updateInPlace(slotValue,value);
+					return updateInPlace(slotValue,ref);
 				}
 
 				i++;
@@ -400,7 +400,7 @@ public class Etch {
 			// System.out.println("Compressing chain, offset="+keyOffset+" chain length="+i+" with key "+key+ " indexDat= "+readBlob(indexPosition,2048));
 
 			// first we build a new index block, containing our new data
-			long newDataPointer=appendData(key,value);
+			long newDataPointer=appendData(key,ref);
 			long newIndexPos=appendLeafIndex(key.byteAt(keyOffset+1),newDataPointer);
 
 			// for each element in chain, move existing data to new index block. i is the length of chain
@@ -414,7 +414,7 @@ public class Etch {
 
 			// finally update this index with the new index pointer
 			writeSlot(indexPosition,digit,newIndexPos|PTR_INDEX);
-			return value;
+			return ref;
 		} else if (type==PTR_CHAIN) {
 			// need to collapse existing chain
 			int chainStartDigit=seekChainStart(indexPosition,digit);
@@ -434,7 +434,7 @@ public class Etch {
 			writeSlot(indexPosition,chainStartDigit,newIndexPos|PTR_INDEX);
 
 			// write to the current slot
-			return writeNewData(indexPosition,digit,key,value,PTR_PLAIN);
+			return writeNewData(indexPosition,digit,key,ref,PTR_PLAIN);
 		} else {
 			throw new Error("Unexpected type: "+type);
 		}
@@ -865,14 +865,14 @@ public class Etch {
 	 * @return The position of the new data block
 	 * @throws IOException
 	 */
-	private long appendData(AArrayBlob key,Ref<ACell> value) throws IOException {
+	private long appendData(AArrayBlob key,Ref<ACell> ref) throws IOException {
 		assert(key.count()==KEY_SIZE);
 
 		// Get relevant values for writing
 		// probably need to call these first, might move mbb position?
-		ACell cell=value.getValue();
+		ACell cell=ref.getValue();
 		Blob encoding=cell.getEncoding();
-		int status=value.getStatus();
+		int status=ref.getStatus();
 
 		long memorySize=0L;
 		if (status>=Ref.PERSISTED) {
@@ -887,7 +887,7 @@ public class Etch {
 		mbb.put(key.getInternalArray(),key.getInternalOffset(),KEY_SIZE);
 
 		// append flags (1 byte)
-		int flags=value.flagsWithStatus(Math.max(value.getStatus(),Ref.STORED));
+		int flags=ref.flagsWithStatus(Math.max(ref.getStatus(),Ref.STORED));
 		mbb.put((byte)(flags)); // currently all flags fit in one byte
 
 		// append Memory Size (8 bytes). Initialised to 0L if STORED only.

@@ -65,6 +65,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 
 	@Override
 	public RefSoft<T> withFlags(int newFlags) {
+		if (flags==newFlags) return this;
 		return new RefSoft<T>(store,softRef,hash,newFlags);
 	}
 

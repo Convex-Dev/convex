@@ -12,6 +12,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 
@@ -151,9 +152,15 @@ public class EtchStore extends AStore {
 			if (!topLevel) return ref;
 		}
 
-		final ACell cell = ref.getValue();
+		ACell cell = ref.getValue();
+		
 		// Quick handling for null
 		if (cell == null) return (Ref<T>) Ref.NULL_VALUE;
+		
+		if (cell.equals(Symbols.TORUS)) {
+			System.out.println("Persisting Torus");
+		}
+
 
 		// check store for existing ref first.
 		boolean embedded = cell.isEmbedded();
@@ -165,8 +172,6 @@ public class EtchStore extends AStore {
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
-					// TODO: is updating in place dangerous here?
-					cell.attachRef(existing);
 					return existing;
 				}
 			}
@@ -183,7 +188,11 @@ public class EtchStore extends AStore {
 			ACell newObject = cell.updateRefs(func);
 
 			// perhaps need to update Ref
-			if (cell != newObject) ref = ref.withValue((T) newObject);
+			if (cell != newObject) {
+				ref = ref.withValue((T) newObject);
+				cell=newObject;
+				cell.attachRef(ref); // make sure we are using current ref within cell
+			}
 		}
 
 		if (topLevel || !embedded) {
@@ -198,6 +207,7 @@ public class EtchStore extends AStore {
 			try {
 				// ensure status is set when we write to store
 				ref = ref.withMinimumStatus(requiredStatus);
+				cell.attachRef(ref); // make sure we are using current ref within cell
 				result = etch.write(fHash, (Ref<ACell>) ref);
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
@@ -210,7 +220,9 @@ public class EtchStore extends AStore {
 			return (Ref<T>) result;
 		} else {
 			// no need to write, just tag updated status
-			return ref.withMinimumStatus(requiredStatus);
+			ref= ref.withMinimumStatus(requiredStatus);
+			cell.attachRef(ref);
+			return ref;
 		}
 	}
 

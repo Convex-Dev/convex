@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -310,6 +311,8 @@ public class Symbols {
 	public static final Symbol PRINT = intern("print");
 	public static final Symbol SPLIT = intern("split");
 	public static final Symbol JOIN = intern("join");
+	
+	public static final Symbol TORUS = intern("torus");
 	
 
 	

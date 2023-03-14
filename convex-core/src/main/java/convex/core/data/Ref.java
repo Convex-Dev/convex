@@ -188,12 +188,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Ensures the Ref has the given status, at minimum
+	 * Updates the Ref has the given status, at minimum
 	 * 
 	 * Assumes any necessary changes to storage will be made separately. 
 	 * SECURITY: Dangerous if misused since may invalidate storage assumptions
 	 * @param newStatus New status to apply to Ref
-	 * @return Updated Ref
+	 * @return Updated Ref (may be same Ref is status unchanged)
 	 */
 	public Ref<T> withMinimumStatus(int newStatus) {
 		newStatus&=STATUS_MASK;
@@ -565,7 +565,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * (identical hash), but may have updated internal refs etc.
 	 * 
 	 * @param newValue New value
-	 * @return Updated Ref
+	 * @return Updated Ref. May be identical if value unchanged
 	 */
 	public abstract Ref<T> withValue(T newValue);
 	
