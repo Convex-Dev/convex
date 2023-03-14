@@ -641,20 +641,16 @@ public class Format {
 	 * @return Cell value read
 
 	 * @throws BadFormatException If encoding is invalid
-	 * @throws BufferUnderflowException if the ByteBuffer contains insufficent bytes for Encoding
+	 * @throws BufferUnderflowException if the ByteBuffer contains insufficient bytes for Encoding
 	 */
 	private static ANumeric readNumeric(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
-		try {
-			if (tag == Tag.LONG) return CVMLong.create(readVLCLong(bb));
-			if (tag == Tag.INTEGER) return CVMBigInteger.read(bb);
+		if (tag == Tag.LONG) return CVMLong.create(readVLCLong(bb));
+		if (tag == Tag.INTEGER) return CVMBigInteger.read(bb);
 			
-			// Double is special, we enforce a canonical NaN
-			if (tag == Tag.DOUBLE) return CVMDouble.read(bb.getDouble());
+		// Double is special, we enforce a canonical NaN
+		if (tag == Tag.DOUBLE) return CVMDouble.read(bb.getDouble());
 
-			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
-		} catch (IllegalArgumentException e) {
-			throw new BadFormatException("Format error basic type with tag byte: " + tag);
-		}
+		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 	}
 	
 	@SuppressWarnings("unchecked")

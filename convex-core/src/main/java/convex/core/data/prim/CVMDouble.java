@@ -41,8 +41,13 @@ public final class CVMDouble extends ANumeric {
 		this.value=value;
 	}
 
+	/**
+	 * Creates a CVMDouble. Forces NaN to be canonical instance.
+	 * @param value Double value to wrap
+	 * @return CVMDouble value
+	 */
 	public static CVMDouble create(double value) {
-		// We need to use a canonical NaN value (0x7ff8000000000000L);
+		// We must use a canonical NaN value (0x7ff8000000000000L);
 		if (Double.isNaN(value)) value=Double.NaN;
 		return new CVMDouble(value);
 	}
