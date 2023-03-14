@@ -12,7 +12,6 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
-import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 
@@ -157,11 +156,6 @@ public class EtchStore extends AStore {
 		// Quick handling for null
 		if (cell == null) return (Ref<T>) Ref.NULL_VALUE;
 		
-		if (cell.equals(Symbols.TORUS)) {
-			System.out.println("Persisting Torus");
-		}
-
-
 		// check store for existing ref first.
 		boolean embedded = cell.isEmbedded();
 		Hash hash = null;

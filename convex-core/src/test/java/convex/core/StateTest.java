@@ -72,6 +72,7 @@ public class StateTest {
 		RecordTest.doRecordTests(as);
 	}
 	
+	@SuppressWarnings("unused")
 	@Test public void testStateRefs() {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
 		State s=Init.createState(Lists.of(kp.getAccountKey()));

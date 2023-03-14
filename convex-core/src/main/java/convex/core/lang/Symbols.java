@@ -1,6 +1,5 @@
 package convex.core.lang;
 
-import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
