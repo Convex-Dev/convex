@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import convex.core.Constants;
@@ -203,6 +204,8 @@ public class ObjectsTest {
 		} catch (BadFormatException e) {
 			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
 		}
+		
+		assertThrows(BadFormatException.class,()->Format.read(encoding.append(Samples.SMALL_BLOB).toFlatBlob()));
 	}
 	
 
