@@ -17,7 +17,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.net.message.Message;
 
 /**
- * Class responsible for buffered accumulation of messages received over a connection.
+ * Class responsible for buffered accumulation of data received over a connection.
  *
  * ByteBuffers received must be passed in via @receiveFromChannel
  *
@@ -118,7 +118,7 @@ public class MessageReceiver {
 			numRead+=n;
 		}
 
-		// exit if we are still waiting for more bytes
+		// exit if we are still waiting for more bytes to complete message
 		if (buffer.hasRemaining()) return numRead;
 
 		// Log.debug("Message received with length: "+len);

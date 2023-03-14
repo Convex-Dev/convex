@@ -3,7 +3,6 @@ package convex.core.store;
 import java.io.IOException;
 import java.util.function.Consumer;
 
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -122,7 +121,7 @@ public abstract class AStore {
 		if (decoded==null) return decoded; // handle null value
 		
 		// TODO: can remove this check once happy with all tests
-		assert(decoded.cachedEncoding()!=null);
+		assert(decoded.cachedEncoding()==encoding);
 		blobCache.putCell(decoded);
 		
 		return decoded;

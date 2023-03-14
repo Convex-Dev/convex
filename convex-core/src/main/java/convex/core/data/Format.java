@@ -241,7 +241,7 @@ public class Format {
 			// sign bit from top byte looks wrong!
 			String hex = Utils.toHexString((byte) len);
 			throw new BadFormatException(
-					"Format.peekMessageLength: Expected positive message length, got first byte [" + hex + "]");
+					"Format.peekMessageLength: Expected positive VLC message length, got first byte [" + hex + "]");
 		}
 
 		if ((len & 0x80) == 0) {
