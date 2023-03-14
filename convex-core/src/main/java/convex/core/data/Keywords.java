@@ -101,4 +101,8 @@ public class Keywords {
 	public static final Keyword OFFER = Keyword.create("offer");
 	public static final Keyword ORIGIN = Keyword.create("origin");
 	public static final Keyword TARGET = Keyword.create("target");
+
+	public static final Keyword BLOCKS = Keyword.create("blocks");
+	public static final Keyword CONSENSUS_POINT = Keyword.create("consensus-point");
+	public static final Keyword PROPOSAL_POINT = Keyword.create("proposal-point");
 }

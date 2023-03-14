@@ -3,16 +3,20 @@ package convex.core;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.ARecord;
 import convex.core.data.AVector;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.impl.RecordFormat;
 
 /**
  * Class representing an Ordering of transactions, along with the consensus position.
@@ -29,13 +33,17 @@ import convex.core.exceptions.InvalidDataException;
  * An Ordering is immutable.
  * 
  */
-public class Order extends ACell {
+public class Order extends ARecord {
 	private final AVector<SignedData<Block>> blocks;
 
 	private final long proposalPoint;
 	private final long consensusPoint;
 
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT };
+	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+
 	private Order(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint) {
+		super(FORMAT);
 		this.blocks = blocks;
 		this.consensusPoint = consensusPoint;
 		this.proposalPoint = proposalPoint;
@@ -112,29 +120,9 @@ public class Order extends ACell {
 		return new Order(blocks, pp, cp);
 	}
 
-
-
-	@Override
-	public boolean isCanonical() {
-		// Always canonical?
-		return true;
-	}
-	
 	@Override public final boolean isCVMValue() {
 		// Orders exist outside CVM only
 		return false;
-	}
-
-	@Override
-	public boolean print(BlobBuilder sb, long limit) {
-		sb.append("{");
-		sb.append(":prop " + getProposalPoint() + ",");
-		sb.append(":cons " + getConsensusPoint() + ",");
-		sb.append(":hash " + getHash() + ",");
-		sb.append(":blocks ");
-		if (!blocks.print(sb,limit)) return false;
-		sb.append("}\n");
-		return sb.check(limit);
 	}
 
 	/**
@@ -306,7 +294,27 @@ public class Order extends ACell {
 	}
 
 	@Override
-	public ACell toCanonical() {
-		return this;
+	public ACell get(ACell key) {
+		if (Keywords.BLOCKS.equals(key)) return blocks;
+		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(consensusPoint);
+		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(proposalPoint);
+
+		return null;
 	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public Order updateAll(ACell[] newVals) {
+		AVector<SignedData<Block>> blocks = (AVector<SignedData<Block>>)newVals[0];
+		long consensusPoint = ((CVMLong)newVals[1]).longValue();
+		long proposalPoint = ((CVMLong)newVals[2]).longValue();
+
+		if (blocks == this.blocks && consensusPoint == this.consensusPoint
+			&& proposalPoint == this.proposalPoint) {
+			return this;
+		}
+
+		return new Order(blocks, proposalPoint, consensusPoint);
+	}
+	
 }
