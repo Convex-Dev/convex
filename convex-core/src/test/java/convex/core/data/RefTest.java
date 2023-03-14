@@ -308,9 +308,9 @@ public class RefTest {
 	public void testReadRefSoft() throws BadFormatException {
 		Hash h=Hash.wrap(Blobs.createRandom(32));
 		RefSoft<?> ref=RefSoft.createForHash(h);
-		ref.markEmbedded(false); // needed to ensure indirect encoding
+		ref.markEmbedded(false); // needed to ensure indirect encoding is assumed
 		Blob b=ref.getEncoding();
-		assertEquals(33,b.count());
+		assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.count());
 		assertEquals(ref,Format.readRef(b, 0));
 	}
 	
@@ -320,7 +320,7 @@ public class RefTest {
 		Ref<?> ref=a.getRef();
 		assertTrue(a.isEmbedded());
 		Blob b=ref.getEncoding();
-		assertSame(a.getEncoding(),b);
+		assertSame(a.getEncoding(),b); // ref encoding should just be the embedded value encoding
 		assertEquals(ref,Format.readRef(b, 0));
 	}
 }
