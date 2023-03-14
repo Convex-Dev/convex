@@ -146,11 +146,6 @@ public class Symbol extends ASymbolic implements Comparable<Symbol> {
 		bb.append(getName());
 		return bb.check(limit);
 	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		return 50;
-	}
 	
 	@Override
 	public void validateCell() throws InvalidDataException {

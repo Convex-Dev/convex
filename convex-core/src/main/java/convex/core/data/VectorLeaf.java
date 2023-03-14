@@ -291,10 +291,14 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@Override
 	public int estimatedEncodingSize() {
+		if (count<2) {
+			if (count==0) return 2;
+			return 2+Format.MAX_EMBEDDED_LENGTH;
+		}
 		// allow space for header of reasonable length
 		// Estimate 64 bytes per element ref (plus space for tail/ other overhead)
 		int ESTIMATED_REF_SIZE=70;
-		return 1 + 9 + ESTIMATED_REF_SIZE * (items.length + 1);
+		return 1 + 9 + ESTIMATED_REF_SIZE * (items.length + 2);
 	}
 	
 	@Override

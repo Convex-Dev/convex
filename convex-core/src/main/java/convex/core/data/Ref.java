@@ -141,8 +141,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public static final int INDIRECT_ENCODING_LENGTH = 1+Hash.LENGTH;
 
-	
-
 	/**
 	 * Hash of the serialised representation of the value Computed and stored upon
 	 * demand.

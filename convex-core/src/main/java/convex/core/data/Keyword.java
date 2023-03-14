@@ -138,11 +138,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 
 	@Override
-	public int estimatedEncodingSize() {
-		return (int)(name.count()+3);
-	}
-
-	@Override
 	public boolean equals(ACell other) {
 		if (other == this) return true;
 		if (!(other instanceof Keyword)) return false;

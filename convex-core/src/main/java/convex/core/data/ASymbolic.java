@@ -33,6 +33,12 @@ public abstract class ASymbolic extends ACell {
 		return 0;
 	}
 	
+	@Override
+	public int estimatedEncodingSize() {
+		// name length plus a bit for extra
+		return (int)(3+name.count());
+	}
+	
 	/**
 	 * Gets the name of this symbolic value
 	 * @return Name as a short CVM String
