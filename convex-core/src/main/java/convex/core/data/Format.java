@@ -476,11 +476,13 @@ public class Format {
 		
 		//if (tag == Tag.SET) return Sets.read(b,pos);
 
-		//if (tag == Tag.LIST) return List.read(b,pos);
+		if (tag == Tag.LIST) return List.read(b,pos);
 
 		//if (tag == Tag.BLOBMAP) return BlobMap.read(b,pos);
 
-		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
+		return null;
+		// TODO: reinstate this once all cases handled
+		// throw new BadFormatException("Can't read data structure with tag byte: " + tag);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -569,11 +571,16 @@ public class Format {
 		if (tag == Tag.NULL) return null;
 		
 		try {
-		int high=(tag & 0xF0);
-		if (high == 0x00) return (T) readNumeric(tag,blob,offset);
-		if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
-		
-		if (tag == Tag.VECTOR) return (T) Vectors.read(blob,offset);
+			int high=(tag & 0xF0);
+			if (high == 0x00) return (T) readNumeric(tag,blob,offset);
+			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
+			
+			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
+			
+			if ((tag & 0xF0) == 0x80) {
+				ADataStructure<ACell> ds= readDataStructure(tag,blob,offset);
+				if (ds!=null) return (T)ds;
+			}
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
 		}

@@ -20,6 +20,9 @@ public class ListsTest {
 		assertSame(e, Lists.of());
 		assertFalse(e.contains(null));
 		doListTests(e);
+		
+		assertEquals(e,List.wrap(Vectors.empty()));
+		assertEquals(Blob.create(new byte[] {Tag.LIST,0}),e.getEncoding());
 	}
 
 	@Test

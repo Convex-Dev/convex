@@ -280,8 +280,30 @@ public class List<T extends ACell> extends AList<T> {
 	public static <T extends ACell> List<T> read(ByteBuffer bb) throws BadFormatException {
 		try {
 			AVector<T> data = Vectors.read(bb);
-			if (data == null) throw new BadFormatException("Expected vector but got null in List format");
 			return new List<T>(data);
+		} catch (ClassCastException e) {
+			throw new BadFormatException("Expected vector in List format", e);
+		}
+	}
+	
+	/**
+	 * Reads a List from the specified Blob. 
+	 * @param b Blob to read from
+	 * @param pos Position to read from (must point at tag, assumed to be a List)
+	 * 
+	 * @return List instance 
+	 * @throws BadFormatException If Encoding is invalid
+	 * 
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> List<T> read(Blob b, int pos) throws BadFormatException {
+		try {
+			AVector<T> data = Vectors.read(b,pos);
+			if (data.isEmpty()) return (List<T>) EMPTY;
+			List<T> result=new List<T>(data);
+			result.attachEncoding(data.getEncoding()); // keep acquired encoding
+			data.attachEncoding(null); // invalidate encoding since we have a List tag
+			return result;
 		} catch (ClassCastException e) {
 			throw new BadFormatException("Expected vector in List format", e);
 		}
@@ -422,4 +444,6 @@ public class List<T extends ACell> extends AList<T> {
 	public ACell toCanonical() {
 		return this;
 	}
+
+
 }
