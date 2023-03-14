@@ -11,6 +11,7 @@ import convex.core.BlockResult;
 import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -598,9 +599,8 @@ public class Format {
 		}
 		
 		int high=(tag & 0xF0);
-		if (high == 0x00) return readBasicType(tag,blob,offset);
+		if (high == 0x00) return (T) readNumeric(tag,blob,offset);
 
-		
 		if (tag == Tag.BLOB) {
 			return (T) Blobs.readFromBlob(blob,offset);
 		} 
@@ -623,13 +623,12 @@ public class Format {
 		return result;
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readBasicType(byte tag, Blob blob, int offset) throws BadFormatException {
+	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
 		// TODO Auto-generated method stub
-		if (tag == Tag.LONG) return (T) CVMLong.read(tag,blob,offset);
-		if (tag == Tag.INTEGER) return (T) CVMBigInteger.read(tag,blob,offset);
+		if (tag == Tag.LONG) return CVMLong.read(tag,blob,offset);
+		if (tag == Tag.INTEGER) return CVMBigInteger.read(tag,blob,offset);
 		// Double is special, we enforce a canonical NaN
-		if (tag == Tag.DOUBLE) return (T) CVMDouble.read(tag,blob,offset);
+		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
 		
 		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 	}
@@ -644,15 +643,13 @@ public class Format {
 	 * @throws BadFormatException If encoding is invalid
 	 * @throws BufferUnderflowException if the ByteBuffer contains insufficent bytes for Encoding
 	 */
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
-		if (tag == Tag.NULL) return null;
+	private static ANumeric readNumeric(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
 		try {
-			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
-			if (tag == Tag.INTEGER) return (T) CVMBigInteger.read(bb);
+			if (tag == Tag.LONG) return CVMLong.create(readVLCLong(bb));
+			if (tag == Tag.INTEGER) return CVMBigInteger.read(bb);
 			
 			// Double is special, we enforce a canonical NaN
-			if (tag == Tag.DOUBLE) return (T) CVMDouble.read(bb.getDouble());
+			if (tag == Tag.DOUBLE) return CVMDouble.read(bb.getDouble());
 
 			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 		} catch (IllegalArgumentException e) {
@@ -747,9 +744,10 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
+		if (tag==Tag.NULL) return null;
 		try {
 			int high=(tag & 0xF0);
-			if (high == 0x00) return readBasicType(bb, tag);
+			if (high == 0x00) return (T) readNumeric(bb, tag);
 
 			if (high ==0x30) return readBasicObject(bb,tag);
 

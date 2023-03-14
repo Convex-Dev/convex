@@ -13,8 +13,8 @@ public class Tag {
 	// Basic Types: Primitive values and numerics
 	public static final byte NULL = (byte) 0x00;
 
+	// Numeric types
 	public static final byte LONG = (byte) 0x09;
-
 	public static final byte INTEGER = (byte) 0x0a; // Arbitrary length integer
 	public static final byte DOUBLE = (byte) 0x0d;
 	//public static final byte FLOAT = (byte) 0x0f;
