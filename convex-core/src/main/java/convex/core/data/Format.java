@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
@@ -271,78 +269,6 @@ public class Format {
 		return writeVLCLong(bb, len);
 	}
 
-	public static ByteBuffer writeVLCBigInteger(ByteBuffer bb, BigInteger value) {
-		int bitLength = value.bitLength() + 1; // bits required including sign bit
-		if (bitLength <= 64) {
-			return writeVLCLong(bb, value.longValue());
-		}
-		byte[] bs = value.toByteArray();
-		int bslen = bs.length;
-		int blen = (bitLength + 6) / 7; // number of octets required for encoding
-		for (int i = blen - 1; i >= 1; i--) {
-			int bits7 = Utils.extractBits(bs, 7, i * 7); // get 7 bits from source bytes
-			byte single = (byte) (0x80 | bits7); // 7 bits with high bit set
-			bb = bb.put(single);
-		}
-		byte end = (byte) (bs[bslen - 1] & 0x7F); // last 7 bits of last byte
-		return bb.put(end);
-	}
-
-	/**
-	 * Finds the first byte in a bytebuffer which is a VLC terminal byte, starting
-	 * from the current position.
-	 * 
-	 * @param bb A ByteBuffer starting with a VLC encoded value.
-	 * @return VLC terminal byte position (relative to position of bytebuffer), or
-	 *         -1 if not found
-	 */
-	private static int findVLCTerminal(ByteBuffer bb) {
-		int pos = bb.position();
-		int len = bb.remaining();
-		for (int i = 0; i < len; i++) {
-			byte x = bb.get(pos + i);
-			if ((x & 0x80) == 0) return i;
-		}
-		return -1;
-	}
-
-	/**
-	 * Reads a BigInteger from the ByteBuffer. Assumes tag already read.
-	 * 
-	 * @param bb ByteBuffer to read from
-	 * @return A BigInteger
-	 * @throws BadFormatException If format is invalid
-	 */
-	public static BigInteger readVLCBigInteger(ByteBuffer bb) throws BadFormatException {
-		int vlclen = findVLCTerminal(bb) + 1;
-		if (vlclen == 0) throw new BadFormatException("No terminal byte found for VLC encoding of BigInteger");
-
-		/** get bytes of VLC encoding */
-		byte[] vlc = new byte[vlclen];
-		bb.get(vlc);
-		assert ((vlc[vlclen - 1] & 0x80) == 0); // check for terminal byte in correct position
-
-		/** bytes needed to contain VLC encoding bits */
-		int blen = (vlclen * 7 + 7) / 8;
-		byte[] bs = new byte[blen];
-		boolean signBit = (vlc[0] & 0x40) != 0;
-		boolean signOnly = (vlc[0] == (byte) 0xFF) | (vlc[0] == (byte) 0x80); // continuation with sign
-		bs[0] = (byte) (signBit ? -1 : 0); // initialise first byte with sign
-		for (int i = 0; i < vlclen; i++) { // iterate over all bytes in VLC encoding starting from highest
-			byte bits7 = (byte) (vlc[i] & 0x7F); // 7 bits from VLC byte
-
-			// if the top byte could have been sign extended, need to check for canonical
-			// encoding on the next highest byte
-			if (signOnly && (i == 1)) {
-				boolean thisSign = (bits7 & 0x40) != 0;
-				if (thisSign == signBit)
-					throw new BadFormatException("Non-canonical BigInteger with VLC bytes " + Blob.wrap(vlc));
-			}
-			Utils.setBits(bs, 7, 7 * (vlclen - 1 - i), bits7);
-		}
-		return new BigInteger(bs);
-	}
-
 	/**
 	 * Writes a canonical object to a ByteBuffer, preceded by the appropriate tag
 	 * 
@@ -373,18 +299,6 @@ public class Format {
 			return pos;
 		}
 		return cell.encode(bs,pos);
-	}
-
-	public static ByteBuffer writeVLCBigDecimal(ByteBuffer bb, BigDecimal value) {
-		bb = bb.put((byte) value.scale());
-		bb = writeVLCBigInteger(bb, value.unscaledValue());
-		return bb;
-	}
-
-	public static BigDecimal readVLCBigDecimal(ByteBuffer bb) throws BadFormatException {
-		byte scale = bb.get();
-		BigInteger value = readVLCBigInteger(bb);
-		return new BigDecimal(value, scale);
 	}
 
 	/**
