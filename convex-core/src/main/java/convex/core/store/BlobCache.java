@@ -4,6 +4,7 @@ import java.lang.ref.SoftReference;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 
 /**
  * In-memory cache for Blob decoding. Should be used in the context of a specific Store
@@ -32,7 +33,7 @@ public final class BlobCache {
 	 * @param encoding Encoding of Cell to look up in cache
 	 * @return Cached Cell, or null if not found
 	 */
-	public ACell getCell(ABlob encoding) {
+	public ACell getCell(Blob encoding) {
 		int ix=calcIndex(encoding);
 		SoftReference<ACell> ref=cache[ix];
 		if (ref==null) return null;

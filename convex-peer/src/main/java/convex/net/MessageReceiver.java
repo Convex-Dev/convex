@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -156,7 +155,7 @@ public class MessageReceiver {
 	 *
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */
-	private void receiveMessage(MessageType type, ABlob encoding) throws BadFormatException {
+	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException {
 		
 		ACell payload = connection.getStore().decode(encoding);
 

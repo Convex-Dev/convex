@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -113,11 +114,11 @@ public abstract class AStore {
 	 * 
 	 * @throws BadFormatException If cell encoding is invalid
 	 */
-	public final ACell decode(ABlob encoding) throws BadFormatException {
+	public final ACell decode(Blob encoding) throws BadFormatException {
 		ACell cached=blobCache.getCell(encoding);
 		if (cached!=null) return cached;
 		
-		ACell decoded=Format.read(encoding.toFlatBlob());
+		ACell decoded=Format.read(encoding);
 		if (decoded==null) return decoded; // handle null value
 		
 		// TODO: can remove this check once happy with all tests
