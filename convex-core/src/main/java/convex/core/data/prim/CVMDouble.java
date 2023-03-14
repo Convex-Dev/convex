@@ -5,6 +5,7 @@ import java.math.BigInteger;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
@@ -159,6 +160,15 @@ public final class CVMDouble extends ANumeric {
 		}
 		return create(value);
 	}
+	
+	public static CVMDouble read(byte tag, Blob blob, int offset) throws BadFormatException {
+		if (blob.count()<offset+1+8) throw new BadFormatException("Insufficient blob bytes to read Double");
+		long bits=Utils.readLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1);
+		double d=Double.longBitsToDouble(bits);
+		CVMDouble result= read(d);
+		result.attachEncoding(blob.slice(offset,offset+1+8));
+		return result;
+	}
 
 	@Override
 	public AString toCVMString(long limit) {
@@ -218,5 +228,8 @@ public final class CVMDouble extends ANumeric {
 		BigInteger bi=bd.toBigInteger();
 		return CVMBigInteger.create(bi);
 	}
+
+
+
 
 }

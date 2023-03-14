@@ -4,12 +4,14 @@ import java.math.BigInteger;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -101,6 +103,13 @@ public final class CVMLong extends AInteger {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		return Format.writeVLCLong(bs, pos, value);
+	}
+	
+	public static CVMLong read(byte tag, Blob blob, int offset) throws BadFormatException {
+		long v=Format.readVLCLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1);
+		CVMLong result= create(v);
+		result.attachEncoding(blob.slice(offset,offset+Format.getVLCLength(v)+1));
+		return result;
 	}
 
 	@Override
@@ -304,4 +313,6 @@ public final class CVMLong extends AInteger {
 		}
 		return b.multiply(this);
 	}
+
+
 }

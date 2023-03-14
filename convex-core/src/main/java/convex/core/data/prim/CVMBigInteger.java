@@ -45,7 +45,7 @@ public class CVMBigInteger extends AInteger {
 	}
 	
 	/**
-	 * Create a big integer from a valid blob representation. Can be non-canonical.
+	 * Create a big integer from a valid blob representation. Blob can be non-canonical.
 	 * @param data Blob data containing minimal BigInteger twos complement representation
 	 * @return Big Integer value or null if not valid.
 	 */
@@ -201,6 +201,19 @@ public class CVMBigInteger extends AInteger {
 		if (bi==null) throw new BadFormatException("Invalid blob representation of big integer");
 		return bi;
 	}
+	
+	public static CVMBigInteger read(byte tag, Blob blob, int offset) throws BadFormatException {
+		ABlob b=Blobs.readFromBlob(blob, offset);
+		if (b==null) throw new BadFormatException("Bad big integer format in read from blob");
+		CVMBigInteger result= create(b);
+		if (result==null) throw new BadFormatException("Null result in big integer create from blob");
+		
+		// Attach the Blob encoding as the biginteger encoding.
+		// Note this only works because the Blob read assumes correct tag
+		result.attachEncoding(b.getEncoding());
+		b.attachEncoding(null); // this encoding is definitely invalid, so wipe it clean
+		return result;
+	}
 
 	@Override
 	public APrimitive abs() {
@@ -287,5 +300,7 @@ public class CVMBigInteger extends AInteger {
 		}
 		return create(big().multiply(bb));
 	}
+
+
 
 }

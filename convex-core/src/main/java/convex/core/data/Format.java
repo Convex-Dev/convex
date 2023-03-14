@@ -570,6 +570,17 @@ public class Format {
 	}
 	
 	/**
+	 * Helper method to read a value encoded as a hex string
+	 * @param <T> Type of value to read
+	 * @param hexString A valid hex String
+	 * @return Value read
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public static <T extends ACell> T read(String hexString) throws BadFormatException {
+		return read(Blob.fromHex(hexString));
+	}
+	
+	/**
 	 * Read from a Blob with the specified tag, assumed to be at position 0
 	 * @param <T> Type of value to read
 	 * @param tag Tag to use for reading
@@ -585,6 +596,11 @@ public class Format {
 			if (len!=1) throw new BadFormatException("Bad null encoding with length"+len);
 			return null;
 		}
+		
+		int high=(tag & 0xF0);
+		if (high == 0x00) return readBasicType(tag,blob,offset);
+
+		
 		if (tag == Tag.BLOB) {
 			return (T) Blobs.readFromBlob(blob,offset);
 		} 
@@ -607,15 +623,15 @@ public class Format {
 		return result;
 	}
 
-	/**
-	 * Read a value encoded as a hex string
-	 * @param <T> Type of value to read
-	 * @param hexString A valid hex String
-	 * @return Value read
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <T extends ACell> T read(String hexString) throws BadFormatException {
-		return read(Blob.fromHex(hexString));
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> T readBasicType(byte tag, Blob blob, int offset) throws BadFormatException {
+		// TODO Auto-generated method stub
+		if (tag == Tag.LONG) return (T) CVMLong.read(tag,blob,offset);
+		if (tag == Tag.INTEGER) return (T) CVMBigInteger.read(tag,blob,offset);
+		// Double is special, we enforce a canonical NaN
+		if (tag == Tag.DOUBLE) return (T) CVMDouble.read(tag,blob,offset);
+		
+		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 	}
 
 	/**
@@ -630,8 +646,8 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readBasicType(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
+		if (tag == Tag.NULL) return null;
 		try {
-			if (tag == Tag.NULL) return null;
 			if (tag == Tag.LONG) return (T) CVMLong.create(readVLCLong(bb));
 			if (tag == Tag.INTEGER) return (T) CVMBigInteger.read(bb);
 			
