@@ -445,6 +445,27 @@ public class Format {
 		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
 		return Ref.get(cell);
 	}
+	
+	/**
+	 * Reads a Ref or embedded Cell value from a Blob
+	 * 
+	 * Converts Embedded Cells to Direct Refs automatically.
+	 * 
+	 * @param <T> Type of referenced value
+	 * @param b Blob containing a ref to read
+	 * @param pos Position to read Ref from (should point to tag)
+	 * @return Ref as read from ByteBuffer
+	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
+	 *                            object is found.
+	 */
+	public static <T extends ACell> Ref<T> readRef(Blob b,int pos) throws BadFormatException {
+		byte tag=b.byteAt(pos);
+		if (tag==Tag.REF) return Ref.readRaw(b,pos+1);
+		
+		T cell= Format.read(tag,b,pos);
+		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
+		return Ref.get(cell);
+	}
 
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readDataStructure(ByteBuffer bb, byte tag) throws BadFormatException {

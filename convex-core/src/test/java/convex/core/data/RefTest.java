@@ -303,4 +303,24 @@ public class RefTest {
 		assertTrue(nullRef.isEmbedded());
 		assertFalse(nullRef.isMissing());
 	}
+	
+	@Test 
+	public void testReadRefSoft() throws BadFormatException {
+		Hash h=Hash.wrap(Blobs.createRandom(32));
+		RefSoft<?> ref=RefSoft.createForHash(h);
+		ref.markEmbedded(false); // needed to ensure indirect encoding
+		Blob b=ref.getEncoding();
+		assertEquals(33,b.count());
+		assertEquals(ref,Format.readRef(b, 0));
+	}
+	
+	@Test 
+	public void testReadRefEmbedded() throws BadFormatException {
+		CVMLong a=CVMLong.create(678575875);
+		Ref<?> ref=a.getRef();
+		assertTrue(a.isEmbedded());
+		Blob b=ref.getEncoding();
+		assertSame(a.getEncoding(),b);
+		assertEquals(ref,Format.readRef(b, 0));
+	}
 }

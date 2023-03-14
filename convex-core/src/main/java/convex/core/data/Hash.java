@@ -94,7 +94,7 @@ public class Hash extends AArrayBlob {
      */
 	public static Hash wrap(AArrayBlob data, int pos) {
 		if ((pos==0) &&(data instanceof Hash)) return (Hash)data;
-		if (pos+LENGTH>=data.count()) return null;
+		if (pos+LENGTH>data.count()) return null;
 		return wrap(data.getInternalArray(),Utils.checkedInt(data.getInternalOffset()+pos));
 	}
 
