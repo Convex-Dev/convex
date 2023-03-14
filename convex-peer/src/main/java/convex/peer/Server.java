@@ -674,7 +674,8 @@ public class Server implements Closeable {
 	 * Time of last belief broadcast
 	 */
 	private long lastBroadcastBelief=0;
-	private long broadcastCount=0L;
+	private long beliefBroadcastCount=0L;
+	private long beliefReceivedCount=0L;
 
 	private void broadcastBelief(Belief belief) {
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -699,7 +700,7 @@ public class Server implements Closeable {
         // at the moment broadcast to all peers trusted or not TODO: recheck this
 		manager.broadcast(msg, false);
 		lastBroadcastBelief=Utils.getCurrentTimestamp();
-		broadcastCount++;
+		beliefBroadcastCount++;
 	}
 
 	/**
@@ -707,8 +708,17 @@ public class Server implements Closeable {
 	 * @return Count of broadcasts from this Server instance
 	 */
 	public long getBroadcastCount() {
-		return broadcastCount;
+		return beliefBroadcastCount;
 	}
+	
+	/**
+	 * Gets the number of belief broadcasts made by this Peer
+	 * @return Count of broadcasts from this Server instance
+	 */
+	public long getBeliefReceivedCount() {
+		return beliefReceivedCount;
+	}
+
 
 	private long lastBlockPublishedTime=0L;
 
@@ -1037,9 +1047,9 @@ public class Server implements Closeable {
 					awaitEvents();
 				}
 			} catch (InterruptedException e) {
-				log.debug("Terminating Server update due to interrupt");
+				log.info("Terminating Belief Merge loop due to interrupt");
 			} catch (Throwable e) {
-				log.error("Unexpected exception in server update loop: {}", e);
+				log.error("Unexpected exception in Belief Merge loop: {}", e);
 				log.error("Terminating Server update");
 				e.printStackTrace();
 			}
@@ -1067,6 +1077,7 @@ public class Server implements Closeable {
 						.getTimestamp())) {
 					// Add to map of new Beliefs received for each Peer
 					newBeliefs.put(addr, receivedBelief);
+					beliefReceivedCount++;
 
 					// Notify the update thread that there is something new to handle
 					log.debug("Valid belief received by peer at {}: {}"
