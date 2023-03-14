@@ -322,8 +322,6 @@ public class ObjectsTest {
 			long tcount = Refs.totalRefCount(a);
 			assertTrue(rc <= tcount);
 		}
-		
-
 	}
 
 }
