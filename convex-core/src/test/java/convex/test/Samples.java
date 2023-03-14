@@ -154,6 +154,7 @@ public class Samples {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static final VectorLeaf<ACell> MAX_EMBEDDED_VECTOR = (VectorLeaf) Vectors.of(Blobs.createRandom(105),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
 
+	public static final Blob SMALL_BLOB = Blob.fromHex("cafebabe");
 	
 	static {
 		try {

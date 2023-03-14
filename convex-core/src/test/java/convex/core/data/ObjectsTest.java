@@ -17,6 +17,7 @@ import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 /**
  * Generic test functions for arbitrary Data Objects.
@@ -37,26 +38,7 @@ public class ObjectsTest {
 		assertEquals(h,r.getHash());
 		assertEquals(a, r.getValue());
 
-		Blob encoding = Format.encodedBlob(a);
-		if (a==null) {
-			assertSame(Blob.NULL_ENCODING,encoding);
-		} else {
-			assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
-			assertSame(encoding,a.getEncoding()); // should be same cached encoding
-			assertEquals(encoding.length,a.getEncodingLength());
-			
-			if (a.isCVMValue()) {
-				assertNotNull(a.getType());
-			}
-		}
-
-		// Any encoding should be less than or equal to the limit
-		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
-		
-		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
-		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
-			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
-		}
+		doAnyEncodingTests(a);
 		
 		// tests for memory size
 		if (a!=null) {
@@ -75,19 +57,12 @@ public class ObjectsTest {
 				assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
 			}
 		}
-
-
-		try {
-			ACell a2;
-			a2 = Format.read(encoding);
-			assertEquals(a, a2);
-		} catch (BadFormatException e) {
-			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
-		}
 		
 		doCellTests(a);
 	}
-	
+
+
+
 
 	/**
 	 * Generic tests for an arbitrary vaid Cell. May or may not be a valid CVM value. 
@@ -99,7 +74,7 @@ public class ObjectsTest {
 	public static void doCellTests(ACell a) {
 		if (a==null) return;
 		
-		doEncodingTest(a);
+		doCellEncodingTest(a);
 		doCanonicalTests(a);	
 		doHashTests(a);
 		doEqualityTests(a);
@@ -162,7 +137,7 @@ public class ObjectsTest {
 	}
 
 
-	private static void doEncodingTest(ACell a) {
+	private static void doCellEncodingTest(ACell a) {
 		Blob enc=a.getEncoding();
 		long len=enc.count();
 		assertEquals(a.getEncodingLength(),enc.count());
@@ -187,6 +162,49 @@ public class ObjectsTest {
 			doCompleteEncodingTests(a);
 		}
 	}
+	
+	/**
+	 * Encoding tests for an arbitrary cell
+	 * @param a Any Cell, might not be CVM value
+	 */
+	private static void doAnyEncodingTests(ACell a) {
+		Blob encoding = Format.encodedBlob(a);
+		if (a==null) {
+			assertSame(Blob.NULL_ENCODING,encoding);
+			return;
+		} 
+		
+		assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
+		assertSame(encoding,a.getEncoding()); // should be same cached encoding
+		assertEquals(encoding.length,a.getEncodingLength());
+			
+		if (a.isCVMValue()) {
+			assertNotNull(a.getType());
+		}
+
+		// Any encoding should be less than or equal to the limit
+		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
+		
+		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
+		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
+			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+		}
+
+		try {
+			// Test that we can re-read the encoding accurately
+			ACell a2 = Format.read(encoding);
+			assertEquals(a, a2);
+			
+			// Test that we can re-read from a sliced Blob
+			ABlob t=Samples.SMALL_BLOB.append(encoding);
+			Blob offsetEncoding=t.slice(Samples.SMALL_BLOB.count()).toFlatBlob();
+			ACell a3= Format.read(offsetEncoding);
+			assertEquals(a, a3);
+		} catch (BadFormatException e) {
+			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
+		}
+	}
+	
 
 	/**
 	 * Test Hash properties for an arbitrary cell
