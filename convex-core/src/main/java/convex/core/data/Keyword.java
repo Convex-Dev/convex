@@ -116,7 +116,6 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		Keyword kw = Keyword.create(name);
 		if (kw == null) throw new BadFormatException("Can't read keyword (probably invalid name)");
 		return kw;
-
 	}
 	
 	@Override

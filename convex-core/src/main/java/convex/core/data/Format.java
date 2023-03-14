@@ -355,8 +355,7 @@ public class Format {
 	}
 
 	/**
-	 * Reads a UTF-8 String from a ByteBuffer. Assumes the object tag has already been
-	 * read
+	 * Reads a UTF-8 String from a ByteBuffer. Assumes any tag has already been read
 	 * 
 	 * @param bb ByteBuffer to read from
 	 * @param len Number of UTF-8 bytes to read
