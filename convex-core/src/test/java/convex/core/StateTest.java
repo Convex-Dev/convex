@@ -79,6 +79,8 @@ public class StateTest {
 		Ref<State> r1=ACell.createPersisted(s);
 		RefTreeStats rs1=Refs.getRefTreeStats(r1);
 		
+		assertTrue(r1.isPersisted());
+		
 		final long[] cnt=new long[1];
 		Refs.visitAllRefs(r1, r->{
 			ACell cell=r.getValue();

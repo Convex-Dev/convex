@@ -141,12 +141,12 @@ public class Constants {
 	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD*1;
 
 	/**
-	 * Default size for client receive buffers.
+	 * Default size for client receive ByteBuffers.
 	 */
 	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
 
 	/**
-	 * Default size for client receive buffers.
+	 * Default size for client send ByteBuffers.
 	 */
 	public static final int SEND_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
 
@@ -157,7 +157,7 @@ public class Constants {
 	public static final int SOCKET_SERVER_BUFFER_SIZE = 16*65536;
 
 	/**
-	 * Size of default server socket buffers for a peer connection
+	 * Size of default server socket buffers for an outbound peer connection
 	 */
 	public static final int SOCKET_PEER_BUFFER_SIZE = 16*65536;
 
