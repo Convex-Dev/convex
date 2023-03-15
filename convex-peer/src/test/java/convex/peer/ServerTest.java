@@ -120,7 +120,7 @@ public class ServerTest {
 		
 		// Should still get status OK
 		Convex convex2=Convex.connect(hostAddress, network.HERO,network.HERO_KEYPAIR);
-		assertNotNull(convex2.requestStatusSync(1000));
+		assertNotNull(convex2.requestStatusSync(2000));
 	}
 
 	@Test

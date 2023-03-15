@@ -94,10 +94,16 @@ public class Server implements Closeable {
 	 */
 	private static final int TRANSACTION_QUEUE_SIZE = 500;
 	
+	/**
+	 * Size of incoming Belief queue
+	 */
 	private static final int BELIEF_QUEUE_SIZE = 100;
 
-	// Maximum Pause for each iteration of Server update loop.
-	private static final long SERVER_UPDATE_PAUSE = 5L;
+	/**
+	 * Maximum Pause for each iteration of Server Belief Merge loop.
+	 * We handle Belief merges as fast as possible, pausing to poll for this period if none arrive
+	 */
+	private static final long BELIEF_MERGE_PAUSE = 5L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -569,7 +575,7 @@ public class Server implements Closeable {
 			} catch (Exception e) {
 				// Ignore?? Connection probably gone anyway
 			}
-			log.info("Bad signature from Client! {}" , sd);
+			log.debug("Bad signature from Client! {}" , sd);
 			return;
 		}
 		
@@ -1102,7 +1108,7 @@ public class Server implements Closeable {
 					}
 
 					// Maybe sleep a bit, wait for some new events to accumulate
-					awaitEvents();
+					awaitBeliefs();
 				}
 			} catch (InterruptedException e) {
 				log.info("Terminating Belief Merge loop due to interrupt");
@@ -1114,9 +1120,9 @@ public class Server implements Closeable {
 		}
 	};
 
-	private void awaitEvents() throws InterruptedException {
+	private void awaitBeliefs() throws InterruptedException {
 		
-		SignedData<Belief> firstEvent=beliefQueue.poll(SERVER_UPDATE_PAUSE, TimeUnit.MILLISECONDS);
+		SignedData<Belief> firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
 		if (firstEvent==null) return;
 		ArrayList<SignedData<Belief>> allBeliefs=new ArrayList<>();
 		allBeliefs.add(firstEvent);
