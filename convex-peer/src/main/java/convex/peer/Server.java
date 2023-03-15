@@ -22,6 +22,7 @@ import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
@@ -882,19 +883,44 @@ public class Server implements Closeable {
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
 
-			Peer peer=this.getPeer();
-			Hash beliefHash=peer.getSignedBelief().getHash();
-			Hash stateHash=peer.getStates().getHash();
-			Hash initialStateHash=peer.getStates().get(0).getHash();
-			AccountKey peerKey=getPeerKey();
-			Hash consensusHash=peer.getConsensusState().getHash();
-
-			AVector<ACell> reply=Vectors.of(beliefHash,stateHash,initialStateHash,peerKey,consensusHash);
+			AVector<ACell> reply = getStatusVector();
 
 			m.reportResult(m.getID(), reply);
 		} catch (Throwable t) {
 			log.warn("Status Request Error: {}", t);
 		}
+	}
+
+	/**
+	 * Gets the status vector for the Peer
+	 * 0 = latest signed belief hash
+	 * 1 = states vector hash
+	 * 2 = genesis state hash
+	 * 3 = peer key
+	 * 4 = consensus state
+	 * 5 = consensus point
+	 * 6 = proposal point
+	 * 7 = ordering length
+	 * @return Status vector
+	 */
+	public AVector<ACell> getStatusVector() {
+		Peer peer=this.getPeer();
+		SignedData<Belief> signedBelief = peer.getSignedBelief();
+		Belief belief=signedBelief.getValue();
+		
+		Hash beliefHash=signedBelief.getHash();
+		Hash statesHash=peer.getStates().getHash();
+		Hash genesisHash=peer.getStates().get(0).getHash();
+		AccountKey peerKey=getPeerKey();
+		Hash consensusHash=peer.getConsensusState().getHash();
+		
+		Order order=peer.getPeerOrder();
+		CVMLong cp = CVMLong.create(order.getConsensusPoint()) ;
+		CVMLong pp = CVMLong.create(order.getProposalPoint()) ;
+		CVMLong op = CVMLong.create(order.count()) ;
+
+		AVector<ACell> reply=Vectors.of(beliefHash,statesHash,genesisHash,peerKey,consensusHash, cp,pp,op);
+		return reply;
 	}
 
 	private void processChallenge(Message m) {

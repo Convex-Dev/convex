@@ -191,7 +191,7 @@ public class Constants {
 	/**
 	 * Number of fields in a Peer STATUS message
 	 */
-	public static final long STATUS_COUNT = 5;
+	public static final long STATUS_COUNT = 8;
 
 	/**
 	 * Default port for Convex Peers
