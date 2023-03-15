@@ -89,6 +89,8 @@ public class Server implements Closeable {
 	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
 	private static final int EVENT_QUEUE_SIZE = 1000;
+	
+	private static final int BELIEF_QUEUE_SIZE = 100;
 
 	// Maximum Pause for each iteration of Server update loop.
 	private static final long SERVER_UPDATE_PAUSE = 5L;
@@ -105,8 +107,12 @@ public class Server implements Closeable {
 	/**
 	 * Queue for received events (Beliefs, Transactions) to be processed
 	 */
-	private BlockingQueue<SignedData<?>> eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_SIZE);
-
+	private BlockingQueue<SignedData<?>> eventQueue;
+	
+	/**
+	 * Queue for received events (Beliefs, Transactions) to be processed
+	 */
+	private BlockingQueue<SignedData<Belief>> beliefQueue;
 
 	/**
 	 * Message consumer that simply enqueues received messages received by this Server
@@ -201,6 +207,11 @@ public class Server implements Closeable {
 				this.eventHook = (IServerEvent)maybeHook;
 			}
 		}
+		
+		// Set up Queue. TODO: use config if provided
+		eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_SIZE);
+		beliefQueue = new ArrayBlockingQueue<>(BELIEF_QUEUE_SIZE);
+		
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
