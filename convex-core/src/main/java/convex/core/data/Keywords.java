@@ -105,4 +105,6 @@ public class Keywords {
 	public static final Keyword BLOCKS = Keyword.create("blocks");
 	public static final Keyword CONSENSUS_POINT = Keyword.create("consensus-point");
 	public static final Keyword PROPOSAL_POINT = Keyword.create("proposal-point");
+
+	public static final Keyword ROOT_KEY = Keyword.create("root-key");
 }

@@ -28,6 +28,7 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -37,6 +38,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -130,7 +132,13 @@ public class Server implements Closeable {
 	 */
 	private final AStore store;
 
+	/**
+	 * Configuration
+	 */
+
 	private final HashMap<Keyword, Object> config;
+
+	private final ACell rootKey;
 
 	/**
 	 * Flag for a running server. Setting to false will terminate server threads.
@@ -180,6 +188,8 @@ public class Server implements Closeable {
 	private IServerEvent eventHook = null;
 
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
+
+		this.rootKey = (ACell)config.get(Keywords.ROOT_KEY);
 
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
@@ -283,7 +293,7 @@ public class Server implements Closeable {
 				// Restore from storage case
 				try {
 
-					Peer peer = Peer.restorePeer(store, keyPair);
+					Peer peer = Peer.restorePeer(store, keyPair, rootKey);
 					if (peer != null) {
 						log.info("Restored Peer with root data hash: {}",store.getRootHash());
 						return peer;
@@ -1159,15 +1169,25 @@ public class Server implements Closeable {
 	 *
 	 * This will overwrite any previously persisted peer data.
 	 */
-	public void persistPeerData() {
+	@SuppressWarnings("unchecked")
+	public boolean persistPeerData() {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			ACell peerData = peer.toData();
-			store.setRootData(peerData);
-			log.info( "Stored peer data for Server with hash: {}", peerData.getHash().toHexString());
+			ACell rootData = peer.toData();
+
+			if (rootKey != null) {
+				Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
+				AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
+				rootData = currentRootData.assoc(rootKey, rootData);
+			}
+
+			store.setRootData(rootData);
+			log.info( "Stored peer data for Server with hash: {}", rootData.getHash().toHexString());
+			return true;
 		} catch (Throwable e) {
-			log.warn("Failed to persist peer state when closing server: {}" ,e.getMessage());
+			log.warn("Failed to persist peer state: {}" ,e.getMessage());
+			return false;
 		} finally {
 			Stores.setCurrent(tempStore);
 		}
@@ -1177,11 +1197,7 @@ public class Server implements Closeable {
 	public void close() {
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
-			try {
-				persistPeerData();
-			} catch (Throwable t) {
-				log.warn("Exception persisting peer data: {}", t);
-			}
+			persistPeerData();
 		}
 
 		// TODO: not much point signing this?

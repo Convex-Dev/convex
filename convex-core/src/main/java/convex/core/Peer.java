@@ -159,36 +159,52 @@ public class Peer {
 	}
 
 	/**
+	 * Like {@link #restorePeer(AStore, AKeyPair, ACell)} but uses a null root key.
+	 */
+	public static Peer restorePeer(AStore store, AKeyPair keyPair) throws IOException {
+		return restorePeer(store, keyPair, null);
+	}
+
+	/**
 	 * Restores a Peer from the Etch database specified in Config
 	 * @param store Store to restore from
 	 * @param keyPair Key Pair to use for restored Peer
+	 * @param rootKey When not null, assumes the root data is a map and peer data is under that key
 	 * @return Peer instance, or null if root hash was not found
 	 * @throws IOException If store reading failed
 	 */
-	public static Peer restorePeer(AStore store,AKeyPair keyPair) throws IOException {
-			AMap<Keyword,ACell> peerData=getPeerData(store);
+	public static Peer restorePeer(AStore store, AKeyPair keyPair, ACell rootKey) throws IOException {
+			AMap<Keyword,ACell> peerData=getPeerData(store, rootKey);
 			if (peerData==null) return null;
 			Peer peer=Peer.fromData(keyPair,peerData);
 			return peer;
 	}
 	
 	/**
+	 * Like {@link #getPeerData(AStore, ACell)} but uses a null root key.
+	 */
+	public static AMap<Keyword, ACell> getPeerData(AStore store) throws IOException {
+		return getPeerData(store, null);
+	}
+
+	/**
 	 * Gets Peer Data from a Store.
 	 * 
 	 * @param store Store to retrieve Peer Data from
+	 * @param rootKey When not null, assumes the root data is a map and peer data is under that key
 	 * @return Peer data map, or null if not available
 	 * @throws IOException If a store IO error occurs
 	 */
-	public static AMap<Keyword, ACell> getPeerData(AStore store) throws IOException {
+	@SuppressWarnings("unchecked")
+	public static AMap<Keyword, ACell> getPeerData(AStore store, ACell rootKey) throws IOException {
 		Stores.setCurrent(store);
 		Hash root = store.getRootHash();
 		Ref<ACell> ref=store.refForHash(root);
 		if (ref==null) return null; // not found case
 		if (ref.getStatus()<Ref.PERSISTED) return null; // not fully in store
 		
-		@SuppressWarnings("unchecked")
-		AMap<Keyword,ACell> peerData=(AMap<Keyword, ACell>) ref.getValue();
-		return peerData;
+		if (rootKey == null) return (AMap<Keyword,ACell>)ref.getValue();
+		else return (AMap<Keyword,ACell>)((AMap<ACell,ACell>)ref.getValue()).get(rootKey);
 	}
 
 	/**
