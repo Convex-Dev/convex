@@ -92,7 +92,7 @@ public class Server implements Closeable {
 	 * Default size for incoming client transaction queue
 	 * Note: this limits TPS for client transactions, will send failures if overloaded
 	 */
-	private static final int TRANSACTION_QUEUE_SIZE = 1000;
+	private static final int TRANSACTION_QUEUE_SIZE = 500;
 	
 	private static final int BELIEF_QUEUE_SIZE = 100;
 
@@ -829,6 +829,8 @@ public class Server implements Closeable {
 
 		// If we already did this recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
+		
+		transactionQueue.drainTo(newTransactions);
 
 		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
@@ -1113,7 +1115,6 @@ public class Server implements Closeable {
 	};
 
 	private void awaitEvents() throws InterruptedException {
-		transactionQueue.drainTo(newTransactions);
 		
 		SignedData<Belief> firstEvent=beliefQueue.poll(SERVER_UPDATE_PAUSE, TimeUnit.MILLISECONDS);
 		if (firstEvent==null) return;

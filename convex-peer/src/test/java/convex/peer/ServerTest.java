@@ -3,6 +3,7 @@ package convex.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -102,21 +103,21 @@ public class ServerTest {
 		assertEquals(v, results.get(id1));
 	}
 
-// Commented out because it's slow....
-//	@Test
-//	public void testServerFlood() throws IOException, InterruptedException {
-//		InetSocketAddress hostAddress=server.getHostAddress();
-//		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
-//		// from backpressure and *not* bring down the server.
-//		Convex convex=Convex.connect(hostAddress, VILLAIN_ADDRESS,Init.VILLAIN_KEYPAIR);
-//
-//		Object cmd=Reader.read("(def tmp (inc tmp))");
-//		assertThrows(IOException.class, ()-> {
-//			for (int i=0; i<1000000; i++) {
-//				convex.transact(Invoke.create(VILLAIN_ADDRESS, 0, cmd));
-//			}
-//		});
-//	}
+
+	@Test
+	public void testServerFlood() throws IOException, InterruptedException, TimeoutException {
+		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
+		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
+		// from backpressure and *not* bring down the server.
+		Convex convex=Convex.connect(hostAddress, network.VILLAIN,network.VILLAIN_KEYPAIR);
+
+		ACell cmd=Reader.read("(def tmp (inc tmp))");
+		assertThrows(IOException.class, ()-> {
+			for (int i=0; i<1000000; i++) {
+				convex.transact(Invoke.create(network.VILLAIN, 0, cmd));
+			}
+		});
+	}
 
 	@Test
 	public void testBalanceQuery() throws IOException, TimeoutException {

@@ -130,11 +130,7 @@ public class ConvexRemote extends Convex {
 			while (id < 0) {
 				id = connection.sendTransaction(signed);
 				if (id < 0) {
-					try {
-						Thread.sleep(10);
-					} catch (InterruptedException e) {
-						// Ignore
-					}
+					throw new IOException("Send buffer full");
 				}
 			}
 
