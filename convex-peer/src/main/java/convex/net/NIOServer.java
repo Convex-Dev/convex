@@ -142,7 +142,7 @@ public class NIOServer implements Closeable {
 							// e.printStackTrace();
 							key.cancel();
 						} catch (CancelledKeyException e) {
-							log.warn("Cancelled key: {}", e);
+							log.debug("Cancelled key: {}", e);
 							// e.printStackTrace();
 							key.cancel();
 						}

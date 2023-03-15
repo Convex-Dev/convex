@@ -768,7 +768,7 @@ public class Server implements Closeable {
 		ACell.createPersisted(block);
 
 		Peer newPeer = peer.proposeBlock(block);
-		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
+		log.debug("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
 
 		peer = newPeer;
 		lastBlockPublishedTime=timestamp;
@@ -843,7 +843,7 @@ public class Server implements Closeable {
 		// Try to set hostname if not correctly set
 		trySetHostname:
 		if (!Utils.equals(desiredHostname, currentHostname)) {
-			log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
+			log.debug("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
 			Address address=ps.getController();
 			if (address==null) break trySetHostname;
 			AccountStatus as=s.getAccount(address);

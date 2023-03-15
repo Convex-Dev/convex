@@ -117,6 +117,10 @@ public class ServerTest {
 				convex.transact(Invoke.create(network.VILLAIN, 0, cmd));
 			}
 		});
+		
+		// Should still get status OK
+		Convex convex2=Convex.connect(hostAddress, network.HERO,network.HERO_KEYPAIR);
+		assertNotNull(convex2.requestStatusSync(1000));
 	}
 
 	@Test

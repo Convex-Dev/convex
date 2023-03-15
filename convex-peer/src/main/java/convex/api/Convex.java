@@ -453,7 +453,7 @@ public abstract class Convex {
 	 *
 	 * @param signed Signed transaction to execute
 	 * @return A Future for the result of the transaction
-	 * @throws IOException If the connection is broken
+	 * @throws IOException If the connection is broken or send buffer is full
 	 */
 	public abstract CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException;
 
