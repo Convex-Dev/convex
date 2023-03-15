@@ -88,7 +88,11 @@ public class Server implements Closeable {
 
 	private static final int RECEIVE_QUEUE_SIZE = 10000;
 
-	private static final int EVENT_QUEUE_SIZE = 1000;
+	/**
+	 * Default size for incoming client transaction queue
+	 * Note: this limits TPS for client transactions, will send failures if overloaded
+	 */
+	private static final int TRANSACTION_QUEUE_SIZE = 1000;
 	
 	private static final int BELIEF_QUEUE_SIZE = 100;
 
@@ -209,7 +213,7 @@ public class Server implements Closeable {
 		}
 		
 		// Set up Queue. TODO: use config if provided
-		eventQueue = new ArrayBlockingQueue<>(EVENT_QUEUE_SIZE);
+		eventQueue = new ArrayBlockingQueue<>(TRANSACTION_QUEUE_SIZE);
 		beliefQueue = new ArrayBlockingQueue<>(BELIEF_QUEUE_SIZE);
 		
 		// Switch to use the configured store for setup, saving the caller store
@@ -773,7 +777,11 @@ public class Server implements Closeable {
 
 	private long lastOwnTransactionTimestamp=0L;
 
-	private static final long OWN_TRANSACTIONS_DELAY=300;
+	/**
+	 * Default minimum delay between proposing a block of transactions
+	 * Note: this limits the TPS for a single peer in terms of client transactions
+	 */
+	private static final long OWN_BLOCK_DELAY=100;
 
 	/**
 	 * Gets the Peer controller Address
@@ -820,7 +828,7 @@ public class Server implements Closeable {
 		long ts=Utils.getCurrentTimestamp();
 
 		// If we already did this recently, don't try again
-		if (ts<(lastOwnTransactionTimestamp+OWN_TRANSACTIONS_DELAY)) return;
+		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
 
 		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
@@ -1004,6 +1012,7 @@ public class Server implements Closeable {
 
 		Ref<ACell> ref = Ref.get(o);
 		try {
+			
 			// check we can persist the new belief
 			// May also pick up cached signature verification if already held
 			ref = ref.persist();
@@ -1015,7 +1024,8 @@ public class Server implements Closeable {
 			// TODO: validate trusted connection?
 			// TODO: can drop Beliefs if under pressure?
 			
-			if (!(receivedBelief.getValue() instanceof Belief)) {
+			ACell b=receivedBelief.getValue(); // might not actually be a Belief
+			if (!(b instanceof Belief)) {
 				Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
 				m.reportResult(r);
 				return;
