@@ -413,7 +413,7 @@ public class Server implements Closeable {
 			receiverThread.start();
 
 			// Start Peer update thread
-			updateThread = new Thread(beliefMergeLoop, "Update Loop on port: " + port);
+			updateThread = new Thread(beliefMergeLoop, "Belief Merge Loop on port: " + port);
 			updateThread.setDaemon(true);
 			updateThread.start();
 
