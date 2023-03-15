@@ -109,9 +109,9 @@ public class Server implements Closeable {
 	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
 	/**
-	 * Queue for received events (Beliefs, Transactions) to be processed
+	 * Queue for received Transactions submitted for clients of this Peer
 	 */
-	private BlockingQueue<SignedData<?>> eventQueue;
+	private BlockingQueue<SignedData<ATransaction>> transactionQueue;
 	
 	/**
 	 * Queue for received events (Beliefs, Transactions) to be processed
@@ -213,7 +213,7 @@ public class Server implements Closeable {
 		}
 		
 		// Set up Queue. TODO: use config if provided
-		eventQueue = new ArrayBlockingQueue<>(TRANSACTION_QUEUE_SIZE);
+		transactionQueue = new ArrayBlockingQueue<>(TRANSACTION_QUEUE_SIZE);
 		beliefQueue = new ArrayBlockingQueue<>(BELIEF_QUEUE_SIZE);
 		
 		// Switch to use the configured store for setup, saving the caller store
@@ -581,7 +581,7 @@ public class Server implements Closeable {
 
 		registerInterest(sd.getHash(), m);
 		try {
-			eventQueue.put(sd);
+			transactionQueue.put(sd);
 		} catch (InterruptedException e) {
 			log.warn("Unexpected interruption adding transaction to event queue!");
 		}
@@ -804,8 +804,8 @@ public class Server implements Closeable {
 	 * @param event Signed event to add to inbound event queue
 	 * @throws InterruptedException If interrupted while waiting
 	 */
-	public void queueEvent(SignedData<?> event) throws InterruptedException {
-		eventQueue.put(event);
+	public void queueBelief(SignedData<Belief> event) throws InterruptedException {
+		beliefQueue.put(event);
 	}
 	
 	/**
@@ -1031,7 +1031,10 @@ public class Server implements Closeable {
 				return;
 			}
 
-			eventQueue.put(receivedBelief);
+			boolean queued = beliefQueue.offer(receivedBelief);
+			if (!queued) {
+				log.debug("Incoming belief queue full");
+			}
 		} catch (ClassCastException e) {
 			// bad message?
 			log.warn("Exception due to bad message from peer? {}" ,e);
@@ -1039,9 +1042,7 @@ public class Server implements Closeable {
 			// we got sent a bad signature.
 			// TODO: Probably need to slash peer? but ignore for now
 			log.warn("Bad signed belief from peer: " + Utils.print(o));
-		} catch (InterruptedException e) {
-			throw Utils.sneakyThrow(e);
-		}
+		} 
 	}
 
 	/*
@@ -1064,10 +1065,9 @@ public class Server implements Closeable {
 
 				log.debug("Receiver thread terminated normally for peer {}", this);
 			} catch (InterruptedException e) {
-				log.debug("Receiver thread interrupted ");
+				log.info("Receiver thread interrupted for peer {}", this);
 			} catch (Throwable e) {
-				log.warn("Receiver thread terminated abnormally! ");
-				log.error("Server FAILED: " + e.getMessage());
+				log.error("Peer Server FAILED: Receiver thread terminated abnormally" + e.getMessage());
 				e.printStackTrace();
 			}
 		}
@@ -1112,35 +1112,29 @@ public class Server implements Closeable {
 		}
 	};
 
-	@SuppressWarnings("unchecked")
 	private void awaitEvents() throws InterruptedException {
-		SignedData<?> firstEvent=eventQueue.poll(SERVER_UPDATE_PAUSE, TimeUnit.MILLISECONDS);
+		transactionQueue.drainTo(newTransactions);
+		
+		SignedData<Belief> firstEvent=beliefQueue.poll(SERVER_UPDATE_PAUSE, TimeUnit.MILLISECONDS);
 		if (firstEvent==null) return;
-		ArrayList<SignedData<?>> allEvents=new ArrayList<>();
-		allEvents.add(firstEvent);
-		eventQueue.drainTo(allEvents);
-		for (SignedData<?> signedEvent: allEvents) {
-			ACell event=signedEvent.getValue();
-			if (event instanceof ATransaction) {
-				SignedData<ATransaction> receivedTrans=(SignedData<ATransaction>)signedEvent;
-				newTransactions.add(receivedTrans);
-			} else if (event instanceof Belief) {
-				SignedData<Belief> receivedBelief=(SignedData<Belief>)signedEvent;
-				AccountKey addr = receivedBelief.getAccountKey();
-				SignedData<Belief> current = newBeliefs.get(addr);
-				// Make sure the Belief is the latest from a Peer
-				if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
-						.getTimestamp())) {
-					// Add to map of new Beliefs received for each Peer
-					newBeliefs.put(addr, receivedBelief);
-					beliefReceivedCount++;
+		ArrayList<SignedData<Belief>> allBeliefs=new ArrayList<>();
+		allBeliefs.add(firstEvent);
+		beliefQueue.drainTo(allBeliefs);
+		for (SignedData<Belief> signedEvent: allBeliefs) {
+			SignedData<Belief> receivedBelief=(SignedData<Belief>)signedEvent;
+			AccountKey addr = receivedBelief.getAccountKey();
+			SignedData<Belief> current = newBeliefs.get(addr);
+			
+			// Make sure the Belief is the latest from a Peer
+			if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
+					.getTimestamp())) {
+				// Add to map of new Beliefs received for each Peer
+				newBeliefs.put(addr, receivedBelief);
+				beliefReceivedCount++;
 
-					// Notify the update thread that there is something new to handle
-					log.debug("Valid belief received by peer at {}: {}"
+				// Notify the update thread that there is something new to handle
+				log.debug("Valid belief received by peer at {}: {}"
 							,getHostAddress(),receivedBelief.getValue().getHash());
-				}
-			} else {
-				log.debug("Unexpected type in event queue! {}",event.getType());
 			}
 		}
 	}
