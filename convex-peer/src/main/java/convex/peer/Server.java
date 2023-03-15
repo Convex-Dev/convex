@@ -916,7 +916,6 @@ public class Server implements Closeable {
 	public AVector<ACell> getStatusVector() {
 		Peer peer=this.getPeer();
 		SignedData<Belief> signedBelief = peer.getSignedBelief();
-		Belief belief=signedBelief.getValue();
 		
 		Hash beliefHash=signedBelief.getHash();
 		Hash statesHash=peer.getStates().getHash();
@@ -1168,8 +1167,8 @@ public class Server implements Closeable {
 	 * Note: Does not flush buffers to disk. 
 	 *
 	 * This will overwrite any previously persisted peer data.
+	 * @return True if successfully persisted, false in case of any error
 	 */
-	@SuppressWarnings("unchecked")
 	public boolean persistPeerData() {
 		AStore tempStore = Stores.current();
 		try {
