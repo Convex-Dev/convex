@@ -954,7 +954,7 @@ public class Server implements Closeable {
 		Order order=peer.getPeerOrder();
 		CVMLong cp = CVMLong.create(order.getConsensusPoint()) ;
 		CVMLong pp = CVMLong.create(order.getProposalPoint()) ;
-		CVMLong op = CVMLong.create(order.count()) ;
+		CVMLong op = CVMLong.create(order.getBlockCount()) ;
 
 		AVector<ACell> reply=Vectors.of(beliefHash,statesHash,genesisHash,peerKey,consensusHash, cp,pp,op);
 		return reply;
