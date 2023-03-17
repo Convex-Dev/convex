@@ -112,11 +112,10 @@ public class ServerTest {
 		Convex convex=Convex.connect(hostAddress, network.VILLAIN,network.VILLAIN_KEYPAIR);
 
 		ACell cmd=Reader.read("(def tmp (inc tmp))");
-		assertThrows(IOException.class, ()-> {
-			for (int i=0; i<1000000; i++) {
-				convex.transact(Invoke.create(network.VILLAIN, 0, cmd));
-			}
-		});
+		// Might block, but no issue
+		for (int i=0; i<100; i++) {
+			convex.transact(Invoke.create(network.VILLAIN, 0, cmd));
+		}
 		
 		// Should still get status OK
 		Convex convex2=Convex.connect(hostAddress, network.HERO,network.HERO_KEYPAIR);

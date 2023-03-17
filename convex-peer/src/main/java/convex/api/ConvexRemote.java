@@ -129,8 +129,12 @@ public class ConvexRemote extends Convex {
 			// loop until request is queued
 			while (id < 0) {
 				id = connection.sendTransaction(signed);
-				if (id < 0) {
-					throw new IOException("Send buffer full");
+				
+				// If we can't send yet, block briefly and try again
+				try {
+					Thread.sleep(10);
+				} catch (InterruptedException e) {
+					throw new IOException("Transaction sending interrupted",e);
 				}
 			}
 
