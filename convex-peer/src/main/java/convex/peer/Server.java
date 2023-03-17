@@ -163,7 +163,7 @@ public class Server implements Closeable {
 
 	private NIOServer nio;
 	private Thread receiverThread = null;
-	private Thread updateThread = null;
+	private Thread beliefMergeThread = null;
 
 	/**
 	 * The Peer instance current state for this server. Will be updated based on peer events.
@@ -419,9 +419,9 @@ public class Server implements Closeable {
 			receiverThread.start();
 
 			// Start Peer update thread
-			updateThread = new Thread(beliefMergeLoop, "Belief Merge Loop on port: " + port);
-			updateThread.setDaemon(true);
-			updateThread.start();
+			beliefMergeThread = new Thread(beliefMergeLoop, "Belief Merge Loop on port: " + port);
+			beliefMergeThread.setDaemon(true);
+			beliefMergeThread.start();
 
 
 			// Close server on shutdown, should be before Etch stores in priority
@@ -790,11 +790,12 @@ public class Server implements Closeable {
 	/**
 	 * Default minimum delay between proposing own transactions as a peer
 	 */
-	private static final long OWN_BLOCK_DELAY=500;
+	private static final long OWN_BLOCK_DELAY=1000;
 	
 	/**
 	 * Default minimum delay between proposing a block of transactions
 	 * Note: this limits the TPS for a single peer in terms of client transactions
+	 * Also affects latency for client confirmations by up to this amount
 	 */
 	private static final long CLIENT_BLOCK_DELAY=100;
 
@@ -1250,10 +1251,10 @@ public class Server implements Closeable {
 		manager.broadcast(msg, false);
 
 		isRunning = false;
-		if (updateThread != null) {
-			updateThread.interrupt();
+		if (beliefMergeThread != null) {
+			beliefMergeThread.interrupt();
 			try {
-				updateThread.join(100);
+				beliefMergeThread.join(100);
 			} catch (InterruptedException e) {
 				// Ignore
 			}
