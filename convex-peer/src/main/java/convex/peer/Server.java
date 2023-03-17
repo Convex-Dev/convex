@@ -666,6 +666,9 @@ public class Server implements Closeable {
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 		long oldConsensusPoint = peer.getConsensusPoint();
 
+		// possibly have client transactions to publish
+		maybePostClientTransactions();
+
 		// possibly have own transactions to publish
 		maybePostOwnTransactions();
 
@@ -782,12 +785,18 @@ public class Server implements Closeable {
 	}
 
 	private long lastOwnTransactionTimestamp=0L;
+	private long lastClientTransactionTimestamp=0L;
 
+	/**
+	 * Default minimum delay between proposing own transactions as a peer
+	 */
+	private static final long OWN_BLOCK_DELAY=500;
+	
 	/**
 	 * Default minimum delay between proposing a block of transactions
 	 * Note: this limits the TPS for a single peer in terms of client transactions
 	 */
-	private static final long OWN_BLOCK_DELAY=100;
+	private static final long CLIENT_BLOCK_DELAY=100;
 
 	/**
 	 * Gets the Peer controller Address
@@ -822,6 +831,20 @@ public class Server implements Closeable {
 	public void queueMessage(Message m) throws InterruptedException {
 		receiveQueue.put(m);
 	}
+	
+	/**
+	 * Check if the Peer want to send any of its own transactions
+	 * @param transactionList List of transactions to add to.
+	 */
+	private void maybePostClientTransactions() {
+		long ts=Utils.getCurrentTimestamp();
+		// If we already did this recently, don't try again
+		if (ts<(lastClientTransactionTimestamp+CLIENT_BLOCK_DELAY)) return;
+		
+		transactionQueue.drainTo(newTransactions);
+
+		lastClientTransactionTimestamp=ts; // mark this timestamp
+	}
 
 	/**
 	 * Check if the Peer want to send any of its own transactions
@@ -833,9 +856,6 @@ public class Server implements Closeable {
 
 		// If we already did this recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
-		
-		transactionQueue.drainTo(newTransactions);
-
 		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
 		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set

@@ -601,7 +601,7 @@ public abstract class Convex {
 	}
 
 	/**
-	 * Attempts to acquire a complete persistent data structure for the given hash
+	 * Attempts to asynchronously acquire a complete persistent data structure for the given hash
 	 * from the remote peer. Uses the current store configured for the calling
 	 * thread.
 	 *
