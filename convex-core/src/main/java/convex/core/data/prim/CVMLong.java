@@ -260,7 +260,7 @@ public final class CVMLong extends AInteger {
 		
 		BigInteger bi=BigInteger.valueOf(av);
 		bi=bi.add(BigInteger.valueOf(bv));
-		return CVMBigInteger.create(bi).toCanonical();
+		return CVMBigInteger.wrap(bi).toCanonical();
 	}
 	
 	@Override
@@ -268,7 +268,7 @@ public final class CVMLong extends AInteger {
 		if (a instanceof CVMLong)  return sub((CVMLong)a);
 		BigInteger bi=big();
 		bi=bi.subtract(a.big());
-		return CVMBigInteger.create(bi).toCanonical();
+		return CVMBigInteger.wrap(bi).toCanonical();
 	}
 	
 	public AInteger sub(CVMLong b) {
@@ -284,7 +284,7 @@ public final class CVMLong extends AInteger {
 		
 		BigInteger bi=BigInteger.valueOf(av);
 		bi=bi.subtract(BigInteger.valueOf(bv));
-		return CVMBigInteger.create(bi).toCanonical();
+		return CVMBigInteger.wrap(bi).toCanonical();
 	}
 
 	@Override
@@ -309,7 +309,7 @@ public final class CVMLong extends AInteger {
 			if ((hi==0)&&(lo>=0)) return CVMLong.create(lo);
 			if ((hi==-1)&&(lo<0)) return CVMLong.create(lo);
 			BigInteger result= BigInteger.valueOf(av).multiply(BigInteger.valueOf(bv));
-			return CVMBigInteger.create(result);
+			return CVMBigInteger.wrap(result);
 		}
 		return b.multiply(this);
 	}

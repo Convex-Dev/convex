@@ -207,7 +207,7 @@ public class Format {
 		long result = (((long) octet) << 57) >> 57; // sign extend 7th bit to 64th bit
 		int bits = 7;
 		while ((octet & 0x80) != 0) {
-			if (pos >= data.length) throw new BadFormatException("VLC encoding beyong end of array");
+			if (pos >= data.length) throw new BadFormatException("VLC encoding beyond end of array");
 			if (bits > 64) throw new BadFormatException("VLC encoding too long for long value");
 			octet = data[pos++];
 			// continue while high bit of byte set

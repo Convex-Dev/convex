@@ -48,7 +48,7 @@ public class BigIntegerParamTest {
 	
 	@Test
 	public void testCVMBigInteger() {
-		CVMBigInteger bi=CVMBigInteger.create(num);
+		CVMBigInteger bi=CVMBigInteger.wrap(num);
 		assertEquals(num,bi.getBigInteger());
 		
 		BigIntegerTest.doBigTest(bi);

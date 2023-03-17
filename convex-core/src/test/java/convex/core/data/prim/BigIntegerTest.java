@@ -12,7 +12,9 @@ import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.core.exceptions.BadFormatException;
 
 public class BigIntegerTest {
 
@@ -38,6 +40,17 @@ public class BigIntegerTest {
 		assertEquals(BigInteger.ONE,bi.getBigInteger());
 		
 		doBigTest(bi);
+	}
+	
+	@Test public void test0980Regression () {
+		Blob b=Blob.fromHex("0980");
+		assertThrows(BadFormatException.class,()->Format.read(b));
+		
+		BigInteger b1=BigInteger.valueOf(-128);
+		CVMBigInteger cb=CVMBigInteger.wrap(b1);
+		Blob bb=cb.getEncoding();
+		assertNotEquals(b,bb);
+		assertNotEquals(b,Format.encodedBlob(cb));
 	}
 	
 	@Test public void testSmallestPositive() {
@@ -80,7 +93,7 @@ public class BigIntegerTest {
 		BigInteger big=bi.getBigInteger();
 		assertSame(big,bi.getBigInteger());
 		
-		CVMBigInteger bi2=CVMBigInteger.create(big);
+		CVMBigInteger bi2=CVMBigInteger.wrap(big);
 		assertEquals(bi.getEncoding(),bi2.getEncoding());
 		assertEquals(bi,bi2);
 		
@@ -109,7 +122,7 @@ public class BigIntegerTest {
 	}
 	
 	@Test public void testDoubleCompares() {
-		assertTrue(CVMDouble.ZERO.compareTo(CVMBigInteger.create(BigInteger.ZERO))==0);
+		assertTrue(CVMDouble.ZERO.compareTo(CVMBigInteger.wrap(BigInteger.ZERO))==0);
 		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMBigInteger.MIN_POSITIVE)>0);
 		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMBigInteger.MIN_NEGATIVE)<0);
 	}

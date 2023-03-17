@@ -828,8 +828,6 @@ public class Server implements Closeable {
 	 * @param transactionList List of transactions to add to.
 	 */
 	private void maybePostOwnTransactions() {
-		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
-
 		State s=getPeer().getConsensusState();
 		long ts=Utils.getCurrentTimestamp();
 
@@ -840,12 +838,15 @@ public class Server implements Closeable {
 
 		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
+		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
+		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
+
 		String desiredHostname=getHostname(); // Intended hostname
 		AccountKey peerKey=getPeerKey();
 		PeerStatus ps=s.getPeer(peerKey);
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();
-
+		
 		// Try to set hostname if not correctly set
 		trySetHostname:
 		if (!Utils.equals(desiredHostname, currentHostname)) {

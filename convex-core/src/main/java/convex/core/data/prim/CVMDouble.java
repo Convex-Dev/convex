@@ -231,7 +231,7 @@ public final class CVMDouble extends ANumeric {
 		if ((value<=Long.MAX_VALUE)&&(value>=Long.MIN_VALUE)) return CVMLong.create((long)value);
 		BigDecimal bd=BigDecimal.valueOf(value);
 		BigInteger bi=bd.toBigInteger();
-		return CVMBigInteger.create(bi);
+		return CVMBigInteger.wrap(bi);
 	}
 
 

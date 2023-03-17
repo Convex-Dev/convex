@@ -34,13 +34,25 @@ public class CVMBigInteger extends AInteger {
 		this.data=value;
 	}
 
+	/**
+	 * Creates a CVMBigInteger
+	 * WARNING: might not be canonical
+	 * @param bs Bytes representing BigInteger value. Highest bit assumed to be sign.
+	 * @return CVMBigInteger instance
+	 */
 	public static CVMBigInteger create(byte[] bs) {
 		byte[] tbs=Utils.trimBigIntegerLeadingBytes(bs);
 		if (tbs==bs) tbs=tbs.clone(); // Defensive copy just in case
 		return new CVMBigInteger(Blob.wrap(tbs),null);
 	}
 	
-	public static CVMBigInteger create(BigInteger value) {
+	/**
+	 * Creates a CVMBigInteger
+	 * WARNING: might not be canonical
+	 * @param value Java BigInteger
+	 * @return CVMBigInteger instance
+	 */
+	public static CVMBigInteger wrap(BigInteger value) {
 		return new CVMBigInteger(null,value);
 	}
 	
@@ -219,19 +231,19 @@ public class CVMBigInteger extends AInteger {
 	public APrimitive abs() {
 		BigInteger bi=big();
 		if (bi.signum()>=0) return this;
-		return create(bi.abs());
+		return wrap(bi.abs());
 	}
 
 	@Override
 	public AInteger inc() {
 		BigInteger bi=big().add(BigInteger.ONE);
-		return (AInteger) create(bi).getCanonical();
+		return (AInteger) wrap(bi).getCanonical();
 	}
 
 	@Override
 	public AInteger dec() {
 		BigInteger bi=big().subtract(BigInteger.ONE);
-		return (AInteger) create(bi).getCanonical();
+		return (AInteger) wrap(bi).getCanonical();
 	}
 	
 	@Override
@@ -253,21 +265,21 @@ public class CVMBigInteger extends AInteger {
 		
 		BigInteger bi=big();
 		bi=bi.add(a.big());
-		return CVMBigInteger.create(bi).toCanonical();
+		return CVMBigInteger.wrap(bi).toCanonical();
 	}
 	
 	@Override
 	public AInteger sub(AInteger b) {
 		BigInteger bi=big();
 		bi=bi.subtract(b.big());
-		return CVMBigInteger.create(bi).toCanonical();
+		return CVMBigInteger.wrap(bi).toCanonical();
 	}
 	
 	@Override
 	public AInteger negate() {
 		BigInteger bi=big();
 		bi=bi.negate();
-		return CVMBigInteger.create(bi).toCanonical();
+		return CVMBigInteger.wrap(bi).toCanonical();
 	}
 
 	/**
@@ -277,7 +289,7 @@ public class CVMBigInteger extends AInteger {
 	 */
 	public static CVMBigInteger parse(String s) {
 		BigInteger bi=new BigInteger(s);
-		return create(bi);
+		return wrap(bi);
 	}
 
 	@Override
@@ -298,7 +310,7 @@ public class CVMBigInteger extends AInteger {
 		} else {
 			bb=((CVMBigInteger)b).getBigInteger();
 		}
-		return create(big().multiply(bb));
+		return wrap(big().multiply(bb));
 	}
 
 
