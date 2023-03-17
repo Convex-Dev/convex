@@ -21,8 +21,8 @@ import convex.core.util.Utils;
  */
 public class CVMBigInteger extends AInteger {
 
-	public static final CVMBigInteger MIN_POSITIVE = create(new byte[] {0,-128,0,0,0,0,0,0,0});
-	public static final CVMBigInteger MIN_NEGATIVE = create(new byte[] {-1,127,-1,-1,-1,-1,-1,-1,-1});
+	public static final CVMBigInteger MIN_POSITIVE = wrap(new byte[] {0,-128,0,0,0,0,0,0,0});
+	public static final CVMBigInteger MIN_NEGATIVE = wrap(new byte[] {-1,127,-1,-1,-1,-1,-1,-1,-1});
 	protected static final long LONG_BYTELENGTH = 8;
 	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
@@ -40,7 +40,7 @@ public class CVMBigInteger extends AInteger {
 	 * @param bs Bytes representing BigInteger value. Highest bit assumed to be sign.
 	 * @return CVMBigInteger instance
 	 */
-	public static CVMBigInteger create(byte[] bs) {
+	public static CVMBigInteger wrap(byte[] bs) {
 		byte[] tbs=Utils.trimBigIntegerLeadingBytes(bs);
 		if (tbs==bs) tbs=tbs.clone(); // Defensive copy just in case
 		return new CVMBigInteger(Blob.wrap(tbs),null);

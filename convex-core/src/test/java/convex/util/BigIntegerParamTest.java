@@ -28,6 +28,8 @@ public class BigIntegerParamTest {
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] { 
 			{ "Zero", BigInteger.ZERO },
+			{ "Max Long", BigInteger.valueOf(Long.MAX_VALUE) },
+			{ "Min Long", BigInteger.valueOf(Long.MIN_VALUE) },
 			{ "Short hex string CAFEBABE", Utils.hexToBigInt("CAFEBABE") },
 			{ "A big number", Utils.hexToBigInt(
 					"506bc1dc099358e5137292f4efdd57e400f29ba5132aa5d12b18dac1c1f6aaba645c0b7b58158babbfa6c6cd5a48aa7340a8749176b120e8516216787a13dc76") },

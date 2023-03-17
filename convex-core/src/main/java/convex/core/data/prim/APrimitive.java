@@ -1,8 +1,6 @@
 package convex.core.data.prim;
 
 import convex.core.data.ACell;
-import convex.core.data.Ref;
-import convex.core.data.RefDirect;
 
 /**
  * Abstract base class for CVM primitive values.
@@ -12,15 +10,6 @@ public abstract  class APrimitive extends ACell {
 	@Override
 	public boolean isCanonical() {
 		return true;
-	}
-	
-	@Override
-	@SuppressWarnings("unchecked")
-	protected <R extends ACell> Ref<R> createRef() {
-		// Create Ref at maximum status to reflect internal embedded nature
-		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.INTERNAL_FLAGS);
-		cachedRef=newRef;
-		return (Ref<R>) newRef;
 	}
 
 	@Override

@@ -24,7 +24,7 @@ public class BigIntegerTest {
 	}
 	
 	@Test public void testZero() {
-		CVMBigInteger bi=CVMBigInteger.create(new byte[] {0});
+		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {0});
 		assertEquals(0,bi.longValue());
 		assertEquals(0.0,bi.doubleValue());
 		assertEquals(BigInteger.ZERO,bi.getBigInteger());
@@ -34,10 +34,14 @@ public class BigIntegerTest {
 	}
 	
 	@Test public void testOne() {
-		CVMBigInteger bi=CVMBigInteger.create(new byte[] {1});
+		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {1});
 		assertEquals(1,bi.longValue());
 		assertEquals(1.0,bi.doubleValue());
 		assertEquals(BigInteger.ONE,bi.getBigInteger());
+		
+		// canonicality tests
+		assertFalse(bi.isCanonical());
+		assertTrue(bi.getRef().getValue().isCanonical());
 		
 		doBigTest(bi);
 	}
@@ -53,8 +57,17 @@ public class BigIntegerTest {
 		assertNotEquals(b,Format.encodedBlob(cb));
 	}
 	
+	@Test 
+	public void testByteArrayConstruction() {
+		byte[] bs=new byte[] {-1,-1,-1,-1,-1,-1,-1,-1,-128};
+		CVMBigInteger b=CVMBigInteger.wrap(bs);
+		assertFalse(b.isCanonical());
+		assertEquals(1,b.blob().count());
+		assertEquals(CVMLong.create(-128),b.getCanonical());
+	}
+	
 	@Test public void testSmallestPositive() {
-		CVMBigInteger bi=CVMBigInteger.create(new byte[] {0,-128,0,0,0,0,0,0,0});
+		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {0,-128,0,0,0,0,0,0,0});
 		assertEquals(CVMBigInteger.MIN_POSITIVE,bi);
 
 		assertEquals(Long.MIN_VALUE,bi.longValue());
@@ -68,7 +81,7 @@ public class BigIntegerTest {
 
 		
 		// Extra leading zeros should get ignored
-		assertEquals(bi,CVMBigInteger.create(new byte[] {0,0,0,-128,0,0,0,0,0,0,0}));
+		assertEquals(bi,CVMBigInteger.wrap(new byte[] {0,0,0,-128,0,0,0,0,0,0,0}));
 		
 		doBigTest(bi);
 	}
