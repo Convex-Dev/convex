@@ -377,14 +377,16 @@ public abstract class Convex {
 	/**
 	 * Submits a transaction to the Convex network, returning a future once the
 	 * transaction has been successfully queued. Signs the transaction with the
-	 * currently set key pair
+	 * currently set key pair.
 	 *
 	 * Should be thread safe as long as multiple clients do not attempt to submit
 	 * transactions for the same account concurrently.
+	 * 
+	 * May block briefly if the send buffer is full.
 	 *
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction
-	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
 	 */
 	public synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
 		if (transaction.getOrigin() == null) {
