@@ -163,6 +163,7 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	protected int encodeRaw(byte[] bs, int pos) {
 		ABlob b=blob();
+		if (b.count()<=8) throw new IllegalStateException("Big Integer not canonical");
 		return b.encodeRaw(bs, pos);
 	}
 

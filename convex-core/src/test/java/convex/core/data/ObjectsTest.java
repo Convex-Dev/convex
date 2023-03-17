@@ -246,6 +246,7 @@ public class ObjectsTest {
 			assertTrue(canon.isCanonical());
 			assertEquals(a,canon);
 			assertEquals(enc,canon.getEncoding());
+			assertTrue(a.getRef().getValue().isCanonical());
 		}
 		
 		// Encoding of canonical object should be cached and equal to initial value
