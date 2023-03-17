@@ -747,8 +747,8 @@ public class Server implements Closeable {
 	}
 	
 	/**
-	 * Gets the number of belief broadcasts made by this Peer
-	 * @return Count of broadcasts from this Server instance
+	 * Gets the number of beliefs received by this Peer
+	 * @return Count of the beliefs received by this Server instance
 	 */
 	public long getBeliefReceivedCount() {
 		return beliefReceivedCount;
