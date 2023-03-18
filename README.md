@@ -12,7 +12,7 @@ It is designed as a full stack solution for decentralised application and econom
 - Lambda Calculus based VM supporting Turing complete Smart Contracts
 - High transaction throughput (tens of thousands of write transactions per second, scaling to millions in the future)
 - Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
-- 100% Green - energy efficiency using the the Convergent Proof of Stake consensus algorithm
+- 100% Green - energy efficiency using the Convergent Proof of Stake consensus algorithm
 - Integrated on-chain compiler (Convex Lisp)
 
 ## About this repository
