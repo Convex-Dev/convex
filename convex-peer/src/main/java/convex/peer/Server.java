@@ -694,9 +694,7 @@ public class Server implements Closeable {
 		if (!(updated||published)) return false;
 
 		// At this point we know our Order should have changed
-		final Belief belief = peer.getBelief();
-
-		broadcastBelief(belief);
+		broadcastBelief(peer);
 
 		// Report transaction results
 		long newConsensusPoint = peer.getConsensusPoint();
@@ -719,7 +717,9 @@ public class Server implements Closeable {
 	private long beliefBroadcastCount=0L;
 	private long beliefReceivedCount=0L;
 
-	private void broadcastBelief(Belief belief) {
+	private void broadcastBelief(Peer peer) {
+		Belief belief=peer.getBelief();
+		
 		// At this point we know something updated our belief, so we want to rebroadcast
 		// belief to network
 		Consumer<Ref<ACell>> noveltyHandler = r -> {
@@ -1131,7 +1131,7 @@ public class Server implements Closeable {
 					if (beliefUpdated||((lastBroadcastBelief+Constants.MAX_REBROADCAST_DELAY)<timestamp)) {
 						// rebroadcast only if there is still stuff outstanding for consensus
 						if (peer.getConsensusPoint()<peer.getPeerOrder().getBlockCount()) {
-							broadcastBelief(peer.getBelief());
+							broadcastBelief(peer);
 						}
 					}
 
