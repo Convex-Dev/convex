@@ -56,7 +56,7 @@ public class MessageReceiver {
 		this.connection = pc;
 	}
 
-	public Consumer<Message> getAction() {
+	public Consumer<Message> getReceiceAction() {
 		return action;
 	}
 
@@ -160,6 +160,13 @@ public class MessageReceiver {
 		ACell payload = connection.getStore().decode(encoding);
 
 		Message message = Message.create(connection, type, payload);
+		
+		// If we have DATA, it might complete a previous message
+		if (type==MessageType.DATA) {
+			if (connection.maybeProcessPartial(message)) return;
+		}
+		
+		// Otherwise, send to a message queue
 		receivedMessageCount++;
 		if (action != null) {
 			try {

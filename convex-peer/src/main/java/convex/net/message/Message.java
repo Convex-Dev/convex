@@ -75,6 +75,13 @@ public abstract class Message {
 	public <T extends ACell> T getPayload() {
 		return (T) payload;
 	}
+	
+	public Blob getPayloadEncoding() {
+		if (encoding==null) {
+			encoding=Format.encodedBlob(payload);
+		}
+		return encoding;
+	}
 
 	public MessageType getType() {
 		return type;
@@ -155,6 +162,13 @@ public abstract class Message {
 	 * @return True if request sent, false otherwise
 	 */
 	public abstract boolean sendMissingData(Hash hash);
+
+	/**
+	 * Gets the Connection instance associated with this message, or null if no
+	 * connection exists (presumably a local Message) 
+	 * @return Connection instance
+	 */
+	public abstract Connection getConnection();
 
 
 

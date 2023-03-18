@@ -188,12 +188,6 @@ public class Server implements Closeable {
 	 */
 	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
 
-	/**
-	 * The set of queued partial messages pending missing data.
-	 *
-	 * Delivery will be re-attempted when missing data is provided
-	 */
-	private HashMap<Hash, Message> partialMessages = new HashMap<Hash, Message>();
 
 	/**
 	 * The list of new beliefs received from remote peers the block being created
@@ -520,13 +514,7 @@ public class Server implements Closeable {
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
-			try {
-				registerPartialMessage(missingHash, m);
-				m.sendMissingData(missingHash);
-				log.trace("Requested missing data {} for partial message",missingHash);
-			} catch (Exception ex) {
-				log.warn( "Exception while requesting missing data: {}" + ex);
-			}
+			m.getConnection().registerPartialMessage(missingHash,m);
 		} catch (BadFormatException | ClassCastException | NullPointerException e) {
 			log.warn("Error processing client message: {}", e);
 		}
@@ -611,44 +599,8 @@ public class Server implements Closeable {
 		raiseServerChange("connection");
 	}
 
-	/**
-	 * Checks if received data fulfils the requirement for a partial message If so,
-	 * process the message again.
-	 *
-	 * @param hash
-	 * @return true if the data request resulted in a re-queued message, false
-	 *         otherwise
-	 */
-	private boolean maybeProcessPartial(Hash hash) {
-		Message m;
-		synchronized (partialMessages) {
-			m = partialMessages.get(hash);
 
-			if (m != null) {
-				log.trace( "Attempting to re-queue partial message due to received hash: ",hash);
-				if (receiveQueue.offer(m)) {
-					partialMessages.remove(hash);
-					return true;
-				} else {
-					log.warn( "Queue full for message with received hash: {}", hash);
-				}
-			}
-		}
-		return false;
-	}
 
-	/**
-	 * Stores a partial message for potential later handling.
-	 *
-	 * @param missingHash Hash of missing data dependency
-	 * @param m           Message to re-attempt later when missing data is received.
-	 */
-	private void registerPartialMessage(Hash missingHash, Message m) {
-		synchronized (partialMessages) {
-			log.trace( "Registering partial message with missing hash: " ,missingHash);
-			partialMessages.put(missingHash, m);
-		}
-	}
 
 	/**
 	 * Register of client interests in receiving transaction responses
@@ -1025,7 +977,7 @@ public class Server implements Closeable {
 	private void processData(Message m) {
 		ACell payload = m.getPayload();
 
-		// TODO: be smarter about this? hold a per-client queue for a while?
+		// Note: partial messages are handled in Connection now
 		Ref<?> r = Ref.get(payload);
 		r = r.persistShallow();
 		Hash payloadHash = r.getHash();
@@ -1034,8 +986,6 @@ public class Server implements Closeable {
 			log.trace( "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
 					+ payloadHash.toHexString() + " and encoding: " + Format.encodedBlob(payload).toHexString());
 		}
-		// if our data satisfies a missing data object, need to process it
-		maybeProcessPartial(r.getHash());
 	}
 
 	/**

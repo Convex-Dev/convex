@@ -8,6 +8,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
+import convex.net.Connection;
 import convex.net.MessageType;
 import convex.peer.Server;
 
@@ -70,6 +71,11 @@ public class MessageLocal extends Message {
 			store.storeRef(ref, Ref.STORED, null);
 		} 
 		return true;
+	}
+
+	@Override
+	public Connection getConnection() {
+		return null;
 	}
 
 }

@@ -12,6 +12,7 @@ import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Random;
 import java.util.Set;
@@ -26,6 +27,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -42,7 +44,7 @@ import convex.net.message.Message;
 
 /**
  * <p>
- * Class representing a low-level Connection between network participants.
+ * Class representing the low-level network Connection between network participants.
  * </p>
  *
  * <p>
@@ -766,5 +768,52 @@ public class Connection {
 
 	public boolean isTrusted() {
 		return trustedPeerKey != null;
+	}
+	
+	/**
+	 * The set of queued partial messages pending missing data.
+	 *
+	 * Delivery will be re-attempted when missing data is provided
+	 */
+	private HashMap<Hash, Message> partialMessages = new HashMap<Hash, Message>();
+
+	public void registerPartialMessage(Hash missingHash, Message m) {
+		try {
+			synchronized (partialMessages) {
+				log.trace( "Registering partial message with missing hash: " ,missingHash);
+				partialMessages.put(missingHash, m);
+			}
+			
+			boolean requested = m.sendMissingData(missingHash);
+			log.trace("Requested missing data {} for partial message",missingHash);
+		} catch (Exception ex) {
+			log.warn( "Exception while requesting missing data: {}", ex);
+		}
+	}
+	
+	/**
+	 * Checks if received data Message fulfils the requirement for a partial message If so,
+	 * process the message again.
+	 *
+	 * @param hash
+	 * @return true if the data request resulted in a re-queued message, false
+	 *         otherwise
+	 */
+	boolean maybeProcessPartial(Message dm) {
+		Blob b=dm.getPayloadEncoding();
+		Hash hash=b.getContentHash();
+		
+		Message pm;
+		synchronized (partialMessages) {
+			pm = partialMessages.get(hash);
+
+			if (pm != null) {
+				partialMessages.remove(hash);
+				log.trace( "Attempting to re-queue partial message due to received hash: {}",hash);
+				receiver.getReceiceAction().accept(pm);
+				return true;
+			}
+		}
+		return false;
 	}
 }

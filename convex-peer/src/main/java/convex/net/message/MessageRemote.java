@@ -22,10 +22,7 @@ public class MessageRemote extends Message {
 		this.connection=conn;
 	}
 	
-	/**
-	 * Gets the Connection instance associated with this Message
-	 * @return Connection instance. May be null.
-	 */
+	@Override
     public Connection getConnection() {
 		return connection;
 	}
