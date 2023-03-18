@@ -32,7 +32,7 @@ public abstract class AInteger extends ANumeric {
 	
 	/**
 	 * Parse an integer value as a canonical value
-	 * @param s
+	 * @param s String to parse
 	 * @return AInteger instance
 	 */
 	public static AInteger parse(String s) {

@@ -55,6 +55,8 @@ public class BigIntegerTest {
 		Blob bb=cb.getEncoding();
 		assertNotEquals(b,bb);
 		assertNotEquals(b,Format.encodedBlob(cb));
+		
+		ObjectsTest.doAnyValueTests(cb);
 	}
 	
 	@Test 
