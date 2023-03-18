@@ -21,7 +21,7 @@ public class MessageLocal extends Message {
 	protected Consumer<Result> resultHandler;
 	
 	protected MessageLocal(MessageType type, ACell payload, Server server, Consumer<Result> handler) {
-		super(type, payload);
+		super(type, payload,null);
 		this.server=server;
 		this.resultHandler=handler;
 	}

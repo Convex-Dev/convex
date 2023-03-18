@@ -582,7 +582,7 @@ public class ConnectionManager {
 		synchronized(connections) {
 			for (Connection pc : connections.values()) {
 				try {
-					if ( (requireTrusted && pc.isTrusted()) || !requireTrusted) {
+					if ( !requireTrusted || (pc.isTrusted())) {
 						pc.sendMessage(msg);
 					}
 				} catch (IOException e) {

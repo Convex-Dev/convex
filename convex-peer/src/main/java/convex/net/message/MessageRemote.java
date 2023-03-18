@@ -1,5 +1,7 @@
 package convex.net.message;
 
+import java.io.IOException;
+
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
@@ -16,7 +18,7 @@ public class MessageRemote extends Message {
 
 
 	protected MessageRemote(Connection conn, MessageType type, ACell payload) {
-		super(type, payload);
+		super(type, payload,null);
 		this.connection=conn;
 	}
 	
@@ -82,7 +84,7 @@ public class MessageRemote extends Message {
 		if (pc==null) return false;
 		try {
 			pc.sendData(data);
-		} catch (Exception e) {
+		} catch (IOException e) {
 			return false;
 		}
 		return true;
@@ -94,7 +96,7 @@ public class MessageRemote extends Message {
 		if (pc==null) return false;
 		try {
 			pc.sendMissingData(hash);
-		} catch (Exception e) {
+		} catch (IOException e) {
 			return false;
 		}
 		return true;

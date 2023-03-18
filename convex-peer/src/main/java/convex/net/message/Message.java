@@ -7,9 +7,12 @@ import convex.core.Belief;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.MessageType;
@@ -28,11 +31,13 @@ public abstract class Message {
 	
 	static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
-	protected final ACell payload;
-	protected final MessageType type;
+	protected ACell payload;
+	protected Blob encoding; // encoding of payload
+	protected MessageType type;
 
-	protected Message(MessageType type, ACell payload) {
+	protected Message(MessageType type, ACell payload, Blob encoding) {
 		this.type = type;
+		this.encoding=encoding;
 		this.payload = payload;
 	}
 
@@ -75,15 +80,10 @@ public abstract class Message {
 		return type;
 	}
 
-	public ACell getErrorCode() {
-		ACell et=((AVector<?>)payload).get(2);
-		return et;
-	}
-
 	@Override
 	public String toString() {
 		// TODO. Are tags really needed in `.toString`?
-		return "#message {:type " + getType() + " :payload " + Utils.print(payload) + "}";
+		return "#message {:type " + getType() + " :payload " + Utils.print(getPayload()) + "}";
 	}
 
 	/**
@@ -92,6 +92,7 @@ public abstract class Message {
 	 * @return Message ID, or null if the message type does not use message IDs
 	 */
 	public CVMLong getID() {
+		ensurePayload();
 		switch (type) {
 			// Query and transact use a vector [ID ...]
 			case QUERY:
@@ -104,6 +105,16 @@ public abstract class Message {
 			case STATUS: return (CVMLong)(payload);
 
 			default: return null;
+		}
+	}
+
+	private void ensurePayload() {
+		if (payload==null) {
+			try {
+				payload=Format.read(encoding);
+			} catch (BadFormatException e) {
+				throw Utils.sneakyThrow(e);
+			}
 		}
 	}
 

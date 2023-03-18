@@ -125,7 +125,8 @@ public class Server implements Closeable {
 	private BlockingQueue<SignedData<Belief>> beliefQueue;
 
 	/**
-	 * Message consumer that simply enqueues received messages received by this Server
+	 * Message Consumer that simply enqueues received messages received by this peer
+	 * Called on NIO thread: should never block for long
 	 */
 	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
@@ -679,7 +680,7 @@ public class Server implements Closeable {
 		// incoming beliefs
 		if ((!published) && newBeliefs.isEmpty()) return false;
 
-		// Update Peer timestamp first. This determines what we might accept.
+		// Update Peer timestamp. This determines what we might accept.
 		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 		boolean updated = maybeMergeBeliefs();
@@ -732,7 +733,6 @@ public class Server implements Closeable {
 
 		Message msg = Message.createBelief(sb);
 
-        // at the moment broadcast to all peers trusted or not TODO: recheck this
 		manager.broadcast(msg, false);
 		lastBroadcastBelief=Utils.getCurrentTimestamp();
 		beliefBroadcastCount++;
@@ -1331,6 +1331,10 @@ public class Server implements Closeable {
 		return config;
 	}
 
+	/**
+	 * Gets the action to perform for an incoming client message
+	 * @return Message consumer
+	 */
 	public Consumer<Message> getReceiveAction() {
 		return peerReceiveAction;
 	}
