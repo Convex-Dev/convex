@@ -143,6 +143,11 @@ public class Server implements Closeable {
 	 * Connection manager instance.
 	 */
 	protected ConnectionManager manager;
+	
+	/**
+	 * Connection manager instance.
+	 */
+	protected BeliefPropagator propagator;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -230,6 +235,7 @@ public class Server implements Closeable {
 			this.config = config;
 			// now setup the connection manager
 			this.manager = new ConnectionManager(this);
+			this.propagator = new BeliefPropagator(this);
 
 			this.peer = establishPeer();
 
