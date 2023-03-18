@@ -88,7 +88,7 @@ public class Init {
 		// Set up memory exchange. Initially 1GB available at 1000 per byte. (one diamond coin liquidity)
 		{
 			long memoryCoins = 1 * Coin.DIAMOND;
-			accts = addMemoryExchange(accts, MEMORY_EXCHANGE_ADDRESS, memoryCoins, 1000000000L);
+			accts = addMemoryExchange(accts, MEMORY_EXCHANGE_ADDRESS, memoryCoins, Constants.INITIAL_MEMORY_POOL);
 			supply -= memoryCoins;
 		}
 
