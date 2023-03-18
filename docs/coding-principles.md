@@ -46,7 +46,7 @@ that a higher level operation can determine what step to take.
 
 ### Common sense
 
-Any of the the above principles can be overridden by reason, evidence and common sense.
+Any of the above principles can be overridden by reason, evidence and common sense.
 
 "The three great essentials to achieve anything worthwhile are, first, hard work; second, stick-to-itiveness; third, common sense."
 ― Thomas Edison
@@ -58,7 +58,7 @@ Any of the the above principles can be overridden by reason, evidence and common
 decentralised systems.
 
 - *Lisp* - for demonstrating the power of homoiconicity, and the ability to bootstrap a
-languge ecosystem with just a few core primitives closely linked to the Lambda Calculus.
+language ecosystem with just a few core primitives closely linked to the Lambda Calculus.
 
 - *Clojure* - primarily for its syntax and functional style, an elegant evolution of Lisp
 for the modern age.
