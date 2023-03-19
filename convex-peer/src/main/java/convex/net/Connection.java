@@ -31,6 +31,7 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -792,7 +793,7 @@ public class Connection {
 	}
 	
 	/**
-	 * Checks if received data Message fulfils the requirement for a partial message If so,
+	 * Checks if received data Message fulfils the requirement for a partial message. If so,
 	 * process the message again.
 	 *
 	 * @param hash
@@ -800,8 +801,10 @@ public class Connection {
 	 *         otherwise
 	 */
 	boolean maybeProcessPartial(Message dm) {
-		Blob b=dm.getPayloadEncoding();
-		Hash hash=b.getContentHash();
+		ACell cell=dm.getPayload();
+		Ref<?> r = Ref.get(cell);
+		r = r.persistShallow();
+		Hash hash=cell.getHash();
 		
 		Message pm;
 		synchronized (partialMessages) {

@@ -95,7 +95,7 @@ public class ConvexRemoteTest {
 			}
 			for (int i = 0; i < n; i++) {
 				Result r = rs[i].get(6000, TimeUnit.MILLISECONDS);
-				assertNull(r.getErrorCode(), "Error:" + r.toString());
+				assertNull(r.getErrorCode(), ()->"Error:" + r.toString());
 			}
 		}
 	}
