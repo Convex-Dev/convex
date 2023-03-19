@@ -219,6 +219,14 @@ public class Connection {
 	public long getReceivedCount() {
 		return receiver.getReceivedCount();
 	}
+	
+	/**
+	 * Sets an optional additional message receiver hook (for debugging / observability purposes)
+	 * @param hook Hook to call when a message is received
+	 */
+	public void setReceiveHook(Consumer<Message> hook) {
+		receiver.setHook(hook);
+	}
 
 	/**
 	 * Returns the remote SocketAddress associated with this connection, or null if

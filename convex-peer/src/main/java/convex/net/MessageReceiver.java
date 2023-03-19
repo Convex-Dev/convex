@@ -45,6 +45,7 @@ public class MessageReceiver {
 	private ByteBuffer buffer = ByteBuffer.allocate(RECEIVE_BUFFER_SIZE);
 
 	private final Consumer<Message> action;
+	private Consumer<Message> hook=null;
 	private final Connection connection;
 
 	private long receivedMessageCount = 0;
@@ -161,6 +162,9 @@ public class MessageReceiver {
 
 		Message message = Message.create(connection, type, payload);
 		
+		// call the receiver hook, if registered
+		maybeCallHook(message);
+		
 		// If we have DATA, it might complete a previous message
 		if (type==MessageType.DATA) {
 			if (connection.maybeProcessPartial(message)) return;
@@ -179,6 +183,21 @@ public class MessageReceiver {
 		} else {
 			log.warn("Ignored message because no receive action set: " + message);
 		}
+	}
+
+	private void maybeCallHook(Message message) {
+		Consumer<Message> hook=this.hook;
+		if (hook!=null) {
+			hook.accept(message);
+		}
+	}
+
+	/**
+	 * Sets an optional additional message receiver hook (for debugging / observability purposes)
+	 * @param hook Hook to call when a message is received
+	 */
+	public void setHook(Consumer<Message> hook) {
+		this.hook = hook;
 	}
 
 }

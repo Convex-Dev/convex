@@ -21,11 +21,13 @@ import convex.core.crypto.Ed25519Signature;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
+import convex.net.Connection;
 import convex.peer.TestNetwork;
 
 /**
@@ -97,6 +99,26 @@ public class ConvexRemoteTest {
 				Result r = rs[i].get(6000, TimeUnit.MILLISECONDS);
 				assertNull(r.getErrorCode(), ()->"Error:" + r.toString());
 			}
+		}
+	}
+	
+	@Test
+	public void testReceivedCount() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+		synchronized (network.SERVER) {
+			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			Connection conn=convex.getConnection();
+
+			long seq=convex.getSequence();
+			assertEquals(1,conn.getReceivedCount());
+			
+			// conn.setReceiveHook(m-> System.out.println(m));
+			
+			convex.querySync("'foo");
+			assertEquals(2,conn.getReceivedCount());
+			
+			Result r=convex.transactSync("*sequence*");
+			assertEquals(seq+1,RT.ensureLong(r.getValue()).longValue());
+			assertEquals(3,conn.getReceivedCount());
 		}
 	}
 
