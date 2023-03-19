@@ -443,7 +443,9 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		if (newEntries==entries) return this;
 		// Note: we assume no key hashes have changed
-		return new MapLeaf(newEntries);
+		MapLeaf result= new MapLeaf(newEntries);
+		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
+		return result;
 	}
 
 	/**

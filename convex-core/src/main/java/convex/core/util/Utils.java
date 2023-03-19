@@ -1352,7 +1352,8 @@ public class Utils {
 
 	private synchronized static ExecutorService getExecutor() {
 		if (executor==null) {
-			ExecutorService ex = Executors.newFixedThreadPool(100);
+			ExecutorService ex = Executors.newFixedThreadPool(8);
+			executor=ex;
 			Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
 				// Try a gentle termination. If not fast enough, terminate with extreme prejudice
 				ex.shutdown();
@@ -1364,7 +1365,6 @@ public class Utils {
 					ex.shutdownNow();
 				}
 			});
-			executor=ex;
 		}
 		return executor;
 	}

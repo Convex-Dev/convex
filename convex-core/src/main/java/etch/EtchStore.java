@@ -12,6 +12,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 
@@ -123,10 +124,10 @@ public class EtchStore extends AStore {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T extends ACell> Ref<T> refForHash(Hash hash) {
+	public <T extends ACell> RefSoft<T> refForHash(Hash hash) {
 		try {
-			Ref<ACell> existing = etch.read(hash);
-			return (Ref<T>) existing;
+			RefSoft<ACell> existing = etch.read(hash);
+			return (RefSoft<T>) existing;
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -134,23 +135,25 @@ public class EtchStore extends AStore {
 
 	@Override
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-		return storeRef(ref, noveltyHandler, status, false);
+		return storeRef(ref, status, noveltyHandler, false);
 	}
 
 	@Override
 	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
-		return storeRef(ref, noveltyHandler, status, true);
+		return storeRef(ref, status, noveltyHandler, true);
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, Consumer<Ref<ACell>> noveltyHandler, int requiredStatus,
+	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
 			boolean topLevel) {
+		// TODO: remove this?, probably dangerous if in different store
 		// first check if the Ref is already persisted to required level
-		if (ref.getStatus() >= requiredStatus) {
-			// we are done as long as not top level
-			if (!topLevel) return ref;
-		}
+		//if (ref.getStatus() >= requiredStatus) {
+		//	// we are done as long as not top level
+		//	if (!topLevel) return ref;
+		//}
 
+		// Get the value. If we are persisting, should be there!
 		ACell cell = ref.getValue();
 		
 		// Quick handling for null
@@ -162,7 +165,7 @@ public class EtchStore extends AStore {
 		// if not embedded, worth checking store first for existing value
 		if (!embedded) {
 			hash = ref.getHash();
-			Ref<T> existing = refForHash(hash);
+			RefSoft<T> existing = refForHash(hash);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
@@ -173,8 +176,9 @@ public class EtchStore extends AStore {
 
 		// beyond STORED level, need to recursively persist child refs if they exist
 		if ((requiredStatus > Ref.STORED)&&(cell.getRefCount()>0)) {
+			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
-				return storeRef((Ref<ACell>) r, noveltyHandler, requiredStatus, false);
+				return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false);
 			};
 
 			// need to do recursive persistence
@@ -183,9 +187,13 @@ public class EtchStore extends AStore {
 
 			// perhaps need to update Ref
 			if (cell != newObject) {
+				if (ref instanceof RefSoft) {
+					ref=((RefSoft<T>)ref).withStore(this); 
+				}
+				
 				ref = ref.withValue((T) newObject);
 				cell=newObject;
-				cell.attachRef(ref); // make sure we are using current ref within cell
+				cell.attachRef(ref); // make sure we are using current ref within new cell
 			}
 		}
 

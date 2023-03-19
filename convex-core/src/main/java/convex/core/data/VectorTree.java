@@ -633,7 +633,9 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			}
 		}
 		if (newChildren==children) return this; // no change, safe to return this
-		return new VectorTree<>(newChildren, count);
+		VectorTree<T> result= new VectorTree<>(newChildren, count);
+		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
+		return result;
 	}
 
 	@Override

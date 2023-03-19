@@ -129,8 +129,8 @@ public class Peer {
 		AVector<State> states=Vectors.of(initialState);
 
 		// Ensure initial belief and states are persisted in current store
-		ACell.createPersisted(sb);
-		ACell.createPersisted(states);
+		sb=ACell.createPersisted(sb).getValue();
+		states=ACell.createPersisted(states).getValue();
 
 		// Check belief persistence
 		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());

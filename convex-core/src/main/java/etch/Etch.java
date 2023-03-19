@@ -653,7 +653,7 @@ public class Etch {
 	 * @return Blob containing the data, or null if not found
 	 * @throws IOException If an IO error occurs
 	 */
-	public Ref<ACell> read(AArrayBlob key) throws IOException {
+	public RefSoft<ACell> read(AArrayBlob key) throws IOException {
 		Counters.etchRead++;
 
 		long pointer=seekPosition(key);
@@ -686,7 +686,7 @@ public class Etch {
 				cell.attachMemorySize(memorySize);
 			}
 
-			Ref<ACell> ref=RefSoft.create(store,cell, (int)flagByte);
+			RefSoft<ACell> ref=RefSoft.create(store,cell, (int)flagByte);
 			cell.attachRef(ref);
 
 			return ref;

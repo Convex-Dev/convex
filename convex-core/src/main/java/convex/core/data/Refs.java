@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
+import convex.core.store.AStore;
 import convex.core.util.Trees;
 
 /**
@@ -31,7 +32,22 @@ public class Refs {
 		Trees.visitStack(al,addingVisitor);
 	}
 	
-	
+	/**
+	 * Checks the complete tree of Refs is consistent with the given store
+	 * @param root Root of Ref tree to visit
+	 * @param store Store to check consistency with
+	 */
+	public static void checkConsistentStores(Ref<?> root, AStore store) {
+		visitAllRefs(root,r->{
+			if (r instanceof RefSoft) {
+				RefSoft<?> rs=(RefSoft<?>)r;
+				AStore rstore=rs.getStore();
+				if (!(rstore==store)) {
+					throw new IllegalStateException("Inconsistent store! "+rs+" expected "+store+ " but was "+rstore);
+				}
+			}
+		});
+	}
 	
 	public static final class RefTreeStats {
 		public Ref<?> root=null;

@@ -512,7 +512,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		if (newChildren == children) return this;
 		// Note: we assume no key hashes have changed, so structure is the same
-		return new MapTree<>(newChildren, shift, mask, count);
+		MapTree<K,V> result= new MapTree<>(newChildren, shift, mask, count);
+		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
+		return result;
 	}
 
 	@Override

@@ -20,6 +20,7 @@ import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import etch.EtchStore;
 
 
 /**
@@ -70,9 +71,21 @@ public class API {
 
 		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
 
+		AStore tempStore=Stores.current();
 		try {
+			// Port defaults to null, which picks 
 			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
-			if (!config.containsKey(Keywords.STORE)) config.put(Keywords.STORE, Stores.getGlobalStore());
+			
+			// Configure the store and use on this thread
+			AStore store;
+			if (config.containsKey(Keywords.STORE)) {
+				store=(AStore)config.get(Keywords.STORE);
+			} else {
+				store=EtchStore.createTemp("defaultPeerStore");
+				config.put(Keywords.STORE, store);
+			}
+			Stores.setCurrent(store);
+			
 			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
 			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 			if (!config.containsKey(Keywords.AUTO_MANAGE)) config.put(Keywords.AUTO_MANAGE, true);
@@ -89,6 +102,8 @@ public class API {
 			return server;
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
+		} finally {
+			Stores.setCurrent(tempStore);
 		}
 	}
 	
@@ -144,10 +159,6 @@ public class API {
 
 		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);
-
-		// TODO maybe have this as an option in the calling parameters?
-		AStore store = Stores.current();
-		config.put(Keywords.STORE, store);
 
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);

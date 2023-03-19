@@ -283,6 +283,7 @@ public class SignedData<T extends ACell> extends ARecord {
 		// SECURITY: preserve verification flags
 		SignedData<T> newSD= new SignedData<T>(newValueRef, publicKey, signature);
 		newSD.cachedRef=newSD.getRef().withFlags(getRef().getFlags());
+		newSD.attachEncoding(encoding); // optimisation to keep encoding
 		return newSD;
 	}
 

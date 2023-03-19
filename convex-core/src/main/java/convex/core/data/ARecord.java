@@ -157,7 +157,9 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 			if (v!=null) v=v.updateRefs(func);
 			newValues[i]=v;
 		}
-		return updateAll(newValues);
+		ARecord result= updateAll(newValues);
+		result.attachEncoding(encoding);
+		return result;
 	}
 	
 	/**

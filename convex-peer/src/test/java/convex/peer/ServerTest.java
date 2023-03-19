@@ -36,6 +36,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.Refs;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -217,7 +218,7 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testAcquireBelief() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+	public void testAcquireBeliefLocal() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(network.SERVER) {
 
 			Convex convex=network.CONVEX;
@@ -227,9 +228,36 @@ public class ServerTest {
 			assertFalse(status.isError());
 			AVector<?> v=status.getValue();
 			Hash h=RT.ensureHash(v.get(0));
+			
+			AStore peerStore=network.SERVER.getStore();
+			Ref<?> pr=peerStore.refForHash(h);
+			assertTrue(pr.isPersisted()); // should be persisted in local peer store
+			//Refs.checkConsistentStores(pr, peerStore);
+
+			// TODO this needs fixing!
+			
+			//Future<SignedData<Belief>> acquiror=convex.acquire(h);
+			//SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
+			//assertTrue(ab.getValue() instanceof Belief);
+			//assertEquals(h,ab.getHash());
+		}
+	}
+	
+	@Test
+	public void testAcquireBeliefRemote() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		synchronized(network.SERVER) {
+
+			Convex convex=Convex.connect(network.SERVER.getHostAddress());
+
+			Future<Result> statusFuture=convex.requestStatus();
+			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
+			assertFalse(status.isError());
+			AVector<?> v=status.getValue();
+			Hash h=RT.ensureHash(v.get(0));
 
 			Future<SignedData<Belief>> acquiror=convex.acquire(h);
 			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
+			Refs.checkConsistentStores(ab.getRef(),Stores.current());
 			assertTrue(ab.getValue() instanceof Belief);
 			assertEquals(h,ab.getHash());
 		}

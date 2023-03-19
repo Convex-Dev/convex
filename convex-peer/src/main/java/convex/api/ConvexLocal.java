@@ -51,10 +51,10 @@ public class ConvexLocal extends Convex {
 			@SuppressWarnings("unchecked")
 			@Override
 			public void run() {
-				AStore remoteStore=server.getStore();
-				Ref<ACell> ref=remoteStore.refForHash(hash);
+				AStore peerStore=server.getStore();
+				Ref<ACell> ref=peerStore.refForHash(hash);
 				if (ref==null) {
-					f.completeExceptionally(new MissingDataException(remoteStore,hash));
+					f.completeExceptionally(new MissingDataException(peerStore,hash));
 				} else {
 					ref=store.storeTopRef(ref, Ref.PERSISTED, null);
 					f.complete((T) ref.getValue());

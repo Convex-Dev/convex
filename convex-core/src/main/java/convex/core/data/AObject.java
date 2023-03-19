@@ -73,7 +73,8 @@ public abstract class AObject {
 	 * Warning: Blob must be the correct canonical representation of this Cell,
 	 * otherwise bad things may happen (incorrect hashcode, etc.)
 	 * 
-	 * @param data Encoding of Value. Must be a correct canonical encoding.
+	 * @param data Encoding of Value. Must be a correct canonical encoding, or null
+	 * to clear the cached encoding
 	 */
 	public final void attachEncoding(Blob data) {
 		this.encoding=data;

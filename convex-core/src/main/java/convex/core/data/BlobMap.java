@@ -123,7 +123,9 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		MapEntry<K, V> newEntry = (entry == null) ? null : entry.updateRefs(func);
 		Ref<BlobMap<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
-		return new BlobMap<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
+		BlobMap<K,V> result= new BlobMap<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
+		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
+		return result;
 	}
 
 	@Override

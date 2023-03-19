@@ -37,7 +37,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	/**
 	 * SoftReference to value. Might get updated to a fresh instance.
 	 */
-	protected AStore store;
+	protected final AStore store;
 	
 	protected RefSoft(AStore store, SoftReference<T> ref, Hash hash, int flags) {
 		super(hash, flags);
@@ -93,7 +93,9 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		T result = softRef.get();
 		if (result == null) {
 			Ref<T> storeRef = store.refForHash(hash);
-			if (storeRef == null) throw Utils.sneakyThrow(new MissingDataException(store,hash));
+			if (storeRef == null) {
+				throw Utils.sneakyThrow(new MissingDataException(store,hash));
+			}
 			this.flags=Ref.mergeFlags(this.flags, storeRef.flags);
 			result = storeRef.getValue();
 
@@ -164,6 +166,11 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		if (softRef.get()!=newValue) return new RefSoft<T>(store,newValue,hash,flags);
 		return this;
 	}
+	
+	public Ref<T> withStore(AStore store) {
+		if (this.store==store) return this;
+		return new RefSoft<T>(store,softRef,hash,flags);
+	}
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -174,4 +181,10 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	public Ref<T> ensureCanonical() {
 		return this;
 	}
+
+	public AStore getStore() {
+		return store;
+	}
+
+
 }

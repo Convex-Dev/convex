@@ -422,6 +422,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * The function *must not* change the hash value of Refs, in order to ensure
 	 * structural integrity of modified data structures.
 	 * 
+	 * The implementation *should* re-attach any original encoding in order to
+	 * prevent re-encoding or surplus hashing
+	 * 
 	 * This is a building block for a very sneaky trick that enables use to do a lot
 	 * of efficient operations on large trees of smart references.
 	 * 

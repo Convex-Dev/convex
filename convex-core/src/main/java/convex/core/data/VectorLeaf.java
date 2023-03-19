@@ -649,7 +649,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			}
 		}
 		if ((items==newItems) && (prefix == newPrefix)) return this; // if no change, safe to return this
-		return new VectorLeaf<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
+		VectorLeaf<T> result= new VectorLeaf<T>((Ref<T>[]) newItems, (Ref<AVector<T>>) newPrefix, count);
+		
+		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")

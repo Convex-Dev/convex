@@ -307,7 +307,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	/**
 	 * Creates a RefSoft using a specific Hash. Fetches the actual value lazily from the
-	 * store on demand.
+	 * current thread's store on demand.
 	 * 
 	 * Internal soft reference may be initially empty: This Ref might not have
 	 * available data in the store, in which case calls to getValue() may result in
