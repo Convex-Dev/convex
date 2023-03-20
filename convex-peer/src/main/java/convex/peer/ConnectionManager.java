@@ -156,7 +156,7 @@ public class ConnectionManager {
 				convex.close();
 			}
 		} catch (Throwable t) {
-			if (server.isLive()) log.warn("Polling failed: {}",t);
+			if (server.isLive()) log.warn("Belief Polling failed: {}",t.getMessage());
 		}
 	}
 
@@ -617,7 +617,7 @@ public class ConnectionManager {
 			convex.close();
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages
-				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null,Constants.SOCKET_PEER_BUFFER_SIZE,Constants.SOCKET_PEER_BUFFER_SIZE);
+				newConn = Connection.connect(hostAddress, server.clientReceiveAction, server.getStore(), null,Constants.SOCKET_PEER_BUFFER_SIZE,Constants.SOCKET_PEER_BUFFER_SIZE);
 				connections.put(peerKey, newConn);
 			}
 			server.raiseServerChange("connection");

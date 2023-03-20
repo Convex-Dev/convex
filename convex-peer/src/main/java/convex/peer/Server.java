@@ -125,10 +125,10 @@ public class Server implements Closeable {
 	private BlockingQueue<SignedData<Belief>> beliefQueue;
 
 	/**
-	 * Message Consumer that simply enqueues received messages received by this peer
+	 * Message Consumer that simply enqueues received client messages received by this peer
 	 * Called on NIO thread: should never block for long
 	 */
-	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
+	Consumer<Message> clientReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
 			try {
@@ -424,6 +424,7 @@ public class Server implements Closeable {
 			beliefMergeThread.setDaemon(true);
 			beliefMergeThread.start();
 
+			propagator.start();
 
 			// Close server on shutdown, should be before Etch stores in priority
 			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
@@ -754,7 +755,8 @@ public class Server implements Closeable {
 	}
 	
 	/**
-	 * Queues a message for processing by this Server. May block briefly.
+	 * Queues a message for processing by this Server. May block briefly
+	 * while messages are processed
 	 * @param m Message to queue
 	 * @throws InterruptedException If thread is interrupted
 	 */
@@ -1165,6 +1167,9 @@ public class Server implements Closeable {
 
 	@Override
 	public void close() {
+		// Shut down propagator first, not point sending any more Beliefs
+		propagator.close();
+		
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
@@ -1263,7 +1268,7 @@ public class Server implements Closeable {
 	 * @return Message consumer
 	 */
 	public Consumer<Message> getReceiveAction() {
-		return peerReceiveAction;
+		return clientReceiveAction;
 	}
 
 	/**

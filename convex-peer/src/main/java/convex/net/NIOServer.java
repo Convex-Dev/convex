@@ -206,17 +206,17 @@ public class NIOServer implements Closeable {
 	}
 
 	private Connection ensureConnection(SelectionKey key) throws IOException {
-		Connection pc = (Connection) key.attachment();
-		if (pc != null)
-			return pc;
+		Connection clientConnection = (Connection) key.attachment();
+		if (clientConnection != null)
+			return clientConnection;
 		SocketChannel sc = (SocketChannel) key.channel();
 		assert (!sc.isBlocking());
-		pc = createPC(sc, receiveQueue);
-		key.attach(pc);
-		return pc;
+		clientConnection = createClientConnection(sc, receiveQueue);
+		key.attach(clientConnection);
+		return clientConnection;
 	}
 
-	private Connection createPC(SocketChannel sc, BlockingQueue<Message> queue) throws IOException {
+	private Connection createClientConnection(SocketChannel sc, BlockingQueue<Message> queue) throws IOException {
 		return Connection.create(sc, server.getReceiveAction(), server.getStore(), null);
 	}
 
