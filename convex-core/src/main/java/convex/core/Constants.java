@@ -25,7 +25,7 @@ public class Constants {
 	/**
 	 * Threshold of stake required to propose consensus
 	 */
-	public static final double PROPOSAL_THRESHOLD = 0.51;
+	public static final double PROPOSAL_THRESHOLD = 0.67;
 
 	/**
 	 * Threshold of stake required to confirm consensus
