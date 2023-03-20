@@ -1238,7 +1238,7 @@ public class Utils {
 	private static final long startupNanos=System.nanoTime();
 
 	/**
-	 * Gets the a millisecond accurate time suitable for use in timing.
+	 * Gets a millisecond accurate time suitable for use in timing.
 	 *
 	 * Should not be used for timestamps
 	 *

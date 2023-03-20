@@ -707,7 +707,7 @@ public class Server implements Closeable {
 		ACell.createPersisted(block);
 
 		Peer newPeer = peer.proposeBlock(block);
-		log.debug("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
+		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
 
 		peer = newPeer;
 		lastBlockPublishedTime=timestamp;
@@ -785,7 +785,7 @@ public class Server implements Closeable {
 	private void maybePostOwnTransactions() {
 		long ts=Utils.getCurrentTimestamp();
 
-		// If we already did this recently, don't try again
+		// If we already posted own transaction recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
 
 		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
@@ -953,9 +953,9 @@ public class Server implements Closeable {
 		// Note: partial messages are handled in Connection now
 		Ref<?> r = Ref.get(payload);
 		r = r.persistShallow();
-		Hash payloadHash = r.getHash();
 
 		if (log.isTraceEnabled()) {
+			Hash payloadHash = r.getHash();
 			log.trace( "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
 					+ payloadHash.toHexString() + " and encoding: " + Format.encodedBlob(payload).toHexString());
 		}
