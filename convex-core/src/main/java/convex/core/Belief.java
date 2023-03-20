@@ -472,7 +472,7 @@ public class Belief extends ARecord {
 				}
 				Double stake = me.getValue();
 				agreedOrders.put(blocks, stake);
-				if (stake >= totalStake * 0.5) {
+				if (stake > totalStake * 0.5) {
 					// have a winner for sure, no point continuing so populate final Voting set and break
 					votingSet.clear();
 					votingSet.put(blocks, stake);
@@ -494,6 +494,11 @@ public class Belief extends ARecord {
 				if (blockVote > winningVote) {
 					winningVote = blockVote;
 					winningResult = me;
+				} else if (blockVote==winningVote) {
+					// tie break special case, choose lowest hash
+					if (me.getKey().getHash().compareTo(winningResult.getKey().getHash())<0) {
+						winningResult=me;
+					}
 				}
 			}
 
