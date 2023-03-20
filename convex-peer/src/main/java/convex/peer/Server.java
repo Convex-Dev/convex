@@ -992,7 +992,7 @@ public class Server implements Closeable {
 
 			boolean queued = beliefQueue.offer(receivedBelief);
 			if (!queued) {
-				log.debug("Incoming belief queue full");
+				log.warn("Incoming belief queue full");
 			}
 		} catch (ClassCastException e) {
 			// bad message?

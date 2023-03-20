@@ -138,6 +138,7 @@ public class StressPanel extends JPanel {
 			protected String doInBackground() throws Exception {
 				StringBuilder sb = new StringBuilder();
 				try {
+					resultArea.setText("Connecting clients...");
 					InetSocketAddress sa = peerView.peerServer.getHostAddress();
 
 					// Use client store
@@ -166,9 +167,13 @@ public class StressPanel extends JPanel {
 						Convex cc=Convex.connect(sa,clientAddr,kp);
 						ccs.add(cc);
 					}
+					
+					resultArea.setText("Syncing...");
 					// Make sure we are in consensus
 					pc.transactSync(Invoke.create(address, -1, Strings.create("sync")));
 					long startTime = Utils.getCurrentTimestamp();
+					
+					resultArea.setText("Sending transactions...");
 					
 					ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (cc->{
 						try {
@@ -184,18 +189,26 @@ public class StressPanel extends JPanel {
 								ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
 								CompletableFuture<Result> fr;
 								fr = cc.transact(t);
-								frs.add(fr);
+								synchronized(frs) {
+									// synchronised so we don't collide with other threads
+									frs.add(fr);
+								}
 							}
 						} catch (IOException e) {
 							throw Utils.sneakyThrow(e);
 						}
 						return null;
 					},ccs);
+					
+
 					// wait for everything to be sent
 					for (int i=0; i<clientCount; i++) {
 						cfutures.get(i).get(60, TimeUnit.SECONDS);
 					}
 
+					int futureCount=frs.size();
+					resultArea.setText("Awaiting "+futureCount+" results...");
+					
 					long sendTime = Utils.getCurrentTimestamp();
 
 					List<Result> results = Utils.completeAll(frs).get(60, TimeUnit.SECONDS);
