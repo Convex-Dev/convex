@@ -1476,6 +1476,8 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(first 1)"));
 		assertCastError(step("(first :foo)"));
 		
+		assertEquals(17L,evalL("(first 0x11223344)"));
+		
 		// Not data structures, but are countable
 		assertEquals(CVMChar.create('a'), eval("(first \"abc\")"));
 		assertEquals(CVMLong.create(0x12), eval("(first 0x1234)"));

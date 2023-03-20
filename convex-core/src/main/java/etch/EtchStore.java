@@ -211,6 +211,7 @@ public class EtchStore extends AStore {
 				ref = ref.withMinimumStatus(requiredStatus);
 				cell.attachRef(ref); // make sure we are using current ref within cell
 				result = etch.write(fHash, (Ref<ACell>) ref);
+				blobCache.putCell(cell); // cache for subsequent writes
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
