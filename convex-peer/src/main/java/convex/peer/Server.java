@@ -707,7 +707,7 @@ public class Server implements Closeable {
 		ACell.createPersisted(block);
 
 		Peer newPeer = peer.proposeBlock(block);
-		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
+		log.debug("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
 
 		peer = newPeer;
 		lastBlockPublishedTime=timestamp;
