@@ -114,16 +114,11 @@ public abstract class AStore {
 	 * @throws BadFormatException If cell encoding is invalid
 	 */
 	public final ACell decode(Blob encoding) throws BadFormatException {
-		ACell cached=blobCache.getCell(encoding);
-		if (cached!=null) return cached;
+		Hash hash=encoding.getContentHash();
+		Ref<?> cached=blobCache.getCell(hash);
+		if (cached!=null) return cached.getValue();
 		
-		ACell decoded=Format.read(encoding);
-		if (decoded==null) return decoded; // handle null value
-		
-		// TODO: can remove this check once happy with all tests
-		assert(decoded.cachedEncoding()==encoding);
-		blobCache.putCell(decoded);
-		
+		ACell decoded=Format.read(encoding);		
 		return decoded;
 	}
 }

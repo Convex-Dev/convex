@@ -124,10 +124,11 @@ public class EtchStore extends AStore {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <T extends ACell> RefSoft<T> refForHash(Hash hash) {
+	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
-			RefSoft<ACell> existing = etch.read(hash);
-			return (RefSoft<T>) existing;
+			Ref<ACell> existing = (Ref<ACell>) blobCache.getCell(hash);
+			existing= etch.read(hash);
+			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -165,7 +166,7 @@ public class EtchStore extends AStore {
 		// if not embedded, worth checking store first for existing value
 		if (!embedded) {
 			hash = ref.getHash();
-			RefSoft<T> existing = refForHash(hash);
+			Ref<T> existing = refForHash(hash);
 			if (existing != null) {
 				// Return existing ref if status is sufficient
 				if (existing.getStatus() >= requiredStatus) {
@@ -211,6 +212,7 @@ public class EtchStore extends AStore {
 				ref = ref.withMinimumStatus(requiredStatus);
 				cell.attachRef(ref); // make sure we are using current ref within cell
 				result = etch.write(fHash, (Ref<ACell>) ref);
+				cell.attachRef(result);
 				blobCache.putCell(cell); // cache for subsequent writes
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);

@@ -1,23 +1,20 @@
 package convex.core.store;
 
-import java.lang.ref.SoftReference;
-
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.Blob;
+import convex.core.data.Hash;
+import convex.core.data.Ref;
 
 /**
  * In-memory cache for Blob decoding. Should be used in the context of a specific Store
  */
 public final class BlobCache {
 
-	private SoftReference<ACell>[] cache;
+	private Ref<?>[] cache;
 	private int size;
 	
-	@SuppressWarnings("unchecked")
 	private BlobCache(int size) {
 		this.size=size;
-		this.cache=new SoftReference[size];
+		this.cache=new Ref[size];
 	};
 	
 	public static BlobCache create(int size) {
@@ -29,36 +26,36 @@ public final class BlobCache {
 	}
 	
 	/**
-	 * Gets the Cached Cell for a given Blob Encoding, or null if not cached.
-	 * @param encoding Encoding of Cell to look up in cache
-	 * @return Cached Cell, or null if not found
+	 * Gets the Cached Ref for a given hash, or null if not cached.
+	 * @param hash Hash of Cell to look up in cache
+	 * @return Cached Ref, or null if not found
 	 */
-	public ACell getCell(Blob encoding) {
-		int ix=calcIndex(encoding);
-		SoftReference<ACell> ref=cache[ix];
+	public Ref<?> getCell(Hash hash) {
+		int ix=calcIndex(hash);
+		Ref<?> ref=cache[ix];
 		if (ref==null) return null;
-		ACell cell=ref.get();
-		if (cell!=null) {
-			if (encoding.equals(cell.getEncoding())) {
-				return cell;
-			}
-			return null; // cached value not the same as this encoding
+		if (ref.isMissing()) {
+			// Ref is missing, so kill in cache
+			cache[ix]=null;
+			return null;			
 		}
-		cache[ix]=null;
-		return null;
+	
+		if (ref.getHash().equals(hash)) return ref;
+		return null; // different hash, hence not in cache
 	}
 	
 	/**
-	 * Stores a cell in the cache
-	 * @param cell Cell to store
+	 * Stores a Ref in the cache
+	 * @param cell Cell with Ref to store
 	 */
 	public void putCell(ACell cell) {
-		int ix=calcIndex(cell.getEncoding());
-		cache[ix]=new SoftReference<>(cell);
+		Ref<?> ref=Ref.get(cell);
+		int ix=calcIndex(ref.getHash());
+		cache[ix]=ref;
 	}
 
-	private int calcIndex(ABlob encoding) {
-		int hash=Long.hashCode(encoding.getContentHash().longValue());
+	private int calcIndex(Hash h) {
+		int hash=(int)h.longValue();
 		int ix=Math.floorMod(hash, size);
 		return ix;
 	}

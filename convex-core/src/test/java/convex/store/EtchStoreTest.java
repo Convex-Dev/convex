@@ -5,6 +5,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
@@ -24,8 +25,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
@@ -219,14 +220,33 @@ public class EtchStoreTest {
 	}
 	
 	@Test public void testDecodeCache() throws BadFormatException {
-		Address a1=Address.create(12345678);
-		ACell cell=store.decode(a1.getEncoding());
-		assertNotSame(cell,a1);
-		assertEquals(cell,a1);
-		
-		// decoding again should get same value with very high probability
-		ACell cell2=store.decode(a1.getEncoding());
-		assertSame(cell,cell2);
+		AStore oldStore = Stores.current();
+		try {
+			Stores.setCurrent(store);
+
+			// Use a non-embedded Blob
+			Blob a1=Blobs.createRandom(Format.MAX_EMBEDDED_LENGTH+1);
+			assertFalse(a1.isEmbedded());
+			
+			ACell cell=store.decode(a1.getEncoding());
+			assertNotSame(cell,a1);
+			assertEquals(cell,a1);
+			
+			Ref<?> r=ACell.createPersisted(cell);
+			assertTrue(r.isPersisted());
+			cell=r.getValue();
+			
+			// TODO: might not happen?
+			//assertTrue(r instanceof RefSoft);
+			//assertTrue(cell.getRef() instanceof RefSoft);
+			
+			// decoding again should get same value with very high probability
+			ACell cell2=store.decode(a1.getEncoding());
+			assertSame(cell,cell2);
+			assertSame(r,cell.getRef());
+		} finally {
+			Stores.setCurrent(oldStore);
+		}
 	}
 
 	@Test
