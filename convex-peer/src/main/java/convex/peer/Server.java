@@ -97,7 +97,7 @@ public class Server implements Closeable {
 	/**
 	 * Size of incoming Belief queue
 	 */
-	private static final int BELIEF_QUEUE_SIZE = 100;
+	private static final int BELIEF_QUEUE_SIZE = 500;
 
 	/**
 	 * Maximum Pause for each iteration of Server Belief Merge loop.
@@ -727,7 +727,7 @@ public class Server implements Closeable {
 	 * Note: this limits the TPS for a single peer in terms of client transactions
 	 * Also affects latency for client confirmations by up to this amount
 	 */
-	private static final long CLIENT_BLOCK_DELAY=100;
+	private static final long CLIENT_BLOCK_DELAY=10;
 
 	/**
 	 * Gets the Peer controller Address
@@ -783,16 +783,15 @@ public class Server implements Closeable {
 	 * @param transactionList List of transactions to add to.
 	 */
 	private void maybePostOwnTransactions() {
-		State s=getPeer().getConsensusState();
 		long ts=Utils.getCurrentTimestamp();
 
 		// If we already did this recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
-		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
 		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
 		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
 
+		State s=getPeer().getConsensusState();
 		String desiredHostname=getHostname(); // Intended hostname
 		AccountKey peerKey=getPeerKey();
 		PeerStatus ps=s.getPeer(peerKey);
@@ -818,6 +817,7 @@ public class Server implements Closeable {
 			ACell message = Reader.read(code);
 			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
 			newTransactions.add(getKeyPair().signData(transaction));
+			lastOwnTransactionTimestamp=ts; // mark this timestamp
 		}
 	}
 
@@ -1072,7 +1072,6 @@ public class Server implements Closeable {
 	};
 
 	private void awaitBeliefs() throws InterruptedException {
-		
 		SignedData<Belief> firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
 		if (firstEvent==null) return;
 		ArrayList<SignedData<Belief>> allBeliefs=new ArrayList<>();
