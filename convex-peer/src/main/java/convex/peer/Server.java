@@ -799,11 +799,10 @@ public class Server implements Closeable {
 			processData(m);
 			return;
 		default:
+			receiveQueue.put(m);
 			break;
 		
 		}
-		
-		receiveQueue.put(m);
 	}
 	
 	/**
@@ -1162,6 +1161,7 @@ public class Server implements Closeable {
 				BlockResult br = peer.getBlockResult(i);
 				reportTransactions(block.getValue(), br);
 			}
+			reportedConsensusPoint=newConsensusPoint;
 		}
 	}
 
@@ -1185,7 +1185,7 @@ public class Server implements Closeable {
 					interests.remove(h);
 				}
 			} catch (Throwable e) {
-				log.warn("Exception while sending Result: ",e);
+				log.warn("Exception while reporting transaction Result: ",e);
 				// ignore
 			}
 		}

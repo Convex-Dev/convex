@@ -88,7 +88,7 @@ public class PeerView {
 	 */
 	public InetSocketAddress getHostAddress() {
 		// this is direct connection to a peer, so get its host address
-		if (peerServer != null) return peerServer.getHostAddress();
+		if (isLocal()) return peerServer.getHostAddress();
 
 		// need to get the remote address from the PeerConnection
 		return ((ConvexRemote) peerConnection).getRemoteAddress();
