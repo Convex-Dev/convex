@@ -137,14 +137,6 @@ public class Belief extends ARecord {
 	public Belief merge(MergeContext mc, Belief... beliefs) throws BadSignatureException, InvalidDataException {
 		Belief newBelief = mergeOnce(mc, beliefs);
 
-		// May repeat belief update until stable, this handles the case when the Peer's
-		// own voting stake is sufficient to change proposed / actual consensus
-		// if we updated the Belief, then do a quick update again.
-		// this may be needed to stabilise state in the case that this peer's update
-		// changes the consensus
-		if (this != newBelief) {
-			newBelief = newBelief.mergeOnce(mc);
-		}
 		return newBelief;
 	}
 
@@ -161,7 +153,7 @@ public class Belief extends ARecord {
 
 		Counters.beliefMerge++;
 
-		// accumulate combined list of latest chains for all peers
+		// accumulate combined list of latest Orders for all peers
 		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, beliefs);
 
 		// vote for new proposed chain
@@ -203,7 +195,11 @@ public class Belief extends ARecord {
 				if(key.equalsBytes(mc.getAccountKey())) continue; 
 				
 				SignedData<Order> a=result.get(key);
-				if (a == null) {result=result.assocEntry(be); continue;}
+				if (a == null) {
+					// This is a new order to us, so include if valid
+					result=result.assocEntry(be); 
+					continue;
+				}
 				SignedData<Order> b=be.getValue();
 				if (b == null) continue;
 				
@@ -221,7 +217,7 @@ public class Belief extends ARecord {
 				// TODO: penalise inconsistency?
 				// TODO: check for forks / inconsistent values?
 				// TODO: check logic?
-
+				
 				// prefer advanced consensus first!
 				if (bc.getConsensusPoint() > ac.getConsensusPoint()) {result=result.assocEntry(be); continue;};
 

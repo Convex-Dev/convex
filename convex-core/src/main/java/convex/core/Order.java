@@ -38,15 +38,17 @@ public class Order extends ARecord {
 
 	private final long proposalPoint;
 	private final long consensusPoint;
+	private final long timestamp;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT };
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	private Order(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint) {
+	private Order(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
 		super(FORMAT);
 		this.blocks = blocks;
 		this.consensusPoint = consensusPoint;
 		this.proposalPoint = proposalPoint;
+		this.timestamp = timestamp;
 	}
 
 	/**
@@ -56,8 +58,8 @@ public class Order extends ARecord {
 	 * @param consensusPoint Consensus Point
 	 * @return New Order instance
 	 */
-	private static Order create(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint) {
-		return new Order(blocks, proposalPoint, consensusPoint);
+	private static Order create(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
+		return new Order(blocks, proposalPoint, consensusPoint,timestamp);
 	}
 
 	/**
@@ -66,7 +68,7 @@ public class Order extends ARecord {
 	 * @return New Order instance
 	 */
 	public static Order create() {
-		return create(Vectors.empty(), 0, 0);
+		return create(Vectors.empty(), 0, 0,0);
 	}
 
 	private byte getRecordTag() {
@@ -84,6 +86,7 @@ public class Order extends ARecord {
 		pos = blocks.encode(bs,pos);
 		pos = Format.writeVLCLong(bs,pos, proposalPoint);
 		pos = Format.writeVLCLong(bs,pos, consensusPoint);
+		pos = Format.writeVLCLong(bs,pos, timestamp);
 		return pos;
 	}
 	
@@ -107,6 +110,7 @@ public class Order extends ARecord {
 		
 		long pp = Format.readVLCLong(bb);
 		long cp = Format.readVLCLong(bb);
+		long ts = Format.readVLCLong(bb);
 		
 		if ((cp < 0) || (cp > bcount)) {
 			throw new BadFormatException("Consensus point outside current block range: " + cp);
@@ -117,7 +121,7 @@ public class Order extends ARecord {
 		if (pp>bcount) {
 			throw new BadFormatException("Proposal point outside block range: " + pp);
 		}
-		return new Order(blocks, pp, cp);
+		return new Order(blocks, pp, cp,ts);
 	}
 
 	@Override public final boolean isCVMValue() {
@@ -158,6 +162,14 @@ public class Order extends ARecord {
 	public long getProposalPoint() {
 		return proposalPoint;
 	}
+	
+	/**
+	 * Gets the timestamp of this Order
+	 * @return Proposal Point
+	 */
+	public long getTimestamp() {
+		return timestamp;
+	}
 
 	/**
 	 * Gets the Blocks in this Order
@@ -184,7 +196,7 @@ public class Order extends ARecord {
 	 */
 	public Order append(SignedData<Block> block) {
 		AVector<SignedData<Block>> newBlocks = blocks.append(block);
-		return create(newBlocks, proposalPoint, consensusPoint);
+		return create(newBlocks, proposalPoint, consensusPoint, timestamp);
 	}
 
 	/**
@@ -194,7 +206,17 @@ public class Order extends ARecord {
 	 */
 	public Order withBlocks(AVector<SignedData<Block>> newBlocks) {
 		if (blocks == newBlocks) return this;
-		return create(newBlocks, proposalPoint, consensusPoint);
+		return create(newBlocks, proposalPoint, consensusPoint, timestamp);
+	}
+	
+	/**
+	 * Updates timestamp in this Order. Returns the same Order if timestamp is identical.
+	 * @param newTimestamp New timestamp to use
+	 * @return Updated Order, or the same Order if unchanged
+	 */
+	public Order withTimestamp(long newTimestamp) {
+		if (timestamp == newTimestamp) return this;
+		return create(blocks, proposalPoint, consensusPoint, newTimestamp);
 	}
 
 	/**
@@ -211,7 +233,7 @@ public class Order extends ARecord {
 					"Trying to move proposed consensus before confirmed consensus?! " + newProposalPoint);
 		}
 		if (newProposalPoint > blocks.count()) throw new IndexOutOfBoundsException("Block index: " + newProposalPoint);
-		return new Order(blocks, newProposalPoint, consensusPoint);
+		return new Order(blocks, newProposalPoint, consensusPoint, timestamp);
 	}
 
 	/**
@@ -228,7 +250,7 @@ public class Order extends ARecord {
 		if (newConsensusPoint > blocks.count())
 			throw new IndexOutOfBoundsException("Block index: " + newConsensusPoint);
 		long newProposalPoint = Math.max(proposalPoint, newConsensusPoint);
-		return create(blocks, newProposalPoint, newConsensusPoint);
+		return create(blocks, newProposalPoint, newConsensusPoint, timestamp);
 	}
 
 	/**
@@ -244,7 +266,7 @@ public class Order extends ARecord {
 	 * @return Updated order with zeroed consensus positions
 	 */
 	public Order withoutConsenus() {
-		return create(blocks, 0, 0);
+		return create(blocks, 0, 0,timestamp);
 	}
 
 	/**
@@ -255,10 +277,13 @@ public class Order extends ARecord {
 	 */
 	public Order updateBlocks(AVector<SignedData<Block>> newBlocks) {
 		if (blocks == newBlocks) return this;
-		long prefix = blocks.commonPrefixLength(newBlocks);
-		long newProposalPoint = Math.min(prefix, proposalPoint);
+		
+		// Update proposal point and consensus point if necessary to ensure consistency
+		long nblocks=newBlocks.count();
+		long newProposalPoint = Math.min(nblocks, proposalPoint);
 		long newConsensusPoint = Math.min(consensusPoint, newProposalPoint);
-		return create(newBlocks, newProposalPoint, newConsensusPoint);
+		
+		return create(newBlocks, newProposalPoint, newConsensusPoint, timestamp);
 	}
 
 	@Override
@@ -298,6 +323,7 @@ public class Order extends ARecord {
 		if (Keywords.BLOCKS.equals(key)) return blocks;
 		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(consensusPoint);
 		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(proposalPoint);
+		if (Keywords.TIMESTAMP.equals(key)) return CVMLong.create(timestamp);
 
 		return null;
 	}
@@ -308,13 +334,14 @@ public class Order extends ARecord {
 		AVector<SignedData<Block>> blocks = (AVector<SignedData<Block>>)newVals[0];
 		long consensusPoint = ((CVMLong)newVals[1]).longValue();
 		long proposalPoint = ((CVMLong)newVals[2]).longValue();
+		long ts = ((CVMLong)newVals[3]).longValue();
 
 		if (blocks == this.blocks && consensusPoint == this.consensusPoint
 			&& proposalPoint == this.proposalPoint) {
 			return this;
 		}
 
-		return new Order(blocks, proposalPoint, consensusPoint);
+		return new Order(blocks, proposalPoint, consensusPoint, ts);
 	}
 	
 }
