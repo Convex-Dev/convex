@@ -84,7 +84,7 @@ public class SignedData<T extends ACell> extends ARecord {
 		Ref<ACell> ref=getRef();
 		int flags=ref.getFlags();
 		if ((flags&Ref.VERIFIED_MASK)!=0) return; // already done
-		cachedRef=ref.withFlags(flags|Ref.VERIFIED_MASK);
+		ref.setFlags(flags|Ref.VERIFIED_MASK);
 	}
 	
 	/**
@@ -94,7 +94,7 @@ public class SignedData<T extends ACell> extends ARecord {
 		Ref<ACell> ref=getRef();
 		int flags=ref.getFlags();
 		if ((flags&Ref.BAD_MASK)!=0) return; // already done
-		cachedRef=ref.withFlags(flags|Ref.BAD_MASK);
+		ref.setFlags(flags|Ref.BAD_MASK);
 	}
 
 
@@ -243,7 +243,6 @@ public class SignedData<T extends ACell> extends ARecord {
 	 */
 	public boolean isSignatureChecked() {
 		Ref<SignedData<T>> sigRef=getRef();
-		if (sigRef==null) return false;
 		int flags=sigRef.getFlags();
 		return (flags&(Ref.BAD_MASK|Ref.VERIFIED_MASK))!=0;
 	}
