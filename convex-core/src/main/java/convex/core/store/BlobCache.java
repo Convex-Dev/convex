@@ -3,6 +3,7 @@ package convex.core.store;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.data.RefSoft;
 
 /**
  * In-memory cache for Blob decoding. Should be used in the context of a specific Store
@@ -34,10 +35,12 @@ public final class BlobCache {
 		int ix=calcIndex(hash);
 		Ref<?> ref=cache[ix];
 		if (ref==null) return null;
-		if (ref.isMissing()) {
-			// Ref is missing, so kill in cache
-			cache[ix]=null;
-			return null;			
+		if (ref instanceof RefSoft) {
+			if (!((RefSoft<?>)ref).hasReference()) {
+				// Ref is missing, so kill in cache
+				cache[ix]=null;
+				return null;			
+			}
 		}
 	
 		if (ref.getHash().equals(hash)) return ref;

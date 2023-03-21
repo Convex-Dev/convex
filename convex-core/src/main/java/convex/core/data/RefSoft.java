@@ -186,5 +186,13 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		return store;
 	}
 
+	/**
+	 * Checks if this Ref still has a local reference
+	 * @return True if an in memory reference exists
+	 */
+	public boolean hasReference() {
+		return softRef.get()!=null;
+	}
+
 
 }
