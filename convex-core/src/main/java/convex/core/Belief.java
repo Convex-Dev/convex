@@ -214,23 +214,49 @@ public class Belief extends ARecord {
 				Order ac = a.getValue();
 				Order bc = b.getValue();
 
-				// TODO: penalise inconsistency?
-				// TODO: check for forks / inconsistent values?
-				// TODO: check logic?
-				
-				// prefer advanced consensus first!
-				if (bc.getConsensusPoint() > ac.getConsensusPoint()) {result=result.assocEntry(be); continue;};
-
-				// prefer longer orders, must be later?
-				if (bc.getBlockCount() > ac.getBlockCount()) {result=result.assocEntry(be); continue;};
-
-				// prefer advanced proposals
-				if (bc.getProposalPoint() > ac.getProposalPoint()) {result=result.assocEntry(be); continue;};
-
+				boolean shouldReplace=compareOrders(ac,bc);
+				if (shouldReplace) {
+					result=result.assocEntry(be); 
+					continue;
+				}
 				// keep current view (more stable?)
 			}
 		}
 		return result;
+	}
+	
+	/**
+	 * Checks if a new Order should replace the current order when collecting Peer orders
+	 * @param a Current Order
+	 * @param b Potential new ORder
+	 * @return
+	 */
+	static boolean compareOrders(Order a, Order b) {
+		// TODO: penalise inconsistency?
+		// TODO: check for forks / inconsistent values?
+		// TODO: check logic?
+		
+		int tsComp=Long.compare(a.getTimestamp(), b.getTimestamp());
+		if (tsComp>0) return false; // Keep current order if more recent
+		
+		if (tsComp<0) {
+			// new Order is more recent, so switch to this
+			return true;
+		} else {
+			// This shouldn't happen if peers are sticking to timestamps
+			// But we compare anyway
+			// Prefer advanced consensus
+			if (b.getConsensusPoint()>a.getConsensusPoint()) return true;
+			
+			// Then prefer advanced proposal
+			if (b.getProposalPoint()>a.getProposalPoint()) return true;
+
+			// Finally prefer more blocks
+			AVector<SignedData<Block>> abs=a.getBlocks();
+			AVector<SignedData<Block>> bbs=b.getBlocks();
+			if(abs.count()<bbs.count()) return true;
+		}
+		return false;
 	}
 
 	/**
@@ -285,8 +311,9 @@ public class Belief extends ARecord {
 		AVector<SignedData<Block>> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
 		if (winningBlocks == null) return null; // if no voting stake on any chain
 
+		// Take winning blocks into my Order
 		// winning chain should have same consensus as my initial chain
-		Order winningOrder = myOrder.updateBlocks(winningBlocks);
+		Order winningOrder = myOrder.withBlocks(winningBlocks);
 
 		final double P_THRESHOLD = totalStake * Constants.PROPOSAL_THRESHOLD;
 		final Order proposedOrder = updateProposal(winningOrder, stakedOrders, P_THRESHOLD);
@@ -297,9 +324,12 @@ public class Belief extends ARecord {
 		final Order consensusOrder = updateConsensus(proposedOrder, stakedOrders, C_THRESHOLD);
 
 		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
-		if (!consensusOrder.equals(myOrder)) {
+		if (!consensusOrder.consensusEquals(myOrder)) {
+			// Update timestamp
+			Order myNewOrder=consensusOrder.withTimestamp(mc.getTimeStamp());
+			
 			// Only sign and update Order if it has changed
-			final SignedData<Order> signedOrder = mc.sign(consensusOrder);
+			final SignedData<Order> signedOrder = mc.sign(myNewOrder);
 			resultOrders = resultOrders.assoc(myAddress, signedOrder);
 		}
 		return resultOrders;

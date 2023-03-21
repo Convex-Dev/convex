@@ -206,7 +206,13 @@ public class Order extends ARecord {
 	 */
 	public Order withBlocks(AVector<SignedData<Block>> newBlocks) {
 		if (blocks == newBlocks) return this;
-		return create(newBlocks, proposalPoint, consensusPoint, timestamp);
+		
+		// Update proposal point and consensus point if necessary to ensure consistency
+		long nblocks=newBlocks.count();
+		long newProposalPoint = Math.min(nblocks, proposalPoint);
+		long newConsensusPoint = Math.min(nblocks, consensusPoint);
+		
+		return create(newBlocks, newProposalPoint, newConsensusPoint, timestamp);
 	}
 	
 	/**
@@ -269,22 +275,6 @@ public class Order extends ARecord {
 		return create(blocks, 0, 0,timestamp);
 	}
 
-	/**
-	 * Update this chain with a new list of blocks
-	 * 
-	 * @param newBlocks New vector of blocks to use in this Chain
-	 * @return The updated Order
-	 */
-	public Order updateBlocks(AVector<SignedData<Block>> newBlocks) {
-		if (blocks == newBlocks) return this;
-		
-		// Update proposal point and consensus point if necessary to ensure consistency
-		long nblocks=newBlocks.count();
-		long newProposalPoint = Math.min(nblocks, proposalPoint);
-		long newConsensusPoint = Math.min(consensusPoint, newProposalPoint);
-		
-		return create(newBlocks, newProposalPoint, newConsensusPoint, timestamp);
-	}
 
 	@Override
 	public void validate() throws InvalidDataException {
@@ -342,6 +332,18 @@ public class Order extends ARecord {
 		}
 
 		return new Order(blocks, proposalPoint, consensusPoint, ts);
+	}
+
+	/**
+	 * Tests if this ORder is equivalent to another in terms of consensus (timestamp ignored)
+	 * @param b Order to compare with
+	 * @return True if Orders are functionally equal, flase otherwise
+	 */
+	public boolean consensusEquals(Order b) {
+		if (this.proposalPoint!=b.proposalPoint) return false;
+		if (this.consensusPoint!=b.consensusPoint) return false;
+		if (!this.blocks.equals(b.blocks)) return false;
+		return true;
 	}
 	
 }
