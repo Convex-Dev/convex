@@ -619,12 +619,12 @@ public class Server implements Closeable {
 		}
 
 		try {
-			registerInterest(sd.getHash(), m);
 			boolean queued= transactionQueue.offer(sd,0,TimeUnit.MILLISECONDS);
 			if (!queued) {
 				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
 				m.reportResult(r);
-			}
+			} 
+			registerInterest(sd.getHash(), m);
 		} catch (InterruptedException e) {
 			log.warn("Unexpected interruption adding transaction to event queue!");
 		}
