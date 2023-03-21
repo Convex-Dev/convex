@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 /**
@@ -341,6 +342,24 @@ public class VectorsTest {
 		assertEquals(10, Samples.INT_VECTOR_10.commonPrefixLength(Samples.INT_VECTOR_23));
 		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256));
 		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256.append(RT.cvm(17L))));
+	}
+	
+	@Test
+	public void testPrefixLengthBuilding() throws BadFormatException {
+		AVector<ACell> v1=Vectors.empty();
+		AVector<ACell> v2=Vectors.empty();
+		for (int i=0; i<=300; i++) {
+			assertEquals(i,v1.commonPrefixLength(v2));
+			
+			ACell d=CVMLong.create(i+1000);
+			AVector<ACell> v1d=v1.conj(d);
+			AVector<ACell> v2d=v1.conj(CVMLong.create(i+1000));
+			assertEquals(i,v1.commonPrefixLength(v2d));
+			assertEquals(i,v2.conj((ACell)Symbols.FOO).commonPrefixLength(v2d));
+			
+			v1=v1d;
+			v2=v2d;
+		}
 	}
 
 	/**

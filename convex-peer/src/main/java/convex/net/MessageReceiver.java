@@ -170,7 +170,7 @@ public class MessageReceiver {
 			if (connection.maybeProcessPartial(message)) return;
 		}
 		
-		// Otherwise, send to a message queue
+		// Otherwise, send to the message receive action
 		receivedMessageCount++;
 		if (action != null) {
 			try {
