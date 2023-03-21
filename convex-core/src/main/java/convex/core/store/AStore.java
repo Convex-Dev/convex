@@ -103,7 +103,7 @@ public abstract class AStore {
 	 */
 	public abstract void close();
 	
-	protected final BlobCache blobCache=BlobCache.create(100000);
+	protected final BlobCache blobCache=BlobCache.create(10000);
 	
 	/**
 	 * Decodes a Cell from an Encoding. Looks up Cell in cache if available. Otherwise

@@ -120,7 +120,7 @@ public class Server implements Closeable {
 	private BlockingQueue<SignedData<ATransaction>> transactionQueue;
 	
 	/**
-	 * Queue for received events (Beliefs, Transactions) to be processed
+	 * Queue for received Beliefs to be processed
 	 */
 	private BlockingQueue<SignedData<Belief>> beliefQueue;
 
@@ -129,6 +129,25 @@ public class Server implements Closeable {
 	 * Called on NIO thread: should never block for long
 	 */
 	Consumer<Message> clientReceiveAction = new Consumer<Message>() {
+		@Override
+		public void accept(Message msg) {
+			try {
+				if (msg.getType()==MessageType.BELIEF) {
+					processBelief(msg);
+					return;
+				}
+				queueMessage(msg);
+			} catch (InterruptedException e) {
+				log.warn("Interrupt on peer receive queue!");
+			}
+		}
+	};
+	
+	/**
+	 * Message Consumer that simply enqueues received messages from outbound peer connections
+	 * Called on NIO thread: should never block for long
+	 */
+	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
 			try {
@@ -971,6 +990,10 @@ public class Server implements Closeable {
 
 		Ref<ACell> ref = Ref.get(o);
 		try {
+			if (beliefQueue.remainingCapacity()<=0) {
+				log.warn("skipping Belief message because incoming belief queue full");
+				return;
+			}
 			
 			// check we can persist the new belief
 			// May also pick up cached signature verification if already held
