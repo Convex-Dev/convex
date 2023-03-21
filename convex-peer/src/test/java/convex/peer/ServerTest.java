@@ -233,14 +233,14 @@ public class ServerTest {
 			AStore peerStore=network.SERVER.getStore();
 			Ref<?> pr=peerStore.refForHash(h);
 			assertTrue(pr.isPersisted()); // should be persisted in local peer store
-			//Refs.checkConsistentStores(pr, peerStore);
+			Refs.checkConsistentStores(pr, peerStore);
 
 			// TODO this needs fixing!
 			
-			//Future<SignedData<Belief>> acquiror=convex.acquire(h);
-			//SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
-			//assertTrue(ab.getValue() instanceof Belief);
-			//assertEquals(h,ab.getHash());
+			Future<SignedData<Belief>> acquiror=convex.acquire(h);
+			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
+			assertTrue(ab.getValue() instanceof Belief);
+			assertEquals(h,ab.getHash());
 		}
 	}
 	

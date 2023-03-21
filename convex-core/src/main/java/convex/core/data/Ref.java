@@ -673,7 +673,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	/**
 	 * Checks if this Ref refers to missing data, i.e. a Cell that does not exist in the
-	 * current store.
+	 * current store. May cause a read to the store.
 	 * 
 	 * @return true if this specific Ref has missing data, false otherwise.
 	 */
