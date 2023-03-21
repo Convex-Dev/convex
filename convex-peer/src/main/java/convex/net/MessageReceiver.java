@@ -177,7 +177,7 @@ public class MessageReceiver {
 				log.trace("Message received: {}", message.getType());
 				action.accept(message);
 			} catch (Throwable e) {
-				log.warn("Exception not handled from: " + connection.getRemoteAddress());
+				log.warn("Exception in receive action from: " + connection.getRemoteAddress());
 				e.printStackTrace();
 			}
 		} else {

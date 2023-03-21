@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -103,7 +102,7 @@ public class Server implements Closeable {
 	 * Maximum Pause for each iteration of Server Belief Merge loop.
 	 * We handle Belief merges as fast as possible, pausing to poll for this period if none arrive
 	 */
-	private static final long BELIEF_MERGE_PAUSE = 5L;
+	private static final long BELIEF_MERGE_PAUSE = 50L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -112,17 +111,17 @@ public class Server implements Closeable {
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
-	private BlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
+	private ArrayBlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
 
 	/**
 	 * Queue for received Transactions submitted for clients of this Peer
 	 */
-	private BlockingQueue<SignedData<ATransaction>> transactionQueue;
+	private ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
 	
 	/**
 	 * Queue for received Beliefs to be processed
 	 */
-	private BlockingQueue<SignedData<Belief>> beliefQueue;
+	private ArrayBlockingQueue<SignedData<Belief>> beliefQueue;
 
 	/**
 	 * Message Consumer that simply enqueues received client messages received by this peer
@@ -132,8 +131,9 @@ public class Server implements Closeable {
 		@Override
 		public void accept(Message msg) {
 			try {
-				if (msg.getType()==MessageType.BELIEF) {
-					processBelief(msg);
+				MessageType type=msg.getType();
+				if (type==MessageType.MISSING_DATA) {
+					processMissingData(msg);
 					return;
 				}
 				queueMessage(msg);
@@ -151,10 +151,15 @@ public class Server implements Closeable {
 		@Override
 		public void accept(Message msg) {
 			try {
+				MessageType type=msg.getType();
+				if (type==MessageType.MISSING_DATA) {
+					processMissingData(msg);
+					return;
+				}
 				queueMessage(msg);
 			} catch (InterruptedException e) {
 				log.warn("Interrupt on peer receive queue!");
-			}
+			} 
 		}
 	};
 
@@ -194,6 +199,11 @@ public class Server implements Closeable {
 	 * The Peer instance current state for this server. Will be updated based on peer events.
 	 */
 	private Peer peer;
+	
+	/**
+	 * The latest peer that has benn broadcast to the network
+	 */
+	private Peer broadcastPeer;
 
 	/**
 	 * The Peer Controller Address
@@ -251,10 +261,12 @@ public class Server implements Closeable {
 			this.propagator = new BeliefPropagator(this);
 
 			this.peer = establishPeer();
-
+			this.broadcastPeer=this.peer;
+			this.reportedConsensusPoint=peer.getConsensusPoint();
+			
 			establishController();
 
-			nio = NIOServer.create(this, receiveQueue);
+			nio = NIOServer.create(this);
 
 		} finally {
 			Stores.setCurrent(savedStore);
@@ -394,6 +406,8 @@ public class Server implements Closeable {
 	public Peer getPeer() {
 		return peer;
 	}
+	
+
 
 	/**
 	 * Gets the desired host name for this Peer
@@ -535,7 +549,7 @@ public class Server implements Closeable {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
 			m.getConnection().registerPartialMessage(missingHash,m);
-		} catch (BadFormatException | ClassCastException | NullPointerException e) {
+		} catch (ClassCastException | NullPointerException e) {
 			log.warn("Error processing client message: {}", e);
 		}
 	}
@@ -547,10 +561,14 @@ public class Server implements Closeable {
 	 * @param m
 	 * @throws BadFormatException
 	 */
-	private void processMissingData(Message m) throws BadFormatException {
+	private void processMissingData(Message m)  {
 		// payload for a missing data request should be a valid Hash
 		Hash h = RT.ensureHash(m.getPayload());
-		if (h == null) throw new BadFormatException("Hash required for missing data message");
+		if (h == null) {
+			log.warn("Bad missing data request, not a Hash, terminating client");
+			m.getConnection().close();
+			return;
+		};
 
 		Ref<?> r = store.refForHash(h);
 		if (r != null) {
@@ -559,13 +577,13 @@ public class Server implements Closeable {
 				boolean sent = m.sendData(data);
 				// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
 				if (!sent) {
-					log.debug("Can't send missing data for hash {} due to full buffer",h);
+					log.warn("Can't send missing data for hash {} due to full buffer",h);
 				}
 			} catch (Exception e) {
 				log.warn("Unable to deliver missing data for {} due to exception: {}", h, e);
 			}
 		} else {
-			log.debug("Unable to provide missing data for {} from store: {}", h,Stores.current());
+			log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
 		}
 	}
 
@@ -600,9 +618,13 @@ public class Server implements Closeable {
 			return;
 		}
 
-		registerInterest(sd.getHash(), m);
 		try {
-			transactionQueue.put(sd);
+			registerInterest(sd.getHash(), m);
+			boolean queued= transactionQueue.offer(sd,0,TimeUnit.MILLISECONDS);
+			if (!queued) {
+				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
+				m.reportResult(r);
+			}
 		} catch (InterruptedException e) {
 			log.warn("Unexpected interruption adding transaction to event queue!");
 		}
@@ -643,7 +665,7 @@ public class Server implements Closeable {
 	 * @throws InterruptedException
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
-		long oldConsensusPoint = peer.getConsensusPoint();
+
 
 		// possibly have client transactions to publish
 		maybePostClientTransactions();
@@ -668,16 +690,7 @@ public class Server implements Closeable {
 		// At this point we know our Order should have changed
 		propagator.broadcastBelief(peer);
 
-		// Report transaction results
-		long newConsensusPoint = peer.getConsensusPoint();
-		if (newConsensusPoint > oldConsensusPoint) {
-			log.debug("Consensus point update from {} to {}" ,oldConsensusPoint , newConsensusPoint);
-			for (long i = oldConsensusPoint; i < newConsensusPoint; i++) {
-				SignedData<Block> block = peer.getPeerOrder().getBlock(i);
-				BlockResult br = peer.getBlockResult(i);
-				reportTransactions(block.getValue(), br);
-			}
-		}
+
 
 		return true;
 	}
@@ -746,7 +759,7 @@ public class Server implements Closeable {
 	 * Note: this limits the TPS for a single peer in terms of client transactions
 	 * Also affects latency for client confirmations by up to this amount
 	 */
-	private static final long CLIENT_BLOCK_DELAY=10;
+	private static final long CLIENT_BLOCK_DELAY=50;
 
 	/**
 	 * Gets the Peer controller Address
@@ -780,6 +793,16 @@ public class Server implements Closeable {
 	 * @throws InterruptedException If thread is interrupted
 	 */
 	public void queueMessage(Message m) throws InterruptedException {
+		MessageType type = m.getType();
+		switch (type) {
+		case DATA:
+			processData(m);
+			return;
+		default:
+			break;
+		
+		}
+		
 		receiveQueue.put(m);
 	}
 	
@@ -913,7 +936,8 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusVector() {
-		Peer peer=this.getPeer();
+		// Make sure we use the latest broadcast peer version
+		Peer peer=this.broadcastPeer;
 		SignedData<Belief> signedBelief = peer.getSignedBelief();
 		
 		Hash beliefHash=signedBelief.getHash();
@@ -1074,7 +1098,7 @@ public class Server implements Closeable {
 					long timestamp=Utils.getCurrentTimestamp();
 
 					// Broadcast Belief if changed or otherwise not done recently
-					if (beliefUpdated||((propagator.lastBroadcastBelief+Constants.MAX_REBROADCAST_DELAY)<timestamp)) {
+					if (beliefUpdated||((propagator.lastBroadcastTime+Constants.MAX_REBROADCAST_DELAY)<timestamp)) {
 						// rebroadcast only if there is still stuff outstanding for consensus
 						if (peer.getConsensusPoint()<peer.getPeerOrder().getBlockCount()) {
 							propagator.broadcastBelief(peer);
@@ -1118,6 +1142,28 @@ public class Server implements Closeable {
 			}
 		}
 	}
+	
+	long reportedConsensusPoint;
+	
+	// Called from belief propagator
+	public void reportPeerBroadcast(Peer broadcastPeer) {
+		this.broadcastPeer=broadcastPeer;
+		
+		maybeReportTransactions(broadcastPeer);
+	}
+
+	private void maybeReportTransactions(Peer peer) {
+		// Report transaction results
+		long newConsensusPoint = peer.getConsensusPoint();
+		if (newConsensusPoint > reportedConsensusPoint) {
+			log.debug("Consensus point update from {} to {}" ,reportedConsensusPoint , newConsensusPoint);
+			for (long i = reportedConsensusPoint; i < newConsensusPoint; i++) {
+				SignedData<Block> block = peer.getPeerOrder().getBlock(i);
+				BlockResult br = peer.getBlockResult(i);
+				reportTransactions(block.getValue(), br);
+			}
+		}
+	}
 
 	private void reportTransactions(Block block, BlockResult br) {
 		// TODO: consider culling old interests after some time period
@@ -1132,8 +1178,10 @@ public class Server implements Closeable {
 					log.trace("Returning tranaction result ID {} to {}", id,m.getOriginString());
 					Result res = br.getResults().get(j);
 
-					m.reportResult(res);
-					
+					boolean reported = m.reportResult(res);
+					if (!reported) {
+						// ignore?
+					}
 					interests.remove(h);
 				}
 			} catch (Throwable e) {
@@ -1304,4 +1352,7 @@ public class Server implements Closeable {
 	public boolean isLive() {
 		return isRunning;
 	}
+
+
+
 }

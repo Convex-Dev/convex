@@ -191,5 +191,7 @@ public class ErrorCodes {
 	 */
 	public static final Keyword FORMAT = Keyword.create("FORMAT");
 
+	public static final Keyword LOAD = Keyword.create("LOAD");
+
 
 }

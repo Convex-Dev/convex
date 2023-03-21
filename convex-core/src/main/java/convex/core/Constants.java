@@ -174,7 +174,7 @@ public class Constants {
 	/**
 	 * Delay before rebroadcasting Belief if not in consensus
 	 */
-	public static final long MAX_REBROADCAST_DELAY = 100;
+	public static final long MAX_REBROADCAST_DELAY = 200;
 
 	/**
 	 * Delay before a Peer produces another Block. 

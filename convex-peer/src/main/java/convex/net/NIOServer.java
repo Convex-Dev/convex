@@ -6,15 +6,14 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.SocketException;
 import java.net.StandardSocketOptions;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.CancelledKeyException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
-import java.util.concurrent.BlockingQueue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +21,6 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
-import convex.net.message.Message;
 import convex.peer.Server;
 
 /**
@@ -42,7 +40,6 @@ public class NIOServer implements Closeable {
 
 	private ServerSocketChannel ssc = null;
 
-	private BlockingQueue<Message> receiveQueue;
 
 	private Selector selector = null;
 
@@ -50,9 +47,8 @@ public class NIOServer implements Closeable {
 
 	private final Server server;
 
-	private NIOServer(Server server, BlockingQueue<Message> receiveQueue) {
+	private NIOServer(Server server) {
 		this.server = server;
-		this.receiveQueue = receiveQueue;
 	}
 
 	/**
@@ -62,8 +58,8 @@ public class NIOServer implements Closeable {
 	 * @param receiveQueue Queue for received messages
 	 * @return New NIOServer instance
 	 */
-	public static NIOServer create(Server server, BlockingQueue<Message> receiveQueue) {
-		return new NIOServer(server, receiveQueue);
+	public static NIOServer create(Server server) {
+		return new NIOServer(server);
 	}
 
 	public void launch(Integer port) {
@@ -211,12 +207,12 @@ public class NIOServer implements Closeable {
 			return clientConnection;
 		SocketChannel sc = (SocketChannel) key.channel();
 		assert (!sc.isBlocking());
-		clientConnection = createClientConnection(sc, receiveQueue);
+		clientConnection = createClientConnection(sc);
 		key.attach(clientConnection);
 		return clientConnection;
 	}
 
-	private Connection createClientConnection(SocketChannel sc, BlockingQueue<Message> queue) throws IOException {
+	private Connection createClientConnection(SocketChannel sc) throws IOException {
 		return Connection.create(sc, server.getReceiveAction(), server.getStore(), null);
 	}
 

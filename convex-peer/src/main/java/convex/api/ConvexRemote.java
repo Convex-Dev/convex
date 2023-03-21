@@ -221,7 +221,7 @@ public class ConvexRemote extends Convex {
 					HashSet<Hash> missingSet = new HashSet<>();
 
 					// Loop until future is complete or cancelled
-					long LIMIT=1000; // limit of missing data elements to query at any time
+					long LIMIT=100; // limit of missing data elements to query at any time
 					while (!f.isDone()) {
 						missingSet.clear();
 
@@ -235,17 +235,23 @@ public class ConvexRemote extends Convex {
 							}
 							ref.findMissing(missingSet,LIMIT);
 						}
+						
+						long requestsSent=0;
 						for (Hash h : missingSet) {
 							// send missing data requests until we fill pipeline
 							log.debug("Request missing data: {}", h);
 							boolean sent = connection.sendMissingData(h);
-							if (!sent) {
-								log.debug("Send Queue full!");
+							if (sent) {
+								requestsSent++;
+							} else {
+								log.debug("Send Queue full! Reducing limit");
+								LIMIT=Math.max(requestsSent, 10);
 								break;
 							}
 						}
+						
 						// if too low, can send multiple requests, and then block the peer
-						Thread.sleep(100);
+						Thread.sleep(10);
 						ref = store.refForHash(hash);
 						if (ref != null) {
 							if (ref.getStatus() >= Ref.PERSISTED) {

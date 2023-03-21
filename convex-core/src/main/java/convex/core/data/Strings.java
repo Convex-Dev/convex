@@ -21,6 +21,7 @@ public class Strings {
 	
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
 	public static final StringShort BAD_FORMAT = StringShort.create("Bad Massage Format!");
+	public static final StringShort SERVER_LOADED = StringShort.create("Trx overload");
 	
 	public static final StringShort COLON = StringShort.create(":");
 	public static final StringShort HEX_PREFIX = StringShort.create("0x");
@@ -33,6 +34,8 @@ public class Strings {
 	 * 0xff (-1) is invalid UTF-8
 	 */
 	public static final byte EXCESS_BYTE = -1;
+
+
 
 
 	/**

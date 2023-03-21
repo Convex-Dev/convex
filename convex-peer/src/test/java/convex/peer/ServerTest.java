@@ -190,7 +190,8 @@ public class ServerTest {
 			assertFalse(trans.isError());
 
 			Convex convex=Convex.connect(network.SERVER.getHostAddress(), controller, kp);
-			trans=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
+			Result cresult=convex.transactSync(Invoke.create(controller, 0, "(create-peer "+peerKey+" "+STAKE+")"));
+			assertFalse(cresult.isError(),()->"Failed to create peer: "+cresult.toString());
 			assertEquals(RT.cvm(STAKE),trans.getValue());
 			//Thread.sleep(1000); // sleep a bit to allow background stuff
 
