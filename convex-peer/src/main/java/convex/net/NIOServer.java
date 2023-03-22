@@ -133,13 +133,13 @@ public class NIOServer implements Closeable {
 							// channel was closed, just lose the key?
 							log.debug("Client closed channel");
 							key.cancel();
-						} catch (IOException e) {
-							log.warn("Unexpected IOException, canceling key: {}", e);
-							// e.printStackTrace();
-							key.cancel();
-						} catch (CancelledKeyException e) {
+						}  catch (CancelledKeyException e) {
 							log.debug("Cancelled key: {}", e);
 							// e.printStackTrace();
+							key.cancel();
+						} catch (Throwable e) {
+							log.warn("Unexpected Exception, canceling key: {}", e);
+							e.printStackTrace();
 							key.cancel();
 						}
 					}
