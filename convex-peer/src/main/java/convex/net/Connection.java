@@ -668,10 +668,10 @@ public class Connection {
 							}
 						} catch (ClosedChannelException e) {
 							// channel was closed, just lose the key?
-							log.debug("Unexpected ChannelClosedException, cancelling key: {}", e);
+							log.trace("Unexpected ChannelClosedException, cancelling key: {}", e);
 							key.cancel();
 						} catch (IOException e) {
-							log.debug("Unexpected IOException, cancelling key: {}", e);
+							log.trace("Unexpected IOException, cancelling key: {}", e);
 							key.cancel();
 						} catch (CancelledKeyException e) {
 							log.debug("Cancelled key");

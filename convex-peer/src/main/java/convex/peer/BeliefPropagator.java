@@ -59,7 +59,6 @@ public class BeliefPropagator {
 	private long beliefBroadcastCount=0L;
 
 	private Peer latestPeer;
-	private SignedData<Belief> lastSignedBelief;
 	
 	public long getBeliefBroadcastCount() {
 		return beliefBroadcastCount;
@@ -75,7 +74,6 @@ public class BeliefPropagator {
 
 		// Broadcast latest Belief to connected Peers
 		SignedData<Belief> sb = peer.getSignedBelief();
-		if (Utils.equals(sb, lastSignedBelief)) return; // don't broadcast again
 		Belief belief=sb.getValue();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -97,7 +95,6 @@ public class BeliefPropagator {
 
 		server.manager.broadcast(msg, false);
 		lastBroadcastTime=Utils.getCurrentTimestamp();
-		lastSignedBelief=sb;
 		beliefBroadcastCount++;
 	}
 

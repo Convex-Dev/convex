@@ -618,16 +618,12 @@ public class Server implements Closeable {
 			return;
 		}
 
-		try {
-			boolean queued= transactionQueue.offer(sd,0,TimeUnit.MILLISECONDS);
-			if (!queued) {
-				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
-				m.reportResult(r);
-			} 
-			registerInterest(sd.getHash(), m);
-		} catch (InterruptedException e) {
-			log.warn("Unexpected interruption adding transaction to event queue!");
-		}
+		boolean queued= transactionQueue.offer(sd);
+		if (!queued) {
+			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
+			m.reportResult(r);
+		} 
+		registerInterest(sd.getHash(), m);
 	}
 
 	/**
@@ -675,23 +671,22 @@ public class Server implements Closeable {
 
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
+		
+		boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
 
-		// only do belief merge if needed: either after publishing a new block or with
+		// only do belief merge if needed either after:
+		// publishing a new block
 		// incoming beliefs
-		if ((!published) && newBeliefs.isEmpty()) return false;
+		// not in full consensus yet
+		if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
 		// Update Peer timestamp. This determines what we might accept.
 		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 		boolean updated = maybeMergeBeliefs();
-		// Must skip broadcast if we haven't published a new Block or updated our own Order
+		// Should skip broadcast if we haven't published a new Block or updated our own Order
 		if (!(updated||published)) return false;
-
-		// At this point we know our Order should have changed
-		propagator.broadcastBelief(peer);
-
-
-
+		
 		return true;
 	}
 
@@ -792,7 +787,7 @@ public class Server implements Closeable {
 	 * @param m Message to queue
 	 * @throws InterruptedException If thread is interrupted
 	 */
-	public void queueMessage(Message m) throws InterruptedException {
+	private void queueMessage(Message m) throws InterruptedException {
 		MessageType type = m.getType();
 		switch (type) {
 		case DATA:
@@ -871,7 +866,7 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybeMergeBeliefs() {
 		try {
-			// First get the set of new beliefs for merging
+			// First get the set of new beliefs for merging. Might be empty
 			Belief[] beliefs;
 			synchronized (newBeliefs) {
 				int n = newBeliefs.size();
@@ -1090,18 +1085,10 @@ public class Server implements Closeable {
 				while (isRunning) {
 					// Try belief update
 					boolean beliefUpdated=maybeUpdateBelief();
+					
 					if (beliefUpdated) {
 						raiseServerChange("consensus");
-					}
-
-					long timestamp=Utils.getCurrentTimestamp();
-
-					// Broadcast Belief if changed or otherwise not done recently
-					if (beliefUpdated||((propagator.lastBroadcastTime+Constants.MAX_REBROADCAST_DELAY)<timestamp)) {
-						// rebroadcast only if there is still stuff outstanding for consensus
-						if (peer.getConsensusPoint()<peer.getPeerOrder().getBlockCount()) {
-							propagator.broadcastBelief(peer);
-						}
+						propagator.broadcastBelief(peer);
 					}
 
 					// Maybe sleep a bit, wait for some new events to accumulate

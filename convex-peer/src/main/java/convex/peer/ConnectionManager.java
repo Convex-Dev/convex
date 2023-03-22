@@ -156,7 +156,7 @@ public class ConnectionManager {
 				convex.close();
 			}
 		} catch (Throwable t) {
-			if (server.isLive()) log.warn("Belief Polling failed: {}",t.getMessage());
+			if (server.isLive()) log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
 		}
 	}
 
