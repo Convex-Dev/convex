@@ -85,7 +85,7 @@ import convex.net.message.Message;
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
-	private static final int RECEIVE_QUEUE_SIZE = 10000;
+	private static final int QUERY_QUEUE_SIZE = 1000;
 
 	/**
 	 * Default size for incoming client transaction queue
@@ -111,7 +111,7 @@ public class Server implements Closeable {
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
-	private ArrayBlockingQueue<Message> receiveQueue = new ArrayBlockingQueue<Message>(RECEIVE_QUEUE_SIZE);
+	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(QUERY_QUEUE_SIZE);
 
 	/**
 	 * Queue for received Transactions submitted for clients of this Peer
@@ -130,16 +130,7 @@ public class Server implements Closeable {
 	Consumer<Message> clientReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
-			try {
-				MessageType type=msg.getType();
-				if (type==MessageType.MISSING_DATA) {
-					processMissingData(msg);
-					return;
-				}
-				queueMessage(msg);
-			} catch (InterruptedException e) {
-				log.warn("Interrupt on peer receive queue!");
-			}
+			processMessage(msg);
 		}
 	};
 	
@@ -150,16 +141,7 @@ public class Server implements Closeable {
 	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
-			try {
-				MessageType type=msg.getType();
-				if (type==MessageType.MISSING_DATA) {
-					processMissingData(msg);
-					return;
-				}
-				queueMessage(msg);
-			} catch (InterruptedException e) {
-				log.warn("Interrupt on peer receive queue!");
-			} 
+			processMessage(msg);
 		}
 	};
 
@@ -192,7 +174,7 @@ public class Server implements Closeable {
 	private volatile boolean isRunning = false;
 
 	private NIOServer nio;
-	private Thread receiverThread = null;
+	private Thread queryThread = null;
 	private Thread beliefMergeThread = null;
 
 	/**
@@ -448,9 +430,9 @@ public class Server implements Closeable {
 			// Start connection manager loop
 			manager.start();
 
-			receiverThread = new Thread(receiverLoop, "Receive Loop on port: " + port);
-			receiverThread.setDaemon(true);
-			receiverThread.start();
+			queryThread = new Thread(queryLoop, "Query handler on port: " + port);
+			queryThread.setDaemon(true);
+			queryThread.start();
 
 			// Start Peer update thread
 			beliefMergeThread = new Thread(beliefMergeLoop, "Belief Merge Loop on port: " + port);
@@ -780,25 +762,6 @@ public class Server implements Closeable {
 	}
 	
 	/**
-	 * Queues a message for processing by this Server. May block briefly
-	 * while messages are processed
-	 * @param m Message to queue
-	 * @throws InterruptedException If thread is interrupted
-	 */
-	private void queueMessage(Message m) throws InterruptedException {
-		MessageType type = m.getType();
-		switch (type) {
-		case DATA:
-			processData(m);
-			return;
-		default:
-			receiveQueue.put(m);
-			break;
-		
-		}
-	}
-	
-	/**
 	 * Check if the Peer want to send any of its own transactions
 	 * @param transactionList List of transactions to add to.
 	 */
@@ -928,8 +891,12 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusVector() {
-		// Make sure we use the latest broadcast peer version
 		Peer peer=this.broadcastPeer;
+		return createStatusVector(peer);
+	}
+		
+	private AVector<ACell> createStatusVector(Peer peer) {
+		// Make sure we use the latest broadcast peer version
 		SignedData<Belief> signedBelief = peer.getSignedBelief();
 		
 		Hash beliefHash=signedBelief.getHash();
@@ -956,6 +923,14 @@ public class Server implements Closeable {
 	}
 
 	private void processQuery(Message m) {
+		boolean queued= queryQueue.offer(m);
+		if (!queued) {
+			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
+			m.reportResult(r);
+		} 
+	}
+	
+	private void handleQuery(Message m) {
 		try {
 			// query is a vector [id , form, address?]
 			AVector<ACell> v = m.getPayload();
@@ -1043,9 +1018,10 @@ public class Server implements Closeable {
 	}
 
 	/*
-	 * Loop to process messages from the receive queue
+	 * Loop to process messages from the query queue. These may be long runnning, so we don't want to 
+	 * block the NIO Server
 	 */
-	private Runnable receiverLoop = new Runnable() {
+	private Runnable queryLoop = new Runnable() {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
@@ -1054,17 +1030,24 @@ public class Server implements Closeable {
 				log.debug("Receiver thread started for peer at {}", getHostAddress());
 
 				while (isRunning) { // loop until server terminated
-					Message m = receiveQueue.poll(100, TimeUnit.MILLISECONDS);
-					if (m != null) {
-						processMessage(m);
+					Message m = queryQueue.poll(10000, TimeUnit.MILLISECONDS);
+					if (m==null) continue;
+					
+					MessageType type=m.getType();
+					switch (type) {
+					case QUERY:
+						handleQuery(m);
+						break;
+					default:
+						log.warn("Unexpected Message type on query queue: "+type);
 					}
 				}
 
-				log.debug("Receiver thread terminated normally for peer {}", this);
+				log.debug("Query thread terminated normally for peer {}", this);
 			} catch (InterruptedException e) {
-				log.info("Receiver thread interrupted for peer {}", this);
+				log.info("Query thread interrupted for peer {}", this);
 			} catch (Throwable e) {
-				log.error("Peer Server FAILED: Receiver thread terminated abnormally" + e.getMessage());
+				log.error("Query Thread FAILED: Receiver thread terminated abnormally" + e.getMessage());
 				e.printStackTrace();
 			}
 		}
@@ -1245,10 +1228,10 @@ public class Server implements Closeable {
 				// Ignore
 			}
 		}
-		if (receiverThread != null) {
-			receiverThread.interrupt();
+		if (queryThread != null) {
+			queryThread.interrupt();
 			try {
-				receiverThread.join(100);
+				queryThread.join(100);
 			} catch (InterruptedException e) {
 				// Ignore
 			}

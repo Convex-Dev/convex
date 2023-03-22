@@ -50,7 +50,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			}
 		} catch (Throwable t) {
 			log.warn("Failed to accept message! {}",t);
-			t.printStackTrace();
 		}
 	}
 
@@ -75,9 +74,12 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		
 		Ref<?> r = Stores.current().refForHash(h);
 		if (r != null) try {
-			m.sendData(r.getValue());
+			boolean sent=m.sendData(r.getValue());
+			if (!sent) {
+				log.warn("Unable to satisfy missing data request");
+			}
 		} catch (Exception e) {
-			log.debug("Error replying to MISSING DATA request",e);
+			log.warn("Error replying to MISSING DATA request",e);
 		}
 	}
 

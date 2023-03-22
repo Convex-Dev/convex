@@ -22,6 +22,9 @@ import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.core.Result;
 import convex.core.State;
@@ -40,6 +43,8 @@ import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class StressPanel extends JPanel {
+	
+	static final Logger log = LoggerFactory.getLogger(StressPanel.class.getName());
 
 	protected PeerView peerView;
 
@@ -239,7 +244,7 @@ public class StressPanel extends JPanel {
 							+ formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
 
 				} catch (Exception e) {
-					e.printStackTrace();
+					log.warn("Stress test worker terminated unexpectedly",e);
 				} finally {
 					btnRun.setEnabled(true);
 				}

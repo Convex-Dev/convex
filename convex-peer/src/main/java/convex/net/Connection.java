@@ -794,6 +794,10 @@ public class Connection {
 			}
 			
 			boolean requested = m.sendMissingData(missingHash);
+			if (!requested) {
+				log.warn("Unable to request missing data for message "+m+" hash="+missingHash);
+				partialMessages.remove(missingHash);
+			}
 			log.trace("Requested missing data {} for partial message",missingHash);
 		} catch (Exception ex) {
 			log.warn( "Exception while requesting missing data: {}", ex);
