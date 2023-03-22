@@ -637,9 +637,6 @@ public class Server implements Closeable {
 		raiseServerChange("connection");
 	}
 
-
-
-
 	/**
 	 * Register of client interests in receiving transaction responses
 	 */
@@ -775,10 +772,11 @@ public class Server implements Closeable {
 	/**
 	 * Adds an event to the inbound server event queue. May block.
 	 * @param event Signed event to add to inbound event queue
-	 * @throws InterruptedException If interrupted while waiting
+	 * @return True if Belief was successfullly queued, false otherwise
 	 */
-	public void queueBelief(SignedData<Belief> event) throws InterruptedException {
-		beliefQueue.put(event);
+	public boolean queueBelief(SignedData<Belief> event) {
+		boolean offered=beliefQueue.offer(event);
+		return offered;
 	}
 	
 	/**
@@ -1031,8 +1029,7 @@ public class Server implements Closeable {
 				return;
 			}
 
-			boolean queued = beliefQueue.offer(receivedBelief);
-			if (!queued) {
+			if (!queueBelief(receivedBelief)) {
 				log.warn("Incoming belief queue full");
 			}
 		} catch (ClassCastException e) {
@@ -1091,7 +1088,7 @@ public class Server implements Closeable {
 						propagator.broadcastBelief(peer);
 					}
 
-					// Maybe sleep a bit, wait for some new events to accumulate
+					// Wait for some new events to accumulate up to a given time
 					awaitBeliefs();
 				}
 			} catch (InterruptedException e) {
