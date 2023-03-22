@@ -38,8 +38,7 @@ public class BeliefPropagator {
 					// wait until the thread is notified of new work
 					synchronized(BeliefPropagator.this) {BeliefPropagator.this.wait(1000);};
 					
-					long delay=(lastBroadcastTime+MIN_BELIEF_BROADCAST_DELAY)-Utils.getCurrentTimestamp();
-					if (delay>0) Thread.sleep(Math.min(1000, delay));
+					if (!isBroadcastDue()) Thread.sleep(MIN_BELIEF_BROADCAST_DELAY);
 					Peer peer=latestPeer;
 					latestPeer=null;
 					doBroadcastBelief(peer);
@@ -49,6 +48,10 @@ public class BeliefPropagator {
 			}
 		}
 	};
+	
+	public boolean isBroadcastDue() {
+		return (lastBroadcastTime+MIN_BELIEF_BROADCAST_DELAY)<Utils.getCurrentTimestamp();
+	}
 	
 	protected final Thread beliefPropagatorThread=new Thread(beliefPropagatorLoop);
 	

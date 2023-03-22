@@ -1083,7 +1083,7 @@ public class Server implements Closeable {
 					// Try belief update
 					boolean beliefUpdated=maybeUpdateBelief();
 					
-					if (beliefUpdated) {
+					if (beliefUpdated||propagator.isBroadcastDue()) {
 						raiseServerChange("consensus");
 						propagator.broadcastBelief(peer);
 					}
