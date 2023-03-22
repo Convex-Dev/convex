@@ -278,7 +278,7 @@ public class Server implements Closeable {
 
 	@SuppressWarnings("unchecked")
 	private Peer establishPeer() throws TimeoutException, IOException {
-		log.info("Establishing Peer with store: {}",Stores.current());
+		log.debug("Establishing Peer with store: {}",Stores.current());
 		try {
 			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
 			if (keyPair==null) {
@@ -339,11 +339,11 @@ public class Server implements Closeable {
 			}
 			State genesisState = (State) config.get(Keywords.STATE);
 			if (genesisState!=null) {
-				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+				log.debug("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
 			} else {
 				AccountKey peerKey=keyPair.getAccountKey();
 				genesisState=Init.createState(List.of(peerKey));
-				log.info("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
+				log.debug("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
 			}
 			return Peer.createGenesisPeer(keyPair,genesisState);
 		} catch (ExecutionException|InterruptedException e) {
@@ -464,7 +464,7 @@ public class Server implements Closeable {
 				}
 			}
 
-			log.info( "Peer Server started with Peer Address: {}",getPeerKey());
+			log.info( "Peer Server started at "+nio.getHostAddress()+" with Peer Address: {}",getPeerKey());
 		} catch (Throwable e) {
 			close();
 			throw new Error("Failed to launch Server", e);
@@ -641,13 +641,6 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 
-
-		// possibly have client transactions to publish
-		maybePostClientTransactions();
-
-		// possibly have own transactions to publish
-		maybePostOwnTransactions();
-
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
 		
@@ -702,6 +695,12 @@ public class Server implements Closeable {
 		long timestamp=Utils.getCurrentTimestamp();
 		// skip if recently published a block
 		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
+
+		// possibly have client transactions to publish
+		maybePostClientTransactions();
+
+		// possibly have own transactions to publish
+		maybePostOwnTransactions();
 
 		Block block=null;
 		int n = newTransactions.size();
@@ -1045,7 +1044,7 @@ public class Server implements Closeable {
 
 				log.debug("Query thread terminated normally for peer {}", this);
 			} catch (InterruptedException e) {
-				log.info("Query thread interrupted for peer {}", this);
+				log.debug("Query thread interrupted for peer {}", this);
 			} catch (Throwable e) {
 				log.error("Query Thread FAILED: Receiver thread terminated abnormally" + e.getMessage());
 				e.printStackTrace();
@@ -1075,7 +1074,7 @@ public class Server implements Closeable {
 					awaitBeliefs();
 				}
 			} catch (InterruptedException e) {
-				log.info("Terminating Belief Merge loop due to interrupt");
+				log.debug("Terminating Belief Merge loop due to interrupt");
 			} catch (Throwable e) {
 				log.error("Unexpected exception in Belief Merge loop: {}", e);
 				log.error("Terminating Server update");
@@ -1192,7 +1191,7 @@ public class Server implements Closeable {
 			}
 
 			store.setRootData(rootData);
-			log.info( "Stored peer data for Server with hash: {}", rootData.getHash().toHexString());
+			log.debug( "Stored peer data for Server with hash: {}", rootData.getHash().toHexString());
 			return true;
 		} catch (Throwable e) {
 			log.warn("Failed to persist peer state: {}" ,e.getMessage());
@@ -1204,6 +1203,8 @@ public class Server implements Closeable {
 
 	@Override
 	public void close() {
+		if (!isRunning) return;
+		
 		// Shut down propagator first, not point sending any more Beliefs
 		propagator.close();
 		
@@ -1239,6 +1240,7 @@ public class Server implements Closeable {
 		manager.close();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
+		log.info("Peer shutdown complete for "+this);
 	}
 
 	/**

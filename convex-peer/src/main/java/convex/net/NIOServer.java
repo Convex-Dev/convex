@@ -94,7 +94,7 @@ public class NIOServer implements Closeable {
 			Thread selectorThread = new Thread(selectorLoop, "NIO Server selector loop on port: " + port);
 			selectorThread.setDaemon(true);
 			selectorThread.start();
-			log.info("NIO server started on port {}", port);
+			log.debug("NIO server started on port {}", port);
 		} catch (Exception e) {
 			throw new Error("Can't bind NIOServer to port: " + port, e);
 		}
@@ -175,7 +175,7 @@ public class NIOServer implements Closeable {
 					}
 				}
 
-				log.info("Selector loop ended on port: " + getPort());
+				log.debug("Selector loop ended on port: " + getPort());
 			}
 		}
 	};
