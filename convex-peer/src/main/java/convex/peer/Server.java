@@ -838,6 +838,7 @@ public class Server implements Closeable {
 				newBeliefs.clear();
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
+			if(newPeer==peer) return false;
 
 			// Check for substantive change (i.e. Orders updated, can ignore timestamp)
 			if (newPeer.getBelief().getOrders().equals(peer.getBelief().getOrders())) return false;

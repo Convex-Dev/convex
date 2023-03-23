@@ -42,8 +42,11 @@ public class BeliefPropagator {
 					Peer peer=latestPeer;
 					latestPeer=null;
 					doBroadcastBelief(peer);
-				}catch (InterruptedException e) {
+				
+				} catch (InterruptedException e) {
 					log.trace("Belief Propagator thread interrupted on "+server);
+				} catch (Throwable e) {
+					log.warn("Unexpected exception in Belief propagator: ",e);
 				}
 			}
 		}
