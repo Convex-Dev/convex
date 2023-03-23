@@ -137,8 +137,10 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	@Override
 	public boolean containsKey(ACell key) {
-		if (key instanceof CVMLong) {
-			long ix = ((CVMLong) key).longValue();
+		// TODO: probably should be AInteger?
+		CVMLong index=RT.ensureLong(key);
+		if (index!=null) {
+			long ix = index.longValue();
 			if ((ix >= 0) && (ix < count())) return true;
 		}
 		return false;

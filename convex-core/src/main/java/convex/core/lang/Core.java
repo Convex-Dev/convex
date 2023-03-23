@@ -2143,8 +2143,9 @@ public class Core {
 			long juice=Juice.costBuildStructure(counted,end-start);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
+			// TODO: this might not be canonical? Should be careful...
 			ACountable<ACell> result = counted.slice(start,end);
-			// TODO: probably needs to cost a lot?
+			// TODO: probably needs to cost a lot more?
 			return context.withResult(juice, result);
 		}
 	});
