@@ -152,7 +152,7 @@ public class ConnectionManager {
 
 				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
 
-				server.queueBelief(sb);
+				server.queueBelief(Message.createBelief(sb));
 			} finally {
 				convex.close();
 			}

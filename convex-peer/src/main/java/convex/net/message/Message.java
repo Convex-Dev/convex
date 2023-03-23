@@ -13,6 +13,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.MessageType;
@@ -89,8 +90,7 @@ public abstract class Message {
 
 	@Override
 	public String toString() {
-		// TODO. Are tags really needed in `.toString`?
-		return "#message {:type " + getType() + " :payload " + Utils.print(getPayload()) + "}";
+		return "#message {:type " + getType() + " :payload " + RT.print(getPayload(),1000) + "}";
 	}
 
 	/**

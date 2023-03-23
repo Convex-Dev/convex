@@ -121,7 +121,7 @@ public class Server implements Closeable {
 	/**
 	 * Queue for received Beliefs to be processed
 	 */
-	private ArrayBlockingQueue<SignedData<Belief>> beliefQueue;
+	private ArrayBlockingQueue<Message> beliefQueue;
 
 	/**
 	 * Message Consumer that simply enqueues received client messages received by this peer
@@ -754,7 +754,7 @@ public class Server implements Closeable {
 	 * @param event Signed event to add to inbound event queue
 	 * @return True if Belief was successfullly queued, false otherwise
 	 */
-	public boolean queueBelief(SignedData<Belief> event) {
+	public boolean queueBelief(Message event) {
 		boolean offered=beliefQueue.offer(event);
 		return offered;
 	}
@@ -975,31 +975,10 @@ public class Server implements Closeable {
 	 *
 	 * @param m
 	 */
-	@SuppressWarnings("unchecked")
 	private void processBelief(Message m) {
-		ACell o = m.getPayload();
-
-		try {
-			if (beliefQueue.remainingCapacity()<=0) {
-				log.warn("skipping Belief message because incoming belief queue full");
-				return;
-			}
-			
-			SignedData<Belief> sb=((SignedData<Belief>)o);
-			ACell b =sb.getValue(); // might not actually be a Belief
-			if (!(b instanceof Belief)) {
-				Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
-				m.reportResult(r);
-				return;
-			}
-
-			if (!queueBelief(sb)) {
-				log.warn("Incoming belief queue full");
-			}
-		} catch (ClassCastException e) {
-			// bad message?
-			log.warn("Exception due to bad message from peer? {}" ,e);
-		} 
+		if (!queueBelief(m)) {
+			log.warn("Incoming belief queue full");
+		}
 	}
 
 	/*
@@ -1070,13 +1049,15 @@ public class Server implements Closeable {
 	};
 
 	private void awaitBeliefs() throws InterruptedException {
-		SignedData<Belief> firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
+		Message firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
+
 		if (firstEvent==null) return;
-		ArrayList<SignedData<Belief>> allBeliefs=new ArrayList<>();
+		ArrayList<Message> allBeliefs=new ArrayList<>();
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs);
-		for (SignedData<Belief> receivedBelief: allBeliefs) {
+		for (Message m: allBeliefs) {
 			try {
+				SignedData<Belief> receivedBelief=m.getPayload();
 				AccountKey addr = receivedBelief.getAccountKey();
 				SignedData<Belief> current = newBeliefs.get(addr);
 				
@@ -1102,12 +1083,18 @@ public class Server implements Closeable {
 					log.debug("Valid belief received by peer at {}: {}"
 								,getHostAddress(),receivedBelief.getValue().getHash());
 				}
+			} catch (ClassCastException e) {
+				// Bad message from Peer
+				m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
 			} catch (BadSignatureException e) {
 				// we got sent a bad signature. TODO: consider dropping connection? banning?
 				log.info("Bad signed belief from peer!");
 			} catch (MissingDataException e) {
 				// Missing data, ignore
-				log.debug("Missing data in Belief!",e);
+				log.trace("Missing data in Belief!",e);
+				if (!m.sendMissingData(e.getMissingHash())) {
+					log.warn("Unable to request Missing data in Belief!");
+				}
 			} 
 		}
 	}
