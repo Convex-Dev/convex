@@ -189,19 +189,6 @@ public class AccountStatus extends ARecord {
 		return controller;
 	}
 
-	/**
-	 * Checks if this account has enough balance for a transaction consuming the
-	 * specified amount.
-	 * 
-	 * @param amt minimum amount that must be present in the specified balance
-	 * @return true if Account has at least the balance specified, false otherwise
-	 */
-	public boolean hasBalance(long amt) {
-		if (amt < 0) return false;
-		if (amt > balance) return false;
-		return true;
-	}
-
 	public AccountStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
 		return new AccountStatus(sequence, newBalance, memory, environment,metadata,holdings,controller,publicKey);
@@ -401,7 +388,7 @@ public class AccountStatus extends ARecord {
 		Address newController = (Address)newVals[6];
 		AccountKey newKey=AccountKey.create((ABlob)newVals[7]);
 		
-		if ((balance==newBal)&&(sequence==newSeq)&&(newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
+		if ((balance==newBal)&&(sequence==newSeq)&&(memory==newAllowance)&&(newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
 			return this;
 		}
 		

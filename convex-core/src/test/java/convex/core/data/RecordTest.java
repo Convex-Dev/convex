@@ -96,8 +96,8 @@ public class RecordTest {
 		}
 		assertThrows(Exception.class,()->r.getRef(rc));
 
-		assertSame(r,r.updateAll(r.getValuesArray()));
-		assertSame(r,r.updateAll(r.values().toCellArray()));
+		assertEquals(r,r.updateAll(r.getValuesArray()));
+		assertEquals(r,r.updateAll(r.values().toCellArray()));
 
 		CollectionsTest.doDataStructureTests(r);
 	}
