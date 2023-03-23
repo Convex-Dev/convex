@@ -129,15 +129,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 
 	@Override
-	public boolean containsValue(Object value) {
-		if ((entry != null) && Utils.equals(entry.getValue(), value)) return true;
-		for (int i = 0; i < count; i++) {
-			if (children[i].getValue().containsValue(value)) return true;
-		}
-		return false;
-	}
-
-	@Override
 	public V get(ABlob key) {
 		MapEntry<K, V> me = getEntry(key);
 		if (me == null) return null;
@@ -745,6 +736,15 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@Override
 	public ACell toCanonical() {
 		return this;
+	}
+
+	@Override
+	public boolean containsValue(ACell value) {
+		if ((entry!=null)&&Utils.equals(value, entry.getValue())) return true;
+		for (Ref<BlobMap<K,V>> cr : children) {
+			if (cr.getValue().containsValue(value)) return true;
+		}
+		return false;
 	}
 
 

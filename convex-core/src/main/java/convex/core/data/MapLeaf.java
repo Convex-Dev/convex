@@ -133,7 +133,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public boolean containsValue(Object value) {
+	public boolean containsValue(ACell value) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			if (Utils.equals(value, entries[i].getValue())) return true;

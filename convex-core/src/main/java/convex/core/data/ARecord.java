@@ -192,7 +192,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public boolean containsValue(Object value) {
+	public boolean containsValue(ACell value) {
 		return values().contains(value);
 	}
 

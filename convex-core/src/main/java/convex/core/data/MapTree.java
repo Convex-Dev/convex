@@ -194,7 +194,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public boolean containsValue(Object value) {
+	public boolean containsValue(ACell value) {
 		for (Ref<AHashMap<K, V>> b : children) {
 			if (b.getValue().containsValue(value)) return true;
 		}

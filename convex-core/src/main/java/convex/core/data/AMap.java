@@ -93,6 +93,19 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		// If not a valid CVM value, cannot contain key
 		return false;
 	}
+	
+	@Override
+	public final boolean containsValue(Object value) {
+		if (value instanceof ACell) return containsValue((ACell)value);
+		return false;
+	}
+
+	/**
+	 * CHecks if this map contains the given value. WARNING: probably O(n)
+	 * @param value Value to check
+	 * @return true if map contains value, false otherwise
+	 */
+	public abstract boolean containsValue(ACell value);
 
 	/**
 	 * Get an entry given a Ref to the key value. This is more efficient than
@@ -338,4 +351,5 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		}
 		return Vectors.create(keys);
 	}
+
 }
