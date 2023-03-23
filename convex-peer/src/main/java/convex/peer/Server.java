@@ -1103,11 +1103,11 @@ public class Server implements Closeable {
 								,getHostAddress(),receivedBelief.getValue().getHash());
 				}
 			} catch (BadSignatureException e) {
-				// we got sent a bad signature.
-				log.warn("Bad signed belief from peer!");
+				// we got sent a bad signature. TODO: consider dropping connection? banning?
+				log.info("Bad signed belief from peer!");
 			} catch (MissingDataException e) {
 				// Missing data, ignore
-				log.warn("Missing data in Belief!",e);
+				log.debug("Missing data in Belief!",e);
 			} 
 		}
 	}

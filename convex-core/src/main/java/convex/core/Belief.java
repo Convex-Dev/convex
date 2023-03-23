@@ -326,12 +326,31 @@ public class Belief extends ARecord {
 
 		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {
-			// Update timestamp
-			Order myNewOrder=consensusOrder.withTimestamp(mc.getTimeStamp());
+			// We have a different Order to propose
+			// First check how consistent this is with out current Order
+			long match = consensusOrder.getBlocks().commonPrefixLength(myOrder.getBlocks());
+			long ts=mc.getTimeStamp();
 			
-			// Only sign and update Order if it has changed
-			final SignedData<Order> signedOrder = mc.sign(myNewOrder);
-			resultOrders = resultOrders.assoc(myAddress, signedOrder);
+			// We always want to replace our Order if consistent with our current proposal
+			boolean shouldReplace=match>=myOrder.getProposalPoint();
+			
+			// If we need to switch proposals be careful!
+			// We only do this after sufficient time has elapsed
+			if (!shouldReplace) {
+				long keepProposalTime=5000;
+				if (mc.getTimeStamp()>myOrder.getTimestamp()+keepProposalTime) {
+					shouldReplace=true;
+				}
+			}
+			
+			if (shouldReplace) {
+				// Update timestamp
+				Order myNewOrder=consensusOrder.withTimestamp(ts);
+			
+				// Only sign and update Order if it has changed
+				final SignedData<Order> signedOrder = mc.sign(myNewOrder);
+				resultOrders = resultOrders.assoc(myAddress, signedOrder);
+			}
 		}
 		return resultOrders;
 	}
