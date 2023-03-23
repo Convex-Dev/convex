@@ -19,7 +19,7 @@ import convex.net.message.Message;
  */
 public class BeliefPropagator {
 	
-	public static final int MIN_BELIEF_BROADCAST_DELAY=30;
+	public static final int MIN_BELIEF_BROADCAST_DELAY=50;
 
 	protected final Server server;
 	
