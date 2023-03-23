@@ -895,14 +895,14 @@ public class Server implements Closeable {
 		return createStatusVector(peer);
 	}
 		
-	private AVector<ACell> createStatusVector(Peer peer) {
+	private static AVector<ACell> createStatusVector(Peer peer) {
 		// Make sure we use the latest broadcast peer version
 		SignedData<Belief> signedBelief = peer.getSignedBelief();
 		
 		Hash beliefHash=signedBelief.getHash();
 		Hash statesHash=peer.getStates().getHash();
 		Hash genesisHash=peer.getStates().get(0).getHash();
-		AccountKey peerKey=getPeerKey();
+		AccountKey peerKey=peer.getPeerKey();
 		Hash consensusHash=peer.getConsensusState().getHash();
 		
 		Order order=peer.getPeerOrder();

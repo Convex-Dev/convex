@@ -4,6 +4,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
+import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.InvalidDataException;
 
 /**
  * Class representing the context to be used for a Belief merge/update function. This
@@ -17,12 +19,14 @@ import convex.core.data.SignedData;
  */
 public class MergeContext {
 
+	private final Belief initialBelief;
 	private final AccountKey publicKey;
 	private final State state;
 	private final AKeyPair keyPair;
 	private final long timestamp;
 
-	private MergeContext(AKeyPair peerKeyPair, long mergeTimestamp, State consensusState) {
+	private MergeContext(Belief belief, AKeyPair peerKeyPair, long mergeTimestamp, State consensusState) {
+		this.initialBelief=belief;
 		this.state = consensusState;
 		this.publicKey = peerKeyPair.getAccountKey();
 		this.keyPair = peerKeyPair;
@@ -31,13 +35,14 @@ public class MergeContext {
 
 	/**
 	 * Create a MergeContext
+	 * @param belief 
 	 * @param kp Keypair
 	 * @param timestamp Timestamp
 	 * @param s Consensus State
 	 * @return New MergeContext instance
 	 */
-	public static MergeContext create(AKeyPair kp, long timestamp, State s) {
-		return new MergeContext(kp, timestamp, s);
+	public static MergeContext create(Belief belief, AKeyPair kp, long timestamp, State s) {
+		return new MergeContext(belief, kp, timestamp, s);
 	}
 
 	/**
@@ -73,7 +78,8 @@ public class MergeContext {
 	 * @return Updated MergeContext
 	 */
 	public MergeContext withTimestamp(long newTimestamp) {
-		return new MergeContext(keyPair, newTimestamp, state);
+		if (timestamp==newTimestamp) return this;
+		return new MergeContext(initialBelief,keyPair, newTimestamp, state);
 	}
 
 	/**
@@ -82,6 +88,10 @@ public class MergeContext {
 	 */
 	public State getConsensusState() {
 		return state;
+	}
+
+	public Belief merge(Belief[] beliefs) throws BadSignatureException, InvalidDataException {
+		return initialBelief.merge(this,beliefs);
 	}
 
 }
