@@ -62,7 +62,7 @@ public class Peer {
 	private transient final AKeyPair keyPair;
 	
 	/** The latest merged belief */
-	private final SignedData<Belief> belief;
+	private final SignedData<Belief> signedBelief;
 
 	/**
 	 * The latest observed timestamp. This is increased by the Server polling the
@@ -84,7 +84,7 @@ public class Peer {
 			long timeStamp) {
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
-		this.belief = belief;
+		this.signedBelief = belief;
 		this.states = states;
 		this.blockResults = results;
 		this.timestamp = timeStamp;
@@ -111,7 +111,7 @@ public class Peer {
 	 */
 	public AMap<Keyword, ACell> toData() {
 		return Maps.of(
-			Keywords.BELIEF,belief,
+			Keywords.BELIEF,signedBelief,
 			Keywords.RESULTS,blockResults,
 			Keywords.STATES,states
 		);
@@ -242,7 +242,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp < timestamp) return this;
-		return new Peer(keyPair, belief, states, blockResults, timestamp);
+		return new Peer(keyPair, signedBelief, states, blockResults, timestamp);
 	}
 
 	/**
@@ -354,7 +354,7 @@ public class Peer {
  	 * @return Belief
  	 */
 	public Belief getBelief() {
-		return belief.getValue();
+		return signedBelief.getValue();
 	}
 
 	/**
@@ -362,7 +362,7 @@ public class Peer {
 	 * @return Signed Belief
 	 */
 	public SignedData<Belief> getSignedBelief() {
-		return belief;
+		return signedBelief;
 	}
 
 	/**
@@ -408,7 +408,6 @@ public class Peer {
 			Belief newBelief2 = belief.merge(mc, beliefs);
 
 		}
-
 		return updateConsensus(newBelief);
 	}
 
@@ -420,7 +419,7 @@ public class Peer {
 	 * @throws BadSignatureException 
 	 */
 	private Peer updateConsensus(Belief newBelief) {
-		if (belief.getValue() == newBelief) return this;
+		if (signedBelief.getValue() == newBelief) return this;
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
 		long stateIndex = states.count() - 1; // index of last state
@@ -450,7 +449,7 @@ public class Peer {
 	 */
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
 		// Peer Belief must be announced using novelty handler
-		SignedData<Belief> sb=this.belief;
+		SignedData<Belief> sb=this.signedBelief;
 		sb.announce(noveltyHandler);
 
 		// Persist states

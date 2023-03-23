@@ -2,6 +2,7 @@ package convex.peer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.UnresolvedAddressException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -585,6 +586,9 @@ public class ConnectionManager {
 					if ( !requireTrusted || (pc.isTrusted())) {
 						pc.sendMessage(msg);
 					}
+				} catch (ClosedChannelException e) {
+					log.debug("Closed channel during broadcast");
+					pc.close();
 				} catch (IOException e) {
 					log.error("Error in broadcast: ", e);
 				}

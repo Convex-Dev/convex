@@ -712,7 +712,7 @@ public class Server implements Closeable {
 		ACell.createPersisted(block);
 
 		Peer newPeer = peer.proposeBlock(block);
-		log.debug("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
+		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
 
 		peer = newPeer;
 		lastBlockPublishedTime=timestamp;
@@ -975,44 +975,30 @@ public class Server implements Closeable {
 	 *
 	 * @param m
 	 */
+	@SuppressWarnings("unchecked")
 	private void processBelief(Message m) {
 		ACell o = m.getPayload();
 
-		Ref<ACell> ref = Ref.get(o);
 		try {
 			if (beliefQueue.remainingCapacity()<=0) {
 				log.warn("skipping Belief message because incoming belief queue full");
 				return;
 			}
 			
-			// check we can persist the new belief
-			// May also pick up cached signature verification if already held
-			ref = ref.persist();
-
-			@SuppressWarnings("unchecked")
-			SignedData<Belief> receivedBelief = (SignedData<Belief>) o;
-			receivedBelief.validateSignature();
-
-			// TODO: validate trusted connection?
-			// TODO: can drop Beliefs if under pressure?
-			
-			ACell b=receivedBelief.getValue(); // might not actually be a Belief
+			SignedData<Belief> sb=((SignedData<Belief>)o);
+			ACell b =sb.getValue(); // might not actually be a Belief
 			if (!(b instanceof Belief)) {
 				Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
 				m.reportResult(r);
 				return;
 			}
 
-			if (!queueBelief(receivedBelief)) {
+			if (!queueBelief(sb)) {
 				log.warn("Incoming belief queue full");
 			}
 		} catch (ClassCastException e) {
 			// bad message?
 			log.warn("Exception due to bad message from peer? {}" ,e);
-		} catch (BadSignatureException e) {
-			// we got sent a bad signature.
-			// TODO: Probably need to slash peer? but ignore for now
-			log.warn("Bad signed belief from peer: " + Utils.print(o));
 		} 
 	}
 
@@ -1089,22 +1075,40 @@ public class Server implements Closeable {
 		ArrayList<SignedData<Belief>> allBeliefs=new ArrayList<>();
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs);
-		for (SignedData<Belief> signedEvent: allBeliefs) {
-			SignedData<Belief> receivedBelief=(SignedData<Belief>)signedEvent;
-			AccountKey addr = receivedBelief.getAccountKey();
-			SignedData<Belief> current = newBeliefs.get(addr);
-			
-			// Make sure the Belief is the latest from a Peer
-			if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
-					.getTimestamp())) {
-				// Add to map of new Beliefs received for each Peer
-				newBeliefs.put(addr, receivedBelief);
-				beliefReceivedCount++;
-
-				// Notify the update thread that there is something new to handle
-				log.debug("Valid belief received by peer at {}: {}"
-							,getHostAddress(),receivedBelief.getValue().getHash());
-			}
+		for (SignedData<Belief> receivedBelief: allBeliefs) {
+			try {
+				AccountKey addr = receivedBelief.getAccountKey();
+				SignedData<Belief> current = newBeliefs.get(addr);
+				
+				// Make sure the Belief is the latest from a Peer
+				if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
+						.getTimestamp())) {
+					// Add to map of new Beliefs received for each Peer
+					
+					// check we can persist the new belief
+					// May also pick up cached signature verification if already held
+					receivedBelief.validateSignature();
+					
+					// Persist
+					Ref<SignedData<Belief>> ref=ACell.createPersisted(receivedBelief);
+					receivedBelief=ref.getValue();
+					// TODO: validate trusted connection?
+					// TODO: can drop Beliefs if under pressure?
+					
+					newBeliefs.put(addr, receivedBelief);
+					beliefReceivedCount++;
+	
+					// Notify the update thread that there is something new to handle
+					log.debug("Valid belief received by peer at {}: {}"
+								,getHostAddress(),receivedBelief.getValue().getHash());
+				}
+			} catch (BadSignatureException e) {
+				// we got sent a bad signature.
+				log.warn("Bad signed belief from peer!");
+			} catch (MissingDataException e) {
+				// Missing data, ignore
+				log.warn("Missing data in Belief!");
+			} 
 		}
 	}
 	
@@ -1240,7 +1244,7 @@ public class Server implements Closeable {
 		manager.close();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
-		log.info("Peer shutdown complete for "+this);
+		log.info("Peer shutdown complete for "+peer.getPeerKey());
 	}
 
 	/**
