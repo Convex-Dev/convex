@@ -576,10 +576,15 @@ public class Server implements Closeable {
 		SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
 
 		// System.out.println("transact: "+v);
-
+		if (!(sd.getValue() instanceof ATransaction)) {
+			Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
+			m.reportResult(r);
+			return;
+		}
+		
 		// Persist the signed transaction. Might throw MissingDataException?
 		// If we already have the transaction persisted, will get signature status
-		ACell.createPersisted(sd);
+		sd=ACell.createPersisted(sd).getValue();
 
 		if (!sd.checkSignature()) {
 			// terminate the connection, dishonest client?
@@ -591,12 +596,6 @@ public class Server implements Closeable {
 				// Ignore?? Connection probably gone anyway
 			}
 			log.debug("Bad signature from Client! {}" , sd);
-			return;
-		}
-		
-		if (!(sd.getValue() instanceof ATransaction)) {
-			Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
-			m.reportResult(r);
 			return;
 		}
 

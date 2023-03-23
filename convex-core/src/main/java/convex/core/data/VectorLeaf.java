@@ -612,6 +612,11 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		return true;
 	}
 	
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+	
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
@@ -787,10 +792,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (!isCanonical()) throw new InvalidDataException("Not a canonical VectorLeaf!", this);
 	}
 
-	@Override
-	public ACell toCanonical() {
-		return this;
-	}
 
 	/**
 	 * Tests if a given count should result in a VectorLeaf

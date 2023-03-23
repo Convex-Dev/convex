@@ -20,7 +20,7 @@ public class Strings {
 	public static final StringShort FALSE = StringShort.create("false");
 	
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
-	public static final StringShort BAD_FORMAT = StringShort.create("Bad Massage Format!");
+	public static final StringShort BAD_FORMAT = StringShort.create("Bad Message Format!");
 	public static final StringShort SERVER_LOADED = StringShort.create("Trx overload");
 	
 	public static final StringShort COLON = StringShort.create(":");

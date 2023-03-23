@@ -44,7 +44,7 @@ import convex.core.transactions.ATransaction;
  *
  * @param <T> The type of the signed object
  */
-public class SignedData<T extends ACell> extends ARecord {
+public final class SignedData<T extends ACell> extends ARecord {
 	// Encoded fields
 	private final AccountKey publicKey;
 	private final ASignature signature;
@@ -261,7 +261,7 @@ public class SignedData<T extends ACell> extends ARecord {
 	}
 
 	@Override
-	public int getRefCount() {
+	public final int getRefCount() {
 		// Value Ref only
 		return 1;
 	}
@@ -298,7 +298,7 @@ public class SignedData<T extends ACell> extends ARecord {
 		valueRef.validate();
 	}
 
-	public Ref<T> getDataRef() {
+	public Ref<T> getValueRef() {
 		return valueRef;
 	}
 	

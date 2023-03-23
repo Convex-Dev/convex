@@ -66,7 +66,7 @@ public class SignedDataTest {
 		sd.validateSignature();
 		assertEquals(cl, sd.getValue());
 
-		assertTrue(sd.getDataRef().isEmbedded());
+		assertTrue(sd.getValueRef().isEmbedded());
 	}
 	
 	@SuppressWarnings("unchecked")

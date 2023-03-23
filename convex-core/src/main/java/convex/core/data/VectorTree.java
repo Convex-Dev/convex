@@ -593,6 +593,11 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		return true;
 	}
 	
+	@Override
+	public ACell toCanonical() {
+		return this;
+	}
+	
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
@@ -766,10 +771,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	}
 
-	@Override
-	public ACell toCanonical() {
-		return this;
-	}
 
 
 }

@@ -137,7 +137,7 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 100;
+		return stakes.estimatedEncodingSize()+100;
 	}
 
 	@Override
