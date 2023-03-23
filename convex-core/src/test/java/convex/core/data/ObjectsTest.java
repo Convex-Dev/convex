@@ -257,6 +257,8 @@ public class ObjectsTest {
 	}
 
 	private static void doCellRefTests(ACell a) {
+		assertSame(a,a.updateRefs(ref->ref));
+
 		Ref<ACell> cachedRef=a.cachedRef;
 		Ref<ACell> ref=a.getRef();
 		if (cachedRef!=null) assertSame(ref,cachedRef);
