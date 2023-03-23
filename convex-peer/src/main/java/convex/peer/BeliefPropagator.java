@@ -109,7 +109,6 @@ public class BeliefPropagator {
 	}
 
 	public void start() {
-		// TODO Auto-generated method stub
 		beliefPropagatorThread.start();
 	}
 }
