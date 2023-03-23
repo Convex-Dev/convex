@@ -11,7 +11,6 @@ import convex.core.Block;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Base class for Record data types. 
@@ -122,30 +121,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 */
 	@Override
 	public abstract byte getTag();
-	
-	@Override
-	public int getRefCount() {
-		long n=format.count();
-		int count=0;
-		for (int i=0; i<n; i++) {
-			count+=Utils.refCount(get(getKeys().get(i)));
-		}
-		return count;
-	}
-	
-	@Override
-	public <R extends ACell> Ref<R> getRef(int index) {
-		long n=size();
-		int si=index;
-		if (index<0) throw new IndexOutOfBoundsException("Negative ref index: "+index);
-		for (int i=0; i<n; i++) {
-			ACell v=get(getKeys().get(i));
-			int rc=Utils.refCount(v);
-			if (si<rc) return v.getRef(si);
-			si-=rc;
-		}
-		throw new IndexOutOfBoundsException("Bad ref index: "+index);
-	}
 
 	@Override
 	public ARecord updateRefs(IRefFunction func) {

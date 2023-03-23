@@ -584,7 +584,10 @@ public class ConnectionManager {
 			for (Connection pc : connections.values()) {
 				try {
 					if ( !requireTrusted || (pc.isTrusted())) {
-						pc.sendMessage(msg);
+						boolean sent = pc.sendMessage(msg);
+						if (!sent) {
+							log.warn("Failed to send broadcast message: "+msg);
+						}
 					}
 				} catch (ClosedChannelException e) {
 					log.debug("Closed channel during broadcast");

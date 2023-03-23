@@ -167,7 +167,8 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 
 	@Override
 	public int getRefCount() {
-		return ((entry == null) ? 0 : entry.getRefCount()) + children.length;
+		// note entry might be null
+		return Utils.refCount(entry) + children.length;
 	}
 
 	@SuppressWarnings("unchecked")

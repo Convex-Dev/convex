@@ -12,6 +12,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
@@ -215,6 +216,16 @@ public final class Block extends ARecord {
 		
 		if (!(Utils.equals(transactions, a.transactions))) return false;
 		return true;
+	}
+
+	@Override
+	public int getRefCount() {
+		return transactions.getRefCount();
+	}
+	
+	@Override 
+	public <R extends ACell> Ref<R> getRef(int i) {
+		return transactions.getRef(i);
 	}
 	
 }

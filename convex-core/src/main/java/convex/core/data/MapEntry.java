@@ -174,7 +174,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public int getRefCount() {
+	public final int getRefCount() {
 		return 2;
 	}
 

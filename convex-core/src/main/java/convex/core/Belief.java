@@ -23,6 +23,7 @@ import convex.core.data.Hash;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
@@ -755,6 +756,16 @@ public class Belief extends ARecord {
 		if (timestamp!=a.timestamp) return false;
 		if (!(Utils.equals(orders, a.orders))) return false;
 		return true;
+	}
+
+	@Override
+	public int getRefCount() {
+		return orders.getRefCount();
+	}
+	
+	@Override 
+	public <R extends ACell> Ref<R> getRef(int i) {
+		return orders.getRef(i);
 	}
 	
 }

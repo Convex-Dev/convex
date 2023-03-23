@@ -274,9 +274,28 @@ public class PeerStatus extends ARecord {
 		
 		if (stake!=a.stake) return false;
 		if (delegatedStake!=a.delegatedStake) return false;
-		if (!(Utils.equals(metadata, a.metadata))) return false;
 		if (!(Utils.equals(stakes, a.stakes))) return false;
+		if (!(Utils.equals(metadata, a.metadata))) return false;
 		if (!(Utils.equals(controller, a.controller))) return false;
 		return true;
+	}
+
+	@Override
+	public int getRefCount() {
+		int result=0;
+		result+=Utils.refCount(stakes);
+		result+=Utils.refCount(metadata);
+		return result;
+	}
+	
+	@Override 
+	public <R extends ACell> Ref<R> getRef(int i) {
+		int sc=Utils.refCount(stakes);
+		if (i<sc) {
+			return stakes.getRef(i);
+		} else {
+			if (metadata==null) throw new IndexOutOfBoundsException(i);
+			return metadata.getRef(i-sc);
+		}
 	}
 }

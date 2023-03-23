@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Block;
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
@@ -44,6 +45,16 @@ public class BlocksTest {
 		assertEquals(t, b.getTransactions().get(0).getValue());
 
 		RecordTest.doRecordTests(b);
+
+	}
+	
+	@Test 
+	public void testBlockRefs() {
+		long ts=Constants.INITIAL_TIMESTAMP;
+		ATransaction t = Transfer.create(InitTest.HERO,0, InitTest.VILLAIN, 1000);
+		Block b1 = Block.create(ts, Vectors.of(t,t,t));
+
+		assertEquals(3,b1.getRefCount());
 
 	}
 }

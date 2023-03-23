@@ -9,6 +9,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -205,5 +206,21 @@ public class BlockResult extends ARecord {
 		if (!(Utils.equals(state, a.state))) return false;
 		return true;
 	}
+
+	@Override
+	public int getRefCount() {
+		return state.getRefCount()+results.getRefCount();
+	}
+	
+	@Override 
+	public <R extends ACell> Ref<R> getRef(int i) {
+		int sc=Utils.refCount(state);
+		if (i<sc) {
+			return state.getRef(i);
+		} else {
+			return results.getRef(i-sc);
+		}
+	}
+
 	
 }

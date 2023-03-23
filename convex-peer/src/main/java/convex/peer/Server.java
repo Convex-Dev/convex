@@ -1046,26 +1046,26 @@ public class Server implements Closeable {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
-			try {
-				// loop while the server is running
-				while (isRunning) {
-					// Try belief update
-					boolean beliefUpdated=maybeUpdateBelief();
-					
-					if (beliefUpdated||propagator.isBroadcastDue()) {
-						raiseServerChange("consensus");
-						propagator.broadcastBelief(peer);
-					}
-
-					// Wait for some new events to accumulate up to a given time
-					awaitBeliefs();
+			while (isRunning) {
+				try {
+					// loop while the server is running
+						// Try belief update
+						boolean beliefUpdated=maybeUpdateBelief();
+						
+						if (beliefUpdated||propagator.isBroadcastDue()) {
+							raiseServerChange("consensus");
+							propagator.broadcastBelief(peer);
+						}
+	
+						// Wait for some new events to accumulate up to a given time
+						awaitBeliefs();
+				} catch (InterruptedException e) {
+					log.debug("Terminating Belief Merge loop due to interrupt");
+					break;
+				} catch (Throwable e) {
+					log.error("Unexpected exception in Belief Merge loop: {}", e);
+					e.printStackTrace();
 				}
-			} catch (InterruptedException e) {
-				log.debug("Terminating Belief Merge loop due to interrupt");
-			} catch (Throwable e) {
-				log.error("Unexpected exception in Belief Merge loop: {}", e);
-				log.error("Terminating Server update");
-				e.printStackTrace();
 			}
 		}
 	};
@@ -1108,7 +1108,7 @@ public class Server implements Closeable {
 				log.warn("Bad signed belief from peer!");
 			} catch (MissingDataException e) {
 				// Missing data, ignore
-				log.warn("Missing data in Belief!");
+				log.warn("Missing data in Belief!",e);
 			} 
 		}
 	}
