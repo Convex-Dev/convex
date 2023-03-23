@@ -7,7 +7,7 @@ import convex.core.util.Utils;
 /**
  * Abstract base class for generic records.
  * 
- * Generic records are backed by a vector
+ * Generic records are backed by a vector of values
  */
 public abstract class ARecordGeneric extends ARecord {
 

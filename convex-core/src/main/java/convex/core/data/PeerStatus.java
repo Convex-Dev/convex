@@ -211,7 +211,8 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// TODO: Nothing?
+		stakes.validateCell();
+		if (metadata!=null) metadata.validateCell();
 	}
 
 	@Override
