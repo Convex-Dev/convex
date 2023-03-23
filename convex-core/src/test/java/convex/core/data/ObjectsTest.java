@@ -109,7 +109,7 @@ public class ObjectsTest {
 			AString s=bb.getCVMString();
 			long n=s.count();
 			assertTrue(n<=limit); // should fit in length specified
-			assertEquals(s,a.print());
+			assertEquals(s,a.print(n));
 			
 			assertEquals(s,RT.print(a,n),()->"Expected print of length "+n+" for "+a); // must re-print in same length
 			assertNull(RT.print(a,n-1)); // must fail with one less character in limit

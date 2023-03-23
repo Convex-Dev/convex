@@ -990,8 +990,18 @@ public class RT {
 	 * @return Java String representation. May be "nil".
 	 */
 	public static String toString(ACell a) {
+		return toString(a,Constants.PRINT_LIMIT);
+	}
+	
+	/**
+	 * Converts a value to a Java String representation
+	 * @param a Any CVM value
+	 * @param limit Limit of string printing
+	 * @return Java String representation. May be "nil". May include message if print limit exceeded
+	 */
+	public static String toString(ACell a, long limit) {
 		if (a==null) return "nil";
-		return a.toString();
+		return a.print(limit).toString();
 	}
 
 	/**
@@ -1664,9 +1674,10 @@ public class RT {
 			HashMap<String,Object> hm=new HashMap<>();
 			for (long i=0; i<n; i++) {
 				MapEntry<?,?> me=m.entryAt(i);
-				String k=RT.toString(me.getKey());
+				ACell k=me.getKey();
+				String sk=(k instanceof AString)?k.toString():RT.toString(k);
 				Object v=json(me.getValue());
-				hm.put(k, v);
+				hm.put(sk, v);
 			}
 			return (T) hm;
 		}
