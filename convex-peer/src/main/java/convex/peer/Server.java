@@ -99,8 +99,7 @@ public class Server implements Closeable {
 	private static final int BELIEF_QUEUE_SIZE = 500;
 
 	/**
-	 * Maximum Pause for each iteration of Server Belief Merge loop.
-	 * We handle Belief merges as fast as possible, pausing to poll for this period if none arrive
+	 * Pause for each iteration of Server Belief Merge loop.
 	 */
 	private static final long BELIEF_MERGE_PAUSE = 50L;
 
@@ -1012,7 +1011,12 @@ public class Server implements Closeable {
 			}
 		}
 	};
-
+	
+	/**
+	 * Timestamp for last Belief merge
+	 */
+	private long lastBeliefMerge=0;
+	
 	/*
 	 * Runnable loop for managing Server belief merges
 	 */
@@ -1028,6 +1032,7 @@ public class Server implements Closeable {
 					// loop while the server is running
 					// Try belief update
 					boolean beliefUpdated=maybeUpdateBelief();
+					if (beliefUpdated) lastBeliefMerge=Utils.getCurrentTimestamp();
 					
 					if (beliefUpdated||propagator.isBroadcastDue()) {
 						raiseServerChange("consensus");
@@ -1045,10 +1050,15 @@ public class Server implements Closeable {
 	};
 
 	private void awaitBeliefs() throws InterruptedException {
+		ArrayList<Message> allBeliefs=new ArrayList<>();
+		
+		// if we did a belief merge recently, pause for a bit to await more Beliefs
+		long delay = lastBeliefMerge+BELIEF_MERGE_PAUSE-Utils.getCurrentTimestamp();
+		delay=Math.min(1000, delay);
+		if (delay>0) Thread.sleep(delay);
 		Message firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
 
 		if (firstEvent==null) return;
-		ArrayList<Message> allBeliefs=new ArrayList<>();
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs);
 		for (Message m: allBeliefs) {
