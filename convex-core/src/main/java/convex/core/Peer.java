@@ -507,8 +507,8 @@ public class Peer {
 		Order newChain = myOrder.append(sign(block));
 		SignedData<Order> newSignedOrder = sign(newChain);
 		
-		BlobMap<AccountKey, SignedData<Order>> newChains = orders.assoc(peerKey, newSignedOrder);
-		Belief newBelief=b.withOrders(newChains);
+		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
+		Belief newBelief=b.withOrders(newOrders);
 		return updateConsensus(newBelief);
 	}
 

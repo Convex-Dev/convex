@@ -683,7 +683,7 @@ public class Belief extends ARecord {
 	 */
 	public Belief withOrders(BlobMap<AccountKey, SignedData<Order>> newOrders) {
 		if (newOrders == orders) return this;
-		return Belief.create(newOrders);
+		return Belief.create(newOrders,timestamp);
 	}
 
 	@Override
