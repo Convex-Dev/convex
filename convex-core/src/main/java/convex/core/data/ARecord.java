@@ -121,21 +121,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 */
 	@Override
 	public abstract byte getTag();
-
-	@Override
-	public ARecord updateRefs(IRefFunction func) {
-		int n=size();		
-		ACell[] newValues=new ACell[n];
-		AVector<Keyword> keys=getKeys();
-		for (int i=0; i<n; i++) {
-			ACell v=get(keys.get(i));
-			if (v!=null) v=v.updateRefs(func);
-			newValues[i]=v;
-		}
-		ARecord result= updateAll(newValues);
-		result.attachEncoding(encoding);
-		return result;
-	}
 	
 	/**
 	 * Gets an array containing all values in this record, in format-defined key order.
@@ -150,16 +135,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		}
 		return result;
 	}
-		
-	/**
-	 * Updates all values in this record, in declared field order.
-	 * 
-	 * Returns this if all values are identical.
-	 * 
-	 * @param newVals New values to replace current
-	 * @return Updated Record
-	 */
-	protected abstract ARecord updateAll(ACell[] newVals);
 	
 	@Override
 	public boolean containsKey(ACell key) {

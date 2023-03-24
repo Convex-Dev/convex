@@ -375,24 +375,17 @@ public class AccountStatus extends ARecord {
 		return Tag.ACCOUNT_STATUS;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected AccountStatus updateAll(ACell[] newVals) {
-		long newSeq=((CVMLong)newVals[0]).longValue();
-		long newBal=((CVMLong)newVals[1]).longValue();
-		long newAllowance=((CVMLong)newVals[2]).longValue();
-		AHashMap<Symbol, ACell> newEnv=(AHashMap<Symbol, ACell>) newVals[3];
-		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta=(AHashMap<Symbol, AHashMap<ACell,ACell>>) newVals[4];
-		ABlobMap<Address, ACell> newHoldings=(ABlobMap<Address, ACell>) newVals[5];
-		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null; // switch empty maps to null
-		Address newController = (Address)newVals[6];
-		AccountKey newKey=AccountKey.create((ABlob)newVals[7]);
+	public AccountStatus updateRefs(IRefFunction func) {
+		AHashMap<Symbol, ACell> newEnv=Ref.updateRefs(environment, func);
+		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta=Ref.updateRefs(metadata, func);
+		ABlobMap<Address, ACell> newHoldings=Ref.updateRefs(holdings, func);
 		
-		if ((balance==newBal)&&(sequence==newSeq)&&(memory==newAllowance)&&(newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)&&(newController==controller)&&(newKey==publicKey)) {
+		if ((newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)) {
 			return this;
 		}
 		
-		return new AccountStatus(newSeq,newBal,newAllowance,newEnv,newMeta,newHoldings,newController,newKey);
+		return new AccountStatus(sequence,balance,memory,newEnv,newMeta,newHoldings,controller,publicKey);
 	}
 
 	/**

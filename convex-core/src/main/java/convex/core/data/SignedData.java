@@ -167,19 +167,6 @@ public final class SignedData<T extends ACell> extends ARecord {
 	}
 
 	@Override
-	protected SignedData<T> updateAll(ACell[] newVals) {
-		AccountKey publicKey = (AccountKey)newVals[0];
-		ASignature signature = (ASignature)newVals[1];
-		Ref<T> valueRef = newVals[2].getRef();
-
-		if (publicKey == this.publicKey && signature == this.signature && valueRef == this.valueRef) {
-			return this;
-		}
-
-		return new SignedData<T>(valueRef, publicKey, signature);
-	}
-
-	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.SIGNED_DATA;
 		return encodeRaw(bs,pos);

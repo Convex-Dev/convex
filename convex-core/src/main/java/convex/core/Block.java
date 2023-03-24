@@ -10,6 +10,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
@@ -19,7 +20,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
@@ -66,15 +66,13 @@ public final class Block extends ARecord {
 		return null;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected Block updateAll(ACell[] newVals) {
-		long newTimestamp = RT.ensureLong(newVals[0]).longValue();		
-		AVector<SignedData<ATransaction>> newTransactions = (AVector<SignedData<ATransaction>>) newVals[1];
-		if ((this.transactions == newTransactions) && (this.timestamp == newTimestamp) ) {
+	public Block updateRefs(IRefFunction func) {
+		AVector<SignedData<ATransaction>> newTransactions = transactions.updateRefs(func);
+		if (this.transactions == newTransactions) {
 			return this;
 		}
-		return new Block(newTimestamp, newTransactions);
+		return new Block(timestamp, newTransactions);
 	}
 
 	/**

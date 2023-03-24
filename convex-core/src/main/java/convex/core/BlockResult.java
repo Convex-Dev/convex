@@ -7,6 +7,7 @@ import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
@@ -121,11 +122,10 @@ public class BlockResult extends ARecord {
 		return Tag.BLOCK_RESULT;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected BlockResult updateAll(ACell[] newVals) {
-		State newState=(State)newVals[0];
-		AVector<Result> newResults=(AVector<Result>)newVals[1];
+	public BlockResult updateRefs(IRefFunction func) {
+		State newState=state.updateRefs(func);
+		AVector<Result> newResults=results.updateRefs(func);
 		return create(newState,newResults);
 	}
 

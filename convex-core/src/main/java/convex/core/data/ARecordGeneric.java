@@ -67,22 +67,6 @@ public abstract class ARecordGeneric extends ARecord {
 		AVector<ACell> newValues=values.updateRefs(func);
 		return withValues(newValues);
 	}
-
-	@Override
-	protected ARecord updateAll(ACell[] newVals) {
-		int n=size();
-		if (newVals.length!=n) throw new IllegalArgumentException("Wrong number of values: "+newVals.length);
-		boolean changed = false;
-		for (int i=0; i<n; i++) {
-			if (values.get(i)!=newVals[i]) {
-				changed=true;
-				break;
-			}
-		}
-		if (!changed) return this;
-		AVector<ACell> newVector=Vectors.create(newVals);
-		return withValues(newVector);
-	}
 	
 	@Override
 	public AVector<ACell> values() {

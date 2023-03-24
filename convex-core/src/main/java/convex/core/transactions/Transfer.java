@@ -150,19 +150,4 @@ public class Transfer extends ATransaction {
 
 		return null;
 	}
-
-	@Override
-	protected Transfer updateAll(ACell[] newVals) {
-		long amount = ((CVMLong)newVals[0]).longValue();
-		Address origin = (Address)newVals[1];
-		long sequence = ((CVMLong)newVals[2]).longValue();
-		Address target = (Address)newVals[3];
-
-		if (amount == this.amount && origin == this.origin && sequence == this.sequence
-			&& target == this.target) {
-			return this;
-		}
-
-		return new Transfer(origin, sequence, target, amount);
-	}
 }

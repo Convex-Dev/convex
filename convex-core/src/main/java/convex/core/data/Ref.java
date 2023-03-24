@@ -695,6 +695,13 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public abstract Ref<T> ensureCanonical();
 
+	@SuppressWarnings("unchecked")
+	public static <R extends ACell> R updateRefs(R a, IRefFunction func) {
+		if (a==null) return null;
+		R b=(R) a.updateRefs(func);
+		return b;
+	}
+
 
 
 

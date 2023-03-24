@@ -296,12 +296,6 @@ public class Order extends ARecord {
 	public <R extends ACell> Ref<R> getRef(int i) {
 		return blocks.getRef(i);
 	}
-
-	@Override
-	public Order updateRefs(IRefFunction func) {
-		AVector<SignedData<Block>> newBlocks = blocks.updateRefs(func);
-		return this.withBlocks(newBlocks);
-	}
 	
 	@Override
 	public byte getTag() {
@@ -318,20 +312,13 @@ public class Order extends ARecord {
 		return null;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public Order updateAll(ACell[] newVals) {
-		AVector<SignedData<Block>> blocks = (AVector<SignedData<Block>>)newVals[0];
-		long consensusPoint = ((CVMLong)newVals[1]).longValue();
-		long proposalPoint = ((CVMLong)newVals[2]).longValue();
-		long ts = ((CVMLong)newVals[3]).longValue();
-
-		if (blocks == this.blocks && consensusPoint == this.consensusPoint
-			&& proposalPoint == this.proposalPoint) {
+	public Order updateRefs(IRefFunction func) {
+		AVector<SignedData<Block>> newBlocks = blocks.updateRefs(func);
+		if (blocks == newBlocks) {
 			return this;
 		}
-
-		return new Order(blocks, proposalPoint, consensusPoint, ts);
+		return new Order(newBlocks, proposalPoint, consensusPoint, timestamp);
 	}
 
 	/**

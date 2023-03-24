@@ -231,20 +231,15 @@ public class PeerStatus extends ARecord {
 		return Tag.PEER_STATUS;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected PeerStatus updateAll(ACell[] newVals) {
-        Address newOwner = (Address) newVals[0];
-		long newStake = ((CVMLong) newVals[1]).longValue();
-		ABlobMap<Address, CVMLong> newStakes = (ABlobMap<Address, CVMLong>) newVals[2];
-		long newDelStake = ((CVMLong) newVals[3]).longValue();
-		AHashMap<Keyword,ACell> newMeta = (AHashMap<Keyword,ACell>) newVals[4];
+	public PeerStatus updateRefs(IRefFunction func) {
+		ABlobMap<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
+		AHashMap<Keyword,ACell> newMeta = Ref.updateRefs(metadata, func);
 
-		if ((this.stake==newStake)&&(this.stakes==newStakes)
-				&&(this.metadata==newMeta)&&(this.delegatedStake==newDelStake)) {
+		if ((this.stakes==newStakes)&&(this.metadata==newMeta)) {
 			return this;
 		}
-		return new PeerStatus(newOwner, newStake, newStakes, newDelStake, newMeta);
+		return new PeerStatus(controller, stake, newStakes, delegatedStake, newMeta);
 	}
 
 	protected static long computeDelegatedStake(ABlobMap<Address, CVMLong> stakes) {

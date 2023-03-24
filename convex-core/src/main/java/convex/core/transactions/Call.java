@@ -4,17 +4,15 @@ import java.nio.ByteBuffer;
 
 import convex.core.Constants;
 import convex.core.data.ACell;
-import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Format;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.Tag;
-import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -146,20 +144,5 @@ public class Call extends ATransaction {
 		if (Keywords.TARGET.equals(key)) return target;
 
 		return null;
-	}
-
-	@Override
-	public Call updateAll(ACell[] newVals) {
-		@SuppressWarnings("unchecked")
-		AList<ACell> call = (AList<ACell>)newVals[0];
-		long offer = ((CVMLong)newVals[1]).longValue();
-		Address origin = (Address)newVals[2];
-		long sequence = ((CVMLong)newVals[3]).longValue();
-		Address target = (Address)newVals[4];
-
-		Symbol functionName = (Symbol)call.get(0);
-		AVector<ACell> args = Vectors.create(call.next());
-
-		return new Call(origin, sequence, target, offer, functionName, args);
 	}
 }

@@ -173,17 +173,4 @@ public class Invoke extends ATransaction {
 
 		return null;
 	}
-
-	@Override
-	public Invoke updateAll(ACell[] newVals) {
-		ACell command = (ACell)newVals[0];
-		Address origin = (Address)newVals[1];
-		long sequence = ((CVMLong)newVals[2]).longValue();
-
-		if (command == this.command && origin == this.origin && sequence == this.sequence) {
-			return this;
-		}
-
-		return new Invoke(origin, sequence, command);
-	}
 }

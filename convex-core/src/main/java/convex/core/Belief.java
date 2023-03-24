@@ -20,6 +20,7 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
@@ -75,15 +76,13 @@ public class Belief extends ARecord {
 		return null;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected Belief updateAll(ACell[] newVals) {
-		BlobMap<AccountKey, SignedData<Order>> newOrders = (BlobMap<AccountKey, SignedData<Order>>) newVals[0];
-		long newTimestamp = ((CVMLong) newVals[1]).longValue();
-		if ((this.orders == newOrders)&&(this.timestamp==newTimestamp)) {
+	public Belief updateRefs(IRefFunction func) {
+		BlobMap<AccountKey, SignedData<Order>> newOrders = Ref.updateRefs(orders, func);
+		if (this.orders == newOrders) {
 			return this;
 		}
-		return new Belief(newOrders, newTimestamp);
+		return new Belief(newOrders, timestamp);
 	}
 
 	/**

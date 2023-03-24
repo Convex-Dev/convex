@@ -19,6 +19,7 @@ import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.LongBlob;
@@ -145,18 +146,17 @@ public class State extends ARecord {
 		throw new IndexOutOfBoundsException(i);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	protected State updateAll(ACell[] newVals) {
-		AVector<AccountStatus> accounts = (AVector<AccountStatus>) newVals[0];
-		BlobMap<AccountKey, PeerStatus> peers = (BlobMap<AccountKey, PeerStatus>) newVals[1];
-		AVector<ACell> globals = (AVector<ACell>) newVals[2];
-		BlobMap<ABlob, AVector<ACell>> schedule = (BlobMap<ABlob, AVector<ACell>>) newVals[3];
-		if ((this.accounts == accounts) && (this.peers == peers) && (this.globals == globals)
-				&& (this.schedule == schedule)) {
+	public State updateRefs(IRefFunction func) {
+		AVector<AccountStatus> newAccounts = accounts.updateRefs(func);
+		BlobMap<AccountKey, PeerStatus> newPeers = peers.updateRefs(func);
+		AVector<ACell> newGlobals = globals.updateRefs(func);
+		BlobMap<ABlob, AVector<ACell>> newSchedule = schedule.updateRefs(func);
+		if ((accounts == newAccounts) && (peers == newPeers) && (globals == newGlobals)
+				&& (schedule == newSchedule)) {
 			return this;
 		}
-		return new State(accounts, peers, globals, schedule);
+		return new State(newAccounts, peers, globals, schedule);
 	}
 
 	/**
