@@ -155,7 +155,7 @@ public class Belief extends ARecord {
 		Counters.beliefMerge++;
 
 		// accumulate combined list of latest Orders for all peers
-		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc, beliefs);
+		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(beliefs);
 
 		// vote for new proposed chain
 		final BlobMap<AccountKey, SignedData<Order>> resultOrders = vote(mc, accOrders);
@@ -175,8 +175,7 @@ public class Belief extends ARecord {
 	 * @param beliefs
 	 * @return
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc,
-			Belief[] beliefs) {
+	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(Belief[] beliefs) {
 		// Initialise result with existing Orders from this Belief
 		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
 		
@@ -192,8 +191,8 @@ public class Belief extends ARecord {
 				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
 				ABlob key=be.getKey();
 				
-				// Skip merging own Key. We should always have our own latest Order
-				if(key.equalsBytes(mc.getAccountKey())) continue; 
+				SignedData<Order> b=be.getValue();
+				if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
 				
 				SignedData<Order> a=result.get(key);
 				if (a == null) {
@@ -201,14 +200,7 @@ public class Belief extends ARecord {
 					result=result.assocEntry(be); 
 					continue;
 				}
-				SignedData<Order> b=be.getValue();
-				if (b == null) continue;
 				
-				// Check signature
-				if (!b.checkSignature()) {
-					// TODO: Better handling than just ignoring, e.g. slashing?
-					continue;
-				};
 				
 				if (a.equals(b)) continue; // PERF: fast path for no changes
 
@@ -217,6 +209,12 @@ public class Belief extends ARecord {
 
 				boolean shouldReplace=compareOrders(ac,bc);
 				if (shouldReplace) {
+					// Check signature TODO make link with persistence?
+					if (!b.checkSignature()) {
+						// TODO: Better handling rather than just ignoring, e.g. slashing?
+						continue;
+					};
+					
 					result=result.assocEntry(be); 
 					continue;
 				}

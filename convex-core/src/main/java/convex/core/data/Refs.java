@@ -43,7 +43,9 @@ public class Refs {
 				RefSoft<?> rs=(RefSoft<?>)r;
 				AStore rstore=rs.getStore();
 				if (!(rstore==store)) {
-					throw new IllegalStateException("Inconsistent store! "+rs+" expected "+store+ " but was "+rstore);
+					String msg="Inconsistent store! "+rs+" expected "+store+ " but was "+rstore;
+					msg+=" in Cell of type: "+r.getValue().getClass();
+					throw new IllegalStateException(msg);
 				}
 			}
 		});
