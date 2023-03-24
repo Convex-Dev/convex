@@ -237,9 +237,9 @@ public class ServerTest {
 
 			// TODO this needs fixing!
 			
-			Future<SignedData<Belief>> acquiror=convex.acquire(h);
-			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
-			assertTrue(ab.getValue() instanceof Belief);
+			Future<Belief> acquiror=convex.acquire(h);
+			Belief ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
+			assertTrue(ab instanceof Belief);
 			assertEquals(h,ab.getHash());
 		}
 	}
@@ -256,10 +256,10 @@ public class ServerTest {
 			AVector<?> v=status.getValue();
 			Hash h=RT.ensureHash(v.get(0));
 
-			Future<SignedData<Belief>> acquiror=convex.acquire(h);
-			SignedData<Belief> ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
+			Future<Belief> acquiror=convex.acquire(h);
+			Belief ab=acquiror.get(10000,TimeUnit.MILLISECONDS);
 			Refs.checkConsistentStores(ab.getRef(),Stores.current());
-			assertTrue(ab.getValue() instanceof Belief);
+			assertTrue(ab instanceof Belief);
 			assertEquals(h,ab.getHash());
 		}
 	}

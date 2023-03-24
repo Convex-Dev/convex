@@ -148,9 +148,8 @@ public class ConnectionManager {
 				AVector<ACell> status = result.getValue();
 
 				Hash h=RT.ensureHash(status.get(0));
-				@SuppressWarnings("unchecked")
 
-				SignedData<Belief> sb=(SignedData<Belief>) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
+				Belief sb=(Belief) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
 
 				server.queueBelief(Message.createBelief(sb));
 			} finally {

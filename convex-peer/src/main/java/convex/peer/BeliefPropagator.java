@@ -9,7 +9,6 @@ import convex.core.Belief;
 import convex.core.Peer;
 import convex.core.data.ACell;
 import convex.core.data.Ref;
-import convex.core.data.SignedData;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.message.Message;
@@ -79,8 +78,7 @@ public class BeliefPropagator {
 		if (peer==null) return;
 
 		// Broadcast latest Belief to connected Peers
-		SignedData<Belief> sb = peer.getSignedBelief();
-		Belief belief=sb.getValue();
+		Belief belief = peer.getBelief();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
 		// belief to network
@@ -97,7 +95,7 @@ public class BeliefPropagator {
 		peer=peer.persistState(noveltyHandler);
 		server.reportPeerBroadcast(peer); 
 
-		Message msg = Message.createBelief(sb);
+		Message msg = Message.createBelief(belief);
 
 		server.manager.broadcast(msg, false);
 		lastBroadcastTime=Utils.getCurrentTimestamp();

@@ -204,7 +204,7 @@ public class Server implements Closeable {
 	 * The list of new beliefs received from remote peers the block being created
 	 * Should only modify with the lock for this Server held.
 	 */
-	private HashMap<AccountKey, SignedData<Belief>> newBeliefs = new HashMap<>();
+	private ArrayList<Belief> newBeliefs = new ArrayList<>();
 
 
 	/**
@@ -276,7 +276,6 @@ public class Server implements Closeable {
 		this.setPeerController(controlAddress);
 	}
 
-	@SuppressWarnings("unchecked")
 	private Peer establishPeer() throws TimeoutException, IOException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
 		try {
@@ -309,11 +308,11 @@ public class Server implements Closeable {
 				
 				// Belief acquisition
 				log.info("Attempting to obtain peer Belief: "+beliefHash);
-				SignedData<Belief> belF=null;
+				Belief belF=null;
 				long timeElapsed=0;
 				while (belF==null) {
 					try {
-						belF=(SignedData<Belief>) convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS);
+						belF=(Belief) convex.acquire(beliefHash).get(timeout,TimeUnit.MILLISECONDS);
 					} catch (TimeoutException te) {
 						timeElapsed+=timeout;
 						log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
@@ -321,7 +320,7 @@ public class Server implements Closeable {
 				}
 				log.info("Retrieved Peer Signed Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 
-				Peer peer=Peer.create(keyPair, genF, belF.getValue());
+				Peer peer=Peer.create(keyPair, genF, belF);
 				return peer;
 
 			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
@@ -830,10 +829,7 @@ public class Server implements Closeable {
 			synchronized (newBeliefs) {
 				int n = newBeliefs.size();
 				beliefs = new Belief[n];
-				int i = 0;
-				for (AccountKey addr : newBeliefs.keySet()) {
-					beliefs[i++] = newBeliefs.get(addr).getValue();
-				}
+				newBeliefs.toArray(beliefs);
 				newBeliefs.clear();
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
@@ -879,7 +875,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Gets the status vector for the Peer
-	 * 0 = latest signed belief hash
+	 * 0 = latest belief hash
 	 * 1 = states vector hash
 	 * 2 = genesis state hash
 	 * 3 = peer key
@@ -896,9 +892,9 @@ public class Server implements Closeable {
 		
 	private static AVector<ACell> createStatusVector(Peer peer) {
 		// Make sure we use the latest broadcast peer version
-		SignedData<Belief> signedBelief = peer.getSignedBelief();
+		Belief belief = peer.getBelief();
 		
-		Hash beliefHash=signedBelief.getHash();
+		Hash beliefHash=belief.getHash();
 		Hash statesHash=peer.getStates().getHash();
 		Hash genesisHash=peer.getStates().get(0).getHash();
 		AccountKey peerKey=peer.getPeerKey();
@@ -1026,17 +1022,17 @@ public class Server implements Closeable {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
 			while (isRunning) {
 				try {
+					// Wait for some new Beliefs to accumulate up to a given time
+					awaitBeliefs();
+					
 					// loop while the server is running
-						// Try belief update
-						boolean beliefUpdated=maybeUpdateBelief();
-						
-						if (beliefUpdated||propagator.isBroadcastDue()) {
-							raiseServerChange("consensus");
-							propagator.broadcastBelief(peer);
-						}
-	
-						// Wait for some new events to accumulate up to a given time
-						awaitBeliefs();
+					// Try belief update
+					boolean beliefUpdated=maybeUpdateBelief();
+					
+					if (beliefUpdated||propagator.isBroadcastDue()) {
+						raiseServerChange("consensus");
+						propagator.broadcastBelief(peer);
+					}
 				} catch (InterruptedException e) {
 					log.debug("Terminating Belief Merge loop due to interrupt");
 					break;
@@ -1057,38 +1053,24 @@ public class Server implements Closeable {
 		beliefQueue.drainTo(allBeliefs);
 		for (Message m: allBeliefs) {
 			try {
-				SignedData<Belief> receivedBelief=m.getPayload();
-				AccountKey addr = receivedBelief.getAccountKey();
-				SignedData<Belief> current = newBeliefs.get(addr);
+				Belief receivedBelief=m.getPayload();	
+				// Add to map of new Beliefs received for each Peer
 				
-				// Make sure the Belief is the latest from a Peer
-				if ((current == null) || (current.getValue().getTimestamp() <= receivedBelief.getValue()
-						.getTimestamp())) {
-					// Add to map of new Beliefs received for each Peer
-					
-					// check we can persist the new belief
-					// May also pick up cached signature verification if already held
-					receivedBelief.validateSignature();
-					
-					// Persist
-					Ref<SignedData<Belief>> ref=ACell.createPersisted(receivedBelief);
-					receivedBelief=ref.getValue();
-					// TODO: validate trusted connection?
-					// TODO: can drop Beliefs if under pressure?
-					
-					newBeliefs.put(addr, receivedBelief);
-					beliefReceivedCount++;
-	
-					// Notify the update thread that there is something new to handle
-					log.debug("Valid belief received by peer at {}: {}"
-								,getHostAddress(),receivedBelief.getValue().getHash());
-				}
+				// check we can persist the new belief
+				Ref<Belief> ref=ACell.createPersisted(receivedBelief);
+				receivedBelief=ref.getValue();
+				// TODO: validate trusted connection?
+				// TODO: can drop Beliefs if under pressure?
+				
+				newBeliefs.add(receivedBelief);
+				beliefReceivedCount++;
+
+				// Notify the update thread that there is something new to handle
+				log.debug("Valid belief received by peer at {}: {}"
+								,getHostAddress(),receivedBelief.getHash());
 			} catch (ClassCastException e) {
 				// Bad message from Peer
 				m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
-			} catch (BadSignatureException e) {
-				// we got sent a bad signature. TODO: consider dropping connection? banning?
-				log.info("Bad signed belief from peer!");
 			} catch (MissingDataException e) {
 				// Missing data, ignore
 				log.trace("Missing data in Belief!",e);

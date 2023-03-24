@@ -62,7 +62,7 @@ public class Peer {
 	private transient final AKeyPair keyPair;
 	
 	/** The latest merged belief */
-	private final SignedData<Belief> signedBelief;
+	private final Belief belief;
 
 	/**
 	 * The latest observed timestamp. This is increased by the Server polling the
@@ -80,11 +80,11 @@ public class Peer {
 	 */
 	private final AVector<BlockResult> blockResults;
 
-	private Peer(AKeyPair kp, SignedData<Belief> belief, AVector<State> states, AVector<BlockResult> results,
+	private Peer(AKeyPair kp, Belief belief, AVector<State> states, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
-		this.signedBelief = belief;
+		this.belief = belief;
 		this.states = states;
 		this.blockResults = results;
 		this.timestamp = timeStamp;
@@ -98,10 +98,10 @@ public class Peer {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
-		SignedData<Belief> belief=(SignedData<Belief>) peerData.get(Keywords.BELIEF);
+		Belief belief=(Belief) peerData.get(Keywords.BELIEF);
 		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
 		AVector<State> states=(AVector<State>) peerData.get(Keywords.STATES);
-		long timestamp=belief.getValue().getTimestamp();
+		long timestamp=belief.getTimestamp();
 		return new Peer(keyPair,belief,states,results,timestamp);
 	}
 
@@ -111,7 +111,7 @@ public class Peer {
 	 */
 	public AMap<Keyword, ACell> toData() {
 		return Maps.of(
-			Keywords.BELIEF,signedBelief,
+			Keywords.BELIEF,belief,
 			Keywords.RESULTS,blockResults,
 			Keywords.STATES,states
 		);
@@ -125,20 +125,13 @@ public class Peer {
 	 */
 	public static Peer create(AKeyPair peerKP, State initialState) {
 		Belief belief = Belief.createSingleOrder(peerKP);
-		SignedData<Belief> sb = peerKP.signData(belief);
 		AVector<State> states=Vectors.of(initialState);
 
 		// Ensure initial belief and states are persisted in current store
-		sb=ACell.createPersisted(sb).getValue();
+		belief=ACell.createPersisted(belief).getValue();
 		states=ACell.createPersisted(states).getValue();
 
-		// Check belief persistence
-		Ref<SignedData<Belief>> sbr=Ref.forHash(sb.getHash());
-		if (sbr==null) {
-			throw new Error("Belief not correctly persisted! "+sb.getHash());
-		}
-
-		return new Peer(peerKP, sb, states, Vectors.empty(), initialState.getTimeStamp().longValue());
+		return new Peer(peerKP, belief, states, Vectors.empty(), initialState.getTimeStamp().longValue());
 	}
 	
 	/**
@@ -242,7 +235,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp < timestamp) return this;
-		return new Peer(keyPair, signedBelief, states, blockResults, timestamp);
+		return new Peer(keyPair, belief, states, blockResults, timestamp);
 	}
 
 	/**
@@ -354,15 +347,7 @@ public class Peer {
  	 * @return Belief
  	 */
 	public Belief getBelief() {
-		return signedBelief.getValue();
-	}
-
-	/**
-	 * Get the signed Belief of this Peer
-	 * @return Signed Belief
-	 */
-	public SignedData<Belief> getSignedBelief() {
-		return signedBelief;
+		return belief;
 	}
 
 	/**
@@ -416,7 +401,7 @@ public class Peer {
 	 * @throws BadSignatureException 
 	 */
 	private Peer updateConsensus(Belief newBelief) {
-		if (signedBelief.getValue() == newBelief) return this;
+		if (belief == newBelief) return this;
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
 		long stateIndex = states.count() - 1; // index of last state
@@ -435,8 +420,7 @@ public class Peer {
 			newResults = newResults.append(br);
 			stateIndex++;
 		}
-		SignedData<Belief> sb = keyPair.signData(newBelief);
-		return new Peer(keyPair, sb, newStates, newResults, timestamp);
+		return new Peer(keyPair, newBelief, newStates, newResults, timestamp);
 	}
 
 	/**
@@ -446,8 +430,8 @@ public class Peer {
 	 */
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
 		// Peer Belief must be announced using novelty handler
-		SignedData<Belief> sb=this.signedBelief;
-		sb.announce(noveltyHandler);
+		Belief belief=this.belief;
+		belief.announce(noveltyHandler);
 
 		// Persist states
 		AVector<State> newStates = this.states;
@@ -457,7 +441,7 @@ public class Peer {
 		AVector<BlockResult> newResults = this.blockResults;
 		newResults=ACell.createPersisted(newResults).getValue();
 
-		return new Peer(this.keyPair, sb, newStates, newResults, this.timestamp);
+		return new Peer(this.keyPair, belief, newStates, newResults, this.timestamp);
 	}
 
 	/**
@@ -504,8 +488,8 @@ public class Peer {
 		if (myOrder==null) myOrder=Order.create();
 
 		// Create new order with signed Block
-		Order newChain = myOrder.append(sign(block));
-		SignedData<Order> newSignedOrder = sign(newChain);
+		Order newOrder = myOrder.append(sign(block));
+		SignedData<Order> newSignedOrder = sign(newOrder);
 		
 		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
 		Belief newBelief=b.withOrders(newOrders);

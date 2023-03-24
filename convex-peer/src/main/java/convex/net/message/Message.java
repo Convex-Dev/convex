@@ -54,8 +54,8 @@ public abstract class Message {
 		return create(null,MessageType.DATA,o);
 	}
 
-	public static Message createBelief(SignedData<Belief> sb) {
-		return create(null,MessageType.BELIEF,sb);
+	public static Message createBelief(Belief belief) {
+		return create(null,MessageType.BELIEF,belief);
 	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
