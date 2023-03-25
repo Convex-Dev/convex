@@ -529,7 +529,7 @@ public class Server implements Closeable {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
 			m.getConnection().registerPartialMessage(missingHash,m);
-		} catch (ClassCastException | NullPointerException e) {
+		} catch (Throwable e) {
 			log.warn("Error processing client message: {}", e);
 		}
 	}

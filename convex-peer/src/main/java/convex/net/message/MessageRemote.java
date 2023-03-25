@@ -58,7 +58,7 @@ public class MessageRemote extends Message {
 		if ((pc == null) || pc.isClosed()) return false;
 		try {
 			return pc.sendResult(id,reply);
-		} catch (Exception t) {
+		} catch (IOException t) {
 			// Ignore, probably IO error
 			log.debug("Error reporting result: {}",t.getMessage());
 			return false;
