@@ -11,6 +11,7 @@ import convex.core.State;
 import convex.core.crypto.bc.BCKeyPair;
 import convex.core.crypto.bc.BCProvider;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Counters;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerGUI;
@@ -79,6 +80,9 @@ public class AboutPanel extends JPanel {
 		sb.append("\n");
 		sb.append("BC Signatures:        " + lpad(BCKeyPair.signatureCount + "\n"));
 		sb.append("BC Verifications:     " + lpad(BCProvider.verificationCount + "\n"));
+		sb.append("\n");
+		sb.append(Counters.getStats());
+		sb.append("\n");
 
 		textArea.setText(sb.toString());
 	}

@@ -13,12 +13,12 @@ public class Counters {
 	public static volatile long etchWrite = 0;
 	public static volatile long etchMiss =0;
 	
-	public String getStats() {
+	public static String getStats() {
 		StringBuffer sb=new StringBuffer();
 		
-		sb.append("Etch writes:  "+etchWrite);
-		sb.append("Etch reads:   "+etchRead);
-		sb.append("Etch hit(%):  "+Text.toPercentString(100.0*(etchRead-etchMiss)/etchRead));
+		sb.append("Etch writes:  "+etchWrite+"\n");
+		sb.append("Etch reads:   "+etchRead+"\n");
+		sb.append("Etch hit(%):  "+Text.toPercentString(100.0*(etchRead-etchMiss)/etchRead)+"\n");
 		
 		return sb.toString();
 	}

@@ -289,13 +289,13 @@ public class Connection {
 	/**
 	 * Sends a DATA Message on this connection.
 	 *
-	 * @param value Any data object
+	 * @param hash Any data object
 	 * @return true if buffered successfully, false otherwise (not sent)
 	 * @throws IOException If IO error occurs
 	 */
-	public boolean sendMissingData(Hash value) throws IOException {
-		log.trace("Requested missing data for hash {} with store {}", value.toHexString(), Stores.current());
-		return sendObject(MessageType.MISSING_DATA, value);
+	public boolean sendMissingData(Hash hash) throws IOException {
+		log.trace("Requested missing data for hash {} with store {}", hash.toHexString(), Stores.current());
+		return sendObject(MessageType.MISSING_DATA, hash);
 	}
 
 	/**

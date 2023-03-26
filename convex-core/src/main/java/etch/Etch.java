@@ -309,7 +309,6 @@ public class Etch {
 	 * @throws IOException If an IO error occurs
 	 */
 	public synchronized Ref<ACell> write(AArrayBlob key, Ref<ACell> value) throws IOException {
-		Counters.etchWrite++;
 		return write(key,0,value,INDEX_START);
 	}
 
@@ -867,6 +866,7 @@ public class Etch {
 	 */
 	private long appendData(AArrayBlob key,Ref<ACell> ref) throws IOException {
 		assert(key.count()==KEY_SIZE);
+		Counters.etchWrite++;
 
 		// Get relevant values for writing
 		// probably need to call these first, might move mbb position?
