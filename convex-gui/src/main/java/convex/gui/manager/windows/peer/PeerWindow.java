@@ -26,6 +26,7 @@ public class PeerWindow extends BaseWindow {
 		add(tabbedPane, BorderLayout.CENTER);
 		tabbedPane.addTab("REPL", null, new REPLPanel(this.getPeerView()), null);
 		tabbedPane.addTab("Stress", null, new StressPanel(this.getPeerView()), null);
+		tabbedPane.addTab("Info", null, new PeerInfoPanel(this.getPeerView()), null);
 
 		PeerComponent pcom = new PeerComponent(manager, peer);
 		add(pcom, BorderLayout.NORTH);
