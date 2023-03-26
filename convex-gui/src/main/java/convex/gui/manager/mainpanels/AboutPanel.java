@@ -8,6 +8,8 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
 import convex.core.State;
+import convex.core.crypto.bc.BCKeyPair;
+import convex.core.crypto.bc.BCProvider;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
@@ -52,7 +54,7 @@ public class AboutPanel extends JPanel {
 	}
 
 	private String lpad(Object s) {
-		return Text.leftPad(s.toString(), 25);
+		return Text.leftPad(s.toString(), 30);
 	}
 
 	private void updateState(State s) {
@@ -74,6 +76,9 @@ public class AboutPanel extends JPanel {
 		sb.append("\n");
 		sb.append("Total funds:          " + lpad(Text.toFriendlyBalance(s.computeTotalFunds())) + "\n");
 		sb.append("Total stake:          " + lpad(Text.toFriendlyBalance(s.computeStakes().get(null))) + "\n");
+		sb.append("\n");
+		sb.append("BC Signatures:        " + lpad(BCKeyPair.signatureCount + "\n"));
+		sb.append("BC Verifications:     " + lpad(BCProvider.verificationCount + "\n"));
 
 		textArea.setText(sb.toString());
 	}

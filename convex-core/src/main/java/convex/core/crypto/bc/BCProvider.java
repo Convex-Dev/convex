@@ -15,6 +15,7 @@ import convex.core.util.Utils;
  */
 @SuppressWarnings("serial")
 public class BCProvider extends AProvider {
+	public static long verificationCount=0;
 	
 	public static final BouncyCastleProvider BC=new BouncyCastleProvider();
 
@@ -27,6 +28,7 @@ public class BCProvider extends AProvider {
 		int mlength=Utils.checkedInt(message.count());
 		byte[] sigBytes=signature.getBytes();
 		boolean verified = Ed25519.verify(sigBytes, 0, publicKey.getInternalArray(), publicKey.getInternalOffset(), message.getInternalArray(), message.getInternalOffset(), mlength);
+		verificationCount++;
 		return verified;
 	}
 	

@@ -16,6 +16,8 @@ import convex.core.data.Blob;
  */
 @SuppressWarnings("serial")
 public class SodiumProvider extends AProvider {
+	public static long verificationCount=0;
+
 	
 	private static final SodiumJava NATIVE_SODIUM=new SodiumJava();
 	
@@ -39,6 +41,7 @@ public class SodiumProvider extends AProvider {
 			msgBytes=message.getBytes();
 		}
 		boolean verified = SodiumProvider.SODIUM_SIGN.cryptoSignVerifyDetached(sigBytes, msgBytes, mlength, publicKey.getBytes());
+		verificationCount++;
 		return verified;
 	}
 	

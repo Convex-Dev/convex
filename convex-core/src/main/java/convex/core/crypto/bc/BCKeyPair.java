@@ -26,6 +26,7 @@ public class BCKeyPair extends AKeyPair {
 	 * Secret key in the specific format that Sodium expects, we wrap this complexity in this class
 	 */
 	protected final Ed25519PrivateKeyParameters priv;
+	public static long signatureCount;
 
 	private BCKeyPair(AccountKey pk, Blob seed, Ed25519PrivateKeyParameters priv) {
 		this.publicKey=pk;
@@ -63,6 +64,7 @@ public class BCKeyPair extends AKeyPair {
 	public ASignature sign(AArrayBlob hash) {		
 		byte[] sigBytes=new byte[Ed25519Signature.SIGNATURE_LENGTH];
 		Ed25519.sign(seed.getInternalArray(), seed.getInternalOffset(),hash.getInternalArray(), hash.getInternalOffset(),(int)hash.count(), sigBytes, 0);
+		signatureCount++;
 		return Ed25519Signature.wrap(sigBytes);
 	}
 

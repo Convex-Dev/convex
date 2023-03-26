@@ -182,7 +182,7 @@ public class Server implements Closeable {
 	private Peer peer;
 	
 	/**
-	 * The latest peer that has benn broadcast to the network
+	 * The latest peer that has been broadcast to the network
 	 */
 	private Peer broadcastPeer;
 
