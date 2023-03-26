@@ -170,8 +170,7 @@ public class Belief extends ARecord {
 
 	/**
 	 * Assemble the latest list of orders from all peers by merging from each Belief received
-	 * @param mc
-	 * @param beliefs
+	 * @param beliefs Set of Beliefs from which to merge orders
 	 * @return
 	 */
 	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(Belief[] beliefs) {
@@ -182,46 +181,63 @@ public class Belief extends ARecord {
 		for (Belief belief : beliefs) {
 			if (belief == null) continue; // ignore null beliefs, might happen if invalidated
 			if (belief.equals(this)) continue; // ignore an identical belief. Nothing to update.
-			BlobMap<AccountKey, SignedData<Order>> bOrders = belief.orders;
 			
-			// Iterate over each Peer's ordering convevey in this Belief
-			long bcount=bOrders.count();
-			for (long i=0; i<bcount; i++) {
-				MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
-				ABlob key=be.getKey();
-				
-				SignedData<Order> b=be.getValue();
-				if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
-				
-				SignedData<Order> a=result.get(key);
-				if (a == null) {
-					// This is a new order to us, so include if valid
-					result=result.assocEntry(be); 
-					continue;
-				}
-				
-				
-				if (a.equals(b)) continue; // PERF: fast path for no changes
+			result=accumulateOrders(result, belief);
+		}
+		return result;
+	}
+	
+	public Belief mergeOrders(Belief b) {
+		BlobMap<AccountKey, SignedData<Order>> newOrders=accumulateOrders(orders,b);
+		return withOrders(newOrders);
+	}
+	
+	/**
+	 * Update a map of orders from all peers by merging from each Belief received
+	 * @param belief Belief from which to merge orders
+	 * @return Updated map of orders
+	 */
+	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(BlobMap<AccountKey, SignedData<Order>> orders,Belief belief) {
+		BlobMap<AccountKey, SignedData<Order>> result=orders;
+		
+		BlobMap<AccountKey, SignedData<Order>> bOrders = belief.orders;
+		// Iterate over each Peer's ordering conveyed in this Belief
+		long bcount=bOrders.count();
+		for (long i=0; i<bcount; i++) {
+			MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
+			ABlob key=be.getKey();
+			
+			SignedData<Order> b=be.getValue();
+			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
+			
+			SignedData<Order> a=result.get(key);
+			if (a == null) {
+				// This is a new order to us, so include if valid
+				result=result.assocEntry(be); 
+				continue;
+			}
+			
+			
+			if (a.equals(b)) continue; // PERF: fast path for no changes
 
-				Order ac = a.getValue();
-				Order bc = b.getValue();
+			Order ac = a.getValue();
+			Order bc = b.getValue();
 
-				boolean shouldReplace=compareOrders(ac,bc);
-				if (shouldReplace) {
-					// Check signature TODO make link with persistence?
-					if (!b.checkSignature()) {
-						// TODO: Better handling rather than just ignoring, e.g. slashing?
-						continue;
-					};
-					
-					result=result.assocEntry(be); 
+			boolean shouldReplace=compareOrders(ac,bc);
+			if (shouldReplace) {
+				// Check signature TODO make link with persistence?
+				if (!b.checkSignature()) {
+					// TODO: Better handling rather than just ignoring, e.g. slashing?
 					continue;
-				}
-				// keep current view (more stable?)
+				};
+				
+				result=result.assocEntry(be); 
+				continue;
 			}
 		}
 		return result;
 	}
+
 	
 	/**
 	 * Checks if a new Order should replace the current order when collecting Peer orders
@@ -241,7 +257,7 @@ public class Belief extends ARecord {
 			// new Order is more recent, so switch to this
 			return true;
 		} else {
-			// This shouldn't happen if peers are sticking to timestamps
+			// This probably shouldn't happen if peers are sticking to timestamps
 			// But we compare anyway
 			// Prefer advanced consensus
 			if (b.getConsensusPoint()>a.getConsensusPoint()) return true;
