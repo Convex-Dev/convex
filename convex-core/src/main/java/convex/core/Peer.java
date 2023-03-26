@@ -231,7 +231,7 @@ public class Peer {
 	 * Updates the timestamp to the specified time, going forwards only
 	 *
 	 * @param newTimestamp New Peer timestamp
-	 * @return This peer upated with the given timestamp
+	 * @return This peer updated with the given timestamp
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp < timestamp) return this;
@@ -390,7 +390,7 @@ public class Peer {
 			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+newOrder.getConsensusPoint());
 			
 		}
-		return updateConsensus(newBelief);
+		return updateBelief(newBelief);
 	}
 
 	/**
@@ -400,7 +400,7 @@ public class Peer {
 	 * @return
 	 * @throws BadSignatureException 
 	 */
-	private Peer updateConsensus(Belief newBelief) {
+	private Peer updateBelief(Belief newBelief) {
 		if (belief == newBelief) return this;
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
@@ -493,7 +493,7 @@ public class Peer {
 		
 		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
 		Belief newBelief=b.withOrders(newOrders);
-		return updateConsensus(newBelief);
+		return updateBelief(newBelief);
 	}
 
 	/**

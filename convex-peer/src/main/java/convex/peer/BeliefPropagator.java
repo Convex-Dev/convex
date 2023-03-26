@@ -19,6 +19,7 @@ import convex.net.message.Message;
 public class BeliefPropagator {
 	
 	public static final int MIN_BELIEF_BROADCAST_DELAY=50;
+	public static final int BELIEF_REBROADCAST_DELAY=2000;
 
 	protected final Server server;
 	
@@ -35,7 +36,7 @@ public class BeliefPropagator {
 			while (server.isLive()) {
 				try {
 					// wait until the thread is notified of new work
-					synchronized(BeliefPropagator.this) {BeliefPropagator.this.wait(1000);};
+					synchronized(BeliefPropagator.this) {BeliefPropagator.this.wait(BELIEF_REBROADCAST_DELAY);};
 					
 					if (!isBroadcastDue()) Thread.sleep(MIN_BELIEF_BROADCAST_DELAY);
 					Peer peer=latestPeer;
