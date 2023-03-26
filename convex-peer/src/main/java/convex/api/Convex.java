@@ -90,6 +90,9 @@ public abstract class Convex {
 	 */
 	protected HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
 
+	/**
+	 * Result Consumer for messages received back from a client connection
+	 */
 	protected final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
 		protected synchronized void handleResult(long id, Result v) {

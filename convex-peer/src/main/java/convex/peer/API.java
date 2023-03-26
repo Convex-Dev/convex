@@ -82,6 +82,7 @@ public class API {
 				store=(AStore)config.get(Keywords.STORE);
 			} else {
 				store=EtchStore.createTemp("defaultPeerStore");
+				//config.put(Keywords.STORE, tempStore);
 				config.put(Keywords.STORE, store);
 			}
 			Stores.setCurrent(store);
