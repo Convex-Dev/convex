@@ -1017,7 +1017,7 @@ public class Server implements Closeable {
 	 */
 	private long lastBeliefMerge=0;
 	
-	/*
+	/**
 	 * Runnable loop for managing Server belief merges
 	 */
 	private final Runnable beliefMergeLoop = new Runnable() {

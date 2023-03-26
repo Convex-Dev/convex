@@ -53,6 +53,14 @@ public final class BlobCache {
 	 */
 	public void putCell(ACell cell) {
 		Ref<?> ref=Ref.get(cell);
+		putCell(ref);
+	}
+	
+	/**
+	 * Stores a Ref in the cache
+	 * @param ref Ref to store
+	 */
+	public void putCell(Ref<?> ref) {
 		int ix=calcIndex(ref.getHash());
 		cache[ix]=ref;
 	}

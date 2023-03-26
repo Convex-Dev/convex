@@ -127,7 +127,10 @@ public class EtchStore extends AStore {
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
 			Ref<ACell> existing = (Ref<ACell>) blobCache.getCell(hash);
+			if (existing!=null) return (Ref<T>) existing;
+			
 			existing= etch.read(hash);
+			if (existing!=null) blobCache.putCell(existing);
 			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
@@ -213,7 +216,7 @@ public class EtchStore extends AStore {
 				cell.attachRef(ref); // make sure we are using current ref within cell
 				result = etch.write(fHash, (Ref<ACell>) ref);
 				cell.attachRef(result);
-				blobCache.putCell(cell); // cache for subsequent writes
+				blobCache.putCell(result); // cache for subsequent writes
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
