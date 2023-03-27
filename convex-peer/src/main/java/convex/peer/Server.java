@@ -56,6 +56,7 @@ import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.MessageType;
@@ -124,7 +125,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Message Consumer that simply enqueues received client messages received by this peer
-	 * Called on NIO thread: should never block for long
+	 * Called on NIO thread: should never block
 	 */
 	Consumer<Message> clientReceiveAction = new Consumer<Message>() {
 		@Override
@@ -135,7 +136,7 @@ public class Server implements Closeable {
 	
 	/**
 	 * Message Consumer that simply enqueues received messages from outbound peer connections
-	 * Called on NIO thread: should never block for long
+	 * Called on NIO thread: should never block
 	 */
 	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
@@ -953,9 +954,14 @@ public class Server implements Closeable {
 
 	private void processData(Message m) {
 		ACell payload = m.getPayload();
-
+		Counters.peerDataReceived++;
+		
 		// Note: partial messages are handled in Connection now
 		Ref<?> r = Ref.get(payload);
+		if (r.isEmbedded()) {
+			log.warn("DATA with embedded value: "+payload);
+			return;
+		}
 		r = r.persistShallow();
 
 		if (log.isTraceEnabled()) {
