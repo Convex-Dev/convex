@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed most Javadoc warnings
 - Fixed issue with encoding of `set!` Op
 - Tighten casting behaviour
+- Better management of message queues and server threads
 
 ## [0.7.9] - 2022-09-22
 ### Fixed
