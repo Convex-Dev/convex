@@ -229,7 +229,7 @@ public class Format {
 	 *                            message length
 	 */
 	public static int peekMessageLength(ByteBuffer bb) throws BadFormatException {
-		int remaining=bb.position();
+		int remaining=bb.limit();
 		if (remaining==0) return -1;
 		
 		int len = bb.get(0);
@@ -246,17 +246,20 @@ public class Format {
 			throw new BadFormatException(
 					"Format.peekMessageLength: Expected positive VLC message length, got first byte [" + hex + "]");
 		}
-
+		
 		// Quick check for 1 byte message length
 		if ((len & 0x80) == 0) {
 			// 1 byte header (without high bit set)
 			return len & 0x3F;
 		}
+		
+		// Clear high bit
+		len &=0x7f;
 
 		for (int i=1; i<Format.MAX_VLC_LONG_LENGTH; i++) {
 			if (i>=remaining) return -1; // we are expecting more bytes, but none available yet....
 			int lsb = bb.get(i);
-			len = ((len & 0x3F) << 7) + lsb;
+			len = (len << 7) + (lsb&0x7f);
 			if ((lsb & 0x80) == 0) {
 				return len;
 			}

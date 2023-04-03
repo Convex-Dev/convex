@@ -22,10 +22,7 @@ public class VLCEncodingTest {
 		ByteBuffer bb = Blob.fromHex("8048").getByteBuffer();
 		assertEquals(0, bb.position());
 		int len = Format.peekMessageLength(bb);
-		assertTrue(len<0); // insufficient position
-		
-		// move to correct posiition
-		bb.position(2);
+
 		len = Format.peekMessageLength(bb);
 		
 		assertEquals(72, len);
@@ -45,7 +42,7 @@ public class VLCEncodingTest {
 	}
 	
 	@Test
-	public void testMessageLenbthCases() throws BadFormatException {
+	public void testMessageLengthCases() throws BadFormatException {
 		// short length
 		assertEquals(10,Format.peekMessageLength(Testing.messageBuffer("0a")));
 		
