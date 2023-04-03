@@ -239,7 +239,7 @@ public class Format {
 			throw new BadFormatException(
 					"Format.peekMessageLength: Zero message length:" + Utils.readBufferData(bb));
 		}
-
+		
 		if ((len & 0x40) != 0) {
 			// sign bit from top byte looks wrong!
 			String hex = Utils.toHexString((byte) len);
@@ -247,6 +247,7 @@ public class Format {
 					"Format.peekMessageLength: Expected positive VLC message length, got first byte [" + hex + "]");
 		}
 
+		// Quick check for 1 byte message length
 		if ((len & 0x80) == 0) {
 			// 1 byte header (without high bit set)
 			return len & 0x3F;

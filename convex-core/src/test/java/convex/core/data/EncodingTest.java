@@ -16,6 +16,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.test.Samples;
+import convex.test.Testing;
 
 public class EncodingTest {
 
@@ -149,28 +150,26 @@ public class EncodingTest {
 	
 	@Test
 	public void testMessageLength() throws BadFormatException {
-		// empty bytebuffer, therefore no message lengtg
+		// empty bytebuffer, therefore no message length -> returns negative
 		ByteBuffer bb1=Blob.fromHex("").toByteBuffer();
-		assertThrows(IndexOutOfBoundsException.class,()->Format.peekMessageLength(bb1));
+		assertTrue(0>Format.peekMessageLength(bb1));
 		
 		// bad first byte! Needs to carry if 0x40 or more
-		ByteBuffer bb2=Blob.fromHex("43").toByteBuffer();
+		ByteBuffer bb2=Testing.messageBuffer("43");
 		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2));
 		
 		// maximum message length 
-		ByteBuffer bb2a=Blob.fromHex("BF7F").toByteBuffer();
+		ByteBuffer bb2a=Testing.messageBuffer("BF7F");
 		assertEquals(Format.LIMIT_ENCODING_LENGTH,Format.peekMessageLength(bb2a));
 
-		// overflow message length
-		Blob overflow=Blob.fromHex("C000");
-		ByteBuffer bb2aa=overflow.toByteBuffer();
+		// 2 byte message length with negative sign = BAD
+		ByteBuffer bb2aa=Testing.messageBuffer("C000");
 		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2aa));
 		
-		ByteBuffer bb2b=Blob.fromHex("8043").toByteBuffer();
-		assertEquals(67,Format.peekMessageLength(bb2b));
+		ByteBuffer bb2b=Testing.messageBuffer("8101");
+		assertEquals(129,Format.peekMessageLength(bb2b));
 
-		
-		ByteBuffer bb3=Blob.fromHex("FFFF").toByteBuffer();
+		ByteBuffer bb3=Testing.messageBuffer("FFFF");
 		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb3));
 	}
 	

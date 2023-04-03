@@ -13,7 +13,7 @@ import convex.core.data.Format;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
+import convex.test.Testing;
 
 public class VLCEncodingTest {
 
@@ -35,41 +35,34 @@ public class VLCEncodingTest {
 	@Test
 	public void testBadMessageLength() throws BadFormatException {
 		// Too many bytes in VLC encoding
-		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(messageBuffer("80808080808080808080808080808080")));
+		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("80808080808080808080808080808080")));
 		
 		// small negative
-		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(messageBuffer("40")));
+		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("40")));
 		
 		// bigger negative
-		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(messageBuffer("ffff00")));
+		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("ffff00")));
 	}
 	
 	@Test
 	public void testMessageLenbthCases() throws BadFormatException {
 		// short length
-		assertEquals(10,Format.peekMessageLength(messageBuffer("0a")));
+		assertEquals(10,Format.peekMessageLength(Testing.messageBuffer("0a")));
 		
 		// extra bytes OK (assumed to be start of message)
-		assertEquals(10,Format.peekMessageLength(messageBuffer("0affff")));
+		assertEquals(10,Format.peekMessageLength(Testing.messageBuffer("0affff")));
 		
 		// Smallest 2 byte overflow cases
-		assertEquals(64,Format.peekMessageLength(messageBuffer("8040")));
-		assertEquals(128,Format.peekMessageLength(messageBuffer("8100")));
+		assertEquals(64,Format.peekMessageLength(Testing.messageBuffer("8040")));
+		assertEquals(128,Format.peekMessageLength(Testing.messageBuffer("8100")));
 		
 		// 3 byte cases
-		assertEquals(2*128*128,Format.peekMessageLength(messageBuffer("828000")));
-		assertEquals(3*128*128,Format.peekMessageLength(messageBuffer("838000ffff")));
+		assertEquals(2*128*128,Format.peekMessageLength(Testing.messageBuffer("828000")));
+		assertEquals(3*128*128,Format.peekMessageLength(Testing.messageBuffer("838000ffff")));
 		
 		// incomplete lengths
-		assertTrue(0>Format.peekMessageLength(messageBuffer("8080"))); // Bad format?
-		assertTrue(0>Format.peekMessageLength(messageBuffer("818080"))); 
-	}
-
-	private ByteBuffer messageBuffer(String hex) {
-		Blob b=Blob.fromHex(hex);
-		ByteBuffer bb = b.getByteBuffer();
-		bb.position(Utils.checkedInt(b.count()));
-		return bb;
+		assertTrue(0>Format.peekMessageLength(Testing.messageBuffer("8080"))); // Bad format?
+		assertTrue(0>Format.peekMessageLength(Testing.messageBuffer("818080"))); 
 	}
 
 	/**

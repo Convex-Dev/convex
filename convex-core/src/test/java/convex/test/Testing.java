@@ -1,10 +1,12 @@
 package convex.test;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.Blob;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
@@ -34,6 +36,13 @@ public class Testing {
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
+	}
+
+	public static ByteBuffer messageBuffer(String hex) {
+		Blob b=Blob.fromHex(hex);
+		ByteBuffer bb = b.getByteBuffer();
+		bb.position(Utils.checkedInt(b.count()));
+		return bb;
 	}
 
 }
