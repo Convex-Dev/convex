@@ -46,10 +46,6 @@ public abstract class Message {
 		return new MessageRemote(peerConnection, type, payload);
 	}
 
-	public static MessageRemote create(Connection peerConnection, ACell o) {
-		return create(peerConnection, MessageType.DATA, o);
-	}
-
 	public static Message createData(ACell o) {
 		return create(null,MessageType.DATA,o);
 	}

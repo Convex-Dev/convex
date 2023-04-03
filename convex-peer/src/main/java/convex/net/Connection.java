@@ -452,31 +452,6 @@ public class Connection {
 		return sendObject(MessageType.RESULT, result);
 	}
 
-	private IRefFunction sender() {
-		return sendAll;
-	}
-
-	private final IRefFunction sendAll = (r -> {
-		// TODO: halt conditions to prevent sending the whole universe
-		ACell o = r.getValue();
-		if (o == null)
-			return r;
-
-		// send children first
-		o.updateRefs(sender());
-
-		// only send this value if not embedded
-		if (!o.isEmbedded()) {
-			try {
-				sendData(o);
-			} catch (IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
-		}
-
-		return r;
-	});
-
 	/**
 	 * Sends a message over this connection
 	 *
