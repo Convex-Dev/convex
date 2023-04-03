@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- Support for arbitrary sized integers (Part 1)
 - Better support for CI builds
 - Allow `merge` to work with BlobMaps
 
