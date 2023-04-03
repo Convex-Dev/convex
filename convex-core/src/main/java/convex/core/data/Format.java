@@ -224,11 +224,14 @@ public class Format {
 	 * Does not move the buffer position.
 	 * 
 	 * @param bb ByteBuffer containing a message length
-	 * @return The message length
+	 * @return The message length, or negative if insufficient bytes
 	 * @throws BadFormatException If the ByteBuffer does not start with a valid
 	 *                            message length
 	 */
 	public static int peekMessageLength(ByteBuffer bb) throws BadFormatException {
+		int remaining=bb.position();
+		if (remaining==0) return -1;
+		
 		int len = bb.get(0);
 
 		// Zero message length not allowed
@@ -249,15 +252,16 @@ public class Format {
 			return len & 0x3F;
 		}
 
-		int lsb = bb.get(1);
-		if ((lsb & 0x80) != 0) {
-			String hex = Utils.toHexString((byte) len) + Utils.toHexString((byte) lsb);
-			throw new BadFormatException(
-					"Format.peekMessageLength: Max 2 bytes allowed in VLC encoded message length, got [" + hex + "]");
+		for (int i=1; i<Format.MAX_VLC_LONG_LENGTH; i++) {
+			if (i>=remaining) return -1; // we are expecting more bytes, but none available yet....
+			int lsb = bb.get(i);
+			len = ((len & 0x3F) << 7) + lsb;
+			if ((lsb & 0x80) == 0) {
+				return len;
+			}
 		}
-		len = ((len & 0x3F) << 7) + lsb;
 
-		return len;
+		throw new BadFormatException("Format.peekMessageLength: Too many bytes in length encoding");
 	}
 
 	/**
@@ -268,9 +272,6 @@ public class Format {
 	 * @return The ByteBuffer after writing the message length
 	 */
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
-		if ((len <= 0) || (len > LIMIT_ENCODING_LENGTH)) {
-			throw new IllegalArgumentException("Invalid message length: " + len);
-		}
 		return writeVLCLong(bb, len);
 	}
 

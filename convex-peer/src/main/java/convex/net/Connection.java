@@ -538,6 +538,11 @@ public class Connection {
 		int messageLength = dataLength + 1;
 		boolean sent;
 		int headerLength;
+		
+		// TODO: checks on message length?
+		//if ((len <= 0) || (len > LIMIT_ENCODING_LENGTH)) {
+		//	throw new IllegalArgumentException("Invalid message length: " + len);
+		//}
 
 		// synchronize in case we are sending messages from different threads
 		// This is OK but need to avoid corrupted messages.

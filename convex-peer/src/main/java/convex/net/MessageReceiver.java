@@ -106,9 +106,10 @@ public class MessageReceiver {
 
 		// peek message length at start of buffer. May throw BFE.
 		int len = Format.peekMessageLength(buffer);
-		int lengthLength = (len < 64) ? 1 : 2;
-
+		if (len<0) return numRead; // Not enough bytes for a message length yet
+		
 		// limit buffer to total message frame size including length
+		int lengthLength = Format.getVLCLength(len);
 		int totalFrameSize=lengthLength + len;
 		buffer.limit(totalFrameSize);
 
