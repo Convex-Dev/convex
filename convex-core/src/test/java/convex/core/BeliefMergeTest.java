@@ -39,8 +39,6 @@ import convex.core.util.Utils;
 public class BeliefMergeTest {
 
 	public static final int NUM_PEERS = 9;
-	public static final int NUM_INITIAL_TRANS = 10;
-	public static final int ROUNDS = 20;
 
 	public static final AKeyPair[] KEY_PAIRS = new AKeyPair[NUM_PEERS];
 	public static final Address[] ADDRESSES = new Address[NUM_PEERS];
@@ -48,6 +46,8 @@ public class BeliefMergeTest {
 	public static final State INITIAL_STATE;
 	private static final long TEST_TIMESTAMP = Instant.parse("1977-11-13T00:30:00Z").toEpochMilli();
 	private static final long TOTAL_VALUE;
+	
+	private static final long TS_INCREMENT=100;
 
 	static {
 		// long seed=new Random().nextLong();
@@ -101,6 +101,7 @@ public class BeliefMergeTest {
 			Peer ps = initial[i];
 			result[i] = ps.mergeBeliefs(sharedBeliefs); // belief merge step
 		}
+		result=updateTimestamps(result);
 		return result;
 	}
 
@@ -122,7 +123,18 @@ public class BeliefMergeTest {
 			}
 			result[i] = ps.mergeBeliefs(sources); // belief merge step
 		}
+		result=updateTimestamps(result);
 		return result;
+	}
+
+	private Peer[] updateTimestamps(Peer[] peers) {
+		Peer[] newPeers = peers.clone();
+		for (int i=0; i<newPeers.length; i++) {
+			Peer p=peers[i];
+			Peer np = p.updateTimestamp(p.getTimeStamp()+TS_INCREMENT);
+			newPeers[i]=np;
+		}
+		return newPeers;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -184,7 +196,7 @@ public class BeliefMergeTest {
 		assertTrue(allBeliefsEqual(bs1)); // should share beliefs
 
 		Peer[] bs2 = shareBeliefs(bs1); // sync again, should be idempotent
-		assertEquals(bs1[0].getBelief(), bs2[0].getBelief()); // belief should not change for peer 0
+		assertEquals(bs1[0].getPeerOrder(), bs2[0].getPeerOrder()); // belief should not change for peer 0
 		assertTrue(allBeliefsEqual(bs2)); // beliefs across peers should be equal
 
 		int PROPOSER = 0;
@@ -266,7 +278,7 @@ public class BeliefMergeTest {
 		assertTrue(allBeliefsEqual(bs1)); // should see other beliefs
 
 		Peer[] bs2 = shareBeliefs(bs1); // sync again, should be idempotent
-		assertEquals(bs1[0].getBelief(), bs2[0].getBelief()); // belief should not change
+		assertEquals(bs1[0].getPeerOrder(), bs2[0].getPeerOrder()); // belief should not change
 		assertTrue(allBeliefsEqual(bs2)); // beliefs across peers should be equal
 
 		int PROPOSER = 0;
@@ -346,8 +358,11 @@ public class BeliefMergeTest {
 	 */
 	@Test
 	public void testGossipConsensus() throws Exception {
-		boolean ANALYSIS = false;
+		boolean ANALYSIS = true;
 		int GOSSIP_NUM = 4;
+		final int TX_ROUNDS = 20;
+		final int SETTLE_ROUNDS = 20;
+		final int NUM_INITIAL_TRANS = 1;
 
 		Peer[] bs0 = initialBeliefs();
 		if (ANALYSIS) printAnalysis(bs0, "Initial beliefs");
@@ -358,7 +373,7 @@ public class BeliefMergeTest {
 		assertTrue(allBeliefsEqual(bs1)); // should see other beliefs
 
 		Peer[] bs2 = shareBeliefs(bs1); // sync again, should be idempotent
-		assertEquals(bs1[0].getBelief(), bs2[0].getBelief()); // belief should not change
+		assertEquals(bs1[0].getPeerOrder(), bs2[0].getPeerOrder()); // belief should not change
 		assertTrue(allBeliefsEqual(bs2)); // beliefs across peers should be equal
 		if (ANALYSIS) printAnalysis(bs2, "Shared beliefs");
 
@@ -378,11 +393,8 @@ public class BeliefMergeTest {
 			// propose initial transactions
 			for (int j = 1; j <= NUM_INITIAL_TRANS; j++) {
 				long TRANSFER_AMOUNT = 100L;
-				ATransaction trans = Transfer.create(ADDRESSES[i],j, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); // note 1 =
-																										// first
-																										// sequence
-																										// number
-																										// required
+				// note 1 = first required
+				ATransaction trans = Transfer.create(ADDRESSES[i],j, ADDRESSES[NUM_PEERS - 1 - i], TRANSFER_AMOUNT); 
 				bs3 = proposeTransactions(bs3, i, trans);
 			}
 		}
@@ -392,35 +404,49 @@ public class BeliefMergeTest {
 		assertEquals(0, bs3[RECEIVER].getOrder(PKEY).getBlockCount());
 
 		Peer[] bs4 = bs3;
-		for (int i = 1; i < ROUNDS; i++) {
-			bs4 = shareGossip(bs4, GOSSIP_NUM, i);
+		
+		for (int i = 1; i <= TX_ROUNDS; i++) {
+			for (int p = 0; p < NUM_PEERS; p++) {
+				// propose initial transactions
+				long TRANSFER_AMOUNT = 100L;
+				long seq=NUM_INITIAL_TRANS+i;
+				ATransaction trans = Transfer.create(ADDRESSES[p],seq, ADDRESSES[NUM_PEERS - 1 - p], TRANSFER_AMOUNT); 
+				bs4 = proposeTransactions(bs4, p, trans);
+			}
+			
+			bs4 = shareGossip(bs4, GOSSIP_NUM, i+TX_ROUNDS);
+			if (ANALYSIS) printAnalysis(bs4, "Tx round: " + i);
+		}
+
+		for (int i = 1; i < SETTLE_ROUNDS; i++) {
+			bs4 = shareGossip(bs4, GOSSIP_NUM, i+TX_ROUNDS);
 			if (ANALYSIS) printAnalysis(bs4, "Share round: " + i);
 		}
-		bs4 = shareGossip(bs4, GOSSIP_NUM, ROUNDS);
-		if (ANALYSIS) printAnalysis(bs4, "Share round: " + ROUNDS);
-
-		// final state checks
-		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, bs4[PROPOSER].getOrder(RKEY).getConsensusPoint()); // proposer
-																											// now sees
-																											// receivers
-																											// consensus
-		assertTrue(allBeliefsEqual(bs4));
-
-		Order finalChain = bs4[0].getOrder(PKEY);
-		AVector<SignedData<Block>> finalBlocks = finalChain.getBlocks();
-		assertEquals(NUM_PEERS * NUM_INITIAL_TRANS, new HashSet<>(finalBlocks).size());
+		bs4 = shareGossip(bs4, GOSSIP_NUM, SETTLE_ROUNDS);
+		if (ANALYSIS) printAnalysis(bs4, "Share round: " + SETTLE_ROUNDS);
 
 		State finalState = bs4[0].getConsensusState();
 		AVector<AccountStatus> accounts = finalState.getAccounts();
 		if (ANALYSIS) printAccounts(accounts);
+		// final state checks
+		
+		int expectedTxCount=NUM_PEERS * (NUM_INITIAL_TRANS+TX_ROUNDS);
+		assertEquals(expectedTxCount, bs4[PROPOSER].getOrder(RKEY).getConsensusPoint()); 
+		assertTrue(allBeliefsEqual(bs4));
+
+		Order finalChain = bs4[0].getOrder(PKEY);
+		AVector<SignedData<Block>> finalBlocks = finalChain.getBlocks();
+		assertEquals(expectedTxCount, new HashSet<>(finalBlocks).size());
+
 
 		// should have correct number of transactions each
 		for (int i = 0; i < NUM_PEERS; i++) {
-			assertEquals(NUM_INITIAL_TRANS, accounts.get(ADDRESSES[i].toExactLong()).getSequence());
+			assertEquals(NUM_INITIAL_TRANS+TX_ROUNDS, accounts.get(ADDRESSES[i].toExactLong()).getSequence());
 		}
 		// should have equal balance
-		assertEquals(INITIAL_BALANCE_PROPOSER-TJUICE, finalState.getBalance(PADDRESS));
-		assertEquals(INITIAL_BALANCE_RECEIVER-TJUICE, finalState.getBalance(RADDRESS));
+		long expectedJuice = (TJUICE*(NUM_INITIAL_TRANS+TX_ROUNDS));
+		assertEquals(INITIAL_BALANCE_PROPOSER-expectedJuice, finalState.getBalance(PADDRESS));
+		assertEquals(INITIAL_BALANCE_RECEIVER-expectedJuice, finalState.getBalance(RADDRESS));
 
 		// 100% of value still exists
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
@@ -433,7 +459,7 @@ public class BeliefMergeTest {
 		System.out.println("===== Accounts =====");
 		for (int i = 0; i < NUM_PEERS; i++) {
 			Address address = ADDRESSES[i];
-			AccountStatus as = accounts.get(address);
+			AccountStatus as = accounts.get(address.longValue());
 			System.out.println(peerString(i) + " " + as);
 		}
 	}

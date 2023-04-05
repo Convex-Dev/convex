@@ -235,7 +235,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp < timestamp) return this;
-		return new Peer(keyPair, belief, states, blockResults, timestamp);
+		return new Peer(keyPair, belief, states, blockResults, newTimestamp);
 	}
 
 	/**
