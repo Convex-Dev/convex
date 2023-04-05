@@ -86,19 +86,6 @@ import convex.net.message.Message;
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
-	private static final int QUERY_QUEUE_SIZE = 1000;
-
-	/**
-	 * Default size for incoming client transaction queue
-	 * Note: this limits TPS for client transactions, will send failures if overloaded
-	 */
-	private static final int TRANSACTION_QUEUE_SIZE = 500;
-	
-	/**
-	 * Size of incoming Belief queue
-	 */
-	private static final int BELIEF_QUEUE_SIZE = 500;
-
 	/**
 	 * Pause for each iteration of Server Belief Merge loop.
 	 */
@@ -111,7 +98,7 @@ public class Server implements Closeable {
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
-	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(QUERY_QUEUE_SIZE);
+	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Constants.QUERY_QUEUE_SIZE);
 
 	/**
 	 * Queue for received Transactions submitted for clients of this Peer
@@ -154,6 +141,11 @@ public class Server implements Closeable {
 	 * Connection manager instance.
 	 */
 	protected BeliefPropagator propagator;
+	
+	/**
+	 * Transaction handler instance.
+	 */
+	protected TransactionHandler transactionHandler;
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -230,17 +222,21 @@ public class Server implements Closeable {
 		}
 		
 		// Set up Queue. TODO: use config if provided
-		transactionQueue = new ArrayBlockingQueue<>(TRANSACTION_QUEUE_SIZE);
-		beliefQueue = new ArrayBlockingQueue<>(BELIEF_QUEUE_SIZE);
+		transactionQueue = new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
+		beliefQueue = new ArrayBlockingQueue<>(Constants.BELIEF_QUEUE_SIZE);
 		
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
 			this.config = config;
+
+			nio = NIOServer.create(this);
+
 			// now setup the connection manager
 			this.manager = new ConnectionManager(this);
 			this.propagator = new BeliefPropagator(this);
+			this.transactionHandler=new TransactionHandler(this);
 
 			this.peer = establishPeer();
 			this.broadcastPeer=this.peer;
@@ -248,7 +244,6 @@ public class Server implements Closeable {
 			
 			establishController();
 
-			nio = NIOServer.create(this);
 
 		} finally {
 			Stores.setCurrent(savedStore);
@@ -420,8 +415,6 @@ public class Server implements Closeable {
 			} else {
 				hostname = null;
 			}
-
-
 
 			// set running status now, so that loops don't terminate
 			isRunning = true;
