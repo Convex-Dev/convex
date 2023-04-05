@@ -60,6 +60,10 @@ public class TransactionHandler {
 			}
 		}
 	};
+	
+	protected void processMessage(Message m) {
+		
+	}
 
 	public void close() {
 		transactionThread.interrupt();
