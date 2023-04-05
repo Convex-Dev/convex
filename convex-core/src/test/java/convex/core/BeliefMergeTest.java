@@ -48,6 +48,7 @@ public class BeliefMergeTest {
 	private static final long TOTAL_VALUE;
 	
 	private static final long TS_INCREMENT=100;
+	private static final int SEED = 1277121;
 
 	static {
 		// long seed=new Random().nextLong();
@@ -107,7 +108,7 @@ public class BeliefMergeTest {
 
 	public Peer[] shareGossip(Peer[] initial, int numGossips, int round)
 			throws BadSignatureException, InvalidDataException {
-		Random r = new Random(107701 + round * 1337);
+		Random r = new Random(SEED + round * 1337);
 		int n = initial.length;
 		Peer[] result = new Peer[n];
 
@@ -358,11 +359,11 @@ public class BeliefMergeTest {
 	 */
 	@Test
 	public void testGossipConsensus() throws Exception {
-		boolean ANALYSIS = true;
+		boolean ANALYSIS = false;
 		int GOSSIP_NUM = 4;
-		final int TX_ROUNDS = 20;
+		final int TX_ROUNDS = 2000;
 		final int SETTLE_ROUNDS = 20;
-		final int NUM_INITIAL_TRANS = 1;
+		final int NUM_INITIAL_TRANS = 2;
 
 		Peer[] bs0 = initialBeliefs();
 		if (ANALYSIS) printAnalysis(bs0, "Initial beliefs");
@@ -385,7 +386,7 @@ public class BeliefMergeTest {
 		AccountKey RKEY = KEYS[RECEIVER];
 		long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
-		long TJUICE=Juice.TRANSFER*NUM_INITIAL_TRANS;
+		long expectedJuice=Juice.TRANSFER*(NUM_INITIAL_TRANS+TX_ROUNDS);
 
 
 		Peer[] bs3 = bs2;
@@ -444,7 +445,6 @@ public class BeliefMergeTest {
 			assertEquals(NUM_INITIAL_TRANS+TX_ROUNDS, accounts.get(ADDRESSES[i].toExactLong()).getSequence());
 		}
 		// should have equal balance
-		long expectedJuice = (TJUICE*(NUM_INITIAL_TRANS+TX_ROUNDS));
 		assertEquals(INITIAL_BALANCE_PROPOSER-expectedJuice, finalState.getBalance(PADDRESS));
 		assertEquals(INITIAL_BALANCE_RECEIVER-expectedJuice, finalState.getBalance(RADDRESS));
 
