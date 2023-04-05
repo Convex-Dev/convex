@@ -33,12 +33,12 @@ public abstract class Message {
 	static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
 	protected ACell payload;
-	protected Blob encoding; // encoding of payload
+	protected Blob messageData; // encoding of payload
 	protected MessageType type;
 
-	protected Message(MessageType type, ACell payload, Blob encoding) {
+	protected Message(MessageType type, ACell payload, Blob data) {
 		this.type = type;
-		this.encoding=encoding;
+		this.messageData=data;
 		this.payload = payload;
 	}
 
@@ -73,11 +73,15 @@ public abstract class Message {
 		return (T) payload;
 	}
 	
-	public Blob getPayloadEncoding() {
-		if (encoding==null) {
-			encoding=Format.encodedBlob(payload);
+	/**
+	 * Gets the encoded data for this message. 
+	 * @return Blob containing message data
+	 */
+	public Blob getMessageData() {
+		if (messageData==null) {
+			messageData=Format.encodedBlob(payload);
 		}
-		return encoding;
+		return messageData;
 	}
 
 	public MessageType getType() {
@@ -114,7 +118,7 @@ public abstract class Message {
 	private void ensurePayload() {
 		if (payload==null) {
 			try {
-				payload=Format.read(encoding);
+				payload=Format.read(messageData);
 			} catch (BadFormatException e) {
 				throw Utils.sneakyThrow(e);
 			}
