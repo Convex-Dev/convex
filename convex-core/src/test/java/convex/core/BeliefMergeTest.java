@@ -48,7 +48,7 @@ public class BeliefMergeTest {
 	private static final long TOTAL_VALUE;
 	
 	private static final long TS_INCREMENT=100;
-	private static final int SEED = 1277121;
+	private static final int SEED = 12721;
 
 	static {
 		// long seed=new Random().nextLong();
@@ -360,10 +360,10 @@ public class BeliefMergeTest {
 	@Test
 	public void testGossipConsensus() throws Exception {
 		boolean ANALYSIS = false;
-		int GOSSIP_NUM = 4;
-		final int TX_ROUNDS = 80;
+		int GOSSIP_NUM = 2;
+		final int TX_ROUNDS = 180;
 		final int SETTLE_ROUNDS = 20;
-		final int NUM_INITIAL_TRANS = 2;
+		final int NUM_INITIAL_TRANS = 3;
 
 		Peer[] bs0 = initialBeliefs();
 		if (ANALYSIS) printAnalysis(bs0, "Initial beliefs");
