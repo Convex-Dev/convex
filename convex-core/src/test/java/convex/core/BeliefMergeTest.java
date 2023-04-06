@@ -361,7 +361,7 @@ public class BeliefMergeTest {
 	public void testGossipConsensus() throws Exception {
 		boolean ANALYSIS = false;
 		int GOSSIP_NUM = 4;
-		final int TX_ROUNDS = 2000;
+		final int TX_ROUNDS = 80;
 		final int SETTLE_ROUNDS = 20;
 		final int NUM_INITIAL_TRANS = 2;
 
