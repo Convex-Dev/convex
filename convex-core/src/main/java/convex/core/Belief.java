@@ -135,22 +135,6 @@ public class Belief extends ARecord {
 	 * @throws InvalidDataException In case of invalid data
 	 */
 	public Belief merge(MergeContext mc, Belief... beliefs) throws BadSignatureException, InvalidDataException {
-		Belief newBelief = mergeOnce(mc, beliefs);
-
-		return newBelief;
-	}
-
-	/**
-	 * Merges Beliefs one time. This may need to be repeated.
-	 * 
-	 * @param mc MergeContext for Belief Merge
-	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
-	 * @return The updated merged belief, or the same Belief if there is no change.
-	 * @throws BadSignatureException In case of a bad signature
-	 * @throws InvalidDataException In case of invalid data
-	 */
-	Belief mergeOnce(MergeContext mc, Belief... beliefs) throws BadSignatureException, InvalidDataException {
-
 		Counters.beliefMerge++;
 
 		// accumulate combined list of latest Orders for all peers
