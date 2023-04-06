@@ -474,16 +474,13 @@ public class Peer {
 	}
 
 	/**
-	 * Propose a new Block. Adds the block to the current proposed chain for this
-	 * Peer.
+	 * Propose a new Block. Adds the Block to the current proposed Order for this
+	 * Peer. Also increments Peer timestamp if necessary for new Block
 	 *
 	 * @param block Block to publish
 	 * @return Peer after proposing new Block in Peer's own Order
 	 */
 	public Peer proposeBlock(Block block) {
-		if (block.getTimeStamp()>this.getTimeStamp()) {
-			throw new IllegalStateException("Trying to propose Block with future timestamp!");
-		}
 		
 		Belief b = getBelief();
 		BlobMap<AccountKey, SignedData<Order>> orders = b.getOrders();
@@ -497,7 +494,14 @@ public class Peer {
 		
 		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
 		Belief newBelief=b.withOrders(newOrders);
-		return updateBelief(newBelief);
+		
+		Peer result=this;
+		long blockTimeStamp=block.getTimeStamp();
+		if (blockTimeStamp>result.getTimeStamp()) {
+			result=result.updateTimestamp(blockTimeStamp);
+		}
+		result=result.updateBelief(newBelief);
+		return result;
 	}
 
 	/**
