@@ -150,7 +150,7 @@ public class BeliefMergeTest {
 		for (int ix = 0; ix < tcount; ix++) {
 			signedTransactions[ix] = initial[peerIndex].sign(transactions[ix]);
 		}
-		long newTimeStamp = ps.getTimeStamp() + peerIndex + 100;
+		long newTimeStamp = ps.getTimeStamp();
 		Block block = Block.of(newTimeStamp, signedTransactions);
 
 		ps = ps.proposeBlock(block);

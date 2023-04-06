@@ -481,6 +481,10 @@ public class Peer {
 	 * @return Peer after proposing new Block in Peer's own Order
 	 */
 	public Peer proposeBlock(Block block) {
+		if (block.getTimeStamp()>this.getTimeStamp()) {
+			throw new IllegalStateException("Trying to propose Block with future timestamp!");
+		}
+		
 		Belief b = getBelief();
 		BlobMap<AccountKey, SignedData<Order>> orders = b.getOrders();
 

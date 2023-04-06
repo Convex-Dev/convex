@@ -631,6 +631,8 @@ public class Server implements Closeable {
 	 * @throws InterruptedException
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
+		// Update Peer timestamp. This determines what we might accept.
+		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
@@ -642,9 +644,6 @@ public class Server implements Closeable {
 		// incoming beliefs
 		// not in full consensus yet
 		if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
-
-		// Update Peer timestamp. This determines what we might accept.
-		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 		boolean updated = maybeMergeBeliefs();
 		// Should skip broadcast if we haven't published a new Block or updated our own Order
@@ -683,7 +682,7 @@ public class Server implements Closeable {
 	 * @return True if a new block is published, false otherwise.
 	 */
 	protected boolean maybePublishBlock() {
-		long timestamp=Utils.getCurrentTimestamp();
+		long timestamp=peer.getTimeStamp();
 		// skip if recently published a block
 		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
 
