@@ -224,6 +224,16 @@ public class RefTest {
 
 	}
 	
+	@Test 
+	public void testVisitNonEmbedded() {
+		AVector<?> v=Vectors.of(1,Samples.NON_EMBEDDED_BLOB);
+		ArrayList<ACell> al=new ArrayList<ACell>();
+		
+		Refs.visitNonEmbedded(v, r->al.add(r.getValue()));
+		assertEquals(1,al.size());
+		assertSame(v.get(1), al.get(0));
+	}
+	
 	@Test
 	public void testToString() {
 		AVector<CVMLong> v=Vectors.of(1,2,3,4);
