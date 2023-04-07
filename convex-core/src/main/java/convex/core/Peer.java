@@ -496,10 +496,12 @@ public class Peer {
 		Belief newBelief=b.withOrders(newOrders);
 		
 		Peer result=this;
+		// Update timestamp if necessary to accommodate Block
 		long blockTimeStamp=block.getTimeStamp();
 		if (blockTimeStamp>result.getTimeStamp()) {
 			result=result.updateTimestamp(blockTimeStamp);
 		}
+		
 		result=result.updateBelief(newBelief);
 		return result;
 	}
