@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 
 import convex.core.Belief;
 import convex.core.Block;
@@ -916,6 +917,31 @@ public class Format {
 	public static int estimateSize(ACell cell) {
 		if (cell==null) return 1;
 		return cell.estimatedEncodingSize();
+	}
+
+	/**
+	 * Reads a cell from a Blob of data, allowing for non-embedded children following the first cell
+	 * @param data Data to decode
+	 * @return Cell instance
+	 * @throws BadFormatException If encoding format is invalid
+	 */
+	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
+		long ml=data.count();
+		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
+		byte tag = data.byteAt(0);
+		T result= read(tag,data,0);
+		int rl=Utils.checkedInt(result.getEncodingLength());
+		if (rl==ml) return result; // Already complete
+		
+		HashMap<Hash,Ref<?>> hm=new HashMap<>();
+		for (int ix=rl; ix<ml;) {
+			ACell c=read(tag,data,ix);
+			Ref<?> cr=Ref.get(c);
+			Hash h=cr.getHash();
+			hm.put(h, cr);
+			ix+=c.getEncodingLength();
+		}
+		return result;
 	}
 
 }

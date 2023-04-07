@@ -11,6 +11,7 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -70,6 +71,17 @@ public abstract class Message {
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() {
+		if (payload==null) {
+			if (messageData==null) throw new IllegalStateException("Null payload and data in Message?!? Type = "+type);
+			if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
+			try {
+				// TODO: should probably have checked exception here?
+				payload=Format.decodeMultiCell(messageData);
+			} catch (BadFormatException e) {
+				log.warn("Bad format in Message payload",e);
+				throw Utils.sneakyThrow(e);
+			}
+		}
 		return (T) payload;
 	}
 	
