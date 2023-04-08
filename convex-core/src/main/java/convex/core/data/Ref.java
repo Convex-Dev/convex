@@ -356,7 +356,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Reads a ref from the given Blob position. Assumes no tag.
 	 * 
-	 * Marks as non-embedded
+	 * Marks as non-embedded, since only non-embedded cells should be encoded this way
 	 * 
 	 * @param b Blob containing the data to read at the current position
 	 * @param pos position in Blob to read
@@ -367,7 +367,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		Hash h = Hash.wrap(b,pos);
 		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref as position: "+pos);
 		Ref<T> ref=Ref.forHash(h);
-		return ref.markEmbedded(false);
+		ref=ref.markEmbedded(false);
+		return ref;
 	}
 
 	public void validate() throws InvalidDataException {

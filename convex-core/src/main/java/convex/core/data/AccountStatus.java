@@ -165,7 +165,7 @@ public class AccountStatus extends ARecord {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 30+Format.estimateSize(environment)+Format.estimateSize(holdings)+Format.estimateSize(controller)+33;
+		return 30+Format.estimateEncodingSize(environment)+Format.estimateEncodingSize(holdings)+Format.estimateEncodingSize(controller)+33;
 	}
 
 	@Override

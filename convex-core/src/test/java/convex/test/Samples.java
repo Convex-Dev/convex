@@ -140,7 +140,7 @@ public class Samples {
 	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.count()+1);
 
 	public static final AString MAX_EMBEDDED_STRING= Strings.create("This is a string containing exactly 137 characters. This is just right for a maximum embedded string in Convex. How lucky is that, eh????");
-	public static final AString NON_EMBEDDED_STRING= Strings.create(MAX_EMBEDDED_STRING.toString()+" ");
+	public static final AString NON_EMBEDDED_STRING= Strings.create("This is a string containing exactly 138 characters. This is slightly too long to be an embedded Cell within a Convex encoding. Watch out!!");
 	public static final StringShort MAX_SHORT_STRING= (StringShort) Strings.create(createASCIIString(StringShort.MAX_LENGTH));
 	public static final AString MIN_TREE_STRING= Strings.create(createASCIIString(StringShort.MAX_LENGTH+1));
 

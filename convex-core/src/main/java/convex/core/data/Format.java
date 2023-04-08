@@ -2,7 +2,10 @@ package convex.core.data;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.function.Consumer;
 
 import convex.core.Belief;
 import convex.core.Block;
@@ -27,6 +30,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
+import convex.core.util.Trees;
 import convex.core.util.Utils;
 
 /**
@@ -67,6 +71,11 @@ public class Format {
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
 	 */
 	public static final int MAX_REF_LENGTH = Math.max(Ref.INDIRECT_ENCODING_LENGTH, MAX_EMBEDDED_LENGTH);
+
+	/**
+	 * Maximum allowed encoded message length in bytes
+	 */
+	public static final long MAX_MESSAGE_LENGTH = 100000000;
 
 	/**
 	 * Gets the length in bytes of VLC encoding for the given long value
@@ -579,7 +588,6 @@ public class Format {
 		try {
 			int high=(tag & 0xF0);
 			if (high == 0x00) return (T) readNumeric(tag,blob,offset);
-			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);	
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
 			if ((tag & 0xF0) == 0x80) {
@@ -914,7 +922,7 @@ public class Format {
 		return encodedString(RT.cvm(o));
 	}
 
-	public static int estimateSize(ACell cell) {
+	public static int estimateEncodingSize(ACell cell) {
 		if (cell==null) return 1;
 		return cell.estimatedEncodingSize();
 	}
@@ -925,23 +933,107 @@ public class Format {
 	 * @return Cell instance
 	 * @throws BadFormatException If encoding format is invalid
 	 */
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
 		long ml=data.count();
+		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 		byte tag = data.byteAt(0);
-		T result= read(tag,data,0);
-		int rl=Utils.checkedInt(result.getEncodingLength());
+		T result= Format.read(tag,data,0);
+		int rl=(result==null)?1:Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Already complete
 		
 		HashMap<Hash,Ref<?>> hm=new HashMap<>();
+		ArrayList<ACell> al=new ArrayList<>();
 		for (int ix=rl; ix<ml;) {
-			ACell c=read(tag,data,ix);
+			tag=data.byteAt(ix);
+			ACell c=Format.read(tag,data,ix);
+			if (c==null) throw new BadFormatException("Null child encoding in Message");
+			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
+			Hash h=c.getHash();
 			Ref<?> cr=Ref.get(c);
-			Hash h=cr.getHash();
 			hm.put(h, cr);
+			al.add(c);
 			ix+=c.getEncodingLength();
 		}
+		
+		IRefFunction func=new IRefFunction() {
+			@Override
+			public Ref<?> apply(Ref<?> r) {
+				if (r.isEmbedded()) {
+					ACell cc=r.getValue();
+					if (cc==null) return r;
+					ACell nc=cc.updateRefs(this);
+					if (cc==nc) return r;
+					return nc.getRef();
+				} else {
+					Hash h=r.getHash();
+					Ref<?> hmr=hm.get(h);
+					if (hmr!=null) return hmr;
+					// Not in hashmap, so assume this is a partial message
+					return r;
+				}
+			} 
+		};
+		
+		for (int i=al.size()-1; i>=0; i--) {
+			ACell c=al.get(i);
+			ACell nc=c.updateRefs(func);
+			if (c!=nc) {
+				Hash h=c.getHash();
+				hm.put(h, nc.getRef());
+			}
+		}
+		
+		result=(T) result.updateRefs(func);
+		
 		return result;
+	}
+
+	/**
+	 * Encode a Cell completely in multi-cell message format
+	 * @param a Cell to Encode
+	 * @return Blob encoding
+	 */
+	public static Blob encodeMultiCell(ACell a) {
+		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
+		Consumer<Ref<?>> func=r->{cells.add(r);};
+		Refs.visitNonEmbedded(a, func);
+		
+		Blob topCellEncoding=Format.encodedBlob(a);
+		if (cells.isEmpty()) {
+			// single cell only
+			return topCellEncoding;
+		}
+		
+		long[] ml=new long[] {topCellEncoding.count()};
+		HashSet<Ref<?>> refs=new HashSet<>();
+		Trees.visitStack(cells, cr->{
+			if (!refs.contains(cr)) {
+				ACell c=cr.getValue();
+				long cellLength=c.getEncodingLength();
+				long newLength=ml[0]+cellLength;
+				if (newLength>Format.MAX_MESSAGE_LENGTH) return;
+				ml[0]=newLength;
+				Refs.visitNonEmbedded(c, func);
+				refs.add(cr);
+			}
+		});
+		
+		byte[] msg=new byte[Utils.checkedInt(ml[0])];
+		
+		// Ensure we add each unique child
+		topCellEncoding.getBytes(msg, 0);
+		int ix=Utils.checkedInt(topCellEncoding.count());
+		for (Ref<?> r: refs) {
+			ACell c=r.getValue();
+			Blob enc=Format.encodedBlob(c);
+			enc.getBytes(msg, ix);
+			ix+=enc.count();
+		}
+		if (ix!=ml[0]) throw new Error("Bad message length expected "+ml[0]+" but was: "+ix);
+		
+		return Blob.wrap(msg);
 	}
 
 }

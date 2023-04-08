@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -237,5 +238,26 @@ public class EncodingTest {
 		Blob b=Blob.fromHex("8001"+neb.toHexString());
 		
 		assertThrows(BadFormatException.class,()->Format.read(b));
+	}
+	
+	@Test public void testMessageEncoding() throws BadFormatException {
+		assertNull(Format.decodeMultiCell(Blob.fromHex("00")));
+		doMultiEncodingTest(CVMLong.ONE);
+		doMultiEncodingTest(Samples.NON_EMBEDDED_STRING);
+		doMultiEncodingTest(Vectors.of(1,2,3));
+		
+		// Two non-embedded identical children
+		AVector<?> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING);
+		doMultiEncodingTest(v1);
+	}
+	
+	private void doMultiEncodingTest(ACell a) throws BadFormatException {
+		Blob enc=Format.encodeMultiCell(a);
+		assertEquals(a,Format.decodeMultiCell(enc));
+	}
+	
+	@Test public void testBadMessageEncoding() {
+		// Non-embedded child value
+		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(Blob.fromHex("0000")));
 	}
 }

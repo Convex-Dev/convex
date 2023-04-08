@@ -26,6 +26,9 @@ public class PeerStatus extends ARecord {
 	private final long stake;
 	private final long delegatedStake;
 
+	/**
+	 * Map of delegated stakes. Never null internally, but empty map encoded as null.
+	 */
 	private final ABlobMap<Address, CVMLong> stakes;
 
 	/**
@@ -118,7 +121,11 @@ public class PeerStatus extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, controller);
 		pos = Format.writeVLCLong(bs,pos, stake);
-		pos = Format.write(bs,pos, stakes);
+		if (stakes.isEmpty()) {
+			bs[pos++]=Tag.NULL;
+		} else {
+			pos = Format.write(bs,pos, stakes);
+		}
 		pos = Format.writeVLCLong(bs,pos, delegatedStake);
 		pos = Format.write(bs,pos, metadata);
 		return pos;
@@ -127,7 +134,14 @@ public class PeerStatus extends ARecord {
 	public static PeerStatus read(ByteBuffer bb) throws BadFormatException {
         Address owner = Format.read(bb);
 		long stake = Format.readVLCLong(bb);
+		
 		ABlobMap<Address, CVMLong> stakes = Format.read(bb);
+		if (stakes==null) {
+			stakes=BlobMaps.empty();
+		} else if (stakes.isEmpty()) {
+			throw new BadFormatException("Empty delegated stakes should be encoded as null");
+		}
+		
 		long delegatedStake = Format.readVLCLong(bb);
 
 		AHashMap<Keyword,ACell> metadata = Format.read(bb);
