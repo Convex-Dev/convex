@@ -699,10 +699,8 @@ public class Server implements Closeable {
 		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
 		newTransactions.clear();
 
-		ACell.createPersisted(block);
-
 		Peer newPeer = peer.proposeBlock(block);
-		log.info("New block proposed: {} transaction(s), hash={}", block.getTransactions().count(), block.getHash());
+		log.info("New block proposed: {} transaction(s), size= {}, hash={}", block.getTransactions().count(), block.getMemorySize(),block.getHash());
 
 		peer = newPeer;
 		lastBlockPublishedTime=timestamp;

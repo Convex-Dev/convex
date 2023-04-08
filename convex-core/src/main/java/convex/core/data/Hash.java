@@ -204,7 +204,7 @@ public class Hash extends AArrayBlob {
 	}
 	
 	@Override
-	public long getEncodingLength() {
+	public int getEncodingLength() {
 		// Always a fixed encoding length, tag plus count plus length
 		return 2 + LENGTH;
 	}

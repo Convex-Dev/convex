@@ -332,11 +332,11 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 	
 	@Override
-	public long getEncodingLength() {
-		if (encoding!=null) return encoding.count();
+	public int getEncodingLength() {
+		if (encoding!=null) return encoding.size();
 		
 		// tag and count
-		long length=1+Format.getVLCLength(count);
+		int length=1+Format.getVLCLength(count);
 		int n = items.length;
 		if (prefix!=null) length+=prefix.getEncodingLength();
 		for (int i = 0; i < n; i++) {

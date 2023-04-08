@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.util.ArrayList;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -78,17 +79,13 @@ public class BeliefPropagator {
 	private void doBroadcastBelief(Peer peer) {
 		if (peer==null) return;
 
-		// Broadcast latest Belief to connected Peers
-		Belief belief = peer.getBelief();
+		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
 		// belief to network
 		Consumer<Ref<ACell>> noveltyHandler = r -> {
 			ACell o = r.getValue();
-			if (o == belief) return; // skip sending data for belief cell itself, will be BELIEF payload
-			Message msg = Message.createData(o);
-            // broadcast to all peers trusted or not
-			server.manager.broadcast(msg, false);
+			novelty.add(o);
 		};
 
 		// persist the state of the Peer, announcing the new Belief
@@ -96,9 +93,19 @@ public class BeliefPropagator {
 		peer=peer.persistState(noveltyHandler);
 		server.reportPeerBroadcast(peer); 
 
-		Message msg = Message.createBelief(belief);
-
+		int n=novelty.size();
+		if (n==0) {
+			//log.warn("No novelty in Belief");
+			novelty.add(n, peer.getBelief());
+		} else if ((!(novelty.get(n-1) instanceof Belief))) {
+			//log.warn("Last element not Belief out of "+novelty.size());
+			novelty.add(n, peer.getBelief());
+		} else {
+			//log.warn("Novelty with "+novelty.size()+ " cells");
+		}
+		Message msg = Message.createBelief(novelty);
 		server.manager.broadcast(msg, false);
+		
 		lastBroadcastTime=Utils.getCurrentTimestamp();
 		beliefBroadcastCount++;
 	}

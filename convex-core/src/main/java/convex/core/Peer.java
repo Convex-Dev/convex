@@ -430,8 +430,8 @@ public class Peer {
 	 */
 	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
 		// Peer Belief must be announced using novelty handler
-		Belief belief=this.belief;
-		belief.announce(noveltyHandler);
+		Belief newBelief=this.belief;
+		newBelief=newBelief.announce(noveltyHandler);
 
 		// Persist states
 		AVector<State> newStates = this.states;
@@ -441,7 +441,7 @@ public class Peer {
 		AVector<BlockResult> newResults = this.blockResults;
 		newResults=ACell.createPersisted(newResults).getValue();
 
-		return new Peer(this.keyPair, belief, newStates, newResults, this.timestamp);
+		return new Peer(this.keyPair, newBelief, newStates, newResults, this.timestamp);
 	}
 
 	/**

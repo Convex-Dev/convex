@@ -1036,4 +1036,26 @@ public class Format {
 		return Blob.wrap(msg);
 	}
 
+	public static Blob encodeDelta(java.util.List<ACell> cells) {
+		int n=cells.size();
+		int ml=0;
+		for (int i=0; i<n; i++) {
+			int clen=cells.get(i).getEncodingLength();
+			ml+=clen;
+		}
+		
+		byte[] msg=new byte[ml];
+		int ix=0;
+		// Note we reverse the order since we want the main item first
+		for (int i=n-1; i>=0; i--) {
+			Blob enc=cells.get(i).getEncoding();
+			int elen=enc.size();
+			enc.getBytes(msg,ix);
+			ix+=elen;
+		}
+		if (ix!=ml) throw new Error("Bad message length expected "+ml+" but was: "+ix);
+		
+		return Blob.wrap(msg);
+	}
+
 }

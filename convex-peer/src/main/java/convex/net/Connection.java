@@ -409,42 +409,7 @@ public class Connection {
 		}
 	}
 
-	/**
-	 * Sends a RESULT Message on this connection with no error code (i.e. a success)
-	 *
-	 * @param id    ID for result message
-	 * @param value Any data object
-	 * @return True if buffered for sending successfully, false otherwise
-	 * @throws IOException If IO error occurs
-	 */
-	public boolean sendResult(CVMLong id, ACell value) throws IOException {
-		return sendResult(id, value, null);
-	}
 
-	/**
-	 * Sends a RESULT Message on this connection.
-	 *
-	 * @param id        ID for result message
-	 * @param value     Any data object
-	 * @param errorCode Error code for this result. May be null to indicate success
-	 * @return True if buffered for sending successfully, false otherwise
-	 * @throws IOException In case of IO Error
-	 */
-	public boolean sendResult(CVMLong id, ACell value, ACell errorCode) throws IOException {
-		Result result = Result.create(id, value, errorCode);
-		return sendObject(MessageType.RESULT, result);
-	}
-
-	/**
-	 * Sends a RESULT Message on this connection.
-	 *
-	 * @param result Result data structure
-	 * @return true if message queued successfully, false otherwise
-	 * @throws IOException If IO error occurs
-	 */
-	public boolean sendResult(Result result) throws IOException {
-		return sendObject(MessageType.RESULT, result);
-	}
 
 	/**
 	 * Sends a message over this connection

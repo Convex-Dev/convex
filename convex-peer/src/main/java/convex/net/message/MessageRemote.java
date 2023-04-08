@@ -46,10 +46,11 @@ public class MessageRemote extends Message {
 		if ((pc == null) || pc.isClosed()) return false;
 
 		try {
-			return pc.sendResult(res);
-		} catch (Exception t) {
+			Message msg=Message.createResult(res);
+			return pc.sendMessage(msg);
+		} catch (IOException t) {
 			// Ignore, probably IO error
-			log.debug("Error reporting result: {}",t.getMessage());
+			log.warn("Error reporting result: {}",t.getMessage());
 			return false;
 		}
 	}
@@ -58,7 +59,8 @@ public class MessageRemote extends Message {
 		Connection pc = getConnection();
 		if ((pc == null) || pc.isClosed()) return false;
 		try {
-			return pc.sendResult(id,reply);
+			Message msg=Message.createResult(id,reply,null);
+			return pc.sendMessage(msg);
 		} catch (IOException t) {
 			// Ignore, probably IO error
 			log.debug("Error reporting result: {}",t.getMessage());

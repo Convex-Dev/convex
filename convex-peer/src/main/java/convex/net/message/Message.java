@@ -1,5 +1,7 @@
 package convex.net.message;
 
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +33,7 @@ import convex.net.MessageType;
  */
 public abstract class Message {
 	
-	static final Logger log = LoggerFactory.getLogger(Message.class.getName());
+	protected static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
 	protected ACell payload;
 	protected Blob messageData; // encoding of payload
@@ -53,6 +55,16 @@ public abstract class Message {
 
 	public static Message createBelief(Belief belief) {
 		return create(null,MessageType.BELIEF,belief,null);
+	}
+	
+	/**
+	 * Create a Belief message ready for broadcast including delta novelty
+	 * @param novelty Novel cells for transmission. Last entry should be Belief
+	 * @return Message instance
+	 */
+	public static Message createBelief(List<ACell> novelty) {
+		Blob data=Format.encodeDelta(novelty);
+		return create(null,MessageType.BELIEF,novelty.get(0),data);
 	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
@@ -175,7 +187,14 @@ public abstract class Message {
 		return messageData!=null;
 	}
 
+	public static Message createResult(Result res) {
+		Blob enc=Format.encodeMultiCell(res);
+		return create(null,MessageType.RESULT,res,enc);
+	}
 
-
+	public static Message createResult(CVMLong id, ACell value, ACell error) {
+		Result r=Result.create(id, value,error);
+		return createResult(r);
+	}
 
 }

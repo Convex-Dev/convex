@@ -293,8 +293,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @return Exact encoding length of this Cell
 	 */
-	public long getEncodingLength() {
-		return getEncoding().count();
+	public int getEncodingLength() {
+		return getEncoding().size();
 	}
 
 	/**
