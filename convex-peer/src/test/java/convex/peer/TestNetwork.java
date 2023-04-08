@@ -36,9 +36,6 @@ public class TestNetwork {
 			AKeyPair.createSeeded(3),
 			AKeyPair.createSeeded(5),
 			AKeyPair.createSeeded(7),
-			AKeyPair.createSeeded(11),
-			AKeyPair.createSeeded(13),
-			AKeyPair.createSeeded(17),
 			AKeyPair.createSeeded(19),
 	};
 

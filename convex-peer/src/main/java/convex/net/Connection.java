@@ -281,7 +281,7 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a DATA Message on this connection.
+	 * Sends a MISSING_DATA Message on this connection.
 	 *
 	 * @param hash Any data object
 	 * @return true if buffered successfully, false otherwise (not sent)
