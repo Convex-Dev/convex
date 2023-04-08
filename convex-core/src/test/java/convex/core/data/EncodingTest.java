@@ -249,6 +249,10 @@ public class EncodingTest {
 		// Two non-embedded identical children
 		AVector<?> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING);
 		doMultiEncodingTest(v1);
+		
+		// Moar layers
+		AVector<?> v2=Vectors.of(1,Samples.NON_EMBEDDED_STRING,v1);
+		doMultiEncodingTest(v2);
 	}
 	
 	private void doMultiEncodingTest(ACell a) throws BadFormatException {

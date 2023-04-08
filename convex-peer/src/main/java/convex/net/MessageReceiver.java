@@ -10,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
-import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
@@ -158,10 +157,7 @@ public class MessageReceiver {
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */
 	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException {
-		
-		ACell payload = connection.getStore().decode(encoding);
-
-		Message message = Message.create(connection, type, payload);
+		Message message = Message.createMessage(connection, type, encoding);
 		
 		// call the receiver hook, if registered
 		maybeCallHook(message);

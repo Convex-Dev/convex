@@ -44,8 +44,13 @@ public abstract class Message {
 	}
 
 	public static MessageRemote create(Connection peerConnection, MessageType type, ACell payload) {
-		return new MessageRemote(peerConnection, type, payload);
+		return new MessageRemote(peerConnection, type, payload,null);
 	}
+	
+	public static MessageRemote createMessage(Connection peerConnection, MessageType type, Blob message) {
+		return new MessageRemote(peerConnection, type, null, message);
+	}
+
 
 	public static Message createData(ACell o) {
 		return create(null,MessageType.DATA,o);
@@ -75,7 +80,7 @@ public abstract class Message {
 			if (messageData==null) throw new IllegalStateException("Null payload and data in Message?!? Type = "+type);
 			if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
 			try {
-				// TODO: should probably have checked exception here?
+				// TODO: should probably expose checked exception here?
 				payload=Format.decodeMultiCell(messageData);
 			} catch (BadFormatException e) {
 				log.warn("Bad format in Message payload",e);
@@ -86,7 +91,7 @@ public abstract class Message {
 	}
 	
 	/**
-	 * Gets the encoded data for this message. 
+	 * Gets the encoded data for this message. Generates a single cell encoding if required.
 	 * @return Blob containing message data
 	 */
 	public Blob getMessageData() {
@@ -111,29 +116,18 @@ public abstract class Message {
 	 * @return Message ID, or null if the message type does not use message IDs
 	 */
 	public CVMLong getID() {
-		ensurePayload();
 		switch (type) {
 			// Query and transact use a vector [ID ...]
 			case QUERY:
-			case TRANSACT: return (CVMLong) ((AVector<?>)payload).get(0);
+			case TRANSACT: return (CVMLong) ((AVector<?>)getPayload()).get(0);
 
 			// Result is a special record type
-			case RESULT: return (CVMLong)((Result)payload).getID();
+			case RESULT: return (CVMLong)((Result)getPayload()).getID();
 
 			// Status ID is the single value
-			case STATUS: return (CVMLong)(payload);
+			case STATUS: return (CVMLong)(getPayload());
 
 			default: return null;
-		}
-	}
-
-	private void ensurePayload() {
-		if (payload==null) {
-			try {
-				payload=Format.read(messageData);
-			} catch (BadFormatException e) {
-				throw Utils.sneakyThrow(e);
-			}
 		}
 	}
 
@@ -170,7 +164,7 @@ public abstract class Message {
 
 	/**
 	 * Sends a missing data request to the connected Peer
-	 * @param hash HAsh of missing data
+	 * @param hash Hash of missing data
 	 * @return True if request sent, false otherwise
 	 */
 	public abstract boolean sendMissingData(Hash hash);

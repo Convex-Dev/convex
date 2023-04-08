@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import convex.core.Result;
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.net.Connection;
@@ -17,8 +18,8 @@ public class MessageRemote extends Message {
 	private final Connection connection;
 
 
-	protected MessageRemote(Connection conn, MessageType type, ACell payload) {
-		super(type, payload,null);
+	protected MessageRemote(Connection conn, MessageType type, ACell payload, Blob data) {
+		super(type, payload,data);
 		this.connection=conn;
 	}
 	
@@ -28,7 +29,7 @@ public class MessageRemote extends Message {
 	}
 
 	public MessageRemote withConnection(Connection peerConnection) {
-		return new MessageRemote(peerConnection, type, payload);
+		return new MessageRemote(peerConnection, type, payload, messageData);
 	}
 	
 	/**
