@@ -43,33 +43,28 @@ public abstract class Message {
 		this.payload = payload;
 	}
 
-	public static MessageRemote create(Connection peerConnection, MessageType type, ACell payload) {
-		return new MessageRemote(peerConnection, type, payload,null);
+	public static MessageRemote create(Connection peerConnection, MessageType type, ACell payload, Blob data) {
+		return new MessageRemote(peerConnection, type, payload,data);
 	}
-	
-	public static MessageRemote createMessage(Connection peerConnection, MessageType type, Blob message) {
-		return new MessageRemote(peerConnection, type, null, message);
-	}
-
 
 	public static Message createData(ACell o) {
-		return create(null,MessageType.DATA,o);
+		return create(null,MessageType.DATA,o,null);
 	}
 
 	public static Message createBelief(Belief belief) {
-		return create(null,MessageType.BELIEF,belief);
+		return create(null,MessageType.BELIEF,belief,null);
 	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
-		return create(null,MessageType.CHALLENGE, challenge);
+		return create(null,MessageType.CHALLENGE, challenge,null);
 	}
 
 	public static Message createResponse(SignedData<ACell> response) {
-		return create(null,MessageType.RESPONSE, response);
+		return create(null,MessageType.RESPONSE, response,null);
 	}
 
 	public static Message createGoodBye(SignedData<ACell> peerKey) {
-		return create(null,MessageType.GOODBYE, peerKey);
+		return create(null,MessageType.GOODBYE, peerKey,null);
 	}
 
 

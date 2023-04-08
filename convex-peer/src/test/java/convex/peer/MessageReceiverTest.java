@@ -70,7 +70,7 @@ public class MessageReceiverTest {
 
 		Blob blob = Blob.createRandom(new Random(), 10000);
 		Blob enc=Format.encodeMultiCell(blob);
-		Message msg=Message.createMessage(pc, MessageType.DATA, enc);
+		Message msg=Message.create(pc, MessageType.DATA, blob,enc);
 		pc.sendMessage(msg);
 
 		// need to call sendBytes to flush send buffer to channel

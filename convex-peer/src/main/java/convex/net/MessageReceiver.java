@@ -157,7 +157,7 @@ public class MessageReceiver {
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */
 	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException {
-		Message message = Message.createMessage(connection, type, encoding);
+		Message message = Message.create(connection, type, null, encoding);
 		
 		// call the receiver hook, if registered
 		maybeCallHook(message);
