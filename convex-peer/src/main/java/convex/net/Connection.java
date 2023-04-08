@@ -454,6 +454,9 @@ public class Connection {
 	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
+		if (msg.hasData()) {
+			return sendBuffer(msg.getType(),msg.getMessageData());
+		}
 		return sendObject(msg.getType(), msg.getPayload());
 	}
 

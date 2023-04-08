@@ -176,6 +176,10 @@ public abstract class Message {
 	 */
 	public abstract Connection getConnection();
 
+	public boolean hasData() {
+		return messageData!=null;
+	}
+
 
 
 
