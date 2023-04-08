@@ -196,7 +196,7 @@ public class Connection {
 			long now = Utils.getCurrentTimestamp();
 			long elapsed=now-start;
 			if (elapsed > Constants.DEFAULT_CLIENT_TIMEOUT)
-				throw new TimeoutException("Couldn't connect");
+				throw new TimeoutException("Couldn't connect after "+elapsed+"ms");
 			try {
 				Thread.sleep(10+elapsed/5);
 			} catch (InterruptedException e) {
@@ -426,7 +426,7 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a payload for the given message type. Should be called on the thread
+	 * Sends a full payload for the given message type. Should be called on the thread
 	 * that responds to missing data messages from the destination.
 	 *
 	 * @param type    Type of message
@@ -437,22 +437,7 @@ public class Connection {
 	public boolean sendObject(MessageType type, ACell payload) throws IOException {
 		Counters.sendCount++;
 
-		// Need to ensure message is persisted at least, so we can respond to missing
-		// data messages using the current thread store
-		// We pre-send any novelty to the destination
-		ACell sendVal = payload;
-		ACell.createPersisted(sendVal, r -> {
-			try {
-				ACell data = r.getValue();
-				if (data==sendVal) return; // skip sending top payload
-				if (!Format.isEmbedded(data)) sendData(data);
-			} catch (IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
-		});
-
-		// TODO: use data from message
-		Blob enc = Format.encodedBlob(sendVal);
+		Blob enc = Format.encodeMultiCell(payload);
 		if (log.isTraceEnabled()) {
 			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
 					+ Format.encodedBlob(payload).toHexString());

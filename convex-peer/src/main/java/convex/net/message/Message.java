@@ -63,8 +63,10 @@ public abstract class Message {
 	 * @return Message instance
 	 */
 	public static Message createBelief(List<ACell> novelty) {
+		int n=novelty.size();
+		if (n==0) throw new Error("Trying to send Belief with no data?");
 		Blob data=Format.encodeDelta(novelty);
-		return create(null,MessageType.BELIEF,novelty.get(0),data);
+		return create(null,MessageType.BELIEF,novelty.get(n-1),data);
 	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
