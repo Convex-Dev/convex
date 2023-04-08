@@ -67,7 +67,7 @@ public class EncodingTest {
 	@Test public void testEmbeddedRegression() throws BadFormatException {
 		Keyword k=Keyword.create("foo");
 		Blob b=Format.encodedBlob(k);
-		Object o=Format.read(b);
+		ACell o=Format.read(b);
 		assertEquals(k,o);
 		assertTrue(Format.isEmbedded(k));
 		Ref<?> r=Ref.get(o);
@@ -253,7 +253,13 @@ public class EncodingTest {
 	
 	private void doMultiEncodingTest(ACell a) throws BadFormatException {
 		Blob enc=Format.encodeMultiCell(a);
-		assertEquals(a,Format.decodeMultiCell(enc));
+		ACell decoded=Format.decodeMultiCell(enc);
+		assertEquals(a,decoded);
+		
+		// since this is a full encoding, expect all Refs to be direct
+		Refs.visitAllRefs(Ref.get(decoded), r->{
+			assertTrue(r.isDirect());
+		});
 	}
 	
 	@Test public void testBadMessageEncoding() {

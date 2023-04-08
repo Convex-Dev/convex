@@ -10,7 +10,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
-import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Trees;
@@ -296,13 +295,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static <T extends ACell> Ref<T> get(T value) {
 		if (value==null) return (Ref<T>) NULL_VALUE;
 		return value.getRef();
-	}
-	
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Ref<T> get(Object value) {
-		if (value==null) return (Ref<T>) NULL_VALUE;
-		if (value instanceof ACell) return ((ACell)value).getRef();
-		return RT.cvm(value).getRef();
 	}
 
 	/**
