@@ -42,7 +42,10 @@ public class Refs {
 		for (int i=0; i<n; i++) {
 			Ref<?> ref=a.getRef(i);
 			if (ref.isEmbedded()) {
-				visitNonEmbedded(ref.getValue(),visitor);
+				ACell child=ref.getValue();
+				if (child!=null) {
+					visitNonEmbedded(ref.getValue(),visitor);
+				}
 			} else {
 				visitor.accept(ref);
 			}

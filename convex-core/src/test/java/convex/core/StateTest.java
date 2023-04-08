@@ -72,6 +72,15 @@ public class StateTest {
 		RecordTest.doRecordTests(as);
 	}
 	
+	@Test
+	public void testMultiCellTrip() throws BadFormatException {
+		State s = INIT_STATE;
+
+		Blob b=Format.encodeMultiCell(s);
+		State s2=Format.decodeMultiCell(b);
+		assertEquals(s,s2);
+	}
+	
 	@SuppressWarnings("unused")
 	@Test public void testStateRefs() {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
