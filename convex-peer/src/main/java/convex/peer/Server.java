@@ -522,7 +522,6 @@ public class Server implements Closeable {
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
-			m.getConnection().registerPartialMessage(missingHash,m);
 		} catch (Throwable e) {
 			log.warn("Error processing client message: {}", e);
 		}

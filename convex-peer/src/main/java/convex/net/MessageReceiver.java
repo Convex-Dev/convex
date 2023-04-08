@@ -162,11 +162,6 @@ public class MessageReceiver {
 		// call the receiver hook, if registered
 		maybeCallHook(message);
 		
-		// If we have DATA, it might complete a previous message
-		if (type==MessageType.DATA) {
-			if (connection.maybeProcessPartial(message)) return;
-		}
-		
 		// Otherwise, send to the message receive action
 		receivedMessageCount++;
 		if (action != null) {
