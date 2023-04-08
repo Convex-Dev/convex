@@ -29,13 +29,15 @@ public class EtchBenchmark {
 	
 	static long nonce=0;
 	
+	static int NUMVALS=20000;
+	
 	@SuppressWarnings("unchecked")
-	static Ref<ACell>[] refs=new Ref[1000];
+	static Ref<ACell>[] refs=new Ref[NUMVALS];
 	
 	static final Random rand=new Random();
 	
 	static {
-		for (int i=0; i<1000; i++) {
+		for (int i=0; i<NUMVALS; i++) {
 			AVector<CVMLong> v=Vectors.of(0L,(long)i);
 			Ref<ACell> r=v.getRef();
 			refs[i]=r;
@@ -52,8 +54,8 @@ public class EtchBenchmark {
 	
 	@Benchmark
 	public void readDataRandom() {
-		int ix=rand.nextInt(1000);
-		store.refForHash(refs[ix].getHash());
+		int ix=rand.nextInt(NUMVALS);
+		store.refForHash(refs[ix].getHash()).getValue();
 	}
 	
 	public static void main(String[] args) throws Exception {
