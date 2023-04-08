@@ -23,7 +23,7 @@ public class MessageSender {
 	 * Buffer for send bytes. Retained in a state ready for reading, so we flip on
 	 * initialisation. Must be accessed holding lock on buffer.
 	 */
-	private final ByteBuffer buffer = ByteBuffer.allocate(SEND_BUFFER_SIZE).flip();
+	private ByteBuffer buffer = null;
 
 	protected static final Logger log = LoggerFactory.getLogger(MessageSender.class.getName());
 
@@ -32,27 +32,21 @@ public class MessageSender {
 	}
 
 	/**
-	 * Buffers a message for sending.
+	 * Buffers a message for sending. Message buffer should be flipped, ready for reading
 	 * 
 	 * @param messageFrame Source ByteBuffer containing complete message bytes (including length)
 	 * @return True if successfully buffered, false otherwise (insufficient send buffer
 	 *         size)
+	 * @throws IOException In case of IO Error
 	 */
-	public boolean bufferMessage(ByteBuffer messageFrame) {
-		synchronized (buffer) {
-			// compact buffer, ready for writing			
-			buffer.compact();
-			
-			// return false if insufficient space to send
-			if (buffer.remaining() < messageFrame.remaining()) {
-				// flip to maintain readiness for writing
-				buffer.flip();
-				return false;
-			}
-			buffer.put(messageFrame);
-			// flip so ready for reading once again
-			buffer.flip();
-		}
+	public synchronized boolean bufferMessage(ByteBuffer messageFrame) throws IOException {
+		if (buffer!=null) return false;
+		buffer=messageFrame;
+		
+		// try to send bytes immediately
+		maybeSendBytes();
+		
+		// Return true because the message is in flight / buffered sucessfully
 		return true;
 	}
 
@@ -62,20 +56,32 @@ public class MessageSender {
 	 * @return True if all bytes have been sent, false otherwise.
 	 * @throws IOException If IO error occurs
 	 */
-	public boolean maybeSendBytes() throws IOException {
-		synchronized (buffer) {
-			if (!buffer.hasRemaining()) return true;
-
-			// write to channel if possible. May write zero or more bytes
-			channel.write(buffer);
-
-			if (buffer.hasRemaining()) {
-				log.debug("Send buffer full!");
-				return false;
-			} else {
-				return true;
-			}
+	public synchronized boolean maybeSendBytes() throws IOException {
+		if (buffer==null) return true;
+		if (!buffer.hasRemaining()) {
+			buffer=null;
+			return true;
 		}
+
+		// write to channel if possible. May write zero or more bytes
+		channel.write(buffer);
+
+		if (buffer.hasRemaining()) {
+			return false;
+		} else {
+			buffer=null;
+			return true;
+		}
+	}
+
+	/**
+	 * Checks if this sender is ready to send a message. Caller should syncronize on 
+	 * this sender in case the state changes concurrently
+	 * 
+	 * @return True if ready, false otherwise
+	 */
+	public boolean canSendMessage() {
+		return buffer==null;
 	}
 
 }

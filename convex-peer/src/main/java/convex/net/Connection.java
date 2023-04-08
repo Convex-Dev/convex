@@ -84,12 +84,6 @@ public class Connection {
 
 	private static final Logger log = LoggerFactory.getLogger(Connection.class.getName());
 
-	/**
-	 * Pre-allocated direct buffer for message sending TODO: is one per connection
-	 * OK? Users should synchronise on this briefly while building message.
-	 */
-	private final ByteBuffer frameBuf = ByteBuffer.allocateDirect(Format.LIMIT_ENCODING_LENGTH + 20);
-
 	private final MessageReceiver receiver;
 	private final MessageSender sender;
 
@@ -282,8 +276,8 @@ public class Connection {
 	 */
 	public boolean sendData(ACell value) throws IOException {
 		log.trace("Sending data: {}", value);
-		ByteBuffer buf = Format.encodedBuffer(value);
-		return sendBuffer(MessageType.DATA, buf);
+		Blob enc = Format.encodedBlob(value);
+		return sendBuffer(MessageType.DATA, enc);
 	}
 
 	/**
@@ -489,76 +483,76 @@ public class Connection {
 			}
 		});
 
-		ByteBuffer buf = Format.encodedBuffer(sendVal);
+		// TODO: use data from message
+		Blob enc = Format.encodedBlob(sendVal);
 		if (log.isTraceEnabled()) {
 			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
 					+ Format.encodedBlob(payload).toHexString());
 		}
-		boolean sent = sendBuffer(type, buf);
+		boolean sent = sendBuffer(type, enc);
 		return sent;
 	}
 
 	/**
-	 * Sends a message with the given message type and data buffer.
+	 * Sends a message with the given message type and data.
 	 *
 	 * @param type MessageType value
-	 * @param buf  Buffer containing raw wire data for the message
+	 * @param data Raw data for the message
 	 * @return true if message sent, false otherwise
 	 * @throws IOException
 	 */
-	private boolean sendBuffer(MessageType type, ByteBuffer buf) throws IOException {
-		int dataLength = buf.remaining();
-
-		// Total length field is message code + encoded object length
-		int messageLength = dataLength + 1;
-		boolean sent;
-		int headerLength;
-		
-		// TODO: checks on message length?
-		//if ((len <= 0) || (len > LIMIT_ENCODING_LENGTH)) {
-		//	throw new IllegalArgumentException("Invalid message length: " + len);
-		//}
-
-		// synchronize in case we are sending messages from different threads
-		// This is OK but need to avoid corrupted messages.
-		synchronized (frameBuf) {
+	private boolean sendBuffer(MessageType type, Blob data) throws IOException {
+		// synchronize on sender
+		synchronized (sender) {
+			if (!sender.canSendMessage()) return false;
+			int dataLength = Utils.checkedInt(data.count());
+			
+			// Total message length field is one byte for message code + encoded object length
+			int messageLength = dataLength + 1;
+			boolean sent;
+			int headerLength;
 			// ensure frameBuf is clear and ready for writing
-			frameBuf.clear();
+			ByteBuffer frameBuf=ByteBuffer.allocate(messageLength+10);
 
-			// write message header
+			// write message header (length plus message code)
 			Format.writeMessageLength(frameBuf, messageLength);
 			frameBuf.put(type.getMessageCode());
 			headerLength = frameBuf.position();
 
 			// now write message
-			frameBuf.put(buf);
+			frameBuf.put(headerLength, data.getInternalArray(), data.getInternalOffset(), dataLength);
+			frameBuf.position(headerLength+dataLength);
 			frameBuf.flip(); // ensure frameBuf is ready to write to channel
 
 			sent = sender.bufferMessage(frameBuf);
-		}
-
-		if (sent) {
-			if (channel instanceof SocketChannel) {
-				SocketChannel chan = (SocketChannel) channel;
-				// register interest in both reads and writes
-				try {
-					chan.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, this);
-				} catch (CancelledKeyException e) {
-					// ignore. Must have got cancelled elsewhere?
+			
+			if (sent) {
+				if (channel instanceof SocketChannel) {
+					SocketChannel chan = (SocketChannel) channel;
+					// register interest in both reads and writes
+					try {
+						chan.register(selector, SelectionKey.OP_WRITE | SelectionKey.OP_READ, this);
+					} catch (CancelledKeyException e) {
+						// ignore. Must have got cancelled elsewhere?
+					}
+					// wake up selector if needed. TODO: do we need this?
+					// if (!sender.canSendMessage()) {
+					//   selector.wakeup();
+					// }
 				}
-				// wake up selector
-				selector.wakeup();
-			}
 
-			if (log.isTraceEnabled()) {
-				log.trace("Sent message " + type + " of length: " + dataLength + " Connection ID: "
-						+ System.identityHashCode(this));
+				if (log.isTraceEnabled()) {
+					log.trace("Sent message " + type + " of length: " + dataLength + " Connection ID: "
+							+ System.identityHashCode(this));
+				}
+			} else {
+				log.debug("sendBuffer failed with message {} of length: {} Connection ID: {}"
+							, type, dataLength, System.identityHashCode(this));
 			}
-		} else {
-			log.debug("sendBuffer failed with message {} of length: {} Connection ID: {}"
-						, type, dataLength, System.identityHashCode(this));
+			return sent;
 		}
-		return sent;
+
+
 	}
 
 	public synchronized void close() {
@@ -716,20 +710,22 @@ public class Connection {
 	/**
 	 * Handles writes to the channel.
 	 *
-	 * SECURITY: Called on Selector Thread
+	 * SECURITY: Called on Selector Thread, must never block
 	 *
 	 * @param key Selection Key
 	 * @throws IOException 
 	 */
 	static void selectWrite(SelectionKey key) throws IOException {
 		Connection pc = (Connection) key.attachment();
-		boolean allSent = pc.sender.maybeSendBytes();
-
-		if (allSent) {
-			// deregister interest in writing
-			key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
-		} else {
-			// we want to continue writing
+		
+		synchronized(pc.sender) { 
+			boolean allSent = pc.sender.maybeSendBytes();
+			if (allSent) {
+				// deregister interest in writing
+				key.interestOps(key.interestOps() & ~SelectionKey.OP_WRITE);
+			} else {
+				// we want to continue writing
+			}
 		}
 	}
 
