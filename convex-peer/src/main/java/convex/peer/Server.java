@@ -480,7 +480,6 @@ public class Server implements Closeable {
 	 */
 	private void processMessage(Message m) {
 		MessageType type = m.getType();
-		log.trace("Processing message {}",type);
 		try {
 			switch (type) {
 			case BELIEF:
@@ -969,7 +968,7 @@ public class Server implements Closeable {
 	/**
 	 * Timestamp for last Belief merge
 	 */
-	private long lastBeliefMerge=0;
+	protected long lastBeliefMerge=0;
 	
 	/**
 	 * Runnable loop for managing Server belief merges
@@ -1007,12 +1006,9 @@ public class Server implements Closeable {
 		ArrayList<Message> allBeliefs=new ArrayList<>();
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
-		long delay = lastBeliefMerge+BELIEF_MERGE_PAUSE-Utils.getCurrentTimestamp();
-		delay=Math.min(1000, delay);
-		if (delay>0) Thread.sleep(delay);
 		Message firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
-
 		if (firstEvent==null) return;
+		
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs);
 		for (Message m: allBeliefs) {
