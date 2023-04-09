@@ -73,7 +73,7 @@ public abstract class Message {
 			novelty.add(n, belief);
 		}
 		Blob data=Format.encodeDelta(novelty);
-		return create(null,MessageType.BELIEF,novelty.get(n-1),data);
+		return create(null,MessageType.BELIEF,belief,data);
 	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
