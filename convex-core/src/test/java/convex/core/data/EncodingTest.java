@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
@@ -240,6 +242,23 @@ public class EncodingTest {
 		assertThrows(BadFormatException.class,()->Format.read(b));
 	}
 	
+	@Test public void testDeltaEncoding() throws BadFormatException {
+		Blob randBlob=Blob.createRandom(new Random(1234), 2*Format.MAX_EMBEDDED_LENGTH);
+		AVector<?> v=Vectors.of(1,randBlob,randBlob);
+		
+		ArrayList<ACell> novelty=new ArrayList<>();
+		ACell.createPersisted(v,r->novelty.add(r.getValue()));
+		if (v.isEmbedded()) novelty.add(v);
+		
+		assertEquals(2,novelty.size());
+		
+		Blob b=Format.encodeDelta(novelty);
+		
+		AVector<?> v2 = Format.decodeMultiCell(b);
+		assertEquals(v,v2);
+		
+	}
+	
 	@Test public void testMessageEncoding() throws BadFormatException {
 		assertNull(Format.decodeMultiCell(Blob.fromHex("00")));
 		doMultiEncodingTest(CVMLong.ONE);
@@ -269,5 +288,8 @@ public class EncodingTest {
 	@Test public void testBadMessageEncoding() {
 		// Non-embedded child value
 		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(Blob.fromHex("0000")));
+		
+		// illegal child tag
+		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(Blob.fromHex("00FF")));
 	}
 }

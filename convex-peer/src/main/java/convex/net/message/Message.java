@@ -59,12 +59,19 @@ public abstract class Message {
 	
 	/**
 	 * Create a Belief message ready for broadcast including delta novelty
-	 * @param novelty Novel cells for transmission. Last entry should be Belief
+	 * @param novelty Novel cells for transmission. 
+	 * @param belief Belief top level Cell to encode
 	 * @return Message instance
 	 */
-	public static Message createBelief(List<ACell> novelty) {
+	public static Message createBelief(Belief belief, List<ACell> novelty) {
 		int n=novelty.size();
-		if (n==0) throw new Error("Trying to send Belief with no data?");
+		if (n==0) {
+			//log.warn("No novelty in Belief");
+			novelty.add(n, belief);
+		} else if ((!(novelty.get(n-1) instanceof Belief))) {
+			//log.warn("Last element not Belief out of "+novelty.size());
+			novelty.add(n, belief);
+		}
 		Blob data=Format.encodeDelta(novelty);
 		return create(null,MessageType.BELIEF,novelty.get(n-1),data);
 	}

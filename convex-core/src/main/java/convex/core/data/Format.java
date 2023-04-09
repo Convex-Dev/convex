@@ -1036,6 +1036,11 @@ public class Format {
 		return Blob.wrap(msg);
 	}
 
+	/**
+	 * Encode a list of cells as a delta message. Encodes list in reverse order
+	 * @param cells Cells to encode
+	 * @return Encoded multi-cell blob containing the given cells
+	 */
 	public static Blob encodeDelta(java.util.List<ACell> cells) {
 		int n=cells.size();
 		int ml=0;

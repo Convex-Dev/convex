@@ -93,17 +93,7 @@ public class BeliefPropagator {
 		peer=peer.persistState(noveltyHandler);
 		server.reportPeerBroadcast(peer); 
 
-		int n=novelty.size();
-		if (n==0) {
-			//log.warn("No novelty in Belief");
-			novelty.add(n, peer.getBelief());
-		} else if ((!(novelty.get(n-1) instanceof Belief))) {
-			//log.warn("Last element not Belief out of "+novelty.size());
-			novelty.add(n, peer.getBelief());
-		} else {
-			//log.warn("Novelty with "+novelty.size()+ " cells");
-		}
-		Message msg = Message.createBelief(novelty);
+		Message msg = Message.createBelief(peer.getBelief(), novelty);
 		server.manager.broadcast(msg, false);
 		
 		lastBroadcastTime=Utils.getCurrentTimestamp();
