@@ -1,7 +1,5 @@
 package convex.net;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -14,7 +12,6 @@ import convex.core.data.Ref;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
-import convex.core.util.Utils;
 import convex.net.message.Message;
 
 /**
@@ -61,7 +58,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			r.persistShallow();
 			Hash h=r.getHash();
 			log.trace("Recieved DATA for hash {}",h);
-			unbuffer(h);
 		} catch (MissingDataException e) {
 			// ignore?
 		}
@@ -84,35 +80,6 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 
 	/**
-	 * Map for messages delayed due to missing data
-	 */
-	private HashMap<Hash, ArrayList<Message>> bufferedMessages = new HashMap<>();
-
-	private synchronized void buffer(Hash hash, Message m) {
-		ArrayList<Message> msgs = bufferedMessages.get(hash);
-		if (msgs == null) {
-			msgs = new ArrayList<Message>();
-			bufferedMessages.put(hash, msgs);
-		}
-		msgs.add(m);
-	}
-
-	/**
-	 * Unbuffer and replay messages for a given hash
-	 *
-	 * @param hash
-	 */
-	protected synchronized void unbuffer(Hash hash) {
-		ArrayList<Message> msgs = bufferedMessages.get(hash);
-		if (msgs != null) {
-			bufferedMessages.remove(hash);
-			for (Message m : msgs) {
-				accept(m);
-			}
-		}
-	}
-
-	/**
 	 * Method called when a result is received.
 	 *
 	 * By default, delegates to handleResult and handleError
@@ -120,27 +87,13 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	private final void handleResultMessage(Message m) {
 		Result result = m.getPayload();
 		try {
-			ACell.createPersisted(result);
-
 			// we now have the full result, so notify those interested
 			long id=m.getID().longValue();
 			handleResult(id,result);
-		} catch (MissingDataException e) {
+		} catch (Throwable e) {
 			// If there is missing data, re-buffer the message
-			// And wait for it to arrive later
-			Hash hash = e.getMissingHash();
-			try {
-				if (m.sendMissingData(hash)) {
-					log.debug("Missing data {} requested by client for RESULT of type: {}",hash.toHexString(),Utils.getClassName(result));
-					buffer(hash, m);
-				} else {
-					log.debug("Unable to request missing data");
-				}
-			} catch (Exception e1) {
-				// Ignore. We probably lost this result?
-				log.warn("Exception handling result - {}",e1);
-			}
-			return;
+			// Ignore. We probably lost this result?
+			log.warn("Exception handling result",e);
 		}
 	}
 	

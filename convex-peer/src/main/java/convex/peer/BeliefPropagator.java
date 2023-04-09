@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
-import convex.core.Peer;
 import convex.core.data.ACell;
 import convex.core.data.Ref;
 import convex.core.store.Stores;
