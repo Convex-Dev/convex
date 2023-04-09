@@ -5,6 +5,7 @@ import java.io.IOException;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.net.Connection;
@@ -83,11 +84,11 @@ public class MessageRemote extends Message {
 		Connection pc=getConnection();
 		if (pc==null) return false;
 		try {
-			pc.sendData(data);
+			Blob enc=Format.encodedBlob(data);
+			return pc.sendData(enc);
 		} catch (IOException e) {
 			return false;
 		}
-		return true;
 	}
 
 	@Override

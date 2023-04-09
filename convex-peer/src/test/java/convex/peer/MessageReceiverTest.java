@@ -35,9 +35,9 @@ public class MessageReceiverTest {
 		MessageReceiver mr = new MessageReceiver(a -> received.add(a), pc);
 
 		ACell msg1 = RT.cvm("Hello World!");
-		assertTrue(pc.sendData(msg1));
+		assertTrue(pc.sendData(msg1.getEncoding()));
 		ACell msg2 = RT.cvm(13L);
-		assertTrue(pc.sendData(msg2));
+		assertTrue(pc.sendData(msg2.getEncoding()));
 
 		// need to call sendBytes to flush send buffer to channel
 		// since we aren't using a Selector / SocketChannel here

@@ -166,10 +166,10 @@ public abstract class Message {
 
 	/**
 	 * Sends a cell of data to the connected Peer
-	 * @param data Data to send
+	 * @param value Cell value to send
 	 * @return true if data sent, false otherwise
 	 */
-	public abstract boolean sendData(ACell data);
+	public abstract boolean sendData(ACell value);
 
 	/**
 	 * Sends a missing data request to the connected Peer

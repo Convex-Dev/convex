@@ -274,10 +274,9 @@ public class Connection {
 	 * @return true if buffered successfully, false otherwise (not sent)
 	 * @throws IOException If IO error occurs
 	 */
-	public boolean sendData(ACell value) throws IOException {
-		log.trace("Sending data: {}", value);
-		Blob enc = Format.encodedBlob(value);
-		return sendBuffer(MessageType.DATA, enc);
+	public boolean sendData(Blob data) throws IOException {
+		log.trace("Sending data: {}", data);
+		return sendBuffer(MessageType.DATA, data);
 	}
 
 	/**

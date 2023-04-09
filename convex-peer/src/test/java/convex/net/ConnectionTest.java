@@ -55,7 +55,7 @@ public class ConnectionTest {
 			boolean sent=false;
 			CVMLong value=CVMLong.create(i);
 			while(!sent) {
-				sent=conn.sendData(value);
+				sent=conn.sendData(value.getEncoding());
 				if (sent) {
 					sentCount++;
 				} else {
