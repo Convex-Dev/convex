@@ -1,5 +1,8 @@
 package convex.core.data;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -33,6 +36,15 @@ public class BlobMaps {
 			result = result.assoc((K) kvs[i], value);
 		}
 
+		return (R) result;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R create(HashMap<K, V> map) {
+		BlobMap<K,V> result=empty();
+		for (Map.Entry<K,V> me: map.entrySet()) {
+			result=result.assoc(me.getKey(), me.getValue());
+		}
 		return (R) result;
 	}
 }

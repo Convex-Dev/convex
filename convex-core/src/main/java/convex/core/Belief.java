@@ -108,6 +108,12 @@ public class Belief extends ARecord {
 	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders, long timestamp) {
 		return new Belief(orders, timestamp);
 	}
+	
+
+	public static Belief create(HashMap<AccountKey, SignedData<Order>> orderMap, long timestamp) {
+		BlobMap<AccountKey, SignedData<Order>> orders=BlobMaps.create(orderMap);
+		return new Belief(orders, timestamp);
+	}
 
 	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders) {
 		return create(orders, Constants.INITIAL_TIMESTAMP);
@@ -225,16 +231,15 @@ public class Belief extends ARecord {
 	
 	/**
 	 * Checks if a new Order should replace the current order when collecting Peer orders
-	 * @param a Current Order
-	 * @param b Potential new ORder
+	 * @param oldOrder Current Order
+	 * @param newOrder Potential new ORder
 	 * @return
 	 */
-	static boolean compareOrders(Order a, Order b) {
-		// TODO: penalise inconsistency?
-		// TODO: check for forks / inconsistent values?
-		// TODO: check logic?
+	public static boolean compareOrders(Order oldOrder, Order newOrder) {
+		if (newOrder==null) return false;
+		if (oldOrder==null) return true;
 		
-		int tsComp=Long.compare(a.getTimestamp(), b.getTimestamp());
+		int tsComp=Long.compare(oldOrder.getTimestamp(), newOrder.getTimestamp());
 		if (tsComp>0) return false; // Keep current order if more recent
 		
 		if (tsComp<0) {
@@ -244,14 +249,14 @@ public class Belief extends ARecord {
 			// This probably shouldn't happen if peers are sticking to timestamps
 			// But we compare anyway
 			// Prefer advanced consensus
-			if (b.getConsensusPoint()>a.getConsensusPoint()) return true;
+			if (newOrder.getConsensusPoint()>oldOrder.getConsensusPoint()) return true;
 			
 			// Then prefer advanced proposal
-			if (b.getProposalPoint()>a.getProposalPoint()) return true;
+			if (newOrder.getProposalPoint()>oldOrder.getProposalPoint()) return true;
 
 			// Finally prefer more blocks
-			AVector<SignedData<Block>> abs=a.getBlocks();
-			AVector<SignedData<Block>> bbs=b.getBlocks();
+			AVector<SignedData<Block>> abs=oldOrder.getBlocks();
+			AVector<SignedData<Block>> bbs=newOrder.getBlocks();
 			if(abs.count()<bbs.count()) return true;
 		}
 		return false;

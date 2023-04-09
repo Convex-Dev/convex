@@ -32,10 +32,12 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.BlobMap;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
@@ -185,13 +187,11 @@ public class Server implements Closeable {
 	 */
 	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
 
-
 	/**
 	 * The list of new beliefs received from remote peers the block being created
 	 * Should only modify with the lock for this Server held.
 	 */
 	private ArrayList<Belief> newBeliefs = new ArrayList<>();
-
 
 	/**
 	 * Hostname of the peer server.
@@ -1006,18 +1006,29 @@ public class Server implements Closeable {
 		
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs);
+		HashMap<AccountKey,SignedData<Order>> newOrders=new HashMap<>();
+		
 		for (Message m: allBeliefs) {
 			try {
 				Belief receivedBelief=m.getPayload();	
 				// Add to map of new Beliefs received for each Peer
 				
-				// check we can persist the new belief
-				Ref<Belief> ref=ACell.createPersisted(receivedBelief);
-				receivedBelief=ref.getValue();
-				// TODO: validate trusted connection?
-				// TODO: can drop Beliefs if under pressure?
+				BlobMap<AccountKey, SignedData<Order>> a = receivedBelief.getOrders();
+				int n=a.size();
+				for (int i=0; i<n; i++) {
+					MapEntry<AccountKey,SignedData<Order>> me=a.entryAt(i);
+					AccountKey key=RT.ensureAccountKey(me.getKey());
+					SignedData<Order> so=me.getValue();
+					if (newOrders.containsKey(key)) {
+						Order newOrder=so.getValue();
+						Order oldOrder=newOrders.get(key).getValue();
+						boolean replace=Belief.compareOrders(oldOrder, newOrder);
+						if (!replace) continue;
+					} 
+					so=ACell.createPersisted(so).getValue();
+					newOrders.put(key, so);
+				}
 				
-				newBeliefs.add(receivedBelief);
 				beliefReceivedCount++;
 
 				// Notify the update thread that there is something new to handle
@@ -1033,6 +1044,10 @@ public class Server implements Closeable {
 					log.warn("Unable to request Missing data in Belief!");
 				}
 			} 
+		}
+		if (!newOrders.isEmpty()) {
+			Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
+			newBeliefs.add(newBelief);
 		}
 	}
 
