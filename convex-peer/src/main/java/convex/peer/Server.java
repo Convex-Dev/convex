@@ -172,11 +172,6 @@ public class Server implements Closeable {
 	 * The Peer instance current state for this server. Will be updated based on peer events.
 	 */
 	private Peer peer;
-	
-	/**
-	 * The latest peer that has been broadcast to the network
-	 */
-	private Peer broadcastPeer;
 
 	/**
 	 * The Peer Controller Address
@@ -238,8 +233,6 @@ public class Server implements Closeable {
 			this.transactionHandler=new TransactionHandler(this);
 
 			this.peer = establishPeer();
-			this.broadcastPeer=this.peer;
-
 			
 			establishController();
 
@@ -833,7 +826,7 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusVector() {
-		Peer peer=this.broadcastPeer;
+		Peer peer=this.peer;
 		return createStatusVector(peer);
 	}
 		
@@ -989,7 +982,9 @@ public class Server implements Closeable {
 					
 					if (beliefUpdated||propagator.isBroadcastDue()) {
 						raiseServerChange("consensus");
-						propagator.broadcastBelief(peer);
+						propagator.queueBelief(peer.getBelief());
+						
+						transactionHandler.maybeReportTransactions(peer);
 					}
 				} catch (InterruptedException e) {
 					log.debug("Terminating Belief Merge loop due to interrupt");
@@ -1040,15 +1035,6 @@ public class Server implements Closeable {
 			} 
 		}
 	}
-	
-	// Called from belief propagator
-	public void reportPeerBroadcast(Peer broadcastPeer) {
-		this.broadcastPeer=broadcastPeer;
-		
-		transactionHandler.maybeReportTransactions(broadcastPeer);
-	}
-
-
 
 	/**
 	 * Gets the port that this Server is currently accepting connections on
