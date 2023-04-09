@@ -8,6 +8,7 @@ import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -576,18 +577,25 @@ public class ConnectionManager {
 	 * @param msg Message to broadcast
 	 *
 	 * @param requireTrusted If true, only broadcast to trusted peers
+	 * @throws InterruptedException 
 	 *
 	 */
-	public synchronized void broadcast(Message msg, boolean requireTrusted) {
+	public synchronized void broadcast(Message msg, boolean requireTrusted) throws InterruptedException {
+		HashMap<AccountKey,Connection> hm;
 		synchronized(connections) {
-			for (Connection pc : connections.values()) {
+			hm=new HashMap<>(connections);
+		}
+		
+		long start=Utils.getCurrentTimestamp();
+		while ((start+1000>Utils.getCurrentTimestamp())&&!hm.isEmpty()) {
+			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
+			for (Map.Entry<AccountKey,Connection> me: left) {
+				Connection pc=me.getValue();
 				try {
-					if ( !requireTrusted || (pc.isTrusted())) {
-						boolean sent = pc.sendMessage(msg);
-						if (!sent) {
-							log.warn("Failed to send broadcast message: "+msg);
-						}
-					}
+					boolean sent = pc.sendMessage(msg);
+					if (sent) {
+						hm.remove(me.getKey());	
+					} 
 				} catch (ClosedChannelException e) {
 					log.debug("Closed channel during broadcast");
 					pc.close();
@@ -595,6 +603,14 @@ public class ConnectionManager {
 					log.error("Error in broadcast: ", e);
 				}
 			}
+			// Avoid a busy wait if buffers are full
+			if (!hm.isEmpty()) {
+				Thread.sleep(50);
+			}
+		}
+		
+		if (!hm.isEmpty()) {
+			log.warn("Unable to send broadcast to "+hm.size()+" peers");
 		}
 	}
 

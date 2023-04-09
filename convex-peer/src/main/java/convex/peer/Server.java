@@ -543,13 +543,13 @@ public class Server implements Closeable {
 				boolean sent = m.sendData(data);
 				// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
 				if (!sent) {
-					log.warn("Can't send missing data for hash {} due to full buffer",h);
+					log.trace("Can't send missing data for hash {} due to full buffer",h);
 				}
 			} catch (Exception e) {
-				log.warn("Unable to deliver missing data for {} due to exception: {}", h, e);
+				log.trace("Unable to deliver missing data for {} due to exception: {}", h, e);
 			}
 		} else {
-			log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
+			log.trace("Unable to provide missing data for {} from store: {}", h,Stores.current());
 		}
 	}
 
@@ -1102,6 +1102,8 @@ public class Server implements Closeable {
 		// Shut down propagator first, not point sending any more Beliefs
 		propagator.close();
 		
+		transactionHandler.close();
+		
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
@@ -1112,7 +1114,11 @@ public class Server implements Closeable {
 		Message msg = Message.createGoodBye(signedPeerKey);
 
 		// broadcast GOODBYE message to all outgoing remote peers
-		manager.broadcast(msg, false);
+		try {
+			manager.broadcast(msg, false);
+		} catch (InterruptedException e1) {
+			// Ignore
+		}
 
 		isRunning = false;
 		if (beliefMergeThread != null) {

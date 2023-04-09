@@ -22,7 +22,7 @@ public class BeliefPropagator {
 	
 	public static final int MIN_BELIEF_BROADCAST_DELAY=50;
 	public static final int BELIEF_REBROADCAST_DELAY=2000;
-	private static final int BELIEF_PROPAGATOR_QUEUE_SIZE = 10;
+	private static final int BELIEF_PROPAGATOR_QUEUE_SIZE = 1;
 
 	protected final Server server;
 	
@@ -76,7 +76,7 @@ public class BeliefPropagator {
 		return beliefQueue.offer(belief);
 	}
 	
-	private void doBroadcastBelief(Belief belief) {
+	private void doBroadcastBelief(Belief belief) throws InterruptedException {
 		if (belief==null) {
 			log.warn("Unexpected null Belief!!");
 			return;
