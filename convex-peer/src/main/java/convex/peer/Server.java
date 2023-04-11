@@ -1209,6 +1209,10 @@ public class Server implements Closeable {
 		return isRunning;
 	}
 
+	public TransactionHandler getTransactionHandler() {
+		return transactionHandler;
+	}
+
 
 
 }

@@ -193,4 +193,8 @@ public class TransactionHandler {
 	public boolean isAwaitingResults() {
 		return interests.size()>0;
 	}
+
+	public int countInterests() {
+		return interests.size();
+	}
 }

@@ -61,6 +61,10 @@ public class PeerInfoPanel extends JPanel {
 	
 			sb.append(s.getStatusVector()+"\n");
 			sb.append("\n");
+			
+			sb.append("Transactions Pending: "+s.getTransactionHandler().countInterests());
+			sb.append("\n");
+
 		}
 		
 		textArea.setText(sb.toString());
