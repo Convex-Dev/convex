@@ -58,14 +58,16 @@ public class TransactionHandler {
 			while (server.isLive()) {
 				try {
 					Message m = transactionQueue.poll(1000, TimeUnit.MILLISECONDS);
-					messages.add(m);
+					if (m==null) continue;
 					
+					// We have at least one transaction to handle, drain queue to get the rest
+					messages.add(m);
 					transactionQueue.drainTo(messages);
+					
+					// Process transaction messages
 					for (Message msg: messages) {
 						processMessage(msg);
 					}
-					
-					Thread.sleep(10);
 				} catch (InterruptedException e) {
 					log.debug("Transaction handler thread interrupted");
 				} catch (Throwable e) {
@@ -129,7 +131,7 @@ public class TransactionHandler {
 			} 
 			registerInterest(sd.getHash(), m);		
 		} catch (Throwable e) {
-			
+			log.warn("Unandled exception in transaction handler",e);
 		}
 	}
 	

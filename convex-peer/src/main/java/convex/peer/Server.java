@@ -1006,7 +1006,7 @@ public class Server implements Closeable {
 		if (firstEvent==null) return;
 		
 		allBeliefs.add(firstEvent);
-		beliefQueue.drainTo(allBeliefs);
+		beliefQueue.drainTo(allBeliefs); 
 		HashMap<AccountKey,SignedData<Order>> newOrders=peer.getBelief().getOrdersHashMap();
 		
 		for (Message m: allBeliefs) {
