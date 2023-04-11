@@ -26,7 +26,7 @@ import convex.net.message.Message;
  */
 public class BeliefPropagator {
 	
-	public static final int BELIEF_REBROADCAST_DELAY=200;
+	public static final int BELIEF_REBROADCAST_DELAY=300;
 
 	protected final Server server;
 	
@@ -53,7 +53,6 @@ public class BeliefPropagator {
 					Belief b=beliefQueue.poll(1000, TimeUnit.MILLISECONDS);
 					if (b!=null) {
 						doBroadcastBelief(b);
-						server.lastBroadcastBelief=b;
 					}
 					Thread.sleep(10);
 				} catch (InterruptedException e) {
@@ -113,6 +112,7 @@ public class BeliefPropagator {
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
 		belief=ACell.createAnnounced(belief, noveltyHandler);
+		server.lastBroadcastBelief=belief;
 
 		Message msg = Message.createBelief(belief, novelty);
 		server.manager.broadcast(msg, false);

@@ -108,7 +108,7 @@ public class TransactionHandler {
 			}
 			
 			if (!sd.checkSignature()) {
-				// terminate the connection, dishonest client?
+				// SECURITY: Client tried to send a badly signed transaction!
 				try {
 					// TODO: throttle?
 					Result r=Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE);

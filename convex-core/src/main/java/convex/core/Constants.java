@@ -181,7 +181,7 @@ public class Constants {
 	 * 
 	 * Note: This may be the bottleneck in some benchmarks! Set to 0 if blocks are being delayed
 	 */
-	public static final long MIN_BLOCK_TIME = 100;
+	public static final long MIN_BLOCK_TIME = 50;
 
 	/**
 	 * Timeout for syncing with an existing Peer

@@ -88,9 +88,9 @@ public class Server implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
 	/**
-	 * Pause for each iteration of Server Belief Merge loop.
+	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
 	 */
-	private static final long BELIEF_MERGE_PAUSE = 50L;
+	private static final long AWAIT_BELIEFS_PAUSE = 50L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -633,7 +633,7 @@ public class Server implements Closeable {
 	 * @return True if a new block is published, false otherwise.
 	 */
 	protected boolean maybePublishBlock() {
-		long timestamp=peer.getTimeStamp();
+		long timestamp=Utils.getCurrentTimestamp();
 		// skip if recently published a block and still awaiting some results
 		if (transactionHandler.isAwaitingResults()) { 
 			if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
@@ -965,6 +965,8 @@ public class Server implements Closeable {
 						propagator.queueBelief(peer.getBelief());
 						
 						transactionHandler.maybeReportTransactions(peer);
+					} else {
+						Thread.sleep(10);
 					}
 				} catch (InterruptedException e) {
 					log.debug("Terminating Belief Merge loop due to interrupt");
@@ -982,7 +984,7 @@ public class Server implements Closeable {
 		ArrayList<Message> allBeliefs=new ArrayList<>();
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
-		Message firstEvent=beliefQueue.poll(BELIEF_MERGE_PAUSE, TimeUnit.MILLISECONDS);
+		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
 		if (firstEvent==null) return;
 		
 		allBeliefs.add(firstEvent);

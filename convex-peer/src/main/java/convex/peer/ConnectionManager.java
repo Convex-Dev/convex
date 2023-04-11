@@ -596,7 +596,9 @@ public class ConnectionManager {
 					boolean sent = pc.sendMessage(msg);
 					if (sent) {
 						hm.remove(me.getKey());	
-					} 
+					} else {
+						// log.warn("Delayed sending to peer because of full Buffer");
+					}
 				} catch (ClosedChannelException e) {
 					log.debug("Closed channel during broadcast");
 					pc.close();
