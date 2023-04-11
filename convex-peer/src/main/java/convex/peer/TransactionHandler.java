@@ -189,4 +189,8 @@ public class TransactionHandler {
 		this.reportedConsensusPoint=server.getPeer().getConsensusPoint();
 		transactionThread.start();
 	}
+
+	public boolean isAwaitingResults() {
+		return interests.size()>0;
+	}
 }

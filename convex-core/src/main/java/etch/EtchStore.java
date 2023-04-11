@@ -129,12 +129,17 @@ public class EtchStore extends AStore {
 			Ref<ACell> existing = (Ref<ACell>) blobCache.getCell(hash);
 			if (existing!=null) return (Ref<T>) existing;
 			
-			existing= etch.read(hash);
-			if (existing!=null) blobCache.putCell(existing);
+			existing= readStoreRef(hash);
 			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
 		}
+	}
+
+	private Ref<ACell> readStoreRef(Hash hash) throws IOException {
+		Ref<ACell> ref=etch.read(hash);
+		if (ref!=null) blobCache.putCell(ref);
+		return ref;
 	}
 
 	@Override

@@ -490,7 +490,7 @@ public class Server implements Closeable {
 				processData(m);
 				break;
 			case MISSING_DATA:
-				processMissingData(m);
+				processQuery(m);
 				break;
 			case QUERY:
 				processQuery(m);
@@ -527,7 +527,7 @@ public class Server implements Closeable {
 	 * @param m
 	 * @throws BadFormatException
 	 */
-	private void processMissingData(Message m)  {
+	private void handleMissingData(Message m)  {
 		// payload for a missing data request should be a valid Hash
 		Hash h = RT.ensureHash(m.getPayload());
 		if (h == null) {
@@ -633,18 +633,21 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybePublishBlock() {
 		long timestamp=peer.getTimeStamp();
-		// skip if recently published a block
-		if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
+		// skip if recently published a block and still awaiting some results
+		if (transactionHandler.isAwaitingResults()) { 
+			if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
+		}
 
 		// possibly have client transactions to publish
-		maybePostClientTransactions();
+		transactionQueue.drainTo(newTransactions);
 
-		// possibly have own transactions to publish
-		maybePostOwnTransactions();
+		// possibly have own transactions to publish as a Peer
+		maybeGetOwnTransactions();
 
 		Block block=null;
 		int n = newTransactions.size();
 		if (n == 0) return false;
+		
 		// TODO: smaller block if too many transactions?
 		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
 		newTransactions.clear();
@@ -658,19 +661,11 @@ public class Server implements Closeable {
 	}
 
 	private long lastOwnTransactionTimestamp=0L;
-	private long lastClientTransactionTimestamp=0L;
 
 	/**
 	 * Default minimum delay between proposing own transactions as a peer
 	 */
 	private static final long OWN_BLOCK_DELAY=1000;
-	
-	/**
-	 * Default minimum delay between proposing a block of transactions
-	 * Note: this limits the TPS for a single peer in terms of client transactions
-	 * Also affects latency for client confirmations by up to this amount
-	 */
-	private static final long CLIENT_BLOCK_DELAY=50;
 
 	/**
 	 * Gets the Peer controller Address
@@ -697,26 +692,12 @@ public class Server implements Closeable {
 		boolean offered=beliefQueue.offer(event);
 		return offered;
 	}
-	
-	/**
-	 * Check if the Peer want to send any of its own transactions
-	 * @param transactionList List of transactions to add to.
-	 */
-	private void maybePostClientTransactions() {
-		long ts=Utils.getCurrentTimestamp();
-		// If we already did this recently, don't try again
-		if (ts<(lastClientTransactionTimestamp+CLIENT_BLOCK_DELAY)) return;
-		
-		transactionQueue.drainTo(newTransactions);
-
-		lastClientTransactionTimestamp=ts; // mark this timestamp
-	}
 
 	/**
 	 * Check if the Peer want to send any of its own transactions
 	 * @param transactionList List of transactions to add to.
 	 */
-	private void maybePostOwnTransactions() {
+	private void maybeGetOwnTransactions() {
 		long ts=Utils.getCurrentTimestamp();
 
 		// If we already posted own transaction recently, don't try again
@@ -942,6 +923,9 @@ public class Server implements Closeable {
 					switch (type) {
 					case QUERY:
 						handleQuery(m);
+						break;
+					case MISSING_DATA:
+						handleMissingData(m);
 						break;
 					default:
 						log.warn("Unexpected Message type on query queue: "+type);

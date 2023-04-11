@@ -123,6 +123,7 @@ public class BeliefPropagator {
 	}
 
 	public void start() {
+		beliefPropagatorThread.setDaemon(true);
 		beliefPropagatorThread.start();
 	}
 }
