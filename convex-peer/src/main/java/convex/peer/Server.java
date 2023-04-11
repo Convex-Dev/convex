@@ -989,6 +989,7 @@ public class Server implements Closeable {
 		beliefQueue.drainTo(allBeliefs); 
 		HashMap<AccountKey,SignedData<Order>> newOrders=peer.getBelief().getOrdersHashMap();
 		// log.info("Merging Beliefs: "+allBeliefs.size());
+		boolean anyOrderChanged=false;
 		
 		for (Message m: allBeliefs) {
 			try {
@@ -1007,9 +1008,10 @@ public class Server implements Closeable {
 						boolean replace=Belief.compareOrders(oldOrder, newOrder);
 						if (!replace) continue;
 					} 
-					// Persist newly received Order
+					// Ensure we can persist newly received Order
 					so=ACell.createPersisted(so).getValue();
 					newOrders.put(key, so);
+					anyOrderChanged=true;
 				}
 				
 				beliefReceivedCount++;
@@ -1028,7 +1030,7 @@ public class Server implements Closeable {
 				}
 			} 
 		}
-		if (!newOrders.isEmpty()) {
+		if (anyOrderChanged) {
 			Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
 			newBeliefs.add(newBelief);
 		}
