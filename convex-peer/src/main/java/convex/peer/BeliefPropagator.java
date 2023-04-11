@@ -26,7 +26,6 @@ import convex.net.message.Message;
  */
 public class BeliefPropagator {
 	
-	public static final int MIN_BELIEF_BROADCAST_DELAY=50;
 	public static final int BELIEF_REBROADCAST_DELAY=200;
 
 	protected final Server server;
@@ -54,12 +53,12 @@ public class BeliefPropagator {
 					Belief b=beliefQueue.poll(1000, TimeUnit.MILLISECONDS);
 					if (b!=null) {
 						doBroadcastBelief(b);
+						server.lastBroadcastBelief=b;
 					}
-					// TODO: this seems sensible but seems to cause problems?
-					// Thread.sleep(MIN_BELIEF_BROADCAST_DELAY);
-				
+					Thread.sleep(10);
 				} catch (InterruptedException e) {
 					log.trace("Belief Propagator thread interrupted on "+server);
+					return;
 				} catch (Throwable e) {
 					log.warn("Unexpected exception in Belief propagator: ",e);
 				}
@@ -67,8 +66,12 @@ public class BeliefPropagator {
 		}
 	};
 	
-	public boolean isBroadcastDue() {
-		return (lastBroadcastTime+MIN_BELIEF_BROADCAST_DELAY)<Utils.getCurrentTimestamp();
+	/**
+	 * Check if the propagator wants the latest Belief for rebroadcast
+	 * @return True is rebroadcast is due
+	 */
+	public boolean isRebroadcastDue() {
+		return (lastBroadcastTime+BELIEF_REBROADCAST_DELAY)<Utils.getCurrentTimestamp();
 	}
 	
 	protected final Thread beliefPropagatorThread=new Thread(beliefPropagatorLoop);

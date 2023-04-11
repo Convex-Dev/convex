@@ -94,6 +94,8 @@ public class Server implements Closeable {
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
+	Belief lastBroadcastBelief;
+
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
 	/**
@@ -549,7 +551,7 @@ public class Server implements Closeable {
 				log.trace("Unable to deliver missing data for {} due to exception: {}", h, e);
 			}
 		} else {
-			log.trace("Unable to provide missing data for {} from store: {}", h,Stores.current());
+			// log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
 		}
 	}
 
@@ -581,18 +583,17 @@ public class Server implements Closeable {
 	 * @throws InterruptedException
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
-		// Update Peer timestamp. This determines what we might accept.
-		peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
 		
+		// we are in full consensus if there are no unconfirmed blocks after the consensus point
 		boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
 
 		// only do belief merge if needed either after:
-		// publishing a new block
-		// incoming beliefs
-		// not in full consensus yet
+		// - publishing a new block
+		// - incoming beliefs
+		// - not in full consensus yet
 		if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
 		boolean updated = maybeMergeBeliefs();
@@ -755,13 +756,14 @@ public class Server implements Closeable {
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
 			if(newPeer==peer) return false;
+			peer = newPeer;
 
 			// Check for substantive change (i.e. Orders updated, can ignore timestamp)
-			if (newPeer.getBelief().getOrders().equals(peer.getBelief().getOrders())) return false;
+			boolean orderSame=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
+			if (orderSame) return false;
 
-			log.debug( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
+			//log.info( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
 			// we merged successfully, so clear pending beliefs and update Peer
-			peer = newPeer;
 			return true;
 		} catch (MissingDataException e) {
 			// Shouldn't happen if beliefs are persisted
@@ -807,13 +809,9 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusVector() {
-		Peer peer=this.peer;
-		return createStatusVector(peer);
-	}
-		
-	private static AVector<ACell> createStatusVector(Peer peer) {
 		// Make sure we use the latest broadcast peer version
-		Belief belief = peer.getBelief();
+		Belief belief = lastBroadcastBelief;
+		if (belief==null) belief=peer.getBelief();
 		
 		Hash beliefHash=belief.getHash();
 		Hash statesHash=peer.getStates().getHash();
@@ -821,7 +819,7 @@ public class Server implements Closeable {
 		AccountKey peerKey=peer.getPeerKey();
 		Hash consensusHash=peer.getConsensusState().getHash();
 		
-		Order order=peer.getPeerOrder();
+		Order order=belief.getOrder(peerKey);
 		CVMLong cp = CVMLong.create(order.getConsensusPoint()) ;
 		CVMLong pp = CVMLong.create(order.getProposalPoint()) ;
 		CVMLong op = CVMLong.create(order.getBlockCount()) ;
@@ -943,29 +941,26 @@ public class Server implements Closeable {
 	};
 	
 	/**
-	 * Timestamp for last Belief merge
-	 */
-	protected long lastBeliefMerge=0;
-	
-	/**
 	 * Runnable loop for managing Server belief merges
 	 */
 	private final Runnable beliefMergeLoop = new Runnable() {
 		@Override
 		public void run() {
 			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
+			// loop while the server is running
 			while (isRunning) {
 				try {
+					// Update Peer timestamp.
+					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
+					
 					// Wait for some new Beliefs to accumulate up to a given time
 					awaitBeliefs();
 					
-					// loop while the server is running
+
 					// Try belief update
-					boolean beliefUpdated=maybeUpdateBelief();
-					if (beliefUpdated) lastBeliefMerge=Utils.getCurrentTimestamp();
+					boolean beliefUpdated=maybeUpdateBelief();			
 					
-					
-					if (beliefUpdated||propagator.isBroadcastDue()) {						
+					if (beliefUpdated||propagator.isRebroadcastDue()) {						
 						raiseServerChange("consensus");
 						propagator.queueBelief(peer.getBelief());
 						
@@ -993,6 +988,7 @@ public class Server implements Closeable {
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs); 
 		HashMap<AccountKey,SignedData<Order>> newOrders=peer.getBelief().getOrdersHashMap();
+		// log.info("Merging Beliefs: "+allBeliefs.size());
 		
 		for (Message m: allBeliefs) {
 			try {
