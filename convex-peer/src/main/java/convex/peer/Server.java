@@ -980,6 +980,7 @@ public class Server implements Closeable {
 					boolean beliefUpdated=maybeUpdateBelief();
 					if (beliefUpdated) lastBeliefMerge=Utils.getCurrentTimestamp();
 					
+					
 					if (beliefUpdated||propagator.isBroadcastDue()) {
 						raiseServerChange("consensus");
 						propagator.queueBelief(peer.getBelief());

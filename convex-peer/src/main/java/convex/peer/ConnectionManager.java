@@ -70,6 +70,10 @@ public class ConnectionManager {
 	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 10000;
 
 	protected final Server server;
+	
+	/**
+	 * Map of current connections.
+	 */
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
 
 	/**
@@ -581,10 +585,7 @@ public class ConnectionManager {
 	 *
 	 */
 	public synchronized void broadcast(Message msg, boolean requireTrusted) throws InterruptedException {
-		HashMap<AccountKey,Connection> hm;
-		synchronized(connections) {
-			hm=new HashMap<>(connections);
-		}
+		HashMap<AccountKey,Connection> hm=getCurrentConnections();
 		
 		long start=Utils.getCurrentTimestamp();
 		while ((start+1000>Utils.getCurrentTimestamp())&&!hm.isEmpty()) {
@@ -603,14 +604,22 @@ public class ConnectionManager {
 					log.error("Error in broadcast: ", e);
 				}
 			}
-			// Avoid a busy wait if buffers are full
-			if (!hm.isEmpty()) {
-				Thread.sleep(50);
-			}
+			
+			// terminate look if everything is sucessfully sent
+			if (hm.isEmpty()) break;
+			
+			// Avoid a busy wait if buffers are full and still have things to send		
+			Thread.sleep(50);
 		}
 		
 		if (!hm.isEmpty()) {
 			log.warn("Unable to send broadcast to "+hm.size()+" peers");
+		}
+	}
+
+	private HashMap<AccountKey, Connection> getCurrentConnections() {
+		synchronized(connections) {
+			return new HashMap<>(connections);
 		}
 	}
 

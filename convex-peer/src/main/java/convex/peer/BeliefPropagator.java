@@ -1,7 +1,7 @@
 package convex.peer;
 
 import java.util.ArrayList;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -12,21 +12,31 @@ import convex.core.Belief;
 import convex.core.data.ACell;
 import convex.core.data.Ref;
 import convex.core.store.Stores;
+import convex.core.util.TransferQueue;
 import convex.core.util.Utils;
 import convex.net.message.Message;
 
 /**
  * Component class to handle propagation of new Beliefs from a Peer
+ * 
+ * Overall logic:
+ * 1. We want to propagate a new Belief delta as fast as possible once one is received
+ * 2. We want to pause to ensure that as many peers as possible have received the delta
+ * 
  */
 public class BeliefPropagator {
 	
 	public static final int MIN_BELIEF_BROADCAST_DELAY=50;
-	public static final int BELIEF_REBROADCAST_DELAY=2000;
-	private static final int BELIEF_PROPAGATOR_QUEUE_SIZE = 1;
+	public static final int BELIEF_REBROADCAST_DELAY=200;
 
 	protected final Server server;
 	
-	private ArrayBlockingQueue<Belief> beliefQueue=new ArrayBlockingQueue<>(BELIEF_PROPAGATOR_QUEUE_SIZE);
+	/**
+	 * Queue on which Beliefs are received from the Belief merge thread.
+	 * 
+	 * We use a custom TransferQueue because we only want to propagate the most recent Belief
+	 */
+	private BlockingQueue<Belief> beliefQueue=new TransferQueue<>();
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 
@@ -45,7 +55,8 @@ public class BeliefPropagator {
 					if (b!=null) {
 						doBroadcastBelief(b);
 					}
-					
+					// TODO: this seems sensible but seems to cause problems?
+					// Thread.sleep(MIN_BELIEF_BROADCAST_DELAY);
 				
 				} catch (InterruptedException e) {
 					log.trace("Belief Propagator thread interrupted on "+server);
