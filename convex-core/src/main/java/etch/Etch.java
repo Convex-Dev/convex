@@ -267,7 +267,9 @@ public class Etch {
 		MappedByteBuffer mbb=(regionIndex<regionMapSize)?regionMap.get(regionIndex):null;
 
 		// Call createBuffer if mapped region does not exist, or is too small
-		if ((mbb==null)||(mbb.capacity()<dataLength+REGION_MARGIN)) mbb=createBuffer(regionIndex);
+		if ((mbb==null)||((mbb.capacity()+regionIndex*MAX_REGION_SIZE)<dataLength+REGION_MARGIN)) {
+			mbb=createBuffer(regionIndex);
+		}
 
 		return mbb;
 	}
