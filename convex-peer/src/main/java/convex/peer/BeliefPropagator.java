@@ -54,7 +54,6 @@ public class BeliefPropagator {
 					if (b!=null) {
 						doBroadcastBelief(b);
 					}
-					Thread.sleep(10);
 				} catch (InterruptedException e) {
 					log.trace("Belief Propagator thread interrupted on "+server);
 					return;

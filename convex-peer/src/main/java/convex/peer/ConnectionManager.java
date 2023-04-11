@@ -52,7 +52,7 @@ public class ConnectionManager {
 	/**
 	 * Pause for each iteration of Server connection loop.
 	 */
-	static final long SERVER_CONNECTION_PAUSE = 1000;
+	static final long SERVER_CONNECTION_PAUSE = 500;
 
 	/**
 	 * Default pause for each iteration of Server connection loop.
@@ -67,7 +67,7 @@ public class ConnectionManager {
 	/**
 	 * How long to wait for a complete acquire of a belief.
 	 */
-	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 10000;
+	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 12000;
 
 	protected final Server server;
 	
@@ -588,7 +588,7 @@ public class ConnectionManager {
 		HashMap<AccountKey,Connection> hm=getCurrentConnections();
 		
 		long start=Utils.getCurrentTimestamp();
-		while ((start+1000>Utils.getCurrentTimestamp())&&!hm.isEmpty()) {
+		while ((!hm.isEmpty())&&(start+1000>Utils.getCurrentTimestamp())) {
 			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
 			for (Map.Entry<AccountKey,Connection> me: left) {
 				Connection pc=me.getValue();
@@ -607,7 +607,7 @@ public class ConnectionManager {
 				}
 			}
 			
-			// terminate look if everything is sucessfully sent
+			// terminate loop if everything is successfully sent
 			if (hm.isEmpty()) break;
 			
 			// Avoid a busy wait if buffers are full and still have things to send		

@@ -5,7 +5,7 @@
 
 (import convex.fungible :as fun)
 
-(def my-token (deploy (fun/build-token {@supply 5555555})))
+(def my-token (deploy (fun/build-token {:supply 5555555})))
 
 (fun/balance my-token *address*)
 

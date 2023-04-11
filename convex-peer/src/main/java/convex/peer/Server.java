@@ -90,7 +90,7 @@ public class Server implements Closeable {
 	/**
 	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
 	 */
-	private static final long AWAIT_BELIEFS_PAUSE = 50L;
+	private static final long AWAIT_BELIEFS_PAUSE = 10L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -956,7 +956,6 @@ public class Server implements Closeable {
 					// Wait for some new Beliefs to accumulate up to a given time
 					awaitBeliefs();
 					
-
 					// Try belief update
 					boolean beliefUpdated=maybeUpdateBelief();			
 					
@@ -965,9 +964,7 @@ public class Server implements Closeable {
 						propagator.queueBelief(peer.getBelief());
 						
 						transactionHandler.maybeReportTransactions(peer);
-					} else {
-						Thread.sleep(10);
-					}
+					} 
 				} catch (InterruptedException e) {
 					log.debug("Terminating Belief Merge loop due to interrupt");
 					break;
