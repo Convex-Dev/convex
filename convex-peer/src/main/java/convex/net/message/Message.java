@@ -187,7 +187,7 @@ public abstract class Message {
 	public abstract boolean sendData(ACell value);
 
 	/**
-	 * Sends a missing data request to the connected Peer
+	 * Returns a missing data request to the connected Peer
 	 * @param hash Hash of missing data
 	 * @return True if request sent, false otherwise
 	 */
