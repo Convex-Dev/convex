@@ -31,6 +31,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
@@ -793,6 +794,21 @@ public class Belief extends ARecord {
 	@Override 
 	public <R extends ACell> Ref<R> getRef(int i) {
 		return orders.getRef(i);
+	}
+
+	/**
+	 * Gets a new HashMap containing all Orders
+	 * @return HashMap of current orders
+	 */
+	public HashMap<AccountKey, SignedData<Order>> getOrdersHashMap() {
+		int n=orders.size();
+		HashMap<AccountKey, SignedData<Order>> hm=new HashMap<>(n);
+		for (int i=0; i<n; i++) {
+			MapEntry<AccountKey, SignedData<Order>> entry=orders.entryAt(i);
+			AccountKey key=RT.ensureAccountKey(entry.getKey());
+			hm.put(key, entry.getValue());
+		}
+		return hm;
 	}
 	
 }

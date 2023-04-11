@@ -26,6 +26,8 @@ import convex.core.lang.Ops;
 import convex.core.lang.RT;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
@@ -943,6 +945,8 @@ public class Format {
 		int rl=(result==null)?1:Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Already complete
 		
+		AStore store=Stores.current();
+		
 		HashMap<Hash,Ref<?>> hm=new HashMap<>();
 		ArrayList<ACell> al=new ArrayList<>();
 		for (int ix=rl; ix<ml;) {
@@ -951,7 +955,11 @@ public class Format {
 			if (c==null) throw new BadFormatException("Null child encoding in Message");
 			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
 			Hash h=c.getHash();
-			Ref<?> cr=Ref.get(c);
+			
+			// Check store for Ref - avoids duplicate objects in many cases
+			Ref<?> sr=store.checkCache(h);
+			
+			Ref<?> cr=(sr!=null)?sr:Ref.get(c);
 			hm.put(h, cr);
 			al.add(c);
 			ix+=c.getEncodingLength();

@@ -121,4 +121,12 @@ public abstract class AStore {
 		ACell decoded=Format.read(encoding);		
 		return decoded;
 	}
+
+	/**
+	 * checks in-memory cache for a stored Ref
+	 * @param <T> Type of Cell
+	 * @param h Hash to check
+	 * @return Stored Ref, or null if not found (may still be in persistent store)
+	 */
+	public abstract <T extends ACell> Ref<T> checkCache(Hash h);
 }

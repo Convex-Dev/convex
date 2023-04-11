@@ -1007,7 +1007,7 @@ public class Server implements Closeable {
 		
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs);
-		HashMap<AccountKey,SignedData<Order>> newOrders=new HashMap<>();
+		HashMap<AccountKey,SignedData<Order>> newOrders=peer.getBelief().getOrdersHashMap();
 		
 		for (Message m: allBeliefs) {
 			try {
@@ -1026,6 +1026,7 @@ public class Server implements Closeable {
 						boolean replace=Belief.compareOrders(oldOrder, newOrder);
 						if (!replace) continue;
 					} 
+					// Persist newly received Order
 					so=ACell.createPersisted(so).getValue();
 					newOrders.put(key, so);
 				}

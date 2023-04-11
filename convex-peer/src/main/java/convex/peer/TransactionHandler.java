@@ -105,10 +105,6 @@ public class TransactionHandler {
 				return;
 			}
 			
-			// Persist the signed transaction. Might throw MissingDataException?
-			// If we already have the transaction persisted, will get signature status
-			sd=ACell.createPersisted(sd).getValue();
-	
 			if (!sd.checkSignature()) {
 				// terminate the connection, dishonest client?
 				try {
@@ -121,6 +117,10 @@ public class TransactionHandler {
 				log.debug("Bad signature from Client! {}" , sd);
 				return;
 			}
+			
+			// Persist the signed transaction. Might throw MissingDataException?
+			// If we already have the transaction persisted, will get signature status
+			sd=ACell.createPersisted(sd).getValue();
 	
 			boolean queued= server.transactionQueue.offer(sd);
 			if (!queued) {

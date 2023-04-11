@@ -111,4 +111,9 @@ public class MemoryStore extends AStore {
 		hashRefs.clear();
 		rootData=null;
 	}
+
+	@Override
+	public <T extends ACell> Ref<T> checkCache(Hash h) {
+		return refForHash(h);
+	}
 }

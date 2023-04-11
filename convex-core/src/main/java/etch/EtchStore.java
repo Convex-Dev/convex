@@ -288,4 +288,10 @@ public class EtchStore extends AStore {
 	public Etch getEtch() {
 		return etch;
 	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public <T extends ACell> Ref<T> checkCache(Hash h) {
+		return (Ref<T>) blobCache.getCell(h);
+	}
 }
