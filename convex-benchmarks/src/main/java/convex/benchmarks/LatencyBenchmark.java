@@ -23,17 +23,20 @@ import convex.peer.API;
 import convex.peer.Server;
 
 /**
- * Benchmark for full round-trip latencies
+ * Benchmarks for full round-trip latencies on a small local Peer Network
  * 
- * Note: these are for a single client executing transactions sequentially, and are
- * therefore not useful for measuring overall network throughput (which would have many
- * clients submitting transactions in parallel).
+ * Main purpose is to test clean, efficient execution of transactions when not under load.
+ * 
+ * Note: these are for a single client executing transactions in batches, and are
+ * therefore not useful for estimating overall network throughput (which would have many
+ * clients submitting transactions in parallel), and higher latency due to global hops etc.
+ * 
  */
 public class LatencyBenchmark {
 	
 	static Address HERO=null;
 	static Address VILLAIN=null;
-	static final AKeyPair[] KPS=new AKeyPair[] {AKeyPair.generate(),AKeyPair.generate()};
+	static final AKeyPair[] KPS=new AKeyPair[] {AKeyPair.generate(),AKeyPair.generate(),AKeyPair.generate()};
 
 	static Server server;
 	static Convex client;
