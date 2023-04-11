@@ -645,7 +645,7 @@ public abstract class Convex {
 		try {
 			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException | ExecutionException e) {
-			throw new Error("Unable to get network status ", e);
+			throw Utils.sneakyThrow(e);
 		} finally {
 			// in case the future is still running?
 			statusFuture.cancel(true);

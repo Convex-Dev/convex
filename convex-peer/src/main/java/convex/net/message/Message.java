@@ -75,6 +75,14 @@ public abstract class Message {
 		Blob data=Format.encodeDelta(novelty);
 		return create(null,MessageType.BELIEF,belief,data);
 	}
+	
+	/**
+	 * Create a Belief request message
+	 * @return Message instance
+	 */
+	public static Message createBeliefRequest() {
+		return create(null,MessageType.REQUEST_BELIEF,null,null);
+	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
 		return create(null,MessageType.CHALLENGE, challenge,null);

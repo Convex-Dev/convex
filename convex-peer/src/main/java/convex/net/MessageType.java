@@ -88,11 +88,18 @@ public enum MessageType {
 	 * Payload is a Belief
 	 */
 	BELIEF(9),
+	
+	/**
+	 * Request the latest broadcast Belief from a Peer.
+	 *
+	 * Payload is ignored, nil recommended
+	 */
+	REQUEST_BELIEF(10),
 
 	/**
 	 * Communication of an intention to shutdown.
 	 */
-	GOODBYE(10),
+	GOODBYE(11),
 
 	/**
 	 * Request for a peer status update.
@@ -101,7 +108,7 @@ public enum MessageType {
 	 *
 	 * Expected Result is a Vector: [signed-belief-hash states-hash initial-state-hash peer-key consensus-state-hash]
 	 */
-	STATUS(11);
+	STATUS(12);
 
 	private final byte messageCode;
 
@@ -130,8 +137,10 @@ public enum MessageType {
 		case 9:
 			return BELIEF;
 		case 10:
-			return GOODBYE;
+			return REQUEST_BELIEF;
 		case 11:
+			return GOODBYE;
+		case 12:
 			return STATUS;
 		}
 		throw new BadFormatException("Invalid message code: " + i);

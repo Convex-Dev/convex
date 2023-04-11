@@ -965,7 +965,7 @@ public class Server implements Closeable {
 					if (beliefUpdated) lastBeliefMerge=Utils.getCurrentTimestamp();
 					
 					
-					if (beliefUpdated||propagator.isBroadcastDue()) {
+					if (beliefUpdated||propagator.isBroadcastDue()) {						
 						raiseServerChange("consensus");
 						propagator.queueBelief(peer.getBelief());
 						
@@ -980,6 +980,7 @@ public class Server implements Closeable {
 				}
 			}
 		}
+
 	};
 
 	private void awaitBeliefs() throws InterruptedException {
