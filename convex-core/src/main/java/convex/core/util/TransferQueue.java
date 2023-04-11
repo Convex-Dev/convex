@@ -10,7 +10,9 @@ import java.util.concurrent.TimeUnit;
 import convex.core.exceptions.TODOException;
 
 /**
- * Non-blocking Queue implementation that overwrites the queued item in a non-blocking manner
+ * Non-blocking Queue implementation that overwrites the queued item in a non-blocking manner.
+ * 
+ * Adding a new item always succeeds.
  * 
  * @param <E> Type of Queue elements
  */

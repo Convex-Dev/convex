@@ -83,6 +83,11 @@ public class BeliefPropagator {
 		return beliefBroadcastCount;
 	}
 	
+	/**
+	 * Queues a Belief for broadcast
+	 * @param belief Belief to queue
+	 * @return True assuming Belief is queued successfully
+	 */
 	public synchronized boolean queueBelief(Belief belief) {
 		return beliefQueue.offer(belief);
 	}
