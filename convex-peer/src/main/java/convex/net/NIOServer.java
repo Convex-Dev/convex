@@ -129,8 +129,8 @@ public class NIOServer implements Closeable {
 							} else if (key.isWritable()) {
 								selectWrite(key);
 							}
-						} catch (ClosedChannelException e) {
-							// channel was closed, just lose the key?
+						} catch (IOException e) {
+							// IO Exception, just lose the key?
 							log.debug("Client closed channel");
 							key.cancel();
 						}  catch (CancelledKeyException e) {
