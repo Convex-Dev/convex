@@ -498,7 +498,7 @@ public class Connection {
 							+ System.identityHashCode(this));
 				}
 			} else {
-				log.debug("sendBuffer failed with message {} of length: {} Connection ID: {}"
+				log.warn("sendBuffer failed with message {} of length: {} Connection ID: {}"
 							, type, dataLength, System.identityHashCode(this));
 			}
 			return sent;
@@ -653,7 +653,13 @@ public class Connection {
 		try {
 			// set the current store for handling incoming messages
 			Stores.setCurrent(store);
-			return receiver.receiveFromChannel(channel);
+			int recd= receiver.receiveFromChannel(channel);
+			int total =recd;
+			//while (recd>0) {
+			//	recd=receiver.receiveFromChannel(channel);
+			//	total+=recd;
+			//}
+			return total;
 		} finally {
 			Stores.setCurrent(tempStore);
 		}

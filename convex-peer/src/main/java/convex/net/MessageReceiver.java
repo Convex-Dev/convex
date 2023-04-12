@@ -131,7 +131,7 @@ public class MessageReceiver {
 		byte mType=buffer.get();
 		MessageType type=MessageType.decode(mType);
 		
-		byte[] bs=new byte[len-1]; // message length after type byte
+		byte[] bs=new byte[len-1]; // message data length after type byte
 		buffer.get(bs);
 		assert(!buffer.hasRemaining()); // should consume entire buffer!
 		Blob messageData=Blob.wrap(bs);

@@ -65,7 +65,8 @@ public class PeerInfoPanel extends JPanel {
 			sb.append("Transactions Pending: "+s.getTransactionHandler().countInterests());
 			sb.append("\n");
 
-			sb.append("Beliefs Received:     "+s.getBeliefReceivedCount());
+			sb.append("Beliefs Sent:         "+s.getBeliefPropagator().getBeliefBroadcastCount()+"\n");
+			sb.append("Beliefs Received:     "+s.getBeliefReceivedCount()+"\n");
 			sb.append("\n");
 		}
 		

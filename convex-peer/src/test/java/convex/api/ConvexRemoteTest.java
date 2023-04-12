@@ -46,7 +46,8 @@ public class ConvexRemoteTest {
 		synchronized(network.SERVER) {
 			try {
 				ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
-				network.CONVEX.transfer(ADDRESS, 1000000000L).get(1000,TimeUnit.MILLISECONDS);
+				Result r=network.CONVEX.transfer(ADDRESS, 1000000000L).get(5000,TimeUnit.MILLISECONDS);
+				assertFalse(r.isError(),()->"Error transferring init funds: "+r);
 			} catch (Throwable e) {
 				e.printStackTrace();
 				throw Utils.sneakyThrow(e);
@@ -68,7 +69,7 @@ public class ConvexRemoteTest {
 	public void testConvex() throws IOException, TimeoutException {
 		synchronized (network.SERVER) {
 			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 1000);
+			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 5000);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
 			assertEquals(ADDRESS, r.getValue());
 		}

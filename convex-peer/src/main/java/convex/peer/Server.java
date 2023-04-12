@@ -557,7 +557,11 @@ public class Server implements Closeable {
 
 	private void processTransact(Message m) {
 		boolean queued=transactionHandler.offer(m);
-		if (!queued) {
+		
+		if (queued) {
+			// log.info("transaction queued");
+		} else {
+			// Failed to queue transaction
 			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
 			m.reportResult(r);
 		} 
@@ -587,6 +591,10 @@ public class Server implements Closeable {
 		// publish new blocks if needed. Guaranteed to change belief if this happens
 		boolean published = maybePublishBlock();
 		
+		if (published) {
+			// log.info("Block published");
+		}
+		
 		// we are in full consensus if there are no unconfirmed blocks after the consensus point
 		boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
 
@@ -597,6 +605,9 @@ public class Server implements Closeable {
 		if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
 		boolean updated = maybeMergeBeliefs();
+		if (updated) {
+			maybeMergeBeliefs(); // try double merge
+		}
 		
 		// Return true iff we published a new Block or updated our own Order
 		return (updated||published);
@@ -977,6 +988,7 @@ public class Server implements Closeable {
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
+		if (firstEvent==null) return; // nothing arrived
 		
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs); 
@@ -985,7 +997,6 @@ public class Server implements Closeable {
 		boolean anyOrderChanged=false;
 		
 		for (Message m: allBeliefs) {
-			if (m==null) continue; // ignore null Belief
 			try {
 				Belief receivedBelief=m.getPayload();	
 				// Add to map of new Beliefs received for each Peer
@@ -1203,6 +1214,10 @@ public class Server implements Closeable {
 
 	public TransactionHandler getTransactionHandler() {
 		return transactionHandler;
+	}
+
+	public BeliefPropagator getBeliefPropagator() {
+		return propagator;
 	}
 
 
