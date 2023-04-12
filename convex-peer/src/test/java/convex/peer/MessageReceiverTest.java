@@ -67,7 +67,7 @@ public class MessageReceiverTest {
 		// null Queue OK, we aren't queueing with our custom receive action
 		MessageReceiver mr = new MessageReceiver(a -> received.add(a), pc);
 
-		ABlob blob = Blobs.createRandom(new Random(), 10000).toCanonical();
+		ABlob blob = Blobs.createRandom(new Random(), 100000).toCanonical();
 		Blob enc=Format.encodeMultiCell(blob);
 		Message msg=Message.create(pc, MessageType.DATA, blob,enc);
 		pc.sendMessage(msg);

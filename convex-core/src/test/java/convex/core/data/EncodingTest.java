@@ -271,7 +271,7 @@ public class EncodingTest {
 	@Test 
 	public void testSignedDataEncoding() throws BadFormatException {
 		Blob bigBlob=Blob.createRandom(new Random(123), 10000);
-		Invoke trans=Invoke.create(Address.create(607), 6976, Vectors.of(1,2,bigBlob));
+		Invoke trans=Invoke.create(Address.create(607), 6976, Vectors.of(1,bigBlob,2,bigBlob));
 		SignedData<ATransaction> strans=Samples.KEY_PAIR.signData(trans);
 		assertFalse(strans.isEmbedded());
 		AVector<?> v=Vectors.of(strans);
@@ -280,6 +280,13 @@ public class EncodingTest {
 		
 		AVector<?> v2=Format.decodeMultiCell(enc);
 		assertEquals(v,v2);
+	}
+	
+	@SuppressWarnings("unused")
+	@Test 
+	public void testFailedMissingEncoding() throws BadFormatException {
+		ABlob bigBlob=Blob.createRandom(new Random(123), 5000).toCanonical();
+		
 	}
 	
 	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException {

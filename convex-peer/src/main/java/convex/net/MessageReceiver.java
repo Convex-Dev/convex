@@ -105,7 +105,11 @@ public class MessageReceiver {
 			int totalFrameSize=lengthLength + len;
 			
 			if (totalFrameSize>buffer.capacity()) {
-				throw new TODOException("Need to handle bigger messages");
+				int newSize=Math.max(totalFrameSize, buffer.position());
+				ByteBuffer newBuffer=ByteBuffer.allocate(newSize);
+				buffer.flip();
+				newBuffer.put(buffer);
+				buffer=newBuffer;
 			}
 			
 			// Exit if we hven't got the full message yet
