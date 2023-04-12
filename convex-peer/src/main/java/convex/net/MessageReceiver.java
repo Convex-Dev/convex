@@ -12,6 +12,7 @@ import convex.core.Constants;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.TODOException;
 import convex.net.message.Message;
 
 /**
@@ -88,57 +89,42 @@ public class MessageReceiver {
 	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws IOException, BadFormatException {
 		int numRead=0;
 
-		// first read a message length
-		if (buffer.position()<2) {
-			buffer.limit(2);
-			numRead = chan.read(buffer);
+		numRead = chan.read(buffer);
 
-			if (numRead <= 0) {
-				// no bytes received / at end of stream
-				return numRead;
+		if (numRead <= 0) {
+			// no bytes received / at end of stream
+			return numRead;
+		}
+
+		while (buffer.position()>0) {
+			// peek message length at start of buffer. May throw BFE.
+			int len = Format.peekMessageLength(buffer);
+			if (len<0) return numRead; // Not enough bytes for a message length yet
+			
+			int lengthLength = Format.getVLCLength(len);
+			int totalFrameSize=lengthLength + len;
+			
+			if (totalFrameSize>buffer.capacity()) {
+				throw new TODOException("Need to handle bigger messages");
 			}
-
-			// exit if we don't have at least 2 bytes for message length (may also be a message code)
-			if (buffer.position()<2) return numRead;
+			
+			// Exit if we hven't got the full message yet
+			if (buffer.position()<totalFrameSize) return numRead;
+	
+			byte mType=buffer.get(lengthLength);
+			MessageType type=MessageType.decode(mType);
+			
+			byte[] bs=new byte[len-1]; // message data length after type byte
+			buffer.get(lengthLength+1, bs, 0, len-1);
+			
+			Blob messageData=Blob.wrap(bs);
+			receiveMessage(type, messageData);
+	
+			int receivedLimit=buffer.position();
+			buffer.position(totalFrameSize);
+			buffer.limit(receivedLimit);
+			buffer.compact();
 		}
-
-		// peek message length at start of buffer. May throw BFE.
-		int len = Format.peekMessageLength(buffer);
-		if (len<0) return numRead; // Not enough bytes for a message length yet
-		
-		// limit buffer to total message frame size including length
-		int lengthLength = Format.getVLCLength(len);
-		int totalFrameSize=lengthLength + len;
-		buffer.limit(totalFrameSize);
-
-		// try to read more bytes up to limit of total message size
-		{
-			int n=chan.read(buffer);
-			if (n < 0) return n;
-			numRead+=n;
-		}
-
-		// exit if we are still waiting for more bytes to complete message
-		if (buffer.hasRemaining()) return numRead;
-
-		// Log.debug("Message received with length: "+len);
-		buffer.flip(); // prepare for read
-
-		// position buffer ready to receive message content (i.e. skip length
-		// field). We still want to include the message code.
-		buffer.position(lengthLength);
-		byte mType=buffer.get();
-		MessageType type=MessageType.decode(mType);
-		
-		byte[] bs=new byte[len-1]; // message data length after type byte
-		buffer.get(bs);
-		assert(!buffer.hasRemaining()); // should consume entire buffer!
-		Blob messageData=Blob.wrap(bs);
-
-		receiveMessage(type, messageData);
-
-		// clear buffer
-		buffer.clear();
 		return numRead;
 	}
 
@@ -156,22 +142,22 @@ public class MessageReceiver {
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */
 	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException {
-		Message message = Message.create(connection, type, null, encoding);
-		
-		// call the receiver hook, if registered
-		maybeCallHook(message);
-		
-		// Otherwise, send to the message receive action
-		receivedMessageCount++;
-		if (action != null) {
-			try {
-				log.trace("Message received: {}", message.getType());
-				action.accept(message);
-			} catch (Throwable e) {
-				log.warn("Exception in receive action from: " + connection.getRemoteAddress(),e);
+		try {
+			Message message = Message.create(connection, type, null, encoding);
+			
+			// call the receiver hook, if registered
+			maybeCallHook(message);
+			
+			// Otherwise, send to the message receive action
+			receivedMessageCount++;
+			if (action != null) {
+					log.trace("Message received: {}", message.getType());
+					action.accept(message);
+			} else {
+				log.warn("Ignored message because no receive action set: " + message);
 			}
-		} else {
-			log.warn("Ignored message because no receive action set: " + message);
+		} catch (Throwable e) {
+			log.warn("Exception in receive action from: " + connection.getRemoteAddress(),e);
 		}
 	}
 

@@ -46,14 +46,10 @@ public class MessageReceiverTest {
 		// since we aren't using a Selector / SocketChannel here
 		assertTrue(pc.flushBytes());
 
-		// receive first message
-		mr.receiveFromChannel(chan);
-		assertEquals(1, received.size());
-		assertEquals(msg1, received.get(0).getPayload());
-
-		// receive second message
+		// receive messages
 		mr.receiveFromChannel(chan);
 		assertEquals(2, received.size());
+		assertEquals(msg1, received.get(0).getPayload());
 		assertEquals(msg2, received.get(1).getPayload());
 
 		Message m1 = received.get(0);
@@ -90,7 +86,7 @@ public class MessageReceiverTest {
 		Blob recData=rec.getMessageData();
 		assertEquals(enc,recData);
 		
-		Blob b2=Format.decodeMultiCell(recData);
+		ABlob b2=Format.decodeMultiCell(recData);
 		Refs.totalRefCount(b2);
 		assertEquals(blob,b2);
 	}
