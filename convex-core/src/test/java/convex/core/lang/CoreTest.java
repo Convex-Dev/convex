@@ -2470,6 +2470,9 @@ public class CoreTest extends ACVMTest {
 		// Query rollback should result in same account being created
 		assertTrue(evalB("(= (query (create-account *key*)) (query (create-account *key*)))"));
 
+		// Check multiple create-accounts in same transaction
+		assertNotError(step("(dotimes [i 100] (create-account *key*))"));
+		
 		assertCastError(step("(create-account :foo)"));
 		assertCastError(step("(create-account 1)"));
 		assertCastError(step("(create-account nil)"));
