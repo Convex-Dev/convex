@@ -116,17 +116,18 @@ public class NIOServer implements Closeable {
 
 					Set<SelectionKey> keys = selector.selectedKeys();
 					Iterator<SelectionKey> it = keys.iterator();
-					while (it.hasNext()) {
+					while (it.hasNext()) { 
 						SelectionKey key = it.next();
 						it.remove();
 
 						try {
-							// Just do one op on each key
 							if (key.isAcceptable()) {
 								accept(selector);
-							} else if (key.isReadable()) {
+							} 
+							if (key.isReadable()) {
 								selectRead(key);
-							} else if (key.isWritable()) {
+							} 
+							if (key.isWritable()) {
 								selectWrite(key);
 							}
 						} catch (ClosedChannelException e) {
@@ -134,11 +135,13 @@ public class NIOServer implements Closeable {
 							log.debug("Client closed channel");
 							key.cancel();
 						}  catch (CancelledKeyException e) {
-							log.debug("Cancelled key: {}", e);
-							// e.printStackTrace();
+							log.debug("Cancelled key: {}", e.getMessage());
+							key.cancel();
+						}  catch (IOException e) {
+							log.debug("IOException: {}", e.getMessage());
 							key.cancel();
 						} catch (Throwable e) {
-							log.warn("Unexpected Exception, canceling key: {}", e);
+							log.warn("Unexpected Exception, canceling key:", e);
 							e.printStackTrace();
 							key.cancel();
 						}
@@ -224,11 +227,14 @@ public class NIOServer implements Closeable {
 			throw new Error("No PeerConnection specified");
 		try {
 			int n = conn.handleChannelRecieve();
-			if (n == 0) {
-				log.debug("No bytes received for key: {}", key);
+			if (n < 0) {
+				key.cancel();
+				log.trace("EOS on channel?");
+			} else if (n==0) {
+				log.trace("No bytes received for key: {}", key);
 			}
 		} catch (ClosedChannelException | SocketException e) {
-			log.debug("Channel closed from: {}", conn.getRemoteAddress());
+			log.info("Channel closed from: {}", conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
 			log.warn("Cancelled connection: Bad data format from: {} message: {}", conn.getRemoteAddress(),

@@ -623,9 +623,14 @@ public class Connection {
 		Connection conn = (Connection) key.attachment();
 		if (conn == null)
 			throw new Error("No PeerConnection specified");
-
+ 
 		try {
 			int n = conn.handleChannelRecieve();
+			if (n<0) {
+				// Deregister interest in reading if EOS
+				log.debug("Cancelled Key due to EOS");
+				key.cancel();
+			}
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
 			log.debug("Channel closed from: {}", conn.getRemoteAddress());
@@ -644,7 +649,7 @@ public class Connection {
 	 *
 	 * SECURITY: Called on NIO Thread (Server or client Connection)
 	 *
-	 * @return The number of bytes read from channel
+	 * @return The number of bytes read from channel, or -1 if EOS
 	 * @throws IOException If IO error occurs
 	 * @throws BadFormatException If there is an encoding error
 	 */
@@ -655,10 +660,10 @@ public class Connection {
 			Stores.setCurrent(store);
 			int recd= receiver.receiveFromChannel(channel);
 			int total =recd;
-			//while (recd>0) {
-			//	recd=receiver.receiveFromChannel(channel);
-			//	total+=recd;
-			//}
+			while (recd>0) {
+				recd=receiver.receiveFromChannel(channel);
+				total+=recd;
+			}
 			return total;
 		} finally {
 			Stores.setCurrent(tempStore);

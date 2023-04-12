@@ -2,7 +2,6 @@ package convex.net;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
 
@@ -83,7 +82,7 @@ public class MessageReceiver {
 	 *
 	 * @param chan Byte channel
 	 * @throws IOException If IO error occurs
-	 * @return The number of bytes read from the channel
+	 * @return The number of bytes read from the channel, or -1 if EOS
 	 * @throws BadFormatException If a bad encoding is received
 	 */
 	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws IOException, BadFormatException {
@@ -94,9 +93,9 @@ public class MessageReceiver {
 			buffer.limit(2);
 			numRead = chan.read(buffer);
 
-			if (numRead < 0) {
-				chan.close();
-			    throw new ClosedChannelException();
+			if (numRead <= 0) {
+				// no bytes received / at end of stream
+				return numRead;
 			}
 
 			// exit if we don't have at least 2 bytes for message length (may also be a message code)
@@ -115,7 +114,7 @@ public class MessageReceiver {
 		// try to read more bytes up to limit of total message size
 		{
 			int n=chan.read(buffer);
-			if (n < 0) throw new ClosedChannelException();
+			if (n < 0) return n;
 			numRead+=n;
 		}
 

@@ -603,7 +603,8 @@ public class ConnectionManager {
 					log.debug("Closed channel during broadcast");
 					pc.close();
 				} catch (IOException e) {
-					log.error("Error in broadcast: ", e);
+					log.debug("IO Error in broadcast: ", e);
+					pc.close();
 				}
 			}
 			

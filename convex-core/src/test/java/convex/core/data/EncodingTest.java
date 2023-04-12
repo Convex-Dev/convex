@@ -14,10 +14,14 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Belief;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.transactions.ATransaction;
+import convex.core.transactions.Invoke;
 import convex.test.Samples;
 import convex.test.Testing;
 
@@ -257,6 +261,27 @@ public class EncodingTest {
 		AVector<?> v2 = Format.decodeMultiCell(b);
 		assertEquals(v,v2);
 		
+	}
+	
+	@Test 
+	public void testSignedDataEncoding() throws BadFormatException {
+		Blob bigBlob=Blob.createRandom(new Random(123), 10000);
+		Invoke trans=Invoke.create(Address.create(607), 6976, Vectors.of(1,2,bigBlob));
+		SignedData<ATransaction> strans=Samples.KEY_PAIR.signData(trans);
+		assertFalse(strans.isEmbedded());
+		AVector<?> v=Vectors.of(strans);
+		
+		Blob enc=Format.encodeMultiCell(v);
+		
+		AVector<?> v2=Format.decodeMultiCell(enc);
+		assertEquals(v,v2);
+	}
+	
+	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException {
+		Blob enc=Blob.fromHex("aa840200000000a08401013f803120501b0aa00b0643dcd117a1132d8d0e11eb29630b5fa990ea34b8170ab0fcd08a2019552844f5db2a3f82d4c1d9edc975b011641d294eb427991bfc878c33ceca8e8401013f8031207cf10aaf0007323d075d0c7522ff727d3d66cbfda97f8ed75109ccfc9ad1e12c2067452e7a7a8cec4e092e9e853666c573174cce92d93e9cef06e92446d5f7361309b0f7a4c88c12907cf10aaf0007323d075d0c7522ff727d3d66cbfda97f8ed75109ccfc9ad1e12c0350385593eee650f4a0ec41c969153b781d4340fa1641ed4a47e0607f5aaf0259b6a0d30e89756e3600a790fba02a287425170cbc3f732be8cdd63e22ba2809ac8000000000");
+		
+		Belief b=(Belief)Format.decodeMultiCell(enc);
+		b.validateCell();
 	}
 	
 	@Test public void testMessageEncoding() throws BadFormatException {
