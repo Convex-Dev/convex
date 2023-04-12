@@ -11,15 +11,20 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Random;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.Belief;
+import convex.core.Block;
+import convex.core.Order;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.test.Samples;
@@ -278,10 +283,35 @@ public class EncodingTest {
 	}
 	
 	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException {
-		Blob enc=Blob.fromHex("aa840200000000a08401013f803120501b0aa00b0643dcd117a1132d8d0e11eb29630b5fa990ea34b8170ab0fcd08a2019552844f5db2a3f82d4c1d9edc975b011641d294eb427991bfc878c33ceca8e8401013f8031207cf10aaf0007323d075d0c7522ff727d3d66cbfda97f8ed75109ccfc9ad1e12c2067452e7a7a8cec4e092e9e853666c573174cce92d93e9cef06e92446d5f7361309b0f7a4c88c12907cf10aaf0007323d075d0c7522ff727d3d66cbfda97f8ed75109ccfc9ad1e12c0350385593eee650f4a0ec41c969153b781d4340fa1641ed4a47e0607f5aaf0259b6a0d30e89756e3600a790fba02a287425170cbc3f732be8cdd63e22ba2809ac8000000000");
+		AKeyPair kp=Samples.KEY_PAIR;
+		Order order=Order.create();
+		order.append(kp.signData(Block.create(0, Vectors.empty())));
+		order.append(kp.signData(Block.create(2, Vectors.of(kp.signData(Invoke.create(Address.create(123), 0, Constant.create(CVMLong.ONE)))))));
+		order.append(kp.signData(Block.create(2, Vectors.empty())));
+		Belief b=Belief.create(kp, order);
 		
-		Belief b=(Belief)Format.decodeMultiCell(enc);
-		b.validateCell();
+		ArrayList<ACell> novelty=new ArrayList<>();
+		// At this point we know something updated our belief, so we want to rebroadcast
+		// belief to network
+		Consumer<Ref<ACell>> noveltyHandler = r -> {
+			ACell o = r.getValue();
+			novelty.add(o);
+		};
+
+		// persist the state of the Peer, announcing the new Belief
+		// (ensure we can handle missing data requests etc.)
+		b=ACell.createAnnounced(b, noveltyHandler);
+		novelty.add(b);
+		
+		Blob enc=Format.encodeDelta(novelty);
+		
+		Belief b2=Format.decodeMultiCell(enc);
+		assertEquals(Refs.totalRefCount(b),Refs.totalRefCount(b2));
+		
+		novelty.clear();
+		b=ACell.createAnnounced(b, noveltyHandler);
+		assertTrue(novelty.isEmpty());
+		
 	}
 	
 	@Test public void testMessageEncoding() throws BadFormatException {

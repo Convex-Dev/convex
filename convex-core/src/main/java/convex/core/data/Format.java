@@ -957,9 +957,9 @@ public class Format {
 			Hash h=c.getHash();
 			
 			// Check store for Ref - avoids duplicate objects in many cases
-			Ref<?> sr=store.checkCache(h);
+			Ref<?> storeRef=store.checkCache(h);
 			
-			Ref<?> cr=(sr!=null)?sr:Ref.get(c);
+			Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
 			hm.put(h, cr);
 			al.add(c);
 			ix+=c.getEncodingLength();
