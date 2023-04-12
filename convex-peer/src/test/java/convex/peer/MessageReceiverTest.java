@@ -9,9 +9,12 @@ import java.util.Random;
 
 import org.junit.Test;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Format;
+import convex.core.data.Refs;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
@@ -43,14 +46,10 @@ public class MessageReceiverTest {
 		// since we aren't using a Selector / SocketChannel here
 		assertTrue(pc.flushBytes());
 
-		// receive first message
-		mr.receiveFromChannel(chan);
-		assertEquals(1, received.size());
-		assertEquals(msg1, received.get(0).getPayload());
-
-		// receive second message
+		// receive messages
 		mr.receiveFromChannel(chan);
 		assertEquals(2, received.size());
+		assertEquals(msg1, received.get(0).getPayload());
 		assertEquals(msg2, received.get(1).getPayload());
 
 		Message m1 = received.get(0);
@@ -68,14 +67,10 @@ public class MessageReceiverTest {
 		// null Queue OK, we aren't queueing with our custom receive action
 		MessageReceiver mr = new MessageReceiver(a -> received.add(a), pc);
 
-		Blob blob = Blob.createRandom(new Random(), 10000);
+		ABlob blob = Blobs.createRandom(new Random(), 10000).toCanonical();
 		Blob enc=Format.encodeMultiCell(blob);
 		Message msg=Message.create(pc, MessageType.DATA, blob,enc);
 		pc.sendMessage(msg);
-
-		// need to call sendBytes to flush send buffer to channel
-		// since we aren't using a Selector / SocketChannel here
-		assertTrue(pc.flushBytes());
 
 		// receive message
 		while (!pc.flushBytes()) {
@@ -90,6 +85,9 @@ public class MessageReceiverTest {
 		
 		Blob recData=rec.getMessageData();
 		assertEquals(enc,recData);
-		assertEquals(blob,Format.decodeMultiCell(recData));
+		
+		ABlob b2=Format.decodeMultiCell(recData);
+		Refs.totalRefCount(b2);
+		assertEquals(blob,b2);
 	}
 }

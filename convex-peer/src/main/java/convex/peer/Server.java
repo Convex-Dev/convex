@@ -90,7 +90,7 @@ public class Server implements Closeable {
 	/**
 	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
 	 */
-	private static final long AWAIT_BELIEFS_PAUSE = 30L;
+	private static final long AWAIT_BELIEFS_PAUSE = 60L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -764,12 +764,7 @@ public class Server implements Closeable {
 			if(newPeer==peer) return false;
 			peer = newPeer;
 
-			// Check for substantive change (i.e. Orders updated, can ignore timestamp)
-			boolean orderSame=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
-			if (orderSame) return false;
-
 			//log.info( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
-			// we merged successfully, so clear pending beliefs and update Peer
 			return true;
 		} catch (MissingDataException e) {
 			// Shouldn't happen if beliefs are persisted
@@ -1026,10 +1021,11 @@ public class Server implements Closeable {
 								,getHostAddress(),receivedBelief.getHash());
 			} catch (ClassCastException e) {
 				// Bad message from Peer
+				log.warn("Class cast exception in Belief!",e);
 				m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
 			} catch (MissingDataException e) {
 				// Missing data, ignore
-				log.trace("Missing data in Belief!",e);
+				log.warn("Missing data in Belief!",e);
 				if (!m.sendMissingData(e.getMissingHash())) {
 					log.warn("Unable to request Missing data in Belief!");
 				}
