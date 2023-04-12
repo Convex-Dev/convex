@@ -3,9 +3,11 @@ package convex.util;
 import static convex.core.lang.TestState.STATE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
@@ -28,6 +30,7 @@ import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Bits;
+import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
 
 public class UtilsTest {
@@ -377,6 +380,20 @@ public class UtilsTest {
 				CVMLong.create(STATE.getTimeStamp().longValue() + 1000),
 				statesInRange.get(statesInRange.count() - 1).getTimeStamp()
 		);
+	}
+	
+	@Test public void testLatestUpdateQueue() {
+		LatestUpdateQueue<Integer> q=new LatestUpdateQueue<>();
+		
+		assertNull(q.poll());
+		
+		assertTrue(q.offer(1));
+		assertTrue(q.offer(2));
+		
+		assertFalse(q.isEmpty());
+		assertEquals(2,q.poll());
+		assertNull(q.poll());
+		assertTrue(q.isEmpty());
 	}
 
 }

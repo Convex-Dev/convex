@@ -16,7 +16,7 @@ import convex.core.exceptions.TODOException;
  * 
  * @param <E> Type of Queue elements
  */
-public class TransferQueue<E> implements BlockingQueue<E> {
+public class LatestUpdateQueue<E> implements BlockingQueue<E> {
 	private E item;
 	
 	@Override

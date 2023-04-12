@@ -12,7 +12,7 @@ import convex.core.Belief;
 import convex.core.data.ACell;
 import convex.core.data.Ref;
 import convex.core.store.Stores;
-import convex.core.util.TransferQueue;
+import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
 import convex.net.message.Message;
 
@@ -35,7 +35,7 @@ public class BeliefPropagator {
 	 * 
 	 * We use a custom TransferQueue because we only want to propagate the most recent Belief
 	 */
-	private BlockingQueue<Belief> beliefQueue=new TransferQueue<>();
+	private BlockingQueue<Belief> beliefQueue=new LatestUpdateQueue<>();
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 

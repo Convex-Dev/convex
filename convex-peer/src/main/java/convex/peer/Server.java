@@ -624,8 +624,7 @@ public class Server implements Closeable {
 		return beliefReceivedCount;
 	}
 
-
-	private long lastBlockPublishedTime=0L;
+	protected long lastBlockPublishedTime=0L;
 
 	/**
 	 * Checks for pending transactions, and if found propose them as a new Block.
@@ -634,10 +633,6 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybePublishBlock() {
 		long timestamp=Utils.getCurrentTimestamp();
-		// skip if recently published a block and still awaiting some results
-		if (transactionHandler.isAwaitingResults()) { 
-			if ((lastBlockPublishedTime+Constants.MIN_BLOCK_TIME)>=timestamp) return false;
-		}
 
 		// possibly have client transactions to publish
 		transactionQueue.drainTo(newTransactions);
@@ -950,11 +945,11 @@ public class Server implements Closeable {
 			// loop while the server is running
 			while (isRunning) {
 				try {
-					// Update Peer timestamp.
-					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
-					
 					// Wait for some new Beliefs to accumulate up to a given time
 					awaitBeliefs();
+					
+					// Update Peer timestamp.
+					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 					
 					// Try belief update
 					boolean beliefUpdated=maybeUpdateBelief();			
@@ -982,7 +977,6 @@ public class Server implements Closeable {
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
-		if (firstEvent==null) return;
 		
 		allBeliefs.add(firstEvent);
 		beliefQueue.drainTo(allBeliefs); 
@@ -991,9 +985,11 @@ public class Server implements Closeable {
 		boolean anyOrderChanged=false;
 		
 		for (Message m: allBeliefs) {
+			if (m==null) continue; // ignore null Belief
 			try {
 				Belief receivedBelief=m.getPayload();	
 				// Add to map of new Beliefs received for each Peer
+				beliefReceivedCount++;
 				
 				BlobMap<AccountKey, SignedData<Order>> a = receivedBelief.getOrders();
 				int n=a.size();
@@ -1013,7 +1009,6 @@ public class Server implements Closeable {
 					anyOrderChanged=true;
 				}
 				
-				beliefReceivedCount++;
 
 				// Notify the update thread that there is something new to handle
 				log.debug("Valid belief received by peer at {}: {}"

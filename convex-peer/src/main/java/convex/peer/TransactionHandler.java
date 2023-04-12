@@ -30,11 +30,13 @@ public class TransactionHandler {
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 
+	protected static final int FORCE_BELIEF_THRESHOLD = 100;
+
 	protected final Server server;
 	
 	protected final Thread transactionThread; 
 	
-	protected final ArrayBlockingQueue<Message> transactionQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
+	protected final ArrayBlockingQueue<Message> txMessageQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
 	
 	public TransactionHandler(Server server) {
 		this.server=server;
@@ -47,7 +49,7 @@ public class TransactionHandler {
 	 * @return True if queued for handling, false otherwise
 	 */
 	public boolean offer(Message m) {
-		return transactionQueue.offer(m);
+		return txMessageQueue.offer(m);
 	}
 	
 	protected final Runnable transactionHandlerLoop = new Runnable() {
@@ -57,17 +59,21 @@ public class TransactionHandler {
 			ArrayList<Message> messages=new ArrayList<>();
 			while (server.isLive()) {
 				try {
-					Message m = transactionQueue.poll(1000, TimeUnit.MILLISECONDS);
+					Message m = txMessageQueue.poll(1000, TimeUnit.MILLISECONDS);
 					if (m==null) continue;
 					
 					// We have at least one transaction to handle, drain queue to get the rest
 					messages.add(m);
-					transactionQueue.drainTo(messages);
+					txMessageQueue.drainTo(messages);
 					
 					// Process transaction messages
 					for (Message msg: messages) {
 						processMessage(msg);
 					}
+					
+					// Wait for more transactions to accumulate before sending anything new
+					Thread.sleep(Constants.MIN_BLOCK_TIME);
+					
 				} catch (InterruptedException e) {
 					log.debug("Transaction handler thread interrupted");
 				} catch (Throwable e) {
