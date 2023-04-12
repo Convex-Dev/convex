@@ -398,8 +398,7 @@ public class State extends ARecord {
 			} catch (Throwable t) {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
 				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED);
-				t.printStackTrace();
-				log.error(msg);
+				log.error(msg,t);
 			}
 		}
 

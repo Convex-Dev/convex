@@ -59,7 +59,7 @@ public abstract class AStore {
 
 	
 	/**
-	 * Gets the stored Ref for a given hash value, or null if not found.
+	 * Gets the stored Ref for a given hash value, or null if not found in the store.
 	 * 
 	 * If the result is non-null, the Ref will have a status equal to STORED at minimum.
 	 * Calls to Ref.getValue() should therefore never throw MissingDataException.

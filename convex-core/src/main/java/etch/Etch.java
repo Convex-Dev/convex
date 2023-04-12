@@ -286,12 +286,18 @@ public class Etch {
 	private synchronized MappedByteBuffer createBuffer(int regionIndex) throws IOException {
 		while(regionMap.size()<=regionIndex) regionMap.add(null);
 
-		long pos=regionIndex*(long)MAX_REGION_SIZE;
+		// position of region start
+		long pos=((long)regionIndex)*MAX_REGION_SIZE;
 
 		// Expand region size until big enough for current database plus appropriate margin
-		int length=1<<16;
-		while((length<MAX_REGION_SIZE)&&((pos+length)<(dataLength+REGION_MARGIN))) {
-			length*=2;
+		int length;
+		if (regionIndex==0) {
+			length=1<<16;
+			while((length<MAX_REGION_SIZE)&&((pos+length)<(dataLength+REGION_MARGIN))) {
+				length*=2;
+			}
+		} else {
+			length=MAX_REGION_SIZE;
 		}
 
 		length+=REGION_MARGIN; // include margin in buffer length

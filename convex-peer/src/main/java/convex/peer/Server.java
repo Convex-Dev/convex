@@ -90,7 +90,7 @@ public class Server implements Closeable {
 	/**
 	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
 	 */
-	private static final long AWAIT_BELIEFS_PAUSE = 10L;
+	private static final long AWAIT_BELIEFS_PAUSE = 30L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
@@ -597,10 +597,10 @@ public class Server implements Closeable {
 		if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
 		boolean updated = maybeMergeBeliefs();
-		// Should skip broadcast if we haven't published a new Block or updated our own Order
-		if (!(updated||published)) return false;
 		
-		return true;
+		// Return true iff we published a new Block or updated our own Order
+		return (updated||published);
+
 	}
 
 
@@ -666,7 +666,7 @@ public class Server implements Closeable {
 	/**
 	 * Default minimum delay between proposing own transactions as a peer
 	 */
-	private static final long OWN_BLOCK_DELAY=1000;
+	private static final long OWN_BLOCK_DELAY=2000;
 
 	/**
 	 * Gets the Peer controller Address
