@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -323,17 +324,26 @@ public class EncodingTest {
 	
 	@Test public void testMessageEncoding() throws BadFormatException {
 		assertNull(Format.decodeMultiCell(Blob.fromHex("00")));
+		
 		doMultiEncodingTest(CVMLong.ONE);
 		doMultiEncodingTest(Samples.NON_EMBEDDED_STRING);
 		doMultiEncodingTest(Vectors.of(1,2,3));
 		
 		// Two non-embedded identical children
-		AVector<?> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING);
+		AVector<?> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING,Samples.INT_VECTOR_23);
 		doMultiEncodingTest(v1);
 		
 		// Moar layers
-		AVector<?> v2=Vectors.of(1,Samples.NON_EMBEDDED_STRING,v1);
+		AVector<?> v2=Vectors.of(7,Samples.NON_EMBEDDED_STRING,v1.concat(Samples.INT_VECTOR_23));
 		doMultiEncodingTest(v2);
+		
+		// Mooooar layers
+		AVector<?> v3=Vectors.of(13,v2,v1,Samples.KEY_PAIR.signData(v2));
+		doMultiEncodingTest(v3);
+		
+		// Wrap in transaction
+		SignedData<ATransaction> st=Samples.KEY_PAIR.signData(Invoke.create(Address.ZERO, 0, v3));
+		doMultiEncodingTest(st);
 	}
 	
 	private void doMultiEncodingTest(ACell a) throws BadFormatException {
@@ -343,15 +353,23 @@ public class EncodingTest {
 		
 		// since this is a full encoding, expect all Refs to be direct
 		Refs.visitAllRefs(Ref.get(decoded), r->{
-			assertTrue(r.isDirect());
+			ACell c=r.getValue();
+			int n=c.getRefCount();
+			for (int i=0; i<n; i++) {
+				if (!c.getRef(i).isDirect()) {
+					fail("Unexpected indirect ref");
+				}
+			}
 		});
 	}
 	
 	@Test public void testBadMessageEncoding() {
+		Blob first=Vectors.of(1,2,3).getEncoding();
+		
 		// Non-embedded child value
-		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(Blob.fromHex("0000")));
+		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(first.append(Blob.fromHex("00")).toFlatBlob()));
 		
 		// illegal child tag
-		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(Blob.fromHex("00FF")));
+		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(first.append(Blob.fromHex("00FF")).toFlatBlob()));
 	}
 }

@@ -26,8 +26,6 @@ import convex.core.lang.Ops;
 import convex.core.lang.RT;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
@@ -940,15 +938,16 @@ public class Format {
 		long ml=data.count();
 		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
+		
+		// read first cell
 		byte tag = data.byteAt(0);
 		T result= Format.read(tag,data,0);
+		if (result==null) return result; // null value OK at top level
 		int rl=(result==null)?1:Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Already complete
 		
-		AStore store=Stores.current();
-		
+		// read remaining cells
 		HashMap<Hash,Ref<?>> hm=new HashMap<>();
-		ArrayList<ACell> al=new ArrayList<>();
 		for (int ix=rl; ix<ml;) {
 			tag=data.byteAt(ix);
 			ACell c=Format.read(tag,data,ix);
@@ -957,14 +956,17 @@ public class Format {
 			Hash h=c.getHash();
 			
 			// Check store for Ref - avoids duplicate objects in many cases
-			Ref<?> storeRef=store.checkCache(h);
+			//Ref<?> storeRef=store.checkCache(h);
+			//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
 			
-			Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
+			Ref<?> cr=Ref.get(c);
 			hm.put(h, cr);
-			al.add(c);
 			ix+=c.getEncodingLength();
 		}
-		
+
+		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();		
+		ArrayList<ACell> al=new ArrayList<>();
+
 		IRefFunction func=new IRefFunction() {
 			@Override
 			public Ref<?> apply(Ref<?> r) {
@@ -976,34 +978,54 @@ public class Format {
 					return nc.getRef();
 				} else {
 					Hash h=r.getHash();
-					Ref<?> hmr=hm.get(h);
-					if (hmr!=null) return hmr;
-					// Not in hashmap, so assume this is a partial message
+					// if done, just replace with done version
+					ACell doneVal=done.get(h);
+					if (doneVal!=null) return doneVal.getRef();
+					
+					// if in map, push cell to stack
+					Ref<?> partRef=hm.get(h);
+					if (partRef!=null) {
+						al.add(partRef.getValue());
+						return partRef;
+					}
+					
+					// not in message, must be partial
 					return r;
 				}
 			} 
 		};
 		
-		for (int i=al.size()-1; i>=0; i--) {
-			ACell c=al.get(i);
+		al.add(result);
+		Trees.visitStack(al, c->{
+			Hash h=c.getHash();
+			if (done.containsKey(h)) return;
+			
+			al.add(c);
+			int pos=al.size();
 			ACell nc=c.updateRefs(func);
-			if (c!=nc) {
-				Hash h=c.getHash();
-				hm.put(h, nc.getRef());
+			if (pos==al.size()) {
+				// we must be done
+				done.put(h,nc);
+			} else {
+				// something extra on the stack to handle first
 			}
-		}
+		});
+
 		
-		result=(T) result.updateRefs(func);
+		result=(T) done.get(result.getHash());
 		
 		return result;
 	}
 
 	/**
-	 * Encode a Cell completely in multi-cell message format
+	 * Encode a Cell completely in multi-cell message format. Format places top level
+	 * cell first, following cells in arbitrary order.
+	 * 
 	 * @param a Cell to Encode
 	 * @return Blob encoding
 	 */
 	public static Blob encodeMultiCell(ACell a) {
+		// Add non-embedded child cells to stack
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
 		Consumer<Ref<?>> func=r->{cells.add(r);};
 		Refs.visitNonEmbedded(a, func);
