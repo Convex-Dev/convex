@@ -5,6 +5,8 @@ import java.util.Random;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Blobs;
+import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.store.Stores;
 import etch.EtchStore;
 
@@ -19,8 +21,14 @@ public class EtchStressTest {
 		
 		while (true) {
 			ABlob b=Blobs.createRandom(r,10000);
+			Hash h=b.getHash();
 			
 			b=ACell.createPersisted(b).getValue();
+			
+			Ref<ABlob> rb=store.refForHash(h);
+			if (rb==null) {
+				throw new Error("Lost a blob!");
+			}
 			
 			long dl=store.getEtch().getDataLength();
 			long dc=(dl/STEP) * dl;
