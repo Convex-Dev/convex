@@ -92,7 +92,7 @@
 
 
  *sequence*
- {:doc      {:description "Returns the current sequence number for this account. The sequence number is equal to the number of signed transactions executed. The next valid sequence number is `(+ *sequence* 1)."
+ {:doc      {:description "Returns the sequence number for the current transaction. The sequence number is the number of transactions executed on this account *including* the current transaction / query. The next valid transction must increment *sequence* by one."
              :examples    [{:code "*sequence*"}]}
   :special? true}
 
