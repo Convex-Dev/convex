@@ -10,6 +10,10 @@ import convex.core.data.Ref;
 import convex.core.store.Stores;
 import etch.EtchStore;
 
+/**
+ * A test application that just writes a lot of random Blobs to Etch in order to test
+ * out large database sizes.
+ */
 public class EtchStressTest {
 
 	public static void main(String[] args) {
@@ -17,7 +21,7 @@ public class EtchStressTest {
 		EtchStore store=EtchStore.createTemp();
 		Stores.setCurrent(store);
 		long rc=0;
-		long STEP=100000000;
+		long STEP=10000000; // threshold at which to print a status line
 		
 		while (true) {
 			ABlob b=Blobs.createRandom(r,10000);
@@ -31,7 +35,7 @@ public class EtchStressTest {
 			}
 			
 			long dl=store.getEtch().getDataLength();
-			long dc=(dl/STEP) * dl;
+			long dc=(dl/STEP) * STEP;
 			if (dc>rc) {
 				System.out.println("Length: "+dl);
 				rc=dc;
