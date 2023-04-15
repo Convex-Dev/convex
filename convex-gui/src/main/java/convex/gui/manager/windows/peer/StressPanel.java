@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
@@ -55,6 +56,7 @@ public class StressPanel extends JPanel {
 	private JSpinner transactionCountSpinner;
 	private JSpinner opCountSpinner;
 	private JSpinner clientCountSpinner;
+	private JCheckBox syncCheckBox;
 
 	public StressPanel(PeerView peerView) {
 		this.peerView = peerView;
@@ -86,23 +88,29 @@ public class StressPanel extends JPanel {
 		panel.add(optionPanel);
 		optionPanel.setLayout(new GridLayout(0, 2, 0, 0));
 
-		JLabel lblNewLabel = new JLabel("Transactions per client");
-		optionPanel.add(lblNewLabel);
+		JLabel lblClients = new JLabel("Clients");
+		optionPanel.add(lblClients);
+		clientCountSpinner = new JSpinner();
+		clientCountSpinner.setModel(new SpinnerNumberModel(10, 1, 1000, 1));
+		optionPanel.add(clientCountSpinner);
+
+		JLabel lblRequests = new JLabel("Requests per client");
+		optionPanel.add(lblRequests);
 		transactionCountSpinner = new JSpinner();
-		transactionCountSpinner.setModel(new SpinnerNumberModel(1000, 1, 1000000, 100));
+		transactionCountSpinner.setModel(new SpinnerNumberModel(100, 1, 1000000, 100));
 		optionPanel.add(transactionCountSpinner);
 
-		JLabel lblNewLabel2 = new JLabel("Ops per Transaction");
-		optionPanel.add(lblNewLabel2);
+		JLabel lblOps = new JLabel("Ops per Transaction");
+		optionPanel.add(lblOps);
 		opCountSpinner = new JSpinner();
 		opCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1000, 10));
 		optionPanel.add(opCountSpinner);
+		
+		JLabel lblSync=new JLabel("Sync Requests?");
+		optionPanel.add(lblSync);
+		syncCheckBox=new JCheckBox();
+		optionPanel.add(syncCheckBox);
 
-		JLabel lblNewLabel3 = new JLabel("Clients");
-		optionPanel.add(lblNewLabel3);
-		clientCountSpinner = new JSpinner();
-		clientCountSpinner.setModel(new SpinnerNumberModel(1, 1, 100, 1));
-		optionPanel.add(clientCountSpinner);
 
 		// =========================================
 		// Result Panel
@@ -193,13 +201,18 @@ public class StressPanel extends JPanel {
 								
 								ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
 								CompletableFuture<Result> fr;
-								fr = cc.transact(t);
+								if (syncCheckBox.isSelected()) {
+									Result r=cc.transactSync(t);
+									fr=CompletableFuture.completedFuture(r);
+								} else {	
+									fr = cc.transact(t);
+								}
 								synchronized(frs) {
 									// synchronised so we don't collide with other threads
 									frs.add(fr);
 								}
 							}
-						} catch (IOException e) {
+						} catch (Exception e) {
 							throw Utils.sneakyThrow(e);
 						}
 						return null;

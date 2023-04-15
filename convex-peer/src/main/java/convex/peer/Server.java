@@ -1024,12 +1024,15 @@ public class Server implements Closeable {
 				log.warn("Class cast exception in Belief!",e);
 				m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
 			} catch (MissingDataException e) {
-				// Missing data, ignore
-				log.warn("Missing data in Belief!",e);
+				// Missing data
+				Hash h=e.getMissingHash();
+				log.warn("Missing data in Belief! {}",h);
 				if (!m.sendMissingData(e.getMissingHash())) {
 					log.warn("Unable to request Missing data in Belief!");
 				}
-			} 
+			} catch (Exception e) {
+				log.warn("Unexpected exception getting Belief",e);
+			}
 		}
 		if (anyOrderChanged) {
 			Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
