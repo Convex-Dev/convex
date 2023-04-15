@@ -79,6 +79,7 @@ public class Tag {
 	public static final byte INVOKE = (byte) 0xD0;
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
+	public static final byte MULTI = (byte) 0xD3;
 	
 	// 0xE? = Reserved for future extension
 

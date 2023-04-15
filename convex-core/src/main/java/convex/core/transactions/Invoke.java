@@ -35,7 +35,7 @@ import convex.core.util.Utils;
 public class Invoke extends ATransaction {
 	protected final ACell command;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.COMMAND, Keywords.ORIGIN, Keywords.SEQUENCE };
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,Keywords.COMMAND};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Invoke(Address address,long sequence, ACell args) {

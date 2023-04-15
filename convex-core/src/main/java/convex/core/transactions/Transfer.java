@@ -26,7 +26,7 @@ public class Transfer extends ATransaction {
 	protected final Address target;
 	protected final long amount;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.AMOUNT, Keywords.ORIGIN, Keywords.SEQUENCE, Keywords.TARGET };
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE, Keywords.TARGET, Keywords.AMOUNT};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Transfer(Address origin,long sequence, Address target, long amount) {

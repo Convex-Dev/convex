@@ -74,8 +74,6 @@ public abstract class ATransaction extends ARecord {
 	public final long getSequence() {
 		return sequence;
 	}
-	
-
 
 	/**
 	 * Gets the max juice allowed for this transaction

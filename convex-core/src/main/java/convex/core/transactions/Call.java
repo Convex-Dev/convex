@@ -34,8 +34,7 @@ public class Call extends ATransaction {
 	protected final Symbol functionName;
 	protected final AVector<ACell> args;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.CALL, Keywords.OFFER, Keywords.ORIGIN, Keywords.SEQUENCE,
-		                                           Keywords.TARGET };
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,  Keywords.TARGET , Keywords.OFFER,Keywords.CALL };
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
