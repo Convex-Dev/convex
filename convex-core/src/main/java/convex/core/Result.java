@@ -225,5 +225,10 @@ public final class Result extends ARecordGeneric {
 		return Tag.RESULT;
 	}
 
+	@Override
+	public RecordFormat getFormat() {
+		return RESULT_FORMAT;
+	}
+
 
 }

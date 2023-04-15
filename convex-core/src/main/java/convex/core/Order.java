@@ -44,7 +44,7 @@ public class Order extends ARecord {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	private Order(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
-		super(FORMAT);
+		super(FORMAT.count());
 		this.blocks = blocks;
 		this.consensusPoint = consensusPoint;
 		this.proposalPoint = proposalPoint;
@@ -331,6 +331,11 @@ public class Order extends ARecord {
 		if (this.consensusPoint!=b.consensusPoint) return false;
 		if (!this.blocks.equals(b.blocks)) return false;
 		return true;
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 	
 }

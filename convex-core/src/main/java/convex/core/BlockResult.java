@@ -36,7 +36,7 @@ public class BlockResult extends ARecord {
 
 
 	private BlockResult(State state, AVector<Result> results) {
-		super(FORMAT);
+		super(FORMAT.count());
 		this.state = state;
 		this.results = results;
 	}
@@ -220,6 +220,11 @@ public class BlockResult extends ARecord {
 		} else {
 			return results.getRef(i-sc);
 		}
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 
 	

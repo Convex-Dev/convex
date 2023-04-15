@@ -12,10 +12,13 @@ import convex.core.util.Utils;
 public abstract class ARecordGeneric extends ARecord {
 
 	protected AVector<ACell> values;
-
+	
+	protected final RecordFormat format;
+	
 	protected ARecordGeneric(RecordFormat format, AVector<ACell> values) {
-		super(format);
+		super(format.count());
 		if (values.count()!=format.count()) throw new IllegalArgumentException("Wrong number of field values for record: "+values.count());
+		this.format=format;
 		this.values=values;
 	}
 	

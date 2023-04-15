@@ -22,14 +22,11 @@ import convex.core.lang.impl.RecordFormat;
  */
 public abstract class ARecord extends AMap<Keyword,ACell> {
 
-	protected final RecordFormat format;
-	
 	// TODO: need a better default value?
 	public static final ARecord DEFAULT_VALUE=Block.create(0, Vectors.empty());
 
-	protected ARecord(RecordFormat format) {
-		super(format.count());
-		this.format=format;
+	protected ARecord(long n) {
+		super(n);
 	}
 	
 	public AType getType() {
@@ -38,7 +35,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return (int) (Format.MAX_EMBEDDED_LENGTH*format.count());
+		return (int) (Format.MAX_EMBEDDED_LENGTH*count);
 	}
 	
 	@Override
@@ -77,7 +74,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 */
 	@Override
 	public final AVector<Keyword> getKeys() {
-		return format.getKeys();
+		return getFormat().getKeys();
 	}
 	
 	/**
@@ -89,6 +86,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	public AVector<ACell> values() {
 		int n=size();
 		ACell[] os=new ACell[n];
+		RecordFormat format=getFormat();
 		for (int i=0; i<n; i++) {
 			os[i]=get(format.getKey(i));
 		}
@@ -129,7 +127,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	public ACell[] getValuesArray() {
 		int n=size();
 		ACell[] result=new ACell[n];
-		AVector<Keyword> keys=format.getKeys();
+		AVector<Keyword> keys=getFormat().getKeys();
 		for (int i=0; i<n; i++) {
 			result[i]=get(keys.get(i));
 		}
@@ -138,7 +136,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	
 	@Override
 	public boolean containsKey(ACell key) {
-		return format.containsKey(key);
+		return getFormat().containsKey(key);
 	}
 
 	@Override
@@ -148,7 +146,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 
 	@Override
 	public java.util.Set<Keyword> keySet() {
-		return format.keySet();
+		return getFormat().keySet();
 	}
 
 	@Override
@@ -188,7 +186,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 
 	@Override
 	protected void accumulateKeySet(HashSet<Keyword> h) {
-		AVector<Keyword> keys=format.getKeys();
+		AVector<Keyword> keys=getFormat().getKeys();
 		for (long i=0; i<count; i++) {
 			h.add(keys.get(i));
 		}
@@ -212,7 +210,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	@Override
 	public MapEntry<Keyword, ACell> entryAt(long i) {
 		if ((i<0)||(i>=count)) throw new IndexOutOfBoundsException("Index:"+i);
-		Keyword k=format.getKeys().get(i);
+		Keyword k=getFormat().getKeys().get(i);
 		return getEntry(k);
 	}
 
@@ -265,9 +263,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * Gets the RecordFormat instance that describes this Record's layout
 	 * @return RecordFormat instance
 	 */
-	public RecordFormat getFormat() {
-		return format;
-	}
+	public abstract RecordFormat getFormat();
 	
 
 

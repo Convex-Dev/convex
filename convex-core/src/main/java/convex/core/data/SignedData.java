@@ -55,7 +55,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
-		super(FORMAT);
+		super(FORMAT.count());
 		this.valueRef = refToValue;
 		this.publicKey = address;
 		signature = sig;
@@ -301,5 +301,10 @@ public final class SignedData<T extends ACell> extends ARecord {
 	@Override
 	public byte getTag() {
 		return Tag.SIGNED_DATA;
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 }

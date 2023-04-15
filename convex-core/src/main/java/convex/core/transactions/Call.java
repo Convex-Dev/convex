@@ -144,4 +144,9 @@ public class Call extends ATransaction {
 
 		return null;
 	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
+	}
 }

@@ -54,7 +54,7 @@ public final class Block extends ARecord {
 	};
 
 	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions) {
-		super(FORMAT);
+		super(FORMAT.count());
 		this.timestamp = timestamp;
 		this.transactions = transactions;
 	}
@@ -224,6 +224,11 @@ public final class Block extends ARecord {
 	@Override 
 	public <R extends ACell> Ref<R> getRef(int i) {
 		return transactions.getRef(i);
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 	
 }

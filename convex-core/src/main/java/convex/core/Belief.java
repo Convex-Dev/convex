@@ -50,7 +50,7 @@ import convex.core.util.Utils;
  * Nakamoto
  */
 public class Belief extends ARecord {
-	private static final RecordFormat BELIEF_KEYS = RecordFormat.of(Keywords.ORDERS, Keywords.TIMESTAMP);
+	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS, Keywords.TIMESTAMP);
 
 	/**
 	 * The latest view of signed Orders held by other Peers
@@ -65,7 +65,7 @@ public class Belief extends ARecord {
 	// private final long timeStamp;
 
 	private Belief(BlobMap<AccountKey,SignedData<Order>> orders, long timestamp) {
-		super(BELIEF_KEYS);
+		super(BELIEF_FORMAT.count());
 		this.orders = orders;
 		this.timestamp = timestamp;
 	}
@@ -809,6 +809,11 @@ public class Belief extends ARecord {
 			hm.put(key, entry.getValue());
 		}
 		return hm;
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return BELIEF_FORMAT;
 	}
 	
 }

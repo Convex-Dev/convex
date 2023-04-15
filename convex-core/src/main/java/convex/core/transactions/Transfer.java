@@ -150,4 +150,9 @@ public class Transfer extends ATransaction {
 
 		return null;
 	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
+	}
 }

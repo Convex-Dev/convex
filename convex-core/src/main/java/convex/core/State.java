@@ -91,7 +91,7 @@ public class State extends ARecord {
 
 	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
 			AVector<ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
-		super(FORMAT);
+		super(FORMAT.count());
 		this.accounts = accounts;
 		this.peers = peers;
 		this.globals = globals;
@@ -791,6 +791,11 @@ public class State extends ARecord {
 		if (!(Utils.equals(peers, a.peers))) return false;
 		if (!(Utils.equals(schedule, a.schedule))) return false;
 		return true;
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 
 }

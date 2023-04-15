@@ -148,4 +148,9 @@ public class Multi extends ATransaction {
 		return 1;
 	}
 
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
+	}
+
 }

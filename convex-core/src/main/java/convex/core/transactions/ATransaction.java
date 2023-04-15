@@ -24,8 +24,8 @@ public abstract class ATransaction extends ARecord {
 	protected final Address origin;
 	protected final long sequence;
 
-	protected ATransaction(RecordFormat format, Address origin, long sequence) {
-		super(format);
+	protected ATransaction(RecordFormat format,Address origin, long sequence) {
+		super(format.count());
 		if (origin==null) throw new ClassCastException("Null Origin Address for transaction");
 		this.origin=origin;
 		this.sequence = sequence;

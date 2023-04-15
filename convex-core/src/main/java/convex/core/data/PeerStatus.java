@@ -37,7 +37,7 @@ public class PeerStatus extends ARecord {
 	private final AHashMap<Keyword,ACell> metadata;
 
 	private PeerStatus(Address controller, long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<Keyword,ACell> metadata) {
-		super(FORMAT);
+		super(FORMAT.count());
         this.controller = controller;
 		this.stake = stake;
 		this.delegatedStake = delegatedStake;
@@ -308,5 +308,10 @@ public class PeerStatus extends ARecord {
 			if (metadata==null) throw new IndexOutOfBoundsException(i);
 			return metadata.getRef(i-sc);
 		}
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 }

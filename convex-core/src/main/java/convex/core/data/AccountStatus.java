@@ -49,7 +49,7 @@ public class AccountStatus extends ARecord {
 			ABlobMap<Address, ACell> holdings,
 			Address controller, 
 			AccountKey publicKey) {
-		super(FORMAT);
+		super(FORMAT.count());
 		this.sequence = sequence;
 		this.balance = balance;
 		this.memory = memory;
@@ -471,6 +471,11 @@ public class AccountStatus extends ARecord {
 			return fn;
 		}
 		return null;
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		return FORMAT;
 	}
 
 }
