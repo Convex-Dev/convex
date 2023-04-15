@@ -74,8 +74,8 @@ public class Etch {
 	private static final int INDEX_BLOCK_SIZE=POINTER_SIZE*256;
 
 	// constants for memory mapping buffers into manageable regions
-	private static final int MAX_REGION_SIZE=1<<30; // 1GB seems reasonable
-	private static final int REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
+	private static final long MAX_REGION_SIZE=1<<30; // 1GB seems reasonable
+	private static final long REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
 
 	/**
 	 * Magic number for Etch files, must be first 2 bytes
@@ -246,28 +246,29 @@ public class Etch {
 		if ((position<0)||(position>dataLength)) {
 			throw new Error("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
 		}
-		int mapIndex=Utils.checkedInt(position/MAX_REGION_SIZE); // 1GB chunks
 
-		MappedByteBuffer mbb=(MappedByteBuffer)((ByteBuffer)getInternalBuffer(mapIndex)).duplicate();
+		MappedByteBuffer mbb=(MappedByteBuffer)((ByteBuffer)getInternalBuffer(position)).duplicate();
 
-		mbb.position(Utils.checkedInt(position-MAX_REGION_SIZE*(long)mapIndex));
+		mbb.position(Utils.checkedInt(position%MAX_REGION_SIZE));
 		return mbb;
 	}
 
 	/**
 	 * Gets the internal mapped byte buffer for the specified region of the Etch database
 	 * 
-	 * @param regionIndex Index of region 
+	 * @param position Position for which to get buffer
 	 * @return Mapped Byte Buffer for specified region
 	 * @throws IOException
 	 */
-	private MappedByteBuffer getInternalBuffer(int regionIndex) throws IOException {
+	private MappedByteBuffer getInternalBuffer(long position) throws IOException {
+		int regionIndex=Utils.checkedInt(position/MAX_REGION_SIZE); // 1GB chunks
+
 		// Get current mapped region, or null if out of range
 		int regionMapSize=regionMap.size();
 		MappedByteBuffer mbb=(regionIndex<regionMapSize)?regionMap.get(regionIndex):null;
 
 		// Call createBuffer if mapped region does not exist, or is too small
-		if ((mbb==null)||((mbb.capacity()+regionIndex*MAX_REGION_SIZE)<dataLength+REGION_MARGIN)) {
+		if ((mbb==null)||((mbb.capacity()+regionIndex*MAX_REGION_SIZE)<position+REGION_MARGIN)) {
 			mbb=createBuffer(regionIndex);
 		}
 
@@ -297,7 +298,7 @@ public class Etch {
 				length*=2;
 			}
 		} else {
-			length=MAX_REGION_SIZE;
+			length=(int)MAX_REGION_SIZE;
 		}
 
 		length+=REGION_MARGIN; // include margin in buffer length
