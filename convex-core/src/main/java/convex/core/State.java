@@ -453,8 +453,10 @@ public class State extends ARecord {
 				// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
 		Context<T> ctx = prepareTransaction(t);
 		if (ctx.isExceptional()) {
-			// We hit some error while preparing transaction. Return context with no state change,
-			// i.e. before executing the transaction
+			// We hit some error while preparing transaction. Possible culprits:
+			// - Non-existent Origin account
+			// - Bad sequence number
+			// Return context with no change, i.e. before executing the transaction
 			return ctx;
 		}
 		
@@ -462,8 +464,7 @@ public class State extends ARecord {
 
 		State preparedState=ctx.getState();
 
-
-		// apply transaction. This may result in an error!
+		// apply transaction. This may result in an error / exceptional result!
 		ctx = t.apply(ctx);
 
 		// complete transaction
@@ -486,16 +487,15 @@ public class State extends ARecord {
 
 		// Update sequence number for target account
 		long sequence=t.getSequence();
-		AccountStatus newAccount = account.updateSequence(sequence);
-		if (newAccount == null) {
-			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+(account.getSequence()+1));
+		long expectedSequence=account.getSequence()+1;
+		if (sequence!=expectedSequence) {
+			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+expectedSequence);
 		}
-		State preparedState = this.putAccount(origin, newAccount);
 
 		// Create context with juice subtracted
 		Long maxJuice=t.getMaxJuice();
 		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance():maxJuice);
-		Context<T> ctx = Context.createInitial(preparedState, origin, juiceLimit);
+		Context<T> ctx = Context.createInitial(this, origin, juiceLimit);
 		return ctx;
 	}
 

@@ -258,6 +258,7 @@ public abstract class Convex {
 	public long getSequence() {
 		if (sequence == null) {
 			try {
+				// Note: query on sequence returns the *next* sequence number (as if in a transaction)
 				Future<Result> f = query(Special.forSymbol(Symbols.STAR_SEQUENCE));
 				Result r = f.get();
 				if (r.isError())
@@ -265,7 +266,7 @@ public abstract class Convex {
 				ACell result = r.getValue();
 				if (!(result instanceof CVMLong))
 					throw new Error("*sequence* query did not return Long, got: " + result);
-				sequence = RT.jvm(result);
+				sequence = ((CVMLong)result).longValue()-1;
 			} catch (IOException | InterruptedException | ExecutionException e) {
 				throw new Error("Error trying to get sequence number", e);
 			}

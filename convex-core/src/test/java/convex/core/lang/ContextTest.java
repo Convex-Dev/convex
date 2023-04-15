@@ -165,7 +165,8 @@ public class ContextTest extends ACVMTest {
 		assertCVMEquals(ctx.getBalance(ADDR),eval(Symbols.STAR_BALANCE));
 		assertCVMEquals(0L,eval(Symbols.STAR_OFFER));
 
-		assertCVMEquals(0L,eval(Symbols.STAR_SEQUENCE));
+		// Sequence 1 in first transaction / query
+		assertCVMEquals(1L,eval(Symbols.STAR_SEQUENCE));
 
 		assertCVMEquals(Constants.INITIAL_TIMESTAMP,eval(Symbols.STAR_TIMESTAMP));
 

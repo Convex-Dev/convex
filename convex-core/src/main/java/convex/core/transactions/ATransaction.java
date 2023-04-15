@@ -71,6 +71,10 @@ public abstract class ATransaction extends ARecord {
 		return origin;
 	}
 	
+	/**
+	 * Gets the sequence number for this transaction
+	 * @return Sequence number
+	 */
 	public final long getSequence() {
 		return sequence;
 	}

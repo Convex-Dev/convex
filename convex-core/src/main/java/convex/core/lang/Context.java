@@ -320,6 +320,7 @@ public class Context<T extends ACell> extends AObject {
 	 * <ul>
 	 * <li>Refunds juice</li>
 	 * <li>Accumulates used juice fees in globals</li>
+	 * <li>Increments sequence number</li>
 	 * </ul>
 	 *
 	 * @param initialState State before transaction execution (after prepare)
@@ -392,6 +393,9 @@ public class Context<T extends ACell> extends AObject {
 
 		// Make balance changes if needed for refund and memory purchase
 		account=account.addBalance(refund-memorySpend);
+		
+		// Update sequence
+		account=account.updateSequence(account.getSequence()+1);
 
 		// update Account
 		state=state.putAccount(address,account);
