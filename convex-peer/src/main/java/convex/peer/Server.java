@@ -125,13 +125,18 @@ public class Server implements Closeable {
 	};
 	
 	/**
-	 * Message Consumer that simply enqueues received messages from outbound peer connections
+	 * Message Consumer that simply enqueues received messages back from outbound peer connections
 	 * Called on NIO thread: should never block
 	 */
 	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
 		@Override
 		public void accept(Message msg) {
-			processMessage(msg);
+			// We prioritise missing data requests from a Peer we have connected to
+			if (msg.getType()==MessageType.MISSING_DATA) {
+				handleMissingData(msg);
+			} else {
+				processMessage(msg);
+			}
 		}
 	};
 
