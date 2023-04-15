@@ -1421,6 +1421,16 @@ public class Utils {
 		return r;
 	}
 
+	public static <K> void histogramAdd(HashMap<K, Integer> hm, K value) {
+		Integer count=hm.get(value);
+		if (count==null) {
+			count=1;
+		} else {
+			count=count+1;
+		}
+		hm.put(value, count);
+	}
+
 
 
 

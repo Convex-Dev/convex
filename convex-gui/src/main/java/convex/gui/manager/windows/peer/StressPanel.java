@@ -8,6 +8,7 @@ import java.net.InetSocketAddress;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -30,6 +31,7 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Strings;
@@ -53,6 +55,7 @@ public class StressPanel extends JPanel {
 
 	private JButton btnRun;
 
+	private JSpinner requestCountSpinner;
 	private JSpinner transactionCountSpinner;
 	private JSpinner opCountSpinner;
 	private JSpinner clientCountSpinner;
@@ -96,8 +99,14 @@ public class StressPanel extends JPanel {
 
 		JLabel lblRequests = new JLabel("Requests per client");
 		optionPanel.add(lblRequests);
+		requestCountSpinner = new JSpinner();
+		requestCountSpinner.setModel(new SpinnerNumberModel(100, 1, 1000, 10));
+		optionPanel.add(requestCountSpinner);
+
+		JLabel lblTrans = new JLabel("Transactions per Request");
+		optionPanel.add(lblTrans);
 		transactionCountSpinner = new JSpinner();
-		transactionCountSpinner.setModel(new SpinnerNumberModel(100, 1, 1000000, 100));
+		transactionCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1000, 1));
 		optionPanel.add(transactionCountSpinner);
 
 		JLabel lblOps = new JLabel("Ops per Transaction");
@@ -142,6 +151,7 @@ public class StressPanel extends JPanel {
 		Address address=PeerGUI.getGenesisAddress();
 
 		int transCount = (Integer) transactionCountSpinner.getValue();
+		int requestCount = (Integer) requestCountSpinner.getValue();
 		int opCount = (Integer) opCountSpinner.getValue();
 		// TODO: enable multiple clients
 		int clientCount = (Integer) clientCountSpinner.getValue();
@@ -190,7 +200,7 @@ public class StressPanel extends JPanel {
 					
 					ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (cc->{
 						try {
-							for (int i = 0; i < transCount; i++) {
+							for (int i = 0; i < requestCount; i++) {
 								StringBuilder tsb = new StringBuilder();
 								tsb.append("(def a (do ");
 								for (int j = 0; j < opCount; j++) {
@@ -232,9 +242,11 @@ public class StressPanel extends JPanel {
 					List<Result> results = Utils.completeAll(frs).get(60, TimeUnit.SECONDS);
 					long endTime = Utils.getCurrentTimestamp();
 
+					HashMap<ACell, Integer> errorMap=new HashMap<>();
 					for (Result r : results) {
 						if (r.isError()) {
 							errors++;
+							Utils.histogramAdd(errorMap,r.getErrorCode());
 						} else {
 							values++;
 						}
@@ -247,9 +259,13 @@ public class StressPanel extends JPanel {
 					Thread.sleep(100); // wait for state update to be reflected
 					State endState = PeerGUI.getLatestState();
 
-					sb.append("Results for " + transCount + " transactions\n");
+					sb.append("Results for " + clientCount*transCount*requestCount + " transactions\n");
 					sb.append(values + " values received\n");
 					sb.append(errors + " errors received\n");
+					if (errors>0) {
+						sb.append(errorMap);
+						sb.append("\n");
+					}
 					sb.append("\n");
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
 					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
