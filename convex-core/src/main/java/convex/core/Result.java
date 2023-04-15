@@ -44,7 +44,7 @@ public final class Result extends ARecordGeneric {
 		super(RESULT_FORMAT, values);
 	}
 	
-	private static Result create(AVector<ACell> values) {
+	private static Result buildFromVector(AVector<ACell> values) {
 		return new Result(values);
 	}
 	
@@ -57,7 +57,7 @@ public final class Result extends ARecordGeneric {
 	 * @return Result instance
 	 */
 	public static Result create(CVMLong id, ACell value, ACell errorCode, AMap<Keyword,ACell> info) {
-		return create(Vectors.of(id,value,errorCode,info));
+		return buildFromVector(Vectors.of(id,value,errorCode,info));
 	}
 	
 	/**
@@ -176,7 +176,7 @@ public final class Result extends ARecordGeneric {
 		AVector<ACell> v=Vectors.read(bb);
 		if (v.size()!=RESULT_FORMAT.count()) throw new BadFormatException("Invalid number of fields for Result!");
 		
-		return create(v);
+		return buildFromVector(v);
 	}
 
 	/**

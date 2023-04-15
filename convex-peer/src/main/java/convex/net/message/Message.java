@@ -181,14 +181,6 @@ public abstract class Message {
 	 * @return True if reported successfully, false otherwise
 	 */
 	public abstract boolean reportResult(Result res);
-
-	/**
-	 * Report a result for a given message ID
-	 * @param id Message ID
-	 * @param reply Value for result
-	 * @return True if reported successfully, false otherwise
-	 */
-	public abstract boolean reportResult(CVMLong id, ACell reply);
 	
 	/**
 	 * Gets a String identifying the origin of the message. Used for logging.

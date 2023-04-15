@@ -42,7 +42,9 @@ public class MessageRemote extends Message {
 	 * @return True if reported successfully, false otherwise
 	 */
 	public boolean reportResult(Result res) {
-		res=res.withID(getID());
+		ACell id=getID();
+		if (id!=null) res=res.withID(id);
+		
 		Connection pc = getConnection();
 		if ((pc == null) || pc.isClosed()) return false;
 

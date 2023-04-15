@@ -6,7 +6,6 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.net.Connection;
 import convex.net.MessageType;
@@ -41,13 +40,10 @@ public class MessageLocal extends Message {
 
 	@Override
 	public boolean reportResult(Result res) {
+		ACell id=getID();
+		if (id!=null) res=res.withID(id);
+		
 		resultHandler.accept(res);
-		return true;
-	}
-
-	@Override
-	public boolean reportResult(CVMLong id, ACell reply) {
-		resultHandler.accept(Result.create(id, reply));
 		return true;
 	}
 

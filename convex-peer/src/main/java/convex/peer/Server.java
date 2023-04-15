@@ -795,8 +795,9 @@ public class Server implements Closeable {
 			// address);
 
 			AVector<ACell> reply = getStatusVector();
+			Result r=Result.create(m.getID(), reply);
 
-			m.reportResult(m.getID(), reply);
+			m.reportResult(r);
 		} catch (Throwable t) {
 			log.warn("Status Request Error: {}", t);
 		}
