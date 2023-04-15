@@ -130,6 +130,20 @@ public class ServerTest {
 		// test the connection is still working
 		assertNotNull(convex.getBalance(network.VILLAIN));
 	}
+	
+	@Test
+	public void testSequence() throws IOException, TimeoutException {
+		Convex convex=network.getClient();
+		// sequence number should be zero for fresh account
+		assertEquals(0,convex.getSequence());
+		
+		// Queries and transactions should return the incremented value (as if in a transaction)
+		assertEquals(1L,(Long)RT.jvm(convex.querySync("*sequence*").getValue()));
+		assertEquals(1L,(Long)RT.jvm(convex.transactSync("*sequence*").getValue()));
+		
+		// Sequence number should be incremented after previous transaction
+		assertEquals(1,convex.getSequence());
+	}
 
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {

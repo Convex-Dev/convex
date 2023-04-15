@@ -160,6 +160,9 @@ public class API {
 
 		// Peers should all have the same genesis state
 		config.put(Keywords.STATE, genesisState);
+		
+		// Test code to share a store
+		// config.put(Keywords.STORE, Stores.current());
 
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);

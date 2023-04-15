@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.api.ConvexRemote;
+import convex.core.Coin;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
@@ -75,8 +77,25 @@ public class TestNetwork {
 		}
 		log.info("*** Test Network ready ***");
 	}
+	
+	/**
+	 * Gets a fresh client account on the test network with 1 Gold
+	 * @return Convex Client instance
+	 */
+	public synchronized ConvexRemote getClient() {
+		try {
+			TestNetwork network=this;
+			AKeyPair kp=AKeyPair.generate();
+			Address addr=network.CONVEX.createAccountSync(kp.getAccountKey());
+			network.CONVEX.transferSync(addr, Coin.GOLD);
+			ConvexRemote client=Convex.connect(network.SERVER.getHostAddress(),addr,kp);
+			return client;
+		} catch (Throwable t) {
+			throw Utils.sneakyThrow(t);
+		}
+	}
 
-	public static TestNetwork getInstance() {
+	public static synchronized TestNetwork getInstance() {
 		if (instance == null) {
 			instance = new TestNetwork();
 		}
