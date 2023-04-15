@@ -14,6 +14,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -51,6 +52,22 @@ public abstract class Message {
 
 	public static Message createData(ACell o) {
 		return create(null,MessageType.DATA,o,null);
+	}
+	
+	public static Message createMissingData(Hash missingHash) {
+		return create(null,MessageType.DATA,missingHash,null);
+	}
+	
+	public static Message createMissingData(CVMLong id, Hash... missingHashes) {
+		int n=Hash.LENGTH;
+		if (n==1) return create(null,MessageType.DATA,missingHashes[0],null);
+		
+		ACell[] cs=new ACell[n+1];
+		cs[0]=id;
+		for (int i=0; i<n; i++) {
+			cs[i+1]=missingHashes[i];
+		}
+		return create(null,MessageType.DATA,Vectors.create(cs),null);
 	}
 
 	public static Message createBelief(Belief belief) {

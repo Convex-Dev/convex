@@ -96,6 +96,7 @@ public class MessageRemote extends Message {
 		Connection pc=getConnection();
 		if (pc==null) return false;
 		try {
+			
 			pc.sendMissingData(hash);
 		} catch (IOException e) {
 			return false;

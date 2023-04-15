@@ -114,7 +114,7 @@ public class ConvexRemote extends Convex {
 
 			if (stateHash == null)
 				throw new Error("Bad status response from Peer");
-			return acquire(stateHash);
+			return acquire(stateHash,Stores.current());
 		} catch (InterruptedException | ExecutionException e) {
 			throw Utils.sneakyThrow(e);
 		}
@@ -252,6 +252,9 @@ public class ConvexRemote extends Convex {
 								break;
 							}
 						}
+						
+						// increase limit if connection can handle it and we need to
+						if (requestsSent==LIMIT) LIMIT=Math.min(LIMIT*2, 1000);
 						
 						// if too low, can send multiple requests, and then block the peer
 						Thread.sleep(10);
