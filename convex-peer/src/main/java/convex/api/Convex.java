@@ -96,10 +96,13 @@ public abstract class Convex {
 	protected final Consumer<Message> internalHandler = new ResultConsumer() {
 		@Override
 		protected synchronized void handleResult(long id, Result v) {
-
-			if ((v != null) && (ErrorCodes.SEQUENCE.equals(v.getErrorCode()))) {
-				// We probably got a wrong sequence number. Kill the stored value.
-				sequence = null;
+			ACell ec=v.getErrorCode();
+			
+			if (ec!=null) {
+				if ((ErrorCodes.SEQUENCE.equals(ec))||(ErrorCodes.LOAD.equals(ec))) {
+					// We probably have a wrong sequence number now. Kill the stored value.
+					sequence = null;
+				}
 			}
 
 			// TODO: maybe extract method?
@@ -110,7 +113,7 @@ public abstract class Convex {
 					cf.complete(v);
 					log.debug("Completed Result received for message ID: {}", id);
 				} else {
-					log.debug("Ignored Result received for unexpected message ID: {}", id);
+					log.warn("Ignored Result received for unexpected message ID: {}", id);
 				}
 			}
 		}
