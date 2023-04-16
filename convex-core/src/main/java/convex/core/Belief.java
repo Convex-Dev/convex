@@ -16,6 +16,7 @@ import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
@@ -713,12 +714,29 @@ public class Belief extends ARecord {
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
-		BlobMap<AccountKey, SignedData<Order>> chains = Format.read(bb);
-		if (chains == null) throw new BadFormatException("Null orders in Belief");
+		BlobMap<AccountKey, SignedData<Order>> orders = Format.read(bb);
+		if (orders == null) throw new BadFormatException("Null orders in Belief");
 		CVMLong timestamp = Format.read(bb);
 		if (timestamp == null) throw new BadFormatException("Null timestamp");
-		return new Belief(chains, timestamp.longValue());
+		return new Belief(orders, timestamp.longValue());
 	}
+	
+	public static Belief read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		
+		BlobMap<AccountKey, SignedData<Order>> orders = Format.read(b,epos);
+		if (orders == null) throw new BadFormatException("Null orders in Belief");
+		epos+=Format.getEncodingLength(orders);
+		
+		CVMLong timestamp = Format.read(b,epos);
+		if (timestamp == null) throw new BadFormatException("Null timestamp");
+		epos+=Format.getEncodingLength(timestamp);
+
+		Belief result= new Belief(orders, timestamp.longValue());
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+
 
 	@Override
 	public byte getTag() {
@@ -815,5 +833,7 @@ public class Belief extends ARecord {
 	public RecordFormat getFormat() {
 		return BELIEF_FORMAT;
 	}
-	
+
+
+
 }

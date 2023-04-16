@@ -248,6 +248,8 @@ public class BlobsTest {
 		// LongBlobs considered as Blob type
 		LongBlob b=LongBlob.create(v);
 		Blob fb=b.toFlatBlob();
+		assertEquals(v,fb.longAt(0));
+		
 		assertEquals(fb,b);
 		assertEquals(b,fb);
 		assertEquals(fb.hashCode(),b.hashCode());

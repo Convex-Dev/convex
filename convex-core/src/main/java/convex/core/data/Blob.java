@@ -255,10 +255,4 @@ public class Blob extends AArrayBlob {
 		return Blobs.toCanonical(this);
 	}
 
-
-	
-
-
-
-
 }

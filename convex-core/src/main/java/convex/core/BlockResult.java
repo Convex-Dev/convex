@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -181,6 +182,23 @@ public class BlockResult extends ARecord {
 		return create(newState,newResults);
 	}
 	
+	public static BlockResult read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+
+		State newState=Format.read(b,epos);
+		if (newState==null) throw new BadFormatException("Null state");
+		epos+=Format.getEncodingLength(newState);
+		
+		AVector<Result> newResults=Format.read(b,epos);
+		if (newResults==null) throw new BadFormatException("Null results");
+		epos+=Format.getEncodingLength(newResults);
+
+		BlockResult result=create(newState,newResults);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+
+	
 	@Override 
 	public boolean equals(ACell a) {
 		if (!(a instanceof BlockResult)) return false;
@@ -226,6 +244,7 @@ public class BlockResult extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 
 	
 }

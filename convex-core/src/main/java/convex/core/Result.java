@@ -8,6 +8,8 @@ import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
@@ -178,6 +180,18 @@ public final class Result extends ARecordGeneric {
 		
 		return buildFromVector(v);
 	}
+	
+
+	public static Result read(Blob b, int pos) throws BadFormatException {
+		int epos=pos; // include tag since we are reading raw Vector
+		AVector<ACell> v=Vectors.read(b,epos);
+		epos+=Format.getEncodingLength(v);
+		
+		Result r=buildFromVector(v);
+		r.attachEncoding(b.slice(pos, epos));
+		return r;
+	}
+
 
 	/**
 	 * Tests is the Result represents an Error

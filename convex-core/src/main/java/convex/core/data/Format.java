@@ -619,7 +619,7 @@ public class Format {
 			
 			if ((tag & 0xF0) == 0x80) return readDataStructure(tag,blob,offset);
 			
-//			if ((tag & 0xF0) == 0xA0) return (T) readRecord(bb, tag);
+			if ((tag & 0xF0) == 0xA0) return (T) readRecord(tag,blob,offset);
 //
 			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(tag, blob, offset);
 //
@@ -750,6 +750,39 @@ public class Format {
 			return (T) BlockResult.read(bb);
 		}
 
+		throw new BadFormatException("Can't read record type with tag byte: " + tag);
+	}
+	
+	/**
+	 * Reads a Record with the given tag
+	 * 
+	 * @param bb ByteBuffer to read from
+	 * @param tag Tag byte indicating type to read
+	 * @return Record value read
+	 * @throws BadFormatException In case of a bad record encoding
+	 */
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
+		if (tag == Tag.BLOCK) {
+			return (T) Block.read(b,pos);
+		}
+		if (tag == Tag.STATE) {
+			return (T) State.read(b,pos);
+		}
+		if (tag == Tag.ORDER) {
+			return (T) Order.read(b,pos);
+		}
+		if (tag == Tag.BELIEF) {
+			return (T) Belief.read(b,pos);
+		}
+		
+		if (tag == Tag.RESULT) {
+			return (T) Result.read(b,pos);
+		}
+		
+		if (tag == Tag.BLOCK_RESULT) {
+			return (T) BlockResult.read(b,pos);
+		}
 
 		throw new BadFormatException("Can't read record type with tag byte: " + tag);
 	}

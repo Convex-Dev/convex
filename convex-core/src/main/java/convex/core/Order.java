@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -123,6 +124,40 @@ public class Order extends ARecord {
 		}
 		return new Order(blocks, pp, cp,ts);
 	}
+	
+
+	public static Order read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		AVector<SignedData<Block>> blocks = Format.read(b,epos);
+		if (blocks==null) {
+			throw new BadFormatException("Null blocks in Order!");
+		}
+		long bcount=blocks.count();
+		epos+=Format.getEncodingLength(blocks);
+		
+		long pp = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(pp);
+		long cp = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(cp);
+		long ts = Format.readVLCLong(b,epos); // TODO: should just be 8 bytes?
+		epos+=Format.getVLCLength(ts);
+		
+		if ((cp < 0) || (cp > bcount)) {
+			throw new BadFormatException("Consensus point outside current block range: " + cp);
+		}
+		if (pp<cp) {
+			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
+		}
+		if (pp>bcount) {
+			throw new BadFormatException("Proposal point outside block range: " + pp);
+		}
+
+		
+		Order result=new Order(blocks, pp, cp,ts);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+	
 
 	@Override public final boolean isCVMValue() {
 		// Orders exist outside CVM only
@@ -337,5 +372,5 @@ public class Order extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
-	
+
 }

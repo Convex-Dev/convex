@@ -15,6 +15,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
@@ -224,6 +225,25 @@ public class State extends ARecord {
 		} catch (ClassCastException ex) {
 			throw new BadFormatException("Can't read state", ex);
 		}
+	}
+	
+	public static State read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		AVector<AccountStatus> accounts = Format.read(b,epos);
+		epos+=Format.getEncodingLength(accounts);
+
+		BlobMap<AccountKey, PeerStatus> peers = Format.read(b,epos);
+		epos+=Format.getEncodingLength(peers);
+
+		AVector<ACell> globals = Format.read(b,epos);
+		epos+=Format.getEncodingLength(globals);
+
+		BlobMap<ABlob, AVector<ACell>> schedule = Format.read(b,epos);
+		epos+=Format.getEncodingLength(schedule);
+
+		State result=create(accounts, peers, globals, schedule);
+		result.attachEncoding(b.slice(pos,epos));
+		return result;
 	}
 
 	/**
@@ -797,5 +817,7 @@ public class State extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
+
 
 }

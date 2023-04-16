@@ -8,6 +8,7 @@ import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -165,6 +166,19 @@ public final class Block extends ARecord {
 			throw new BadFormatException("Error reading Block format", e);
 		}
 	}
+	
+	public static Block read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		long timestamp = b.longAt(epos);
+		epos+=8;
+		
+		AVector<SignedData<ATransaction>> transactions = Format.read(b,epos);
+		epos+=Format.getEncodingLength(transactions);
+		
+		Block result=Block.create(timestamp, transactions);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
 
 	/**
 	 * Get the vector of transactions in this Block
@@ -230,5 +244,6 @@ public final class Block extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 	
 }

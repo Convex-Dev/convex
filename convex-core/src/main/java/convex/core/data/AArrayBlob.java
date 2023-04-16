@@ -166,6 +166,17 @@ public abstract class AArrayBlob extends ABlob {
 		return (short)((store[ix]<<8) |(store[ix+1]&0xFF));
 	}
 	
+
+	public long longAt(long i) {
+		int ix=(int)i;
+		if ((ix != i) || (ix < 0) || (ix+7 >= length)) {
+			throw new IndexOutOfBoundsException("Index: " + i);
+		}
+		
+		long val=Utils.readLong(store, offset+ix);
+		return val;
+	}
+	
 	@Override
 	public final byte getUnchecked(long i) {
 		int ix = (int) i;
