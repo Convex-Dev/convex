@@ -148,6 +148,33 @@ public class PeerStatus extends ARecord {
 
 		return new PeerStatus(owner, stake,stakes,delegatedStake,metadata);
 	}
+	
+	public static PeerStatus read(Blob b, int pos) throws BadFormatException{
+		int epos=pos+1; // skip tag
+	    Address owner = Format.read(b,epos);
+	    epos+=Format.getEncodingLength(owner);
+	    
+	    long stake = Format.readVLCLong(b,epos);
+	    epos+=Format.getVLCLength(stake);
+	    
+		ABlobMap<Address, CVMLong> stakes = Format.read(b,epos);
+		epos+=Format.getEncodingLength(stakes);
+		if (stakes==null) {
+			stakes=BlobMaps.empty();
+		} else if (stakes.isEmpty()) {
+			throw new BadFormatException("Empty delegated stakes should be encoded as null");
+		}
+
+		long delegatedStake = Format.readVLCLong(b,epos);
+	    epos+=Format.getVLCLength(delegatedStake);
+	    
+		AHashMap<Keyword,ACell> metadata = Format.read(b,epos);
+		epos+=Format.getEncodingLength(metadata);
+	    
+		PeerStatus result= new PeerStatus(owner, stake,stakes,delegatedStake,metadata);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -314,4 +341,5 @@ public class PeerStatus extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 }

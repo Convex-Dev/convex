@@ -623,7 +623,7 @@ public class Format {
 //
 			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(tag, blob, offset);
 //
-//			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(bb);
+			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(blob,offset);
 			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset); 
 //
 //			if ((tag & 0xF0) == 0xC0) return (T) readCode(bb, tag);
