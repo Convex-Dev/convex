@@ -21,30 +21,31 @@ import convex.core.lang.Symbols;
  */
 public class EncodingBenchmark {
 	
-	@SuppressWarnings("unused")
-	@Benchmark
-	public void encodingViaBlob() throws BadFormatException {
+	static Blob enc;
+	static ByteBuffer buf;
+	
+	static {
 		AVector<?> v=Vectors.of(1,true,Symbols.FOO,Sets.of(1,2,3),Maps.empty());
-		v.attachEncoding(null);
+		enc=v.getEncoding();
 		
-		Blob enc=Format.encodedBlob(v);
-		AVector<?> v2=Format.read(enc);
-		Blob enc2=v2.getEncoding();
-	}
-
-	@SuppressWarnings("unused")
-	@Benchmark
-	public void encodingViaBuffer() throws BadFormatException {
-		AVector<?> v=Vectors.of(1,true,Symbols.FOO,Sets.of(1,2,3),Maps.empty());
-		v.attachEncoding(null);
-		
-		ByteBuffer buf=ByteBuffer.allocate(1000);
-		v.write(buf);
+		buf=ByteBuffer.allocate(1000);
+		buf=v.write(buf);
 		buf.flip();
-		AVector<?> v2=Format.read(buf);
-		Blob enc2=v2.getEncoding();
+		
 	}
 	
+	@Benchmark
+	public void encodingViaBlob() throws BadFormatException {
+		AVector<?> v2=Format.read(enc);
+		v2.getEncoding();
+	}
+
+	@Benchmark
+	public void encodingViaBuffer() throws BadFormatException {
+		buf.position(0);
+		AVector<?> v2=Format.read(buf);
+		v2.getEncoding();
+	}
 
 	public static void main(String[] args) throws Exception {
 		Options opt = Benchmarks.createOptions(EncodingBenchmark.class);

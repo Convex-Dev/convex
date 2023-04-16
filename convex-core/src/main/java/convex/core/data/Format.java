@@ -652,27 +652,11 @@ public class Format {
 
 			if ((tag & 0xF0) == 0xC0) return (T) readCode(tag,blob,offset);
 
-
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
 		}
 
-		// Fallback to read via ByteBuffer
-		// TODO: maybe refactor to avoid read from byte buffers?
-		ByteBuffer bb = blob.getByteBuffer().position(offset+1);
-		T result;
-
-		try {
-			result = (T) read(tag,bb);
-		} catch (BufferUnderflowException e) {
-			throw new BadFormatException("Blob has insufficients bytes: count=" + blob.count()+ " tag="+tag+" offset="+offset, e);
-		} 
-		long epos=bb.position();
-		if (result.cachedEncoding()==null) {
-			result.attachEncoding(blob.slice(offset,epos));
-		}
-
-		return result;
+		throw new BadFormatException("Don't recognise tag "+tag);
 	}
 
 
