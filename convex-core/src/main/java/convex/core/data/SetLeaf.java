@@ -234,6 +234,30 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return new SetLeaf<V>(items);
 	}
 	
+	public static <V extends ACell> SetLeaf<V> read(Blob b, int pos, long count) throws BadFormatException {
+		int headerLen=1+Format.getVLCLength(count);
+		
+		int epos=pos+headerLen;
+		if (count == 0) return Sets.empty();
+		if (count < 0) throw new BadFormatException("Negative count of map elements!");
+		if (count > MAX_ELEMENTS) throw new BadFormatException("SetLeaf too big: " + count);
+		
+		@SuppressWarnings("unchecked")
+		Ref<V>[] items = (Ref<V>[]) new Ref[(int) count];
+		for (int i = 0; i < count; i++) {
+			Ref<V> ref=Format.readRef(b,epos);
+			epos+=ref.getEncodingLength();
+			items[i]=ref;
+		}
+		
+		SetLeaf<V> result=new SetLeaf<V>(items);
+		
+		Blob enc=b.slice(pos, epos);
+		result.attachEncoding(enc);
+		return result;
+	}
+
+	
 
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> SetLeaf<V> emptySet() {
@@ -571,6 +595,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	public ASet<T> slice(long start, long end) {
 		throw new TODOException();
 	}
+
 
 
 

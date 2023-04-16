@@ -56,7 +56,15 @@ public class Strings {
 		return StringTree.read(length,bb);
 	}
 	
-	public static ACell read(Blob blob, int offset) throws BadFormatException {
+	/**
+	 * Reads a String from a Blob encoding.
+	 * 
+	 * @param blob Blob to read from
+	 * @param offset Offset withing blob
+	 * @return String instance
+	 * @throws BadFormatException If any problem with encoding
+	 */
+	public static AString read(Blob blob, int offset) throws BadFormatException {
 		long length=Format.readVLCLong(blob,offset+1);
 		if (length<0) throw new BadFormatException("Negative string length!");
 		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
@@ -65,7 +73,6 @@ public class Strings {
 		}
 		return StringTree.read(length,blob,offset);
 	}
-
 
 	/**
 	 * Create a canonical CVM String from a regular Java String

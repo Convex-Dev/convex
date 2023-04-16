@@ -489,7 +489,7 @@ public class Format {
 
 		// if (tag == Tag.SYNTAX) return Syntax.read(b,pos);
 		
-		//if (tag == Tag.SET) return Sets.read(b,pos);
+		if (tag == Tag.SET) return Sets.read(b,pos);
 
 		if (tag == Tag.LIST) return List.read(b,pos);
 
@@ -682,7 +682,6 @@ public class Format {
 		}
 	}
 	
-
 	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
 		if (tag == Tag.BLOB) return Blobs.read(blob,offset);
 		if (tag == Tag.STRING) return Strings.read(blob,offset);

@@ -254,6 +254,8 @@ public class Blob extends AArrayBlob {
 		if (isCanonical()) return this;
 		return Blobs.toCanonical(this);
 	}
+
+
 	
 
 

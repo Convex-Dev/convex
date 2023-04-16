@@ -476,6 +476,8 @@ public class BlobsTest {
 		assertTrue(n >= 0L);
 		ABlob canonical=a.toCanonical();
 		
+		assertThrows(IndexOutOfBoundsException.class,()->a.shortAt(-1));
+		
 		//  copy of the Blob data
 		ABlob b=Blob.wrap(a.getBytes()).toCanonical();
 		assertEquals(a.count(),b.count());
@@ -517,5 +519,6 @@ public class BlobsTest {
 		
 		// Should pass tests for a CVM value
 		CollectionsTest.doCountableTests(a);
+		
 	}
 }

@@ -157,6 +157,16 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
+	public final short shortAt(long i) {
+		int ix=(int)i;
+		if ((ix != i) || (ix < 0) || (ix+1 >= length)) {
+			throw new IndexOutOfBoundsException("Index: " + i);
+		}
+		ix+=offset;
+		return (short)((store[ix]<<8) |(store[ix+1]&0xFF));
+	}
+	
+	@Override
 	public final byte getUnchecked(long i) {
 		int ix = (int) i;
 		return store[offset + ix];

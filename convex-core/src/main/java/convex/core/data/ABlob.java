@@ -433,5 +433,11 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	 */
 	public abstract boolean equalsBytes(ABlob b);
 
+	public short shortAt(long i) {
+		byte hi=byteAt(i);
+		byte lo=byteAt(i+1);
+		return (short)((hi<<8)|(lo&0xFF));
+	}
+
 
 }

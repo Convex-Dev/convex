@@ -111,6 +111,16 @@ public class Sets {
 			return SetTree.read(bb, count);
 		}
 	}
+	
+
+	public static <T extends ACell> ASet<T> read(Blob b, int pos) throws BadFormatException {
+		long count = Format.readVLCLong(b,pos+1);
+		if (count <= SetLeaf.MAX_ELEMENTS) {
+			return SetLeaf.read(b, pos, count);
+		} else {
+			return SetTree.read(b, pos, count);
+		}
+	}
 
 	public static <T extends ACell> AHashSet<T> createWithShift(int shift, ArrayList<Ref<T>> values) {
 		AHashSet<T> result=Sets.empty();
@@ -119,6 +129,7 @@ public class Sets {
 		}
 		return result;
 	}
+
 
 
 }

@@ -154,7 +154,7 @@ public class StringShort extends AString {
 		return new StringShort(data);
 	}
 	
-	public static ACell read(long length, Blob blob, int pos) {
+	public static StringShort read(long length, Blob blob, int pos) {
 		int len=Utils.checkedInt(length);
 		int dataOffset=pos+1+Format.getVLCLength(length);
 		byte[] data = new byte[len];
