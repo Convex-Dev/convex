@@ -606,10 +606,16 @@ public class Format {
 	private static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
 		if (tag == Tag.NULL) return null;
 		
+		if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
+		if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
+
 		try {
 			int high=(tag & 0xF0);
 			if (high == 0x00) return (T) readNumeric(tag,blob,offset);
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
+			
+			//if (tag == Tag.ADDRESS) return (T) Address.readRaw(blob,offset);
+			//if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(blob,offset);
 			
 			if ((tag & 0xF0) == 0x80) {
 				T ds= readDataStructure(tag,blob,offset);
@@ -772,14 +778,14 @@ public class Format {
 	@SuppressWarnings("unchecked")
 	static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
 		if (tag==Tag.NULL) return null;
+		
+		if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
+		if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
+		
 		try {
 			int high=(tag & 0xF0);
 			if (high == 0x00) return (T) readNumeric(bb, tag);
-
 			if (high ==0x30) return readBasicObject(bb,tag);
-
-			if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
-			if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
 
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(bb);
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(bb);

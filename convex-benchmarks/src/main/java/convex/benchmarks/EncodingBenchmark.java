@@ -39,7 +39,7 @@ public class EncodingBenchmark {
 		v.attachEncoding(null);
 		
 		ByteBuffer buf=ByteBuffer.allocate(1000);
-		Format.write(buf, v);
+		v.write(buf);
 		buf.flip();
 		AVector<?> v2=Format.read(buf);
 		Blob enc2=v2.getEncoding();
