@@ -32,19 +32,18 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 */
 	public abstract APrimitive signum();
 
-	public abstract ANumeric toStandardNumber();
 
 	/**
 	 * Gets the absolute value of this number. May be ##NaN for Doubles.
 	 * @return Absolute value of the numeric value
 	 */
-	public abstract APrimitive abs();
+	public abstract ANumeric abs();
 
 	/**
 	 * Gets the numeric value as a Long integer, or null if not a valid Long
 	 * @return CVMLong value, or null
 	 */
-	public abstract CVMLong asLongInteger();
+	public abstract CVMLong ensureLong();
 
 	/**
 	 * Adds a second numeric value to this value

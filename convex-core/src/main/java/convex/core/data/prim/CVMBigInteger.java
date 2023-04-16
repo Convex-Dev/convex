@@ -130,12 +130,6 @@ public class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	public ANumeric toStandardNumber() {
-		if (isCanonical()) return this;
-		return (ANumeric) getCanonical();
-	}
-
-	@Override
 	public int estimatedEncodingSize() {
 		if (blob!=null) return blob.estimatedEncodingSize();
 		return (int) Math.min(Blob.MAX_ENCODING_LENGTH,byteLength()+10);
@@ -170,7 +164,6 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	protected int encodeRaw(byte[] bs, int pos) {
 		ABlob b=blob();
-		if (b.count()<=8) return getCanonical().encode(bs, pos);
 		return b.encodeRaw(bs, pos);
 	}
 
@@ -236,7 +229,7 @@ public class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	public APrimitive abs() {
+	public ANumeric abs() {
 		BigInteger bi=big();
 		if (bi.signum()>=0) return this;
 		return wrap(bi.abs());
@@ -301,7 +294,7 @@ public class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	public CVMLong asLongInteger() {
+	public CVMLong ensureLong() {
 		if (byteLength()>LONG_BYTELENGTH) return null;
 		return (CVMLong)getCanonical();
 	}

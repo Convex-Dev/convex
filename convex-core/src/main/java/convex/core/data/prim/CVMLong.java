@@ -23,6 +23,8 @@ import convex.core.util.Utils;
  */
 public final class CVMLong extends AInteger {
 
+	// We implement a 256-entry cache for common small values 0-255
+	// i.e. the valid Byte range
 	private static final int CACHE_SIZE = 256;
 	private static final CVMLong[] CACHE= new CVMLong[CACHE_SIZE];
 
@@ -60,6 +62,11 @@ public final class CVMLong extends AInteger {
 		return new CVMLong(value);
 	}
 	
+	/**
+	 * Gets the CVMLong representing an unsigned byte value
+	 * @param b Byte to convery to CVMLong (will be interpreted as unsigned)
+	 * @return CVMLong value
+	 */
 	public static CVMLong forByte(byte b) {
 		return CACHE[0xff&b];
 	}
@@ -177,11 +184,6 @@ public final class CVMLong extends AInteger {
 	}
 
 	@Override
-	public CVMLong toStandardNumber() {
-		return this;
-	}
-
-	@Override
 	public AString toCVMString(long limit) {
 		if (limit<1) return null;
 		return Strings.create(toString());
@@ -248,7 +250,7 @@ public final class CVMLong extends AInteger {
 	}
 	
 	@Override
-	public CVMLong asLongInteger() {
+	public CVMLong ensureLong() {
 		return this;
 	}
 

@@ -151,11 +151,6 @@ public final class CVMDouble extends ANumeric {
 		return Tag.DOUBLE;
 	}
 
-	@Override
-	public CVMDouble toStandardNumber() {
-		return this;
-	}
-
 	public static CVMDouble read(double value) throws BadFormatException {
 		// Need to check for non-canonical NaN values
 		if (Double.isNaN(value)) {
@@ -187,7 +182,7 @@ public final class CVMDouble extends ANumeric {
 	}
 
 	@Override
-	public APrimitive abs() {
+	public ANumeric abs() {
 		// We use fast path here to save allocations in ~50% of cases
 		if (value>0) return this;
 		if (value==0) return ZERO; // note: we do this to handle -0.0
@@ -200,7 +195,7 @@ public final class CVMDouble extends ANumeric {
 	}
 
 	@Override
-	public CVMLong asLongInteger() {
+	public CVMLong ensureLong() {
 		// TODO: possible conversion of some values?
 		return null;
 	}

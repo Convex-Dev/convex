@@ -607,7 +607,7 @@ public class RT {
 			return (CVMLong) a;
 		if (a instanceof ANumeric) {
 			ANumeric ap = (ANumeric) a;
-			return ap.asLongInteger();
+			return ap.ensureLong();
 		}
 		return null;
 	}

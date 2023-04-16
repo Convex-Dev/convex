@@ -2548,7 +2548,7 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
-				return ((AInteger)val).asLongInteger()!=null;
+				return ((AInteger)val).ensureLong()!=null;
 			}
 			return false;
 		}

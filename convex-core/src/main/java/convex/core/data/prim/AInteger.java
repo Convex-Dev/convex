@@ -93,11 +93,20 @@ public abstract class AInteger extends ANumeric {
 	/**
 	 * Create a canonical CVM integer representation of the given Java BigInteger
 	 * @param bi BigInteger value
-	 * @return AIintger instance
+	 * @return AInteger instance
 	 */
 	public static AInteger create(BigInteger bi) {
 		if (bi.compareTo(CVMBigInteger.MIN_POSITIVE_BIG)>=0) return CVMBigInteger.wrap(bi);
 		if (bi.compareTo(CVMBigInteger.MIN_NEGATIVE_BIG)<=0) return CVMBigInteger.wrap(bi);
 		return CVMLong.create(bi.longValue());
+	}
+	
+	/**
+	 * Create a canonical CVM integer representation of the given Java Long
+	 * @param value Long value
+	 * @return AInteger instance
+	 */
+	public static AInteger create(long value) {
+		return CVMLong.create(value);
 	}
 }
