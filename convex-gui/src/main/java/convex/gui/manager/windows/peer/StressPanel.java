@@ -119,6 +119,7 @@ public class StressPanel extends JPanel {
 		optionPanel.add(lblSync);
 		syncCheckBox=new JCheckBox();
 		optionPanel.add(syncCheckBox);
+		syncCheckBox.setSelected(true);
 
 
 		// =========================================
