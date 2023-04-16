@@ -545,6 +545,30 @@ public class Format {
 
 		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
 	}
+	
+	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
+		if (tag == Tag.OP) return Ops.read(b,pos);
+		if (tag == Tag.CORE_DEF) {
+			
+			Symbol sym = Symbol.read(b,pos);
+			// TODO: consider if dependency of format on core bad?
+			ACell o = Core.ENVIRONMENT.get(sym);
+			if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
+			return o;
+		}
+		
+		if (tag == Tag.FN_MULTI) {
+			AFn<?> fn = MultiFn.read(b,pos);
+			return fn;
+		}
+
+		if (tag == Tag.FN) {
+			AFn<?> fn = Fn.read(b,pos);
+			return fn;
+		}
+
+		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
+	}
 
 	/**
 	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
@@ -620,13 +644,13 @@ public class Format {
 			if ((tag & 0xF0) == 0x80) return readDataStructure(tag,blob,offset);
 			
 			if ((tag & 0xF0) == 0xA0) return (T) readRecord(tag,blob,offset);
-//
+
 			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(tag, blob, offset);
-//
+
 			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(blob,offset);
 			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset); 
-//
-//			if ((tag & 0xF0) == 0xC0) return (T) readCode(bb, tag);
+
+			if ((tag & 0xF0) == 0xC0) return (T) readCode(tag,blob,offset);
 
 
 		} catch (IndexOutOfBoundsException e) {

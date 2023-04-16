@@ -6,6 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -89,9 +90,18 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return 1+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	public static <T extends ACell> AOp<T> read(ByteBuffer bb) throws BadFormatException {
+	public static <T extends ACell> Constant<T> read(ByteBuffer bb) throws BadFormatException {
 		Ref<T> ref = Format.readRef(bb);
 		return createFromRef(ref);
+	}
+	
+	public static <T extends ACell> Constant<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+2; // skip tag and opcode
+		Ref<T> ref = Format.readRef(b,epos);
+		epos+=ref.getEncodingLength();
+		Constant<T> result= createFromRef(ref);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 
 	@Override

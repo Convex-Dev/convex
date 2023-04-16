@@ -135,12 +135,19 @@ public class Symbol extends ASymbolic implements Comparable<Symbol> {
 		return sym;
 	}
 	
-	public static ACell read(Blob blob, int offset) throws BadFormatException {
+	public static Symbol read(Blob blob, int offset) throws BadFormatException {
 		int len=0xff&blob.byteAt(offset+1); // skip tag
 		AString name=Format.readUTF8String(blob,offset+2,len);
 		Symbol sym = Symbol.create(name);
+		
 		if (sym == null) throw new BadFormatException("Can't read symbol");
-		sym.attachEncoding(blob.slice(offset, offset+2+len));
+		
+		// Note we sometimes call this with a fake tag, and there is a cache
+		// we only want to attach encoding if not already done, and if tag is correct
+		if (sym.cachedEncoding()==null) {
+			if (blob.byteAt(offset)==Tag.SYMBOL);
+			sym.attachEncoding(blob.slice(offset, offset+2+len));
+		}
 		return sym;
 	}
 

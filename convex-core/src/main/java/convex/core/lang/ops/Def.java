@@ -3,6 +3,7 @@ package convex.core.lang.ops;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -140,6 +141,22 @@ public class Def<T extends ACell> extends AOp<T> {
 		if (!validKey(symbol)) throw new BadFormatException("Symbol not valid for Def op");
 		return new Def<>(symbol, ref);
 	}
+	
+
+	public static <T extends ACell> Def<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+2; // skip tag and opcode
+		ACell symbol = Format.read(b,epos);
+		epos+=Format.getEncodingLength(symbol);
+		
+		Ref<AOp<T>> ref = Format.readRef(b,epos);
+		if (!validKey(symbol)) throw new BadFormatException("Symbol not valid for Def op");
+		epos+=ref.getEncodingLength();
+		
+		Def<T> result= new Def<>(symbol, ref);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+
 
 	@Override
 	public void validateCell() throws InvalidDataException {

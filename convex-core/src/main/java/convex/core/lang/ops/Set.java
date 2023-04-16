@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -86,6 +87,21 @@ public class Set<T extends ACell> extends AOp<T> {
 		AOp<R> op = Format.read(bb);
 		return create(position, op);
 	}
+	
+
+	public static <R extends ACell> Set<R> read(Blob b, int pos) throws BadFormatException{
+		int epos=pos+2;
+		
+		long position = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(position);
+		
+		AOp<R> op = Format.read(b,epos);
+		epos+=Format.getEncodingLength(op);
+		
+		Set<R> result= create(position, op);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
 
 	@Override
 	public Set<T> updateRefs(IRefFunction func) {
@@ -126,4 +142,5 @@ public class Set<T extends ACell> extends AOp<T> {
 		sb.append(')');
 		return sb.check(limit);
 	}
+
 }

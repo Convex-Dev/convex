@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -137,6 +138,27 @@ public class Fn<T extends ACell> extends AClosure<T> {
 			throw new BadFormatException("Bad Fn format", e);
 		}
 	}
+	
+	public static <T extends ACell> Fn<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		
+		AVector<ACell> params = Format.read(b,epos);
+		if (params==null) throw new BadFormatException("Null parameters to Fn");
+		epos+=Format.getEncodingLength(params);
+		
+		AOp<T> body = Format.read(b,epos);
+		if (body==null) throw new BadFormatException("Null body in Fn");
+		epos+=Format.getEncodingLength(body);
+		
+		AVector<ACell> lexicalEnv = Format.read(b,epos);
+		epos+=Format.getEncodingLength(lexicalEnv);
+
+		
+		Fn<T> result = new Fn<>(params, body, lexicalEnv);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
@@ -210,6 +232,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	public ACell toCanonical() {
 		return this;
 	}
+
 
 
 	

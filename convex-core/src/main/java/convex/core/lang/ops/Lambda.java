@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -89,6 +90,16 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	public static <T extends ACell> Lambda<T> read(ByteBuffer bb) throws BadFormatException {
 		Ref<AClosure<T>> function=Format.readRef(bb);
 		return new Lambda<T>(function);
+	}
+	
+	public static <T extends ACell> Lambda<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+2; // skip tag and opcode
+		Ref<AClosure<T>> function= Format.readRef(b,epos);
+		epos+=function.getEncodingLength();
+		
+		Lambda<T> result= new Lambda<T>(function);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 	
 	@Override 

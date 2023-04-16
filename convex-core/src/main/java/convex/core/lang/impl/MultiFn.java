@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -117,6 +118,20 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		if (fns==null) throw new BadFormatException("Null fns!");
 		return new MultiFn<T>(fns);
 	}
+
+	public static <T extends ACell> MultiFn<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		
+		AVector<AClosure<T>> fns=Format.read(b,epos);
+		if (fns==null) throw new BadFormatException("Null fns!");
+		epos+=Format.getEncodingLength(fns);
+		
+		MultiFn<T> result= new MultiFn<T>(fns);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+
+	
 
 	@Override
 	public int estimatedEncodingSize() {

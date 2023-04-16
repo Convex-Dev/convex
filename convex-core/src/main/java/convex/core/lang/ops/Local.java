@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -41,6 +42,7 @@ public class Local<T extends ACell> extends AOp<T> {
 	 */
 	public static final <R extends ACell> Local<R> create(long position) {
 		if (position<0) return null;
+		// TODO: we can probably cache these?
 		return new Local<R>(position);
 	}
 	
@@ -74,6 +76,18 @@ public class Local<T extends ACell> extends AOp<T> {
 		if (result==null) throw new BadFormatException("Can't create Local with position: "+position);
 		return result;
 	}
+	
+
+	public static <R extends ACell> Local<R> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+2;
+		long position=Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(position);
+		
+		Local<R> result= create(position);
+		if (result==null) throw new BadFormatException("Can't create Local with position: "+position);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
 
 	@Override
 	public Local<T> updateRefs(IRefFunction func) {
@@ -102,6 +116,8 @@ public class Local<T extends ACell> extends AOp<T> {
 	public String toString() {
 		return "%" + position;
 	}
+
+
 
 
 

@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -101,6 +102,21 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
 		AOp<Address> address = Format.read(bb);
 		return create(address,sym);
+	}
+	
+	public static <T extends ACell> Lookup<T> read(Blob b,int pos) throws BadFormatException {
+		int epos=pos+2; // skip tag and opcode
+		
+		Symbol sym = Format.read(b,epos);
+		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
+		epos+=Format.getEncodingLength(sym);
+		
+		AOp<Address> address = Format.read(b,epos);
+		epos+=Format.getEncodingLength(address);
+		
+		Lookup<T> result= create(address,sym);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 
 	@Override

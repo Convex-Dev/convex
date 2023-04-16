@@ -3,6 +3,7 @@ package convex.core.lang;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
@@ -81,6 +82,50 @@ public class Ops {
 			return Local.read(bb);
 		case Ops.SET:
 			return Set.read(bb);
+
+		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
+		default:
+			// range 64-127 is special ops
+			if ((opCode&0xC0) == 0x40) {
+				Special<T> special=(Special<T>) Special.create(opCode);
+				if (special==null) throw new BadFormatException("Bad OpCode for Special value: "+Utils.toHexString((byte)opCode));
+				return special;
+			}
+			
+			throw new BadFormatException("Invalide OpCode: " + opCode);
+		}
+	}
+
+
+
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
+		byte opCode = b.byteAt(pos+1); // second byte identifies Op
+		switch (opCode) {
+		case Ops.INVOKE:
+			return Invoke.read(b,pos);
+		case Ops.COND:
+			return Cond.read(b,pos);
+		case Ops.CONSTANT:
+			return Constant.read(b,pos);
+		case Ops.DEF:
+			return Def.read(b,pos);
+		case Ops.DO:
+			return Do.read(b,pos);
+		case Ops.LOOKUP:
+			return Lookup.read(b,pos);
+		case Ops.LAMBDA:
+			return (AOp<T>) Lambda.read(b,pos);
+		case Ops.LET:
+			return Let.read(b,pos,false);
+		case Ops.QUERY:
+			return Query.read(b,pos);
+		case Ops.LOOP:
+			return Let.read(b,pos,true);
+		case Ops.LOCAL:
+			return Local.read(b,pos);
+		case Ops.SET:
+			return Set.read(b,pos);
 
 		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
 		default:

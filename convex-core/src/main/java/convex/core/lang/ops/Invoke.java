@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
@@ -112,4 +113,15 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 
 		return create(ops);
 	}
+	
+	public static<T extends ACell> Invoke<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+2; // skip tag and opcode
+		AVector<AOp<ACell>> ops = Format.read(b,epos);
+		epos+=Format.getEncodingLength(ops);
+		
+		Invoke<T> result=create(ops);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
+
 }

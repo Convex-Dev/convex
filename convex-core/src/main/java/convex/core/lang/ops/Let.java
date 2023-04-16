@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -177,5 +178,17 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		AVector<ACell> syms = Format.read(b);
 		AVector<AOp<?>> ops = Format.read(b);
 		return create(syms, ops.toVector(),isLoop);
+	}
+
+	public static <T extends ACell> Let<T> read(Blob b, int pos, boolean isLoop) throws BadFormatException {
+		int epos=pos+2; // skip tag and opcode
+		AVector<ACell> syms = Format.read(b,epos);
+		epos+=Format.getEncodingLength(syms);
+		AVector<AOp<?>> ops = Format.read(b,epos);
+		epos+=Format.getEncodingLength(ops);
+		
+		Let<T> result= create(syms, ops.toVector(),isLoop);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 }
