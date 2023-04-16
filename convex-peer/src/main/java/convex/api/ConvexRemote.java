@@ -215,7 +215,7 @@ public class ConvexRemote extends Convex {
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
-		new Thread(new Runnable() {
+		Thread acquireThread=new Thread(new Runnable() {
 			@Override
 			public void run() {
 				Stores.setCurrent(store); // use store for calling thread
@@ -281,7 +281,10 @@ public class ConvexRemote extends Convex {
 					f.completeExceptionally(t);
 				}
 			}
-		}).start();
+		});
+		acquireThread.setDaemon(true);
+		acquireThread.start();
+		
 		return f;
 	}
 	
