@@ -130,11 +130,9 @@ public class TransactionHandler {
 			// If we already have the transaction persisted, will get signature status
 			sd=ACell.createPersisted(sd).getValue();
 	
-			boolean queued= server.transactionQueue.offer(sd);
-			if (!queued) {
-				Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
-				m.reportResult(r);
-			} 
+			// Put on Server's transaction queue. We are OK to block here
+			server.transactionQueue.put(sd);
+			
 			registerInterest(sd.getHash(), m);		
 		} catch (Throwable e) {
 			log.warn("Unandled exception in transaction handler",e);

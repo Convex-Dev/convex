@@ -212,6 +212,7 @@ public class ServerTest {
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR,kp);
 			config.put(Keywords.STORE,EtchStore.createTemp());
+			config.put(Keywords.CONTROLLER,controller);
 			config.put(Keywords.SOURCE,network.SERVER.getHostAddress());
 
 			Server newServer=API.launchPeer(config);

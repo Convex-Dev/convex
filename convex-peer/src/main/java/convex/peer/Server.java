@@ -593,26 +593,23 @@ public class Server implements Closeable {
 	 */
 	protected boolean maybeUpdateBelief() throws InterruptedException {
 
-		// publish new blocks if needed. Guaranteed to change belief if this happens
-		boolean published = maybePublishBlock();
-		
-		if (published) {
-			// log.info("Block published");
-		}
-		
 		// we are in full consensus if there are no unconfirmed blocks after the consensus point
-		boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
+		//boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
 
 		// only do belief merge if needed either after:
 		// - publishing a new block
 		// - incoming beliefs
 		// - not in full consensus yet
-		if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
+		//if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
 		boolean updated = maybeMergeBeliefs();
 		if (updated) {
 			maybeMergeBeliefs(); // try double merge
 		}
+		
+		// publish new blocks if needed. Guaranteed to change belief if this happens
+		boolean published = maybePublishBlock();
+
 		
 		// Return true iff we published a new Block or updated our own Order
 		return (updated||published);
@@ -650,8 +647,10 @@ public class Server implements Closeable {
 	protected boolean maybePublishBlock() {
 		long timestamp=Utils.getCurrentTimestamp();
 
-		// possibly have client transactions to publish
-		transactionQueue.drainTo(newTransactions);
+		if (timestamp>=lastBlockPublishedTime+Constants.MIN_BLOCK_TIME) {
+			// possibly have client transactions to publish
+			transactionQueue.drainTo(newTransactions);
+		}
 
 		// possibly have own transactions to publish as a Peer
 		maybeGetOwnTransactions();
@@ -722,6 +721,8 @@ public class Server implements Closeable {
 		String desiredHostname=getHostname(); // Intended hostname
 		AccountKey peerKey=getPeerKey();
 		PeerStatus ps=s.getPeer(peerKey);
+		if (ps==null) return; // No peer record in consensus state?
+		
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();
 		
@@ -986,6 +987,7 @@ public class Server implements Closeable {
 
 	private void awaitBeliefs() throws InterruptedException {
 		ArrayList<Message> allBeliefs=new ArrayList<>();
+		AccountKey myKey=getPeerKey();
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
@@ -1008,6 +1010,9 @@ public class Server implements Closeable {
 				for (int i=0; i<n; i++) {
 					MapEntry<AccountKey,SignedData<Order>> me=a.entryAt(i);
 					AccountKey key=RT.ensureAccountKey(me.getKey());
+					
+					if (Utils.equals(myKey, key)) continue; // skip own order
+					
 					SignedData<Order> so=me.getValue();
 					if (newOrders.containsKey(key)) {
 						Order newOrder=so.getValue();
@@ -1015,6 +1020,7 @@ public class Server implements Closeable {
 						boolean replace=Belief.compareOrders(oldOrder, newOrder);
 						if (!replace) continue;
 					} 
+					
 					// Ensure we can persist newly received Order
 					so=ACell.createPersisted(so).getValue();
 					newOrders.put(key, so);
