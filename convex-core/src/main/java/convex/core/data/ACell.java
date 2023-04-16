@@ -118,11 +118,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	public final Blob getEncoding() {
 		if (encoding!=null) return encoding;
-		if (!isCanonical()) {
-			encoding=getCanonical().getEncoding();
-		} else {
-			encoding=createEncoding();
-		}
+		encoding=createEncoding();
 		return encoding;
 	}
 	
@@ -137,7 +133,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		if (isCanonical()) return this;
 		Ref<ACell> ref=getRef().ensureCanonical();
 		if (cachedRef!=ref) cachedRef=ref;
-		return ref.getValue();
+		ACell c= ref.getValue();
+		return c;
 	}
 	
 	/**
@@ -257,7 +254,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @return The cached blob for this cell, or null if not available. 
 	 */
-	public ABlob cachedEncoding() {
+	public Blob cachedEncoding() {
 		return encoding;
 	}
 

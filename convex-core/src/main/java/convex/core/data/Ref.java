@@ -571,11 +571,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public final int encode(byte[] bs, int pos) {
 		if (isEmbedded()) {
 			T value=getValue();
-			if (value==null) {
-				bs[pos++]=Tag.NULL;
-				return pos;
-			}
-			return value.encode(bs, pos);
+			return Format.write(bs, pos,value); // handles null and re-uses existing encodings
 		} else {
 			bs[pos++]=Tag.REF;
 			return getHash().writeToBuffer(bs, pos);

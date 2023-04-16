@@ -152,7 +152,7 @@ public class ObjectsTest {
 			throw new Error("Reload from complete encoding failed for: " + a + " with encoding "+enc);
 		}
 		assertEquals(a,b);
-		assertSame(enc,b.getEncoding()); // Encoding should be cached
+		assertEquals(enc,b.getEncoding()); // Encoding should be the same
 		
 		// Tag must equal first byte of encoding
 		assertEquals(a.getTag(),enc.byteAt(0));
@@ -249,8 +249,8 @@ public class ObjectsTest {
 			assertTrue(a.getRef().getValue().isCanonical());
 		}
 		
-		// Encoding of canonical object should be cached and equal to initial value
-		assertSame(enc, a.getCanonical().getEncoding());
+		// Encoding of canonical object should be equal to initial value
+		assertEquals(enc, a.getCanonical().getEncoding());
 		
 		// Canonical object itself should be cached
 		assertSame(a.getCanonical(), a.getCanonical());

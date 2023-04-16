@@ -23,6 +23,10 @@ public class CVMBigInteger extends AInteger {
 
 	public static final CVMBigInteger MIN_POSITIVE = wrap(new byte[] {0,-128,0,0,0,0,0,0,0});
 	public static final CVMBigInteger MIN_NEGATIVE = wrap(new byte[] {-1,127,-1,-1,-1,-1,-1,-1,-1});
+	
+	public static final BigInteger MIN_POSITIVE_BIG=new BigInteger("9223372036854775808");
+	public static final BigInteger MIN_NEGATIVE_BIG=new BigInteger("-9223372036854775809");
+	
 	protected static final long LONG_BYTELENGTH = 8;
 	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
@@ -156,6 +160,9 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
+		if (!isCanonical()) {
+			return getCanonical().encode(bs, pos);
+		}
 		bs[pos++]=Tag.INTEGER;
 		return encodeRaw(bs,pos);
 	}
@@ -163,7 +170,7 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	protected int encodeRaw(byte[] bs, int pos) {
 		ABlob b=blob();
-		if (b.count()<=8) throw new IllegalStateException("Big Integer not canonical");
+		if (b.count()<=8) return getCanonical().encode(bs, pos);
 		return b.encodeRaw(bs, pos);
 	}
 
@@ -238,13 +245,13 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	public AInteger inc() {
 		BigInteger bi=big().add(BigInteger.ONE);
-		return (AInteger) wrap(bi).getCanonical();
+		return AInteger.create(bi);
 	}
 
 	@Override
 	public AInteger dec() {
 		BigInteger bi=big().subtract(BigInteger.ONE);
-		return (AInteger) wrap(bi).getCanonical();
+		return AInteger.create(bi);
 	}
 	
 	@Override

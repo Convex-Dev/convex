@@ -138,7 +138,7 @@ public final class Block extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Utils.writeLong(bs,pos, timestamp);
-		pos = transactions.encode(bs,pos);
+		pos = Format.write(bs, pos, transactions);
 		return pos;
 	}
 	

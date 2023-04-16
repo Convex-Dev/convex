@@ -306,7 +306,7 @@ public class Format {
 	}
 	
 	/**
-	 * Writes a canonical object to a byte array, preceded by the appropriate tag
+	 * Writes a cell encoding to a byte array, preceded by the appropriate tag
 	 * 
 	 * @param bs Byte array to write to
 	 * @param pos Starting position to write in byte array
@@ -318,7 +318,14 @@ public class Format {
 			bs[pos++]=Tag.NULL;
 			return pos;
 		}
-		return cell.encode(bs,pos);
+		Blob enc=cell.cachedEncoding();
+		
+		if (enc!=null) {
+			enc.writeToBuffer(bs, pos);
+			return pos+enc.size();
+		} else {
+			return cell.encode(bs,pos);
+		}
 	}
 
 	/**

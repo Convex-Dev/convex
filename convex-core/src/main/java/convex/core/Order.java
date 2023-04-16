@@ -83,7 +83,7 @@ public class Order extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = blocks.encode(bs,pos);
+		pos = Format.write(bs,pos,blocks);
 		pos = Format.writeVLCLong(bs,pos, proposalPoint);
 		pos = Format.writeVLCLong(bs,pos, consensusPoint);
 		pos = Format.writeVLCLong(bs,pos, timestamp);

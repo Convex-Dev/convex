@@ -71,6 +71,8 @@ public class BigIntegerTest {
 	@Test public void testSmallestPositive() {
 		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {0,-128,0,0,0,0,0,0,0});
 		assertEquals(CVMBigInteger.MIN_POSITIVE,bi);
+		assertEquals(CVMBigInteger.MIN_POSITIVE_BIG,bi.big());
+
 
 		assertEquals(Long.MIN_VALUE,bi.longValue());
 		assertEquals(Long.MAX_VALUE,bi.dec().longValue());
@@ -91,6 +93,7 @@ public class BigIntegerTest {
 	@Test public void testSmallestNegative() {
 		CVMBigInteger bi=CVMBigInteger.create(Blob.fromHex("ff7fffffffffffffff"));
 		assertEquals(CVMBigInteger.MIN_NEGATIVE,bi);
+		assertEquals(CVMBigInteger.MIN_NEGATIVE_BIG,bi.big());
 
 		assertEquals(Long.MAX_VALUE,bi.longValue());
 		assertEquals(Long.MIN_VALUE,bi.inc().longValue());
