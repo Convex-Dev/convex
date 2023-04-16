@@ -28,6 +28,7 @@ public class SyntaxTest {
 		// should be invalid to have an empty map as encoded metadata
 		assertThrows(BadFormatException.class,()->Format.read("880901820000"));
 		assertThrows(BadFormatException.class,()->Format.read("8800820000"));
+		assertThrows(BadFormatException.class,()->Format.read("88008200"));
 	}
 	
 	/**

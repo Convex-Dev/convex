@@ -482,16 +482,17 @@ public class Format {
 		return Ref.get(cell);
 	}
 	
-	private static <T extends ACell> ADataStructure<T> readDataStructure(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == Tag.VECTOR) return Vectors.read(b,pos);
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> T readDataStructure(byte tag, Blob b, int pos) throws BadFormatException {
+		if (tag == Tag.VECTOR) return (T) Vectors.read(b,pos);
 
 		// if (tag == Tag.MAP) return Maps.read(b,pos);
 
-		// if (tag == Tag.SYNTAX) return Syntax.read(b,pos);
+		if (tag == Tag.SYNTAX) return (T) Syntax.read(b,pos);
 		
-		if (tag == Tag.SET) return Sets.read(b,pos);
+		if (tag == Tag.SET) return (T) Sets.read(b,pos);
 
-		if (tag == Tag.LIST) return List.read(b,pos);
+		if (tag == Tag.LIST) return (T) List.read(b,pos);
 
 		//if (tag == Tag.BLOBMAP) return BlobMap.read(b,pos);
 
@@ -606,8 +607,8 @@ public class Format {
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
 			if ((tag & 0xF0) == 0x80) {
-				ADataStructure<ACell> ds= readDataStructure(tag,blob,offset);
-				if (ds!=null) return (T)ds;
+				T ds= readDataStructure(tag,blob,offset);
+				if (ds!=null) return ds;
 			}
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
@@ -1103,6 +1104,11 @@ public class Format {
 		if (ix!=ml) throw new Error("Bad message length expected "+ml+" but was: "+ix);
 		
 		return Blob.wrap(msg);
+	}
+
+	public static int getEncodingLength(ACell value) {
+		if (value==null) return 1;
+		return value.getEncodingLength();
 	}
 
 }

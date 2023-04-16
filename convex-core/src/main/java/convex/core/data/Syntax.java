@@ -161,6 +161,27 @@ public class Syntax extends ACell {
 		}
 		return new Syntax(datum, props);
 	}
+	
+	public static Syntax read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // read position after tag
+		Ref<ACell> datum = Format.readRef(b,epos);
+		
+		epos+=datum.getEncodingLength();
+		AHashMap<ACell, ACell> props = Format.read(b,epos);
+		epos+=Format.getEncodingLength(props);
+		
+		if (props == null) {
+			props = Maps.empty(); // we encode empty props as null for efficiency
+		} else {
+			if (props.isEmpty()) {
+				throw new BadFormatException("Empty Syntax metadata should be encoded as nil");
+			}
+		}
+		Syntax result=new Syntax(datum,props);
+		result.attachEncoding(b.slice(pos,epos));
+		return result;
+	}
+
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -328,6 +349,7 @@ public class Syntax extends ACell {
 	public ACell toCanonical() {
 		return this;
 	}
+
 
 
 
