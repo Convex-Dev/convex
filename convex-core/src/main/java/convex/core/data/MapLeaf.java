@@ -370,7 +370,9 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
 		for (int i = 0; i < count; i++) {
-			items[i] = MapEntry.read(bb);
+			Ref<K> kr=Format.readRef(bb);
+			Ref<V> vr=Format.readRef(bb);
+			items[i] = MapEntry.createRef(kr, vr);
 		}
 
 		if (!isValidOrder(items)) {
@@ -378,6 +380,29 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 
 		return new MapLeaf<K, V>(items);
+	}
+	
+
+	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(Blob b, int pos, long count) throws BadFormatException {
+		int epos=pos+2; // Note: Tag byte plus VLC length of count which is always 1
+		
+		@SuppressWarnings("unchecked")
+		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
+		for (int i = 0; i < count; i++) {
+			Ref<K> kr=Format.readRef(b,epos);
+			epos+=kr.getEncodingLength();
+			Ref<V> vr=Format.readRef(b,epos);
+			epos+=vr.getEncodingLength();
+			items[i] = MapEntry.createRef(kr, vr);
+		}
+
+		if (!isValidOrder(items)) {
+			throw new BadFormatException("Bad ordering of keys!");
+		}
+		
+		MapLeaf<K,V> result=new MapLeaf<>(items);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 	
 
@@ -749,4 +774,5 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public ACell toCanonical() {
 		return this;
 	}
+
 }

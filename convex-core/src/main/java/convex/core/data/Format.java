@@ -486,7 +486,7 @@ public class Format {
 	private static <T extends ACell> T readDataStructure(byte tag, Blob b, int pos) throws BadFormatException {
 		if (tag == Tag.VECTOR) return (T) Vectors.read(b,pos);
 
-		// if (tag == Tag.MAP) return Maps.read(b,pos);
+		if (tag == Tag.MAP) return (T) Maps.read(b,pos);
 
 		if (tag == Tag.SYNTAX) return (T) Syntax.read(b,pos);
 		

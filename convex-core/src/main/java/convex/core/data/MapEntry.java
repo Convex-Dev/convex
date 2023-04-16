@@ -139,18 +139,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public Ref<V> getValueRef() {
 		return valueRef;
 	}
-
-	/**
-	 * Reads a {@link MapEntry} from a ByteBuffer. Assumes Tag already handled.
-	 * @param bb ByteBuffer to read from
-	 * @return MapEntry instance
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <K extends ACell, V extends ACell> MapEntry<K, V> read(ByteBuffer bb) throws BadFormatException {
-		Ref<K> kr = Format.readRef(bb);
-		Ref<V> vr = Format.readRef(bb);
-		return new MapEntry<K, V>(kr, vr);
-	}
 	
 	/**
 	 * Reads a MapEntry or null from a ByteBuffer. Assumes no Tag.

@@ -153,7 +153,29 @@ public class Maps {
 		}
 	}
 	
+	/**
+	 * Read a Hashmap from a Blob. Assumes tag byte already read and at position specified
+	 * @param <K> Key type
+	 * @param <V> Value type
+	 * @param b ByteBuffer to read from
+	 * @param pos Position to read from Blob (tag location)
+	 * @return Map instance
+	 * @throws BadFormatException If encoding is invalid
+	 */
+	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(Blob b, int pos) throws BadFormatException {
+		long count = Format.readVLCLong(b,pos+1);
+		if (count==0) return empty();
+		if (count <= MapLeaf.MAX_ENTRIES) {
+			if (count < 0) throw new BadFormatException("Negative count of map elements!");
+			return MapLeaf.read(b, pos, count);
+		} else {
+			return MapTree.read(b, pos, count);
+		}
+	}
+	
 	public static int MAX_ENCODING_SIZE = Math.max(MapTree.MAX_ENCODING_LENGTH, MapLeaf.MAX_ENCODING_LENGTH);
+
+
 
 
 }

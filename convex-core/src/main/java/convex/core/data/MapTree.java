@@ -464,6 +464,30 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
 		return result;
 	}
+	
+
+	@SuppressWarnings("unchecked")
+	public static <K extends ACell, V extends ACell> MapTree<K, V> read(Blob b, int pos, long count) throws BadFormatException {
+		int epos=pos+1+Format.getVLCLength(count);
+		int shift=b.byteAt(epos);
+		short mask=b.shortAt(epos+1);
+		epos+=3;
+
+		int ilength = Integer.bitCount(mask & 0xFFFF);
+		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
+
+		for (int i = 0; i < ilength; i++) {
+			// need to read as a Ref
+			Ref<AHashMap<K, V>> ref = Format.readRef(b,epos);
+			epos+=ref.getEncodingLength();
+			blocks[i] = ref;
+		}
+		// create directly, we have all values
+		MapTree<K, V> result = new MapTree<K, V>(blocks, shift, mask, count);
+		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
+		result.attachEncoding(b.slice(pos, epos));
+		return null;
+	}
 
 	@Override
 	public void forEach(BiConsumer<? super K, ? super V> action) {
@@ -863,5 +887,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// shouldn't be possible?
 		throw new TODOException();
 	}
+
 
 }
