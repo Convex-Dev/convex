@@ -562,6 +562,21 @@ public class Format {
 	}
 	
 	/**
+	 * Decodes a single Value from a Blob, starting at a given offset Assumes the presence of a tag.
+	 * throws an exception if the Blob contents are not fully consumed
+	 * 
+	 * @param blob Blob representing the Encoding of the Value
+	 * @param offset Offset of tag byte in blob
+	 * @return Value read from the blob of encoded data
+	 * @throws BadFormatException In case of encoding error
+	 */
+	public static <T extends ACell> T read(Blob blob, int offset) throws BadFormatException {
+		byte tag = blob.byteAt(offset);
+		T result= read(tag,blob,offset);
+		return result;
+	}
+	
+	/**
 	 * Helper method to read a value encoded as a hex string
 	 * @param <T> Type of value to read
 	 * @param hexString A valid hex String
@@ -940,8 +955,7 @@ public class Format {
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 		
 		// read first cell
-		byte tag = data.byteAt(0);
-		T result= Format.read(tag,data,0);
+		T result= Format.read(data,0);
 		if (result==null) return result; // null value OK at top level
 		int rl=(result==null)?1:Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Already complete
@@ -949,8 +963,7 @@ public class Format {
 		// read remaining cells
 		HashMap<Hash,Ref<?>> hm=new HashMap<>();
 		for (int ix=rl; ix<ml;) {
-			tag=data.byteAt(ix);
-			ACell c=Format.read(tag,data,ix);
+			ACell c=Format.read(data,ix);
 			if (c==null) throw new BadFormatException("Null child encoding in Message");
 			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
 			Hash h=c.getHash();
