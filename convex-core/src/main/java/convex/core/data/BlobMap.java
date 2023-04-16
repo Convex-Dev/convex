@@ -542,7 +542,17 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		if (prefixLength < 0) throw new BadFormatException("Negative prefix length!");
 		
 		// Get entry at this node, might be null
-		MapEntry<K, V> me = MapEntry.readCompressed(bb); 
+		byte etype=bb.get();
+		MapEntry<K,V> me;
+		if (etype==Tag.NULL) {
+			me=null;
+		} else if (etype==Tag.VECTOR){
+			Ref<K> kr=Format.readRef(bb);
+			Ref<V> vr=Format.readRef(bb);
+			me=MapEntry.createRef(kr, vr);
+		} else {
+			throw new BadFormatException("Invalid MapEntry tag in BlobMap: "+etype);
+		}
 
 		// single entry map
 		if (count == 1) return new BlobMap<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
@@ -550,30 +560,63 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		short mask = bb.getShort();
 		int n = Utils.bitCount(mask);
 		Ref<BlobMap>[] children = new Ref[n];
-		long childDepth=depth+prefixLength+1; // depth for children = this prefixDepth plus one extra hex digit
 		for (int i = 0; i < n; i++) {
-			children[i] = readChild(bb,childDepth);
+			children[i] = Format.readRef(bb);
 		}
 		return new BlobMap<K, V>(depth, prefixLength, me, children, mask, count);
 	}
 	
-	@SuppressWarnings({ "rawtypes" })
-	private static Ref<BlobMap> readChild(ByteBuffer bb, long childDepth) throws BadFormatException {
-		Ref<BlobMap> ref = Format.readRef(bb);
-		return ref;
-		// TODO: compression of single entries?
-//		ACell c=ref.getValue();
-//		if (c instanceof BlobMap) {
-//			return ref;
-//		} else if (c instanceof AVector) {
-//			AVector v=(AVector)c;
-//			MapEntry me=MapEntry.convertOrNull(v);
-//			if (me==null) throw new BadFormatException("Invalid MApEntry vector as BlobMap child");
-//
-//			return createAtDepth(me,childDepth).getRef();
-//		} else {
-//			throw new BadFormatException("Bad BlobMap child Type: "+RT.getType(c));
-//		}
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static <K extends ABlob, V extends ACell> BlobMap<K, V> read(Blob b, int pos) throws BadFormatException {
+		long count = Format.readVLCLong(b,pos+1);
+		if (count < 0) throw new BadFormatException("Negative count!");
+		if (count == 0) return (BlobMap<K, V>) EMPTY;
+		
+		int epos=pos+1+Format.getVLCLength(count);
+		
+		long depth = Format.readVLCLong(b,epos);
+		if (depth < 0) throw new BadFormatException("Negative depth!");
+		epos+=Format.getVLCLength(depth);
+		
+		long prefixLength = Format.readVLCLong(b,epos);
+		if (prefixLength < 0) throw new BadFormatException("Negative prefix length!");
+		epos+=Format.getVLCLength(prefixLength);
+
+		byte etype=b.byteAt(epos++);
+		MapEntry<K,V> me;
+		if (etype==Tag.NULL) {
+			me=null;
+		} else if (etype==Tag.VECTOR){
+			Ref<K> kr=Format.readRef(b,epos);
+			epos+=kr.getEncodingLength();
+			Ref<V> vr=Format.readRef(b,epos);
+			epos+=vr.getEncodingLength();
+			me=MapEntry.createRef(kr, vr);
+		} else {
+			throw new BadFormatException("Invalid MapEntry tag in BlobMap: "+etype);
+		}
+
+		
+		BlobMap<K,V> result;
+		if (count == 1) {
+			// single entry map
+			result = new BlobMap<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+			result.attachEncoding(b.slice(pos, epos));
+		} else {
+			// Need to include children
+			short mask = b.shortAt(epos);
+			epos+=2;
+			int n = Utils.bitCount(mask);
+			Ref<BlobMap>[] children = new Ref[n];
+			for (int i = 0; i < n; i++) {
+				Ref<BlobMap> cr=Format.readRef(b,epos);
+				epos+=cr.getEncodingLength();
+				children[i] =cr; 
+			}
+			result= new BlobMap<K, V>(depth, prefixLength, me, children, mask, count);
+		}
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 
 	@Override
@@ -747,6 +790,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		}
 		return false;
 	}
+
 
 
 }

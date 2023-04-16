@@ -68,7 +68,7 @@ public abstract class AObject {
 	protected abstract Blob createEncoding();
 	
 	/**
-	 * Attach the given encoding Blob to this object, if no encoding is currently cached
+	 * Attach the given encoded Blob to this object
 	 * 
 	 * Warning: Blob must be the correct canonical representation of this Cell,
 	 * otherwise bad things may happen (incorrect hashcode, etc.)

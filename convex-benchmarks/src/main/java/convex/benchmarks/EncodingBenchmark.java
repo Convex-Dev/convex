@@ -7,12 +7,12 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.data.Blob;
 import convex.core.lang.Symbols;
 
 /**

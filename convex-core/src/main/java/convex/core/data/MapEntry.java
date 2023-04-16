@@ -1,13 +1,11 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
@@ -138,21 +136,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	public Ref<V> getValueRef() {
 		return valueRef;
-	}
-	
-	/**
-	 * Reads a MapEntry or null from a ByteBuffer. Assumes no Tag.
-	 * @param bb ByteBuffer to read from
-	 * @return MapEntry instance, or null
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <K extends ACell, V extends ACell> MapEntry<K, V> readCompressed(ByteBuffer bb) throws BadFormatException {
-		byte b=bb.get();
-		if (b==Tag.NULL) return null;
-		if (b!=Tag.VECTOR) throw new BadFormatException("Bad header byte for compressed MapEntry: "+Utils.toHexString(b));
-		Ref<K> kr = Format.readRef(bb);
-		Ref<V> vr = Format.readRef(bb);
-		return new MapEntry<K, V>(kr, vr);
 	}
 
 	@Override
