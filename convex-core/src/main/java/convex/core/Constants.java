@@ -146,12 +146,6 @@ public class Constants {
 	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
 
 	/**
-	 * Default size for client send ByteBuffers.
-	 */
-	public static final int SEND_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
-
-
-	/**
 	 * Size of default server socket receive buffer
 	 */
 	public static final int SOCKET_SERVER_BUFFER_SIZE = 16*65536;
@@ -169,7 +163,7 @@ public class Constants {
 	/**
 	 * Size of default client socket send buffer
 	 */
-	public static final int SOCKET_SEND_BUFFER_SIZE = 65536;
+	public static final int SOCKET_SEND_BUFFER_SIZE = 2*65536;
 
 	/**
 	 * Delay before rebroadcasting Belief if not in consensus
@@ -211,7 +205,6 @@ public class Constants {
 	public static final byte[] BAD_CHARACTER_BYTES = new byte[] {(byte) 0xff, (byte) 0xfd };
 	public static final String BAD_CHARACTER_STRING = new String(BAD_CHARACTER_BYTES, StandardCharsets.UTF_8);
 	public static final byte[] BAD_CHARACTER_UTF = BAD_CHARACTER_STRING.getBytes(StandardCharsets.UTF_8);
-
 
 	/**
 	 * Default print limit

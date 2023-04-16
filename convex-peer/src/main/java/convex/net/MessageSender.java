@@ -7,16 +7,12 @@ import java.nio.channels.ByteChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.Constants;
-
 /**
  * Message sender responsible for moving bytes from a ByteBuffer to a ByteChannel
  * 
  * Must call maybeSendBytes to attempt to flush buffer to channel.
  */
 public class MessageSender {
-	public static final int SEND_BUFFER_SIZE = Constants.SEND_BUFFER_SIZE;
-
 	private final ByteChannel channel;
 
 	/**
