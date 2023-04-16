@@ -27,6 +27,7 @@ import convex.net.message.Message;
 public class BeliefPropagator {
 	
 	public static final int BELIEF_REBROADCAST_DELAY=300;
+	public static final int BELIEF_BROADCAST_DELAY=10;
 
 	protected final Server server;
 	
@@ -54,6 +55,7 @@ public class BeliefPropagator {
 					if (b!=null) {
 						doBroadcastBelief(b);
 					}
+					Thread.sleep(BELIEF_BROADCAST_DELAY);
 				} catch (InterruptedException e) {
 					log.trace("Belief Propagator thread interrupted on "+server);
 					return;
