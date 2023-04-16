@@ -618,6 +618,16 @@ public class Format {
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(blob,offset); 
 			
 			if ((tag & 0xF0) == 0x80) return readDataStructure(tag,blob,offset);
+			
+//			if ((tag & 0xF0) == 0xA0) return (T) readRecord(bb, tag);
+//
+//			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(bb, tag);
+//
+//			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(bb);
+			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset);
+//
+//			if ((tag & 0xF0) == 0xC0) return (T) readCode(bb, tag);
+
 
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);

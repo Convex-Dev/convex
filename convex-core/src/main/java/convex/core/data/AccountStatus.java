@@ -162,6 +162,59 @@ public class AccountStatus extends ARecord {
 		AccountKey publicKey = ((included&HAS_KEY)!=0) ? AccountKey.readRaw(bb) : null;
 		return new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
 	}
+	
+	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		int included=b.byteAt(epos++);
+		long sequence=0;
+		if ((included&HAS_SEQUENCE)!=0) {
+			sequence=Format.readVLCLong(b, epos);
+			epos+=Format.getVLCLength(sequence);
+		};
+		long balance=0;
+		if ((included&HAS_BALANCE)!=0) {
+			balance=Format.readVLCLong(b, epos);
+			epos+=Format.getVLCLength(balance);
+		};		
+		long allowance=0;
+		if ((included&HAS_ALLOWANCE)!=0) {
+			allowance=Format.readVLCLong(b, epos);
+			epos+=Format.getVLCLength(allowance);
+		};		
+		AHashMap<Symbol, ACell> environment = null;
+		if ((included&HAS_ENVIRONMENT)!=0) {
+			environment=Format.read(b, epos);
+			if ((environment==null)||environment.isEmpty()) throw new BadFormatException("Empty environment included!");
+			epos+=environment.getEncodingLength();
+		};		
+		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = null;
+		if ((included&HAS_METADATA)!=0) {
+			metadata=Format.read(b, epos);
+			if ((metadata==null)||metadata.isEmpty()) throw new BadFormatException("Empty metadata included!");
+			epos+=metadata.getEncodingLength();
+		};		
+		ABlobMap<Address,ACell> holdings = null;
+		if ((included&HAS_HOLDINGS)!=0) {
+			holdings=Format.read(b, epos);
+			if ((holdings==null)||holdings.isEmpty()) throw new BadFormatException("Empty holdings included!");
+			epos+=holdings.getEncodingLength();
+		};		
+		Address controller=null;
+		if ((included&HAS_CONTROLLER)!=0) {
+			controller=Format.read(b, epos); // TODO should be raw Address, save a byte?
+			if ((controller==null)) throw new BadFormatException("Empty controller included!");
+			epos+=controller.getEncodingLength();
+		}
+		AccountKey publicKey=null;
+		if ((included&HAS_KEY)!=0) {
+			publicKey=AccountKey.readRaw(b, epos);
+			epos+=AccountKey.LENGTH;
+		}
+		
+		AccountStatus result= new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
+		result.attachEncoding(b.slice(pos,epos));
+		return result;
+	}
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -477,5 +530,7 @@ public class AccountStatus extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
+
 
 }
