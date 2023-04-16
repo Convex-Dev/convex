@@ -654,6 +654,8 @@ public class Format {
 
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
+		} catch (Exception e) {
+			throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
 		}
 
 		throw new BadFormatException("Don't recognise tag "+tag);

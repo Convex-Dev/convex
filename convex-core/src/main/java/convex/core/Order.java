@@ -35,7 +35,7 @@ import convex.core.lang.impl.RecordFormat;
  * 
  */
 public class Order extends ARecord {
-	private final AVector<SignedData<Block>> blocks;
+	private final Ref<AVector<SignedData<Block>>> blocks;
 
 	private final long proposalPoint;
 	private final long consensusPoint;
@@ -44,7 +44,7 @@ public class Order extends ARecord {
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	private Order(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
+	private Order(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
 		super(FORMAT.count());
 		this.blocks = blocks;
 		this.consensusPoint = consensusPoint;
@@ -59,7 +59,7 @@ public class Order extends ARecord {
 	 * @param consensusPoint Consensus Point
 	 * @return New Order instance
 	 */
-	private static Order create(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
+	private static Order create(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
 		return new Order(blocks, proposalPoint, consensusPoint,timestamp);
 	}
 
@@ -69,7 +69,7 @@ public class Order extends ARecord {
 	 * @return New Order instance
 	 */
 	public static Order create() {
-		return create(Vectors.empty(), 0, 0,0);
+		return create(Vectors.empty().getRef(), 0, 0,0);
 	}
 
 	private byte getRecordTag() {
@@ -84,7 +84,7 @@ public class Order extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.write(bs,pos,blocks);
+		pos = blocks.encode(bs,pos);
 		pos = Format.writeVLCLong(bs,pos, proposalPoint);
 		pos = Format.writeVLCLong(bs,pos, consensusPoint);
 		pos = Format.writeVLCLong(bs,pos, timestamp);
@@ -103,37 +103,30 @@ public class Order extends ARecord {
 	 * @throws BadFormatException If encoding format is invalid
 	 */
 	public static Order read(ByteBuffer bb) throws BadFormatException {
-		AVector<SignedData<Block>> blocks = Format.read(bb);
+		Ref<AVector<SignedData<Block>>> blocks = Format.readRef(bb);
 		if (blocks==null) {
 			throw new BadFormatException("Null blocks in Order!");
 		}
-		long bcount=blocks.count();
 		
 		long pp = Format.readVLCLong(bb);
 		long cp = Format.readVLCLong(bb);
 		long ts = Format.readVLCLong(bb);
 		
-		if ((cp < 0) || (cp > bcount)) {
-			throw new BadFormatException("Consensus point outside current block range: " + cp);
-		}
 		if (pp<cp) {
 			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
 		}
-		if (pp>bcount) {
-			throw new BadFormatException("Proposal point outside block range: " + pp);
-		}
+
 		return new Order(blocks, pp, cp,ts);
 	}
 	
 
 	public static Order read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		AVector<SignedData<Block>> blocks = Format.read(b,epos);
+		Ref<AVector<SignedData<Block>>> blocks = Format.readRef(b,epos);
 		if (blocks==null) {
 			throw new BadFormatException("Null blocks in Order!");
 		}
-		long bcount=blocks.count();
-		epos+=Format.getEncodingLength(blocks);
+		epos+=blocks.getEncodingLength();
 		
 		long pp = Format.readVLCLong(b,epos);
 		epos+=Format.getVLCLength(pp);
@@ -142,14 +135,8 @@ public class Order extends ARecord {
 		long ts = Format.readVLCLong(b,epos); // TODO: should just be 8 bytes?
 		epos+=Format.getVLCLength(ts);
 		
-		if ((cp < 0) || (cp > bcount)) {
-			throw new BadFormatException("Consensus point outside current block range: " + cp);
-		}
 		if (pp<cp) {
 			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
-		}
-		if (pp>bcount) {
-			throw new BadFormatException("Proposal point outside block range: " + pp);
 		}
 
 		
@@ -178,7 +165,7 @@ public class Order extends ARecord {
 	 * @return True if chains are consistent, false otherwise.
 	 */
 	public boolean checkConsistent(Order bc) {
-		long commonPrefix = blocks.commonPrefixLength(bc.blocks);
+		long commonPrefix = getBlocks().commonPrefixLength(bc.getBlocks());
 		return commonPrefix >= consensusPoint;
 	}
 
@@ -211,7 +198,7 @@ public class Order extends ARecord {
 	 * @return Vector of Blocks
 	 */
 	public AVector<SignedData<Block>> getBlocks() {
-		return blocks;
+		return blocks.getValue();
 	}
 
 	/**
@@ -220,7 +207,7 @@ public class Order extends ARecord {
 	 * @return Block at specified index.
 	 */
 	public SignedData<Block> getBlock(long i) {
-		return blocks.get(i);
+		return getBlocks().get(i);
 	}
 
 	/**
@@ -230,8 +217,8 @@ public class Order extends ARecord {
 	 * @return The updated chain
 	 */
 	public Order append(SignedData<Block> block) {
-		AVector<SignedData<Block>> newBlocks = blocks.append(block);
-		return create(newBlocks, proposalPoint, consensusPoint, timestamp);
+		AVector<SignedData<Block>> newBlocks = getBlocks().append(block);
+		return create(newBlocks.getRef(), proposalPoint, consensusPoint, timestamp);
 	}
 
 	/**
@@ -240,14 +227,14 @@ public class Order extends ARecord {
 	 * @return Updated Order, or the same order if unchanged
 	 */
 	public Order withBlocks(AVector<SignedData<Block>> newBlocks) {
-		if (blocks == newBlocks) return this;
+		if (blocks.getValue() == newBlocks) return this;
 		
 		// Update proposal point and consensus point if necessary to ensure consistency
 		long nblocks=newBlocks.count();
 		long newProposalPoint = Math.min(nblocks, proposalPoint);
 		long newConsensusPoint = Math.min(nblocks, consensusPoint);
 		
-		return create(newBlocks, newProposalPoint, newConsensusPoint, timestamp);
+		return create(newBlocks.getRef(), newProposalPoint, newConsensusPoint, timestamp);
 	}
 	
 	/**
@@ -273,7 +260,7 @@ public class Order extends ARecord {
 			throw new IllegalArgumentException(
 					"Trying to move proposed consensus before confirmed consensus?! " + newProposalPoint);
 		}
-		if (newProposalPoint > blocks.count()) throw new IndexOutOfBoundsException("Block index: " + newProposalPoint);
+		if (newProposalPoint > getBlocks().count()) throw new IndexOutOfBoundsException("Block index: " + newProposalPoint);
 		return new Order(blocks, newProposalPoint, consensusPoint, timestamp);
 	}
 
@@ -288,7 +275,7 @@ public class Order extends ARecord {
 	 */
 	public Order withConsenusPoint(long newConsensusPoint) {
 		if (this.consensusPoint == newConsensusPoint) return this;
-		if (newConsensusPoint > blocks.count())
+		if (newConsensusPoint > getBlocks().count())
 			throw new IndexOutOfBoundsException("Block index: " + newConsensusPoint);
 		long newProposalPoint = Math.max(proposalPoint, newConsensusPoint);
 		return create(blocks, newProposalPoint, newConsensusPoint, timestamp);
@@ -299,7 +286,7 @@ public class Order extends ARecord {
 	 * @return Number of Blocks
 	 */
 	public long getBlockCount() {
-		return blocks.count();
+		return getBlocks().count();
 	}
 
 	/**
@@ -324,12 +311,14 @@ public class Order extends ARecord {
 
 	@Override
 	public int getRefCount() {
-		return blocks.getRefCount();
+		return 1;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		return blocks.getRef(i);
+		if (i==0) return (Ref<R>) blocks;
+		throw new IndexOutOfBoundsException(i);
 	}
 	
 	@Override
@@ -339,7 +328,7 @@ public class Order extends ARecord {
 
 	@Override
 	public ACell get(ACell key) {
-		if (Keywords.BLOCKS.equals(key)) return blocks;
+		if (Keywords.BLOCKS.equals(key)) return getBlocks();
 		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(consensusPoint);
 		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(proposalPoint);
 		if (Keywords.TIMESTAMP.equals(key)) return CVMLong.create(timestamp);
@@ -347,9 +336,10 @@ public class Order extends ARecord {
 		return null;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Order updateRefs(IRefFunction func) {
-		AVector<SignedData<Block>> newBlocks = blocks.updateRefs(func);
+		Ref<AVector<SignedData<Block>>> newBlocks = (Ref<AVector<SignedData<Block>>>) func.apply(blocks);
 		if (blocks == newBlocks) {
 			return this;
 		}
