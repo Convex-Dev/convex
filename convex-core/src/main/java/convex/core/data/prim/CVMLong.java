@@ -106,9 +106,12 @@ public final class CVMLong extends AInteger {
 	}
 	
 	public static CVMLong read(byte tag, Blob blob, int offset) throws BadFormatException {
-		long v=Format.readVLCLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1);
+		long v=Format.readVLCLong(blob,offset+1);
 		CVMLong result= create(v);
-		result.attachEncoding(blob.slice(offset,offset+Format.getVLCLength(v)+1));
+		if (result.encoding==null) {
+			// we likely already have a valid encoding if cached!
+			result.attachEncoding(blob.slice(offset,offset+Format.getVLCLength(v)+1));
+		}
 		return result;
 	}
 
