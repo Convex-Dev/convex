@@ -18,6 +18,10 @@ import convex.core.lang.Symbols;
 /**
  * Benchmarks for data encoding
  * 
+ * There doesn't seem to be much in it between blob-based decoding and buffer based decoding.
+ * Blob based decoding has the advantage of being able to cache encodings directly however.
+ * This is probably a win for persistence, networking etc.?
+ * 
  */
 public class EncodingBenchmark {
 	
