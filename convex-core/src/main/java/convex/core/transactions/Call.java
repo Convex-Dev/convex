@@ -6,6 +6,7 @@ import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -70,7 +71,7 @@ public class Call extends ATransaction {
 		return pos;
 	}
 	
-	public static ATransaction read(ByteBuffer bb) throws BadFormatException {
+	public static Call read(ByteBuffer bb) throws BadFormatException {
 		Address address=Address.create(Format.readVLCLong(bb));
 		long sequence = Format.readVLCLong(bb);
 		Address target=Format.read(bb);
@@ -78,6 +79,33 @@ public class Call extends ATransaction {
 		Symbol functionName=Format.read(bb);
 		AVector<ACell> args = Format.read(bb);
 		return create(address,sequence, target, offer, functionName,args);
+	}
+	
+
+	public static Call read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		long aval=Format.readVLCLong(b,epos);
+		Address origin=Address.create(aval);
+		epos+=Format.getVLCLength(aval);
+		
+		long sequence = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(sequence);
+		
+		Address target=Format.read(b, epos);
+		epos+=Format.getEncodingLength(target);
+		
+		long offer=Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(offer);
+
+		Symbol functionName=Format.read(b,epos);
+		epos+=Format.getEncodingLength(functionName);
+
+		AVector<ACell> args = Format.read(b,epos);
+		epos+=Format.getEncodingLength(args);
+
+		Call result=create(origin,sequence, target, offer, functionName,args);
+		result.attachEncoding(b.slice(pos,epos));
+		return result;
 	}
 
 	@Override
@@ -149,4 +177,5 @@ public class Call extends ATransaction {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 }

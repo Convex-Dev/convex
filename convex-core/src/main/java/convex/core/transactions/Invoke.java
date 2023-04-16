@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -93,6 +94,23 @@ public class Invoke extends ATransaction {
 		ACell args = Format.read(bb);
 		return create(address,sequence, args);
 	}
+	
+	public static Invoke read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		long aval=Format.readVLCLong(b,epos);
+		Address address=Address.create(aval);
+		epos+=Format.getVLCLength(aval);
+		
+		long sequence = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(sequence);
+		
+		ACell args=Format.read(b, epos);
+		epos+=Format.getEncodingLength(args);
+
+		Invoke result=create(address, sequence, args);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override
@@ -178,4 +196,5 @@ public class Invoke extends ATransaction {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 }

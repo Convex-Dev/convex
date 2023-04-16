@@ -6,11 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
+import convex.core.data.RecordTest;
+import convex.core.data.Vectors;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
+import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
+import convex.core.transactions.Call;
 import convex.core.transactions.Transfer;
 
 /**
@@ -44,6 +48,23 @@ public class TransactionTest extends ACVMTest {
 		long expectedFees=Juice.TRANSFER*JP;
 		assertEquals(1000+expectedFees,state().getAccount(HERO).getBalance()-s.getAccount(HERO).getBalance());
 		assertEquals(expectedFees,s.getGlobalFees().longValue());
+		
+		doTransactionTests(t1);
 	}
+	
+	@Test 
+	public void testCall() {
+		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());
+		Context<?> ctx=state().applyTransaction(t1);
+		assertEquals(ErrorCodes.STATE,ctx.getErrorCode());
+		
+		doTransactionTests(t1);
+	}
+
+	private void doTransactionTests(ATransaction t) {
+		RecordTest.doRecordTests(t);
+	}
+	
+	
 
 }

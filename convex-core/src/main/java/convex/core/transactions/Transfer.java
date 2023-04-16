@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -68,6 +69,28 @@ public class Transfer extends ATransaction {
 		long amount = Format.readVLCLong(bb);
 		if (!RT.isValidAmount(amount)) throw new BadFormatException("Invalid amount: "+amount);
 		return create(origin,sequence, target, amount);
+	}
+	
+
+	public static ATransaction read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		long aval=Format.readVLCLong(b,epos);
+		Address origin=Address.create(aval);
+		epos+=Format.getVLCLength(aval);
+		
+		long sequence = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(sequence);
+		
+		long tval=Format.readVLCLong(b,epos);
+		Address target=Address.create(tval);
+		epos+=Format.getVLCLength(tval);
+
+		long amount = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(amount);
+		
+		Transfer result=create(origin,sequence, target, amount);
+		result.attachEncoding(b.slice(pos, epos));
+		return result;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -155,4 +178,5 @@ public class Transfer extends ATransaction {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 }

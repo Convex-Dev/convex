@@ -621,10 +621,10 @@ public class Format {
 			
 //			if ((tag & 0xF0) == 0xA0) return (T) readRecord(bb, tag);
 //
-//			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(bb, tag);
+			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(tag, blob, offset);
 //
 //			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(bb);
-			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset);
+			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset); 
 //
 //			if ((tag & 0xF0) == 0xC0) return (T) readCode(bb, tag);
 
@@ -650,6 +650,7 @@ public class Format {
 
 		return result;
 	}
+
 
 
 	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
@@ -829,6 +830,17 @@ public class Format {
 			return Transfer.read(bb);
 		} else if (tag == Tag.CALL) {
 			return Call.read(bb);
+		}
+		throw new BadFormatException("Can't read Transaction with tag " + Utils.toHexString(tag));
+	}
+	
+	private static ATransaction readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
+		if (tag == Tag.INVOKE) {
+			return Invoke.read(b,pos);
+		} else if (tag == Tag.TRANSFER) {
+			return Transfer.read(b,pos);
+		} else if (tag == Tag.CALL) {
+			return Call.read(b,pos);
 		}
 		throw new BadFormatException("Can't read Transaction with tag " + Utils.toHexString(tag));
 	}
