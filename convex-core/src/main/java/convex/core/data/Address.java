@@ -158,6 +158,16 @@ public final class Address extends ALongBlob {
 		if (a==null) throw new BadFormatException("Invalid Address: "+value);
 		return a;
 	}
+	
+	public static Address readRaw(Blob b, int pos) throws BadFormatException {
+		long value=Format.readVLCLong(b,pos+1); // skip tag
+		Address a= Address.create(value);
+		if (a==null) throw new BadFormatException("Invalid Address: "+value);
+		int epos=pos+1+Format.getVLCLength(value);
+		a.attachEncoding(b.slice(pos, epos));
+		return a;
+	}
+
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -259,6 +269,7 @@ public final class Address extends ALongBlob {
 	public Address offset(long offset) {
 		return create(value+offset);
 	}
+
 
 
 
