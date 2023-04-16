@@ -615,7 +615,7 @@ public class Format {
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(blob,offset);
-			//if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(blob,offset);
+			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(blob,offset); 
 			
 			if ((tag & 0xF0) == 0x80) {
 				T ds= readDataStructure(tag,blob,offset);

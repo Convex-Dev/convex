@@ -29,9 +29,13 @@ public class Ed25519Signature extends ASignature {
 	
 
 	private Ed25519Signature(byte[] signature) {
-		super(signature);
+		super(signature,0);
 	}
 	
+	public Ed25519Signature(byte[] data, int pos) {
+		super(data,pos);
+	}
+
 	/**
 	 * Creates a Signature instance with specific bytes
 	 * @param signature Bytes for signature
@@ -40,6 +44,15 @@ public class Ed25519Signature extends ASignature {
 	public static Ed25519Signature wrap(byte[] signature) {
 		if (signature.length!=SIGNATURE_LENGTH) throw new IllegalArgumentException("Bsd signature length for ED25519");
 		return new Ed25519Signature(signature);
+	}
+	
+	/**
+	 * Creates a Signature instance with specific bytes
+	 * @param signature Bytes for signature
+	 * @return Signature instance
+	 */
+	public static Ed25519Signature wrap(byte[] data, int pos) {
+		return new Ed25519Signature(data,pos);
 	}
 	
 	@Override
@@ -80,6 +93,10 @@ public class Ed25519Signature extends ASignature {
 		bb.get(sigData);
 		return wrap(sigData);
 	}
+	
+	public static ASignature readRaw(Blob b, int pos) {
+		return wrap(b.getInternalArray(),b.getInternalOffset()+pos);
+	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -119,7 +136,7 @@ public class Ed25519Signature extends ASignature {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (store.length!=SIGNATURE_LENGTH) throw new InvalidDataException("Bad signature array length?",this);
+		// if (store.length!=SIGNATURE_LENGTH) throw new InvalidDataException("Bad signature array length?",this);
 	}
 
 	@Override
@@ -129,12 +146,17 @@ public class Ed25519Signature extends ASignature {
 
 	@Override
 	public byte[] getBytes() {
-		return store;
+		if (offset==0) return store;
+		byte[] bs=new byte[SIGNATURE_LENGTH];
+		System.arraycopy(store, offset, bs,0,SIGNATURE_LENGTH);
+		return bs;
 	}
 
 	@Override
 	public Blob getChunk(long i) {
 		return Blob.create(store).getChunk(i);
 	}
+
+
 
 }

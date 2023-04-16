@@ -14,8 +14,8 @@ import convex.core.util.Utils;
  */
 public abstract class ASignature extends AArrayBlob {
 
-	protected ASignature(byte[] signature) {
-		super(signature, 0, Ed25519Signature.SIGNATURE_LENGTH);
+	protected ASignature(byte[] signature,int pos) {
+		super(signature, pos, Ed25519Signature.SIGNATURE_LENGTH);
 	} 
 
 	/**
@@ -76,7 +76,7 @@ public abstract class ASignature extends AArrayBlob {
 	}
 
 	/**
-	 * Gets the raw bytes representing this signature
+	 * Gets the raw bytes representing this signature, as a zero based array
 	 * @return byte array from this signature
 	 */
 	public abstract byte[] getBytes();

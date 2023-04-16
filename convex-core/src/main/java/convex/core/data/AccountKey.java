@@ -217,6 +217,10 @@ public class AccountKey extends AArrayBlob {
 		data.get(buff);
 		return AccountKey.wrap(buff);
 	}
+	
+	public static AccountKey readRaw(Blob b, int pos) {
+		return AccountKey.wrap(b.getInternalArray(),b.getInternalOffset()+pos);
+	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -269,5 +273,7 @@ public class AccountKey extends AArrayBlob {
 	public Blob toCanonical() {
 		return toFlatBlob();
 	}
+
+
 
 }

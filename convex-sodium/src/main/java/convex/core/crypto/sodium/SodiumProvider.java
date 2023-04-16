@@ -37,7 +37,7 @@ public class SodiumProvider extends AProvider {
 		if (message.getInternalOffset()==0) {
 			msgBytes=message.getInternalArray();
 		} else {
-			// need to copy into0 new zero-based array
+			// need to copy into new zero-based array
 			msgBytes=message.getBytes();
 		}
 		boolean verified = SodiumProvider.SODIUM_SIGN.cryptoSignVerifyDetached(sigBytes, msgBytes, mlength, publicKey.getBytes());
