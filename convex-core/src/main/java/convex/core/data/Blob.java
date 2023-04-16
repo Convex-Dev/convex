@@ -105,7 +105,7 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public boolean equals(ABlob a) {
-		if (a==null) return false;
+		if (a==this) return true;
 		if (a instanceof Blob) return equals((Blob) a);
 		long n=count();
 		if (a.count()!=n) return false;

@@ -38,7 +38,9 @@ public class EncodingBenchmark {
 		AVector<?> v=Vectors.of(1,true,Symbols.FOO,Sets.of(1,2,3),Maps.empty());
 		v.attachEncoding(null);
 		
-		ByteBuffer buf=Format.encodedBuffer(v);
+		ByteBuffer buf=ByteBuffer.allocate(1000);
+		Format.write(buf, v);
+		buf.flip();
 		AVector<?> v2=Format.read(buf);
 		Blob enc2=v2.getEncoding();
 	}

@@ -238,7 +238,7 @@ public abstract class ABlob extends ACountable<CVMLong> implements Comparable<AB
 	 * values are equal
 	 */
 	@Override
-	public final boolean equals(ACell o) {
+	public boolean equals(ACell o) {
 		if (o==this) return true; // fast path, avoid a type check / cast
 		// only a Blob can be equal to a Blob
 		if (!(o instanceof ABlob)) return false;

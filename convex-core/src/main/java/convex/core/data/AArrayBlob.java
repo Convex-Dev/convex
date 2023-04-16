@@ -213,6 +213,7 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public boolean equals(ABlob o) {
+		if (o==this) return true;
 		if (o==null) return false;
 		if (o.getType()!=Types.BLOB) return false;
 		if (o.count()!=length) return false;

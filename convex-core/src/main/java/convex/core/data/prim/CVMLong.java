@@ -191,6 +191,19 @@ public final class CVMLong extends AInteger {
 	public String toString() {
 		return Long.toString(value);
 	}
+	
+	@Override
+	public boolean equals(ACell c) {
+		if (c==this) return true;
+		if (c instanceof CVMLong) {
+			return equals((CVMLong)c);
+		}
+		return false;
+	}
+	
+	public boolean equals(CVMLong c) {
+		return c.value==this.value;
+	}
 
 	/**
 	 * Gets a CVMLong representing the signum of the given value

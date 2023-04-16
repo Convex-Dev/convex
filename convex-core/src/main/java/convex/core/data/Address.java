@@ -68,12 +68,19 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
+	public boolean equals(ACell o) {
+		if (o==this) return true;
+		if (!(o instanceof Address)) return false;
+		return value==((Address) o).value;
+	}
+	
+	@Override
 	public boolean equals(ABlob o) {
 		if (!(o instanceof Address)) return false;
 		return value==((Address) o).value;
 	}
 
-	public boolean equals(Address o) {
+	public final boolean equals(Address o) {
 		return value==o.value;
 	}
 
