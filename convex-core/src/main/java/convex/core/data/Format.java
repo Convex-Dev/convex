@@ -617,10 +617,8 @@ public class Format {
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(blob,offset);
 			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(blob,offset); 
 			
-			if ((tag & 0xF0) == 0x80) {
-				T ds= readDataStructure(tag,blob,offset);
-				if (ds!=null) return ds;
-			}
+			if ((tag & 0xF0) == 0x80) return readDataStructure(tag,blob,offset);
+
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
 		}
@@ -975,7 +973,10 @@ public class Format {
 		HashMap<Hash,Ref<?>> hm=new HashMap<>();
 		for (int ix=rl; ix<ml;) {
 			ACell c=Format.read(data,ix);
-			if (c==null) throw new BadFormatException("Null child encoding in Message");
+			if (c==null) {
+				c=Format.read(data,ix);
+				throw new BadFormatException("Null child encoding in Message");
+			}
 			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
 			Hash h=c.getHash();
 			

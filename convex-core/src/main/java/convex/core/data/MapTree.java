@@ -486,7 +486,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		MapTree<K, V> result = new MapTree<K, V>(blocks, shift, mask, count);
 		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
 		result.attachEncoding(b.slice(pos, epos));
-		return null;
+		return result;
 	}
 
 	@Override

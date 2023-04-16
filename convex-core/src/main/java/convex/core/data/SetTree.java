@@ -386,6 +386,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	public static <V extends ACell> SetTree<V> read(Blob b, int pos, long count) throws BadFormatException {
 		int headerLen=1+Format.getVLCLength(count);
 		int epos=pos+headerLen;
+		
 		int shift=b.byteAt(epos++);
 		short mask=b.shortAt(epos);
 		epos+=2;
@@ -405,7 +406,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
 		Blob enc=b.slice(pos,epos);
 		result.attachEncoding(enc);
-		return null;
+		return result;
 	}
 
 
