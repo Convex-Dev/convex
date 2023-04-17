@@ -299,7 +299,7 @@ public class Belief extends ARecord {
 		// current consensus!
 		State votingState = mc.getConsensusState();
 
-		// filter chains for compatibility with current chain for inclusion in Initial Voting Set
+		// filter Orders for compatibility with current Order for inclusion in Voting Set
 		// TODO: figure out what to do with new blocks filtered out?
 		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
 			try {
@@ -505,7 +505,7 @@ public class Belief extends ARecord {
 	 * @param stakedOrders Amount of stake on each distinct Order
 	 * @param consensusPoint Current consensus point
 	 * @param initialTotalStake Total stake under consideration
-	 * @return Vector of Blocks in wiing Order
+	 * @return Vector of Blocks in winning Order
 	 */
 	public static AVector<SignedData<Block>> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
 			double initialTotalStake) {
@@ -585,7 +585,7 @@ public class Belief extends ARecord {
 		}
 		AVector<SignedData<Block>> winningBlocks = votingSet.keySet().iterator().next();
 
-		// add new blocks back to winning chain if not already included
+		// add new blocks back to winning Order (if not already included)
 		AVector<SignedData<Block>> fullWinningBlocks = appendNewBlocks(winningBlocks, newBlocksOrdered, consensusPoint);
 
 		return fullWinningBlocks;
