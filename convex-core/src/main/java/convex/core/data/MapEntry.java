@@ -153,7 +153,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
 		if ((i >> 1) != 0) throw new IndexOutOfBoundsException(i);
-		return (Ref<R>) (((i & 1) == 0) ? keyRef : valueRef);
+		return (Ref<R>) ((i == 0) ? keyRef : valueRef);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -161,7 +161,10 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public MapEntry<K, V> updateRefs(IRefFunction func) {
 		Ref<K> newKeyRef = (Ref<K>) func.apply(keyRef);
 		Ref<V> newValueRef = (Ref<V>) func.apply(valueRef);
+		
+		// Keep this instance if no change
 		if ((keyRef == newKeyRef) && (valueRef == newValueRef)) return this;
+		
 		MapEntry<K, V> result= new MapEntry<K, V>(newKeyRef, newValueRef);
 		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
 		return result;

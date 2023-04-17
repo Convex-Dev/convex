@@ -281,6 +281,9 @@ public class EncodingTest {
 		
 		AVector<?> v2=Format.decodeMultiCell(enc);
 		assertEquals(v,v2);
+		
+		SignedData<ATransaction> dtrans = doMultiEncodingTest(strans);
+		assertEquals(strans.getValue(),dtrans.getValue());
 	}
 	
 	@SuppressWarnings("unused")
@@ -346,10 +349,26 @@ public class EncodingTest {
 		doMultiEncodingTest(st);
 	}
 	
-	private void doMultiEncodingTest(ACell a) throws BadFormatException {
+	@Test public void testBlobMapEncoding() throws BadFormatException {
+		BlobMap<Blob, ACell> bm=BlobMaps.empty();
+		
+		bm=bm.assoc(Blobs.fromHex(""), CVMLong.create((6785759)));
+		bm=bm.assoc(Blobs.fromHex("0a"), CVMLong.create((1678575659)));
+		bm=bm.assoc(Blobs.fromHex("0a56"), CVMLong.create((346785759)));
+		bm=bm.assoc(Blobs.fromHex("0a79"), CVMLong.create((896785759)));
+		
+		BlobMap<Blob, ACell> decoded=doMultiEncodingTest(bm);
+		assertTrue(decoded.containsKey(Blob.fromHex("0a79")));
+	}
+	
+	@SuppressWarnings("unchecked")
+	private <T extends ACell> T doMultiEncodingTest(ACell a) throws BadFormatException {
+		long rc=Refs.totalRefCount(a);
 		Blob enc=Format.encodeMultiCell(a);
 		ACell decoded=Format.decodeMultiCell(enc);
 		assertEquals(a,decoded);
+		
+		assertEquals(rc,Refs.totalRefCount(decoded));
 		
 		// since this is a full encoding, expect all Refs to be direct
 		Refs.visitAllRefs(Ref.get(decoded), r->{
@@ -361,6 +380,7 @@ public class EncodingTest {
 				}
 			}
 		});
+		return (T) decoded;
 	}
 	
 	@Test public void testBadMessageEncoding() {
