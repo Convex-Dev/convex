@@ -220,13 +220,6 @@ public class Peer {
 		return create(keyPair, genesisState);
 	}
 
-	/**
-	 * Gets a MergeContext for this Peer
-	 * @return MergeContext
-	 */
-	private MergeContext getMergeContext() {
-		return MergeContext.create(getBelief(),keyPair, timestamp, getConsensusState());
-	}
 
 	/**
 	 * Updates the timestamp to the specified time, going forwards only
@@ -381,8 +374,9 @@ public class Peer {
 	 *
 	 */
 	public Peer mergeBeliefs(Belief... beliefs) throws BadSignatureException, InvalidDataException {
-		MergeContext mc = getMergeContext();
-		Belief newBelief = mc.merge(beliefs);
+		Belief belief=getBelief();
+		MergeContext mc = MergeContext.create(belief,keyPair, timestamp, getConsensusState());
+		Belief newBelief = belief.merge(mc,beliefs);
 
 		long ocp=getConsensusPoint();
 		Order newOrder=newBelief.getOrder(peerKey);

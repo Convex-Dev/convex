@@ -4,8 +4,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.SignedData;
-import convex.core.exceptions.BadSignatureException;
-import convex.core.exceptions.InvalidDataException;
 
 /**
  * Class representing the context to be used for a Belief merge/update function. This
@@ -88,10 +86,6 @@ public class MergeContext {
 	 */
 	public State getConsensusState() {
 		return state;
-	}
-
-	public Belief merge(Belief[] beliefs) throws BadSignatureException, InvalidDataException {
-		return initialBelief.merge(this,beliefs);
 	}
 
 }

@@ -607,7 +607,7 @@ public class Server implements Closeable {
 			maybeMergeBeliefs(); // try double merge
 		}
 		
-		// publish new blocks if needed. Guaranteed to change belief if this happens
+		// publish new blocks if needed. Guaranteed to change Belief / Order if this happens
 		boolean published = maybePublishBlock();
 
 		
@@ -767,14 +767,15 @@ public class Server implements Closeable {
 				newBeliefs.clear();
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
-			if(newPeer==peer) return false;
+			if (newPeer==peer) return false;
 			
-			boolean orderChanged=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
+			// boolean orderChanged=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
 			
 			peer = newPeer;
 
 			//log.info( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
-			return orderChanged;
+			//return orderChanged;
+			return true;
 		} catch (MissingDataException e) {
 			// Shouldn't happen if beliefs are persisted
 			// e.printStackTrace();
