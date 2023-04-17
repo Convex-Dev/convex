@@ -143,6 +143,7 @@ public class Peer {
 	 */
 	public static Peer create(AKeyPair peerKP, State initialState, Belief remoteBelief) {
 		Peer peer=create(peerKP,initialState);
+		peer=peer.updateTimestamp(Utils.getCurrentTimestamp());
 		try {
 			peer=peer.mergeBeliefs(remoteBelief);
 			return peer;

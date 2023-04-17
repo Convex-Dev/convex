@@ -111,6 +111,18 @@ public class Belief extends ARecord {
 		return new Belief(orders, timestamp);
 	}
 	
+	@SuppressWarnings("unchecked")
+	public static Belief create(SignedData<Order>... orders)  {
+		BlobMap<AccountKey, SignedData<Order>> os=BlobMaps.empty();
+		long timestamp=0;
+		for (SignedData<Order> o:orders) {
+			Order order=o.getValue();
+			timestamp=Math.max(timestamp, order.getTimestamp());
+			os=os.assoc(o.getAccountKey(), o);
+		}
+		return new Belief(os,timestamp);
+	}
+	
 
 	public static Belief create(HashMap<AccountKey, SignedData<Order>> orderMap, long timestamp) {
 		BlobMap<AccountKey, SignedData<Order>> orders=BlobMaps.create(orderMap);
@@ -146,14 +158,14 @@ public class Belief extends ARecord {
 		Counters.beliefMerge++;
 
 		// accumulate combined list of latest Orders for all peers
-		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(beliefs);
+		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc,beliefs);
 
 		// vote for new proposed chain
 		final BlobMap<AccountKey, SignedData<Order>> resultOrders = vote(mc, accOrders);
 		if (resultOrders == null) return this;
 
 		// update my belief with the resulting Orders
-		long newTimestamp = mc.getTimeStamp();
+		long newTimestamp = mc.getTimestamp();
 		if ((orders == resultOrders) && (timestamp == newTimestamp)) return this;
 		final Belief result = new Belief(resultOrders, newTimestamp);
 
@@ -165,7 +177,7 @@ public class Belief extends ARecord {
 	 * @param beliefs Set of Beliefs from which to merge orders
 	 * @return
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(Belief[] beliefs) {
+	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, Belief[] beliefs) {
 		// Initialise result with existing Orders from this Belief
 		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
 		
@@ -174,13 +186,13 @@ public class Belief extends ARecord {
 			if (belief == null) continue; // ignore null beliefs, might happen if invalidated
 			if (belief.equals(this)) continue; // ignore an identical belief. Nothing to update.
 			
-			result=accumulateOrders(result, belief);
+			result=accumulateOrders(mc, result, belief);
 		}
 		return result;
 	}
 	
-	public Belief mergeOrders(Belief b) {
-		BlobMap<AccountKey, SignedData<Order>> newOrders=accumulateOrders(orders,b);
+	public Belief mergeOrders(MergeContext mc, Belief b) {
+		BlobMap<AccountKey, SignedData<Order>> newOrders=accumulateOrders(mc, orders,b);
 		return withOrders(newOrders);
 	}
 	
@@ -189,7 +201,7 @@ public class Belief extends ARecord {
 	 * @param belief Belief from which to merge orders
 	 * @return Updated map of orders
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(BlobMap<AccountKey, SignedData<Order>> orders,Belief belief) {
+	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, BlobMap<AccountKey, SignedData<Order>> orders,Belief belief) {
 		BlobMap<AccountKey, SignedData<Order>> result=orders;
 		
 		BlobMap<AccountKey, SignedData<Order>> bOrders = belief.orders;
@@ -201,6 +213,8 @@ public class Belief extends ARecord {
 			
 			SignedData<Order> b=be.getValue();
 			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
+			Order bc = b.getValue();
+			if (bc.getTimestamp()>mc.getTimestamp()) continue; // ignore future Orders
 			
 			SignedData<Order> a=result.get(key);
 			if (a == null) {
@@ -209,11 +223,9 @@ public class Belief extends ARecord {
 				continue;
 			}
 			
-			
 			if (a.equals(b)) continue; // PERF: fast path for no changes
 
 			Order ac = a.getValue();
-			Order bc = b.getValue();
 
 			boolean shouldReplace=compareOrders(ac,bc);
 			if (shouldReplace) {
@@ -333,7 +345,7 @@ public class Belief extends ARecord {
 			// We have a different Order to propose
 			// First check how consistent this is with out current Order
 			long match = consensusOrder.getBlocks().commonPrefixLength(myOrder.getBlocks());
-			long ts=mc.getTimeStamp();
+			long ts=mc.getTimestamp();
 			
 			// We always want to replace our Order if consistent with our current proposal
 			boolean shouldReplace=match>=myOrder.getProposalPoint();
@@ -348,7 +360,7 @@ public class Belief extends ARecord {
 				}
 				
 				long keepProposalTime=1000; // TODO: needs consideration, maybe randomise?
-				if (mc.getTimeStamp()>myOrder.getTimestamp()+keepProposalTime) {
+				if (mc.getTimestamp()>myOrder.getTimestamp()+keepProposalTime) {
 					shouldReplace=true;
 				}
 			}
@@ -695,6 +707,13 @@ public class Belief extends ARecord {
 		if (newOrders == orders) return this;
 		return Belief.create(newOrders,timestamp);
 	}
+	
+
+	public Belief withTimestamp(long newTimestamp) {
+		if (timestamp==newTimestamp) return this;
+		return Belief.create(orders,newTimestamp);
+	}
+
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -833,6 +852,8 @@ public class Belief extends ARecord {
 	public RecordFormat getFormat() {
 		return BELIEF_FORMAT;
 	}
+
+
 
 
 

@@ -64,6 +64,19 @@ public class Order extends ARecord {
 	}
 
 	/**
+	 * Create an Order with the given consensus positions and Blocks. Mainly for testing.
+	 * @param proposalPoint Proposal Point
+	 * @param consensusPoint Consensus Point
+	 * @param blocks Blocks in Order
+
+	 * @return New Order instance
+	 */
+	@SuppressWarnings("unchecked")
+	public static Order create(long proposalPoint, long consensusPoint, SignedData<Block>... blocks ) {
+		return create(Vectors.of((Object[])blocks).getRef(), proposalPoint, consensusPoint,0);
+	}
+	
+	/**
 	 * Create an empty Order
 
 	 * @return New Order instance
@@ -347,11 +360,12 @@ public class Order extends ARecord {
 	}
 
 	/**
-	 * Tests if this ORder is equivalent to another in terms of consensus (timestamp ignored)
+	 * Tests if this Order is equivalent to another in terms of consensus (timestamp ignored)
 	 * @param b Order to compare with
-	 * @return True if Orders are functionally equal, flase otherwise
+	 * @return True if Orders are functionally equal, false otherwise
 	 */
 	public boolean consensusEquals(Order b) {
+		if (b==null) return false; // definitely not equal
 		if (this.proposalPoint!=b.proposalPoint) return false;
 		if (this.consensusPoint!=b.consensusPoint) return false;
 		if (!this.blocks.equals(b.blocks)) return false;

@@ -31,7 +31,7 @@ public class Transfer extends ATransaction {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Transfer(Address origin,long sequence, Address target, long amount) {
-		super(FORMAT,origin,sequence);
+		super(FORMAT.count(),origin,sequence);
 		this.target = target;
 		this.amount = amount;
 	}

@@ -38,9 +38,10 @@ public class Invoke extends ATransaction {
 
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,Keywords.COMMAND};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+	private static final long FORMAT_COUNT=FORMAT.count();
 
 	protected Invoke(Address address,long sequence, ACell args) {
-		super(FORMAT,address,sequence);
+		super(FORMAT_COUNT,address,sequence);
 		this.command = args;
 	}
 

@@ -68,7 +68,7 @@ public class MergeContext {
 	 * Gets the timestamp of this merge
 	 * @return Timestamp
 	 */
-	public long getTimeStamp() {
+	public long getTimestamp() {
 		return timestamp;
 	}
 

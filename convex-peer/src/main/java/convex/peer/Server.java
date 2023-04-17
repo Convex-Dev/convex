@@ -768,10 +768,13 @@ public class Server implements Closeable {
 			}
 			Peer newPeer = peer.mergeBeliefs(beliefs);
 			if(newPeer==peer) return false;
+			
+			boolean orderChanged=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
+			
 			peer = newPeer;
 
 			//log.info( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
-			return true;
+			return orderChanged;
 		} catch (MissingDataException e) {
 			// Shouldn't happen if beliefs are persisted
 			// e.printStackTrace();
@@ -961,7 +964,8 @@ public class Server implements Closeable {
 					// Wait for some new Beliefs to accumulate up to a given time
 					awaitBeliefs();
 					
-					// Update Peer timestamp.
+					// Update Peer timestamp. Do this so that we can include
+					// Recent Orders from other Peers in merge
 					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 					
 					// Try belief update

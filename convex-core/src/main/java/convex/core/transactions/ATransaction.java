@@ -1,13 +1,12 @@
 package convex.core.transactions;
 
 import convex.core.data.ACell;
-import convex.core.data.Address;
 import convex.core.data.ARecord;
+import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.type.AType;
 import convex.core.data.type.Transaction;
 import convex.core.lang.Context;
-import convex.core.lang.impl.RecordFormat;
 
 /**
  * Abstract base class for immutable transactions
@@ -24,8 +23,8 @@ public abstract class ATransaction extends ARecord {
 	protected final Address origin;
 	protected final long sequence;
 
-	protected ATransaction(RecordFormat format,Address origin, long sequence) {
-		super(format.count());
+	protected ATransaction(long count,Address origin, long sequence) {
+		super(count);
 		if (origin==null) throw new ClassCastException("Null Origin Address for transaction");
 		this.origin=origin;
 		this.sequence = sequence;

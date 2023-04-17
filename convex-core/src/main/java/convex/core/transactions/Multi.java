@@ -49,7 +49,7 @@ public class Multi extends ATransaction {
 
 	
 	protected Multi(Address origin, long sequence, int mode, Ref<AVector<ATransaction>> txs) {
-		super(FORMAT, origin, sequence);
+		super(FORMAT.count(), origin, sequence);
 		this.mode=mode;
 		this.txs=txs;
 	}

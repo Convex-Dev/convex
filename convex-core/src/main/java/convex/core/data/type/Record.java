@@ -2,6 +2,8 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
+import convex.core.data.Keywords;
+import convex.core.lang.impl.RecordFormat;
 
 /**
  * Type that represents any CVM collection
@@ -9,6 +11,9 @@ import convex.core.data.ARecord;
 public class Record extends AStandardType<ARecord> {
 
 	public static final Record INSTANCE = new Record();
+	
+	@SuppressWarnings("unused")
+	private static final RecordFormat DUMMY_FORMAT=RecordFormat.of(Keywords.FOO);
 	
 	private Record() {
 		super(ARecord.class);

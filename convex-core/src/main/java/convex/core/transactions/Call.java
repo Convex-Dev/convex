@@ -39,7 +39,7 @@ public class Call extends ATransaction {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
-		super(FORMAT,address,sequence);
+		super(FORMAT.count(),address,sequence);
 		this.target=target;
 		this.functionName=functionName;
 		this.offer=offer;
