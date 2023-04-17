@@ -150,7 +150,7 @@ public class Belief extends ARecord {
 	 * 
 	 * @param mc MergeContext for Belief Merge
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
-	 * @return The updated merged belief, or the same Belief if there is no change.
+	 * @return The updated merged belief with latest timestamp, or the same Belief if there is no change to Orders.
 	 * @throws BadSignatureException In case of a bad signature
 	 * @throws InvalidDataException In case of invalid data
 	 */
@@ -166,7 +166,7 @@ public class Belief extends ARecord {
 
 		// update my belief with the resulting Orders
 		long newTimestamp = mc.getTimestamp();
-		if ((orders == resultOrders) && (timestamp == newTimestamp)) return this;
+		if (orders == resultOrders) return this;
 		final Belief result = new Belief(resultOrders, newTimestamp);
 
 		return result;
