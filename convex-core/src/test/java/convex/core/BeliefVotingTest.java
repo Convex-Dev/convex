@@ -109,8 +109,8 @@ public class BeliefVotingTest {
 			SignedData<Order> o1=or(1, TS, 0,0,A,B);
 			SignedData<Order> o2=or(2, TS, 0,0,B);
 			SignedData<Order> o3=or(3, TS, 0,0,B,A);
-			SignedData<Order> o4=or(4, TS, 0,0,B,A,C,D);
-			SignedData<Order> o5=or(5, TS, 0,0,B,A,E,F,G);
+			SignedData<Order> o4=or(4, TS, 0,0,B,A,C,G); // should win
+			SignedData<Order> o5=or(5, TS, 0,0,B,A,E,F,D);
 			
 			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
 			MergeContext mc=MergeContext.create(b, kps[0], TS, s);
@@ -119,9 +119,11 @@ public class BeliefVotingTest {
 			Order order=so.getValue();
 			assertEquals(7,order.getBlockCount());
 			assertEquals(B,order.getBlock(0));
+			assertEquals(G,order.getBlock(3));
 			assertEquals(0,order.getProposalPoint()); // 66.66..% just short of proposal threshold
 			assertEquals(0,order.getConsensusPoint());
-			assertEquals(Vectors.of(B,A,C,D,E,F,G),order.getBlocks());
+			// Note D,E,F not in winning ORder so sorted by timestamp order
+			assertEquals(Vectors.of(B,A,C,G,D,E,F),order.getBlocks());
 		}
 		
 		{
@@ -162,6 +164,39 @@ public class BeliefVotingTest {
 			assertEquals(1,order.getProposalPoint()); // Enough for proposal
 			assertEquals(1,order.getConsensusPoint()); // Enough for consensus
 			assertEquals(Vectors.of(B,A),order.getBlocks());
+		}
+		
+		{
+			// "Everybody wants to be my enemy"
+			SignedData<Order> o0=or(0, TS, 1,0,A);
+			SignedData<Order> o1=or(1, TS, 1,0,B);
+			SignedData<Order> o2=or(2, TS, 1,0,B);
+			SignedData<Order> o3=or(3, TS, 1,0,B);
+			SignedData<Order> o4=or(4, TS, 1,0,B);
+			SignedData<Order> o5=or(5, TS, 1,0,B);
+			
+			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
+			MergeContext mc=MergeContext.create(b, kps[0], TS+1, s);
+			Belief b2=b.merge(mc);
+			SignedData<Order> so=b2.getOrders().get(keys[0]);
+			assertEquals(o0,so); // Shouldn't have changed
+			Order order=so.getValue();
+			assertEquals(1,order.getBlockCount());
+			assertEquals(A,order.getBlock(0)); // didn't switch
+			assertEquals(1,order.getProposalPoint()); // Kept proposal
+			assertEquals(0,order.getConsensusPoint()); // No change in my consensus
+
+			// After enough time, Peer should be willing to switch proposal
+			MergeContext mc3=MergeContext.create(b, kps[0], TS+1+Constants.KEEP_PROPOSAL_TIME, s);
+			Belief b3=b.merge(mc3);
+			SignedData<Order> so3=b3.getOrders().get(keys[0]);
+			Order order3=so3.getValue();
+			assertEquals(2,order3.getBlockCount());
+			assertEquals(B,order3.getBlock(0)); // didn't switch
+			assertEquals(A,order3.getBlock(1)); // Kept own block
+			assertEquals(1,order3.getProposalPoint()); // Updated proposal 
+			assertEquals(1,order3.getConsensusPoint()); // New consensus
+
 		}
 
 	}

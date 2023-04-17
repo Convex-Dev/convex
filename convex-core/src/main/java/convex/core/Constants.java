@@ -225,4 +225,9 @@ public class Constants {
 	 * Size of incoming Belief queue
 	 */
 	public static final int BELIEF_QUEUE_SIZE = 500;
+
+	/**
+	 * Minimum milliseconds to retain a proposal before switching
+	 */
+	public static final long KEEP_PROPOSAL_TIME = 1000;
 }

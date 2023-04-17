@@ -353,13 +353,13 @@ public class Belief extends ARecord {
 			// If we need to switch proposals be careful!
 			// We only do this after sufficient time has elapsed
 			if (!shouldReplace) {
-				// Replace if we observe a new consensus elsewhere
-				long newConensusPoint=consensusOrder.getConsensusPoint();
-				if (newConensusPoint>consensusPoint) {
-					shouldReplace=true;
-				}
+				// Replace if we observe a consensus elsewhere??
+				//long newConensusPoint=consensusOrder.getConsensusPoint();
+				//if (newConensusPoint>consensusPoint) {
+				//	shouldReplace=true;
+				//}
 				
-				long keepProposalTime=1000; // TODO: needs consideration, maybe randomise?
+				long keepProposalTime=Constants.KEEP_PROPOSAL_TIME; // TODO: needs consideration, maybe randomise?
 				if (mc.getTimestamp()>myOrder.getTimestamp()+keepProposalTime) {
 					shouldReplace=true;
 				}
