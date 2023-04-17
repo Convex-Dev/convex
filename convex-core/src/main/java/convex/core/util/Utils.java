@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -1429,6 +1430,22 @@ public class Utils {
 			count=count+1;
 		}
 		hm.put(value, count);
+	}
+	
+	public static <T> void shuffle(List<T> list) {
+		shuffle(list,new Random());
+	}
+
+	public static <T> void shuffle(List<T> list, Random r) {
+		int n=list.size();
+		for(int i=0; i<n; i++) {
+			int j=r.nextInt(n);
+			if (i!=j) {
+				T temp=list.get(i);
+				list.set(i, list.get(j));
+				list.set(j, temp);
+			}
+		}
 	}
 
 

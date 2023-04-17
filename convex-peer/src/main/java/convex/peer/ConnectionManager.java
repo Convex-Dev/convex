@@ -590,6 +590,7 @@ public class ConnectionManager {
 		long start=Utils.getCurrentTimestamp();
 		while ((!hm.isEmpty())&&(start+1000>Utils.getCurrentTimestamp())) {
 			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
+			Utils.shuffle(left);
 			for (Map.Entry<AccountKey,Connection> me: left) {
 				Connection pc=me.getValue();
 				try {
