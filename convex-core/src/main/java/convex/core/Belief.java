@@ -173,7 +173,7 @@ public class Belief extends ARecord {
 	}
 
 	/**
-	 * Assemble the latest list of orders from all peers by merging from each Belief received
+	 * Assemble the latest map of Orders from all peers by merging from each Belief received
 	 * @param beliefs Set of Beliefs from which to merge orders
 	 * @return
 	 */
@@ -183,8 +183,7 @@ public class Belief extends ARecord {
 		
 		// Iterate over each received Belief
 		for (Belief belief : beliefs) {
-			if (belief == null) continue; // ignore null beliefs, might happen if invalidated
-			if (belief.equals(this)) continue; // ignore an identical belief. Nothing to update.
+			if (belief == null) continue; // ignore null Beliefs, might happen if invalidated
 			
 			result=accumulateOrders(mc, result, belief);
 		}

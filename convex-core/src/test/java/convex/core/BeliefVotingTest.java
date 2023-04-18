@@ -33,7 +33,12 @@ public class BeliefVotingTest {
 			AKeyPair.createSeeded(6)
 	};
 	
+	
 	AccountKey[] keys=Stream.of(kps).map(kp->kp.getAccountKey()).toArray(AccountKey[]::new);
+	
+	State s=Init.createState(List.of(keys));
+	
+	static final long TS=0;
 	
 	@Test
 	public void testComputeVote() {
@@ -41,14 +46,21 @@ public class BeliefVotingTest {
 		assertEquals(0.0, Belief.computeVote(Maps.hashMapOf()), 0.000001);
 	}
 	
-	static final long TS=0;
+	@Test
+	public void testEmptyMerge() throws BadSignatureException, InvalidDataException {
+		Belief b=Belief.create(kps[0],Order.create());
+		
+		MergeContext mc=MergeContext.create(b, kps[0], TS+5, s);
+		Belief b2=b.merge(mc);
+		assertSame(b,b2);
+	}
 
 	
 	@SuppressWarnings("unchecked")
 	@Test public void testBasicMerges() throws BadSignatureException, InvalidDataException {
 		SignedData<Block> A=bl(1);
 		
-		State s=Init.createState(List.of(keys));
+		
 		assertTrue(s.getPeers().get(keys[0]).getTotalStake()>0);
 		
 		Order o0=Order.create().withTimestamp(TS);
@@ -196,9 +208,7 @@ public class BeliefVotingTest {
 			assertEquals(A,order3.getBlock(1)); // Kept own block
 			assertEquals(1,order3.getProposalPoint()); // Updated proposal 
 			assertEquals(1,order3.getConsensusPoint()); // New consensus
-
 		}
-
 	}
 
 	@SuppressWarnings("unchecked")
@@ -221,5 +231,4 @@ public class BeliefVotingTest {
 		ATransaction t=Invoke.create(Address.create(i), i, CVMLong.create(i));
 		return kps[i%kps.length].signData(t);
 	}
-	
 }
