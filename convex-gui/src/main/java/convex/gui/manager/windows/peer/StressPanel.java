@@ -94,7 +94,7 @@ public class StressPanel extends JPanel {
 		JLabel lblClients = new JLabel("Clients");
 		optionPanel.add(lblClients);
 		clientCountSpinner = new JSpinner();
-		clientCountSpinner.setModel(new SpinnerNumberModel(10, 1, 1000, 1));
+		clientCountSpinner.setModel(new SpinnerNumberModel(10, 1, 300, 1));
 		optionPanel.add(clientCountSpinner);
 
 		JLabel lblRequests = new JLabel("Requests per client");
@@ -176,13 +176,15 @@ public class StressPanel extends JPanel {
 					}
 					
 					StringBuilder cmdsb=new StringBuilder();
-					cmdsb.append("[");
+					cmdsb.append("(mapv (fn [k] (let [a (create-account k)] (transfer a 1000000000) a)) [");
 					for (int i=0; i<clientCount; i++) {
-						cmdsb.append("(let [a (create-account "+kps.get(i).getAccountKey()+")] (transfer a 1000000000) a)");
+						cmdsb.append(" "+kps.get(i).getAccountKey());
 					}
-					cmdsb.append("]");
+					cmdsb.append("])");
 					
-					AVector<Address> v=pc.transactSync(Invoke.create(address, -1, cmdsb.toString())).getValue();
+					Result ccr=pc.transactSync(Invoke.create(address, -1, cmdsb.toString()));
+					if (ccr.isError()) throw new Error("Creating accounts failed: "+ccr);
+					AVector<Address> v=ccr.getValue();
 
 					ArrayList<Convex> ccs=new ArrayList<>(clientCount);
 					for (int i=0; i<clientCount; i++) {

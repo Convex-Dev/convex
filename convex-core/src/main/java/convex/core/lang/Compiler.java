@@ -300,6 +300,7 @@ public class Compiler {
 		if (n == 0) return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_VECTOR);
 
 		context = context.compileAll(vec);
+		if (context.isError()) return (Context<T>) context;
 		AVector<AOp<ACell>> obs = (AVector<AOp<ACell>>) context.getResult();
 
 		// return a 'vector' call - note function arg is a constant, we don't want to
