@@ -1026,6 +1026,14 @@ public class Server implements Closeable {
 						if (!replace) continue;
 					} 
 					
+					// Check signature before we accept Order
+					if (!so.checkSignature()) {
+						log.info("Bad Order signature");
+						m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
+						// TODO: close connection?
+						continue;
+					};
+					
 					// Ensure we can persist newly received Order
 					so=ACell.createPersisted(so).getValue();
 					newOrders.put(key, so);

@@ -229,11 +229,7 @@ public class Belief extends ARecord {
 
 			boolean shouldReplace=compareOrders(ac,bc);
 			if (shouldReplace) {
-				// Check signature TODO make link with persistence?
-				if (!b.checkSignature()) {
-					// TODO: Better handling rather than just ignoring, e.g. slashing?
-					continue;
-				};
+
 				
 				result=result.assocEntry(be); 
 				continue;
