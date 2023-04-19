@@ -193,5 +193,10 @@ public class ErrorCodes {
 
 	public static final Keyword LOAD = Keyword.create("LOAD");
 
+	/**
+	 * ErrorCode indicating failure of a child transaction
+	 */
+	public static final Keyword CHILD = Keyword.create("CHILD");
+
 
 }

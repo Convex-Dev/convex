@@ -224,6 +224,16 @@ public final class Result extends ARecordGeneric {
 		}
 		return create(id,(ACell)result,errorCode,info);
 	}
+	
+	/**
+	 * Constructs a Result from a Context
+	 * @param ctx Context
+	 * @return New Result instance
+	 */
+	public static Result fromContext(Context<?> ctx) {
+		return fromContext(null,ctx);
+	}
+
 
 	/**
 	 * Updates result with a given message ID. Used to tag Results for return to Clients
@@ -243,6 +253,7 @@ public final class Result extends ARecordGeneric {
 	public RecordFormat getFormat() {
 		return RESULT_FORMAT;
 	}
+
 
 
 }

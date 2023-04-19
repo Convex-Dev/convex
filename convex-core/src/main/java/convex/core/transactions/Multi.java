@@ -1,17 +1,22 @@
 package convex.core.transactions;
 
 import convex.core.Constants;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.impl.RecordFormat;
@@ -25,22 +30,22 @@ public class Multi extends ATransaction {
 	/**
 	 * Mode to execute and report all transactions, regardless of outcome
 	 */
-	public int MODE_ANY=0; 
+	public static final int MODE_ANY=0; 
 	
 	/**
 	 * Mode to execute all transactions iff all succeed
 	 */
-	public int MODE_ALL=1; 
+	public static final int MODE_ALL=1; 
 	
 	/**
 	 * Mode to execute up to the first successful transaction result
 	 */
-	public int MODE_FIRST=2; 
+	public static final int MODE_FIRST=2; 
 	
 	/**
 	 * Mode to execute up to the first failed transaction result
 	 */
-	public int MODE_UNTIL=3; 
+	public static final int MODE_UNTIL=3; 
 
 
 	
@@ -52,6 +57,11 @@ public class Multi extends ATransaction {
 		super(FORMAT.count(), origin, sequence);
 		this.mode=mode;
 		this.txs=txs;
+	}
+	
+	public static Multi create(Address origin, long sequence, int mode, ATransaction... txs) {
+		AVector<ATransaction> v= Vectors.create(txs);
+		return new Multi(origin,sequence,mode,v.getRef());
 	}
 
 	public int getMode() {
@@ -71,6 +81,33 @@ public class Multi extends ATransaction {
 		pos = txs.encode(bs, pos);
 		return pos;
 	}
+	
+
+	public static Multi read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		
+		long aval=Format.readVLCLong(b,epos);
+		Address origin=Address.create(aval);
+		epos+=Format.getVLCLength(aval);
+		
+		long sequence = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(sequence);
+
+		long mode = Format.readVLCLong(b,epos);
+		if (!isValidMode(mode)) throw new BadFormatException("Invalid Multi transaction mode: "+mode);
+		epos+=Format.getVLCLength(mode);
+		
+		Ref<AVector<ATransaction>> txs=Format.readRef(b, epos);
+		epos+=txs.getEncodingLength();
+		
+		Multi result=new Multi(origin,sequence,(int)mode,txs);
+		result.attachEncoding(b.slice(pos,epos));
+		return result;
+	}
+
+	private static boolean isValidMode(long mode) {
+		return (mode>=MODE_ANY)&&(mode<=MODE_UNTIL);
+	}
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -78,30 +115,59 @@ public class Multi extends ATransaction {
 		return 100;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> Context<T> apply(Context<?> ctx) {
+		// save initial context, we might need this for rollback
+		Context<?> ictx=ctx.fork(); 
+		
 		AVector<ATransaction> ts=txs.getValue();
 		// Context<?> initialContext=ctx.fork();
 		long n=ts.count();
 		AVector<Result> rs=Vectors.empty();
 		for (int i=0; i<n; i++) {
 			ATransaction t=ts.get(i);
-			ctx=t.apply(ctx);
-			Result r=Result.fromContext(CVMLong.ZERO, ctx);
+			
+			ctx=applySubTransaction(ctx,t);
+			Result r=Result.fromContext(ctx);
 			rs=rs.conj(r);
 			if (r.isError()) {
-				if (mode==MODE_FIRST) break;
+				if (mode==MODE_UNTIL) break;
 				if (mode==MODE_ALL) {
-					// TODO: rollback
+					// rollback
 					break;
 				}
 			} else {
-				if (mode==MODE_UNTIL) break;
+				if (mode==MODE_FIRST) break;
 			}
 		}
-		// TODO: failure cases
-		Context<T> rctx=ctx.withValue(rs);
+		
+		Context<T> rctx;
+		if (ctx.isError()&&(mode==MODE_ALL)) {
+			ctx=ictx.handleStateResults(ctx, true);
+			rctx=(Context<T>) ctx.withError(ErrorCodes.CHILD, rs);
+		} else {
+			rctx=ctx.withResult(rs);
+		}
 		return rctx;
+	}
+
+	private Context<?> applySubTransaction(Context<?> ctx, ATransaction t) {
+		Address torigin=t.origin;
+		if (!this.origin.equals(torigin)) {
+			// different origin account, so need to check control right
+			AccountStatus as=ctx.getAccountStatus(torigin);
+			if (as==null) return ctx.withError(ErrorCodes.NOBODY,"Child transaction origin account does not exist");
+			Address cont=as.getController();
+			if ((cont==null)||!this.origin.equals(cont)) {
+				return ctx.withError(ErrorCodes.TRUST,"Account control not available");
+			}
+		}
+		
+		Context<?> childContext=ctx.forkWithAddress(torigin);
+		childContext = t.apply(childContext);
+		ctx=ctx.handleStateResults(childContext,false);
+		return ctx;
 	}
 
 	@Override
@@ -147,10 +213,26 @@ public class Multi extends ATransaction {
 		// Always just one Ref
 		return 1;
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		if (i==0) return (Ref<R>) txs;
+		throw new IndexOutOfBoundsException(i);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public Multi updateRefs(IRefFunction func) {
+		Ref<AVector<ATransaction>> ntxs=(Ref<AVector<ATransaction>>) func.apply(txs);
+		if (ntxs==txs) return this;
+		return new Multi(origin,sequence,mode,ntxs);
+	}
 
 	@Override
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 
 }

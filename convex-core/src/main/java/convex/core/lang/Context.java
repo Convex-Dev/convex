@@ -1712,13 +1712,14 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Handle results at the end of an execution boundary (actor call, transaction etc.)
-	 * @param <R>
-	 * @param returnContext
-	 * @param rollback
-	 * @return
+	 * @param <R> Return type of Context
+	 * @param returnContext Context containing return from child transaction / call
+	 * @param rollback If true, always rolls back state effects
+	 * @return Updated parent context
 	 */
 	@SuppressWarnings("unchecked")
-	private <R extends ACell> Context<R> handleStateResults(Context<R> returnContext, boolean rollback) {
+	public
+	<R extends ACell> Context<R> handleStateResults(Context<?> returnContext, boolean rollback) {
 		/** Return value */
 		Object rv;
 		if (returnContext.isExceptional()) {
@@ -1838,6 +1839,11 @@ public class Context<T extends ACell> extends AObject {
 
 	public <R extends ACell> Context<R> withError(Keyword errorCode,String message) {
 		return withError(ErrorValue.create(errorCode,Strings.create(message)));
+	}
+	
+
+	public Context<T> withError(Keyword errorCode, ACell rs) {
+		return withError(ErrorValue.createRaw(errorCode,rs));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -2287,6 +2293,7 @@ public class Context<T extends ACell> extends AObject {
 		}
 		return null;
 	}
+
 
 
 
