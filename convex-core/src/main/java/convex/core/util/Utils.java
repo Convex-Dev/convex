@@ -1387,6 +1387,29 @@ public class Utils {
 		}
 		return futures;
 	}
+	
+	/**
+	 * Executes functions on a new thread for each element of a collection
+	 * @param <R> Result type of function
+	 * @param <T> Argument type
+	 * @param func Function to run
+	 * @param items Collection of items to run futures on
+	 * @return List of futures for each item
+	 */
+	public static <R,T> ArrayList<CompletableFuture<R>> threadMap(Function<T,R> func, Collection<T> items) {
+		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
+		for (T item: items) {
+			CompletableFuture<R> f=new CompletableFuture<>();
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					f.complete(func.apply(item));
+				}
+			}).start();
+			futures.add(f);
+		}
+		return futures;
+	}
 
 
 	public static <R> void awaitAll(Collection<CompletableFuture<R>> cfutures) throws InterruptedException, ExecutionException {

@@ -201,7 +201,7 @@ public class StressPanel extends JPanel {
 					
 					resultArea.setText("Sending transactions...");
 					
-					ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (cc->{
+					ArrayList<CompletableFuture<Object>> cfutures=Utils.threadMap (cc->{
 						try {
 							for (int i = 0; i < requestCount; i++) {
 								StringBuilder tsb = new StringBuilder();
