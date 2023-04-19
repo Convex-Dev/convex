@@ -92,4 +92,7 @@ Alternatively, email: info(at)convex.world
 
 ## Copyright
 
-Copyright 2017-2021 The Convex Foundation
+Copyright 2017-2023 The Convex Foundation and Contributors
+
+Unless otherwise specified, source code is available under the terms of the [Convex 
+Public License](LICENSE.md)
