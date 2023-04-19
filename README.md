@@ -6,11 +6,14 @@
 
 Convex is a decentralised network and execution engine for the Internet of Value. It can be seen as an implementation of a "Stateful Internet" where the network itself securely hosts and executes code and data.
 
-It is designed as a full stack solution for decentralised application and economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. It has some similarities with a typical public blockchain, but offers some significant advantages:
+It is designed as a full stack solution for decentralised applications and programmable economic systems that manage digital assets, where asset ownership is cryptographically secured and can be managed (optionally) with Smart Contracts. 
+
+Convex is based on Lattice Technology, exploiting the mathematical properties of lattices to achieve efficient consensus and verifiability. Lattice technology can be used to solve problems in a similar manner to blockchains, but offers some significant advantages:
 
 - Global State model with immutable data structures and atomic transactions
 - Lambda Calculus based VM supporting Turing complete Smart Contracts
-- High transaction throughput (tens of thousands of write transactions per second, scaling to millions in the future)
+- High transaction throughput (tens of thousands of write transactions per second, potentially scaling to millions in the future)
+- Simple networking protocol based on random gossip
 - Low latency for transaction confirmation (milliseconds for global consensus, depending on network speed)
 - 100% Green - energy efficiency using the Convergent Proof of Stake consensus algorithm
 - Integrated on-chain compiler (Convex Lisp)
@@ -24,6 +27,7 @@ This repository contains the core Convex distribution including:
 - CLI Tools for operating Peers, scripting transactions and more
 - The Etch database for persistent data storage
 - A Swing GUI for managing local peers / exploring the network
+- A simple REST API server
 - JMH Benchmarking suite
 - Java Client API
 
@@ -80,13 +84,13 @@ or you can run this from the command line by using the `local gui` command:
 
 Open Source contributions are welcome under the terms of the Convex Public License. Contributors retain copyright to their work, but must accept the terms of the license.
 
-We are planning to institute a Contributors Agreement for all contributions to the core Convex repository.
+We have instituted a Contributors Agreement for all contributions to the core Convex repository.
 
 The Convex Foundation may, at its sole discretion, award contributors with Convex Coins as recognition of value contributed to the Convex ecosystem. Convex coins are the native coin of the Convex network, and function as a utility token that provides the right to make use of the services of the network. Convex coins may be exchangeable for other digital assets and currencies.
 
 ## Community
 
-We use Discord as the primary means for discussing Convex - you can join the public server at [https://discord.gg/5j2mPsk](https://discord.gg/5j2mPsk)
+We use Discord as for discussing Convex - you can join the public server at [https://discord.gg/5j2mPsk](https://discord.gg/5j2mPsk)
 
 Alternatively, email: info(at)convex.world
 
