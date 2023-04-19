@@ -38,6 +38,7 @@ import convex.core.data.Strings;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.core.transactions.Multi;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
@@ -211,8 +212,17 @@ public class StressPanel extends JPanel {
 								}
 								tsb.append("))");
 								String source = tsb.toString();
+								Address origin=cc.getAddress();
 								
-								ATransaction t = Invoke.create(cc.getAddress(),-1, Reader.read(source));
+								ATransaction t = Invoke.create(origin,-1, Reader.read(source));
+								if (transCount!=1) {
+									ATransaction[] trxs=new ATransaction[transCount];
+									for (int k=0; k<transCount; k++) {
+										trxs[k]=t;
+									}
+									t=Multi.create(origin, -1, Multi.MODE_ANY, trxs);
+								}
+								
 								CompletableFuture<Result> fr;
 								if (syncCheckBox.isSelected()) {
 									Result r=cc.transactSync(t);
