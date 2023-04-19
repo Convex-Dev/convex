@@ -21,6 +21,16 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.impl.RecordFormat;
 
+/**
+ * The Multi class enables multiple child transactions to be grouped into a single 
+ * wrapper transaction with useful joint execution semantics.
+ * 
+ * Important notes:
+ * - Child transactions must either have the same origin address, or be
+ *   for accounts controlled by the top level origin Address
+ * - Sequence numbers on child transactions are ignored
+ * - All transactions currently share the same juice limit / memory allowance
+ */
 public class Multi extends ATransaction {
 
 	protected Ref<AVector<ATransaction>> txs;
@@ -28,22 +38,26 @@ public class Multi extends ATransaction {
 	private int mode;
 	
 	/**
-	 * Mode to execute and report all transactions, regardless of outcome
+	 * Mode to execute and report all transactions, regardless of outcome. 
+	 * Equivalent to executing transactions independently.
 	 */
 	public static final int MODE_ANY=0; 
 	
 	/**
-	 * Mode to execute all transactions iff all succeed
+	 * Mode to execute all transactions iff all succeed. 
+	 * Will rollback state changes if any fail.
 	 */
 	public static final int MODE_ALL=1; 
 	
 	/**
-	 * Mode to execute up to the first successful transaction result
+	 * Mode to execute up to the first transaction succeeds. 
+	 * State changes resulting from the first successful transaction only will be applied.
 	 */
 	public static final int MODE_FIRST=2; 
 	
 	/**
-	 * Mode to execute up to the first failed transaction result
+	 * Mode to execute until the transaction fails. 
+	 * Transactions beyond the first failure will not be attempted.
 	 */
 	public static final int MODE_UNTIL=3; 
 
@@ -111,8 +125,7 @@ public class Multi extends ATransaction {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// TODO Better estimate?
-		return 100;
+		return 30+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	@SuppressWarnings("unchecked")
