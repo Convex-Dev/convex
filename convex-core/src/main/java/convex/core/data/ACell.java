@@ -82,12 +82,14 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Cached Hash value, or null if not available
 	 */
 	protected final Hash cachedHash() {
-		if (cachedRef!=null) {
-			Hash h=cachedRef.cachedHash();
+		Ref<ACell> ref=cachedRef;
+		if (ref!=null) {
+			Hash h=ref.cachedHash();
 			if (h!=null) return h;
 		}
-		if (encoding==null) return null;
-		return encoding.contentHash;
+		Blob enc=encoding;
+		if (enc==null) return null;
+		return enc.contentHash;
 	}
 
 	/**
@@ -161,6 +163,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		}
 
 		// Else default to checking encodings
+		// We would need to get encodings anyway to compute a Hash....
 		return getEncoding().equals(a.getEncoding());
 	}
 

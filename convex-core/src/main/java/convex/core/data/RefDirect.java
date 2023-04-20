@@ -31,20 +31,9 @@ public class RefDirect<T extends ACell> extends Ref<T> {
      * @param status Status for the Ref
      * @return New Direct Ref
      */
-	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
+	static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
 		int flags=status&Ref.STATUS_MASK;
 		return new RefDirect<T>(value, hash, flags);
-	}
-
-	/**
-	 * Creates a direct Ref to the given value
-	 * @param <T> Type of value
-	 * @param value Any value (may be embedded or otherwise, but should not be null)
-	 * @param hash Hash of value's encoding, or null if not known
-	 * @return Direct Ref to Value
-	 */
-	public static <T extends ACell> RefDirect<T> create(T value, Hash hash) {
-		return create(value, hash, UNKNOWN);
 	}
 
 	/**
@@ -104,7 +93,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		super.validate();
 		if (isEmbedded() != Format.isEmbedded(value)) throw new InvalidDataException("Embedded flag is wrong!", this);
 		if (value == null) {
-			if (this != Ref.NULL_VALUE) throw new InvalidDataException("Null ref not singleton!", this);
+			if (this != Ref.NULL_VALUE) throw new InvalidDataException("Null Ref not singleton!", this);
 		}
 	}
 
@@ -137,7 +126,4 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 		if ((value==null)||value.isCanonical()) return this;
 		return new RefDirect<T>((T)value.toCanonical(), hash,flags);
 	}
-
-
-
 }
