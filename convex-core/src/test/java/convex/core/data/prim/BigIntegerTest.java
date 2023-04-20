@@ -41,7 +41,6 @@ public class BigIntegerTest {
 		
 		// canonicality tests
 		assertFalse(bi.isCanonical());
-		assertTrue(bi.getRef().getValue().isCanonical());
 		
 		doBigTest(bi);
 	}

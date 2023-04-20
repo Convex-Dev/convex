@@ -392,7 +392,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	@SuppressWarnings("unchecked")
 	protected <R extends ACell> Ref<R> createRef() {
-		Ref<ACell> newRef= RefDirect.create(toCanonical(),cachedHash());
+		Ref<ACell> newRef= RefDirect.create(this);
 		cachedRef=newRef;
 		return (Ref<R>) newRef;
 	}
@@ -507,13 +507,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return announce(null);
 	}
 	
-	@SuppressWarnings("unchecked")
 	public <T extends ACell> T announce(Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<ACell> ref = getRef();
+		Ref<T> ref = getRef();
 		AStore store=Stores.current();
 		ref= store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
-		cachedRef=ref;
-		return (T) this;
+		return ref.getValue();
 	}
 	
 	public <T extends ACell> T mark() {

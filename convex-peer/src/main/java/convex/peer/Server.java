@@ -41,7 +41,6 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
-import convex.core.data.Refs;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -1044,7 +1043,8 @@ public class Server implements Closeable {
 						// Missing data
 						Hash h=e.getMissingHash();
 						log.warn("Missing data in Belief! {}",h);
-						System.out.print(Refs.printMissingTree(me));
+						// System.out.print(Refs.printMissingTree(a));
+						// System.exit(0);
 						if (!m.sendMissingData(e.getMissingHash())) {
 							log.warn("Unable to request Missing data in Belief!");
 						}

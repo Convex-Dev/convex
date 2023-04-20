@@ -2,6 +2,7 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -271,7 +272,7 @@ public class EncodingTest {
 	
 	@Test 
 	public void testSignedDataEncoding() throws BadFormatException {
-		Blob bigBlob=Blob.createRandom(new Random(123), 10000);
+		ABlob bigBlob=Blob.createRandom(new Random(123), 10000).toCanonical();
 		Invoke trans=Invoke.create(Address.create(607), 6976, Vectors.of(1,bigBlob,2,bigBlob));
 		SignedData<ATransaction> strans=Samples.KEY_PAIR.signData(trans);
 		assertFalse(strans.isEmbedded());
@@ -384,7 +385,7 @@ public class EncodingTest {
 	}
 	
 	@Test public void testDeltaBeliefEncoding() throws BadFormatException {
-		AKeyPair kp=AKeyPair.generate();
+		AKeyPair kp=AKeyPair.createSeeded(101);
 		Order o=Order.create();
 		o=o.append(kp.signData(Block.create(0, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 1, o))))));
 		o=o.append(kp.signData(Block.create(2, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 2, o))))));
@@ -420,6 +421,23 @@ public class EncodingTest {
 		novelty.clear();
 		b=ACell.createAnnounced(b, noveltyHandler);
 		assertEquals(0,novelty.size());
+		
+		// Extend Belief with new Peer Order
+		AKeyPair kp2=AKeyPair.createSeeded(156757);
+		Order o2=b.getOrder(kp.getAccountKey());
+		o2=o2.append(kp2.signData(Block.create(400, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 7, o))))));
+		Belief b3=b.withOrders(b.getOrders().assoc(kp2.getAccountKey(), kp2.signData(o2)));
+		
+		novelty.clear();
+		b3=ACell.createAnnounced(b3, noveltyHandler);
+		assertFalse(novelty.isEmpty());
+		novelty.add(b3);
+		Blob enc2=Format.encodeDelta(novelty);
+		
+		// Check decode of full delta
+		Belief b4=Format.decodeMultiCell(enc2);
+		Refs.RefTreeStats stats2=Refs.getRefTreeStats(b4.getRef());
+		assertNotEquals(stats2.total,stats2.direct); // should be some non-direct Refs
 	}
 	
 	@Test public void testBadMessageEncoding() {

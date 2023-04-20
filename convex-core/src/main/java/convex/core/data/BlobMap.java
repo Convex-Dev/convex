@@ -764,11 +764,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		
 		if (!Utils.equals(this.entry, a.entry)) return false;
 		
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return h.equals(ha);
-		}
 		return getHash().equals(a.getHash());
 	}
 

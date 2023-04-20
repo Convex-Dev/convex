@@ -101,7 +101,7 @@ public class RefTest {
 		assertEquals(Ref.PERSISTED, vr.getStatus());	
 		
 		// Now try announcing vv
-		vv.announce();
+		vv=vv.announce();
 		vvr=vv.getRef();
 		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
 		assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());
@@ -117,7 +117,7 @@ public class RefTest {
 	
 	@Test 
 	public void testNonStored() throws BadFormatException {
-		Blob r=Blob.createRandom(new Random(), 2*Blob.CHUNK_LENGTH+100); // 2 chunks + an embedded Blob of length 100
+		ABlob r=Blob.createRandom(new Random(), 2*Blob.CHUNK_LENGTH+100).toCanonical(); // 2 chunks + an embedded Blob of length 100
 		assertEquals(4,Refs.totalRefCount(r));
 		assertEquals(4,Refs.uniqueRefCount(r));
 		Blob enc=r.getEncoding();

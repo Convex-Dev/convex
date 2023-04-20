@@ -82,6 +82,21 @@ public class SignedDataTest {
 		assertTrue(sd1.isSignatureChecked());
 		assertTrue(sd1.checkSignature());
 	}
+	
+	@Test
+	public void testRefs() {
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		SignedData<?> sd=kp.signData(Vectors.of(1,3,5,7));
+		
+		assertEquals(1,sd.getRefCount());
+		assertEquals(6,Refs.totalRefCount(sd));
+		
+		SignedData<?> nsd=sd.updateRefs(r->r);
+		assertSame(nsd,sd);
+		
+		Refs.RefTreeStats stats=Refs.getRefTreeStats(sd.getRef());
+		assertEquals(6,stats.total);
+	}
 
 	@Test
 	public void testNullValueSignings() throws BadSignatureException {

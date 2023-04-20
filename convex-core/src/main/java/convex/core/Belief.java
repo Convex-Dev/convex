@@ -814,7 +814,7 @@ public class Belief extends ARecord {
 		}
 
 		if (timestamp!=a.timestamp) return false;
-		if (!(Utils.equals(orders, a.orders))) return false;
+		if (!orders.equals(a.orders)) return false;
 		return true;
 	}
 

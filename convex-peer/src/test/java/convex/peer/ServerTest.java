@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.Belief;
 import convex.core.Coin;
 import convex.core.ErrorCodes;
@@ -110,7 +111,7 @@ public class ServerTest {
 		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
 		// This is a test of flooding a client connection with async messages. Should eventually throw an IOExcepion
 		// from backpressure and *not* bring down the server.
-		Convex convex=Convex.connect(hostAddress, network.VILLAIN,network.VILLAIN_KEYPAIR);
+		ConvexRemote convex=Convex.connect(hostAddress, network.VILLAIN,network.VILLAIN_KEYPAIR);
 
 		ACell cmd=Reader.read("(def tmp (inc tmp))");
 		// Might block, but no issue
