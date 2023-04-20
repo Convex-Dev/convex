@@ -168,4 +168,41 @@ public class Refs {
 		Set<Ref<?>> rs=accumulateRefSet(a);
 		return rs.size();
 	}
+
+	/**
+	 * Utility function to locate missing data
+	 * @param sb StringBuilder to append to
+	 * @param value Value to search for missing data
+	 */
+	public static void printMissingTree(StringBuilder sb, ACell value) {
+		printTree(sb,Ref.get(value),0);
+	}
+	
+
+	public static String printMissingTree(ACell value) {
+		StringBuilder sb=new StringBuilder();
+		printMissingTree(sb,value);
+		return sb.toString();
+	}
+
+	private static void printTree(StringBuilder sb, Ref<ACell> ref, int indent) {
+		for (int i=0; i<indent; i++) {
+			sb.append(' ');
+		}
+		if (ref.isMissing()) {
+			sb.append("Missing: "+ref.getHash()+"\n");
+			return;
+		}
+		ACell v=ref.getValue();
+		if (v==null) {
+			sb.append("nil\n");
+			return;
+		}
+		sb.append(v.getClass().getSimpleName()+"\n");
+		int rc=v.getRefCount();
+		for (int i=0; i<rc; i++) {
+			printTree(sb,v.getRef(i),indent+1);
+		}
+	}
+
 }

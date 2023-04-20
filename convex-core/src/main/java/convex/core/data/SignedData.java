@@ -161,7 +161,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	public ACell get(ACell key) {
 		if (Keywords.PUBLIC_KEY.equals(key)) return publicKey;
 		if (Keywords.SIGNATURE.equals(key)) return signature;
-		if (Keywords.VALUE.equals(key)) return valueRef.getValue();
+		if (Keywords.VALUE.equals(key)) return getValue();
 		
 		return null;
 	}
@@ -200,15 +200,18 @@ public final class SignedData<T extends ACell> extends ARecord {
 		return create(address, sig, value);
 	}
 	
-
 	public static <T extends ACell> SignedData<T>  read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
+		
 		AccountKey address=AccountKey.readRaw(b,epos);
 		epos+=AccountKey.LENGTH;
+		
 		ASignature sig = Ed25519Signature.readRaw(b,epos);
 		epos+=Ed25519Signature.SIGNATURE_LENGTH;
+		
 		Ref<T> value=Format.readRef(b, epos);
 		epos+=value.getEncodingLength();
+		
 		SignedData<T> result=create(address, sig, value);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
@@ -282,7 +285,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 		
 		// SECURITY: preserve verification flags
 		SignedData<T> newSD= new SignedData<T>(newValueRef, publicKey, signature);
-		newSD.cachedRef=newSD.getRef().withFlags(getRef().getFlags());
+		Ref<?> sdr=newSD.getRef();
+		sdr.setFlags(Ref.mergeFlags(sdr.getFlags(), getRef().getFlags()));
 		newSD.attachEncoding(encoding); // optimisation to keep encoding
 		return newSD;
 	}

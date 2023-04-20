@@ -83,9 +83,17 @@ public class TestNetwork {
 	 * @return Convex Client instance
 	 */
 	public synchronized ConvexRemote getClient() {
+		return getClient(AKeyPair.generate());
+	}
+	
+	/**
+	 * Gets a fresh client account on the test network with 1 Gold
+	 * @param kp Key pair to use for client
+	 * @return Convex Client instance
+	 */
+	public synchronized ConvexRemote getClient(AKeyPair kp) {
 		try {
 			TestNetwork network=this;
-			AKeyPair kp=AKeyPair.generate();
 			Address addr=network.CONVEX.createAccountSync(kp.getAccountKey());
 			network.CONVEX.transferSync(addr, Coin.GOLD);
 			ConvexRemote client=Convex.connect(network.SERVER.getHostAddress(),addr,kp);

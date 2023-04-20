@@ -41,6 +41,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
+import convex.core.data.Refs;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -1013,33 +1014,42 @@ public class Server implements Closeable {
 				BlobMap<AccountKey, SignedData<Order>> a = receivedBelief.getOrders();
 				int n=a.size();
 				for (int i=0; i<n; i++) {
-					MapEntry<AccountKey,SignedData<Order>> me=a.entryAt(i);
-					AccountKey key=RT.ensureAccountKey(me.getKey());
-					
-					if (Utils.equals(myKey, key)) continue; // skip own order
-					
-					SignedData<Order> so=me.getValue();
-					if (newOrders.containsKey(key)) {
-						Order newOrder=so.getValue();
-						Order oldOrder=newOrders.get(key).getValue();
-						boolean replace=Belief.compareOrders(oldOrder, newOrder);
-						if (!replace) continue;
-					} 
-					
-					// Check signature before we accept Order
-					if (!so.checkSignature()) {
-						log.info("Bad Order signature");
-						m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
-						// TODO: close connection?
-						continue;
-					};
-					
-					// Ensure we can persist newly received Order
-					so=ACell.createPersisted(so).getValue();
-					newOrders.put(key, so);
-					anyOrderChanged=true;
+					MapEntry<AccountKey,SignedData<Order>> me=null;
+					try {
+						me=a.entryAt(i);
+						AccountKey key=RT.ensureAccountKey(me.getKey());
+						
+						if (Utils.equals(myKey, key)) continue; // skip own order
+						SignedData<Order> so=me.getValue();
+						if (newOrders.containsKey(key)) {
+							Order newOrder=so.getValue();
+							Order oldOrder=newOrders.get(key).getValue();
+							boolean replace=Belief.compareOrders(oldOrder, newOrder);
+							if (!replace) continue;
+						} 
+						
+						// Check signature before we accept Order
+						if (!so.checkSignature()) {
+							log.info("Bad Order signature");
+							m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
+							// TODO: close connection?
+							continue;
+						};
+						
+						// Ensure we can persist newly received Order
+						so=ACell.createPersisted(so).getValue();
+						newOrders.put(key, so);
+						anyOrderChanged=true;
+					} catch (MissingDataException e) {
+						// Missing data
+						Hash h=e.getMissingHash();
+						log.warn("Missing data in Belief! {}",h);
+						System.out.println(Refs.printMissingTree(me));
+						if (!m.sendMissingData(e.getMissingHash())) {
+							log.warn("Unable to request Missing data in Belief!");
+						}
+					}
 				}
-				
 
 				// Notify the update thread that there is something new to handle
 				log.debug("Valid belief received by peer at {}: {}"
@@ -1048,14 +1058,7 @@ public class Server implements Closeable {
 				// Bad message from Peer
 				log.warn("Class cast exception in Belief!",e);
 				m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
-			} catch (MissingDataException e) {
-				// Missing data
-				Hash h=e.getMissingHash();
-				log.warn("Missing data in Belief! {}",h);
-				if (!m.sendMissingData(e.getMissingHash())) {
-					log.warn("Unable to request Missing data in Belief!");
-				}
-			} catch (Exception e) {
+			}  catch (Exception e) {
 				log.warn("Unexpected exception getting Belief",e);
 			}
 		}
