@@ -21,6 +21,7 @@ import convex.core.crypto.Ed25519Signature;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
@@ -82,6 +83,20 @@ public class ConvexRemoteTest {
 			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
 			Result r = convex.transact(SignedData.create(KEYPAIR, Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
+		}
+	}
+	
+	@Test
+	public void testBadSequence() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+		synchronized (network.SERVER) {
+			Convex convex = network.getClient();
+			ATransaction tr = Invoke.create(convex.getAddress(), 10, Reader.read("*address*"));
+			Result r = convex.transactSync(tr);
+			assertEquals(ErrorCodes.SEQUENCE, r.getErrorCode());
+			
+			// Sequence should recover
+			r=convex.transactSync("(+ 2 3)");
+			assertEquals(CVMLong.create(5),r.getValue());
 		}
 	}
 
