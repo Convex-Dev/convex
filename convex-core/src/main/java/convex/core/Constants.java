@@ -75,7 +75,7 @@ public class Constants {
 	/**
 	 * Default timeout in milliseconds for client transactions
 	 */
-	public static final long DEFAULT_CLIENT_TIMEOUT = 6000;
+	public static final long DEFAULT_CLIENT_TIMEOUT = 10000;
 
 	/**
 	 * Allowance for initial user / peer accounts

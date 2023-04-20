@@ -107,11 +107,10 @@ public abstract class Convex {
 
 			// TODO: maybe extract method?
 			synchronized (awaiting) {
-				CompletableFuture<Result> cf = awaiting.get(id);
+				CompletableFuture<Result> cf = awaiting.remove(id);
 				if (cf != null) {
-					awaiting.remove(id);
 					cf.complete(v);
-					log.debug("Completed Result received for message ID: {}", id);
+					log.trace("Result received for message ID: {}", id);
 				} else {
 					log.warn("Ignored Result received for unexpected message ID: {}", id);
 				}
@@ -673,6 +672,11 @@ public abstract class Convex {
 	 */
 	protected CompletableFuture<Result> awaitResult(long id) {
 		CompletableFuture<Result> cf = new CompletableFuture<Result>();
+		cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS).whenComplete((r,e)->{
+			synchronized(awaiting) {
+				awaiting.remove(id);
+			}
+		});
 		awaiting.put(id, cf);
 		return cf;
 	}

@@ -312,15 +312,10 @@ public class Connection {
 	 */
 	public long sendQuery(ACell form, Address address) throws IOException {
 		AStore temp = Stores.current();
-		try {
-			long id = ++idCounter;
-			AVector<ACell> v = Vectors.of(id, form, address);
-			boolean sent = sendObject(MessageType.QUERY, v);
-			return sent ? id : -1;
-		} finally {
-			Stores.setCurrent(temp);
-		}
-
+		long id = ++idCounter;
+		AVector<ACell> v = Vectors.of(id, form, address);
+		boolean sent = sendObject(MessageType.QUERY, v);
+		return sent ? id : -1;
 	}
 
 	/**
@@ -331,14 +326,10 @@ public class Connection {
 	 */
 	public long sendStatusRequest() throws IOException {
 		AStore temp = Stores.current();
-		try {
-			long id = ++idCounter;
-			CVMLong idPayload = CVMLong.create(id);
-			sendObject(MessageType.STATUS, idPayload);
-			return id;
-		} finally {
-			Stores.setCurrent(temp);
-		}
+		long id = ++idCounter;
+		CVMLong idPayload = CVMLong.create(id);
+		boolean sent=sendObject(MessageType.STATUS, idPayload);
+		return sent? id:-1;
 	}
 
 	/**

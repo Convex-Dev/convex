@@ -124,7 +124,8 @@ public class ConvexRemote extends Convex {
 	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
 		CompletableFuture<Result> cf;
 		long id = -1;
-
+		long wait=1;
+		
 		synchronized (awaiting) {
 			// loop until request is queued
 			while (id < 0) {
@@ -134,7 +135,8 @@ public class ConvexRemote extends Convex {
 				} else {
 					// If we can't send yet, block briefly and try again
 					try {
-						Thread.sleep(1);
+						Thread.sleep(wait);
+						wait+=1; // linear backoff
 					} catch (InterruptedException e) {
 						throw new IOException("Transaction sending interrupted",e);
 					}
@@ -156,6 +158,7 @@ public class ConvexRemote extends Convex {
 	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
 		synchronized (awaiting) {
 			long id = connection.sendQuery(query, address);
+			long wait=1;
 			if (id < 0) {
 				throw new IOException("Failed to send query due to full buffer");
 			}
@@ -166,7 +169,8 @@ public class ConvexRemote extends Convex {
 				
 				// If we can't send yet, block briefly and try again
 				try {
-					Thread.sleep(10);
+					Thread.sleep(wait);
+					wait+=1; // linear backoff
 				} catch (InterruptedException e) {
 					throw new IOException("Transaction sending interrupted",e);
 				}
