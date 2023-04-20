@@ -1118,32 +1118,33 @@ public class Format {
 	 * @return Blob encoding
 	 */
 	public static Blob encodeMultiCell(ACell a) {
-		// Add non-embedded child cells to stack
-		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
-		Consumer<Ref<?>> func=r->{cells.add(r);};
-		Refs.visitNonEmbedded(a, func);
-		
 		Blob topCellEncoding=Format.encodedBlob(a);
+		if (a.getRefCount()==0) return topCellEncoding;
+
+		// Add any non-embedded child cells to stack
+		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
+		Consumer<Ref<?>> addToStackFunc=r->{cells.add(r);};
+		Refs.visitNonEmbedded(a, addToStackFunc);
 		if (cells.isEmpty()) {
 			// single cell only
 			return topCellEncoding;
 		}
 		
-		long[] ml=new long[] {topCellEncoding.count()};
+		int[] ml=new int[] {topCellEncoding.size()}; // Array mutation trick for accumulator. Ugly but works....
 		HashSet<Ref<?>> refs=new HashSet<>();
 		Trees.visitStack(cells, cr->{
 			if (!refs.contains(cr)) {
 				ACell c=cr.getValue();
-				long cellLength=c.getEncodingLength();
-				long newLength=ml[0]+cellLength;
+				int cellLength=c.getEncodingLength();
+				int newLength=ml[0]+cellLength;
 				if (newLength>Format.MAX_MESSAGE_LENGTH) return;
 				ml[0]=newLength;
-				Refs.visitNonEmbedded(c, func);
 				refs.add(cr);
+				Refs.visitNonEmbedded(c, addToStackFunc);
 			}
 		});
-		
-		byte[] msg=new byte[Utils.checkedInt(ml[0])];
+		int messageLength=ml[0];
+		byte[] msg=new byte[messageLength];
 		
 		// Ensure we add each unique child
 		topCellEncoding.getBytes(msg, 0);
@@ -1154,7 +1155,7 @@ public class Format {
 			enc.getBytes(msg, ix);
 			ix+=enc.count();
 		}
-		if (ix!=ml[0]) throw new Error("Bad message length expected "+ml[0]+" but was: "+ix);
+		if (ix!=messageLength) throw new Error("Bad message length expected "+ml[0]+" but was: "+ix);
 		
 		return Blob.wrap(msg);
 	}

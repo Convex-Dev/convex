@@ -1044,7 +1044,7 @@ public class Server implements Closeable {
 						// Missing data
 						Hash h=e.getMissingHash();
 						log.warn("Missing data in Belief! {}",h);
-						System.out.println(Refs.printMissingTree(me));
+						System.out.print(Refs.printMissingTree(me));
 						if (!m.sendMissingData(e.getMissingHash())) {
 							log.warn("Unable to request Missing data in Belief!");
 						}
