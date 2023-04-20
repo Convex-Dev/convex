@@ -69,6 +69,8 @@ public class ConnectionManager {
 	 */
 	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 12000;
 
+	private static final long BROADCAST_TIMEOUT = 1000;
+
 	protected final Server server;
 	
 	/**
@@ -161,7 +163,9 @@ public class ConnectionManager {
 				convex.close();
 			}
 		} catch (Throwable t) {
-			if (server.isLive()) log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
+			if (server.isLive()) {
+				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
+			}
 		}
 	}
 
@@ -588,7 +592,7 @@ public class ConnectionManager {
 		HashMap<AccountKey,Connection> hm=getCurrentConnections();
 		
 		long start=Utils.getCurrentTimestamp();
-		while ((!hm.isEmpty())&&(start+1000>Utils.getCurrentTimestamp())) {
+		while ((!hm.isEmpty())&&(start+BROADCAST_TIMEOUT>Utils.getCurrentTimestamp())) {
 			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
 			Utils.shuffle(left);
 			for (Map.Entry<AccountKey,Connection> me: left) {
@@ -635,7 +639,7 @@ public class ConnectionManager {
 	public Connection connectToPeer(InetSocketAddress hostAddress) {
 		Connection newConn = null;
 		try {
-			// Temp client connection
+			// Use temp client connection to query status
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
 			AVector<ACell> status = result.getValue();
@@ -648,7 +652,7 @@ public class ConnectionManager {
 
 			Connection existing=connections.get(peerKey);
 			if ((existing!=null)&&!existing.isClosed()) return existing;
-			// close the current connecton to Convex API
+			// close the current connection to Convex API
 			convex.close();
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages

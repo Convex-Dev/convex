@@ -4,6 +4,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -32,12 +33,10 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
@@ -991,81 +990,79 @@ public class Server implements Closeable {
 	};
 
 	private void awaitBeliefs() throws InterruptedException {
-		ArrayList<Message> allBeliefs=new ArrayList<>();
-		AccountKey myKey=getPeerKey();
+		ArrayList<Message> beliefMessages=new ArrayList<>();
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
 		if (firstEvent==null) return; // nothing arrived
 		
-		allBeliefs.add(firstEvent);
-		beliefQueue.drainTo(allBeliefs); 
+		beliefMessages.add(firstEvent);
+		beliefQueue.drainTo(beliefMessages); 
 		HashMap<AccountKey,SignedData<Order>> newOrders=peer.getBelief().getOrdersHashMap();
 		// log.info("Merging Beliefs: "+allBeliefs.size());
 		boolean anyOrderChanged=false;
 		
-		for (Message m: allBeliefs) {
-			try {
-				Belief receivedBelief=m.getPayload();	
-				// Add to map of new Beliefs received for each Peer
-				beliefReceivedCount++;
-				
-				BlobMap<AccountKey, SignedData<Order>> a = receivedBelief.getOrders();
-				int n=a.size();
-				for (int i=0; i<n; i++) {
-					MapEntry<AccountKey,SignedData<Order>> me=null;
-					try {
-						me=a.entryAt(i);
-						AccountKey key=RT.ensureAccountKey(me.getKey());
-						
-						if (Utils.equals(myKey, key)) continue; // skip own order
-						SignedData<Order> so=me.getValue();
-						if (newOrders.containsKey(key)) {
-							Order newOrder=so.getValue();
-							Order oldOrder=newOrders.get(key).getValue();
-							boolean replace=Belief.compareOrders(oldOrder, newOrder);
-							if (!replace) continue;
-						} 
-						
-						// Check signature before we accept Order
-						if (!so.checkSignature()) {
-							log.info("Bad Order signature");
-							m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
-							// TODO: close connection?
-							continue;
-						};
-						
-						// Ensure we can persist newly received Order
-						so=ACell.createPersisted(so).getValue();
-						newOrders.put(key, so);
-						anyOrderChanged=true;
-					} catch (MissingDataException e) {
-						// Missing data
-						Hash h=e.getMissingHash();
-						log.warn("Missing data in Belief! {}",h);
-						// System.out.print(Refs.printMissingTree(a));
-						// System.exit(0);
-						if (!m.sendMissingData(e.getMissingHash())) {
-							log.warn("Unable to request Missing data in Belief!");
-						}
-					}
-				}
-
-				// Notify the update thread that there is something new to handle
-				log.debug("Valid belief received by peer at {}: {}"
-								,getHostAddress(),receivedBelief.getHash());
-			} catch (ClassCastException e) {
-				// Bad message from Peer
-				log.warn("Class cast exception in Belief!",e);
-				m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
-			}  catch (Exception e) {
-				log.warn("Unexpected exception getting Belief",e);
-			}
+		for (Message m: beliefMessages) {
+			anyOrderChanged=mergeBeliefMessage(newOrders,m);
 		}
 		if (anyOrderChanged) {
 			Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
 			newBeliefs.add(newBelief);
 		}
+	}
+
+	private boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
+		boolean changed=false;
+		AccountKey myKey=getPeerKey();
+		try {
+			// Add to map of new Beliefs received for each Peer
+			beliefReceivedCount++;
+			
+			try {
+				ACell payload=m.getPayload();
+				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
+				for (SignedData<Order> so:a ) {
+					AccountKey key=so.getAccountKey();
+					
+					if (Utils.equals(myKey, key)) continue; // skip own order
+					if (newOrders.containsKey(key)) {
+						Order newOrder=so.getValue();
+						Order oldOrder=newOrders.get(key).getValue();
+						boolean replace=Belief.compareOrders(oldOrder, newOrder);
+						if (!replace) continue;
+					} 
+					
+					// Check signature before we accept Order
+					if (!so.checkSignature()) {
+						log.info("Bad Order signature");
+						m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
+						// TODO: close connection?
+						continue;
+					};
+					
+					// Ensure we can persist newly received Order
+					so=ACell.createPersisted(so).getValue();
+					newOrders.put(key, so);
+					changed=true;
+				}
+			} catch (MissingDataException e) {
+				// Missing data somewhere in Belief / Order received
+				Hash h=e.getMissingHash();
+				log.warn("Missing data in Belief! {}",h);
+				//System.out.print(Refs.printMissingTree(a));
+				// System.exit(0);
+				if (!m.sendMissingData(e.getMissingHash())) {
+					log.warn("Unable to request Missing data in Belief!");
+				}
+			}
+		} catch (ClassCastException e) {
+			// Bad message from Peer
+			log.warn("Class cast exception in Belief!",e);
+			m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
+		}  catch (Exception e) {
+			log.warn("Unexpected exception getting Belief",e);
+		}
+		return changed;
 	}
 
 	/**

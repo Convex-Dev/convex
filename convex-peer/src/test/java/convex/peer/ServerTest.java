@@ -68,6 +68,11 @@ public class ServerTest {
 	private HashMap<Long, Object> results = new HashMap<>();
 
 	private static TestNetwork network;
+	
+	@BeforeAll
+	public static void init() {
+		network = TestNetwork.getInstance();
+	}
 
 	private Consumer<Message> handler = new ResultConsumer() {
 		@Override
@@ -88,11 +93,6 @@ public class ServerTest {
 		}
 	};
 
-	@BeforeAll
-	public static void init() {
-		network = TestNetwork.getInstance();
-	}
-
 	@Test
 	public void testServerConnect() throws IOException, InterruptedException, TimeoutException {
 		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
@@ -104,7 +104,6 @@ public class ServerTest {
 		Utils.timeout(5000, () -> results.get(id1) != null);
 		assertEquals(v, results.get(id1));
 	}
-
 
 	@Test
 	public void testServerFlood() throws IOException, InterruptedException, TimeoutException {

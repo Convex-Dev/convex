@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
 import convex.core.data.ACell;
+import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.store.Stores;
 import convex.core.util.LatestUpdateQueue;
@@ -116,6 +117,10 @@ public class BeliefPropagator {
 		server.lastBroadcastBelief=belief;
 
 		Message msg = Message.createBelief(belief, novelty);
+		long mdc=msg.getMessageData().count();
+		if (mdc>=Format.MAX_MESSAGE_LENGTH*0.95) {
+			log.warn("Long Belief Delta message: "+mdc);
+		}
 		server.manager.broadcast(msg, false);
 		
 		lastBroadcastTime=Utils.getCurrentTimestamp();

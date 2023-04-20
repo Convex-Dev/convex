@@ -85,7 +85,7 @@ public enum MessageType {
 	/**
 	 * Communication of a latest Belief by a Peer.
 	 *
-	 * Payload is a Belief
+	 * Payload is a Belief or a Signed Order
 	 */
 	BELIEF(9),
 	

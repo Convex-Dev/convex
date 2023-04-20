@@ -848,6 +848,30 @@ public class Belief extends ARecord {
 		return BELIEF_FORMAT;
 	}
 
+	/**
+	 * Extract a collection of Orders from a Cell, suitable for Belief merge
+	 * @param payload Cell to extra orders from
+	 * @return Collection of signed orders
+	 */
+	@SuppressWarnings("unchecked")
+	public static Collection<SignedData<Order>> extractOrders(ACell payload) {
+		ArrayList<SignedData<Order>> result=new ArrayList<>();
+		if (payload instanceof SignedData) {
+			SignedData<?> sd=(SignedData<?>)payload;
+			if (sd.getValue() instanceof Order) {
+				result.add((SignedData<Order>) sd);
+			}
+		} else if (payload instanceof Belief) {
+			Belief b=(Belief)payload;
+			BlobMap<AccountKey, SignedData<Order>> porders = b.getOrders();
+			int n=porders.size();
+			for (int i=0; i<n; i++) {
+				result.add(porders.entryAt(i).getValue());
+			}
+		}
+		return result;
+	}
+
 
 
 

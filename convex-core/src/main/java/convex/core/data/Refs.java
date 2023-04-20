@@ -189,6 +189,9 @@ public class Refs {
 		for (int i=0; i<indent; i++) {
 			sb.append(' ');
 		}
+		sb.append(ref.isEmbedded()?'-':'=');
+
+		sb.append(' ');
 		if (ref.isMissing()) {
 			sb.append("Missing: "+ref.getHash()+"\n");
 			return;
