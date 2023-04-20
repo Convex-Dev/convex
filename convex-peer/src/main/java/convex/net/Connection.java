@@ -562,7 +562,7 @@ public class Connection {
 	private static Runnable selectorLoop = new Runnable() {
 		@Override
 		public void run() {
-			log.info("Client selector loop starting...");
+			log.debug("Client selector loop starting...");
 			while (true) {
 				try {
 					selector.select(300);
@@ -595,8 +595,7 @@ public class Connection {
 						}
 					}
 				} catch (Throwable t) {
-					log.error("Uncaught error in PeerConnection client selector loop: {}", t);
-					t.printStackTrace();
+					log.warn("Uncaught error in PeerConnection client selector loop: ", t);
 				}
 			}
 		}

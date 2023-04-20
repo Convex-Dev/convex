@@ -379,8 +379,6 @@ public class Server implements Closeable {
 	public Peer getPeer() {
 		return peer;
 	}
-	
-
 
 	/**
 	 * Gets the desired host name for this Peer
@@ -456,7 +454,7 @@ public class Server implements Closeable {
 			}
 
 			log.info( "Peer Server started at "+nio.getHostAddress()+" with Peer Address: {}",getPeerKey());
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			close();
 			throw new Error("Failed to launch Server", e);
 		} finally {
@@ -943,6 +941,7 @@ public class Server implements Closeable {
 				log.debug("Query thread terminated normally for peer {}", this);
 			} catch (InterruptedException e) {
 				log.debug("Query thread interrupted for peer {}", this);
+				return;
 			} catch (Throwable e) {
 				log.error("Query Thread FAILED: Receiver thread terminated abnormally" + e.getMessage());
 				e.printStackTrace();
@@ -1112,7 +1111,7 @@ public class Server implements Closeable {
 	public void close() {
 		if (!isRunning) return;
 		
-		// Shut down propagator first, not point sending any more Beliefs
+		// Shut down propagator first, no point sending any more Beliefs
 		propagator.close();
 		
 		transactionHandler.close();
