@@ -7,7 +7,6 @@ import java.nio.channels.UnresolvedAddressException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -79,11 +78,6 @@ public class ConnectionManager {
 	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
 
 	/**
-	 * Planned future connections for this Peer
-	 */
-	private final HashSet<InetSocketAddress> plannedConnections = new HashSet<>();
-
-	/**
 	 * The list of outgoing challenges that are being made to remote peers
 	 */
 	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
@@ -110,7 +104,6 @@ public class ConnectionManager {
 				lastUpdate = Utils.getCurrentTimestamp();
 				while (server.isLive()) {
 					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
-					makePlannedConnections();
 					maintainConnections();
 					pollBelief();
 					lastUpdate = Utils.getCurrentTimestamp();
@@ -168,21 +161,6 @@ public class ConnectionManager {
 			}
 		}
 	}
-
-	private void makePlannedConnections() {
-		synchronized(plannedConnections) {
-			for (InetSocketAddress a: plannedConnections) {
-				Connection c=connectToPeer(a);
-				if (c==null) {
-					log.warn( "Planned Connection failed to {}",a);
-				} else {
-					log.info("Planned Connection made to {}",a);
-				}
-			}
-			plannedConnections.clear();
-		}
-	}
-
 
 	protected void maintainConnections() {
 		State s=server.getPeer().getConsensusState();
@@ -301,16 +279,6 @@ public class ConnectionManager {
 
 		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
 		this.pollDelay = (_pollDelay == null) ? ConnectionManager.SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
-	}
-
-	public synchronized void setConnection(AccountKey peerKey, Connection peerConnection) {
-		if (connections.containsKey(peerKey)) {
-			connections.get(peerKey).close();
-			connections.replace(peerKey, peerConnection);
-		}
-		else {
-			connections.put(peerKey, peerConnection);
-		}
 	}
 
 	/**
@@ -585,7 +553,7 @@ public class ConnectionManager {
 	 * @param msg Message to broadcast
 	 *
 	 * @param requireTrusted If true, only broadcast to trusted peers
-	 * @throws InterruptedException 
+	 * @throws InterruptedException If broadcast is interrupted
 	 *
 	 */
 	public synchronized void broadcast(Message msg, boolean requireTrusted) throws InterruptedException {
@@ -617,7 +585,7 @@ public class ConnectionManager {
 			if (hm.isEmpty()) break;
 			
 			// Avoid a busy wait if buffers are full and still have things to send		
-			Thread.sleep(50);
+			Thread.sleep(10);
 		}
 		
 		if (!hm.isEmpty()) {
@@ -643,6 +611,9 @@ public class ConnectionManager {
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
 			AVector<ACell> status = result.getValue();
+			// close the temp connection to Convex API
+			convex.close();
+			
 			if (status == null || status.count()!=Constants.STATUS_COUNT) {
 				throw new Error("Bad status message from remote Peer");
 			}
@@ -652,8 +623,6 @@ public class ConnectionManager {
 
 			Connection existing=connections.get(peerKey);
 			if ((existing!=null)&&!existing.isClosed()) return existing;
-			// close the current connection to Convex API
-			convex.close();
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages
 				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null,Constants.SOCKET_PEER_BUFFER_SIZE,Constants.SOCKET_PEER_BUFFER_SIZE);
@@ -666,16 +635,6 @@ public class ConnectionManager {
 			log.info("Unable to resolve host address: "+hostAddress);
 		}
 		return newConn;
-	}
-
-	/**
-	 * Schedules a request to connect to a Peer at the given host address
-	 * @param hostAddress Address to connect to
-	 */
-	public void connectToPeerAsync(InetSocketAddress hostAddress) {
-		synchronized (plannedConnections) {
-			plannedConnections.add(hostAddress);
-		}
 	}
 
 	public void start() {

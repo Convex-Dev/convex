@@ -58,7 +58,7 @@ public class ConvexRemoteTest {
 	@Test
 	public void testConnection() throws IOException, TimeoutException {
 		synchronized (network.SERVER) {
-			ConvexRemote convex = Convex.connectRemote(network.SERVER);
+			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
 			assertTrue(convex.isConnected());
 			convex.close();
 			assertFalse(convex.isConnected());

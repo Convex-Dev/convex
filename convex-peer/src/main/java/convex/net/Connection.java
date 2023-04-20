@@ -503,7 +503,7 @@ public class Connection {
 		if (chan != null) {
 			try {
 				chan.close();
-			} catch (IOException e) {
+			} catch (Exception e) {
 				// TODO OK to ignore?
 			}
 		}

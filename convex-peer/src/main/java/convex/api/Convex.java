@@ -105,7 +105,7 @@ public abstract class Convex {
 				}
 			}
 
-			// TODO: maybe extract method?
+			// Check if we are waiting for a Result with this ID for this connection
 			synchronized (awaiting) {
 				CompletableFuture<Result> cf = awaiting.remove(id);
 				if (cf != null) {
@@ -164,18 +164,6 @@ public abstract class Convex {
 	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
 			throws IOException, TimeoutException {
 		return Convex.connect(peerAddress, address, keyPair, Stores.current());
-	}
-
-	/**
-	 * Create a remote connection to a Convex Server in the same JVM.
-	 * 
-	 * @param server Server instance to connect to.
-	 * @return Convex client instance
-	 * @throws IOException      If connection fails due to IO error
-	 * @throws TimeoutException If connection attempt times out
-	 */
-	public static ConvexRemote connectRemote(Server server) throws IOException, TimeoutException {
-		return connect(server.getHostAddress(), server.getPeerController(), server.getKeyPair());
 	}
 
 	/**
