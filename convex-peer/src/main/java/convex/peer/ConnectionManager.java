@@ -68,6 +68,9 @@ public class ConnectionManager {
 	 */
 	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 12000;
 
+	/**
+	 * Timeout for a regular Belief delta broadcast
+	 */
 	private static final long BROADCAST_TIMEOUT = 1000;
 
 	protected final Server server;

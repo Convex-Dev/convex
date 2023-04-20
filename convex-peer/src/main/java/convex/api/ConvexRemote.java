@@ -126,26 +126,24 @@ public class ConvexRemote extends Convex {
 		long id = -1;
 		long wait=1;
 		
-		synchronized (awaiting) {
-			// loop until request is queued
-			while (id < 0) {
+		// loop until request is queued
+		while (true) {
+			synchronized (awaiting) {
 				id = connection.sendTransaction(signed);
 				if (id>=0) {
+					// Store future for completion by result message
+					cf = awaitResult(id);
+					maybeUpdateSequence(signed);
 					break;
-				} else {
-					// If we can't send yet, block briefly and try again
-					try {
-						Thread.sleep(wait);
-						wait+=1; // linear backoff
-					} catch (InterruptedException e) {
-						throw new IOException("Transaction sending interrupted",e);
-					}
-				}
+				} 
 			}
-
-			// Store future for completion by result message
-			cf = awaitResult(id);
-			maybeUpdateSequence(signed);
+			
+			try {
+				Thread.sleep(wait);
+				wait+=1; // linear backoff
+			} catch (InterruptedException e) {
+				throw new IOException("Transaction sending interrupted",e);
+			}
 		}
 
 		log.debug("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
@@ -156,29 +154,25 @@ public class ConvexRemote extends Convex {
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
-		synchronized (awaiting) {
-			long id = connection.sendQuery(query, address);
-			long wait=1;
-			if (id < 0) {
-				throw new IOException("Failed to send query due to full buffer");
-			}
-			
-			// loop until request is queued
-			while (id < 0) {
-				id = connection.sendQuery(query);
-				
-				// If we can't send yet, block briefly and try again
-				try {
-					Thread.sleep(wait);
-					wait+=1; // linear backoff
-				} catch (InterruptedException e) {
-					throw new IOException("Transaction sending interrupted",e);
+		long wait=1;
+		
+		// loop until request is queued
+		while (true) {
+			synchronized (awaiting) {
+				long id = connection.sendQuery(query, address);
+				if(id>=0) {
+					CompletableFuture<Result> cf= awaitResult(id);
+					return cf;
 				}
 			}
-
-			// Store future for completion by result message
-			CompletableFuture<Result> cf = awaitResult(id);
-			return cf;
+			
+			// If we can't send yet, block briefly and try again
+			try {
+				Thread.sleep(wait);
+				wait+=1; // linear backoff
+			} catch (InterruptedException e) {
+				throw new IOException("Transaction sending interrupted",e);
+			}
 		}
 	}
 	
