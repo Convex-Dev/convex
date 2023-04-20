@@ -383,6 +383,45 @@ public class EncodingTest {
 		return (T) decoded;
 	}
 	
+	@Test public void testDeltaBeliefEncoding() throws BadFormatException {
+		AKeyPair kp=AKeyPair.generate();
+		Order o=Order.create();
+		o=o.append(kp.signData(Block.create(0, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 1, o))))));
+		o=o.append(kp.signData(Block.create(2, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 2, o))))));
+		o=o.append(kp.signData(Block.create(200, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 3, Samples.MIN_TREE_STRING))))));
+		
+		Belief b=Belief.create(kp, o);
+		
+		b=ACell.createPersisted(b).getValue();
+		assertTrue(b.getRef().getStatus()==Ref.PERSISTED);
+		
+		ArrayList<ACell> novelty=new ArrayList<>();
+		
+		// At this point we know something updated our belief, so we want to rebroadcast
+		// belief to network
+		Consumer<Ref<ACell>> noveltyHandler = r -> {
+			ACell x = r.getValue();
+			novelty.add(x);
+		};
+
+		// persist the state of the Peer, announcing the new Belief
+		// (ensure we can handle missing data requests etc.)
+		b=ACell.createAnnounced(b, noveltyHandler);
+		novelty.add(b);
+		Blob enc=Format.encodeDelta(novelty);
+		
+		// Check decode of full delta
+		Belief b2=Format.decodeMultiCell(enc);
+		Refs.RefTreeStats stats=Refs.getRefTreeStats(b2.getRef());
+		assertEquals(stats.total,stats.direct); // should have everything as direct Ref
+		assertEquals(b,b2);
+		
+		// Check no new novelty if announce again
+		novelty.clear();
+		b=ACell.createAnnounced(b, noveltyHandler);
+		assertEquals(0,novelty.size());
+	}
+	
 	@Test public void testBadMessageEncoding() {
 		Blob first=Vectors.of(1,2,3).getEncoding();
 		
