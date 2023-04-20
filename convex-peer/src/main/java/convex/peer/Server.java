@@ -33,7 +33,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -897,7 +896,7 @@ public class Server implements Closeable {
 		if (log.isTraceEnabled()) {
 			Hash payloadHash = r.getHash();
 			log.trace( "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
-					+ payloadHash.toHexString() + " and encoding: " + Format.encodedBlob(payload).toHexString());
+					+ payloadHash.toHexString());
 		}
 	}
 

@@ -52,10 +52,9 @@ public class NIOServer implements Closeable {
 	}
 
 	/**
-	 * Creates a new unlaunched NIO server
+	 * Creates a new unlaunched NIO server component
 	 * 
-	 * @param server       Peer Server instance for this NIOServer
-	 * @param receiveQueue Queue for received messages
+	 * @param server Peer Server instance for this NIOServer
 	 * @return New NIOServer instance
 	 */
 	public static NIOServer create(Server server) {

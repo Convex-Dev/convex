@@ -270,7 +270,7 @@ public class Connection {
 	 * 
 	 * Does not send embedded values.
 	 *
-	 * @param value Any data object, which will be encoded and sent as a single cell
+	 * @param data Encoded data object
 	 * @return true if buffered successfully, false otherwise (not sent)
 	 * @throws IOException If IO error occurs
 	 */

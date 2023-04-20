@@ -85,8 +85,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * By default, delegates to handleResult and handleError
 	 */
 	private final void handleResultMessage(Message m) {
-		Result result = m.getPayload();
 		try {
+			Result result = m.getPayload();
 			// we now have the full result, so notify those interested
 			long id=m.getID().longValue();
 			handleResult(id,result);
