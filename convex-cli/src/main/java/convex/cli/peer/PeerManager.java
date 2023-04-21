@@ -7,19 +7,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.stream.Collectors;
-
 import convex.api.Convex;
-import convex.core.util.Shutdown;
 import convex.cli.Helpers;
 import convex.core.Belief;
 import convex.core.Result;
@@ -36,11 +33,10 @@ import convex.core.data.SignedData;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
+import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.Server;
-import convex.peer.ServerEvent;
-import convex.peer.ServerInformation;
 import convex.restapi.RESTServer;
 import etch.EtchStore;
 
@@ -55,8 +51,8 @@ public class PeerManager {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerManager.class.getName());
 
-	private static final long TRANSACTION_TIMEOUT_MILLIS = 50000;
-	private static final int FRIENDLY_HEX_STRING_SIZE = 6;
+	protected static final long TRANSACTION_TIMEOUT_MILLIS = 50000;
+	protected static final int FRIENDLY_HEX_STRING_SIZE = 6;
 
 	protected List<Server> peerServerList = new ArrayList<Server>();
 
@@ -69,9 +65,6 @@ public class PeerManager {
 	protected Address address;
 
 	protected AStore store;
-
-	protected BlockingQueue<ServerEvent> serverEventQueue = new ArrayBlockingQueue<ServerEvent>(1024);
-
 
 	private PeerManager(String sessionFilename, AKeyPair keyPair, Address address, AStore store) {
         this.sessionFilename = sessionFilename;
@@ -287,52 +280,10 @@ public class PeerManager {
 
 		Server firstServer = peerServerList.get(0);
 		System.out.println("Starting network Id: "+ firstServer.getPeer().getNetworkID().toString());
-		while (true) {
-			try {
-				ServerEvent event = serverEventQueue.take();
-                ServerInformation information = event.getInformation();
-				int index = getServerIndex(information.getPeerKey());
-				if (index >=0) {
-					String item = toServerInformationText(information);
-					System.out.println(String.format("#%d: %s Msg: %s", index + 1, item, event.getReason()));
-				}
-			} catch (InterruptedException e) {
-				System.out.println("Peer manager interrupted!");
-				return;
-			}
-		}
+		
 	}
 
-	protected String toServerInformationText(ServerInformation serverInformation) {
-		String shortName = Utils.toFriendlyHexString(serverInformation.getPeerKey().toHexString(), FRIENDLY_HEX_STRING_SIZE);
-		String hostname = serverInformation.getHostname();
-		String joined = "NJ";
-		String synced = "NS";
-		if (serverInformation.isJoined()) {
-			joined = " J";
-		}
-		if (serverInformation.isSynced()) {
-			synced = " S";
-		}
-		String stateHash =  Utils.toFriendlyHexString(serverInformation.getStateHash().toHexString(), FRIENDLY_HEX_STRING_SIZE);
-		String beliefHash =  Utils.toFriendlyHexString(serverInformation.getBeliefHash().toHexString(), FRIENDLY_HEX_STRING_SIZE);
-		int connectionCount = serverInformation.getConnectionCount();
-		int trustedConnectionCount = serverInformation.getTrustedConnectionCount();
-		long consensusPoint = serverInformation.getConsensusPoint();
-		String item = String.format("Peer:%s URL: %s Status:%s %s Connections:%2d/%2d Consensus:%4d State:%s Belief:%s",
-				shortName,
-				hostname,
-				joined,
-				synced,
-				connectionCount,
-				trustedConnectionCount,
-				consensusPoint,
-				stateHash,
-				beliefHash
-		);
 
-		return item;
-	}
 
 	protected int getServerIndex(AccountKey peerKey) {
 		for (int index = 0; index < peerServerList.size(); index ++) {
@@ -350,15 +301,5 @@ public class PeerManager {
 		Convex convex = Convex.connect(peerServer, peerServer.getPeerController(), keyPair);
 		RESTServer server=RESTServer.create(convex);
 		server.start(port);
-	}
-
-	/**
-	 * Implements for IServerEvent
-	 *
-	 */
-
-	public void onServerChange(ServerEvent serverEvent) {
-		// add in queue if space available
-		serverEventQueue.offer(serverEvent);
 	}
 }
