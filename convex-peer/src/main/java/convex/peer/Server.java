@@ -193,12 +193,6 @@ public class Server implements Closeable {
 	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
 
 	/**
-	 * The list of new beliefs received from remote peers the block being created
-	 * Should only modify with the lock for this Server held.
-	 */
-	private ArrayList<Belief> newBeliefs = new ArrayList<>();
-
-	/**
 	 * Hostname of the peer server.
 	 */
 	String hostname;
@@ -587,7 +581,7 @@ public class Server implements Closeable {
 	 * @return true if Peer Belief changed, false otherwise
 	 * @throws InterruptedException
 	 */
-	protected boolean maybeUpdateBelief() throws InterruptedException {
+	protected boolean maybeUpdateBelief(Belief newBelief) throws InterruptedException {
 
 		// we are in full consensus if there are no unconfirmed blocks after the consensus point
 		//boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
@@ -598,7 +592,7 @@ public class Server implements Closeable {
 		// - not in full consensus yet
 		//if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
-		boolean updated = maybeMergeBeliefs();
+		boolean updated = maybeMergeBeliefs(newBelief);
 		if (updated) {
 			maybeMergeBeliefs(); // try double merge
 		}
@@ -749,20 +743,13 @@ public class Server implements Closeable {
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief.
+	 * @param newBelief 
 	 *
 	 * @return True if Peer Belief Order was changed, false otherwise.
 	 */
-	protected boolean maybeMergeBeliefs() {
+	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
 		try {
-			// First get the set of new beliefs for merging. Might be empty
-			Belief[] beliefs;
-			synchronized (newBeliefs) {
-				int n = newBeliefs.size();
-				beliefs = new Belief[n];
-				newBeliefs.toArray(beliefs);
-				newBeliefs.clear();
-			}
-			Peer newPeer = peer.mergeBeliefs(beliefs);
+			Peer newPeer = peer.mergeBeliefs(newBeliefs);
 			if (newPeer==peer) return false;
 			
 			// boolean orderChanged=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
@@ -960,14 +947,14 @@ public class Server implements Closeable {
 			while (isRunning) {
 				try {
 					// Wait for some new Beliefs to accumulate up to a given time
-					awaitBeliefs();
+					Belief newBelief = awaitBelief();
 					
 					// Update Peer timestamp. Do this so that we can include
 					// Recent Orders from other Peers in merge
 					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
 					
 					// Try belief update
-					boolean beliefUpdated=maybeUpdateBelief();			
+					boolean beliefUpdated=maybeUpdateBelief(newBelief);			
 					
 					if (beliefUpdated||propagator.isRebroadcastDue()) {						
 						raiseServerChange("consensus");
@@ -987,12 +974,12 @@ public class Server implements Closeable {
 
 	};
 
-	private void awaitBeliefs() throws InterruptedException {
+	private Belief awaitBelief() throws InterruptedException {
 		ArrayList<Message> beliefMessages=new ArrayList<>();
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
-		if (firstEvent==null) return; // nothing arrived
+		if (firstEvent==null) return null; // nothing arrived
 		
 		beliefMessages.add(firstEvent);
 		beliefQueue.drainTo(beliefMessages); 
@@ -1003,10 +990,10 @@ public class Server implements Closeable {
 		for (Message m: beliefMessages) {
 			anyOrderChanged=mergeBeliefMessage(newOrders,m);
 		}
-		if (anyOrderChanged) {
-			Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
-			newBeliefs.add(newBelief);
-		}
+		if (!anyOrderChanged) return null;
+		
+		Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
+		return newBelief;
 	}
 
 	private boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
