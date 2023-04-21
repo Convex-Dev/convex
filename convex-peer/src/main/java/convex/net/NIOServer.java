@@ -61,42 +61,39 @@ public class NIOServer implements Closeable {
 		return new NIOServer(server);
 	}
 
-	public void launch(Integer port) {
+	public void launch(Integer port) throws IOException {
 		launch(null, port);
 	}
 
-	public void launch(String bindAddress, Integer port) {
-		if (port == null)
+	public void launch(String bindAddress, Integer port) throws IOException {
+		if (port == null) {
 			port = 0;
-
-		try {
-			ssc = ServerSocketChannel.open();
-
-			// Set receive buffer size
-			ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
-
-			bindAddress = (bindAddress == null) ? "localhost" : bindAddress;
-			InetSocketAddress address = new InetSocketAddress(bindAddress, port);
-			ssc.bind(address);
-			address = (InetSocketAddress) ssc.getLocalAddress();
-			ssc.configureBlocking(false);
-			port = ssc.socket().getLocalPort();
-
-			// Register for accept. Do this before selection loop starts and
-			// before we return from launch!
-			selector = Selector.open();
-			ssc.register(selector, SelectionKey.OP_ACCEPT);
-
-			// set running status now, so that loops don't terminate
-			running = true;
-
-			Thread selectorThread = new Thread(selectorLoop, "NIO Server selector loop on port: " + port);
-			selectorThread.setDaemon(true);
-			selectorThread.start();
-			log.debug("NIO server started on port {}", port);
-		} catch (Exception e) {
-			throw new Error("Can't bind NIOServer to port: " + port, e);
 		}
+
+		ssc = ServerSocketChannel.open();
+
+		// Set receive buffer size
+		ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
+
+		bindAddress = (bindAddress == null) ? "localhost" : bindAddress;
+		InetSocketAddress address = new InetSocketAddress(bindAddress, port);
+		ssc.bind(address);
+		address = (InetSocketAddress) ssc.getLocalAddress();
+		ssc.configureBlocking(false);
+		port = ssc.socket().getLocalPort();
+
+		// Register for accept. Do this before selection loop starts and
+		// before we return from launch!
+		selector = Selector.open();
+		ssc.register(selector, SelectionKey.OP_ACCEPT);
+
+		// set running status now, so that loops don't terminate
+		running = true;
+
+		Thread selectorThread = new Thread(selectorLoop, "NIO Server selector loop on port: " + port);
+		selectorThread.setDaemon(true);
+		selectorThread.start();
+		log.debug("NIO server started on port {}", port);
 	}
 
 	/**

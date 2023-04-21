@@ -1,6 +1,7 @@
 package convex.core;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.TimeoutException;
 
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -13,6 +14,7 @@ import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -252,6 +254,13 @@ public final class Result extends ARecordGeneric {
 	@Override
 	public RecordFormat getFormat() {
 		return RESULT_FORMAT;
+	}
+
+	public static Result fromException(Throwable e) {
+		if (e instanceof TimeoutException) {
+			return Result.create(null,ErrorCodes.TIMEOUT,Strings.create(e.getMessage()));
+		}
+		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
 
 

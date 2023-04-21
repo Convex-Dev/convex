@@ -28,7 +28,16 @@ import convex.net.message.Message;
 public class BeliefPropagator {
 	
 	public static final int BELIEF_REBROADCAST_DELAY=300;
+	
+	/**
+	 * Minimum delay between successive Belief broadcasts
+	 */
 	public static final int BELIEF_BROADCAST_DELAY=10;
+	
+	/**
+	 * Polling period for Belief propagator loop
+	 */
+	public static final int BELIEF_BROADCAST_POLL_TIME=1000;
 
 	protected final Server server;
 	
@@ -52,7 +61,7 @@ public class BeliefPropagator {
 			while (server.isLive()) {
 				try {
 					// wait until the thread is notified of new work
-					Belief b=beliefQueue.poll(1000, TimeUnit.MILLISECONDS);
+					Belief b=beliefQueue.poll(BELIEF_BROADCAST_POLL_TIME, TimeUnit.MILLISECONDS);
 					if (b!=null) {
 						doBroadcastBelief(b);
 					}
@@ -121,7 +130,7 @@ public class BeliefPropagator {
 		if (mdc>=Format.MAX_MESSAGE_LENGTH*0.95) {
 			log.warn("Long Belief Delta message: "+mdc);
 		}
-		server.manager.broadcast(msg, false);
+		server.manager.broadcast(msg);
 		
 		lastBroadcastTime=Utils.getCurrentTimestamp();
 		beliefBroadcastCount++;

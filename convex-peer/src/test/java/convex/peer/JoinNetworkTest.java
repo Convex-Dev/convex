@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
 import convex.core.Coin;
+import convex.core.Constants;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
@@ -38,7 +39,7 @@ public class JoinNetworkTest {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 
-		long STAKE=1000000000;
+		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*10;
 		synchronized(network.SERVER) {
 			Convex heroConvex=network.CONVEX;
 
@@ -75,7 +76,7 @@ public class JoinNetworkTest {
 			// assertEquals(newServer.getPeer().getConsensusState(),network.SERVER.getPeer().getConsensusState());
 
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
-			assertEquals(user,client.transactSync(Invoke.create(user, 0, "*address*")).getValue());
+			assertEquals(user,client.transactSync("*address*").getValue());
 			
 			Result r=client.requestStatus().get(2000,TimeUnit.MILLISECONDS);
 			assertFalse(r.isError());

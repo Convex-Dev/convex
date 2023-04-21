@@ -48,7 +48,7 @@ public class MemoryByteChannel implements ByteChannel {
 	}
 
 	@Override
-	public void close() throws IOException {
+	public void close() {
 		open=false;
 	}
 

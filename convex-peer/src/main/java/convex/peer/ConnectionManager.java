@@ -91,11 +91,6 @@ public class ConnectionManager {
 
 	private long pollDelay;
 
-	/**
-	 * Timstamp for the last execution of the Connection Manager update loop.
-	 */
-	private long lastUpdate = Utils.getCurrentTimestamp();
-
 	/*
 	 * Runnable loop for managing server connections
 	 */
@@ -104,12 +99,10 @@ public class ConnectionManager {
 		public void run() {
 			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
 			try {
-				lastUpdate = Utils.getCurrentTimestamp();
 				while (server.isLive()) {
 					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 					maintainConnections();
 					pollBelief();
-					lastUpdate = Utils.getCurrentTimestamp();
 				}
 			} catch (InterruptedException e) {
 				/* OK? Close the thread normally */
@@ -128,9 +121,9 @@ public class ConnectionManager {
 	 */
 	private void pollBelief() {
 		try {
-			// Poll if no recent consensus updates
+			// Poll only if no recent consensus updates
 			long lastConsensus = server.getPeer().getConsensusState().getTimeStamp().longValue();
-			if (lastConsensus + pollDelay >= lastUpdate) return;
+			if (lastConsensus + pollDelay >= Utils.getCurrentTimestamp()) return;
 
 			ArrayList<Connection> conns = new ArrayList<>(connections.values());
 			if (conns.size() == 0) {
@@ -165,10 +158,13 @@ public class ConnectionManager {
 		}
 	}
 
+	private long lastConnectionUpdate=Utils.getCurrentTimestamp();
+	
 	protected void maintainConnections() {
 		State s=server.getPeer().getConsensusState();
 
-		long millisSinceLastUpdate=Math.max(0,Utils.getCurrentTimestamp()-lastUpdate);
+		long now=Utils.getCurrentTimestamp();
+		long millisSinceLastUpdate=Math.max(0,now-lastConnectionUpdate);
 
 		int targetPeerCount=getTargetPeerCount();
 		int currentPeerCount=connections.size();
@@ -259,6 +255,8 @@ public class ConnectionManager {
 				connectToPeer(target);
 			}
 		}
+		
+		lastConnectionUpdate=Utils.getCurrentTimestamp();
 	}
 
 	/**
@@ -552,14 +550,13 @@ public class ConnectionManager {
 	}
 
 	/**
-	 *
+	 * Broadcasts a Message to all connected Peers
+	 * 
 	 * @param msg Message to broadcast
-	 *
-	 * @param requireTrusted If true, only broadcast to trusted peers
 	 * @throws InterruptedException If broadcast is interrupted
 	 *
 	 */
-	public synchronized void broadcast(Message msg, boolean requireTrusted) throws InterruptedException {
+	public synchronized void broadcast(Message msg) throws InterruptedException {
 		HashMap<AccountKey,Connection> hm=getCurrentConnections();
 		
 		long start=Utils.getCurrentTimestamp();
@@ -641,14 +638,10 @@ public class ConnectionManager {
 	}
 
 	public void start() {
-		// Set timestamp for connection updates
-		lastUpdate=Utils.getCurrentTimestamp();
-
 		// start connection thread
 		connectionThread = new Thread(connectionLoop, "Connection Manager thread at "+server.getPort());
 		connectionThread.setDaemon(true);
 		connectionThread.start();
-
 	}
 
 	public void close() {

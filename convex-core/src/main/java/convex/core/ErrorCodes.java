@@ -198,5 +198,7 @@ public class ErrorCodes {
 	 */
 	public static final Keyword CHILD = Keyword.create("CHILD");
 
+	public static final Keyword TIMEOUT = Keyword.create("TIMEOUT");
+
 
 }

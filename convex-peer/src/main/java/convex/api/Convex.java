@@ -532,11 +532,12 @@ public abstract class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
-			
-		} catch (InterruptedException | ExecutionException e) {
-			throw new Error("Not possible? Since there is no Thread for the future....", e);
+			return result;
+		} catch (InterruptedException e) {
+			throw Utils.sneakyThrow(e);
+		} catch (ExecutionException e) {
+			return Result.fromException(e.getCause());
 		}
-		return result;
 	}
 
 	/**
@@ -563,10 +564,14 @@ public abstract class Convex {
 		timeout = Math.max(0L, timeout - (now - start));
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException | ExecutionException e) {
-			throw new Error("Not possible? Since there is no Thread for the future....", e);
+			return result;
+		} catch (InterruptedException e) {
+			throw Utils.sneakyThrow(e);
+		} catch (ExecutionException e) {
+			return Result.fromException(e);
+		} finally {
+			cf.cancel(true);
 		}
-		return result;
 	}
 
 	/**
@@ -762,8 +767,10 @@ public abstract class Convex {
 		Result result;
 		try {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException | ExecutionException e) {
-			throw new Error("Not possible? Since there is no Thread for the future....", e);
+		} catch (InterruptedException e) {
+			throw Utils.sneakyThrow(e);
+		} catch (Exception e) {
+			return Result.fromException(e);
 		} finally {
 			cf.cancel(true);
 		}

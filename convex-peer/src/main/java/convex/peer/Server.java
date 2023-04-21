@@ -1127,7 +1127,7 @@ public class Server implements Closeable {
 
 		// broadcast GOODBYE message to all outgoing remote peers
 		try {
-			manager.broadcast(msg, false);
+			manager.broadcast(msg);
 		} catch (InterruptedException e1) {
 			// Ignore
 		}
