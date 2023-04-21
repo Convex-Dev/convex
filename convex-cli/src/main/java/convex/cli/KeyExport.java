@@ -50,8 +50,8 @@ public class KeyExport implements Runnable {
 		}
 
 		if (exportPassword == null || exportPassword.length() == 0) {
-			log.warn("You should provide an export password '--export-password' for the exported key");
-			return;
+			log.warn("No export password '--export-password' provided: Defaulting to blank.");
+			exportPassword="";
 		}
 
 		String publicKey = keystorePublicKey;
