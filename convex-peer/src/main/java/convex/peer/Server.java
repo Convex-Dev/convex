@@ -44,7 +44,6 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
@@ -64,12 +63,16 @@ import convex.net.message.Message;
 
 
 /**
- * A self contained server that can be launched with a config.
+ * A self contained Peer Server that can be launched with a config.
+ * 
+ * The primary role for the Server is to responf to incoming messages and maintain
+ * network consensus.
  *
- * Server creates the following threads:
- * - A ReceiverThread that processes message from the Server's receive Queue
- * - An UpdateThread that handles Belief updates and transaction processing
- * - A ConnectionManager thread, via the ConnectionManager
+ * Components contained within the Server handle specific tasks, e.g:
+ * - Client transaction handling
+ * - CPoS Belief merges
+ * - Belief Propagation
+ * - CVM Execution
  *
  * "Programming is a science dressed up as art, because most of us don't
  * understand the physics of software and it's rarely, if ever, taught. The
@@ -763,10 +766,6 @@ public class Server implements Closeable {
 			// Shouldn't happen if beliefs are persisted
 			// e.printStackTrace();
 			throw new Error("Missing data in belief update: " + e.getMissingHash().toHexString(), e);
-		} catch (BadSignatureException e) {
-			// Shouldn't happen if Beliefs are already validated
-			// e.printStackTrace();
-			throw new Error("Bad Signature in belief update!", e);
 		} catch (InvalidDataException e) {
 			// Shouldn't happen if Beliefs are already validated
 			// e.printStackTrace();

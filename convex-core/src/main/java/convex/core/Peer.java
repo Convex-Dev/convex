@@ -370,10 +370,9 @@ public class Peer {
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @return Updated Peer after Belief Merge
 	 * @throws InvalidDataException if 
-	 * @throws BadSignatureException IF a Signature validation fails
 	 *
 	 */
-	public Peer mergeBeliefs(Belief... beliefs) throws BadSignatureException, InvalidDataException {
+	public Peer mergeBeliefs(Belief... beliefs) throws InvalidDataException {
 		Belief belief=getBelief();
 		MergeContext mc = MergeContext.create(belief,keyPair, timestamp, getConsensusState());
 		Belief newBelief = belief.merge(mc,beliefs);

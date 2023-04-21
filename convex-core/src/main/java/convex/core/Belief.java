@@ -151,10 +151,9 @@ public class Belief extends ARecord {
 	 * @param mc MergeContext for Belief Merge
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @return The updated merged belief with latest timestamp, or the same Belief if there is no change to Orders.
-	 * @throws BadSignatureException In case of a bad signature
 	 * @throws InvalidDataException In case of invalid data
 	 */
-	public Belief merge(MergeContext mc, Belief... beliefs) throws BadSignatureException, InvalidDataException {
+	public Belief merge(MergeContext mc, Belief... beliefs) throws InvalidDataException {
 		Counters.beliefMerge++;
 
 		// accumulate combined list of latest Orders for all peers
@@ -281,8 +280,7 @@ public class Belief extends ARecord {
 	 * @return
 	 * @throws BadSignatureException @
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> vote(final MergeContext mc, final BlobMap<AccountKey, SignedData<Order>> accOrders)
-			throws BadSignatureException {
+	private BlobMap<AccountKey, SignedData<Order>> vote(final MergeContext mc, final BlobMap<AccountKey, SignedData<Order>> accOrders) {
 		AccountKey myAddress = mc.getAccountKey();
 
 		// get current Order for this peer.
@@ -684,7 +682,7 @@ public class Belief extends ARecord {
 	 * @return Order for current Peer, or null if not found
 	 * @throws BadSignatureException 
 	 */
-	private Order getMyOrder(MergeContext mc) throws BadSignatureException {
+	private Order getMyOrder(MergeContext mc) {
 		AccountKey myAddress = mc.getAccountKey();
 		SignedData<Order> signed = (SignedData<Order>) orders.get(myAddress);
 		if (signed == null) return null;
