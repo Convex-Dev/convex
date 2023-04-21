@@ -1032,7 +1032,7 @@ public class Server implements Closeable {
 					
 					// Check signature before we accept Order
 					if (!so.checkSignature()) {
-						log.info("Bad Order signature");
+						log.warn("Bad Order signature");
 						m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
 						// TODO: close connection?
 						continue;

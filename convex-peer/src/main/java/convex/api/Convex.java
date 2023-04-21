@@ -546,7 +546,7 @@ public abstract class Convex {
 	 *
 	 * @param transaction Transaction to execute
 	 * @param timeout     Number of milliseconds for timeout
-	 * @return The result of the transaction
+	 * @return The Result of the transaction, if received
 	 * @throws IOException      If the connection is broken
 	 * @throws TimeoutException If the attempt to transact with the network is not
 	 *                          confirmed by the specified timeout
@@ -568,7 +568,8 @@ public abstract class Convex {
 		} catch (InterruptedException e) {
 			throw Utils.sneakyThrow(e);
 		} catch (ExecutionException e) {
-			return Result.fromException(e);
+			throw Utils.sneakyThrow(e);
+			// return Result.fromException(e);
 		} finally {
 			cf.cancel(true);
 		}
