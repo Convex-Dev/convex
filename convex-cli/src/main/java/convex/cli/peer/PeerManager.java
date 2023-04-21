@@ -38,7 +38,6 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 import convex.peer.API;
-import convex.peer.IServerEvent;
 import convex.peer.Server;
 import convex.peer.ServerEvent;
 import convex.peer.ServerInformation;
@@ -52,7 +51,7 @@ import etch.EtchStore;
 *
 */
 
-public class PeerManager implements IServerEvent {
+public class PeerManager {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerManager.class.getName());
 
@@ -94,7 +93,7 @@ public class PeerManager implements IServerEvent {
 
 		this.keyPair = keyPairList.get(0);
 		State genesisState=Init.createState(keyList);
-		peerServerList = API.launchLocalPeers(keyPairList,genesisState, peerPorts, this);
+		peerServerList = API.launchLocalPeers(keyPairList,genesisState, peerPorts);
 	}
 
 	public List<Hash> getNetworkHashList(String remotePeerHostname) {

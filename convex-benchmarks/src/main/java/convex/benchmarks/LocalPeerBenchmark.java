@@ -56,7 +56,7 @@ public class LocalPeerBenchmark {
 	
 	static {
 		try {
-			List<Server> servers=API.launchLocalPeers(PEER_KEYPAIRS, GENESIS, null, null);
+			List<Server> servers=API.launchLocalPeers(PEER_KEYPAIRS, GENESIS, null);
 
 			SERVER=servers.get(0);
 			PEER_CLIENT=Convex.connect(SERVER, Init.GENESIS_ADDRESS, PEER_KP);

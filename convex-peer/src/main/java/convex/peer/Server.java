@@ -185,22 +185,12 @@ public class Server implements Closeable {
 	 */
 	String hostname;
 
-	private IServerEvent eventHook = null;
-
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 
 		this.rootKey = (ACell)config.get(Keywords.ROOT_KEY);
 
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
-
-		// assign the event hook if set
-		if (config.containsKey(Keywords.EVENT_HOOK)) {
-			Object maybeHook=config.get(Keywords.EVENT_HOOK);
-			if (maybeHook instanceof IServerEvent) {
-				this.eventHook = (IServerEvent)maybeHook;
-			}
-		}
 		
 		// Set up Queue. TODO: use config if provided
 		beliefQueue = new ArrayBlockingQueue<>(Constants.BELIEF_QUEUE_SIZE);
@@ -557,10 +547,8 @@ public class Server implements Closeable {
 		SignedData<AccountKey> signedPeerKey = m.getPayload();
 		AccountKey remotePeerKey = RT.ensureAccountKey(signedPeerKey.getValue());
 		manager.closeConnection(remotePeerKey);
-		raiseServerChange("connection");
+		log.trace("Connection Closed");
 	}
-
-
 
 	/**
 	 * Handle general Belief update, taking belief registered in newBeliefs
@@ -864,9 +852,7 @@ public class Server implements Closeable {
 					boolean beliefUpdated=maybeUpdateBelief(newBelief);			
 					
 					if (beliefUpdated||propagator.isRebroadcastDue()) {						
-						raiseServerChange("consensus");
 						propagator.queueBelief(peer.getBelief());
-						
 						transactionHandler.maybeReportTransactions(peer);
 					} 
 				} catch (InterruptedException e) {
@@ -1087,17 +1073,6 @@ public class Server implements Closeable {
 	 */
 	public AStore getStore() {
 		return store;
-	}
-
-	/**
-	 * Reports a server change event to the registered hook, if any
-	 * @param reason Message for server change
-	 */
-	public void raiseServerChange(String reason) {
-		if (eventHook != null) {
-			ServerEvent serverEvent = ServerEvent.create(this, reason);
-			eventHook.onServerChange(serverEvent);
-		}
 	}
 
 	public ConnectionManager getConnectionManager() {

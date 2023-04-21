@@ -133,7 +133,7 @@ public class API {
 	 *
 	 */
 	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState) {
-		return launchLocalPeers(keyPairs, genesisState, null, null);
+		return launchLocalPeers(keyPairs, genesisState, null);
 	}
 	/**
 	 * Launch a local set of peers. Intended mainly for testing / development.
@@ -141,14 +141,14 @@ public class API {
 	 * The Peers will have a unique genesis State, i.e. an independent network
 	 *
 	 * @param keyPairs List of keypairs for peers
-	 * @param genesisState enesis state for local network
+	 * @param genesisState Genesis state for local network
 	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
 	 * @param event Server event handler
 	 *
 	 * @return List of Servers launched
 	 *
 	 */
-	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[], IServerEvent event) {
+	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[]) {
 		int count=keyPairs.size();
 
 		List<Server> serverList = new ArrayList<Server>();
@@ -166,10 +166,6 @@ public class API {
 
 		// Automatically manage Peer connections
 		config.put(Keywords.AUTO_MANAGE, true);
-
-		if (event!=null) {
-			config.put(Keywords.EVENT_HOOK, event);
-		}
 
 		for (int i = 0; i < count; i++) {
 			AKeyPair keyPair = keyPairs.get(i);

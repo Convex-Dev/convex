@@ -296,7 +296,6 @@ public class ConnectionManager {
 				conn.close();
 			}
 			connections.remove(peerKey);
-			server.raiseServerChange("connection");
 		}
 	}
 
@@ -505,7 +504,6 @@ public class ConnectionManager {
 				Connection connection = getConnection(fromPeer);
 				if (connection != null) {
 					connection.setTrustedPeerKey(fromPeer);
-					server.raiseServerChange("trusted connection");
 				}
 
 				// return the trusted peer key
@@ -629,7 +627,6 @@ public class ConnectionManager {
 				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null,Constants.SOCKET_PEER_BUFFER_SIZE,Constants.SOCKET_PEER_BUFFER_SIZE);
 				connections.put(peerKey, newConn);
 			}
-			server.raiseServerChange("connection");
 		} catch (IOException | TimeoutException e) {
 			// ignore any errors from the peer connections
 		} catch (UnresolvedAddressException e) {
