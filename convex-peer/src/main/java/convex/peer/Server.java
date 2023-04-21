@@ -28,7 +28,6 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -37,7 +36,6 @@ import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
-import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -49,11 +47,8 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.Reader;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -104,10 +99,6 @@ public class Server implements Closeable {
 	 */
 	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Constants.QUERY_QUEUE_SIZE);
 
-	/**
-	 * Queue for received Transactions submitted for clients of this Peer
-	 */
-	ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
 	
 	/**
 	 * Queue for received Beliefs to be processed
@@ -188,12 +179,6 @@ public class Server implements Closeable {
 	 */
 	private Address controller;
 
-	/**
-	 * The list of new transactions to be added to the next Block. Accessed only in update loop
-	 *
-	 * Must all have been fully persisted.
-	 */
-	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
 
 	/**
 	 * Hostname of the peer server.
@@ -218,7 +203,6 @@ public class Server implements Closeable {
 		}
 		
 		// Set up Queue. TODO: use config if provided
-		transactionQueue = new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
 		beliefQueue = new ArrayBlockingQueue<>(Constants.BELIEF_QUEUE_SIZE);
 		
 		// Switch to use the configured store for setup, saving the caller store
@@ -554,7 +538,7 @@ public class Server implements Closeable {
 	}
 
 	private void processTransact(Message m) {
-		boolean queued=transactionHandler.offer(m);
+		boolean queued=transactionHandler.offerTransaction(m);
 		
 		if (queued) {
 			// log.info("transaction queued");
@@ -600,9 +584,15 @@ public class Server implements Closeable {
 			maybeMergeBeliefs(); // try double merge
 		}
 		
-		// publish new blocks if needed. Guaranteed to change Belief / Order if this happens
-		boolean published = maybePublishBlock();
-
+		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
+		Block block= transactionHandler.maybeGenerateBlock(peer);
+		boolean published=false;
+		if (block!=null) {
+			Peer newPeer = peer.proposeBlock(block);
+			log.info("New block proposed: {} transaction(s), size= {}, hash={}", block.getTransactions().count(), block.getMemorySize(),block.getHash());
+			peer = newPeer;
+			published=true;
+		}
 		
 		// Return true iff we published a new Block or updated our own Order
 		return (updated||published);
@@ -630,46 +620,7 @@ public class Server implements Closeable {
 		return beliefReceivedCount;
 	}
 
-	protected long lastBlockPublishedTime=0L;
 
-	/**
-	 * Checks for pending transactions, and if found propose them as a new Block.
-	 *
-	 * @return True if a new block is published, false otherwise.
-	 */
-	protected boolean maybePublishBlock() {
-		long timestamp=Utils.getCurrentTimestamp();
-
-		if (timestamp>=lastBlockPublishedTime+Constants.MIN_BLOCK_TIME) {
-			// possibly have client transactions to publish
-			transactionQueue.drainTo(newTransactions);
-		}
-
-		// possibly have own transactions to publish as a Peer
-		maybeGetOwnTransactions();
-
-		Block block=null;
-		int n = newTransactions.size();
-		if (n == 0) return false;
-		
-		// TODO: smaller block if too many transactions?
-		block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
-		newTransactions.clear();
-
-		Peer newPeer = peer.proposeBlock(block);
-		log.info("New block proposed: {} transaction(s), size= {}, hash={}", block.getTransactions().count(), block.getMemorySize(),block.getHash());
-
-		peer = newPeer;
-		lastBlockPublishedTime=timestamp;
-		return true;
-	}
-
-	private long lastOwnTransactionTimestamp=0L;
-
-	/**
-	 * Default minimum delay between proposing own transactions as a peer
-	 */
-	private static final long OWN_BLOCK_DELAY=2000;
 
 	/**
 	 * Gets the Peer controller Address
@@ -697,50 +648,7 @@ public class Server implements Closeable {
 		return offered;
 	}
 
-	/**
-	 * Check if the Peer want to send any of its own transactions
-	 * @param transactionList List of transactions to add to.
-	 */
-	private void maybeGetOwnTransactions() {
-		long ts=Utils.getCurrentTimestamp();
 
-		// If we already posted own transaction recently, don't try again
-		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
-
-		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
-		if (!Utils.bool(config.get(Keywords.AUTO_MANAGE))) return;
-
-		State s=getPeer().getConsensusState();
-		String desiredHostname=getHostname(); // Intended hostname
-		AccountKey peerKey=getPeerKey();
-		PeerStatus ps=s.getPeer(peerKey);
-		if (ps==null) return; // No peer record in consensus state?
-		
-		AString chn=ps.getHostname();
-		String currentHostname=(chn==null)?null:chn.toString();
-		
-		// Try to set hostname if not correctly set
-		trySetHostname:
-		if (!Utils.equals(desiredHostname, currentHostname)) {
-			log.debug("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
-			Address address=ps.getController();
-			if (address==null) break trySetHostname;
-			AccountStatus as=s.getAccount(address);
-			if (as==null) break trySetHostname;
-			if (!Utils.equals(getPeerKey(), as.getAccountKey())) break trySetHostname;
-
-			String code;
-			if (desiredHostname==null) {
-				code = String.format("(set-peer-data %s {:url nil})", peerKey);
-			} else {
-				code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
-			}
-			ACell message = Reader.read(code);
-			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
-			newTransactions.add(getKeyPair().signData(transaction));
-			lastOwnTransactionTimestamp=ts; // mark this timestamp
-		}
-	}
 
 
 	/**
