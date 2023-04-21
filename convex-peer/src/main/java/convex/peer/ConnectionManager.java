@@ -33,6 +33,7 @@ import convex.core.data.Vectors;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.ChallengeRequest;
 import convex.net.Connection;
 import convex.net.message.Message;
 import convex.net.message.MessageRemote;

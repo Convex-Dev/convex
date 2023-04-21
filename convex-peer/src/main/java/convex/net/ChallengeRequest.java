@@ -1,4 +1,4 @@
-package convex.peer;
+package convex.net;
 
 import java.io.IOException;
 import java.security.SecureRandom;
@@ -15,9 +15,8 @@ import convex.core.data.Blob;
 import convex.core.data.Vectors;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
-import convex.net.Connection;
 
-class ChallengeRequest {
+public class ChallengeRequest {
 
 	private static final Logger log = LoggerFactory.getLogger(ChallengeRequest.class.getName());
 
