@@ -508,6 +508,11 @@ public class Connection {
 			}
 		}
 	}
+	
+	@Override
+	public void finalize() {
+		close();
+	}
 
 	/**
 	 * Checks if this connection is closed (i.e. the underlying channel is closed)
