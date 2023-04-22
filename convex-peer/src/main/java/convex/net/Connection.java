@@ -67,9 +67,14 @@ public class Connection {
 	final ByteChannel channel;
 
 	/**
-	 * Counter for IDs of all messages sent from this JVM
+	 * Counter for IDs of all messages sent from this Connection
 	 */
-	private static long idCounter = 0;
+	private long idCounter = 0;
+	
+	/**
+	 * Timestamp of last connection activity
+	 */
+	private long lastActivity;
 
 	/**
 	 * Store to use for this connection. Required for responding to incoming
@@ -93,6 +98,7 @@ public class Connection {
 		receiver = new MessageReceiver(receiveAction, this);
 		sender = new MessageSender(clientChannel);
 		this.store = store;
+		this.lastActivity=Utils.getCurrentTimestamp();
 		this.trustedPeerKey = trustedPeerKey;
 	}
 
@@ -114,14 +120,6 @@ public class Connection {
 		ensureSelectorLoop(); 
 	
 		return new Connection(channel, receiveAction, store, trustedPeerKey);
-	}
-	
-	/**
-	 * Gets the global message ID counter
-	 * @return Message ID counter for last message sent
-	 */
-	public static long getCounter() {
-		return idCounter;
 	}
 
 	/**
@@ -470,6 +468,7 @@ public class Connection {
 			sent = sender.bufferMessage(frameBuf);
 			
 			if (sent) {
+				lastActivity=System.currentTimeMillis();
 				if (channel instanceof SocketChannel) {
 					SocketChannel chan = (SocketChannel) channel;
 					// register interest in both reads and writes
@@ -659,6 +658,7 @@ public class Connection {
 				recd=receiver.receiveFromChannel(channel);
 				total+=recd;
 			}
+			if (recd>0) lastActivity=System.currentTimeMillis();
 			return total;
 		} finally {
 			Stores.setCurrent(tempStore);
@@ -711,5 +711,9 @@ public class Connection {
 
 	public boolean isTrusted() {
 		return trustedPeerKey != null;
+	}
+
+	public long getLastActivity() {
+		return lastActivity;
 	}
 }

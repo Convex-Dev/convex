@@ -38,6 +38,10 @@ public class NIOServer implements Closeable {
 
 	private static final Logger log = LoggerFactory.getLogger(NIOServer.class.getName());
 
+	protected static final long SELECT_TIMEOUT = 1000;
+
+	protected static final long PRUNE_TIMEOUT = 60000;
+
 	private ServerSocketChannel ssc = null;
 
 
@@ -95,6 +99,8 @@ public class NIOServer implements Closeable {
 		selectorThread.start();
 		log.debug("NIO server started on port {}", port);
 	}
+	
+	long lastConnectionPrune=0;
 
 	/**
 	 * Runnable class for accepting socket connections and incoming data, one per
@@ -108,7 +114,8 @@ public class NIOServer implements Closeable {
 			try {
 
 				while (running) {
-					selector.select(1000);
+					selector.select(SELECT_TIMEOUT);
+					
 
 					Set<SelectionKey> keys = selector.selectedKeys();
 					Iterator<SelectionKey> it = keys.iterator();
@@ -139,6 +146,14 @@ public class NIOServer implements Closeable {
 							key.cancel();
 						}
 					}
+					
+					long ts=System.currentTimeMillis();
+					if (ts>lastConnectionPrune+PRUNE_TIMEOUT) {
+						pruneConnections(ts,selector.keys());
+						lastConnectionPrune=ts;
+					}
+
+					
 					// keys.clear();
 				}
 			} catch (IOException e) {
@@ -188,6 +203,27 @@ public class NIOServer implements Closeable {
 		if (socket == null)
 			return 0;
 		return socket.getLocalPort();
+	}
+
+	/**
+	 * Prune old connections
+	 * @param keys Keys to examine
+	 */
+	protected void pruneConnections(long ts,Set<SelectionKey> keys) {
+		int n=keys.size();
+		for (SelectionKey key:keys) {
+			Connection conn=(Connection) key.attachment();
+			if (conn!=null) {
+				long age=conn.getLastActivity()-ts;
+				
+				// prune more aggressively if we have more connections 
+				if (age>(1000000L/(n+10))) {
+					log.info("Pruning inactive client connection, age = {}",age);
+					conn.close();
+					key.cancel();
+				}
+			}
+		}
 	}
 
 	protected void selectWrite(SelectionKey key) throws IOException {

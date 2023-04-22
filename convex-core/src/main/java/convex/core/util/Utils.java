@@ -1213,7 +1213,6 @@ public class Utils {
 		}
 	}
 
-	private static long lastTimestamp = Instant.now().toEpochMilli();
 
 	/**
 	 * Gets the current system timestamp. Guaranteed monotonic within this JVM.
@@ -1225,14 +1224,7 @@ public class Utils {
 	 * @return Long representation of Timestamp
 	 */
 	public static long getCurrentTimestamp() {
-		// Use Instant milliseconds
-		long ts = Instant.now().toEpochMilli();
-		if (ts > lastTimestamp) {
-			lastTimestamp = ts;
-			return ts;
-		} else {
-			return lastTimestamp;
-		}
+		return Instant.now().toEpochMilli();
 	}
 
 	private static final long startupTimestamp=getCurrentTimestamp();
