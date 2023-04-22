@@ -70,7 +70,7 @@ public class BlockViewComponent extends JPanel {
 
 			if (c == Color.green) {
 				g.setColor(Color.black);
-				State s = p.getStates().get(i + 1);
+				SignedData<Block> s = blocks.get(i);
 				for (int j = 0; j < 6; j++) {
 					Hash h = s.getHash();
 					if (h.byteAt(j) < 0) {

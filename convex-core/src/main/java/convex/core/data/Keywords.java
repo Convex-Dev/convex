@@ -110,6 +110,8 @@ public class Keywords {
 	public static final Keyword PROPOSAL_POINT = Keyword.create("proposal-point");
 
 	public static final Keyword ROOT_KEY = Keyword.create("root-key");
+	public static final Keyword POSITION = Keyword.create("position");
+	public static final Keyword GENESIS = Keyword.create("genesis");
 
 
 }

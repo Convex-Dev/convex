@@ -69,25 +69,37 @@ public class Peer {
 	 * local clock.
 	 */
 	private final long timestamp;
+	
+	/**
+	 * Current state index
+	 */
+	private final long position;
 
 	/**
-	 * Vector of states
+	 * Current consensus state 
 	 */
-	private final AVector<State> states;
+	private final State state;
+	
+	/**
+	 * Current consensus state 
+	 */
+	private final State genesis;
 
 	/**
 	 * Vector of results
 	 */
 	private final AVector<BlockResult> blockResults;
 
-	private Peer(AKeyPair kp, Belief belief, AVector<State> states, AVector<BlockResult> results,
+	private Peer(AKeyPair kp, Belief belief, long pos, State state, State genesis, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
 		this.belief = belief;
-		this.states = states;
+		this.state = state;
+		this.genesis=genesis;
 		this.blockResults = results;
 		this.timestamp = timeStamp;
+		this.position=pos;
 	}
 
 	/**
@@ -100,9 +112,11 @@ public class Peer {
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
 		Belief belief=(Belief) peerData.get(Keywords.BELIEF);
 		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
-		AVector<State> states=(AVector<State>) peerData.get(Keywords.STATES);
+		State state=(State) peerData.get(Keywords.STATE);
+		State genesis=(State) peerData.get(Keywords.GENESIS);
+		CVMLong pos=(CVMLong) peerData.get(Keywords.POSITION);
 		long timestamp=belief.getTimestamp();
-		return new Peer(keyPair,belief,states,results,timestamp);
+		return new Peer(keyPair,belief,pos.longValue(),state,genesis,results,timestamp);
 	}
 
 	/**
@@ -113,25 +127,22 @@ public class Peer {
 		return Maps.of(
 			Keywords.BELIEF,belief,
 			Keywords.RESULTS,blockResults,
-			Keywords.STATES,states
+			Keywords.POSITION,CVMLong.create(position),
+			Keywords.STATE,state,
+			Keywords.GENESIS,genesis
 		);
 	}
 
 	/**
 	 * Creates a Peer
 	 * @param peerKP Key Pair
-	 * @param initialState Genesis State
+	 * @param genesis Genesis State
 	 * @return New Peer instance
 	 */
-	public static Peer create(AKeyPair peerKP, State initialState) {
+	public static Peer create(AKeyPair peerKP, State genesis) {
 		Belief belief = Belief.createSingleOrder(peerKP);
-		AVector<State> states=Vectors.of(initialState);
 
-		// Ensure initial belief and states are persisted in current store
-		belief=ACell.createPersisted(belief).getValue();
-		states=ACell.createPersisted(states).getValue();
-
-		return new Peer(peerKP, belief, states, Vectors.empty(), initialState.getTimeStamp().longValue());
+		return new Peer(peerKP, belief, 0L,genesis,genesis, Vectors.empty(),genesis.getTimeStamp().longValue());
 	}
 	
 	/**
@@ -229,7 +240,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp <= timestamp) return this;
-		return new Peer(keyPair, belief, states, blockResults, newTimestamp);
+		return new Peer(keyPair, belief, position,state,genesis, blockResults, newTimestamp);
 	}
 
 	/**
@@ -355,12 +366,12 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the current consensus state for this chain
+	 * Gets the current consensus state for this Peer
 	 *
-	 * @return Consensus state for this chain (initial state if no block consensus)
+	 * @return Consensus state for this chain (genesis state if no block consensus)
 	 */
 	public State getConsensusState() {
-		return states.get(states.count() - 1);
+		return state;
 	}
 
 	/**
@@ -398,23 +409,23 @@ public class Peer {
 		if (belief == newBelief) return this;
 		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
-		long stateIndex = states.count() - 1; // index of last state
+
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 
 		// need to advance states
-		AVector<State> newStates = this.states;
+		State s = this.state;
+		long stateIndex=position;
 		AVector<BlockResult> newResults = this.blockResults;
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
-			State s = newStates.get(stateIndex);
 			SignedData<Block> block = blocks.get(stateIndex);
 			
 			// TODO: Block signature validation here?
 			BlockResult br = s.applyBlock(block.getValue());
-			newStates = newStates.append(br.getState());
+			s=br.getState();
 			newResults = newResults.append(br);
 			stateIndex++;
 		}
-		return new Peer(keyPair, newBelief, newStates, newResults, timestamp);
+		return new Peer(keyPair, newBelief, stateIndex,s, genesis, newResults, timestamp);
 	}
 
 	/**
@@ -427,35 +438,31 @@ public class Peer {
 		Belief newBelief=this.belief;
 		newBelief=newBelief.announce(noveltyHandler);
 
-		// Persist states
-		AVector<State> newStates = this.states;
-		newStates=ACell.createPersisted(newStates).getValue();
+		// Persist State
+		State newState = this.state;
+		newState=ACell.createPersisted(newState).getValue();
+		
+		// Persist Genesis
+		State newGenesis = this.genesis;
+		newGenesis=ACell.createPersisted(newGenesis).getValue();
 
 		// Persist results
 		AVector<BlockResult> newResults = this.blockResults;
 		newResults=ACell.createPersisted(newResults).getValue();
 
-		return new Peer(this.keyPair, newBelief, newStates, newResults, this.timestamp);
-	}
-
-	/**
-	 * Gets the vector of States maintained by this Peer, starting from the
-	 * Genesis state (index 0).
-	 * 
-	 * @return Vector of states
-	 */
-	public AVector<State> getStates() {
-		return states;
+		return new Peer(this.keyPair, newBelief, position,newState, newGenesis, newResults, this.timestamp);
 	}
 
 	/**
 	 * Gets the result of a specific transaction
 	 * @param blockIndex Index of Block in Order
 	 * @param txIndex Index of transaction in block
-	 * @return Result from transaction
+	 * @return Result from transaction, or null if the transaction does not exist or is no longer stored
 	 */
 	public Result getResult(long blockIndex, long txIndex) {
-		return blockResults.get(blockIndex).getResult(txIndex);
+		BlockResult br=getBlockResult(blockIndex);
+		if (br==null) return null;
+		return br.getResult(txIndex);
 	}
 
 	/**
@@ -530,35 +537,20 @@ public class Peer {
 		return getBelief().getOrder(peerKey);
 	}
 
-	/**
-	 * Returns State as-of timestamp.
-	 *
-	 * Timestamp doesn't need to be an exact match; a leftmost State will be returned - unless timestamp is too old.
-	 *
-	 * @param timestamp Timestamp in milliseconds.
-	 * @return State or null.
-	 */
-	public State asOf(CVMLong timestamp) {
-		return Utils.stateAsOf(states, timestamp);
-	}
-
-	/**
-	 * Construct a vector of States starting at specified timestamp, and with a given interval in milliseconds.
-	 *
-	 * @param timestamp Timestamp in milliseconds.
-	 * @param interval Interval in milliseconds.
-	 * @param count Number of times to query.
-	 * @return Vector of States.
-	 */
-	public AVector<State> asOfRange(CVMLong timestamp, long interval, int count) {
-		return Utils.statesAsOfRange(states, timestamp, interval, count);
-	}
 
 	/**
 	 * Get the Network ID for this PEer
 	 * @return Network ID
 	 */
 	public Hash getNetworkID() {
-		return getStates().get(0).getHash();
+		return genesis.getHash();
+	}
+
+	/**
+	 * Gets the state position of this Peer, which is equal to the number of state transitions executed.
+	 * @return Position
+	 */
+	public long getPosition() {
+		return position;
 	}
 }

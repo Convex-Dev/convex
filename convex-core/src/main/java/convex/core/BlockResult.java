@@ -95,9 +95,10 @@ public class BlockResult extends ARecord {
 	/**
 	 * Gets a specific Result
 	 * @param i Index of Result
-	 * @return Result at specified index for the current Block
+	 * @return Result at specified index for the current Block, or null if not available
 	 */
 	public Result getResult(long i) {
+		if ((i<0)||(i>=results.count())) return null;
 		return results.get(i);
 	}
 
@@ -106,8 +107,8 @@ public class BlockResult extends ARecord {
 	 * @param i Index of Result
 	 * @return Error code, or null if the transaction succeeded.
 	 */
-	public Object getErrorCode(long i) {
-		Result result=results.get(i);
+	public ACell getErrorCode(long i) {
+		Result result=getResult(i);
 		return result.getErrorCode();
 	}
 

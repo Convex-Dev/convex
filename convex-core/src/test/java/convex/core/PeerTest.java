@@ -3,14 +3,12 @@ package convex.core;
 import static convex.test.Assertions.assertNobodyError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AccountKey;
 import convex.core.data.PeerStatus;
 import convex.core.data.RecordTest;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
@@ -81,38 +79,6 @@ public class PeerTest {
 		RecordTest.doRecordTests(ps2);
 	}
 
-	@Test
-	public void testAsOf() {
-		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 
-		CVMLong timestamp = p.getStates().get(0).getTimeStamp();
-
-		// Exact match.
-		assertNotNull(p.asOf(timestamp));
-
-		// Approximate match.
-		assertNotNull(p.asOf(CVMLong.create(timestamp.longValue() + 1)));
-
-		// No match; timestamp is too old.
-		assertNull(p.asOf(CVMLong.create(timestamp.longValue() - 1)));
-	}
-
-	@Test
-	public void testAsOfRange() {
-		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
-
-		CVMLong initialTimestamp = p.getStates().get(0).getTimeStamp();
-
-		assertEquals(0, p.asOfRange(CVMLong.create(0), 0, 0).count());
-		assertEquals(0, p.asOfRange(initialTimestamp, 0, 0).count());
-		assertEquals(1, p.asOfRange(initialTimestamp, 0, 1).count());
-
-		// It's important to notice that timestamp can be in the future,
-		// and that is fine because 'asOf' returns the leftmost value.
-		//
-		// Peer 'p' has a single State but we are asking to query every minute (5x):
-		// timestamp, timestamp + 1 min, timestamp + 2 min, timestamp + 3 min, timestamp + 4 min.
-		assertEquals(5, p.asOfRange(initialTimestamp, 1000 * 60, 5).count());
-	}
 
 }

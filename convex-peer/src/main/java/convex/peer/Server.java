@@ -109,26 +109,18 @@ public class Server implements Closeable {
 	 * Message Consumer that simply enqueues received client messages received by this peer
 	 * Called on NIO thread: should never block
 	 */
-	Consumer<Message> clientReceiveAction = new Consumer<Message>() {
-		@Override
-		public void accept(Message msg) {
-			processMessage(msg);
-		}
-	};
+	Consumer<Message> clientReceiveAction = m->processMessage(m);
 	
 	/**
 	 * Message Consumer that simply enqueues received messages back from outbound peer connections
 	 * Called on NIO thread: should never block
 	 */
-	Consumer<Message> peerReceiveAction = new Consumer<Message>() {
-		@Override
-		public void accept(Message msg) {
-			// We prioritise missing data requests from a Peer we have connected to
-			if (msg.getType()==MessageType.MISSING_DATA) {
-				handleMissingData(msg);
-			} else {
-				processMessage(msg);
-			}
+	Consumer<Message> peerReceiveAction = msg-> {
+		// We prioritise missing data requests from a Peer we have connected to
+		if (msg.getType()==MessageType.MISSING_DATA) {
+			handleMissingData(msg);
+		} else {
+			processMessage(msg);
 		}
 	};
 
@@ -208,7 +200,9 @@ public class Server implements Closeable {
 			this.propagator = new BeliefPropagator(this);
 			this.transactionHandler=new TransactionHandler(this);
 
+			// Establish Peer state and ensure it is persisted
 			this.peer = establishPeer();
+			peer=peer.persistState(null);
 			
 			establishController();
 
@@ -281,7 +275,7 @@ public class Server implements Closeable {
 						log.info("Still waiting for Belief sync after "+timeElapsed/1000+"s");
 					}
 				}
-				log.info("Retrieved Peer Signed Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
+				log.info("Retrieved Peer Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 
 				Peer peer=Peer.create(keyPair, genF, belF);
 				return peer;
@@ -703,18 +697,20 @@ public class Server implements Closeable {
 		Belief belief = lastBroadcastBelief;
 		if (belief==null) belief=peer.getBelief();
 		
+		State state=peer.getConsensusState();
+		
 		Hash beliefHash=belief.getHash();
-		Hash statesHash=peer.getStates().getHash();
-		Hash genesisHash=peer.getStates().get(0).getHash();
+		Hash stateHash=state.getHash();
+		Hash genesisHash=peer.getNetworkID();
 		AccountKey peerKey=peer.getPeerKey();
-		Hash consensusHash=peer.getConsensusState().getHash();
+		Hash consensusHash=state.getHash();
 		
 		Order order=belief.getOrder(peerKey);
 		CVMLong cp = CVMLong.create(order.getConsensusPoint()) ;
 		CVMLong pp = CVMLong.create(order.getProposalPoint()) ;
 		CVMLong op = CVMLong.create(order.getBlockCount()) ;
 
-		AVector<ACell> reply=Vectors.of(beliefHash,statesHash,genesisHash,peerKey,consensusHash, cp,pp,op);
+		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash, cp,pp,op);
 		return reply;
 	}
 
