@@ -285,6 +285,18 @@ public class State extends ARecord {
 	}
 
 	/**
+	 * Applies a signed Block to the current state
+	 * 
+	 * @param signedBlock Signed Block to apply
+	 * @return The BlockResult from applying the given Block to this State
+	 */
+	public BlockResult applyBlock(SignedData<Block> signedBlock) {
+		
+		Block block=signedBlock.getValue();
+		return applyBlock(block);
+	}
+
+	/**
 	 * Block level state transition function
 	 *
 	 * Updates the state by applying a given block of transactions
@@ -305,7 +317,7 @@ public class State extends ARecord {
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;
-		state = applyTimeUpdate(b.getTimeStamp());
+		state = state.applyTimeUpdate(b.getTimeStamp());
 		state = state.applyScheduledTransactions();
 		return state;
 	}
@@ -325,7 +337,7 @@ public class State extends ARecord {
 	private State applyScheduledTransactions() {
 		long tcount = 0;
 		BlobMap<ABlob, AVector<ACell>> sched = this.schedule;
-		CVMLong timestamp = this.getTimeStamp();
+		CVMLong timestamp = this.getTimestamp();
 
 		// ArrayList to accumulate the transactions to apply. Null until we need it
 		ArrayList<ACell> al = null;
@@ -661,7 +673,7 @@ public class State extends ARecord {
 	 *
 	 * @return The timestamp from this state.
 	 */
-	public CVMLong getTimeStamp() {
+	public CVMLong getTimestamp() {
 		return (CVMLong) globals.get(GLOBAL_TIMESTAMP);
 	}
 

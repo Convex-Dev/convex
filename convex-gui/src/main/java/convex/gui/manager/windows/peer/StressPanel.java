@@ -283,7 +283,7 @@ public class StressPanel extends JPanel {
 					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
 					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
 					sb.append("Consensus time: "
-							+ formatter.format((endState.getTimeStamp().longValue() - startTime) * 0.001) + "s\n");
+							+ formatter.format((endState.getTimestamp().longValue() - startTime) * 0.001) + "s\n");
 
 				} catch (IOException e) {
 					log.warn("Stress test worker terminated from IO Exception");

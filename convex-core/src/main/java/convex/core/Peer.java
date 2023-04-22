@@ -151,7 +151,7 @@ public class Peer {
 	public static Peer create(AKeyPair peerKP, State genesis) {
 		Belief belief = Belief.createSingleOrder(peerKP);
 
-		return new Peer(peerKP, belief, 0L,genesis,genesis, 0,Vectors.empty(),genesis.getTimeStamp().longValue());
+		return new Peer(peerKP, belief, 0L,genesis,genesis, 0,Vectors.empty(),genesis.getTimestamp().longValue());
 	}
 	
 	/**
@@ -411,6 +411,23 @@ public class Peer {
 		p=p.updateState();
 		return p;
 	}
+	
+	/**
+	 * Prunes History before the given timestamp
+	 * @param ts Timestamp from which to to keep History
+	 * @return Updated Peer with pruned History
+	 */
+	public Peer pruneHistory(long ts) {
+		// Return this if we don't possibly have anything to prune
+		if (blockResults.count()==0) return this;
+		long firstTs=blockResults.get(0).getState().getTimestamp().longValue();
+		if (ts<firstTs) return this;
+		
+		@SuppressWarnings("unused")
+		long ix=Utils.binarySearch(blockResults, br->br.getState().getTimestamp(), (a,b)->a.compareTo(b), CVMLong.create(ts));
+		// TODO: complete pruning
+		return this;
+	}
 
 	/**
 	 * Update this Peer with Consensus State for an updated Belief
@@ -437,7 +454,7 @@ public class Peer {
 			SignedData<Block> block = blocks.get(stateIndex);
 			
 			// TODO: Block signature validation here?
-			BlockResult br = s.applyBlock(block.getValue());
+			BlockResult br = s.applyBlock(block);
 			s=br.getState();
 			newResults = newResults.append(br);
 			stateIndex++;

@@ -1929,7 +1929,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Timestamp in milliseconds since UNIX epoch
 	 */
 	public CVMLong getTimeStamp() {
-		return getState().getTimeStamp();
+		return getState().getTimestamp();
 	}
 
 	/**

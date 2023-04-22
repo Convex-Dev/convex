@@ -3923,7 +3923,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testScheduleExecution() throws BadSignatureException {
-		long expectedTS = INITIAL.getTimeStamp().longValue() + 1000;
+		long expectedTS = INITIAL.getTimestamp().longValue() + 1000;
 		Context<?> ctx = step("(schedule (+ *timestamp* 1000) (def a 2))");
 		assertCVMEquals(expectedTS, ctx.getResult());
 		State s = ctx.getState();

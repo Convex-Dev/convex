@@ -60,7 +60,7 @@ public class AboutPanel extends JPanel {
 
 	private void updateState(State s) {
 		StringBuilder sb = new StringBuilder();
-		CVMLong timestamp = s.getTimeStamp();
+		CVMLong timestamp = s.getTimestamp();
 
 		sb.append("Consensus state hash: " + s.getHash().toHexString() + "\n");
 		sb.append("Timestamp:            " + Text.dateFormat(timestamp.longValue()) + "   (" + timestamp + ")\n");

@@ -79,7 +79,7 @@ public class StateTransitionsTest {
 			State s2 = br.getState();
 			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
 			assertEquals(1050, s2.getBalance(ADDRESS_B));
-			assertCVMEquals(nowTS, s2.getTimeStamp());
+			assertCVMEquals(nowTS, s2.getTimestamp());
 		}
 
 		{ // transfer from existing to non-existing account A -> C
@@ -208,7 +208,7 @@ public class StateTransitionsTest {
 		State s = TestState.STATE;
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(def my-lib-address (deploy '(defn foo [x] x)))"));
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
-		Block b1 = Block.of(s.getTimeStamp().longValue(), kp.signData(t1));
+		Block b1 = Block.of(s.getTimestamp().longValue(), kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 		assertFalse(br.isError(0),br.getResult(0).toString());
 
@@ -227,7 +227,7 @@ public class StateTransitionsTest {
 					+ "                     (defn get ^{:callable? true} [] stored-data)\r\n"
 					+ "                     (defn set ^{:callable? true} [x] (def stored-data x)))))\r\n"));
 			AKeyPair kp = InitTest.HERO_KEYPAIR;
-			Block b=Block.of(s.getTimeStamp().longValue(),kp.signData(trans));
+			Block b=Block.of(s.getTimestamp().longValue(),kp.signData(trans));
 			BlockResult br=s.applyBlock(b);
 			Result r=br.getResult(0);
 			assertFalse(r.isError(),r.toString());
@@ -251,7 +251,7 @@ public class StateTransitionsTest {
 		long initialMem=s.getMemorySize();
 
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(def a 1)"));
-		Block b1 = Block.of(s.getTimeStamp().longValue(), kp.signData(t1));
+		Block b1 = Block.of(s.getTimestamp().longValue(), kp.signData(t1));
 		BlockResult br=s.applyBlock(b1);
 
 		// should not be an error
@@ -270,21 +270,21 @@ public class StateTransitionsTest {
 		Address TARGET = InitTest.VILLAIN;
 		String taddr=TARGET.toString();
 
-		long INITIAL_TS = s.getTimeStamp().longValue();
+		long INITIAL_TS = s.getTimestamp().longValue();
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		long BAL2 = s.getBalance(TARGET);
 
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,
 				Reader.read("(transfer "+taddr+" 10000000)"));
-		Block b1 = Block.of(s.getTimeStamp().longValue() + 100, kp.signData(t1));
+		Block b1 = Block.of(s.getTimestamp().longValue() + 100, kp.signData(t1));
 		s = s.applyBlock(b1).getState();
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));
-		assertCVMEquals(INITIAL_TS + 100, s.getTimeStamp());
+		assertCVMEquals(INITIAL_TS + 100, s.getTimestamp());
 
 		// schedule 200ms later for 1s time
 		ATransaction t2 = Invoke.create(InitTest.HERO,2, Reader.read(
 				"(schedule (+ *timestamp* 1000) (transfer "+taddr+" 10000000))"));
-		Block b2 = Block.of(s.getTimeStamp().longValue() + 200, kp.signData(t2));
+		Block b2 = Block.of(s.getTimestamp().longValue() + 200, kp.signData(t2));
 		BlockResult br2 = s.applyBlock(b2);
 		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());
 		s = br2.getState();
@@ -295,7 +295,7 @@ public class StateTransitionsTest {
 
 		// advance 999ms
 		ATransaction t3 = Invoke.create(InitTest.HERO,3, Reader.read("1"));
-		Block b3 = Block.of(s.getTimeStamp().longValue() + 999, kp.signData(t3));
+		Block b3 = Block.of(s.getTimestamp().longValue() + 999, kp.signData(t3));
 		BlockResult br3 = s.applyBlock(b3);
 		assertNull(br3.getErrorCode(0));
 		s = br3.getState();
@@ -304,7 +304,7 @@ public class StateTransitionsTest {
 
 		// advance 1ms to trigger scheduled transfer
 		ATransaction t4 = Invoke.create(InitTest.HERO,4, Reader.read("1"));
-		Block b4 = Block.of(s.getTimeStamp().longValue() + 1, kp.signData(t4));
+		Block b4 = Block.of(s.getTimestamp().longValue() + 1, kp.signData(t4));
 		BlockResult br4 = s.applyBlock(b4);
 		assertNull(br4.getErrorCode(0));
 		s = br4.getState();

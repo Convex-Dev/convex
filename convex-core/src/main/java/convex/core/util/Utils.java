@@ -1303,6 +1303,41 @@ public class Utils {
 		}
 
 	}
+	
+	/**
+	 * Binary Search.
+	 *
+	 * Generic method to search for an exact or approximate (leftmost) value.
+	 *
+	 * Examples:
+	 * Given a vector [1, 2, 3] and target 2: returns 1 (index of 2)
+	 * Given a vector [1, 2, 3] and target 5: returns 3 (end index)
+	 * Given a vector [1, 2, 3] and target 0: returns 0 (start index).
+	 *
+	 * @param L Items.
+	 * @param value Function to get the value for comparison with target.
+	 * @param comparator How to compare value with target.
+	 * @param target Value being searched for.
+	 * @param <T> Type of the elements in L.
+	 * @param <U> Type of the target value.
+	 * @return Position of target in sequence.
+	 */
+	public static <T extends ACell, U> long binarySearch(ASequence<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
+		long min = 0;
+		long max = L.count();
+
+		while (min < max) {
+			long midpoint = (min + max) / 2;
+
+			U midVal=value.apply(L.get(midpoint));
+			if (comparator.compare(midVal, target) < 0)
+				min = midpoint + 1;
+			else
+				max = midpoint;
+		}
+
+		return min;
+	}
 
 	@SuppressWarnings("unchecked")
 	public static <T> CompletableFuture<java.util.List<T>> completeAll(java.util.List<CompletableFuture<T>> futures) {
@@ -1315,7 +1350,7 @@ public class Utils {
 	}
 
 	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
-		return binarySearchLeftmost(states, State::getTimeStamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
+		return binarySearchLeftmost(states, State::getTimestamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
 	}
 
 	public static AVector<State> statesAsOfRange(AVector<State> states, CVMLong timestamp, long interval, int count) {

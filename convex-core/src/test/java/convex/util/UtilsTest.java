@@ -317,6 +317,22 @@ public class UtilsTest {
 				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1000))
 		);
 	}
+	
+	@Test
+	public void testBinarySearch() {
+		AVector<CVMLong> L = Vectors.of(
+				CVMLong.create(1),
+				CVMLong.create(2),
+				CVMLong.create(2),
+				CVMLong.create(3)
+		);
+		
+		assertEquals(0,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(-1)));
+		assertEquals(0,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(1)));
+		assertEquals(1,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(2)));
+		assertEquals(3,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(3)));
+		assertEquals(4,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(6)));
+	}
 
 	@Test
 	public void testBinarySearchLeftmost2() {
@@ -355,7 +371,7 @@ public class UtilsTest {
 		for (int i = 0; i < 10; i++) {
 			State state0 = states.get(states.count() - 1);
 
-			long timestamp = state0.getTimeStamp().longValue() + 100;
+			long timestamp = state0.getTimestamp().longValue() + 100;
 
 			String command = "(def x " + timestamp + ")";
 			SignedData<ATransaction> data = peer.sign(Invoke.create(InitTest.HERO, timestamp, command));
@@ -367,7 +383,7 @@ public class UtilsTest {
 			states = states.conj(state1);
 		}
 
-		AVector<State> statesInRange = Utils.statesAsOfRange(states, STATE.getTimeStamp(), 1000, 2);
+		AVector<State> statesInRange = Utils.statesAsOfRange(states, STATE.getTimestamp(), 1000, 2);
 
 		assertEquals(2, statesInRange.count());
 
@@ -377,8 +393,8 @@ public class UtilsTest {
 		// Since each iteration creates a snapshot of State advances by 100 milliseconds,
 		// the last State's timestamp in the range is the same as the initial timestamp + 1000 milliseconds.
 		assertEquals(
-				CVMLong.create(STATE.getTimeStamp().longValue() + 1000),
-				statesInRange.get(statesInRange.count() - 1).getTimeStamp()
+				CVMLong.create(STATE.getTimestamp().longValue() + 1000),
+				statesInRange.get(statesInRange.count() - 1).getTimestamp()
 		);
 	}
 	

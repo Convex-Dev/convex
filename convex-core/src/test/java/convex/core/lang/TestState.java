@@ -135,7 +135,7 @@ public class TestState {
 
 		assertCVMEquals(Symbols.STAR_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
 
-		assertCVMEquals(Constants.INITIAL_TIMESTAMP, s.getTimeStamp());
+		assertCVMEquals(Constants.INITIAL_TIMESTAMP, s.getTimestamp());
 	}
 
 	@Test
