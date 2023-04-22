@@ -297,41 +297,40 @@ public class UtilsTest {
 				CVMLong.create(3)
 		);
 
+		Comparator<CVMLong> comp=(a,b)->a.compareTo(b);
+		
 		// No match.
-		assertNull(Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(0)));
+		assertNull(Utils.binarySearchLeftmost(L, Function.identity(), comp, CVMLong.create(0)));
 
 		// Exact match.
 		assertEquals(
 				CVMLong.create(2),
-				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(2))
+				Utils.binarySearchLeftmost(L, Function.identity(), comp, CVMLong.create(2))
 		);
 
 		assertEquals(
 				CVMLong.create(3),
-				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(3))
+				Utils.binarySearchLeftmost(L, Function.identity(), comp, CVMLong.create(3))
 		);
 
 		// Approximate match: 3 is the leftmost element.
 		assertEquals(
 				CVMLong.create(3),
-				Utils.binarySearchLeftmost(L, Function.identity(), Comparator.comparingLong(CVMLong::longValue), CVMLong.create(1000))
+				Utils.binarySearchLeftmost(L, Function.identity(), comp, CVMLong.create(1000))
 		);
 	}
 	
 	@Test
 	public void testBinarySearch() {
-		AVector<CVMLong> L = Vectors.of(
-				CVMLong.create(1),
-				CVMLong.create(2),
-				CVMLong.create(2),
-				CVMLong.create(3)
-		);
+		AVector<CVMLong> v = Vectors.of(1,2,2,4);
+		Comparator<CVMLong> comp=(a,b)->a.compareTo(b);
 		
-		assertEquals(0,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(-1)));
-		assertEquals(0,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(1)));
-		assertEquals(1,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(2)));
-		assertEquals(3,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(3)));
-		assertEquals(4,Utils.binarySearch(L, Function.identity(), (a,b)->a.compareTo(b), CVMLong.create(6)));
+		assertEquals(0,Utils.binarySearch(v, Function.identity(), comp, CVMLong.create(-1)));
+		assertEquals(0,Utils.binarySearch(v, Function.identity(), comp, CVMLong.create(1)));
+		assertEquals(1,Utils.binarySearch(v, Function.identity(), comp, CVMLong.create(2)));
+		assertEquals(3,Utils.binarySearch(v, Function.identity(), comp, CVMLong.create(3)));
+		assertEquals(3,Utils.binarySearch(v, Function.identity(), comp, CVMLong.create(4)));
+		assertEquals(4,Utils.binarySearch(v, Function.identity(), comp, CVMLong.create(6)));
 	}
 
 	@Test

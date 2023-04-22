@@ -1289,10 +1289,7 @@ public class Utils {
 				max = midpoint;
 		}
 
-		// Match can be exact or approximate.
-		// In case there isn't an exact match,
-		// a leftmost search returns a rank (min)
-		// which is used to get the leftmost value.
+		// In case there isn't an exact match, return the value to the left.
 		if (min < L.count() && comparator.compare(value.apply(L.get(min)), target) == 0) {
 			return L.get(min);
 		} else {
@@ -1305,12 +1302,12 @@ public class Utils {
 	}
 	
 	/**
-	 * Binary Search.
-	 *
-	 * Generic method to search for an exact or approximate (leftmost) value.
+	 * Binary Search for an exact or approximate (leftmost) value.
+	 * 
+	 * Returns the position where the target value would be inserted if in order
 	 *
 	 * Examples:
-	 * Given a vector [1, 2, 3] and target 2: returns 1 (index of 2)
+	 * Given a vector [1, 2, 3] and target 2: returns 1 (index of exact match 2)
 	 * Given a vector [1, 2, 3] and target 5: returns 3 (end index)
 	 * Given a vector [1, 2, 3] and target 0: returns 0 (start index).
 	 *
