@@ -202,7 +202,7 @@ public class Server implements Closeable {
 
 			// Establish Peer state and ensure it is persisted
 			this.peer = establishPeer();
-			peer=peer.persistState(null);
+			persistPeerData();
 			
 			establishController();
 

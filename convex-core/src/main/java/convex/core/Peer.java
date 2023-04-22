@@ -1,7 +1,6 @@
 package convex.core;
 
 import java.io.IOException;
-import java.util.function.Consumer;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -54,10 +53,10 @@ public class Peer {
 	/** This Peer's key */
 	private final AccountKey peerKey;
 
-	/** This Peer's key pair 
+	/** 
+	 * This Peer's key pair 
 	 * 
 	 *  Make transient to mark that this should never be Persisted by accident
-	 * 
 	 */
 	private transient final AKeyPair keyPair;
 	
@@ -74,6 +73,12 @@ public class Peer {
 	 * Current state index
 	 */
 	private final long position;
+	
+	/**
+	 * Current base history position, from which results are stored
+	 */
+	private final long historyPosition;
+
 
 	/**
 	 * Current consensus state 
@@ -90,16 +95,18 @@ public class Peer {
 	 */
 	private final AVector<BlockResult> blockResults;
 
-	private Peer(AKeyPair kp, Belief belief, long pos, State state, State genesis, AVector<BlockResult> results,
+	private Peer(AKeyPair kp, Belief belief, long pos, State state, State genesis, long history, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
 		this.belief = belief;
 		this.state = state;
 		this.genesis=genesis;
-		this.blockResults = results;
 		this.timestamp = timeStamp;
 		this.position=pos;
+		
+		this.historyPosition=history;
+		this.blockResults = results;
 	}
 
 	/**
@@ -114,9 +121,10 @@ public class Peer {
 		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
 		State state=(State) peerData.get(Keywords.STATE);
 		State genesis=(State) peerData.get(Keywords.GENESIS);
-		CVMLong pos=(CVMLong) peerData.get(Keywords.POSITION);
+		long pos=((CVMLong) peerData.get(Keywords.POSITION)).longValue();
+		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();
 		long timestamp=belief.getTimestamp();
-		return new Peer(keyPair,belief,pos.longValue(),state,genesis,results,timestamp);
+		return new Peer(keyPair,belief,pos,state,genesis,hpos,results,timestamp);
 	}
 
 	/**
@@ -142,7 +150,7 @@ public class Peer {
 	public static Peer create(AKeyPair peerKP, State genesis) {
 		Belief belief = Belief.createSingleOrder(peerKP);
 
-		return new Peer(peerKP, belief, 0L,genesis,genesis, Vectors.empty(),genesis.getTimeStamp().longValue());
+		return new Peer(peerKP, belief, 0L,genesis,genesis, 0,Vectors.empty(),genesis.getTimeStamp().longValue());
 	}
 	
 	/**
@@ -240,7 +248,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp <= timestamp) return this;
-		return new Peer(keyPair, belief, position,state,genesis, blockResults, newTimestamp);
+		return new Peer(keyPair, belief, position,state,genesis, historyPosition,blockResults, newTimestamp);
 	}
 
 	/**
@@ -425,36 +433,11 @@ public class Peer {
 			newResults = newResults.append(br);
 			stateIndex++;
 		}
-		return new Peer(keyPair, newBelief, stateIndex,s, genesis, newResults, timestamp);
+		return new Peer(keyPair, newBelief, stateIndex,s, genesis, historyPosition,newResults, timestamp);
 	}
 
 	/**
-	 * Persist the state of the Peer to the current store. We ensure states and results are also persisted
-	 * @param noveltyHandler Novelty handler for Belief
-	 * @return Updates Peer
-	 */
-	public Peer persistState(Consumer<Ref<ACell>> noveltyHandler) {
-		// Peer Belief must be announced using novelty handler
-		Belief newBelief=this.belief;
-		newBelief=newBelief.announce(noveltyHandler);
-
-		// Persist State
-		State newState = this.state;
-		newState=ACell.createPersisted(newState).getValue();
-		
-		// Persist Genesis
-		State newGenesis = this.genesis;
-		newGenesis=ACell.createPersisted(newGenesis).getValue();
-
-		// Persist results
-		AVector<BlockResult> newResults = this.blockResults;
-		newResults=ACell.createPersisted(newResults).getValue();
-
-		return new Peer(this.keyPair, newBelief, position,newState, newGenesis, newResults, this.timestamp);
-	}
-
-	/**
-	 * Gets the result of a specific transaction
+	 * Gets the Result of a specific transaction
 	 * @param blockIndex Index of Block in Order
 	 * @param txIndex Index of transaction in block
 	 * @return Result from transaction, or null if the transaction does not exist or is no longer stored
