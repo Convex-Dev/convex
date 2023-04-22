@@ -134,6 +134,7 @@ public class Peer {
 	public AMap<Keyword, ACell> toData() {
 		return Maps.of(
 			Keywords.BELIEF,belief,
+			Keywords.HISTORY,CVMLong.create(historyPosition),
 			Keywords.RESULTS,blockResults,
 			Keywords.POSITION,CVMLong.create(position),
 			Keywords.STATE,state,
@@ -325,7 +326,7 @@ public class Peer {
 	 * Gets the timestamp of this Peer
 	 * @return Timestamp
 	 */
-	public long getTimeStamp() {
+	public long getTimestamp() {
 		return timestamp;
 	}
 
@@ -493,7 +494,7 @@ public class Peer {
 		Peer result=this;
 		// Update timestamp if necessary to accommodate Block
 		long blockTimeStamp=block.getTimeStamp();
-		if (blockTimeStamp>result.getTimeStamp()) {
+		if (blockTimeStamp>result.getTimestamp()) {
 			result=result.updateTimestamp(blockTimeStamp);
 		}
 		

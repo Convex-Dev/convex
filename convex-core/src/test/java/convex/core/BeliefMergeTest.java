@@ -132,7 +132,7 @@ public class BeliefMergeTest {
 		Peer[] newPeers = peers.clone();
 		for (int i=0; i<newPeers.length; i++) {
 			Peer p=peers[i];
-			Peer np = p.updateTimestamp(p.getTimeStamp()+TS_INCREMENT);
+			Peer np = p.updateTimestamp(p.getTimestamp()+TS_INCREMENT);
 			newPeers[i]=np;
 		}
 		return newPeers;
@@ -150,7 +150,7 @@ public class BeliefMergeTest {
 		for (int ix = 0; ix < tcount; ix++) {
 			signedTransactions[ix] = initial[peerIndex].sign(transactions[ix]);
 		}
-		long newTimeStamp = ps.getTimeStamp();
+		long newTimeStamp = ps.getTimestamp();
 		Block block = Block.of(newTimeStamp, signedTransactions);
 
 		ps = ps.proposeBlock(block);
@@ -169,7 +169,7 @@ public class BeliefMergeTest {
 
 		// propose a new block by peer 1, after 200ms
 		long newTimestamp1 = TEST_TIMESTAMP + 200;
-		b1 = b1.updateTimestamp(b1.getTimeStamp() + 200);
+		b1 = b1.updateTimestamp(b1.getTimestamp() + 200);
 		assertEquals(0, b1.getPeerOrder().getBlocks().size());
 		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1)); // empty block, just with timestamp
 		assertEquals(1, b1a.getPeerOrder().getBlocks().size());

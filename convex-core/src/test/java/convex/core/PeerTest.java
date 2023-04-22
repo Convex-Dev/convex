@@ -24,7 +24,7 @@ public class PeerTest {
 		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
 
 		// initial checks
-		long timestamp = p.getTimeStamp();
+		long timestamp = p.getTimestamp();
 		assertEquals(timestamp, Constants.INITIAL_TIMESTAMP);
 		assertEquals(STATE, p.getConsensusState());
 

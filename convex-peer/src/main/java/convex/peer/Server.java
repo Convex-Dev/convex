@@ -881,7 +881,7 @@ public class Server implements Closeable {
 		}
 		if (!anyOrderChanged) return null;
 		
-		Belief newBelief= Belief.create(newOrders,peer.getTimeStamp());
+		Belief newBelief= Belief.create(newOrders,peer.getTimestamp());
 		return newBelief;
 	}
 
