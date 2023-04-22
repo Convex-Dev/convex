@@ -403,7 +403,12 @@ public class Peer {
 			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+newOrder.getConsensusPoint());
 			
 		}
-		return updateBelief(newBelief);
+		Peer p= updateBelief(newBelief);
+		if (p==this) return this;
+		
+		// TODO: separate this out
+		p=p.updateState();
+		return p;
 	}
 
 	/**
@@ -415,9 +420,12 @@ public class Peer {
 	 */
 	private Peer updateBelief(Belief newBelief) {
 		if (belief == newBelief) return this;
-		Order myOrder = newBelief.getOrder(peerKey); // this peer's chain from new belief
+		return new Peer(keyPair, newBelief, position,state, genesis, historyPosition,blockResults, timestamp);
+	}	
+		
+	private Peer updateState() {
+		Order myOrder = belief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
-
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 
 		// need to advance states
@@ -433,7 +441,7 @@ public class Peer {
 			newResults = newResults.append(br);
 			stateIndex++;
 		}
-		return new Peer(keyPair, newBelief, stateIndex,s, genesis, historyPosition,newResults, timestamp);
+		return new Peer(keyPair, belief, stateIndex,s, genesis, historyPosition,newResults, timestamp);
 	}
 
 	/**
@@ -451,10 +459,13 @@ public class Peer {
 	/**
 	 * Gets the BlockResult of a specific block index
 	 * @param i Index of Block
-	 * @return BlockResult
+	 * @return BlockResult, or null if the BlockResult is not stired
 	 */
 	public BlockResult getBlockResult(long i) {
-		return blockResults.get(i);
+		if (i<historyPosition) return null; // Ancient history
+		long brix=i-historyPosition;
+		if (brix>=blockResults.count()) return null;
+		return blockResults.get(brix);
 	}
 
 	/**
@@ -487,6 +498,7 @@ public class Peer {
 		}
 		
 		result=result.updateBelief(newBelief);
+		result=result.updateState();
 		return result;
 	}
 
