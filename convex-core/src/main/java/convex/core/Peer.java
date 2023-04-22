@@ -549,4 +549,12 @@ public class Peer {
 	public long getPosition() {
 		return position;
 	}
+
+	/**
+	 * Gets the genesis State of this Peer
+	 * @return Genesis State
+	 */
+	public State getGenesisState() {
+		return genesis;
+	}
 }

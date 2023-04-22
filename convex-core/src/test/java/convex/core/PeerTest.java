@@ -3,6 +3,7 @@ package convex.core;
 import static convex.test.Assertions.assertNobodyError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
@@ -18,7 +19,6 @@ import convex.test.Samples;
 public class PeerTest {
 	static State STATE=InitTest.STATE;
 
-
 	@Test
 	public void testInitial() throws BadSignatureException {
 		Peer p = Peer.create(InitTest.FIRST_PEER_KEYPAIR, STATE);
@@ -26,7 +26,8 @@ public class PeerTest {
 		// initial checks
 		long timestamp = p.getTimestamp();
 		assertEquals(timestamp, Constants.INITIAL_TIMESTAMP);
-		assertEquals(STATE, p.getConsensusState());
+		assertSame(STATE, p.getConsensusState());
+		assertSame(STATE, p.getGenesisState());
 
 		// Belief check
 		AccountKey peerKey = p.getPeerKey();
