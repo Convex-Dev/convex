@@ -217,7 +217,7 @@ public class Constants {
 	 * Default size for incoming client transaction queue
 	 * Note: this limits TPS for client transactions, will send failures if overloaded
 	 */
-	public static final int TRANSACTION_QUEUE_SIZE = 500;
+	public static final int TRANSACTION_QUEUE_SIZE = 1000;
 
 	public static final int QUERY_QUEUE_SIZE = 1000;
 

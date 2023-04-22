@@ -277,6 +277,7 @@ public class Server implements Closeable {
 				}
 				log.info("Retrieved Peer Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 
+				convex.close();
 				Peer peer=Peer.create(keyPair, genF, belF);
 				return peer;
 
@@ -821,8 +822,7 @@ public class Server implements Closeable {
 				log.debug("Query thread interrupted for peer {}", this);
 				return;
 			} catch (Throwable e) {
-				log.error("Query Thread FAILED: Receiver thread terminated abnormally" + e.getMessage());
-				e.printStackTrace();
+				log.error("Query Thread FAILED: Receiver thread terminated abnormally",e);
 			}
 		}
 	};
