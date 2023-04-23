@@ -48,7 +48,9 @@ public abstract class AThreadedComponent {
 	
 	protected abstract String getThreadName();
 
-
+	/**
+	 * Start the threaded component
+	 */
 	public void start() {
 		String name=getThreadName();
 		thread.setName(name);
@@ -57,6 +59,10 @@ public abstract class AThreadedComponent {
 		thread.start();
 	}
 	
+	/**
+	 * Close this threaded component, including interrupting any running thread(s). 
+	 * Subclasses may override, but should call `super.close()` to close the main thread
+	 */
 	public void close() {
 		Thread t=thread;
 		t.interrupt();

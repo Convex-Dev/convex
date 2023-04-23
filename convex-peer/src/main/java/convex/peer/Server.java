@@ -120,7 +120,7 @@ public class Server implements Closeable {
 	/**
 	 * Connection manager instance.
 	 */
-	protected ConnectionManager manager;
+	protected final ConnectionManager manager = new ConnectionManager(this);
 	
 	/**
 	 * Connection manager instance.
@@ -155,7 +155,7 @@ public class Server implements Closeable {
 	 */
 	private volatile boolean isRunning = false;
 
-	private NIOServer nio;
+	private NIOServer nio = NIOServer.create(this);
 	private Thread beliefMergeThread = null;
 
 	/**
@@ -169,6 +169,7 @@ public class Server implements Closeable {
 	private Address controller;
 
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
+		this.config = config;
 
 		rootKey = RT.cvm(config.get(Keywords.ROOT_KEY));
 
@@ -182,12 +183,6 @@ public class Server implements Closeable {
 		final AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
-			this.config = config;
-
-			nio = NIOServer.create(this);
-
-			// now setup the connection manager
-			this.manager = new ConnectionManager(this);
 
 			// Establish Peer state and ensure it is persisted
 			this.peer = establishPeer();

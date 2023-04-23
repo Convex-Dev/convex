@@ -31,7 +31,6 @@ import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.lang.RT;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.ChallengeRequest;
 import convex.net.Connection;
@@ -45,7 +44,7 @@ import convex.net.message.MessageRemote;
  * to known peers - Should be targets for broadcast of belief updates - Should
  * be limited in number
  */
-public class ConnectionManager {
+public class ConnectionManager extends AThreadedComponent {
 
 	private static final Logger log = LoggerFactory.getLogger(ConnectionManager.class.getName());
 
@@ -74,8 +73,6 @@ public class ConnectionManager {
 	 */
 	private static final long BROADCAST_TIMEOUT = 1000;
 
-	protected final Server server;
-	
 	/**
 	 * Map of current connections.
 	 */
@@ -86,36 +83,9 @@ public class ConnectionManager {
 	 */
 	private HashMap<AccountKey, ChallengeRequest> challengeList = new HashMap<>();
 
-	private Thread connectionThread = null;
-
 	private SecureRandom random = new SecureRandom();
 
 	private long pollDelay;
-
-	/*
-	 * Runnable loop for managing server connections
-	 */
-	private Runnable connectionLoop = new Runnable() {
-		@Override
-		public void run() {
-			Stores.setCurrent(server.getStore()); // ensure the loop uses this Server's store
-			try {
-				while (server.isLive()) {
-					Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
-					maintainConnections();
-					pollBelief();
-				}
-			} catch (InterruptedException e) {
-				/* OK? Close the thread normally */
-			} catch (Throwable e) {
-				log.error("Unexpected exception, Terminating Server connection loop");
-				e.printStackTrace();
-			} finally {
-				connectionThread = null;
-				closeAllConnections(); // shut down everything gracefully if we can
-			}
-		}
-	};
 
 	/**
 	 * Celled by the connection manager to ensure we are tracking latest Beliefs on the network
@@ -277,10 +247,8 @@ public class ConnectionManager {
 
 
 	public ConnectionManager(Server server) {
-		this.server = server;
+		super(server);
 
-		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
-		this.pollDelay = (_pollDelay == null) ? ConnectionManager.SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
 	}
 
 	/**
@@ -635,26 +603,37 @@ public class ConnectionManager {
 		return newConn;
 	}
 
-	public void start() {
-		// start connection thread
-		connectionThread = new Thread(connectionLoop, "Connection Manager thread at "+server.getPort());
-		connectionThread.setDaemon(true);
-		connectionThread.start();
-	}
-
+	@Override
 	public void close() {
-		if (connectionThread!=null) {
-			connectionThread.interrupt();
-		}
-		
-		Message msg = Message.createGoodBye();
-
 		// broadcast GOODBYE message to all outgoing remote peers
 		try {
+			Message msg = Message.createGoodBye();
 			broadcast(msg);
-		} catch (InterruptedException e1) {
+		} catch (Throwable e1) {
 			// Ignore
 		}
+		
+		super.close();
+	}
+	
+	@Override
+	public void start() {
+		Object _pollDelay = server.getConfig().get(Keywords.POLL_DELAY);
+		this.pollDelay = (_pollDelay == null) ? ConnectionManager.SERVER_POLL_DELAY : Utils.toInt(_pollDelay);
+
+		super.start();
+	}
+
+	@Override
+	protected void loop() throws InterruptedException {
+		Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
+		maintainConnections();
+		pollBelief();
+	}
+
+	@Override
+	protected String getThreadName() {
+		return "Connection Manager thread at "+server.getPort();
 	}
 
 
