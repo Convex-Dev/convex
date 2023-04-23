@@ -120,6 +120,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				Message msg=createBeliefUpdateMessage();
 				
 				// Trigger CVM update before broadcast
+				// This can potentially help latency on transaction result reporting etc.
 				if (updated) server.updateBelief(belief);
 				
 				doBroadcast(msg);
