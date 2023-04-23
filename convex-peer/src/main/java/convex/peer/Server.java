@@ -125,17 +125,17 @@ public class Server implements Closeable {
 	/**
 	 * Connection manager instance.
 	 */
-	protected BeliefPropagator propagator;
+	protected final BeliefPropagator propagator=new BeliefPropagator(this);
 	
 	/**
 	 * Transaction handler instance.
 	 */
-	protected TransactionHandler transactionHandler=new TransactionHandler(this);
+	protected final TransactionHandler transactionHandler=new TransactionHandler(this);
 
 	/**
 	 * Query handler instance.
 	 */
-	protected QueryHandler queryHandler=new QueryHandler(this);
+	protected final QueryHandler queryHandler=new QueryHandler(this);
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -168,15 +168,9 @@ public class Server implements Closeable {
 	 */
 	private Address controller;
 
-
-	/**
-	 * Hostname of the peer server.
-	 */
-	String hostname;
-
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 
-		this.rootKey = (ACell)config.get(Keywords.ROOT_KEY);
+		rootKey = RT.cvm(config.get(Keywords.ROOT_KEY));
 
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
@@ -194,7 +188,6 @@ public class Server implements Closeable {
 
 			// now setup the connection manager
 			this.manager = new ConnectionManager(this);
-			this.propagator = new BeliefPropagator(this);
 
 			// Establish Peer state and ensure it is persisted
 			this.peer = establishPeer();
@@ -347,7 +340,7 @@ public class Server implements Closeable {
 	 * @return Hostname String
 	 */
 	public String getHostname() {
-		return hostname;
+		return (String) config.get(Keywords.URL);
 	}
 
 	/**
@@ -365,13 +358,6 @@ public class Server implements Closeable {
 
 			nio.launch((String)config.get(Keywords.BIND_ADDRESS), port);
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
-
-			if (getConfig().containsKey(Keywords.URL)) {
-				hostname = (String) config.get(Keywords.URL);
-				log.debug("Setting desired peer URL to: " + hostname);
-			} else {
-				hostname = null;
-			}
 
 			// set running status now, so that loops don't terminate
 			isRunning = true;
@@ -886,16 +872,16 @@ public class Server implements Closeable {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			ACell rootData = peer.toData();
+			ACell peerData = peer.toData();
 
 			if (rootKey != null) {
 				Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
 				AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
-				rootData = currentRootData.assoc(rootKey, rootData);
+				peerData = currentRootData.assoc(rootKey, peerData);
 			}
 
-			store.setRootData(rootData);
-			log.debug( "Stored peer data for Server with hash: {}", rootData.getHash().toHexString());
+			store.setRootData(peerData);
+			log.debug( "Stored peer data for Server with hash: {}", peerData.getHash().toHexString());
 			return true;
 		} catch (Throwable e) {
 			log.warn("Failed to persist peer state: {}" ,e.getMessage());
@@ -997,7 +983,7 @@ public class Server implements Closeable {
 	 * @param string Desired host name String, e.g. "my-domain.com:12345"
 	 */
 	public void setHostname(String string) {
-		hostname=string;
+		config.put(Keywords.URL, string);
 	}
 
 	public boolean isLive() {
