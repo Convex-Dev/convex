@@ -1,7 +1,6 @@
 package convex.peer;
 
 import java.util.ArrayList;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -41,9 +40,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Queue on which Beliefs are received from the Belief merge thread.
 	 * 
-	 * We use a custom TransferQueue because we only want to propagate the most recent Belief
+	 * We use a custom Queue because we only care about propagating the most recent Belief
 	 */
-	private BlockingQueue<Belief> beliefQueue=new LatestUpdateQueue<>();
+	private LatestUpdateQueue<Belief> beliefQueue=new LatestUpdateQueue<>();
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 
