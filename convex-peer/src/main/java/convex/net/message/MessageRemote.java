@@ -106,5 +106,13 @@ public class MessageRemote extends Message {
 		return true;
 	}
 
+	@Override
+	public void closeConnection() {
+		Connection pc=getConnection();
+		if (pc!=null) {
+			pc.close();
+		}
+	}
+
 
 }

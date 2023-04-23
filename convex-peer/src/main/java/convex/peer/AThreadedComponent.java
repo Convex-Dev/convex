@@ -52,7 +52,7 @@ public abstract class AThreadedComponent {
 	public void start() {
 		String name=getThreadName();
 		thread.setName(name);
-		log.info("Thread started: "+name);
+		log.trace("Thread started: {}",name);
 		thread.setDaemon(true);
 		thread.start();
 	}

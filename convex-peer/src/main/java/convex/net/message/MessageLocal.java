@@ -74,4 +74,9 @@ public class MessageLocal extends Message {
 		return null;
 	}
 
+	@Override
+	public void closeConnection() {
+		// Nothing to close
+	}
+
 }

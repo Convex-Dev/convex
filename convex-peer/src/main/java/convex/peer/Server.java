@@ -158,7 +158,6 @@ public class Server implements Closeable {
 	private volatile boolean isRunning = false;
 
 	private NIOServer nio;
-	private Thread queryThread = null;
 	private Thread beliefMergeThread = null;
 
 	/**
@@ -531,10 +530,7 @@ public class Server implements Closeable {
 	 *
 	 */
 	private void processClose(Message m) {
-		SignedData<AccountKey> signedPeerKey = m.getPayload();
-		AccountKey remotePeerKey = RT.ensureAccountKey(signedPeerKey.getValue());
-		manager.closeConnection(remotePeerKey);
-		log.trace("Connection Closed");
+		m.closeConnection();
 	}
 
 	/**
@@ -918,6 +914,7 @@ public class Server implements Closeable {
 		// Shut down propagator first, no point sending any more Beliefs
 		propagator.close();
 		
+		queryHandler.close();
 		transactionHandler.close();
 		
 		// persist peer state if necessary
@@ -925,16 +922,7 @@ public class Server implements Closeable {
 			persistPeerData();
 		}
 
-		// TODO: not much point signing this?
-		SignedData<ACell> signedPeerKey = peer.sign(peer.getPeerKey());
-		Message msg = Message.createGoodBye(signedPeerKey);
 
-		// broadcast GOODBYE message to all outgoing remote peers
-		try {
-			manager.broadcast(msg);
-		} catch (InterruptedException e1) {
-			// Ignore
-		}
 
 		isRunning = false;
 		if (beliefMergeThread != null) {
@@ -945,14 +933,7 @@ public class Server implements Closeable {
 				// Ignore
 			}
 		}
-		if (queryThread != null) {
-			queryThread.interrupt();
-			try {
-				queryThread.join(100);
-			} catch (InterruptedException e) {
-				// Ignore
-			}
-		}
+
 		manager.close();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.

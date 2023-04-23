@@ -109,11 +109,9 @@ public abstract class Message {
 		return create(null,MessageType.RESPONSE, response,null);
 	}
 
-	public static Message createGoodBye(SignedData<ACell> peerKey) {
-		return create(null,MessageType.GOODBYE, peerKey,null);
+	public static Message createGoodBye() {
+		return create(null,MessageType.GOODBYE, null,Blob.NULL_ENCODING);
 	}
-
-
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() {
@@ -222,5 +220,7 @@ public abstract class Message {
 		Result r=Result.create(id, value,error);
 		return createResult(r);
 	}
+
+	public abstract void closeConnection();
 
 }

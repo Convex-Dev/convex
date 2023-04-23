@@ -646,6 +646,15 @@ public class ConnectionManager {
 		if (connectionThread!=null) {
 			connectionThread.interrupt();
 		}
+		
+		Message msg = Message.createGoodBye();
+
+		// broadcast GOODBYE message to all outgoing remote peers
+		try {
+			broadcast(msg);
+		} catch (InterruptedException e1) {
+			// Ignore
+		}
 	}
 
 
