@@ -431,7 +431,7 @@ public class Server implements Closeable {
 	 *
 	 * @param m
 	 */
-	private void processMessage(Message m) {
+	protected void processMessage(Message m) {
 		MessageType type = m.getType();
 		try {
 			switch (type) {
@@ -487,7 +487,7 @@ public class Server implements Closeable {
 	 * @param m
 	 * @throws BadFormatException
 	 */
-	void handleMissingData(Message m)  {
+	protected void handleMissingData(Message m)  {
 		// payload for a missing data request should be a valid Hash
 		Hash h = RT.ensureHash(m.getPayload());
 		if (h == null) {
@@ -513,7 +513,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	private void processTransact(Message m) {
+	protected void processTransact(Message m) {
 		boolean queued=transactionHandler.offerTransaction(m);
 		
 		if (queued) {
@@ -529,7 +529,7 @@ public class Server implements Closeable {
 	 * Called by a remote peer to close connections to the remote peer.
 	 *
 	 */
-	private void processClose(Message m) {
+	protected void processClose(Message m) {
 		m.closeConnection();
 	}
 
@@ -652,7 +652,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	private void processStatus(Message m) {
+	protected void processStatus(Message m) {
 		try {
 			// We can ignore payload
 
@@ -707,11 +707,11 @@ public class Server implements Closeable {
 		manager.processChallenge(m, peer);
 	}
 
-	private void processResponse(Message m) {
+	protected void processResponse(Message m) {
 		manager.processResponse(m, peer);
 	}
 
-	private void processQuery(Message m) {
+	protected void processQuery(Message m) {
 		boolean queued= queryHandler.offerQuery(m);
 		if (!queued) {
 			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
@@ -745,7 +745,7 @@ public class Server implements Closeable {
 	 *
 	 * @param m
 	 */
-	private void processBelief(Message m) {
+	protected void processBelief(Message m) {
 		if (!queueBelief(m)) {
 			log.warn("Incoming belief queue full");
 		}
@@ -809,7 +809,7 @@ public class Server implements Closeable {
 		return newBelief;
 	}
 
-	private boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
+	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
 		boolean changed=false;
 		AccountKey myKey=getPeerKey();
 		try {
@@ -884,7 +884,7 @@ public class Server implements Closeable {
 	 * This will overwrite any previously persisted peer data.
 	 * @return True if successfully persisted, false in case of any error
 	 */
-	public boolean persistPeerData() {
+	protected boolean persistPeerData() {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -921,8 +921,6 @@ public class Server implements Closeable {
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
 		}
-
-
 
 		isRunning = false;
 		if (beliefMergeThread != null) {
