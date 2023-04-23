@@ -89,8 +89,6 @@ public class Server implements Closeable {
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
-	Belief lastBroadcastBelief;
-
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
 
@@ -683,7 +681,7 @@ public class Server implements Closeable {
 	 */
 	public AVector<ACell> getStatusVector() {
 		// Make sure we use the latest broadcast peer version
-		Belief belief = lastBroadcastBelief;
+		Belief belief = propagator.getLastBroadcastBelief();
 		if (belief==null) belief=peer.getBelief();
 		
 		State state=peer.getConsensusState();

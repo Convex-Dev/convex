@@ -123,7 +123,7 @@ public class BeliefPropagator {
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
 		belief=ACell.createAnnounced(belief, noveltyHandler);
-		server.lastBroadcastBelief=belief;
+		lastBroadcastBelief=belief;
 
 		Message msg = Message.createBelief(belief, novelty);
 		long mdc=msg.getMessageData().count();
@@ -143,5 +143,11 @@ public class BeliefPropagator {
 	public void start() {
 		beliefPropagatorThread.setDaemon(true);
 		beliefPropagatorThread.start();
+	}
+
+	private Belief lastBroadcastBelief;
+
+	public Belief getLastBroadcastBelief() {
+		return lastBroadcastBelief;
 	}
 }
