@@ -95,7 +95,7 @@ public class StressPanel extends JPanel {
 		JLabel lblClients = new JLabel("Clients");
 		optionPanel.add(lblClients);
 		clientCountSpinner = new JSpinner();
-		clientCountSpinner.setModel(new SpinnerNumberModel(10, 1, 300, 1));
+		clientCountSpinner.setModel(new SpinnerNumberModel(100, 1, 300, 1));
 		optionPanel.add(clientCountSpinner);
 
 		JLabel lblRequests = new JLabel("Requests per client");
@@ -107,7 +107,7 @@ public class StressPanel extends JPanel {
 		JLabel lblTrans = new JLabel("Transactions per Request");
 		optionPanel.add(lblTrans);
 		transactionCountSpinner = new JSpinner();
-		transactionCountSpinner.setModel(new SpinnerNumberModel(1, 1, 1000, 1));
+		transactionCountSpinner.setModel(new SpinnerNumberModel(10, 1, 1000, 1));
 		optionPanel.add(transactionCountSpinner);
 
 		JLabel lblOps = new JLabel("Ops per Transaction");

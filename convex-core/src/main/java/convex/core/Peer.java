@@ -455,7 +455,6 @@ public class Peer {
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
 			SignedData<Block> block = blocks.get(stateIndex);
 			
-			// TODO: Block signature validation here?
 			BlockResult br = s.applyBlock(block);
 			s=br.getState();
 			newResults = newResults.append(br);

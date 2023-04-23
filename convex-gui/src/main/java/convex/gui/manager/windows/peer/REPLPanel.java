@@ -126,14 +126,14 @@ public class REPLPanel extends JPanel {
 		outputArea.setRows(15);
 		outputArea.setEditable(false);
 		outputArea.setLineWrap(true);
-		outputArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
+		outputArea.setFont(new Font("Monospaced", Font.PLAIN, 16));
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 		splitPane.setLeftComponent(new JScrollPane(outputArea));
 
 		inputArea = new JTextArea();
 		inputArea.setRows(5);
-		inputArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
+		inputArea.setFont(new Font("Monospaced", Font.PLAIN, 20));
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
 		splitPane.setRightComponent(new JScrollPane(inputArea));

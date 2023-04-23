@@ -291,6 +291,7 @@ public class State extends ARecord {
 	 * @return The BlockResult from applying the given Block to this State
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
+		// TODO: behaviour if invalid Peer / Block?
 		
 		Block block=signedBlock.getValue();
 		return applyBlock(block);
