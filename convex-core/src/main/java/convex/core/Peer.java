@@ -8,7 +8,6 @@ import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -18,7 +17,6 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.lang.AOp;
@@ -432,16 +430,19 @@ public class Peer {
 	/**
 	 * Update this Peer with Consensus State for an updated Belief
 	 *
-	 * @param newBelief
-	 * @return
-	 * @throws BadSignatureException 
+	 * @param newBelief Belief to apply
+	 * @return Updated Peer
 	 */
-	private Peer updateBelief(Belief newBelief) {
+	public Peer updateBelief(Belief newBelief) {
 		if (belief == newBelief) return this;
 		return new Peer(keyPair, newBelief, position,state, genesis, historyPosition,blockResults, timestamp);
 	}	
-		
-	private Peer updateState() {
+	
+	/**
+	 * Updates the state of the Peer based on latest consensus Belief
+	 * @return
+	 */
+	public Peer updateState() {
 		Order myOrder = belief.getOrder(peerKey); // this peer's chain from new belief
 		long consensusPoint = myOrder.getConsensusPoint();
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
@@ -495,18 +496,8 @@ public class Peer {
 	 */
 	public Peer proposeBlock(Block block) {
 		
-		Belief b = getBelief();
-		BlobMap<AccountKey, SignedData<Order>> orders = b.getOrders();
-
-		Order myOrder = b.getOrder(peerKey);
-		if (myOrder==null) myOrder=Order.create();
-
-		// Create new order with signed Block
-		Order newOrder = myOrder.append(sign(block));
-		SignedData<Order> newSignedOrder = sign(newOrder);
-		
-		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
-		Belief newBelief=b.withOrders(newOrders);
+		SignedData<Block> signedBlock=sign(block);
+		Belief newBelief=belief.proposeBlock(keyPair, signedBlock);
 		
 		Peer result=this;
 		// Update timestamp if necessary to accommodate Block

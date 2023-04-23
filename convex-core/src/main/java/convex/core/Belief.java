@@ -870,6 +870,27 @@ public class Belief extends ARecord {
 		return result;
 	}
 
+	public Belief proposeBlock(AKeyPair kp, SignedData<Block> signedBlock) {
+		AccountKey peerKey=kp.getAccountKey();
+		BlobMap<AccountKey, SignedData<Order>> orders = getOrders();
+
+		SignedData<Order> mySO=orders.get(peerKey);
+		Order myOrder;
+		if (mySO==null) {
+			myOrder=Order.create();
+		} else {
+			myOrder=mySO.getValue();
+		}
+
+		// Create new order with signed Block
+		Order newOrder = myOrder.append(signedBlock);
+		SignedData<Order> newSignedOrder = kp.signData(newOrder);
+		
+		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
+		Belief newBelief=this.withOrders(newOrders);
+		return newBelief;
+	}
+
 
 
 

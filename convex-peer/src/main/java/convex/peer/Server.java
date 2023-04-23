@@ -3,11 +3,8 @@ package convex.peer;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -18,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Belief;
-import convex.core.Block;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Order;
@@ -37,12 +33,10 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
-import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -82,21 +76,10 @@ import convex.net.message.Message;
 public class Server implements Closeable {
 	public static final int DEFAULT_PORT = 18888;
 
-	/**
-	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
-	 */
-	private static final long AWAIT_BELIEFS_PAUSE = 60L;
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
-
-
-	
-	/**
-	 * Queue for received Beliefs to be processed
-	 */
-	private ArrayBlockingQueue<Message> beliefQueue;
 
 	/**
 	 * Message Consumer that simply enqueues received client messages received by this peer
@@ -131,6 +114,12 @@ public class Server implements Closeable {
 	 * Transaction handler instance.
 	 */
 	protected final TransactionHandler transactionHandler=new TransactionHandler(this);
+	
+	/**
+	 * Transaction handler instance.
+	 */
+	protected final CVMExecutor executor=new CVMExecutor(this);
+
 
 	/**
 	 * Query handler instance.
@@ -159,11 +148,6 @@ public class Server implements Closeable {
 	private Thread beliefMergeThread = null;
 
 	/**
-	 * The Peer instance current state for this server. Will be updated based on peer events.
-	 */
-	private Peer peer;
-
-	/**
 	 * The Peer Controller Address
 	 */
 	private Address controller;
@@ -176,8 +160,6 @@ public class Server implements Closeable {
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 		
-		// Set up Queue. TODO: use config if provided
-		beliefQueue = new ArrayBlockingQueue<>(Constants.BELIEF_QUEUE_SIZE);
 		
 		// Switch to use the configured store for setup, saving the caller store
 		final AStore savedStore=Stores.current();
@@ -185,7 +167,8 @@ public class Server implements Closeable {
 			Stores.setCurrent(store);
 
 			// Establish Peer state and ensure it is persisted
-			this.peer = establishPeer();
+			Peer peer = establishPeer();
+			executor.setPeer(peer);
 			persistPeerData();
 			
 			establishController();
@@ -200,6 +183,7 @@ public class Server implements Closeable {
 	 * Establish the controller Account for this Peer.
 	 */
 	private void establishController() {
+		Peer peer=getPeer();
 		Address controlAddress=RT.toAddress(getConfig().get(Keywords.CONTROLLER));
 		if (controlAddress==null) {
 			controlAddress=peer.getController();
@@ -313,12 +297,12 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Gets the current Belief held by this {@link Server}
+	 * Gets the current Belief held by this Peer
 	 *
 	 * @return Current Belief
 	 */
 	public Belief getBelief() {
-		return peer.getBelief();
+		return getPeer().getBelief();
 	}
 
 	/**
@@ -327,7 +311,7 @@ public class Server implements Closeable {
 	 * @return Current Peer data
 	 */
 	public Peer getPeer() {
-		return peer;
+		return executor.getPeer();
 	}
 
 	/**
@@ -362,15 +346,12 @@ public class Server implements Closeable {
 
 			queryHandler.start();
 
-			// Start Peer update thread
-			beliefMergeThread = new Thread(beliefMergeLoop, "Belief Merge Loop on port: " + port);
-			beliefMergeThread.setDaemon(true);
-			beliefMergeThread.start();
-
 			propagator.start();
 			
 			transactionHandler.start();
-
+			
+			executor.start();
+			
 			// Close server on shutdown, should be before Etch stores in priority
 			Shutdown.addHook(Shutdown.SERVER, ()->close());
 
@@ -512,45 +493,7 @@ public class Server implements Closeable {
 		m.closeConnection();
 	}
 
-	/**
-	 * Handle general Belief update, taking belief registered in newBeliefs
-	 *
-	 * @return true if Peer Belief changed, false otherwise
-	 * @throws InterruptedException
-	 */
-	protected boolean maybeUpdateBelief(Belief newBelief) throws InterruptedException {
 
-		// we are in full consensus if there are no unconfirmed blocks after the consensus point
-		//boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
-
-		// only do belief merge if needed either after:
-		// - publishing a new block
-		// - incoming beliefs
-		// - not in full consensus yet
-		//if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
-
-		boolean updated = maybeMergeBeliefs(newBelief);
-		if (updated) {
-			maybeMergeBeliefs(); // try double merge
-		}
-		
-		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
-		Block block= transactionHandler.maybeGenerateBlock(peer);
-		boolean published=false;
-		if (block!=null) {
-			Peer newPeer = peer.proposeBlock(block);
-			log.info("New block proposed: {} transaction(s), size= {}, hash={}", block.getTransactions().count(), block.getMemorySize(),block.getHash());
-			peer = newPeer;
-			published=true;
-		}
-		
-		// Return true iff we published a new Block or updated our own Order
-		return (updated||published);
-
-	}
-
-
-	private long beliefReceivedCount=0L;
 
 
 
@@ -567,7 +510,7 @@ public class Server implements Closeable {
 	 * @return Count of the beliefs received by this Server instance
 	 */
 	public long getBeliefReceivedCount() {
-		return beliefReceivedCount;
+		return propagator.beliefReceivedCount;
 	}
 
 
@@ -594,42 +537,14 @@ public class Server implements Closeable {
 	 * @return True if Belief was successfullly queued, false otherwise
 	 */
 	public boolean queueBelief(Message event) {
-		boolean offered=beliefQueue.offer(event);
+		boolean offered=propagator.queueBelief(event);
 		return offered;
 	}
 
 
 
 
-	/**
-	 * Checks for mergeable remote beliefs, and if found merge and update own
-	 * belief.
-	 * @param newBelief 
-	 *
-	 * @return True if Peer Belief Order was changed, false otherwise.
-	 */
-	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
-		try {
-			Peer newPeer = peer.mergeBeliefs(newBeliefs);
-			if (newPeer==peer) return false;
-			
-			// boolean orderChanged=newPeer.getPeerOrder().consensusEquals(peer.getPeerOrder());
-			
-			peer = newPeer;
 
-			//log.info( "New merged Belief update: {}" ,newPeer.getBelief().getHash());
-			//return orderChanged;
-			return true;
-		} catch (MissingDataException e) {
-			// Shouldn't happen if beliefs are persisted
-			// e.printStackTrace();
-			throw new Error("Missing data in belief update: " + e.getMissingHash().toHexString(), e);
-		} catch (InvalidDataException e) {
-			// Shouldn't happen if Beliefs are already validated
-			// e.printStackTrace();
-			throw new Error("Invalid data in belief update!", e);
-		}
-	}
 
 	protected void processStatus(Message m) {
 		try {
@@ -661,9 +576,8 @@ public class Server implements Closeable {
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusVector() {
-		// Make sure we use the latest broadcast peer version
-		Belief belief = propagator.getLastBroadcastBelief();
-		if (belief==null) belief=peer.getBelief();
+		Peer peer=getPeer();
+		Belief belief=peer.getBelief();
 		
 		State state=peer.getConsensusState();
 		
@@ -683,11 +597,11 @@ public class Server implements Closeable {
 	}
 
 	private void processChallenge(Message m) {
-		manager.processChallenge(m, peer);
+		manager.processChallenge(m, getPeer());
 	}
 
 	protected void processResponse(Message m) {
-		manager.processResponse(m, peer);
+		manager.processResponse(m, getPeer());
 	}
 
 	protected void processQuery(Message m) {
@@ -725,121 +639,9 @@ public class Server implements Closeable {
 	 * @param m
 	 */
 	protected void processBelief(Message m) {
-		if (!queueBelief(m)) {
+		if (!propagator.queueBelief(m)) {
 			log.warn("Incoming belief queue full");
 		}
-	}
-	
-	/**
-	 * Runnable loop for managing Server belief merges
-	 */
-	private final Runnable beliefMergeLoop = new Runnable() {
-		@Override
-		public void run() {
-			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
-			// loop while the server is running
-			while (isRunning) {
-				try {
-					// Wait for some new Beliefs to accumulate up to a given time
-					Belief newBelief = awaitBelief();
-					
-					// Update Peer timestamp. Do this so that we can include
-					// Recent Orders from other Peers in merge
-					peer = peer.updateTimestamp(Utils.getCurrentTimestamp());
-					
-					// Try belief update
-					boolean beliefUpdated=maybeUpdateBelief(newBelief);			
-					
-					if (beliefUpdated||propagator.isRebroadcastDue()) {						
-						propagator.queueBelief(peer.getBelief());
-						transactionHandler.maybeReportTransactions(peer);
-					} 
-				} catch (InterruptedException e) {
-					log.debug("Terminating Belief Merge loop due to interrupt");
-					break;
-				} catch (Throwable e) {
-					log.error("Unexpected exception in Belief Merge loop: {}", e);
-					e.printStackTrace();
-				}
-			}
-		}
-
-	};
-
-	private Belief awaitBelief() throws InterruptedException {
-		ArrayList<Message> beliefMessages=new ArrayList<>();
-		
-		// if we did a belief merge recently, pause for a bit to await more Beliefs
-		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
-		if (firstEvent==null) return null; // nothing arrived
-		
-		beliefMessages.add(firstEvent);
-		beliefQueue.drainTo(beliefMessages); 
-		HashMap<AccountKey,SignedData<Order>> newOrders=peer.getBelief().getOrdersHashMap();
-		// log.info("Merging Beliefs: "+allBeliefs.size());
-		boolean anyOrderChanged=false;
-		
-		for (Message m: beliefMessages) {
-			anyOrderChanged=mergeBeliefMessage(newOrders,m);
-		}
-		if (!anyOrderChanged) return null;
-		
-		Belief newBelief= Belief.create(newOrders,Utils.getCurrentTimestamp());
-		return newBelief;
-	}
-
-	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
-		boolean changed=false;
-		AccountKey myKey=getPeerKey();
-		try {
-			// Add to map of new Beliefs received for each Peer
-			beliefReceivedCount++;
-			
-			try {
-				ACell payload=m.getPayload();
-				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
-				for (SignedData<Order> so:a ) {
-					AccountKey key=so.getAccountKey();
-					
-					if (Utils.equals(myKey, key)) continue; // skip own order
-					if (newOrders.containsKey(key)) {
-						Order newOrder=so.getValue();
-						Order oldOrder=newOrders.get(key).getValue();
-						boolean replace=Belief.compareOrders(oldOrder, newOrder);
-						if (!replace) continue;
-					} 
-					
-					// Check signature before we accept Order
-					if (!so.checkSignature()) {
-						log.warn("Bad Order signature");
-						m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
-						// TODO: close connection?
-						continue;
-					};
-					
-					// Ensure we can persist newly received Order
-					so=ACell.createPersisted(so).getValue();
-					newOrders.put(key, so);
-					changed=true;
-				}
-			} catch (MissingDataException e) {
-				// Missing data somewhere in Belief / Order received
-				Hash h=e.getMissingHash();
-				log.warn("Missing data in Belief! {}",h);
-				//System.out.print(Refs.printMissingTree(a));
-				// System.exit(0);
-				if (!m.sendMissingData(e.getMissingHash())) {
-					log.warn("Unable to request Missing data in Belief!");
-				}
-			}
-		} catch (ClassCastException e) {
-			// Bad message from Peer
-			log.warn("Class cast exception in Belief!",e);
-			m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
-		}  catch (Exception e) {
-			log.warn("Unexpected exception getting Belief",e);
-		}
-		return changed;
 	}
 
 	/**
@@ -867,7 +669,7 @@ public class Server implements Closeable {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			ACell peerData = peer.toData();
+			ACell peerData = getPeer().toData();
 
 			if (rootKey != null) {
 				Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
@@ -895,7 +697,9 @@ public class Server implements Closeable {
 		
 		queryHandler.close();
 		transactionHandler.close();
+		executor.close();
 		
+		Peer peer=getPeer();
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
 			persistPeerData();
@@ -991,6 +795,10 @@ public class Server implements Closeable {
 
 	public BeliefPropagator getBeliefPropagator() {
 		return propagator;
+	}
+ 
+	public void updateBelief(Belief belief) {
+		executor.queueUpdate(belief);
 	}
 
 

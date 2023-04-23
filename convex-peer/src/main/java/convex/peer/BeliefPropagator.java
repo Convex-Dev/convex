@@ -1,6 +1,9 @@
 package convex.peer;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -8,10 +11,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
+import convex.core.Block;
+import convex.core.Constants;
+import convex.core.ErrorCodes;
+import convex.core.MergeContext;
+import convex.core.Order;
+import convex.core.Result;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.util.LatestUpdateQueue;
+import convex.core.data.SignedData;
+import convex.core.data.Strings;
+import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.util.Utils;
 import convex.net.message.Message;
 
@@ -24,6 +39,11 @@ import convex.net.message.Message;
  * 
  */
 public class BeliefPropagator extends AThreadedComponent {
+	/**
+	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
+	 */
+	private static final long AWAIT_BELIEFS_PAUSE = 60L;
+
 	
 	public static final int BELIEF_REBROADCAST_DELAY=300;
 	
@@ -38,13 +58,17 @@ public class BeliefPropagator extends AThreadedComponent {
 	public static final int BELIEF_BROADCAST_POLL_TIME=1000;
 	
 	/**
-	 * Queue on which Beliefs are received from the Belief merge thread.
-	 * 
-	 * We use a custom Queue because we only care about propagating the most recent Belief
+	 * Queue on which Beliefs messages are received 
 	 */
-	private LatestUpdateQueue<Belief> beliefQueue=new LatestUpdateQueue<>();
+	// TODO: use config if provided
+	private ArrayBlockingQueue<Message> beliefQueue = new ArrayBlockingQueue<>(Constants.BELIEF_QUEUE_SIZE);
+
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
+	
+
+	long beliefReceivedCount=0L;
+
 
 	public BeliefPropagator(Server server) {
 		super(server);
@@ -71,30 +95,193 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	/**
-	 * Queues a Belief for broadcast
-	 * @param belief Belief to queue
-	 * @return True assuming Belief is queued successfully
+	 * Queues a Belief Message for broadcast
+	 * @param beliefMessage Belief Message to queue
+	 * @return True if Belief is queued successfully
 	 */
-	public synchronized boolean queueBelief(Belief belief) {
-		return beliefQueue.offer(belief);
+	public synchronized boolean queueBelief(Message beliefMessage) {
+		return beliefQueue.offer(beliefMessage);
 	}
 	
-	Belief belief;
+	Belief belief=null;
 	
 	protected void loop() throws InterruptedException {
-		Belief newBelief=beliefQueue.poll(BELIEF_BROADCAST_POLL_TIME, TimeUnit.MILLISECONDS);
 		
-		if (newBelief==null) {
-			return;
+		// Wait for some new Beliefs to accumulate up to a given time
+		Belief newBelief = awaitBelief();
+		boolean updated= maybeUpdateBelief(newBelief);
+		
+		if (updated||(Utils.getCurrentTimestamp()>lastBroadcastTime+BELIEF_BROADCAST_DELAY)) {
+			Message msg=createBeliefUpdateMessage();
+			
+			// Trigger CVM update before broadcast
+			server.updateBelief(belief);
+			
+			doBroadcast(msg);
 		}
-
-		belief=newBelief;
-		doBroadcast();
 		
-		Thread.sleep(BELIEF_BROADCAST_DELAY);
+		if (updated) server.updateBelief(belief);	
 	}
 	
-	private void doBroadcast() throws InterruptedException {
+	@Override public void start() {
+		belief=server.getBelief();
+		super.start();
+	}
+	
+	/**
+	 * Handle general Belief update, taking belief registered in newBeliefs
+	 *
+	 * @return true if Peer Belief changed, false otherwise
+	 * @throws InterruptedException
+	 */
+	protected boolean maybeUpdateBelief(Belief newBelief) throws InterruptedException {
+
+		// we are in full consensus if there are no unconfirmed blocks after the consensus point
+		//boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
+
+		// only do belief merge if needed either after:
+		// - publishing a new block
+		// - incoming beliefs
+		// - not in full consensus yet
+		//if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
+
+		boolean updated = maybeMergeBeliefs(newBelief);
+		if (updated) {
+			maybeMergeBeliefs(); // try double merge
+		}
+		
+		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
+		SignedData<Block> signedBlock= server.transactionHandler.maybeGenerateBlock(server.getPeer());
+		boolean published=false;
+		if (signedBlock!=null) {
+			belief=belief.proposeBlock(server.getKeyPair(),signedBlock);
+			if (log.isDebugEnabled()) {
+				Block bl=signedBlock.getValue();
+				log.debug("New block proposed: {} transaction(s), size= {}, hash={}", bl.getTransactions().count(), signedBlock.getMemorySize(),signedBlock.getHash());
+			}
+			published=true;
+		}
+		
+		// Return true iff we published a new Block or updated our own Order
+		return (updated||published);
+
+	}
+
+	
+	/**
+	 * Checks for mergeable remote beliefs, and if found merge and update own
+	 * belief.
+	 * @param newBelief 
+	 *
+	 * @return True if Peer Belief Order was changed, false otherwise.
+	 */
+	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
+		try {
+			long ts=Utils.getCurrentTimestamp();
+			AKeyPair kp=server.getKeyPair();
+			MergeContext mc = MergeContext.create(belief,kp, ts, server.getPeer().getConsensusState());
+			Belief newBelief = belief.merge(mc,newBeliefs);
+
+			boolean beliefChanged=(belief==newBelief);
+			belief=newBelief;
+
+			return beliefChanged;
+		} catch (MissingDataException e) {
+			// Shouldn't happen if beliefs are persisted
+			// e.printStackTrace();
+			throw new Error("Missing data in belief update: " + e.getMissingHash().toHexString(), e);
+		} catch (InvalidDataException e) {
+			// Shouldn't happen if Beliefs are already validated
+			// e.printStackTrace();
+			throw new Error("Invalid data in belief update!", e);
+		}
+	}
+	
+	private Belief awaitBelief() throws InterruptedException {
+		ArrayList<Message> beliefMessages=new ArrayList<>();
+		
+		// if we did a belief merge recently, pause for a bit to await more Beliefs
+		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
+		if (firstEvent==null) return null; // nothing arrived
+		
+		beliefMessages.add(firstEvent);
+		beliefQueue.drainTo(beliefMessages); 
+		HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
+		// log.info("Merging Beliefs: "+allBeliefs.size());
+		boolean anyOrderChanged=false;
+		
+		for (Message m: beliefMessages) {
+			anyOrderChanged=mergeBeliefMessage(newOrders,m);
+		}
+		if (!anyOrderChanged) return null;
+		
+		Belief newBelief= Belief.create(newOrders,Utils.getCurrentTimestamp());
+		return newBelief;
+	}
+	
+
+	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
+		boolean changed=false;
+		AccountKey myKey=server.getPeerKey();
+		try {
+			// Add to map of new Beliefs received for each Peer
+			beliefReceivedCount++;
+			
+			try {
+				ACell payload=m.getPayload();
+				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
+				for (SignedData<Order> so:a ) {
+					AccountKey key=so.getAccountKey();
+					
+					if (Utils.equals(myKey, key)) continue; // skip own order
+					if (newOrders.containsKey(key)) {
+						Order newOrder=so.getValue();
+						Order oldOrder=newOrders.get(key).getValue();
+						boolean replace=Belief.compareOrders(oldOrder, newOrder);
+						if (!replace) continue;
+					} 
+					
+					// Check signature before we accept Order
+					if (!so.checkSignature()) {
+						log.warn("Bad Order signature");
+						m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
+						// TODO: close connection?
+						continue;
+					};
+					
+					// Ensure we can persist newly received Order
+					so=ACell.createPersisted(so).getValue();
+					newOrders.put(key, so);
+					changed=true;
+				}
+			} catch (MissingDataException e) {
+				// Missing data somewhere in Belief / Order received
+				Hash h=e.getMissingHash();
+				log.warn("Missing data in Belief! {}",h);
+				//System.out.print(Refs.printMissingTree(a));
+				// System.exit(0);
+				if (!m.sendMissingData(e.getMissingHash())) {
+					log.warn("Unable to request Missing data in Belief!");
+				}
+			}
+		} catch (ClassCastException e) {
+			// Bad message from Peer
+			log.warn("Class cast exception in Belief!",e);
+			m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
+		}  catch (Exception e) {
+			log.warn("Unexpected exception getting Belief",e);
+		}
+		return changed;
+	}
+	
+	private void doBroadcast(Message msg) throws InterruptedException {
+		server.manager.broadcast(msg);
+		
+		lastBroadcastTime=Utils.getCurrentTimestamp();
+		beliefBroadcastCount++;
+	}
+	
+	private Message createBeliefUpdateMessage() {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -114,10 +301,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		if (mdc>=Format.MAX_MESSAGE_LENGTH*0.95) {
 			log.warn("Long Belief Delta message: "+mdc);
 		}
-		server.manager.broadcast(msg);
-		
-		lastBroadcastTime=Utils.getCurrentTimestamp();
-		beliefBroadcastCount++;
+		return msg;
 	}
 
 	private Belief lastBroadcastBelief;

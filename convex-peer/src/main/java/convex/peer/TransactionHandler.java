@@ -178,7 +178,7 @@ public class TransactionHandler extends AThreadedComponent{
 	 *
 	 * @return True if a new block is published, false otherwise.
 	 */
-	protected Block maybeGenerateBlock(Peer peer) {
+	protected SignedData<Block> maybeGenerateBlock(Peer peer) {
 		long timestamp=Utils.getCurrentTimestamp();
 
 		if (timestamp>=lastBlockPublishedTime+Constants.MIN_BLOCK_TIME) {
@@ -196,7 +196,8 @@ public class TransactionHandler extends AThreadedComponent{
 		Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
 		newTransactions.clear();
 		lastBlockPublishedTime=Utils.getCurrentTimestamp();
-		return block;
+		SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
+		return signedBlock;
 	}
 	
 	/**
