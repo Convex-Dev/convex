@@ -12,7 +12,6 @@ import convex.core.Belief;
 import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.data.Ref;
-import convex.core.store.Stores;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.Utils;
 import convex.net.message.Message;
@@ -25,7 +24,7 @@ import convex.net.message.Message;
  * 2. We want to pause to ensure that as many peers as possible have received the delta
  * 
  */
-public class BeliefPropagator {
+public class BeliefPropagator extends AThreadedComponent {
 	
 	public static final int BELIEF_REBROADCAST_DELAY=300;
 	
@@ -38,8 +37,6 @@ public class BeliefPropagator {
 	 * Polling period for Belief propagator loop
 	 */
 	public static final int BELIEF_BROADCAST_POLL_TIME=1000;
-
-	protected final Server server;
 	
 	/**
 	 * Queue on which Beliefs are received from the Belief merge thread.
@@ -51,30 +48,9 @@ public class BeliefPropagator {
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 
 	public BeliefPropagator(Server server) {
-		this.server=server;
+		super(server);
 	}
 	
-	protected final Runnable beliefPropagatorLoop = new Runnable() {
-		@Override
-		public void run() {
-			Stores.setCurrent(server.getStore());
-			while (server.isLive()) {
-				try {
-					// wait until the thread is notified of new work
-					Belief b=beliefQueue.poll(BELIEF_BROADCAST_POLL_TIME, TimeUnit.MILLISECONDS);
-					if (b!=null) {
-						doBroadcastBelief(b);
-					}
-					Thread.sleep(BELIEF_BROADCAST_DELAY);
-				} catch (InterruptedException e) {
-					log.trace("Belief Propagator thread interrupted on "+server);
-					return;
-				} catch (Throwable e) {
-					log.warn("Unexpected exception in Belief propagator: ",e);
-				}
-			}
-		}
-	};
 	
 	/**
 	 * Check if the propagator wants the latest Belief for rebroadcast
@@ -83,8 +59,7 @@ public class BeliefPropagator {
 	public boolean isRebroadcastDue() {
 		return (lastBroadcastTime+BELIEF_REBROADCAST_DELAY)<Utils.getCurrentTimestamp();
 	}
-	
-	protected final Thread beliefPropagatorThread=new Thread(beliefPropagatorLoop);
+
 	
 	/**
 	 * Time of last belief broadcast
@@ -105,9 +80,10 @@ public class BeliefPropagator {
 		return beliefQueue.offer(belief);
 	}
 	
-	private void doBroadcastBelief(Belief belief) throws InterruptedException {
+	protected void loop() throws InterruptedException {
+		Belief belief=beliefQueue.poll(BELIEF_BROADCAST_POLL_TIME, TimeUnit.MILLISECONDS);
+		
 		if (belief==null) {
-			log.warn("Unexpected null Belief!!");
 			return;
 		}
 
@@ -134,20 +110,19 @@ public class BeliefPropagator {
 		
 		lastBroadcastTime=Utils.getCurrentTimestamp();
 		beliefBroadcastCount++;
-	}
-
-	public void close() {
-		beliefPropagatorThread.interrupt();
-	}
-
-	public void start() {
-		beliefPropagatorThread.setDaemon(true);
-		beliefPropagatorThread.start();
+		
+		Thread.sleep(BELIEF_BROADCAST_DELAY);
 	}
 
 	private Belief lastBroadcastBelief;
 
 	public Belief getLastBroadcastBelief() {
 		return lastBroadcastBelief;
+	}
+
+
+	@Override
+	protected String getThreadName() {
+		return "Belief propagator thread on port "+server.getPort();
 	}
 }
