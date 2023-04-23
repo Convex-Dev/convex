@@ -45,9 +45,9 @@ public class PeerView {
 			
 			PeerStatus ps=state.getPeer(paddr);
 			if (ps!=null) {
-				sb.append("Peer Stake:  "+Text.toFriendlyBalance(ps.getPeerStake()));
+				sb.append("Peer Stake:  "+Text.toFriendlyNumber(ps.getPeerStake()));
 				sb.append("    ");
-				sb.append("Delegated Stake:  "+Text.toFriendlyBalance(ps.getDelegatedStake()));
+				sb.append("Delegated Stake:  "+Text.toFriendlyNumber(ps.getDelegatedStake()));
 			}
 			ConnectionManager cm=peerServer.getConnectionManager();
 			sb.append("\n");

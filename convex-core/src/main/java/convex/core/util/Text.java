@@ -51,7 +51,7 @@ public class Text {
 
 	static DecimalFormat balanceFormatter = new DecimalFormat("#,###");
 
-	public static String toFriendlyBalance(long value) {
+	public static String toFriendlyNumber(long value) {
 		return balanceFormatter.format(value);
 	}
 	
@@ -60,8 +60,8 @@ public class Text {
 		return percentFormatter.format(value);
 	}
 
-	public static String toFriendlyBalance(double value) {
-		return toFriendlyBalance((long) value);
+	public static String toFriendlyIntString(double value) {
+		return toFriendlyNumber((long) value);
 	}
 
 	static final DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendInstant(3).toFormatter();

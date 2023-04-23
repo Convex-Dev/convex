@@ -459,6 +459,9 @@ public class State extends ARecord {
 			if (!Utils.equals(key, signedTransaction.getAccountKey())) {
 				return Context.createFake(this).withError(ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+" expected public key: "+key);
 			}
+			
+			boolean sigValid=signedTransaction.checkSignature();
+			if (!sigValid) return Context.createFake(this).withError(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 		}
 
 		Context<T> ctx=applyTransaction(t);

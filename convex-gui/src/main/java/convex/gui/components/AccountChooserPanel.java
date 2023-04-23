@@ -88,7 +88,7 @@ public class AccountChooserPanel extends JPanel {
 			balanceLabel.setText("Balance: <not available>");
 		} else {
 			Long amt= s.getBalance(a);
-			balanceLabel.setText("Balance: " + ((amt==null)?"Null":Text.toFriendlyBalance(amt)));
+			balanceLabel.setText("Balance: " + ((amt==null)?"Null":Text.toFriendlyNumber(amt)));
 		}
 	}
 

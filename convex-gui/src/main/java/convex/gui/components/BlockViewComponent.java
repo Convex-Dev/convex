@@ -13,8 +13,11 @@ import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerGUI;
+import convex.peer.Server;
 
 /**
  * Panel presenting a summary graphic of the most recent blocks for a given
@@ -46,38 +49,47 @@ public class BlockViewComponent extends JPanel {
 		int ph = getHeight();
 		g.fillRect(0, 0, pw, ph);
 		
-		Peer p = peerView.peerServer.getPeer();
-		Order order = p.getPeerOrder();
-		if (order==null) return; // no current peer order - maybe not a valid peer?
-		AVector<SignedData<Block>> blocks = order.getBlocks();
-		int n = (int) blocks.count();
-
-
-		int W = 10;
-		long tw = W * PeerGUI.maxBlock;
-		long offset = Math.max(0, tw - pw);
-
-		for (int i = (int) (offset / W); i < n; i++) {
-			Color c = Color.orange;
-			if (i < order.getProposalPoint()) c = Color.yellow;
-			if (i < order.getConsensusPoint()) c = Color.green;
-			if (p.getConsensusPoint() != order.getConsensusPoint()) {
-				System.out.println("Strange consensus?");
-			}
-			int x = (int) (W * i - offset);
-			g.setColor(c);
-			g.fillRect(x + 1, 1, W - 2, W - 2);
-
-			if (c == Color.green) {
-				g.setColor(Color.black);
-				SignedData<Block> s = blocks.get(i);
-				for (int j = 0; j < 6; j++) {
-					Hash h = s.getHash();
-					if (h.byteAt(j) < 0) {
-						g.fillRect(x + 2, 2 + j, 6, 1);
+		Server server=peerView.peerServer;
+		
+		AStore tempStore=Stores.current(); // just in case, since we are reading from a specific peer
+		try {
+			Stores.setCurrent(server.getStore());
+			
+			Peer p = server.getPeer();
+			Order order = p.getPeerOrder();
+			if (order==null) return; // no current peer order - maybe not a valid peer?
+			AVector<SignedData<Block>> blocks = order.getBlocks();
+			int n = (int) blocks.count();
+	
+	
+			int W = 10;
+			long tw = W * PeerGUI.maxBlock;
+			long offset = Math.max(0, tw - pw);
+	
+			for (int i = (int) (offset / W); i < n; i++) {
+				Color c = Color.orange;
+				if (i < order.getProposalPoint()) c = Color.yellow;
+				if (i < order.getConsensusPoint()) c = Color.green;
+				if (p.getConsensusPoint() != order.getConsensusPoint()) {
+					System.out.println("Strange consensus?");
+				}
+				int x = (int) (W * i - offset);
+				g.setColor(c);
+				g.fillRect(x + 1, 1, W - 2, W - 2);
+	
+				if (c == Color.green) {
+					g.setColor(Color.black);
+					SignedData<Block> s = blocks.get(i);
+					for (int j = 0; j < 6; j++) {
+						Hash h = s.getHash();
+						if (h.byteAt(j) < 0) {
+							g.fillRect(x + 2, 2 + j, 6, 1);
+						}
 					}
 				}
 			}
+		} finally {
+			Stores.setCurrent(tempStore);
 		}
 	}
 }

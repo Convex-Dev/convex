@@ -558,7 +558,7 @@ public class ConnectionManager extends AThreadedComponent {
 			LoadMonitor.up();
 		}
 		
-		if (!hm.isEmpty()) {
+		if ((!hm.isEmpty())&&server.isLive()) {
 			log.warn("Unable to send broadcast to "+hm.size()+" peers");
 		}
 	}
@@ -629,7 +629,10 @@ public class ConnectionManager extends AThreadedComponent {
 
 	@Override
 	protected void loop() throws InterruptedException {
+		LoadMonitor.down();
 		Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
+		LoadMonitor.up();
+		
 		maintainConnections();
 		pollBelief();
 	}

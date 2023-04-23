@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -39,6 +38,7 @@ import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
+import convex.core.util.Text;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
@@ -241,16 +241,15 @@ public class StressPanel extends JPanel {
 						return null;
 					},ccs);
 					
-
 					// wait for everything to be sent
 					for (int i=0; i<clientCount; i++) {
 						cfutures.get(i).get(60, TimeUnit.SECONDS);
 					}
+					// long sendTime = Utils.getCurrentTimestamp();
 
 					int futureCount=frs.size();
 					resultArea.setText("Awaiting "+futureCount+" results...");
 					
-					long sendTime = Utils.getCurrentTimestamp();
 
 					List<Result> results = Utils.completeAll(frs).get(60, TimeUnit.SECONDS);
 					long endTime = Utils.getCurrentTimestamp();
@@ -270,9 +269,9 @@ public class StressPanel extends JPanel {
 					}
 
 					Thread.sleep(100); // wait for state update to be reflected
-					State endState = PeerGUI.getLatestState();
 
-					sb.append("Results for " + clientCount*transCount*requestCount + " transactions\n");
+					long totalCount=clientCount*transCount*requestCount;
+					sb.append("Results for " + Text.toFriendlyNumber(totalCount) + " transactions\n");
 					sb.append(values + " values received\n");
 					sb.append(errors + " errors received\n");
 					if (errors>0) {
@@ -280,10 +279,10 @@ public class StressPanel extends JPanel {
 						sb.append("\n");
 					}
 					sb.append("\n");
-					sb.append("Send time:     " + formatter.format((sendTime - startTime) * 0.001) + "s\n");
-					sb.append("End time:      " + formatter.format((endTime - startTime) * 0.001) + "s\n");
-					sb.append("Consensus time: "
-							+ formatter.format((endState.getTimestamp().longValue() - startTime) * 0.001) + "s\n");
+					sb.append("Total time:     " + formatter.format((endTime - startTime) * 0.001) + "s\n");
+					sb.append("\n");
+					sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/((endTime - startTime) * 0.001)) + "\n");
+
 
 				} catch (IOException e) {
 					log.warn("Stress test worker terminated from IO Exception");

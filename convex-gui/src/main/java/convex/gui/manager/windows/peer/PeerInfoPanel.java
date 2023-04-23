@@ -1,10 +1,15 @@
 package convex.gui.manager.windows.peer;
 
 import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
+import javax.swing.Timer;
 
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
@@ -35,6 +40,25 @@ public class PeerInfoPanel extends JPanel {
 		textArea.setEditable(false);
 		textArea.setBackground(null);
 		textArea.setFont(Toolkit.SMALL_MONO_FONT);
+		
+		// Set up periodic refresh
+		int INTERVAL = 500;
+		Timer timer = new Timer(INTERVAL,new ActionListener() {
+			public void actionPerformed(ActionEvent evt) {
+			   updateState(p);
+		    }    
+		});
+		timer.start();
+		
+		addComponentListener(new ComponentAdapter() {
+		    public void componentHidden(ComponentEvent ce) {
+		        timer.stop();
+		    }
+		    
+		    public void componentShown(ComponentEvent ce) {
+		        timer.start();
+		    }
+		});
 
 		panel_1.add(textArea);
 		refreshButton.addActionListener(e -> {
@@ -70,11 +94,12 @@ public class PeerInfoPanel extends JPanel {
 			sb.append("Beliefs Received:     "+s.getBeliefReceivedCount()+"\n");
 			sb.append("\n");
 			
-			sb.append("Load averages\n");
-			sb.append("Transaction handler:  "+load(s.getTransactionHandler())+"\n");
-			sb.append("Query handler:        "+load(s.getQueryProcessor())+"\n");
-			sb.append("Belief Propagator:    "+load(s.getBeliefPropagator())+"\n");
-			sb.append("CVM Executor:         "+load(s.getCVMExecutor())+"\n");
+			sb.append("Load averages:\n");
+			sb.append("- Transaction handler:  "+load(s.getTransactionHandler())+"\n");
+			sb.append("- Query handler:        "+load(s.getQueryProcessor())+"\n");
+			sb.append("- Belief Propagator:    "+load(s.getBeliefPropagator())+"\n");
+			sb.append("- CVM Executor:         "+load(s.getCVMExecutor())+"\n");
+			sb.append("- Connection Manager:   "+load(s.getConnectionManager())+"\n");
 
 		}
 		

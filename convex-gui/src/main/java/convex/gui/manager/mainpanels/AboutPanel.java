@@ -72,11 +72,11 @@ public class AboutPanel extends JPanel {
 		sb.append("  # Peers:            " + lpad(s.getPeers().count()) + "\n");
 		sb.append("\n");
 		sb.append("Globals\n");
-		sb.append("  fees:               " + lpad(Text.toFriendlyBalance(s.getGlobalFees().longValue())) + "\n");
-		sb.append("  juice-price:        " + lpad(Text.toFriendlyBalance(s.getJuicePrice().longValue())) + "\n");
+		sb.append("  fees:               " + lpad(Text.toFriendlyNumber(s.getGlobalFees().longValue())) + "\n");
+		sb.append("  juice-price:        " + lpad(Text.toFriendlyNumber(s.getJuicePrice().longValue())) + "\n");
 		sb.append("\n");
-		sb.append("Total funds:          " + lpad(Text.toFriendlyBalance(s.computeTotalFunds())) + "\n");
-		sb.append("Total stake:          " + lpad(Text.toFriendlyBalance(s.computeStakes().get(null))) + "\n");
+		sb.append("Total funds:          " + lpad(Text.toFriendlyNumber(s.computeTotalFunds())) + "\n");
+		sb.append("Total stake:          " + lpad(Text.toFriendlyIntString(s.computeStakes().get(null))) + "\n");
 		sb.append("\n");
 		sb.append("BC Signatures:        " + lpad(BCKeyPair.signatureCount + "\n"));
 		sb.append("BC Verifications:     " + lpad(BCProvider.verificationCount + "\n"));

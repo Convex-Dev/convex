@@ -94,7 +94,7 @@ public class WalletComponent extends BaseListComponent {
 	private String getInfoString() {
 		State s = PeerGUI.getLatestState();
 		Long bal=s.getBalance(address);
-		return "Balance: " + ((bal==null)?"Null":Text.toFriendlyBalance(s.getBalance(address)));
+		return "Balance: " + ((bal==null)?"Null":Text.toFriendlyNumber(s.getBalance(address)));
 	}
 
 }

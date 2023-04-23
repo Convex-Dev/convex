@@ -1842,7 +1842,7 @@ public class Context<T extends ACell> extends AObject {
 	}
 	
 
-	public Context<T> withError(Keyword errorCode, ACell rs) {
+	public <R extends ACell> Context<R> withError(Keyword errorCode, ACell rs) {
 		return withError(ErrorValue.createRaw(errorCode,rs));
 	}
 
