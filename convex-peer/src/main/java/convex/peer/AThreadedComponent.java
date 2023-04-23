@@ -19,16 +19,23 @@ public abstract class AThreadedComponent {
 	private class ComponentTask implements Runnable {
 		@Override
 		public void run() {
+			// Set Thread-local store for the current Server
 			Stores.setCurrent(server.getStore());
+			
+			// Run main component loop
 			while (server.isLive()) {
 				try {
 					loop();		
 				} catch (InterruptedException e) {
 					log.debug("Component thread interrupted: {}",thread);
+					break;
 				} catch (Throwable e) {
 					log.warn("Unexpected exception in Server component: ",e);
 				} 
 			}
+			
+			// Finally close the component properly
+			close();
 		}
 	}
 
@@ -38,13 +45,21 @@ public abstract class AThreadedComponent {
 	}
 	
 	protected abstract void loop() throws InterruptedException;
+	
+	protected abstract String getThreadName();
+
 
 	public void start() {
+		String name=getThreadName();
+		thread.setName(name);
+		log.info("Thread started: "+name);
+		thread.setDaemon(true);
 		thread.start();
 	}
 	
 	public void close() {
-		thread.interrupt();
+		Thread t=thread;
+		t.interrupt();
 	}
 	
 	@Override

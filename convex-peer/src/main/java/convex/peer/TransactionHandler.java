@@ -62,7 +62,6 @@ public class TransactionHandler extends AThreadedComponent{
 		txMessageQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
 		transactionQueue=new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);	
 		
-		thread.setName("Transaction handler on port: "+server.getPort());
 	}
 	
 	/**
@@ -298,5 +297,10 @@ public class TransactionHandler extends AThreadedComponent{
 		} finally {
 			messages.clear();
 		}
+	}
+
+	@Override
+	protected String getThreadName() {
+		return "Transaction handler on port: "+server.getPort();
 	}
 }

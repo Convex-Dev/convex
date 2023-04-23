@@ -1,0 +1,89 @@
+package convex.peer;
+
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+import convex.core.Constants;
+import convex.core.Result;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Address;
+import convex.core.data.prim.CVMLong;
+import convex.core.lang.Context;
+import convex.core.lang.RT;
+import convex.net.MessageType;
+import convex.net.message.Message;
+
+public class QueryHandler extends AThreadedComponent {
+
+	/**
+	 * Queue for received messages to be processed by this Peer Server
+	 */
+	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Constants.QUERY_QUEUE_SIZE);
+
+	public QueryHandler(Server server) {
+		super(server);	
+		queryQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
+	}
+	
+	/**
+	 * Offer a transaction for handling
+	 * @param m Message offered
+	 * @return True if queued for handling, false otherwise
+	 */
+	public boolean offerQuery(Message m) {
+		return queryQueue.offer(m);
+	}
+	
+
+	@Override
+	protected void loop() throws InterruptedException {
+		Message m = queryQueue.poll(10000, TimeUnit.MILLISECONDS);
+		if (m==null) return;
+		
+		MessageType type=m.getType();
+		switch (type) {
+		case QUERY:
+			handleQuery(m);
+			break;
+		case MISSING_DATA:
+			server.handleMissingData(m);
+			break;
+		default:
+			log.warn("Unexpected Message type on query queue: "+type);
+		}
+	}
+	
+	private void handleQuery(Message m) {
+		try {
+			// query is a vector [id , form, address?]
+			AVector<ACell> v = m.getPayload();
+			CVMLong id = (CVMLong) v.get(0);
+			ACell form = v.get(1);
+
+			// extract the Address, might be null
+			Address address = RT.ensureAddress(v.get(2));
+
+			log.debug( "Processing query: {} with address: {}" , form, address);
+			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
+			// address);
+			Context<ACell> resultContext = server.getPeer().executeQuery(form, address);
+			
+			// Report result back to message sender
+			boolean resultReturned= m.reportResult(Result.fromContext(id, resultContext));
+
+			if (!resultReturned) {
+				log.warn("Failed to send query result back to client with ID: {}", id);
+			}
+
+		} catch (Throwable t) {
+			log.warn("Query Error: {}", t);
+		}
+	}
+
+	@Override
+	protected String getThreadName() {
+		return "Query handler on port: " + server.getPort();
+	}
+
+}

@@ -45,7 +45,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -94,10 +93,6 @@ public class Server implements Closeable {
 
 	// private static final Level LEVEL_MESSAGE = Level.FINER;
 
-	/**
-	 * Queue for received messages to be processed by this Peer Server
-	 */
-	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Constants.QUERY_QUEUE_SIZE);
 
 	
 	/**
@@ -137,7 +132,12 @@ public class Server implements Closeable {
 	/**
 	 * Transaction handler instance.
 	 */
-	protected TransactionHandler transactionHandler;
+	protected TransactionHandler transactionHandler=new TransactionHandler(this);
+
+	/**
+	 * Query handler instance.
+	 */
+	protected QueryHandler queryHandler=new QueryHandler(this);
 
 	/**
 	 * Store to use for all threads associated with this server instance
@@ -198,7 +198,6 @@ public class Server implements Closeable {
 			// now setup the connection manager
 			this.manager = new ConnectionManager(this);
 			this.propagator = new BeliefPropagator(this);
-			this.transactionHandler=new TransactionHandler(this);
 
 			// Establish Peer state and ensure it is persisted
 			this.peer = establishPeer();
@@ -383,9 +382,7 @@ public class Server implements Closeable {
 			// Start connection manager loop
 			manager.start();
 
-			queryThread = new Thread(queryLoop, "Query handler on port: " + port);
-			queryThread.setDaemon(true);
-			queryThread.start();
+			queryHandler.start();
 
 			// Start Peer update thread
 			beliefMergeThread = new Thread(beliefMergeLoop, "Belief Merge Loop on port: " + port);
@@ -397,12 +394,7 @@ public class Server implements Closeable {
 			transactionHandler.start();
 
 			// Close server on shutdown, should be before Etch stores in priority
-			Shutdown.addHook(Shutdown.SERVER, new Runnable() {
-				@Override
-				public void run() {
-					close();
-				}
-			});
+			Shutdown.addHook(Shutdown.SERVER, ()->close());
 
 			// Connect to source peer if specified
 			if (getConfig().containsKey(Keywords.SOURCE)) {
@@ -496,7 +488,7 @@ public class Server implements Closeable {
 	 * @param m
 	 * @throws BadFormatException
 	 */
-	private void handleMissingData(Message m)  {
+	void handleMissingData(Message m)  {
 		// payload for a missing data request should be a valid Hash
 		Hash h = RT.ensureHash(m.getPayload());
 		if (h == null) {
@@ -724,39 +716,14 @@ public class Server implements Closeable {
 	}
 
 	private void processQuery(Message m) {
-		boolean queued= queryQueue.offer(m);
+		boolean queued= queryHandler.offerQuery(m);
 		if (!queued) {
 			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
 			m.reportResult(r);
 		} 
 	}
 	
-	private void handleQuery(Message m) {
-		try {
-			// query is a vector [id , form, address?]
-			AVector<ACell> v = m.getPayload();
-			CVMLong id = (CVMLong) v.get(0);
-			ACell form = v.get(1);
 
-			// extract the Address, might be null
-			Address address = RT.ensureAddress(v.get(2));
-
-			log.debug( "Processing query: {} with address: {}" , form, address);
-			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
-			// address);
-			Context<ACell> resultContext = peer.executeQuery(form, address);
-			
-			// Report result back to message sender
-			boolean resultReturned= m.reportResult(Result.fromContext(id, resultContext));
-
-			if (!resultReturned) {
-				log.warn("Failed to send query result back to client with ID: {}", id);
-			}
-
-		} catch (Throwable t) {
-			log.warn("Query Error: {}", t);
-		}
-	}
 
 	private void processData(Message m) {
 		ACell payload = m.getPayload();
@@ -787,45 +754,6 @@ public class Server implements Closeable {
 			log.warn("Incoming belief queue full");
 		}
 	}
-
-	/*
-	 * Loop to process messages from the query queue. These may be long runnning, so we don't want to 
-	 * block the NIO Server
-	 */
-	private Runnable queryLoop = new Runnable() {
-		@Override
-		public void run() {
-			Stores.setCurrent(getStore()); // ensure the loop uses this Server's store
-
-			try {
-				log.debug("Receiver thread started for peer at {}", getHostAddress());
-
-				while (isRunning) { // loop until server terminated
-					Message m = queryQueue.poll(10000, TimeUnit.MILLISECONDS);
-					if (m==null) continue;
-					
-					MessageType type=m.getType();
-					switch (type) {
-					case QUERY:
-						handleQuery(m);
-						break;
-					case MISSING_DATA:
-						handleMissingData(m);
-						break;
-					default:
-						log.warn("Unexpected Message type on query queue: "+type);
-					}
-				}
-
-				log.debug("Query thread terminated normally for peer {}", this);
-			} catch (InterruptedException e) {
-				log.debug("Query thread interrupted for peer {}", this);
-				return;
-			} catch (Throwable e) {
-				log.error("Query Thread FAILED: Receiver thread terminated abnormally",e);
-			}
-		}
-	};
 	
 	/**
 	 * Runnable loop for managing Server belief merges
