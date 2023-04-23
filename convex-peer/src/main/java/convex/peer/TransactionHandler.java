@@ -34,7 +34,7 @@ import convex.core.util.Utils;
 import convex.net.message.Message;
 
 /**
- * Server component for handling client transactions
+ * Server component for handling client transactions and producing Blocks
  */
 public class TransactionHandler extends AThreadedComponent{
 	
