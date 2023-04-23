@@ -39,7 +39,7 @@ import convex.net.message.Message;
 import convex.net.message.MessageRemote;
 
 /**
- * Class for managing the outbound connections from a Peer Server.
+ * Class for managing the outbound Peer connections from a Peer Server.
  *
  * Outbound connections need special handling: - Should be trusted connections
  * to known peers - Should be targets for broadcast of belief updates - Should

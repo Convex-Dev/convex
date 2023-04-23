@@ -28,7 +28,6 @@ import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.lang.Reader;
-import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -37,7 +36,7 @@ import convex.net.message.Message;
 /**
  * Server component for handling client transactions
  */
-public class TransactionHandler {
+public class TransactionHandler extends AThreadedComponent{
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 	
@@ -46,10 +45,6 @@ public class TransactionHandler {
 	 */
 	private static final long OWN_BLOCK_DELAY=2000;
 
-
-	protected final Server server;
-	
-	protected final Thread transactionThread; 
 	
 	/**
 	 * Queue for incoming (unverified) transaction messages
@@ -62,12 +57,12 @@ public class TransactionHandler {
 	ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
 
 	public TransactionHandler(Server server) {
-		this.server=server;
+		super(server);
 		
 		txMessageQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
 		transactionQueue=new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);	
 		
-		transactionThread=new Thread(transactionHandlerLoop,"Transaction handler on port: "+server.getPort());
+		thread.setName("Transaction handler on port: "+server.getPort());
 	}
 	
 	/**
@@ -78,39 +73,6 @@ public class TransactionHandler {
 	public boolean offerTransaction(Message m) {
 		return txMessageQueue.offer(m);
 	}
-	
-	protected final Runnable transactionHandlerLoop = new Runnable() {
-		@Override
-		public void run() {
-			Stores.setCurrent(server.getStore());
-			ArrayList<Message> messages=new ArrayList<>();
-			while (server.isLive()) {
-				try {
-					Message m = txMessageQueue.poll(1000, TimeUnit.MILLISECONDS);
-					if (m==null) continue;
-					
-					// We have at least one transaction to handle, drain queue to get the rest
-					messages.add(m);
-					txMessageQueue.drainTo(messages);
-					
-					// Process transaction messages
-					for (Message msg: messages) {
-						processMessage(msg);
-					}
-					
-					// Wait for more transactions to accumulate before sending anything new
-					Thread.sleep(Constants.MIN_BLOCK_TIME);
-					
-				} catch (InterruptedException e) {
-					log.debug("Transaction handler thread interrupted");
-				} catch (Throwable e) {
-					log.warn("Unexpected exception in Transaction handler: ",e);
-				} finally {
-					messages.clear();
-				}
-			}
-		}
-	};
 	
 	/**
 	 * Register of client interests in receiving transaction responses
@@ -297,12 +259,13 @@ public class TransactionHandler {
 	}
 
 	public void close() {
-		transactionThread.interrupt();
+		super.close();
 	}
 
 	public void start() {
 		this.reportedConsensusPoint=server.getPeer().getConsensusPoint();
-		transactionThread.start();
+		super.start();
+
 	}
 
 	public boolean isAwaitingResults() {
@@ -311,5 +274,29 @@ public class TransactionHandler {
 
 	public int countInterests() {
 		return interests.size();
+	}
+	
+	ArrayList<Message> messages=new ArrayList<>();
+
+	@Override
+	protected void loop() throws InterruptedException {
+		try {
+			Message m = txMessageQueue.poll(1000, TimeUnit.MILLISECONDS);
+			if (m==null) return;
+			
+			// We have at least one transaction to handle, drain queue to get the rest
+			messages.add(m);
+			txMessageQueue.drainTo(messages);
+			
+			// Process transaction messages
+			for (Message msg: messages) {
+				processMessage(msg);
+			}
+			
+			// Wait for more transactions to accumulate before sending anything new
+			Thread.sleep(Constants.MIN_BLOCK_TIME);
+		} finally {
+			messages.clear();
+		}
 	}
 }
