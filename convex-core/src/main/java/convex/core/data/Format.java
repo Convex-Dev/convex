@@ -1018,6 +1018,23 @@ public class Format {
 		if (cell==null) return 1;
 		return cell.estimatedEncodingSize();
 	}
+	
+	public static ACell[] decodeCells(Blob data) throws BadFormatException {
+		long ml=data.count();
+		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
+		if (ml==0) return ACell.EMPTY_ARRAY;
+		
+		ArrayList<ACell> cells=new ArrayList<>();
+		int pos=0;
+		while (pos<ml) {
+			ACell result=Format.read(data, pos);
+			pos+=Format.getEncodingLength(result);
+			result.getRef().getHash();
+			cells.add(result);
+		}
+				
+		return cells.toArray(ACell[]::new);
+	}
 
 	/**
 	 * Reads a cell from a Blob of data, allowing for non-embedded children following the first cell
@@ -1053,6 +1070,7 @@ public class Format {
 			//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
 			
 			Ref<?> cr=Ref.get(c);
+			// System.out.println("Decoding novelty: "+cr.getHash()+ " "+c.getClass().getSimpleName());
 			hm.put(h, cr);
 			ix+=c.getEncodingLength();
 		}
@@ -1191,5 +1209,7 @@ public class Format {
 		if (value==null) return 1;
 		return value.getEncodingLength();
 	}
+
+
 
 }

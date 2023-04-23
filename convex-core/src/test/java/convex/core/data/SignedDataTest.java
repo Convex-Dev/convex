@@ -15,6 +15,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.transactions.Invoke;
 import convex.test.Samples;
 
 public class SignedDataTest {
@@ -121,5 +122,17 @@ public class SignedDataTest {
 		assertEquals(kp.getAccountKey(),sd.getAccountKey());
 		
 		ObjectsTest.doAnyValueTests(sd);
+	}
+	
+	@Test 
+	public void testEncoding() {
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		SignedData<?> sd=kp.signData(Invoke.create(Address.ZERO, 0, Samples.MAX_SYMBOLIC));
+		
+		Blob enc=sd.getEncoding();
+		Ref<SignedData<?>> r=sd.getRef();
+		
+		assertEquals(enc.getContentHash(),r.getHash());
+		
 	}
 }

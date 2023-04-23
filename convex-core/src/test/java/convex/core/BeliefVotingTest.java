@@ -64,7 +64,7 @@ public class BeliefVotingTest {
 		assertTrue(s.getPeers().get(keys[0]).getTotalStake()>0);
 		
 		Order o0=Order.create().withTimestamp(TS);
-		Belief b0=Belief.create(kps[0], o0).withTimestamp(TS);
+		Belief b0=Belief.create(kps[0], o0);
 
 		// check trivial merges are idempotent
 		MergeContext baseMC=MergeContext.create(b0, kps[0], TS, s);
@@ -76,7 +76,7 @@ public class BeliefVotingTest {
 		
 		long ATIME=A.getValue().getTimeStamp();
 		Order p1o=Order.create(0, 0, A).withTimestamp(ATIME);
-		Belief b1=Belief.create(kps[1], p1o).withTimestamp(ATIME);
+		Belief b1=Belief.create(kps[1], p1o);
 		
 		// Shouldn't change Belief, since incoming order is from future
 		Belief b0present=b0.merge(baseMC, b1);
@@ -92,10 +92,10 @@ public class BeliefVotingTest {
 		assertEquals(TS+1,o2.getTimestamp());
 		
 		// Beliefs from other Peers, enough for Proposal
-		Belief br2=Belief.create(kps[2], p1o).withTimestamp(ATIME);
-		Belief br3=Belief.create(kps[3], p1o).withTimestamp(ATIME);
-		Belief br4=Belief.create(kps[4], p1o).withTimestamp(ATIME);
-		Belief br5=Belief.create(kps[5], p1o).withTimestamp(ATIME);
+		Belief br2=Belief.create(kps[2], p1o);
+		Belief br3=Belief.create(kps[3], p1o);
+		Belief br4=Belief.create(kps[4], p1o);
+		Belief br5=Belief.create(kps[5], p1o);
 		
 		// Merge new Beliefs
 		Belief b3=b2.merge(mc, br2,br3,br4,br5);
@@ -103,6 +103,11 @@ public class BeliefVotingTest {
 		assertEquals(p1o.getBlocks(),o3.getBlocks());
 		assertEquals(1,o3.getProposalPoint());
 		assertEquals(0,o3.getConsensusPoint());
+		
+		// Future merges should be idempotent
+		assertSame(b3,b3.merge(mc,br2,br3,br4,br5));
+		MergeContext mc3=MergeContext.create(b0, kps[0], TS+10, s);
+		assertSame(b3,b3.merge(mc3,br2,br3,br4,br5));
 	}
 	
 	@SuppressWarnings("unchecked")

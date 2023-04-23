@@ -228,10 +228,11 @@ public class ServerTest {
 	}
 	
 	@Test
-	public void testQueryStrings() throws TimeoutException, IOException {
+	public void testQueryStrings() throws TimeoutException, IOException, InterruptedException {
 		Convex convex=network.CONVEX;
 		assertEquals(convex.getAddress(),convex.querySync("*address*").getValue());
 		assertEquals(CVMLong.ONE,convex.querySync("3 2 1").getValue());
+		// Thread.sleep(1000000000);
 	}
 
 	@Test

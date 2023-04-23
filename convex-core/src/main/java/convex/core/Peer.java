@@ -121,7 +121,7 @@ public class Peer {
 		State genesis=(State) peerData.get(Keywords.GENESIS);
 		long pos=((CVMLong) peerData.get(Keywords.POSITION)).longValue();
 		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();
-		long timestamp=belief.getTimestamp();
+		long timestamp=((CVMLong) peerData.get(Keywords.TIMESTAMP)).longValue();
 		return new Peer(keyPair,belief,pos,state,genesis,hpos,results,timestamp);
 	}
 
@@ -136,7 +136,8 @@ public class Peer {
 			Keywords.RESULTS,blockResults,
 			Keywords.POSITION,CVMLong.create(position),
 			Keywords.STATE,state,
-			Keywords.GENESIS,genesis
+			Keywords.GENESIS,genesis,
+			Keywords.TIMESTAMP,timestamp
 		);
 	}
 

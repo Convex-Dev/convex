@@ -28,7 +28,6 @@ import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
@@ -51,30 +50,23 @@ import convex.core.util.Utils;
  * Nakamoto
  */
 public class Belief extends ARecord {
-	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS, Keywords.TIMESTAMP);
+	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS);
 
 	/**
 	 * The latest view of signed Orders held by other Peers
 	 */
 	private final BlobMap<AccountKey,SignedData<Order>> orders;
 
-	/**
-	 * The timestamp at which this belief was created
-	 */
-	private final long timestamp;
-
 	// private final long timeStamp;
 
-	private Belief(BlobMap<AccountKey,SignedData<Order>> orders, long timestamp) {
+	private Belief(BlobMap<AccountKey,SignedData<Order>> orders) {
 		super(BELIEF_FORMAT.count());
 		this.orders = orders;
-		this.timestamp = timestamp;
 	}
 
 	@Override
 	public ACell get(ACell k) {
 		if (Keywords.ORDERS.equals(k)) return orders;
-		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
 		return null;
 	}
 
@@ -84,7 +76,7 @@ public class Belief extends ARecord {
 		if (this.orders == newOrders) {
 			return this;
 		}
-		return new Belief(newOrders, timestamp);
+		return new Belief(newOrders);
 	}
 
 	/**
@@ -108,25 +100,22 @@ public class Belief extends ARecord {
 
 
 	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders, long timestamp) {
-		return new Belief(orders, timestamp);
+		return new Belief(orders);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static Belief create(SignedData<Order>... orders)  {
-		BlobMap<AccountKey, SignedData<Order>> os=BlobMaps.empty();
-		long timestamp=0;
-		for (SignedData<Order> o:orders) {
-			Order order=o.getValue();
-			timestamp=Math.max(timestamp, order.getTimestamp());
-			os=os.assoc(o.getAccountKey(), o);
+		BlobMap<AccountKey, SignedData<Order>> newOrders=BlobMaps.empty();
+		for (SignedData<Order> so:orders) {
+			newOrders=newOrders.assoc(so.getAccountKey(), so);
 		}
-		return new Belief(os,timestamp);
+		return new Belief(newOrders);
 	}
 	
 
-	public static Belief create(HashMap<AccountKey, SignedData<Order>> orderMap, long timestamp) {
+	public static Belief create(HashMap<AccountKey, SignedData<Order>> orderMap) {
 		BlobMap<AccountKey, SignedData<Order>> orders=BlobMaps.create(orderMap);
-		return new Belief(orders, timestamp);
+		return new Belief(orders);
 	}
 
 	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders) {
@@ -164,9 +153,8 @@ public class Belief extends ARecord {
 		if (resultOrders == null) return this;
 
 		// update my belief with the resulting Orders
-		long newTimestamp = mc.getTimestamp();
 		if (orders == resultOrders) return this;
-		final Belief result = new Belief(resultOrders, newTimestamp);
+		final Belief result = new Belief(resultOrders);
 
 		return result;
 	}
@@ -698,14 +686,9 @@ public class Belief extends ARecord {
 	 */
 	public Belief withOrders(BlobMap<AccountKey, SignedData<Order>> newOrders) {
 		if (newOrders == orders) return this;
-		return Belief.create(newOrders,timestamp);
+		return Belief.create(newOrders);
 	}
 	
-
-	public Belief withTimestamp(long newTimestamp) {
-		if (timestamp==newTimestamp) return this;
-		return Belief.create(orders,newTimestamp);
-	}
 
 
 	@Override
@@ -728,9 +711,7 @@ public class Belief extends ARecord {
 	public static Belief read(ByteBuffer bb) throws BadFormatException {
 		BlobMap<AccountKey, SignedData<Order>> orders = Format.read(bb);
 		if (orders == null) throw new BadFormatException("Null orders in Belief");
-		CVMLong timestamp = Format.read(bb);
-		if (timestamp == null) throw new BadFormatException("Null timestamp");
-		return new Belief(orders, timestamp.longValue());
+		return new Belief(orders);
 	}
 	
 	public static Belief read(Blob b, int pos) throws BadFormatException {
@@ -740,11 +721,7 @@ public class Belief extends ARecord {
 		if (orders == null) throw new BadFormatException("Null orders in Belief");
 		epos+=Format.getEncodingLength(orders);
 		
-		CVMLong timestamp = Format.read(b,epos);
-		if (timestamp == null) throw new BadFormatException("Null timestamp");
-		epos+=Format.getEncodingLength(timestamp);
-
-		Belief result= new Belief(orders, timestamp.longValue());
+		Belief result= new Belief(orders);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
@@ -780,15 +757,6 @@ public class Belief extends ARecord {
 		if (orders == null) throw new InvalidDataException("Null orders", this);
 		orders.validateCell();
 	}
-
-	/**
-	 * Returns the timestamp of this Belief. A Belief should have a new timestamp if
-	 * and only if the Peer incorporates new information.
-	 * @return Timestamp of belief
-	 */
-	public long getTimestamp() {
-		return timestamp;
-	}
 	
 	@Override 
 	public boolean equals(ACell a) {
@@ -811,7 +779,6 @@ public class Belief extends ARecord {
 			if (ha!=null) return Utils.equals(h, ha);
 		}
 
-		if (timestamp!=a.timestamp) return false;
 		if (!orders.equals(a.orders)) return false;
 		return true;
 	}
