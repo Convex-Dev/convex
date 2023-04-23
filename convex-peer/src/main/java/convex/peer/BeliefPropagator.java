@@ -114,7 +114,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean updated= maybeUpdateBelief(incomingBelief);
 		
 		if (server.manager.getConnectionCount()>0) {
-			if (updated||(Utils.getCurrentTimestamp()>lastBroadcastTime+BELIEF_BROADCAST_DELAY)) {
+			long ts=Utils.getCurrentTimestamp();
+			if (updated||(ts>lastBroadcastTime+BELIEF_BROADCAST_DELAY)) {
+				lastBroadcastTime=ts;
 				Message msg=createBeliefUpdateMessage();
 				
 				// Trigger CVM update before broadcast
@@ -186,7 +188,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			MergeContext mc = MergeContext.create(belief,kp, ts, server.getPeer().getConsensusState());
 			Belief newBelief = belief.merge(mc,newBeliefs);
 
-			boolean beliefChanged=(belief==newBelief);
+			boolean beliefChanged=(belief!=newBelief);
 			belief=newBelief;
 
 			return beliefChanged;
@@ -310,7 +312,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	private void doBroadcast(Message msg) throws InterruptedException {
 		server.manager.broadcast(msg);
 		
-		lastBroadcastTime=Utils.getCurrentTimestamp();
+
 		beliefBroadcastCount++;
 	}
 	
