@@ -79,13 +79,22 @@ public class BeliefPropagator extends AThreadedComponent {
 		return beliefQueue.offer(belief);
 	}
 	
+	Belief belief;
+	
 	protected void loop() throws InterruptedException {
-		Belief belief=beliefQueue.poll(BELIEF_BROADCAST_POLL_TIME, TimeUnit.MILLISECONDS);
+		Belief newBelief=beliefQueue.poll(BELIEF_BROADCAST_POLL_TIME, TimeUnit.MILLISECONDS);
 		
-		if (belief==null) {
+		if (newBelief==null) {
 			return;
 		}
 
+		belief=newBelief;
+		doBroadcast();
+		
+		Thread.sleep(BELIEF_BROADCAST_DELAY);
+	}
+	
+	private void doBroadcast() throws InterruptedException {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -109,8 +118,6 @@ public class BeliefPropagator extends AThreadedComponent {
 		
 		lastBroadcastTime=Utils.getCurrentTimestamp();
 		beliefBroadcastCount++;
-		
-		Thread.sleep(BELIEF_BROADCAST_DELAY);
 	}
 
 	private Belief lastBroadcastBelief;
