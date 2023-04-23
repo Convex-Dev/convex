@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit;
 import convex.core.Belief;
 import convex.core.Peer;
 import convex.core.util.LatestUpdateQueue;
+import convex.core.util.LoadMonitor;
 
 /**
  * Component handling CVM execution loop with a Peer Server
@@ -22,7 +23,9 @@ public class CVMExecutor extends AThreadedComponent {
 	@Override
 	protected void loop() throws InterruptedException {
 		// poll for any Belief change
+		LoadMonitor.down();
 		Belief beliefUpdate=update.poll(1000, TimeUnit.MILLISECONDS);
+		LoadMonitor.up();
 		if (beliefUpdate!=null) {
 			peer=peer.updateBelief(beliefUpdate);
 		}

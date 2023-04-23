@@ -11,6 +11,7 @@ import convex.core.data.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
+import convex.core.util.LoadMonitor;
 import convex.net.MessageType;
 import convex.net.message.Message;
 
@@ -38,7 +39,9 @@ public class QueryHandler extends AThreadedComponent {
 
 	@Override
 	protected void loop() throws InterruptedException {
+		LoadMonitor.down();
 		Message m = queryQueue.poll(10000, TimeUnit.MILLISECONDS);
+		LoadMonitor.up();
 		if (m==null) return;
 		
 		MessageType type=m.getType();

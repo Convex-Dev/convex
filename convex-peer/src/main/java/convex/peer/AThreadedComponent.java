@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.store.Stores;
+import convex.core.util.*; 
 
 /**
  * Base class for a threaded execution component that runs within the context of a Peer Server
@@ -37,6 +38,10 @@ public abstract class AThreadedComponent {
 			// Finally close the component properly
 			close();
 		}
+	}
+	
+	public double getLoad() {  
+		return LoadMonitor.getLoad(thread);
 	}
 
 	protected AThreadedComponent(Server server) {

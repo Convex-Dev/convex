@@ -10,6 +10,7 @@ import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
 import convex.gui.utils.Toolkit;
+import convex.peer.AThreadedComponent;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")
@@ -68,9 +69,22 @@ public class PeerInfoPanel extends JPanel {
 			sb.append("Beliefs Sent:         "+s.getBeliefPropagator().getBeliefBroadcastCount()+"\n");
 			sb.append("Beliefs Received:     "+s.getBeliefReceivedCount()+"\n");
 			sb.append("\n");
+			
+			sb.append("Load averages\n");
+			sb.append("Transaction handler:  "+load(s.getTransactionHandler())+"\n");
+			sb.append("Query handler:        "+load(s.getQueryProcessor())+"\n");
+			sb.append("Belief Propagator:    "+load(s.getBeliefPropagator())+"\n");
+			sb.append("CVM Executor:         "+load(s.getCVMExecutor())+"\n");
+
 		}
 		
 		textArea.setText(sb.toString());
+	}
+	
+
+	private String load(AThreadedComponent  comp) {
+		double ld=comp.getLoad();
+		return Text.leftPad((long)(ld*100)+"%", 6);
 	}
 
 }

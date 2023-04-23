@@ -31,6 +31,7 @@ import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.lang.RT;
+import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.ChallengeRequest;
 import convex.net.Connection;
@@ -552,7 +553,9 @@ public class ConnectionManager extends AThreadedComponent {
 			if (hm.isEmpty()) break;
 			
 			// Avoid a busy wait if buffers are full and still have things to send		
+			LoadMonitor.down();
 			Thread.sleep(10);
+			LoadMonitor.up();
 		}
 		
 		if (!hm.isEmpty()) {

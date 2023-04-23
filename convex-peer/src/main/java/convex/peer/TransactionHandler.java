@@ -30,6 +30,7 @@ import convex.core.data.Strings;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.message.Message;
 
@@ -281,7 +282,9 @@ public class TransactionHandler extends AThreadedComponent{
 	@Override
 	protected void loop() throws InterruptedException {
 		try {
+			LoadMonitor.down();
 			Message m = txMessageQueue.poll(1000, TimeUnit.MILLISECONDS);
+			LoadMonitor.up();
 			if (m==null) return;
 			
 			// We have at least one transaction to handle, drain queue to get the rest
@@ -294,7 +297,9 @@ public class TransactionHandler extends AThreadedComponent{
 			}
 			
 			// Wait for more transactions to accumulate before sending anything new
+			LoadMonitor.down();
 			Thread.sleep(Constants.MIN_BLOCK_TIME);
+			LoadMonitor.up();
 		} finally {
 			messages.clear();
 		}

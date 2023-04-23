@@ -29,6 +29,7 @@ import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.message.Message;
 
@@ -208,7 +209,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		ArrayList<Message> beliefMessages=new ArrayList<>();
 		
 		// if we did a belief merge recently, pause for a bit to await more Beliefs
+		LoadMonitor.down();
 		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
+		LoadMonitor.up();
 		if (firstEvent==null) return null; // nothing arrived
 		
 		beliefMessages.add(firstEvent);

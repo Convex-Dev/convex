@@ -801,6 +801,14 @@ public class Server implements Closeable {
 		executor.queueUpdate(belief);
 	}
 
+	public CVMExecutor getCVMExecutor() {
+		return executor;
+	}
+
+	public QueryHandler getQueryProcessor() {
+		return queryHandler;
+	}
+
 
 
 }
