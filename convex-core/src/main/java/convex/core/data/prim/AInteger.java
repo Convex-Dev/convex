@@ -117,4 +117,18 @@ public abstract class AInteger extends ANumeric {
 	 */
 	public abstract AInteger mod(AInteger base);
 
+	/**
+	 * Divides this integer with a given denominator. Performs Euclidian division consistent with mod
+	 * @param base Base of division
+	 * @return Division result
+	 */
+	public abstract AInteger div(AInteger base);
+
+	/**
+	 * Divides this integer with a given denominator. Performs division consistent with rem
+	 * @param base Base of division
+	 * @return Division result
+	 */
+	public abstract AInteger quot(AInteger lb);
+
 }

@@ -103,6 +103,10 @@ public class NumericsTest extends ACVMTest {
 
 	    // Check modular behaviour (mod a b) == (mod (mod a b) b)
 		assertNotError(step("(map (fn [[a b]] (or (== (mod a b) (mod (mod a b) b)) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
+
+		// TODO FIXME: Check consistency of mod and div
+		// assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (div a b)) (mod a b) ) ) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
+
 	}
 
 	@Test

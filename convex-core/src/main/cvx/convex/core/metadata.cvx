@@ -493,6 +493,13 @@
         :examples    [{:code "(dissoc {1 2 3 4} 3)"}]
         :signature   [{:params [coll & keys]
                        :return Map}]}}
+ 
+ div
+ {:doc {:description "Returns the integer value of a numerator divided by a divisor. Performs Euclidian division (i.e. non-negative remainder)."
+        :errors      {:CAST "If any argument is not an Integer."}
+        :examples    [{:code "(div 14 3)"}]
+        :signature   [{:params [num denom]
+                       :return Integer}]}}
 
  do
  {:doc      {:description "Executes multiple expressions sequentially, and returns the value of the final expression."

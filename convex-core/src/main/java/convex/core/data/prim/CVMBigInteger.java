@@ -331,6 +331,26 @@ public class CVMBigInteger extends AInteger {
 		return AInteger.create(big().mod(divisor));
 	}
 
+	@Override
+	public AInteger div(AInteger base) {
+		BigInteger divisor=base.big();
+		int signum=divisor.signum();
+		if (signum==0) return null;
+		// if (signum<0) divisor=divisor.negate();
+		BigInteger d=big().divide(divisor);
+		return AInteger.create(d);
+	}
+	
+	@Override
+	public AInteger quot(AInteger base) {
+		BigInteger divisor=base.big();
+		int signum=divisor.signum();
+		if (signum==0) return null;
+		// if (signum<0) divisor=divisor.negate();
+		BigInteger d=big().divide(divisor);
+		return AInteger.create(d);
+	}
+
 
 
 }

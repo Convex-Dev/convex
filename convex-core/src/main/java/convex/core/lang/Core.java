@@ -1798,7 +1798,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.floor(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (result == null) return context.withCastError(0,args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1810,7 +1810,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.ceil(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (result == null) return context.withCastError(0,args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1822,7 +1822,7 @@ public class Core {
 		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.sqrt(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (result == null) return context.withCastError(0,args, Types.NUMBER);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1865,6 +1865,23 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+	public static final CoreFn<AInteger> DIV = reg(new CoreFn<>(Symbols.DIV) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<AInteger> invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			AInteger la=RT.ensureInteger(args[0]);
+			AInteger lb=RT.ensureInteger(args[1]);
+			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
+
+			AInteger result=la.div(lb);
+			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
+
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
 
 	public static final CoreFn<CVMLong> REM = reg(new CoreFn<>(Symbols.REM) {
 		@SuppressWarnings("unchecked")
@@ -1887,22 +1904,18 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> QUOT = reg(new CoreFn<>(Symbols.QUOT) {
+	public static final CoreFn<AInteger> QUOT = reg(new CoreFn<>(Symbols.QUOT) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context<AInteger> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			CVMLong la=RT.ensureLong(args[0]);
-			CVMLong lb=RT.ensureLong(args[1]);
-			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
+			AInteger la=RT.ensureInteger(args[0]);
+			AInteger lb=RT.ensureInteger(args[1]);
+			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 
-			long num = la.longValue();
-			long denom = lb.longValue();
-			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
-
-			long m = num / denom;
-			CVMLong result=CVMLong.create(m);
+			AInteger result=la.quot(lb);
+			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

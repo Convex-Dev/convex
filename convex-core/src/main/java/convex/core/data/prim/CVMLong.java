@@ -352,5 +352,36 @@ public final class CVMLong extends AInteger {
 		return CVMLong.create(m);
 	}
 
+	@Override
+	public AInteger div(AInteger base) {
+		if (base instanceof CVMLong) return div((CVMLong)base);
+		return null;
+	}
+	
+	public CVMLong div(CVMLong base) {
+		long num=value;
+		long denom=base.value;
+		if (denom==0) return null;
+		if (num<0) num-=(denom-1); // Correct for Euclidean modular function
+		long d = num / denom;
+		
+		return CVMLong.create(d);
+	}
+	
+	@Override
+	public AInteger quot(AInteger base) {
+		if (base instanceof CVMLong) return quot((CVMLong)base);
+		return null;
+	}
+	
+	public CVMLong quot(CVMLong base) {
+		long num=value;
+		long denom=base.value;
+		if (denom==0) return null;
+		long d = num / denom;
+		// Correct for Euclidean modular function
+		return CVMLong.create(d);
+	}
+
 
 }

@@ -137,6 +137,7 @@ public class Symbols {
 	public static final Symbol SQRT = intern("sqrt");
 	public static final Symbol EXP = intern("exp");
 	public static final Symbol POW = intern("pow");
+	public static final Symbol DIV = intern("div");
 	public static final Symbol MOD = intern("mod");
 	public static final Symbol QUOT = intern("quot");
 	public static final Symbol REM = intern("rem");

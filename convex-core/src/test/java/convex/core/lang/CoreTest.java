@@ -3134,6 +3134,13 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(quot 1)"));
 		assertArityError(step("(quot 1 2 3)"));
 	}
+	
+	@Test
+	public void testDiv() {
+		assertEquals(0L, evalL("(div 4 10)"));
+		assertEquals(-4L, evalL("(div -10 3)"));
+		// TODO: more tests
+	}
 
 	@Test
 	public void testMod() {
