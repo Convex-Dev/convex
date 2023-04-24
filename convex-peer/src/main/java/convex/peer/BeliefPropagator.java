@@ -129,10 +129,10 @@ public class BeliefPropagator extends AThreadedComponent {
 				
 				doBroadcast(msg);
 			}
-		} else {
-			// persist Belief anyway, just without announcing
-			belief=ACell.createPersisted(belief).getValue();
-		}
+		} 
+		// Persist Belief anyway, just without announcing
+		// This is super cheap if already persisted, so no problem
+		belief=ACell.createPersisted(belief).getValue();
 		
 		if (updated) server.updateBelief(belief);	
 	}
