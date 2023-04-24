@@ -172,7 +172,10 @@ public class CVMBigInteger extends AInteger {
 		long blen=byteLength();
 		if (blen>limit*2) return false;
 		AString s=Strings.create(big().toString());
-		if (s.count()>limit) return false;
+		if (s.count()>limit) {
+			sb.append(s.slice(0, limit));
+			return false;
+		}
 		sb.append(s);
 		return true;
 	}

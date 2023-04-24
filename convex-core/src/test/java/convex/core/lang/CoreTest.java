@@ -3062,6 +3062,9 @@ public class CoreTest extends ACVMTest {
 		
 		assertEquals(-0.0, evalD("(min -0.0 0.0)"));
 		assertEquals(0.0, evalD("(min 0.0 -0.0)"));
+		
+		assertEquals(10L, evalL("(min 10 1000 1000000000000000000000 1e30)"));
+		assertEquals(CVMBigInteger.parse("1000000000000000000000"), eval("(min 1000000000000000000000 5000000000000000000000)"));
 
 		assertCastError(step("(min true)"));
 		assertCastError(step("(min \\c)"));
@@ -3086,6 +3089,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-0.0, evalD("(max -0.0 0.0)"));
 		assertEquals(0.0, evalD("(max 0.0 -0.0)"));
 
+		assertEquals(1e30, evalD("(max 1e30 10000000000000000000000000)"));
 
 		assertArityError(step("(max)"));
 		

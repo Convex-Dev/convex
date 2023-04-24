@@ -155,7 +155,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 			/*
 			 *  Always remove Peers not staked in consensus. This should eliminate Peers that have
-			 *  withdrawn or are slashed from current consideration.
+			 *  withdrawn, have trivial stake or are slashed from current consideration.
 			 */
 			PeerStatus ps=s.getPeer(p);
 			if ((ps==null)||(ps.getTotalStake()<=Constants.MINIMUM_EFFECTIVE_STAKE)) {
