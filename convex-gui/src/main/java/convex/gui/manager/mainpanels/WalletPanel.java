@@ -7,15 +7,24 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.ListModel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.Address;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.WalletComponent;
 import convex.gui.manager.PeerGUI;
+import convex.peer.Server;
 
 @SuppressWarnings("serial")
 public class WalletPanel extends JPanel {
+	
+	private static final Logger log = LoggerFactory.getLogger(WalletPanel.class.getName());
+
 
 	public static WalletEntry HERO;
 
@@ -39,7 +48,15 @@ public class WalletPanel extends JPanel {
 		JButton btnNew = new JButton("New");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
-			listModel.addElement(WalletEntry.create(null,AKeyPair.generate()));
+			Server s=PeerGUI.getDefaultPeer().peerServer;
+			Convex convex=Convex.connect(s, HERO.getAddress(), HERO.getKeyPair());
+			AKeyPair newKP=AKeyPair.generate();
+			try {
+				Address addr=convex.createAccountSync(newKP.getAccountKey());
+				listModel.addElement(WalletEntry.create(addr,newKP));
+			} catch (Throwable t) {
+				log.warn("Exception creating account: ",e);
+			}
 		});
 
 		// inital list

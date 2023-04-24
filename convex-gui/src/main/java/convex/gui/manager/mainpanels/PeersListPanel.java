@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +23,7 @@ import javax.swing.JScrollPane;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -68,16 +71,34 @@ public class PeersListPanel extends JPanel {
 	
 	// TODO
 	public void launchPeer(PeerGUI manager) {
-		
 		AKeyPair kp=AKeyPair.generate();
-		HashMap<Keyword, Object> config=new HashMap<>();
-		config.put(Keywords.KEYPAIR, kp);
-		config.put(Keywords.STATE, PeerGUI.genesisState);
-		Server server=API.launchPeer(config);
-		// server.
 		
-		PeerView peer = new PeerView(server);
-		addPeer(peer);
+		try {
+			Server base=getFirst().peerServer;
+			Convex convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
+			Address a= convex.createAccountSync(kp.getAccountKey());
+			
+			convex=Convex.connect(base, a, kp);
+			AccountKey key=kp.getAccountKey();
+			convex.transact("(create-peer "+key+")");
+			
+			HashMap<Keyword, Object> config=new HashMap<>();
+			config.put(Keywords.KEYPAIR, kp);
+			config.put(Keywords.CONTROLLER, a);
+			config.put(Keywords.STATE, PeerGUI.genesisState);
+			Server server=API.launchPeer(config);
+			server.getConnectionManager().connectToPeer(base.getHostAddress());
+			base.getConnectionManager().connectToPeer(server.getHostAddress());
+			
+			PeerView peer = new PeerView(server);
+			addPeer(peer);
+		} catch (TimeoutException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 
 	public static PeerView getFirst() {

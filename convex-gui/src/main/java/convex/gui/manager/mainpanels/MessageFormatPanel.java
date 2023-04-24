@@ -85,7 +85,7 @@ public class MessageFormatPanel extends JPanel {
 		instructionsPanel = new JPanel();
 		add(instructionsPanel, BorderLayout.NORTH);
 
-		lblNewLabel = new JLabel("Use this fine tool to convert data to formatted binary messages, and vice versa");
+		lblNewLabel = new JLabel("Use this fine tool to convert data values to encoded binary representations, and vice versa");
 		instructionsPanel.add(lblNewLabel);
 		clearButton.addActionListener(e -> {
 			dataArea.setText("");

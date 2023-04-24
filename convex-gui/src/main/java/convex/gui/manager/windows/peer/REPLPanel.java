@@ -212,6 +212,8 @@ public class REPLPanel extends JPanel {
 					}
 					Address address = getAddress();
 					ATransaction trans = Invoke.create(address,-1, message);
+					convex.setAddress(address);
+					convex.setKeyPair(getKeyPair());
 					future = convex.transact(trans);
 				} else {
 					throw new Error("Unrecognosed REPL mode: " + mode);

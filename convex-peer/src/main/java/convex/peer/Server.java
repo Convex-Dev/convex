@@ -193,10 +193,9 @@ public class Server implements Closeable {
 		}
 		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
 		if (as==null) {
-			throw new IllegalStateException("Peer Controller Account does not exist: "+controlAddress);
-		}
-		if (!as.getAccountKey().equals(getKeyPair().getAccountKey())) {
-			throw new IllegalStateException("Server keypair does not match keypair for control account: "+controlAddress);
+			log.warn("Peer Controller Account does not exist: "+controlAddress);	
+		} else if (!as.getAccountKey().equals(getKeyPair().getAccountKey())) {
+			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
 		}
 		this.setPeerController(controlAddress);
 	}

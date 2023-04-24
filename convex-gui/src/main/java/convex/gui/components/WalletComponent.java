@@ -12,6 +12,9 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
@@ -21,6 +24,10 @@ import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class WalletComponent extends BaseListComponent {
+	
+	@SuppressWarnings("unused")
+	private static final Logger log = LoggerFactory.getLogger(WalletComponent.class.getName());
+
 	Icon icon = Toolkit.LOCKED_ICON;
 
 	JButton lockButton;
