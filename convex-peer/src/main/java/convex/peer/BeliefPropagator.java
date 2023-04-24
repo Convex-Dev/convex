@@ -127,10 +127,13 @@ public class BeliefPropagator extends AThreadedComponent {
 				// This can potentially help latency on transaction result reporting etc.
 				if (updated) server.updateBelief(belief);
 				
+				// Actually broadcast the message to outbound connected Peers
 				doBroadcast(msg);
 			}
 		} 
+		
 		// Persist Belief anyway, just without announcing
+		// This is mainly in case we get missing data / sync requests for the Belief
 		// This is super cheap if already persisted, so no problem
 		belief=ACell.createPersisted(belief).getValue();
 		
