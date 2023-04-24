@@ -22,6 +22,8 @@ import javax.swing.JScrollPane;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
+import convex.core.Coin;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -77,10 +79,12 @@ public class PeersListPanel extends JPanel {
 			Server base=getFirst().peerServer;
 			Convex convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
 			Address a= convex.createAccountSync(kp.getAccountKey());
+			convex.transferSync(a, Coin.DIAMOND);
 			
 			convex=Convex.connect(base, a, kp);
 			AccountKey key=kp.getAccountKey();
-			convex.transact("(create-peer "+key+")");
+			Result rcr=convex.transactSync("(create-peer "+key+" 10000000000)");
+			if (rcr.isError()) log.warn("Error creating peer: "+rcr);
 			
 			HashMap<Keyword, Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR, kp);
@@ -88,6 +92,7 @@ public class PeersListPanel extends JPanel {
 			config.put(Keywords.STATE, PeerGUI.genesisState);
 			Server server=API.launchPeer(config);
 			server.getConnectionManager().connectToPeer(base.getHostAddress());
+			server.setHostname("localhost:"+server.getPort());
 			base.getConnectionManager().connectToPeer(server.getHostAddress());
 			
 			PeerView peer = new PeerView(server);

@@ -75,7 +75,7 @@ public class TestNetwork {
 				throw Utils.sneakyThrow(t);
 			}
 		}
-		log.info("*** Test Network ready ***");
+		log.debug("*** Test Network ready ***");
 	}
 	
 	/**

@@ -68,6 +68,9 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
+
+
+	private static final boolean ANALYSE_MISSING = false;
 	
 
 	long beliefReceivedCount=0L;
@@ -296,6 +299,8 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	private void analyseMissing(Hash h, Message m, SignedData<Order> so) throws BadFormatException {
+		if (!ANALYSE_MISSING) return;
+		
 		StringBuilder sb=new StringBuilder();
 		ACell[] cs=Format.decodeCells(m.getMessageData());
 		

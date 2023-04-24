@@ -1,6 +1,7 @@
 package convex.gui.manager.windows.peer;
 		
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -127,6 +128,7 @@ public class REPLPanel extends JPanel {
 		outputArea.setEditable(false);
 		outputArea.setLineWrap(true);
 		outputArea.setFont(new Font("Monospaced", Font.PLAIN, 16));
+		outputArea.setForeground(Color.GREEN);
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 		splitPane.setLeftComponent(new JScrollPane(outputArea));
@@ -136,6 +138,8 @@ public class REPLPanel extends JPanel {
 		inputArea.setFont(new Font("Monospaced", Font.PLAIN, 20));
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
+		inputArea.setForeground(Color.GREEN);
+
 		splitPane.setRightComponent(new JScrollPane(inputArea));
 		
 		// stop ctrl+arrow losing focus
