@@ -1857,15 +1857,10 @@ public class Core {
 
 			AInteger la=RT.ensureInteger(args[0]);
 			AInteger lb=RT.ensureInteger(args[1]);
-			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
+			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
 
-			long num = la.longValue();
-			long denom = lb.longValue();
-			if (denom==0) return context.withArgumentError("Divsion by zero in "+name());
-
-			long m = num % denom;
-			if (m<0) m+=Math.abs(denom); // Correct for Euclidean modular function
-			CVMLong result=CVMLong.create(m);
+			AInteger result=la.mod(lb);
+			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

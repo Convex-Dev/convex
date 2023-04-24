@@ -109,4 +109,12 @@ public abstract class AInteger extends ANumeric {
 	public static AInteger create(long value) {
 		return CVMLong.create(value);
 	}
+
+	/**
+	 * Returns the modulus of this integer with a given integer base
+	 * @param base Base of modulus operation
+	 * @return Modulus result
+	 */
+	public abstract AInteger mod(AInteger base);
+
 }

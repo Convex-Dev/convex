@@ -317,6 +317,20 @@ public class CVMBigInteger extends AInteger {
 		return wrap(big().multiply(bb));
 	}
 
+	@Override
+	public boolean isZero() {
+		return big().signum()==0;
+	}
+
+	@Override
+	public AInteger mod(AInteger base) {
+		BigInteger divisor=base.big();
+		int signum=divisor.signum();
+		if (signum==0) return null;
+		if (signum<0) divisor=divisor.negate();
+		return AInteger.create(big().mod(divisor));
+	}
+
 
 
 }

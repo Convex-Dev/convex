@@ -229,6 +229,11 @@ public final class CVMDouble extends ANumeric {
 		return CVMBigInteger.wrap(bi);
 	}
 
+	@Override
+	public boolean isZero() {
+		return value==0.0;
+	}
+
 
 
 

@@ -332,5 +332,25 @@ public final class CVMLong extends AInteger {
 		return b.multiply(this);
 	}
 
+	@Override
+	public boolean isZero() {
+		return value==0;
+	}
+
+	@Override
+	public AInteger mod(AInteger base) {
+		if (base instanceof CVMLong) return mod((CVMLong)base);
+		return AInteger.create(big().mod(base.big()));
+	}
+	
+	public CVMLong mod(CVMLong base) {
+		long num=value;
+		long denom=base.value;
+		if (denom==0) return null;
+		long m = num % denom;
+		if (m<0) m+=Math.abs(denom); // Correct for Euclidean modular function
+		return CVMLong.create(m);
+	}
+
 
 }

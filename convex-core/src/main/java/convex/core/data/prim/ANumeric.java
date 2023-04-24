@@ -77,4 +77,10 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return Integer value
 	 */
 	public abstract AInteger toInteger();
+	
+	/**
+	 * Check if this numeric value is equal to zero
+	 * @return True if this value is numerically equal to zero
+	 */
+	public abstract boolean isZero();
 }

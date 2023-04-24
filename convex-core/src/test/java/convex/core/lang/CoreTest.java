@@ -3144,11 +3144,19 @@ public class CoreTest extends ACVMTest {
 		assertEquals(0L, evalL("(mod 0 -1)"));
 
 		assertEquals(6L, evalL("(mod -1 -7)"));
+		assertEquals(6L, evalL("(mod 10000000000000000000000006 10000000000000000000000000)"));
+		assertEquals(CVMBigInteger.parse("9999999999999999999999999"), eval("(mod  9999999999999999999999999 10000000000000000000000000)"));
+
+		assertEquals(1L, evalL("(mod 10000000000000000000000001 2)"));
+		assertEquals(1L, evalL("(mod 10000000000000000000000001 -2)")); // TODO: check?
+
+		assertEquals(CVMBigInteger.parse("999999999999999999999999"), eval("(mod -1 1000000000000000000000000)")); // TODO: check?
 
 		// Division by zero
 		assertArgumentError(step("(mod -2 0)"));
 		assertArgumentError(step("(mod 0 0)"));
 		assertArgumentError(step("(mod 10 0)"));
+		assertArgumentError(step("(mod 9999999999999999999999999999999 0)"));
 
 		assertCastError(step("(mod :a 7)"));
 		assertCastError(step("(mod 7 nil)"));
