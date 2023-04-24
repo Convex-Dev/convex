@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,16 +12,33 @@ import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
+import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 
 public class BigIntegerTest {
 
 	@Test public void testBigIntegerAssumptions() {
 		assertThrows(java.lang.NumberFormatException.class,()->new BigInteger(new byte[0]));
 		assertEquals(BigInteger.ZERO,new BigInteger(new byte[1]));
+	}
+	
+	@Test public void testPrint() {
+		String s="678638762397869864875634897567896587";
+		AString cs=Strings.create(s);
+		CVMBigInteger bi=CVMBigInteger.parse(s);
+		assertEquals(s,bi.toString());
+		assertEquals(cs,RT.print(bi));
+		
+		// insufficient print limit
+		assertNull(RT.print(bi,10));
+		
+		assertEquals(s.substring(0, 20)+Constants.PRINT_EXCEEDED_MESSAGE,bi.print(20).toString());
 	}
 	
 	@Test public void testZero() {

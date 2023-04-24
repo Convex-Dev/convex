@@ -1849,14 +1849,14 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> MOD = reg(new CoreFn<>(Symbols.MOD) {
+	public static final CoreFn<AInteger> MOD = reg(new CoreFn<>(Symbols.MOD) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context<AInteger> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			CVMLong la=RT.ensureLong(args[0]);
-			CVMLong lb=RT.ensureLong(args[1]);
+			AInteger la=RT.ensureInteger(args[0]);
+			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.LONG);
 
 			long num = la.longValue();
