@@ -664,7 +664,7 @@ public class Server implements Closeable {
 	 * This will overwrite any previously persisted peer data.
 	 * @return True if successfully persisted, false in case of any error
 	 */
-	protected boolean persistPeerData() {
+	public boolean persistPeerData() {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
