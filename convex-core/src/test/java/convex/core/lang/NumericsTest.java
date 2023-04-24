@@ -108,6 +108,19 @@ public class NumericsTest extends ACVMTest {
 		// assertNotError(step("(map (fn [[a b]] (or (== a (+ (* b (div a b)) (mod a b) ) ) (fail [a b])) ) [[10 3] [-10 3] [10 -3] [-10 -3] [10000000 1] [1 10000000]])"));
 
 	}
+	
+	@Test
+	public void testIntConsistency() {
+		doIntConsistencyChecks(CVMLong.create(156858),CVMLong.create(-576));
+		doIntConsistencyChecks(AInteger.parse("99999999999999999999999999999"),CVMLong.create(1));
+	}
+	
+	private void doIntConsistencyChecks(AInteger a, AInteger b) {
+		if (!b.isZero()) {
+			assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (+ (* b (quot a b)) (rem a b))) )"));
+			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (mod a b) (mod (mod a b) b)) )"));
+		}
+	}
 
 	@Test
 	public void testMinusDouble() {

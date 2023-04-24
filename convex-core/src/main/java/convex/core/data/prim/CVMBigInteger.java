@@ -330,6 +330,14 @@ public class CVMBigInteger extends AInteger {
 		if (signum<0) divisor=divisor.negate();
 		return AInteger.create(big().mod(divisor));
 	}
+	
+	@Override
+	public AInteger rem(AInteger base) {
+		BigInteger divisor=base.big();
+		int signum=divisor.signum();
+		if (signum==0) return null;
+		return AInteger.create(big().remainder(divisor));
+	}
 
 	@Override
 	public AInteger div(AInteger base) {

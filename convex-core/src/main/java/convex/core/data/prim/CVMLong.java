@@ -369,6 +369,22 @@ public final class CVMLong extends AInteger {
 	}
 	
 	@Override
+	public AInteger rem(AInteger base) {
+		if (base instanceof CVMLong) return rem((CVMLong)base);
+		return null;
+	}
+	
+	public CVMLong rem(CVMLong base) {
+		long num=value;
+		long denom=base.value;
+		if (denom==0) return null;
+
+		long r = num % denom;
+		
+		return CVMLong.create(r);
+	}
+	
+	@Override
 	public AInteger quot(AInteger base) {
 		if (base instanceof CVMLong) return quot((CVMLong)base);
 		return null;

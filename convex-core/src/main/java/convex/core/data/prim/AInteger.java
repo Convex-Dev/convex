@@ -126,9 +126,16 @@ public abstract class AInteger extends ANumeric {
 
 	/**
 	 * Divides this integer with a given denominator. Performs division consistent with rem
-	 * @param base Base of division
+	 * @param divisor Base of division
 	 * @return Division result
 	 */
-	public abstract AInteger quot(AInteger lb);
+	public abstract AInteger quot(AInteger divisor);
+
+	/**
+	 * Returns the remainder of dividing this integer with a given divisor
+	 * @param divisor Base of division operation
+	 * @return Modulus result
+	 */
+	public abstract AInteger rem(AInteger divisor);
 
 }
