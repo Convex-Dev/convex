@@ -231,6 +231,9 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public boolean isZero() {
+		// According to the IEEE 754 standard, negative zero and positive zero should
+		// compare as equal with the usual (numerical) comparison operators
+		// This is the behaviour in Java
 		return value==0.0;
 	}
 

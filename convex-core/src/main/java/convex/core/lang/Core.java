@@ -2075,7 +2075,7 @@ public class Core {
 
 			// Second argument should be an Integer index within long range
 			ACell iarg=args[1];
-			if (!(iarg instanceof AInteger)) return context.withCastError(1,args, Types.LONG);
+			if (!(iarg instanceof AInteger)) return context.withCastError(1,args, Types.INTEGER);
 			CVMLong ix = RT.ensureLong(iarg);
 			if (ix == null) return context.withError(ErrorCodes.BOUNDS,"Excessively large index");
 
@@ -2589,11 +2589,8 @@ public class Core {
 		public boolean test(ACell val) {
 			if (!RT.isNumber(val)) return false;
 			ANumeric n = RT.ensureNumber(val);
-
-			// According to the IEEE 754 standard, negative zero and positive zero should
-			// compare as equal with the usual (numerical) comparison operators
-			// This is the behaviour in Java
-			return n.doubleValue() == 0.0;
+			if (n==null) return false;
+			return n.isZero();
 		}
 	});
 

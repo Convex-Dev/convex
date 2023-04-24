@@ -555,7 +555,7 @@ public class RT {
 	}
 
 	/**
-	 * Ensures the argument is a CVM Long value.
+	 * Ensures the argument is a CVM Double value.
 	 * 
 	 * @param a Value to cast
 	 * @return CVMDouble value, or null if not convertible
@@ -582,7 +582,6 @@ public class RT {
 		if (n != null) {
 			return n.toLong();
 		}
-		;
 
 		if (a instanceof APrimitive) {
 			return CVMLong.create(((APrimitive) a).longValue());
@@ -1695,31 +1694,6 @@ public class RT {
 
 
 		return (T) o.toString();
-	}
-
-	/**
-	 * Compute mode.
-	 * 
-	 * @param a First numeric argument (numerator)
-	 * @param b First numeric argument (divisor)
-	 * @return Numeric value or null if cast fails
-	 */
-	public static CVMLong mod(ACell a, ACell b) {
-		CVMLong la = RT.castLong(a);
-		if (la == null)
-			return null;
-
-		CVMLong lb = RT.castLong(b);
-		if (lb == null)
-			return null;
-
-		long num = la.longValue();
-		long denom = lb.longValue();
-		long result = num % denom;
-		if (result < 0)
-			result += denom;
-
-		return CVMLong.create(result);
 	}
 
 	/**
