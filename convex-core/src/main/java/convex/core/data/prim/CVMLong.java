@@ -63,6 +63,15 @@ public final class CVMLong extends AInteger {
 	}
 	
 	/**
+	 * Creates a CVMLong wrapping the given Java long value. Always succeeds.
+	 * @param value Java long
+	 * @return CVMLong instance.
+	 */
+	public static CVMLong create(Long value) {
+		return create(value.longValue());
+	}
+	
+	/**
 	 * Gets the CVMLong representing an unsigned byte value
 	 * @param b Byte to convery to CVMLong (will be interpreted as unsigned)
 	 * @return CVMLong value
@@ -147,11 +156,11 @@ public final class CVMLong extends AInteger {
 		if (o instanceof ACell) {
 			return RT.castLong((ACell)o);
 		}
-		if (o instanceof Long) return CVMLong.create((Long)o);
+		if (o instanceof Long) return CVMLong.create(((Long)o).longValue());
 		if (o instanceof Number) {
 			Number n=(Number)o;
 			Long lv= n.longValue();
-			if (lv.doubleValue()==n.doubleValue()) return CVMLong.create(lv);
+			if (lv.doubleValue()==n.doubleValue()) return CVMLong.create(lv.longValue());
 		}
 		if (o instanceof String) try {
 			return parse((String)o);

@@ -111,15 +111,28 @@ public class NumericsTest extends ACVMTest {
 	
 	@Test
 	public void testIntConsistency() {
-		doIntConsistencyChecks(CVMLong.create(156858),CVMLong.create(-576));
+		doIntConsistencyChecks(156858,-576);
 		doIntConsistencyChecks(AInteger.parse("99999999999999999999999999999"),CVMLong.create(1));
+		doIntConsistencyChecks(-1,2);
+		doIntConsistencyChecks(3,0);
+		doIntConsistencyChecks(0,7);
+		doIntConsistencyChecks(Long.MAX_VALUE,Long.MIN_VALUE);
+		doIntConsistencyChecks(CVMBigInteger.MIN_POSITIVE,Long.MAX_VALUE);
+		doIntConsistencyChecks(156756567568L,CVMBigInteger.MIN_NEGATIVE);
 	}
 	
-	private void doIntConsistencyChecks(AInteger a, AInteger b) {
+	private void doIntConsistencyChecks(Object oa, Object ob) {
+		AInteger a=AInteger.parse(oa);
+		AInteger b=AInteger.parse(oa);
 		if (!b.isZero()) {
 			assertTrue(evalB("(let [a "+a+" b "+b+"] (== a (+ (* b (quot a b)) (rem a b))) )"));
 			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (mod a b) (mod (mod a b) b)) )"));
+			assertTrue(evalB("(let [a "+a+" b "+b+"] (== (quot (* a b) b) ))"));
 		}
+		
+		assertTrue(evalB("(let [a "+a+" b "+b+"] (== (- (+ a b) b) ))"));
+		
+		assertTrue(evalB("(let [a "+a+"] (== a (* (abs a) (signum a)) ))"));
 	}
 
 	@Test

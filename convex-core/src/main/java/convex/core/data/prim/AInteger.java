@@ -46,6 +46,17 @@ public abstract class AInteger extends ANumeric {
 			return CVMBigInteger.parse(s);
 		}
 	}
+	
+	/**
+	 * Parse a  value as a canonical integer
+	 * @param o Object to parse
+	 * @return AInteger instance, or null if not convertible
+	 */
+	public static AInteger parse(Object o) {
+		if (o instanceof AInteger) return (AInteger)o;
+		if (o instanceof Number) return create((Number)o);
+		return null;
+	}
 
 	/**
 	 * Number of bytes in minimal representation of this Integer. Returns 0 if and only if the integer is zero.
@@ -109,6 +120,17 @@ public abstract class AInteger extends ANumeric {
 	public static AInteger create(long value) {
 		return CVMLong.create(value);
 	}
+	
+	/**
+	 * Create a canonical CVM integer representation of the given Java Number
+	 * @param value Long value
+	 * @return AInteger instance
+	 */
+	public static AInteger create(Number value) {
+		if (value instanceof Long) return CVMLong.create(((Long)value).longValue());
+		if (value instanceof BigInteger) return create((BigInteger)value);
+		return CVMLong.create(value.longValue());
+	}
 
 	/**
 	 * Returns the modulus of this integer with a given integer base
@@ -137,5 +159,7 @@ public abstract class AInteger extends ANumeric {
 	 * @return Modulus result
 	 */
 	public abstract AInteger rem(AInteger divisor);
+
+
 
 }
