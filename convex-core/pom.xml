@@ -28,7 +28,7 @@
 				<artifactId>antlr4-maven-plugin</artifactId>
 				<version>${antlr.version}</version>
 				<configuration>
-					<libDirectory>${basedir}/lib/src/main/antlr4/convex/core/lang/reader/antlr</libDirectory>
+					<visitor>true</visitor>
 				</configuration>
 				<executions>
 					<execution>

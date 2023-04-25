@@ -55,7 +55,7 @@ public abstract class AInteger extends ANumeric {
 	public static AInteger parse(Object o) {
 		if (o instanceof AInteger) return (AInteger)o;
 		if (o instanceof Number) return create((Number)o);
-		return null;
+		return parse(o.toString());
 	}
 
 	/**

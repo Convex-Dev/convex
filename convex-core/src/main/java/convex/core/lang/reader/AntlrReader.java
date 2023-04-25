@@ -60,7 +60,7 @@ import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
 import convex.core.util.Utils;
-
+ 
 public class AntlrReader {
 	
 	public static class CRListener implements ConvexListener {

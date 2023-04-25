@@ -1,5 +1,5 @@
 grammar Convex;
-
+ 
 form
 	: literal
 	| symbol

@@ -6,6 +6,7 @@ import static convex.test.Assertions.assertCastError;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -132,6 +133,24 @@ public class NumericsTest extends ACVMTest {
 		
 		assertTrue(evalB("(let [a "+a+" b "+b+"] (== (- (+ a b) b) ))"));
 		
+	}
+	
+	@Test
+	public void testArbitraryIntegers() {
+		doIntChecks(0);
+		doIntChecks(16869696);
+		doIntChecks(-16869696);
+		doIntChecks(Long.MAX_VALUE);
+		doIntChecks(Long.MIN_VALUE);
+		doIntChecks(CVMBigInteger.MIN_POSITIVE);
+		doIntChecks(CVMBigInteger.MIN_NEGATIVE);
+		doIntChecks("676969696986986986969698698698698696969866986");
+		doIntChecks("-4524746724376436273417263424376432173471243");
+	}
+	
+	private void doIntChecks(Object o) {
+		AInteger a=AInteger.parse(o);
+		assertNotNull(a);
 		assertTrue(evalB("(let [a "+a+"] (== a (* (abs a) (signum a)) ))"));
 	}
 
@@ -357,6 +376,15 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(2L, evalL("(apply inc [1])"), 0);
 		assertEquals(1L, evalL("(apply * [])"), 0);
 		assertEquals(0L, evalL("(apply + nil)"), 0);
+	}
+	
+	@Test
+	public void testAbs() {
+		assertEquals(0L,evalL("(abs 0)"));
+		assertEquals(3L,evalL("(abs -3)"));
+		String s="678638762397869864875634897567896587";
+		assertEquals(AInteger.parse(s),eval("(abs "+s+")"));
+		assertEquals(AInteger.parse(s),eval("(abs -678638762397869864875634897567896587)"));
 	}
 	
 	@Test

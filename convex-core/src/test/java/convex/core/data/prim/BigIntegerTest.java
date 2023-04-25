@@ -140,6 +140,8 @@ public class BigIntegerTest {
 		} else {
 			assertTrue(bi.byteLength()<=8);
 			assertEquals(bi,bi.toLong());
+			long lv=bi.longValue();
+			assertEquals(CVMLong.create(lv), bi);
 		}
 		
 		String s=bi.toString();

@@ -209,6 +209,9 @@ public final class CVMLong extends AInteger {
 		if (c instanceof CVMLong) {
 			return equals((CVMLong)c);
 		}
+		if (c instanceof CVMBigInteger) {
+			return equals(c.getCanonical());
+		}
 		return false;
 	}
 	
