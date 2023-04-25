@@ -132,7 +132,7 @@ public class ConvexRemote extends Convex {
 				id = connection.sendTransaction(signed);
 				if (id>=0) {
 					// Store future for completion by result message
-					cf = awaitResult(id);
+					cf = awaitResult(id,timeout);
 					maybeUpdateSequence(signed);
 					break;
 				} 
@@ -161,7 +161,7 @@ public class ConvexRemote extends Convex {
 			synchronized (awaiting) {
 				long id = connection.sendQuery(query, address);
 				if(id>=0) {
-					CompletableFuture<Result> cf= awaitResult(id);
+					CompletableFuture<Result> cf= awaitResult(id,timeout);
 					return cf;
 				}
 			}
@@ -187,7 +187,7 @@ public class ConvexRemote extends Convex {
 	
 				// TODO: ensure status is fully loaded
 				// Store future for completion by result message
-				CompletableFuture<Result> cf = awaitResult(id);
+				CompletableFuture<Result> cf = awaitResult(id,timeout);
 	
 				return cf;
 			}
@@ -206,7 +206,7 @@ public class ConvexRemote extends Convex {
 			}
 
 			// Store future for completion by result message
-			return awaitResult(id);
+			return awaitResult(id,timeout);
 		}
 	}
 	

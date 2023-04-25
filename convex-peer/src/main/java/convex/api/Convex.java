@@ -664,9 +664,13 @@ public abstract class Convex {
 	 * @param id ID of result message to await
 	 * @return
 	 */
-	protected CompletableFuture<Result> awaitResult(long id) {
+	protected CompletableFuture<Result> awaitResult(long id, long timeout) {
+		// TODO: timeout parameter, maybe allow 0 timeout for never fail?
 		CompletableFuture<Result> cf = new CompletableFuture<Result>();
-		cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS).whenComplete((r,e)->{
+		if (timeout>0) {
+			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
+		}
+		cf=cf.whenComplete((r,e)->{
 			synchronized(awaiting) {
 				awaiting.remove(id);
 			}
@@ -857,6 +861,14 @@ public abstract class Convex {
 	 * @throws TimeoutException If initial status request times out
 	 */
 	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
+	
+	/**
+	 * Sets the timeout for this Convex client instance.
+	 * @param timeout timeout in milliseconds
+	 */
+	public void setTimeout(long timeout) {
+		this.timeout=timeout;
+	}
 	
 	@Override 
 	public abstract String toString();
