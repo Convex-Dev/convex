@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow `merge` to work with BlobMaps
 
 ### Changed
-- General update of dependencies to most recent versions as of Sep 2022
+- General update of dependencies to most recent versions as of Apr 2023
 - Refactoring of Sodium crypto libraries to separate convex-sodium module
 - Sequence numbers are now incremented at end of transaction. *sequence* behaves "as-if" already updated.
 - New networking message model
