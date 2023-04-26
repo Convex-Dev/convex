@@ -441,6 +441,7 @@ public class AntlrReader {
 	public static ACell read(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		lexer.removeErrorListeners();
+		lexer.addErrorListener(new ConvexErrorListener() );
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
 		parser.removeErrorListeners();
@@ -465,6 +466,7 @@ public class AntlrReader {
 	public static AList<ACell> readAll(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		lexer.removeErrorListeners();
+		lexer.addErrorListener(new ConvexErrorListener() );
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
 		parser.removeErrorListeners();

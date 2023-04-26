@@ -197,7 +197,7 @@ ALPHA: [a-z] | [A-Z];
  */
  
 fragment
-WS : [ \n\r\t,] ;
+WS: [ \n\r\t,] ;
 
 fragment
 COMMENT: ';' ~[\r\n]* ;

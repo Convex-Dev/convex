@@ -55,6 +55,9 @@ public class ReaderTest {
 
 		// keywords can start with more than one colon
 		assertEquals(Keyword.create(":foo"), Reader.read("::foo"));
+		
+		assertThrows(ParseException.class,()->Reader.read(":"));
+
 	}
 
 	@Test
@@ -111,6 +114,13 @@ public class ReaderTest {
 	public void testSymbolPath() {
 		ACell form=Reader.read("foo/bar/baz");
 		assertEquals(Lists.of(Symbols.LOOKUP,Lists.of(Symbols.LOOKUP,Symbols.FOO,Symbols.BAR),Symbols.BAZ),form) ;
+	}
+	
+	@Test 
+	public void testColonIssue462() {
+		String s462="() : ()";
+		assertThrows(ParseException.class,()->Reader.readAll(s462));
+		
 	}
 
 	@Test
