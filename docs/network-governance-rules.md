@@ -135,8 +135,8 @@ Alternatively, Operators MAY submit a request to the Governing Body to operate a
 
 Operators MAY freely operate a Network for testing and development purposes providing that the following requirements are met:
 
-- It is not used to facilitate real economic transactions
-- They do not mislead any party into believing the test network is a real Network 
+- It is not used to facilitate real economic transactions (simulations, experiements and proofs of concept are OK)
+- They do not mislead any party into believing the test network is a real Network and/or relying upon it as such
 
 A Network used for testing and development in this way is not otherwise bound by the CNGRs
 
