@@ -34,9 +34,9 @@ public class PeerStatus extends ARecord {
 	/**
 	 * Metadata for the Peer. Can be null internally, which is interpreted as an empty Map.
 	 */
-	private final AHashMap<Keyword,ACell> metadata;
+	private final AHashMap<ACell,ACell> metadata;
 
-	private PeerStatus(Address controller, long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<Keyword,ACell> metadata) {
+	private PeerStatus(Address controller, long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata) {
 		super(FORMAT.count());
         this.controller = controller;
 		this.stake = stake;
@@ -49,7 +49,7 @@ public class PeerStatus extends ARecord {
 		return create(controller, stake, null);
 	}
 
-	public static PeerStatus create(Address controller, long stake, AHashMap<Keyword,ACell> metadata) {
+	public static PeerStatus create(Address controller, long stake, AHashMap<ACell,ACell> metadata) {
 		return new PeerStatus(controller, stake, BlobMaps.empty(), 0L, metadata);
 	}
 	/**
@@ -106,7 +106,7 @@ public class PeerStatus extends ARecord {
 	 *
 	 * @return Host String
 	 */
-	public AHashMap<Keyword, ACell> getMetadata() {
+	public AHashMap<ACell, ACell> getMetadata() {
 		return metadata==null?Maps.empty():metadata;
 	}
 	
@@ -144,7 +144,7 @@ public class PeerStatus extends ARecord {
 		
 		long delegatedStake = Format.readVLCLong(bb);
 
-		AHashMap<Keyword,ACell> metadata = Format.read(bb);
+		AHashMap<ACell,ACell> metadata = Format.read(bb);
 
 		return new PeerStatus(owner, stake,stakes,delegatedStake,metadata);
 	}
@@ -168,7 +168,7 @@ public class PeerStatus extends ARecord {
 		long delegatedStake = Format.readVLCLong(b,epos);
 	    epos+=Format.getVLCLength(delegatedStake);
 	    
-		AHashMap<Keyword,ACell> metadata = Format.read(b,epos);
+		AHashMap<ACell,ACell> metadata = Format.read(b,epos);
 		epos+=Format.getEncodingLength(metadata);
 	    
 		PeerStatus result= new PeerStatus(owner, stake,stakes,delegatedStake,metadata);
@@ -238,15 +238,8 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata);
 	}
 
-	public PeerStatus withPeerData(AString newHostname) {
-		AHashMap<Keyword,ACell> newMeta=metadata;
-		if (newMeta==null) {
-			newMeta=Maps.create(Keywords.URL, newHostname);
-		} else {
-			newMeta=newMeta.assoc(Keywords.URL, newHostname);
-		}
-		if (metadata==newMeta) return this;
-		
+	public PeerStatus withPeerData(AHashMap<ACell,ACell> newMeta) {
+		if (metadata==newMeta) return this;	
 		return new PeerStatus(controller, stake, stakes, delegatedStake, newMeta);
     }
 
@@ -276,7 +269,7 @@ public class PeerStatus extends ARecord {
 	@Override
 	public PeerStatus updateRefs(IRefFunction func) {
 		ABlobMap<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
-		AHashMap<Keyword,ACell> newMeta = Ref.updateRefs(metadata, func);
+		AHashMap<ACell,ACell> newMeta = Ref.updateRefs(metadata, func);
 
 		if ((this.stakes==newStakes)&&(this.metadata==newMeta)) {
 			return this;

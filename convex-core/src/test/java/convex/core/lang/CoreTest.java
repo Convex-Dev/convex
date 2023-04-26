@@ -2929,11 +2929,14 @@ public class CoreTest extends ACVMTest {
 			assertEquals(newHostname,ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
 			ctx=step(ctx,"(set-peer-data peer-key {})");
 			assertNotError(ctx);
-			// no change to data
-			assertEquals(newHostname,ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname().toString());
+			// should clear data
+			assertNull(ctx.getState().getPeer(InitTest.FIRST_PEER_KEY).getHostname());
         }
 
-		assertArgumentError(step(ctx, "(set-peer-data peer-key {:url :fail})"));
+		assertNull(eval(ctx, "(set-peer-data peer-key nil)"));
+		
+		assertCastError(step(ctx, "(set-peer-data peer-key :fail)"));
+		assertCastError(step(ctx, "(set-peer-data peer-key (blob-map))"));
 
 		// Try to hijack with an account that isn't the first Peer
 		ctx=ctx.forkWithAddress(HERO.offset(2));

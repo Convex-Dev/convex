@@ -952,10 +952,11 @@ public class Core {
 			AccountKey peerKey=RT.ensureAccountKey(args[0]);
 			if (peerKey == null) return context.withCastError(0,args, Types.BLOB);
 			
-			AMap<ACell, ACell> data = RT.ensureMap(args[1]);
+			AHashMap<ACell, ACell> data = RT.ensureHashMap(args[1]);
 			if (data == null) return context.withCastError(1,args, Types.MAP);
 			
-			context=context.consumeJuice(Juice.PEER_UPDATE);
+			long juice=Juice.PEER_UPDATE;
+			context=context.consumeJuice(juice);
 			if (context.isExceptional()) return context;
 
 			return context.setPeerData(peerKey,data);

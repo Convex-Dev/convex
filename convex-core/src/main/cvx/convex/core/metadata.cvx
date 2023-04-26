@@ -1059,7 +1059,7 @@
 
  set-peer-data
  {:doc {:description "Sets metadata on a given peer. Metadata must be a map. Peer must exist, with a public account key."
-        :errors      {:CAST "If the first argument is not a valid peer Key, or the second argument is not a map."}
+        :errors      {:CAST "If the first argument is not a valid peer Key, or the second argument is not a hash map."}
         :examples    [{:code "(set-peer-data peer-key {:url \"my-peer.com:4242\"})"}]
         :signature   [{:params [peer map]}]}}
 

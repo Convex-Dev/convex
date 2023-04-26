@@ -7,10 +7,8 @@ import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
-import convex.core.data.AMap;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
-import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -2067,7 +2065,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Context with final peer data set
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> setPeerData(AccountKey peerKey, AMap<ACell, ACell> data) {
+	public <R extends ACell> Context<R> setPeerData(AccountKey peerKey, AHashMap<ACell, ACell> data) {
 		State s=getState();
 
 		// get the callers account and account status
@@ -2083,21 +2081,10 @@ public class Context<T extends ACell> extends AObject {
 		Hash lastStateHash = s.getHash();
 		// TODO: should use complete Map
 		// at the moment only :url is used in the data map
-		for (ACell key: data.keySet()) {
-			if (Keywords.URL.equals((Keyword) key)) {
-				ACell url = (ACell)data.get(Keywords.URL);
-				if (url == null || url instanceof AString) {
-					PeerStatus updatedPeer=ps.withPeerData((AString)url);
-					s=s.withPeer(ak, updatedPeer); // adjust peer
-				}
-				else {
-					return withArgumentError("URL must be Nil or a String");
-				}
-			}
-			else {
-				return withArityError("invalid key name " + key.toString());
-			}
-		}
+		AHashMap<ACell,ACell> newMeta=data;
+		PeerStatus updatedPeer=ps.withPeerData(newMeta);
+		s=s.withPeer(ak, updatedPeer); // adjust peer
+		
 		// if no change just return the current context
 		if (lastStateHash.equals(s.getHash())){
 			return (Context<R>) this;

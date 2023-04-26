@@ -17,7 +17,7 @@ public class PeerStatusTest {
 	@Test public void testFull() {
 		PeerStatus ps=PeerStatus.create(Address.create(111), 7000);
 		ps=ps.withDelegatedStake(Address.create(10000), 8000);
-		ps=ps.withPeerData(Strings.create("www.foobar.com"));
+		ps=ps.withPeerData(Maps.of(Keywords.URL,"www.foobar.com"));
 		doPeerStatusTest(ps);
 	}
 	
