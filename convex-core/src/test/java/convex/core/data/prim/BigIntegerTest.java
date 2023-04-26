@@ -51,6 +51,13 @@ public class BigIntegerTest {
 		doBigTest(bi);
 	}
 	
+	@Test public void testComparisons() {
+		assertEquals(-1,CVMLong.MAX_VALUE.compareTo(CVMBigInteger.MIN_POSITIVE));
+		assertEquals(-1,CVMBigInteger.MIN_NEGATIVE.compareTo(CVMBigInteger.MIN_POSITIVE));
+		assertEquals(0,CVMBigInteger.MIN_POSITIVE.compareTo(CVMBigInteger.MIN_POSITIVE));
+		assertEquals(1,CVMBigInteger.MIN_POSITIVE.compareTo(CVMLong.ZERO));
+	}
+	
 	@Test public void testOne() {
 		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {1});
 		assertEquals(1,bi.longValue());
