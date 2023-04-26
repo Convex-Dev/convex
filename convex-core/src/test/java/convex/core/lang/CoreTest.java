@@ -3627,6 +3627,9 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(declare foo 1)"));
 		assertCastError(step("(declare :bar)"));
 		assertCastError(step("(declare \"foo\")"));
+		
+		// Declare should not overwrite existing value (see #440)
+		assertEquals(1L, evalL("(do (def a 1) (declare a) a)"));
 	}
 	
 	

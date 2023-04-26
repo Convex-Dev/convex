@@ -139,7 +139,7 @@
   (map 
     (fn [sym] 
        (cond (symbol? sym)
-       (eval `(def ~sym nil))
+       (eval `(if (lookup-meta (quote ~sym)) nil (def ~sym nil)))
        (fail :CAST "declare requires symbols only as arguments"))) 
      syms))
 
