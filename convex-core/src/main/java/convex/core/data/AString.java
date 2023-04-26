@@ -35,7 +35,15 @@ public abstract class AString extends ACountable<CVMChar> implements Comparable<
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		long n=count();
-		if (!sb.check(limit-n-2)) return false;
+		if (!sb.check(limit-(n+2))) {
+			// Can't print full string, but attempt up to limit
+			long avail=limit-sb.count();
+			if (avail>0) {
+				sb.append('"');
+				sb.append(slice(0,avail-1));
+			}
+			return false;
+		}
 		sb.append('"');
 		printEscaped(sb,0,n);
 		sb.append('"');

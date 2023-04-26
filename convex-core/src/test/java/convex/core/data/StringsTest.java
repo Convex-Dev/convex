@@ -148,11 +148,19 @@ public class StringsTest {
 		assertEquals(null,RT.print(null,1));
 	}
 	
+	@Test 
+	public void testPrint() {
+		assertEquals("\"\"",Strings.empty().print(2).toString());
+		assertEquals("\"foo bar\"",Strings.create("foo bar").print().toString());
+	}
+	
 	@Test public void testPrintExceeded() {
 		AString s=Strings.create("foobar");
-		assertEquals(Constants.PRINT_EXCEEDED_MESSAGE,s.print(1));
+		String exp="\"f"+Constants.PRINT_EXCEEDED_MESSAGE;
+		assertEquals(exp,s.print(2).toString());
+		
+		assertEquals(Constants.PRINT_EXCEEDED_MESSAGE,s.print(0));
 	}
-
 	
 	@Test public void testIntAt() {
 		AString s= Strings.create(Blob.fromHex("12345678abcd"));

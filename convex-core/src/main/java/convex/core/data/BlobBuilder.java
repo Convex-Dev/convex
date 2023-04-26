@@ -152,6 +152,10 @@ public class BlobBuilder {
 		return Strings.create(result);
 	}
 
+	/**
+	 * Current number of bytes accumulated in this BlobBuilder
+	 * @return Number of bytes
+	 */
 	public long count() {
 		return count;
 	}
