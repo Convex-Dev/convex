@@ -47,8 +47,6 @@ You can clone this repository and run `mvn install` to get a working local versi
 
 ## License
 
-Copyright 2021 The Convex Foundation
+Copyright 2021-203 The Convex Foundation and Contributors
 
-`convex-java` is licensed under the Apache License v2.0. 
-
-Some dependencies from The Convex Foundation are licensed under the Convex Public License, which is an open source license that is free to use for any applications using the Convex Network.
+Code in convex-java is provided under the Convex Public License

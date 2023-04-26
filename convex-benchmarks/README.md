@@ -39,3 +39,9 @@ EtchBenchmark.writeData       thrpt    5   728486.145 ± 168739.491  ops/s
 ```
 
 For example, this can be interpreted as an indication that the Etch database layer is handling approximately 4.8 million reads and 729k million atomic writes per second in the testing environment. Usual benchmarking caveats apply and results may vary considerably based on your system setup (available RAM, disk performance etc.) - it is advisable to examine the benchmark source to determine precisely which operations are being performed.
+
+## Copyright
+
+Code in `convex-benchmarks` provided under the Convex Public License
+
+Copyright 2020-2023 Convex Foundation and Contributors
