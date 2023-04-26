@@ -12,6 +12,8 @@ The Convex Network Governance Rules (the "CNGRs") are maintained by the Convex F
 
 In particular, the CNGRs are intended to ensure a long-lived public utility network for the Internet of Value, supporting decentralised economic systems and open to all participants as a public good.
 
+The CNGRs therefore apply to parties that wish to use Convex technology to operate decentralised economic systems ("Operators" in this document). 
+
 ## Foundation Commitment
 
 The Governing Body is committed to serving the Convex ecosystem. In particular it will:
@@ -22,7 +24,7 @@ The Governing Body is committed to serving the Convex ecosystem. In particular i
 
 3. Make governance decisions on a neutral and non-discriminatory basis, in the interests of the Convex ecosystem as a whole.
 
-4. Maintain these CNGRs according to the spirit of running an open, decentralised public utility network.
+4. Maintain and update the CNGRs as necessary and in the spirit of running a well governed, open, decentralised public utility network.
 
 The Convex Foundation intends to evolve governance over time to best support the needs of the ecosystem. In the long run, it is intended to implement mechanisms of decentralised governance, wherein Users and Operators of the Convex Network shall be appropriately represented.
 
