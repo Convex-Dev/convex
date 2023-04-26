@@ -152,9 +152,13 @@ public final class CVMLong extends AInteger {
 	 * @param o String to parse
 	 * @return CVM Long value or null if parse failed
 	 */
-	public static CVMLong tryParse(Object o) {
+	public static CVMLong parse(Object o) {
 		if (o instanceof ACell) {
-			return RT.castLong((ACell)o);
+			CVMLong v= RT.ensureLong((ACell)o);
+			if (v!=null) return v;
+			if (o instanceof AString) {
+				return parse(o.toString());
+			}
 		}
 		if (o instanceof Long) return CVMLong.create(((Long)o).longValue());
 		if (o instanceof Number) {
@@ -162,10 +166,8 @@ public final class CVMLong extends AInteger {
 			Long lv= n.longValue();
 			if (lv.doubleValue()==n.doubleValue()) return CVMLong.create(lv.longValue());
 		}
-		if (o instanceof String) try {
+		if (o instanceof String) {
 			return parse((String)o);
-		} catch (NumberFormatException ne) {
-			return null;
 		}
 		return null;
 	}
@@ -173,11 +175,14 @@ public final class CVMLong extends AInteger {
 	/**
 	 * Parse a String as a CVM Long. Throws an exception if the string is not valid
 	 * @param s String to parse
-	 * @return CVM Long value
-	 * @throws NumberFormatException if the string format is not a valid long
+	 * @return CVM Long value, or null if not convertible
 	 */
 	public static CVMLong parse(String s) {
-		return create(Long.parseLong(s));
+		try {
+			return create(Long.parseLong(s));
+		} catch (NumberFormatException e) {
+			return null;
+		}
 	}
 	
 	@Override
@@ -409,6 +414,12 @@ public final class CVMLong extends AInteger {
 		long d = num / denom;
 		// Correct for Euclidean modular function
 		return CVMLong.create(d);
+	}
+
+	@Override
+	public AInteger toCanonical() {
+		// Always canonical
+		return this;
 	}
 
 

@@ -213,12 +213,9 @@ public class AntlrReader {
 		@Override
 		public void exitLongValue(LongValueContext ctx) {
 			String s=ctx.getText();
-			try {	
-				push( AInteger.parse(s));
-			
-				} catch (NumberFormatException x2) {
-					throw new ParseException("Unparseable long value: "+s,x2);
-				}
+			AInteger a= AInteger.parse(s);
+			if (a==null) throw new ParseException("Unparseable number: "+s);
+			push(a);
 		}
 		
 		@Override

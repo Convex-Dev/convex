@@ -222,7 +222,7 @@ public class RESTServer {
 			throw new BadRequestResponse(jsonError("Expected JSON body containing 'address' field"));
 
 		Object o=req.get("amount");
-		CVMLong l=CVMLong.tryParse(o);
+		CVMLong l=CVMLong.parse(o);
 		if (l==null)  throw new BadRequestResponse(jsonError("faucet requires an 'amount' field containing a long value."));
 
 		try {

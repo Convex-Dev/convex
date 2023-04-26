@@ -23,6 +23,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
@@ -46,6 +47,10 @@ public class TransactionHandler extends AThreadedComponent{
 	 */
 	private static final long OWN_BLOCK_DELAY=2000;
 
+	/**
+	 * Default minimum delay between proposing own transactions as a peer
+	 */
+	private static final long MIN_BLOCK_TIME=50;
 	
 	/**
 	 * Queue for incoming (unverified) transaction messages
@@ -182,7 +187,10 @@ public class TransactionHandler extends AThreadedComponent{
 	protected SignedData<Block> maybeGenerateBlock(Peer peer) {
 		long timestamp=Utils.getCurrentTimestamp();
 
-		if (timestamp>=lastBlockPublishedTime+Constants.MIN_BLOCK_TIME) {
+		
+		Long minBlockTime=getMinBlockTime();
+		
+		if (timestamp>=lastBlockPublishedTime+minBlockTime) {
 			// possibly have client transactions to publish
 			transactionQueue.drainTo(newTransactions);
 		}
@@ -201,6 +209,13 @@ public class TransactionHandler extends AThreadedComponent{
 		return signedBlock;
 	}
 	
+	private long getMinBlockTime() {
+		HashMap<Keyword, Object> config = server.getConfig();
+		Long minBlockTime=Utils.parseLong(config.get(Keywords.MIN_BLOCK_TIME));
+		if (minBlockTime==null) minBlockTime=MIN_BLOCK_TIME;
+		return minBlockTime;
+	}
+
 	/**
 	 * The list of new transactions to be added to the next Block. Accessed only in update loop
 	 *
@@ -298,7 +313,7 @@ public class TransactionHandler extends AThreadedComponent{
 			
 			// Wait for more transactions to accumulate before sending anything new
 			LoadMonitor.down();
-			Thread.sleep(Constants.MIN_BLOCK_TIME);
+			Thread.sleep(getMinBlockTime());
 			LoadMonitor.up();
 		} finally {
 			messages.clear();

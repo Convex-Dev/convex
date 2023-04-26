@@ -2083,7 +2083,7 @@ public class Core {
 			if (n == null) return context.withCastError(arg, Types.SEQUENCE);
 
 			// Second argument should be an Integer index within long range
-			ACell iarg=args[1];
+			ACell iarg=RT.ensureInteger(args[1]);
 			if (!(iarg instanceof AInteger)) return context.withCastError(1,args, Types.INTEGER);
 			CVMLong ix = RT.ensureLong(iarg);
 			if (ix == null) return context.withError(ErrorCodes.BOUNDS,"Excessively large index");

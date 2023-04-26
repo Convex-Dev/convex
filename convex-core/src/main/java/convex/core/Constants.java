@@ -171,13 +171,6 @@ public class Constants {
 	public static final long MAX_REBROADCAST_DELAY = 200;
 
 	/**
-	 * Delay before a Peer produces another Block. 
-	 * 
-	 * Note: This may be the bottleneck in some benchmarks! Set to 0 if blocks are being delayed
-	 */
-	public static final long MIN_BLOCK_TIME = 50;
-
-	/**
 	 * Timeout for syncing with an existing Peer
 	 */
 	public static final long PEER_SYNC_TIMEOUT = 60000;

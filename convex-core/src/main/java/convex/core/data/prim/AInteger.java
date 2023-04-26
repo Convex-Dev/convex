@@ -12,6 +12,9 @@ public abstract class AInteger extends ANumeric {
  
 	@Override
 	public abstract boolean isCanonical();
+	
+	@Override
+	public abstract AInteger toCanonical();
 
 	/**
 	 * Increments this Integer
@@ -33,18 +36,19 @@ public abstract class AInteger extends ANumeric {
 	/**
 	 * Parse an integer value as a canonical value
 	 * @param s String to parse
-	 * @return AInteger instance
+	 * @return AInteger instance, or null if not convertible
 	 */
 	public static AInteger parse(String s) {
 		int n=s.length();
 		if (n<19) return CVMLong.parse(s); // can't be a big integer
 		if (n>20) return CVMBigInteger.parse(s); // can't be a long
 				
-		try {	
-			return CVMLong.parse(s);
-		} catch (Throwable t) {
-			return CVMBigInteger.parse(s);
+		AInteger r= CVMLong.parse(s);
+		if (r==null) {
+			r=CVMBigInteger.parse(s);
+			if (r!=null) r=r.toCanonical();
 		}
+		return r;
 	}
 	
 	/**
@@ -53,6 +57,7 @@ public abstract class AInteger extends ANumeric {
 	 * @return AInteger instance, or null if not convertible
 	 */
 	public static AInteger parse(Object o) {
+		if (o==null) return null;
 		if (o instanceof AInteger) return (AInteger)o;
 		if (o instanceof Number) return create((Number)o);
 		return parse(o.toString());
