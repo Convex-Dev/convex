@@ -209,4 +209,13 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 */
 	@Override
 	public abstract ASet<T> slice(long start, long end);
+	
+	/**
+	 * Gets a slice of this Set from start to the end
+	 * @param start Start index (inclusive)
+	 * @return Slice of Set, or null if invalid slice
+	 */
+	public ASet<T> slice(long start) {
+		return slice(start, count());
+	}
 }

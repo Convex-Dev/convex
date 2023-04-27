@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.TODOException;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
 
@@ -708,9 +707,48 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return getRefByHash(hash)!=null;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public ASet<T> slice(long start, long end) {
-		throw new TODOException();
+		if (start<0) return null;
+		if (end>count) return null;
+		long n=end-start;
+		if (n<0) return null;
+		if (n==count) return this;
+		if (n==0) return empty();
+
+		if (n<=SetLeaf.MAX_ELEMENTS) {
+			int nc=(int)n;
+			Ref<T>[] elems=new Ref[nc];
+			for (int i=0; i<nc; i++) {
+				elems[i]=Ref.get(get(start+i));
+			}
+			return SetLeaf.create(elems);
+		}
+		
+		SetTree<T> result=this;
+		int nc=children.length;
+		long cstart=0;
+		for (int i=0; i<nc; i++) {
+			AHashSet<T> c=result.children[i].getValue();
+			long cc=c.count();
+			long cend=cstart+cc;
+			if ((cend<=start)||(cstart>=end)) {
+				// Remove entire child
+				result=(SetTree<T>) result.dissocChild(i);
+				i--;
+				nc--;
+			} else {
+				long istart=Math.max(0, start-cstart);
+				long iend=Math.min(cc, end-cstart);
+				AHashSet<T> nchild=(AHashSet<T>) c.slice(istart,iend);
+				if (nchild!=c) {
+					result=(SetTree<T>) result.replaceChild(i, nchild.getRef());
+				}
+			}
+			cstart=cend;
+		}
+		return result;
 	}
 
 }

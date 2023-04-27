@@ -152,6 +152,32 @@ public class SetsTest {
 
 		assertThrows(Throwable.class,()->a.intersectAll(null));
 	}
+	
+	@Test
+	public void testBigSlice() {
+		ASet<CVMLong> s = Sets.create(Samples.INT_VECTOR_300);
+		assertEquals(300,s.count());
+		assertSame(s,s.slice(0));
+		assertSame(s,s.slice(0,300));
+		assertSame(Sets.empty(),s.slice(19,19));
+		
+		ASet<CVMLong> s1=s.slice(157);
+		assertEquals(300-157,s1.count());
+		doSetTests(s1);
+		
+		ASet<CVMLong> s2=s.slice(0,13);
+		assertEquals(13,s2.count());
+		assertTrue(s2 instanceof SetLeaf);
+		doSetTests(s2);
+		
+		ASet<CVMLong> s3=s.slice(13,157);
+		assertEquals(157-13,s3.count());
+		assertTrue(s3 instanceof SetTree);
+		doSetTests(s3);
+		
+		assertEquals(s,s1.includeAll(s2).includeAll(s3));
+
+	}
 
 	@Test
 	public void testBigMerging() {
