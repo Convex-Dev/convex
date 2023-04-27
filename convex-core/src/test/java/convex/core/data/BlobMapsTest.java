@@ -262,13 +262,23 @@ public class BlobMapsTest {
 		}
 		assertSame(BlobMaps.empty(),m);
 	}
-
+	
 	@Test
-	public void testRemoveEntries() {
-		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
+	public void testSliceSmallBlobMap() {
+		BlobMap<Blob, CVMLong> m=Samples.INT_BLOBMAP_7;
+		BlobMap<Blob, CVMLong> ms=m.slice(3,4);
+		assertEquals(1,ms.count());
+		doBlobMapTests(ms);
+		
+		assertEquals(ms.entryAt(0),m.entryAt(3));
+		
+		// Invalid slices
+		assertNull(m.slice(-1));
+		assertNull(m.slice(0,9));
 
-		assertSame(m, m.removeLeadingEntries(0));
-		assertSame(BlobMaps.empty(), m.removeLeadingEntries(7));
+		
+		assertSame(m, m.slice(0));
+		assertSame(BlobMaps.empty(), m.slice(7));
 	}
 
 	@Test
@@ -285,6 +295,10 @@ public class BlobMapsTest {
 
 	private <K extends ABlob, V extends ACell> void doBlobMapTests(BlobMap<K, V> m) {
 		long n = m.count();
+		
+		BlobMap<K,V> secondHalf=m.slice(n/2,n);
+		assertNotNull(secondHalf);
+		assertEquals(m,m.slice(0,n/2).merge(secondHalf));
 
 		if (n >= 2) {
 			MapEntry<K, V> e1 = m.entryAt(0);

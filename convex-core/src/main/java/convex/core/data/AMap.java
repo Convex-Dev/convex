@@ -329,11 +329,13 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		return result;
 	}
 
-	
-
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
-	public AMap slice(long start, long end) {
+	public AMap<K,V> slice(long start) {
+		return slice(start,count);
+	}
+
+	@Override
+	public AMap<K,V> slice(long start, long end) {
 		throw new TODOException();
 	}
 

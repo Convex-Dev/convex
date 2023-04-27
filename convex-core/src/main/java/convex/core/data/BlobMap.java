@@ -719,17 +719,43 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	}
 
 	/**
+	 * Slices this BlobMap, starting at the specified position
+	 * 
 	 * Removes n leading entries from this BlobMap, in key order.
 	 * 
-	 * @param n Number of entries to remove
+	 * @param start Start position of entries to keep
 	 * @return Updated BlobMap with leading entries removed.
 	 * @throws IndexOutOfBoundsException If there are insufficient entries in the
 	 *                                   BlobMap
 	 */
-	public BlobMap<K, V> removeLeadingEntries(long n) {
+	@Override
+	public BlobMap<K, V> slice(long start) {
+		return slice(start,count);
+	}
+	
+	/**
+	 * Returns a slice of this BlobMap
+	 * 
+	 * @param start Start position of slice (inclusive)
+	 * @param end End position of slice (exclusive)
+	 * @return Slice of BlobMap, or null if invalid slice
+	 */
+	@Override
+	public BlobMap<K, V> slice(long start, long end) {
+		if ((start<0)||(end>count)) return null;
+		if (end<start) return null;
+		long n=end-start;
+		if (n==0) return empty();
+		if (n==count) return this;
+		
 		// TODO: optimise this
 		BlobMap<K, V> bm = this;
-		for (long i = 0; i < n; i++) {
+		for (long i=count-1; i>=end; i--) {
+			MapEntry<K, V> me = bm.entryAt(i);
+			bm = bm.dissoc(me.getKey());
+		}
+		
+		for (long i = 0; i < start; i++) {
 			MapEntry<K, V> me = bm.entryAt(0);
 			bm = bm.dissoc(me.getKey());
 		}
