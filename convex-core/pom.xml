@@ -9,7 +9,7 @@
 	
 	<properties>
 	  <antlr.version>4.12.0</antlr.version>
-	  <bc.version>1.72</bc.version>
+	  <bc.version>1.73</bc.version>
 	</properties>
 
 
@@ -112,6 +112,11 @@
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
 			<artifactId>bcpkix-jdk18on</artifactId>
+			<version>${bc.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.bouncycastle</groupId>
+			<artifactId>bcutil-jdk18on</artifactId>
 			<version>${bc.version}</version>
 		</dependency>
 
