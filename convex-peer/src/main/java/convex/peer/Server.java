@@ -539,12 +539,7 @@ public class Server implements Closeable {
 		boolean offered=propagator.queueBelief(event);
 		return offered;
 	}
-
-
-
-
-
-
+	
 	protected void processStatus(Message m) {
 		try {
 			// We can ignore payload
@@ -558,7 +553,7 @@ public class Server implements Closeable {
 
 			m.reportResult(r);
 		} catch (Throwable t) {
-			log.warn("Status Request Error: {}", t);
+			log.warn("Status Request Error:", t);
 		}
 	}
 

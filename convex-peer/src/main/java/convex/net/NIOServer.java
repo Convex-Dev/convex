@@ -157,9 +157,7 @@ public class NIOServer implements Closeable {
 					// keys.clear();
 				}
 			} catch (IOException e) {
-				log.error("Unexpected IOException, terminating selector loop: {}", e);
-				// print error and terminate
-				e.printStackTrace();
+				log.error("Unexpected IOException, terminating selector loop: ", e);
 			} finally {
 				try {
 					// close all client channels
@@ -169,8 +167,7 @@ public class NIOServer implements Closeable {
 					selector.close();
 					selector = null;
 				} catch (IOException e) {
-					log.error("IOException while closing NIO server");
-					e.printStackTrace();
+					log.error("IOException while closing NIO server",e);
 				} finally {
 					selector = null;
 				}
@@ -179,8 +176,7 @@ public class NIOServer implements Closeable {
 					try {
 						ssc.close();
 					} catch (IOException e) {
-						log.error("IOException while closing NIO socket channel");
-						e.printStackTrace();
+						log.error("IOException while closing NIO socket channel",e);
 					} finally {
 						ssc = null;
 					}
