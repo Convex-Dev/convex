@@ -353,7 +353,13 @@
         :signature   [{:params [address offer fn-name & args]
                        :return Any}]}}
 
+ callable?
+ {:doc {:description "Returns true the given function name (a symbol) is a callable function in actor. See `call`."
+        :errors      {:CAST "If the actor argument is not an address."}
+        :examples    [{:code "(callable? actor-address 'function-name)"}]
+        :signature   [{:params [addr symbol]}]}}
 
+ 
  ceil
  {:doc {:description "Computes the mathematical ceiling (rounding up towards positive infinity) for a numerical argument. Uses double precision mathematics."
         :errors      {:CAST "If the argument is not a number."}
@@ -575,13 +581,6 @@
         :signature   [{:params [form]}
                       {:params [form expander]}
                       {:params [form expander cont]}]}}
-
-
- callable?
- {:doc {:description "Returns true the given function name (a symbol) is a callable function in actor. See `call`."
-        :errors      {:CAST "If the actor argument is not an address."}
-        :examples    [{:code "(callable? actor-address 'function-name)"}]
-        :signature   [{:params [actor symbol]}]}}
 
 
  fail

@@ -433,18 +433,22 @@
   (deploy `(set-key ~key)))
 
 
-(defmacro defined?
+(defn defined?
 
    ^{:doc {:description "Returns true if the given symbol name is defined in the current environment, false otherwise."
-           :examples    [{:code "(defined? max)"}]
+           :examples    [{:code "(defined? 'max)"}]
            :signature   [{:params [sym]}]}}
 
-  [sym]
-
-  (or (symbol? sym)
+  ([sym]
+    (or (symbol? sym)
       (fail :CAST
-            "defined? requires a Symbol"))
-  `(boolean (lookup-meta (quote ~sym))))
+        "defined? requires a Symbol"))
+    (boolean (lookup-meta sym)))
+   ([addr sym]
+    (or (symbol? sym)
+      (fail :CAST
+        "defined? requires a Symbol"))
+    (boolean (lookup-meta addr sym))))
 
 
 

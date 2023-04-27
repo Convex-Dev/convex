@@ -3680,10 +3680,11 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testDefinedQ() {
-		assertFalse(evalB("(defined? foobar)"));
+		assertFalse(evalB("(defined? 'foobar)"));
 
-		assertTrue(evalB("(do (def foobar [2 3]) (defined? foobar))"));
-		assertTrue(evalB("(defined? count)"));
+		assertTrue(evalB("(do (def foobar [2 3]) (defined? 'foobar))"));
+		assertTrue(evalB("(do (def foobar [2 3]) (defined? *address* 'foobar))"));
+		assertTrue(evalB("(defined? 'count)"));
 
 		// invalid names
 		assertCastError(step("(defined? :count)")); // not a Symbol
@@ -3691,9 +3692,13 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(defined? nil)"));
 		assertCastError(step("(defined? 1)"));
 		assertCastError(step("(defined? 0x)"));
+		
+		// invalid addresses
+		assertCastError(step("(defined? nil 'foo)"));
+		assertCastError(step("(defined? 12 'foo)"));
 
 		assertArityError(step("(defined?)"));
-		assertArityError(step("(defined? foo bar)"));
+		assertArityError(step("(defined? :foo :bar :baz)"));
 	}
 
 	@Test
@@ -3705,7 +3710,7 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals(Vectors.of(1L, 2L), eval("(do (def a 1) (def v [a 2]) (undef a) v)"));
 
-		assertFalse(evalB("(do (def a 1) (undef a) (defined? a))"));
+		assertFalse(evalB("(do (def a 1) (undef a) (defined? 'a))"));
 
 		assertUndeclaredError(step("(do (def a 1) (undef a) a)"));
 
