@@ -351,6 +351,14 @@ public class NumericsTest extends ACVMTest {
 		assertArityError(step("(exp)"));
 		assertArityError(step("(exp 1 2)"));
 	}
+	
+	@Test
+	public void testFactorial() {
+		Context<?> ctx=step("(defn fact [a] (cond (<= a 1) 1 (* a (fact (dec a)))))");
+		
+		assertEquals(24L,evalL(ctx,"(fact 4)"));
+		assertEquals("265252859812191058636308480000000", eval(ctx,"(fact 30)").toString());
+	}
 
 	@Test
 	public void testPow() {
