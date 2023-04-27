@@ -1667,6 +1667,9 @@ public class Context<T extends ACell> extends AObject {
 		AFn<R> fn = as.getCallableFunction(sym);
 
 		if (fn == null) {
+			if (!as.getEnvironment().containsKey(sym)) {
+				return this.withError(ErrorCodes.STATE, "Account " + target + " does not define Symbol: " + sym);						
+			}
 			return this.withError(ErrorCodes.STATE, "Value defined in account " + target + " is not a callable function: " + sym);
 		}
 
