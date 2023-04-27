@@ -591,9 +591,17 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		return SetTree.create(elements, 0);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public ASet<T> slice(long start, long end) {
-		throw new TODOException();
+		if (start<0) return null;
+		if (end>count) return null;
+		int n=(int)(end-start);
+		if (n==count) return this;
+		if (n==0) return empty();
+		Ref<T>[] nrefs=new Ref[n];
+		System.arraycopy(elements, (int) start, nrefs, 0, n);
+		return new SetLeaf<T>(nrefs);
 	}
 
 

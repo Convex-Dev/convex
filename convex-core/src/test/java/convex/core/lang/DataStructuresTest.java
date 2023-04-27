@@ -11,7 +11,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 
 /**
- * Tests for various data structure operations.
+ * Tests for various CVM data structure operations.
  *
  */
 public class DataStructuresTest extends ACVMTest {

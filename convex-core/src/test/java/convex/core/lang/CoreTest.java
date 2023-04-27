@@ -841,7 +841,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Lists.of(2),eval("(slice (list 1 2) 1)"));
 		
 		// TODO: slicing for sets
-		//assertEquals(Sets.of(1,2),eval("(slice #{1 2} 0)"));
+		assertEquals(Sets.of(1,2),eval("(slice #{1 2} 0)"));
+		assertEquals(Sets.empty(),eval("(slice #{1 2} 1 1)"));
 		
 		// TODO: slicing for maps
 		//assertEquals(Maps.of(1,2),eval("(slice {1 2} 0)"));
