@@ -1,7 +1,6 @@
 package convex.core.lang;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -2348,10 +2347,10 @@ public class Core {
 
 	});
 
-	public static final CoreFn<ASequence<?>> MAP = reg(new CoreFn<>(Symbols.MAP) {
+	public static final CoreFn<ADataStructure<?>> MAP = reg(new CoreFn<>(Symbols.MAP) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<ASequence<?>> invoke(Context context, ACell[] args) {
+		public  Context<ADataStructure<?>> invoke(Context context, ACell[] args) {
 			if (args.length < 2) return context.withArityError(minArityMessage(2, args.length));
 
 			// check and cast first argument to a function
@@ -2362,32 +2361,40 @@ public class Core {
 			// remaining arguments determine function arity to use
 			int fnArity = args.length - 1;
 			ACell[] xs = new ACell[fnArity];
-			ASequence<?>[] seqs = new ASequence[fnArity];
+			ADataStructure<?>[] seqs = new ADataStructure[fnArity];
 
 			int length = Integer.MAX_VALUE;
 			for (int i = 0; i < fnArity; i++) {
 				ACell maybeSeq = args[1 + i];
-				ASequence<?> seq = RT.sequence(maybeSeq);
-				if (seq == null) return context.withCastError(maybeSeq, Types.SEQUENCE);
+				ADataStructure<ACell> seq = RT.ensureDataStructure(maybeSeq);
 				seqs[i] = seq;
+				if (seq == null) {
+					if (maybeSeq!=null) return context.withCastError(maybeSeq, Types.SEQUENCE);
+					// We bail out with empty result
+					ADataStructure<?> result=seqs[0];
+					if (result!=null) result=result.empty();
+					return context.withResult(Juice.MAP,result);
+				}
 				length = Math.min(length, seq.size());
 			}
 
 			final long juice = Juice.addMul(Juice.MAP, Juice.BUILD_DATA , length);
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			ArrayList<ACell> al = new ArrayList<>();
+			ADataStructure<?> result = seqs[0].empty();
+			boolean reverse=result instanceof AList;
 			for (int i = 0; i < length; i++) {
+				long srcIndex=reverse?(length-1-i):i;
 				for (int j = 0; j < fnArity; j++) {
-					xs[j] = seqs[j].get(i);
+					xs[j] = seqs[j].get(srcIndex);
 				}
 				context = (Context) context.invoke(f, xs);
-				if (context.isExceptional()) return (Context<ASequence<?>>) context;
+				if (context.isExceptional()) return (Context<ADataStructure<?>>) context;
 				ACell r = context.getResult();
-				al.add(r);
+				result=result.conj(r);
+				if (result==null) return context.withError(ErrorCodes.ARGUMENT,"Invalid element type for "+seqs[0].getType());
 			}
 
-			ASequence<?> result = Vectors.create(al);
 			return context.withResult(juice, result);
 		}
 	});

@@ -1743,16 +1743,40 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testMap() {
 		assertEquals(Vectors.of(2L, 3L), eval("(map inc [1 2])"));
-		assertEquals(Vectors.of(2L, 3L), eval("(map inc '(1 2))")); // TODO is this right?
-		assertEquals(Vectors.empty(), eval("(map inc nil)")); // TODO is this right?
+		assertEquals(Lists.of(2L, 3L), eval("(map inc '(1 2))")); // TODO is this right?
 		assertEquals(Vectors.of(4L, 6L), eval("(map + [1 2] [3 4 5])"));
 		assertEquals(Vectors.of(3L), eval("(map + [1 2 3] [2])"));
 		assertEquals(Vectors.of(1L, 2L, 3L), eval("(map identity [1 2 3])"));
 
+		// Not a function => CAST error
 		assertCastError(step("(map 1 [1])"));
 		assertCastError(step("(map 1 [] [] [])"));
+		
+		// Not a data structure => cast error
 		assertCastError(step("(map inc 1)"));
+		assertCastError(step("(map inc [1] 0x1234)"));
+		
+		// Map with null elements treats as empty collection
+		assertNull(eval("(map inc nil)"));
+		assertEquals(Vectors.empty(),eval("(map inc [1 2] nil)"));
+		assertEquals(Maps.empty(),eval("(map inc {:a 1 :b 3} nil)"));
+		
+		// Map with maps replaces elements by key, in order
+		assertEquals(Maps.of(2,1,4,3),eval("(map (fn [[a b]] [b a]) {1 2 3 4})"));
+		assertEquals(Maps.of(1,3),eval("(map (fn [a b] b) {0 0 1 1} [[1 2] [1 3] [1 4]])"));
 
+		// Map with sets works like conj'ing in each result in turn
+		assertEquals(Sets.of(4,5,6),eval("(map (fn [a b] b) #{1 2 3} [4 5 6])"));
+
+		// ARGUMENT if function creates wrong element type
+		assertArgumentError(step("(map (fn [_ _] :foo) {1 2} [1 2 3 4])"));
+
+		// ARITY if function accepts wrong number of arguments
+		assertArityError(step("(map (fn [_] :foo) {1 2} [1 2 3 4])"));
+		assertArityError(step("(map (fn []) [1 2 3 4])"));
+		assertArityError(step("(map (fn [a b c]) [1 2 3 4] [5 6])"));
+
+		
 		assertArityError(step("(map)"));
 		assertArityError(step("(map inc)"));
 		assertArityError(step("(map 1)")); // arity > cast
@@ -1792,9 +1816,12 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testMapv() {
-		assertEquals(Vectors.empty(), eval("(map inc nil)"));
 		assertEquals(Vectors.of(2L, 3L), eval("(mapv inc [1 2])"));
 		assertEquals(Vectors.of(4L, 6L), eval("(mapv + '(1 2) '(3 4 5))"));
+		
+		// nil treated as empty collection
+		assertEquals(Vectors.empty(), eval("(mapv + '(1 2) nil)"));
+		assertEquals(Vectors.empty(), eval("(mapv + nil)"));
 
 		assertArityError(step("(mapv)"));
 		assertArityError(step("(mapv inc)"));
@@ -1804,7 +1831,10 @@ public class CoreTest extends ACVMTest {
 	public void testFilter() {
 		assertEquals(Vectors.of(1,2,3), eval("(filter number? [1 :foo 2 :bar 3])"));
 		assertEquals(Lists.of(Keywords.FOO), eval("(filter #{:foo} '(:foo 2 3))"));
+		
+		// nil behaves as empty collection
 		assertNull(eval("(filter keyword? nil)"));
+		
 		assertEquals(Maps.empty(), eval("(filter nil? {1 2 3 4})"));
 		assertEquals(Maps.of(Keywords.FOO,1), eval("(filter (fn [[k v]] (keyword? k)) {:foo 1 'bar 2})"));
 		assertEquals(Sets.of(1,2,3), eval("(filter number? #{1 2 3 :foo})"));
