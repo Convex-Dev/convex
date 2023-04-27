@@ -169,6 +169,8 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(byte nil)"));
 		assertCastError(step("(byte :foo)"));
 		assertCastError(step("(byte 0x)")); // can't cast empty blob
+		
+		// Shouldn't try to convert an Address, see #431
 		assertCastError(step("(byte #13)"));
 
 		assertArityError(step("(byte)"));
@@ -1719,8 +1721,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(255.0,evalD("(double (byte -1))")); // byte should be 0-255
 
 		assertCastError(step("(double :foo)"));
+		
+		// Shouldn't try to cast an Address, see #431
 		assertCastError(step("(double #7)"));
-		assertCastError(step("(double true)")); // doesn't transitively cast
+		
+		// Note: doesn't transitively cast Boolean -> Integer -> Double
+		assertCastError(step("(double true)")); 
 
 		assertArityError(step("(double)"));
 		assertArityError(step("(double :foo :bar)"));

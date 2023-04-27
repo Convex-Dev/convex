@@ -1222,6 +1222,7 @@ public class RT {
 		// handle address, hash, blob instances
 		if (a instanceof ABlob)
 			return Blobs.toCanonical((ABlob) a);
+		// TODO: big integer support?
 		if (a instanceof CVMLong)
 			return LongBlob.create(((CVMLong) a).longValue());
 		if (a instanceof AString)
