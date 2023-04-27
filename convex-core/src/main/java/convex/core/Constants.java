@@ -51,6 +51,16 @@ public class Constants {
 	 * Initial memory price per byte
 	 */
 	public static final long INITIAL_MEMORY_PRICE = 1000L;
+	
+	/**
+	 * Memory Pool of growth increment 1mn
+	 */
+	public static final long MEMORY_POOL_GROWTH = 1000000L;
+
+	/**
+	 * Memory Pool of growth interval (once per day)
+	 */
+	public static final long MEMORY_POOL_GROWTH_INTERVAL = 1000L*24*3600;
 
 	/**
 	 * Max juice allowable for execution of a single transaction.

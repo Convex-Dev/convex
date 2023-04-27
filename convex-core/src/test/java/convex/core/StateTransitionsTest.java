@@ -265,6 +265,15 @@ public class StateTransitionsTest {
 		// should have increased memory size for account
 		long newMem=s.getMemorySize();
 		assertTrue(initialMem<newMem);
+		
+		// Test for memory pool growth over time
+		long memPool=s.getGlobalMemoryPool().longValue();
+		long newTS=s.getTimestamp().longValue()+Constants.MEMORY_POOL_GROWTH_INTERVAL;
+		Block b2 = Block.of(newTS);
+		BlockResult br2=s.applyBlock(b2);
+		State s2=br2.getState();
+		assertEquals(memPool+Constants.MEMORY_POOL_GROWTH,s2.getGlobalMemoryPool().longValue());
+
 	}
 
 	@Test

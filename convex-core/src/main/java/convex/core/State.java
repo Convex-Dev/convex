@@ -330,11 +330,27 @@ public class State extends ARecord {
 		AVector<ACell> glbs = state.globals;
 		long oldTimestamp=((CVMLong)glbs.get(GLOBAL_TIMESTAMP)).longValue();
 		
-		if (newTimestamp > oldTimestamp) {
-			AVector<ACell> newGlbs=glbs.assoc(GLOBAL_TIMESTAMP,CVMLong.create(newTimestamp));
-			state = state.withGlobals(newGlbs);
+		// Exit if no time elapsed
+		if (newTimestamp <= oldTimestamp) return this;
+		// long elapsed=newTimestamp-oldTimestamp;
+		
+		// Update timestamp
+		glbs=glbs.assoc(GLOBAL_TIMESTAMP,CVMLong.create(newTimestamp));
+		
+		// Grow memory pool if required
+		long memAdditions=(newTimestamp/Constants.MEMORY_POOL_GROWTH_INTERVAL)-(oldTimestamp/Constants.MEMORY_POOL_GROWTH_INTERVAL);
+		if (memAdditions>0) {
+			long mem=((CVMLong)glbs.get(GLOBAL_MEMORY_MEM)).longValue();
+			long add=memAdditions*Constants.MEMORY_POOL_GROWTH;
+			if (add>0) {
+				long  newMem=mem+add;
+				glbs=glbs.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(newMem));
+			} else {
+				throw new Error("Bad memory additions?");
+			}
 		}
 		
+		state = state.withGlobals(glbs);
 		return state;
 	}
 
