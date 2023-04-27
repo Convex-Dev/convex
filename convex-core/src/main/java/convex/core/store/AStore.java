@@ -83,20 +83,34 @@ public abstract class AStore {
 	 * 
 	 * @return Root data value from this store.
 	 * @throws IOException In case of store IO error
+	 * @throws MissingDataException is Root Data is missing
 	 */
 	public <T extends ACell> T getRootData() throws IOException {
+		Ref<T> ref=getRootRef();
+		if (ref==null) throw new MissingDataException(this,getRootHash());
+		return ref.getValue();
+	}
+	
+	/**
+	 * Gets a Ref for Root Data. Root data is typically used to store the Peer state
+	 * in situations where the Peer needs to be restored from persistent storage.
+	 * 
+	 * @return Root Data Ref from this store, or null if not found.
+	 * @throws IOException In case of store IO error
+	 */
+	public <T extends ACell> Ref<T> getRootRef() throws IOException {
 		Hash h=getRootHash();
 		Ref<T> ref=refForHash(h);
-		if (ref==null) throw new MissingDataException(this,h);
-		return ref.getValue();
+		return ref;
 	}
 
 	/**
 	 * Sets the root data for this Store
 	 * @param data Root data to set
+	 * @return Ref to written root data
 	 * @throws IOException In case of store IO error
 	 */
-	public abstract void setRootData(ACell data) throws IOException;
+	public abstract <T extends ACell> Ref<T> setRootData(T data) throws IOException;
 
 	/**
 	 * Closes this store and frees associated resources

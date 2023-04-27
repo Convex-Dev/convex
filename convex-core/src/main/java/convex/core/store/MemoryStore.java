@@ -102,8 +102,9 @@ public class MemoryStore extends AStore {
 	}
 
 	@Override
-	public void setRootData(ACell data) {
+	public <T extends ACell> Ref<T> setRootData(T data) {
 		rootData=data;
+		return Ref.get(data);
 	}
 
 	@Override
