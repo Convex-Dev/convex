@@ -11,8 +11,8 @@ B) Ensure effective governance of economic systems and networks based on Convex 
 
 As such the license has been written based on the following principles:
 
-- It is a "weak Copyleft" open source license, similar in spirit to the Eclipse Public License. Derivative Works must be released under the same license. However, you may freely link and utilise the Work from software using a different license.
-- It is intended to support good governance of the decentralised Convex network. To protect the interests of the ecosystem, the CPL places a requirement to operate the system according to the Convex Network Governance Rules. This is primarily done to prevent forking, which would be harmful to the ecosystem of Convex users and contrary to the objective of Convex to create an open, shared global public network for the Internet of Value
+- It is a "weak copyleft" open source license, similar in spirit to the Eclipse Public License. Derivative Works and any Contributions must be released under the same license. However, you may link and utilise the Work from software using a different license, including use as a library commercial and proprietary software.
+- It is intended to support good governance of the decentralised Convex network, and therefore gives certain governance powers to a Governing Body (at time of writing the non-profit Convex Foundation). The Governing Body, in turn, is expected to use these powers to serve the interests of the whole ecosystem.
 
 
 # Definitions.
@@ -54,11 +54,11 @@ As such the license has been written based on the following principles:
 
 "Convex Network" shall mean the union of all systems using the Work as part of a public utility network or operating a Decentralised Economic System. 
 
-"Originator" shall mean the original author of the Convex software, Michael Richard Anderson
+"Originator" shall mean the original author of the Convex software, Michael Richard Anderson, who established to Convex Foundation to further the goals of building effective decentralised economic systems.
 
 "Governance Body" shall mean the the Legal Entity legally authorised by the Originator to administer governance decisions relating to the Work, which as of April 2023 is the Convex Foundation.
 
-"Convex Network Governance Rules" shall mean the set of rules established and updated from time to time by the Governance Body for the secure, equitable and efficient operation of the Convex Network
+"Convex Network Governance Rules" shall mean the set of rules established and updated from time to time by the Governance Body for the secure, equitable and efficient operation of the Convex Network. The current version shall be made publicly available by the Governance Body, at time of writing [here](docs/network-governance-rules.md).
 
 # License Terms
 
@@ -88,7 +88,7 @@ Unless You explicitly state otherwise, any Contribution intentionally submitted 
 
 ## 6. Trademarks. 
 
-This Licence does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use in describing the origin of the Work and reproducing the content of the NOTICE file.
+This Licence does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use including, but not limited to, describing the origin of the Work and reproducing the content of any NOTICE file.
 
 ## 7. Disclaimer of Warranty. 
 
@@ -104,11 +104,11 @@ While redistributing the Work or Derivative Works thereof, You may choose to off
 
 ## 10. Relicensing. 
 
-Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute contributions under any future revision of this license approved by the Governing Body. The Governing Body will ensure that this Work is always free and open source for anyone to use with the Convex Network.
+Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute Contributions under any license, including future revisions of this license, providing that such license is formally approved by the Governing Body. The Governing Body will ensure that this Work is always free and open source for anyone to use within the Convex ecosystem.
 
 ## 11. Contributor Awards
 
-The Governing Body may, at its sole and absolute discretion, make awards of Convex Coins for contributions to the Work. To be eligible for such awards, contributor agrees to sign a contributor agreement which shall be provided separately. 
+The Governing Body may, at its sole and absolute discretion, make awards of Convex Coins for Contributions to the Work. To be eligible for such awards, Contributor agrees to sign a Contributor Agreement which shall be made available separately from this License. 
 
 # Copyright
 

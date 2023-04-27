@@ -1,11 +1,5 @@
 # Convex Network Governance Rules
 
-DRAFT - WORK IN PROGRESS
-
-This draft is being developed in advance of the launch of the Convex Main Network 
-
-Feedback and PRs are welcome, as are discussions on the [Convex Discord](https://discord.com/invite/xfYGq4CT7v)
-
 ## Preamble
 
 The Convex Network Governance Rules (the "CNGRs") are maintained by the Convex Foundation acting as the Governance Body to serve the interests of the Convex Ecosystem.
@@ -13,6 +7,8 @@ The Convex Network Governance Rules (the "CNGRs") are maintained by the Convex F
 In particular, the CNGRs are intended to ensure a long-lived public utility network for the Internet of Value, supporting decentralised economic systems and open to all participants as a public good.
 
 The CNGRs therefore apply to parties that wish to use Convex technology to operate decentralised economic systems ("Operators" in this document). 
+
+Feedback and PRs are welcome, as are discussions on the [Convex Discord](https://discord.com/invite/xfYGq4CT7v)
 
 ## Foundation Commitment
 
