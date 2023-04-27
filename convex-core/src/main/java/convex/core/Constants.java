@@ -50,7 +50,7 @@ public class Constants {
 	/**
 	 * Initial memory price per byte
 	 */
-	public static final long INITIAL_MEMORY_PRICE = 10L;
+	public static final long INITIAL_MEMORY_PRICE = 1000L;
 
 	/**
 	 * Max juice allowable for execution of a single transaction.
@@ -96,7 +96,7 @@ public class Constants {
 	 * Initial global values for a new State
 	 */
 	public static final AVector<ACell> INITIAL_GLOBALS = Vectors.of(
-			Constants.INITIAL_TIMESTAMP, 0L, Constants.INITIAL_JUICE_PRICE);
+			Constants.INITIAL_TIMESTAMP, 0L, Constants.INITIAL_JUICE_PRICE,Constants.INITIAL_MEMORY_POOL,Constants.INITIAL_MEMORY_POOL*Constants.INITIAL_MEMORY_PRICE);
 
 	/**
 	 * Maximum length of a symbolic name in bytes (keywords and symbols)

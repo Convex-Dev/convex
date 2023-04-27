@@ -42,7 +42,7 @@ public class Init {
 	public static final Address LIVEPOOL_ADDRESS = Address.create(6);
 
 	// Built-in special accounts
-	public static final Address MEMORY_EXCHANGE_ADDRESS = Address.create(7);
+	public static final Address TEMP_ADDRESS = Address.create(7);
 	public static final Address CORE_ADDRESS = Address.create(8);
 	public static final Address REGISTRY_ADDRESS = Address.create(9);
     public static final Address TRUST_ADDRESS = Address.create(10);
@@ -85,12 +85,7 @@ public class Init {
 		accts = addGovernanceAccount(accts, LIVEPOOL_ADDRESS, 5 * Coin.DIAMOND); 
 		supply -= livePool;
 
-		// Set up memory exchange. Initially 1GB available at 1000 per byte. (one diamond coin liquidity)
-		{
-			long memoryCoins = 1 * Coin.DIAMOND;
-			accts = addMemoryExchange(accts, MEMORY_EXCHANGE_ADDRESS, memoryCoins, Constants.INITIAL_MEMORY_POOL);
-			supply -= memoryCoins;
-		}
+		accts = addGovernanceAccount(accts, TEMP_ADDRESS, 0 ); 
 
 		// Always have at least one user and one peer setup
 		int keyCount = genesisKeys.size();
@@ -106,6 +101,7 @@ public class Init {
 
 		// Create the inital state
 		State s = State.create(accts, peers, globals, BlobMaps.empty());
+		supply-=s.getGlobalMemoryValue().longValue();
 
 		// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
 		s = createStaticLibraries(s, TRUST_ADDRESS, REGISTRY_ADDRESS);
@@ -184,7 +180,6 @@ public class Init {
 						             
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
-			s = register(s, MEMORY_EXCHANGE_ADDRESS, "Memory Exchange Pool", "Automated exchange following the Convex memory allowance model.");
 		}
 
 		/*
@@ -319,13 +314,6 @@ public class Init {
 	private static AVector<AccountStatus> addGovernanceAccount(AVector<AccountStatus> accts, Address a, long balance) {
 		if (accts.count() != a.toExactLong()) throw new Error("Incorrect initialisation address: " + a);
 		AccountStatus as = AccountStatus.createGovernance(balance);
-		accts = accts.conj(as);
-		return accts;
-	}
-
-	private static AVector<AccountStatus> addMemoryExchange(AVector<AccountStatus> accts, Address a, long balance, long allowance) {
-		if (accts.count() != a.toExactLong()) throw new Error("Incorrect memory exchange address: " + a);
-		AccountStatus as = AccountStatus.createGovernance(balance).withMemory(allowance);
 		accts = accts.conj(as);
 		return accts;
 	}

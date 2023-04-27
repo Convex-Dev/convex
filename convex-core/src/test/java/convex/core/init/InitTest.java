@@ -23,6 +23,7 @@ import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
 
@@ -107,9 +108,10 @@ public class InitTest extends ACVMTest {
 
 	@Test
 	public void testMemoryExchange() {
-		AccountStatus as = STATE.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
-		assertNotNull(as);
-		assertTrue(as.getMemory() > 0L);
+		CVMLong mem=STATE.getGlobalMemoryPool();
+		CVMLong cvx=STATE.getGlobalMemoryValue();
+		assertEquals(Constants.INITIAL_MEMORY_POOL,mem.longValue());
+		assertEquals(Constants.INITIAL_MEMORY_POOL*Constants.INITIAL_MEMORY_PRICE,cvx.longValue());
 	}
 
 	@Test

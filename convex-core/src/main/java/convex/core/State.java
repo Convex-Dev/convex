@@ -66,12 +66,14 @@ public class State extends ARecord {
 	/**
 	 * Symbols for Globals
 	 */
-	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE);
+	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE);
 
 	// Indexes for globals in Globals Vector
 	static final int GLOBAL_TIMESTAMP=0;
 	static final int GLOBAL_FEES=1;
 	static final int GLOBAL_JUICE_PRICE=2;
+	static final int GLOBAL_MEMORY_MEM=3;
+	static final int GLOBAL_MEMORY_CVX=4;
 
 	/**
 	 * An empty State
@@ -326,11 +328,13 @@ public class State extends ARecord {
 	private State applyTimeUpdate(long newTimestamp) {
 		State state = this;
 		AVector<ACell> glbs = state.globals;
-		long ts=((CVMLong)glbs.get(0)).longValue();
-		if (newTimestamp > ts) {
-			AVector<ACell> newGlbs=glbs.assoc(0,CVMLong.create(newTimestamp));
+		long oldTimestamp=((CVMLong)glbs.get(GLOBAL_TIMESTAMP)).longValue();
+		
+		if (newTimestamp > oldTimestamp) {
+			AVector<ACell> newGlbs=glbs.assoc(GLOBAL_TIMESTAMP,CVMLong.create(newTimestamp));
 			state = state.withGlobals(newGlbs);
 		}
+		
 		return state;
 	}
 
@@ -656,6 +660,7 @@ public class State extends ARecord {
 		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
 		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getTotalStake(), 0L);
 		total += getGlobalFees().longValue();
+		total += getGlobalMemoryValue().longValue();
 		return total;
 	}
 
@@ -832,6 +837,21 @@ public class State extends ARecord {
 	@Override
 	public RecordFormat getFormat() {
 		return FORMAT;
+	}
+
+	public CVMLong getGlobalMemoryValue() {
+		return (CVMLong)(globals.get(GLOBAL_MEMORY_CVX));
+	}
+
+	public CVMLong getGlobalMemoryPool() {
+		return (CVMLong)(globals.get(GLOBAL_MEMORY_MEM));
+	}
+
+	public State updateMemoryPool(long cvx, long mem) {
+		AVector<ACell> r=globals;
+		r=r.assoc(GLOBAL_MEMORY_CVX, CVMLong.create(cvx));
+		r=r.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(mem));
+		return withGlobals(r);
 	}
 
 

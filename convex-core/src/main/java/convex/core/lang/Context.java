@@ -361,26 +361,21 @@ public class Context<T extends ACell> extends AObject {
 			// compute additional memory purchase requirement beyond allowance
 			long purchaseNeeded=memUsed-allowanceUsed;
 			if (purchaseNeeded>0) {
-				AccountStatus pool=state.getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
-				// we do memory purchase if pool exists
-				if (pool!=null) {
-					long poolBalance=pool.getBalance();
-					long poolAllowance=pool.getMemory();
-					memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
+				long poolBalance=state.getGlobalMemoryValue().longValue();
+				long poolAllowance=state.getGlobalMemoryPool().longValue();
+				memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
 
-					if ((refund+balanceLeft)>=memorySpend) {
-						// enough to cover memory price, so automatically buy from pool
-						// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
-						pool=pool.withBalances(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
-						state=state.putAccount(Init.MEMORY_EXCHANGE_ADDRESS,pool);
-					} else {
-						// Insufficient memory, so need to roll back state to before transaction
-						// origin should still pay transaction fees, but no memory costs
-						memorySpend=0L;
-						state=initialState;
-						account=state.getAccount(address);
-						memoryFailure=true;
-					}
+				if ((refund+balanceLeft)>=memorySpend) {
+					// enough to cover memory price, so automatically buy from pool
+					// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
+					state=state.updateMemoryPool(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
+				} else {
+					// Insufficient memory, so need to roll back state to before transaction
+					// origin should still pay transaction fees, but no memory costs
+					memorySpend=0L;
+					state=initialState;
+					account=state.getAccount(address);
+					memoryFailure=true;
 				}
 			}
 		} else {
@@ -1561,7 +1556,8 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Context indicating the price paid for the allowance change (may be zero or negative for refund)
 	 */
 	public Context<CVMLong> setMemory(long allowance) {
-		AVector<AccountStatus> accounts=getState().getAccounts();
+		State state=getState();
+		AVector<AccountStatus> accounts=state.getAccounts();
 		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative allowance amount");
 		if (allowance>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 
@@ -1574,23 +1570,20 @@ public class Context<T extends ACell> extends AObject {
 		long delta=allowance-current;
 		if (delta==0L) return this.withResult(CVMLong.ZERO);
 
-		AccountStatus pool=getState().getAccount(Init.MEMORY_EXCHANGE_ADDRESS);
-
 		try {
-			long poolAllowance=pool.getMemory();
-			long poolBalance=pool.getBalance();
+			long poolAllowance=state.getGlobalMemoryPool().longValue();
+			long poolBalance=state.getGlobalMemoryValue().longValue();
 			long price = Economics.swapPrice(delta, poolAllowance,poolBalance);
 			if (price>balance) {
 				return withError(ErrorCodes.FUNDS,"Cannot afford allowance, would cost: "+price);
 			}
 			sourceAccount=sourceAccount.withBalances(balance-price, allowance);
-			pool=pool.withBalances(poolBalance+price, poolAllowance-delta);
+			state=state.updateMemoryPool(poolBalance+price, poolAllowance-delta);
 
 			// Update accounts
 			AVector<AccountStatus> newAccounts=accounts.assoc(sourceIndex, sourceAccount);
-			newAccounts=newAccounts.assoc(Init.MEMORY_EXCHANGE_ADDRESS.toExactLong(),pool);
-
-			return withChainState(chainState.withAccounts(newAccounts)).withResult(null);
+			state=state.withAccounts(newAccounts);
+			return withState(state).withResult(null);
 		} catch (IllegalArgumentException e) {
 			return withError(ErrorCodes.FUNDS,"Cannot trade allowance: "+e.getMessage());
 		}

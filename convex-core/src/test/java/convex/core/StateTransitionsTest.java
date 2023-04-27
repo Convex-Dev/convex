@@ -52,13 +52,16 @@ public class StateTransitionsTest {
 
 	@Test
 	public void testAccountTransfers() throws BadSignatureException {
+		AccountKey ka=KEYPAIR_A.getAccountKey();
+		AccountKey kb=KEYPAIR_B.getAccountKey();
 		AVector<AccountStatus> accounts = Vectors.of(
-				AccountStatus.create(10000L,KEYPAIR_A.getAccountKey()),
-				AccountStatus.create(1000L,KEYPAIR_B.getAccountKey()),
-				AccountStatus.create(Constants.MAX_SUPPLY - 10000 - 1000,KEYPAIR_ROBB.getAccountKey())
+				AccountStatus.create(10000L,ka).withMemory(10000),
+				AccountStatus.create(1000L,kb).withMemory(10000),
+				AccountStatus.create(Constants.MAX_SUPPLY - 10000 - 1000,KEYPAIR_ROBB.getAccountKey()).withMemory(10000)
 		// No account for C yet
 		);
 		State s = State.EMPTY.withAccounts(accounts); // don't need any peers for these tests
+		s=s.updateMemoryPool(0, 0); // clear memory pool so doesn't confuse things
 		assertEquals(Constants.MAX_SUPPLY, s.computeTotalFunds());
 
 		assertEquals(10000, s.getBalance(ADDRESS_A));
