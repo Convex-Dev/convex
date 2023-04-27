@@ -302,7 +302,7 @@
 
   ^{:doc {:description "Returns true if the given address refers to an actor."
           :examples    [{:code "(actor? #1345)"}]
-          :signature   [{:params [address]
+          :signature   [{:params [addr]
                          :return Boolean}]}}
 
   [addr]
@@ -435,9 +435,10 @@
 
 (defn defined?
 
-   ^{:doc {:description "Returns true if the given symbol name is defined in the current environment, false otherwise."
+   ^{:doc {:description "Returns true if the given symbol name is defined in the current or specified account environment, false otherwise."
            :examples    [{:code "(defined? 'max)"}]
-           :signature   [{:params [sym]}]}}
+           :signature   [{:params [sym]}
+                         {:params [addr sym]}]}}
 
   ([sym]
     (or (symbol? sym)

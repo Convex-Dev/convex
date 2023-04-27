@@ -2295,6 +2295,9 @@ public class CoreTest extends ACVMTest {
 		AHashMap<ACell,ACell> countMeta=Core.METADATA.get(Symbols.COUNT);
 		assertSame(countMeta, (eval("(lookup-meta 'count)")));
 		assertSame(countMeta, (eval("(lookup-meta "+Init.CORE_ADDRESS+ " 'count)")));
+		
+		// Not actually defined in current address
+		assertNull(eval("(lookup-meta *address* 'count)"));
 
 		assertNull(eval("(lookup-meta 'non-existent-symbol)"));
 		assertNull(eval("(lookup-meta #666666 'count)")); // invalid address
@@ -3684,7 +3687,12 @@ public class CoreTest extends ACVMTest {
 
 		assertTrue(evalB("(do (def foobar [2 3]) (defined? 'foobar))"));
 		assertTrue(evalB("(do (def foobar [2 3]) (defined? *address* 'foobar))"));
+		
+		// Note: defined by reference to core. TODO: is this OK?
 		assertTrue(evalB("(defined? 'count)"));
+		
+		// Not defined in explicit environment. TODO: is this OK?
+		assertFalse(evalB("(defined? *address* 'count)"));
 
 		// invalid names
 		assertCastError(step("(defined? :count)")); // not a Symbol
