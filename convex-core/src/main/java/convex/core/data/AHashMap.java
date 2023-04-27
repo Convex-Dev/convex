@@ -166,5 +166,13 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		}
 		return Vectors.create(keys);
 	}
+	
+	@Override
+	public AHashMap<K,V> slice(long start) {
+		return slice(start,count);
+	}
+
+	@Override
+	public abstract AHashMap<K,V> slice(long start, long end);
 
 }

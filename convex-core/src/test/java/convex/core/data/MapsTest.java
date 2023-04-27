@@ -263,6 +263,18 @@ public class MapsTest {
 
 		assertEquals(2L,m.getEncoding().count());
 	}
+	
+	@Test 
+	public void testSlice() {
+		AMap<CVMLong, CVMLong> m = Samples.LONG_MAP_5;
+		assertSame(m,m.slice(0));
+		assertSame(m.empty(),m.slice(5));
+		assertSame(m.empty(),m.slice(3,3));
+		
+		assertNull(m.slice(-1));
+		assertNull(m.slice(12));
+		assertNull(m.slice(4,3));
+	}
 
 	@Test
 	public void testEquals() {

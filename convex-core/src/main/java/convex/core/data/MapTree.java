@@ -888,5 +888,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		throw new TODOException();
 	}
 
+	@Override
+	public AHashMap<K, V> slice(long start, long end) {
+		throw new TODOException();
+	}
+
 
 }

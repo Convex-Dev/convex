@@ -775,4 +775,18 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return this;
 	}
 
+	@Override
+	public MapLeaf<K, V> slice(long start, long end) {
+		if ((start<0)||(end>count)) return null;
+		if (end<start) return null;
+		int n=(int)(end-start);
+		if (n==0) return Maps.empty();
+		if (n==count) return this;
+
+		@SuppressWarnings("unchecked")
+		MapEntry<K,V>[] nrefs=new MapEntry[n];
+		System.arraycopy(entries, (int) start, nrefs, 0, n);
+		return new MapLeaf<K,V>(nrefs);
+	}
+
 }

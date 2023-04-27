@@ -724,9 +724,7 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	 * Removes n leading entries from this BlobMap, in key order.
 	 * 
 	 * @param start Start position of entries to keep
-	 * @return Updated BlobMap with leading entries removed.
-	 * @throws IndexOutOfBoundsException If there are insufficient entries in the
-	 *                                   BlobMap
+	 * @return Updated BlobMap with leading entries removed, or null if invalid slice
 	 */
 	@Override
 	public BlobMap<K, V> slice(long start) {
