@@ -1730,6 +1730,7 @@ public class CoreTest extends ACVMTest {
 	public void testDoublePred() {
 		assertTrue(evalB("(double? 1.0)"));
 		assertTrue(evalB("(double? ##NaN)"));
+		assertTrue(evalB("(double? ##Inf)"));
 
 		assertFalse(evalB("(double? nil)"));
 		assertFalse(evalB("(double? [])"));
@@ -1752,11 +1753,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(map 1 [1])"));
 		assertCastError(step("(map 1 [] [] [])"));
 		
-		// Not a data structure => cast error
-		assertCastError(step("(map inc 1)"));
-		assertCastError(step("(map inc [1] 0x1234)"));
-		
-		// Map with null elements treats as empty collection
+		// Map with nil (treated as empty collection)
 		assertNull(eval("(map inc nil)"));
 		assertEquals(Vectors.empty(),eval("(map inc [1 2] nil)"));
 		assertEquals(Maps.empty(),eval("(map inc {:a 1 :b 3} nil)"));
@@ -1768,6 +1765,10 @@ public class CoreTest extends ACVMTest {
 		// Map with sets works like conj'ing in each result in turn
 		assertEquals(Sets.of(4,5,6),eval("(map (fn [a b] b) #{1 2 3} [4 5 6])"));
 
+		// CAST error if any following arguments are not a data structure
+		assertCastError(step("(map inc 1)"));
+		assertCastError(step("(map inc [1] 0x1234)"));
+		
 		// ARGUMENT if function creates wrong element type
 		assertArgumentError(step("(map (fn [_ _] :foo) {1 2} [1 2 3 4])"));
 
@@ -1776,7 +1777,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(map (fn []) [1 2 3 4])"));
 		assertArityError(step("(map (fn [a b c]) [1 2 3 4] [5 6])"));
 
-		
+		// ARITY error if insufficient arguments to map
 		assertArityError(step("(map)"));
 		assertArityError(step("(map inc)"));
 		assertArityError(step("(map 1)")); // arity > cast
@@ -4178,8 +4179,9 @@ public class CoreTest extends ACVMTest {
 	public void testInc() {
 		assertEquals(2L, evalL("(inc 1)"));
 		assertEquals(2L, evalL("(inc (byte 1))"));
-		// assertEquals(98L,(long)eval("(inc \\a)")); // TODO: think about this
 
+		assertTrue(evalB("(= 1000000000000000000000 (inc 999999999999999999999))"));
+		
 		assertCastError(step("(inc #42)")); // Issue #89
 		assertCastError(step("(inc nil)"));
 		assertCastError(step("(inc \\c)")); // Issue #89
@@ -4218,8 +4220,8 @@ public class CoreTest extends ACVMTest {
 		// ensure later branches never get executed
 		assertNull(eval("(and nil (+ nil :bar))"));
 
-		assertFalse(evalB("(and 1 false 2)"));
-		assertTrue(evalB("(and 1 :foo true true)"));
+		assertSame(CVMBool.FALSE,eval("(and 1 false 2)"));
+		assertSame(CVMBool.TRUE,eval("(and 1 :foo true true)"));
 
 		// arity error if fails before first falsey value
 		assertArityError(step("(and true (count) nil)"));
