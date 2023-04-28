@@ -4,12 +4,12 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.7.10] - 2023-04-28
 
 ### Added
 - Support for arbitrary sized integers (Part 1)
 - Better support for CI builds
-- Allow `merge` to work with BlobMaps
+- Allow `merge` and `slice` to work with BlobMaps
 
 ### Changed
 - General update of dependencies to most recent versions as of Apr 2023
