@@ -173,6 +173,7 @@ public class Symbols {
 	public static final Symbol STAR_HOLDINGS = intern("*holdings*");
 	public static final Symbol STAR_SEQUENCE = intern("*sequence*");
 	public static final Symbol STAR_KEY = intern("*key*");
+	public static final Symbol STAR_SCOPE = intern("*scope*");
 
 	public static final Symbol STAR_LANG = intern("*lang*");
 

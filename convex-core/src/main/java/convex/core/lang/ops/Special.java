@@ -23,7 +23,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte opCode;
 	
-	private static int NUM_SPECIALS=15;
+	private static int NUM_SPECIALS=16;
 	private static final int BASE=Ops.SPECIAL_BASE;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	private static final Symbol[] symbols=new Symbol[NUM_SPECIALS];
@@ -45,6 +45,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static final byte S_SEQUENCE=BASE+12;
 	private static final byte S_KEY=BASE+13;
 	private static final byte S_JUICE_PRICE=BASE+14;
+	private static final byte S_SCOPE=BASE+15;
 
 	static {
 		reg(S_JUICE,Symbols.STAR_JUICE);
@@ -62,6 +63,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		reg(S_SEQUENCE,Symbols.STAR_SEQUENCE);
 		reg(S_KEY,Symbols.STAR_KEY);
 		reg(S_JUICE_PRICE,Symbols.STAR_JUICE_PRICE);
+		reg(S_SCOPE,Symbols.STAR_SCOPE);
 	}
 	
 	private static byte reg(byte opCode, Symbol sym) {
@@ -109,6 +111,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_SEQUENCE: ctx= ctx.withResult(CVMLong.create(ctx.getAccountStatus().getSequence()+1)); break;
 		case S_KEY: ctx= ctx.withResult(ctx.getAccountStatus().getAccountKey()); break;
 		case S_JUICE_PRICE: ctx= ctx.withResult(ctx.getState().getJuicePrice()); break;
+		case S_SCOPE: ctx= ctx.withResult(ctx.getScope()); break;
 		default:
 			throw new Error("Bad Opcode"+opCode);
 		}

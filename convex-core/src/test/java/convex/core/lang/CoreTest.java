@@ -4343,6 +4343,11 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
+	public void testSpecialScope() {
+		assertNull(eval("*scope*"));
+	}
+	
+	@Test
 	public void testSqrt() {
 		// Implicit double conversions for numeric values only, see #344
 		assertCVMEquals(2.0, eval("(sqrt 4.0)"));

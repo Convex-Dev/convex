@@ -152,6 +152,9 @@ public class ContextTest extends ACVMTest {
 	@Test
 	public void testSpecial() {
 		Context<?> ctx=context();
+		
+		assertNull(eval(Symbols.STAR_SCOPE));
+		
 		assertEquals(ADDR, eval(Symbols.STAR_ADDRESS));
 		assertEquals(ADDR, eval(Symbols.STAR_ORIGIN));
 		assertNull(eval(Symbols.STAR_CALLER));
