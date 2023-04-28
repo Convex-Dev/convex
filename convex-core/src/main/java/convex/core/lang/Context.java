@@ -164,7 +164,7 @@ public class Context<T extends ACell> extends AObject {
 			this.scope=scope;
 		}
 
-		public static ChainState create(State state, Address origin, Address caller, Address address, long offer) {
+		public static ChainState create(State state, Address origin, Address caller, Address address, long offer, ACell scope) {
 			AHashMap<Symbol, ACell> environment=Core.ENVIRONMENT;
 			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata=Core.METADATA;
 			if (address!=null) {
@@ -174,17 +174,17 @@ public class Context<T extends ACell> extends AObject {
 					metadata=as.getMetadata();
 				}
 			}
-			return new ChainState(state,origin,caller,address,environment,metadata,offer,null);
+			return new ChainState(state,origin,caller,address,environment,metadata,offer,scope);
 		}
 
 		public ChainState withStateOffer(State newState,long newOffer) {
 			if ((state==newState)&&(offer==newOffer)) return this;
-			return create(newState,origin,caller,address,newOffer);
+			return create(newState,origin,caller,address,newOffer,scope);
 		}
 
 		private ChainState withState(State newState) {
 			if (state==newState) return this;
-			return create(newState,origin,caller,address,offer);
+			return create(newState,origin,caller,address,offer,scope);
 		}
 
 		protected long getOffer() {
@@ -230,6 +230,11 @@ public class Context<T extends ACell> extends AObject {
 			return metadata;
 		}
 
+		public ChainState withScope(ACell newScope) {
+			if (scope==newScope) return this;
+			return create(state,origin,caller,address,offer,newScope);
+		}
+
 
 	}
 
@@ -252,7 +257,7 @@ public class Context<T extends ACell> extends AObject {
 	}
 
 	private static <T extends ACell> Context<T> create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
-		ChainState chainState=ChainState.create(state,origin,caller,address,offer);
+		ChainState chainState=ChainState.create(state,origin,caller,address,offer,null);
 		return create(chainState,juice,localBindings,result,depth,log,comp);
 	}
 
@@ -1368,7 +1373,7 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public <R extends ACell> Context<R> queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
-		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER);
+		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER,null);
 		Context<R> ctx=Context.create(cs, juice, EMPTY_BINDINGS, null, depth,log,null);
 		ctx=ctx.evalAs(address, form);
 		return handleQueryResult(ctx);
@@ -1690,7 +1695,7 @@ public class Context<T extends ACell> extends AObject {
 		}
 
 		// Ensure we create a forked Context for the Actor call
-		final Context<R> exContext=forkActorCall(state, target, offer);
+		final Context<R> exContext=forkActorCall(state, target, offer, null);
 
 		// INVOKE ACTOR FUNCTION
 		final Context<R> rctx=exContext.invoke(fn,args);
@@ -1716,8 +1721,12 @@ public class Context<T extends ACell> extends AObject {
 	 * @param offer Offer amount for actor call. Must have been pre-subtracted from caller account.
 	 * @return
 	 */
-	private <R extends ACell> Context<R> forkActorCall(State state, Address target, long offer) {
-		return Context.create(state, juice, EMPTY_BINDINGS, (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+	private <R extends ACell> Context<R> forkActorCall(State state, Address target, long offer, ACell scope) {
+		Context<R> fctx=Context.create(state, juice, EMPTY_BINDINGS, (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+		if (scope!=null) {
+			fctx.chainState=fctx.chainState.withScope(scope);
+		}
+		return fctx;
 	}
 
 	/**
