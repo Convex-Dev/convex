@@ -59,6 +59,15 @@ public class Blobs {
 	}
 	
 	/**
+	 * Creates a blob from a hex string
+	 * @param a Hex String
+	 * @return Blob created, or null if String not valid hex
+	 */
+	public static ABlob fromHex(AString a) {
+		return fromHex(a.toString());
+	}
+	
+	/**
 	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length
 	 * @param o Object expected to contain a Blob value
 	 * @return ABlob value, or null if not parseable
@@ -174,4 +183,5 @@ public class Blobs {
 			return b.getBytes();
 		}
 	}
+
 }

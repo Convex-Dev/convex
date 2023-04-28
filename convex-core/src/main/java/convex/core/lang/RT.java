@@ -29,7 +29,6 @@ import convex.core.data.Hash;
 import convex.core.data.IAssociative;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
-import convex.core.data.LongBlob;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -1223,10 +1222,10 @@ public class RT {
 		if (a instanceof ABlob)
 			return Blobs.toCanonical((ABlob) a);
 		// TODO: big integer support?
-		if (a instanceof CVMLong)
-			return LongBlob.create(((CVMLong) a).longValue());
+		if (a instanceof AInteger)
+			return ((AInteger)a).toBlob();
 		if (a instanceof AString)
-			return Blobs.fromHex(a.toString());
+			return Blobs.fromHex((AString)a);
 		return null;
 	}
 

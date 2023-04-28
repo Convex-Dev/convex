@@ -131,7 +131,12 @@ public class CoreTest extends ACVMTest {
 		
 		// Blob from a long
 		assertEquals(eval("0x0000000000001234"),eval("(blob (long \\u1234))")); // blob literal
+		assertEquals(eval("0xffffffffffffffff"),eval("(blob -1)")); 
 
+		// Blob from a bigint
+		assertEquals(eval("0x00ffffffffffffffff"),eval("(blob 18446744073709551615)")); 
+		assertEquals(eval("0xff0000000000000000"),eval("(blob -18446744073709551616)")); 
+		
 		// Address converts to regular Blob
 		assertEquals(eval("0x0000000000000013"),eval("(blob #19)")); 
 		

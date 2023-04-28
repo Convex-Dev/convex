@@ -7,6 +7,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
+import convex.core.data.LongBlob;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
@@ -420,6 +421,12 @@ public final class CVMLong extends AInteger {
 	public AInteger toCanonical() {
 		// Always canonical
 		return this;
+	}
+
+	@Override
+	public LongBlob toBlob() {
+		// TODO: do we want minimal length?
+		return LongBlob.create(value);
 	}
 
 

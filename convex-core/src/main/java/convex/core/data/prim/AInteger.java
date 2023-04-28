@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import java.math.BigInteger;
 
+import convex.core.data.ABlob;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
@@ -164,6 +165,12 @@ public abstract class AInteger extends ANumeric {
 	 * @return Modulus result
 	 */
 	public abstract AInteger rem(AInteger divisor);
+
+	/**
+	 * Converts this Integer value to Blob form
+	 * @return minimal blob representing the integer value
+	 */
+	public abstract ABlob toBlob();
 
 
 

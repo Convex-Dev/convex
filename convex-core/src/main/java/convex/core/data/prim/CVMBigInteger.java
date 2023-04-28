@@ -359,6 +359,11 @@ public class CVMBigInteger extends AInteger {
 		return AInteger.create(d);
 	}
 
+	@Override
+	public ABlob toBlob() {
+		return blob();
+	}
+
 
 
 }
