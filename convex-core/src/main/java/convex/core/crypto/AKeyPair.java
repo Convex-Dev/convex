@@ -264,8 +264,8 @@ public abstract class AKeyPair {
 
 	/**
 	 * Gets a Ed25519 Private Key from a 32-byte array.
-	 * @param privKey
-	 * @return
+	 * @param privKey Bytes to use as a private key seed
+	 * @return PrivateKey instance
 	 */
 	public static PrivateKey privateFromBytes(byte[] privKey) {
 		try {

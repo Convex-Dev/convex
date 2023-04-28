@@ -66,7 +66,7 @@ public class State extends ARecord {
 	/**
 	 * Symbols for Globals
 	 */
-	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE);
+	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE,Symbols.PROTOCOL);
 
 	// Indexes for globals in Globals Vector
 	static final int GLOBAL_TIMESTAMP=0;
@@ -74,6 +74,7 @@ public class State extends ARecord {
 	static final int GLOBAL_JUICE_PRICE=2;
 	static final int GLOBAL_MEMORY_MEM=3;
 	static final int GLOBAL_MEMORY_CVX=4;
+	static final int GLOBAL_PROTOCOL=5;
 
 	/**
 	 * An empty State
@@ -315,8 +316,8 @@ public class State extends ARecord {
 
 	/**
 	 * Apply state updates consistent with time advancing to a given timestamp
-	 * @param b
-	 * @return
+	 * @param b Block to apply
+	 * @return Updated state after block preparation
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;

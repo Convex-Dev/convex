@@ -314,8 +314,9 @@ public class Symbols {
 	
 	public static final Symbol TORUS = intern("torus");
 	
-	public static final Object MEMORY = intern("memory");
-	public static final Object MEMORY_VALUE = intern("memory-value");
+	public static final Symbol MEMORY = intern("memory");
+	public static final Symbol MEMORY_VALUE = intern("memory-value");
+	public static final Symbol PROTOCOL = intern("protocol");
 	
 
 	
