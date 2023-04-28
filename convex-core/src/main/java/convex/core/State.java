@@ -64,11 +64,11 @@ public class State extends ARecord {
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
 
 	/**
-	 * Symbols for Globals
+	 * Symbols for global values in :globals Vector
 	 */
 	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE,Symbols.PROTOCOL);
 
-	// Indexes for globals in Globals Vector
+	// Indexes for globals in :globals Vector
 	static final int GLOBAL_TIMESTAMP=0;
 	static final int GLOBAL_FEES=1;
 	static final int GLOBAL_JUICE_PRICE=2;
@@ -596,6 +596,7 @@ public class State extends ARecord {
 	 * @param address Address of Account to update
 	 * @param accountStatus New Account Status
 	 * @return Updates State, or this state if Account was unchanged
+	 * @throws IndexOutOfBoundsException if Address represents an illegal account position
 	 */
 	public State putAccount(Address address, AccountStatus accountStatus) {
 		long ix=address.toExactLong();

@@ -52,8 +52,8 @@ public abstract class AProvider extends Provider {
 
 	/**
 	 * Create a key pair with the given seed
-	 * @param seed
-	 * @return
+	 * @param seed Seed bytes for Key generation (32 bytes)
+	 * @return Key Pair instance
 	 */
 	public abstract AKeyPair create(Blob seed);
 
