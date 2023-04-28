@@ -1506,6 +1506,17 @@ public class Utils {
 		return lv.longValue();
 	}
 
+	public static String joinStrings(List<String> strings, String separator) {
+		StringBuilder sb=new StringBuilder(); 
+		
+		int n=strings.size();
+		for (int i=0; i<n; i++) {
+			if (i!=0) sb.append(separator);
+			sb.append(strings.get(i));
+		}
+		return sb.toString();
+	}
+
 
 
 

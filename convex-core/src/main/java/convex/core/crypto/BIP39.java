@@ -1,5 +1,18 @@
 package convex.core.crypto;
 
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.KeySpec;
+import java.util.List;
+
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+
+import convex.core.data.Blob;
+import convex.core.util.Utils;
+
 public class BIP39 {
 	static final String[] wordlist = { "abandon", "ability", "able", "about", "above", "absent", "absorb",
 			"abstract", "absurd", "abuse", "access", "accident", "account", "accuse", "achieve", "acid", "acoustic",
@@ -186,4 +199,19 @@ public class BIP39 {
 			"wolf", "woman", "wonder", "wood", "wool", "word", "work", "world", "worry", "worth", "wrap", "wreck",
 			"wrestle", "wrist", "write", "wrong", "yard", "year", "yellow", "you", "young", "youth", "zebra", "zero",
 			"zone", "zoo"};
+	
+	public static Blob getSeed(List<String> words, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
+		if (passphrase==null) passphrase="";
+
+		String joined=Utils.joinStrings(words, " ");
+		char[] pass= joined.toCharArray(); 
+		byte[] salt = ("mnemonic"+passphrase).getBytes(StandardCharsets.UTF_8);
+		
+		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
+		KeySpec keyspec = new PBEKeySpec(pass, salt, 2048, 512);
+	    Key key = factory.generateSecret(keyspec);
+	    byte[] bs = key.getEncoded();
+	    // System.out.println(bs.length);
+	    return Blob.wrap(bs);
+	}
 }
