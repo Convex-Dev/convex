@@ -5,6 +5,7 @@ import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
+import java.text.Normalizer;
 import java.util.List;
 
 import javax.crypto.SecretKeyFactory;
@@ -203,15 +204,22 @@ public class BIP39 {
 	public static Blob getSeed(List<String> words, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		if (passphrase==null) passphrase="";
 
+		// Normalise words and convert to char array
 		String joined=Utils.joinStrings(words, " ");
+		joined=Normalizer.normalize(joined, Normalizer.Form.NFKD);		
 		char[] pass= joined.toCharArray(); 
+		
+		// Normalise passphrase and convert to byte array
+		passphrase=Normalizer.normalize(passphrase, Normalizer.Form.NFKD);	
 		byte[] salt = ("mnemonic"+passphrase).getBytes(StandardCharsets.UTF_8);
 		
+		// Generate seed
 		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
 		KeySpec keyspec = new PBEKeySpec(pass, salt, 2048, 512);
 	    Key key = factory.generateSecret(keyspec);
+	    
+	    // Wrap result as Blob
 	    byte[] bs = key.getEncoded();
-	    // System.out.println(bs.length);
 	    return Blob.wrap(bs);
 	}
 }
