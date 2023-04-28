@@ -1643,13 +1643,13 @@ public class Context<T extends ACell> extends AObject {
 	 * Executes a call to an Actor. Utility function which convert a java String function name
 	 *
 	 * @param <R> Return type of Actor call
-	 * @param target Target Actor address
+	 * @param target Target Actor address or scope vector
 	 * @param offer Amount of Convex Coins to offer in Actor call
 	 * @param functionName Symbol of function name defined by Actor
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
-	public <R extends ACell> Context<R> actorCall(Address target, long offer, String functionName, ACell... args) {
+	public <R extends ACell> Context<R> actorCall(ACell target, long offer, String functionName, ACell... args) {
 		return actorCall(target,offer,Symbol.create(functionName),args);
 	}
 
@@ -1663,11 +1663,31 @@ public class Context<T extends ACell> extends AObject {
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
-	public <R extends ACell> Context<R> actorCall(Address target, long offer, ACell functionName, ACell... args) {
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Context<R> actorCall(ACell target, long offer, ACell functionName, ACell... args) {
 		// SECURITY: set up state for actor call
 		State state=getState();
 		Symbol sym=RT.ensureSymbol(functionName);
-		AccountStatus as=state.getAccount(target);
+		Address targetAddress;
+		ACell scope=null;
+		if (target instanceof Address) {
+			targetAddress=(Address)target;
+		} else {
+			if (!(target instanceof AVector)) {
+				return this.withCastError(target, "call target must be an Address or [Address *scope*] vector");
+			}
+			AVector<ACell> v=(AVector<ACell>)target;
+			if (!(v.count()==2)) {
+				return this.withCastError(target, "call target vector must have length 2");
+			}
+			targetAddress=RT.ensureAddress(v.get(0));
+			if (targetAddress==null) {
+				return this.withCastError(target, "call target vector must start with an Address");			
+			}
+			scope=v.get(1);
+		}
+		
+		AccountStatus as=state.getAccount(targetAddress);
 		if (as==null) return this.withError(ErrorCodes.NOBODY,"Actor Account does not exist: "+target);
 
 		// Handling for non-zero offers.
@@ -1689,13 +1709,13 @@ public class Context<T extends ACell> extends AObject {
 
 		if (fn == null) {
 			if (!as.getEnvironment().containsKey(sym)) {
-				return this.withError(ErrorCodes.STATE, "Account " + target + " does not define Symbol: " + sym);						
+				return this.withError(ErrorCodes.STATE, "Account " + targetAddress + " does not define Symbol: " + sym);						
 			}
-			return this.withError(ErrorCodes.STATE, "Value defined in account " + target + " is not a callable function: " + sym);
+			return this.withError(ErrorCodes.STATE, "Value defined in account " + targetAddress + " is not a callable function: " + sym);
 		}
 
 		// Ensure we create a forked Context for the Actor call
-		final Context<R> exContext=forkActorCall(state, target, offer, null);
+		final Context<R> exContext=forkActorCall(state, targetAddress, offer, scope);
 
 		// INVOKE ACTOR FUNCTION
 		final Context<R> rctx=exContext.invoke(fn,args);

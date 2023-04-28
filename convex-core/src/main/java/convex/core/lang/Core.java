@@ -690,8 +690,7 @@ public class Core {
 			Context<ACell> ctx = context.consumeJuice(Juice.CALL_OP);
 			if (ctx.isExceptional()) return ctx;
 
-			Address target = RT.ensureAddress(args[0]);
-			if (target == null) return ctx.withCastError(0,args, Types.ADDRESS);
+			ACell target = args[0];
 
 			CVMLong sendAmount = RT.ensureLong(args[1]);
 			if (sendAmount == null) return ctx.withCastError(1,args, Types.LONG);
