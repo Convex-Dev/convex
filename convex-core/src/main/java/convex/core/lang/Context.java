@@ -139,11 +139,12 @@ public class Context<T extends ACell> extends AObject {
 	 * SECURITY: security critical, since it determines the current *address* and *caller*
 	 * which in turn controls access to most account resources and rights.
 	 */
-	private static final class ChainState {
+	protected static final class ChainState {
 		private final State state;
 		private final Address origin;
 		private final Address caller;
 		private final Address address;
+		private final ACell scope;
 		private final long offer;
 
 		/**
@@ -152,7 +153,7 @@ public class Context<T extends ACell> extends AObject {
 		private final AHashMap<Symbol, ACell> environment;
 		private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
 
-		private ChainState(State state, Address origin,Address caller, Address address,AHashMap<Symbol, ACell> environment, AHashMap<Symbol,AHashMap<ACell,ACell>> metadata, long offer) {
+		private ChainState(State state, Address origin,Address caller, Address address,AHashMap<Symbol, ACell> environment, AHashMap<Symbol,AHashMap<ACell,ACell>> metadata, long offer,ACell scope) {
 			this.state=state;
 			this.origin=origin;
 			this.caller=caller;
@@ -160,6 +161,7 @@ public class Context<T extends ACell> extends AObject {
 			this.environment=environment;
 			this.metadata=metadata;
 			this.offer=offer;
+			this.scope=scope;
 		}
 
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer) {
@@ -172,7 +174,7 @@ public class Context<T extends ACell> extends AObject {
 					metadata=as.getMetadata();
 				}
 			}
-			return new ChainState(state,origin,caller,address,environment,metadata,offer);
+			return new ChainState(state,origin,caller,address,environment,metadata,offer,null);
 		}
 
 		public ChainState withStateOffer(State newState,long newOffer) {
@@ -185,8 +187,12 @@ public class Context<T extends ACell> extends AObject {
 			return create(newState,origin,caller,address,offer);
 		}
 
-		private long getOffer() {
+		protected long getOffer() {
 			return offer;
+		}
+		
+		protected ACell getScope() {
+			return scope;
 		}
 
 		/**
@@ -734,6 +740,16 @@ public class Context<T extends ACell> extends AObject {
 	 */
 	public Address getCaller() {
 		return chainState.caller;
+	}
+	
+	/**
+	 * Gets the scope of the currently executing context.
+	 *
+	 * Will be null if no scope was set
+	 * @return Caller of the currently executing context
+	 */
+	public ACell getScope() {
+		return chainState.scope;
 	}
 
 	/**
