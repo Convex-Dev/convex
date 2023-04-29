@@ -190,8 +190,10 @@
 
          [subject action object]
 
-         (contains-key? whitelist
-                        (address subject)))
+         (and
+           (address? subject)
+           (contains-key? whitelist
+                        (address subject))))
 
 
        (defn set-trusted
