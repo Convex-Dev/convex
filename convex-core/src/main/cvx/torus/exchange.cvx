@@ -381,7 +381,7 @@
                ~*address*)
     (return (call ~*address*
                   (create-market token))))
-  (assert (address? token))
+  (assert (callable? token))
   (let [existing-market (get markets
                              token)]
     (or existing-market

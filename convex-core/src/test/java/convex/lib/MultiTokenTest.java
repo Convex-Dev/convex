@@ -32,9 +32,11 @@ public class MultiTokenTest extends ACVMTest {
 		
 		ctx=step(ctx,"(call mt (create :USD))");
 		assertNotError(ctx);
-		ctx=step(ctx,"(call mt (mint [mt :USD] 1000000000))");
-		assertNotError(ctx);
-		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [[mt :USD] 1000000000])");
+		
+		ctx=step(ctx,"(call [mt :USD] (mint  1000))");
+		assertCVMEquals(1000,ctx.getResult());
+		
+		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [[mt :USD] 400])");
 		assertNotError(ctx);
 
 		
@@ -45,7 +47,7 @@ public class MultiTokenTest extends ACVMTest {
 		Context<?> ctx = context();
 		
 		// Non-existing token can't have balance
-		assertError(step("(asset/balance [mt :FOOSD])"));
+		assertEquals(0L,evalL("(asset/balance [mt :FOOSD])"));
 		
 		ctx=step(ctx,"(call mt (create :FOOSD))");
 		assertNotError(ctx);
@@ -53,7 +55,7 @@ public class MultiTokenTest extends ACVMTest {
 		assertEquals(0L,evalL(ctx,"(asset/balance [mt :FOOSD])"));
 		
 		// Mint with standard call
-		ctx=step(ctx,"(call mt (mint [mt :FOOSD] 2022))");
+		ctx=step(ctx,"(call [mt :FOOSD] (mint 2022))");
 		assertNotError(ctx);
 		assertEquals(2022L,evalL(ctx,"(asset/balance [mt :FOOSD])"));
 
@@ -65,8 +67,9 @@ public class MultiTokenTest extends ACVMTest {
 
 		
 		// Negative mint allowed?
-		// assertError(step(ctx,"(call mt (mint :FOOSD -1))"));
+		assertEquals(4043,evalL(ctx,"(call [mt :FOOSD] (mint -1))"));
 
+		assertError(step(ctx,"(call [mt :FOOSD] (mint -9999999999999999))"));
 	}
 
 }

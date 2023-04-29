@@ -80,14 +80,7 @@
     (fail "Bad asset argument")))
   
   ([sender path quantity]
-    (cond
-      (address? path)
-        (call path (accept sender quantity))
-        
-      (vector? path)
-        (call (first path) (accept sender path quantity))
-        
-      (-fail-path path))))
+    (call path (accept sender quantity))))
 
 
 
@@ -141,7 +134,7 @@
   (cond 
     (vector? asset)
     (let [[path quantity] asset]
-       (offer receiver path quantity))
+       (recur receiver path quantity))
 
     (map? asset)
     (reduce (fn [m [path quantity]]
@@ -150,16 +143,7 @@
             asset)))
   
   ([receiver path quantity]
-    (cond 
-      ;; Address path
-      (address? path)
-        (call path (offer receiver quantity))
-      
-      ;; Vector path
-      (vector? path)
-        (call (first path) (offer receiver path quantity))
-      
-      (-fail-path path))))
+    (call path (offer receiver quantity))))
 
 
 
@@ -171,15 +155,14 @@
           :signature   [{:params [receiver asset]}
                         {:params [receiver asset data]}]}}
 
-
   ([receiver asset]
 
    (cond
      (vector? asset)
        (let [[path quantity] asset]
-         (recur receiver path quantity nil))
+        (recur receiver path quantity nil))
        
-     (map? asset)
+    (map? asset)
      (reduce (fn [m [path quantity]]
                (assoc m
                       path 
@@ -191,30 +174,23 @@
      (fail "Invalid asset")))
 
   ([receiver path quantity]
-    (recur receiver path quantity nil))
-    
+   (recur receiver path quantity nil))
+   
   ([receiver path quantity data]
 
    (cond
-     ;; First check if receiver has a callable receive-asset function. If so, use this
-     (callable? receiver 'receive-asset)
-     (do 
+    ;; First check if receiver has a callable receive-asset function. If so, use this
+    (callable? receiver 'receive-asset)
+    (do 
        (offer receiver path quantity) ;; Offer correct quantity
-       (call receiver
+      (call receiver
          (receive-asset path quantity data)))
      
-     ;; An actor without a receive-asset function is not a valid receiver?
-     (actor? receiver)
+    ;; An actor without a receive-asset function is not a valid receiver?
+    (actor? receiver)
      (fail "Receiver does not have receive-asset function")
-     
-     (address? path)
-     (call path (direct-transfer receiver quantity))
-     
-     (vector? path)
-     (call (first path) (direct-transfer receiver path quantity))
-     
-     ;; else  
-     (-fail-path path))))
+    
+    (call path (direct-transfer receiver quantity)))))
 
 
 ;;;;;;;;;; Ownership
@@ -234,18 +210,7 @@
     (recur path *address*))
 
   ([path owner]
-   (cond 
-      ;; Address version
-      (address? path)
-        (query (call path
-                  (balance owner)))
-      
-      ;; Vector path
-      (vector? path)
-        (query (call (first path)
-                  (balance path owner)))  
-        
-      (-fail-path path))))
+   (call path (balance owner))))
 
 (defn burn 
 
@@ -254,17 +219,8 @@
           :signature   [{:params [path amount]}]}}
 
   [path amount]
-  (cond 
-    (address? path)
     (call path
-      (burn amount))
-    
-    (vector? path)
-    (call (first path)
-      (burn path amount))
-    
-    (-fail-path path)))
-
+      (burn amount)))
 
 
 (defn mint 
@@ -274,17 +230,8 @@
           :signature   [{:params [token amount]}]}}
 
   [path amount]
-
-  (cond 
-    (address? path)
-    (call path
-      (mint amount))
-    
-    (vector? path)
-    (call (first path)
-      (mint path amount))
-    
-    (-fail-path path)))
+  (call path
+      (mint amount)))
 
 
 
@@ -316,19 +263,9 @@
 
   ([owner path quantity]
     (query
-      (let [bal (balance path owner)] 
-        (cond
-          ;; Address version
-          (address? path)
+      (let [bal (balance path owner)]
           (call path
-            (quantity-subset? quantity bal))
-          
-          ;; Vector path
-          (vector? path)
-            (call (first path)
-               (quantity-subset? quantity bal))
-            
-          (-fail-path path))))))
+            (quantity-subset? quantity bal))))))
 
 
 ;;;;;;;;;; Quantities
@@ -362,10 +299,8 @@
 
 
   ([path a b]
-    (let [path (-path-addr path)]
-      (query (call path
-                (quantity-add a b))))))
-
+    (query (call path
+             (quantity-add a b)))))
 
 (defn quantity-sub
 
@@ -399,10 +334,7 @@
 
 
   ([path a b]
-
-   (query (call (-path-addr path)
-                (quantity-sub a
-                              b)))))
+   (query (call path (quantity-sub a b)))))
 
 
 (defn quantity-zero
@@ -415,8 +347,7 @@
           :signature   [{:params [asset-address]}]}}
 
   [path]
-  (query (call (-path-addr path)
-               (quantity-add nil nil))))
+  (query (call path (quantity-add nil nil))))
 
 (defn quantity-contains?
 
@@ -451,5 +382,4 @@
 
   ([path a b]
    (query 
-     (let [addr (-path-addr path)]
-       (call addr (quantity-subset? b a))))))
+     (call path (quantity-subset? b a)))))

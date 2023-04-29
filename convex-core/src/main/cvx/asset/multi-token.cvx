@@ -50,43 +50,42 @@
 
 (defn direct-transfer
 
-         ^{:callable? true}
+   ^{:callable? true}
 
-         [addr path amount]
+   [addr amount]
 
-         (let [addr   (address addr)
-               amount (if amount
-                        (long amount)
-                        0)
-               id (second path)
-               bal    (-get-balance *caller* id)
-               tbal   (-get-balance addr id)]
-           ;; Amount must be in valid range.
-           ;;
-           (assert (<= 0
-                       amount
-                       bal)) 
-           ;; Need this check in case of self-transfers.
-           (when (= *caller*
-                    addr)
-             (return amount))
-           (-set-balance *caller* id (- bal amount))
-           (-set-balance addr id (+ tbal amount))))
+   (let [addr   (address addr)
+         amount (if amount
+                  (long amount)
+                  0)
+         id *scope*
+         bal    (-get-balance *caller* id)
+         tbal   (-get-balance addr id)]
+     ;; Amount must be in valid range.
+     ;;
+     (assert (<= 0
+                 amount
+                 bal)) 
+     ;; Need this check in case of self-transfers.
+     (when (= *caller*
+              addr)
+       (return amount))
+     (-set-balance *caller* id (- bal amount))
+     (-set-balance addr id (+ tbal amount))))
 
 (defn balance
    ^{:callable? true}
    ([addr]
-     (or (get-holding addr)
-       {}))
-   
-   ([path addr]
-     (let [id (second path)]
-       (-get-balance addr id))))
+     (let [hs (get-holding addr)]
+       (if (empty? hs) {})
+       (if *scope*
+         (or (get hs *scope*) 0)
+         {}))))
 
 (defn mint
   ^{:callable? true}
-  [path amount]
-  (let [id (second path)
+  [amount]
+  (let [id *scope*
         token (or (get tokens id) (fail "token does not exist"))
         [controller supply] token]
     (when-not (trust/trusted? controller *caller* :mint)
@@ -98,12 +97,14 @@
           new-bal    (+ bal amount)]
            
       ;; New supply must be in valid range.
-      (assert (<= 0 new-supply max-supply))
+     (assert (<= 0 new-supply max-supply))
       
       ;; new balance must be in range
-      (assert (<= 0 new-bal max-supply))
+     (assert (<= 0 new-bal max-supply))
       
       ;; Update state
-      (-set-balance *caller* id new-bal)
-      (def tokens (assoc tokens id [controller new-supply])))))
+     (-set-balance *caller* id new-bal)
+      (do 
+        (def tokens (assoc tokens id [controller new-supply]))
+        new-supply))))
 
