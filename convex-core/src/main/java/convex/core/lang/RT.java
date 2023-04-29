@@ -1743,9 +1743,22 @@ public class RT {
 		return null;
 	}
 
-
-
-
+	/**
+	 * Gets a callable Address from a cell value. Handles regular Addresses and scoped call targets
+	 * @param a Value to extract Address from
+	 * @return Address of callable target, or null if not a valid call target
+	 */
+	public static Address callableAddress(ACell a) {
+		Address addr=RT.ensureAddress(a);
+		if (addr == null) {
+			if (a instanceof AVector) {
+				AVector<?> v=(AVector<?>)a;
+				if (v.count()!=2) return null;
+				addr=RT.ensureAddress(v.get(0));
+			} 
+		}
+		return addr;
+	}
 
 
 }

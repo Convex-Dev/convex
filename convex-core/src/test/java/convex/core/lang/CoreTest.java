@@ -4161,12 +4161,21 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB(ctx, "(callable? [caddr nil] 'public)")); 
 		assertFalse(evalB(ctx, "(callable? [caddr 1] 'private)")); 
 
+		// 1-arity checks
+		assertTrue(evalB(ctx, "(callable? #1)"));
+		assertTrue(evalB(ctx, "(callable? [#1 nil])"));
+		assertTrue(evalB(ctx, "(callable? [#1 #5675])"));
+		assertFalse(evalB(ctx, "(callable? [#1 #5675 #5875])"));
+		assertFalse(evalB(ctx, "(callable? nil)"));
+		assertFalse(evalB(ctx, "(callable? :foo)"));
+		assertFalse(evalB(ctx, "(callable? [])"));
+
 		
 		assertCastError(step(ctx, "(callable? caddr :public)")); // not a Symbol
 		assertCastError(step(ctx, "(callable? caddr :random-name)"));
 		assertCastError(step(ctx, "(callable? caddr :private)"));
 
-		assertArityError(step(ctx, "(callable? 1)"));
+		assertArityError(step(ctx, "(callable?)"));
 		assertArityError(step(ctx, "(callable? 1 2 3)"));
 
 		assertCastError(step(ctx, "(callable? :foo :foo)"));

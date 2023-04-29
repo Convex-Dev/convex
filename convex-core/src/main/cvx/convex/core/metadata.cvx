@@ -354,10 +354,11 @@
                        :return Any}]}}
 
  callable?
- {:doc {:description "Returns true the given function name (a symbol) is a callable function in actor. See `call`."
-        :errors      {:CAST "If the actor argument is not an address."}
+ {:doc {:description "Returns true if the target is callable. If symbol is provided, also checks that this symbol references a callable function in the specified account. See `call`."
+        :errors      {:CAST "If the symbol argument is not a Symbol."}
         :examples    [{:code "(callable? actor-address 'function-name)"}]
-        :signature   [{:params [addr symbol]}]}}
+        :signature   [{:params [target]}
+                      {:params [target symbol]}]}}
 
  
  ceil
