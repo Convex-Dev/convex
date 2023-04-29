@@ -165,8 +165,8 @@ public class TrustTest extends ACVMTest {
 		// our villain should be on the blacklist
 		assertFalse(evalB(ctx, "(trust/trusted? blist " + VILLAIN + ")"));
 
-		assertCastError(step(ctx, "(trust/trusted? blist nil)"));
-		assertCastError(step(ctx, "(trust/trusted? blist [])"));
+		assertFalse(evalB(ctx, "(trust/trusted? blist nil)"));
+		assertFalse(evalB(ctx, "(trust/trusted? blist [])"));
 
 		assertCastError(step(ctx, "(trust/trusted? nil *address*)"));
 		assertCastError(step(ctx, "(trust/trusted? [] *address*)"));
