@@ -35,21 +35,6 @@
     (vector? a) (conj {} a)
     (nil? a)    {}))
 
-;; Used to throw generic error message for bad path
-(defn -fail-path 
-  ^{:private? true}
-  [p]
-  (fail (str "Bad asset path: " p)))
-
-;; Get actor address for a given path, fail if not possible
-(defn -path-addr 
-  ^{:private? true}
-  [p]
-  (cond
-    (address? p) p
-    (vector? p) (first p)
-    (-fail-path p)))
-
 ;;;;;;;;;; Transfers
 
 
