@@ -631,11 +631,22 @@ public class Core {
 		public Context<CVMBool> invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
-			Address addr = RT.ensureAddress(args[0]);
-			if (addr == null) return context.withCastError(1,args, Types.ADDRESS);
-
+			// Note we check the symbol first, to catch potential CAST errors
 			Symbol sym = RT.ensureSymbol(args[1]);
 			if (sym == null) return context.withCastError(1,args, Types.SYMBOL);
+
+			ACell a0=args[0];
+			Address addr = RT.ensureAddress(a0);
+			if (addr == null) {
+				if (a0 instanceof AVector) {
+					AVector<?> v=(AVector)a0;
+					if (v.count()!=2) return context.withResult(Juice.LOOKUP,CVMBool.FALSE);
+					addr=RT.ensureAddress(v.get(0));
+					if (addr==null) return context.withResult(Juice.LOOKUP,CVMBool.FALSE);
+				} else {
+					return context.withResult(Juice.LOOKUP,CVMBool.FALSE);
+				}
+			}
 
 			AccountStatus as = context.getState().getAccount(addr);
 			if (as == null) return context.withResult(Juice.LOOKUP, CVMBool.FALSE);

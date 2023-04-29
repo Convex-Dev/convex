@@ -4147,7 +4147,7 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testExportsQ() {
+	public void testCallableQ() {
 		Context<?> ctx = step("(def caddr (deploy '(do " + "(defn private [] :priv) " + "(defn public ^{:callable? true} [] :pub))))");
 
 		Address caddr = (Address) ctx.getResult();
@@ -4157,6 +4157,11 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB(ctx, "(callable? caddr 'private)")); // Defined, but not exported
 		assertFalse(evalB(ctx, "(callable? caddr 'random-symbol)")); // Doesn't exist
 
+		// Valid scoped calls
+		assertTrue(evalB(ctx, "(callable? [caddr nil] 'public)")); 
+		assertFalse(evalB(ctx, "(callable? [caddr 1] 'private)")); 
+
+		
 		assertCastError(step(ctx, "(callable? caddr :public)")); // not a Symbol
 		assertCastError(step(ctx, "(callable? caddr :random-name)"));
 		assertCastError(step(ctx, "(callable? caddr :private)"));
