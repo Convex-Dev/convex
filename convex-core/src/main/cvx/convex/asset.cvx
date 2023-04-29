@@ -181,14 +181,14 @@
    (cond
     ;; First check if receiver has a callable receive-asset function. If so, use this
     (callable? receiver 'receive-asset)
-    (do 
-       (offer receiver path quantity) ;; Offer correct quantity
-      (call receiver
-         (receive-asset path quantity data)))
+      (do 
+        (offer receiver path quantity) ;; Offer correct quantity
+        (call receiver 
+          (receive-asset path quantity data)))
      
     ;; An actor without a receive-asset function is not a valid receiver?
     (actor? receiver)
-     (fail "Receiver does not have receive-asset function")
+       (fail "Receiver does not have receive-asset function")
     
     (call path (direct-transfer receiver quantity)))))
 
@@ -210,7 +210,7 @@
     (recur path *address*))
 
   ([path owner]
-   (call path (balance owner))))
+    (call path (balance owner))))
 
 (defn burn 
 
@@ -218,9 +218,9 @@
           :examples    [{:code "(burn [my-token-address :FOO] 1000)"}]
           :signature   [{:params [path amount]}]}}
 
-  [path amount]
+  ([path amount]
     (call path
-      (burn amount)))
+      (burn amount))))
 
 
 (defn mint 
@@ -361,25 +361,24 @@
 
 
   ([asset-a asset-b]
-     (let [asset-a (-make-map asset-a)
-           asset-b (-make-map asset-b)]
-       (reduce (fn [m [path qb]]
-                 (let [qa (get asset-a
-                               path)]
-                   (cond
-                     (= qa
-                        qb)
-                     true
+    (let [asset-a (-make-map asset-a)
+          asset-b (-make-map asset-b)]
+      (reduce (fn [m [path qb]]
+                (let [qa (get asset-a
+                           path)]
+                  (cond
+                    (= qa qb)
+                      true
 
-                     (quantity-contains? path qa qb)
-                     true
+                    (quantity-contains? path qa qb)
+                      true
 
-                     :else
-                     (reduced false))))
+                    :else
+                      (reduced false))))
                true
                asset-b)))
 
 
   ([path a b]
-   (query 
-     (call path (quantity-subset? b a)))))
+    (query 
+      (call path (quantity-subset? b a)))))
