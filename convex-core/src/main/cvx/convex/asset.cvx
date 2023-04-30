@@ -319,7 +319,7 @@
 
 
   ([path a b]
-   (query (call path (quantity-sub a b)))))
+   (call path (quantity-sub a b))))
 
 
 (defn quantity-zero
@@ -332,7 +332,7 @@
           :signature   [{:params [asset-address]}]}}
 
   [path]
-  (query (call path (quantity-add nil nil))))
+  (call path (quantity-add nil nil)))
 
 (defn quantity-contains?
 
@@ -365,5 +365,4 @@
 
 
   ([path a b]
-    (query 
-      (call path (quantity-subset? b a)))))
+    (call path (quantity-subset? b a))))

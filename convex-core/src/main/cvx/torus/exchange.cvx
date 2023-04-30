@@ -24,9 +24,9 @@
 
   ^{:private? true}
 
-  ;; Blob-map of `token address` -> `market actor address`.
+  ;; Map of `token address` -> `market actor address`.
 
-  (blob-map))
+  {})
 
 
 ;;;;;;;;;; API - Creating markets

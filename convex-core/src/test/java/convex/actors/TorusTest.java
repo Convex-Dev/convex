@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
 import convex.core.init.InitTest;
@@ -85,6 +86,29 @@ public class TorusTest extends ACVMTest {
 		assertTrue(ctx.getResult() instanceof CVMDouble);
 
 		ctx= step(ctx,"(torus/price GBP USD)");
+
+	}
+	
+	@Test public void testMultiTokenListing() {
+		Context<?> ctx=INITIAL.fork();
+		String importS="(import asset.multi-token :as mt)";
+		ctx=step(ctx,importS);
+		assertNotError(ctx);
+		
+		ctx=step(ctx,"(def ECO [mt (call mt (create :ECO))])");
+		assertTrue(ctx.getResult() instanceof AVector);
+
+		ctx= step(ctx,"(def ECOM (call TORUS (create-market ECO)))");
+		assertTrue(ctx.getResult() instanceof Address);
+
+		assertNull(eval(ctx,"(torus/price ECO)"));
+		
+		ctx=step(ctx,"(call ECO (mint 1000000))");
+		
+		// TODO: multi-token needs offer and accept for this
+		//ctx=step(ctx,"(torus/add-liquidity ECO 1000 10000)");
+		//assertNotError(ctx);
+		//assertEquals(10.0,evalD(ctx,"(torus/price ECO)"));
 
 	}
 
