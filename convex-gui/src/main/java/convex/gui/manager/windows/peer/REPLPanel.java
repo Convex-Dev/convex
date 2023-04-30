@@ -108,7 +108,7 @@ public class REPLPanel extends JPanel {
 		InetSocketAddress addr = peerView.getHostAddress();
 		if (addr == null) {
 			JOptionPane.showMessageDialog(this, "Error: peer shut down already?");
-			throw new Error("Connect fail, no remote address");
+			throw new IllegalStateException("Connect fail, no remote address");
 		}
 		try {
 			// Connect to peer as a client

@@ -28,8 +28,12 @@ public class PeerComponent extends BaseListComponent {
 	private PeerGUI manager;
 
 	public void launchPeerWindow(PeerView peer) {
-		PeerWindow pw = new PeerWindow(manager, peer);
-		pw.launch();
+		try {
+			PeerWindow pw = new PeerWindow(manager, peer);
+			pw.launch();
+		} catch (Exception e) {
+			// Ignore
+		}
 	}
 
 	public void launchEtchWindow(PeerView peer) {
@@ -77,7 +81,11 @@ public class PeerComponent extends BaseListComponent {
 		if (peer.isLocal()) {
 			JMenuItem closeButton = new JMenuItem("Shutdown Peer");
 			closeButton.addActionListener(e -> {
-				peer.close();
+				try {
+					peer.peerServer.shutdown();
+				} catch (Exception e1) {
+					// ignore
+				}
 			});
 			popupMenu.add(closeButton);
 
