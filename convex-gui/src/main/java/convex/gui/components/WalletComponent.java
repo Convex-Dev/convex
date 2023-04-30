@@ -73,7 +73,7 @@ public class WalletComponent extends BaseListComponent {
 		add(buttons, BorderLayout.EAST);
 
 		// identicon
-		JLabel identicon = new Identicon(walletEntry.getAddress().getHash());
+		JLabel identicon = new Identicon(walletEntry.getIdenticonHash());
 		GridBagConstraints gbc_btnNewButton = new GridBagConstraints();
 		gbc_btnNewButton.insets = new Insets(0, 0, 5, 5);
 		gbc_btnNewButton.gridx = 0;

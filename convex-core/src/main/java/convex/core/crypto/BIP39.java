@@ -3,10 +3,13 @@ package convex.core.crypto;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -222,4 +225,34 @@ public class BIP39 {
 	    byte[] bs = key.getEncoded();
 	    return Blob.wrap(bs);
 	}
+
+	public static String createSecureRandom() {
+		return Utils.joinStrings(createWords(new SecureRandom(),12)," ");
+	}
+
+	public static List<String> createWords(Random r, int n) {
+		ArrayList<String> al=new ArrayList<>(n);
+		for (int i=0; i<n; i++) {
+			int ix=r.nextInt(wordlist.length);
+			String word=wordlist[ix];
+			al.add(word);
+		}
+		return al;
+	}
+
+	public static Blob getSeed(List<String> words) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public static List<String> getWords(String s) {
+		String[] ss=s.split(" ");
+		ArrayList<String> al=new ArrayList<>();
+		for (int i=0; i<ss.length; i++) {
+			String w=ss[i].trim();
+			if (!w.isBlank()) al.add(w);
+		}
+		return al;
+	}
+	
 }

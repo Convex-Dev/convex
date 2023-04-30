@@ -5,6 +5,7 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.util.List;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -13,7 +14,7 @@ import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.Mnemonic;
+import convex.core.crypto.BIP39;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
@@ -52,8 +53,8 @@ public class KeyGenPanel extends JPanel {
 	private void updateMnemonic() {
 		String s = mnemonicArea.getText();
 		try {
-			byte[] bs = Mnemonic.decode(s, 128);
-			Blob keyMat=Blob.wrap(bs);
+			List<String> words=BIP39.getWords(s);
+			Blob keyMat=BIP39.getSeed(words,"");
 			ABlob seed=keyMat.getContentHash();
 			String privateKeyString = seed.toHexString();
 			privateKeyArea.setText(privateKeyString);
@@ -104,7 +105,7 @@ public class KeyGenPanel extends JPanel {
 		JButton btnRecreate = new JButton("Generate");
 		actionPanel.add(btnRecreate);
 		btnRecreate.addActionListener(e -> {
-			mnemonicArea.setText(Mnemonic.createSecureRandom());
+			mnemonicArea.setText(BIP39.createSecureRandom());
 			updateMnemonic();
 		});
 
@@ -131,19 +132,18 @@ public class KeyGenPanel extends JPanel {
 		gbl_formPanel.rowWeights = new double[] { 0.0, 1.0, 1.0, 1.0, Double.MIN_VALUE };
 		formPanel.setLayout(gbl_formPanel);
 
-		JLabel lblNewLabel = new JLabel("Mnenomic Phrase");
+		JLabel lblMnemonic = new JLabel("Mnenomic Phrase");
 		GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
-		gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
 		gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
 		gbc_lblNewLabel.insets = new Insets(0, 0, 5, 5);
 		gbc_lblNewLabel.gridx = 0;
 		gbc_lblNewLabel.gridy = 0;
-		formPanel.add(lblNewLabel, gbc_lblNewLabel);
+		formPanel.add(lblMnemonic, gbc_lblNewLabel);
 
 		mnemonicArea = new JTextArea();
 		mnemonicArea.setWrapStyleWord(true);
 		mnemonicArea.setLineWrap(true);
-		mnemonicArea.setRows(3);
+		mnemonicArea.setRows(2);
 		GridBagConstraints gbc_mnemonicArea = new GridBagConstraints();
 		gbc_mnemonicArea.fill = GridBagConstraints.HORIZONTAL;
 		gbc_mnemonicArea.insets = new Insets(0, 0, 5, 0);
@@ -157,7 +157,7 @@ public class KeyGenPanel extends JPanel {
 			updateMnemonic();
 		}));
 
-		JLabel lblPrivateKey = new JLabel("Private key seed");
+		JLabel lblPrivateKey = new JLabel("Private key Ed25519 seed");
 		GridBagConstraints gbc_lblPrivateKey = new GridBagConstraints();
 		gbc_lblPrivateKey.anchor = GridBagConstraints.WEST;
 		gbc_lblPrivateKey.insets = new Insets(0, 0, 5, 5);
@@ -189,7 +189,7 @@ public class KeyGenPanel extends JPanel {
 
 		publicKeyArea = new JTextArea();
 		publicKeyArea.setEditable(false);
-		publicKeyArea.setRows(4);
+		publicKeyArea.setRows(1);
 		publicKeyArea.setText("(private key not ready)");
 		publicKeyArea.setFont(new Font("Monospaced", Font.BOLD, 13));
 		GridBagConstraints gbc_publicKeyArea = new GridBagConstraints();
