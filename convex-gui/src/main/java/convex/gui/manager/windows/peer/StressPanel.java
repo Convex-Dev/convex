@@ -164,7 +164,7 @@ public class StressPanel extends JPanel {
 				StringBuilder sb = new StringBuilder();
 				try {
 					resultArea.setText("Connecting clients...");
-					InetSocketAddress sa = peerView.peerServer.getHostAddress();
+					InetSocketAddress sa = peerView.getHostAddress();
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);

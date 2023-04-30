@@ -44,7 +44,7 @@ import etch.EtchStore;
 public class PeersListPanel extends JPanel {
 
 	JPanel peersPanel;
-	static DefaultListModel<PeerView> peerList = new DefaultListModel<PeerView>();
+	public static DefaultListModel<PeerView> peerList = new DefaultListModel<PeerView>();
 
 	JPanel peerViewPanel;
 	JScrollPane scrollPane;

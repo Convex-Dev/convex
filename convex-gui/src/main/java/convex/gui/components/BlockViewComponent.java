@@ -50,6 +50,7 @@ public class BlockViewComponent extends JPanel {
 		g.fillRect(0, 0, pw, ph);
 		
 		Server server=peerView.peerServer;
+		if (server==null) return; // not a local server
 		
 		AStore tempStore=Stores.current(); // just in case, since we are reading from a specific peer
 		try {
