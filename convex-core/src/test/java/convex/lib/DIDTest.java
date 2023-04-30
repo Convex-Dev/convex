@@ -102,6 +102,12 @@ public class DIDTest extends ACVMTest {
 		// Check we are now fully authorised
 		assertTrue(evalB(ctx,"(trust/trusted? did *address* nil id)"));
 		assertTrue(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+		
+		// Clear authorised set
+		ctx=step(ctx,"(call did (authorise id nil))");
+
+		// Check authorisation is revoked
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
 
 	}
 	
