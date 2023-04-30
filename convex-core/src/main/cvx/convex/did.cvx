@@ -8,7 +8,12 @@
 ;; - IDs are sequentially allocated integers. mapping human readable names to ID is possible but outside of scope of this library
 ;; - The required operations Create, Read, Update and Deactivate are implemeted on-chain
 ;; - We regard a nil DDO as deactivated
-;; - Records are internally stored as a Vector [ddo-document controller created updated]
+;; - Records are internally stored as a Vector with the following elements:
+;;     0: ddo-document = A string (or nil) containing the DDO
+;;     1: controller = address (or trust monitor) to authorise DID updates
+;;     2: created = timestamp of DID creation 
+;;     3: updated = timestamp of last update
+;;     4: accounts = Set of accounts authorised to act on behalf of this identity
 
 (import convex.trust :as trust)
 
@@ -36,15 +41,15 @@
     (recur *caller*))
   ([controller]
     (let [id counter
-          controller (address controller)
-          rec ["" controller *timestamp* *timestamp*]]
+          controller (if (callable? controller) controller (fail "Invalid controller"))
+          rec ["" controller *timestamp* *timestamp* nil]]
       (def dids (assoc dids id rec))
       (def counter (inc counter))
       id)))
 
 (defn 
   ^{:callable? true
-    :doc       {:description "Updates a DDO for a DID."
+    :doc       {:description "Updates a DDO for a DID. DDO can be a String, or nil to deactivate"
                 :signature   [{:params [id ddo]}]}}
   update
  ([id ddo]
@@ -58,6 +63,38 @@
            ]
        (def dids (assoc dids id rec))
        rec)))
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Authorises a set of accounts for this DID. May be nil."
+                :signature   [{:params [id auth-set]}]}}
+  authorise 
+  ([auth-set]
+    (recur *scope* auth-set))
+  ([id auth-set]
+    (or (nil? auth-set) (set? auth-set) (fail "auth-set must be nil or a set of addresses"))
+    (let [rec (get dids id)
+          _ (or rec (error "Invalid or missing DID"))
+          cont (get rec 1)
+          _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
+          rec (assoc rec 4 auth-set)    ;; update Authorised account set
+          rec (assoc rec 3 *timestamp*) ;; update timestamp
+          ]
+      (def dids (assoc dids id rec))
+      rec)))
+
+(defn check-trusted?
+  ^{:callable? true
+    :doc       {:description "Trust monitor for DID. Checks if subject is authorised by the DID, where the DID is provided either via a scoped call or the object parameter."
+                :signature   [{:params [subject action object]}]}}
+  [subject action object]
+  (let [id (or *scope* object)
+        rec (get dids id)]
+    (and
+      rec ;; not nil
+      (address? subject)
+      (contains-key? (nth rec 4)
+        (address subject)))))
 
 (defn 
   ^{:callable? true

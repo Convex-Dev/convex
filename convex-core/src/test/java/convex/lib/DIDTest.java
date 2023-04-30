@@ -1,6 +1,7 @@
 package convex.lib;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -80,6 +81,28 @@ public class DIDTest extends ACVMTest {
 		// Original DDO should be unchanged
 		ctx=step(ctx,"(call did (read "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
+	}
+	
+	@Test public void testAuthorisedMonitor() {
+		Context<ACell> ctx=context();
+		ctx=step(ctx,"(import convex.did :as did)");
+		ctx=step(ctx,"(import convex.trust :as trust)");
+		
+		// Set up DDO controlled by HERO
+		ctx=step(ctx,"(def id (call did (create)))");
+		
+		// Nobody is initially trusted
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+		
+		// Add HERO address to authorised set
+		ctx=step(ctx,"(call [did id] (authorise #{*address*}))");
+		AVector<?> v=(AVector<?>) ctx.getResult();
+		assertNotNull(v.get(4));
+
+		// Check we are now fully authorised
+		assertTrue(evalB(ctx,"(trust/trusted? did *address* nil id)"));
+		assertTrue(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+
 	}
 	
 	@Test public void testDeactivate() {
