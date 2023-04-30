@@ -24,7 +24,7 @@
 
   [config]
 
-  (let [max-supply (long (or (:max-supply config)
+  (let [max-supply (int (or (:max-supply config)
                              1000000000000000000))
         minter     (address (or (:minter config)
                                 *address*))]
@@ -57,7 +57,7 @@
                                    *caller*)
            (fail :TRUST
                  "No rights to burn"))
-         (let [amount (long amount)
+         (let [amount (int amount)
                bal    (balance *caller*)]
            ;; Burn amount must be less than or equal to caller's balance.
            ;;
@@ -81,7 +81,7 @@
                                    *caller*)
            (fail :TRUST
                  "No rights to mint"))
-         (let [amount     (long amount)
+         (let [amount     (int amount)
                new-supply (+ supply
                              amount)
                bal        (balance *caller*)
@@ -109,7 +109,7 @@
   ^{:doc {:description ["Creates deployable code for a new fungible token which follows the interface described in `convex.asset`."
                         "An optional config map can be provided:"
                         "- `:initial-holder`, address which will hold the initial supply (defaults to `*address*`)"
-                        "- `:supply`, supply created and attributed to `:initial-holder` (long, defaults to 1000000)"]
+                        "- `:supply`, supply created and attributed to `:initial-holder` (Integer, defaults to 1000000)"]
           :examples    [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
           :signature   [{:params [config]}]}}
 
@@ -127,7 +127,7 @@
        (set-holding ~initial-holder
                     ~supply)
 
-       ;; Map of holder-address -> {offeree-address -> positive long amount}
+       ;; Map of holder-address -> {offeree-address -> positive integer amount}
        ;; Must enforce valid positive offers
        ;;
        (def offers {})
@@ -143,7 +143,7 @@
 
          (let [sender   (address sender)
                quantity (if quantity
-                          (long quantity)
+                          (int quantity)
                           0)
                om       (or (get offers
                                  sender)
@@ -215,7 +215,7 @@
 
          (let [addr   (address addr)
                amount (if amount
-                        (long amount)
+                        (int amount)
                         0)
                bal    (or (get-holding *caller*)
                           0)
@@ -258,7 +258,7 @@
 
          (let [receiver (address receiver)
                quantity (if quantity
-                          (long quantity)
+                          (int quantity)
                           0)
                om       (get offers
                              *caller*)]
@@ -289,10 +289,10 @@
          [a b]
 
          (let [a (if a
-                   (long a)
+                   (int a)
                    0)
                b (if b
-                   (long b)
+                   (int b)
                    0)]
            (+ a b)))
 
@@ -304,10 +304,10 @@
          [a b]
 
          (let [a (if a
-                   (long a)
+                   (int a)
                    0)
                b (if b
-                   (long b)
+                   (int b)
                    0)] 
            (if (> a b)
              (- a
@@ -322,10 +322,10 @@
          [a b]
 
          (<= (if a
-               (long a)
+               (int a)
                0)
              (if b
-               (long b)
+               (int b)
                0))))))
 
 
