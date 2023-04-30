@@ -74,7 +74,7 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 
 	/**
 	 * Converts this numeric value to the nearest integer
-	 * @return Integer value
+	 * @return Integer value, or null if bad conversion (e.g. infinity or NaN)
 	 */
 	public abstract AInteger toInteger();
 	

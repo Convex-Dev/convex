@@ -684,6 +684,20 @@
         :examples    [{:code "(intersection #{1 2} #{2 3})"}]
         :signature   [{:params [set & more]
                        :return Set}]}}
+ 
+ int
+ {:doc {:description "Casts the given argument to an Integer)."
+        :errors      {:CAST "If the argument is not castable to Integer."}
+        :examples    [{:code "(int 10)"}]
+        :signature   [{:params [num]}]}}
+
+
+ int?
+ {:doc {:description "Returnes `true` if the argument is an Integer value, `false` otherwise."
+        :examples    [{:code "(int? 1234)"}]
+        :signature   [{:params [x]
+                       :return Boolean}]}}
+
 
 
  into
