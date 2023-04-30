@@ -803,6 +803,25 @@ public class Server implements Closeable {
 		return queryHandler;
 	}
 
+	/**
+	 * Shut down the Server, as gracefully as possible.
+	 * @throws TimeoutException If shitdown attempt times out
+	 * @throws IOException  In case of IO Error
+	 */
+	public void shutdown() throws IOException, TimeoutException {
+		try {
+			AKeyPair kp= getKeyPair();
+			AccountKey key=kp.getAccountKey();
+			Convex convex=Convex.connect(this, controller,kp);
+			Result r=convex.transactSync("(set-peer-stake "+key+" 0)");
+			if (r.isError()) {
+				log.warn("Unable to remove Peer stake: "+r);
+			}
+		} finally {
+			close();
+		}
+	}
+
 
 
 }
