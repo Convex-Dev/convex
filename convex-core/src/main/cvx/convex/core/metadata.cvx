@@ -64,136 +64,116 @@
               :examples    [{:code "*juice*"}]}
    :special? true}
 
-
   *key*
   {:doc      {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."
               :examples    [{:code "*key*"}]}
    :special? true}
 
+  *offer*
+  {:doc      {:description "Returns the amount of native coin offered by `*caller*` during a call. See `call`. Will usually be zero, unless the caller has included an offer with a 'call' expression."
+              :examples    [{:code "*offer*"}]}
+   :special? true}
 
- *offer*
- {:doc      {:description "Returns the amount of native coin offered by `*caller*` during a call. See `call`. Will usually be zero, unless the caller has included an offer with a 'call' expression."
-             :examples    [{:code "*offer*"}]}
-  :special? true}
+  *origin*
+  {:doc      {:description ["Similar to `*caller*` but returns the address of the account that initially signed this transaction."
+                            "In a chain of calls, this address is the very first link."
+                            "Usually, should NOT be used for access control, since a rogue actor can potentially trick a user into creating a transaction that allows code to be indirectly executed. Consider using `*caller*` for access control instead."]
+              :examples    [{:code "*origin*"}]}
+   :special? true}
 
+  *result*
+  {:doc      {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
+              :examples    [{:code "(do 1 *result*)"}]}
+   :special? true}
 
- *origin*
- {:doc      {:description ["Similar to `*caller*` but returns the address of the account that initially signed this transaction."
-                           "In a chain of calls, this address is the very first link."
-                           "Usually, should NOT be used for access control, since a rogue actor can potentially trick a user into creating a transaction that allows code to be indirectly executed. Consider using `*caller*` for access control instead."]
-             :examples    [{:code "*origin*"}]}
-  :special? true}
+  *sequence*
+  {:doc      {:description "Returns the sequence number for the current transaction. The sequence number is the number of transactions executed on this account *including* the current transaction / query. The next valid transction must increment *sequence* by one."
+              :examples    [{:code "*sequence*"}]}
+   :special? true}
 
+  *state*
+  {:doc      {:description "Returns the current CVM state record. This is a large object, and should normally only be used temporarily to look up relevant values."
+              :examples    [{:code "(keys *state*)"}
+                            {:code "(get-in *state* [:accounts *address* :balance])"}]}
+   :special? true}
 
- *result*
- {:doc      {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
-             :examples    [{:code "(do 1 *result*)"}]}
-  :special? true}
+  *timestamp*
+  {:doc      {:description ["Returns the current timestamp."
+                            "The timestamp is a `Long` value that is equal to the greatest timestamp of any block executed (including the current block)."
+                            "A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of peers that are in consensus."
+                            "Commonly used with `schedule`."]
+              :examples    [{:code "*timestamp*"}]}
+   :special? true}
 
+  <
+  {:doc {:description "Tests if numeric arguments are in strict increasing order. Reads as 'less-than'."
+         :examples    [{:code "(< 1 2 3)"}]
+         :signature   [{:params [& xs]
+                        :return Boolean}]}}
+  
+  >
+  {:doc {:description "Tests if numeric arguments are in strict decreasing order. Reads as 'greater-than'."
+         :examples    [{:code "(> 3 2 1)"}]
+         :signature   [{:params [& xs]
+                        :return Boolean}]}}
+  
+  <=
+  {:doc {:description "Tests if numeric arguments are in increasing order. Reads as 'less-than-or-equal'."
+         :examples    [{:code "(<= 1 1 3)"}]
+         :signature   [{:params [& xs]
+                        :return Boolean}]}}
+  
+  >=
+  {:doc {:description "Tests if numeric arguments are in decreasing order. Reads as 'greater-than-or-equal'."
+         :examples    [{:code "(>= 3 2 2)"}]
+         :signature   [{:params [& xs]
+                        :return Boolean}]}}
+  
+  ==
+  {:doc {:description ["Tests if arguments are equal in numerical value."
+                       "Difference with `=` is that types are erased (eg. `Long` value is comparable with a `double` value)."]
+         :examples    [{:code   "(== 2 2.0)"
+                        :return "true"}]
+         :signature   [{:params [& xs]
+                        :return Boolean}]}}
 
- *sequence*
- {:doc      {:description "Returns the sequence number for the current transaction. The sequence number is the number of transactions executed on this account *including* the current transaction / query. The next valid transction must increment *sequence* by one."
-             :examples    [{:code "*sequence*"}]}
-  :special? true}
+  =
+  {:doc {:description "Returns `true` if and only if arguments are precisely equal in value."
+         :examples    [{:code   "(= :foo :foo)"
+                        :return "true"}]
+         :signature   [{:params [& vals]
+                        :return Boolean}]}}
+  
+  +
+  {:doc {:description "Adds numerical arguments. Result will be a `Long` if all arguments are integers, or a double if any floating point values are included."
+         :examples    [{:code "(+ 1 2 3)"}]
+         :signature   [{:params [& xs]}]}}
+  
+  -
+  {:doc {:description "Subtracts numerical arguments from the first argument. Negates a single argument."
+         :examples    [{:code "(- 10 7)"}]
+         :signature   [{:params [x]}
+                       {:params [x y & more]}]}}
+  *
+  {:doc {:description "Multiplies numeric arguments. Result will be a `Double` if any arguments are floating point values, otherwise it will be a `long`."
+         :examples    [{:code "(* 1 2 3 4 5)"}]
+         :signature   [{:params [& xs]}]}}
+  
+  /
+  {:doc {:description "Double precision point divide. With a single argument, returns the reciprocal of a number. With multiple arguments, divides the first argument by the others in order."
+         :examples    [{:code "(/ 10 3)"}]
+         :signature   [{:params [divisor]}
+                       {:params [numerator divisor]}
+                       {:params [numerator divisor & more]}]}}
 
-
- *state*
- {:doc      {:description "Returns the current CVM state record. This is a large object, and should normally only be used temporarily to look up relevant values."
-             :examples    [{:code "(keys *state*)"}
-                           {:code "(get-in *state* [:accounts *address* :balance])"}]}
-  :special? true}
-
-
- *timestamp*
- {:doc      {:description ["Returns the current timestamp."
-                           "The timestamp is a `Long` value that is equal to the greatest timestamp of any block executed (including the current block)."
-                           "A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of peers that are in consensus."
-                           "Commonly used with `schedule`."]
-             :examples    [{:code "*timestamp*"}]}
-  :special? true}
-
-
- <
- {:doc {:description "Tests if numeric arguments are in strict increasing order. Reads as 'less-than'."
-        :examples    [{:code "(< 1 2 3)"}]
-        :signature   [{:params [& xs]
-                       :return Boolean}]}}
-
-
- >
- {:doc {:description "Tests if numeric arguments are in strict decreasing order. Reads as 'greater-than'."
-        :examples    [{:code "(> 3 2 1)"}]
-        :signature   [{:params [& xs]
-                       :return Boolean}]}}
-
-
- <=
- {:doc {:description "Tests if numeric arguments are in increasing order. Reads as 'less-than-or-equal'."
-        :examples    [{:code "(<= 1 1 3)"}]
-        :signature   [{:params [& xs]
-                       :return Boolean}]}}
-
-
- >=
- {:doc {:description "Tests if numeric arguments are in decreasing order. Reads as 'greater-than-or-equal'."
-        :examples    [{:code "(>= 3 2 2)"}]
-        :signature   [{:params [& xs]
-                       :return Boolean}]}}
-
-
- ==
- {:doc {:description ["Tests if arguments are equal in numerical value."
-                      "Difference with `=` is that types are erased (eg. `Long` value is comparable with a `double` value)."]
-        :examples    [{:code   "(== 2 2.0)"
-                       :return "true"}]
-        :signature   [{:params [& xs]
-                       :return Boolean}]}}
-
-
- =
- {:doc {:description "Returns `true` if and only if arguments are precisely equal in value."
-        :examples    [{:code   "(= :foo :foo)"
-                       :return "true"}]
-        :signature   [{:params [& vals]
-                       :return Boolean}]}}
-
-
- +
- {:doc {:description "Adds numerical arguments. Result will be a `Long` if all arguments are integers, or a double if any floating point values are included."
-        :examples    [{:code "(+ 1 2 3)"}]
-        :signature   [{:params [& xs]}]}}
-
-
- -
- {:doc {:description "Subtracts numerical arguments from the first argument. Negates a single argument."
-        :examples    [{:code "(- 10 7)"}]
-        :signature   [{:params [x]}
-                      {:params [x y & more]}]}}
-
-
- *
- {:doc {:description "Multiplies numeric arguments. Result will be a `Double` if any arguments are floating point values, otherwise it will be a `long`."
-        :examples    [{:code "(* 1 2 3 4 5)"}]
-        :signature   [{:params [& xs]}]}}
-
-
- /
- {:doc {:description "Double precision point divide. With a single argument, returns the reciprocal of a number. With multiple arguments, divides the first argument by the others in order."
-        :examples    [{:code "(/ 10 3)"}]
-        :signature   [{:params [divisor]}
-                      {:params [numerator divisor]}
-                      {:params [numerator divisor & more]}]}}
-
-
- abs
- {:doc {:description "Computes the absolute value of a numerical argument. Supports `double` and `long` results."
-        :errors      {:CAST "If the parameter is not a number."}
-        :examples    [{:code "(abs -1.5)"}
-                      {:code "(abs 100)"}]
-        :signature   [{:params [x]
-                       :return Number}]}}
-
-
+  abs
+  {:doc {:description "Computes the absolute value of a numerical argument. Supports `double` and `long` results."
+         :errors      {:CAST "If the parameter is not a number."}
+         :examples    [{:code "(abs -1.5)"}
+                       {:code "(abs 100)"}]
+         :signature   [{:params [x]
+                        :return Number}]}}
+  
  accept
  {:doc {:description ["Used during a `call`, accepts offered coins up to the amount of `*offer*` from `*caller*`. Returns the amount accepted if successful."
                       "Amount must cast to `Long`. If successful, the amount will be added immediately to the `*balance*` of the current `*address*`."
@@ -205,14 +185,12 @@
         :signature   [{:params [amount]
                        :return Number}]}}
 
-
  account
  {:doc {:description "Returns the account record for a given address, or `nil` if the account does not exist. Argument must be an Address."
         :errors      {:CAST "If the argument is not a valid Address."}
         :examples    [{:code "(account *address*)"}]
         :signature   [{:params [address]
                        :return Account}]}}
-
 
  address
  {:doc {:description "Casts the argument to an Address. Valid arguments are hex strings, a Long, an Address or a Blob with the correct length (8 bytes)."
@@ -221,14 +199,12 @@
         :signature   [{:params [x]
                        :return Address}]}}
 
-
  address?
  {:doc {:description "Returns true if the argument is an actual `address`."
         :examples    [{:code "(address? #777)"}
                       {:code "(address? :foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  apply
  {:doc {:description ["Applies a function to the specified arguments, after flattening the last argument. Last argument must be a sequential collection, or 'nil' which is considered an empty collection."
@@ -248,7 +224,6 @@
         :examples    [{:code "(assoc {1 2} 3 4)"}]
         :signature   [{:params [coll & kvs]
                        :return DataStructure}]}}
-
 
  assoc-in
  {:doc {:description "Associates a value into a nested associative data structure, as if using `assoc` at each level."
@@ -292,8 +267,6 @@
         :examples    [{:code "(bit-xor 7 12)"}]
         :signature   [{:params [a b]
                        :return Long}]}}
- 
-
 
  blob
  {:doc {:description "Casts the argument to a canonical Blob. Arugment can be an Address, a hex String, a Long value, or another Blob."
@@ -301,7 +274,6 @@
         :examples    [{:code "(blob \"1234abcd\")"}]
         :signature   [{:params [address]
                        :return Blob}]}}
-
 
  blob-map
  {:doc {:description ["Creates a BlobMap. BlobMaps are specialised maps that support Blob types as keys only (see `blob`)."
@@ -312,13 +284,11 @@
         :signature   [{:params [& kvs]
                        :return BlobMap}]}}
 
-
  blob?
  {:doc {:description "Returns true if and only if the argument is a Blob."
         :examples    [{:code "(blob? 0x1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  boolean
  {:doc {:description "Casts any value to a Boolean. Returns false if value is `nil` or `false`, true in any other case."
@@ -326,13 +296,11 @@
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  boolean?
  {:doc {:description "Returns true if the argument is a Boolean (either `true` or `false`). Any other value (including nil) returns false."
         :examples    [{:code "(boolean? false)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  byte
  {:doc {:description "Casts a value to a Byte. Discards high bits of larger integer types."
@@ -340,7 +308,6 @@
         :examples    [{:code "(byte 1234)"}]
         :signature   [{:params [x]
                        :return Byte}]}}
-
 
  call*
  {:doc {:description ["Behaves like `call` but implemented as a function. Instead of a form, takes a symbol referring to the function, and then arguments separately."
@@ -360,14 +327,12 @@
         :signature   [{:params [target]}
                       {:params [target symbol]}]}}
 
- 
  ceil
  {:doc {:description "Computes the mathematical ceiling (rounding up towards positive infinity) for a numerical argument. Uses double precision mathematics."
         :errors      {:CAST "If the argument is not a number."}
         :examples    [{:code "(ceil 16.3)"}]
         :signature   [{:params [x]
                        :return Double}]}}
-
 
  char
  {:doc {:description "Casts a value to a Character. Discards high bits of larger integer types."
@@ -383,7 +348,6 @@
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  cond
  {:doc      {:description ["Performs conditional tests on successive pairs of `test` -> `result`, returning the `result` for the first `test` that succeeds."
                            "Performs short-circuit evaluation: result expressions that are not used and any test expressions after the first success will not be executed."
@@ -397,7 +361,6 @@
                            {:params [test-1 result-1 test-2 result-2 & more]}]}
   :special? true}
 
-
  compile
  {:doc {:description "Compiles a form, returning an Op. See `eval`."
         :errors      {:COMPILE "If a compiler error occurs."}
@@ -405,14 +368,12 @@
         :signature   [{:params [form]
                        :return Op}]}}
 
-
  concat
  {:doc {:description "Concatenates sequential data structures (Lists or Maps), returning a new sequential data structure of the same type as the first non-nil argument. `nil` is treated as an empty sequence."
         :errors      {:CAST "If any of the arguments is neither a sequential data structure nor nil."}
         :examples    [{:code "(concat [1 2] [3 4])"}]
         :signature   [{:params [& seqs]
                        :return DataStructure}]}}
-
 
  conj
  {:doc {:description "Adds elements to a data structure, in the natural mode of addition for the data structure. Supports sequential collections, sets and maps. `nil` is treated as an empty vector."
@@ -431,13 +392,11 @@
                       {:code "(cons 1 2 '(3 4))"}]
         :signature   [{:params [arg & more-args coll]}]}}
 
-
  contains-key?
  {:doc {:description "Returns true if the given associative data structure contains the given key, false otherwise."
         :examples    [{:code "(contains-key? {:foo 1 :bar 2} :foo)"}]
         :signature   [{:params [coll key]
                        :return Boolean}]}}
-
 
  create-peer
  {:doc {:description "Creates a new peer record for the network. The peer must have an account number and sufficient balance to place a stake amount"
@@ -445,7 +404,6 @@
         :examples    [{:code "(create-peer account-key 700000000)"}]
         :signature   [{:params [account-key stake-amount]
                        :return stake-amount}]}}
-
 
  count
  {:doc {:description "Returns the number of elements in the given collection, blob, or string."
@@ -461,7 +419,6 @@
         :signature   [{:params [long]
                        :return Long}]}}
 
-
  def
  {:doc      {:description ["Creates a definition in the current environment. This value will persist in the environment owned by the current account."
                            "The name argument must be a symbol, or a Symbol wrapped in a syntax object with optional metadata."]
@@ -470,14 +427,12 @@
              :signature   [{:params [name value]}]}
   :special? true}
 
-
  deploy
  {:doc {:description "Deploys an actor. The code provided will be executed to initialise the actor's account. Returns the Address of the deployed actor."
         :errors      {:COMPILE "If a compiler error occurred deploying the given code."}
         :examples    [{:code "(deploy '(defn my-fn [x y] (+ x y)))"}]
         :signature   [{:params [code]
                        :return Address}]}}
-
 
  difference
  {:doc {:description "Computes the difference of one or more sets. Nil arguments are treated as an empty set."
@@ -486,13 +441,11 @@
         :signature   [{:params [set & more]
                        :return Set}]}}
 
-
  disj
  {:doc {:description "Removes the specified key(s) from a set. `nil` is treated as the empty Set."
         :errors      {:CAST "If the first argument is not a set."}
         :examples    [{:code "(disj #{1 2 3} 1)"}]
         :signature   [{:params [coll key]}]}}
-
 
  dissoc
  {:doc {:description "Removes entries with the specified key(s) from a Map (including BlobMaps). `nil` is treated as the empty Map."
@@ -514,7 +467,6 @@
              :signature   [{:params [& expressions]}]}
   :special? true}
 
-
  double
  {:doc {:description "Casts any numerical value to a `Double`."
         :errors    {:CAST "If the argument is not castable to double."}
@@ -535,7 +487,6 @@
         :signature   [{:params [coll]
                        :return DataStructure}]}}
 
-
  empty?
  {:doc {:description "Checks if the argument is an empty collection. Nil is considered empty. "
         :errors      {:CAST "If the argument is neither nil nor a data structure."}
@@ -543,14 +494,12 @@
         :signature   [{:params [coll]
                        :return Boolean}]}}
 
-
  encoding
  {:doc {:description ["Returns the byte encoding for a given value as a Blob."
                       "The encoding is the unique canonical binary representation of a value. Encodings may change between Convex versions - it is unwise to rely on the exact representation."]
         :examples    [{:code "(encoding {1 2})"}]
         :signature   [{:params [value]
                        :return Blob}]}}
-
 
  eval
  {:doc {:description "Evaluates code in the current context, expanding and compiling the form if necessary (see `expand`,`compile`)."
@@ -564,14 +513,12 @@
         :examples    [{:code "(eval-as #666 '(+ 1 2))"}]
         :signature   [{:params [address form]}]}}
 
-
  exp
  {:doc {:description "Returns `e` raised to the power of the given numerical argument."
         :errors      {:CAST "If the argument is not a number."}
         :examples    [{:code "(exp 1.0)"}]
         :signature   [{:params [x]
                        :return Double}]}}
-
 
  expand
  {:doc {:description ["Expands the given form."
@@ -583,7 +530,6 @@
                       {:params [form expander]}
                       {:params [form expander cont]}]}}
 
-
  fail
  {:doc {:description ["Causes execution to fail at the current position."
                       "Error type defaults to `:ASSERT` if not specified, and cannot be nil. Typically a keyword, it can actually be any value."
@@ -592,7 +538,6 @@
         :signature   [{:params []}
                       {:params [message]}
                       {:params [error-type message]}]}}
-
 
  first
  {:doc {:description "Returns the first element from a Countable collection which must contain at least one element. Also see `empty?`"
@@ -607,14 +552,12 @@
         :signature   [{:params [x]
                        :return Double}]}}
 
-
  fn
  {:doc      {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variables in the current lexical scope."
              :examples    [{:code "(let [f (fn [x y] (* x y))] (f 10 7))"}]
              :signature   [{:params [args & body]}]}
   :special? true}
-
-
+ 
  fn?
  {:doc {:description "Returns `true` if and only if the argument is a function. Some values may operate as functions but are not functions themselves (eg. maps and vectors)."
         :examples    [{:code "(fn? count)"}]
@@ -633,7 +576,6 @@
         :errors      {:CAST "If the argument is not an address."}
         :examples    [{:code "(get-holding *caller*)"}]
         :signature   [{:params [owner]}]}}
-
 
  get-in
  {:doc {:description "Gets an element by successively looking up keys in nested collections according to the logic of `get`. If any lookup does not find the appropriate key, will return `not-found` (nil by default)."
@@ -656,7 +598,6 @@
         :signature   [{:params [value]
                        :return Blob}]}}
 
-
  hash-map
  {:doc {:description "Constructs a map with the given keys and values. If a key is repeated, the last value will overwrite previous ones."
         :errors      {:ARITY "If the number of arguments is not even (key-value pairs)."}
@@ -677,7 +618,6 @@
         :signature   [{:params [num]
                        :return Long}]}}
 
-
  intersection
  {:doc {:description "Computes the intersection of one or more sets. Nil is treated as an empty set."
         :errors      {:CAST "If any of the arguments is neither a set nor nil."}
@@ -697,8 +637,6 @@
         :examples    [{:code "(int? 1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
-
 
  into
  {:doc {:description "Adds elements to a collection, in a collection-defined manner as with `conj`."
