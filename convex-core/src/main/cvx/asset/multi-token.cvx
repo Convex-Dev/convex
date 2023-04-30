@@ -108,3 +108,51 @@
         (def tokens (assoc tokens id [controller new-supply]))
         new-supply))))
 
+
+
+(defn quantity-add
+
+         ^{:callable? true}
+
+         [a b]
+
+         (let [a (if a
+                   (long a)
+                   0)
+               b (if b
+                   (long b)
+                   0)]
+           (+ a b)))
+
+
+       (defn quantity-sub
+
+         ^{:callable? true}
+
+         [a b]
+
+         (let [a (if a
+                   (long a)
+                   0)
+               b (if b
+                   (long b)
+                   0)] 
+           (if (> a b)
+             (- a
+                b)
+             0)))
+
+
+       (defn quantity-subset?
+
+         ^{:callable? true}
+
+         [a b]
+
+         (<= (if a
+               (long a)
+               0)
+             (if b
+               (long b)
+               0)))
+

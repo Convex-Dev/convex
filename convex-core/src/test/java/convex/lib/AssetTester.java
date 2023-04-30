@@ -32,7 +32,7 @@ public class AssetTester {
 	 * @param token Fungible token Address
 	 * @param user User Address
 	 */
-	public static void doFungibleTests (Context<?> ctx, Address token, Address user) {
+	public static void doFungibleTests (Context<?> ctx, ACell token, Address user) {
 		ctx=ctx.forkWithAddress(user);
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		ctx=step(ctx,"(import convex.fungible :as fungible)");
@@ -77,7 +77,7 @@ public class AssetTester {
 	 * @param user1 First user
 	 * @param user2 Second user
 	 */
-	public static void doAssetTests (Context<?> ctx, Address asset, Address user1, Address user2) {
+	public static void doAssetTests (Context<?> ctx, ACell asset, Address user1, Address user2) {
 		// Set up test user
 		ctx=ctx.createAccount(TEST_KP.getAccountKey());
 		Address tester=(Address) ctx.getResult();
@@ -132,9 +132,9 @@ public class AssetTester {
 	
 	}
 	
-	public static void doUserAssetTests (Context<?> ctx, Address asset, Address user, ACell balance) {
+	public static void doUserAssetTests (Context<?> ctx, ACell asset, Address user, ACell balance) {
 		ctx=ctx.forkWithAddress(user);
-		ctx=step(ctx,"(def ast (address "+asset+"))");
+		ctx=step(ctx,"(def ast "+asset+")");
 		assertEquals(asset,ctx.getResult());
 
 		ctx=step(ctx,"(def bal (asset/balance "+asset+"))");

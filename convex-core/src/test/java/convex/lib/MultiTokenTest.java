@@ -1,23 +1,32 @@
 package convex.lib;
 
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertError;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.State;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Address;
+import convex.core.data.Keyword;
+import convex.core.data.Symbol;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 
-import static convex.test.Assertions.*;
-
 public class MultiTokenTest extends ACVMTest {
+	
+	private final Address mt;
 	
 	protected MultiTokenTest() {
 		super(createFungibleState());
+		mt=(Address) context().getEnvironment().get(Symbol.create("mt"));
 	}
 	
 	private static State createFungibleState() {
@@ -70,6 +79,9 @@ public class MultiTokenTest extends ACVMTest {
 		assertEquals(4043,evalL(ctx,"(call [mt :FOOSD] (mint -1))"));
 
 		assertError(step(ctx,"(call [mt :FOOSD] (mint -9999999999999999))"));
+		
+		AVector<ACell> token=Vectors.of(mt,Keyword.create("FOOSD"));
+		AssetTester.doFungibleTests(ctx, token, HERO);
 	}
 
 }
