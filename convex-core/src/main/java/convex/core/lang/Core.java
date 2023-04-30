@@ -1677,6 +1677,20 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+	public static final CoreFn<AInteger> INT = reg(new CoreFn<>(Symbols.INT) {
+		@SuppressWarnings("unchecked")
+		@Override
+		public  Context<AInteger> invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			ACell a = args[0];
+			AInteger result = RT.castInteger(a);
+			if (result == null) return context.withCastError(0, args,Types.INTEGER);
+			// TODO: bigint construction cost?
+			return context.withResult(Juice.ARITHMETIC, result);
+		}
+	});
 
 	public static final CoreFn<CVMDouble> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE) {
 		@SuppressWarnings("unchecked")
@@ -2561,6 +2575,16 @@ public class Core {
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
 				return ((AInteger)val).ensureLong()!=null;
+			}
+			return false;
+		}
+	});
+	
+	public static final CorePred INT_Q = reg(new CorePred(Symbols.INT_Q) {
+		@Override
+		public boolean test(ACell val) {
+			if (val instanceof AInteger) {
+				return true;
 			}
 			return false;
 		}

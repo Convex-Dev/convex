@@ -121,6 +121,10 @@ public class Symbols {
 	public static final Symbol LONG = intern("long");
 	public static final Symbol BYTE = intern("byte");
 	public static final Symbol CHAR = intern("char");
+	
+	public static final Symbol INT = intern("int");
+	public static final Symbol INT_Q = intern("int?");
+
 
 	public static final Symbol DOUBLE = intern("double");
 

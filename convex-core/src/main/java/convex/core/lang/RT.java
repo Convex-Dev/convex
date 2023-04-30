@@ -579,7 +579,7 @@ public class RT {
 			return (CVMLong) a;
 		ANumeric n = ensureNumber(a);
 		if (n != null) {
-			return n.toLong();
+			return ensureLong(n.toInteger());
 		}
 
 		if (a instanceof APrimitive) {

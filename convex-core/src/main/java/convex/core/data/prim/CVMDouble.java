@@ -223,7 +223,10 @@ public final class CVMDouble extends ANumeric {
 	@Override
 	public AInteger toInteger() {
 		if (!Double.isFinite(value))return null; // catch NaN and infinity
-		if ((value<=Long.MAX_VALUE)&&(value>=Long.MIN_VALUE)) return CVMLong.create((long)value);
+		if ((value<=Long.MAX_VALUE)&&(value>=Long.MIN_VALUE)) {
+			return CVMLong.create((long)value);
+		}
+		
 		BigDecimal bd=BigDecimal.valueOf(value);
 		BigInteger bi=bd.toBigInteger();
 		return CVMBigInteger.wrap(bi);

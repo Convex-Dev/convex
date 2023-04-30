@@ -211,7 +211,9 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(d, evalD("(+ 0.0 "+cd+")"));
 		assertEquals(d, evalD("(+ 0 "+cd+")"));
 		assertEquals(d, evalD("(double "+cd+")"));
-		assertEquals((long)d, evalL("(long "+cd+")"));
+		if (Double.isFinite(d)) {
+			assertEquals((long)d, evalL("(long "+cd+")"));
+		}
 	}
 
 	@Test

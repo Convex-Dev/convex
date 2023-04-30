@@ -368,9 +368,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMLong.MINUS_ONE,eval("(long -1.9)")); // note rounding towards zero
 		assertEquals(CVMLong.MAX_VALUE,eval("(long 9223372036854775807.0)")); // actual max value
 		assertEquals(CVMLong.MAX_VALUE,eval("(long 9223372036854775809.0)")); // above max value
-		assertEquals(CVMLong.ZERO,eval("(long ##NaN)"));
-		assertEquals(CVMLong.MAX_VALUE,eval("(long ##Inf)"));
-		assertEquals(CVMLong.MIN_VALUE,eval("(long ##-Inf)"));
+		
+		// Cast errors on non-finite doubles
+		assertCastError(step("(long ##NaN)"));
+		assertCastError(step("(long ##Inf)"));
+		assertCastError(step("(long ##-Inf)"));
 
 		assertArityError(step("(long)"));
 		assertArityError(step("(long 1 2)")); 
@@ -379,11 +381,60 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(long [])"));
 		assertCastError(step("(long :foo)"));
 		
-		// Long overflow and truncation
+		// Long limits and overflow
 		assertEquals(Long.MAX_VALUE,evalL("(long 9223372036854775807)"));
-		assertEquals(Long.MIN_VALUE,evalL("(long 9223372036854775808)"));
-		assertEquals(0L,evalL("(long 18446744073709551616)"));
+		assertEquals(Long.MIN_VALUE,evalL("(long -9223372036854775808)"));
+		assertCastError(step("(long 18446744073709551616)"));
+		assertCastError(step("(long 9223372036854775808)"));
+		assertCastError(step("(long -9223372036854775809)"));
+
 	}
+	
+	@Test
+	public void testInt() {
+		assertCVMEquals(1L, eval("(int 1)"));
+		assertEquals(128L, evalL("(int (byte 128))"));
+		assertEquals(97L, evalL("(int \\a)"));
+		assertEquals(2147483648L, evalL("(int 2147483648)"));
+
+		// Blob casts treat blob as extended long bits (zero extended if needed)
+		assertEquals(4096L, evalL("(int 0x1000)"));
+		assertEquals(255L, evalL("(int 0xff)"));
+		assertEquals(4294967295L, evalL("(int 0xffffffff)"));
+		assertEquals(0xff00000050l, evalL("(int 0xff00000050)"));
+
+		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
+		assertEquals(1L, evalL("(int true)"));
+		assertEquals(0L, evalL("(int false)"));
+		
+		// Address casts to equivalent Long value. See #431
+		assertEquals(1L, evalL("(long #1)"));
+		assertEquals(999L, evalL("(long #999)"));
+		
+		// Doubles may cast to longs - currently semantics as in Java primitive conversion
+		assertEquals(CVMLong.ZERO,eval("(int 0.0)"));
+		assertEquals(10L, evalL("(int 10.999)")); // note rounding towards zero
+		assertEquals(CVMLong.MINUS_ONE,eval("(int -1.9)")); // note rounding towards zero
+		assertEquals(CVMLong.MAX_VALUE,eval("(int 9223372036854775807.0)")); // actual max value
+		assertEquals(CVMLong.MAX_VALUE,eval("(int 9223372036854775809.0)")); // above max value
+		
+		assertCastError(step("(int ##NaN)"));
+		assertCastError(step("(int ##Inf)"));
+		assertCastError(step("(int ##-Inf)"));
+
+		assertArityError(step("(int)"));
+		assertArityError(step("(int 1 2)")); 
+		assertArityError(step("(int nil nil)")); // arity before cast
+		assertCastError(step("(int nil)"));
+		assertCastError(step("(int [])"));
+		assertCastError(step("(int :foo)"));
+		
+		// Long overflow and truncation
+		assertEquals(Long.MAX_VALUE,evalL("(int 9223372036854775807)"));
+		assertEquals(Long.MIN_VALUE,evalL("(int -9223372036854775808)"));
+		assertEquals(CVMBigInteger.MIN_POSITIVE,eval("(int 9223372036854775808)"));
+	}
+
 
 	@Test
 	public void testChar() {
