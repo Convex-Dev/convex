@@ -4,6 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
@@ -82,5 +83,11 @@ public class WalletEntry {
 
 	public <R extends ACell> SignedData<R> sign(R message) {
 		return keyPair.signData(message);
+	}
+
+	public Hash getIdenticonHash() {
+		Address a=address;
+		if (a==null) a=Address.ZERO;
+		return a.getHash();
 	}
 }
