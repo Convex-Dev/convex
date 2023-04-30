@@ -113,20 +113,27 @@ public class DIDTest extends ACVMTest {
 	
 	@Test public void testDeactivate() {
 		Context<ACell> ctx=step("(import convex.did :as did)");
+		ctx=step(ctx,"(import convex.trust :as trust)");
 		
 		// Set up DDO controlled by HERO
-		ctx=step(ctx,"(call did (create))");
+		ctx=step(ctx,"(def id (call did (create)))");
 		CVMLong id=(CVMLong) ctx.getResult();
 		AString ddo=Strings.create("{}");
-		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
+		ctx=step(ctx,"(call did (update id "+RT.print(ddo)+"))");
 		
-		// DDO should exist
-		assertNotNull(eval(ctx,"(call did (read "+id+"))"));
+		// DDO should exist and be equal to value set
+		assertEquals(ddo,eval(ctx,"(call did (read "+id+"))"));
+		
+		// Authorise an account
+		ctx=step(ctx,"(call did (authorise id #{*address*}))");
+		assertTrue(evalB(ctx,"(trust/trusted? [did id] *address*)"));
 		
 		// Deactivate
 		ctx=step(ctx,"(call did (deactivate "+id+"))");
 		
-		// Original DDO should be unchanged
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+
+		// DDO should be cleared
 		ctx=step(ctx,"(call did (read "+id+"))");
 		assertNull(ctx.getResult()); 
 	}

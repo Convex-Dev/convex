@@ -52,17 +52,19 @@
     :doc       {:description "Updates a DDO for a DID. DDO can be a String, or nil to deactivate"
                 :signature   [{:params [id ddo]}]}}
   update
+ ([ddo]
+   (recur *scope* ddo))
  ([id ddo]
    (assert (or (nil? ddo) (str? ddo)))
-     (let [rec (get dids id)
-           _ (or rec (error "Invalid DID"))
-           cont (get rec 1)
-           _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
-           rec (assoc rec 0 ddo)         ;; update DDO
-           rec (assoc rec 3 *timestamp*) ;; update timestamp
-           ]
-       (def dids (assoc dids id rec))
-       rec)))
+   (let [rec (get dids id)
+         _ (or rec (error "Invalid DID"))
+         cont (get rec 1)
+         _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
+         rec (assoc rec 0 ddo)         ;; update DDO
+         rec (assoc rec 3 *timestamp*) ;; update timestamp
+         ]
+     (def dids (assoc dids id rec))
+     rec)))
 
 (defn 
   ^{:callable? true
@@ -90,16 +92,19 @@
   [subject action object]
   (let [id (or *scope* object)
         rec (get dids id)]
-    (and
-      rec ;; not nil
-      (address? subject)
-      (contains-key? (nth rec 4)
-        (address subject)))))
+    (boolean (and
+               rec     ;; not nil
+               (nth rec 0) ;; not deactivated
+               (address? subject)
+               (contains-key? (nth rec 4)
+                 (address subject))))))
 
 (defn 
   ^{:callable? true
     :doc       {:description "Deactivates a DID."
                 :signature   [{:params [id]}]}}
   deactivate
+  ([] 
+    (update *scope* nil))
   ([id]
     (update id nil)))
