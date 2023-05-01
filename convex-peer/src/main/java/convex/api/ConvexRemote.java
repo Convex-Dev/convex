@@ -37,6 +37,7 @@ public class ConvexRemote extends Convex {
 	
 	private static final Logger log = LoggerFactory.getLogger(ConvexRemote.class.getName());
 
+	protected InetSocketAddress remoteAddress;
 	
 	/**
 	 * Gets the Internet address of the currently connected remote
@@ -44,7 +45,7 @@ public class ConvexRemote extends Convex {
 	 * @return Remote socket address
 	 */
 	public InetSocketAddress getRemoteAddress() {
-		return connection.getRemoteAddress();
+		return remoteAddress;
 	}
 
 	protected ConvexRemote(Address address, AKeyPair keyPair) {
@@ -52,7 +53,15 @@ public class ConvexRemote extends Convex {
 	}
 	
 	protected void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
+		remoteAddress=peerAddress;
 		setConnection(Connection.connect(peerAddress, internalHandler, store));
+	}
+	
+	public void reconnect() throws IOException, TimeoutException {
+		Connection curr=connection;
+		AStore store=(curr==null)?Stores.current():curr.getStore();
+		close();
+		setConnection(Connection.connect(remoteAddress, internalHandler, store));
 	}
 
 	/**
@@ -61,9 +70,9 @@ public class ConvexRemote extends Convex {
 	 * @param conn Connection value to use
 	 */
 	protected void setConnection(Connection conn) {
-		if (this.connection == conn)
-			return;
-		close();
+		Connection curr=this.connection;
+		if (curr == conn) return;
+		if (curr!=null) close();
 		this.connection = conn;
 	}
 	
@@ -88,7 +97,7 @@ public class ConvexRemote extends Convex {
 	}
 	
 	/**
-	 * Close without affecting the connection
+	 * Close without affecting the underlying connection (will be unlinked but not closed)
 	 */
 	public void closeButMaintainConnection() {
 		this.connection = null;
