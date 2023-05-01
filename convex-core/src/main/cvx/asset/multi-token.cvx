@@ -4,7 +4,6 @@
       (register {:description ["An actor that supports multiple mintable tokens"]
                  :name        "Multi-token actor"}))
 
-
 ;;;;;;;;;; Setup
 
 (import convex.asset :as asset-lib)
@@ -12,23 +11,29 @@
 
 ;;;;;;;;;; State
 
-;; Map of keyword -> [controller supply]
+;; Token metadata is stored here
+;; Map of { id -> [controller supply] ]
 (def tokens {})
+
+;; Per-user data is stored in holdings: Map of { id -> [balance offers] }
+;; where:
+;;    balance is a non-negative Integer
+;;    offers is nil or a map of { address -> offer amount }
 
 ;;;;;;;;; Private functions
 
 (defn -set-balance 
   [addr id bal]
-  (let [h (or (get-holding addr) {})]
-    (set-holding addr (assoc h id bal))))
+  (let [h (get-holding addr)
+        orec (get h id) ;; old record
+        rec (if orec (assoc orec 0 bal) [bal nil])]
+    (set-holding addr (assoc h id rec))))
 
 (defn -get-balance 
   [addr id]
-  (let [h (get-holding addr)]
-    (or (get h id) 
-         (if (tokens id) 
-           0 
-           (fail (str "Token does not exist: " id))))))
+  (let [h (get-holding addr)
+        rec (get h id)]
+    (if rec (nth rec 0) 0)))
 
 ;;;;;;;;;; Public API
 
@@ -71,11 +76,9 @@
 (defn balance
    ^{:callable? true}
    ([addr]
-     (let [hs (get-holding addr)]
-       (if (empty? hs) {})
-       (if *scope*
-         (or (get hs *scope*) 0)
-         {}))))
+     (let [hs (get-holding addr) 
+           rec (get hs *scope*)]
+       (if rec (nth rec 0) 0))))
 
 (defn mint
   ^{:callable? true}
