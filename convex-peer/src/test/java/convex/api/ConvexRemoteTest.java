@@ -63,6 +63,9 @@ public class ConvexRemoteTest {
 			assertTrue(convex.isConnected());
 			convex.close();
 			assertFalse(convex.isConnected());
+			
+			convex.reconnect();
+			assertTrue(convex.isConnected());
 		}
 	}
 
