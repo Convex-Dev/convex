@@ -131,7 +131,9 @@
         (set-holding *caller* (assoc hs id nrec)))
       (do ;; create a new record with given offer
         (or (tokens id) (fail "token does not exist"))
-        (set-holding *caller* {id [0 {receiver quantity}]})))))
+        (set-holding *caller* {id [0 {receiver quantity}]})))
+    quantity ;; return value is quantity offered
+    ))
 
 (defn mint
   ^{:callable? true}
@@ -143,18 +145,18 @@
            (fail :TRUST "No rights to mint"))
     
     (let [amount     (int amount) ;; Mint amount.
-    new-supply (+ supply amount)
+   new-supply (+ supply amount)
           bal        (-get-balance *caller* id)
           new-bal    (+ bal amount)]
            
       ;; New supply must be in valid range.
-     (assert (<= 0 new-supply))
+    (assert (<= 0 new-supply))
       
       ;; new balance must be in range
-     (assert (<= 0 new-bal))
+    (assert (<= 0 new-bal))
       
       ;; Update state
-     (-set-balance *caller* id new-bal)
+    (-set-balance *caller* id new-bal)
       (do 
         (def tokens (assoc tokens id [controller new-supply]))
         new-supply))))

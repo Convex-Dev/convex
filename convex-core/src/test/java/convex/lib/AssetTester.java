@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import static convex.test.Assertions.*;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -54,6 +56,15 @@ public class AssetTester {
 		ctx=step(ctx,"(asset/transfer *address* [token nil])");
 		assertEquals(0L,(long)RT.jvm(ctx.getResult()));
 		assertEquals(BAL, evalL(ctx,"(asset/balance token *address*)"));
+		
+		// set a zero offer
+		ctx=step(ctx,"(asset/offer *address* [token 0])");
+		assertCVMEquals(0, ctx.getResult());
+		assertCVMEquals(0, eval(ctx,"(asset/get-offer token *address* *address*)"));
+
+		// set a non-zero offer
+		ctx=step(ctx,"(asset/offer *address* token 666)");
+		assertCVMEquals(666, eval(ctx,"(asset/get-offer token *address* *address*)"));
 
 		// Run generic asset tests, giving 1/3 the balance to a new user account
 		{
