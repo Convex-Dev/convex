@@ -73,8 +73,10 @@ public class API {
 
 		AStore tempStore=Stores.current();
 		try {
-			// Port defaults to null, which picks 
-			if (!config.containsKey(Keywords.PORT)) config.put(Keywords.PORT, null);
+			// Port defaults to null, which uses default port if available or picks a random port 
+			if (!config.containsKey(Keywords.PORT)) {
+				config.put(Keywords.PORT, null);
+			}
 			
 			// Configure the store and use on this thread
 			AStore store;
@@ -143,7 +145,6 @@ public class API {
 	 * @param keyPairs List of keypairs for peers
 	 * @param genesisState Genesis state for local network
 	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
-	 * @param event Server event handler
 	 *
 	 * @return List of Servers launched
 	 *

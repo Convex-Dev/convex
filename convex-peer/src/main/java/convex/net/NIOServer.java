@@ -80,8 +80,22 @@ public class NIOServer implements Closeable {
 		ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
 
 		bindAddress = (bindAddress == null) ? "localhost" : bindAddress;
-		InetSocketAddress address = new InetSocketAddress(bindAddress, port);
-		ssc.bind(address);
+		InetSocketAddress address;
+		
+		if (port==0) {
+			try {
+				address = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
+				ssc.bind(address);
+			} catch (IOException e) {
+				// try again with random port
+				address = new InetSocketAddress(bindAddress, 0);
+				ssc.bind(address);
+			}
+		} else {
+			address = new InetSocketAddress(bindAddress, port);
+			ssc.bind(address);
+		}
+		
 		address = (InetSocketAddress) ssc.getLocalAddress();
 		ssc.configureBlocking(false);
 		port = ssc.socket().getLocalPort();
