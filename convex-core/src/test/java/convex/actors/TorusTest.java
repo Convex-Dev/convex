@@ -1,7 +1,6 @@
 package convex.actors;
 
-import static convex.test.Assertions.assertError;
-import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -104,11 +103,13 @@ public class TorusTest extends ACVMTest {
 		assertNull(eval(ctx,"(torus/price ECO)"));
 		
 		ctx=step(ctx,"(call ECO (mint 1000000))");
+		assertNotError(ctx);
+		assertCVMEquals(1000000,eval(ctx,"(asset/balance ECO)"));
 		
 		// TODO: multi-token needs offer and accept for this
-		//ctx=step(ctx,"(torus/add-liquidity ECO 1000 10000)");
-		//assertNotError(ctx);
-		//assertEquals(10.0,evalD(ctx,"(torus/price ECO)"));
+		ctx=step(ctx,"(torus/add-liquidity ECO 1000 10000)");
+		assertNotError(ctx);
+		assertEquals(10.0,evalD(ctx,"(torus/price ECO)"));
 
 	}
 

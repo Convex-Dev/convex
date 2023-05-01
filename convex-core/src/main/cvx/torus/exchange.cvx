@@ -62,19 +62,17 @@
         [amount]
 
         (let [;; Amount of tokens deposited.
-              amount              (long amount)
+              amount              (int amount)
               ;; Price of token in CVX (double), nil if no current liquidity.
               price               (price)
               initial-cvx-balance *balance*
-              ;; Amount of CVX required (all if initial deposit).
+              ;; Amount of CVX required (all if initial deposit). Note Long range required
               cvx                 (core/accept (if price 
                                                  (long (* price
                                                           amount))
                                                  *offer*))
               ;; Ensures tokens are transferred from caller to market actor.
-              _                   (asset/accept *caller*
-                                                [token
-                                                 amount])
+              _                   (asset/accept *caller* token amount)
               ;; Compute new total balances for actor/
               new-token-balance   (+ token-balance
                                      amount)
@@ -87,11 +85,11 @@
                                                                  token-balance))
                                           new-liquidity (sqrt (* (double *balance*)
                                                                  new-token-balance))]
-                                      (long (* (- new-liquidity
+                                      (int (* (- new-liquidity
                                                   liquidity)
                                                (/ supply
                                                   liquidity))))
-                                    (long (sqrt (* (double amount)
+                                    (int (sqrt (* (double amount)
                                                    cvx))))]
            ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance (all longs)
            (set-holding *caller*
@@ -418,9 +416,7 @@
   [token token-amount cvx-amount]
 
   (let [market (create-market token)]
-    (asset/offer market
-                 [token
-                  token-amount])
+    (asset/offer market token token-amount)
     (call market
           (long cvx-amount)
           (add-liquidity token-amount))))

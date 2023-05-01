@@ -40,13 +40,14 @@
 
 (defn create
   ^{:callable? true
-    :doc {:description "Creates a new token and returns its id. Caller will be controller of token"
+    :doc {:description "Creates a new token and returns its id. Caller will be controller of token. Returns ID."
           :signature   [{:params []}
                         {:params [actor]}]}}
   ([id]
     (or (keyword? id) (fail "Token ID must be a keyword"))
     (if (contains-key? tokens id) (fail "Token already exists!"))
-    (def tokens (assoc tokens id [*caller* 0]))))
+    (def tokens (assoc tokens id [*caller* 0]))
+    id))
 
 
 ;;; Asset SPI
@@ -80,6 +81,58 @@
            rec (get hs *scope*)]
        (if rec (nth rec 0) 0))))
 
+(defn accept 
+  ^{:callable? true}
+  [sender quantity] 
+  (let [id *scope*
+        quantity (int quantity)
+        _ (cond 
+            (zero? quantity) (return 0)
+            (< quantity 0) (fail "Negative accept amount"))
+        receiver *caller*
+        hs (get-holding sender) ;; holdings of sender
+        rec (get hs id)]
+    (if rec
+      (let [os (nth rec 1) ;; offers map
+            off (or (get os receiver) (fail "No offer to receiver"))
+            _ (cond (< off quantity) (fail "insufficient offer"))
+            bal (nth rec 0)
+            nbal (- bal quantity)
+            _ (cond (< nbal 0) (fail "insufficent balance to accept"))
+            noff (- off quantity)
+            nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
+            nrec [nbal nos]]
+        ;; Update offer and balance of sender
+        (set-holding sender (assoc hs id nrec)) 
+        ;; Add accepted quantity to receiver
+        (-set-balance receiver id (+ (-get-balance receiver id) quantity)))
+      (fail "No offers from sender"))))
+
+(defn get-offer
+  ^{:callable? true}
+  [sender receiver]
+  (let [id *scope*
+        rec (or (get (get-holding sender) id) (return 0))]
+    (or (get (nth rec 1) receiver) 0)))
+
+(defn offer
+  ^{:callable? true}
+  [receiver quantity]
+  (let [id *scope*
+        quantity (int quantity)
+        receiver (address receiver)
+        hs (get-holding *caller*)
+        rec (get hs id)]
+    (if rec
+      (let [os (nth rec 1) ;; offers map
+            nrec (if (<= quantity 0)
+                   (assoc rec 1 (dissoc os receiver))
+                   (assoc rec 1 (assoc os receiver quantity)))]
+        (set-holding *caller* (assoc hs id nrec)))
+      (do ;; create a new record with given offer
+        (or (tokens id) (fail "token does not exist"))
+        (set-holding *caller* {id [0 {receiver quantity}]})))))
+
 (defn mint
   ^{:callable? true}
   [amount]
@@ -90,7 +143,7 @@
            (fail :TRUST "No rights to mint"))
     
     (let [amount     (int amount) ;; Mint amount.
-          new-supply (+ supply amount)
+    new-supply (+ supply amount)
           bal        (-get-balance *caller* id)
           new-bal    (+ bal amount)]
            

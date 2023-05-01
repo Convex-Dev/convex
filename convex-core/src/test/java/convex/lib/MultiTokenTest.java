@@ -12,6 +12,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -48,15 +49,40 @@ public class MultiTokenTest extends ACVMTest {
 		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [[mt :USD] 400])");
 		assertNotError(ctx);
 
-		
 		return ctx.getState();
+	}
+	
+	@Test public void testOfferAccept() {
+		Context<?> ctx = context();
+		
+		ctx=step(ctx,"(def id (call mt (create :foo)))");
+		assertEquals(Keywords.FOO,ctx.getResult());
+		ctx=step(ctx,"(def FOO [mt :foo])");
+		
+		// Mint with standard call
+		ctx=step(ctx,"(call FOO (mint 10000))");
+		assertCVMEquals(10000,evalL(ctx,"(asset/balance FOO)"));
+		
+		assertCVMEquals(0,evalL(ctx,"(asset/get-offer FOO *address* #1)"));
+		
+		ctx=step(ctx,"(asset/offer *address* FOO 1000)");
+		// System.out.println(ctx.getResult());
+		
+		assertCVMEquals(0,evalL(ctx,"(asset/get-offer FOO *address* #1)"));
+		assertCVMEquals(1000,evalL(ctx,"(asset/get-offer FOO *address* *address*)"));
+		
+		// Consume 600 of offer
+		ctx=step(ctx,"(asset/accept *address* FOO 400)");
+		assertNotError(ctx);
+		assertCVMEquals(10000,evalL(ctx,"(asset/balance FOO)"));
+		assertCVMEquals(600,evalL(ctx,"(asset/get-offer FOO *address* *address*)"));
 	}
 	
 	@Test public void testMint() {
 		Context<?> ctx = context();
 		
 		// Non-existing token can't have balance
-		assertEquals(0L,evalL("(asset/balance [mt :FOOSD])"));
+		assertEquals(0L,evalL(ctx,"(asset/balance [mt :FOOSD])"));
 		
 		ctx=step(ctx,"(call mt (create :FOOSD))");
 		assertNotError(ctx);
