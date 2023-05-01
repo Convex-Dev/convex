@@ -15,8 +15,6 @@
 ;; Map of keyword -> [controller supply]
 (def tokens {})
 
-(def max-supply 1000000000000000000)
-
 ;;;;;;;;; Private functions
 
 (defn -set-balance 
@@ -49,11 +47,8 @@
 ;;; Asset SPI
 
 (defn direct-transfer
-
    ^{:callable? true}
-
    [addr amount]
-
    (let [addr   (address addr)
          amount (if amount
                   (int amount)
@@ -97,10 +92,10 @@
           new-bal    (+ bal amount)]
            
       ;; New supply must be in valid range.
-     (assert (<= 0 new-supply max-supply))
+     (assert (<= 0 new-supply))
       
       ;; new balance must be in range
-     (assert (<= 0 new-bal max-supply))
+     (assert (<= 0 new-bal))
       
       ;; Update state
      (-set-balance *caller* id new-bal)
@@ -108,51 +103,24 @@
         (def tokens (assoc tokens id [controller new-supply]))
         new-supply))))
 
-
-
 (defn quantity-add
+  ^{:callable? true}
+  [a b]
+  (let [a (if a (int a) 0)
+        b (if b (int b) 0)]
+    (+ a b)))
 
-         ^{:callable? true}
+(defn quantity-sub
+  ^{:callable? true}
+  [a b]
+  (let [a (if a (int a) 0)
+        b (if b (int b) 0)] 
+    (if (>= a b) (- a b) 0)))
 
-         [a b]
-
-         (let [a (if a
-                   (int a)
-                   0)
-               b (if b
-                   (int b)
-                   0)]
-           (+ a b)))
-
-
-       (defn quantity-sub
-
-         ^{:callable? true}
-
-         [a b]
-
-         (let [a (if a
-                   (int a)
-                   0)
-               b (if b
-                   (int b)
-                   0)] 
-           (if (> a b)
-             (- a
-                b)
-             0)))
-
-
-       (defn quantity-subset?
-
-         ^{:callable? true}
-
-         [a b]
-
-         (<= (if a
-               (int a)
-               0)
-             (if b
-               (int b)
-               0)))
+(defn quantity-subset?
+   ^{:callable? true}
+   [a b]
+    (let [a (if a (int a) 0)
+        b (if b (int b) 0)] 
+    (<= a b)))
 

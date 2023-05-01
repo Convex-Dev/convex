@@ -46,17 +46,11 @@
        (def max-supply
             ~max-supply)
 
-
        (defn burn
-
          ^{:callable? true}
-
          [amount]
-
-         (when-not (trust/trusted? minter
-                                   *caller*)
-           (fail :TRUST
-                 "No rights to burn"))
+         (when-not (trust/trusted? minter *caller*)
+           (fail :TRUST "No rights to burn"))
          (let [amount (int amount)
                bal    (balance *caller*)]
            ;; Burn amount must be less than or equal to caller's balance.
@@ -70,23 +64,15 @@
            (def supply (- supply
                           amount))))
 
-
        (defn mint
-
          ^{:callable? true}
-
          [amount]
-
-         (when-not (trust/trusted? minter
-                                   *caller*)
-           (fail :TRUST
-                 "No rights to mint"))
+         (when-not (trust/trusted? minter *caller*)
+           (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
-               new-supply (+ supply
-                             amount)
+               new-supply (+ supply amount)
                bal        (balance *caller*)
-               new-bal    (+ bal
-                             amount)]
+               new-bal    (+ bal amount)]
            ;; Mint amount.
            ;;
            (assert (<= 0
