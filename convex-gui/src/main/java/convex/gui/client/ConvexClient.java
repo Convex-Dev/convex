@@ -3,20 +3,16 @@ package convex.gui.client;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
-import convex.core.State;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.gui.client.panels.HomePanel;
-import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.utils.Toolkit;
 
@@ -30,11 +26,7 @@ public class ConvexClient extends JPanel {
 
 	private static final Logger log = LoggerFactory.getLogger(ConvexClient.class.getName());
 
-	public static final AStore CLIENT_STORE = Stores.getGlobalStore();
-
 	private static JFrame frame;
-
-	private static StateModel<State> latestState = StateModel.create(null);
 
 	public static long maxBlock = 0;
 
@@ -102,15 +94,9 @@ public class ConvexClient extends JPanel {
 		System.err.println("Missing tab: " + title);
 	}
 
-	public static State getLatestState() {
-		return latestState.getValue();
-	}
 
 	public static Component getFrame() {
 		return frame;
 	}
 
-	public static StateModel<State> getStateModel() {
-		return latestState;
-	}
 }

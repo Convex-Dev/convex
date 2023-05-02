@@ -7,15 +7,10 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
@@ -26,6 +21,9 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
@@ -41,10 +39,8 @@ import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
-import convex.gui.components.PeerView;
 
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
@@ -64,7 +60,7 @@ public class REPLPanel extends JPanel {
 
 	private AccountChooserPanel execPanel = new AccountChooserPanel();
 
-	private final ConvexRemote convex;
+	private final Convex convex;
 
 	private static final Logger log = LoggerFactory.getLogger(REPLPanel.class.getName());
 
@@ -100,22 +96,11 @@ public class REPLPanel extends JPanel {
 
 	/**
 	 * Create the panel.
-	 * @param peerView {@link PeerView} instance
+	 * @param convex Convex connection instance
 	 */
-	public REPLPanel(PeerView peerView) {
+	public REPLPanel(Convex convex) {
+		this.convex=convex;
 		setLayout(new BorderLayout(0, 0));
-
-		InetSocketAddress addr = peerView.getHostAddress();
-		if (addr == null) {
-			JOptionPane.showMessageDialog(this, "Error: peer shut down already?");
-			throw new IllegalStateException("Connect fail, no remote address");
-		}
-		try {
-			// Connect to peer as a client
-			convex = Convex.connect(addr, getAddress(),getKeyPair());
-		} catch (Exception ex) {
-			throw Utils.sneakyThrow(ex);
-		}
 
 		JSplitPane splitPane = new JSplitPane();
 		splitPane.setResizeWeight(0.8);
@@ -160,9 +145,12 @@ public class REPLPanel extends JPanel {
 		panel_1.add(btnInfo);
 		btnInfo.addActionListener(e -> {
 			String infoString = "";
-			infoString += "Remote host:  " + convex.getRemoteAddress() + "\n";
-			infoString += "Sequence:  " + convex.getSequence() + "\n";
-			infoString += "Connection Account:  " + convex.getAddress() + "\n";
+			if (convex instanceof ConvexRemote) {
+				infoString += "Remote host: " + ((ConvexRemote)convex).getRemoteAddress() + "\n";
+			}
+			infoString += "Sequence:    " + convex.getSequence() + "\n";
+			infoString += "Account:     " + convex.getAddress() + "\n";
+			infoString += "Public Key:  " + convex.getAddress() + "\n";
 
 			JOptionPane.showMessageDialog(this, infoString);
 		});
