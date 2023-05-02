@@ -321,14 +321,14 @@ public class Etch {
 		return write(key,0,value,INDEX_START);
 	}
 
-	private Ref<ACell> write(AArrayBlob key, int keyOffset, Ref<ACell> ref, long indexPosition) throws IOException {
-		if (keyOffset>=KEY_SIZE) {
+	private Ref<ACell> write(AArrayBlob key, int level, Ref<ACell> ref, long indexPosition) throws IOException {
+		if (level>=KEY_SIZE) {
 			throw new Error("Offset exceeded for key: "+key);
 		}
 
-		int isize=indexSize(keyOffset);
+		int isize=indexSize(level);
 		int mask=isize-1;
-		final int digit=key.byteAt(keyOffset)&mask;
+		final int digit=key.byteAt(level)&mask;
 		
 		long slotValue=readSlot(indexPosition,digit);
 		long type=slotType(slotValue);
@@ -340,7 +340,7 @@ public class Etch {
 		} else if (type==PTR_INDEX) {
 			// recursively check next level of index
 			long newIndexPosition=slotPointer(slotValue); // clear high bits
-			return write(key,keyOffset+1,ref,newIndexPosition);
+			return write(key,level+1,ref,newIndexPosition);
 
 		} else if (type==PTR_PLAIN) {
 			// existing data pointer (non-zero)
@@ -367,19 +367,19 @@ public class Etch {
 				return ref;
 			}
 
-			if (keyOffset>=KEY_SIZE-1) {
+			if (level>=KEY_SIZE-1) {
 				throw new Error("Unexpected collision at max offset for key: "+key+" with existing key: "+Blob.wrap(temp,0,KEY_SIZE));
 			}
 
 			// have collision, so create new index node including the existing pointer
-			int nextDigitOfCollided=temp[keyOffset+1]&0xFF;
-			long newIndexPosition=appendLeafIndex(nextDigitOfCollided,slotValue);
+			int nextDigitOfCollided=temp[level+1]&0xFF;
+			long newIndexPosition=appendLeafIndex(level+1,nextDigitOfCollided,slotValue);
 
 			// put index pointer into this index block, setting flags for index node
 			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
 
 			// recursively write this key
-			return write(key,keyOffset+1,ref,newIndexPosition);
+			return write(key,level+1,ref,newIndexPosition);
 		} else if (type==PTR_START) {
 			// first check if the start pointer is the right value. if so, bail out with nothing to do
 			if (checkMatchingKey(key, slotValue)) {
@@ -413,14 +413,14 @@ public class Etch {
 
 			// first we build a new index block, containing our new data
 			long newDataPointer=appendData(key,ref);
-			long newIndexPos=appendLeafIndex(key.byteAt(keyOffset+1),newDataPointer);
+			long newIndexPos=appendLeafIndex(level+1,key.byteAt(level+1),newDataPointer);
 
 			// for each element in chain, move existing data to new index block. i is the length of chain
 			for (int j=0; j<i; j++) {
 				int movingDigit=(digit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=slotPointer(movingSlotValue); // just the raw pointer
-				writeExistingData(newIndexPos,keyOffset+1,dp);
+				writeExistingData(newIndexPos,level+1,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
@@ -439,7 +439,7 @@ public class Etch {
 				int movingDigit=(chainStartDigit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=slotPointer(movingSlotValue); // just the raw pointer
-				writeExistingData(newIndexPos,keyOffset+1,dp);
+				writeExistingData(newIndexPos,level+1,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
@@ -651,16 +651,22 @@ public class Etch {
 	 * @return the position of the new index block
 	 * @throws IOException
 	 */
-	private long appendLeafIndex(int digit, long dataPointer) throws IOException {
+	private long appendLeafIndex(int level, int digit, long dataPointer) throws IOException {
+		int isize=indexSize(level);
+		int mask=isize-1;
+		int indexBlockLength=POINTER_SIZE*isize;
+		digit=digit&mask;
+		
 		long position=dataLength;
 		byte[] temp=tempArray.get();
 		Arrays.fill(temp, (byte)0x00);
-		int ix=POINTER_SIZE*(digit&0xFF);
+		int ix=POINTER_SIZE*digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix,dataPointer); // single node
 		MappedByteBuffer mbb=seekMap(position);
-		mbb.put(temp); // write full index block
-		// set the datalength to the last available byte in the file
-		setDataLength(position+INDEX_BLOCK_SIZE);
+		mbb.put(temp,0,indexBlockLength); // write index block
+		
+		// set the datalength to the last available byte in the file after adding index block
+		setDataLength(position+indexBlockLength);
 		return position;
 	}
 
