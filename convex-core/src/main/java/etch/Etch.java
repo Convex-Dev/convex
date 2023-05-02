@@ -508,8 +508,7 @@ public class Etch {
 		int mask=isize-1;
 		
 		// index into existing key data to get current digit
-		AArrayBlob existingKey=readBlob(dp,KEY_SIZE);
-		int digit=getDigit(existingKey,level);
+		int digit=getDigit(dp,level);
 
 		long currentSlot=readSlot(indexPosition,digit);
 		long type = currentSlot&TYPE_MASK;
@@ -870,6 +869,22 @@ public class Etch {
 	private int getDigit(AArrayBlob key, int level) {
 		if (level==0) return key.shortAt(0)&0xffff;
 		return key.byteAt(level+1)&0xFF;
+	}
+	
+	/**
+	 * Gets the radix index digit for the specified level
+	 * @param dp Data pointer into store
+	 * @param level Level of Etch store index to get digit for
+	 * @return
+	 * @throws IOException 
+	 */
+	private int getDigit(long dp, int level) throws IOException {
+		if (level==0) {
+			MappedByteBuffer mbb=seekMap(dp);
+			return mbb.getShort()&0xffff;
+		} 
+		MappedByteBuffer mbb=seekMap(dp+(level+1));
+		return mbb.get()&0xFF;
 	}
 
 	/**
