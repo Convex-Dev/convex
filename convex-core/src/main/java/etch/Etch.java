@@ -868,7 +868,11 @@ public class Etch {
 	 */
 	private int getDigit(AArrayBlob key, int level) {
 		if (level==0) return key.shortAt(0)&0xffff;
-		return key.byteAt(level+1)&0xFF;
+		if (level==1) return key.byteAt(2)&0xFF;
+		int bi=(level+4)/2;      // level 2,3 maps to 3 etc.
+		boolean hi=(level&1)==0; // we want high byte if even
+		byte v= key.byteAt(bi);
+		return (hi?(v>>4):v)&0xf;
 	}
 	
 	/**
@@ -883,8 +887,15 @@ public class Etch {
 			MappedByteBuffer mbb=seekMap(dp);
 			return mbb.getShort()&0xffff;
 		} 
-		MappedByteBuffer mbb=seekMap(dp+(level+1));
-		return mbb.get()&0xFF;
+		if (level==1) {
+			MappedByteBuffer mbb=seekMap(dp+(level+1));
+			return mbb.get()&0xFF;
+		}
+		int bi=(level+4)/2;      // level 2,3 maps to 3 etc.
+		boolean hi=(level&1)==0; // we want high byte if even
+		MappedByteBuffer mbb=seekMap(dp+bi);
+		byte v= mbb.get();
+		return (hi?(v>>4):v)&0xf;		
 	}
 
 	/**
@@ -894,7 +905,8 @@ public class Etch {
 	 */
 	public int indexSize(int level) {
 		if (level==0) return 65536;
-		return 256;
+		if (level==1) return 256;
+		return 16;
 	}
 
 	/**
