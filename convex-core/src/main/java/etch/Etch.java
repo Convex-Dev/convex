@@ -103,11 +103,11 @@ public class Etch {
 	 */
 	private static final long INDEX_START=SIZE_HEADER;
 
-	private static final long TYPE_MASK= 0xC000000000000000L;
-	private static final long PTR_PLAIN=0x0000000000000000L; // direct pointer to data
-	private static final long PTR_INDEX=0x4000000000000000L; // pointer to index block
-	private static final long PTR_START=0x8000000000000000L; // start of chained entries
-	private static final long PTR_CHAIN=0xC000000000000000L; // chained entries after start
+	private static final long TYPE_MASK = 0xC000000000000000L;
+	private static final long PTR_PLAIN = 0x0000000000000000L; // direct pointer to data
+	private static final long PTR_INDEX = 0x4000000000000000L; // pointer to index block
+	private static final long PTR_START = 0x8000000000000000L; // start of chained entries
+	private static final long PTR_CHAIN = 0xC000000000000000L; // chained entries after start
 
 	private static final Logger log=LoggerFactory.getLogger(Etch.class.getName());
 
@@ -326,7 +326,10 @@ public class Etch {
 			throw new Error("Offset exceeded for key: "+key);
 		}
 
-		final int digit=key.byteAt(keyOffset)&0xFF;
+		int isize=indexSize(keyOffset);
+		int mask=isize-1;
+		final int digit=key.byteAt(keyOffset)&mask;
+		
 		long slotValue=readSlot(indexPosition,digit);
 		long type=slotType(slotValue);
 
@@ -385,12 +388,13 @@ public class Etch {
 
 			// now scan slots, looking for either the right value or an empty space
 			int i=1;
-			while (i<256) {
-				slotValue=readSlot(indexPosition,digit+i);
+			while (i<isize) {
+				int ix=(digit+i)&mask;
+				slotValue=readSlot(indexPosition,ix);
 
 				// if we reach an empty location simply write new value as a chain continuation (PTR_CHAIN)
 				if (slotValue==0L) {
-					return writeNewData(indexPosition,digit+i,key,ref,PTR_CHAIN);
+					return writeNewData(indexPosition,ix,key,ref,PTR_CHAIN);
 				}
 
 				// if we are not in a chain, we have reached the maximum chain length. Exit loop and compress.
@@ -413,7 +417,7 @@ public class Etch {
 
 			// for each element in chain, move existing data to new index block. i is the length of chain
 			for (int j=0; j<i; j++) {
-				int movingDigit=digit+j;
+				int movingDigit=(digit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=slotPointer(movingSlotValue); // just the raw pointer
 				writeExistingData(newIndexPos,keyOffset+1,dp);
@@ -425,14 +429,14 @@ public class Etch {
 			return ref;
 		} else if (type==PTR_CHAIN) {
 			// need to collapse existing chain
-			int chainStartDigit=seekChainStart(indexPosition,digit);
+			int chainStartDigit=seekChainStart(indexPosition,digit,isize);
 			if (chainStartDigit==digit) throw new Error("Can't start chain at this digit? "+digit);
-			int chainEndDigit=seekChainEnd(indexPosition,digit);
+			int chainEndDigit=seekChainEnd(indexPosition,digit,isize);
 
 			int n=(chainStartDigit==chainEndDigit)?256:(chainEndDigit-chainStartDigit)&0xFF;
 			long newIndexPos=appendNewIndexBlock();
 			for (int j=0; j<n; j++) {
-				int movingDigit=chainStartDigit+j;
+				int movingDigit=(chainStartDigit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=slotPointer(movingSlotValue); // just the raw pointer
 				writeExistingData(newIndexPos,keyOffset+1,dp);
@@ -456,13 +460,14 @@ public class Etch {
 	 * @return
 	 * @throws IOException
 	 */
-	private int seekChainStart(long indexPosition, int digit) throws IOException {
-		digit=digit&0xFF;
-		int i=(digit-1)&0xFF;
+	private int seekChainStart(long indexPosition, int digit, int isize) throws IOException {
+		int mask=isize-1;
+		digit=digit&mask;
+		int i=(digit-1)&mask;
 		while (i!=digit) {
 			long slotValue=readSlot(indexPosition,i);
 			if (slotType(slotValue)==PTR_START) return i;
-			i=(i-1)&0xFF;
+			i=(i-1)&mask;
 		}
 		throw new Error("Infinite chain?");
 	}
@@ -471,16 +476,17 @@ public class Etch {
 	 * Finds the end digit of a chain, stepping forwards from the given digit
 	 * @param indexPosition
 	 * @param digit
-	 * @return
+	 * @return Next index position that is not PTR_CHAIN
 	 * @throws IOException
 	 */
-	private int seekChainEnd(long indexPosition, int digit) throws IOException {
-		digit=digit&0xFF;
-		int i=(digit+1)&0xFF;
+	private int seekChainEnd(long indexPosition, int digit, int isize) throws IOException {
+		int mask=isize-1;
+		digit=digit&mask;
+		int i=(digit+1)&mask;
 		while (i!=digit) {
 			long slotValue=readSlot(indexPosition,i);
 			if (slotType(slotValue)!=PTR_CHAIN) return i;
-			i=(i+1)&0xFF;
+			i=(i+1)&mask;
 		}
 		throw new Error("Infinite chain?");
 	}
@@ -492,27 +498,30 @@ public class Etch {
 	 * We also don't do chaining, assume clashes unlikely, and that the block given has
 	 * no existing chains.
 	 *
-	 * @param newIndexPos
-	 * @param keyOffsetlong
+	 * @param indexPosition Position of index Block
+	 * @param level Level in Etch database
 	 * @param dp Raw data pointer
 	 * @throws IOException
 	 */
 	@SuppressWarnings("unused")
-	private void writeExistingData(long indexPosition, int keyOffset, long dp) throws IOException {
-
+	private void writeExistingData(long indexPosition, int level, long dp) throws IOException {
+		int isize=indexSize(level);
+		int mask=isize-1;
+		
 		// index into existing key data to get current digit
-		MappedByteBuffer mbb=seekMap(dp+keyOffset);
-		int digit=mbb.get()&0xFF;
+		MappedByteBuffer mbb=seekMap(dp+level);
+		int digit=mbb.get()&mask;
 
 		long currentSlot=readSlot(indexPosition,digit);
 		long type = currentSlot&TYPE_MASK;
 		if (currentSlot==0L) {
 			writeSlot(indexPosition,digit,dp);
 		} else if (type==PTR_INDEX) {
-			writeExistingData(slotPointer(currentSlot),keyOffset+1,dp);
+			writeExistingData(slotPointer(currentSlot),level+1,dp);
 		} else if (type==PTR_PLAIN) {
-			if (keyOffset+1>=KEY_SIZE) {
-				Blob bx=readBlob(indexPosition,2048);
+			if (level+1>=KEY_SIZE) {
+				// Invalid level! Prepare to output error
+				Blob bx=readBlob(indexPosition,POINTER_SIZE*isize);
 				Blob bx2=readBlob(currentSlot,34);
 				Blob bx3=readBlob(dp,34);
 				throw new Error("Overflowing key size - key collision? index="+Utils.toHexString(indexPosition)+" dataPointer="+Utils.toHexString(dp)+" Key: "+readBlob(dp,32));
@@ -520,8 +529,8 @@ public class Etch {
 
 			// expand to a new index block for collision
 			long newIndexPosition=appendNewIndexBlock();
-			writeExistingData(newIndexPosition,keyOffset+1,dp);
-			writeExistingData(newIndexPosition,keyOffset+1,currentSlot);
+			writeExistingData(newIndexPosition,level+1,dp);
+			writeExistingData(newIndexPosition,level+1,currentSlot);
 			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
 		} else {
 			throw new Error("Unexpected type: "+type);
@@ -727,12 +736,12 @@ public class Etch {
 	/**
 	 * Gets the slot value at the specified digit position in an index block.
 	 * @param indexPosition Position of index block
-	 * @param digit Digit of value 0..255 (high bits will be ignored)
+	 * @param digit Position of slot within index block
 	 * @return Pointer value (including type bits in MSBs)
 	 * @throws IOException
 	 */
 	private long readSlot(long indexPosition, int digit) throws IOException {
-		long pointerIndex=indexPosition+POINTER_SIZE*(digit&0xFF);
+		long pointerIndex=indexPosition+POINTER_SIZE*digit;
 		MappedByteBuffer mbb=seekMap(pointerIndex);
 		long pointer=mbb.getLong();
 		return pointer;
@@ -811,9 +820,11 @@ public class Etch {
 		if (offset>=KEY_SIZE) {
 			throw new Error("Offset exceeded for key: "+key);
 		}
-
-		int digit=key.byteAt(offset)&0xFF;
+		int isize=indexSize(offset);
+		int mask=isize-1;
+		int digit=key.byteAt(offset)&mask;
 		long slotValue=readSlot(indexPosition,digit);
+		
 		long type=(slotValue&TYPE_MASK);
 		if (slotValue==0) {
 			// Empty slot i.e. not found
@@ -832,12 +843,12 @@ public class Etch {
 			synchronized (this) {
 				// start of chain, so scan chain of entries
 				int i=0;
-				while (i<256) {
+				while (i<isize) {
 					long ptr=slotValue&(~TYPE_MASK);
 					if (checkMatchingKey(key,ptr)) return ptr;
 
 					i++; // advance to next position
-					slotValue=readSlot(indexPosition,digit+i);
+					slotValue=readSlot(indexPosition,(digit+i)&mask);
 					type=(slotValue&TYPE_MASK);
 					if (!(type==PTR_CHAIN)) return -1; // reached end of chain
 				}
@@ -846,6 +857,15 @@ public class Etch {
 		} else {
 			throw new Error("Shouldn't be possible!");
 		}
+	}
+
+	/**
+	 * Gets the index block size for a given level
+	 * @param level Level of index block in Etch store
+	 * @return
+	 */
+	private int indexSize(int level) {
+		return 256;
 	}
 
 	/**
