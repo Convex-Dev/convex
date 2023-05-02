@@ -167,6 +167,7 @@ public class Etch {
 			dataLength=SIZE_HEADER; // advance past initial long
 
 			// add an index block
+			mbb=seekMap(SIZE_HEADER);
 			long indexStart=appendNewIndexBlock(0);
 			assert(indexStart==INDEX_START);
 
@@ -346,7 +347,6 @@ public class Etch {
 			if (checkMatchingKey(key,slotValue)) {
 				return updateInPlace(slotValue,ref);
 			}
-			byte[] temp=tempArray.get();
 
 			// we need to check the next slot position to see if we can extend to a chain
 			int nextDigit=digit+1;
@@ -366,8 +366,9 @@ public class Etch {
 			
 			// have collision, so create new index node including the existing pointer
 			int nextLevel=level+1;
-			// TODO: update for variable levels
-			int nextDigitOfCollided=temp[nextLevel]&0xFF;
+			// Note: temp should contain key from checkMatchingKey!
+			byte[] temp=tempArray.get();
+			int nextDigitOfCollided=getDigit(Blob.wrap(temp,0,KEY_SIZE),nextLevel);
 			long newIndexPosition=appendLeafIndex(nextLevel,nextDigitOfCollided,slotValue);
 
 			// put index pointer into this index block, setting flags for index node
@@ -507,8 +508,8 @@ public class Etch {
 		int mask=isize-1;
 		
 		// index into existing key data to get current digit
-		MappedByteBuffer mbb=seekMap(dp+level);
-		int digit=mbb.get()&mask;
+		AArrayBlob existingKey=readBlob(dp,KEY_SIZE);
+		int digit=getDigit(existingKey,level);
 
 		long currentSlot=readSlot(indexPosition,digit);
 		long type = currentSlot&TYPE_MASK;
@@ -618,10 +619,10 @@ public class Etch {
 	}
 
 	/**
-	 * Checks if the key matches the data at the specified pointer position
+	 * Checks if the key matches the data at the specified data pointer position
 	 * @param key
 	 * @param dataPointer Pointer to data. Type bits in MSBs will be ignored.
-	 * @return
+	 * @return true if key matches at given data position
 	 * @throws IOException
 	 */
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
@@ -630,14 +631,15 @@ public class Etch {
 		byte[] temp=tempArray.get();
 		mbb.get(temp, 0, KEY_SIZE);
 		if (key.equalsBytes(temp,0)) {
-			// key already in store
+			// key already in store matching at this data position
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Appends a leaf index block including exactly one data pointer, at the specified digit position
+	 * Appends a leaf index block including exactly one data pointer, at the specified digit position.
+	 * WARNING: Overwrites temp array!
 	 * @param digit Digit position for the data pointer to be stored at (0..255, high bits ignored)
 	 * @param dataPointer Single data pointer to include in new index block
 	 * @return the position of the new index block
@@ -734,7 +736,7 @@ public class Etch {
 	}
 
 	/**
-	 * Gets the slot value at the specified digit position in an index block.
+	 * Gets the slot value at the specified digit position in an index block. Doesn't affect temp array.
 	 * @param indexPosition Position of index block
 	 * @param digit Position of slot within index block
 	 * @return Pointer value (including type bits in MSBs)
@@ -798,12 +800,12 @@ public class Etch {
 	 * Writes a slot value to an index block.
 	 *
 	 * @param indexPosition
-	 * @param digit Digit radix position in index block (0..255), high bits are ignored
+	 * @param digit Digit radix position in index block
 	 * @param slotValue
 	 * @throws IOException
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
-		long position=indexPosition+(digit&0xFF)*POINTER_SIZE;
+		long position=indexPosition+digit*POINTER_SIZE;
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.putLong(slotValue);
 	}
@@ -866,8 +868,8 @@ public class Etch {
 	 * @return
 	 */
 	private int getDigit(AArrayBlob key, int level) {
-		// TODO Update for variable levels
-		return key.byteAt(level)&0xFF;
+		if (level==0) return key.shortAt(0)&0xffff;
+		return key.byteAt(level+1)&0xFF;
 	}
 
 	/**
@@ -876,13 +878,14 @@ public class Etch {
 	 * @return Index block size as number of entries
 	 */
 	public int indexSize(int level) {
-		// TODO Update for variable levels
+		if (level==0) return 65536;
 		return 256;
 	}
 
 	/**
 	 * Append a new index block to the store file. The new Index block will be initially empty,
 	 * i.e. filled completely with zeros.
+	 * WARNING: Overwrites temp array!
 	 * @return The location of the newly added index block.
 	 * @throws IOException
 	 */
@@ -898,13 +901,16 @@ public class Etch {
 		long position=dataLength;
 		byte[] temp=tempArray.get();
 		int tlen=temp.length;
-		MappedByteBuffer mbb=seekMap(position);
-		Arrays.fill(temp,0,Math.min(sizeBytes,tlen),(byte)0);
-		for (int ix=0; ix<sizeBytes; ix+=tlen) {
-			mbb.put(temp,0,Math.min(sizeBytes-ix,tlen));
-		}
+		MappedByteBuffer mbb=null;
+		
 		// set the datalength to the last available byte in the file
 		setDataLength(position+sizeBytes);
+		
+		Arrays.fill(temp,0,Math.min(sizeBytes,tlen),(byte)0);
+		for (int ix=0; ix<sizeBytes; ix+=tlen) {
+			mbb=seekMap(position+ix);
+			mbb.put(temp,0,Math.min(sizeBytes-ix,tlen));
+		}
 		return position;
 	}
 

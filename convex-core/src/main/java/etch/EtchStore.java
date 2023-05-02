@@ -136,7 +136,7 @@ public class EtchStore extends AStore {
 		}
 	}
 
-	private Ref<ACell> readStoreRef(Hash hash) throws IOException {
+	public Ref<ACell> readStoreRef(Hash hash) throws IOException {
 		Ref<ACell> ref=etch.read(hash);
 		if (ref!=null) blobCache.putCell(ref);
 		return ref;
