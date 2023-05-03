@@ -1886,6 +1886,10 @@ public class CoreTest extends ACVMTest {
 		// nil treated as empty collection
 		assertEquals(Vectors.empty(), eval("(mapv + '(1 2) nil)"));
 		assertEquals(Vectors.empty(), eval("(mapv + nil)"));
+		
+		// Check blob-map behaviour
+		assertSame(Vectors.empty(),eval("(mapv inc (blob-map))"));
+		assertEquals(Vectors.of(2),eval("(mapv count (blob-map 0x00 :foo))"));
 
 		assertArityError(step("(mapv)"));
 		assertArityError(step("(mapv inc)"));
