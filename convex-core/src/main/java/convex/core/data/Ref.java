@@ -523,9 +523,15 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Converts this Ref to a RefDirect
 	 * @return Direct Ref
 	 */
-	public Ref<T> toDirect() {
-		return RefDirect.create(getValue(), hash, flags);
-	}
+	public abstract RefDirect<T> toDirect();
+	
+	/**
+	 * Converts this Ref to a RefSoft. Does not perform any persistence: doing this
+	 * may make MissingDataExceptions happen.
+	 * 
+	 * @return Direct Ref
+	 */
+	public abstract RefSoft<T> toSoft();
 
 	/**
 	 * Persists a Ref shallowly in the current store.

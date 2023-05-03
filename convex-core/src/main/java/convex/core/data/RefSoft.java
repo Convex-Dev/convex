@@ -143,6 +143,16 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	public boolean isDirect() {
 		return false;
 	}
+	
+	@Override
+	public RefDirect<T> toDirect() {
+		return RefDirect.create(getValue(), hash, flags);
+	}
+	
+	@Override
+	public RefSoft<T> toSoft() {
+		return this;
+	}
 
 	@Override
 	public Hash getHash() {

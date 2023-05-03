@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import convex.core.exceptions.InvalidDataException;
+import convex.core.store.Stores;
 
 /**
  * Ref subclass for direct in-memory references.
@@ -66,8 +67,13 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	}
 
 	@Override
-	public Ref<T> toDirect() {
+	public RefDirect<T> toDirect() {
 		return this;
+	}
+	
+	@Override
+	public RefSoft<T> toSoft() {
+		return RefSoft.create(Stores.current(), value, INTERNAL_FLAGS);
 	}
 
 	@Override
