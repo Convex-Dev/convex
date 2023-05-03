@@ -211,6 +211,11 @@ public class ReaderTest {
 		assertEquals(Strings.create("bar"), Reader.read("\"bar\""));
 		assertEquals(Vectors.of(Strings.create("bar")), Reader.read("[\"bar\"]"));
 		assertEquals(Strings.create("\"bar\""), Reader.read("\"\\\"bar\\\"\""));
+		
+		assertEquals(Strings.create("\n"), Reader.read("\"\\n\""));
+
+		// Multi-line String
+		assertEquals(Strings.create("\n"), Reader.read("\"\n\""));
 
 	}
 
