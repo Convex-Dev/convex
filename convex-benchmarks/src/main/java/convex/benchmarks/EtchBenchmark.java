@@ -1,5 +1,6 @@
 package convex.benchmarks;
 
+import java.io.IOException;
 import java.util.Random;
 
 import org.openjdk.jmh.annotations.Benchmark;
@@ -8,6 +9,7 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -29,7 +31,7 @@ public class EtchBenchmark {
 	
 	static long nonce=0;
 	
-	static int NUMVALS=20000;
+	static int NUMVALS=10000;
 	
 	@SuppressWarnings("unchecked")
 	static Ref<ACell>[] refs=new Ref[NUMVALS];
@@ -44,6 +46,7 @@ public class EtchBenchmark {
 			r.getHash();
 			store.storeTopRef(r, Ref.STORED, null);
 		}
+		System.out.println("Refs stored for testing");
 	}
 	
 	@Benchmark
@@ -53,9 +56,23 @@ public class EtchBenchmark {
 	}
 	
 	@Benchmark
-	public void readDataRandom() {
+	public void readDataRandom() throws IOException {
 		int ix=rand.nextInt(NUMVALS);
-		store.refForHash(refs[ix].getHash()).getValue();
+		Ref<?> rix=refs[ix];
+		Hash h=rix.getHash();
+		// store.refForHash(h);
+		//try {
+			Ref<ACell> r = store.readStoreRef(h);
+			if (r==null) {
+			//	System.out.println(h+" "+ix+refs[ix].getValue());
+			//	r = store.readStoreRef(h);
+			} else {
+				r.getValue();
+			}
+		//} catch (Throwable t) {
+		//	System.out.println(h+" "+ix+refs[ix].getValue());
+		//	throw t;
+		//}
 	}
 	
 	public static void main(String[] args) throws Exception {

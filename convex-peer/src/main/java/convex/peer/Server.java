@@ -53,7 +53,7 @@ import convex.net.message.Message;
 /**
  * A self contained Peer Server that can be launched with a config.
  * 
- * The primary role for the Server is to responf to incoming messages and maintain
+ * The primary role for the Server is to respond to incoming messages and maintain
  * network consensus.
  *
  * Components contained within the Server handle specific tasks, e.g:
@@ -144,8 +144,10 @@ public class Server implements Closeable {
 	 */
 	private volatile boolean isRunning = false;
 
+	/**
+	 * NIO Server instance
+	 */
 	private NIOServer nio = NIOServer.create(this);
-	private Thread beliefMergeThread = null;
 
 	/**
 	 * The Peer Controller Address
@@ -700,14 +702,6 @@ public class Server implements Closeable {
 		}
 
 		isRunning = false;
-		if (beliefMergeThread != null) {
-			beliefMergeThread.interrupt();
-			try {
-				beliefMergeThread.join(100);
-			} catch (InterruptedException e) {
-				// Ignore
-			}
-		}
 
 		manager.close();
 		nio.close();

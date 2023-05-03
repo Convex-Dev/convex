@@ -602,40 +602,27 @@
 
 
 (defn mapv
-
   ^{:doc {:description "Like `map` but systematically returns the result as a vector."
           :examples    [{:code "(mapv inc '(1 2 3))"}]
           :signature   [{:params [f & colls] }]}}
-
-  [f & colls]
-
-  (vec (apply map
-              f
-              colls)))
+  [f fst & more]
+  (apply map f (vec fst) more))
 
 (defmacro schedule
-
   ^{:doc {:description "Schedules a transaction for future execution under this account. Expands and compiles code now, but does not execute until the specified timestamp."
           :examples    [{:code "(schedule (+ *timestamp* 1000) (transfer my-friend 1000000))"}]
           :signature   [{:params [timestamp code]}]}}
-
   [timestamp code]
-
   `(schedule* ~timestamp
               (compile ~(list 'quote
                               code))))
 
-
-
 (defmacro tailcall
-
    ^{:doc {:description ["Advanced feature. While `return` stops the execution of a function and return, `tailcall` calls another one without consuming additional stack depth."
                          "Rest of the current function will never be executed."]
            :examples    [{:code "(tailcall (some-function 1 2 3))"}]
            :signature   [{:params [[f & args]] }]}}
-
   [callspec]
-
   (let []
     (or (list? callspec)
         (fail :ARGUMENT

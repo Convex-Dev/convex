@@ -14,7 +14,6 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -44,7 +43,6 @@ import etch.EtchStore;
 public class PeersListPanel extends JPanel {
 
 	JPanel peersPanel;
-	public static DefaultListModel<PeerView> peerList = new DefaultListModel<PeerView>();
 
 	JPanel peerViewPanel;
 	JScrollPane scrollPane;
@@ -107,7 +105,7 @@ public class PeersListPanel extends JPanel {
 	}
 
 	public static PeerView getFirst() {
-		return peerList.elementAt(0);
+		return PeerGUI.peerList.elementAt(0);
 	}
 
 	/**
@@ -117,16 +115,16 @@ public class PeersListPanel extends JPanel {
 	 */
 	public List<PeerView> getPeerViews() {
 		ArrayList<PeerView> al = new ArrayList<>();
-		int n = peerList.getSize();
+		int n = PeerGUI.peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			PeerView p = peerList.getElementAt(i);
+			PeerView p = PeerGUI.peerList.getElementAt(i);
 			al.add(p);
 		}
 		return al;
 	}
 
 	private void addPeer(PeerView peer) {
-		peerList.addElement(peer);
+		PeerGUI.peerList.addElement(peer);
 	}
 
 	/**
@@ -165,15 +163,15 @@ public class PeersListPanel extends JPanel {
 
 		});
 
-		ScrollyList<PeerView> scrollyList = new ScrollyList<PeerView>(peerList,
+		ScrollyList<PeerView> scrollyList = new ScrollyList<PeerView>(PeerGUI.peerList,
 				peer -> new PeerComponent(manager, peer));
 		add(scrollyList, BorderLayout.CENTER);
 	}
 
 	public void closePeers() {
-		int n = peerList.getSize();
+		int n = PeerGUI.peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			PeerView p = peerList.getElementAt(i);
+			PeerView p = PeerGUI.peerList.getElementAt(i);
 			try {
 				p.peerServer.close();
 			} catch (Exception e) {

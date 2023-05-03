@@ -37,7 +37,7 @@ import convex.core.util.Utils;
  * It is intended that keys are pseudo-random hash values, which will result in desirable distributions
  * of data for the radix tree structure.
  *
- * Radix tree index blocks are 256-way arrays of 8 byte pointers.
+ * Radix tree index blocks are arrays of 8 byte pointers.
  *
  * To avoid creating too many index blocks when collisions occur, a chained entry list inside is created
  * in unused space in index blocks. Once there is no more space, chains are collapsed to a new index block.
@@ -64,17 +64,14 @@ import convex.core.util.Utils;
 public class Etch {
 	// structural constants for data block
 	private static final int KEY_SIZE=32;
+	private static final int MAX_LEVEL=60; // 2 bytes + 1 byte + 58 hex digits for 29 remaining bytes
+
 	private static final int LABEL_SIZE=1+8; // Flags (byte) plus Memory Size (long)
 	private static final int LENGTH_SIZE=2;
 	private static final int POINTER_SIZE=8;
 
-	/**
-	 * Index block is fixed size with 256 entries
-	 */
-	private static final int INDEX_BLOCK_SIZE=POINTER_SIZE*256;
-
 	// constants for memory mapping buffers into manageable regions
-	private static final long MAX_REGION_SIZE=1<<30; // 1GB seems reasonable
+	private static final long MAX_REGION_SIZE=1<<30; // 1GB seems reasonable, note JVM 2GB limit :-/
 	private static final long REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
 
 	/**
@@ -103,21 +100,21 @@ public class Etch {
 	 */
 	private static final long INDEX_START=SIZE_HEADER;
 
-	private static final long TYPE_MASK= 0xC000000000000000L;
-	private static final long PTR_PLAIN=0x0000000000000000L; // direct pointer to data
-	private static final long PTR_INDEX=0x4000000000000000L; // pointer to index block
-	private static final long PTR_START=0x8000000000000000L; // start of chained entries
-	private static final long PTR_CHAIN=0xC000000000000000L; // chained entries after start
+	private static final long TYPE_MASK = 0xC000000000000000L;
+	private static final long PTR_PLAIN = 0x0000000000000000L; // direct pointer to data
+	private static final long PTR_INDEX = 0x4000000000000000L; // pointer to index block
+	private static final long PTR_START = 0x8000000000000000L; // start of chained entries
+	private static final long PTR_CHAIN = 0xC000000000000000L; // chained entries after start
 
 	private static final Logger log=LoggerFactory.getLogger(Etch.class.getName());
 
 	/**
-	 * Temporary byte array for writer. Must not be used by readers.
+	 * Temporary byte array on a thread local basis.
 	 */
 	private final ThreadLocal<byte[]> tempArray=new ThreadLocal<>() {
 		@Override
 		public byte[]  initialValue() {
-			return new byte[INDEX_BLOCK_SIZE];
+			return new byte[2048];
 		}
 	};
 
@@ -170,7 +167,8 @@ public class Etch {
 			dataLength=SIZE_HEADER; // advance past initial long
 
 			// add an index block
-			long indexStart=appendNewIndexBlock();
+			mbb=seekMap(SIZE_HEADER);
+			long indexStart=appendNewIndexBlock(0);
 			assert(indexStart==INDEX_START);
 
 			// ensure data length is initially correct
@@ -321,12 +319,15 @@ public class Etch {
 		return write(key,0,value,INDEX_START);
 	}
 
-	private Ref<ACell> write(AArrayBlob key, int keyOffset, Ref<ACell> ref, long indexPosition) throws IOException {
-		if (keyOffset>=KEY_SIZE) {
-			throw new Error("Offset exceeded for key: "+key);
+	private Ref<ACell> write(AArrayBlob key, int level, Ref<ACell> ref, long indexPosition) throws IOException {
+		if (level>=MAX_LEVEL) {
+			throw new Error("Max Level exceeded for key: "+key);
 		}
 
-		final int digit=key.byteAt(keyOffset)&0xFF;
+		int isize=indexSize(level);
+		int mask=isize-1;
+		final int digit=getDigit(key,level);
+		
 		long slotValue=readSlot(indexPosition,digit);
 		long type=slotType(slotValue);
 
@@ -337,7 +338,7 @@ public class Etch {
 		} else if (type==PTR_INDEX) {
 			// recursively check next level of index
 			long newIndexPosition=slotPointer(slotValue); // clear high bits
-			return write(key,keyOffset+1,ref,newIndexPosition);
+			return write(key,level+1,ref,newIndexPosition);
 
 		} else if (type==PTR_PLAIN) {
 			// existing data pointer (non-zero)
@@ -346,7 +347,6 @@ public class Etch {
 			if (checkMatchingKey(key,slotValue)) {
 				return updateInPlace(slotValue,ref);
 			}
-			byte[] temp=tempArray.get();
 
 			// we need to check the next slot position to see if we can extend to a chain
 			int nextDigit=digit+1;
@@ -363,20 +363,19 @@ public class Etch {
 
 				return ref;
 			}
-
-			if (keyOffset>=KEY_SIZE-1) {
-				throw new Error("Unexpected collision at max offset for key: "+key+" with existing key: "+Blob.wrap(temp,0,KEY_SIZE));
-			}
-
+			
 			// have collision, so create new index node including the existing pointer
-			int nextDigitOfCollided=temp[keyOffset+1]&0xFF;
-			long newIndexPosition=appendLeafIndex(nextDigitOfCollided,slotValue);
+			int nextLevel=level+1;
+			// Note: temp should contain key from checkMatchingKey!
+			byte[] temp=tempArray.get();
+			int nextDigitOfCollided=getDigit(Blob.wrap(temp,0,KEY_SIZE),nextLevel);
+			long newIndexPosition=appendLeafIndex(nextLevel,nextDigitOfCollided,slotValue);
 
 			// put index pointer into this index block, setting flags for index node
 			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
 
 			// recursively write this key
-			return write(key,keyOffset+1,ref,newIndexPosition);
+			return write(key,nextLevel,ref,newIndexPosition);
 		} else if (type==PTR_START) {
 			// first check if the start pointer is the right value. if so, bail out with nothing to do
 			if (checkMatchingKey(key, slotValue)) {
@@ -385,12 +384,13 @@ public class Etch {
 
 			// now scan slots, looking for either the right value or an empty space
 			int i=1;
-			while (i<256) {
-				slotValue=readSlot(indexPosition,digit+i);
+			while (i<isize) {
+				int ix=(digit+i)&mask;
+				slotValue=readSlot(indexPosition,ix);
 
 				// if we reach an empty location simply write new value as a chain continuation (PTR_CHAIN)
 				if (slotValue==0L) {
-					return writeNewData(indexPosition,digit+i,key,ref,PTR_CHAIN);
+					return writeNewData(indexPosition,ix,key,ref,PTR_CHAIN);
 				}
 
 				// if we are not in a chain, we have reached the maximum chain length. Exit loop and compress.
@@ -404,19 +404,21 @@ public class Etch {
 				i++;
 			}
 
-			// we now need to collapse the chain, since it cannot be extended.
+			// we now need to collapse the chain to next level, since it cannot be extended.
+			int nextLevel=level+1;
 			// System.out.println("Compressing chain, offset="+keyOffset+" chain length="+i+" with key "+key+ " indexDat= "+readBlob(indexPosition,2048));
 
-			// first we build a new index block, containing our new data
+			// first we build a new next level index block, containing our new data
 			long newDataPointer=appendData(key,ref);
-			long newIndexPos=appendLeafIndex(key.byteAt(keyOffset+1),newDataPointer);
+			int nextDigit=getDigit(key,nextLevel);
+			long newIndexPos=appendLeafIndex(nextLevel,nextDigit,newDataPointer);
 
 			// for each element in chain, move existing data to new index block. i is the length of chain
 			for (int j=0; j<i; j++) {
-				int movingDigit=digit+j;
+				int movingDigit=(digit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=slotPointer(movingSlotValue); // just the raw pointer
-				writeExistingData(newIndexPos,keyOffset+1,dp);
+				writeExistingData(newIndexPos,nextLevel,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
@@ -425,17 +427,18 @@ public class Etch {
 			return ref;
 		} else if (type==PTR_CHAIN) {
 			// need to collapse existing chain
-			int chainStartDigit=seekChainStart(indexPosition,digit);
+			int chainStartDigit=seekChainStart(indexPosition,digit,isize);
 			if (chainStartDigit==digit) throw new Error("Can't start chain at this digit? "+digit);
-			int chainEndDigit=seekChainEnd(indexPosition,digit);
+			int chainEndDigit=seekChainEnd(indexPosition,digit,isize);
+			int nextLevel=level+1;
 
-			int n=(chainStartDigit==chainEndDigit)?256:(chainEndDigit-chainStartDigit)&0xFF;
-			long newIndexPos=appendNewIndexBlock();
+			int n=(chainStartDigit==chainEndDigit)?isize:(chainEndDigit-chainStartDigit)&mask;
+			long newIndexPos=appendNewIndexBlock(nextLevel);
 			for (int j=0; j<n; j++) {
-				int movingDigit=chainStartDigit+j;
+				int movingDigit=(chainStartDigit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=slotPointer(movingSlotValue); // just the raw pointer
-				writeExistingData(newIndexPos,keyOffset+1,dp);
+				writeExistingData(newIndexPos,nextLevel,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
@@ -456,13 +459,14 @@ public class Etch {
 	 * @return
 	 * @throws IOException
 	 */
-	private int seekChainStart(long indexPosition, int digit) throws IOException {
-		digit=digit&0xFF;
-		int i=(digit-1)&0xFF;
+	private int seekChainStart(long indexPosition, int digit, int isize) throws IOException {
+		int mask=isize-1;
+		digit=digit&mask;
+		int i=(digit-1)&mask;
 		while (i!=digit) {
 			long slotValue=readSlot(indexPosition,i);
 			if (slotType(slotValue)==PTR_START) return i;
-			i=(i-1)&0xFF;
+			i=(i-1)&mask;
 		}
 		throw new Error("Infinite chain?");
 	}
@@ -471,16 +475,17 @@ public class Etch {
 	 * Finds the end digit of a chain, stepping forwards from the given digit
 	 * @param indexPosition
 	 * @param digit
-	 * @return
+	 * @return Next index position that is not PTR_CHAIN
 	 * @throws IOException
 	 */
-	private int seekChainEnd(long indexPosition, int digit) throws IOException {
-		digit=digit&0xFF;
-		int i=(digit+1)&0xFF;
+	private int seekChainEnd(long indexPosition, int digit, int isize) throws IOException {
+		int mask=isize-1;
+		digit=digit&mask;
+		int i=(digit+1)&mask;
 		while (i!=digit) {
 			long slotValue=readSlot(indexPosition,i);
 			if (slotType(slotValue)!=PTR_CHAIN) return i;
-			i=(i+1)&0xFF;
+			i=(i+1)&mask;
 		}
 		throw new Error("Infinite chain?");
 	}
@@ -492,36 +497,32 @@ public class Etch {
 	 * We also don't do chaining, assume clashes unlikely, and that the block given has
 	 * no existing chains.
 	 *
-	 * @param newIndexPos
-	 * @param keyOffsetlong
+	 * @param indexPosition Position of index Block
+	 * @param level Level in Etch database
 	 * @param dp Raw data pointer
 	 * @throws IOException
 	 */
 	@SuppressWarnings("unused")
-	private void writeExistingData(long indexPosition, int keyOffset, long dp) throws IOException {
-
+	private void writeExistingData(long indexPosition, int level, long dp) throws IOException {
+		int isize=indexSize(level);
+		int mask=isize-1;
+		
 		// index into existing key data to get current digit
-		MappedByteBuffer mbb=seekMap(dp+keyOffset);
-		int digit=mbb.get()&0xFF;
+		int digit=getDigit(dp,level);
 
 		long currentSlot=readSlot(indexPosition,digit);
 		long type = currentSlot&TYPE_MASK;
 		if (currentSlot==0L) {
 			writeSlot(indexPosition,digit,dp);
 		} else if (type==PTR_INDEX) {
-			writeExistingData(slotPointer(currentSlot),keyOffset+1,dp);
+			writeExistingData(slotPointer(currentSlot),level+1,dp);
 		} else if (type==PTR_PLAIN) {
-			if (keyOffset+1>=KEY_SIZE) {
-				Blob bx=readBlob(indexPosition,2048);
-				Blob bx2=readBlob(currentSlot,34);
-				Blob bx3=readBlob(dp,34);
-				throw new Error("Overflowing key size - key collision? index="+Utils.toHexString(indexPosition)+" dataPointer="+Utils.toHexString(dp)+" Key: "+readBlob(dp,32));
-			}
+			int newLevel=level+1;
 
 			// expand to a new index block for collision
-			long newIndexPosition=appendNewIndexBlock();
-			writeExistingData(newIndexPosition,keyOffset+1,dp);
-			writeExistingData(newIndexPosition,keyOffset+1,currentSlot);
+			long newIndexPosition=appendNewIndexBlock(newLevel);
+			writeExistingData(newIndexPosition,newLevel,dp);
+			writeExistingData(newIndexPosition,newLevel,currentSlot);
 			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
 		} else {
 			throw new Error("Unexpected type: "+type);
@@ -535,7 +536,7 @@ public class Etch {
 	 * @return
 	 * @throws IOException
 	 */
-	private Blob readBlob(long pointer, int length) throws IOException {
+	protected Blob readBlob(long pointer, int length) throws IOException {
 		MappedByteBuffer mbb=seekMap(pointer);
 		byte[] bs=new byte[length];
 		mbb.get(bs);
@@ -617,10 +618,10 @@ public class Etch {
 	}
 
 	/**
-	 * Checks if the key matches the data at the specified pointer position
+	 * Checks if the key matches the data at the specified data pointer position
 	 * @param key
 	 * @param dataPointer Pointer to data. Type bits in MSBs will be ignored.
-	 * @return
+	 * @return true if key matches at given data position
 	 * @throws IOException
 	 */
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
@@ -629,29 +630,38 @@ public class Etch {
 		byte[] temp=tempArray.get();
 		mbb.get(temp, 0, KEY_SIZE);
 		if (key.equalsBytes(temp,0)) {
-			// key already in store
+			// key already in store matching at this data position
 			return true;
 		}
 		return false;
 	}
 
 	/**
-	 * Appends a leaf index block including exactly one data pointer, at the specified digit position
+	 * Appends a leaf index block including exactly one data pointer, at the specified digit position.
+	 * WARNING: Overwrites temp array!
 	 * @param digit Digit position for the data pointer to be stored at (0..255, high bits ignored)
 	 * @param dataPointer Single data pointer to include in new index block
 	 * @return the position of the new index block
 	 * @throws IOException
 	 */
-	private long appendLeafIndex(int digit, long dataPointer) throws IOException {
+	private long appendLeafIndex(int level, int digit, long dataPointer) throws IOException {
+		assert(level>0);
+		int isize=indexSize(level);
+		int mask=isize-1;
+		int indexBlockLength=POINTER_SIZE*isize;
+		digit=digit&mask;
+		
 		long position=dataLength;
 		byte[] temp=tempArray.get();
-		Arrays.fill(temp, (byte)0x00);
-		int ix=POINTER_SIZE*(digit&0xFF);
+		Arrays.fill(temp, 0,indexBlockLength,(byte)0x00);
+		
+		int ix=POINTER_SIZE*digit; // compute position in block. note: should be already masked above
 		Utils.writeLong(temp, ix,dataPointer); // single node
 		MappedByteBuffer mbb=seekMap(position);
-		mbb.put(temp); // write full index block
-		// set the datalength to the last available byte in the file
-		setDataLength(position+INDEX_BLOCK_SIZE);
+		mbb.put(temp,0,indexBlockLength); // write index block
+		
+		// set the datalength to the last available byte in the file after adding index block
+		setDataLength(position+indexBlockLength);
 		return position;
 	}
 
@@ -725,14 +735,14 @@ public class Etch {
 	}
 
 	/**
-	 * Gets the slot value at the specified digit position in an index block.
+	 * Gets the slot value at the specified digit position in an index block. Doesn't affect temp array.
 	 * @param indexPosition Position of index block
-	 * @param digit Digit of value 0..255 (high bits will be ignored)
+	 * @param digit Position of slot within index block
 	 * @return Pointer value (including type bits in MSBs)
 	 * @throws IOException
 	 */
 	private long readSlot(long indexPosition, int digit) throws IOException {
-		long pointerIndex=indexPosition+POINTER_SIZE*(digit&0xFF);
+		long pointerIndex=indexPosition+POINTER_SIZE*digit;
 		MappedByteBuffer mbb=seekMap(pointerIndex);
 		long pointer=mbb.getLong();
 		return pointer;
@@ -789,12 +799,12 @@ public class Etch {
 	 * Writes a slot value to an index block.
 	 *
 	 * @param indexPosition
-	 * @param digit Digit radix position in index block (0..255), high bits are ignored
+	 * @param digit Digit radix position in index block
 	 * @param slotValue
 	 * @throws IOException
 	 */
 	private void writeSlot(long indexPosition, int digit, long slotValue) throws IOException {
-		long position=indexPosition+(digit&0xFF)*POINTER_SIZE;
+		long position=indexPosition+digit*POINTER_SIZE;
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.putLong(slotValue);
 	}
@@ -802,18 +812,20 @@ public class Etch {
 	/**
 	 * Gets the position of a data block from the given offset into the key
 	 * @param key Key value
-	 * @param offset Offset in number of bytes into key value for next step of search
+	 * @param level Level in Etch index (0 = top level)
 	 * @param indexPosition offset of the current index block
 	 * @return data position for data block or -1 if not found
 	 * @throws IOException
 	 */
-	private long seekPosition(AArrayBlob key, int offset, long indexPosition) throws IOException {
-		if (offset>=KEY_SIZE) {
-			throw new Error("Offset exceeded for key: "+key);
+	private long seekPosition(AArrayBlob key, int level, long indexPosition) throws IOException {
+		if (level>=MAX_LEVEL) {
+			throw new Error("Etch index level exceeded for key: "+key);
 		}
-
-		int digit=key.byteAt(offset)&0xFF;
+		int isize=indexSize(level);
+		int mask=isize-1;
+		int digit=getDigit(key,level);
 		long slotValue=readSlot(indexPosition,digit);
+		
 		long type=(slotValue&TYPE_MASK);
 		if (slotValue==0) {
 			// Empty slot i.e. not found
@@ -821,7 +833,7 @@ public class Etch {
 		} else if (type==PTR_INDEX) {
 			// recursively check next index node
 			long newIndexPosition=slotPointer(slotValue);
-			return seekPosition(key,offset+1,newIndexPosition);
+			return seekPosition(key,level+1,newIndexPosition);
 		} else if (type==PTR_PLAIN) {
 			if (checkMatchingKey(key,slotValue)) return slotValue;
 			return -1;
@@ -832,12 +844,12 @@ public class Etch {
 			synchronized (this) {
 				// start of chain, so scan chain of entries
 				int i=0;
-				while (i<256) {
+				while (i<isize) {
 					long ptr=slotValue&(~TYPE_MASK);
 					if (checkMatchingKey(key,ptr)) return ptr;
 
 					i++; // advance to next position
-					slotValue=readSlot(indexPosition,digit+i);
+					slotValue=readSlot(indexPosition,(digit+i)&mask);
 					type=(slotValue&TYPE_MASK);
 					if (!(type==PTR_CHAIN)) return -1; // reached end of chain
 				}
@@ -849,19 +861,83 @@ public class Etch {
 	}
 
 	/**
+	 * Gets the radix index digit for the specified level
+	 * @param key Blob key for index
+	 * @param level Level of Etch store index to get digit for
+	 * @return
+	 */
+	private int getDigit(AArrayBlob key, int level) {
+		if (level==0) return key.shortAt(0)&0xffff;
+		if (level==1) return key.byteAt(2)&0xFF;
+		int bi=(level+4)/2;      // level 2,3 maps to 3 etc.
+		boolean hi=(level&1)==0; // we want high byte if even
+		byte v= key.byteAt(bi);
+		return (hi?(v>>4):v)&0xf;
+	}
+	
+	/**
+	 * Gets the radix index digit for the specified level
+	 * @param dp Data pointer into store
+	 * @param level Level of Etch store index to get digit for
+	 * @return
+	 * @throws IOException 
+	 */
+	private int getDigit(long dp, int level) throws IOException {
+		if (level==0) {
+			MappedByteBuffer mbb=seekMap(dp);
+			return mbb.getShort()&0xffff;
+		} 
+		if (level==1) {
+			MappedByteBuffer mbb=seekMap(dp+(level+1));
+			return mbb.get()&0xFF;
+		}
+		int bi=(level+4)/2;      // level 2,3 maps to 3 etc.
+		boolean hi=(level&1)==0; // we want high byte if even
+		MappedByteBuffer mbb=seekMap(dp+bi);
+		byte v= mbb.get();
+		return (hi?(v>>4):v)&0xf;		
+	}
+
+	/**
+	 * Gets the index block size for a given level
+	 * @param level Level of index block in Etch store
+	 * @return Index block size as number of entries
+	 */
+	public int indexSize(int level) {
+		if (level==0) return 65536;
+		if (level==1) return 256;
+		return 16;
+	}
+
+	/**
 	 * Append a new index block to the store file. The new Index block will be initially empty,
 	 * i.e. filled completely with zeros.
+	 * WARNING: Overwrites temp array!
 	 * @return The location of the newly added index block.
 	 * @throws IOException
 	 */
-	private long appendNewIndexBlock() throws IOException {
+	private long appendNewIndexBlock(int level) throws IOException {
+		if (level>=MAX_LEVEL) {
+			// Invalid level! Prepare to output error
+			throw new Error("Overflowing key size - key collision?");
+		}
+		
+		int isize=indexSize(level);
+		int sizeBytes=isize*POINTER_SIZE;
+		
 		long position=dataLength;
 		byte[] temp=tempArray.get();
-		MappedByteBuffer mbb=seekMap(position);
-		Arrays.fill(temp,(byte)0);
-		mbb.put(temp);
+		int tlen=temp.length;
+		MappedByteBuffer mbb=null;
+		
 		// set the datalength to the last available byte in the file
-		setDataLength(position+INDEX_BLOCK_SIZE);
+		setDataLength(position+sizeBytes);
+		
+		Arrays.fill(temp,0,Math.min(sizeBytes,tlen),(byte)0);
+		for (int ix=0; ix<sizeBytes; ix+=tlen) {
+			mbb=seekMap(position+ix);
+			mbb.put(temp,0,Math.min(sizeBytes-ix,tlen));
+		}
 		return position;
 	}
 

@@ -88,6 +88,7 @@ public class ANTLRTest {
 	
 	@Test public void testMaps() {
 		assertEquals(Maps.of(1,2),read("{1 2}"));
+		assertEquals(Maps.of(1,2),read("{1\n2}"));
 	}
 		
 	@Test public void testEmptyDataStructures() {

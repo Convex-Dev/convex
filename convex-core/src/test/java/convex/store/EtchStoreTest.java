@@ -1,13 +1,13 @@
 package convex.store;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -78,6 +78,44 @@ public class EtchStoreTest {
 			}
 		} finally {
 			Stores.setCurrent(oldStore);
+		}
+	}
+	
+	@Test public void testStoreTopRef() throws IOException {
+		{ // Quick test with single value
+			ACell a=Vectors.of(0,66758585);
+			Ref<ACell> r=store.storeTopRef(a.getRef(), Ref.STORED, null);
+			Hash h=a.getHash();
+			assertEquals(h,r.getHash());
+			assertNotNull(store.readStoreRef(h));
+		}
+		
+		// Big test, should ensure collisions and chain cases etc.
+		for (int i=0; i<10000; i++) {
+			AVector<?> v=Vectors.of(0,i);
+			//if (i==1600) {
+			//	System.out.println("In interesting case");
+			//}
+			Ref<ACell> r=store.storeTopRef(v.getRef(), Ref.STORED, null);
+			Hash h=r.getHash();
+			assertNotNull(store.readStoreRef(h));
+		}
+		
+		for (int i=0; i<10000; i+=100) {
+			AVector<?> v=Vectors.of(0,i);
+			Hash h=v.getHash();
+			//if (i==1600) {
+			//	System.out.println("In interesting case");
+			//}
+			assertNotNull(store.readStoreRef(h),()->{
+				return "Failed to get value: "+v+" with hash "+h;
+			});
+		}
+		
+		for (int i=0; i<100; i++) {
+			Blob b=Blobs.createRandom(32);
+			Hash h=Hash.wrap(b);
+			assertNull(store.readStoreRef(h));
 		}
 	}
 

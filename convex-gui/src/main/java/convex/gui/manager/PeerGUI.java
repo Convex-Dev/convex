@@ -14,6 +14,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import javax.swing.DefaultListModel;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
@@ -47,6 +48,7 @@ import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.peer.Server;
+import convex.restapi.RESTServer;
 
 @SuppressWarnings("serial")
 public class PeerGUI extends JPanel {
@@ -128,6 +130,8 @@ public class PeerGUI extends JPanel {
 	JTabbedPane tabs = new JTabbedPane();
 	JPanel mainPanel = new JPanel();
 	JPanel accountsPanel = new AccountsPanel(this);
+	
+	RESTServer restServer;
 
 	/**
 	 * Create the application.
@@ -146,10 +150,20 @@ public class PeerGUI extends JPanel {
 		tabs.add("Message", messagePanel);
 		tabs.add("Actors", new ActorsPanel(this));
 		tabs.add("About", aboutPanel);
+		
 
 		// launch local peers for testing
 		EventQueue.invokeLater(() -> {
 			peerPanel.launchAllPeers(this);
+			
+			Server first=peerList.firstElement().peerServer;
+			try {
+				restServer=RESTServer.create(first);
+				restServer.start();
+			} catch (Exception t) {
+				log.warn("Unable to start REST Server:",t);
+			}
+
 		});
 
 		updateThread.start();
@@ -204,6 +218,8 @@ public class PeerGUI extends JPanel {
 			log.info("Manager update thread ended");
 		}
 	}, "GUI Manager state update thread");
+
+	public static DefaultListModel<PeerView> peerList = new DefaultListModel<PeerView>();
 
 
 

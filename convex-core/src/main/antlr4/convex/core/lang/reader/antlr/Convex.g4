@@ -122,7 +122,7 @@ HEX_DIGIT: [0-9a-fA-F];
 STRING: '"' STRING_CHAR* '"' ;
 	
 fragment
-STRING_CHAR: ~["\\\r\n] | STRING_ESCAPE;
+STRING_CHAR: ~["\\] | STRING_ESCAPE;
 
 fragment
 STRING_ESCAPE: '\\' ([btnfr"'\\] | OCTAL_BYTE | UNICODE_ESCAPE);
