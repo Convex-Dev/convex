@@ -177,6 +177,8 @@ public class RefTest {
 		assertEquals(1,rs.embedded); // top level only is embedded with 2 children
 		Ref<ABlob> rb=ACell.createPersisted(bigBlob);
 		
+		// TODO: Check Soft Refs
+		
 		RefTreeStats rs2=Refs.getRefTreeStats(rb);
 		assertEquals(19,rs2.total);
 		assertEquals(19,rs2.persisted);

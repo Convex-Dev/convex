@@ -130,7 +130,7 @@
                    (assoc rec 1 (assoc os receiver quantity)))]
         (set-holding *caller* (assoc hs id nrec)))
       (do ;; create a new record with given offer
-        (or (tokens id) (fail "token does not exist"))
+        (or (get tokens id) (fail "token does not exist"))
         (set-holding *caller* {id [0 {receiver quantity}]})))
     quantity ;; return value is quantity offered
     ))
