@@ -213,6 +213,7 @@ public class Init {
 			s = doActorDeploy(s, "asset/multi-token.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
 			s = doActorDeploy(s, "convex/did.cvx");
+			s = doActorDeploy(s, "lab/curation-market.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")

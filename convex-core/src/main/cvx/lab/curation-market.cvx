@@ -1,0 +1,12 @@
+'asset.curation-market
+
+
+;; Map for curation markets
+;;   { ID -> Market record }
+;;
+;; Where market record is a vector
+;;  0 = controller can be nil
+;;  1 = bonding asset (address or scoped token)
+;;  2 = shape (double, defining price = supply ^ shape, 1.0 is linear price growth)
+
+(def markets {})
