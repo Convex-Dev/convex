@@ -211,6 +211,15 @@
            (fail :TRUST
                  "No access to whitelist!"))))))
 
+;;;;;;;;;; Control of Actor / scope
+
+(defn set-control
+   ^{:doc {:description ["Sets a controller for a actor (possibly scoped). Controller may be any trust monitor."]
+          :examples    [{:code "(set-control my-asset *address*)"}]
+          :signature   [{:params [path controller]}]}}
+  [path controller]
+  (call path (set-control controller))
+  :OK)
 
 ;;;;;;;;;; Upgradable actors
 
@@ -225,47 +234,46 @@
                         "Meant to be used wisely."]
           :examples    [{:code "(deploy (add-trusted-upgrade {:root *address*}))"}]
           :signature   [{:params [config]}]}}
-
    [config]
-
    (let [root (or (:root config)
                   *address*)]
      `(do
         (def trust
              ~-self)
 
-
         (def upgradable-root
              ~root)
 
-
-        (defn upgrade
-
+        (defn set-control
           ^{:callable? true}
-
+          [controller]
+          (or 
+            (trust/trusted? upgradable-root *caller*)
+            (fail :TRUST "Not allowed to update controller"))
+          (cond 
+            (nil? *scope*)  (def upgradable-root controller)
+            (fail :ARGUMENT "Unexpected non-nil scope")))
+        
+        (defn upgrade
+          ^{:callable? true}
           [code]
-
           (if (trust/trusted? upgradable-root
                               *caller*)
             (eval code)
-            (fail :TRUST
-                  "No root access to upgrade capability!"))))))
+            (fail :TRUST "No root access to upgrade capability!"))))))
 
 
 
 (defn remove-upgradability! 
-
   ^{:doc {:description ["Removes upgradability from an actor, previously added using `add-trusted-upgrade`."
                         "Cannot be undone, meant to be used wisely after considering all implications."]
           :examples    [{:code "(remove-upgradability! upgradable-actor)"}]
           :signature   [{:params [config]}]}}
-
   [actor]
-
   (call actor
         (upgrade
           '(do
              ;; Undefine things used for upgradability
              (undef upgrade)
-             (undef upgradable-root))))
+             (undef upgradable-root)))) 
   nil)
