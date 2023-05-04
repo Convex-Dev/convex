@@ -873,4 +873,8 @@ public abstract class Convex {
 	@Override 
 	public abstract String toString();
 
+	public AKeyPair getKeyPair() {
+		return keyPair;
+	}
+
 }

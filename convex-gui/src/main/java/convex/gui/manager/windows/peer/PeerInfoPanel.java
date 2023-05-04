@@ -74,7 +74,7 @@ public class PeerInfoPanel extends JPanel {
 
 	private void updateState(PeerView p) {
 		StringBuilder sb = new StringBuilder();
-		Server s=p.peerServer;
+		Server s=p.server;
 		
 		if (s==null) {
 			sb.append("Not a local Peer");

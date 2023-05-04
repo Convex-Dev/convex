@@ -24,6 +24,7 @@ import convex.api.ConvexRemote;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
@@ -57,6 +58,10 @@ public class PeersListPanel extends JPanel {
 				PeerView peer = new PeerView(server);
 				// InetSocketAddress sa = server.getHostAddress();
 				addPeer(peer);
+				
+				// initial wallet list
+		        WalletEntry we = WalletEntry.create(server.getPeerController(), server.getKeyPair());
+				WalletPanel.addWalletEntry(we);
 			}
 		} catch (Exception e) {
 			if (e instanceof ClosedChannelException) {
@@ -74,7 +79,7 @@ public class PeersListPanel extends JPanel {
 		AKeyPair kp=AKeyPair.generate();
 		
 		try {
-			Server base=getFirst().peerServer;
+			Server base=getFirst().server;
 			Convex convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
 			Address a= convex.createAccountSync(kp.getAccountKey());
 			convex.transferSync(a, Coin.DIAMOND);
@@ -173,7 +178,7 @@ public class PeersListPanel extends JPanel {
 		for (int i = 0; i < n; i++) {
 			PeerView p = PeerGUI.peerList.getElementAt(i);
 			try {
-				p.peerServer.close();
+				p.server.close();
 			} catch (Exception e) {
 				// ignore
 			}

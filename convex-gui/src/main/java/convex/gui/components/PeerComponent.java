@@ -14,7 +14,9 @@ import javax.swing.border.EmptyBorder;
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Peer;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.gui.client.ConvexClient;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerGUI;
@@ -47,7 +49,7 @@ public class PeerComponent extends BaseListComponent {
 	}
 
 	public void launchExploreWindow(PeerView peer) {
-		Server s = peer.peerServer;
+		Server s = peer.server;
 		ACell p = s.getPeer().getConsensusState();
 		StateWindow pw = new StateWindow(manager, p);
 		pw.launch();
@@ -87,7 +89,7 @@ public class PeerComponent extends BaseListComponent {
 			JMenuItem closeButton = new JMenuItem("Shutdown Peer");
 			closeButton.addActionListener(e -> {
 				try {
-					peer.peerServer.shutdown();
+					peer.server.shutdown();
 				} catch (Exception e1) {
 					// ignore
 				}
@@ -100,7 +102,7 @@ public class PeerComponent extends BaseListComponent {
 			});
 			popupMenu.add(exploreButton);
 
-			if (peer.peerServer.getStore() instanceof EtchStore) {
+			if (peer.server.getStore() instanceof EtchStore) {
 				JMenuItem storeButton = new JMenuItem("Explore Etch store");
 				storeButton.addActionListener(e -> {
 					launchEtchWindow(peer);
@@ -111,7 +113,7 @@ public class PeerComponent extends BaseListComponent {
 			
 			JMenuItem killConn = new JMenuItem("Kill Connections");
 			killConn.addActionListener(e -> {
-				peer.peerServer.getConnectionManager().closeAllConnections();
+				peer.server.getConnectionManager().closeAllConnections();
 			});
 			popupMenu.add(killConn);
 			
@@ -156,6 +158,9 @@ public class PeerComponent extends BaseListComponent {
 	private void launchClientWindow(PeerView peer) {
 		try {
 			Convex convex = ConvexRemote.connect(peer.getHostAddress());
+			Address addr=peer.getAddress();
+			AKeyPair kp=peer.getKeyPair();;
+			convex.setAddress(addr,kp);
 			ConvexClient.launch(convex);
 		} catch (IOException | TimeoutException e) {
 			// TODO Auto-generated catch block

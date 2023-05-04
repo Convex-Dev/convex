@@ -26,7 +26,7 @@ public class EtchWindow extends BaseWindow {
 	public EtchWindow(PeerGUI manager, PeerView peer) {
 		super(manager);
 		this.peer=peer;
-		this.store=(EtchStore) peer.peerServer.getStore();
+		this.store=(EtchStore) peer.server.getStore();
 		
 		PeerComponent pcom=new PeerComponent(manager,peer);
 		add(pcom, BorderLayout.NORTH);

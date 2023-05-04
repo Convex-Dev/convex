@@ -151,12 +151,14 @@ public class PeerGUI extends JPanel {
 		tabs.add("Actors", new ActorsPanel(this));
 		tabs.add("About", aboutPanel);
 		
+		tabs.setSelectedComponent(peerPanel);
+		
 
 		// launch local peers for testing
 		EventQueue.invokeLater(() -> {
 			peerPanel.launchAllPeers(this);
 			
-			Server first=peerList.firstElement().peerServer;
+			Server first=peerList.firstElement().server;
 			try {
 				restServer=RESTServer.create(first);
 				restServer.start();
@@ -187,7 +189,7 @@ public class PeerGUI extends JPanel {
 					for (PeerView s : peerViews) {
 						s.checkPeer();
 
-						Server serv=s.peerServer;
+						Server serv=s.server;
 						if (serv==null) continue;
 
 						Peer p = serv.getPeer();

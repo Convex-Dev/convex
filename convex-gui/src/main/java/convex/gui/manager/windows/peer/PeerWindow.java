@@ -32,7 +32,7 @@ public class PeerWindow extends BaseWindow {
 
 		add(tabbedPane, BorderLayout.CENTER);
 		
-		Server server=peer.peerServer;
+		Server server=peer.server;
 		if (server!=null) {
 			try {
 			

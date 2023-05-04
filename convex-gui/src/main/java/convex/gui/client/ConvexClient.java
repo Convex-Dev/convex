@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.gui.client.panels.HomePanel;
 import convex.gui.manager.mainpanels.AboutPanel;
+import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.manager.windows.peer.REPLPanel;
 import convex.gui.utils.Toolkit;
 
@@ -30,6 +31,8 @@ public class ConvexClient extends JPanel {
 	private static JFrame frame;
 
 	public static long maxBlock = 0;
+	
+	static boolean clientMode=false;
 
 	protected Convex convex=null;
 
@@ -39,6 +42,8 @@ public class ConvexClient extends JPanel {
 	 */
 	public static void main(String[] args) {
 		log.info("Running Convex Client");
+		clientMode=true;
+		
 		// call to set up Look and Feel
 		Toolkit.init();
 
@@ -54,6 +59,7 @@ public class ConvexClient extends JPanel {
 	AboutPanel aboutPanel = new AboutPanel();
 	JTabbedPane tabs = new JTabbedPane();
 	JPanel mainPanel = new JPanel();
+	WalletPanel walletPanel=new WalletPanel();
 
 	/**
 	 * Create the application.
@@ -64,7 +70,10 @@ public class ConvexClient extends JPanel {
 
 		tabs.add("Home", homePanel);
 		tabs.add("About", aboutPanel);
+		tabs.add("Wallet", walletPanel);
 		tabs.add("REPL", new REPLPanel(convex));
+		
+		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		
 		this.convex=convex;
 
@@ -95,7 +104,9 @@ public class ConvexClient extends JPanel {
 					frame.setTitle("Convex Client - "+convex);
 					frame.setIconImage(Toolkit.getImage(ConvexClient.class.getResource("/images/Convex.png")));
 					frame.setBounds(100, 100, 1024, 768);
-					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+					if (clientMode) {
+						frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+					}
 					ConvexClient window = new ConvexClient(convex);
 					frame.getContentPane().add(window, BorderLayout.CENTER);
 					frame.pack();

@@ -25,13 +25,12 @@ public class WalletPanel extends JPanel {
 	
 	private static final Logger log = LoggerFactory.getLogger(WalletPanel.class.getName());
 
-
 	public static WalletEntry HERO;
 
 	private static DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
 	ScrollyList<WalletEntry> walletList;
 
-	public void addWalletEntry(WalletEntry we) {
+	public static void addWalletEntry(WalletEntry we) {
 		listModel.addElement(we);
 	}
 
@@ -48,7 +47,7 @@ public class WalletPanel extends JPanel {
 		JButton btnNew = new JButton("New");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
-			Server s=PeerGUI.getDefaultPeer().peerServer;
+			Server s=PeerGUI.getDefaultPeer().server;
 			Convex convex=Convex.connect(s, HERO.getAddress(), HERO.getKeyPair());
 			AKeyPair newKP=AKeyPair.generate();
 			try {
@@ -59,11 +58,6 @@ public class WalletPanel extends JPanel {
 			}
 		});
 
-		// inital list
-        HERO = WalletEntry.create(PeerGUI.getUserAddress(0), PeerGUI.getUserKeyPair(0));
-		addWalletEntry(HERO);
-		//addWalletEntry(WalletEntry.create(PeerGUI.getUserAddress(1), PeerGUI.getUserKeyPair(1)));
-		//addWalletEntry(WalletEntry.create(PeerGUI.getUserAddress(2),PeerGUI.getUserKeyPair(2)));
 
 		// create and add ScrollyList
 		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(we));

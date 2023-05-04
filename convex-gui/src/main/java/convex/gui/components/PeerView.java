@@ -6,7 +6,9 @@ import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Peer;
 import convex.core.State;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
+import convex.core.data.Address;
 import convex.core.data.PeerStatus;
 import convex.core.util.Text;
 import convex.gui.components.models.StateModel;
@@ -20,28 +22,28 @@ import convex.peer.Server;
  * Peer may be either a local Server or remote.
  */
 public class PeerView {
-	public Convex peerConnection = null;
-	public Server peerServer = null;
+	public Convex convex = null;
+	public Server server = null;
 
 	public StateModel<Peer> peerModel = new StateModel<>(null);
 	public StateModel<State> stateModel = new StateModel<>(null);
 
 	public PeerView(Server server) {
-		peerServer=server;
+		this.server=server;
 	}
 
 	public PeerView(Convex pc) {
-		peerConnection=pc;
+		convex=pc;
 	}
 
 	@Override
 	public String toString() {
 		StringBuilder sb=new StringBuilder();
-		if (peerServer != null) {
+		if (server != null) {
 			State state=PeerGUI.getLatestState();
-			AccountKey paddr=peerServer.getPeerKey();
+			AccountKey paddr=server.getPeerKey();
 			sb.append("0x"+paddr.toChecksumHex()+"\n");
-			sb.append("Local peer on: " + peerServer.getHostAddress() + " with store "+peerServer.getStore()+"\n");
+			sb.append("Local peer on: " + server.getHostAddress() + " with store "+server.getStore()+"\n");
 			
 			PeerStatus ps=state.getPeer(paddr);
 			if (ps!=null) {
@@ -49,11 +51,11 @@ public class PeerView {
 				sb.append("    ");
 				sb.append("Delegated Stake:  "+Text.toFriendlyNumber(ps.getDelegatedStake()));
 			}
-			ConnectionManager cm=peerServer.getConnectionManager();
+			ConnectionManager cm=server.getConnectionManager();
 			sb.append("\n");
 			sb.append("Connections: "+cm.getConnectionCount());
-		} else if (peerConnection != null) {
-			sb.append(peerConnection.toString());
+		} else if (convex != null) {
+			sb.append(convex.toString());
 		} else {
 			sb.append("Unknown");
 		}
@@ -68,8 +70,8 @@ public class PeerView {
 	 * @return Peer state for this PeerView
 	 */
 	public Peer checkPeer() {
-		if (peerServer != null) {
-			Peer p = peerServer.getPeer();
+		if (server != null) {
+			Peer p = server.getPeer();
 			peerModel.setValue(p);
 			if (p!=null) stateModel.setValue(p.getConsensusState());
 			return p;
@@ -78,8 +80,8 @@ public class PeerView {
 	}
 
 	public void close() {
-		if (peerServer != null) peerServer.close();
-		if (peerConnection != null) peerConnection.close();
+		if (server != null) server.close();
+		if (convex != null) convex.close();
 	}
 
 	/**
@@ -88,18 +90,28 @@ public class PeerView {
 	 */
 	public InetSocketAddress getHostAddress() {
 		// this is direct connection to a peer, so get its host address
-		if (isLocal()) return peerServer.getHostAddress();
+		if (isLocal()) return server.getHostAddress();
 
 		// need to get the remote address from the PeerConnection
-		return ((ConvexRemote) peerConnection).getRemoteAddress();
+		return ((ConvexRemote) convex).getRemoteAddress();
 	}
 
 	public boolean isLocal() {
-		return peerServer != null;
+		return server != null;
 	}
 
 	public StateModel<State> getStateModel() {
 		return stateModel;
+	}
+
+	public Address getAddress() {
+		if (convex!=null) return convex.getAddress();
+		return server.getPeerController();
+	}
+
+	public AKeyPair getKeyPair() {
+		if (convex!=null) return convex.getKeyPair();
+		return server.getKeyPair();
 	}
 
 }
