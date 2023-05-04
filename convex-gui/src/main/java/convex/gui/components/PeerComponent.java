@@ -1,6 +1,8 @@
 package convex.gui.components;
 
 import java.awt.BorderLayout;
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
@@ -9,8 +11,11 @@ import javax.swing.JPopupMenu;
 import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
+import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.Peer;
 import convex.core.data.ACell;
+import convex.gui.client.ConvexClient;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.etch.EtchWindow;
@@ -120,8 +125,11 @@ public class PeerComponent extends BaseListComponent {
 
 		JMenuItem replButton = new JMenuItem("Launch REPL");
 		replButton.addActionListener(e -> launchPeerWindow(this.peer));
-
 		popupMenu.add(replButton);
+		
+		JMenuItem clientButton = new JMenuItem("Connect Client");
+		clientButton.addActionListener(e -> launchClientWindow(this.peer));
+		popupMenu.add(clientButton);
 
 		JPanel blockView = new BlockViewComponent(peer);
 		add(blockView, BorderLayout.SOUTH);
@@ -143,5 +151,16 @@ public class PeerComponent extends BaseListComponent {
 			description.setText(peer.toString());
 		});
 
+	}
+
+	private void launchClientWindow(PeerView peer) {
+		try {
+			Convex convex = ConvexRemote.connect(peer.getHostAddress());
+			ConvexClient.launch(convex);
+		} catch (IOException | TimeoutException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
 	}
 }

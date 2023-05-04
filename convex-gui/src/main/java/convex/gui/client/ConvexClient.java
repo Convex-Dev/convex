@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.gui.client.panels.HomePanel;
 import convex.gui.manager.mainpanels.AboutPanel;
+import convex.gui.manager.windows.peer.REPLPanel;
 import convex.gui.utils.Toolkit;
 
 /**
@@ -41,24 +42,7 @@ public class ConvexClient extends JPanel {
 		// call to set up Look and Feel
 		Toolkit.init();
 
-		EventQueue.invokeLater(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					ConvexClient.frame = new JFrame();
-					frame.setTitle("Convex Client");
-					frame.setIconImage(Toolkit.getImage(ConvexClient.class.getResource("/images/Convex.png")));
-					frame.setBounds(100, 100, 1024, 768);
-					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-					ConvexClient window = new ConvexClient();
-					frame.getContentPane().add(window, BorderLayout.CENTER);
-					frame.pack();
-					frame.setVisible(true);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-			}
-		});
+		launch(null);
 	}
 
 	/*
@@ -74,12 +58,15 @@ public class ConvexClient extends JPanel {
 	/**
 	 * Create the application.
 	 */
-	public ConvexClient() {
+	public ConvexClient(Convex convex) {
 		setLayout(new BorderLayout());
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Home", homePanel);
 		tabs.add("About", aboutPanel);
+		tabs.add("REPL", new REPLPanel(convex));
+		
+		this.convex=convex;
 
 	}
 
@@ -97,6 +84,27 @@ public class ConvexClient extends JPanel {
 
 	public static Component getFrame() {
 		return frame;
+	}
+	
+	public static void launch(Convex convex) {
+		EventQueue.invokeLater(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					ConvexClient.frame = new JFrame();
+					frame.setTitle("Convex Client - "+convex);
+					frame.setIconImage(Toolkit.getImage(ConvexClient.class.getResource("/images/Convex.png")));
+					frame.setBounds(100, 100, 1024, 768);
+					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+					ConvexClient window = new ConvexClient(convex);
+					frame.getContentPane().add(window, BorderLayout.CENTER);
+					frame.pack();
+					frame.setVisible(true);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+		});
 	}
 
 }

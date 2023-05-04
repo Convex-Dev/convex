@@ -27,14 +27,14 @@ public class HomePanel extends JPanel {
 		panel.setLayout(new BorderLayout(0, 0));
 
 		JLabel lblWelome = new JLabel("Welcome to Convex");
-		lblWelome.setFont(new Font("Monospaced", Font.PLAIN, 18));
+		lblWelome.setFont(new Font("Monospaced", Font.PLAIN, 24));
 		lblWelome.setHorizontalAlignment(SwingConstants.CENTER);
 		panel.add(lblWelome, BorderLayout.NORTH);
 
 		panel.add(new WorldPanel(), BorderLayout.CENTER);
 		
-		JLabel lblConn = new JLabel("Connecting..");
-		panel.add(lblConn, BorderLayout.SOUTH);
+		//JLabel lblConn = new JLabel("Connecting..");
+		//panel.add(lblConn, BorderLayout.SOUTH);
 
 	}
 
