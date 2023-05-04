@@ -59,7 +59,6 @@
 
 
   ([trust-monitor subject action]
-
    (recur trust-monitor
              subject
              action
@@ -213,12 +212,12 @@
 
 ;;;;;;;;;; Control of Actor / scope
 
-(defn set-control
+(defn change-control
    ^{:doc {:description ["Sets a controller for a actor (possibly scoped). Controller may be any trust monitor."]
           :examples    [{:code "(set-control my-asset *address*)"}]
           :signature   [{:params [path controller]}]}}
   [path controller]
-  (call path (set-control controller))
+  (call path (change-control controller))
   :OK)
 
 ;;;;;;;;;; Upgradable actors
@@ -244,7 +243,7 @@
         (def upgradable-root
              ~root)
 
-        (defn set-control
+        (defn change-control
           ^{:callable? true}
           [controller]
           (or 

@@ -1,8 +1,6 @@
 package convex.lib;
 
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertError;
-import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
@@ -38,6 +36,8 @@ public class MultiTokenTest extends ACVMTest {
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		assertNotError(ctx);
 		ctx=step(ctx,"(import convex.fungible :as fungible)");
+		assertNotError(ctx);
+		ctx=step(ctx,"(import convex.trust :as trust)");
 		assertNotError(ctx);
 		
 		ctx=step(ctx,"(call mt (create :USD))");
@@ -100,7 +100,6 @@ public class MultiTokenTest extends ACVMTest {
 		ctx=step(ctx,"(asset/balance [mt :FOOSD] *address*)");
 		assertEquals(CVMLong.create(4044),ctx.getResult());
 
-		
 		// Negative mint allowed?
 		assertEquals(4043,evalL(ctx,"(call [mt :FOOSD] (mint -1))"));
 
@@ -108,6 +107,11 @@ public class MultiTokenTest extends ACVMTest {
 		
 		AVector<ACell> token=Vectors.of(mt,Keyword.create("FOOSD"));
 		AssetTester.doFungibleTests(ctx, token, HERO);
+		
+		// Remove controller => no more minting!
+		ctx=step(ctx,"(trust/change-control [mt :FOOSD] #0)");
+		assertNotError(ctx);
+		assertTrustError(step(ctx,"(asset/mint [mt :FOOSD] 2022)"));
 	}
 
 }
