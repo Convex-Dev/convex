@@ -14,12 +14,16 @@
 ;;     2: created = timestamp of DID creation 
 ;;     3: updated = timestamp of last update
 ;;     4: accounts = Set of accounts authorised to act on behalf of this identity
+;;
+;; DIDs can be used as trust monitors, in the form [did-actor-address id] in which case
+;; they allow access to the DID's authorised account Set.
 
 (import convex.trust :as trust)
 
-;; A map of ID to record vectors
+;; A map of [ID -> record vectors]
 (def dids {})
 
+;; A counter for unique DID IDs, allocated sequentially
 (def counter 1)
 
 (defn 
@@ -57,9 +61,9 @@
  ([id ddo]
    (assert (or (nil? ddo) (str? ddo)))
    (let [rec (get dids id)
-         _ (or rec (error "Invalid DID"))
+         _ (or rec (fail :STATE "Invalid DID"))
          cont (get rec 1)
-         _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
+         _ (or (trust/trusted? cont *caller* :update id) (fail :TRUST "Unauthorised"))
          rec (assoc rec 0 ddo)         ;; update DDO
          rec (assoc rec 3 *timestamp*) ;; update timestamp
          ]
@@ -114,8 +118,8 @@
         rec (get dids id)]
     (boolean (and
                rec     ;; not nil
-   (nth rec 0) ;; not deactivated
-   (address? subject)
+               (nth rec 0) ;; not deactivated
+               (address? subject)
                (contains-key? (nth rec 4)
                  (address subject))))))
 
