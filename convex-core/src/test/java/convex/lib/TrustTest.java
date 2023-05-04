@@ -13,6 +13,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.init.InitTest;
@@ -233,5 +234,28 @@ public class TrustTest extends ACVMTest {
 
 		// eval-as should now fail
 		assertTrustError(step(ctx, "(eval-as alice `(eval-as ~bob :foo))"));
+	}
+
+	/**
+	 * Tests change of control of a scoped target
+	 * @param ctx Context from which to change control
+	 * @param thing Entity to change control (Address or scope vector)
+	 */
+	public static void testChangeControl(Context<?> ctx, ACell thing) {
+		ctx=ctx.createAccount(null);
+		Address nca=ctx.getResult();
+		
+		// Change control should work
+		ctx=step(ctx,"(call "+thing+" (change-control "+nca+"))");
+		assertNotError(ctx);
+		
+		// Should have lost control
+		ctx=step(ctx,"(call "+thing+" (change-control "+nca+"))");
+		assertTrustError(ctx);
+		
+		// Switch to new Address, should have control now
+		ctx=ctx.forkWithAddress(nca);
+		ctx=step(ctx,"(call "+thing+" (change-control "+nca+"))");
+		assertNotError(ctx);	
 	}
 }

@@ -772,7 +772,8 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * @return Result value from this Context.
 	 */
-	public T getResult() {
+	@SuppressWarnings("unchecked")
+	public <R extends T> R getResult() {
 		if (exception!=null) {
 			String msg = "Can't get result with exceptional value: "+exception;
 			if (exception instanceof ErrorValue) {
@@ -781,7 +782,7 @@ public class Context<T extends ACell> extends AObject {
 			}
 			throw new Error(msg);
 		}
-		return (T) result;
+		return (R) result;
 	}
 
 	/**

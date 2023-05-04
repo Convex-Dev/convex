@@ -41,7 +41,7 @@
     (recur *caller*))
   ([controller]
     (let [id counter
-          controller (if (callable? controller) controller (fail "Invalid controller"))
+          controller (if (callable? controller) controller (fail :ARGUMENT "Invalid controller"))
           rec ["" controller *timestamp* *timestamp* nil]]
       (def dids (assoc dids id rec))
       (def counter (inc counter))
@@ -76,12 +76,32 @@
   ([id auth-set]
     (or (nil? auth-set) (set? auth-set) (fail "auth-set must be nil or a set of addresses"))
     (let [rec (get dids id)
-          _ (or rec (error "Invalid or missing DID"))
+          _ (or rec (fail :TRUST "Invalid or missing DID"))
           cont (get rec 1)
-          _ (or (trust/trusted? cont *caller* :update id) (error "Unauthorised"))
+          _ (or (trust/trusted? cont *caller* :update id) (fail :TRUST "Unauthorised"))
           rec (assoc rec 4 auth-set)    ;; update Authorised account set
           rec (assoc rec 3 *timestamp*) ;; update timestamp
           ]
+      (def dids (assoc dids id rec))
+      rec)))
+
+(defn 
+  ^{:callable? true
+    :doc       {:description "Sets the contoller for a DID."
+                :signature   [{:params [id auth-set]}]}}
+  change-control 
+  ([controller]
+    (if (nil? *scope*)
+      (fail :TRUST "Changing controller of DID registry not supported")
+      (recur *scope* controller)))
+  ([id controller]
+    (let [rec (get dids id)
+          _ (or rec (fail :TRUST "Invalid or missing DID"))
+          cont (get rec 1)
+          _ (or (trust/trusted? cont *caller* :control id) (fail :TRUST "Unauthorised"))
+          rec (assoc rec 1 controller)    ;; update Authorised account set
+       rec (assoc rec 3 *timestamp*) ;; update timestamp
+       ]
       (def dids (assoc dids id rec))
       rec)))
 
@@ -94,8 +114,8 @@
         rec (get dids id)]
     (boolean (and
                rec     ;; not nil
-               (nth rec 0) ;; not deactivated
-               (address? subject)
+   (nth rec 0) ;; not deactivated
+   (address? subject)
                (contains-key? (nth rec 4)
                  (address subject))))))
 

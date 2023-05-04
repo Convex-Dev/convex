@@ -16,6 +16,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -36,6 +37,7 @@ public class DIDTest extends ACVMTest {
 	
 	@Test public void testCreate() {
 		Context<ACell> ctx=step("(import convex.did :as did)");
+		Address did=(Address) ctx.getResult();
 		
 		// create an id, should be entered in registry
 		ctx=step(ctx,"(call did (create *address*))");
@@ -58,6 +60,9 @@ public class DIDTest extends ACVMTest {
 		assertTrue(ctx.getResult() instanceof AVector);
 		ctx=step(ctx,"(call did (read "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
+		
+		// Try change of Control
+		TrustTest.testChangeControl(ctx,Vectors.of(did,id));
 		
 	}
 	
@@ -137,6 +142,7 @@ public class DIDTest extends ACVMTest {
 		ctx=step(ctx,"(call did (read "+id+"))");
 		assertNull(ctx.getResult()); 
 	}
+	
 
 
 }

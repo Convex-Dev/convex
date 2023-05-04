@@ -439,7 +439,7 @@ public class Compiler {
 			} else {
 				Context<AOp<T>> rctx= compileQuasiQuoted(context, subSyntax,depth);
 				if (rctx.isExceptional()) return (Context)rctx;
-				rSeq = (ASequence<AOp<T>>) (rSeq.conj(rctx.getResult()));
+				rSeq = (ASequence) (rSeq.conj(rctx.getResult()));
 			}
 		}
 		return context.withResult(rSeq);

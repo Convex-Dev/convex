@@ -108,6 +108,9 @@ public class MultiTokenTest extends ACVMTest {
 		AVector<ACell> token=Vectors.of(mt,Keyword.create("FOOSD"));
 		AssetTester.doFungibleTests(ctx, token, HERO);
 		
+		// Test change of control
+		TrustTest.testChangeControl(ctx, token);
+		
 		// Remove controller => no more minting!
 		ctx=step(ctx,"(trust/change-control [mt :FOOSD] #0)");
 		assertNotError(ctx);
