@@ -8,6 +8,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.KeySpec;
 import java.text.Normalizer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -204,6 +205,15 @@ public class BIP39 {
 			"wrestle", "wrist", "write", "wrong", "yard", "year", "yellow", "you", "young", "youth", "zebra", "zero",
 			"zone", "zoo"};
 	
+	public static final int NUM_WORDS=wordlist.length;
+	
+	private static final HashMap<String,Integer> lookup=new HashMap<>();
+	static {
+		for (int i=0; i<NUM_WORDS; i++) {
+			lookup.put(wordlist[i], i);
+		}
+	}
+	
 	public static Blob getSeed(List<String> words, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		if (passphrase==null) passphrase="";
 
@@ -240,19 +250,24 @@ public class BIP39 {
 		return al;
 	}
 
-	public static Blob getSeed(List<String> words) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
 	public static List<String> getWords(String s) {
 		String[] ss=s.split(" ");
 		ArrayList<String> al=new ArrayList<>();
 		for (int i=0; i<ss.length; i++) {
 			String w=ss[i].trim();
-			if (!w.isBlank()) al.add(w);
+			
+			if (!w.isBlank()) {
+				w=w.toLowerCase();
+				if (lookup.containsKey(w)) {
+					al.add(w);
+				}
+			}
 		}
 		return al;
+	}
+
+	public static String normalise(String s) {
+		return  Utils.joinStrings(getWords(s)," ");
 	}
 	
 }

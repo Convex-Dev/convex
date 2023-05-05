@@ -18,6 +18,7 @@ import convex.core.crypto.BIP39;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.manager.PeerGUI;
@@ -27,10 +28,14 @@ import convex.gui.utils.Toolkit;
 public class KeyGenPanel extends JPanel {
 
 	JTextArea mnemonicArea;
+	JTextArea seedArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
 
 	JButton addWalletButton = new JButton("Add to wallet");
+	
+	int FONT_SIZE=16;
+	Font HEX_FONT=new Font("Monospaced", Font.BOLD, FONT_SIZE);
 
 	/** 
 	 * Format a hex string in blocks for digits
@@ -55,6 +60,7 @@ public class KeyGenPanel extends JPanel {
 		try {
 			List<String> words=BIP39.getWords(s);
 			Blob keyMat=BIP39.getSeed(words,"");
+			seedArea.setText(keyMat.toHexString());
 			ABlob seed=keyMat.getContentHash();
 			String privateKeyString = seed.toHexString();
 			privateKeyArea.setText(privateKeyString);
@@ -65,10 +71,23 @@ public class KeyGenPanel extends JPanel {
 		}
 		updatePublicKeys();
 	}
+	
+	private void updateSeed() {
+		try {
+			mnemonicArea.setText("<can't recreate from BIP39 seed>");
+			ABlob b=Blobs.parse(seedArea.getText());
+			privateKeyArea.setText(b.slice(0,32).toHexString());
+			updatePublicKeys();
+		} catch (Exception ex) {
+			System.err.println(ex.getMessage());
+			return;
+		}
+	}
 
 	private void updatePrivateKey() {
 		try {
-			mnemonicArea.setText("<can't calculate from private key>");
+			mnemonicArea.setText("<can't recreate from private key>");
+			seedArea.setText("<can't recreate from private key>");
 			updatePublicKeys();
 		} catch (Exception ex) {
 			System.err.println(ex.getMessage());
@@ -111,6 +130,17 @@ public class KeyGenPanel extends JPanel {
 
 		JButton btnNewButton = new JButton("Export...");
 		actionPanel.add(btnNewButton);
+		
+		{ // Button to Normalise Mnemonic string
+			JButton btnNormalise = new JButton("Normalise Seed Pharase");
+			actionPanel.add(btnNormalise);
+			btnNormalise.addActionListener(e -> { 
+				String s=mnemonicArea.getText();
+				mnemonicArea.setText(BIP39.normalise(s));
+				updateMnemonic();
+			});
+		}
+
 
 		actionPanel.add(addWalletButton);
 		addWalletButton.addActionListener(e -> {
@@ -150,28 +180,61 @@ public class KeyGenPanel extends JPanel {
 		gbc_mnemonicArea.gridx = 1;
 		gbc_mnemonicArea.gridy = 0;
 		mnemonicArea.setColumns(32);
-		mnemonicArea.setFont(new Font("Monospaced", Font.BOLD, 13));
+		mnemonicArea.setFont(HEX_FONT);
 		formPanel.add(mnemonicArea, gbc_mnemonicArea);
 		mnemonicArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 			if (!mnemonicArea.isFocusOwner()) return;
 			updateMnemonic();
 		}));
 
-		JLabel lblPrivateKey = new JLabel("Private key Ed25519 seed");
-		GridBagConstraints gbc_lblPrivateKey = new GridBagConstraints();
-		gbc_lblPrivateKey.anchor = GridBagConstraints.WEST;
-		gbc_lblPrivateKey.insets = new Insets(0, 0, 5, 5);
-		gbc_lblPrivateKey.gridx = 0;
-		gbc_lblPrivateKey.gridy = 1;
-		formPanel.add(lblPrivateKey, gbc_lblPrivateKey);
+		
+		{
+			JLabel lblBIPSeed = new JLabel("BIP39 Seed");
+			GridBagConstraints gbc = new GridBagConstraints();
+			gbc.anchor = GridBagConstraints.WEST;
+			gbc.insets = new Insets(0, 0, 5, 5);
+			gbc.gridx = 0;
+			gbc.gridy = 1;
+			formPanel.add(lblBIPSeed, gbc);
+		}
+		
+		{
+			seedArea = new JTextArea();
+			seedArea.setFont(HEX_FONT);
+			seedArea.setColumns(64);
+			seedArea.setLineWrap(true);
+			seedArea.setWrapStyleWord(false);
+			GridBagConstraints gbc = new GridBagConstraints();
+			gbc.insets = new Insets(0, 0, 5, 0);
+			gbc.fill = GridBagConstraints.HORIZONTAL;
+			gbc.gridx = 1;
+			gbc.gridy = 1;
+			formPanel.add(seedArea, gbc);
+			seedArea.setText("(mnemonic not ready)");
+			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
+				if (!seedArea.isFocusOwner()) return;
+				updateSeed();
+			}));
+		}
+
+		{
+			JLabel lblPrivateKey = new JLabel("Private key Ed25519 seed");
+			GridBagConstraints gbc_lblPrivateKey = new GridBagConstraints();
+			gbc_lblPrivateKey.anchor = GridBagConstraints.WEST;
+			gbc_lblPrivateKey.insets = new Insets(0, 0, 5, 5);
+			gbc_lblPrivateKey.gridx = 0;
+			gbc_lblPrivateKey.gridy = 2;
+			formPanel.add(lblPrivateKey, gbc_lblPrivateKey);
+		}
+
 
 		privateKeyArea = new JTextArea();
-		privateKeyArea.setFont(new Font("Monospaced", Font.BOLD, 13));
+		privateKeyArea.setFont(HEX_FONT);
 		GridBagConstraints gbc_privateKeyArea = new GridBagConstraints();
 		gbc_privateKeyArea.insets = new Insets(0, 0, 5, 0);
 		gbc_privateKeyArea.fill = GridBagConstraints.HORIZONTAL;
 		gbc_privateKeyArea.gridx = 1;
-		gbc_privateKeyArea.gridy = 1;
+		gbc_privateKeyArea.gridy = 2;
 		formPanel.add(privateKeyArea, gbc_privateKeyArea);
 		privateKeyArea.setText("(mnemonic not ready)");
 		privateKeyArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
@@ -179,25 +242,29 @@ public class KeyGenPanel extends JPanel {
 			updatePrivateKey();
 		}));
 
-		JLabel lblPublicKey = new JLabel("Public Key");
-		GridBagConstraints gbc_lblPublicKey = new GridBagConstraints();
-		gbc_lblPublicKey.anchor = GridBagConstraints.WEST;
-		gbc_lblPublicKey.insets = new Insets(0, 0, 5, 5);
-		gbc_lblPublicKey.gridx = 0;
-		gbc_lblPublicKey.gridy = 2;
-		formPanel.add(lblPublicKey, gbc_lblPublicKey);
+		{
+			JLabel lblPublicKey = new JLabel("Public Key");
+			GridBagConstraints gbc_lblPublicKey = new GridBagConstraints();
+			gbc_lblPublicKey.anchor = GridBagConstraints.WEST;
+			gbc_lblPublicKey.insets = new Insets(0, 0, 5, 5);
+			gbc_lblPublicKey.gridx = 0;
+			gbc_lblPublicKey.gridy = 3;
+			formPanel.add(lblPublicKey, gbc_lblPublicKey);
+		}
 
-		publicKeyArea = new JTextArea();
-		publicKeyArea.setEditable(false);
-		publicKeyArea.setRows(1);
-		publicKeyArea.setText("(private key not ready)");
-		publicKeyArea.setFont(new Font("Monospaced", Font.BOLD, 13));
-		GridBagConstraints gbc_publicKeyArea = new GridBagConstraints();
-		gbc_publicKeyArea.insets = new Insets(0, 0, 5, 0);
-		gbc_publicKeyArea.fill = GridBagConstraints.HORIZONTAL;
-		gbc_publicKeyArea.gridx = 1;
-		gbc_publicKeyArea.gridy = 2;
-		formPanel.add(publicKeyArea, gbc_publicKeyArea);
+		{
+			publicKeyArea = new JTextArea();
+			publicKeyArea.setEditable(false);
+			publicKeyArea.setRows(1);
+			publicKeyArea.setText("(private key not ready)");
+			publicKeyArea.setFont(HEX_FONT);
+			GridBagConstraints gbc_publicKeyArea = new GridBagConstraints();
+			gbc_publicKeyArea.insets = new Insets(0, 0, 5, 0);
+			gbc_publicKeyArea.fill = GridBagConstraints.HORIZONTAL;
+			gbc_publicKeyArea.gridx = 1;
+			gbc_publicKeyArea.gridy = 3;
+			formPanel.add(publicKeyArea, gbc_publicKeyArea);
+		}
 
 	}
 

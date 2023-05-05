@@ -82,11 +82,11 @@ public class PeersListPanel extends JPanel {
 			Server base=getFirst().server;
 			Convex convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
 			Address a= convex.createAccountSync(kp.getAccountKey());
-			convex.transferSync(a, Coin.DIAMOND);
+			convex.transferSync(a, Coin.EMERALD);
 			
 			convex=Convex.connect(base, a, kp);
 			AccountKey key=kp.getAccountKey();
-			Result rcr=convex.transactSync("(create-peer "+key+" 10000000000)");
+			Result rcr=convex.transactSync("(create-peer "+key+" 10000000000000)");
 			if (rcr.isError()) log.warn("Error creating peer: "+rcr);
 			
 			HashMap<Keyword, Object> config=new HashMap<>();

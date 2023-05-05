@@ -78,7 +78,7 @@ public class WalletEntry {
 
 	@Override
 	public String toString() {
-		return getAddress() +" : " +getAccountKey().toChecksumHex();
+		return getAddress() +" : 0x" +getAccountKey().toChecksumHex();
 	}
 
 	public <R extends ACell> SignedData<R> sign(R message) {
