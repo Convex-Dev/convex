@@ -208,6 +208,9 @@ public class BIP39 {
 	public static final int NUM_WORDS=wordlist.length;
 	
 	private static final HashMap<String,Integer> lookup=new HashMap<>();
+
+	public static final int SEED_LENGTH = 64;
+	
 	static {
 		for (int i=0; i<NUM_WORDS; i++) {
 			lookup.put(wordlist[i], i);
@@ -228,7 +231,7 @@ public class BIP39 {
 		
 		// Generate seed
 		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
-		KeySpec keyspec = new PBEKeySpec(pass, salt, 2048, 512);
+		KeySpec keyspec = new PBEKeySpec(pass, salt, 2048, SEED_LENGTH * 8);
 	    Key key = factory.generateSecret(keyspec);
 	    
 	    // Wrap result as Blob
@@ -237,8 +240,13 @@ public class BIP39 {
 	}
 
 	public static String createSecureRandom() {
-		return Utils.joinStrings(createWords(new SecureRandom(),12)," ");
+		return createSecureRandom(12);
 	}
+	
+	public static String createSecureRandom(int numWords) {
+		return Utils.joinStrings(createWords(new SecureRandom(),numWords)," ");
+	}
+
 
 	public static List<String> createWords(Random r, int n) {
 		ArrayList<String> al=new ArrayList<>(n);

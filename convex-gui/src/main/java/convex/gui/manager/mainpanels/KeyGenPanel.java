@@ -10,6 +10,7 @@ import java.util.List;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
@@ -28,6 +29,7 @@ import convex.gui.utils.Toolkit;
 public class KeyGenPanel extends JPanel {
 
 	JTextArea mnemonicArea;
+	JPasswordField passArea;
 	JTextArea seedArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
@@ -56,10 +58,20 @@ public class KeyGenPanel extends JPanel {
 	}
 
 	private void updateMnemonic() {
+		generateSeed();
+	}
+	
+
+	private void updatePass() {
+		generateSeed();
+	}
+	
+	private void generateSeed() {
 		String s = mnemonicArea.getText();
+		String p = new String(passArea.getPassword());
 		try {
 			List<String> words=BIP39.getWords(s);
-			Blob keyMat=BIP39.getSeed(words,"");
+			Blob keyMat=BIP39.getSeed(words,p);
 			seedArea.setText(keyMat.toHexString());
 			ABlob seed=keyMat.getContentHash();
 			String privateKeyString = seed.toHexString();
@@ -68,18 +80,20 @@ public class KeyGenPanel extends JPanel {
 			String pks = "<mnemonic not valid>";
 			if (s.isBlank()) pks = "<enter valid private key or mnemonic>";
 			privateKeyArea.setText(pks);
-		}
-		updatePublicKeys();
+		}		
+		generatePublicKeys();
 	}
 	
 	private void updateSeed() {
 		try {
 			mnemonicArea.setText("<can't recreate from BIP39 seed>");
-			ABlob b=Blobs.parse(seedArea.getText());
-			privateKeyArea.setText(b.slice(0,32).toHexString());
-			updatePublicKeys();
+			ABlob b=Blobs.parse(seedArea.getText()); 
+			if ((b==null)||(b.count()!=BIP39.SEED_LENGTH)) throw new IllegalArgumentException("Dummy");
+			privateKeyArea.setText(b.getContentHash().toHexString());
+			generatePublicKeys();
 		} catch (Exception ex) {
-			System.err.println(ex.getMessage());
+			privateKeyArea.setText("<invalid BIP39 seed>");
+			publicKeyArea.setText("<invalid BIP39 seed>");
 			return;
 		}
 	}
@@ -88,14 +102,14 @@ public class KeyGenPanel extends JPanel {
 		try {
 			mnemonicArea.setText("<can't recreate from private key>");
 			seedArea.setText("<can't recreate from private key>");
-			updatePublicKeys();
+			generatePublicKeys();
 		} catch (Exception ex) {
 			System.err.println(ex.getMessage());
 			return;
 		}
 	}
 
-	private void updatePublicKeys() {
+	private void generatePublicKeys() {
 		String s = privateKeyArea.getText();
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
@@ -106,7 +120,6 @@ public class KeyGenPanel extends JPanel {
 		} catch (Exception ex) {
 			publicKeyArea.setText("<enter valid private key>");
 			addWalletButton.setEnabled(false);
-
 			return;
 		}
 	}
@@ -162,31 +175,60 @@ public class KeyGenPanel extends JPanel {
 		gbl_formPanel.rowWeights = new double[] { 0.0, 1.0, 1.0, 1.0, Double.MIN_VALUE };
 		formPanel.setLayout(gbl_formPanel);
 
-		JLabel lblMnemonic = new JLabel("Mnenomic Phrase");
-		GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
-		gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
-		gbc_lblNewLabel.insets = new Insets(0, 0, 5, 5);
-		gbc_lblNewLabel.gridx = 0;
-		gbc_lblNewLabel.gridy = 0;
-		formPanel.add(lblMnemonic, gbc_lblNewLabel);
+		{ // Mnemonic label
+			JLabel lblMnemonic = new JLabel("Mnenomic Phrase");
+			GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
+			gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
+			gbc_lblNewLabel.insets = new Insets(0, 0, 5, 5);
+			gbc_lblNewLabel.gridx = 0;
+			gbc_lblNewLabel.gridy = 0;
+			formPanel.add(lblMnemonic, gbc_lblNewLabel);
+		}
 
-		mnemonicArea = new JTextArea();
-		mnemonicArea.setWrapStyleWord(true);
-		mnemonicArea.setLineWrap(true);
-		mnemonicArea.setRows(2);
-		GridBagConstraints gbc_mnemonicArea = new GridBagConstraints();
-		gbc_mnemonicArea.fill = GridBagConstraints.HORIZONTAL;
-		gbc_mnemonicArea.insets = new Insets(0, 0, 5, 0);
-		gbc_mnemonicArea.gridx = 1;
-		gbc_mnemonicArea.gridy = 0;
-		mnemonicArea.setColumns(32);
-		mnemonicArea.setFont(HEX_FONT);
-		formPanel.add(mnemonicArea, gbc_mnemonicArea);
-		mnemonicArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
-			if (!mnemonicArea.isFocusOwner()) return;
-			updateMnemonic();
-		}));
+		{ // Mnemonic entry box
+			mnemonicArea = new JTextArea();
+			mnemonicArea.setWrapStyleWord(true);
+			mnemonicArea.setLineWrap(true);
+			mnemonicArea.setRows(2);
+			GridBagConstraints gbc_mnemonicArea = new GridBagConstraints();
+			gbc_mnemonicArea.fill = GridBagConstraints.HORIZONTAL;
+			gbc_mnemonicArea.insets = new Insets(0, 0, 5, 0);
+			gbc_mnemonicArea.gridx = 1;
+			gbc_mnemonicArea.gridy = 0;
+			mnemonicArea.setColumns(32);
+			mnemonicArea.setFont(HEX_FONT);
+			formPanel.add(mnemonicArea, gbc_mnemonicArea);
+			mnemonicArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
+				if (!mnemonicArea.isFocusOwner()) return;
+				updateMnemonic();
+			}));
+		}
 
+		{ // Passphrase label
+			JLabel lblPass = new JLabel("Passphrase");
+			GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
+			gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
+			gbc_lblNewLabel.insets = new Insets(0, 0, 5, 5);
+			gbc_lblNewLabel.gridx = 0;
+			gbc_lblNewLabel.gridy = 1;
+			formPanel.add(lblPass, gbc_lblNewLabel);
+		}
+
+		{ // Passphrase entry box
+			passArea = new JPasswordField();
+			GridBagConstraints gbc_mnemonicArea = new GridBagConstraints();
+			gbc_mnemonicArea.fill = GridBagConstraints.HORIZONTAL;
+			gbc_mnemonicArea.insets = new Insets(0, 0, 5, 0);
+			gbc_mnemonicArea.gridx = 1;
+			gbc_mnemonicArea.gridy = 1;
+			passArea.setColumns(32);
+			passArea.setFont(HEX_FONT);
+			formPanel.add(passArea, gbc_mnemonicArea);
+			passArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
+				if (!passArea.isFocusOwner()) return;
+				updatePass();
+			}));
+		}
 		
 		{
 			JLabel lblBIPSeed = new JLabel("BIP39 Seed");
@@ -194,7 +236,7 @@ public class KeyGenPanel extends JPanel {
 			gbc.anchor = GridBagConstraints.WEST;
 			gbc.insets = new Insets(0, 0, 5, 5);
 			gbc.gridx = 0;
-			gbc.gridy = 1;
+			gbc.gridy = 2;
 			formPanel.add(lblBIPSeed, gbc);
 		}
 		
@@ -208,7 +250,7 @@ public class KeyGenPanel extends JPanel {
 			gbc.insets = new Insets(0, 0, 5, 0);
 			gbc.fill = GridBagConstraints.HORIZONTAL;
 			gbc.gridx = 1;
-			gbc.gridy = 1;
+			gbc.gridy = 2;
 			formPanel.add(seedArea, gbc);
 			seedArea.setText("(mnemonic not ready)");
 			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
@@ -223,7 +265,7 @@ public class KeyGenPanel extends JPanel {
 			gbc_lblPrivateKey.anchor = GridBagConstraints.WEST;
 			gbc_lblPrivateKey.insets = new Insets(0, 0, 5, 5);
 			gbc_lblPrivateKey.gridx = 0;
-			gbc_lblPrivateKey.gridy = 2;
+			gbc_lblPrivateKey.gridy = 3;
 			formPanel.add(lblPrivateKey, gbc_lblPrivateKey);
 		}
 
@@ -234,7 +276,7 @@ public class KeyGenPanel extends JPanel {
 		gbc_privateKeyArea.insets = new Insets(0, 0, 5, 0);
 		gbc_privateKeyArea.fill = GridBagConstraints.HORIZONTAL;
 		gbc_privateKeyArea.gridx = 1;
-		gbc_privateKeyArea.gridy = 2;
+		gbc_privateKeyArea.gridy = 3;
 		formPanel.add(privateKeyArea, gbc_privateKeyArea);
 		privateKeyArea.setText("(mnemonic not ready)");
 		privateKeyArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
@@ -248,7 +290,7 @@ public class KeyGenPanel extends JPanel {
 			gbc_lblPublicKey.anchor = GridBagConstraints.WEST;
 			gbc_lblPublicKey.insets = new Insets(0, 0, 5, 5);
 			gbc_lblPublicKey.gridx = 0;
-			gbc_lblPublicKey.gridy = 3;
+			gbc_lblPublicKey.gridy = 4;
 			formPanel.add(lblPublicKey, gbc_lblPublicKey);
 		}
 
@@ -262,10 +304,11 @@ public class KeyGenPanel extends JPanel {
 			gbc_publicKeyArea.insets = new Insets(0, 0, 5, 0);
 			gbc_publicKeyArea.fill = GridBagConstraints.HORIZONTAL;
 			gbc_publicKeyArea.gridx = 1;
-			gbc_publicKeyArea.gridy = 3;
+			gbc_publicKeyArea.gridy = 4;
 			formPanel.add(publicKeyArea, gbc_publicKeyArea);
 		}
 
 	}
+
 
 }
