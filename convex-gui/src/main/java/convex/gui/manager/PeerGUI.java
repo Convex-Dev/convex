@@ -331,4 +331,12 @@ public class PeerGUI extends JPanel {
 	public static Address getGenesisAddress() {
 		return Init.getGenesisAddress();
 	}
+
+	public static Convex connectClient(Address address, AKeyPair keyPair) {
+		try {
+			return makeConnection(address,keyPair);
+		} catch (IOException | TimeoutException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
 }

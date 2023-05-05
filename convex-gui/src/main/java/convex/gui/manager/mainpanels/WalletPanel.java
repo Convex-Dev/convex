@@ -48,7 +48,7 @@ public class WalletPanel extends JPanel {
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
 			Server s=PeerGUI.getDefaultPeer().server;
-			Convex convex=Convex.connect(s, HERO.getAddress(), HERO.getKeyPair());
+			Convex convex=Convex.connect(s, s.getPeerController(),s.getKeyPair());
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				Address addr=convex.createAccountSync(newKP.getAccountKey());

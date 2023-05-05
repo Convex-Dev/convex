@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.util.Utils;
 import convex.gui.client.panels.HomePanel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
@@ -47,7 +48,7 @@ public class ConvexClient extends JPanel {
 		// call to set up Look and Feel
 		Toolkit.init();
 
-		launch(null);
+		EventQueue.invokeLater(()->launch(null));
 	}
 
 	/*
@@ -57,21 +58,24 @@ public class ConvexClient extends JPanel {
 
 	HomePanel homePanel = new HomePanel();
 	AboutPanel aboutPanel = new AboutPanel();
-	JTabbedPane tabs = new JTabbedPane();
+	public JTabbedPane tabs = new JTabbedPane();
 	JPanel mainPanel = new JPanel();
 	WalletPanel walletPanel=new WalletPanel();
+	public REPLPanel replPanel;
 
 	/**
 	 * Create the application.
+	 * @param convex Convex client instance
 	 */
 	public ConvexClient(Convex convex) {
 		setLayout(new BorderLayout());
+		replPanel=new REPLPanel(convex);
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Home", homePanel);
 		tabs.add("About", aboutPanel);
 		tabs.add("Wallet", walletPanel);
-		tabs.add("REPL", new REPLPanel(convex));
+		tabs.add("REPL", replPanel);
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		
@@ -95,27 +99,23 @@ public class ConvexClient extends JPanel {
 		return frame;
 	}
 	
-	public static void launch(Convex convex) {
-		EventQueue.invokeLater(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					ConvexClient.frame = new JFrame();
-					frame.setTitle("Convex Client - "+convex);
-					frame.setIconImage(Toolkit.getImage(ConvexClient.class.getResource("/images/Convex.png")));
-					frame.setBounds(100, 100, 1024, 768);
-					if (clientMode) {
-						frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-					}
-					ConvexClient window = new ConvexClient(convex);
-					frame.getContentPane().add(window, BorderLayout.CENTER);
-					frame.pack();
-					frame.setVisible(true);
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+	public static ConvexClient launch(Convex convex) {
+		try {
+			ConvexClient.frame = new JFrame();
+			frame.setTitle("Convex Client - "+convex);
+			frame.setIconImage(Toolkit.getImage(ConvexClient.class.getResource("/images/Convex.png")));
+			frame.setBounds(100, 100, 1024, 768);
+			if (clientMode) {
+				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 			}
-		});
+			ConvexClient window = new ConvexClient(convex);
+			frame.getContentPane().add(window, BorderLayout.CENTER);
+			frame.pack();
+			frame.setVisible(true);
+			return window;
+		} catch (Exception e) {
+			throw Utils.sneakyThrow(e);
+		}
 	}
 
 }

@@ -19,6 +19,7 @@ import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
+import convex.gui.client.ConvexClient;
 import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
@@ -31,6 +32,7 @@ public class WalletComponent extends BaseListComponent {
 	Icon icon = Toolkit.LOCKED_ICON;
 
 	JButton lockButton;
+	JButton replButton;
 
 	WalletEntry walletEntry;
 
@@ -43,6 +45,15 @@ public class WalletComponent extends BaseListComponent {
 		address = walletEntry.getAddress();
 
 		setLayout(new BorderLayout());
+		
+		// REPL button
+		replButton = new JButton("");
+		buttons.add(replButton);
+		replButton.setIcon(Toolkit.REPL_ICON);
+		replButton.addActionListener(e -> {
+			ConvexClient c= ConvexClient.launch(PeerGUI.connectClient(walletEntry.getAddress(),walletEntry.getKeyPair()));
+			c.tabs.setSelectedComponent(c.replPanel);
+		});
 
 		// lock button
 		lockButton = new JButton("");
@@ -68,6 +79,8 @@ public class WalletComponent extends BaseListComponent {
 			}
 			lockButton.setIcon(icon);
 		});
+		
+
 
 		// panel of buttons on right
 		add(buttons, BorderLayout.EAST);

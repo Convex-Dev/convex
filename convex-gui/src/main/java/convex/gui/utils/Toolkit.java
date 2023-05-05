@@ -7,9 +7,6 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.net.URL;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
@@ -19,6 +16,9 @@ import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.plaf.FontUIResource;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
@@ -71,6 +71,7 @@ public class Toolkit {
 	public static final ImageIcon CAKE = scaledIcon(36, "/images/ic_cake_black_36dp.png");
 	public static final ImageIcon CONVEX = scaledIcon(36, "/images/Convex.png");
 	public static final ImageIcon COG = scaledIcon(36, "/images/cog.png");
+	public static final ImageIcon REPL_ICON = scaledIcon(36, "/images/terminal-icon.png");
 
 	public static final Font DEFAULT_FONT = new JLabel().getFont();
 
