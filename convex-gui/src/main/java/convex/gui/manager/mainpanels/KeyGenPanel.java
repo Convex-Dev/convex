@@ -11,7 +11,9 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
+import javax.swing.JSpinner;
 import javax.swing.JTextArea;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
@@ -33,6 +35,9 @@ public class KeyGenPanel extends JPanel {
 	JTextArea seedArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
+	
+	JSpinner numSpinner;
+
 
 	JButton addWalletButton = new JButton("Add to wallet");
 	
@@ -137,15 +142,20 @@ public class KeyGenPanel extends JPanel {
 		JButton btnRecreate = new JButton("Generate");
 		actionPanel.add(btnRecreate);
 		btnRecreate.addActionListener(e -> {
-			mnemonicArea.setText(BIP39.createSecureRandom());
+			Integer wc=(Integer) numSpinner.getValue();
+			mnemonicArea.setText(BIP39.createSecureRandom(wc));
 			updateMnemonic();
 		});
+		
+		numSpinner = new JSpinner();
+		numSpinner.setModel(new SpinnerNumberModel(12, 1, 30, 1));
+		actionPanel.add(numSpinner);
 
 		JButton btnNewButton = new JButton("Export...");
 		actionPanel.add(btnNewButton);
 		
 		{ // Button to Normalise Mnemonic string
-			JButton btnNormalise = new JButton("Normalise Seed Pharase");
+			JButton btnNormalise = new JButton("Normalise Mnemonic");
 			actionPanel.add(btnNormalise);
 			btnNormalise.addActionListener(e -> { 
 				String s=mnemonicArea.getText();
