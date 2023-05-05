@@ -75,9 +75,9 @@ public class Toolkit {
 
 	public static final Font DEFAULT_FONT = new JLabel().getFont();
 
-	public static final Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 16);
+	public static final Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 20);
 
-	public static final Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 10);
+	public static final Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 	public static final Font SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 
 	public static ImageIcon scaledIcon(int size, String resourcePath) {

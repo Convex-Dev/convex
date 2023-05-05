@@ -81,7 +81,7 @@ public class TorusPanel extends JPanel {
 		add(scrollPane, BorderLayout.CENTER);
 
 		table.setFont(Toolkit.SMALL_MONO_FONT);
-		table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
+		table.getTableHeader().setFont(Toolkit.SMALL_MONO_BOLD);
 		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
 
 	}
