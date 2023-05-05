@@ -55,7 +55,7 @@ public class AccountsPanel extends JPanel {
 		rightRenderer.setHorizontalAlignment(JLabel.RIGHT);
 		
 		table.getColumnModel().getColumn(0).setCellRenderer(leftRenderer);
-		table.getColumnModel().getColumn(0).setPreferredWidth(150);
+		table.getColumnModel().getColumn(0).setPreferredWidth(80);
 		
 		ActorRenderer actorRenderer = new ActorRenderer();
 		actorRenderer.setHorizontalAlignment(JLabel.CENTER);
@@ -76,7 +76,10 @@ public class AccountsPanel extends JPanel {
 
 		table.getColumnModel().getColumn(6).setPreferredWidth(100);
 		table.getColumnModel().getColumn(6).setCellRenderer(rightRenderer);
-		
+
+		table.getColumnModel().getColumn(7).setPreferredWidth(200);
+		table.getColumnModel().getColumn(7).setCellRenderer(rightRenderer);
+
 		// popup menu, not sure why this doesn't work....
 		final JPopupMenu popupMenu = new JPopupMenu();
 		JMenuItem copyItem = new JMenuItem("Copy Address");

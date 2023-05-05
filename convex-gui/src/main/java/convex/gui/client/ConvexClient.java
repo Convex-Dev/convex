@@ -3,8 +3,11 @@ package convex.gui.client;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
 
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -40,15 +43,21 @@ public class ConvexClient extends JPanel {
 	/**
 	 * Launch the application.
 	 * @param args Command line argument
+	 * @throws TimeoutException 
+	 * @throws IOException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException, TimeoutException {
 		log.info("Running Convex Client");
 		clientMode=true;
 		
 		// call to set up Look and Feel
 		Toolkit.init();
 
-		EventQueue.invokeLater(()->launch(null));
+		String DEFAULT="localhost:18888";
+		String hostAddress=JOptionPane.showInputDialog("Enter Peer Address (default to "+DEFAULT+")");
+		if (hostAddress.isBlank()) hostAddress=DEFAULT;
+		Convex convex=Convex.connect(Utils.toInetSocketAddress(hostAddress));
+		EventQueue.invokeLater(()->launch(convex));
 	}
 
 	/*

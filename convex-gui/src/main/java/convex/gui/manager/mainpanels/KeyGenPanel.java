@@ -120,7 +120,7 @@ public class KeyGenPanel extends JPanel {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
 			AKeyPair kp = AKeyPair.create(b.getBytes());
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
-			publicKeyArea.setText(kp.getAccountKey().toChecksumHex());
+			publicKeyArea.setText("0x"+kp.getAccountKey().toChecksumHex());
 			addWalletButton.setEnabled(true);
 		} catch (Exception ex) {
 			publicKeyArea.setText("<enter valid private key>");
