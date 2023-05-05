@@ -46,6 +46,7 @@ import convex.gui.manager.mainpanels.HomePanel;
 import convex.gui.manager.mainpanels.KeyGenPanel;
 import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
+import convex.gui.manager.mainpanels.TorusPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
@@ -149,6 +150,7 @@ public class PeerGUI extends JPanel {
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("Message", messagePanel);
 		tabs.add("Actors", new ActorsPanel(this));
+		tabs.add("Torus", new TorusPanel(this));
 		tabs.add("About", aboutPanel);
 		
 		tabs.setSelectedComponent(peerPanel);
