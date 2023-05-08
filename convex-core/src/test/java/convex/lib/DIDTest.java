@@ -31,12 +31,12 @@ public class DIDTest extends ACVMTest {
 	}
 	
 	@Test public void testResolveNotThere() {
-		Context<ACell> ctx=step("(import convex.did :as did)");
+		Context ctx=step("(import convex.did :as did)");
 		assertNull(eval(ctx,"(call did (read 5875875865))"));
 	}
 	
 	@Test public void testCreate() {
-		Context<ACell> ctx=step("(import convex.did :as did)");
+		Context ctx=step("(import convex.did :as did)");
 		Address did=(Address) ctx.getResult();
 		
 		// create an id, should be entered in registry
@@ -67,7 +67,7 @@ public class DIDTest extends ACVMTest {
 	}
 	
 	@Test public void testUpdateMonitor() {
-		Context<ACell> ctx=step("(import convex.did :as did)");
+		Context ctx=step("(import convex.did :as did)");
 		
 		// Set up DDO controlled by HERO
 		ctx=step(ctx,"(call did (create))");
@@ -89,7 +89,7 @@ public class DIDTest extends ACVMTest {
 	}
 	
 	@Test public void testAuthorisedMonitor() {
-		Context<ACell> ctx=context();
+		Context ctx=context();
 		ctx=step(ctx,"(import convex.did :as did)");
 		ctx=step(ctx,"(import convex.trust :as trust)");
 		
@@ -117,7 +117,7 @@ public class DIDTest extends ACVMTest {
 	}
 	
 	@Test public void testDeactivate() {
-		Context<ACell> ctx=step("(import convex.did :as did)");
+		Context ctx=step("(import convex.did :as did)");
 		ctx=step(ctx,"(import convex.trust :as trust)");
 		
 		// Set up DDO controlled by HERO

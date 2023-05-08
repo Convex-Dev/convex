@@ -34,7 +34,7 @@ public class AssetTester {
 	 * @param token Fungible token Address
 	 * @param user User Address
 	 */
-	public static void doFungibleTests (Context<?> ctx, ACell token, Address user) {
+	public static void doFungibleTests (Context ctx, ACell token, Address user) {
 		ctx=ctx.forkWithAddress(user);
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		ctx=step(ctx,"(import convex.fungible :as fungible)");
@@ -68,7 +68,7 @@ public class AssetTester {
 
 		// Run generic asset tests, giving 1/3 the balance to a new user account
 		{
-			Context<?> c=ctx.fork();
+			Context c=ctx.fork();
 			c=c.createAccount(Samples.ACCOUNT_KEY);
 			Address user2=(Address) c.getResult();
 			Long smallBal=BAL/3;
@@ -88,7 +88,7 @@ public class AssetTester {
 	 * @param user1 First user
 	 * @param user2 Second user
 	 */
-	public static void doAssetTests (Context<?> ctx, ACell asset, Address user1, Address user2) {
+	public static void doAssetTests (Context ctx, ACell asset, Address user1, Address user2) {
 		// Set up test user
 		ctx=ctx.createAccount(TEST_KP.getAccountKey());
 		Address tester=(Address) ctx.getResult();
@@ -129,7 +129,7 @@ public class AssetTester {
 		
 		// Test transferring everything to tester
 		{
-			Context<?> c=ctx.fork();
+			Context c=ctx.fork();
 			c=stepAs(user1,c,"(asset/transfer "+tester+" ["+asset+" (asset/balance "+asset+")])");
 			c=stepAs(user2,c,"(asset/transfer "+tester+" ["+asset+" (asset/balance "+asset+")])");
 			
@@ -143,7 +143,7 @@ public class AssetTester {
 	
 	}
 	
-	public static void doUserAssetTests (Context<?> ctx, ACell asset, Address user, ACell balance) {
+	public static void doUserAssetTests (Context ctx, ACell asset, Address user, ACell balance) {
 		ctx=ctx.forkWithAddress(user);
 		ctx=step(ctx,"(def ast "+asset+")");
 		assertEquals(asset,ctx.getResult());

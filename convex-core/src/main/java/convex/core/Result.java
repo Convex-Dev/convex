@@ -209,7 +209,7 @@ public final class Result extends ARecordGeneric {
 	 * @param ctx Context
 	 * @return New Result instance
 	 */
-	public static Result fromContext(CVMLong id,Context<?> ctx) {
+	public static Result fromContext(CVMLong id,Context ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;
 		AMap<Keyword,ACell> info=null;
@@ -232,7 +232,7 @@ public final class Result extends ARecordGeneric {
 	 * @param ctx Context
 	 * @return New Result instance
 	 */
-	public static Result fromContext(Context<?> ctx) {
+	public static Result fromContext(Context ctx) {
 		return fromContext(null,ctx);
 	}
 

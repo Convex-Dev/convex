@@ -41,7 +41,7 @@ public class TransactionTest extends ACVMTest {
 	
 	protected State apply(ATransaction t) {
 		State s=state();
-		Context<?> ctx= s.applyTransaction(t);
+		Context ctx= s.applyTransaction(t);
 		assertNotError(ctx);
 		return ctx.getState();
 	}
@@ -74,7 +74,7 @@ public class TransactionTest extends ACVMTest {
 		Transfer t1=Transfer.create(HERO, 120, VILLAIN, 1000);
 		Transfer t2=Transfer.create(VILLAIN, 140, HERO, 2000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_ANY,t1,t2);
-		Context<AVector<Result>> rctx=INITIAL.applyTransaction(m1);
+		Context rctx=INITIAL.applyTransaction(m1);
 		assertFalse(rctx.isError());
 		AVector<Result> rs=rctx.getResult();
 		assertEquals(2,rs.count());
@@ -96,7 +96,7 @@ public class TransactionTest extends ACVMTest {
 		Transfer t1=Transfer.create(HERO, 120, VILLAIN, 1000);
 		Transfer t2=Transfer.create(VILLAIN, 140, HERO, 2000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_ALL,t1,t2);
-		Context<AVector<Result>> rctx=INITIAL.applyTransaction(m1);
+		Context rctx=INITIAL.applyTransaction(m1);
 		assertTrue(rctx.isError());
 		assertEquals(ErrorCodes.CHILD,rctx.getErrorCode());
 		AVector<Result> rs=(AVector<Result>) rctx.getExceptional().getMessage();
@@ -118,7 +118,7 @@ public class TransactionTest extends ACVMTest {
 		Transfer t1=Transfer.create(VILLAIN, 120, VILLAIN, 1000);
 		Transfer t2=Transfer.create(HERO, 140, VILLAIN, 2000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_FIRST,t1,t2);
-		Context<AVector<Result>> rctx=INITIAL.applyTransaction(m1);
+		Context rctx=INITIAL.applyTransaction(m1);
 		assertFalse(rctx.isError());
 		AVector<Result> rs=rctx.getResult();
 		assertEquals(2,rs.count());
@@ -140,7 +140,7 @@ public class TransactionTest extends ACVMTest {
 		Transfer t2=Transfer.create(VILLAIN, 140, VILLAIN, 2000);
 		Transfer t3=Transfer.create(VILLAIN, 160, VILLAIN, 4000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_UNTIL,t1,t2,t3);
-		Context<AVector<Result>> rctx=INITIAL.applyTransaction(m1);
+		Context rctx=INITIAL.applyTransaction(m1);
 		assertFalse(rctx.isError());
 		AVector<Result> rs=rctx.getResult();
 		assertEquals(2,rs.count());
@@ -159,7 +159,7 @@ public class TransactionTest extends ACVMTest {
 	@Test 
 	public void testCall() {
 		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());
-		Context<?> ctx=state().applyTransaction(t1);
+		Context ctx=state().applyTransaction(t1);
 		assertEquals(ErrorCodes.STATE,ctx.getErrorCode());
 		
 		doTransactionTests(t1);

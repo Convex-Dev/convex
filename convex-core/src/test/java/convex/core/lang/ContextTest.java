@@ -42,7 +42,7 @@ public class ContextTest extends ACVMTest {
 	public void testDefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = context().define(sym, Strings.create("buffy"));
+		final Context c2 = context().define(sym, Strings.create("buffy"));
 		assertCVMEquals("buffy", c2.lookup(sym).getResult());
 
 		assertUndeclaredError(c2.lookup(Symbol.create("some-bad-symbol")));
@@ -50,7 +50,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testQuery() {
-		Context<?> c2 = context();
+		Context c2 = context();
 		c2=c2.query(Reader.read("(+ 1 2)"));
 		assertNotSame(c2,context());
 		assertCVMEquals(3L,c2.getResult());
@@ -62,7 +62,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testSymbolLookup() {
-		Context<?> CTX=context();
+		Context CTX=context();
 		Symbol sym1=Symbol.create("count");
 		assertEquals(Core.COUNT,CTX.lookup(sym1).getResult());
 
@@ -72,19 +72,19 @@ public class ContextTest extends ACVMTest {
 	public void testUndefine() {
 		Symbol sym = Symbol.create("the-test-symbol");
 
-		final Context<?> c2 = context().define(sym, Strings.create("vampire"));
+		final Context c2 = context().define(sym, Strings.create("vampire"));
 		assertCVMEquals("vampire", c2.lookup(sym).getResult());
 
-		final Context<?> c3 = c2.undefine(sym);
+		final Context c3 = c2.undefine(sym);
 		assertUndeclaredError(c3.lookup(sym));
 
-		final Context<?> c4 = c3.undefine(sym);
+		final Context c4 = c3.undefine(sym);
 		assertSame(c3,c4);
 	}
 
 	@Test
 	public void testExceptionalState() {
-		Context<?> ctx=context();
+		Context ctx=context();
 
 		assertFalse(ctx.isExceptional());
 		assertTrue(ctx.withError(ErrorCodes.ASSERT).isExceptional());
@@ -92,12 +92,12 @@ public class ContextTest extends ACVMTest {
 
 		assertThrows(IllegalArgumentException.class,()->ctx.withError((Keyword)null));
 
-		assertThrows(Error.class,()->ctx.withError(ErrorCodes.ASSERT).getResult());
+		assertThrows(IllegalStateException.class,()->ctx.withError(ErrorCodes.ASSERT).getResult());
 	}
 
 	@Test
 	public void testJuice() {
-		Context<?> c=context();
+		Context c=context();
 		assertTrue(c.checkJuice(1000));
 
 		// get a juice error if too much juice consumed
@@ -110,7 +110,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testDepth() {
-		Context<?> c=context();
+		Context c=context();
 		assertEquals(0L,c.getDepth());
 		assertEquals(0L,evalL("*depth*"));
 		assertEquals(1L,evalL("(do *depth*)"));
@@ -137,7 +137,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testDepthLimit() {
-		Context<?> c=context().withDepth(Constants.MAX_DEPTH-1);
+		Context c=context().withDepth(Constants.MAX_DEPTH-1);
 		assertEquals(Constants.MAX_DEPTH-1,c.getDepth());
 
 		// Can run 1 deep at this depth
@@ -151,7 +151,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testSpecial() {
-		Context<?> ctx=context();
+		Context ctx=context();
 		
 		assertNull(eval(Symbols.STAR_SCOPE));
 		
@@ -181,7 +181,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testLog() {
-		Context<?> c = context();
+		Context c = context();
 		assertTrue(c.getLog().isEmpty());
 
 		AVector<ACell> v=Vectors.of(1,2,3);
@@ -197,7 +197,7 @@ public class ContextTest extends ACVMTest {
 
 	@Test
 	public void testReturn() {
-		Context<?> ctx=context();
+		Context ctx=context();
 		ctx = ctx.withResult(RT.cvm(100));
 		assertEquals(ctx.getDepth(), ctx.getDepth());
 	}

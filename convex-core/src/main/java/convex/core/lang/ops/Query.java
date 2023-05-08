@@ -45,15 +45,14 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 		return new Query<T>(ops.toVector());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
+	public Context execute(Context context) {
 		State savedState=context.getState();
 		
 		int n = ops.size();
-		if (n == 0) return (Context<T>) context.withResult(Juice.QUERY,  null); // need cast to avoid bindings overload
+		if (n == 0) return context.withResult(Juice.QUERY,  null); // need cast to avoid bindings overload
 
-		Context<T> ctx = (Context<T>) context.consumeJuice(Juice.QUERY);
+		Context ctx = context.consumeJuice(Juice.QUERY);
 		if (ctx.isExceptional()) return ctx;
 		
 		AVector<ACell> savedBindings=context.getLocalBindings();
@@ -62,8 +61,7 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 		// TODO: early return
 		for (int i = 0; i < n; i++) {
 			AOp<?> op = ops.get(i);
-			ctx = (Context<T>) ctx.execute(op);
-
+			ctx = ctx.execute(op);
 			if (ctx.isExceptional()) break;
 
 		}

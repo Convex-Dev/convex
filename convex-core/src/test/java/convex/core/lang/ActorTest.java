@@ -11,7 +11,7 @@ public class ActorTest extends ACVMTest {
 
 	@Test 
 	public void testScopedCall() {
-		Context<?> c=context();
+		Context c=context();
 		
 		c=step(c,"(def a1 (deploy '(defn ^:callable? check [] [*address* :s *scope*])))");
 		assertNotError(c);
@@ -32,7 +32,7 @@ public class ActorTest extends ACVMTest {
 	
 	@Test 
 	public void testBadScopedCalls() {
-		Context<?> c=context();
+		Context c=context();
 		
 		c=step(c,"(def a1 (deploy '(defn ^:callable? check [] [*caller* *address* *scope*])))");
 		assertNotError(c);

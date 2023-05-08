@@ -128,11 +128,10 @@ public class Multi extends ATransaction {
 		return 30+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <T extends ACell> Context<T> apply(Context<?> ctx) {
+	public Context apply(Context ctx) {
 		// save initial context, we might need this for rollback
-		Context<?> ictx=ctx.fork(); 
+		Context ictx=ctx.fork(); 
 		
 		AVector<ATransaction> ts=txs.getValue();
 		// Context<?> initialContext=ctx.fork();
@@ -155,17 +154,17 @@ public class Multi extends ATransaction {
 			}
 		}
 		
-		Context<T> rctx;
+		Context rctx;
 		if (ctx.isError()&&(mode==MODE_ALL)) {
 			ctx=ictx.handleStateResults(ctx, true);
-			rctx=(Context<T>) ctx.withError(ErrorCodes.CHILD, rs);
+			rctx=ctx.withError(ErrorCodes.CHILD, rs);
 		} else {
 			rctx=ctx.withResult(rs);
 		}
 		return rctx;
 	}
 
-	private Context<?> applySubTransaction(Context<?> ctx, ATransaction t) {
+	private Context applySubTransaction(Context ctx, ATransaction t) {
 		Address torigin=t.origin;
 		if (!this.origin.equals(torigin)) {
 			// different origin account, so need to check control right
@@ -177,7 +176,7 @@ public class Multi extends ATransaction {
 			}
 		}
 		
-		Context<?> childContext=ctx.forkWithAddress(torigin);
+		Context childContext=ctx.forkWithAddress(torigin);
 		childContext = t.apply(childContext);
 		ctx=ctx.handleStateResults(childContext,false);
 		return ctx;

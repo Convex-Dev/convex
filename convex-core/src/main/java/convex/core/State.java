@@ -402,7 +402,7 @@ public class State extends ARecord {
 			AVector<ACell> st = (AVector<ACell>) al.get(i);
 			Address origin = (Address) st.get(0);
 			AOp<?> op = (AOp<?>) st.get(1);
-			Context<?> ctx;
+			Context ctx;
 			try {
 				// TODO juice refund?
 				ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
@@ -448,7 +448,7 @@ public class State extends ARecord {
 				SignedData<? extends ATransaction> signed = transactions.get(i);
 				
 				// execute the transaction using the *latest* state (not necessarily "this")
-				Context<?> ctx = state.applyTransaction(signed);
+				Context ctx = state.applyTransaction(signed);
 
 				// record results and state update
 				results[i] = Result.fromContext(CVMLong.create(i),ctx);
@@ -472,7 +472,7 @@ public class State extends ARecord {
 	 *
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	private <T extends ACell> Context<T> applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+	private Context applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
 		Address addr=t.getOrigin();
@@ -490,7 +490,7 @@ public class State extends ARecord {
 			if (!sigValid) return Context.createFake(this).withError(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 		}
 
-		Context<T> ctx=applyTransaction(t);
+		Context ctx=applyTransaction(t);
 		return ctx;
 	}
 
@@ -506,13 +506,12 @@ public class State extends ARecord {
 	 *
 	 * SECURITY: Assumes digital signature already checked.
 	 *
-	 * @param <T> Type of transaction result
 	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	public <T extends ACell> Context<T> applyTransaction(ATransaction t) {
+	public Context applyTransaction(ATransaction t) {
 				// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
-		Context<T> ctx = prepareTransaction(t);
+		Context ctx = prepareTransaction(t);
 		if (ctx.isExceptional()) {
 			// We hit some error while preparing transaction. Possible culprits:
 			// - Non-existent Origin account
@@ -536,14 +535,13 @@ public class State extends ARecord {
 
 	}
 
-	@SuppressWarnings("unchecked")
-	private <T extends ACell> Context<T> prepareTransaction(ATransaction t) {
+	private Context prepareTransaction(ATransaction t) {
 		Address origin = t.getOrigin();
 		
 		// Pre-transaction state updates (persisted even if transaction fails)
 		AccountStatus account = getAccount(origin);
 		if (account == null) {
-			return (Context<T>) Context.createFake(this).withError(ErrorCodes.NOBODY);
+			return Context.createFake(this).withError(ErrorCodes.NOBODY);
 		}
 
 		// Update sequence number for target account
@@ -556,7 +554,7 @@ public class State extends ARecord {
 		// Create context with juice subtracted
 		Long maxJuice=t.getMaxJuice();
 		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance():maxJuice);
-		Context<T> ctx = Context.createInitial(this, origin, juiceLimit);
+		Context ctx = Context.createInitial(this, origin, juiceLimit);
 		return ctx;
 	}
 
@@ -806,7 +804,7 @@ public class State extends ARecord {
 	 * @return Address from CNS, or null if not found
 	 */
 	public Address lookupCNS(String name) {
-		Context<?> ctx=Context.createFake(this);
+		Context ctx=Context.createFake(this);
 		return (Address) ctx.lookupCNS(name).getResult();
 	}
 

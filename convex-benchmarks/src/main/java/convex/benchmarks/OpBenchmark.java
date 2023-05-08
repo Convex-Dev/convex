@@ -14,7 +14,7 @@ import convex.core.lang.ops.Invoke;
 
 public class OpBenchmark {
 	
-	static final Context<?> CTX=Benchmarks.context();
+	static final Context CTX=Benchmarks.context();
 	
 	private static final ACell runOp(AOp<ACell> op) {
 		return CTX.fork().execute(op).getResult();

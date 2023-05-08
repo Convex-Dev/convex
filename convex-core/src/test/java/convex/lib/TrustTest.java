@@ -24,10 +24,10 @@ import convex.test.Samples;
 public class TrustTest extends ACVMTest {
 	private Address trusted=null;
 
-	private Context<?> CONTEXT;
+	private Context CONTEXT;
 	protected TrustTest() throws IOException {
 		super(InitTest.BASE);
-		Context<?> ctx = context();
+		Context ctx = context();
 
 		String importS = "(import convex.trust :as trust)";
 		ctx = step(ctx, importS);
@@ -51,7 +51,7 @@ public class TrustTest extends ACVMTest {
 
 	@Test
 	public void testSelfTrust() {
-		Context<?> ctx = CONTEXT.fork();
+		Context ctx = CONTEXT.fork();
 
 		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
@@ -62,7 +62,7 @@ public class TrustTest extends ACVMTest {
 
 	@Test
 	public void testUpgradeWhitelist() {
-		Context<?> ctx = CONTEXT.fork();
+		Context ctx = CONTEXT.fork();
 
 		// deploy a whitelist with default config and upgradable capability
 		ctx = step(ctx, "(def wlist (deploy [(trust/build-whitelist nil) (trust/add-trusted-upgrade nil)]))");
@@ -78,7 +78,7 @@ public class TrustTest extends ACVMTest {
 			// check our villain cannot upgrade the actor!
 			Address a1 = VILLAIN;
 			
-			Context<?> c = ctx.forkWithAddress(a1);
+			Context c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def wlist " + wl + "))");
 
 			assertTrustError(step(c, "(call wlist (upgrade '(do :foo)))"));
@@ -99,7 +99,7 @@ public class TrustTest extends ACVMTest {
 	@Test
 	public void testWhitelist() {
 		// check our alias is right
-		Context<?> ctx = CONTEXT.fork();
+		Context ctx = CONTEXT.fork();
 
 		// deploy a whitelist with default config
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist nil)))");
@@ -117,7 +117,7 @@ public class TrustTest extends ACVMTest {
 
 		{ // check adding and removing to whitelist
 			Address a1 = Samples.BAD_ADDRESS;
-			Context<?> c = ctx;
+			Context c = ctx;
 
 			// Check not initially on whitelist
 			assertFalse(evalB(c, "(trust/trusted? wlist " + a1 + ")"));
@@ -137,7 +137,7 @@ public class TrustTest extends ACVMTest {
 			Address a1 = VILLAIN;
 			Address a2 = HERO;
 			
-			Context<?> c = ctx.forkWithAddress(a1);
+			Context c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def wlist (address " + wl + ")))");
 			assertNotError(c);
 
@@ -153,7 +153,7 @@ public class TrustTest extends ACVMTest {
 
 	@Test
 	public void testBlacklist() {
-		Context<?> ctx = CONTEXT.fork();
+		Context ctx = CONTEXT.fork();
 
 		// deploy a blacklist with default config
 		ctx = step(ctx, "(def blist (deploy (trust/build-blacklist {:blacklist [" + VILLAIN + "]})))");
@@ -174,7 +174,7 @@ public class TrustTest extends ACVMTest {
 
 		{ // check adding and removing to blacklist
 			Address a1 = Samples.BAD_ADDRESS;
-			Context<?> c = ctx;
+			Context c = ctx;
 
 			// Check not initially on blacklist
 			assertTrue(evalB(c, "(trust/trusted? blist " + a1 + ")"));
@@ -194,7 +194,7 @@ public class TrustTest extends ACVMTest {
 			Address a1 = VILLAIN;
 			Address a2 = HERO;
 
-			Context<?> c = ctx.forkWithAddress(a1);
+			Context c = ctx.forkWithAddress(a1);
 			c = step(c, "(do (import " + trusted + " :as trust) (def blist (address " + wl + ")))");
 			assertNotError(c);
 
@@ -210,7 +210,7 @@ public class TrustTest extends ACVMTest {
 
 	@Test
 	public void testWhitelistController() {
-		Context<?> ctx = CONTEXT.fork();
+		Context ctx = CONTEXT.fork();
 
 		// deploy an initially empty whitelist
 		ctx = step(ctx, "(def wlist (deploy (trust/build-whitelist {:whitelist []})))");
@@ -241,9 +241,9 @@ public class TrustTest extends ACVMTest {
 	 * @param ctx Context from which to change control
 	 * @param thing Entity to change control (Address or scope vector)
 	 */
-	public static void testChangeControl(Context<?> ctx, ACell thing) {
+	public static void testChangeControl(Context ctx, ACell thing) {
 		ctx=ctx.createAccount(null);
-		Address nca=ctx.getResult();
+		Address nca=(Address) ctx.getResult();
 		
 		// Change control should work
 		ctx=step(ctx,"(call "+thing+" (change-control "+nca+"))");

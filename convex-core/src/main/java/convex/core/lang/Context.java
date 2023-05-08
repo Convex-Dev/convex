@@ -68,9 +68,8 @@ import convex.core.util.Errors;
  * "If you have a procedure with 10 parameters, you probably missed some"
  * - Alan Perlis
  *
- * @param <T> Result type of Context
  */
-public class Context<T extends ACell> extends AObject {
+public class Context extends AObject {
 	private static final long INITIAL_JUICE = 0;
 
 	// Default values
@@ -89,7 +88,7 @@ public class Context<T extends ACell> extends AObject {
 	 */
 
 	private long juice;
-	private T result;
+	private ACell result;
 	private AExceptional exception;
 	private int depth;
 	private AVector<ACell> localBindings;
@@ -238,7 +237,7 @@ public class Context<T extends ACell> extends AObject {
 
 	}
 
-	protected Context(ChainState chainState, long juice, AVector<ACell> localBindings2, T result,int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
+	protected Context(ChainState chainState, long juice, AVector<ACell> localBindings2, ACell result,int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
 		this.chainState=chainState;
 		this.juice=juice;
 		this.localBindings=localBindings2;
@@ -250,13 +249,13 @@ public class Context<T extends ACell> extends AObject {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<T> create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,AVector<AVector<ACell>> log, CompilerState comp) {
+	private static <T extends ACell> Context create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,AVector<AVector<ACell>> log, CompilerState comp) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
-		Context<T> ctx= new Context<T>(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
+		Context ctx= new Context(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
 		return ctx;
 	}
 
-	private static <T extends ACell> Context<T> create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
+	private static <T extends ACell> Context create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer,null);
 		return create(chainState,juice,localBindings,result,depth,log,comp);
 	}
@@ -269,7 +268,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param state State to use for this Context
 	 * @return Fake context
 	 */
-	public static <R extends ACell> Context<R> createFake(State state) {
+	public static Context createFake(State state) {
 		return createFake(state,Init.CORE_ADDRESS);
 	}
 
@@ -283,7 +282,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param origin Origin address to use
 	 * @return Fake context
 	 */
-	public static <R extends ACell> Context<R> createFake(State state, Address origin) {
+	public static Context createFake(State state, Address origin) {
 		if (origin==null) throw new IllegalArgumentException("Null address!");
 		return create(state,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,origin,null,origin, 0, DEFAULT_LOG,null);
 	}
@@ -299,7 +298,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param juice Initial juice for Context
 	 * @return Initial execution context with reserved juice.
 	 */
-	public static <T extends ACell> Context<T> createInitial(State state, Address origin,long juice) {
+	public static Context createInitial(State state, Address origin,long juice) {
 		AccountStatus as=state.getAccount(origin);
 		if (as==null) {
 			// no account
@@ -336,7 +335,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param initialJuice total juice reserved at start of transaction
 	 * @return Updated context
 	 */
-	public Context<T> completeTransaction(State initialState, long initialJuice) {
+	public Context completeTransaction(State initialState, long initialJuice) {
 		// get state at end of transaction application
 		State state=getState();
 
@@ -413,16 +412,15 @@ public class Context<T extends ACell> extends AObject {
 		}
 
 		// final state update and result reporting
-		Context<T> rctx=this.withState(state);
+		Context rctx=this.withState(state);
 		if (memoryFailure) {
 			rctx=rctx.withError(ErrorCodes.MEMORY, "Unable to allocate additional memory required for transaction ("+memUsed+" bytes)");
 		}
 		return rctx;
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withState(State newState) {
-		return (Context<R>) this.withChainState(chainState.withState(newState));
+	public Context withState(State newState) {
+		return this.withChainState(chainState.withState(newState));
 	}
 
 	/**
@@ -475,16 +473,14 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Consumes juice, returning an updated context if sufficient juice remains or an exceptional JUICE error.
-	 * @param <R> Result type
 	 * @param gulp Amount of juice to consume
 	 * @return Updated context with juice consumed
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> consumeJuice(long gulp) {
+	public Context consumeJuice(long gulp) {
 		if (gulp<=0) throw new Error("Juice gulp must be positive!");
 		if(!checkJuice(gulp)) return withJuiceError();
 		juice=juice-gulp;
-		return (Context<R>) this;
+		return this;
 		// return new Context<R>(chainState,newJuice,localBindings,(R) result,depth,isExceptional);
 	}
 
@@ -501,11 +497,10 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Looks up a symbol's value in the current execution context, without any effect on the Context (no juice consumed etc.)
 	 *
-	 * @param <R> Type of value associated with the given symbol
 	 * @param symbol Symbol to look up. May be qualified
 	 * @return Context with the result of the lookup (may be an undeclared exception)
 	 */
-	public <R extends ACell> Context<R> lookup(Symbol symbol) {
+	public Context lookup(Symbol symbol) {
 		// try lookup in dynamic environment
 		return lookupDynamic(symbol);
 	}
@@ -515,11 +510,10 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
 	 *
-	 * @param <R> Result type
 	 * @param symbol Symbol to look up
 	 * @return Updated Context
 	 */
-	public <R extends ACell> Context<R> lookupDynamic(Symbol symbol) {
+	public Context lookupDynamic(Symbol symbol) {
 		Address address=getAddress();
 		return lookupDynamic(address,symbol);
 	}
@@ -529,13 +523,11 @@ public class Context<T extends ACell> extends AObject {
 	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
 	 * Returns a NOBODY exception if the specified Account does not exist
 	 *
-	 * @param <R> Type of value result
 	 * @param address Address of account in which to look up value
 	 * @param symbol Symbol to look up
 	 * @return Updated Context
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> lookupDynamic(Address address, Symbol symbol) {
+	public Context lookupDynamic(Address address, Symbol symbol) {
 		AccountStatus as=getAccountStatus(address);
 		if (as==null) return withError(ErrorCodes.NOBODY,"No account found for: "+symbol.toString());
 		MapEntry<Symbol,ACell> envEntry=lookupDynamicEntry(as,symbol);
@@ -547,7 +539,7 @@ public class Context<T extends ACell> extends AObject {
 
 		// Result is whatever is defined as the datum value in the environment entry
 		ACell result = envEntry.getValue();
-		return (Context<R>) withResult(result);
+		return withResult(result);
 	}
 
 	/**
@@ -773,14 +765,14 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Result value from this Context.
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends T> R getResult() {
+	public <R extends ACell> R getResult() {
 		if (exception!=null) {
 			String msg = "Can't get result with exceptional value: "+exception;
 			if (exception instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue)exception;
 				msg=msg+"\n"+ev.getTrace();
 			}
-			throw new Error(msg);
+			throw new IllegalStateException(msg);
 		}
 		return (R) result;
 	}
@@ -808,36 +800,32 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Context may become exceptional depending on the result type.
 	 *
-	 * @param <R> Result type
 	 * @param value Value
 	 * @return Context updated with the specified result.
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withResult(ACell value) {
-		result=(T)value;
+	public Context withResult(ACell value) {
+		result=value;
 		exception=null;
-		return (Context<R>) this;
+		return this;
 	}
 
 	/**
 	 * Updates this context with a given value, which may either be a normal result or exceptional value
-	 * @param <R> Result type
 	 * @param value Value
 	 * @return Context updated with the specified result value.
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withValue(Object value) {
+	public Context withValue(Object value) {
 		if (value instanceof AExceptional) {
 			exception=(AExceptional)value;
 			result=null;
 		} else {
-			result = (T)value;
+			result = (ACell)value;
 			exception=null;
 		}
-		return (Context<R>) this;
+		return this;
 	}
 
-	public <R extends ACell> Context<R> withResult(long gulp,R value) {
+	public Context withResult(long gulp,ACell value) {
 		if (!checkJuice(gulp)) return withJuiceError();
 		juice=juice-gulp;
 
@@ -846,24 +834,22 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Returns this context with a JUICE error, consuming all juice.
-	 * @param <R> Result type
 	 * @return Exceptional Context signalling JUICE error.
 	 */
-	public <R extends ACell> Context<R> withJuiceError() {
+	public Context withJuiceError() {
 		// set juice to zero. Can't consume more that we have!
 		this.juice=0;
 		return withError(ErrorCodes.JUICE,"Out of juice!");
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withException(AExceptional exception) {
+	public Context withException(AExceptional exception) {
 		//return (Context<R>) new Context<AExceptional>(chainState,juice,localBindings,exception,depth,true);
 		this.exception=exception;
 		this.result=null;
-		return (Context<R>) this;
+		return this;
 	}
 
-	public <R extends ACell> Context<R> withException(long gulp,AExceptional value) {
+	public Context withException(long gulp,AExceptional value) {
 		if (!checkJuice(gulp)) return withJuiceError();
 		juice=juice-gulp;
 		return withException(value);
@@ -878,7 +864,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param newEnvironment
 	 * @return Updated Context with the given dynamic environment
 	 */
-	private Context<T> withEnvironment(AHashMap<Symbol, ACell> newEnvironment)  {
+	private Context withEnvironment(AHashMap<Symbol, ACell> newEnvironment)  {
 		ChainState cs=chainState.withEnvironment(newEnvironment);
 		return withChainState(cs);
 	}
@@ -890,12 +876,12 @@ public class Context<T extends ACell> extends AObject {
 	 * @param newEnvironment
 	 * @return Updated Context with the given dynamic environment
 	 */
-	private Context<T> withEnvironment(AHashMap<Symbol, ACell> newEnvironment, AHashMap<Symbol,AHashMap<ACell,ACell>> newMeta)  {
+	private Context withEnvironment(AHashMap<Symbol, ACell> newEnvironment, AHashMap<Symbol,AHashMap<ACell,ACell>> newMeta)  {
 		ChainState cs=chainState.withEnvironment(newEnvironment,newMeta);
 		return withChainState(cs);
 	}
 
-	private Context<T> withChainState(ChainState newChainState) {
+	private Context withChainState(ChainState newChainState) {
 		//if (chainState==newChainState) return this;
 		//return create(newChainState,juice,localBindings,result,depth);
 		chainState=newChainState;
@@ -905,18 +891,16 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Executes an Op within this context, returning an updated context.
 	 *
-	 * @param <R> Return type of the Op
 	 * @param op Op to execute
 	 * @return Updated Context
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> execute(AOp<R> op) {
+	public Context execute(AOp<?> op) {
 		// execute op with adjusted depth
 		int savedDepth=getDepth();
-		Context<AOp<R>> ctx =this.withDepth(savedDepth+1);
-		if (ctx.isExceptional()) return (Context<R>) ctx; // depth error, won't have modified depth
+		Context ctx =this.withDepth(savedDepth+1);
+		if (ctx.isExceptional()) return ctx; // depth error, won't have modified depth
 
-		Context<R> rctx=op.execute(ctx);
+		Context rctx=op.execute(ctx);
 
 		// reset depth after execution.
 		rctx=rctx.withDepth(savedDepth);
@@ -928,13 +912,12 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Returning an updated context containing the result or an exceptional error.
 	 *
-	 * @param <R> Return type of the Op
 	 * @param op Op to execute
 	 * @return Updated Context
 	 */
-	public <R extends ACell> Context<R> run(AOp<R> op) {
+	public Context run(AOp<?> op) {
 		// Security: run in fork
-		Context<R> ctx=fork().execute(op);
+		Context ctx=fork().execute(op);
 
 		// must handle state results like halt, rollback etc.
 		return handleStateResults(ctx,false);
@@ -945,12 +928,11 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Returning an updated context containing the result or an exceptional error.
 	 *
-	 * @param <R> Return type of the Op
 	 * @param code Code to execute
 	 * @return Updated Context
 	 */
-	public <R extends ACell> Context<R> run(ACell code) {
-		Context<R> ctx=fork();
+	public Context run(ACell code) {
+		Context ctx=fork();
 		ctx=ctx.eval(code);
 
 		// must handle state results like halt, rollback etc.
@@ -965,15 +947,13 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Keeps depth constant upon return.
 	 *
-	 * @param <R> Return type of the function
 	 * @param fn Function to execute
 	 * @param args Arguments for function
 	 * @return Updated Context
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> invoke(AFn<R> fn, ACell... args) {
+	public Context invoke(AFn<?> fn, ACell... args) {
 		// Note: we don't adjust depth here because execute(...) does it for us in the function body
-		Context<R> ctx = fn.invoke((Context<ACell>) this,args);
+		Context ctx = fn.invoke(this,args);
 
 		if (ctx.isExceptional()) {
 			// Need an Object because maybe mutating later
@@ -988,7 +968,7 @@ public class Context<T extends ACell> extends AObject {
 					RecurValue rv = (RecurValue) v;
 					ACell[] newArgs = rv.getValues();
 					ctx=ctx.withValue(null); // clear value
-					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
+					ctx = fn.invoke(ctx,newArgs);
 					v = ctx.getValue();
 				} else if (v instanceof TailcallValue) {
 					if (fn==Core.TAILCALL_STAR) break;
@@ -996,19 +976,19 @@ public class Context<T extends ACell> extends AObject {
 					ACell[] newArgs = rv.getValues();
 
 					// redirect function and invoke
-					fn = (AFn<R>) rv.getFunction();
+					fn = (AFn<?>) rv.getFunction();
 					ctx=ctx.withValue(null); // clear value
-					ctx = fn.invoke((Context<ACell>) ctx,newArgs);
+					ctx = fn.invoke(ctx,newArgs);
 					v = ctx.getValue();
 				}
 			}
 
 			// unwrap return value if necessary
 			if ((v instanceof ReturnValue)&&(!(fn==Core.RETURN))) {
-				v = ((ReturnValue<T>) v).getValue();
+				ACell val = ((ReturnValue<?>) v).getValue();
 
 				// unwrap result
-				return ctx.withResult((R)v);
+				return ctx.withResult(val);
 			}
 
 			if (v instanceof ErrorValue) {
@@ -1028,28 +1008,25 @@ public class Context<T extends ACell> extends AObject {
 	 * @param bindingForm Binding form
 	 * @param op Op to execute to get binding values
 	 *
-	 * @param <I> Result type of Context
 	 * @return Context with local bindings updated
 	 */
-	@SuppressWarnings("unchecked")
-	public <I extends ACell> Context<I> executeLocalBinding(ACell bindingForm, AOp<I> op) {
-		Context<I> ctx=this.execute(op);
+	public Context executeLocalBinding(ACell bindingForm, AOp<?> op) {
+		Context ctx=this.execute(op);
 		if (ctx.isExceptional()) return ctx;
-		return (Context<I>) ctx.updateBindings(bindingForm, ctx.getResult());
+		return ctx.updateBindings(bindingForm, ctx.getResult());
 	}
 
 	/**
 	 * Updates local bindings with a given binding form
 	 *
-	 * @param <R> Result type of Context
 	 * @param bindingForm Binding form
 	 * @param args Arguments to bind
 	 * @return Non-exceptional Context with local bindings updated, or an exceptional result if bindings fail
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> updateBindings(ACell bindingForm, Object args) {
+	public Context updateBindings(ACell bindingForm, Object args) {
 		// Clear any exceptional status
-		Context<R> ctx=this.withValue(null);	
+		Context ctx=this.withValue(null);	
 
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;
@@ -1127,16 +1104,14 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Updates this Context with new local bindings. Doesn't affact result state (exceptional or otherwise)
-	 * @param <R> Return type of Context
 	 * @param newBindings New local bindings map to use.
 	 * @return Updated context
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withLocalBindings(AVector<ACell> newBindings) {
+	public Context withLocalBindings(AVector<ACell> newBindings) {
 		//if (localBindings==newBindings) return (Context<R>) this;
 		//return create(chainState,juice,newBindings,(R)result,depth);
 		localBindings=newBindings;
-		return (Context<R>) this;
+		return this;
 	}
 
 	/**
@@ -1163,7 +1138,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param value Value to define
 	 * @return Updated context with symbol defined in environment
 	 */
-	public Context<T> define(Symbol key, ACell value) {
+	public Context define(Symbol key, ACell value) {
 		AHashMap<Symbol, ACell> env = getEnvironment();
 		AHashMap<Symbol, ACell> newEnvironment = env.assoc(key, value);
 
@@ -1177,7 +1152,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param value Value to set of the given Symbol
 	 * @return Updated context with symbol defined in environment
 	 */
-	public Context<T> defineWithSyntax(Syntax syn, ACell value) {
+	public Context defineWithSyntax(Syntax syn, ACell value) {
 		Symbol key=syn.getValue();
 		AHashMap<Symbol, ACell> env = getEnvironment();
 		AHashMap<Symbol, ACell> newEnvironment = env.assoc(key, value);
@@ -1192,7 +1167,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param key Symbol of the environment mapping to remove
 	 * @return Updated context with symbol definition removed from the environment, or this context if unchanged
 	 */
-	public Context<T> undefine(Symbol key) {
+	public Context undefine(Symbol key) {
 		AHashMap<Symbol, ACell> m = getEnvironment();
 		AHashMap<Symbol, ACell> newEnvironment = m.dissoc(key);
 		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta = getMetadata().dissoc(key);
@@ -1203,14 +1178,13 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Expand and compile a form in this Context.
 	 *
-	 * @param <R> Return type of compiled op
 	 * @param form Form to expand and compile
 	 * @return Updated Context with compiled Op as result
 	 */
-	public <R extends ACell> Context<AOp<R>> expandCompile(ACell form) {
+	public Context expandCompile(ACell form) {
 		// run compiler with adjusted depth
 		int saveDepth=getDepth();
-		Context<AOp<R>> rctx =this.withDepth(saveDepth+1);
+		Context rctx =this.withDepth(saveDepth+1);
 		if (rctx.isExceptional()) return rctx; // depth error, won't have modified depth
 
 		// EXPAND AND COMPILE
@@ -1225,14 +1199,13 @@ public class Context<T extends ACell> extends AObject {
 	/**
 	 * Compile a form in this Context. Form must already be fully expanded to a Syntax Object
 	 *
-	 * @param <R> Return type of compiled op
 	 * @param expandedForm Form to compile
 	 * @return Updated Context with compiled Op as result
 	 */
-	public <R extends ACell> Context<AOp<R>> compile(ACell expandedForm) {
+	public Context compile(ACell expandedForm) {
 		// Save an adjust depth
 		int saveDepth=getDepth();
-		Context<AOp<R>> rctx =this.withDepth(saveDepth+1);
+		Context rctx =this.withDepth(saveDepth+1);
 		if (rctx.isExceptional()) return rctx; // depth error
 
 		// Save Compiler state
@@ -1266,36 +1239,34 @@ public class Context<T extends ACell> extends AObject {
 	 * Other forms will be expanded and compiled before execution, unless *lang* is set, in which case they will
 	 * be executed via the *lang* function.
 	 *
-	 * @param <R> Return type of evaluation
 	 * @param form Form to evaluate
 	 * @return Context containing the result of evaluating the specified form
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> eval(ACell form) {
-		Context<AOp<R>> ctx=(Context<AOp<R>>) this;
-		AOp<R> op;
+	public Context eval(ACell form) {
+		Context ctx= this;
+		AOp<?> op;
 	
 		if (form instanceof AOp) {
-			op=(AOp<R>)form;
+			op=(AOp<?>)form;
 		} else {
-			AFn<R> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
+			AFn<?> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
 			if (lang!=null) {
 				// Execute *lang* function, but increment depth just in case
 				int saveDepth=ctx.getDepth();
 				ctx=ctx.withDepth(saveDepth+1);
-				if (ctx.isExceptional()) return (Context<R>) ctx;
-				Context<R> rctx = ctx.invoke(lang,form);
+				if (ctx.isExceptional()) return ctx;
+				Context rctx = ctx.invoke(lang,form);
 				return rctx.withDepth(saveDepth);
 			} else {
 				ctx=expandCompile(form);
-				if (ctx.isExceptional()) return (Context<R>) ctx;
+				if (ctx.isExceptional()) return ctx;
 				op=ctx.getResult();
 				ctx=ctx.withResult(null); // clear result for execution
 			}
 		}
 		AVector<ACell> savedBindings = ctx.getLocalBindings();
 		ctx=ctx.withLocalBindings(Vectors.empty());
-		Context<R> rctx= ctx.execute(op);
+		Context rctx= ctx.execute(op);
 		return rctx.withLocalBindings(savedBindings);
 	}
 
@@ -1303,12 +1274,11 @@ public class Context<T extends ACell> extends AObject {
 	 * Evaluates a form as another Address.
 	 *
 	 * Causes TRUST error if the Address is not controlled by the current address.
-	 * @param <R> Result type
 	 * @param address Address of Account in which to evaluate
 	 * @param form Form to evaluate
 	 * @return Updated Context
 	 */
-	public <R extends ACell> Context<R> evalAs(Address address, ACell form) {
+	public Context evalAs(Address address, ACell form) {
 		Address caller=getAddress();
 		if (caller.equals(address)) return eval(form);
 		AccountStatus as=this.getAccountStatus(address);
@@ -1320,7 +1290,7 @@ public class Context<T extends ACell> extends AObject {
 		boolean canControl=false;
 
 		// Run eval in a forked context
-		Context<R> ctx=this.fork();
+		Context ctx=this.fork();
 		if (controller.equals(getAddress())) {
 			canControl=true;
 		} else {
@@ -1337,21 +1307,20 @@ public class Context<T extends ACell> extends AObject {
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
 
 		// SECURITY: eval with a context switch
-		final Context<R> exContext=Context.create(getState(), juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),caller, address,0,log,null);
+		final Context exContext=Context.create(getState(), juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),caller, address,0,log,null);
 
-		final Context<R> rContext=exContext.eval(form);
+		final Context rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
 		return handleStateResults(rContext,false);
 	}
 
 	/**
 	 * Executes code as if run in the current account, but always discarding state changes.
-	 * @param <R> Result type
 	 * @param form Code to execute.
 	 * @return Context updated with only query result and juice consumed
 	 */
-	public <R extends ACell> Context<R> query(ACell form) {
-		Context<R> ctx=this.fork();
+	public Context query(ACell form) {
+		Context ctx=this.fork();
 
 		// adjust depth. May be exceptional if depth limit exceeded
 		ctx=ctx.withDepth(depth+1);
@@ -1367,26 +1336,24 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Executes code as if run in the specified account, but always discarding state changes.
-	 * @param <R> Result type
 	 * @param address Address of Account in which to execute the query
 	 * @param form Code to execute.
 	 * @return Context updated with only query result and juice consumed
 	 */
-	public <R extends ACell> Context<R> queryAs(Address address, ACell form) {
+	public Context queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER,null);
-		Context<R> ctx=Context.create(cs, juice, EMPTY_BINDINGS, null, depth,log,null);
+		Context ctx=Context.create(cs, juice, EMPTY_BINDINGS, null, depth,log,null);
 		ctx=ctx.evalAs(address, form);
 		return handleQueryResult(ctx);
 	}
 
 	/**
 	 * Just take result and juice from query. Log and state not kept.
-	 * @param <R>
 	 * @param ctx
 	 * @return
 	 */
-	protected <R extends ACell> Context<R> handleQueryResult(Context<R> ctx) {
+	protected Context handleQueryResult(Context ctx) {
 		this.juice=ctx.getJuice();
 		return this.withValue(ctx.result);
 	}
@@ -1397,12 +1364,11 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * Maintains depth.
 	 *
-	 * @param <R> Return type of compiled op.
 	 * @param forms A sequence of forms to compile
 	 * @return Updated context with vector of compiled forms
 	 */
-	public <R extends ACell> Context<AVector<AOp<R>>> compileAll(ASequence<ACell> forms) {
-		Context<AVector<AOp<R>>> rctx = Compiler.compileAll(forms, this);
+	public Context compileAll(ASequence<ACell> forms) {
+		Context rctx = Compiler.compileAll(forms, this);
 		return rctx;
 	}
 
@@ -1413,28 +1379,24 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Changes the depth of this context. Returns exceptional result if depth limit exceeded.
-	 * @param <R> Result type
 	 * @param newDepth New depth value
 	 * @return Updated context with new depth set
 	 */
-	@SuppressWarnings("unchecked")
-	<R extends ACell> Context<R> withDepth(int newDepth) {
-		if (newDepth==depth) return (Context<R>) this;
+	Context withDepth(int newDepth) {
+		if (newDepth==depth) return this;
 		if ((newDepth<0)||(newDepth>Constants.MAX_DEPTH)) return withError(ErrorCodes.DEPTH,"Invalid depth: "+newDepth);
 		depth=newDepth;
-		return (Context<R>)this;
+		return this;
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withJuice(long newJuice) {
+	public Context withJuice(long newJuice) {
 		juice=newJuice;
-		return (Context<R>) this;
+		return this;
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withCompilerState(CompilerState comp) {
+	public Context withCompilerState(CompilerState comp) {
 		compilerState=comp;
-		return (Context<R>) this;
+		return this;
 	}
 
 	/**
@@ -1476,7 +1438,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param amount Amount to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with sent amount if the transaction succeeds, or an exceptional value if the transfer fails
 	 */
-	public Context<CVMLong> transfer(Address target, long amount) {
+	public Context transfer(Address target, long amount) {
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an amount beyond maximum limit");
 
@@ -1505,7 +1467,7 @@ public class Context<T extends ACell> extends AObject {
 		if (targetAccount.isActor()) {
 			// (call target amount (receive-coin source amount nil))
 			// SECURITY: actorCall must do fork to preserve this
-			Context<CVMLong> actx=this.fork();
+			Context actx=this.fork();
 			actx=actorCall(target,amount,Symbols.RECEIVE_COIN,source,CVMLong.create(amount),null);
 			if (actx.isExceptional()) return actx;
 
@@ -1519,7 +1481,7 @@ public class Context<T extends ACell> extends AObject {
 			accounts=accounts.assoc(targetIndex, newTargetAccount);
 
 			// SECURITY: new context with updated accounts
-			Context<CVMLong> result=withChainState(chainState.withAccounts(accounts)).withResult(CVMLong.create(amount));
+			Context result=withChainState(chainState.withAccounts(accounts)).withResult(CVMLong.create(amount));
 
 			return result;
 		}
@@ -1535,7 +1497,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param amountToSend Amount of memory to transfer, must be between 0 and Amount.MAX_VALUE inclusive
 	 * @return Context with a null result if the transaction succeeds, or an exceptional value if the transfer fails
 	 */
-	public Context<CVMLong> transferMemoryAllowance(Address target, CVMLong amountToSend) {
+	public Context transferMemoryAllowance(Address target, CVMLong amountToSend) {
 		long amount=amountToSend.longValue();
 		if (amount<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative allowance amount");
 		if (amount>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
@@ -1567,7 +1529,7 @@ public class Context<T extends ACell> extends AObject {
 		accounts=accounts.assoc(targetIndex, newTargetAccount);
 
 		// SECURITY: new context with updated accounts
-		Context<CVMLong> result=withChainState(chainState.withAccounts(accounts)).withResult(amountToSend);
+		Context result=withChainState(chainState.withAccounts(accounts)).withResult(amountToSend);
 		return result;
 	}
 
@@ -1577,7 +1539,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param allowance New memory allowance
 	 * @return Context indicating the price paid for the allowance change (may be zero or negative for refund)
 	 */
-	public Context<CVMLong> setMemory(long allowance) {
+	public Context setMemory(long allowance) {
 		State state=getState();
 		AVector<AccountStatus> accounts=state.getAccounts();
 		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative allowance amount");
@@ -1616,14 +1578,12 @@ public class Context<T extends ACell> extends AObject {
 	 *
 	 * STATE error if offered amount is insufficient. ARGUMENT error if acceptance is negative.
 	 *
-	 * @param <R> Type of result
 	 * @param amount Amount to accept
 	 * @return Updated context, with long amount accepted as result
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> acceptFunds(long amount) {
+	public Context acceptFunds(long amount) {
 		if (amount<0L) return this.withError(ErrorCodes.ARGUMENT,"Negative accept argument");
-		if (amount==0L) return this.withResult(Juice.ACCEPT, (R)CVMLong.ZERO);
+		if (amount==0L) return this.withResult(Juice.ACCEPT, CVMLong.ZERO);
 
 		long offer=getOffer();
 		if (amount>offer) return this.withError(ErrorCodes.STATE,"Insufficient offered funds");
@@ -1635,29 +1595,27 @@ public class Context<T extends ACell> extends AObject {
 
 		// need to update both state and offer
 		ChainState cs=chainState.withStateOffer(state,offer-amount);
-		Context<T> ctx=this.withChainState(cs);
+		Context ctx=this.withChainState(cs);
 
-		return (Context<R>) ctx.withResult(Juice.ACCEPT, CVMLong.create(amount));
+		return ctx.withResult(Juice.ACCEPT, CVMLong.create(amount));
 	}
 
 	/**
 	 * Executes a call to an Actor. Utility function which convert a java String function name
 	 *
-	 * @param <R> Return type of Actor call
 	 * @param target Target Actor address or scope vector
 	 * @param offer Amount of Convex Coins to offer in Actor call
 	 * @param functionName Symbol of function name defined by Actor
 	 * @param args Arguments to Actor function invocation
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
-	public <R extends ACell> Context<R> actorCall(ACell target, long offer, String functionName, ACell... args) {
+	public Context actorCall(ACell target, long offer, String functionName, ACell... args) {
 		return actorCall(target,offer,Symbol.create(functionName),args);
 	}
 
 	/**
 	 * Executes a call to an Actor.
 	 *
-	 * @param <R> Return type of Actor call
 	 * @param target Target Actor address
 	 * @param offer Amount of Convex Coins to offer in Actor call
 	 * @param functionName Symbol of function name defined by Actor
@@ -1665,7 +1623,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @return Context with result of Actor call (may be exceptional)
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> actorCall(ACell target, long offer, ACell functionName, ACell... args) {
+	public Context actorCall(ACell target, long offer, ACell functionName, ACell... args) {
 		// SECURITY: set up state for actor call
 		State state=getState();
 		Symbol sym=RT.ensureSymbol(functionName);
@@ -1706,7 +1664,7 @@ public class Context<T extends ACell> extends AObject {
 			return this.withError(ErrorCodes.ARGUMENT, "Cannot make negative offer in Actor call: "+offer);
 		}
 
-		AFn<R> fn = as.getCallableFunction(sym);
+		AFn<?> fn = as.getCallableFunction(sym);
 
 		if (fn == null) {
 			if (!as.getEnvironment().containsKey(sym)) {
@@ -1716,10 +1674,10 @@ public class Context<T extends ACell> extends AObject {
 		}
 
 		// Ensure we create a forked Context for the Actor call
-		final Context<R> exContext=forkActorCall(state, targetAddress, offer, scope);
+		final Context exContext=forkActorCall(state, targetAddress, offer, scope);
 
 		// INVOKE ACTOR FUNCTION
-		final Context<R> rctx=exContext.invoke(fn,args);
+		final Context rctx=exContext.invoke(fn,args);
 
 		ErrorValue ev=rctx.getError();
 		if (ev!=null) {
@@ -1736,14 +1694,13 @@ public class Context<T extends ACell> extends AObject {
 	 * SECURITY: Increments depth, will be restored in handleStateResults
 	 * SECURITY: Must change address to the target Actor address.
 	 * SECURITY: Must change caller to current address.
-	 * @param <R>
 	 * @param state for forked context.
 	 * @param target Target actor call address, will become new *address* for context
 	 * @param offer Offer amount for actor call. Must have been pre-subtracted from caller account.
 	 * @return
 	 */
-	private <R extends ACell> Context<R> forkActorCall(State state, Address target, long offer, ACell scope) {
-		Context<R> fctx=Context.create(state, juice, EMPTY_BINDINGS, (R)null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+	private Context forkActorCall(State state, Address target, long offer, ACell scope) {
+		Context fctx=Context.create(state, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
 		if (scope!=null) {
 			fctx.chainState=fctx.chainState.withScope(scope);
 		}
@@ -1752,14 +1709,12 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Handle results at the end of an execution boundary (actor call, transaction etc.)
-	 * @param <R> Return type of Context
 	 * @param returnContext Context containing return from child transaction / call
 	 * @param rollback If true, always rolls back state effects
 	 * @return Updated parent context
 	 */
-	@SuppressWarnings("unchecked")
 	public
-	<R extends ACell> Context<R> handleStateResults(Context<?> returnContext, boolean rollback) {
+	Context handleStateResults(Context returnContext, boolean rollback) {
 		/** Return value */
 		Object rv;
 		if (returnContext.isExceptional()) {
@@ -1769,9 +1724,9 @@ public class Context<T extends ACell> extends AObject {
 				// roll back state to before Actor call
 				// Note: this will also refund unused offer.
 				rollback=true;
-				rv=((RollbackValue<R>)ex).getValue();
+				rv=((RollbackValue<?>)ex).getValue();
 			} else if (ex instanceof HaltValue) {
-				rv=((HaltValue<R>)ex).getValue();
+				rv=((HaltValue<?>)ex).getValue();
 			} else if (ex instanceof ErrorValue) {
 				// OK to pass through error, but need to roll back state changes
 				rollback=true;
@@ -1779,7 +1734,7 @@ public class Context<T extends ACell> extends AObject {
 			} else if (ex instanceof ReturnValue) {
 				// Normally doesn't happen (invoke catches this)
 				// but might in a user transaction. Treat as a Halt.
-				rv=((ReturnValue<R>)ex).getValue();
+				rv=((ReturnValue<?>)ex).getValue();
 			} else {
 				rollback=true;
 				String msg;
@@ -1822,7 +1777,7 @@ public class Context<T extends ACell> extends AObject {
 		// Rebuild context for the current execution
 		// SECURITY: must restore origin,depth,caller,address,local bindings, offer
 
-		Context<R> result=this.withState(returnState);
+		Context result=this.withState(returnState);
 		result.juice=returnContext.juice;
 		result=this.withValue(rv);
 		return result;
@@ -1839,7 +1794,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param code Actor initialisation code
 	 * @return Updated Context with Actor deployed, or an exceptional result
 	 */
-	public Context<Address> deployActor(ACell code) {
+	public Context deployActor(ACell code) {
 		final State initialState=getState();
 
 		// deploy initial contract state to next address
@@ -1847,10 +1802,10 @@ public class Context<T extends ACell> extends AObject {
 		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		final Context<Address> deployContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
-		final Context<Address> rctx=deployContext.eval(code);
+		final Context deployContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		final Context rctx=deployContext.eval(code);
 
-		Context<Address> result=this.handleStateResults(rctx,false);
+		Context result=this.handleStateResults(rctx,false);
 		if (result.isExceptional()) return result;
 
 		return result.withResult(Juice.DEPLOY_CONTRACT,address);
@@ -1861,68 +1816,65 @@ public class Context<T extends ACell> extends AObject {
 	 * @param key New Account Key
 	 * @return Updated context with new Account added
 	 */
-	public Context<Address> createAccount(AccountKey key) {
+	public Context createAccount(AccountKey key) {
 		final State initialState=getState();
 		Address address=initialState.nextAddress();
 		AVector<AccountStatus> accounts=initialState.getAccounts();
 		AccountStatus as=AccountStatus.create(0L, key);
 		accounts=accounts.conj(as);
 		final State newState=initialState.withAccounts(accounts);
-		Context<Address> rctx=this.withState(newState);
+		Context rctx=this.withState(newState);
 		return rctx.withResult(address);
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withError(Keyword error) {
-		return (Context<R>) withError(ErrorValue.create(error));
+	public Context withError(Keyword error) {
+		return withError(ErrorValue.create(error));
 	}
 
-	public <R extends ACell> Context<R> withError(Keyword errorCode,String message) {
+	public Context withError(Keyword errorCode,String message) {
 		return withError(ErrorValue.create(errorCode,Strings.create(message)));
 	}
 	
 
-	public <R extends ACell> Context<R> withError(Keyword errorCode, ACell rs) {
+	public Context withError(Keyword errorCode, ACell rs) {
 		return withError(ErrorValue.createRaw(errorCode,rs));
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> withError(ErrorValue error) {
+	public Context withError(ErrorValue error) {
 		error.addLog(log);
 		error.setAddress(getAddress());
-		return (Context<R>) withException(error);
+		return withException(error);
 	}
 
-
-	public <R extends ACell> Context<R> withArityError(String message) {
+	public Context withArityError(String message) {
 		return withError(ErrorCodes.ARITY,message);
 	}
 
-	public <R extends ACell> Context<R> withCompileError(String message) {
+	public Context withCompileError(String message) {
 		return withError(ErrorCodes.COMPILE,message);
 	}
 
-	public <R extends ACell> Context<R> withBoundsError(long index) {
+	public Context withBoundsError(long index) {
 		return withError(ErrorCodes.BOUNDS,"Index: "+index);
 	}
 
-	public <R extends ACell> Context<R> withCastError(int argIndex, AType klass) {
+	public Context withCastError(int argIndex, AType klass) {
 		return withError(ErrorCodes.CAST,"Can't convert argument at position "+(argIndex+1)+" to type "+klass);
 	}
 
-	public <R extends ACell> Context<R> withCastError(int argIndex, ACell[] args, AType klass) {
+	public Context withCastError(int argIndex, ACell[] args, AType klass) {
 		return withError(ErrorCodes.CAST,"Can't convert argument at position "+(argIndex+1)+" (with type "+RT.getType(args[argIndex])+ ") to type "+klass);
 	}
 
-	public <R extends ACell> Context<R> withCastError(ACell a, AType klass) {
+	public Context withCastError(ACell a, AType klass) {
 		return withError(ErrorCodes.CAST,"Can't convert value of type "+RT.getType(a)+ " to type "+klass);
 	}
 
-	public <R extends ACell> Context<R> withCastError(AType klass) {
+	public Context withCastError(AType klass) {
 		return withError(ErrorCodes.CAST,"Can't convert value(s) to type "+klass);
 	}
 
-	public <R extends ACell> Context<R> withCastError(ACell a, String message) {
+	public Context withCastError(ACell a, String message) {
 		return withError(ErrorCodes.CAST,message);
 	}
 
@@ -1950,15 +1902,15 @@ public class Context<T extends ACell> extends AObject {
 		return null;
 	}
 
-	public <R extends ACell> Context<R> withAssertError(String message) {
+	public Context withAssertError(String message) {
 		return withError(ErrorCodes.ASSERT,message);
 	}
 
-	public <R extends ACell> Context<R> withFundsError(String message) {
+	public Context withFundsError(String message) {
 		return withError(ErrorCodes.FUNDS,message);
 	}
 
-	public <R extends ACell> Context<R> withArgumentError(String message) {
+	public Context withArgumentError(String message) {
 		return withError(ErrorCodes.ARGUMENT,message);
 	}
 
@@ -1980,7 +1932,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param op Operation to schedule.
 	 * @return Updated context, with scheduled time as the result
 	 */
-	public Context<CVMLong> schedule(long time, AOp<ACell> op) {
+	public Context schedule(long time, AOp<?> op) {
 		// check vs current timestamp
 		long timestamp=getTimeStamp().longValue();
 		if (timestamp<0L) return withError(ErrorCodes.ARGUMENT);
@@ -1990,7 +1942,7 @@ public class Context<T extends ACell> extends AObject {
 		if (this.juice<juice) return withJuiceError();
 
 		State s=getState().scheduleOp(time,getAddress(),op);
-		Context<?> ctx=this.withChainState(chainState.withState(s));
+		Context ctx=this.withChainState(chainState.withState(s));
 
 		return ctx.withResult(juice,CVMLong.create(time));
 	}
@@ -2003,8 +1955,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param newStake Amount to stake
 	 * @return Context with amount of coins transferred to Peer as result (may be negative if stake withdrawn)
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> setDelegatedStake(AccountKey peerKey, long newStake) {
+	public Context setDelegatedStake(AccountKey peerKey, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
@@ -2016,7 +1967,7 @@ public class Context<T extends ACell> extends AObject {
 		long currentStake=ps.getDelegatedStake(myAddress);
 		long delta=newStake-currentStake;
 
-		if (delta==0) return (Context<R>) this; // no change
+		if (delta==0) return this; // no change
 		
 		// need to check sufficient balance if increasing stake
 		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Delegated Stake to "+newStake);
@@ -2034,8 +1985,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param newStake New stake for Peer
 	 * @return Updated Context
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> setPeerStake(AccountKey peerKey, long newStake) {
+	public Context setPeerStake(AccountKey peerKey, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
@@ -2049,7 +1999,7 @@ public class Context<T extends ACell> extends AObject {
 		long currentStake=ps.getPeerStake();
 		long delta=newStake-currentStake;
 		
-		if (delta==0) return (Context<R>) this; // no change
+		if (delta==0) return this; // no change
 		
 		// need to check sufficient balance if increasing stake
 		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Peer Stake to "+newStake);
@@ -2074,7 +2024,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param initialStake Initial stake amount
 	 * @return Context with final take set
 	 */
-	public <R extends ACell> Context<R> createPeer(AccountKey accountKey, long initialStake) {
+	public Context createPeer(AccountKey accountKey, long initialStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(accountKey);
 		if (ps!=null) return withError(ErrorCodes.STATE,"Peer already exists for this account key: "+accountKey.toChecksumHex());
@@ -2106,8 +2056,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param data Map of data to set for the peer
 	 * @return Context with final peer data set
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> setPeerData(AccountKey peerKey, AHashMap<ACell, ACell> data) {
+	public Context setPeerData(AccountKey peerKey, AHashMap<ACell, ACell> data) {
 		State s=getState();
 
 		// get the callers account and account status
@@ -2129,7 +2078,7 @@ public class Context<T extends ACell> extends AObject {
 		
 		// if no change just return the current context
 		if (lastStateHash.equals(s.getHash())){
-			return (Context<R>) this;
+			return this;
 		}
 		return withState(s);
 	}
@@ -2142,7 +2091,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param value Value to set for the holding.
 	 * @return Updated context
 	 */
-	public Context<T> setHolding(Address targetAddress, ACell value) {
+	public Context setHolding(Address targetAddress, ACell value) {
 		AccountStatus as=getAccountStatus(targetAddress);
 		if (as==null) return withError(ErrorCodes.NOBODY,"Can't set set holding for non-existent account "+targetAddress);
 		as=as.withHolding(getAddress(), value);
@@ -2151,11 +2100,10 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Sets the controller for the current Account
-	 * @param <R> Result type
 	 * @param address New controller Address
 	 * @return Context with current Account controller set
 	 */
-	public <R extends ACell> Context<R> setController(Address address) {
+	public Context setController(Address address) {
 		AccountStatus as=getAccountStatus();
 		as=as.withController(address);
 		return withAccountStatus(getAddress(),as);
@@ -2164,37 +2112,34 @@ public class Context<T extends ACell> extends AObject {
 
 	/**
 	 * Sets the public key for the current account
-	 * @param <R> Result type
 	 * @param publicKey New Account Public Key
 	 * @return Context with current Account Key set
 	 */
-	public <R extends ACell> Context<R> setAccountKey(AccountKey publicKey) {
+	public Context setAccountKey(AccountKey publicKey) {
 		AccountStatus as=getAccountStatus();
 		as=as.withAccountKey(publicKey);
 		return withAccountStatus(getAddress(),as);
 	}
 
-	protected <R extends ACell> Context<R> withAccountStatus(Address target, AccountStatus accountStatus) {
+	protected Context withAccountStatus(Address target, AccountStatus accountStatus) {
 		return withState(getState().putAccount(target, accountStatus));
 	}
 
 	/**
 	 * Switches the context to a new address, creating a new execution context. Suitable for testing.
-	 * @param <R> Result type
 	 * @param newAddress New Address to use.
 	 * @return Result type of new Context
 	 */
-	public <R extends ACell> Context<R> forkWithAddress(Address newAddress) {
+	public Context forkWithAddress(Address newAddress) {
 		return createFake(getState(),newAddress);
 	}
 
 	/**
 	 * Forks this context, creating a new copy of all local state
-	 * @param <R> Result type of new Context
 	 * @return A new forked Context
 	 */
-	public <R extends ACell> Context<R> fork() {
-		return new Context<R>(chainState, juice, localBindings, null,depth, null,log,compilerState);
+	public Context fork() {
+		return new Context(chainState, juice, localBindings, null,depth, null,log,compilerState);
 	}
 
 	@Override
@@ -2207,7 +2152,7 @@ public class Context<T extends ACell> extends AObject {
 	 * @param values Values to log
 	 * @return Updated Context
 	 */
-	public Context<T> appendLog(AVector<ACell> values) {
+	public Context appendLog(AVector<ACell> values) {
 		Address addr=getAddress();
 		AVector<AVector<ACell>> log=this.log;
 		if (log==null) {
@@ -2230,8 +2175,8 @@ public class Context<T extends ACell> extends AObject {
 		return log;
 	}
 
-	public Context<?> lookupCNS(String name) {
-		Context<?> ctx=this.fork();
+	public Context lookupCNS(String name) {
+		Context ctx=this.fork();
 		ctx=this.actorCall(Init.REGISTRY_ADDRESS, 0, Symbols.CNS_RESOLVE, Symbol.create(name));
 
 		return ctx;
@@ -2242,20 +2187,19 @@ public class Context<T extends ACell> extends AObject {
 	 * @param form Form to expand
 	 * @return Syntax Object resulting from expansion.
 	 */
-	public Context<ACell> expand(ACell form) {
+	public Context expand(ACell form) {
 		return expand(Core.INITIAL_EXPANDER, form, Core.INITIAL_EXPANDER);
 	}
 
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> Context<R> expand(AFn<?> expander, ACell form, AFn<?> cont) {
+	public Context expand(AFn<?> expander, ACell form, AFn<?> cont) {
 		// execute with adjusted depth
 		int savedDepth=getDepth();
-		Context<R> ctx =(Context<R>) this.withDepth(savedDepth+1);
+		Context ctx = this.withDepth(savedDepth+1);
 		if (ctx.isExceptional()) return ctx; // depth error, won't have modified depth
 
 		//AVector<ACell> savedEnv=getLocalBindings();
 
-		Context<R> rctx= (Context<R>)invoke(expander, form, cont);
+		Context rctx= invoke(expander, form, cont);
 
 		// reset depth after execution.
 		//rctx=rctx.withLocalBindings(savedEnv);

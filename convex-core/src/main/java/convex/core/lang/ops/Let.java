@@ -78,11 +78,10 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		return new Let<T>(newSymbols, newOps.toVector(), isLoop);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(final Context<I> context) {
-		Context<?> ctx = context.consumeJuice(Juice.LET);
-		if (ctx.isExceptional()) return (Context<T>) ctx;
+	public Context execute(final Context context) {
+		Context ctx = context.consumeJuice(Juice.LET);
+		if (ctx.isExceptional()) return ctx;
 
 		AVector<ACell> savedEnv = ctx.getLocalBindings();
 		
@@ -125,7 +124,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		return ctx.withLocalBindings(savedEnv);
 	}
 
-	public Context<?> executeBody(Context<?> ctx) {
+	public Context executeBody(Context ctx) {
 		int end = ops.size();
 		if (bindingCount == end) return ctx.withResult(null);
 		for (int i = bindingCount; i < end; i++) {

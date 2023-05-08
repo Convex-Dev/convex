@@ -23,7 +23,7 @@ import convex.core.util.Utils;
 public class ParamTestEvals {
 
 	private static long INITIAL_JUICE = TestState.INITIAL_JUICE;
-	private static final Context<?> INITIAL_CONTEXT = TestState.CONTEXT.fork();
+	private static final Context INITIAL_CONTEXT = TestState.CONTEXT.fork();
 
 	private static final Address TEST_CONTRACT = TestState.CONTRACTS[0];
 
@@ -70,7 +70,7 @@ public class ParamTestEvals {
 
 	public <T extends ACell> AOp<T> compile(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT.fork();
+			Context c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
 			return op;
 		} catch (Exception e) {
@@ -78,20 +78,20 @@ public class ParamTestEvals {
 		}
 	}
 
-	public <T extends ACell> Context<T> eval(AOp<T> op) {
+	public Context eval(AOp<?> op) {
 		try {
-			Context<?> c = INITIAL_CONTEXT.fork();
-			Context<T> rc = c.execute(op);
+			Context c = INITIAL_CONTEXT.fork();
+			Context rc = c.execute(op);
 			return rc;
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
 
-	public <T extends ACell> Context<T> eval(String source) {
+	public Context eval(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT.fork();
-			AOp<T> op = TestState.compile(c, source);
+			Context c = INITIAL_CONTEXT.fork();
+			AOp<?> op = TestState.compile(c, source);
 			return eval(op);
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
@@ -114,9 +114,9 @@ public class ParamTestEvals {
 
 	@Test
 	public void testResultAndJuice() {
-		Context<?> c = eval(source);
+		Context c = eval(source);
 
-		Object result = c.getResult();
+		ACell result = c.getResult();
 		assertCVMEquals(expectedResult, result);
 	}
 }

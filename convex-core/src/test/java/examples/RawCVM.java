@@ -21,7 +21,7 @@ public class RawCVM {
 	public static void main(String[] args) {
 		ACell code = Reader.read("[(+ 2 3) *address* (def foo :bar)]");
 		
-		Context<?> c=Context.createInitial(s, Init.GENESIS_ADDRESS, 1000000000L);
+		Context c=Context.createInitial(s, Init.GENESIS_ADDRESS, 1000000000L);
 		
 		c=c.run(code);
 		System.out.println(c.getResult());

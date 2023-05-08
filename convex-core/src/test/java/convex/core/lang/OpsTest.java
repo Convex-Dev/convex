@@ -58,11 +58,11 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testConstant() {
-		Context<?> c = context();
+		Context c = context();
 
 		{// simple long constant
 			AOp<CVMLong> op = Constant.of(10L);
-			Context<CVMLong> c2 = c.fork().execute(op);
+			Context c2 = c.fork().execute(op);
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertEquals(CVMLong.create(10L), c2.getResult());
@@ -71,7 +71,7 @@ public class OpsTest extends ACVMTest {
 
 		{// null constant
 			AOp<ACell> op = Constant.nil();
-			Context<ACell> c2 = c.fork().execute(op);
+			Context c2 = c.fork().execute(op);
 
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
 			assertNull(c2.getResult());
@@ -82,7 +82,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testOutOfJuice() {
 		long JUICE = Juice.CONSTANT - 1; // insufficient juice to run operation
-		Context<?> c = Context.createInitial(INITIAL, InitTest.HERO, JUICE);
+		Context c = Context.createInitial(INITIAL, InitTest.HERO, JUICE);
 
 		AOp<CVMLong> op = Constant.of(10L);
 		assertJuiceError(c.execute(op));
@@ -92,13 +92,13 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testDef() {
-		Context<?> c1 = context();
+		Context c1 = context();
 
 		Symbol fooSym = Symbol.create("foo");
 		AOp<AString> op = Def.create(Syntax.create(fooSym), Constant.createString("bar"));
 
 		AMap<Symbol, ACell> env1 = c1.getEnvironment();
-		Context<AString> c2 = c1.execute(op);
+		Context c2 = c1.execute(op);
 		AMap<Symbol, ACell> env2 = c2.getEnvironment();
 
 		assertNotEquals(env1, env2);
@@ -111,7 +111,7 @@ public class OpsTest extends ACVMTest {
 		assertEquals("bar", c2.getResult().toString());
 
 		AOp<AString> lookupOp = Lookup.create(Symbol.create("foo"));
-		Context<AString> c3 = c2.execute(lookupOp);
+		Context c3 = c2.execute(lookupOp);
 		expectedJuice -= Juice.LOOKUP_DYNAMIC;
 		assertEquals(expectedJuice, c3.getJuice());
 		assertEquals("bar", c3.getResult().toString());
@@ -122,7 +122,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testUndeclaredLookup() {
-		Context<?> c = context();
+		Context c = context();
 		AOp<AString> op = Lookup.create("missing-symbol");
 		assertUndeclaredError(c.execute(op));
 
@@ -131,11 +131,11 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testDo() {
-		Context<?> c = context();
+		Context c = context();
 
 		AOp<AString> op = Do.create(Def.create("foo", Constant.createString("bar")), Lookup.create("foo"));
 
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuice());
 		assertEquals("bar", c2.getResult().toString());
@@ -145,12 +145,12 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testSpecial() {
-		Context<?> c = context();
+		Context c = context();
 
 		AOp<Address> op = Special.forSymbol(Symbols.STAR_ADDRESS);
 		assertEquals(op,Special.forSymbol(Symbol.create("*address*"))); // double check lookup in hash map
 
-		Context<Address> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 		assertEquals(c2.getAddress(), c2.getResult());
 
 		doOpTest(op);
@@ -167,10 +167,10 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testLet() {
-		Context<?> c = context();
+		Context c = context();
 		AOp<AString> op = Let.create(Vectors.of(Symbols.FOO),
 				Vectors.of(Constant.createString("bar"), Local.create(0)), false);
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
 
 		doOpTest(op);
@@ -178,12 +178,12 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondTrue() {
-		Context<?> c = context();
+		Context c = context();
 
 		AOp<AString> op = Cond.create(Constant.of(true), Constant.createString("trueResult"),
 				Constant.createString("falseResult"));
 
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 
 		assertEquals("trueResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
@@ -194,12 +194,12 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondFalse() {
-		Context<?> c = context();
+		Context c = context();
 
 		AOp<AString> op = Cond.create(Constant.of(false), Constant.createString("trueResult"),
 				Constant.createString("falseResult"));
 
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 
 		assertEquals("falseResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
@@ -210,11 +210,11 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondNoResult() {
-		Context<?> c = context();
+		Context c = context();
 
 		AOp<AString> op = Cond.create(Constant.of(false), Constant.createString("trueResult"));
 
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 
 		assertNull(c2.getResult());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT);
@@ -225,7 +225,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testCondEnvironmentChange() {
-		Context<?> c = context();
+		Context c = context();
 
 		Symbol sym = Symbol.create("val");
 
@@ -234,7 +234,7 @@ public class OpsTest extends ACVMTest {
 				Do.create(Def.create(sym, Constant.of(true)), Constant.of(false)), Constant.of("3"),
 				Lookup.create(sym), Constant.of("4"), Constant.of("5"));
 
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 		assertEquals("4", c2.getResult().toString());
 
 		doOpTest(op);
@@ -242,14 +242,14 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testInvoke() {
-		Context<?> c = context();
+		Context c = context();
 
 		Symbol sym = Symbol.create("arg0");
 
 		Invoke<AString> op = Invoke.create(Lambda.create(Vectors.of(sym), Local.create(0)),
 				Constant.createString("bar"));
 
-		Context<AString> c2 = c.execute(op);
+		Context c2 = c.execute(op);
 		assertEquals("bar", c2.getResult().toString());
 
 		doOpTest(op);
@@ -268,7 +268,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testLocal() throws InvalidDataException {
-		Context<?> c=Context.createFake(State.EMPTY);
+		Context c=Context.createFake(State.EMPTY);
 		c=c.withLocalBindings(Vectors.of(1337L));
 
 		Local<?> op=Local.create(0);
@@ -283,13 +283,13 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testLambda() {
-		Context<?> c = context();
+		Context c = context();
 
 		Symbol sym = Symbol.create("arg0");
 
 		Lambda<ACell> lam = Lambda.create(Vectors.of(Syntax.create(sym)), Lookup.create(sym));
 
-		Context<AClosure<ACell>> c2 = c.execute(lam);
+		Context c2 = c.execute(lam);
 		AClosure<ACell> fn = c2.getResult();
 		assertTrue(fn.hasArity(1));
 		assertFalse(fn.hasArity(2));

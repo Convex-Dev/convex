@@ -49,7 +49,7 @@ public class Benchmarks {
 				.warmupTime(TimeValue.seconds(1)).measurementTime(TimeValue.seconds(1)).forks(0).build();
 	}
 
-	public static Context<?> context() {
+	public static Context context() {
 		return Context.createFake(STATE,HERO);
 	}
 }

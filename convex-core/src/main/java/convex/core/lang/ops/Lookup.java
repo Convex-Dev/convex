@@ -58,13 +58,12 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		return create(Symbol.create(name));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
-		Context<T> rctx=(Context<T>) context;
+	public Context execute(Context context) {
+		Context rctx=context;
 		Address namespaceAddress=null;
 		if (address!=null) {
-			rctx=(Context<T>) rctx.execute(address);
+			rctx=rctx.execute(address);
 			if (rctx.isExceptional()) return rctx;
 			ACell maybeAddress=rctx.getResult();
 			namespaceAddress=RT.ensureAddress(maybeAddress);

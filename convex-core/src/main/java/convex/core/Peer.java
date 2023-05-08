@@ -254,13 +254,11 @@ public class Peer {
 	/**
 	 * Compiles and executes a query on the current consensus state of this Peer.
 	 *
-	 * @param <T> Type of result
 	 * @param form Form to compile and execute.
 	 * @param address Address to use for query execution. If null, core address will be used
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
-	@SuppressWarnings("unchecked")
-	public <T extends ACell> Context<T> executeQuery(ACell form, Address address) {
+	public Context executeQuery(ACell form, Address address) {
 		State state=getConsensusState();
 
 		if (address==null) {
@@ -268,19 +266,19 @@ public class Peer {
 			//return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
 		}
 
-		Context<?> ctx= Context.createFake(state, address);
+		Context ctx= Context.createFake(state, address);
 
 		if (state.getAccount(address)==null) {
 			return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
 		}
 
-		Context<AOp<T>> ectx = ctx.expandCompile(form);
+		Context ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {
-			return (Context<T>) ectx;
+			return (Context) ectx;
 		}
 
-		AOp<T> op = ectx.getResult();
-		Context<T> rctx = ctx.run(op);
+		AOp<?> op = ectx.getResult();
+		Context rctx = ctx.run(op);
 		return rctx;
 	}
 
@@ -295,29 +293,27 @@ public class Peer {
 	public long estimateCost(ATransaction trans) {
 		Address address=trans.getOrigin();
 		State state=getConsensusState();
-		Context<?> ctx=executeDryRun(trans);
+		Context ctx=executeDryRun(trans);
 		return state.getBalance(address)-ctx.getState().getBalance(address);
 	}
 
 	/**
 	 * Executes a "dry run" transaction on the current consensus state of this Peer.
 	 *
-	 * @param <T> Type of Result
 	 * @param transaction Transaction to execute
 	 * @return The Context containing the transaction results.
 	 */
-	public <T extends ACell> Context<T> executeDryRun(ATransaction transaction) {
-		Context<T> ctx=getConsensusState().applyTransaction(transaction);
+	public Context executeDryRun(ATransaction transaction) {
+		Context ctx=getConsensusState().applyTransaction(transaction);
 		return ctx;
 	}
 
 	/**
 	 * Executes a query in this Peer's current Consensus State, using a default address
-	 * @param <T> Type of query result
 	 * @param form Form to execute as a Query
 	 * @return Context after executing query
 	 */
-	public <T extends ACell> Context<T> executeQuery(ACell form) {
+	public Context executeQuery(ACell form) {
 		return executeQuery(form,Init.getGenesisAddress());
 	}
 

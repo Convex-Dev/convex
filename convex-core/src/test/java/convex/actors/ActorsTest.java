@@ -30,7 +30,7 @@ import convex.core.util.Utils;
 public class ActorsTest extends ACVMTest {
 
 	@Test public void testDeployAndCall() {
-		Context<?> ctx=step("(def caddr (deploy '(let [n 10] (defn getter ^{:callable? true} [] n) (defn hidden [] nil) (defn plus ^{:callable? true} [x] (+ n x)))))");
+		Context ctx=step("(def caddr (deploy '(let [n 10] (defn getter ^{:callable? true} [] n) (defn hidden [] nil) (defn plus ^{:callable? true} [x] (+ n x)))))");
 
 		assertEquals(Address.class,ctx.getResult().getClass());
 
@@ -60,7 +60,7 @@ public class ActorsTest extends ACVMTest {
 	}
 
 	@Test public void testUserAsActor() {
-		Context<?> ctx=step("(do (defn foo ^{:callable? true} [] *caller*) (defn bar [] nil) (def z 1))");
+		Context ctx=step("(do (defn foo ^{:callable? true} [] *caller*) (defn bar [] nil) (def z 1))");
 		assertEquals(InitTest.HERO,eval(ctx,"(call *address* (foo))"));
 		assertStateError(step(ctx,"(call *address* (non-existent-function))"));
 		assertStateError(step(ctx,"(call *address* (bar))"));
@@ -74,7 +74,7 @@ public class ActorsTest extends ACVMTest {
 	}
 
 	@Test public void testMinimalContract() {
-		Context<?> ctx=step("(def caddr (deploy '(do)))");
+		Context ctx=step("(def caddr (deploy '(do)))");
 		Address a=(Address) ctx.getResult();
 		assertNotNull(a);
 
@@ -89,7 +89,7 @@ public class ActorsTest extends ACVMTest {
 		String HERO=InitTest.HERO.toHexString();
 
 		// setup address for this scene
-		Context<?> ctx=step("(do (def HERO (address \""+HERO+"\")) (def VILLAIN (address \""+VILLAIN+"\")))");
+		Context ctx=step("(do (def HERO (address \""+HERO+"\")) (def VILLAIN (address \""+VILLAIN+"\")))");
 
 		// Technique of constructing a contract using a String
 		String contractString=Utils.readResourceAsString("contracts/token.con");
@@ -99,7 +99,7 @@ public class ActorsTest extends ACVMTest {
 		assertEquals(0L,evalL(ctx,"(call my-token (balance VILLAIN))"));
 		ctx=step(ctx,"(call my-token (transfer VILLAIN 10))");
 		ctx=step(ctx,"(call my-token (transfer HERO 100))"); // should have no effect
-		final Context<?> fctx=ctx; // save context for later tests
+		final Context fctx=ctx; // save context for later tests
 
 		assertEquals(990L,evalL(fctx,"(call my-token (balance *address*))"));
 		assertEquals(10L,evalL(fctx,"(call my-token (balance VILLAIN))"));
@@ -119,7 +119,7 @@ public class ActorsTest extends ACVMTest {
 
 
 	@Test public void testHelloContract() throws IOException {
-		Context<?> ctx=step("(do )");
+		Context ctx=step("(do )");
 
 		// Technique for deploying contract with a quoted form
 		String contractString=Utils.readResourceAsString("contracts/hello.con");
@@ -137,7 +137,7 @@ public class ActorsTest extends ACVMTest {
 	}
 
 	@Test public void testFundingContract() throws IOException {
-		Context<?> ctx=step("(do )");
+		Context ctx=step("(do )");
 		long TOTAL_FUNDS=Constants.MAX_SUPPLY;
 
 		Address addr=ctx.getAddress();
@@ -158,7 +158,7 @@ public class ActorsTest extends ACVMTest {
 
 		{
 			// test accepting half of funds
-			final Context<?> rctx=step(ctx,"(call funcon 1000 (accept-quarter))");
+			final Context rctx=step(ctx,"(call funcon 1000 (accept-quarter))");
 			assertCVMEquals(250,rctx.getResult());
 			assertEquals(250,rctx.getBalance(caddr));
 
@@ -168,7 +168,7 @@ public class ActorsTest extends ACVMTest {
 
 		{
 			// test accepting all funds
-			final Context<?> rctx=step(ctx,"(call funcon 1237 (accept-all))");
+			final Context rctx=step(ctx,"(call funcon 1237 (accept-all))");
 			assertCVMEquals(1237,rctx.getResult());
 			assertEquals(1237,rctx.getBalance(caddr));
 
@@ -178,7 +178,7 @@ public class ActorsTest extends ACVMTest {
 
 		{
 			// test accepting zero funds
-			final Context<?> rctx=step(ctx,"(call funcon 1237 (accept-zero))");
+			final Context rctx=step(ctx,"(call funcon 1237 (accept-zero))");
 			assertCVMEquals(0,rctx.getResult());
 			assertEquals(0,rctx.getBalance(caddr));
 
@@ -188,7 +188,7 @@ public class ActorsTest extends ACVMTest {
 
 		{
 			// test contract that accepts funds then rolls back
-			final Context<?> rctx=step(ctx,"(call funcon 1237 (accept-rollback))");
+			final Context rctx=step(ctx,"(call funcon 1237 (accept-rollback))");
 			assertEquals(Keywords.FOO,rctx.getResult());
 			assertEquals(0,rctx.getBalance(caddr));
 			assertEquals(0,rctx.getOffer());
@@ -199,7 +199,7 @@ public class ActorsTest extends ACVMTest {
 
 		{
 			// test contract that accepts funds repeatedly
-			final Context<?> rctx=step(ctx,"(call funcon 1337 (accept-repeat))");
+			final Context rctx=step(ctx,"(call funcon 1337 (accept-repeat))");
 			assertCVMEquals(0,rctx.getResult()); // final offer echoed back
 			assertEquals(1337,rctx.getBalance(caddr));
 
@@ -209,7 +209,7 @@ public class ActorsTest extends ACVMTest {
 
 		{
 			// test contract that forwards funds to self
-			final Context<?> rctx=step(ctx,"(call funcon 1337 (accept-forward))");
+			final Context rctx=step(ctx,"(call funcon 1337 (accept-forward))");
 			assertCVMEquals(1337,rctx.getResult()); // result of forward to accept-all
 			assertEquals(1337,rctx.getBalance(caddr));
 
@@ -227,7 +227,7 @@ public class ActorsTest extends ACVMTest {
 
 
 	@Test public void testExceptionContract() throws IOException {
-		Context<?> ctx=step("(do )");
+		Context ctx=step("(do )");
 
 		String contractString=Utils.readResourceAsString("contracts/exceptional.con");
 		ctx=step(ctx,"(def ex (deploy '"+contractString+"))");

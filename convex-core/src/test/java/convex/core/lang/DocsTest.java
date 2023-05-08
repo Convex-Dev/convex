@@ -1,7 +1,6 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.step;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static convex.test.Assertions.*;
 
 import java.util.Map.Entry;
 
@@ -13,7 +12,7 @@ import convex.core.data.AVector;
 import convex.core.data.Keywords;
 import convex.core.data.Symbol;
 
-public class DocsTest {
+public class DocsTest extends ACVMTest {
 	public static final boolean PRINT_MISSING=true;
 	
 	@Test public void testDocs() {
@@ -52,7 +51,12 @@ public class DocsTest {
 	private void doExampleTest(Symbol sym, AHashMap<ACell, ACell> ex) {
 		String code=RT.jvm( ex.get(Keywords.CODE));
 		
-		Context<?> ctx=step(code);
-		assertNotNull(ctx);
+		Context ctx=step(code);
+		if (ctx.isError()) {
+			// TODO: consider what errors are acceptable?
+		} else {
+			assertNotError(ctx);
+		}
+		
 	}
 }

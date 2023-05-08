@@ -58,12 +58,11 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		return create(Lookup.create(string), Vectors.create(args));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
+	public Context execute(Context context) {
 		// execute first op to obtain function value
 		AOp<?> fnOp=ops.get(0);
-		Context<T> ctx = (Context<T>) context.execute(fnOp);
+		Context ctx = context.execute(fnOp);
 		if (ctx.isExceptional()) return ctx;
 
 		ACell rf = ctx.getResult();
@@ -75,7 +74,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		for (int i = 0; i < arity; i++) {
 			// Compute the op for each argument in order
 			AOp<?> argOp=ops.get(i + 1);
-			ctx = (Context<T>) ctx.execute(argOp);
+			ctx = ctx.execute(argOp);
 			if (ctx.isExceptional()) return ctx;
 
 			args[i] = ctx.getResult();
@@ -87,7 +86,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 			ctx.getError().addTrace("In expression: "+RT.print(this));
 		}
 
-		return (Context<T>) ctx;
+		return ctx;
 	}
 
 	@Override

@@ -55,23 +55,22 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 		return new Cond<T>(ops.toVector());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
+	public Context execute(Context context) {
 		int n=ops.size();
-		Context<?> ctx=context.consumeJuice(Juice.COND_OP);
-		if (ctx.isExceptional()) return (Context<T>) ctx;
+		Context ctx=context.consumeJuice(Juice.COND_OP);
+		if (ctx.isExceptional()) return (Context) ctx;
 		
 		for (int i=0; i<(n-1); i+=2) {
 			AOp<ACell> testOp=ops.get(i);
 			ctx=ctx.execute(testOp);
 			
 			// bail out from exceptional result in test
-			if (ctx.isExceptional()) return (Context<T>) ctx;
+			if (ctx.isExceptional()) return (Context) ctx;
 			
 			ACell test=ctx.getResult();
 			if (RT.bool(test)) {
-				return (Context<T>) ctx.execute(ops.get(i+1));
+				return ctx.execute(ops.get(i+1));
 			}
 		}
 		if ((n&1)==0) {
@@ -79,7 +78,7 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 			return ctx.withResult((T)null);
 		} else {
 			// default value
-			return (Context<T>) ctx.execute(ops.get(n-1));
+			return ctx.execute(ops.get(n-1));
 		}
 	}
 	

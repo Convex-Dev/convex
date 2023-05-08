@@ -406,7 +406,7 @@ public class Juice {
 	 * @param context Context to check for Juice
 	 * @return Limit in number of bytes
 	 */
-	public static long limitString(Context<?> context) {
+	public static long limitString(Context context) {
 		long juice=context.getJuice();
 		long limit=juice/BUILD_PER_BYTE;
 		return limit;

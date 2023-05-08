@@ -175,7 +175,7 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust.cvx");
 
 		{ // Register core libraries now that registry exists
-			Context<?> ctx = Context.createFake(s, INIT_ADDRESS);
+			Context ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
 						             
 			s = ctx.getState();
@@ -249,7 +249,7 @@ public class Init {
 	// First form is the name that must be used when registering the actor.
 	//
 	private static State doActorDeploy(State s, String resource) {
-		Context<Address> ctx = Context.createFake(s, INIT_ADDRESS);
+		Context ctx = Context.createFake(s, INIT_ADDRESS);
 
 		try {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
@@ -279,7 +279,7 @@ public class Init {
 		double cvx = price * liquidity / Math.pow(10, decimals);
 
 		long supply = 1000000000000L;
-		Context<Address> ctx = Context.createFake(s, MAINBANK_ADDRESS);
+		Context ctx = Context.createFake(s, MAINBANK_ADDRESS);
 		ctx = ctx.eval(Reader
 				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + "})))"));
 		Address addr = ctx.getResult();
@@ -292,7 +292,7 @@ public class Init {
 	}
 
 	private static State register(State state, Address origin, String name, String description) {
-		Context<?> ctx = Context.createFake(state, origin);
+		Context ctx = Context.createFake(state, origin);
 		ctx = ctx.eval(Reader.read("(call *registry* (register {:description \"" + description + "\" :name \"" + name + "\"}))"));
 		return ctx.getState();
 	}

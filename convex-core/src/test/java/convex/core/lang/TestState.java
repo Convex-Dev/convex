@@ -43,7 +43,7 @@ public class TestState {
 		try {
 
 			State s = InitTest.STATE;
-			Context<?> ctx = Context.createFake(s, InitTest.HERO);
+			Context ctx = Context.createFake(s, InitTest.HERO);
 			for (int i = 0; i < NUM_CONTRACTS; i++) {
 				// Construct code for each contract
 				ACell contractCode = Reader.read(
@@ -77,7 +77,7 @@ public class TestState {
 	/**
 	 * A test context set up with a few accounts
 	 */
-	public static final Context<?> CONTEXT;
+	public static final Context CONTEXT;
 
 
 
@@ -91,7 +91,7 @@ public class TestState {
 
 
 	@SuppressWarnings("unchecked")
-	static <T extends ACell> AOp<T> compile(Context<?> c, String source) {
+	static <T extends ACell> AOp<T> compile(Context c, String source) {
 		c=c.fork();
 		try {
 			ACell form = Reader.read(source);
@@ -102,11 +102,11 @@ public class TestState {
 		}
 	}
 
-	public static <T extends ACell> T eval(Context<?> c, String source) {
+	public static <T extends ACell> T eval(Context c, String source) {
 		c=c.fork();
 		try {
 			AOp<T> op = compile(c, source);
-			Context<T> rc = c.run(op);
+			Context rc = c.run(op);
 			return rc.getResult();
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
@@ -114,7 +114,7 @@ public class TestState {
 	}
 
 	// Deploy actor code directly into a Context
-	public static Context<?> deploy(Context<?> ctx,String actorResource) {
+	public static Context deploy(Context ctx,String actorResource) {
 		String source;
 		try {
 			source = Utils.readResourceAsString(actorResource);
@@ -128,7 +128,7 @@ public class TestState {
 
 	@Test
 	public void testInitial() {
-		Context<?> ctx = Context.createFake(STATE,InitTest.HERO);
+		Context ctx = Context.createFake(STATE,InitTest.HERO);
 		State s = ctx.getState();
 		assertEquals(STATE, s);
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
@@ -140,11 +140,11 @@ public class TestState {
 
 	@Test
 	public void testContractCall() {
-		Context<?> ctx0 = Context.createFake(STATE, InitTest.HERO);
+		Context ctx0 = Context.createFake(STATE, InitTest.HERO);
 		Address TARGET = CONTRACTS[0];
 		ctx0 = ctx0.execute(compile(ctx0, "(def target (address \"" + TARGET.toHexString() + "\"))"));
 		ctx0 = ctx0.execute(compile(ctx0, "(def hero *address*)"));
-		final Context<?> ctx = ctx0;
+		final Context ctx = ctx0;
 
 		assertEquals(InitTest.HERO, ctx.lookup(Symbols.HERO).getResult());
 		assertEquals(Keyword.create("bar"), eval(ctx, "(call target (foo))"));
@@ -160,11 +160,11 @@ public class TestState {
 		return ((CVMBool)eval(source)).booleanValue();
 	}
 
-	public static boolean evalB(Context<?> ctx, String source) {
+	public static boolean evalB(Context ctx, String source) {
 		return ((CVMBool)eval(ctx, source)).booleanValue();
 	}
 
-	public static double evalD(Context<?> ctx, String source) {
+	public static double evalD(Context ctx, String source) {
 		ACell result=eval(ctx,source);
 		CVMDouble d=RT.castDouble(result);
 		if (d==null) throw new ClassCastException("Expected Double, but got: "+RT.getType(result));
@@ -175,7 +175,7 @@ public class TestState {
 		return evalD(CONTEXT,source);
 	}
 
-	public static long evalL(Context<?> ctx, String source) {
+	public static long evalL(Context ctx, String source) {
 		ACell result=eval(ctx,source);
 		CVMLong d=RT.castLong(result);
 		if (d==null) throw new ClassCastException("Expected Long, but got: "+RT.getType(result));
@@ -195,29 +195,27 @@ public class TestState {
 		return (T) step(source).getResult();
 	}
 
-	public static <T extends ACell> Context<T> step(String source) {
+	public static Context step(String source) {
 		return step(CONTEXT, source);
 	}
 
 	/**
 	 * Steps execution in a new forked Context
-	 * @param <T> Type of return value
 	 * @param ctx Initial context to fork
 	 * @param source Source to execute
 	 * @return New forked context containing step result
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Context<T> step(Context<?> ctx, String source) {
+	public static Context step(Context ctx, String source) {
 		// Compile form in forked context
-		Context<AOp<ACell>> cctx=ctx.fork();
+		Context cctx=ctx.fork();
 		ACell form = Reader.read(source);
 		cctx = cctx.expandCompile(form);
-		if (cctx.isExceptional()) return (Context<T>) cctx;
+		if (cctx.isExceptional()) return cctx;
 		AOp<ACell> op = cctx.getResult();
 
 		// Run form in separate forked context to get result context
-		Context<T> rctx = ctx.fork();
-		rctx=(Context<T>) rctx.run(op);
+		Context rctx = ctx.fork();
+		rctx= rctx.run(op);
 		assert(rctx.getDepth()==0):"Invalid depth after step: "+rctx.getDepth();
 		return rctx;
 	}
@@ -230,11 +228,10 @@ public class TestState {
 	 * @param source Source form to execute
 	 * @return Updated context
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> Context<T> stepAs(Address address, Context<?> c, String source) {
-		Context<?> rc = Context.createFake(c.getState(), address);
+	public static Context stepAs(Address address, Context c, String source) {
+		Context rc = Context.createFake(c.getState(), address);
 		rc = step(rc, source);
-		return (Context<T>) Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
+		return Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
 	}
 
 	@Test public void testStateSetup() {

@@ -26,22 +26,22 @@ public class SeqFn<T extends ACell> extends ADataFn<T> {
 		return new SeqFn<T>(m);
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@SuppressWarnings({ "unchecked"})
 	@Override
-	public Context<T> invoke(Context context, ACell[] args) {
+	public Context invoke(Context context, ACell[] args) {
 		int n = args.length;
 		if (n == 1) {
 			CVMLong key = RT.ensureLong(args[0]);
 			if (key==null) return context.withCastError(0,args, Types.LONG);
 			long ix=key.longValue();
-			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withBoundsError(ix);
+			if ((ix < 0) || (ix >= seq.count())) return context.withBoundsError(ix);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else if (n == 2) {
 			CVMLong key = RT.ensureLong(args[0]);
 			if (key==null) return context.withCastError(0,args, Types.LONG);
 			long ix=key.longValue();
-			if ((ix < 0) || (ix >= seq.count())) return (Context<T>) context.withResult((T)args[1]);
+			if ((ix < 0) || (ix >= seq.count())) return context.withResult((T)args[1]);
 			T result = (T) seq.get(key);
 			return context.withResult(result);
 		} else {

@@ -17,9 +17,9 @@ public class MapFn<K extends ACell, T  extends ACell> extends ADataFn<T> {
 		return new MapFn<K, T>(m);
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
+	@SuppressWarnings({ "unchecked"})
 	@Override
-	public Context<T> invoke(Context context, ACell[] args) {
+	public Context invoke(Context context, ACell[] args) {
 		int n = args.length;
 		T result;
 		if (n == 1) {

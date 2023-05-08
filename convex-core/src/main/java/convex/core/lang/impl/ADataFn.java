@@ -21,7 +21,7 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	}
 
 	@Override
-	public Context<T> invoke(Context<ACell> context, ACell[] args) {
+	public Context invoke(Context context, ACell[] args) {
 		throw new UnsupportedOperationException();
 	}
 

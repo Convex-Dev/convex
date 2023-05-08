@@ -93,9 +93,8 @@ public class Transfer extends ATransaction {
 		return result;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <T extends ACell> Context<T> apply(Context<?> ctx) {
+	public Context apply(Context ctx) {
 		// consume juice, ensure we have enough to make transfer!
 		ctx = ctx.consumeJuice(Juice.TRANSFER);
 		
@@ -105,7 +104,7 @@ public class Transfer extends ATransaction {
 		}
 		
 		// Return unconditionally. Might be an error.
-		return (Context<T>) ctx;
+		return ctx;
 	}
 
 	@Override

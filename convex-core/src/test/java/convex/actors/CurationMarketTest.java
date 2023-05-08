@@ -15,7 +15,7 @@ public class CurationMarketTest extends ACVMTest {
 		super(InitTest.STATE);
 
 		try {
-			Context<?> ctx=context();
+			Context ctx=context();
 			ctx=step(ctx,"(import convex.asset :as asset)");
 			ctx=step(ctx,"(import convex.trust :as trust)");
 			ctx=step(ctx,"(import asset.curation-market :as cm)");

@@ -109,7 +109,7 @@ public class Core {
 
 	public static final CoreFn<AVector<ACell>> VECTOR = reg(new CoreFn<>(Symbols.VECTOR) {
 		@Override
-		public Context<AVector<ACell>> invoke(Context<ACell> context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Need to charge juice on per-element basis
 			long juice = Juice.BUILD_DATA + args.length * Juice.BUILD_PER_ELEMENT;
 
@@ -124,9 +124,8 @@ public class Core {
 	});
 
 	public static final CoreFn<ASequence<ACell>> CONCAT = reg(new CoreFn<>(Symbols.CONCAT) {
-		@SuppressWarnings("unchecked")
 		@Override
-		public Context<ASequence<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			ASequence<?> result = null;
 			int n=args.length;
 
@@ -148,9 +147,8 @@ public class Core {
 	});
 
 	public static final CoreFn<AVector<ACell>> VEC = reg(new CoreFn<>(Symbols.VEC) {
-		@SuppressWarnings("unchecked")
 		@Override
-		public Context<AVector<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1 exactly
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell o = args[0];
@@ -168,9 +166,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AVector<ACell>> REVERSE = reg(new CoreFn<>(Symbols.REVERSE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AVector<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1 exactly
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell o = args[0];
@@ -187,9 +185,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ASet<ACell>> SET = reg(new CoreFn<>(Symbols.SET) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell o = args[0];
 
@@ -207,9 +205,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ASet<ACell>> UNION = reg(new CoreFn<>(Symbols.UNION) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n=args.length;
 			ASet<ACell> result=Sets.empty();
 
@@ -233,9 +231,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ASet<ACell>> INTERSECTION = reg(new CoreFn<>(Symbols.INTERSECTION) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length <1) return context.withArityError(minArityMessage(1, args.length));
 
 			int n=args.length;
@@ -262,9 +260,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ASet<ACell>> DIFFERENCE = reg(new CoreFn<>(Symbols.DIFFERENCE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<ASet<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length <1) return context.withArityError(minArityMessage(1, args.length));
 
 			int n=args.length;
@@ -293,9 +291,9 @@ public class Core {
 
 
 	public static final CoreFn<AList<ACell>> LIST = reg(new CoreFn<>(Symbols.LIST) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AList<ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// Any arity is OK
 
 			// Need to compute juice before building a potentially big list
@@ -308,9 +306,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AString> STR = reg(new CoreFn<>(Symbols.STR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AString> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// TODO: pre-check juice? String rendering definitions?
 			AString result = RT.str(args);
 			if (result==null) return context.withCastError(Types.STRING);
@@ -321,9 +319,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<AString> PRINT = reg(new CoreFn<>(Symbols.PRINT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AString> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
@@ -339,9 +337,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<AString> SPLIT = reg(new CoreFn<>(Symbols.SPLIT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AString> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
@@ -364,9 +362,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<AString> JOIN = reg(new CoreFn<>(Symbols.JOIN) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AString> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
@@ -386,9 +384,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AString> NAME = reg(new CoreFn<>(Symbols.NAME) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AString> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
@@ -403,9 +401,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Keyword> KEYWORD = reg(new CoreFn<>(Symbols.KEYWORD) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<Keyword> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
@@ -425,9 +423,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Symbol> SYMBOL = reg(new CoreFn<Symbol>(Symbols.SYMBOL) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<Symbol> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n!=1) return context.withArityError(exactArityMessage(1,args.length));
 
@@ -453,9 +451,9 @@ public class Core {
 
 	public static final CoreFn<AOp<ACell>> COMPILE = reg(new CoreFn<>(Symbols.COMPILE) {
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<AOp<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell form = (ACell) args[0];
 			// note: compiler takes care of Juice for us
@@ -466,13 +464,13 @@ public class Core {
 
 	public static final CoreFn<ACell> EVAL = reg(new CoreFn<>(Symbols.EVAL) {
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<ACell> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell form = (ACell) args[0];
-			Context<ACell> rctx = context.eval(form);
+			Context rctx = context.eval(form);
 			return rctx.consumeJuice(Juice.EVAL);
 		}
 
@@ -480,24 +478,24 @@ public class Core {
 
 	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS) {
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
 			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
 
 			ACell form = (ACell) args[1];
-			Context<ACell> rctx = context.evalAs(address,form);
+			Context rctx = context.evalAs(address,form);
 			return rctx.consumeJuice(Juice.EVAL);
 		}
 	});
 
 	public static final CoreFn<CVMLong> SCHEDULE_STAR = reg(new CoreFn<>(Symbols.SCHEDULE_STAR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n != 2) return context.withArityError(this.exactArityMessage(3, n));
 
@@ -516,9 +514,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Syntax> SYNTAX = reg(new CoreFn<>(Symbols.SYNTAX) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<Syntax> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n=args.length;
 			if (n < 1) return context.withArityError(minArityMessage(1, args.length));
 			if (n > 2) return context.withArityError(maxArityMessage(2, args.length));
@@ -539,9 +537,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> UNSYNTAX = reg(new CoreFn<>(Symbols.UNSYNTAX) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
@@ -555,9 +553,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AHashMap<ACell,ACell>> META = reg(new CoreFn<>(Symbols.META) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AHashMap<ACell,ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a=args[0];
@@ -582,9 +580,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> EXPAND = reg(new CoreFn<>(Symbols.EXPAND) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if ((n<1)||(n>3)) {
 				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 2)");
@@ -614,7 +612,7 @@ public class Core {
 			}
 
 			ACell form = args[0];
-			Context<ACell> rctx = context.expand(expander,form, cont);
+			Context rctx = context.expand(expander,form, cont);
 			return rctx;
 		}
 	});
@@ -626,9 +624,9 @@ public class Core {
 	public static final AFn<ACell> QUASIQUOTE_EXPANDER = reg(Compiler.QUASIQUOTE_EXPANDER);
 
 	public static final CoreFn<CVMBool> CALLABLE_Q = reg(new CoreFn<>(Symbols.CALLABLE_Q) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public Context<CVMBool> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length==1) {
 				Address addr = RT.callableAddress(args[0]);
 				return context.withResult(Juice.LOOKUP,CVMBool.create(addr!=null));
@@ -665,9 +663,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Address> DEPLOY = reg(new CoreFn<>(Symbols.DEPLOY) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<Address> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
 
 			return context.deployActor(args[0]);
@@ -676,9 +674,9 @@ public class Core {
 
 
 	public static final CoreFn<CVMLong> ACCEPT = reg(new CoreFn<>(Symbols.ACCEPT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// Arity 1
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
@@ -691,13 +689,13 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> CALL_STAR = reg(new CoreFn<>(Symbols.CALL_STAR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length < 3) return context.withArityError(minArityMessage(1, args.length));
 
 			// consume juice first?
-			Context<ACell> ctx = context.consumeJuice(Juice.CALL_OP);
+			Context ctx = context.consumeJuice(Juice.CALL_OP);
 			if (ctx.isExceptional()) return ctx;
 
 			ACell target = args[0];
@@ -717,9 +715,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Hash> LOG = reg(new CoreFn<>(Symbols.LOG) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<Hash> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// any arity fine
 			int n=args.length;
 			long juice = Juice.LOG+Juice.BUILD_DATA+n*Juice.BUILD_PER_ELEMENT;
@@ -735,14 +733,14 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> UNDEF_STAR = reg(new CoreFn<>(Symbols.UNDEF_STAR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			Symbol sym=RT.ensureSymbol(args[0]);
 			if (sym == null) return context.withArgumentError("Invalid Symbol name for undef: " + Utils.toString(args[0]));
 
-			Context<ACell> ctx=(Context<ACell>) context.undefine(sym);
+			Context ctx=(Context) context.undefine(sym);
 
 			// return nil
 			return ctx.withResult(Juice.DEF, null);
@@ -752,9 +750,9 @@ public class Core {
 
 
 	public static final CoreFn<ACell> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n=args.length;
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
@@ -776,9 +774,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Syntax> LOOKUP_META = reg(new CoreFn<>(Symbols.LOOKUP_META) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<Syntax> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n=args.length;
 			if ((n<1)||(n>2)) return context.withArityError(rangeArityMessage(1,2, args.length));
 
@@ -802,9 +800,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Address> ADDRESS = reg(new CoreFn<>(Symbols.ADDRESS) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<Address> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell o = args[0];
@@ -821,9 +819,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ABlob> BLOB = reg(new CoreFn<>(Symbols.BLOB) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ABlob> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// TODO: probably need to pre-cost this?
@@ -837,9 +835,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AccountStatus> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a0 = args[0];
@@ -854,9 +852,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> BALANCE = reg(new CoreFn<>(Symbols.BALANCE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
@@ -870,9 +868,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> TRANSFER = reg(new CoreFn<>(Symbols.TRANSFER) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
@@ -887,9 +885,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> SET_MEMORY = reg(new CoreFn<>(Symbols.SET_MEMORY) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			CVMLong amount = RT.ensureLong(args[0]);
@@ -900,9 +898,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> TRANSFER_MEMORY = reg(new CoreFn<>(Symbols.TRANSFER_MEMORY) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			Address address = RT.ensureAddress(args[0]);
@@ -916,9 +914,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> STAKE = reg(new CoreFn<>(Symbols.STAKE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			ABlob b=RT.ensureBlob(args[0]);
@@ -935,9 +933,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AccountKey accountKey = RT.ensureAccountKey(args[0]);
@@ -952,9 +950,9 @@ public class Core {
 
 
 	public static final CoreFn<CVMLong> SET_PEER_DATA = reg(new CoreFn<>(Symbols.SET_PEER_DATA) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(1, args.length));
 
 			AccountKey peerKey=RT.ensureAccountKey(args[0]);
@@ -972,9 +970,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMLong> SET_PEER_STAKE = reg(new CoreFn<>(Symbols.SET_PEER_STAKE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 			
 			AccountKey peerKey=RT.ensureAccountKey(args[0]);
@@ -993,9 +991,9 @@ public class Core {
 
 
 	public static final CoreFn<AMap<?, ?>> HASHMAP = reg(new CoreFn<>(Symbols.HASH_MAP) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AMap<?, ?>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int len = args.length;
 			// specialised arity check since we need even length
 			if (Utils.isOdd(len)) return context.withArityError(name() + " requires an even number of arguments");
@@ -1007,9 +1005,9 @@ public class Core {
 
 
 	public static final CoreFn<ABlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ABlobMap> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int len = args.length;
 			// specialised arity check since we need even length
 			if (Utils.isOdd(len)) return context.withArityError(name() + " requires an even number of arguments");
@@ -1032,9 +1030,8 @@ public class Core {
 	});
 
 	public static final CoreFn<ASet<?>> HASHSET = reg(new CoreFn<>(Symbols.HASH_SET) {
-		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<ASet<?>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// any arity is OK
 
 			long juice = Juice.BUILD_DATA + (args.length * Juice.BUILD_PER_ELEMENT);
@@ -1047,7 +1044,7 @@ public class Core {
 	public static final CoreFn<AVector<ACell>> KEYS = reg(new CoreFn<>(Symbols.KEYS) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<AVector<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1066,7 +1063,7 @@ public class Core {
 	public static final CoreFn<AVector<ACell>> VALUES = reg(new CoreFn<>(Symbols.VALUES) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public  Context<AVector<ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1083,9 +1080,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ADataStructure<ACell>> ASSOC = reg(new CoreFn<>(Symbols.ASSOC) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ADataStructure<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n < 1) return context.withArityError(minArityMessage(1, n));
 
@@ -1097,7 +1094,7 @@ public class Core {
 			ACell o = args[0];
 
 			// convert to associative data structure. nil-> empty map
-			ADataStructure result = RT.ensureAssociative(o);
+			ADataStructure<?> result = RT.ensureAssociative(o);
 
 			// values that are non-null but not a data structure are a cast error
 			if ((o != null) && (result == null)) return context.withCastError(0,args, Types.DATA_STRUCTURE);
@@ -1117,9 +1114,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> ASSOC_IN = reg(new CoreFn<>(Symbols.ASSOC_IN) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 3) return context.withArityError(exactArityMessage(3, args.length));
 
 			ASequence<ACell> ixs = RT.ensureSequence(args[1]);
@@ -1144,7 +1141,7 @@ public class Core {
 			}
 
 			for (int i = n-1; i >=0; i--) {
-				ADataStructure struct=ass[i];
+				ADataStructure<?> struct=ass[i];
 				ACell k=ks[i];
 				value=RT.assoc(struct, k, value);
 				if (value==null) {
@@ -1157,9 +1154,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> GET_HOLDING = reg(new CoreFn<>(Symbols.GET_HOLDING) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 
@@ -1178,9 +1175,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> SET_HOLDING = reg(new CoreFn<>(Symbols.SET_HOLDING) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=2) return context.withArityError(exactArityMessage(2, n));
 
@@ -1193,16 +1190,16 @@ public class Core {
 			// we set the target account holdings for the currently executing account
 			// might return NOBODY if account does not exist
 			context=(Context) context.setHolding(address,result);
-			if (context.isExceptional()) return (Context<ACell>) context;
+			if (context.isExceptional()) return (Context) context;
 
 			return context.withResult(Juice.ASSOC, result);
 		}
 	});
 
 	public static final CoreFn<ACell> SET_CONTROLLER = reg(new CoreFn<>(Symbols.SET_CONTROLLER) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 
@@ -1218,16 +1215,16 @@ public class Core {
 			}
 
 			context=(Context) context.setController(controller);
-			if (context.isExceptional()) return (Context<ACell>) context;
+			if (context.isExceptional()) return (Context) context;
 
 			return context.withResult(Juice.ASSOC, controller);
 		}
 	});
 
 	public static final CoreFn<AccountKey> SET_KEY = reg(new CoreFn<>(Symbols.SET_KEY) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AccountKey> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n !=1) return context.withArityError(exactArityMessage(1, n));
 
@@ -1246,7 +1243,7 @@ public class Core {
 			}
 			
 			context=(Context) context.setAccountKey(publicKey);
-			if (context.isExceptional()) return (Context<AccountKey>) context;
+			if (context.isExceptional()) return context;
 
 			return context.withResult(Juice.ASSOC, publicKey);
 		}
@@ -1254,9 +1251,9 @@ public class Core {
 
 
 	public static final CoreFn<ACell> GET = reg(new CoreFn<>(Symbols.GET) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if ((n < 2) || (n > 3)) {
 				return context.withArityError(name() + " requires exactly 2 or 3 arguments");
@@ -1282,9 +1279,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> GET_IN = reg(new CoreFn<>(Symbols.GET_IN) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if ((n < 2) || (n > 3)) {
 				return context.withArityError(name() + " requires exactly 2 or 3 arguments");
@@ -1319,9 +1316,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> CONTAINS_KEY_Q = reg(new CoreFn<>(Symbols.CONTAINS_KEY_Q) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n != 2) return context.withArityError(exactArityMessage(2, n));
 
@@ -1341,9 +1338,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n != 2) return context.withArityError(exactArityMessage(2, n));
 
@@ -1362,9 +1359,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AMap<?, ?>> DISSOC = reg(new CoreFn<>(Symbols.DISSOC) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AMap<?, ?>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
@@ -1380,9 +1377,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ADataStructure<ACell>> CONJ = reg(new CoreFn<>(Symbols.CONJ) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ADataStructure<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int numAdditions = args.length - 1;
 			if (args.length <= 0) return context.withArityError(name() + " requires a data structure as first argument");
 
@@ -1404,9 +1401,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ASet<ACell>> DISJ = reg(new CoreFn<>(Symbols.DISJ) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ASet<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
 			// compute juice up front
@@ -1429,9 +1426,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AList<ACell>> CONS = reg(new CoreFn<>(Symbols.CONS) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AList<ACell>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (args.length < 2) return context.withArityError(minArityMessage(2, args.length));
 
@@ -1455,9 +1452,9 @@ public class Core {
 	public static final CoreFn<ACell> FIRST = reg(new CoreFn<>(Symbols.FIRST) {
 		// note we could define this as (nth coll 0) but this is more efficient
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell maybeColl = args[0];
@@ -1474,9 +1471,9 @@ public class Core {
 	public static final CoreFn<ACell> SECOND = reg(new CoreFn<>(Symbols.SECOND) {
 		// note we could define this as (nth coll 1) but this is more efficient
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell maybeColl = (ACell) args[0];
@@ -1491,9 +1488,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> LAST = reg(new CoreFn<>(Symbols.LAST) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1510,9 +1507,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> EQUALS = reg(new CoreFn<>(Symbols.EQUALS) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 
 			// all arities OK, all args OK
 			CVMBool result = CVMBool.of(RT.allEqual(args));
@@ -1521,9 +1518,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> EQ = reg(new CoreFn<>(Symbols.EQ) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// all arities OK, but need to watch for non-numeric arguments
 			CVMBool result = RT.eq(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
@@ -1533,9 +1530,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> GE = reg(new CoreFn<>(Symbols.GE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// all arities OK
 			CVMBool result = RT.ge(args);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
@@ -1545,9 +1542,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> GT = reg(new CoreFn<>(Symbols.GT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// all arities OK
 
 			CVMBool result = RT.gt(args);
@@ -1558,9 +1555,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> LE = reg(new CoreFn<>(Symbols.LE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// all arities OK
 
 			CVMBool result = RT.le(args);
@@ -1571,9 +1568,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> LT = reg(new CoreFn<>(Symbols.LT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// all arities OK
 
 			CVMBool result = RT.lt(args);
@@ -1584,9 +1581,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMBool> MIN = reg(new CoreFn<>(Symbols.MIN) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
 			ACell result = RT.min(args);
@@ -1597,9 +1594,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMBool> MAX = reg(new CoreFn<>(Symbols.MAX) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
 			ACell result = RT.max(args);
@@ -1610,9 +1607,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> INC = reg(new CoreFn<>(Symbols.INC) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1625,9 +1622,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> DEC = reg(new CoreFn<>(Symbols.DEC) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1640,9 +1637,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> BOOLEAN = reg(new CoreFn<>(Symbols.BOOLEAN) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			// Boolean cast always works for any value
@@ -1660,9 +1657,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ABlob> ENCODING = reg(new CoreFn<>(Symbols.ENCODING) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ABlob> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1674,9 +1671,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> LONG = reg(new CoreFn<>(Symbols.LONG) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1688,9 +1685,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<AInteger> INT = reg(new CoreFn<>(Symbols.INT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AInteger> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1702,9 +1699,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMDouble> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1716,9 +1713,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMChar> CHAR = reg(new CoreFn<>(Symbols.CHAR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMChar> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1739,9 +1736,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> BYTE = reg(new CoreFn<>(Symbols.BYTE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
@@ -1752,9 +1749,9 @@ public class Core {
 	});
 
 	public static final CoreFn<APrimitive> PLUS = reg(new CoreFn<>(Symbols.PLUS) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<APrimitive> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// All arities OK
 			long cost=Juice.precostNumericLinear(args);
 			if (cost<0) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
@@ -1769,9 +1766,9 @@ public class Core {
 	});
 
 	public static final CoreFn<APrimitive> MINUS = reg(new CoreFn<>(Symbols.MINUS) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<APrimitive> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 			
 			long cost=Juice.precostNumericLinear(args);
@@ -1786,9 +1783,9 @@ public class Core {
 	});
 
 	public static final CoreFn<APrimitive> TIMES = reg(new CoreFn<>(Symbols.TIMES) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<APrimitive> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			// All arities OK
 			long cost=Juice.precostNumericLinear(args);
 			if (cost<0) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
@@ -1804,9 +1801,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMDouble> DIVIDE = reg(new CoreFn<>(Symbols.DIVIDE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length < 1) return context.withArityError(minArityMessage(1, args.length));
 
 			CVMDouble result = RT.divide(args);
@@ -1816,9 +1813,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMDouble> FLOOR = reg(new CoreFn<>(Symbols.FLOOR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.floor(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.NUMBER);
@@ -1828,9 +1825,9 @@ public class Core {
 
 
 	public static final CoreFn<CVMDouble> CEIL = reg(new CoreFn<>(Symbols.CEIL) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.ceil(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.NUMBER);
@@ -1840,9 +1837,9 @@ public class Core {
 
 
 	public static final CoreFn<CVMDouble> SQRT = reg(new CoreFn<>(Symbols.SQRT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			CVMDouble result = RT.sqrt(args[0]);
 			if (result == null) return context.withCastError(0,args, Types.NUMBER);
@@ -1851,9 +1848,9 @@ public class Core {
 	});
 
 	public static final CoreFn<APrimitive> ABS = reg(new CoreFn<>(Symbols.ABS) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<APrimitive> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			APrimitive result = RT.abs(args[0]);
 			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
@@ -1862,9 +1859,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			ACell result = RT.signum(args[0]);
 			if (result == null) return context.withCastError(args[0], Types.NUMBER);
@@ -1873,9 +1870,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AInteger> MOD = reg(new CoreFn<>(Symbols.MOD) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AInteger> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AInteger la=RT.ensureInteger(args[0]);
@@ -1890,9 +1887,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<AInteger> DIV = reg(new CoreFn<>(Symbols.DIV) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AInteger> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AInteger la=RT.ensureInteger(args[0]);
@@ -1907,9 +1904,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AInteger> REM = reg(new CoreFn<>(Symbols.REM) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AInteger> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AInteger la=RT.ensureInteger(args[0]);
@@ -1924,9 +1921,9 @@ public class Core {
 	});
 
 	public static final CoreFn<AInteger> QUOT = reg(new CoreFn<>(Symbols.QUOT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AInteger> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			AInteger la=RT.ensureInteger(args[0]);
@@ -1942,9 +1939,9 @@ public class Core {
 
 
 	public static final CoreFn<CVMDouble> POW = reg(new CoreFn<>(Symbols.POW) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			CVMDouble result = RT.pow(args);
@@ -1955,9 +1952,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMDouble> EXP = reg(new CoreFn<>(Symbols.EXP) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMDouble> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			CVMDouble result = RT.exp(args[0]);
@@ -1968,9 +1965,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> NOT = reg(new CoreFn<>(Symbols.NOT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			CVMBool result = CVMBool.of(!RT.bool(args[0]));
@@ -1979,9 +1976,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMLong> BIT_AND = reg(new CoreFn<>(Symbols.BIT_AND) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			CVMLong a = RT.ensureLong(args[0]);
@@ -1997,9 +1994,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMLong> BIT_XOR = reg(new CoreFn<>(Symbols.BIT_XOR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			CVMLong a = RT.ensureLong(args[0]);
@@ -2015,9 +2012,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMLong> BIT_OR = reg(new CoreFn<>(Symbols.BIT_OR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			CVMLong a = RT.ensureLong(args[0]);
@@ -2033,9 +2030,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<CVMLong> BIT_NOT = reg(new CoreFn<>(Symbols.BIT_NOT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			CVMLong a = RT.ensureLong(args[0]);
@@ -2048,9 +2045,9 @@ public class Core {
 	});
 
 	public static final CoreFn<Hash> HASH = reg(new CoreFn<>(Symbols.HASH) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<Hash> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ABlob blob=RT.ensureBlob(args[0]);
@@ -2062,9 +2059,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMLong> COUNT = reg(new CoreFn<>(Symbols.COUNT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMLong> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			Long result = RT.count(args[0]);
@@ -2075,9 +2072,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> EMPTY = reg(new CoreFn<>(Symbols.EMPTY) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell o = args[0];
@@ -2094,9 +2091,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> NTH = reg(new CoreFn<>(Symbols.NTH) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// Arity 2
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
@@ -2124,9 +2121,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ASequence<ACell>> NEXT = reg(new CoreFn<>(Symbols.NEXT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ASequence<ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ASequence<ACell> seq = RT.sequence(args[0]);
@@ -2139,9 +2136,9 @@ public class Core {
 	});
 	
 	public static final CoreFn<ASequence<ACell>> SLICE= reg(new CoreFn<>(Symbols.SLICE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ASequence<ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int alen=args.length;
 			if (alen < 2) return context.withArityError(minArityMessage(2, args.length));
 			if (alen > 3) return context.withArityError(maxArityMessage(3, args.length));
@@ -2178,9 +2175,9 @@ public class Core {
 	});
 
 	public static final CoreFn<?> RECUR = reg(new CoreFn<>(Symbols.RECUR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			// any arity OK?
 
 			AExceptional result = RecurValue.wrap(args);
@@ -2190,9 +2187,9 @@ public class Core {
 	});
 
 	public static final CoreFn<?> TAILCALL_STAR = reg(new CoreFn<>(Symbols.TAILCALL_STAR) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n=args.length;
 			if (n < 1) return context.withArityError(this.minArityMessage(1, n));
 
@@ -2207,9 +2204,9 @@ public class Core {
 	});
 
 	public static final CoreFn<?> ROLLBACK = reg(new CoreFn<>(Symbols.ROLLBACK) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			AExceptional result = RollbackValue.wrap((ACell)args[0]);
@@ -2219,9 +2216,9 @@ public class Core {
 	});
 
 	public static final CoreFn<?> HALT = reg(new CoreFn<>(Symbols.HALT) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n = args.length;
 			if (n > 1) return context.withArityError(this.maxArityMessage(1, n));
 
@@ -2232,9 +2229,9 @@ public class Core {
 	});
 
 	public static final CoreFn<?> RETURN = reg(new CoreFn<>(Symbols.RETURN) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			AExceptional result = ReturnValue.wrap((ACell)args[0]);
@@ -2243,9 +2240,9 @@ public class Core {
 	});
 
 	public static final CoreFn<CVMBool> FAIL = reg(new CoreFn<>(Symbols.FAIL) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<CVMBool> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int alen = args.length;
 			if (alen > 2) return context.withArityError(maxArityMessage(2, alen));
 
@@ -2262,9 +2259,9 @@ public class Core {
 	});
 
 	public static final CoreFn<?> APPLY = reg(new CoreFn<>(Symbols.APPLY) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int alen = args.length;
 			if (alen < 2) return context.withArityError(minArityMessage(2, alen));
 
@@ -2295,16 +2292,16 @@ public class Core {
 				applyArgs = coll.toCellArray();
 			}
 
-			Context<ACell> rctx = context.invoke(fn, applyArgs);
+			Context rctx = context.invoke(fn, applyArgs);
 			return rctx.consumeJuice(Juice.APPLY);
 		}
 	});
 
 	public static final CoreFn<ADataStructure<ACell>> INTO = reg(new CoreFn<>(Symbols.INTO) {
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ADataStructure<ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
 
 			ACell a0 = args[0];
@@ -2338,9 +2335,9 @@ public class Core {
 
 	public static final CoreFn<AHashMap<ACell,ACell>> MERGE = reg(new CoreFn<>(Symbols.MERGE) {
 
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<AHashMap<ACell, ACell>> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			int n=args.length;
 			if (n==0) return context.withResult(Juice.BUILD_DATA,Maps.empty());
 
@@ -2371,9 +2368,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ADataStructure<?>> MAP = reg(new CoreFn<>(Symbols.MAP) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ADataStructure<?>> invoke(Context context, ACell[] args) {
+		public Context invoke(Context context, ACell[] args) {
 			if (args.length < 2) return context.withArityError(minArityMessage(2, args.length));
 
 			// check and cast first argument to a function
@@ -2412,7 +2409,7 @@ public class Core {
 					xs[j] = seqs[j].get(srcIndex);
 				}
 				context = (Context) context.invoke(f, xs);
-				if (context.isExceptional()) return (Context<ADataStructure<?>>) context;
+				if (context.isExceptional()) return context;
 				ACell r = context.getResult();
 				result=result.conj(r);
 				if (result==null) return context.withError(ErrorCodes.ARGUMENT,"Invalid element type for "+seqs[0].getType());
@@ -2423,9 +2420,9 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> REDUCE = reg(new CoreFn<>(Symbols.REDUCE) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context ctx, ACell[] args) {
+		public  Context invoke(Context ctx, ACell[] args) {
 			int ac=args.length;
 			if ((ac<2)||(ac > 3)) return ctx.withArityError(exactArityMessage(3, ac));
 
@@ -2475,7 +2472,7 @@ public class Core {
 	});
 
 	// Helper function for reduce
-	private static final Context<ACell> reduceResult(Context<?> ctx) {
+	private static final Context reduceResult(Context ctx) {
 		Object ex=ctx.getValue(); // might be an ACell or Exception. We need to check for a Reduced result only
 	 	if (ex instanceof Reduced) {
 	 		ctx=ctx.withResult(((Reduced)ex).getValue());
@@ -2484,9 +2481,9 @@ public class Core {
 	}
 
 	public static final CoreFn<ACell> REDUCED = reg(new CoreFn<>(Symbols.REDUCED) {
-		@SuppressWarnings("unchecked")
+		
 		@Override
-		public  Context<ACell> invoke(Context context, ACell[] args) {
+		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			AExceptional result = Reduced.wrap((ACell) args[0]);
@@ -2667,12 +2664,12 @@ public class Core {
 	 * @return Loaded environment map
 	 * @throws IOException
 	 */
-	private static Context<?> registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
+	private static Context registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
 
 		// We use a fake state to build the initial environment with core address.
 		Address ADDR = Address.ZERO;
 		State state = State.EMPTY.putAccount(ADDR, AccountStatus.createActor());
-		Context<?> ctx = Context.createFake(state, ADDR);
+		Context ctx = Context.createFake(state, ADDR);
 
 		// Map in forms from env.
 		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {
@@ -2699,7 +2696,7 @@ public class Core {
 	}
 
  	@SuppressWarnings("unchecked")
- 	private static Context<?> applyDocumentation(Context<?> ctx) throws IOException {
+	private static Context applyDocumentation(Context ctx) throws IOException {
 
  		AMap<Symbol, AHashMap<ACell, ACell>> metas = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
 
@@ -2758,7 +2755,7 @@ public class Core {
 				coreEnv = register(coreEnv, o);
 			}
 
-			Context<?> ctx = registerCoreCode(coreEnv);
+			Context ctx = registerCoreCode(coreEnv);
 			ctx=applyDocumentation(ctx);
 
 			coreEnv = ctx.getEnvironment();

@@ -13,7 +13,7 @@ public class ExpanderTest extends ACVMTest {
 
 	@Test 
 	public void testExpanderInActor() {
-		Context<?> ctx=context();
+		Context ctx=context();
 		
 		ctx=step("(deploy `(let [[a c] [*address* *caller*]] (defmacro foo [] [*address* *caller* a c])))");
 		Address aa=(Address) ctx.getResult();

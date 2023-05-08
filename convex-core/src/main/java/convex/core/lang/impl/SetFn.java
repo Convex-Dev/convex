@@ -18,9 +18,8 @@ public class SetFn<T extends ACell> extends ADataFn<CVMBool> {
 		return new SetFn<T>(m);
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
-	public Context<CVMBool> invoke(Context context, ACell[] args) {
+	public Context invoke(Context context, ACell[] args) {
 		int n = args.length;
 		if (n == 1) {
 			ACell key = args[0];

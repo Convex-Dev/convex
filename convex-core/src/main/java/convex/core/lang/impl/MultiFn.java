@@ -66,11 +66,11 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	}
 
 	@Override
-	public Context<T> invoke(Context<ACell> context, ACell[] args) {
+	public Context invoke(Context context, ACell[] args) {
 		for (int i=0; i<num; i++) {
 			AClosure<T> fn=fns.get(i);
 			if (fn.supportsArgs(args)) {
-				return fn.invoke((Context<ACell>) context, args);
+				return fn.invoke( context, args);
 			}
 		}
 		// TODO: type specific message?

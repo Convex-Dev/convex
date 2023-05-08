@@ -46,7 +46,7 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	}
 
 	@Override
-	public <I extends ACell> Context<AClosure<T>> execute(Context<I> context) {
+	public Context execute(Context context) {
 		AClosure<T> fn= function.getValue().withEnvironment(context.getLocalBindings());
 		return context.withResult(Juice.LAMBDA,fn);
 	}

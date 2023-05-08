@@ -70,7 +70,7 @@ public class Constant<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
+	public Context execute(Context context) {
 		return context.withResult(Juice.CONSTANT, valueRef.getValue());
 	}
 	

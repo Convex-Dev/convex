@@ -66,7 +66,7 @@ public class ParamTestJuice {
 
 	private static final State INITIAL = TestState.STATE;
 	private static final long INITIAL_JUICE = 10000;
-	private static final Context<?> INITIAL_CONTEXT;
+	private static final Context INITIAL_CONTEXT;
 
 	static {
 		try {
@@ -78,7 +78,7 @@ public class ParamTestJuice {
 
 	public static <T extends ACell> AOp<T> compile(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT.fork();
+			Context c = INITIAL_CONTEXT.fork();
 			AOp<T> op = TestState.compile(c, source);
 			return op;
 		} catch (Exception e) {
@@ -86,11 +86,11 @@ public class ParamTestJuice {
 		}
 	}
 
-	public static <T extends ACell> Context<T> eval(String source) {
+	public static Context eval(String source) {
 		try {
-			Context<?> c = INITIAL_CONTEXT.fork();
-			AOp<T> op = TestState.compile(c, source);
-			Context<T> rc = c.fork().execute(op);
+			Context c = INITIAL_CONTEXT.fork();
+			AOp<?> op = TestState.compile(c, source);
+			Context rc = c.fork().execute(op);
 			return rc;
 		} catch (Exception e) {
 			throw Utils.sneakyThrow(e);
@@ -108,7 +108,7 @@ public class ParamTestJuice {
 
 	@Test
 	public void testResultAndJuice() {
-		Context<?> c = eval(source);
+		Context c = eval(source);
 
 		Object result = c.getResult();
 		assertCVMEquals(expectedResult, result);

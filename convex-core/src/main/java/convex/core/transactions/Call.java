@@ -114,7 +114,7 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public <T extends ACell> Context<T> apply(Context<?> ctx) {
+	public Context apply(Context ctx) {
 		return ctx.actorCall(target, offer, functionName, args.toCellArray());
 	}
 

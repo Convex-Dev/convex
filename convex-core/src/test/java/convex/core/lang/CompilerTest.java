@@ -104,12 +104,12 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test public void testMinCompileRegression() throws IOException {
-		Context<?> c=context();
+		Context c=context();
 		String src=Utils.readResourceAsString("testsource/min.con");
 		ACell form=Reader.read(src);
-		Context<ACell> exp=c.expand(form);
+		Context exp=c.expand(form);
 		assertNotError(exp);
-		Context<AOp<ACell>> com=c.compile(exp.getResult());
+		Context com=c.compile(exp.getResult());
 
 		assertNotError(com);
 	}
@@ -182,7 +182,7 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test public void testDefMetadataOnLiteral() {
-		Context<?> ctx=step("(def a ^:foo 2)");
+		Context ctx=step("(def a ^:foo 2)");
 		assertNotError(ctx);
 		AHashMap<ACell,ACell> m=ctx.getMetadata().get(Symbol.create("a"));
 		assertSame(CVMBool.TRUE,m.get(Keywords.FOO));
@@ -192,7 +192,7 @@ public class CompilerTest extends ACVMTest {
 		String code="(def a ^:foo (+ 1 2))";
 		Symbol sym=Symbol.create("a");
 
-		Context<?> ctx=step(code);
+		Context ctx=step(code);
 		assertNotError(ctx);
 		ACell v=ctx.getEnvironment().get(sym);
 		assertCVMEquals(3L,v);
@@ -200,7 +200,7 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test public void testDefMetadataOnSymbol() {
-		Context<?> ctx=step("(def ^{:foo true} a (+ 1 2))");
+		Context ctx=step("(def ^{:foo true} a (+ 1 2))");
 		assertNotError(ctx);
 
 		Symbol sym=Symbol.create("a");
@@ -240,7 +240,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testStackOverflow()  {
 		// fake state with default juice
-		Context<?> c=context();
+		Context c=context();
 
 		AOp<CVMLong> op=Do.create(
 				    // define a nasty function that calls its argument recursively on itself
@@ -345,7 +345,7 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testQuoteCases() {
 		// Tests from Racket / Scheme
-		Context<?> ctx=step("(def x 1)");
+		Context ctx=step("(def x 1)");
 		assertEquals(read("(a b c)"),eval(ctx,"`(a b c)"));
 		assertEquals(read("(a b 1)"),eval(ctx,"`(a b ~x)"));
 		assertEquals(read("(a b 3)"),eval(ctx,"`(a b ~(+ x 2))"));
@@ -544,7 +544,7 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testDefExpander()  {
-		Context<?> c=context();
+		Context c=context();
 		String source="(defexpander bex [x e] (syntax \"foo\"))";
 		ACell exp=expand(source);
 		assertTrue(exp instanceof AList);
@@ -600,7 +600,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test public void testExternalCompile() {
 		// Inspired by #377, thanks @Darkneew!
-		Context<?> ctx=context();
+		Context ctx=context();
 		ctx=step(ctx,"(def a (deploy `(defn ^:callable? eval [code] (eval-as *address* code))))");
 		assertTrue(ctx.getResult() instanceof Address);
 		
@@ -615,7 +615,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test public void testEvalCompile() {
 		// Inspired by #377, thanks @Darkneew!
-		Context<?> ctx=context();
+		Context ctx=context();
 		ctx=step(ctx,"(eval `(defn identity [arg] arg))");
 		assertTrue(ctx.getResult() instanceof AFn);
 		
@@ -625,7 +625,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test public void testNestedEvalRegression() {
 		// Test for nasty case if eval captured calling local bindings
-		Context<?> ctx=context();
+		Context ctx=context();
 		ctx=step(ctx,"((fn [code] (eval code)) '(defn g [x] x))");
 		ctx=step(ctx,"(g 13)");
 		assertCVMEquals(13L,ctx.getResult());
@@ -633,7 +633,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test
 	public void testMacrosInActor() {
-		Context<?> ctx=context();
+		Context ctx=context();
 		ctx=step(ctx,"(def lib (deploy `(do (defmacro foo [x] :foo))))");
 		Address addr=(Address) ctx.getResult();
 		assertNotNull(addr);

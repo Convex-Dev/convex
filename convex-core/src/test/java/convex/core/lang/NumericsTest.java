@@ -356,7 +356,7 @@ public class NumericsTest extends ACVMTest {
 	
 	@Test
 	public void testFactorial() {
-		Context<?> ctx=step("(defn fact ([a] (recur 1 a)) ([acc a] (if (<= a 1) acc (recur (* acc a) (dec a)))))");
+		Context ctx=step("(defn fact ([a] (recur 1 a)) ([acc a] (if (<= a 1) acc (recur (* acc a) (dec a)))))");
 		
 		assertEquals(24L,evalL(ctx,"(fact 4)"));
 		assertEquals("265252859812191058636308480000000", eval(ctx,"(fact 30)").toString());

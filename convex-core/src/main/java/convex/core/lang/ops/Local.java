@@ -48,15 +48,14 @@ public class Local<T extends ACell> extends AOp<T> {
 	
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> Context<T> execute(Context<R> context) {
-		Context<T> ctx=(Context<T>) context;
+	public Context execute(Context ctx) {
 		AVector<ACell> env=ctx.getLocalBindings();
 		long ec=env.count();
 		if ((position<0)||(position>=ec)) {
 			return ctx.withError(ErrorCodes.BOUNDS,"Bad position for Local: "+position);
 		}
 		T result = (T)env.get(position);
-		return (Context<T>) ctx.withResult(Juice.LOOKUP,result);
+		return ctx.withResult(Juice.LOOKUP,result);
 	}
 
 	@Override

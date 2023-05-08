@@ -84,19 +84,18 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		return -1L;
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public Context<T> invoke(Context context, ACell[] args) {
+	public Context invoke(Context context, ACell[] args) {
 		// update local bindings for the duration of this function call
 		final AVector<ACell> savedBindings = context.getLocalBindings();
 
 		// update to correct lexical environment, then bind function parameters
 		context = context.withLocalBindings(lexicalEnv);
 
-		Context<T> boundContext = context.updateBindings(params, args);
+		Context boundContext = context.updateBindings(params, args);
 		if (boundContext.isExceptional()) return boundContext.withLocalBindings(savedBindings);
 
-		Context<T> ctx = boundContext.execute(body);
+		Context ctx = boundContext.execute(body);
 
 		// return with restored bindings
 		return ctx.withLocalBindings(savedBindings);

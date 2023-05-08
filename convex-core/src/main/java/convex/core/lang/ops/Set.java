@@ -52,14 +52,13 @@ public class Set<T extends ACell> extends AOp<T> {
 		return new Set<R>(position, op.getRef());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> Context<T> execute(Context<R> context) {
-		Context<T> ctx = (Context<T>) context;
+	public Context execute(Context ctx) {
 		AVector<ACell> env = ctx.getLocalBindings();
 		long ec = env.count();
-		if ((position < 0) || (position >= ec))
-			return context.withError(ErrorCodes.BOUNDS, "Bad position for set!: " + position);
+		if ((position < 0) || (position >= ec)) {
+			return ctx.withError(ErrorCodes.BOUNDS, "Bad position for set!: " + position);
+		}
 
 		ctx = ctx.execute(op.getValue());
 		if (ctx.isExceptional()) return ctx;

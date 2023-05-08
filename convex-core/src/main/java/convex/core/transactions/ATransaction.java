@@ -1,6 +1,5 @@
 package convex.core.transactions;
 
-import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -60,7 +59,7 @@ public abstract class ATransaction extends ARecord {
 	 * @param ctx Context for which to apply this Transaction
 	 * @return The updated chain state
 	 */
-	public abstract <T extends ACell> Context<T> apply(Context<?> ctx);
+	public abstract Context apply(Context ctx);
 
 	/**
 	 * Gets the *origin* Address for this transaction

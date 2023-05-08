@@ -1,8 +1,5 @@
 package convex.core.lang;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.evalL;
-import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertArityError;
 import static convex.test.Assertions.assertAssertError;
 import static convex.test.Assertions.assertCastError;
@@ -15,10 +12,10 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Address;
 
-public class AliasTest {
+public class AliasTest extends ACVMTest {
 	
 	@Test public void testLibraryAlias() {
-		Context<?> ctx=step("(def lib (deploy '(do (def foo 100) (defn bar [] (inc foo)) (defn baz [f] (f foo)))))");
+		Context ctx=step("(def lib (deploy '(do (def foo 100) (defn bar [] (inc foo)) (defn baz [f] (f foo)))))");
 		Address libAddress=eval(ctx,"lib");
 		assertNotNull(libAddress);
 		
@@ -45,7 +42,7 @@ public class AliasTest {
 
 	@Test
 	public void testImport() {
-		Context<?> ctx = step("(def lib (deploy '(def foo 100)))");
+		Context ctx = step("(def lib (deploy '(def foo 100)))");
 		Address libAddress = eval(ctx, "lib");
 		assertNotNull(libAddress);
 
@@ -61,7 +58,7 @@ public class AliasTest {
 	
 	@Test
 	public void testBadImports() {
-		Context<?> ctx = step("(def lib (deploy `(def foo 100)))");
+		Context ctx = step("(def lib (deploy `(def foo 100)))");
 		Address lib = (Address) ctx.getResult();
 		assertNotNull(lib);
 		
@@ -82,7 +79,7 @@ public class AliasTest {
 	@Test
 	public void testTransitiveImports() {
 		// create first library
-		Context<?> ctx = step("(def lib1 (deploy '(do (def foo 101))))");
+		Context ctx = step("(def lib1 (deploy '(do (def foo 101))))");
 		Address lib1 = (Address) ctx.getResult();
 		assertNotNull(lib1);
 		
@@ -100,7 +97,7 @@ public class AliasTest {
 	
 	@Test
 	public void testLibraryAssumptions() {
-		Context<?> ctx = step("(def lib (deploy '(defn run [code] (eval code))))");
+		Context ctx = step("(def lib (deploy '(defn run [code] (eval code))))");
 		Address lib = (Address) ctx.getResult();
 		ctx=step(ctx,"(do (import 0x"+lib.toHexString()+" :as lib))");
 		

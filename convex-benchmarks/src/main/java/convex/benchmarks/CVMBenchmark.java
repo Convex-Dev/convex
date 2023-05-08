@@ -43,7 +43,7 @@ public class CVMBenchmark {
 		HERO=Benchmarks.HERO;
 		
 		// Move some USD to Hero
-		Context<?> ctx=Context.createFake(STATE, Init.MAINBANK_ADDRESS);
+		Context ctx=Context.createFake(STATE, Init.MAINBANK_ADDRESS);
 		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) (fun/transfer usd "+HERO+" 1000000000))"));
 		if (ctx.isError()) throw new Error("Problem moving USD: "+ctx.getError().toString());
 		STATE=ctx.getState();
@@ -64,7 +64,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Transfer.create(addr,1, Benchmarks.VILLAIN, 1000);
-		Context<ACell>  ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 
@@ -73,7 +73,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
-		Context<ACell>  ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 
@@ -82,7 +82,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
-		Context<ACell> ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	
@@ -91,7 +91,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, Constant.of(null));
-		Context<ACell> ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 
@@ -100,7 +100,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
-		Context<ACell>  ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	
@@ -118,7 +118,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply 1000000})))"));
-		Context<ACell>  ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 	
@@ -128,7 +128,7 @@ public class CVMBenchmark {
 	public ACell dexMarketTrade() {
 		State s=STATE;
 		ATransaction trans=buyTrade;
-		Context<ACell>  ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		return ctx.getResult();
 	}
 
@@ -137,7 +137,7 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
-		Context<ACell>  ctx=s.applyTransaction(trans);
+		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
 

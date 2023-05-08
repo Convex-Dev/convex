@@ -113,18 +113,17 @@ public class Invoke extends ATransaction {
 		return result;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <T extends ACell> Context<T> apply(final Context<?> context) {
-		Context<T> ctx=(Context<T>) context;
+	public Context apply(final Context context) {
+		Context ctx=context;
 		
 		// Run command
 		if (command instanceof AOp) {
-			ctx = ctx.run((AOp<T>) command);
+			ctx = ctx.run((AOp<?>) command);
 		} else {
 			ctx = ctx.run(command);
 		}
-		return (Context<T>) ctx;
+		return ctx;
 	}
 
 	@Override

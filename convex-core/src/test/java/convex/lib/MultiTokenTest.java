@@ -29,7 +29,7 @@ public class MultiTokenTest extends ACVMTest {
 	}
 	
 	private static State createFungibleState() {
-		Context<?> ctx=TestState.CONTEXT.fork();
+		Context ctx=TestState.CONTEXT.fork();
 		String importS="(import asset.multi-token :as mt)";
 		ctx=step(ctx,importS);
 		assertNotError(ctx);
@@ -53,7 +53,7 @@ public class MultiTokenTest extends ACVMTest {
 	}
 	
 	@Test public void testOfferAccept() {
-		Context<?> ctx = context();
+		Context ctx = context();
 		
 		ctx=step(ctx,"(def id (call mt (create :foo)))");
 		assertEquals(Keywords.FOO,ctx.getResult());
@@ -79,7 +79,7 @@ public class MultiTokenTest extends ACVMTest {
 	}
 	
 	@Test public void testMint() {
-		Context<?> ctx = context();
+		Context ctx = context();
 		
 		// Non-existing token can't have balance
 		assertEquals(0L,evalL(ctx,"(asset/balance [mt :FOOSD])"));

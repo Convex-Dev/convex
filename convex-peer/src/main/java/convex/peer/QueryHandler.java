@@ -70,7 +70,7 @@ public class QueryHandler extends AThreadedComponent {
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
-			Context<ACell> resultContext = server.getPeer().executeQuery(form, address);
+			Context resultContext = server.getPeer().executeQuery(form, address);
 			
 			// Report result back to message sender
 			boolean resultReturned= m.reportResult(Result.fromContext(id, resultContext));

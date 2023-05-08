@@ -91,10 +91,8 @@ public class Special<T extends ACell> extends AOp<T> {
 		return specials[opCode-BASE];
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> Context<T> execute(Context<R> context) {
-		Context<T> ctx=(Context<T>) context;
+	public Context execute(Context ctx) {
 		switch (opCode) {
 		case S_JUICE: ctx= ctx.withResult(CVMLong.create(ctx.getJuice())); break;
 		case S_CALLER: ctx= ctx.withResult(ctx.getCaller()); break;

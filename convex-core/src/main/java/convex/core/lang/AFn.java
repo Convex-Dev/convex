@@ -17,7 +17,7 @@ import convex.core.data.type.Types;
 public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	
 	@Override
-	public abstract Context<T> invoke(Context<ACell> context, ACell[] args);
+	public abstract Context invoke(Context context, ACell[] args);
 	
 	@Override
 	public abstract AFn<T> updateRefs(IRefFunction func);

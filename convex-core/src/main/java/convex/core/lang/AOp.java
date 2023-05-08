@@ -25,12 +25,11 @@ public abstract class AOp<T extends ACell> extends ACell {
 	 * Executes this op with the given context. Must preserve depth unless an
 	 * exceptional is returned.
 	 * 
-	 * @param <I> Type of Context
 	 * @param context Initial Context
 	 * @return The updated Context after executing this operation
 	 * 
 	 */
-	public abstract <I extends ACell> Context<T> execute(Context<I> context);
+	public abstract Context execute(Context context);
 
 	@Override
 	public final AType getType() {

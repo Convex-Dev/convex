@@ -19,7 +19,7 @@ public class Testing {
 	 * @param resourceName Path to resource
 	 * @return Updates context after all test are run. This will be a new fork.
 	 */
-	public static Context<?> runTests(Context<?> ctx, String resourceName) {
+	public static Context runTests(Context ctx, String resourceName) {
 		ctx=ctx.fork();
 		try {
 			String source=Utils.readResourceAsString(resourceName);

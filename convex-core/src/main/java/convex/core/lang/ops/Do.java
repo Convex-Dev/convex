@@ -46,20 +46,19 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 		return new Do<T>(ops.toVector());
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
+	public Context execute(Context context) {
 		int n = ops.size();
-		if (n == 0) return (Context<T>) context.withResult(Juice.DO,  null); // need cast to avoid bindings overload
+		if (n == 0) return context.withResult(Juice.DO,  null); // need cast to avoid bindings overload
 
-		Context<T> ctx = (Context<T>) context.consumeJuice(Juice.DO);
+		Context ctx = context.consumeJuice(Juice.DO);
 		if (ctx.isExceptional()) return ctx;
 		
 		// execute each operation in turn
 		// TODO: early return
 		for (int i = 0; i < n; i++) {
 			AOp<?> op = ops.get(i);
-			ctx = (Context<T>) ctx.execute(op);
+			ctx = ctx.execute(op);
 
 			if (ctx.isExceptional()) break;
 

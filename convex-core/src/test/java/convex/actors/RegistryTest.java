@@ -28,7 +28,7 @@ public class RegistryTest extends ACVMTest {
 
 	static final Address REG = Init.REGISTRY_ADDRESS;
 
-	Context<?> INITIAL_CONTEXT=context();
+	Context INITIAL_CONTEXT=context();
 
 	@Test
 	public void testRegistryContract() throws IOException {
@@ -36,24 +36,24 @@ public class RegistryTest extends ACVMTest {
 		// String contractString=Utils.readResourceAsString("contracts/registry.con");
 		// Object
 		// cfn=CoreTest.INITIAL_CONTEXT.eval(Reader.read(contractString)).getResult();
-		// Context<?> ctx=CoreTest.INITIAL_CONTEXT.deployContract(cfn);
+		// Context ctx=CoreTest.INITIAL_CONTEXT.deployContract(cfn);
 		// Address addr=(Address) ctx.getResult();
 
 		AHashMap<Keyword, ACell> ddo = Maps.of(Keyword.create("name"), "Bob");
-		Context<?> ctx = INITIAL_CONTEXT.actorCall(REG, 0, Symbol.create("register"), ddo);
+		Context ctx = INITIAL_CONTEXT.actorCall(REG, 0, Symbol.create("register"), ddo);
 		assertEquals(ddo, ctx.actorCall(REG, 0, "lookup", ctx.getAddress()).getResult());
 	}
 
 	@Test
 	public void testRegistryCNS() throws IOException {
-		Context<?> ctx=INITIAL_CONTEXT.fork();
+		Context ctx=INITIAL_CONTEXT.fork();
 
 		assertEquals(REG,eval(ctx,"(call *registry* (cns-resolve 'convex.registry))"));
 	}
 
 	@Test
 	public void testRegistryCNSUpdate() throws IOException {
-		Context<?> ctx=INITIAL_CONTEXT.fork();
+		Context ctx=INITIAL_CONTEXT.fork();
 
 		assertNull(eval(ctx,"(call *registry* (cns-resolve 'convex.test.foo))"));
 
@@ -74,7 +74,7 @@ public class RegistryTest extends ACVMTest {
 		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve 'convex.test.foo))"));
 
 		{ // Check VILLAIN can't steal CNS mapping
-			Context<?> c=ctx.forkWithAddress(VILLAIN);
+			Context c=ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
@@ -84,7 +84,7 @@ public class RegistryTest extends ACVMTest {
 		}
 
 		{ // Check Transfer of control to VILLAIN
-			Context<?> c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+VILLAIN+"))");
+			Context c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+VILLAIN+"))");
 
 			// HERO shouldn't be able to use update or control any more
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
@@ -102,7 +102,7 @@ public class RegistryTest extends ACVMTest {
 		{ // Check VILLAIN can create new mapping
 			// TODO probably shouldn't be free-for-all?
 
-			Context<?> c=ctx.forkWithAddress(VILLAIN);
+			Context c=ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
 			c=step(c,"(call *registry* (cns-update 'convex.villain *address*))");

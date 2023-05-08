@@ -32,17 +32,17 @@ public class FungibleTest extends ACVMTest {
 	}
 	
 	private static State createFungibleState() {
-		Context<?> ctx=TestState.CONTEXT.fork();
+		Context ctx=TestState.CONTEXT.fork();
 		String importS="(import convex.fungible :as fungible)";
-		ctx=TestState.step(ctx,importS);
+		ctx=step(ctx,importS);
 		assertNotError(ctx);
-		ctx=TestState.step(ctx,"(import convex.asset :as asset)");
+		ctx=step(ctx,"(import convex.asset :as asset)");
 		assertFalse(ctx.isExceptional());
 		return ctx.getState();
 	}
 
 	@Test public void testAssetAPI() {
-		Context<?> ctx = context();
+		Context ctx = context();
 		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		Address token = (Address) ctx.getResult();
 		assertNotNull(token);
@@ -91,7 +91,7 @@ public class FungibleTest extends ACVMTest {
 
 	@Test public void testBuildToken() {
 		// check our alias is right
-		Context<?> ctx = context();
+		Context ctx = context();
 		assertEquals(fungible,eval(ctx,"fungible"));
 
 		// deploy a token with default config
@@ -109,7 +109,7 @@ public class FungibleTest extends ACVMTest {
 
 		// transfer to the Villain scenario
 		{
-			Context<?> tctx=step(ctx,"(fungible/transfer token "+VILLAIN+" 100)");
+			Context tctx=step(ctx,"(fungible/transfer token "+VILLAIN+" 100)");
 			assertEquals(bal-100,evalL(tctx,"(fungible/balance token *address*)"));
 			assertEquals(100,evalL(tctx,"(fungible/balance token "+VILLAIN+")"));
 		}
@@ -125,7 +125,7 @@ public class FungibleTest extends ACVMTest {
 
 	@Test public void testMint() {
 		// check our alias is right
-		Context<?> ctx = context();
+		Context ctx = context();
 
 		// deploy a token with default config
 		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
@@ -141,7 +141,7 @@ public class FungibleTest extends ACVMTest {
 
 		// Mint up to max and back down to zero
 		{
-			Context<?> c=step(ctx,"(fungible/mint token 900)");
+			Context c=step(ctx,"(fungible/mint token 900)");
 			assertNotError(c);
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
@@ -154,7 +154,7 @@ public class FungibleTest extends ACVMTest {
 
 		// Mint up to max and burn down to zero
 		{
-			Context<?> c=step(ctx,"(fungible/mint token 900)");
+			Context c=step(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
 			c=step(c,"(fungible/burn token 900)");
@@ -171,7 +171,7 @@ public class FungibleTest extends ACVMTest {
 
 		// Shouldn't be possible to burn tokens in supply but not held
 		{
-			Context<?> c=step(ctx,"(fungible/mint token 900)");
+			Context c=step(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
 			c=step(c,"(fungible/transfer token "+VILLAIN+" 800)");
@@ -189,7 +189,7 @@ public class FungibleTest extends ACVMTest {
 
 		// Villain shouldn't be able to mint or burn
 		{
-			Context<?> c=ctx.forkWithAddress(VILLAIN);
+			Context c=ctx.forkWithAddress(VILLAIN);
 			c=step(c,"(def token "+token+")");
 			c=step(c,"(import convex.fungible :as fungible)");
 

@@ -47,11 +47,11 @@ public class ParamTestCasts {
 		assertTrue(namedFn instanceof AFn);
 		AFn<ACell> fn=(AFn<ACell>)namedFn;
 		
-		Context<ACell> ctx=TestState.CONTEXT.fork();
+		Context ctx=TestState.CONTEXT.fork();
 		
 		for (ACell x: values) {
 			ACell[] args= new ACell[] {x};
-			Context<ACell> r = ctx.fork().invoke(fn, args);
+			Context r = ctx.fork().invoke(fn, args);
 			if (r.isExceptional()) {
 				ACell code=r.getExceptional().getCode();
 				assertTrue(Sets.of(ErrorCodes.CAST,ErrorCodes.ARGUMENT).contains(code));

@@ -20,6 +20,6 @@ public interface IFn<T extends ACell> {
 	 * @return Context containing result of function invocation, or an exceptional
 	 *         value
 	 */
-	public abstract Context<T> invoke(Context<ACell> context, ACell[] args);
+	public abstract Context invoke(Context context, ACell[] args);
 
 }

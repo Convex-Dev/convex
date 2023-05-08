@@ -1,50 +1,51 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.eval;
-import static convex.core.lang.TestState.step;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Sets;
+import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 import convex.test.Testing;
 
-public class SimpleNFTTest {
+public class SimpleNFTTest extends ACVMTest {
 	
 	static final AKeyPair KP1=AKeyPair.generate();
 	static final AKeyPair KP2=AKeyPair.generate();
 	
-	static final Address NFT;
+	final Address NFT;
 	
-	private static final Context<?> CTX;
+	protected SimpleNFTTest() {
+		super(createState());
+		NFT = context().lookup(Symbol.create("nft")).getResult();
+	}
 	
-	static {
-		Context<?> ctx=TestState.CONTEXT.fork();
+	private static State createState() {
+		Context ctx=TestState.CONTEXT.fork();
 		String importS = "(import asset.nft.simple :as nft)";
 		ctx=step(ctx,importS);
-		NFT=(Address)ctx.getResult();
-		assertNotNull(NFT);
 		ctx=step(ctx,"(import convex.asset :as asset)");
-		CTX=ctx;
+		return ctx.getState();
 	}
 	
 	@Test public void testScript1() {
-		Context<?> c=Testing.runTests(CTX,"contracts/nft/simple-nft-test.con");
+		Context c=Testing.runTests(context(),"contracts/nft/simple-nft-test.con");
 		assertNotError(c);
 	}
 	
 	
 	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
-		Context<?> ctx=CTX.fork();
+		Context ctx=context();
 		ctx=step(ctx,"(def total (map (fn [v] (call nft (create))) [1 2 3 4]))");
 		AVector<CVMLong> v=(AVector<CVMLong>) ctx.getResult();
 		assertEquals(4,v.count());

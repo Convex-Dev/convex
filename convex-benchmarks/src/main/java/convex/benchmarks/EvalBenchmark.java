@@ -10,7 +10,7 @@ import convex.core.lang.Reader;
 
 public class EvalBenchmark {
 	
-	static final Context<?> CTX=Benchmarks.context();
+	static final Context CTX=Benchmarks.context();
 	
 	private static final ACell eval(ACell form) {
 		return CTX.fork().eval(form).getResult();

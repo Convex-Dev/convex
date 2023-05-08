@@ -69,21 +69,19 @@ public class Compiler {
 	 * compile. Should not be used directly, intended for use via
 	 * Context.expandCompile(...)
 	 * 
-	 * @param <T>
 	 * @param form A form, either raw or wrapped in a Syntax Object
 	 * @param context Compilation context
 	 * @return Context with compiled op as result
 	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	static <T extends ACell> Context<AOp<T>> expandCompile(ACell form, Context context) {
+	static Context expandCompile(ACell form, Context context) {
 		// expand phase starts with initial expander
 		AFn<ACell> ex = INITIAL_EXPANDER;
 		
 		// Use initial expander both as current and continuation expander
 		// call expand via context to get correct depth and exception handling
-		final Context<ACell> ctx = context.invoke(ex, form,ex);
+		final Context ctx = context.invoke(ex, form,ex);
 		
-		if (ctx.isExceptional()) return (Context<AOp<T>>) (Object) ctx;
+		if (ctx.isExceptional()) return ctx;
 		ACell c=ctx.getResult();
 		
 		return ctx.compile(c);
@@ -95,13 +93,12 @@ public class Compiler {
 	 * 
 	 * Updates context with result, juice consumed
 	 * 
-	 * @param <T> Type of op result
 	 * @param expandedForm A fully expanded form expressed as a Syntax Object
 	 * @param context
 	 * @return Context with compiled Op as result
 	 */
 	@SuppressWarnings("unchecked")
-	static <T extends ACell> Context<AOp<T>> compile(ACell form, Context<?> context) {
+	static Context compile(ACell form, Context context) {
 		if (form==null) return compileConstant(context,null);
 
 		if (form instanceof AList) return compileList((AList<ACell>) form, context);
@@ -121,7 +118,7 @@ public class Compiler {
 		
 		if (form instanceof AOp) {
 			// already compiled, just return as constant
-			return context.withResult(Juice.COMPILE_CONSTANT, (AOp<T>)form);
+			return context.withResult(Juice.COMPILE_CONSTANT, (AOp<?>)form);
 		}
 
 		// return as a constant literal
@@ -132,42 +129,35 @@ public class Compiler {
 	 * Compiles a sequence of forms, returning a vector of ops in the updated
 	 * context. Equivalent to calling compile sequentially on each form.
 	 * 
-	 * @param <R>
-	 * @param <T>
 	 * @param forms
 	 * @param context
 	 * @return Context with Vector of compiled ops as result
 	 */
-	@SuppressWarnings("unchecked")
-	static <T extends ACell> Context<AVector<AOp<T>>> compileAll(ASequence<ACell> forms, Context<?> context) {
+	static Context compileAll(ASequence<ACell> forms, Context context) {
 		if (forms == null) return context.withResult(Vectors.empty()); // consider null as empty list
 		int n = forms.size();
-		AVector<AOp<T>> obs = Vectors.empty();
+		AVector<AOp<?>> obs = Vectors.empty();
 		for (int i = 0; i < n; i++) {
 			ACell form = forms.get(i);
 			context = context.compile(form);
-			if (context.isExceptional()) return (Context<AVector<AOp<T>>>) context;
-			obs = obs.conj((AOp<T>) context.getResult());
+			if (context.isExceptional()) return context;
+			obs = obs.conj((AOp<?>) context.getResult());
 		}
 		return context.withResult(obs);
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileSyntax(Syntax s, Context<?> context) {
+	private static Context compileSyntax(Syntax s, Context context) {
 		context=compile(s.getValue(),context);
-		return (Context<T>) context;
+		return context;
 	}
 
 	/**
 	 * Compiles a Symbol as found in regular code
-	 * @param <R> Return type from Symbol evaluation
-	 * @param <T>
 	 * @param sym Symbol
 	 * @param context
 	 * @return Context with compiled symbol lookup
 	 */
-	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileSymbol(Symbol sym, Context<?> context) {
+	private static Context compileSymbol(Symbol sym, Context context) {
 		// First check for lexically defined Symbols
 		CompilerState cs=context.getCompilerState();
 		
@@ -175,13 +165,13 @@ public class Compiler {
 		if (cs!=null) {
 			CVMLong position=cs.getPosition(sym);
 			if (position!=null) {
-				Local<R> op=Local.create(position.longValue());
-				return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP,op);
+				Local<?> op=Local.create(position.longValue());
+				return context.withResult(Juice.COMPILE_LOOKUP,op);
 			}
 		}
 		
 		// Next check for special values
-		Special<T> maybeSpecial=Special.forSymbol(sym);
+		Special<?> maybeSpecial=Special.forSymbol(sym);
 		if (maybeSpecial!=null) {
 			return context.withResult(maybeSpecial);
 		}
@@ -191,8 +181,7 @@ public class Compiler {
 		return compileEnvSymbol(address,sym,context);
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileEnvSymbol(Address address,Symbol sym, Context<?> context) {
+	private static Context compileEnvSymbol(Address address,Symbol sym, Context context) {
 		// Optional code for :static embedding
 		if (Constants.OPT_STATIC) {
 			// Get metadata for symbol.
@@ -201,17 +190,16 @@ public class Compiler {
 			// If static, embed value directly as constant
 			if ((meta!=null)&&meta.get(Keywords.STATIC)==CVMBool.TRUE) {
 				ACell value=context.lookupValue(sym);
-				return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP,Constant.create(value));
+				return context.withResult(Juice.COMPILE_LOOKUP,Constant.create(value));
 			}
 		}
 		
 		// Finally revert to a lookup in the current address / environment
-		Lookup<T> lookUp=Lookup.create(Constant.of(address),sym);
-		return (Context<T>) context.withResult(Juice.COMPILE_LOOKUP, lookUp);
+		Lookup<?> lookUp=Lookup.create(Constant.of(address),sym);
+		return context.withResult(Juice.COMPILE_LOOKUP, lookUp);
 	}
 	
-	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileSetBang(AList<ACell> list, Context<?> context) {
+	private static Context compileSetBang(AList<ACell> list, Context context) {
 		if (list.count()!=3) return context.withArityError("set! requires two arguments, a symbol and an expression");
 
 		ACell a1=list.get(1);
@@ -223,10 +211,10 @@ public class Compiler {
 		if (position==null) return context.withCompileError("Trying to set! an undeclared symbol: "+sym);
 		
 		context=context.compile(list.get(2));
-		if (context.isExceptional()) return (Context<T>)context;
-		AOp<R> exp=(AOp<R>) context.getResult();
+		if (context.isExceptional()) return context;
+		AOp<?> exp=(AOp<?>) context.getResult();
 		
-		T op=(T) convex.core.lang.ops.Set.create(position.longValue(), exp);
+		AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 	
@@ -237,7 +225,7 @@ public class Compiler {
 	 * @return Op performing Lookup
 	 */
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileLookup(AList<ACell> list, Context<?> context) {
+	private static Context compileLookup(AList<ACell> list, Context context) {
 		long n=list.count();
 		if ((n<2)||(n>3)) return context.withArityError("lookup requires one or two arguments: an optional expression specifying an account and a Symbol");
 
@@ -245,7 +233,7 @@ public class Compiler {
 		if (n==3) {
 			// second element of list should be an expression that evaluates to an Address
 			context=context.compile(list.get(1));
-			if (context.isExceptional()) return (Context<T>)context;
+			if (context.isExceptional()) return context;
 			exp=(AOp<Address>) context.getResult();
 		}
 		
@@ -253,7 +241,7 @@ public class Compiler {
 		if (!(a1 instanceof Symbol)) return context.withCompileError("lookup requires a Symbol as last argument");
 		Symbol sym=(Symbol)a1;
 		
-		T op=(T) Lookup.create(exp,sym);
+		Lookup<?> op=Lookup.create(exp,sym);
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 
@@ -263,7 +251,7 @@ public class Compiler {
 	 * @param context
 	 * @return Op producing the given map
 	 */
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileMap(AMap<ACell, ACell> form, Context<?> context) {
+	private static Context compileMap(AMap<ACell, ACell> form, Context context) {
 		int n = form.size();
 		if (n==0) return compileConstant(context,form);
 		
@@ -280,7 +268,7 @@ public class Compiler {
 	/**
 	 * Compile a set literal of the form #{1 2} as (hash-set 1 2)
 	 */
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileSet(ASet<ACell> form, Context<?> context) {
+	private static Context compileSet(ASet<ACell> form, Context context) {
 		if (form.isEmpty()) return compileConstant(context,Sets.empty());
 		
 		AVector<ACell> vs = Vectors.empty();
@@ -292,39 +280,36 @@ public class Compiler {
 	}
 
 	// A vector literal needs to be compiled as (vector ....)
-	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileVector(AVector<ACell> vec, Context<?> context) {
+	private static Context compileVector(AVector<ACell> vec, Context context) {
 		int n = vec.size();
 		
 		// Zero length vector fast path compiles to a constant
-		if (n == 0) return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_VECTOR);
+		if (n == 0) return context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_VECTOR);
 
 		context = context.compileAll(vec);
-		if (context.isError()) return (Context<T>) context;
-		AVector<AOp<ACell>> obs = (AVector<AOp<ACell>>) context.getResult();
+		if (context.isError()) return context;
+		AVector<AOp<ACell>> obs = context.getResult();
 
 		// return a 'vector' call - note function arg is a constant, we don't want to
 		// lookup on the 'vector' symbol
 		Constant<ACell> fn = Constant.create(Core.VECTOR);
-		return (Context<T>) context.withResult(Juice.COMPILE_NODE, Invoke.create(fn, obs));
+		return context.withResult(Juice.COMPILE_NODE, Invoke.create(fn, obs));
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<T> compileConstant(Context<?> context, ACell value) {
-		return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.create(value));
+	private static Context compileConstant(Context context, ACell value) {
+		return context.withResult(Juice.COMPILE_CONSTANT, Constant.create(value));
 	}
 
 	/**
 	 * Compiles a quoted form, returning an op that will produce a data structure
 	 * after evaluation of all unquotes.
 	 * 
-	 * @param <T>
 	 * @param context
 	 * @param form Quoted form. May be a regular value or Syntax object.
 	 * @return Context with complied op as result
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context<AOp<T>> compileQuasiQuoted(Context<?> context, ACell aForm, int depth) {
+	private static Context compileQuasiQuoted(Context context, ACell aForm, int depth) {
 		ACell form;
 		
 		// Check if form is a Syntax Object and unwrap if necessary
@@ -349,7 +334,7 @@ public class Compiler {
 					if (n != 2) return context.withArityError("unquote requires 1 argument");
 					ACell unquoted=seq.get(1);
 					//if (!(unquoted instanceof Syntax)) return context.withCompileError("unquote expects an expanded Syntax Object");
-					Context<AOp<T>> opContext = expandCompile(unquoted, context);
+					Context opContext = expandCompile(unquoted, context);
 					return opContext;
 				} else {
 					depth-=1;
@@ -360,11 +345,11 @@ public class Compiler {
 
 			// compile quoted elements
 			context = compileAllQuasiQuoted(context, seq, depth);
-			if (context.isExceptional()) return (Context<AOp<T>>) context;
-			ASequence<AOp<ACell>> rSeq = (ASequence<AOp<ACell>>) context.getResult();
+			if (context.isExceptional()) return context;
+			ASequence<AOp<ACell>> rSeq = context.getResult();
 
 			ACell fn = (seq instanceof AList) ? Core.LIST : Core.VECTOR;
-			AOp<T> inv = Invoke.create( Constant.create(fn), rSeq);
+			AOp<?> inv = Invoke.create( Constant.create(fn), rSeq);
 			if (isSyntax) {
 				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
 			}
@@ -379,11 +364,11 @@ public class Compiler {
 
 			// compile quoted elements
 			context = compileAllQuasiQuoted(context, rSeq,depth);
-			if (context.isExceptional()) return (Context<AOp<T>>) context;
+			if (context.isExceptional()) return context;
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
 			ACell fn = Core.HASHMAP;
-			AOp<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			AOp<?> inv = Invoke.create(Constant.create(fn), cSeq);
 			if (isSyntax) {
 				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
 			}
@@ -395,11 +380,11 @@ public class Compiler {
 
 			// compile quoted elements
 			context = compileAllQuasiQuoted(context, rSeq,depth);
-			if (context.isExceptional()) return (Context<AOp<T>>) context;
-			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
+			if (context.isExceptional()) return context;
+			ASequence<AOp<ACell>> cSeq = context.getResult();
 
 			ACell fn = Core.HASHSET;
-			AOp<T> inv = Invoke.create(Constant.create(fn), cSeq);
+			AOp<?> inv = Invoke.create(Constant.create(fn), cSeq);
 			if (isSyntax) {
 				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
 			}
@@ -417,16 +402,15 @@ public class Compiler {
 	/**
 	 * Compiles a sequence of quoted forms
 	 * 
-	 * @param <T>
 	 * @param context
 	 * @param form
 	 * @return Context with complied sequence of ops as result
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static <T extends ACell> Context<ASequence<AOp<T>>> compileAllQuasiQuoted(Context<?> context, ASequence<ACell> forms, int depth) {
+	private static Context compileAllQuasiQuoted(Context context, ASequence<ACell> forms, int depth) {
 		int n = forms.size();
 		// create a list of ops producing each sub-element
-		ASequence<AOp<T>> rSeq = Vectors.empty();
+		ASequence<AOp<?>> rSeq = Vectors.empty();
 		for (int i = 0; i < n; i++) {
 			ACell subSyntax = forms.get(i);
 			ACell subForm = Syntax.unwrap(subSyntax);
@@ -437,8 +421,8 @@ public class Compiler {
 				// unquote-splicing looks like it needs flatmap
 				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
 			} else {
-				Context<AOp<T>> rctx= compileQuasiQuoted(context, subSyntax,depth);
-				if (rctx.isExceptional()) return (Context)rctx;
+				Context rctx= compileQuasiQuoted(context, subSyntax,depth);
+				if (rctx.isExceptional()) return rctx;
 				rSeq = (ASequence) (rSeq.conj(rctx.getResult()));
 			}
 		}
@@ -464,9 +448,9 @@ public class Compiler {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileList(AList<ACell> list, Context<?> context) {
+	private static Context compileList(AList<ACell> list, Context context) {
 		int n = list.size();
-		if (n == 0) return (Context<T>) context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_LIST);
+		if (n == 0) return context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_LIST);
 
 		// first entry in list should be syntax
 		ACell first = list.get(0);
@@ -477,18 +461,18 @@ public class Compiler {
 			
 			if (sym.equals(Symbols.DO)) {
 				context = context.compileAll(list.next());
-				if (context.isExceptional()) return (Context<T>) context;
-				Do<R> op = Do.create((AVector<AOp<ACell>>) context.getResult());
-				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+				if (context.isExceptional()) return context;
+				Do<?> op = Do.create((AVector<AOp<ACell>>) context.getResult());
+				return context.withResult(Juice.COMPILE_NODE, op);
 			}
 			
 			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 
 			if (sym.equals(Symbols.COND)) {
 				context = context.compileAll(list.next());
-				if (context.isExceptional()) return (Context<T>) context;
-				Cond<R> op = Cond.create((AVector<AOp<ACell>>) (context.getResult()));
-				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+				if (context.isExceptional()) return context;
+				Cond<?> op = Cond.create((AVector<AOp<ACell>>) (context.getResult()));
+				return context.withResult(Juice.COMPILE_NODE, op);
 			}
 			
 			if (sym.equals(Symbols.DEF)) return compileDef(list, context);
@@ -501,29 +485,29 @@ public class Compiler {
 				
 			if (sym.equals(Symbols.QUASIQUOTE)) {
 				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
-				return (Context<T>) compileQuasiQuoted(context, list.get(1),1);
+				return compileQuasiQuoted(context, list.get(1),1);
 			}
 
 			if (sym.equals(Symbols.UNQUOTE)) {
 				// execute the unquoted code directly to get a form to compile
 				if (list.size() != 2) return context.withCompileError(Symbols.UNQUOTE + " expects one argument.");
 				context = context.expandCompile(list.get(1));
-				if (context.isExceptional()) return (Context<T>) context;
-				AOp<T> quotedOp = (AOp<T>) context.getResult();
+				if (context.isExceptional()) return context;
+				AOp<?> quotedOp = context.getResult();
 
-				Context<T> rctx = context.execute(quotedOp);
-				if (rctx.isExceptional()) return (Context<T>) rctx;
+				Context rctx = context.execute(quotedOp);
+				if (rctx.isExceptional()) return rctx;
 
 				Syntax resultForm = Syntax.create(rctx.getResult());
 				// need to expand and compile here, since we just created a raw form
-				return (Context<T>) expandCompile(resultForm, context);
+				return expandCompile(resultForm, context);
 			}
 
 			if (sym.equals(Symbols.QUERY)) {
 				context = context.compileAll(list.next());
-				if (context.isExceptional()) return (Context<T>) context;
-				Query<R> op = Query.create((AVector<AOp<ACell>>) context.getResult());
-				return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+				if (context.isExceptional()) return context;
+				Query<?> op = Query.create((AVector<AOp<ACell>>) context.getResult());
+				return context.withResult(Juice.COMPILE_NODE, op);
 			}
 
 			if (sym.equals(Symbols.LOOP)) return compileLet(list, context, true);
@@ -535,15 +519,15 @@ public class Compiler {
 		
 		// must be a regular function call
 		context = context.compileAll(list);
-		if (context.isExceptional()) return (Context<T>) context;
-		Invoke<R> op = Invoke.create((AVector<AOp<ACell>>) context.getResult());
+		if (context.isExceptional()) return context;
+		Invoke<?> op = Invoke.create((AVector<AOp<ACell>>) context.getResult());
 
-		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 
 
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileLet(ASequence<ACell> list, Context<?> context,
+	private static Context compileLet(ASequence<ACell> list, Context context,
 			boolean isLoop) {
 		// list = (let [...] a b c ...)
 		int n=list.size();
@@ -564,26 +548,26 @@ public class Compiler {
 		for (int i = 0; i < bn; i += 2) {		
 			// Get corresponding op
 			context = context.expandCompile(bv.get(i + 1));
-			if (context.isExceptional()) return (Context<T>) context;
+			if (context.isExceptional()) return context;
 			AOp<ACell> op = (AOp<ACell>) context.getResult();
 			ops = ops.conj(op);
 			
 			// Get a binding form. Note binding happens *after* op
 			ACell bf = bv.get(i);
 			context=compileBinding(bf,context);
-			if (context.isExceptional()) return (Context<T>) context;
+			if (context.isExceptional()) return context;
 			bindingForms = bindingForms.conj(context.getResult());
 		}
 		int exs = n - 2; // expressions in let after binding vector
 		for (int i = 2; i < 2 + exs; i++) {
 			context = context.expandCompile(list.get(i));
-			if (context.isExceptional()) return (Context<T>) context;
+			if (context.isExceptional()) return context;
 			AOp<ACell> op = (AOp<ACell>) context.getResult();
 			ops = ops.conj(op);
 		}
-		AOp<R> op = Let.create(bindingForms, ops, isLoop);
+		AOp<?> op = Let.create(bindingForms, ops, isLoop);
 
-		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 
 	/**
@@ -592,7 +576,7 @@ public class Compiler {
 	 * @param context
 	 * @return
 	 */
-	private static Context<ACell> compileBinding(ACell bindingForm,Context<?> context) {
+	private static Context compileBinding(ACell bindingForm,Context context) {
 		CompilerState cs=context.getCompilerState();
 		if (cs==null) cs=CompilerState.EMPTY;
 		
@@ -637,14 +621,12 @@ public class Compiler {
 	/**
 	 * Compiles a lambda function form "(fn [...] ...)" to create a Lambda op.
 	 * 
-	 * @param <R>
-	 * @param <T>
 	 * @param list
 	 * @param context
 	 * @return Context with compiled op as result.
 	 */
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileFn(AList<ACell> list, Context<?> context) {
+	private static Context compileFn(AList<ACell> list, Context context) {
 		// list.get(0) is presumably fn
 		int n = list.size();
 		if (n < 2) return context.withArityError("fn requires parameter vector and body in form: " + list);
@@ -661,8 +643,8 @@ public class Compiler {
 	}
 	
 	@SuppressWarnings({ "unchecked"})
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileMultiFn(AList<ACell> list, Context<?> context) {
-		AVector<AClosure<R>> fns=Vectors.empty();
+	private static Context compileMultiFn(AList<ACell> list, Context context) {
+		AVector<AClosure<ACell>> fns=Vectors.empty();
 		
 		int num=list.size();
 		for (int i=0; i<num; i++) {
@@ -672,28 +654,26 @@ public class Compiler {
 			}
 			
 			context= compileFnInstance((AList<ACell>) o,context);
-			if (context.isExceptional()) return (Context<T>) context;
+			if (context.isExceptional()) return context;
 			
-			AClosure<R> compiledFn=((Lambda<R>) context.getResult()).getFunction();
+			AClosure<ACell> compiledFn=((Lambda<ACell>) context.getResult()).getFunction();
 			fns=fns.conj(compiledFn);
 		}
 			
-		MultiFn<R> mf=MultiFn.create(fns);
-		Lambda<R> op = Lambda.create(mf);
-		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+		MultiFn<?> mf=MultiFn.create(fns);
+		Lambda<?> op = Lambda.create(mf);
+		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 	
 	/**
 	 * Compiles a function instance function form "([...] ...)" to create a Lambda op.
 	 * 
-	 * @param <R> 
-	 * @param <T>
 	 * @param list
 	 * @param context
 	 * @return Context with compiled op as result.
 	 */
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileFnInstance(AList<ACell> list, Context<?> context) {
+	private static Context compileFnInstance(AList<ACell> list, Context context) {
 		int n = list.size();
 		if (n < 1) return context.withArityError("fn requires parameter vector and body in form: " + list);
 
@@ -709,7 +689,7 @@ public class Compiler {
 	}
 		
 	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileFnInstance(AVector<ACell> paramsVector, AList<ACell> bodyList,Context<?> context) {
+	private static Context compileFnInstance(AVector<ACell> paramsVector, AList<ACell> bodyList,Context context) {
 		// need to save compiler state, since we are compiling bindings
 		CompilerState savedCompilerState=context.getCompilerState();
 		
@@ -721,25 +701,24 @@ public class Compiler {
 		if (context.isExceptional()) return context.withCompilerState(savedCompilerState); // restore before return
 
 		int n=bodyList.size();
-		AOp<T> body;
+		AOp<?> body;
 		if (n == 0) {
 			// no body, so function just returns nil
 			body = Constant.nil();
 		} else if (n == 1) {
 			// one body element, so just unwrap from list
-			body = ((ASequence<AOp<T>>) context.getResult()).get(0);
+			body = ((ASequence<AOp<?>>) context.getResult()).get(0);
 		} else {
 			// wrap multiple expressions in implicit do
 			body = Do.create(((ASequence<AOp<ACell>>) context.getResult()));
 		}
 
-		Lambda<T> op = Lambda.create(paramsVector, body);
+		Lambda<?> op = Lambda.create(paramsVector, body);
 		context=context.withCompilerState(savedCompilerState);
-		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <R extends ACell, T extends AOp<R>> Context<T> compileDef(AList<ACell> list, Context<?> context) {
+	private static Context compileDef(AList<ACell> list, Context context) {
 		int n = list.size();
 		if (n != 3) return context.withCompileError("def requires a symbol and an expression, but got: " + list);
 
@@ -759,10 +738,10 @@ public class Compiler {
 		}
 		
 		context = context.compile(exp);
-		if (context.isExceptional()) return (Context<T>) context;
+		if (context.isExceptional()) return context;
 
-		Def<R> op = Def.create(symArg, (AOp<R>) context.getResult());
-		return (Context<T>) context.withResult(Juice.COMPILE_NODE, op);
+		Def<?> op = Def.create(symArg, context.getResult());
+		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 	
 	
@@ -778,7 +757,7 @@ public class Compiler {
 	public static final AFn<ACell> INITIAL_EXPANDER =new CoreFn<ACell>(Symbols.STAR_INITIAL_EXPANDER) {
 		@SuppressWarnings("unchecked")
 		@Override
-		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
+		public Context invoke(Context context,ACell[] args ) {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = args[0];
 			AFn<ACell> cont=RT.ensureFunction(args[1]);
@@ -836,13 +815,12 @@ public class Compiler {
 					ACell newElement = context.getResult();
 					if (newElement!=elem) seq=seq.assoc(i, newElement);
 				};
-				Context<ACell> rctx = context;
+				Context rctx = context;
 				return rctx.withResult(Juice.EXPAND_SEQUENCE, seq);
 			}
 
 			if (form instanceof ASet) {
-				@SuppressWarnings("rawtypes")
-				Context<ACell> ctx =  (Context)context;
+				Context ctx =  (Context)context;
 				ASet<ACell> updated = Sets.empty();
 				for (ACell elem : ((ASet<ACell>) form)) {
 					ctx = ctx.expand(cont, elem, cont);
@@ -855,8 +833,7 @@ public class Compiler {
 			}
 
 			if (form instanceof AMap) {
-				@SuppressWarnings("rawtypes")
-				Context<ACell> ctx =  (Context)context;
+				Context ctx =  context;
 				AMap<ACell, ACell> updated = Maps.empty();
 				for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
 					// get new key
@@ -890,7 +867,7 @@ public class Compiler {
 	 */
 	public static final AFn<ACell> QUOTE_EXPANDER =new CoreFn<ACell>(Symbols.QUOTE) {
 		@Override
-		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
+		public Context invoke(Context context,ACell[] args ) {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = args[0];
 		
@@ -907,7 +884,7 @@ public class Compiler {
 	 */
 	public static final AFn<ACell> QUASIQUOTE_EXPANDER =new CoreFn<ACell>(Symbols.QUASIQUOTE) {
 		@Override
-		public Context<ACell> invoke(Context<ACell> context,ACell[] args ) {
+		public Context invoke(Context context,ACell[] args ) {
 			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
 			ACell x = args[0];
 		

@@ -69,10 +69,9 @@ public class Def<T extends ACell> extends AOp<T> {
 		return create(Symbol.create(key), op);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <I extends ACell> Context<T> execute(Context<I> context) {
-		Context<T> ctx = context.execute(op.getValue());
+	public Context execute(Context context) {
+		Context ctx = context.execute(op.getValue());
 		if (ctx.isExceptional()) return ctx;
 		
 		ACell opResult = ctx.getResult();
@@ -84,7 +83,7 @@ public class Def<T extends ACell> extends AOp<T> {
 		} else {
 			ctx=ctx.define((Symbol)symbol, opResult);
 		}
-		return (Context<T>) ctx.withResult(Juice.DEF, opResult);
+		return ctx.withResult(Juice.DEF, opResult);
 	}
 
 	@Override
