@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- Scoped Actors 
 - BIP39 compatible seed generation
+- Variable sized Etch index levels
 
 ### Changed
 - Make `blob` casts support arbitrary sized integers
+- Remove unnecessary generic type parameter from Context class
+- Updates to GUI implementation
 
 ### Fixed
 
