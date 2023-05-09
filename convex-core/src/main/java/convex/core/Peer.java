@@ -402,8 +402,6 @@ public class Peer {
 		Peer p= updateBelief(newBelief);
 		if (p==this) return this;
 		
-		// TODO: separate this out
-		p=p.updateState();
 		return p;
 	}
 	

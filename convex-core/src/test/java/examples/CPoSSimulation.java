@@ -75,6 +75,7 @@ public class CPoSSimulation {
 				Belief b=MESSAGES[bi];
 				Peer rp=PEERS[receivePeer];
 				rp=rp.mergeBeliefs(b);
+				rp=rp.updateState();
 				PEERS[receivePeer]=rp;
 			}
 

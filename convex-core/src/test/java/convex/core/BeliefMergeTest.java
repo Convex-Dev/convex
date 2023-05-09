@@ -99,7 +99,10 @@ public class BeliefMergeTest {
 
 		for (int i = 0; i < n; i++) {
 			Peer ps = initial[i];
-			result[i] = ps.mergeBeliefs(sharedBeliefs); // belief merge step
+			ps=ps.mergeBeliefs(sharedBeliefs); // belief merge step
+			ps=ps.updateState(); // state update
+
+			result[i] = ps;
 		}
 		result=updateTimestamps(result);
 		return result;
@@ -121,7 +124,9 @@ public class BeliefMergeTest {
 			for (int j = 0; j < numGossips; j++) {
 				sources[j] = sharedBeliefs[r.nextInt(n)];
 			}
-			result[i] = ps.mergeBeliefs(sources); // belief merge step
+			ps=ps.mergeBeliefs(sources); // belief merge step
+			ps=ps.updateState(); // state update
+			result[i] = ps; 
 		}
 		result=updateTimestamps(result);
 		return result;
@@ -164,6 +169,7 @@ public class BeliefMergeTest {
 		assertNotEquals(b0, b1); // should not be equal - no knowledge of other peer chains yet
 
 		Peer bm0 = b0.mergeBeliefs(b1.getBelief());
+		bm0=bm0.updateState();
 		assertTrue(b0.getPeerOrder() == bm0.getPeerOrder());
 
 		// propose a new block by peer 1, after 200ms
@@ -175,6 +181,7 @@ public class BeliefMergeTest {
 
 		// merge updated belief, new proposed block should be included
 		Peer bm2 = b0.mergeBeliefs(b1a.getBelief());
+		bm2=bm2.updateState();
 		assertEquals(b1a.getPeerOrder().getBlocks(), bm2.getPeerOrder().getBlocks());
 	}
 
