@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.time.Instant;
 import java.util.HashSet;
 import java.util.Random;
 
@@ -44,7 +43,6 @@ public class BeliefMergeTest {
 	public static final Address[] ADDRESSES = new Address[NUM_PEERS];
 	public static final AccountKey[] KEYS = new AccountKey[NUM_PEERS];
 	public static final State INITIAL_STATE;
-	private static final long TEST_TIMESTAMP = Instant.parse("1977-11-13T00:30:00Z").toEpochMilli();
 	private static final long TOTAL_VALUE;
 	
 	private static final long TS_INCREMENT=100;
@@ -77,7 +75,8 @@ public class BeliefMergeTest {
 	}
 
 	private Peer initialPeerState(int i) {
-		return Peer.create(KEY_PAIRS[i], INITIAL_STATE);
+		Peer p =  Peer.create(KEY_PAIRS[i], INITIAL_STATE);
+		return p;
 	}
 
 	private Peer[] initialBeliefs() {
@@ -168,8 +167,8 @@ public class BeliefMergeTest {
 		assertTrue(b0.getPeerOrder() == bm0.getPeerOrder());
 
 		// propose a new block by peer 1, after 200ms
-		long newTimestamp1 = TEST_TIMESTAMP + 200;
-		b1 = b1.updateTimestamp(b1.getTimestamp() + 200);
+		long newTimestamp1 = b1.getTimestamp() + 200;
+		b1 = b1.updateTimestamp(newTimestamp1);
 		assertEquals(0, b1.getPeerOrder().getBlocks().size());
 		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1)); // empty block, just with timestamp
 		assertEquals(1, b1a.getPeerOrder().getBlocks().size());
@@ -360,7 +359,7 @@ public class BeliefMergeTest {
 	@Test
 	public void testGossipConsensus() throws Exception {
 		boolean ANALYSIS = false;
-		int GOSSIP_NUM = 2;
+		int GOSSIP_NUM = 1;
 		final int TX_ROUNDS = 180;
 		final int SETTLE_ROUNDS = 20;
 		final int NUM_INITIAL_TRANS = 3;
@@ -420,7 +419,7 @@ public class BeliefMergeTest {
 		}
 
 		for (int i = 1; i < SETTLE_ROUNDS; i++) {
-			bs4 = shareGossip(bs4, GOSSIP_NUM, i+TX_ROUNDS);
+			bs4 = shareGossip(bs4, NUM_PEERS, i+TX_ROUNDS);
 			if (ANALYSIS) printAnalysis(bs4, "Share round: " + i);
 		}
 		bs4 = shareGossip(bs4, GOSSIP_NUM, SETTLE_ROUNDS);
