@@ -390,8 +390,8 @@ public class Peer {
 	 */
 	public Peer mergeBeliefs(Belief... beliefs) throws InvalidDataException {
 		Belief belief=getBelief();
-		MergeContext mc = MergeContext.create(belief,keyPair, timestamp, getConsensusState());
-		Belief newBelief = belief.merge(mc,beliefs);
+		BeliefMerge mc = BeliefMerge.create(belief,keyPair, timestamp, getConsensusState());
+		Belief newBelief = mc.merge(beliefs);
 
 		long ocp=getConsensusPoint();
 		Order newOrder=newBelief.getOrder(peerKey);

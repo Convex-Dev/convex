@@ -14,7 +14,7 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.MergeContext;
+import convex.core.BeliefMerge;
 import convex.core.Order;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -196,8 +196,8 @@ public class BeliefPropagator extends AThreadedComponent {
 		try {
 			long ts=Utils.getCurrentTimestamp();
 			AKeyPair kp=server.getKeyPair();
-			MergeContext mc = MergeContext.create(belief,kp, ts, server.getPeer().getConsensusState());
-			Belief newBelief = belief.merge(mc,newBeliefs);
+			BeliefMerge mc = BeliefMerge.create(belief,kp, ts, server.getPeer().getConsensusState());
+			Belief newBelief = mc.merge(newBeliefs);
 
 			boolean beliefChanged=(belief!=newBelief);
 			belief=newBelief;
@@ -257,7 +257,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (newOrders.containsKey(key)) {
 							Order newOrder=so.getValue();
 							Order oldOrder=newOrders.get(key).getValue();
-							boolean replace=Belief.compareOrders(oldOrder, newOrder);
+							boolean replace=BeliefMerge.compareOrders(oldOrder, newOrder);
 							if (!replace) continue;
 						} 
 						

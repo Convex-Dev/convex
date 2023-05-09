@@ -10,7 +10,6 @@ import java.util.Map;
 import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.ARecord;
@@ -33,7 +32,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Counters;
 import convex.core.util.Utils;
 
 /**
@@ -59,7 +57,7 @@ public class Belief extends ARecord {
 
 	// private final long timeStamp;
 
-	private Belief(BlobMap<AccountKey,SignedData<Order>> orders) {
+	Belief(BlobMap<AccountKey,SignedData<Order>> orders) {
 		super(BELIEF_FORMAT.count());
 		this.orders = orders;
 	}
@@ -134,129 +132,15 @@ public class Belief extends ARecord {
 		return create(BlobMap.of(address, order));
 	}
 
-	/**
-	 * The Belief merge function
-	 * 
-	 * @param mc MergeContext for Belief Merge
-	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
-	 * @return The updated merged belief with latest timestamp, or the same Belief if there is no change to Orders.
-	 * @throws InvalidDataException In case of invalid data
-	 */
-	public Belief merge(MergeContext mc, Belief... beliefs) throws InvalidDataException {
-		Counters.beliefMerge++;
 
-		// accumulate combined list of latest Orders for all peers
-		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(mc,beliefs);
 
-		// vote for new proposed chain
-		final BlobMap<AccountKey, SignedData<Order>> resultOrders = vote(mc, accOrders);
-		if (resultOrders == null) return this;
-
-		// update my belief with the resulting Orders
-		if (orders == resultOrders) return this;
-		final Belief result = new Belief(resultOrders);
-
-		return result;
-	}
-
-	/**
-	 * Assemble the latest map of Orders from all peers by merging from each Belief received
-	 * @param beliefs Set of Beliefs from which to merge orders
-	 * @return
-	 */
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, Belief[] beliefs) {
-		// Initialise result with existing Orders from this Belief
-		BlobMap<AccountKey, SignedData<Order>> result = this.orders;
-		
-		// Iterate over each received Belief
-		for (Belief belief : beliefs) {
-			if (belief == null) continue; // ignore null Beliefs, might happen if invalidated
-			
-			result=accumulateOrders(mc, result, belief);
-		}
-		return result;
-	}
 	
-	public Belief mergeOrders(MergeContext mc, Belief b) {
-		BlobMap<AccountKey, SignedData<Order>> newOrders=accumulateOrders(mc, orders,b);
+	public Belief mergeOrders(BeliefMerge mc, Belief b) {
+		BlobMap<AccountKey, SignedData<Order>> newOrders=mc.accumulateOrders(orders,b);
 		return withOrders(newOrders);
 	}
 	
-	/**
-	 * Update a map of orders from all peers by merging from each Belief received
-	 * @param belief Belief from which to merge orders
-	 * @return Updated map of orders
-	 */
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(MergeContext mc, BlobMap<AccountKey, SignedData<Order>> orders,Belief belief) {
-		BlobMap<AccountKey, SignedData<Order>> result=orders;
-		
-		BlobMap<AccountKey, SignedData<Order>> bOrders = belief.orders;
-		// Iterate over each Peer's ordering conveyed in this Belief
-		long bcount=bOrders.count();
-		for (long i=0; i<bcount; i++) {
-			MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
-			ABlob key=be.getKey();
-			
-			SignedData<Order> b=be.getValue();
-			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
-			Order bc = b.getValue();
-			if (bc.getTimestamp()>mc.getTimestamp()) continue; // ignore future Orders
-			
-			SignedData<Order> a=result.get(key);
-			if (a == null) {
-				// This is a new order to us, so include if valid
-				result=result.assocEntry(be); 
-				continue;
-			}
-			
-			if (a.equals(b)) continue; // PERF: fast path for no changes
 
-			Order ac = a.getValue();
-
-			boolean shouldReplace=compareOrders(ac,bc);
-			if (shouldReplace) {
-
-				
-				result=result.assocEntry(be); 
-				continue;
-			}
-		}
-		return result;
-	}
-
-	
-	/**
-	 * Checks if a new Order should replace the current order when collecting Peer orders
-	 * @param oldOrder Current Order
-	 * @param newOrder Potential new ORder
-	 * @return
-	 */
-	public static boolean compareOrders(Order oldOrder, Order newOrder) {
-		if (newOrder==null) return false;
-		if (oldOrder==null) return true;
-		
-		int tsComp=Long.compare(oldOrder.getTimestamp(), newOrder.getTimestamp());
-		if (tsComp>0) return false; // Keep current order if more recent
-		
-		if (tsComp<0) {
-			// new Order is more recent, so switch to this
-			return true;
-		} else {
-			// This probably shouldn't happen if peers are sticking to timestamps
-			// But we compare anyway
-			// Prefer advanced consensus
-			if (newOrder.getConsensusPoint()>oldOrder.getConsensusPoint()) return true;
-			
-			// Then prefer advanced proposal
-			if (newOrder.getProposalPoint()>oldOrder.getProposalPoint()) return true;
-
-			// Finally prefer more blocks
-			AVector<SignedData<Block>> abs=oldOrder.getBlocks();
-			AVector<SignedData<Block>> bbs=newOrder.getBlocks();
-			if(abs.count()<bbs.count()) return true;
-		}
-		return false;
-	}
 
 	/**
 	 * Conducts a stake-weighted vote across a map of consistent chains, in the
@@ -268,7 +152,7 @@ public class Belief extends ARecord {
 	 * @return
 	 * @throws BadSignatureException @
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> vote(final MergeContext mc, final BlobMap<AccountKey, SignedData<Order>> accOrders) {
+	BlobMap<AccountKey, SignedData<Order>> vote(final BeliefMerge mc, final BlobMap<AccountKey, SignedData<Order>> accOrders) {
 		AccountKey myAddress = mc.getAccountKey();
 
 		// get current Order for this peer.
@@ -582,7 +466,8 @@ public class Belief extends ARecord {
 		// exclude new blocks already in the base Order
 		// TODO: what about blocks already in consensus?
 		// Probably need to check last block time from Peer
-		Iterator<SignedData<Block>> it = blocks.listIterator(Math.min(blocks.count(), consensusPoint));
+		long scanStart=Math.min(blocks.count(), consensusPoint);
+		Iterator<SignedData<Block>> it = blocks.listIterator(scanStart);
 		while (it.hasNext()) {
 			newBlocks.remove(it.next());
 		}
@@ -672,7 +557,7 @@ public class Belief extends ARecord {
 	 * @return Order for current Peer, or null if not found
 	 * @throws BadSignatureException 
 	 */
-	private Order getMyOrder(MergeContext mc) {
+	private Order getMyOrder(BeliefMerge mc) {
 		AccountKey myAddress = mc.getAccountKey();
 		SignedData<Order> signed = (SignedData<Order>) orders.get(myAddress);
 		if (signed == null) return null;

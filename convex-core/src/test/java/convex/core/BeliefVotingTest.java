@@ -50,8 +50,8 @@ public class BeliefVotingTest {
 	public void testEmptyMerge() throws BadSignatureException, InvalidDataException {
 		Belief b=Belief.create(kps[0],Order.create());
 		
-		MergeContext mc=MergeContext.create(b, kps[0], TS+5, s);
-		Belief b2=b.merge(mc);
+		BeliefMerge mc=BeliefMerge.create(b, kps[0], TS+5, s);
+		Belief b2=mc.merge(b);
 		assertSame(b,b2);
 	}
 
@@ -67,24 +67,23 @@ public class BeliefVotingTest {
 		Belief b0=Belief.create(kps[0], o0);
 
 		// check trivial merges are idempotent
-		MergeContext baseMC=MergeContext.create(b0, kps[0], TS, s);
+		BeliefMerge baseMC=BeliefMerge.create(b0, kps[0], TS, s);
 		assertSame(b0,b0.mergeOrders(baseMC,b0));
-		Belief b00=b0.merge(baseMC);
+		Belief b00=baseMC.merge(b0);
 		assertSame(b0,b00);
-		assertSame(b0,b0.merge(baseMC,b0));
-		assertSame(b0,b0.merge(baseMC,b0,b0));
+		assertSame(b0,baseMC.merge(b0,b0));
 		
 		long ATIME=A.getValue().getTimeStamp();
 		Order p1o=Order.create(0, 0, A).withTimestamp(ATIME);
 		Belief b1=Belief.create(kps[1], p1o);
 		
 		// Shouldn't change Belief, since incoming order is from future
-		Belief b0present=b0.merge(baseMC, b1);
+		Belief b0present=baseMC.merge(b1);
 		assertSame(b0,b0present);
 		
 		// Updated merge context should allow Belief merge with new Block
-		MergeContext mc=MergeContext.create(b0, kps[0], TS+1, s);
-		Belief b2=b0.merge(mc, b1);
+		BeliefMerge mc=BeliefMerge.create(b0, kps[0], TS+1, s);
+		Belief b2=mc.merge(b1);
 		Order o2=b2.getOrder(keys[0]);
 		assertEquals(p1o.getBlocks(),o2.getBlocks());
 		assertEquals(0,o2.getProposalPoint());
@@ -98,16 +97,17 @@ public class BeliefVotingTest {
 		Belief br5=Belief.create(kps[5], p1o);
 		
 		// Merge new Beliefs
-		Belief b3=b2.merge(mc, br2,br3,br4,br5);
+		Belief b3=mc.merge(b2,br2,br3,br4,br5);
 		Order o3=b3.getOrder(keys[0]);
 		assertEquals(p1o.getBlocks(),o3.getBlocks());
 		assertEquals(1,o3.getProposalPoint());
 		assertEquals(0,o3.getConsensusPoint());
 		
+		mc=BeliefMerge.create(b3, kps[0], TS+1, s);
 		// Future merges should be idempotent
-		assertSame(b3,b3.merge(mc,br2,br3,br4,br5));
-		MergeContext mc3=MergeContext.create(b0, kps[0], TS+10, s);
-		assertSame(b3,b3.merge(mc3,br2,br3,br4,br5));
+		assertSame(b3,mc.merge(br2,br3,br4,br5));
+		BeliefMerge mc3=BeliefMerge.create(b3, kps[0], TS+10, s);
+		assertSame(b3,mc3.merge(br2,br3,br4,br5));
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -130,8 +130,8 @@ public class BeliefVotingTest {
 			SignedData<Order> o5=or(5, TS, 0,0,B,A,E,F,D);
 			
 			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
-			MergeContext mc=MergeContext.create(b, kps[0], TS, s);
-			Belief b2=b.merge(mc);
+			BeliefMerge mc=BeliefMerge.create(b, kps[0], TS, s);
+			Belief b2=mc.merge();
 			SignedData<Order> so=b2.getOrders().get(keys[0]);
 			Order order=so.getValue();
 			assertEquals(7,order.getBlockCount());
@@ -152,8 +152,8 @@ public class BeliefVotingTest {
 			SignedData<Order> o5=or(5, TS, 1,0,B,A,E,F,G);
 			
 			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
-			MergeContext mc=MergeContext.create(b, kps[0], TS, s);
-			Belief b2=b.merge(mc);
+			BeliefMerge mc=BeliefMerge.create(b, kps[0], TS, s);
+			Belief b2=mc.merge();
 			SignedData<Order> so=b2.getOrders().get(keys[0]);
 			Order order=so.getValue();
 			assertEquals(7,order.getBlockCount());
@@ -172,8 +172,8 @@ public class BeliefVotingTest {
 			SignedData<Order> o5=or(5, TS, 1,0,B);
 			
 			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
-			MergeContext mc=MergeContext.create(b, kps[0], TS, s);
-			Belief b2=b.merge(mc);
+			BeliefMerge mc=BeliefMerge.create(b, kps[0], TS, s);
+			Belief b2=mc.merge();
 			SignedData<Order> so=b2.getOrders().get(keys[0]);
 			Order order=so.getValue();
 			assertEquals(2,order.getBlockCount());
@@ -193,8 +193,8 @@ public class BeliefVotingTest {
 			SignedData<Order> o5=or(5, TS, 1,0,B);
 			
 			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
-			MergeContext mc=MergeContext.create(b, kps[0], TS+1, s);
-			Belief b2=b.merge(mc);
+			BeliefMerge mc=BeliefMerge.create(b, kps[0], TS+1, s);
+			Belief b2=mc.merge();
 			SignedData<Order> so=b2.getOrders().get(keys[0]);
 			assertEquals(o0,so); // Shouldn't have changed
 			Order order=so.getValue();
@@ -204,8 +204,8 @@ public class BeliefVotingTest {
 			assertEquals(0,order.getConsensusPoint()); // No change in my consensus
 
 			// After enough time, Peer should be willing to switch proposal
-			MergeContext mc3=MergeContext.create(b, kps[0], TS+1+Constants.KEEP_PROPOSAL_TIME, s);
-			Belief b3=b.merge(mc3);
+			BeliefMerge mc3=BeliefMerge.create(b, kps[0], TS+1+Constants.KEEP_PROPOSAL_TIME, s);
+			Belief b3=mc3.merge();
 			SignedData<Order> so3=b3.getOrders().get(keys[0]);
 			Order order3=so3.getValue();
 			assertEquals(2,order3.getBlockCount());
