@@ -114,7 +114,7 @@ public class PredictionMarketTest extends ACVMTest {
 		// setup address for this little play
 		Context ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " +VILLAIN + ") )");
 
-		ctx = step("(import convex.trusted-oracle :as oaddr)");
+		ctx = step("(import convex.oracle :as oaddr)");
 
 		// call to create oracle with key :bar and current address (HERO) trusted
 		ctx = step(ctx, "(oaddr/register :bar {:trust #{*address*}})");

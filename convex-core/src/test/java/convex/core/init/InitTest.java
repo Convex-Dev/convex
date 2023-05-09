@@ -93,7 +93,7 @@ public class InitTest extends ACVMTest {
 		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
 		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.play))"));
 		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle.actor))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle))"));
+		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.oracle))"));
 		assertNotNull(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
 
 		assertEquals(Init.CORE_ADDRESS, eval("(call *registry* (cns-resolve 'convex.core))"));

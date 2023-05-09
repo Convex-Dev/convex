@@ -1,5 +1,4 @@
-'convex.trusted-oracle
-
+'convex.oracle
 
 (call *registry*
       (register {:description ["API for simple oracle actors that depend on a trusted set of addresses who may provide results."
@@ -15,80 +14,45 @@
                                "- `(provide key result)`"]
                  :name        "Trusted oracle API"}))
 
-
 (import convex.trusted-oracle.actor :as default-actor)
-
 
 ;;;;;;;;;; API
 
-
 (defn data
-
   ^{:doc {:description "Returns data registered for `key`."
           :examples    [{:code "(data :foo)"}]
           :signature   [{:params [key]}
                         {:params [actor key]}]}}
-
-
   ([key]
-
-   (data default-actor
+   (recur default-actor
         key))
-
-
   ([actor key]
-
-   (call actor
-         (data key))))
-
-
+    (call actor (data key))))
 
 (defn finalized?
-
   ^{:callable? true
     :doc       {:description "Returns a boolean indicating if a results has been provided for `key`."
                 :examples    [{:code "(finalized? :foo)"}]
                 :signature   [{:params [key]}
                               {:params [actor key]}]}}
-
-
   ([key]
-
-   (finalized? default-actor
-               key))
-
-
+    (recur default-actor key))
   ([actor key]
-
-   (call actor
-         (finalized? key))))
-
-
+    (call actor(finalized? key))))
 
 (defn read
-
   ^{:callable? true
     :doc       {:description "Returns the result for `key`."
                 :examples    [{:code "(read :foo)"}]
                 :signature   [{:params [key]}
                               {:params [actor key]}]}}
-
-
   ([key]
-
-   (read default-actor
-         key))
-
-
+    (recur default-actor key))
   ([actor key]
-
-   (call actor
-         (read key))))
-
-
+    (call actor 
+      (read key))))
 
 (defn register
-
   ^{:callable? true
     :doc       {:description ["Callable function for registering a new oracle key."
                               "Returns true if successful, false if key already exists."
@@ -97,25 +61,15 @@
                 :examples    [{:code "(register :foo {:trust #{*address*}})"}]
                 :signature   [{:params [key data]}
                               {:params [actor key data]}]}}
-
-
   ([key data]
-
-   (register default-actor
-             key
-             data))
-
-
+    (recur default-actor
+      key
+      data))
   ([actor key data]
-
-   (call actor
-         (register key
-                   data))))
-
-
+    (call actor
+      (register key data))))
 
 (defn provide
-
   ^{:callable? true
     :doc       {:description ["Provides a result for a key registered using `register`."
                               "Does not change anything if a resulted has already been provided for that key."
@@ -125,17 +79,10 @@
                 :examples    [{:code "(provide :foo 42)"}]
                 :signature   [{:params [key result]}
                               {:params [actor key result]}]}}
-
-
   ([key result]
-
    (provide default-actor
             key
             result))
-
-
   ([actor key result]
-
-   (call actor
-         (provide key
-                  result))))
+    (call actor
+      (provide key result))))
