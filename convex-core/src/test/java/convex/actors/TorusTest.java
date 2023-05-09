@@ -1,6 +1,8 @@
 package convex.actors;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -11,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
-import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
@@ -19,13 +20,14 @@ import convex.core.util.Utils;
 import convex.lib.AssetTester;
 
 public class TorusTest extends ACVMTest {
-	Context INITIAL=context();
 
-	protected TorusTest() {
-		super(InitTest.STATE);
-
+	Address USD;
+	Address GBP;
+	Address TORUS;
+	Address USD_MARKET;
+	
+	@Override public Context buildContext(Context ctx) {
 		try {
-			Context ctx=INITIAL;
 			ctx=step(ctx,"(import convex.fungible :as fun)");
 
 			ctx=step(ctx,"(import convex.asset :as asset)");
@@ -38,8 +40,6 @@ public class TorusTest extends ACVMTest {
 			GBP=(Address) ctx.getResult();
 
 			// Deploy Torus actor itself
-			ctx=ctx.withJuice(INITIAL_JUICE);
-
 			ctx= step(ctx,"(def TORUS (import torus.exchange :as torus))");
 			TORUS=(Address)ctx.getResult();
 			assertNotNull(ctx.getAccountStatus(TORUS));
@@ -48,24 +48,17 @@ public class TorusTest extends ACVMTest {
 			// Deploy USD market. No market for GBP yet!
 			ctx= step(ctx,"(call TORUS (create-market USD))");
 			USD_MARKET=(Address)ctx.getResult();
-			INITIAL= ctx.withResult(TORUS).withJuice(INITIAL_JUICE);
+			
+			return ctx;
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw Utils.sneakyThrow(e);
-		}
+		}		
 	}
 
-	Address USD = null;
-	Address GBP = null;
-	Address TORUS = null;
-	Address USD_MARKET = null;
-
-	static {
-
-	}
 
 	@Test public void testMissingMarket() {
-		Context ctx=INITIAL.fork();
+		Context ctx=context();
 
 		assertNull(eval(ctx,"(torus/get-market GBP)"));
 
@@ -76,7 +69,7 @@ public class TorusTest extends ACVMTest {
 	}
 
 	@Test public void testDeployedCurrencies() {
-		Context ctx=INITIAL.fork(); // Initial test context
+		Context ctx=context(); // Initial test context
 		ctx=step(ctx,"(import torus.exchange :as torus)");
 		ctx= step(ctx,"(def GBP (import currency.GBP :as GBP))");
 		ctx= step(ctx,"(def USD (import currency.USD :as USD))");
@@ -89,7 +82,7 @@ public class TorusTest extends ACVMTest {
 	}
 	
 	@Test public void testMultiTokenListing() {
-		Context ctx=INITIAL.fork();
+		Context ctx=context();
 		String importS="(import asset.multi-token :as mt)";
 		ctx=step(ctx,importS);
 		assertNotError(ctx);
@@ -115,7 +108,7 @@ public class TorusTest extends ACVMTest {
 
 
 	@Test public void testTorusAPI() {
-		Context ctx=INITIAL.fork();
+		Context ctx=context();
 
 		// Deploy GBP market.
 		ctx= step(ctx,"(def GBPM (call TORUS (create-market GBP)))");
@@ -174,7 +167,7 @@ public class TorusTest extends ACVMTest {
 	}
 
 	@Test public void testInitialTokenMarket() {
-		Context ctx=INITIAL.fork();
+		Context ctx=context();
 
 		// Check we can access the USD market
 		ctx= step(ctx,"(def USDM (torus/get-market USD))");

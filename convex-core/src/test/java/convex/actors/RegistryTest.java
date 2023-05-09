@@ -28,32 +28,25 @@ public class RegistryTest extends ACVMTest {
 
 	static final Address REG = Init.REGISTRY_ADDRESS;
 
-	Context INITIAL_CONTEXT=context();
-
 	@Test
 	public void testRegistryContract() throws IOException {
-		// TODO: think about whether we want this in initial state
-		// String contractString=Utils.readResourceAsString("contracts/registry.con");
-		// Object
-		// cfn=CoreTest.INITIAL_CONTEXT.eval(Reader.read(contractString)).getResult();
-		// Context ctx=CoreTest.INITIAL_CONTEXT.deployContract(cfn);
-		// Address addr=(Address) ctx.getResult();
+		Context ctx =context();
 
 		AHashMap<Keyword, ACell> ddo = Maps.of(Keyword.create("name"), "Bob");
-		Context ctx = INITIAL_CONTEXT.actorCall(REG, 0, Symbol.create("register"), ddo);
+		ctx = ctx.actorCall(REG, 0, Symbol.create("register"), ddo);
 		assertEquals(ddo, ctx.actorCall(REG, 0, "lookup", ctx.getAddress()).getResult());
 	}
 
 	@Test
 	public void testRegistryCNS() throws IOException {
-		Context ctx=INITIAL_CONTEXT.fork();
+		Context ctx=context();
 
 		assertEquals(REG,eval(ctx,"(call *registry* (cns-resolve 'convex.registry))"));
 	}
 
 	@Test
 	public void testRegistryCNSUpdate() throws IOException {
-		Context ctx=INITIAL_CONTEXT.fork();
+		Context ctx=context();
 
 		assertNull(eval(ctx,"(call *registry* (cns-resolve 'convex.test.foo))"));
 

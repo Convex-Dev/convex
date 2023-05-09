@@ -22,22 +22,20 @@ import convex.core.lang.Context;
 import convex.test.Samples;
 
 public class TrustTest extends ACVMTest {
-	private Address trusted=null;
+	private Address trusted;
 
-	private Context CONTEXT;
 	protected TrustTest() throws IOException {
 		super(InitTest.BASE);
-		Context ctx = context();
+	}
 
+	@Override protected Context buildContext(Context ctx) {
 		String importS = "(import convex.trust :as trust)";
 		ctx = step(ctx, importS);
 		assertNotError(ctx);
 		trusted = (Address)ctx.getResult();
-
-		CONTEXT=ctx.fork();
-		INITIAL=ctx.getState();
+		return ctx;
 	}
-
+	
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
 	 */

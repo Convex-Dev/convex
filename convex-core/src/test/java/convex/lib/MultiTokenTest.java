@@ -1,11 +1,13 @@
 package convex.lib;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -17,19 +19,17 @@ import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.lang.TestState;
 
 public class MultiTokenTest extends ACVMTest {
 	
 	private final Address mt;
 	
 	protected MultiTokenTest() {
-		super(createFungibleState());
+		super();
 		mt=(Address) context().getEnvironment().get(Symbol.create("mt"));
 	}
 	
-	private static State createFungibleState() {
-		Context ctx=TestState.CONTEXT.fork();
+	@Override protected Context buildContext(Context ctx) {
 		String importS="(import asset.multi-token :as mt)";
 		ctx=step(ctx,importS);
 		assertNotError(ctx);
@@ -49,7 +49,7 @@ public class MultiTokenTest extends ACVMTest {
 		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [[mt :USD] 400])");
 		assertNotError(ctx);
 
-		return ctx.getState();
+		return ctx;
 	}
 	
 	@Test public void testOfferAccept() {

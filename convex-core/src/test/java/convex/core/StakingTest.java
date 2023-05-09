@@ -12,11 +12,6 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 
 public class StakingTest extends ACVMTest {
-
-	protected StakingTest() {
-		super(InitTest.STATE);
-	}
-
 	@Test
 	public void testDelegatedStaking() {
 

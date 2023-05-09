@@ -21,10 +21,6 @@ import convex.core.util.Utils;
 
 public class PredictionMarketTest extends ACVMTest {
 
-	protected PredictionMarketTest() {
-		super(TestState.STATE);
-	}
-
 	private <T> T evalCall(Context ctx,Address addr, long offer, String name, Object... args) {
 		Context rctx=doCall(ctx,addr, offer, name, args);
 		return RT.jvm(rctx.getResult());

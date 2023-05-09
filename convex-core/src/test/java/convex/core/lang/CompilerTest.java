@@ -39,7 +39,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
@@ -56,10 +55,6 @@ import convex.test.Samples;
  * State setup includes only basic accounts and core library.
  */
 public class CompilerTest extends ACVMTest {
-
-	protected CompilerTest() {
-		super(InitTest.STATE);
-	}
 
 	@Test
 	public void testConstants() {

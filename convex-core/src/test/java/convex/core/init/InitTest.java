@@ -61,6 +61,10 @@ public class InitTest extends ACVMTest {
 	 * Standard Genesis state used for testing
 	 */
 	public static final State STATE= createState();
+	
+	/**
+	 * Base state (without libraries)
+	 */
 	public static final State BASE = Init.createBaseState(PEER_KEYS);
 
 

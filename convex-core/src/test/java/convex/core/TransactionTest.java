@@ -26,10 +26,6 @@ import static convex.test.Assertions.*;
  * Tests for Transactions, especially when applied in isolation to a State
  */
 public class TransactionTest extends ACVMTest {
-
-	protected TransactionTest() {
-		super(InitTest.STATE);
-	}
 	
 	Address HERO=InitTest.HERO;
 	Address VILLAIN=InitTest.VILLAIN;

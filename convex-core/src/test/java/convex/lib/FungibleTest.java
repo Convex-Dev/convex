@@ -27,11 +27,11 @@ public class FungibleTest extends ACVMTest {
 	private Address fungible;
 
 	protected FungibleTest() {
-		super(createFungibleState());
+		super(buildState());
 		fungible = (Address) context().lookup(Symbol.create("fungible")).getResult();
 	}
 	
-	private static State createFungibleState() {
+	private static State buildState() {
 		Context ctx=TestState.CONTEXT.fork();
 		String importS="(import convex.fungible :as fungible)";
 		ctx=step(ctx,importS);

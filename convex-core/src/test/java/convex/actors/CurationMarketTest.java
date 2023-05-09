@@ -13,18 +13,19 @@ public class CurationMarketTest extends ACVMTest {
 	
 	protected CurationMarketTest() {
 		super(InitTest.STATE);
-
+	}
+	
+	@Override protected Context buildContext(Context ctx) {
 		try {
-			Context ctx=context();
 			ctx=step(ctx,"(import convex.asset :as asset)");
 			ctx=step(ctx,"(import convex.trust :as trust)");
 			ctx=step(ctx,"(import asset.curation-market :as cm)");
 			assertNotError(ctx);
 			
-			INITIAL=ctx.getState();
+			return ctx;
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
-		}
+		}	
 	}
 	
 	@Test public void testCreate() {

@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -17,9 +18,9 @@ import convex.core.util.Utils;
  */
 public abstract class ACVMTest {
 
-	protected State INITIAL;
-	private Context CONTEXT;
-	protected long INITIAL_JUICE;
+	protected final State INITIAL;
+	protected final Context CONTEXT;
+	protected final long INITIAL_JUICE;
 
 	/**
 	 * Address of the HERO, equal to the genesis address
@@ -48,13 +49,16 @@ public abstract class ACVMTest {
 	 * @param genesis Genesis State to use for this CVM test
 	 */
 	protected ACVMTest(State genesis) {
-		this.INITIAL = genesis;
-		CONTEXT = Context.createFake(genesis, Init.GENESIS_ADDRESS);
+		Context c = Context.createFake(genesis, Init.GENESIS_ADDRESS);
+		c=buildContext(c);
+		this.INITIAL=c.getState();
+		this.CONTEXT=c;
 		HERO = InitTest.HERO;
 		VILLAIN = InitTest.VILLAIN;
-		INITIAL_JUICE = CONTEXT.getJuice();
-		HERO_BALANCE = INITIAL.getAccount(InitTest.HERO).getBalance();
-		VILLAIN_BALANCE = INITIAL.getAccount(InitTest.VILLAIN).getBalance();
+		c=c.withJuice(Constants.MAX_TRANSACTION_JUICE);
+		INITIAL_JUICE = c.getJuice();
+		HERO_BALANCE = c.getAccountStatus(InitTest.HERO).getBalance();
+		VILLAIN_BALANCE = c.getAccountStatus(InitTest.VILLAIN).getBalance();
 	}
 
 	/**
@@ -66,6 +70,16 @@ public abstract class ACVMTest {
 
 	protected Context context() {
 		return CONTEXT.fork();
+	}
+	
+	/**
+	 * Builds the Context for this test class instance. Subclasses may override
+	 * to generate a separate context
+	 * @param ctx Context to modify
+	 * @return
+	 */
+	protected Context buildContext(Context ctx) {
+		return ctx;
 	}
 
 	/**
@@ -301,4 +315,5 @@ public abstract class ACVMTest {
 		ACell form = Reader.read(source);
 		return expand(form);
 	}
+
 }
