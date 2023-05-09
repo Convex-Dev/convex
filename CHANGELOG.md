@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make `blob` casts support arbitrary sized integers
 - Remove unnecessary generic type parameter from Context class
 - Updates to GUI implementation
+- `*juice*` now starts at 0 and counts upwards towards a juice limit
 
 ### Fixed
 
