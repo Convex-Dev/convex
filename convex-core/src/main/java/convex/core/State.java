@@ -75,7 +75,7 @@ public class State extends ARecord {
 	static final int GLOBAL_JUICE_PRICE=2;
 	static final int GLOBAL_MEMORY_MEM=3;
 	static final int GLOBAL_MEMORY_CVX=4;
-	static final int GLOBAL_PROTOCOL=5;
+	static final int GLOBAL_PROTOCOL=5; // TODO: move to actor
 
 	/**
 	 * An empty State
