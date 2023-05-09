@@ -477,11 +477,11 @@ public class BeliefMerge {
 
 		if (i < numAgreed) {
 			// we have a consensus since we hit the stake threshold!
-			Order lastAgreed = agreedChains.get(i); // Order that hit the threshold
+			Order lastAgreed = agreedChains.get(i); // Order that tipped us over the threshold
 			long prefixMatch = winnningOrder.getBlocks().commonPrefixLength(lastAgreed.getBlocks());
 			long previousLevel = Math.min(winnningOrder.getConsensusPoint(level-1), lastAgreed.getConsensusPoint(level-1));
 			long newPoint = Math.min(prefixMatch, previousLevel);
-			return winnningOrder.withConsenusPoint(newPoint);
+			return winnningOrder.withConsensusPoint(level,newPoint);
 		} else {
 			return winnningOrder;
 		}

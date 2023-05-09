@@ -300,12 +300,27 @@ public class Order extends ARecord {
 	 * @param newConsensusPoint New consensus point
 	 * @return Updated chain, or this Chain instance if no change.
 	 */
-	public Order withConsenusPoint(long newConsensusPoint) {
+	public Order withConsensusPoint(long newConsensusPoint) {
 		if (this.consensusPoint == newConsensusPoint) return this;
 		if (newConsensusPoint > getBlocks().count())
 			throw new IndexOutOfBoundsException("Block index: " + newConsensusPoint);
 		long newProposalPoint = Math.max(proposalPoint, newConsensusPoint);
 		return create(blocks, newProposalPoint, newConsensusPoint, timestamp);
+	}
+	
+	/**
+	 * Updates this Order with a new consensus position.
+	 * 
+	 * @param level Consensus level to update
+	 * @param newPosition New consensus point
+	 * @return Updated chain, or this Chain instance if no change.
+	 */
+	public Order withConsensusPoint(int level,long newPosition) {
+		switch (level) {
+		case 1: return withProposalPoint(newPosition);
+		case 2: return withConsensusPoint(newPosition);
+		default: throw new Error("Illegal level");
+		}
 	}
 
 	/**
