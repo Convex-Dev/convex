@@ -42,8 +42,8 @@ public class BeliefVotingTest {
 	
 	@Test
 	public void testComputeVote() {
-		assertEquals(100.0, Belief.computeVote(Maps.hashMapOf(1, 50.0, 0, 50.0)), 0.000001);
-		assertEquals(0.0, Belief.computeVote(Maps.hashMapOf()), 0.000001);
+		assertEquals(100.0, BeliefMerge.computeVote(Maps.hashMapOf(1, 50.0, 0, 50.0)), 0.000001);
+		assertEquals(0.0, BeliefMerge.computeVote(Maps.hashMapOf()), 0.000001);
 	}
 	
 	@Test
@@ -68,7 +68,7 @@ public class BeliefVotingTest {
 
 		// check trivial merges are idempotent
 		BeliefMerge baseMC=BeliefMerge.create(b0, kps[0], TS, s);
-		assertSame(b0,b0.mergeOrders(baseMC,b0));
+		assertSame(b0,baseMC.mergeOrders(b0));
 		Belief b00=baseMC.merge(b0);
 		assertSame(b0,b00);
 		assertSame(b0,baseMC.merge(b0,b0));
