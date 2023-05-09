@@ -282,7 +282,9 @@ public class Belief extends ARecord {
 
 		// filter Orders for compatibility with current Order for inclusion in Voting Set
 		// TODO: figure out what to do with new blocks filtered out?
-		final BlobMap<AccountKey, SignedData<Order>> filteredOrders = accOrders.filterValues(signedOrder -> {
+		BlobMap<AccountKey, SignedData<Order>> filteredOrders=accOrders;
+		
+		filteredOrders= accOrders.filterValues(signedOrder -> {
 			try {
 				Order otherOrder = signedOrder.getValue();
 				return myOrder.checkConsistent(otherOrder);

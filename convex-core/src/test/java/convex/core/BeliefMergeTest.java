@@ -115,8 +115,9 @@ public class BeliefMergeTest {
 		Peer[] result = new Peer[n];
 
 		Belief[] sharedBeliefs = new Belief[n];
-		for (int j = 0; j < n; j++)
+		for (int j = 0; j < n; j++) {
 			sharedBeliefs[j] = initial[j].getBelief();
+		}
 
 		for (int i = 0; i < n; i++) {
 			Peer ps = initial[i];

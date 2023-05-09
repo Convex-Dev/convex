@@ -380,7 +380,8 @@ public class Peer {
 
 	/**
 	 * Merges a set of new Beliefs into this Peer's belief. Beliefs may be null, in
-	 * which case they are ignored.
+	 * which case they are ignored. Should call updateState() at some point after this to
+	 * update the global consensus state
 	 *
 	 * @param beliefs An array of Beliefs. May contain nulls, which will be ignored.
 	 * @return Updated Peer after Belief Merge
