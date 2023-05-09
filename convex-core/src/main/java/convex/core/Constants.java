@@ -239,5 +239,10 @@ public class Constants {
 	 */
 	public static final long KEEP_PROPOSAL_TIME = 1000;
 
+	/**
+	 * Number of consensus levels (blocks, proposed, consensus)
+	 */
+	public static final int CONSENSUS_LEVELS = 3;
+
 
 }

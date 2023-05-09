@@ -432,14 +432,14 @@ public class BeliefMerge {
 	 * @param THRESHOLD Threshold from Consensus
 	 * @return updated Order
 	 */
-	private Order updateConsensus(Order winningOrder, HashMap<Order, Double> stakedOrders, double totalStake) {
+	private Order updateConsensus(Order order, HashMap<Order, Double> stakedOrders, double totalStake) {
 		final double THRESHOLD = totalStake * Constants.CONSENSUS_THRESHOLD;
 		
-		final Order proposedOrder = updateProposal(winningOrder, stakedOrders, THRESHOLD);
-
-		final Order consensusOrder = updateLevel(proposedOrder,2, stakedOrders, THRESHOLD);
+		for (int level=1; level<Constants.CONSENSUS_LEVELS; level++) {
+			order = updateLevel(order,level, stakedOrders, THRESHOLD);
+		}
 		
-		return consensusOrder;
+		return order;
 	}
 	
 	/**
@@ -459,8 +459,9 @@ public class BeliefMerge {
 
 				// Match length is how many blocks agree with winning order at previous consensus level
 				long match = Math.min(blockMatch, minPrevious);
-				if (match <= winnningOrder.getConsensusPoint()) return null; // skip if no progress vs existing
-																				// consensus
+				
+				// skip if no progress vs existing consensus
+				if (match <= winnningOrder.getConsensusPoint()) return null; 
 				return -match;
 			}
 		}, stakedOrders.keySet());
@@ -487,57 +488,6 @@ public class BeliefMerge {
 		}
 	}
 
-	/**
-	 * Updates the proposal point for the winning Order, given an overall map of
-	 * staked Orders and consensus threshold.
-	 */
-	private Order updateProposal(Order winningOrder, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
-		AVector<SignedData<Block>> winningBlocks = winningOrder.getBlocks();
-
-		// sort all chains according to extent of agreement with winning chain
-		ArrayList<Order> agreedOrders = sortByAgreement(stakedOrders, winningBlocks);
-		int numAgreed = agreedOrders.size();
-
-		// accumulate stake to see how many agreed chains are required to meet proposal
-		// threshold
-		double accumulatedStake = 0.0;
-		int i = 0;
-		for (; i < numAgreed; i++) {
-			Order c = agreedOrders.get(i);
-			double orderStake = stakedOrders.get(c);
-			accumulatedStake += orderStake;
-			if (accumulatedStake > THRESHOLD) break;
-		}
-
-		if (i < numAgreed) {
-			// we have a proposed consensus
-			Order lastAgreed = agreedOrders.get(i);
-			AVector<SignedData<Block>> lastBlocks = lastAgreed.getBlocks();
-			long newProposalPoint = winningBlocks.commonPrefixLength(lastBlocks);
-			return winningOrder.withProposalPoint(newProposalPoint);
-		} else {
-			return winningOrder;
-		}
-	}
-	
-	/**
-	 * Sorts a set of Orders according to level of agreement with a given vector of
-	 * Blocks. Orders with longest common prefix length are placed first.
-	 * 
-	 * @param stakedOrders  Map with Orders as keys
-	 * @param winningBlocks Vector of blocks to seek agreement with
-	 * @return List of Orders in agreement order
-	 */
-	private static ArrayList<Order> sortByAgreement(HashMap<Order, ?> stakedOrders, AVector<SignedData<Block>> winningBlocks) {
-		return Utils.sortListBy(new Function<Order, Long>() {
-			@Override
-			public Long apply(Order c) {
-				long match = winningBlocks.commonPrefixLength(c.getBlocks());
-				return -match; // sort highest matches first
-			}
-		}, stakedOrders.keySet());
-	}
-	
 	/**
 	 * Computes the total vote for all entries in a HashMap
 	 * 
