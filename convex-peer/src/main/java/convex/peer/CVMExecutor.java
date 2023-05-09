@@ -24,7 +24,7 @@ public class CVMExecutor extends AThreadedComponent {
 	protected void loop() throws InterruptedException {
 		// poll for any Belief change
 		LoadMonitor.down();
-		Belief beliefUpdate=update.poll(1000, TimeUnit.MILLISECONDS);
+		Belief beliefUpdate=update.poll(100, TimeUnit.MILLISECONDS);
 		LoadMonitor.up();
 		if (beliefUpdate!=null) {
 			peer=peer.updateBelief(beliefUpdate);

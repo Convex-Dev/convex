@@ -74,8 +74,10 @@ public class JoinNetworkTest {
 			// TODO: should these be in consensus at this point since just synced
 			// note: shouldn't matter which is the current store
 			// assertEquals(newServer.getPeer().getConsensusState(),network.SERVER.getPeer().getConsensusState());
-
+			// Thread.sleep(100);
+			
 			Convex client=Convex.connect(newServer.getHostAddress(), user, kp);
+			client.setNextSequence(1); // avoids a potential stale query
 			assertEquals(user,client.transactSync("*address*").getValue());
 			
 			Result r=client.requestStatus().get(2000,TimeUnit.MILLISECONDS);
