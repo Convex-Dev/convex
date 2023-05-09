@@ -1,6 +1,5 @@
 package convex.core.lang;
 
-import convex.core.Constants;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -55,8 +54,8 @@ public abstract class ACVMTest {
 		this.CONTEXT=c;
 		HERO = InitTest.HERO;
 		VILLAIN = InitTest.VILLAIN;
-		c=c.withJuice(Constants.MAX_TRANSACTION_JUICE);
-		INITIAL_JUICE = c.getJuice();
+		c=c.withJuice(0); // reset juice used
+		INITIAL_JUICE = c.getJuiceAvailable();
 		HERO_BALANCE = c.getAccountStatus(InitTest.HERO).getBalance();
 		VILLAIN_BALANCE = c.getAccountStatus(InitTest.VILLAIN).getBalance();
 	}
@@ -252,7 +251,7 @@ public abstract class ACVMTest {
 	public long juiceCompile(String source) {
 		ACell form = Reader.read(source);
 		Context jctx = context().expandCompile(form);
-		return CONTEXT.getJuice() - jctx.getJuice();
+		return jctx.getJuiceUsed()-CONTEXT.getJuiceUsed();
 	}
 
 	/**
@@ -265,7 +264,7 @@ public abstract class ACVMTest {
 	public long juiceExpand(String source) {
 		ACell form = Reader.read(source);
 		Context jctx = context().invoke(Core.INITIAL_EXPANDER, form, Core.INITIAL_EXPANDER);
-		return CONTEXT.getJuice() - jctx.getJuice();
+		return jctx.getJuiceUsed()-CONTEXT.getJuiceUsed();
 	}
 
 	/**
@@ -291,7 +290,7 @@ public abstract class ACVMTest {
 		ACell form = Reader.read(source);
 		AOp<?> op = ctx.fork().expandCompile(form).getResult();
 		Context jctx = ctx.fork().execute(op);
-		return ctx.getJuice() - jctx.getJuice();
+		return jctx.getJuiceUsed()-ctx.getJuiceUsed();
 	}
 
 	/**

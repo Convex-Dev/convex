@@ -519,8 +519,6 @@ public class State extends ARecord {
 			// Return context with no change, i.e. before executing the transaction
 			return ctx;
 		}
-		
-		final long totalJuice = ctx.getJuice();
 
 		State preparedState=ctx.getState();
 
@@ -529,7 +527,7 @@ public class State extends ARecord {
 
 		// complete transaction
 		// NOTE: completeTransaction handles error cases as well
-		ctx = ctx.completeTransaction(preparedState, totalJuice);
+		ctx = ctx.completeTransaction(preparedState);
 
 		return ctx;
 

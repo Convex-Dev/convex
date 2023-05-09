@@ -54,7 +54,7 @@ public class OpsTest extends ACVMTest {
 		super(InitTest.BASE);
 	}
 
-	private final long INITIAL_JUICE = context().getJuice();
+	private final long INITIAL_JUICE = context().getJuiceAvailable();
 
 	@Test
 	public void testConstant() {
@@ -64,7 +64,7 @@ public class OpsTest extends ACVMTest {
 			AOp<CVMLong> op = Constant.of(10L);
 			Context c2 = c.fork().execute(op);
 
-			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
+			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuiceAvailable());
 			assertEquals(CVMLong.create(10L), c2.getResult());
 			doOpTest(op);
 		}
@@ -73,7 +73,7 @@ public class OpsTest extends ACVMTest {
 			AOp<ACell> op = Constant.nil();
 			Context c2 = c.fork().execute(op);
 
-			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuice());
+			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuiceAvailable());
 			assertNull(c2.getResult());
 			doOpTest(op);
 		}
@@ -107,13 +107,13 @@ public class OpsTest extends ACVMTest {
 		assertEquals("bar", env2.get(fooSym).toString());
 
 		long expectedJuice = INITIAL_JUICE - Juice.CONSTANT - Juice.DEF;
-		assertEquals(expectedJuice, c2.getJuice());
+		assertEquals(expectedJuice, c2.getJuiceAvailable());
 		assertEquals("bar", c2.getResult().toString());
 
 		AOp<AString> lookupOp = Lookup.create(Symbol.create("foo"));
 		Context c3 = c2.execute(lookupOp);
 		expectedJuice -= Juice.LOOKUP_DYNAMIC;
-		assertEquals(expectedJuice, c3.getJuice());
+		assertEquals(expectedJuice, c3.getJuiceAvailable());
 		assertEquals("bar", c3.getResult().toString());
 
 		doOpTest(op);
@@ -137,7 +137,7 @@ public class OpsTest extends ACVMTest {
 
 		Context c2 = c.execute(op);
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
-		assertEquals(expectedJuice, c2.getJuice());
+		assertEquals(expectedJuice, c2.getJuiceAvailable());
 		assertEquals("bar", c2.getResult().toString());
 
 		doOpTest(op);
@@ -187,7 +187,7 @@ public class OpsTest extends ACVMTest {
 
 		assertEquals("trueResult", c2.getResult().toString());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
-		assertEquals(expectedJuice, c2.getJuice());
+		assertEquals(expectedJuice, c2.getJuiceAvailable());
 
 		doOpTest(op);
 	}
@@ -202,8 +202,8 @@ public class OpsTest extends ACVMTest {
 		Context c2 = c.execute(op);
 
 		assertEquals("falseResult", c2.getResult().toString());
-		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
-		assertEquals(expectedJuice, c2.getJuice());
+		long expectedJuice = (Juice.COND_OP + Juice.CONSTANT + Juice.CONSTANT);
+		assertEquals(expectedJuice, c2.getJuiceUsed());
 
 		doOpTest(op);
 	}
@@ -218,7 +218,7 @@ public class OpsTest extends ACVMTest {
 
 		assertNull(c2.getResult());
 		long expectedJuice = INITIAL_JUICE - (Juice.COND_OP + Juice.CONSTANT);
-		assertEquals(expectedJuice, c2.getJuice());
+		assertEquals(expectedJuice, c2.getJuiceAvailable());
 
 		doOpTest(op);
 	}

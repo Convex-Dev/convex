@@ -101,11 +101,11 @@ public class ContextTest extends ACVMTest {
 		assertTrue(c.checkJuice(1000));
 
 		// get a juice error if too much juice consumed
-		assertJuiceError(c.consumeJuice(c.getJuice() + 1));
+		assertJuiceError(c.consumeJuice(c.getJuiceAvailable() + 1));
 
 		// no error if all juice is consumed
 		c=context();
-		assertFalse(c.consumeJuice(c.getJuice()).isExceptional());
+		assertFalse(c.consumeJuice(c.getJuiceAvailable()).isExceptional());
 	}
 
 	@Test
@@ -163,7 +163,7 @@ public class ContextTest extends ACVMTest {
 		assertEquals(Special.forSymbol(Symbols.STAR_BALANCE),comp("*balance*"));
 
 		assertNull(eval(Symbols.STAR_RESULT));
-		assertCVMEquals(ctx.getJuice(), eval(Special.forSymbol(Symbols.STAR_JUICE)));
+		assertCVMEquals(ctx.getJuiceUsed(), eval(Special.forSymbol(Symbols.STAR_JUICE)));
 		assertCVMEquals(0L,eval(Symbols.STAR_DEPTH));
 		assertCVMEquals(ctx.getBalance(ADDR),eval(Symbols.STAR_BALANCE));
 		assertCVMEquals(0L,eval(Symbols.STAR_OFFER));

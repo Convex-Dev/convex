@@ -94,7 +94,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	@Override
 	public Context execute(Context ctx) {
 		switch (opCode) {
-		case S_JUICE: ctx= ctx.withResult(CVMLong.create(ctx.getJuice())); break;
+		case S_JUICE: ctx= ctx.withResult(CVMLong.create(ctx.getJuiceUsed())); break;
 		case S_CALLER: ctx= ctx.withResult(ctx.getCaller()); break;
 		case S_ADDRESS: ctx= ctx.withResult(ctx.getAddress()); break;
 		case S_MEMORY: ctx= ctx.withResult(CVMLong.create(ctx.getAccountStatus().getMemory())); break;

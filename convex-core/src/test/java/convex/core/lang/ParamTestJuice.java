@@ -110,10 +110,10 @@ public class ParamTestJuice {
 	public void testResultAndJuice() {
 		Context c = eval(source);
 
-		Object result = c.getResult();
+		ACell result = c.getResult();
 		assertCVMEquals(expectedResult, result);
 
-		long juiceUsed = INITIAL_JUICE - c.getJuice();
+		long juiceUsed = c.getJuiceUsed();
 		assertEquals(expectedJuice, juiceUsed);
 
 	}

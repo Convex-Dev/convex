@@ -88,6 +88,7 @@ public class Context extends AObject {
 	 */
 
 	private long juice;
+	private long juiceLimit=Constants.MAX_TRANSACTION_JUICE;
 	private ACell result;
 	private AExceptional exception;
 	private int depth;
@@ -237,9 +238,10 @@ public class Context extends AObject {
 
 	}
 
-	protected Context(ChainState chainState, long juice, AVector<ACell> localBindings2, ACell result,int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
+	protected Context(ChainState chainState, long juice, long juiceLimit, AVector<ACell> localBindings2,ACell result, int depth, AExceptional exception, AVector<AVector<ACell>> log, CompilerState comp) {
 		this.chainState=chainState;
 		this.juice=juice;
+		this.juiceLimit=juiceLimit;
 		this.localBindings=localBindings2;
 		this.result=result;
 		this.depth=depth;
@@ -249,15 +251,15 @@ public class Context extends AObject {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> Context create(ChainState cs, long juice, AVector<ACell> localBindings, ACell result, int depth,AVector<AVector<ACell>> log, CompilerState comp) {
+	private static <T extends ACell> Context create(ChainState cs, long juice,long juiceLimit, AVector<ACell> localBindings, ACell result, int depth,AVector<AVector<ACell>> log, CompilerState comp) {
 		if (juice<0) throw new IllegalArgumentException("Negative juice! "+juice);
-		Context ctx= new Context(cs,juice,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log,comp);
+		Context ctx= new Context(cs,juice,juiceLimit,localBindings,(T)result,depth,DEFAULT_EXCEPTION,log, comp);
 		return ctx;
 	}
 
-	private static <T extends ACell> Context create(State state, long juice,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
+	private static <T extends ACell> Context create(State state, long juice,long juiceLimit,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer,null);
-		return create(chainState,juice,localBindings,result,depth,log,comp);
+		return create(chainState,juice,juiceLimit,localBindings,result,depth,log,comp);
 	}
 
 	/**
@@ -284,7 +286,7 @@ public class Context extends AObject {
 	 */
 	public static Context createFake(State state, Address origin) {
 		if (origin==null) throw new IllegalArgumentException("Null address!");
-		return create(state,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,origin,null,origin, 0, DEFAULT_LOG,null);
+		return create(state,0,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,origin,null,origin, 0, DEFAULT_LOG,null);
 	}
 
 	/**
@@ -295,7 +297,7 @@ public class Context extends AObject {
 	 *
 	 * @param state Initial State for Context
 	 * @param origin Origin Address for Context
-	 * @param juice Initial juice for Context
+	 * @param juice Initial juice requested for Context
 	 * @return Initial execution context with reserved juice.
 	 */
 	public static Context createInitial(State state, Address origin,long juice) {
@@ -309,15 +311,9 @@ public class Context extends AObject {
 		long juicePrice=state.getJuicePrice().longValue();
 
 		// reduce juice if insufficient balance
-		juice=Math.min(juice,balance/juicePrice);
-		long reserve=juicePrice*juice;
+		long juiceLimit=Math.min(juice,balance/juicePrice);
 
-		assert (reserve<=balance) : "Reserve calculation failed!";
-
-		long newBalance=balance-reserve;
-		as=as.withBalance(newBalance);
-		state=state.putAccount(origin, as);
-		return create(state,juice,EMPTY_BINDINGS,null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
+		return create(state,0,juiceLimit,EMPTY_BINDINGS,null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
 	}
 
 
@@ -332,33 +328,23 @@ public class Context extends AObject {
 	 * </ul>
 	 *
 	 * @param initialState State before transaction execution (after prepare)
-	 * @param initialJuice total juice reserved at start of transaction
 	 * @return Updated context
 	 */
-	public Context completeTransaction(State initialState, long initialJuice) {
+	public Context completeTransaction(State initialState) {
 		// get state at end of transaction application
 		State state=getState();
+		long usedJuice=this.juice;
 
-		long remainingJuice=Math.max(0L, juice);
-		long usedJuice=initialJuice-remainingJuice;
 		long juicePrice=initialState.getJuicePrice().longValue();
-		assert(usedJuice>=0);
-
-		long refund=0L;
-
-		// maybe refund remaining juice
-		if (remainingJuice>0L) {
-			// Compute refund. Shouldn't be possible to overflow?
-			// But do a paranoid checked multiply just in case
-			refund+=Math.multiplyExact(remainingJuice,juicePrice);
-		}
+		long juiceFees=Juice.addMul(Constants.BASE_TRANSACTION_JUICE,usedJuice,juicePrice);
 
 		// compute memory delta
 		Address address=getAddress();
 		AccountStatus account=state.getAccount(address);
+		
 		long memUsed=state.getMemorySize()-initialState.getMemorySize();
 		long allowance=account.getMemory();
-		long balanceLeft=account.getBalance();
+		long balance=account.getBalance();
 		boolean memoryFailure=false;
 
 		long memorySpend=0L; // usually zero
@@ -375,7 +361,7 @@ public class Context extends AObject {
 				long poolAllowance=state.getGlobalMemoryPool().longValue();
 				memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
 
-				if ((refund+balanceLeft)>=memorySpend) {
+				if ((balance-juiceFees)>=memorySpend) {
 					// enough to cover memory price, so automatically buy from pool
 					// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
 					state=state.updateMemoryPool(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
@@ -394,8 +380,11 @@ public class Context extends AObject {
 			account=account.withMemory(allowance+allowanceCredit);
 		}
 
+		// Compute total fees
+		long fees=juiceFees+memorySpend;
+		
 		// Make balance changes if needed for refund and memory purchase
-		account=account.addBalance(refund-memorySpend);
+		account=account.addBalance(-fees);
 		
 		// Update sequence
 		account=account.updateSequence(account.getSequence()+1);
@@ -432,12 +421,21 @@ public class Context extends AObject {
 	}
 
 	/**
+	 * Get the juice used so far in this Context
+	 * @return Juice used
+	 */
+	public long getJuiceUsed() {
+		return juice;
+	}
+	
+	/**
 	 * Get the juice available in this Context
 	 * @return Juice available
 	 */
-	public long getJuice() {
-		return juice;
+	public long getJuiceAvailable() {
+		return juiceLimit-juice;
 	}
+
 
 	/**
 	 * Get the current offer from this Context
@@ -479,7 +477,7 @@ public class Context extends AObject {
 	public Context consumeJuice(long gulp) {
 		if (gulp<=0) throw new Error("Juice gulp must be positive!");
 		if(!checkJuice(gulp)) return withJuiceError();
-		juice=juice-gulp;
+		juice=juice+gulp;
 		return this;
 		// return new Context<R>(chainState,newJuice,localBindings,(R) result,depth,isExceptional);
 	}
@@ -491,7 +489,7 @@ public class Context extends AObject {
 	 * @return true if juice is sufficient, false otherwise.
 	 */
 	public boolean checkJuice(long gulp) {
-		return (juice>=gulp);
+		return (juice+gulp<=juiceLimit);
 	}
 
 	/**
@@ -827,8 +825,7 @@ public class Context extends AObject {
 
 	public Context withResult(long gulp,ACell value) {
 		if (!checkJuice(gulp)) return withJuiceError();
-		juice=juice-gulp;
-
+		juice=juice+gulp;
 		return withResult(value);
 	}
 
@@ -838,7 +835,7 @@ public class Context extends AObject {
 	 */
 	public Context withJuiceError() {
 		// set juice to zero. Can't consume more that we have!
-		this.juice=0;
+		this.juice=juiceLimit;
 		return withError(ErrorCodes.JUICE,"Out of juice!");
 	}
 
@@ -851,7 +848,7 @@ public class Context extends AObject {
 
 	public Context withException(long gulp,AExceptional value) {
 		if (!checkJuice(gulp)) return withJuiceError();
-		juice=juice-gulp;
+		juice=juice+gulp;
 		return withException(value);
 		//if ((this.result==value)&&(this.juice==newJuice)) return (Context<R>) this;
 		//return (Context<R>) new Context<AExceptional>(chainState,newJuice,localBindings,value,depth,true);
@@ -1089,6 +1086,8 @@ public class Context extends AObject {
 		bb.append("{");
 		bb.append(":juice "+juice);
 		bb.append(',');
+		bb.append(":juice-limit "+juiceLimit);
+		bb.append(',');
 		bb.append(":result ");
 		if (!RT.print(bb,result,limit)) return false;
 		bb.append(',');
@@ -1307,7 +1306,7 @@ public class Context extends AObject {
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
 
 		// SECURITY: eval with a context switch
-		final Context exContext=Context.create(getState(), juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),caller, address,0,log,null);
+		final Context exContext=Context.create(getState(), juice,juiceLimit, EMPTY_BINDINGS, null, depth+1, getOrigin(),caller, address,0,log,null);
 
 		final Context rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
@@ -1343,7 +1342,7 @@ public class Context extends AObject {
 	public Context queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER,null);
-		Context ctx=Context.create(cs, juice, EMPTY_BINDINGS, null, depth,log,null);
+		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, null, depth,log,null);
 		ctx=ctx.evalAs(address, form);
 		return handleQueryResult(ctx);
 	}
@@ -1354,7 +1353,8 @@ public class Context extends AObject {
 	 * @return
 	 */
 	protected Context handleQueryResult(Context ctx) {
-		this.juice=ctx.getJuice();
+		// Copy juice used
+		this.juice=ctx.juice;
 		return this.withValue(ctx.result);
 	}
 
@@ -1700,7 +1700,7 @@ public class Context extends AObject {
 	 * @return
 	 */
 	private Context forkActorCall(State state, Address target, long offer, ACell scope) {
-		Context fctx=Context.create(state, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+		Context fctx=Context.create(state, juice, juiceLimit,EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
 		if (scope!=null) {
 			fctx.chainState=fctx.chainState.withScope(scope);
 		}
@@ -1802,7 +1802,7 @@ public class Context extends AObject {
 		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		final Context deployContext=Context.create(stateSetup, juice, EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		final Context deployContext=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
 		final Context rctx=deployContext.eval(code);
 
 		Context result=this.handleStateResults(rctx,false);
@@ -1938,13 +1938,13 @@ public class Context extends AObject {
 		if (timestamp<0L) return withError(ErrorCodes.ARGUMENT);
 		if (time<timestamp) time=timestamp;
 
-		long juice=(time-timestamp)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
-		if (this.juice<juice) return withJuiceError();
+		long juiceNeeded=(time-timestamp)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
+		if (!checkJuice(juiceNeeded)) return withJuiceError();
 
 		State s=getState().scheduleOp(time,getAddress(),op);
 		Context ctx=this.withChainState(chainState.withState(s));
 
-		return ctx.withResult(juice,CVMLong.create(time));
+		return ctx.withResult(juiceNeeded,CVMLong.create(time));
 	}
 
 	/**
@@ -2139,7 +2139,7 @@ public class Context extends AObject {
 	 * @return A new forked Context
 	 */
 	public Context fork() {
-		return new Context(chainState, juice, localBindings, null,depth, null,log,compilerState);
+		return new Context(chainState, juice, juiceLimit, localBindings,null, depth,null,log, compilerState);
 	}
 
 	@Override
@@ -2266,6 +2266,7 @@ public class Context extends AObject {
 		}
 		return null;
 	}
+
 
 
 

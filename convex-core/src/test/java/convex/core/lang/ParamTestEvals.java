@@ -22,7 +22,6 @@ import convex.core.util.Utils;
 @RunWith(Parameterized.class)
 public class ParamTestEvals {
 
-	private static long INITIAL_JUICE = TestState.INITIAL_JUICE;
 	private static final Context INITIAL_CONTEXT = TestState.CONTEXT.fork();
 
 	private static final Address TEST_CONTRACT = TestState.CONTRACTS[0];
@@ -53,8 +52,9 @@ public class ParamTestEvals {
 				{ "(let [f (fn [] *depth*)] (f))", 2L }, // let, invoke, *depth*
 
 				{ "(let [])", null }, { "(let [a 1])", null }, { "(let [a 1] a)", 1L },
-				{ "(do (def a 2) (let [a 13] a))", 13L }, { "*juice*", INITIAL_JUICE },
-				{ "(- *juice* *juice*)", Juice.SPECIAL },
+				{ "(do (def a 2) (let [a 13] a))", 13L }, 
+				{ "*juice*", 0 }, // Initial juice used
+				{ "(- *juice* *juice*)", -Juice.SPECIAL },
 				{ "((fn [a] a) 4)", 4L }, { "(do (def a 3) a)", 3L },
 				{ "(do (let [a 1] (def f (fn [] a))) (f))", 1L }, { "1", 1L }, { "(not true)", false },
 				{ "(= true true)", true } });

@@ -3137,7 +3137,7 @@ public class CoreTest extends ACVMTest {
 		// assertTrue(evalB("(>= \\b \\a)")); // TODO: do we want this to work?
 
 		// juice should go down in order of evaluation
-		assertTrue(evalB("(> *juice* *juice* *juice*)"));
+		assertTrue(evalB("(< *juice* *juice* *juice*)"));
 
 		assertCastError(step("(> :foo)"));
 		assertCastError(step("(> :foo :bar)"));
@@ -3983,7 +3983,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(INITIAL,ctx.getState());
 
 		// some juice should be consumed
-		assertTrue(context().getJuice()>ctx.getJuice());
+		assertTrue(context().getJuiceAvailable()>ctx.getJuiceAvailable());
 	}
 
 	@Test
@@ -3992,7 +3992,7 @@ public class CoreTest extends ACVMTest {
 		assertAssertError(ctx);
 
 		// some juice should be consumed
-		assertTrue(context().getJuice()>ctx.getJuice());
+		assertTrue(context().getJuiceAvailable()>ctx.getJuiceAvailable());
 	}
 
 // TODO: probably needs Op level support?
@@ -4442,10 +4442,10 @@ public class CoreTest extends ACVMTest {
 	public void testSpecialJuice() {
 		// TODO: semantics of returning juice before lookup complete is OK?
 		// seems sensible, represents "juice left at this position".
-		assertCVMEquals(INITIAL_JUICE, eval(Special.forSymbol(Symbols.STAR_JUICE)));
+		assertCVMEquals(0, eval(Special.forSymbol(Symbols.STAR_JUICE)));
 
 		// juice gets consumed before returning a value
-		assertCVMEquals(INITIAL_JUICE-Juice.DO - Juice.CONSTANT, eval(comp("(do 1 *juice*)")));
+		assertCVMEquals(Juice.DO + Juice.CONSTANT, eval(comp("(do 1 *juice*)")));
 	}
 	
 	@Test

@@ -3,7 +3,6 @@ package convex.test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.Blob;
@@ -30,7 +29,7 @@ public class Testing {
 					System.err.println("Error in form: "+form);
 					return ctx;
 				}
-				ctx=ctx.withJuice(Constants.MAX_TRANSACTION_JUICE);
+				ctx=ctx.withJuice(0);
 			}
 			return ctx;
 		} catch (IOException e) {

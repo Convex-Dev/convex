@@ -63,10 +63,15 @@ public class Constants {
 	public static final long MEMORY_POOL_GROWTH_INTERVAL = 1000L*24*3600;
 
 	/**
-	 * Max juice allowable for execution of a single transaction.
+	 * Max juice allowable during execution of a single transaction.
 	 */
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
 
+	/**
+	 * Base Juice cost for any transaction, added to consumed juice
+	 */
+	public static final long BASE_TRANSACTION_JUICE = 0;
+	
 	/**
 	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.
 	 */
@@ -233,4 +238,6 @@ public class Constants {
 	 * Minimum milliseconds to retain a proposal before switching
 	 */
 	public static final long KEEP_PROPOSAL_TIME = 1000;
+
+
 }
