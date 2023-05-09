@@ -37,8 +37,7 @@ import convex.core.lang.impl.RecordFormat;
 public class Order extends ARecord {
 	private final Ref<AVector<SignedData<Block>>> blocks;
 
-	private final long proposalPoint;
-	private final long consensusPoint;
+	private final long [] consensusPoints=new long[Constants.CONSENSUS_LEVELS];
 	private final long timestamp;
 
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
@@ -47,8 +46,9 @@ public class Order extends ARecord {
 	private Order(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
 		super(FORMAT.count());
 		this.blocks = blocks;
-		this.consensusPoint = consensusPoint;
-		this.proposalPoint = proposalPoint;
+		consensusPoints[0] = blocks.getValue().count();
+		consensusPoints[1] = proposalPoint;
+		consensusPoints[2] = consensusPoint;
 		this.timestamp = timestamp;
 	}
 
@@ -98,8 +98,9 @@ public class Order extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = blocks.encode(bs,pos);
-		pos = Format.writeVLCLong(bs,pos, proposalPoint);
-		pos = Format.writeVLCLong(bs,pos, consensusPoint);
+		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
+			pos = Format.writeVLCLong(bs,pos, consensusPoints[i]);
+		}
 		pos = Format.writeVLCLong(bs,pos, timestamp);
 		return pos;
 	}
@@ -179,7 +180,7 @@ public class Order extends ARecord {
 	 */
 	public boolean checkConsistent(Order bc) {
 		long commonPrefix = getBlocks().commonPrefixLength(bc.getBlocks());
-		return commonPrefix >= consensusPoint;
+		return commonPrefix >= getConsensusPoint();
 	}
 
 	/**
@@ -187,7 +188,7 @@ public class Order extends ARecord {
 	 * @return Consensus Point
 	 */
 	public long getConsensusPoint() {
-		return consensusPoint;
+		return consensusPoints[Constants.CONSENSUS_LEVELS-1];
 	}
 	
 	/**
@@ -197,9 +198,7 @@ public class Order extends ARecord {
 	 */
 	public long getConsensusPoint(int level) {
 		switch (level) {
-			case 0: return getBlockCount();
-			case 1: return getProposalPoint();
-			case 2: return getConsensusPoint();
+			case 0: case 1: case 2: return consensusPoints[level];
 			default: throw new Error("Illegal consensus level: "+level);
 		}
 	}
@@ -209,7 +208,7 @@ public class Order extends ARecord {
 	 * @return Proposal Point
 	 */
 	public long getProposalPoint() {
-		return proposalPoint;
+		return consensusPoints[1];
 	}
 	
 	/**
@@ -245,7 +244,7 @@ public class Order extends ARecord {
 	 */
 	public Order append(SignedData<Block> block) {
 		AVector<SignedData<Block>> newBlocks = getBlocks().append(block);
-		return create(newBlocks.getRef(), proposalPoint, consensusPoint, timestamp);
+		return withBlocks(newBlocks);
 	}
 
 	/**
@@ -258,8 +257,8 @@ public class Order extends ARecord {
 		
 		// Update proposal point and consensus point if necessary to ensure consistency
 		long nblocks=newBlocks.count();
-		long newProposalPoint = Math.min(nblocks, proposalPoint);
-		long newConsensusPoint = Math.min(nblocks, consensusPoint);
+		long newProposalPoint = Math.min(nblocks, getProposalPoint());
+		long newConsensusPoint = Math.min(nblocks, getConsensusPoint());
 		
 		return create(newBlocks.getRef(), newProposalPoint, newConsensusPoint, timestamp);
 	}
@@ -271,7 +270,7 @@ public class Order extends ARecord {
 	 */
 	public Order withTimestamp(long newTimestamp) {
 		if (timestamp == newTimestamp) return this;
-		return create(blocks, proposalPoint, consensusPoint, newTimestamp);
+		return create(blocks, getProposalPoint(), getConsensusPoint(), newTimestamp);
 	}
 
 	/**
@@ -282,7 +281,8 @@ public class Order extends ARecord {
 	 * @return Updated Order 
 	 */
 	public Order withProposalPoint(long newProposalPoint) {
-		if (this.proposalPoint == newProposalPoint) return this;
+		if (this.getProposalPoint() == newProposalPoint) return this;
+		long consensusPoint=getConsensusPoint();
 		if (newProposalPoint < consensusPoint) {
 			throw new IllegalArgumentException(
 					"Trying to move proposed consensus before confirmed consensus?! " + newProposalPoint);
@@ -301,10 +301,10 @@ public class Order extends ARecord {
 	 * @return Updated chain, or this Chain instance if no change.
 	 */
 	public Order withConsensusPoint(long newConsensusPoint) {
-		if (this.consensusPoint == newConsensusPoint) return this;
+		if (this.getConsensusPoint() == newConsensusPoint) return this;
 		if (newConsensusPoint > getBlocks().count())
 			throw new IndexOutOfBoundsException("Block index: " + newConsensusPoint);
-		long newProposalPoint = Math.max(proposalPoint, newConsensusPoint);
+		long newProposalPoint = Math.max(getProposalPoint(), newConsensusPoint);
 		return create(blocks, newProposalPoint, newConsensusPoint, timestamp);
 	}
 	
@@ -371,8 +371,8 @@ public class Order extends ARecord {
 	@Override
 	public ACell get(ACell key) {
 		if (Keywords.BLOCKS.equals(key)) return getBlocks();
-		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(consensusPoint);
-		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(proposalPoint);
+		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(getConsensusPoint());
+		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(getProposalPoint());
 		if (Keywords.TIMESTAMP.equals(key)) return CVMLong.create(timestamp);
 
 		return null;
@@ -385,7 +385,7 @@ public class Order extends ARecord {
 		if (blocks == newBlocks) {
 			return this;
 		}
-		return new Order(newBlocks, proposalPoint, consensusPoint, timestamp);
+		return new Order(newBlocks, getProposalPoint(), getConsensusPoint(), timestamp);
 	}
 
 	/**
@@ -395,8 +395,8 @@ public class Order extends ARecord {
 	 */
 	public boolean consensusEquals(Order b) {
 		if (b==null) return false; // definitely not equal
-		if (this.proposalPoint!=b.proposalPoint) return false;
-		if (this.consensusPoint!=b.consensusPoint) return false;
+		if (this.getProposalPoint()!=b.getProposalPoint()) return false;
+		if (this.getConsensusPoint()!=b.getConsensusPoint()) return false;
 		if (!this.blocks.equals(b.blocks)) return false;
 		return true;
 	}
