@@ -436,7 +436,7 @@ public class Peer {
 	
 	/**
 	 * Updates the state of the Peer based on latest consensus Belief
-	 * @return
+	 * @return Updated Peer
 	 */
 	public Peer updateState() {
 		Order myOrder = belief.getOrder(peerKey); // this peer's chain from new belief
