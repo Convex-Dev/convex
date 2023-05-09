@@ -5,6 +5,7 @@ import java.util.Random;
 
 import convex.core.Belief;
 import convex.core.Block;
+import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -17,13 +18,16 @@ import convex.core.util.Utils;
 public class CPoSSimulation {
 	private static final int NUM_ROUNDS = 100000;
 	private static final int NUM_PEERS = 3;
+	private static final int NUM_MESSAGES = 100; // Lag rounds, on average
 	
-	private static final int D=6;
+	private static final int D=6; // digits to display
 	
 	State GENESIS;
 	AKeyPair[] KPS=new AKeyPair[NUM_PEERS];
 	AccountKey[] KEYS=new AccountKey[NUM_PEERS];
 	Peer[] PEERS=new Peer[NUM_PEERS];
+	
+	Belief[] MESSAGES=new Belief[NUM_MESSAGES];
 	
 	Random r=new Random(1233);
 
@@ -64,20 +68,53 @@ public class CPoSSimulation {
 				sb.append("]");
 			}
 			
-			// Share a belief from one peer
-			int sharePeer=r.nextInt(NUM_PEERS);
-			Belief b=PEERS[sharePeer].getBelief();
-			
-			// Merge into random other Peer
-			int receivePeer=r.nextInt(NUM_PEERS);
-			Peer rp=PEERS[receivePeer];
-			rp=rp.mergeBeliefs(b);
-			PEERS[receivePeer]=rp;
+			// Merge random message into random other Peer
+			{
+				int receivePeer=r.nextInt(NUM_PEERS);
+				int bi=r.nextInt(MESSAGES.length);
+				Belief b=MESSAGES[bi];
+				Peer rp=PEERS[receivePeer];
+				rp=rp.mergeBeliefs(b);
+				PEERS[receivePeer]=rp;
+			}
+
+			// Share a belief from one peer into random message slot
+			{
+				int sharePeer=r.nextInt(NUM_PEERS);
+				Belief b=PEERS[sharePeer].getBelief();
+				int bi=r.nextInt(MESSAGES.length);
+				MESSAGES[bi]=b;
+			}
 			
 			System.out.println(sb.toString());
 			sb.setLength(0);
+			
+			if (!checkConsistent()) {
+				System.out.println("Inconsistent consensus!");
+				break;
+			}
+			
 			ts+=10;
 		}
+	}
+
+	private boolean checkConsistent() {
+		for (int i=0; i<NUM_PEERS; i++) {
+			Peer a=PEERS[i];
+			
+			for (int j=i+1; j<NUM_PEERS; j++) {
+				Peer b=PEERS[j];
+				Order ao=a.getPeerOrder();
+				Order bo=b.getPeerOrder();
+				long match=ao.getBlocks().commonPrefixLength(bo.getBlocks());
+				if (match<Math.min(ao.getConsensusPoint(), bo.getConsensusPoint())) {
+					System.err.println("Peer "+i+ " inconsistent with Peer "+j);
+					System.err.println("Match length = "+match);
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	private void proposeBlock(int ix, long ts) {
@@ -103,5 +140,10 @@ public class CPoSSimulation {
 			p=p.updateTimestamp(INITIAL_TS);
 			PEERS[i]=p;
 		}		
+		
+		for (int i=0; i<MESSAGES.length; i++) {
+			Peer p=PEERS[r.nextInt(NUM_PEERS)];
+			MESSAGES[i]=p.getBelief();
+		}
 	}
 }
