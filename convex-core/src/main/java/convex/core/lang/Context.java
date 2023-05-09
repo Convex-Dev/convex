@@ -423,6 +423,14 @@ public class Context extends AObject {
 	public long getJuiceAvailable() {
 		return juiceLimit-juice;
 	}
+	
+	/**
+	 * Get the juice limit in this Context
+	 * @return Juice limit
+	 */
+	public long getJuiceLimit() {
+		return juiceLimit;
+	}
 
 
 	/**

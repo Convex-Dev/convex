@@ -59,10 +59,17 @@
 
 
   *juice*
-  {:doc      {:description ["Returns the amount of execution juice remaining at this point of the current transaction."
+  {:doc      {:description ["Returns the amount of execution juice consumed at this point of the current transaction."
                             "Juice is required for every CVM operation executed, and the transaction will fail immediately with a `:JUICE` error if an attempt is made to consume juice beyond this value."]
               :examples    [{:code "*juice*"}]}
    :special? true}
+  
+  *juice-limit*
+  {:doc      {:description ["Returns the limit of execution juice available."
+                            "Juice is required for every CVM operation executed, and the transaction will fail immediately with a `:JUICE` error if an attempt is made to consume juice beyond this value."]
+              :examples    [{:code "*juice-limit*"}]}
+   :special? true}
+
 
   *key*
   {:doc      {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."

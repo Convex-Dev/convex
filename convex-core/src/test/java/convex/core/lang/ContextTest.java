@@ -1,9 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertDepthError;
-import static convex.test.Assertions.assertJuiceError;
-import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -99,6 +96,9 @@ public class ContextTest extends ACVMTest {
 	public void testJuice() {
 		Context c=context();
 		assertTrue(c.checkJuice(1000));
+		
+		// Using all juice should be OK
+		assertNotError(c.consumeJuice(c.getJuiceAvailable()));
 
 		// get a juice error if too much juice consumed
 		assertJuiceError(c.consumeJuice(c.getJuiceAvailable() + 1));

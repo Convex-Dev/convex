@@ -4457,6 +4457,19 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
+	public void testSpecialJuiceLimit() {
+		Special<CVMLong> spec=Special.forSymbol(Symbols.STAR_JUICE_LIMIT);
+		
+		// Juice limit at start of transaction
+		assertCVMEquals(Constants.MAX_TRANSACTION_JUICE, eval(spec));
+
+		// Consuming a small amount of juice shouldn't change limit
+		Context ctx=step("1");
+		assertCVMEquals(Constants.MAX_TRANSACTION_JUICE, eval(ctx,"*juice-limit*"));
+	}
+	
+	
+	@Test
 	public void testSpecialJuicePrice() {
 		Special<?> jp=Special.forSymbol(Symbols.STAR_JUICE_PRICE);
 		assertNotNull(jp);
