@@ -34,12 +34,12 @@ import convex.core.util.Utils;
  *
  */
 public class BeliefMerge {
-
 	private final Belief initialBelief;
 	private final AccountKey publicKey;
 	private final State state;
 	private final AKeyPair keyPair;
 	private final long timestamp;
+	private final BlobMap<AccountKey, PeerStatus> peers;
 
 	private BeliefMerge(Belief belief, AKeyPair peerKeyPair, long mergeTimestamp, State consensusState) {
 		this.initialBelief=belief;
@@ -47,6 +47,7 @@ public class BeliefMerge {
 		this.publicKey = peerKeyPair.getAccountKey();
 		this.keyPair = peerKeyPair;
 		this.timestamp = mergeTimestamp;
+		this.peers = state.getPeers();
 	}
 
 	/**
@@ -81,10 +82,14 @@ public class BeliefMerge {
 		// update my belief with the resulting Orders
 		if (initialBelief.getOrders() == resultOrders) return initialBelief;
 		final Belief result = new Belief(resultOrders);
-
 		return result;
 	}
 	
+	/**
+	 * Merge orders from a second Belief
+	 * @param b Belief from which to merge order
+	 * @return Belief with updated orders (or the same Belief if unchanged)
+	 */
 	public Belief mergeOrders(Belief b) {
 		BlobMap<AccountKey, SignedData<Order>> orders = initialBelief.getOrders();
 		BlobMap<AccountKey, SignedData<Order>> newOrders=accumulateOrders(orders,b);
@@ -106,6 +111,8 @@ public class BeliefMerge {
 			MapEntry<AccountKey,SignedData<Order>> be=bOrders.entryAt(i);
 			ABlob key=be.getKey();
 			
+			if (!isValidPeer(key)) continue;
+			
 			SignedData<Order> b=be.getValue();
 			if (b == null) continue; // If there is no incoming Order skip, though shouldn't happen
 			Order bc = b.getValue();
@@ -124,8 +131,6 @@ public class BeliefMerge {
 
 			boolean shouldReplace=compareOrders(ac,bc);
 			if (shouldReplace) {
-
-				
 				result=result.assocEntry(be); 
 				continue;
 			}
@@ -133,7 +138,9 @@ public class BeliefMerge {
 		return result;
 	}
 	
-
+	private boolean isValidPeer(ABlob key) {
+		return peers.containsKey(key);
+	}
 
 	/**
 	 * Conducts a stake-weighted vote across a map of consistent chains, in the
@@ -151,11 +158,7 @@ public class BeliefMerge {
 		// get current Order for this peer.
 		final Order myOrder = getMyOrder();
 		assert (myOrder != null); // we should always have a Order!
-		
-		// get the Consensus state from this Peer's current perspective
-		// this is needed for peer weights: we only trust peers who have stake in the
-		// current consensus!
-		State votingState = getConsensusState();
+
 
 		// filter Orders for compatibility with current Order for inclusion in Voting Set
 		// TODO: figure out what to do with new blocks filtered out?
@@ -174,8 +177,7 @@ public class BeliefMerge {
 		long consensusPoint = myOrder.getConsensusPoint();
 
 		// Compute stake for all peers in consensus state
-		AMap<AccountKey, PeerStatus> peers = votingState.getPeers();
-		HashMap<AccountKey, Double> weightedStakes = votingState.computeStakes();
+		HashMap<AccountKey, Double> weightedStakes = state.computeStakes();
 		double totalStake = weightedStakes.get(null);
 
 		// Extract unique proposed chains from provided map, computing vote for each.
@@ -542,7 +544,6 @@ public class BeliefMerge {
 		return result;
 	}
 
-	
 	/**
 	 * Gets the Order for the current peer specified by a MergeContext in this
 	 * Belief
@@ -591,7 +592,6 @@ public class BeliefMerge {
 		return false;
 	}
 	
-
 	/**
 	 * Assemble the latest map of Orders from all peers by merging from each Belief received
 	 * @param beliefs Set of Beliefs from which to merge orders
