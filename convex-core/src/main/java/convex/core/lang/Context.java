@@ -132,7 +132,7 @@ public class Context extends AObject {
 	}
 
 	/**
-	 * Inner class for less-frequently changing state related to Actor execution
+	 * Inner class for less-frequently changing CVM state related to Actor execution
 	 * Should save some allocation / GC on average, since it will change less
 	 * frequently than the surrounding Context and can be cheaply copied by reference.
 	 *
@@ -163,13 +163,7 @@ public class Context extends AObject {
 		}
 
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer, ACell scope) {
-			AccountStatus as=null;
-			if (address!=null) {
-				as=state.getAccount(address);
-				if (as!=null) {
-
-				}
-			}
+			AccountStatus as=state.getAccount(address);
 			return new ChainState(state,origin,caller,address,as,offer,scope);
 		}
 
@@ -229,6 +223,11 @@ public class Context extends AObject {
 
 		public AccountStatus getAccount() {
 			return account;
+		}
+
+		public AccountStatus getOriginAccount() {
+			if (address.equals(origin)) return account;
+			return state.getAccount(origin);
 		}
 
 	}
@@ -869,9 +868,9 @@ public class Context extends AObject {
 
 	private Context withChainState(ChainState newChainState) {
 		if (chainState==newChainState) return this;
-		long oldBalance=chainState.state.getAccount(getOrigin()).getBalance();
+		long oldBalance=chainState.getOriginAccount().getBalance();
 		chainState=newChainState;
-		long newBalance=newChainState.state.getAccount(getOrigin()).getBalance();
+		long newBalance=newChainState.getOriginAccount().getBalance();
 		if (newBalance<oldBalance) {
 			reviseJuiceLimit(newBalance);
 		}
