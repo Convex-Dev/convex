@@ -76,13 +76,6 @@ public abstract class ATransaction extends ARecord {
 	public final long getSequence() {
 		return sequence;
 	}
-
-	/**
-	 * Gets the max juice allowed for this transaction
-	 * 
-	 * @return Juice limit
-	 */
-	public abstract Long getMaxJuice();
 	
 	@Override public final boolean isCVMValue() {
 		// Transactions exist outside CVM only

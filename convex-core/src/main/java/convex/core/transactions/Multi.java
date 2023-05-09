@@ -1,6 +1,5 @@
 package convex.core.transactions;
 
-import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -180,12 +179,6 @@ public class Multi extends ATransaction {
 		childContext = t.apply(childContext);
 		ctx=ctx.handleStateResults(childContext,false);
 		return ctx;
-	}
-
-	@Override
-	public Long getMaxJuice() {
-		// TODO Auto-generated method stub
-		return Constants.MAX_TRANSACTION_JUICE;
 	}
 
 	@Override

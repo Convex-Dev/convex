@@ -2618,7 +2618,17 @@ public class CoreTest extends ACVMTest {
 		ctx=step(ctx,"(call act 666 (receive-coin *address* 350 nil))");
 		assertEquals(350L, (long)RT.jvm(ctx.getResult()));
 		assertEquals(450L,evalL(ctx,"(balance act)"));
+	}
+	
+	@Test
+	public void testOfferAndRefund() {
+		Context ctx=context();
+		ctx=step(ctx,"(def act (deploy '(do (defn receive-coin ^{:callable? true} [sender amount refund data] (accept amount) (transfer *caller* refund)))))");
 
+		// send via contract call
+		ctx=step(ctx,"(call act 666 (receive-coin *address* 350  100 nil))");
+		assertEquals(100L, (long)RT.jvm(ctx.getResult()));
+		assertEquals(250L,evalL(ctx,"(balance act)"));
 	}
 
 	@Test
@@ -2963,15 +2973,14 @@ public class CoreTest extends ACVMTest {
 		assertTrue(() -> evalB(ctx,"(let [a "+naddr+"]"
 				+ "   (not (= *balance* (transfer a 1337))))"));
 
-		// transfer it all!
-		assertEquals(0L,step(ctx,"(transfer "+naddr+" *balance*)").getBalance(HERO));
-
 		// Should never be possible to transfer negative amounts
 		assertArgumentError(step("(transfer *address* -1000)"));
 		assertArgumentError(step("(transfer "+naddr+" -1)"));
 
 		// Long.MAX_VALUE is too big for an Amount
 		assertArgumentError(step("(transfer *address* 9223372036854775807)")); // Long.MAX_VALUE
+		// BigInteger is too big for an Amount
+		assertCastError(step("(transfer *address* 9223372036854775808)")); // Long.MAX_VALUE+1
 
 		assertFundsError(step("(transfer *address* 999999999999999999)"));
 
@@ -3094,8 +3103,7 @@ public class CoreTest extends ACVMTest {
 	
 	@Test 
 	public void testCreatePeerRegression() {
-		assertNotError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (dec *balance*))"));
-		assertNotError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e *balance*)"));
+		assertJuiceError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e *balance*)"));
 		assertFundsError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (inc *balance*))"));
 		
 	}
@@ -4354,7 +4362,7 @@ public class CoreTest extends ACVMTest {
 		assertCVMEquals(bal, ctx.getResult());
 
 		// throwing it all away....
-		assertEquals(0L, evalL("(do (transfer "+VILLAIN+" *balance*) *balance*)"));
+		assertEquals(666666L, evalL("(do (transfer "+VILLAIN+" (- *balance* 666666)) *balance*)"));
 
 		// check balance as single expression
 		assertEquals(bal, evalL("*balance*"));

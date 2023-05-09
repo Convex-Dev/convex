@@ -3,6 +3,7 @@ package convex.core.lang;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
+import static convex.test.Assertions.*;
 
 /**
  * Tests for expected juice costs
@@ -84,6 +85,11 @@ public class JuiceTest extends ACVMTest {
 		}
 	}
 
+	@Test
+	public void testBalanceAway() {
+		assertJuiceError(step("(transfer #12 *balance*)"));
+	}
+	
 	@Test
 	public void testDef() {
 		assertEquals(Juice.DEF + Juice.CONSTANT, juice("(def a 1)"));

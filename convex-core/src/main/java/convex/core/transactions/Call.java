@@ -2,7 +2,6 @@ package convex.core.transactions;
 
 import java.nio.ByteBuffer;
 
-import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -116,11 +115,6 @@ public class Call extends ATransaction {
 	@Override
 	public Context apply(Context ctx) {
 		return ctx.actorCall(target, offer, functionName, args.toCellArray());
-	}
-
-	@Override
-	public Long getMaxJuice() {
-		return Constants.MAX_TRANSACTION_JUICE;
 	}
 
 	@Override

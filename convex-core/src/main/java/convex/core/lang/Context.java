@@ -150,31 +150,27 @@ public class Context extends AObject {
 		/**
 		 * Cached copy of the current environment. Avoid looking up via Address each time.
 		 */
-		private final AHashMap<Symbol, ACell> environment;
-		private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
+		private final AccountStatus account;
 
-		private ChainState(State state, Address origin,Address caller, Address address,AHashMap<Symbol, ACell> environment, AHashMap<Symbol,AHashMap<ACell,ACell>> metadata, long offer,ACell scope) {
+		private ChainState(State state, Address origin,Address caller, Address address,AccountStatus account, long offer,ACell scope) {
 			this.state=state;
 			this.origin=origin;
 			this.caller=caller;
 			this.address=address;
-			this.environment=environment;
-			this.metadata=metadata;
+			this.account=account;
 			this.offer=offer;
 			this.scope=scope;
 		}
 
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer, ACell scope) {
-			AHashMap<Symbol, ACell> environment=Core.ENVIRONMENT;
-			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata=Core.METADATA;
+			AccountStatus as=null;
 			if (address!=null) {
-				AccountStatus as=state.getAccount(address);
+				as=state.getAccount(address);
 				if (as!=null) {
-					environment=as.getEnvironment();
-					metadata=as.getMetadata();
+
 				}
 			}
-			return new ChainState(state,origin,caller,address,environment,metadata,offer,scope);
+			return new ChainState(state,origin,caller,address,as,offer,scope);
 		}
 
 		public ChainState withStateOffer(State newState,long newOffer) {
@@ -200,23 +196,20 @@ public class Context extends AObject {
 		 * @return
 		 */
 		private AHashMap<Symbol, ACell> getEnvironment() {
-			if (environment==null) return Maps.empty();
-			return environment;
+			return account.getEnvironment();
 		}
 
 		private ChainState withEnvironment(AHashMap<Symbol, ACell> newEnvironment)  {
-			if (environment==newEnvironment) return this;
-			AccountStatus as=state.getAccount(address);
-			AccountStatus nas=as.withEnvironment(newEnvironment);
+			if (account.getEnvironment()==newEnvironment) return this;
+			AccountStatus nas=account.withEnvironment(newEnvironment);
 			State newState=state.putAccount(address,nas);
 			return withState(newState);
 		}
 
 		public ChainState withEnvironment(AHashMap<Symbol, ACell> newEnvironment,
 				AHashMap<Symbol, AHashMap<ACell, ACell>> newMeta) {
-			if ((environment==newEnvironment)&&(metadata==newMeta)) return this;
-			AccountStatus as=state.getAccount(address);
-			AccountStatus nas=as.withEnvironment(newEnvironment).withMetadata(newMeta);
+			if ((account.getEnvironment()==newEnvironment)&&(account.getMetadata()==newMeta)) return this;
+			AccountStatus nas=account.withEnvironment(newEnvironment).withMetadata(newMeta);
 			State newState=state.putAccount(address,nas);
 			return withState(newState);
 		}
@@ -226,8 +219,7 @@ public class Context extends AObject {
 		}
 
 		public AHashMap<Symbol, AHashMap<ACell, ACell>> getMetadata() {
-			if (metadata==null) return Maps.empty();
-			return metadata;
+			return account.getMetadata();
 		}
 
 		public ChainState withScope(ACell newScope) {
@@ -235,6 +227,9 @@ public class Context extends AObject {
 			return create(state,origin,caller,address,offer,newScope);
 		}
 
+		public AccountStatus getAccount() {
+			return account;
+		}
 
 	}
 
@@ -297,21 +292,15 @@ public class Context extends AObject {
 	 *
 	 * @param state Initial State for Context
 	 * @param origin Origin Address for Context
-	 * @param juice Initial juice requested for Context
+	 * @param juiceLimit Initial juice requested for Context
 	 * @return Initial execution context with reserved juice.
 	 */
-	public static Context createInitial(State state, Address origin,long juice) {
+	public static Context createInitial(State state, Address origin,long juiceLimit) {
 		AccountStatus as=state.getAccount(origin);
 		if (as==null) {
 			// no account
 			return Context.createFake(state).withError(ErrorCodes.NOBODY);
 		}
-
-		long balance=as.getBalance();
-		long juicePrice=state.getJuicePrice().longValue();
-
-		// reduce juice if insufficient balance
-		long juiceLimit=Math.min(juice,balance/juicePrice);
 
 		return create(state,0,juiceLimit,EMPTY_BINDINGS,null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
 	}
@@ -328,14 +317,14 @@ public class Context extends AObject {
 	 * </ul>
 	 *
 	 * @param initialState State before transaction execution (after prepare)
+	 * @param juicePrice Juice price of current execution
 	 * @return Updated context
 	 */
-	public Context completeTransaction(State initialState) {
+	public Context completeTransaction(State initialState, long juicePrice) {
 		// get state at end of transaction application
 		State state=getState();
 		long usedJuice=this.juice;
 
-		long juicePrice=initialState.getJuicePrice().longValue();
 		long juiceFees=Juice.addMul(Constants.BASE_TRANSACTION_JUICE,usedJuice,juicePrice);
 
 		// compute memory delta
@@ -879,10 +868,20 @@ public class Context extends AObject {
 	}
 
 	private Context withChainState(ChainState newChainState) {
-		//if (chainState==newChainState) return this;
-		//return create(newChainState,juice,localBindings,result,depth);
+		if (chainState==newChainState) return this;
+		long oldBalance=chainState.state.getAccount(getOrigin()).getBalance();
 		chainState=newChainState;
+		long newBalance=newChainState.state.getAccount(getOrigin()).getBalance();
+		if (newBalance<oldBalance) {
+			reviseJuiceLimit(newBalance);
+		}
 		return this;
+	}
+
+	private void reviseJuiceLimit(long newBalance) {
+		long juicePrice=chainState.state.getJuicePrice().longValue();
+		
+		juiceLimit=Math.min(juiceLimit, Juice.calcAvailable(newBalance, juicePrice));
 	}
 
 	/**
@@ -1471,7 +1470,7 @@ public class Context extends AObject {
 			actx=actorCall(target,amount,Symbols.RECEIVE_COIN,source,CVMLong.create(amount),null);
 			if (actx.isExceptional()) return actx;
 
-			Long sent=currentBalance-actx.getBalance(source);
+			long sent=currentBalance-actx.getBalance(source);
 			return actx.withResult(CVMLong.create(sent));
 		} else {
 			// must be a user account

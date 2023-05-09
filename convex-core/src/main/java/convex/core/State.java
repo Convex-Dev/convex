@@ -38,6 +38,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
+import convex.core.lang.Juice;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
@@ -510,8 +511,10 @@ public class State extends ARecord {
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public Context applyTransaction(ATransaction t) {
-				// Create prepared context (juice subtracted, sequence updated, transaction entry checks)
-		Context ctx = prepareTransaction(t);
+		long juicePrice=getJuicePrice().longValue();
+		
+		// Create prepared context 
+		Context ctx = prepareTransaction(t,juicePrice);
 		if (ctx.isExceptional()) {
 			// We hit some error while preparing transaction. Possible culprits:
 			// - Non-existent Origin account
@@ -527,13 +530,12 @@ public class State extends ARecord {
 
 		// complete transaction
 		// NOTE: completeTransaction handles error cases as well
-		ctx = ctx.completeTransaction(preparedState);
+		ctx = ctx.completeTransaction(preparedState,juicePrice);
 
 		return ctx;
-
 	}
 
-	private Context prepareTransaction(ATransaction t) {
+	private Context prepareTransaction(ATransaction t, long juicePrice) {
 		Address origin = t.getOrigin();
 		
 		// Pre-transaction state updates (persisted even if transaction fails)
@@ -549,9 +551,14 @@ public class State extends ARecord {
 			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+expectedSequence);
 		}
 
-		// Create context with juice subtracted
-		Long maxJuice=t.getMaxJuice();
-		long juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,(maxJuice==null)?account.getBalance():maxJuice);
+		// Create context with juice limit
+		long balance=account.getBalance();
+		long juiceLimit=Juice.calcAvailable(balance, juicePrice);
+		juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,juiceLimit);
+		if (juiceLimit<=0) {
+			return Context.createFake(this,origin).withJuiceError();
+		}
+		
 		Context ctx = Context.createInitial(this, origin, juiceLimit);
 		return ctx;
 	}
@@ -871,6 +878,8 @@ public class State extends ARecord {
 		r=r.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(mem));
 		return withGlobals(r);
 	}
+
+
 
 
 

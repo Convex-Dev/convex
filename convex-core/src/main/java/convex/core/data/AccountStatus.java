@@ -476,6 +476,10 @@ public class AccountStatus extends ARecord {
 		return publicKey;
 	}
 
+	/**
+	 * Gets the Metadata map for this Account
+	 * @return Metadata map (never null, but may be empty)
+	 */
 	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
 		if (metadata==null) return Maps.empty();
 		return metadata;

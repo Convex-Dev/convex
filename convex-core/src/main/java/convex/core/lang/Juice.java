@@ -483,6 +483,18 @@ public class Juice {
 		return MIN_NUMERIC_COST;
 	}
 
+	/**
+	 * Calculates available transaction Juice for a given coin balance with specified jucie price
+	 * 
+	 * @param balance Coin balance
+	 * @param juicePrice Prevailing juice price
+	 * @return Available juice
+	 */
+	public static long calcAvailable(long balance, long juicePrice) {
+		long limit = (balance/juicePrice)-Constants.BASE_TRANSACTION_JUICE;
+		return Math.max(0, limit);
+	}
+
 
 
 }

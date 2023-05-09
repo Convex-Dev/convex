@@ -2,7 +2,6 @@ package convex.core.transactions;
 
 import java.nio.ByteBuffer;
 
-import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -141,12 +140,6 @@ public class Invoke extends ATransaction {
 		} else {
 			if (!Format.isCanonical(command)) throw new InvalidDataException("Non-canonical object as command?", this);
 		}
-	}
-
-	@Override
-	public Long getMaxJuice() {
-		// TODO make this a field
-		return Constants.MAX_TRANSACTION_JUICE;
 	}
 
 	@Override

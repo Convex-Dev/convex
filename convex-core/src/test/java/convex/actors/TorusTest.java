@@ -252,6 +252,7 @@ public class TorusTest extends ACVMTest {
 		// FINAL TEST - Withdraw all liquidity
 		long shares=evalL(ctx,"(asset/balance USDM *address*)");
 		assertTrue(shares>0);
+		// ctx=ctx.withJuice(0);
 		ctx=step(ctx,"(torus/withdraw-liquidity USD "+shares+")");
 		assertNotError(ctx);
 		assertEquals(0L,evalL(ctx,"(asset/balance USDM *address*)")); // should have no shares left
