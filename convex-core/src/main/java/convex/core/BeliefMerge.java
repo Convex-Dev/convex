@@ -188,19 +188,14 @@ public class BeliefMerge {
 
 		// Get the winning chain for this peer, including new blocks encountered
 		AVector<SignedData<Block>> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
-		if (winningBlocks == null) return null; // if no voting stake on any chain
+		if (winningBlocks == null) return null; // if no voting stake on any order
 
 		// Take winning blocks into my Order
 		// winning chain should have same consensus as my initial chain
 		Order winningOrder = myOrder.withBlocks(winningBlocks);
 
-		final double P_THRESHOLD = totalStake * Constants.PROPOSAL_THRESHOLD;
-		final Order proposedOrder = updateProposal(winningOrder, stakedOrders, P_THRESHOLD);
-
-		assert (proposedOrder != null);
-
 		final double C_THRESHOLD = totalStake * Constants.CONSENSUS_THRESHOLD;
-		final Order consensusOrder = updateConsensus(proposedOrder, stakedOrders, C_THRESHOLD);
+		final Order consensusOrder = updateConsensus(winningOrder,stakedOrders, C_THRESHOLD);
 
 		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {
@@ -432,10 +427,24 @@ public class BeliefMerge {
 	}
 
 	/**
+	 * Updates Consensus based on stake weighted voting results.
+	 * @param winningOrder Winning order from voting
+	 * @param stakedOrders Staked Orders from Peers
+	 * @param THRESHOLD Threshold from Consensus
+	 * @return updated Order
+	 */
+	private Order updateConsensus(Order winningOrder, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
+		final Order proposedOrder = updateProposal(winningOrder, stakedOrders, THRESHOLD);
+
+		final Order consensusOrder = updateConsensus(proposedOrder,2, stakedOrders, THRESHOLD);
+		return consensusOrder;
+	}
+	
+	/**
 	 * Updates the consensus point for the winning Order, given an overall map of
 	 * staked orders and consensus threshold.
 	 */
-	private Order updateConsensus(Order proposedOrder, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
+	private Order updateConsensus(Order proposedOrder, int level, HashMap<Order, Double> stakedOrders, double THRESHOLD) {
 		AVector<SignedData<Block>> proposedBlocks = proposedOrder.getBlocks();
 		ArrayList<Order> agreedChains = Utils.sortListBy(new Function<Order, Long>() {
 			@Override
@@ -444,9 +453,10 @@ public class BeliefMerge {
 				// in order to sort by length of matched proposals
 				long blockMatch = proposedBlocks.commonPrefixLength(c.getBlocks());
 
-				long minProposal = Math.min(proposedOrder.getProposalPoint(), c.getProposalPoint());
+				long minPrevious = Math.min(proposedOrder.getConsensusPoint(level-1), c.getConsensusPoint(level-1));
 
-				long match = Math.min(blockMatch, minProposal);
+				// Match length is how many blocks agree with winning order at previous consensus level
+				long match = Math.min(blockMatch, minPrevious);
 				if (match <= proposedOrder.getConsensusPoint()) return null; // skip if no progress vs existing
 																				// consensus
 				return -match;

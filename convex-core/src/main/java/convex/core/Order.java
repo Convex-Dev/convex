@@ -189,6 +189,20 @@ public class Order extends ARecord {
 	public long getConsensusPoint() {
 		return consensusPoint;
 	}
+	
+	/**
+	 * Gets the Consensus Point of this Order for the specified level
+	 * @param level Consensus level
+	 * @return Consensus Point
+	 */
+	public long getConsensusPoint(int level) {
+		switch (level) {
+			case 0: return getBlockCount();
+			case 1: return getProposalPoint();
+			case 2: return getConsensusPoint();
+			default: throw new Error("Illegal consensus level: "+level);
+		}
+	}
 
 	/**
 	 * Gets the Proposal Point of this Order

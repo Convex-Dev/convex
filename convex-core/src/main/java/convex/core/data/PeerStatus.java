@@ -15,7 +15,7 @@ import convex.core.util.Utils;
  * State includes: - Stake placed by this Peer - A host address for peer
  * connections / client requests
  *
- */
+ */ 
 public class PeerStatus extends ARecord {
 	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.CONTROLLER, Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
 			Keywords.METADATA};
