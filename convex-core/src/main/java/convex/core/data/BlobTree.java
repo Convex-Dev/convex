@@ -189,12 +189,12 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public void getBytes(byte[] dest, int destOffset) {
-		long clen = childLength();
+	public int getBytes(byte[] dest, int pos) {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			getChild(i).getBytes(dest, Utils.checkedInt(destOffset + i * clen));
+			pos=getChild(i).getBytes(dest, pos);
 		}
+		return pos;
 	}
 
 	@Override
@@ -257,10 +257,10 @@ public class BlobTree extends ABlob {
 	}
 	
 	@Override
-	public byte getUnchecked(long i) {
+	public byte byteAtUnchecked(long i) {
 		int childLength = childLength();
 		int ci = (int) (i >> (shift + Blobs.CHUNK_SHIFT));
-		return getChild(ci).getUnchecked(i - ci * childLength);
+		return getChild(ci).byteAtUnchecked(i - ci * childLength);
 	}
 
 	/**
@@ -325,24 +325,6 @@ public class BlobTree extends ABlob {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			pos = children[i].encode(bs,pos);
-		}
-		return pos;
-	}
-
-	@Override
-	public ByteBuffer writeToBuffer(ByteBuffer bb) {
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			bb = children[i].getValue().writeToBuffer(bb);
-		}
-		return bb;
-	}
-	
-	@Override
-	public int writeToBuffer(byte[] bs, int pos) {
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			pos = children[i].getValue().writeToBuffer(bs,pos);
 		}
 		return pos;
 	}

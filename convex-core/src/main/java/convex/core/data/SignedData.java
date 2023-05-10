@@ -172,8 +172,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = publicKey.writeToBuffer(bs,pos);
-		pos = signature.writeToBuffer(bs, pos);
+		pos = publicKey.getBytes(bs,pos);
+		pos = signature.getBytes(bs, pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}

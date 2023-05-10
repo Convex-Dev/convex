@@ -307,8 +307,8 @@ public class Format {
 		Blob enc=cell.cachedEncoding();
 		
 		if (enc!=null) {
-			enc.writeToBuffer(bs, pos);
-			return pos+enc.size();
+			pos=enc.getBytes(bs, pos);
+			return pos;
 		} else {
 			return cell.encode(bs,pos);
 		}

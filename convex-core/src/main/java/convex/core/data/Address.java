@@ -212,11 +212,6 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
-	public void getBytes(byte[] dest, int destOffset) {
-		Utils.writeLong(dest, destOffset, value);
-	}
-
-	@Override
 	public Blob slice(long start, long end) {
 		return toFlatBlob().slice(start,end);
 	}

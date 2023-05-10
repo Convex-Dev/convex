@@ -144,7 +144,7 @@ public class AccountStatus extends ARecord {
 		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
 		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
 		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
-		if ((included&HAS_KEY)!=0) pos = publicKey.writeToBuffer(bs, pos);
+		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
 		return pos;
 	}
 	

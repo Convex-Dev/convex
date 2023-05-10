@@ -67,7 +67,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	public final byte getUnchecked(long i) {
+	public final byte byteAtUnchecked(long i) {
 		return (byte) (value >> ((LENGTH - i - 1) * 8));
 	}
 
@@ -78,16 +78,11 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public abstract boolean equals(ABlob o);
-
-	@Override
-	public final ByteBuffer writeToBuffer(ByteBuffer bb) {
-		return bb.putLong(value);
-	}
 	
 	@Override
-	public final int writeToBuffer(byte[] bs, int pos) {
-		Utils.writeLong(bs, pos, value);
-		return pos+8;
+	public final int getBytes(byte[] bs, int pos) {
+		pos=Utils.writeLong(bs, pos, value);
+		return pos;
 	}
 
 	@Override

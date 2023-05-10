@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
@@ -53,7 +51,7 @@ public class StringTree extends AString {
 	
 	@Override
 	public int writeRawData(byte[] bs, int pos) {
-		return data.writeToBuffer(bs, pos);
+		return data.getBytes(bs, pos);
 	}
 	
 	/**
@@ -111,7 +109,7 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	protected byte byteAt(long i) {
+	public byte byteAt(long i) {
 		if ((i<0)||(i>=length)) return -1;
 		return data.byteAt(i);
 	}
@@ -133,17 +131,12 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	protected void writeToBuffer(ByteBuffer bb) {
-		data.writeToBuffer(bb);
-	}
-
-	@Override
 	protected void printEscaped(BlobBuilder sb, long start, long end) {
 		// TODO This could potentially be faster
 		long n=count();
 		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
 		for (long i=start; i<end; i++) {
-			byte b=data.getUnchecked(i);
+			byte b=data.byteAtUnchecked(i);
 			Text.writeEscapedByte(sb,b);
 		}
 		return;

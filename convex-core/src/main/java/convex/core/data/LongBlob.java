@@ -29,12 +29,7 @@ public final class LongBlob extends ALongBlob {
 	public static LongBlob create(long value) {
 		return new LongBlob(value);
 	}
-
-	@Override
-	public void getBytes(byte[] dest, int destOffset) {
-		Utils.writeLong(dest, destOffset,value);
-	}
-
+	
 	@Override
 	public ABlob slice(long start, long end) {
 		if ((start == 0) && (end == LENGTH)) return this;
@@ -66,8 +61,8 @@ public final class LongBlob extends ALongBlob {
 
 		long max = Math.min(LENGTH, b.count());
 		for (long i = 0; i < max; i++) {
-			byte ai = getUnchecked(i);
-			byte bi = b.getUnchecked(i);
+			byte ai = byteAtUnchecked(i);
+			byte bi = b.byteAtUnchecked(i);
 			if (ai != bi) return (i * 2) + (Utils.firstDigitMatch(ai, bi) ? 1 : 0);
 		}
 		return max * 2;

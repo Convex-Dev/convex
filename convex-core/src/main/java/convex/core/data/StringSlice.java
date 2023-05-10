@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 
@@ -69,7 +67,7 @@ public class StringSlice extends AString {
 	}
 	
 	@Override
-	protected byte byteAt(long i) {
+	public byte byteAt(long i) {
 		if ((i<0)||(i>=length)) return -1;
 		return source.byteAt(i+start);
 	}
@@ -86,11 +84,6 @@ public class StringSlice extends AString {
 	@Override
 	public int compareTo(AString o) {
 		return ((AString)getCanonical()).compareTo(o);
-	}
-
-	@Override
-	protected void writeToBuffer(ByteBuffer bb) {
-		source.writeToBuffer(bb);
 	}
 
 	@Override

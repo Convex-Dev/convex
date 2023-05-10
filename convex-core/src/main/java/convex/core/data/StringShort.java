@@ -77,7 +77,7 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	protected byte byteAt(long index) {
+	public byte byteAt(long index) {
 		if ((index < 0) || (index >= length))
 			return Strings.EXCESS_BYTE;
 		return data.byteAt(index);
@@ -112,7 +112,7 @@ public class StringShort extends AString {
 
 	@Override
 	public int writeRawData(byte[] bs, int pos) {
-		return data.writeToBuffer(bs, pos);
+		return data.getBytes(bs, pos);
 	}
 
 	@Override
@@ -194,11 +194,6 @@ public class StringShort extends AString {
 	}
 
 	@Override
-	protected void writeToBuffer(ByteBuffer bb) {
-		data.writeToBuffer(bb);
-	}
-
-	@Override
 	public AString slice(long start, long end) {
 		Blob newData=data.slice(start, end);
 		if (data==newData) return this;
@@ -211,12 +206,10 @@ public class StringShort extends AString {
 		long n=count();
 		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
 		for (long i=start; i<end; i++) {
-			byte b=data.getUnchecked(i);
+			byte b=data.byteAtUnchecked(i);
 			Text.writeEscapedByte(sb,b);
 		}
 		return;
 	}
-
-
 
 }

@@ -35,8 +35,9 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 * 
 	 * @param dest Destination array
 	 * @param destOffset Offset into destination array
+	 * @return End position in destination array after writing
 	 */
-	public abstract void getBytes(byte[] dest, int destOffset);
+	public abstract int getBytes(byte[] dest, int destOffset);
 
 	/**
 	 * Gets the length of this Blob
@@ -168,16 +169,17 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	protected abstract void updateDigest(MessageDigest digest);
 
 	/**
-	 * Gets the byte at the specified position in this blob
+	 * Gets the byte at the specified position 
 	 * 
 	 * @param i Index of the byte to get
 	 * @return The byte at the specified position
 	 */
+	@Override
 	public byte byteAt(long i) {
 		if ((i < 0) || (i >= count())) {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
-		return getUnchecked(i);
+		return byteAtUnchecked(i);
 	}
 	
 	/**
@@ -187,7 +189,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 * @param i Index of the byte to get
 	 * @return The byte at the specified position
 	 */
-	public abstract byte getUnchecked(long i);
+	public abstract byte byteAtUnchecked(long i);
 
 	/**
 	 * Gets the specified hex digit from this data object.
@@ -198,7 +200,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 * @return The value of the hex digit, in the range 0-15 inclusive
 	 */
 	public int getHexDigit(long digitPos) {
-		byte b = getUnchecked(digitPos >> 1);
+		byte b = byteAtUnchecked(digitPos >> 1);
 		//if ((digitPos & 1) == 0) {
 		//	return (b >> 4) & 0x0F; // first hex digit
 		//} else {
@@ -285,7 +287,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		long blength = b.count();
 		long compareLength = Math.min(alength, blength);
 		for (long i = 0; i < compareLength; i++) {
-			int c = (0xFF & getUnchecked(i)) - (0xFF & b.getUnchecked(i));
+			int c = (0xFF & byteAtUnchecked(i)) - (0xFF & b.byteAtUnchecked(i));
 			if (c > 0) return 1;
 			if (c < 0) return -1;
 		}
@@ -293,23 +295,6 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		if (blength > compareLength) return -1; // b is bigger
 		return 0;
 	}
-
-	/**
-	 * Writes the byte contents of this Blob to a ByteBuffer. May be big!
-	 * 
-	 * @param bb ByteBuffer to write to
-	 * @return The passed ByteBuffer, after writing byte content
-	 */
-	public abstract ByteBuffer writeToBuffer(ByteBuffer bb);
-
-	/**
-	 * Writes the byte contents of this blob to a byte array. Assumes buffer has enough space for all bytes.
-	 * 
-	 * @param bs Byte array to write to
-	 * @param pos Starting position in byte array to write to
-	 * @return Updated position in the array after writing
-	 */
-	public abstract int writeToBuffer(byte[] bs, int pos);
 	
 	/**
 	 * Gets a chunk of this Blob, as a canonical Blob up to the maximum chunk size.

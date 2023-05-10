@@ -100,7 +100,8 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 	 * @param i Index into String (byte position)
 	 * @return Raw byte value
 	 */
-	protected abstract byte byteAt(long i);
+	@Override
+	public abstract byte byteAt(long i);
 	
 	/**
 	 * Gets the Character at the specified point in the String, or null 
@@ -124,9 +125,7 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 	@Override 
 	public final String toString() {
 		int n=Utils.checkedInt(count());
-		ByteBuffer bb=ByteBuffer.allocate(n);
-		writeToBuffer(bb);
-		bb.flip(); // Prepare to read
+		ByteBuffer bb=toBlob().toByteBuffer();
 		
 		int cn=Math.min(4096, n); // Guess sensible size for CharBuffer
 		CharBuffer cb=CharBuffer.allocate(cn);
@@ -165,8 +164,6 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 		if (n==0) return this;
 		return Strings.create(toBlob().append(b.toBlob()));
 	}
-	
-	protected abstract void writeToBuffer(ByteBuffer bb);
 
 	/**
 	 * Gets a slice of this string, or null if not a valid slice

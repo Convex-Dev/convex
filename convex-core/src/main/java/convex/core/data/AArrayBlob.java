@@ -107,17 +107,8 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public final void getBytes(byte[] dest, int destOffset) {
-		System.arraycopy(store, offset, dest, destOffset, length);
-	}
-
-	@Override
-	public ByteBuffer writeToBuffer(ByteBuffer bb) {
-		return bb.put(store, offset, length);
-	}
-
-	public int writeToBuffer(byte[] bs, int pos) {
-		System.arraycopy(store, offset, bs, pos, length);
+	public final int getBytes(byte[] dest, int pos) {
+		System.arraycopy(store, offset, dest, pos, length);
 		return Utils.checkedInt(pos + length);
 	}
 
@@ -127,7 +118,7 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.writeVLCLong(bs, pos, length);
-		return writeToBuffer(bs,pos);
+		return getBytes(bs,pos);
 	}
 
 	@Override
@@ -177,7 +168,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	public final byte getUnchecked(long i) {
+	public final byte byteAtUnchecked(long i) {
 		int ix = (int) i;
 		return store[offset + ix];
 	}
@@ -251,7 +242,7 @@ public abstract class AArrayBlob extends ABlob {
 		if (b instanceof AArrayBlob) return rangeMatches((AArrayBlob)b,start,end);
 		for (int i = start; i < end; i++) {
 			// null entry if key does not match prefix
-			if (store[offset+i] != b.getUnchecked(i)) return false;
+			if (store[offset+i] != b.byteAtUnchecked(i)) return false;
 		}
 		return true;
 	}
@@ -298,8 +289,8 @@ public abstract class AArrayBlob extends ABlob {
 
 		long max = Math.min(count(), b.count());
 		for (long i = 0; i < max; i++) {
-			byte ai = getUnchecked(i);
-			byte bi = b.getUnchecked(i);
+			byte ai = byteAtUnchecked(i);
+			byte bi = b.byteAtUnchecked(i);
 			if (ai != bi) return (i * 2) + (Utils.firstDigitMatch(ai, bi) ? 1 : 0);
 		}
 		return max * 2;
