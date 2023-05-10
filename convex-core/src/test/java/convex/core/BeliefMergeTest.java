@@ -233,30 +233,30 @@ public class BeliefMergeTest {
 		assertEquals(0, bs4[PROPOSER].getOrder(RKEY).getBlockCount()); // proposer can't see block in receiver's
 																			// chain yet
 
-		// all peers should propose new consensus, but not confirmed yet
-		assertEquals(0, bs4[PROPOSER].getOrder(PKEY).getProposalPoint());
-		assertEquals(0, bs4[RECEIVER].getOrder(RKEY).getProposalPoint());
+		// all peers should propose new consensus at level 1, but not confirmed yet
+		assertEquals(0, bs4[PROPOSER].getOrder(PKEY).getConsensusPoint(1));
+		assertEquals(0, bs4[RECEIVER].getOrder(RKEY).getConsensusPoint(1));
 		Peer[] bs5 = shareBeliefs(bs4);
 		if (ANALYSIS) printAnalysis(bs5,
 				"Share 2nd round: each peer should propose consensus after seeing majority for new block");
-		assertEquals(1, bs5[PROPOSER].getOrder(PKEY).getProposalPoint());
-		assertEquals(1, bs5[RECEIVER].getOrder(RKEY).getProposalPoint());
+		assertEquals(1, bs5[PROPOSER].getOrder(PKEY).getConsensusPoint(1));
+		assertEquals(1, bs5[RECEIVER].getOrder(RKEY).getConsensusPoint(1));
 
 		// all peers should now agree on consensus, but don't know each other's
 		// consensus yet
-		assertEquals(0, bs5[PROPOSER].getOrder(PKEY).getConsensusPoint());
-		assertEquals(0, bs5[RECEIVER].getOrder(RKEY).getConsensusPoint());
-		assertEquals(0, bs5[PROPOSER].getOrder(RKEY).getConsensusPoint());
+		assertEquals(0, bs5[PROPOSER].getOrder(PKEY).getConsensusPoint(2));
+		assertEquals(0, bs5[RECEIVER].getOrder(RKEY).getConsensusPoint(2));
+		assertEquals(0, bs5[PROPOSER].getOrder(RKEY).getConsensusPoint(2));
 		Peer[] bs6 = shareBeliefs(bs5);
 		if (ANALYSIS) printAnalysis(bs6,
 				"Share 3nd round: each peer should confirm consensus after seeing proposals from others");
-		assertEquals(1, bs6[PROPOSER].getOrder(PKEY).getConsensusPoint());
-		assertEquals(1, bs6[RECEIVER].getOrder(RKEY).getConsensusPoint());
-		assertEquals(0, bs6[PROPOSER].getOrder(RKEY).getConsensusPoint());
+		assertEquals(1, bs6[PROPOSER].getOrder(PKEY).getConsensusPoint(2));
+		assertEquals(1, bs6[RECEIVER].getOrder(RKEY).getConsensusPoint(2));
+		assertEquals(0, bs6[PROPOSER].getOrder(RKEY).getConsensusPoint(2));
 
 		Peer[] bs7 = shareBeliefs(bs6);
 		if (ANALYSIS) printAnalysis(bs7, "Share 4th round: should reach full consensus, confirmations shared");
-		assertEquals(1, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint()); // proposer now sees receivers consensus
+		assertEquals(1, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint(2)); // proposer now sees receivers consensus
 
 		// final state checks
 		assertTrue(allBeliefsEqual(bs7)); // beliefs across peers should be equal
@@ -321,8 +321,8 @@ public class BeliefMergeTest {
 		assertEquals(NUM_PEERS, bs4[RECEIVER].getOrder(RKEY).getBlockCount());
 		assertEquals(1, bs4[PROPOSER].getOrder(RKEY).getBlockCount()); // proposer can only see 1st block from
 																			// receiver
-		assertEquals(0, bs4[PROPOSER].getOrder(PKEY).getProposalPoint());
-		assertEquals(0, bs4[RECEIVER].getOrder(RKEY).getProposalPoint());
+		assertEquals(0, bs4[PROPOSER].getOrder(PKEY).getConsensusPoint(1));
+		assertEquals(0, bs4[RECEIVER].getOrder(RKEY).getConsensusPoint(1));
 
 		// Next round
 		Peer[] bs5 = shareBeliefs(bs4);
@@ -334,9 +334,12 @@ public class BeliefMergeTest {
 
 		Peer[] bs7 = shareBeliefs(bs6);
 		if (ANALYSIS) printAnalysis(bs7, "Share 4th round: should reach full consensus?");
-		assertEquals(NUM_PEERS, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint()); // proposer now sees receivers
+		assertEquals(NUM_PEERS, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint(2)); // proposer now sees receivers
 																						// consensus
-
+		// Share to finalise all consensus
+		bs7 = shareBeliefs(bs7);
+		bs7 = shareBeliefs(bs7);
+		
 		// final state checks
 		assertTrue(allBeliefsEqual(bs7));
 		State finalState = bs7[0].getConsensusState();

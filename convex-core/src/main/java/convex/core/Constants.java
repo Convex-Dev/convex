@@ -245,7 +245,7 @@ public class Constants {
 	public static final int CONSENSUS_LEVELS = 3;
 
 	public static final int CONSENSUS_LEVEL_PROPOSAL = 1;
-	public static final int CONSENSUS_LEVEL_CONSENSUS = 2;
+	public static final int CONSENSUS_LEVEL_CONSENSUS = CONSENSUS_LEVELS-1;
 
 
 }

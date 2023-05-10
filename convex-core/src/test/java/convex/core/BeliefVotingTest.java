@@ -178,8 +178,8 @@ public class BeliefVotingTest {
 			Order order=so.getValue();
 			assertEquals(2,order.getBlockCount());
 			assertEquals(B,order.getBlock(0));
-			assertEquals(1,order.getProposalPoint()); // Enough for proposal
-			assertEquals(1,order.getConsensusPoint()); // Enough for consensus
+			assertEquals(1,order.getConsensusPoint(1)); // Enough for proposal level 1
+			assertEquals(1,order.getConsensusPoint(2)); // Enough for consensus level 2
 			assertEquals(Vectors.of(B,A),order.getBlocks());
 		}
 		
@@ -200,8 +200,8 @@ public class BeliefVotingTest {
 			Order order=so.getValue();
 			assertEquals(1,order.getBlockCount());
 			assertEquals(A,order.getBlock(0)); // didn't switch
-			assertEquals(1,order.getProposalPoint()); // Kept proposal
-			assertEquals(0,order.getConsensusPoint()); // No change in my consensus
+			assertEquals(1,order.getConsensusPoint(1)); // Kept proposal
+			assertEquals(0,order.getConsensusPoint(2)); // No change in my consensus level 2
 
 			// After enough time, Peer should be willing to switch proposal
 			BeliefMerge mc3=BeliefMerge.create(b, kps[0], TS+1+Constants.KEEP_PROPOSAL_TIME, s);
@@ -211,8 +211,8 @@ public class BeliefVotingTest {
 			assertEquals(2,order3.getBlockCount());
 			assertEquals(B,order3.getBlock(0)); // didn't switch
 			assertEquals(A,order3.getBlock(1)); // Kept own block
-			assertEquals(1,order3.getProposalPoint()); // Updated proposal 
-			assertEquals(1,order3.getConsensusPoint()); // New consensus
+			assertEquals(1,order3.getConsensusPoint(1)); // Updated proposal 
+			assertEquals(1,order3.getConsensusPoint(2)); // New consensus
 		}
 	}
 
