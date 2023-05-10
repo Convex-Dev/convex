@@ -74,7 +74,7 @@ public final class CVMLong extends AInteger {
 	
 	/**
 	 * Gets the CVMLong representing an unsigned byte value
-	 * @param b Byte to convery to CVMLong (will be interpreted as unsigned)
+	 * @param b Byte to convert to CVMLong (will be interpreted as unsigned)
 	 * @return CVMLong value
 	 */
 	public static CVMLong forByte(byte b) {
@@ -347,7 +347,7 @@ public final class CVMLong extends AInteger {
 	}
 
 	@Override
-	public ANumeric negate() {
+	public AInteger negate() {
 		if (value==Long.MIN_VALUE) return CVMBigInteger.MIN_POSITIVE;
 		if (value==0) return ZERO;
 		return create(-value);

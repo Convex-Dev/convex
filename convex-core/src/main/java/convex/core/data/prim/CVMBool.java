@@ -71,7 +71,7 @@ public final class CVMBool extends APrimitive {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		throw new UnsupportedOperationException("Not meaningful to encode raw data for CVMBool");
+		return pos;
 	}
 
 	@Override

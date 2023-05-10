@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * 
  * A CVMBigInteger is a canonical CVM value if and only if it represents a number that cannot be a CVMLong
  */
-public class CVMBigInteger extends AInteger {
+public final class CVMBigInteger extends AInteger {
 
 	public static final CVMBigInteger MIN_POSITIVE = wrap(new byte[] {0,-128,0,0,0,0,0,0,0});
 	public static final CVMBigInteger MIN_NEGATIVE = wrap(new byte[] {-1,127,-1,-1,-1,-1,-1,-1,-1});
@@ -182,6 +182,7 @@ public class CVMBigInteger extends AInteger {
 	
 	@Override
 	public long byteLength() {
+		// TODO: check value for zero?
 		if (blob!=null) return blob.count();
 		return ((data.bitLength())/8)+1;
 	}
@@ -224,7 +225,14 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	public AInteger toCanonical() {
 		if (isCanonical()) return this;
-		return CVMLong.create(big().longValue());
+		ABlob b=blob();
+		long v=b.longValue();
+		
+		// Sign extend
+		int shift=(int) (64-(b.count()*8));
+		v= (v<<shift)>>shift;
+		
+		return CVMLong.create(v);
 	}
 	
 	public static CVMBigInteger read(byte tag, Blob blob, int offset) throws BadFormatException {

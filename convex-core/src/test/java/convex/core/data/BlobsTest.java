@@ -127,7 +127,7 @@ public class BlobsTest {
 
 	@Test
 	public void testToLong() {
-		assertEquals(255L,Blob.fromHex("ff").longValue());
+		assertEquals(255L,Blob.fromHex("00ff").longValue());
 		assertEquals(-1L,Blob.fromHex("ffffffffffffffff").longValue());
 	}
 	

@@ -348,7 +348,9 @@ public abstract class AArrayBlob extends ABlob {
 				result = (result << 8) + (0xFF & store[ix]);
 				ix += 1;
 			}
-		
+			// Sign extend
+			//int shift=64-(length*8);
+			//return (result<<shift)>>shift;
 			return result;
 		}
 	}

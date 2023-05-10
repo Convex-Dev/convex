@@ -77,6 +77,10 @@ public class LongTest {
 		doLongTest(c);
 		return c.getEncoding().toHexString();
 	}
+	
+	@Test public void testFromBlob() {
+		assertEquals(0xff,Blob.fromHex("0000ff").longValue());
+	}
 
 	@Test public void testLongSamples() {
 		doLongTest(CVMLong.ZERO);
