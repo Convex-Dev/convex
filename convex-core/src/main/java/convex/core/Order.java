@@ -279,41 +279,6 @@ public class Order extends ARecord {
 		if (timestamp == newTimestamp) return this;
 		return new Order(blocks, consensusPoints, newTimestamp);
 	}
-
-	/**
-	 * Updates this Order with a new proposal position. It is an error to set the
-	 * proposal point before the consensus point, or beyond the last block.
-	 * 
-	 * @param newProposalPoint New Proposal Point in Order 
-	 * @return Updated Order 
-	 */
-	public Order withProposalPoint(long newProposalPoint) {
-		if (this.getProposalPoint() == newProposalPoint) return this;
-		long consensusPoint=getConsensusPoint();
-		if (newProposalPoint < consensusPoint) {
-			throw new IllegalArgumentException(
-					"Trying to move proposed consensus before confirmed consensus?! " + newProposalPoint);
-		}
-		if (newProposalPoint > getBlocks().count()) throw new IndexOutOfBoundsException("Block index: " + newProposalPoint);
-		return create(blocks, newProposalPoint, consensusPoint, timestamp);
-	}
-
-	/**
-	 * Updates this Order with a new consensus position.
-	 * 
-	 * Proposal point will be set to the max of the consensus point and the current
-	 * proposal point
-	 * 
-	 * @param newConsensusPoint New consensus point
-	 * @return Updated chain, or this Chain instance if no change.
-	 */
-	public Order withConsensusPoint(long newConsensusPoint) {
-		if (this.getConsensusPoint() == newConsensusPoint) return this;
-		if (newConsensusPoint > getBlocks().count())
-			throw new IndexOutOfBoundsException("Block index: " + newConsensusPoint);
-		long newProposalPoint = Math.max(getProposalPoint(), newConsensusPoint);
-		return create(blocks, newProposalPoint, newConsensusPoint, timestamp);
-	}
 	
 	/**
 	 * Updates this Order with a new consensus position.
@@ -414,8 +379,9 @@ public class Order extends ARecord {
 	 */
 	public boolean consensusEquals(Order b) {
 		if (b==null) return false; // definitely not equal
-		if (this.getProposalPoint()!=b.getProposalPoint()) return false;
-		if (this.getConsensusPoint()!=b.getConsensusPoint()) return false;
+		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
+			if (this.getConsensusPoint(i)!=b.getConsensusPoint(i)) return false;			
+		}
 		if (!this.blocks.equals(b.blocks)) return false;
 		return true;
 	}
