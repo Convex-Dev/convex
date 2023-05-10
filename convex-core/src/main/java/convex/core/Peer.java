@@ -195,6 +195,9 @@ public class Peer {
 	
 	/**
 	 * Like {@link #getPeerData(AStore, ACell)} but uses a null root key.
+	 * @param store store from which to load Peer data
+	 * @return Peer data map
+	 * @throws IOException In case of IOException
 	 */
 	public static AMap<Keyword, ACell> getPeerData(AStore store) throws IOException {
 		return getPeerData(store, null);
@@ -446,6 +449,9 @@ public class Peer {
 		// need to advance states
 		State s = this.state;
 		long stateIndex=position;
+		if (stateIndex>=consensusPoint) return this;
+
+		// We need to compute at least one new state update
 		AVector<BlockResult> newResults = this.blockResults;
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
 			SignedData<Block> block = blocks.get(stateIndex);

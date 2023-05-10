@@ -31,7 +31,11 @@ public class CVMExecutor extends AThreadedComponent {
 		}
 		
 		// Trigger State update (if any new Blocks are confirmed)
-		peer=peer.updateState();
+		Peer updatedPeer=peer.updateState();
+		if (updatedPeer!=peer) {
+			peer=updatedPeer;
+			server.persistPeerData();
+		}
 		
 		server.transactionHandler.maybeReportTransactions(peer);
 	}
