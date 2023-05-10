@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * lazily computed on demand
  * 
  */
-public abstract class ABlob extends ACountable<CVMLong> implements Comparable<ABlob> {
+public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABlob> {
 	/**
 	 * Cached hash of the Blob data. Might be null.
 	 */

@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * consistent behaviour (e.g. in conversions to and from Blobs). It is up to clients to decide 
  * how to represent invalid UTF-8 if necessary.
  */
-public abstract class AString extends ACountable<CVMChar> implements Comparable<AString> {
+public abstract class AString extends ABlobLike<CVMChar> implements Comparable<AString> {
 
 	protected long length;
 	
