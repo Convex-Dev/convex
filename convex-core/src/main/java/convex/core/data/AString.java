@@ -120,6 +120,11 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 	}
 	
 	@Override
+	public int getBytes(byte[] dest, int destOffset) {
+		return toBlob().getBytes(dest, destOffset);
+	}
+	
+	@Override
 	public abstract int compareTo(AString o);
 	
 	@Override 

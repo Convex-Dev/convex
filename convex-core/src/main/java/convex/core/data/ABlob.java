@@ -30,14 +30,6 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		return Types.BLOB;
 	}
 	
-	/**
-	 * Copies the bytes from this blob to a given destination
-	 * 
-	 * @param dest Destination array
-	 * @param destOffset Offset into destination array
-	 * @return End position in destination array after writing
-	 */
-	public abstract int getBytes(byte[] dest, int destOffset);
 
 	/**
 	 * Gets the length of this Blob
@@ -209,17 +201,6 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		// This hack avoids a conditional, not sure if worth it....
 		int shift = 4*(1-((int)digitPos&1));
 		return (b>>shift)&0x0F;
-	}
-
-	/**
-	 * Gets a byte array containing a copy of this Blob.
-	 * 
-	 * @return A new byte array containing the contents of this blob.
-	 */
-	public byte[] getBytes() {
-		byte[] result = new byte[Utils.checkedInt(count())];
-		getBytes(result, 0);
-		return result;
 	}
 
 	/**
