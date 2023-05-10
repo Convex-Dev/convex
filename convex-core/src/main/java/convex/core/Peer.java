@@ -398,9 +398,10 @@ public class Peer {
 
 		long ocp=getFinalityPoint();
 		Order newOrder=newBelief.getOrder(peerKey);
-		if (ocp>newBelief.getOrder(peerKey).getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY)) {
+		long ncp=newOrder.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
+		if (ocp>ncp) {
 			// This probably shouldn't happen, but just in case.....
-			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+newOrder.getConsensusPoint());
+			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+ncp);
 			
 		}
 		Peer p= updateBelief(newBelief);

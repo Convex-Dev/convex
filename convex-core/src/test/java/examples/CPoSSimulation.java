@@ -5,6 +5,7 @@ import java.util.Random;
 
 import convex.core.Belief;
 import convex.core.Block;
+import convex.core.Constants;
 import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
@@ -108,7 +109,8 @@ public class CPoSSimulation {
 				Order ao=a.getPeerOrder();
 				Order bo=b.getPeerOrder();
 				long match=ao.getBlocks().commonPrefixLength(bo.getBlocks());
-				if (match<Math.min(ao.getConsensusPoint(), bo.getConsensusPoint())) {
+				long minFinality=Math.min(ao.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY), bo.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY));
+				if (match<minFinality) {
 					System.err.println("Peer "+i+ " inconsistent with Peer "+j);
 					System.err.println("Match length = "+match);
 					return false;
