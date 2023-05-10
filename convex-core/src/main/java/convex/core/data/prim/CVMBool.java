@@ -32,7 +32,6 @@ public final class CVMBool extends APrimitive {
 		return Types.BOOLEAN;
 	}
 
-
 	public static CVMBool create(boolean value) {
 		return value?TRUE:FALSE;
 	}
@@ -103,6 +102,11 @@ public final class CVMBool extends APrimitive {
 	@Override
 	public AString toCVMString(long limit) {
 		return value?Strings.TRUE:Strings.FALSE;
+	}
+	
+	@Override public boolean equals(ACell a) {
+		// Can compare on identity, since only two canonical instances
+		return this==a;
 	}
 
 }

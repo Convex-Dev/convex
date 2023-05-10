@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import java.nio.ByteBuffer;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
@@ -357,6 +358,15 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		return Integer.compare(value, o.value);
 	}
 
+	@Override public boolean equals(ACell a) {
+		if (!(a instanceof CVMChar)) return false;
+		return value==((CVMChar)a).value;
+	}
+	
+	public boolean equals(CVMChar a) {
+		if (a==null) return false;
+		return value==a.value;
+	}
 
 
 

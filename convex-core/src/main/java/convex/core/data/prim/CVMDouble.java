@@ -191,7 +191,7 @@ public final class CVMDouble extends ANumeric {
 	
 	@Override
 	public int compareTo(ANumeric o) {
-		return Double.compare(doubleValue(), o.doubleValue());
+		return Double.compare(value, o.doubleValue());
 	}
 
 	@Override

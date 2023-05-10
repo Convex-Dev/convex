@@ -1,6 +1,7 @@
 package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,12 +31,20 @@ public class DoubleTest {
 		assertTrue(CVMDouble.ONE.compareTo(CVMDouble.ZERO)==1);
 		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMDouble.ZERO)>0);
 		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMDouble.ZERO)<0);
+		
+		// NaN behaves like the biggest possible number in comparison orderings
+		assertEquals(-1,CVMDouble.ZERO.compareTo(CVMDouble.NaN));
+		assertEquals(-1,CVMDouble.POSITIVE_INFINITY.compareTo(CVMDouble.NaN));
+		assertEquals(0,CVMDouble.NaN.compareTo(CVMDouble.NaN));
 	}
 	
 	@Test public void testEquality() {
 		ObjectsTest.doEqualityTests(CVMDouble.ONE, CVMDouble.create(1.0));
 		ObjectsTest.doEqualityTests(CVMDouble.create(12345.0),CVMDouble.create(12345.0));
 		ObjectsTest.doEqualityTests(CVMDouble.NaN,CVMDouble.create(Double.NaN));
+		
+		assertFalse(CVMDouble.NEGATIVE_ZERO.equals(CVMDouble.ZERO));
+		assertTrue(CVMDouble.NaN.equals(CVMDouble.NaN));
 	}
 	
 	@Test public void testIntegerCompares() {

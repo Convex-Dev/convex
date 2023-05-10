@@ -158,7 +158,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return h.equals(ha);
 		}
 
 		// Else default to checking encodings
