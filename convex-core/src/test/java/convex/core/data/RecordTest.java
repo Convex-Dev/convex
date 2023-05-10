@@ -20,15 +20,16 @@ import convex.core.transactions.Transfer;
 
 public class RecordTest {
 	
-	// TODO: add all other record types
+	// TODO: Check we have included all other record types
+	// Transactions handled in TransactionTest which delegates to here
+	// AccountStatusTest delegates to here
+	// PeerStatusTest delegates to here
 
 	@Test
 	public void testBelief() {
 		Belief b=Belief.createSingleOrder(InitTest.FIRST_PEER_KEYPAIR);
 		assertEquals(b.getRefCount(),b.getOrders().getRefCount());
-
 		doRecordTests(b);
-
 	}
 	
 	@Test
@@ -38,7 +39,6 @@ public class RecordTest {
 		SignedData<ATransaction> stx1=InitTest.HERO_KEYPAIR.signData(tx1);
 		SignedData<ATransaction> stx2=InitTest.VILLAIN_KEYPAIR.signData(tx2);
 		Block b=Block.create(Constants.INITIAL_TIMESTAMP+17, Vectors.of(stx1,stx2));
-		
 		doRecordTests(b);
 	}
 
@@ -54,14 +54,13 @@ public class RecordTest {
 	}
 
 	public static void doRecordTests(ARecord r) {
-
 		RecordFormat format=r.getFormat();
-
 		AVector<Keyword> keys=format.getKeys();
 		int n=(int) keys.count();
 
 		AVector<ACell> vals=r.values();
 		assertEquals(n,vals.size());
+		VectorsTest.doVectorTests(vals);
 
 		ACell[] vs=new ACell[n]; // new array to extract values
 		for (int i=0; i<n; i++) {

@@ -48,8 +48,16 @@ public class SignedDataTest {
 		assertTrue(sd1.isSignatureChecked());
 		assertFalse(sd1.checkSignature());
 		
-		ObjectsTest.doAnyValueTests(sd);
-		ObjectsTest.doAnyValueTests(sd1);
+		doSignedDataTest(sd);
+		doSignedDataTest(sd1);
+	}
+
+	/**
+	 * Generic tests or SignedData instance
+	 * @param sd SignedData instance to test
+	 */
+	private void doSignedDataTest(SignedData<?> sd) {
+		RecordTest.doRecordTests(sd);
 	}
 
 	@Test
@@ -68,6 +76,8 @@ public class SignedDataTest {
 		assertEquals(cl, sd.getValue());
 
 		assertTrue(sd.getValueRef().isEmbedded());
+		
+		doSignedDataTest(sd);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -82,6 +92,9 @@ public class SignedDataTest {
 		// should have cached checked signature
 		assertTrue(sd1.isSignatureChecked());
 		assertTrue(sd1.checkSignature());
+		
+		doSignedDataTest(sd);
+		doSignedDataTest(sd1);
 	}
 	
 	@Test
@@ -97,6 +110,8 @@ public class SignedDataTest {
 		
 		Refs.RefTreeStats stats=Refs.getRefTreeStats(sd.getRef());
 		assertEquals(6,stats.total);
+		
+		doSignedDataTest(sd);
 	}
 
 	@Test
@@ -104,6 +119,8 @@ public class SignedDataTest {
 		SignedData<ACell> sd = SignedData.create(InitTest.HERO_KEYPAIR, null);
 		assertNull(sd.getValue());
 		assertTrue(sd.checkSignature());
+		
+		doSignedDataTest(sd);
 	}
 
 	@Test
@@ -121,7 +138,7 @@ public class SignedDataTest {
 
 		assertEquals(kp.getAccountKey(),sd.getAccountKey());
 		
-		ObjectsTest.doAnyValueTests(sd);
+		doSignedDataTest(sd);
 	}
 	
 	@Test 
@@ -134,5 +151,6 @@ public class SignedDataTest {
 		
 		assertEquals(enc.getContentHash(),r.getHash());
 		
+		doSignedDataTest(sd);
 	}
 }
