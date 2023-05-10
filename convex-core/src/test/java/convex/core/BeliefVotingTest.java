@@ -86,8 +86,8 @@ public class BeliefVotingTest {
 		Belief b2=mc.merge(b1);
 		Order o2=b2.getOrder(keys[0]);
 		assertEquals(p1o.getBlocks(),o2.getBlocks());
-		assertEquals(0,o2.getProposalPoint());
-		assertEquals(0,o2.getConsensusPoint());
+		assertEquals(0,o2.getConsensusPoint(1));
+		assertEquals(0,o2.getConsensusPoint(2));
 		assertEquals(TS+1,o2.getTimestamp());
 		
 		// Beliefs from other Peers, enough for Proposal
@@ -100,8 +100,8 @@ public class BeliefVotingTest {
 		Belief b3=mc.merge(b2,br2,br3,br4,br5);
 		Order o3=b3.getOrder(keys[0]);
 		assertEquals(p1o.getBlocks(),o3.getBlocks());
-		assertEquals(1,o3.getProposalPoint());
-		assertEquals(0,o3.getConsensusPoint());
+		assertEquals(1,o3.getConsensusPoint(1));
+		assertEquals(0,o3.getConsensusPoint(2));
 		
 		mc=BeliefMerge.create(b3, kps[0], TS+1, s);
 		// Future merges should be idempotent
@@ -158,8 +158,8 @@ public class BeliefVotingTest {
 			Order order=so.getValue();
 			assertEquals(7,order.getBlockCount());
 			assertEquals(B,order.getBlock(0));
-			assertEquals(1,order.getProposalPoint()); // Enough for proposal
-			assertEquals(0,order.getConsensusPoint());
+			assertEquals(1,order.getConsensusPoint(1)); // Enough for proposal
+			assertEquals(0,order.getConsensusPoint(2));
 			assertEquals(Vectors.of(B,A,C,D,E,F,G),order.getBlocks());
 		}
 		

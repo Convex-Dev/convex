@@ -258,6 +258,10 @@ public class BeliefMergeTest {
 		if (ANALYSIS) printAnalysis(bs7, "Share 4th round: should reach full consensus, confirmations shared");
 		assertEquals(1, bs7[PROPOSER].getOrder(RKEY).getConsensusPoint(2)); // proposer now sees receivers consensus
 
+		// More sharing to reach full alignment
+		bs7 = shareBeliefs(bs7);
+		bs7 = shareBeliefs(bs7);
+		
 		// final state checks
 		assertTrue(allBeliefsEqual(bs7)); // beliefs across peers should be equal
 		State finalState = bs7[0].getConsensusState();

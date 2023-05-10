@@ -199,9 +199,8 @@ public class BeliefMerge {
 		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {
 			// We have a different Order to propose
-			// First check how consistent this is with out current Order
+			// First check how consistent this is with our current Order
 			long match = consensusOrder.getBlocks().commonPrefixLength(myOrder.getBlocks());
-			long ts=getTimestamp();
 			
 			// We always want to replace our Order if consistent with our current proposal
 			boolean shouldReplace=match>=myOrder.getProposalPoint();
@@ -223,6 +222,7 @@ public class BeliefMerge {
 			
 			if (shouldReplace) {
 				// Update timestamp
+				long ts=getTimestamp();
 				Order myNewOrder=consensusOrder.withTimestamp(ts);
 			
 				// Only sign and update Order if it has changed
