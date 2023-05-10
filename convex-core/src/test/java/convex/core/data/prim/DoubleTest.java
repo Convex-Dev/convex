@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.ObjectsTest;
 import convex.core.exceptions.BadFormatException;
 
 public class DoubleTest {
@@ -29,6 +30,12 @@ public class DoubleTest {
 		assertTrue(CVMDouble.ONE.compareTo(CVMDouble.ZERO)==1);
 		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMDouble.ZERO)>0);
 		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMDouble.ZERO)<0);
+	}
+	
+	@Test public void testEquality() {
+		ObjectsTest.doEqualityTests(CVMDouble.ONE, CVMDouble.create(1.0));
+		ObjectsTest.doEqualityTests(CVMDouble.create(12345.0),CVMDouble.create(12345.0));
+		ObjectsTest.doEqualityTests(CVMDouble.NaN,CVMDouble.create(Double.NaN));
 	}
 	
 	@Test public void testIntegerCompares() {

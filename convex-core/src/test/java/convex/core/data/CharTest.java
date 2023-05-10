@@ -42,6 +42,10 @@ public class CharTest {
 		//assertEquals(c,Reader.read(pjs));
 	}
 	
+	@Test public void testEquality() {
+		ObjectsTest.doEqualityTests(CVMChar.create(999), CVMChar.create(999));
+	}
+	
 	@Test public void testUTF16Chars() {
 		testUTF(0);
 		testUTF(128);

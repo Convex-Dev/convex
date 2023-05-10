@@ -228,8 +228,7 @@ public class BlobsTest {
 		assertEquals(10, b.commonHexPrefixLength(bb.slice(0, 5)));
 		assertEquals(8, bb.commonHexPrefixLength(b.slice(0, 4)));
 
-		assertEquals(bb, b); 
-		assertEquals(b, bb); 
+		ObjectsTest.doEqualityTests(b, bb);
 
 		doLongBlobTests(b.toExactLong());
 	}

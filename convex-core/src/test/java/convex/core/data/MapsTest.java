@@ -295,8 +295,13 @@ public class MapsTest {
 	public void testMapEntry() {
 		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
 		MapEntry<CVMLong, CVMLong> me = m.getEntry(RT.cvm(1L));
-		assertCVMEquals(1L, me.getKey());
-		assertCVMEquals(2L, me.getValue());
+		CVMLong k = me.getKey();
+		CVMLong v = me.getValue();
+		assertCVMEquals(1L, k);
+		assertCVMEquals(2L, v);
+		
+		// a Map Entry should be functionally equal to a Vector
+		ObjectsTest.doEqualityTests(me, Vectors.of(k,v));
 
 		// out of range assocs
 		assertNull( me.assoc(2, RT.cvm(3L)));

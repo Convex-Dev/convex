@@ -327,4 +327,27 @@ public class ObjectsTest {
 		}
 	}
 
+	/**
+	 * GEneric test for any two distinct objects that should be considered equal on the CVM
+	 * @param a First instance
+	 * @param b Second instance
+	 */
+	public static void doEqualityTests(ACell a, ACell b) {
+		assertNotSame(a,b);
+		assertTrue(a.equals(b));
+		assertTrue(b.equals(a));
+		assertEquals(a.hashCode(), b.hashCode());
+		assertEquals(a.getHash(), b.getHash());
+		assertEquals(a.getTag(),b.getTag());
+		assertSame(a.getType(),b.getType());
+		
+		Blob enc=a.getEncoding();
+		assertEquals(enc, b.getEncoding());
+		try {
+			assertEquals(a, Format.read(enc));
+		} catch (BadFormatException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+
 }

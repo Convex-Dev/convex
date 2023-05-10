@@ -17,7 +17,7 @@ public class LongTest {
 	@Test
 	public void testEquality() {
 		long v=666666;
-		assertEquals(CVMLong.create(v),CVMLong.create(v));
+		ObjectsTest.doEqualityTests(CVMLong.create(v),CVMLong.create(v));
 	}
 	
 	@Test 

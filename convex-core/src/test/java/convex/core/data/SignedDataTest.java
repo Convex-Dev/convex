@@ -139,6 +139,10 @@ public class SignedDataTest {
 		assertEquals(kp.getAccountKey(),sd.getAccountKey());
 		
 		doSignedDataTest(sd);
+		
+		// Test signing again produces exactly equal value
+		SignedData<AVector<CVMLong>> sd2 = kp.signData(v);
+		ObjectsTest.doEqualityTests(sd, sd2);
 	}
 	
 	@Test 

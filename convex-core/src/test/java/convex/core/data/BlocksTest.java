@@ -21,11 +21,7 @@ public class BlocksTest {
 		Block b1 = Block.create(ts, Vectors.empty());
 		Block b2 = Block.create(ts, Vectors.empty());
 
-		assertEquals(b1, b2);
-		assertEquals(b1.hashCode(), b2.hashCode());
-		assertEquals(b1.getHash(), b2.getHash());
-		assertEquals(b1.getEncoding(), b2.getEncoding());
-		assertEquals(b1, Format.read(b2.getEncoding()));
+		ObjectsTest.doEqualityTests(b1,b2);
 		
 		assertEquals(0,b1.getTransactions().count());
 

@@ -96,8 +96,8 @@ public class SetsTest {
 		assertFalse(b.contains(RT.cvm(3L)));
 
 		assertSame(Sets.empty(), a.disjAll(a));
-		assertEquals(Sets.of(1, 2, 3, 4, 6), a.conjAll(b));
-		assertEquals(Sets.of(1, 3), a.disjAll(b));
+		ObjectsTest.doEqualityTests(Sets.of(1, 2, 3, 4, 6), a.conjAll(b));
+		ObjectsTest.doEqualityTests(Sets.of(1, 3), a.disjAll(b));
 	}
 	
 	@Test 
@@ -123,8 +123,6 @@ public class SetsTest {
 		s = s.include( m);
 		s.validate();
 	}
-	
-	
 
 	@Test
 	public void testMergingIdentity() {
@@ -175,8 +173,7 @@ public class SetsTest {
 		assertTrue(s3 instanceof SetTree);
 		doSetTests(s3);
 		
-		assertEquals(s,s1.includeAll(s2).includeAll(s3));
-
+		ObjectsTest.doEqualityTests(s,s1.includeAll(s2).includeAll(s3));
 	}
 
 	@Test
@@ -196,7 +193,7 @@ public class SetsTest {
 
 		ASet<CVMLong> s5a = Sets.of(1, 3, 7, -1000);
 		ASet<CVMLong> s5 = s5a.disjAll(s);
-		assertEquals(Sets.of(-1000), s5);
+		ObjectsTest.doEqualityTests(Sets.of(-1000), s5);
 	}
 	
 	@Test
