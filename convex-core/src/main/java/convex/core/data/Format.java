@@ -289,22 +289,6 @@ public class Format {
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
 		return writeVLCLong(bb, len);
 	}
-
-	/**
-	 * Writes a canonical object to a ByteBuffer, preceded by the appropriate tag
-	 * 
-	 * @param bb ByteBuffer to write to
-	 * @param cell Cell to write (may be null)
-	 * @return The ByteBuffer after writing the specified object
-	 */
-	public static ByteBuffer write(ByteBuffer bb, ACell cell) {
-		// first check for null
-		if (cell == null) {
-			return bb.put(Tag.NULL);
-		}
-		// Generic handling for all non-null CVM types
-		return cell.write(bb);
-	}
 	
 	/**
 	 * Writes a cell encoding to a byte array, preceded by the appropriate tag
@@ -327,37 +311,6 @@ public class Format {
 		} else {
 			return cell.encode(bs,pos);
 		}
-	}
-
-	/**
-	 * Writes a UTF-8 String to the byteBuffer. Includes string tag and length
-	 * 
-	 * @param bb ByteBuffer to write to
-	 * @param s String to write
-	 * @return ByteBuffer after writing
-	 */
-	public static ByteBuffer writeUTF8String(ByteBuffer bb, String s) {
-		bb = bb.put(Tag.STRING);
-		return writeRawUTF8String(bb, s);
-	}
-
-	/**
-	 * Writes a raw string without tag to the byteBuffer. Includes length in bytes
-	 * of UTF-8 representation
-	 * 
-	 * @param bb ByteBuffer to write to
-	 * @param s String to write
-	 * @return ByteBuffer after writing
-	 */
-	public static ByteBuffer writeRawUTF8String(ByteBuffer bb, String s) {
-		if (s.length() == 0) {
-			bb = writeLength(bb, 0);
-		} else {
-			byte[] bs = Utils.toByteArray(s);
-			bb = writeLength(bb, bs.length);
-			bb = bb.put(bs);
-		}
-		return bb;
 	}
 	
 	/**
@@ -427,27 +380,6 @@ public class Format {
 	public static ByteBuffer writeLength(ByteBuffer bb, int i) {
 		bb = writeVLCLong(bb, i);
 		return bb;
-	}
-
-	/**
-	 * Writes a 64-bit long as 8 bytes to the ByteBuffer provided
-	 * 
-	 * @param bb Destination ByteBuffer
-	 * @param value Value to write
-	 * @return ByteBuffer after writing
-	 */
-	public static ByteBuffer writeLong(ByteBuffer bb, long value) {
-		return bb.putLong(value);
-	}
-
-	/**
-	 * Reads a 64-bit long as 8 bytes from the ByteBuffer provided
-	 * 
-	 * @param bb Destination ByteBuffer
-	 * @return long value
-	 */
-	public static long readLong(ByteBuffer bb) {
-		return bb.getLong();
 	}
 	
 	/**
@@ -749,39 +681,6 @@ public class Format {
 		}
 		System.arraycopy(bs2, 0, bs, pos, nBytes);
 		return pos+nBytes;
-	}
-
-	/**
-	 * Reads hex digits from ByteBuffer into the specified range of a new byte
-	 * array. Needed for BlobMap encoding.
-	 * 
-	 * @param start Start position (in hex digits)
-	 * @param length Length (in hex digits)
-	 * @param bb ByteBuffer to read from
-	 * @return byte array containing hex digits
-	 * @throws BadFormatException In case of bad Encoding format
-	 */
-	public static byte[] readHexDigits(ByteBuffer bb, long start, long length) throws BadFormatException {
-		int nBytes = Utils.checkedInt((length + 1) >> 1);
-		byte[] bs = new byte[nBytes];
-		bb.get(bs);
-		if (length < nBytes * 2) {
-			// test for invalid high bits missing if we have an odd number of digits -
-			// should be zero
-			if (Utils.extractBits(bs, 4, 0) != 0)
-				throw new BadFormatException("Bytes for " + length + " hex digits: " + Utils.toHexString(bs));
-		}
-
-		int rBytes = Utils.checkedInt((start + length + 1) >> 1); // bytes covering the specified range completely
-		byte[] rs = new byte[rBytes];
-
-		for (int i = 0; i < length; i++) {
-			int digit = Utils.extractBits(bs, 4, 4 * ((nBytes * 2) - i - 1));
-			int di = Utils.checkedInt(4 * ((rBytes * 2) - (start + i) - 1));
-			Utils.setBits(rs, 4, di, digit);
-		}
-
-		return rs;
 	}
 
 	/**

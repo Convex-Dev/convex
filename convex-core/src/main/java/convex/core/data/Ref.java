@@ -585,16 +585,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 	
 	@Override
-	public final ByteBuffer write(ByteBuffer bb) {
-		if (isEmbedded()) {
-			return Format.write(bb, getValue());
-		} else {
-			bb=bb.put(Tag.REF);
-			return getHash().writeToBuffer(bb);
-		}
-	}
-	
-	@Override
 	protected Blob createEncoding() {
 		if (isEmbedded()) {
 			return Format.encodedBlob(getValue());

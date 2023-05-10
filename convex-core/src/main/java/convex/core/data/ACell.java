@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.function.Consumer;
 
 import convex.core.Constants;
@@ -165,17 +164,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		// Else default to checking encodings
 		// We would need to get encodings anyway to compute a Hash....
 		return getEncoding().equals(a.getEncoding());
-	}
-
-	/**
-	 * Writes this Cell's encoding to a ByteBuffer, including a tag byte which will be written first
-	 *
-	 * @param bb A ByteBuffer to which to write the encoding
-	 * @return The passed ByteBuffer, after the representation of this object has been written.
-	 */
-	@Override
-	public final ByteBuffer write(ByteBuffer bb) {
-		return getEncoding().writeToBuffer(bb);
 	}
 	
 	/**

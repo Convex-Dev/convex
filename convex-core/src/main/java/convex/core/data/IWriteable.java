@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 public interface IWriteable {
 	/**
 	 * Writes this object to a byte array including an appropriate message tag
@@ -11,14 +9,6 @@ public interface IWriteable {
 	 * @return The updated position
 	 */
 	public int encode(byte[] bs, int pos);
-
-	/**
-	 * Writes this object to a ByteBuffer including an appropriate message tag
-	 * 
-	 * @param bb ByteBuffer to write to
-	 * @return The updated ByteBuffer
-	 */
-	public ByteBuffer write(ByteBuffer bb);
 	
 	/**
 	 * Estimate the encoded data size for this Cell. Used for quickly sizing buffers.
