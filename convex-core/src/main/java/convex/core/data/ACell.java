@@ -530,11 +530,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
 	 * @return Persisted Ref
 	 */
-	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		if (value!=null) {
-			value=(T) value.getCanonical();
-		}
 		Ref<T> ref = Ref.get(value);
 		if (ref.isPersisted()) return ref;
 		AStore store=Stores.current();
