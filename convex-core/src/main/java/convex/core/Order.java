@@ -35,20 +35,30 @@ import convex.core.lang.impl.RecordFormat;
  * 
  */
 public class Order extends ARecord {
+	/**
+	 * Ref to Blocks Vector. We use Ref to assist de-duplication, since many Orders
+	 * likely to share same Blocks value
+	 */
 	private final Ref<AVector<SignedData<Block>>> blocks;
 
-	private final long [] consensusPoints=new long[Constants.CONSENSUS_LEVELS];
+	/**
+	 * Array of consensus points for each consensus level. The first element (block count)
+	 * is ignored.
+	 */
+	private final long [] consensusPoints;
+	
+	/**
+	 * Timestamp of this Order
+	 */
 	private final long timestamp;
 
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	private Order(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
+	private Order(Ref<AVector<SignedData<Block>>> blocks, long[] consensusPoints, long timestamp) {
 		super(FORMAT.count());
 		this.blocks = blocks;
-		consensusPoints[0] = blocks.getValue().count();
-		consensusPoints[1] = proposalPoint;
-		consensusPoints[2] = consensusPoint;
+		this.consensusPoints=consensusPoints;
 		this.timestamp = timestamp;
 	}
 
@@ -60,7 +70,12 @@ public class Order extends ARecord {
 	 * @return New Order instance
 	 */
 	private static Order create(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
-		return new Order(blocks, proposalPoint, consensusPoint,timestamp);
+		long[] consensusPoints=new long[Constants.CONSENSUS_LEVELS];
+		consensusPoints[0] = blocks.getValue().count();
+		consensusPoints[1] = proposalPoint;
+		consensusPoints[2] = consensusPoint;
+
+		return new Order(blocks, consensusPoints,timestamp);
 	}
 
 	/**
@@ -122,15 +137,18 @@ public class Order extends ARecord {
 			throw new BadFormatException("Null blocks in Order!");
 		}
 		
-		long pp = Format.readVLCLong(bb);
-		long cp = Format.readVLCLong(bb);
+		long[] cps=new long[Constants.CONSENSUS_LEVELS];
+		long pp=Format.readVLCLong(bb);
+		cps[1] = pp;
+		long cp=Format.readVLCLong(bb);;
+		cps[2] = cp;
 		long ts = Format.readVLCLong(bb);
 		
 		if (pp<cp) {
 			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
 		}
 
-		return new Order(blocks, pp, cp,ts);
+		return new Order(blocks, cps,ts);
 	}
 	
 
@@ -152,9 +170,11 @@ public class Order extends ARecord {
 		if (pp<cp) {
 			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
 		}
-
+		long[] cps=new long[Constants.CONSENSUS_LEVELS];
+		cps[1]=pp;
+		cps[2]=cp;
 		
-		Order result=new Order(blocks, pp, cp,ts);
+		Order result=new Order(blocks, cps,ts);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
@@ -198,9 +218,16 @@ public class Order extends ARecord {
 	 */
 	public long getConsensusPoint(int level) {
 		switch (level) {
-			case 0: case 1: case 2: return consensusPoints[level];
+			case 0: return blocks.getValue().count();
+			case 1: case 2: return consensusPoints[level];
 			default: throw new Error("Illegal consensus level: "+level);
 		}
+	}
+	
+	public long[] getConsensusPoints() {
+		long[] result=consensusPoints.clone();
+		result[0]=getBlockCount();
+		return result;
 	}
 
 	/**
@@ -270,7 +297,7 @@ public class Order extends ARecord {
 	 */
 	public Order withTimestamp(long newTimestamp) {
 		if (timestamp == newTimestamp) return this;
-		return create(blocks, getProposalPoint(), getConsensusPoint(), newTimestamp);
+		return new Order(blocks, consensusPoints, newTimestamp);
 	}
 
 	/**
@@ -288,7 +315,7 @@ public class Order extends ARecord {
 					"Trying to move proposed consensus before confirmed consensus?! " + newProposalPoint);
 		}
 		if (newProposalPoint > getBlocks().count()) throw new IndexOutOfBoundsException("Block index: " + newProposalPoint);
-		return new Order(blocks, newProposalPoint, consensusPoint, timestamp);
+		return create(blocks, newProposalPoint, consensusPoint, timestamp);
 	}
 
 	/**
@@ -313,7 +340,7 @@ public class Order extends ARecord {
 	 * 
 	 * @param level Consensus level to update
 	 * @param newPosition New consensus point
-	 * @return Updated chain, or this Chain instance if no change.
+	 * @return Updated Order, or this Order instance if no change.
 	 */
 	public Order withConsensusPoint(int level,long newPosition) {
 		switch (level) {
@@ -321,6 +348,18 @@ public class Order extends ARecord {
 		case 2: return withConsensusPoint(newPosition);
 		default: throw new Error("Illegal level");
 		}
+	}
+	
+	/**
+	 * Updates this Order with new consensus positios.
+	 * 
+	 * @param newPositions New consensus points
+	 * @return Updated Order, or this Order instance if no change.
+	 */
+	public Order withConsensusPoints(long[] newPositions) {
+		long[] cps=newPositions.clone();
+		cps[0]=getBlockCount();
+		return new Order(blocks,cps,timestamp);
 	}
 
 	/**
@@ -385,7 +424,7 @@ public class Order extends ARecord {
 		if (blocks == newBlocks) {
 			return this;
 		}
-		return new Order(newBlocks, getProposalPoint(), getConsensusPoint(), timestamp);
+		return new Order(newBlocks, consensusPoints, timestamp);
 	}
 
 	/**
