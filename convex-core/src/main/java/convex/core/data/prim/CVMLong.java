@@ -43,7 +43,7 @@ public final class CVMLong extends AInteger {
 	public static final CVMLong MAX_VALUE = CVMLong.create(Long.MAX_VALUE);
 	public static final CVMLong MIN_VALUE = CVMLong.create(Long.MIN_VALUE);
 	
-	public static final int MAX_ENCODING_LENGTH = 11;
+	public static final int MAX_ENCODING_LENGTH = 9;
 	
 	private final long value;
 	
@@ -83,7 +83,7 @@ public final class CVMLong extends AInteger {
 	
 	@Override
 	public AType getType() {
-		return Types.LONG;
+		return Types.INTEGER;
 	}
 	
 	@Override
@@ -113,21 +113,34 @@ public final class CVMLong extends AInteger {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.LONG;
-		return encodeRaw(bs,pos);
+		int numBytes=Format.getLongLength(value);
+		bs[pos++]=(byte) (Tag.INTEGER+numBytes);
+		return encodeRaw(bs,pos,numBytes);
 	}
-
+	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeVLCLong(bs, pos, value);
+		int numBytes=Format.getLongLength(value);
+		return encodeRaw(bs,pos,numBytes);
+	}
+
+	private int encodeRaw(byte[] bs, int pos, int numBytes) {
+		for (int i=0; i<numBytes; i++) {
+			bs[pos+i]=(byte)(value>>((numBytes-1-i)<<3));
+		}
+		return pos+numBytes;
 	}
 	
 	public static CVMLong read(byte tag, Blob blob, int offset) throws BadFormatException {
-		long v=Format.readVLCLong(blob,offset+1);
+		int numBytes=tag-Tag.INTEGER;
+		if (numBytes==0) return ZERO;
+		long v=Format.readLong(blob,offset+1,numBytes);
+		
+		long end=offset+1+numBytes;
 		CVMLong result= create(v);
 		if (result.encoding==null) {
 			// we likely already have a valid encoding if cached!
-			result.attachEncoding(blob.slice(offset,offset+Format.getVLCLength(v)+1));
+			result.attachEncoding(blob.slice(offset,end));
 		}
 		return result;
 	}
@@ -188,7 +201,10 @@ public final class CVMLong extends AInteger {
 	
 	@Override
 	public byte getTag() {
-		return Tag.LONG;
+		if (encoding!=null) {
+			return encoding.byteAt(0);
+		}
+		return (byte) (Tag.INTEGER+Format.getLongLength(value));
 	}
 
 	@Override

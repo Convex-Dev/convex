@@ -4,13 +4,19 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigInteger;
+import java.util.HashSet;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.core.exceptions.BadFormatException;
+import convex.core.lang.NumericsTest;
 
 public class LongTest {
 
@@ -26,6 +32,52 @@ public class LongTest {
 		assertNotSame(CVMLong.create(666),CVMLong.create(666));
 	}
 	
+	@Test 
+	public void testLongEncoding() {
+		assertEquals("10",es(0));
+		assertEquals("1101",es(1));
+		assertEquals("11ff",es(-1));
+		
+		assertEquals("117f",es(127));
+		assertEquals("120080",es(128));
+		assertEquals("1200ff",es(255));
+		assertEquals("12ff00",es(0xffffffffffffff00l));
+		assertEquals("187fffffffffffffff",es(Long.MAX_VALUE));
+		assertEquals("188000000000000000",es(Long.MIN_VALUE));
+	}
+	
+	@Test 
+	public void testBadEncoding() {
+		// Excess leading zeros
+		assertThrows(BadFormatException.class,()->Format.read("13000fff"));
+		assertThrows(BadFormatException.class,()->Format.read("1100"));
+		
+		// Excess leading ones
+		assertThrows(BadFormatException.class,()->Format.read("13ffffff"));
+		assertThrows(BadFormatException.class,()->Format.read("14ff800000"));
+		
+		// Wrong lengths
+		assertThrows(BadFormatException.class,()->Format.read("14ff"));
+		assertThrows(BadFormatException.class,()->Format.read("12123456"));
+	}
+	
+	@Test
+	public void testUniqueEncodings() {
+		HashSet<Blob> b=new HashSet<>();
+		for (int i=-300; i<=300; i+=3) {
+			CVMLong c=CVMLong.create(i);
+			doLongTest(c);
+			b.add(c.getEncoding());
+		}
+		assertEquals(201,b.size());
+	}
+	
+	private String es(long v) {
+		CVMLong c=CVMLong.create(v);
+		doLongTest(c);
+		return c.getEncoding().toHexString();
+	}
+
 	@Test public void testLongSamples() {
 		doLongTest(CVMLong.ZERO);
 		doLongTest(CVMLong.MIN_VALUE);
@@ -56,12 +108,14 @@ public class LongTest {
 		assertTrue(a.isCanonical());
 		assertTrue(a.isEmbedded());
 		assertTrue(a.byteLength()<=8);
+		assertEquals(val,a.longValue());
+		assertEquals(val,a.toBlob().toExactLong());
 		
 		if (val!=0) {
 			assertEquals(BigInteger.valueOf(val).toByteArray().length,a.byteLength());
 			assertNotEquals(0,a.signum().longValue());
 		}
 		
-		ObjectsTest.doAnyValueTests(a);
+		NumericsTest.doIntegerTests(a);
 	}
 }

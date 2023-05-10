@@ -320,11 +320,11 @@ public class VectorsTest {
 	@Test
 	public void testSmallVectorSerialisation() {
 		// test the byte layout of the vector
-		// value should be an int VLC encoded to two bytes (0x0701)
-		assertEquals(Blob.fromHex("80010901"), Vectors.of(1).getEncoding());
+		// value should be an long encoded to two bytes (0x1101)
+		assertEquals(Blob.fromHex("80011101"), Vectors.of(1).getEncoding());
 
-		// value should be a negative int VLC encoded to two bytes (0x077F)
-		assertEquals(Blob.fromHex("8001097F"), Vectors.of(-1).getEncoding());
+		// value should be a negative long encoded to two bytes (0x11ff)
+		assertEquals(Blob.fromHex("800111ff"), Vectors.of(-1).getEncoding());
 	}
 
 	@Test

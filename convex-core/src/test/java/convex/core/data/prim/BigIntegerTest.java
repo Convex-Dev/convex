@@ -71,7 +71,7 @@ public class BigIntegerTest {
 	}
 	
 	@Test public void test0980Regression () {
-		Blob b=Blob.fromHex("0980");
+		Blob b=Blob.fromHex("1980");
 		assertThrows(BadFormatException.class,()->Format.read(b));
 		
 		BigInteger b1=BigInteger.valueOf(-128);

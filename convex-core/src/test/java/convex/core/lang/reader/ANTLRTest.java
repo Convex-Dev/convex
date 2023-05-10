@@ -246,8 +246,8 @@ public class ANTLRTest {
 		// Data structures
 		doRoundTripTest("[]");
 		doRoundTripTest("{}");
-		doRoundTripTest("{5 6,1 2,3 4,7 8}"); // Note hash order, entry delimiters
-		doRoundTripTest("#{5,1,3,7}");
+		doRoundTripTest("{5 6,7 8,3 4,1 2}"); // Note hash order, entry delimiters
+		doRoundTripTest("#{5,7,3,1}");
 		doRoundTripTest("[1 :foo #{} \\a 0x 9.0 100.0 ##Inf]");
 		doRoundTripTest("()");
 		
@@ -292,8 +292,8 @@ public class ANTLRTest {
 		doDifferentPrintTests("1.333333333333333333333333","1.3333333333333333"); // Rounding to nearest unique double
 		
 		// Re-ordering of entries in hashmaps / sets
-		doDifferentPrintTests("#{1 3 5 7}","#{5,1,3,7}");
-		doDifferentPrintTests("{1 2 03 4 5 6 7 8}","{5 6,1 2,3 4,7 8}");
+		doDifferentPrintTests("#{1 3 5 7}","#{5,7,3,1}");
+		doDifferentPrintTests("{1 2 03 4 5 6 7 8}","{5 6,7 8,3 4,1 2}");
 		
 		// superfluous numerical digits are excluded
 		doDifferentPrintTests("001","1");

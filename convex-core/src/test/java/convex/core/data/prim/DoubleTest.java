@@ -17,9 +17,9 @@ public class DoubleTest {
 		CVMDouble nan=CVMDouble.NaN;
 		
 		// Canonical NaN encoding has just high 
-		assertEquals(Blob.fromHex("0d7ff8000000000000"),nan.getEncoding());
+		assertEquals(Blob.fromHex("1d7ff8000000000000"),nan.getEncoding());
 		
-		Blob BAD_NAN=Blob.fromHex("0d7ff8000000ffffff");
+		Blob BAD_NAN=Blob.fromHex("1d7ff8000000ffffff");
 		
 		assertThrows(BadFormatException.class,()->Format.read(BAD_NAN));
 	}

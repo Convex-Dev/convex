@@ -13,7 +13,6 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
-import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -46,8 +45,8 @@ public class VLCParamTest {
 
 		if (value instanceof CVMLong) {
 			CVMLong cl=(CVMLong) value;
-			assertEquals(Tag.LONG, b.byteAt(0)); // check correct tag
-			assertEquals(1 + Format.getVLCLength(cl.longValue()), b.count()); // check length after tag
+			// check length after tag
+			assertEquals(1 + Format.getLongLength(cl.longValue()), b.count());
 		}
 
 		FuzzTestFormat.doMutationTest(b);

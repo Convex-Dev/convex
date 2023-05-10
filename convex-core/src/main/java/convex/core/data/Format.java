@@ -31,6 +31,7 @@ import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
 import convex.core.transactions.Transfer;
+import convex.core.util.Bits;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
 
@@ -509,7 +510,7 @@ public class Format {
 
 		try {
 			int high=(tag & 0xF0);
-			if (high == 0x00) return (T) readNumeric(tag,blob,offset);
+			if (high == 0x10) return (T) readNumeric(tag,blob,offset);
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(blob,offset);
@@ -539,8 +540,8 @@ public class Format {
 
 	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
 		// TODO Auto-generated method stub
-		if (tag == Tag.LONG) return CVMLong.read(tag,blob,offset);
-		if (tag == Tag.INTEGER) return CVMBigInteger.read(tag,blob,offset);
+		if (tag<0x19) return CVMLong.read(tag,blob,offset);
+		if (tag == 0x19) return CVMBigInteger.read(tag,blob,offset);
 		// Double is special, we enforce a canonical NaN
 		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
 		
@@ -895,6 +896,47 @@ public class Format {
 	public static int getEncodingLength(ACell value) {
 		if (value==null) return 1;
 		return value.getEncodingLength();
+	}
+
+	/**
+	 * Reads a long value represented by the specified bytes in a Blob
+	 * @param blob Blob instance
+	 * @param offset Offset into blob
+	 * @param length Length in bytes to read
+	 * @return Long value
+	 * @throws BadFormatException If the Long format is not canonical (i.e. starts with 0x00)
+	 */
+	public static long readLong(Blob blob, int offset, int length) throws BadFormatException {
+		byte[] bs=blob.getInternalArray();
+		offset+=blob.getInternalOffset();
+			long v=(long)(bs[offset]);
+		if (v==0) {
+			if (length==1) throw new BadFormatException("Long encoding: 0x00 not valid");
+			if (bs[offset+1]>=0) throw new BadFormatException("Excess 0x00 at start of Long encoding");
+		} else if (v==-1) {
+			if ((length>1)&&(bs[offset+1]<0)) {
+				throw new BadFormatException("Excess 0xff at start of Long encoding");
+			}	
+		}
+		
+		// sign extend first byte
+		v=(v<<56)>>56;
+		
+		for (int i=1; i<length; i++) {
+			v=(v<<8)+(bs[offset+i]&0xFFl);
+		}
+		return v;
+	}
+
+	/**
+	 * Gets the length of a Long in bytes (minimum bytes needs to express value
+	 * @param value Long value to analyse
+	 * @return Number of bytes needed to express Long
+	 */
+	public static int getLongLength(long value) {
+		if (value==0) return 0;
+		if (value>0) return 8-((Bits.leadingZeros(value)-1)/8);
+		return 8-((Bits.leadingOnes(value)-1)/8);
 	}
 
 

@@ -270,17 +270,35 @@ public class RefTest {
 		//assertTrue(hs.isEmpty());
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testDiabolicalWide() {
 		// Main purpose is to test we deduplicate correctly
 		
-		Ref<ACell> a = Samples.DIABOLICAL_MAP_30_30.getRef();
+		AMap<ACell, ACell> m = Samples.DIABOLICAL_MAP_30_30;
+		assertEquals(30,m.size());
+		
+		{
+			AMap<ACell, ACell> t=m;
+			ACell c=t.entryAt(0).getValue();
+			while (c instanceof AMap) {
+				t=(AMap<ACell, ACell>)c;
+				c=t.entryAt(0).getValue();
+				if (c==Maps.empty()) break;
+			}
+			assertEquals(30,t.size());
+		}
+		
+		Ref<ACell> a = m.getRef();
 		// OK since we manage de-duplication
 		Set<Ref<?>> set = Refs.accumulateRefSet(a);
-		assertEquals(31 + 30 * 16, set.size()); // 16 refs at each level after de-duping
+		int exp=1 /* {} */ + 30 /* ints */ +30*14 /* 14 Map nodes per level? */;
+		assertEquals(exp, set.size()); // 16 refs at each level after de-duping
 		assertFalse(a.isEmbedded());
 		
 		assertEquals(Long.MAX_VALUE,a.getMemorySize());
+		
+		
 		
 		// Too big most likely
 		//HashSet<Hash> hs=new HashSet<>();

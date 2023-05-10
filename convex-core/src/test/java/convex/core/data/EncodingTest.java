@@ -31,26 +31,12 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.test.Samples;
 import convex.test.Testing;
-
+ 
 public class EncodingTest {
 
 	@Test public void testVLCLongLength() throws BadFormatException, BufferUnderflowException {
-		ByteBuffer bb=ByteBuffer.allocate(100);
-		bb.put(Tag.LONG);
-		Format.writeVLCLong(bb, Long.MAX_VALUE);
-		
-		// must be max long length plus tag
-		assertEquals(Format.MAX_VLC_LONG_LENGTH+1,bb.position());
-		
-		bb.flip();
-		Blob b=Blob.fromByteBuffer(bb);
-		
-		CVMLong max=RT.cvm(Long.MAX_VALUE);
-		
-		assertEquals(max,Format.read(b));
-		
-		assertEquals(max.getEncoding(),b);
-;	}
+		assertEquals(1,Format.getVLCLength(0x0f));
+	}
 	
 //	@Test public void testBigIntegerRegression() throws BadFormatException {
 //		BigInteger expected=BigInteger.valueOf(-4223);
@@ -95,19 +81,14 @@ public class EncodingTest {
 	}
 	
 	@Test public void testBadLongFormats() throws BadFormatException {
-		// test excess high order bits above the long range
-		assertEquals(-3717066608267863778L,((CVMLong)Format.read("09ccb594f3d1bde9b21e")).longValue());
-		assertThrows(BadFormatException.class,()->{
-			Format.read("09b3ccb594f3d1bde9b21e");
-		});
+		// test high zero bytes
+		assertThrows(BadFormatException.class,()->Format.read("1100"));
+		assertThrows(BadFormatException.class,()->Format.read("12007f"));
 		
-		// test excess high bytes for -1
-		assertThrows(BadFormatException.class,()->Format.read("09ffffffffffffffffff7f"));
-
-		// test excess high bytes for negative number
-		assertEquals(RT.cvm(Long.MIN_VALUE),(CVMLong)Format.read("09ff808080808080808000"));
-		assertThrows(BadFormatException.class,()->Format.read("09ff80808080808080808000"));
-
+		// Test excess bytes
+		assertThrows(BadFormatException.class,()->Format.read("10ff"));
+		assertThrows(BadFormatException.class,()->Format.read("11ffff"));
+		assertThrows(BadFormatException.class,()->Format.read("18ffffffffffffffffdd"));
 	}
 	
 	@Test public void testBlobReading() {
@@ -239,7 +220,7 @@ public class EncodingTest {
 	@Test 
 	public void testIllegalEmbedded() throws BadFormatException {
 		AVector<?> v=Vectors.of(1);
-		assertEquals("80010901",v.getEncoding().toHexString());
+		assertEquals("80011101",v.getEncoding().toHexString());
 		
 		ACell s=Samples.NON_EMBEDDED_STRING;
 		Blob neb=s.getEncoding();

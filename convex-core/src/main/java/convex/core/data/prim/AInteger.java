@@ -23,6 +23,8 @@ public abstract class AInteger extends ANumeric {
 	 */
 	public abstract AInteger inc();
 	
+	@Override
+	public abstract CVMLong signum();
 	
 	/**
 	 * Decrements this Integer

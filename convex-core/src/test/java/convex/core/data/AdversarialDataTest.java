@@ -32,7 +32,7 @@ public class AdversarialDataTest {
 		assertFalse(NON_CVM.isCVMValue());
 		assertFalse(NON_CANONICAL.isCanonical());
 		assertThrows(InvalidDataException.class, ()->NON_VALID.validate());
-	}
+	} 
 	
 	@Test public void testBadVectors() {
 		invalidTest(VectorTree.unsafeCreate(0)); // nothing in VectorTree

@@ -79,28 +79,6 @@ public class VLCEncodingTest {
 		assertEquals(2, Format.getVLCLength(len));
 	}
 
-	@Test
-	public void testLongVLC() {
-		// note 09 as tag for long
-		assertEquals("0900", Format.encodedString(0L));
-		assertEquals("0901", Format.encodedString(1L));
-		assertEquals("097f", Format.encodedString(-1L));
-
-		assertEquals("093f", Format.encodedString(63L)); // 6 lowest bits set
-		assertEquals("098040", Format.encodedString(64L)); // first overflow to 2 bytes VLC
-		assertEquals("098100", Format.encodedString(128L)); // first carry of positive bit
-
-		assertEquals("0941", Format.encodedString(-63L));
-		assertEquals("0940", Format.encodedString(-64L)); // sign bit only in 1 byte
-		assertEquals("09ff3f", Format.encodedString(-65L)); // sign overflow to 2 bytes VLC
-		assertEquals("09ff00", Format.encodedString(-128L));
-		assertEquals("09fe7f", Format.encodedString(-129L)); // first negative carry
-
-		assertEquals("0980ffffffffffffffff7f", Format.encodedString(Long.MAX_VALUE));
-		assertEquals("09ff808080808080808000", Format.encodedString(Long.MIN_VALUE));
-	}
-
-
 //  TODO: Currently not allowing BigInteger as valid data object. May reconsider.
 //	@Test public void testBigIntegerVLC() {
 //		// note 0a as tag for short

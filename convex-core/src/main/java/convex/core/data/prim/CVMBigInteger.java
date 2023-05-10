@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import java.math.BigInteger;
 
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
@@ -123,7 +124,7 @@ public class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	public APrimitive signum() {
+	public CVMLong signum() {
 		if (data!=null) return CVMLong.forSignum(data.signum());
 		return CVMLong.forSignum(blob.byteAt(0));
 	}
@@ -148,7 +149,7 @@ public class CVMBigInteger extends AInteger {
 
 	@Override
 	public byte getTag() {
-		return isCanonical()?Tag.INTEGER:Tag.LONG;
+		return getEncoding().byteAt(0);
 	}
 
 	@Override
@@ -156,7 +157,7 @@ public class CVMBigInteger extends AInteger {
 		if (!isCanonical()) {
 			return getCanonical().encode(bs, pos);
 		}
-		bs[pos++]=Tag.INTEGER;
+		bs[pos++]=Tag.BIG_INTEGER;
 		return encodeRaw(bs,pos);
 	}
 
@@ -188,6 +189,23 @@ public class CVMBigInteger extends AInteger {
 	@Override
 	public String toString() {
 		return big().toString();
+	}
+	
+	@Override
+	public boolean equals(ACell a) {
+		if (a instanceof CVMLong) {
+			if (isCanonical()) return false;
+			return getCanonical().equals(a);
+		}
+		if (a instanceof CVMBigInteger) {
+			return equals((CVMBigInteger)a);
+		}
+		return false;
+	}
+	
+	public boolean equals(CVMBigInteger a) {
+		if ((data!=null)&&(a.data!=null)) return data.compareTo(a.data)==0;
+		return blob().equals(a.blob());
 	}
 
 	/**
@@ -249,7 +267,7 @@ public class CVMBigInteger extends AInteger {
 		if (o instanceof CVMLong) {
 			if (!isCanonical()) {
 				// Not canonical, therefore inside long range
-				return Long.compare(longValue(), o.longValue());
+				return ((CVMLong)getCanonical()).compareTo(o);
 			}
 			if (big().compareTo(MIN_POSITIVE.big())>=0) return 1; // Big integer above long range
 			return -1; // big integer must be more neative than Long range

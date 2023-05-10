@@ -305,7 +305,7 @@ public class RT {
 		return result;
 	}
 
-	public static ANumeric multiply(ACell[] args) {
+	public static ANumeric multiply(ACell... args) {
 		int n = args.length;
 		if (n==0) return CVMLong.ONE;
 		ANumeric result = RT.ensureNumber(args[0]);

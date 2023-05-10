@@ -321,7 +321,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test 
 	public void testDataLiterals() {
-		assertEquals(comp("(hash-set 2 1)"),comp("#{1 2}"));
+		assertEquals(comp("(hash-set 1 2)"),comp("#{1 2}"));
 		assertEquals(Constant.of(Sets.empty()),comp("#{}"));
 		
 		// Note inlining of vector from core in vector literal

@@ -103,4 +103,8 @@ public class Bits {
 		return val & lowBitMask(numBits);
 	}
 
+	public static int leadingOnes(long value) {
+		return Long.numberOfLeadingZeros(value^(-1l));
+	}
+
 }

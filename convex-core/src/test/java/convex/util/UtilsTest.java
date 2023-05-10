@@ -169,6 +169,14 @@ public class UtilsTest {
 		assertEquals(48, Bits.leadingZeros(0x00008000L));
 		assertEquals(0, Bits.leadingZeros(-1L));
 	}
+	
+	@Test
+	public void testLongLeadingOnes() {
+		assertEquals(0, Bits.leadingOnes(0L));
+		assertEquals(13, Bits.leadingOnes(0xfff8000000000000l));
+		assertEquals(64, Bits.leadingOnes(-1L));
+	}
+
 
 	@Test
 	public void testWriteUInt256() {

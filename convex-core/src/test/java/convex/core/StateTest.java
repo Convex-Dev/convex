@@ -104,8 +104,5 @@ public class StateTest {
 		// TODO: figure out why not see #453
 		//assertEquals(rs1.stored,rs1.persisted);
 		//assertEquals(rs1.total,rs1.persisted);
-		
-		
-		
 	}
 }

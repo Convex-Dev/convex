@@ -21,10 +21,10 @@ public class EncodingSizeTest {
 	
 	@Test public void testLong() {
 		CVMLong a=CVMLong.create(Long.MAX_VALUE);
-		CVMLong b=CVMLong.create(Long.MAX_VALUE);
+		CVMLong b=CVMLong.create(Long.MIN_VALUE);
 		assertEquals(CVMLong.MAX_ENCODING_LENGTH,size(a));
 		assertEquals(CVMLong.MAX_ENCODING_LENGTH,size(b));
-		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,CVMLong.MAX_ENCODING_LENGTH);
+		assertEquals(1+8,CVMLong.MAX_ENCODING_LENGTH);
 	}
 	
 	@Test public void testNull() {

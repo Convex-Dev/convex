@@ -21,12 +21,12 @@ public class SyntaxTest {
 		// check that empty metadata gets encoded as nil for efficiency.
 		Syntax emptyMeta=Syntax.create(RT.cvm(1L));
 		Blob encoded = emptyMeta.getEncoding();
-		assertEquals("88090100",encoded.toHexString());
+		assertEquals("88110100",encoded.toHexString());
 		Syntax recovered = Format.read(encoded);
 		assertEquals(emptyMeta,recovered);
 		
 		// should be invalid to have an empty map as encoded metadata
-		assertThrows(BadFormatException.class,()->Format.read("880901820000"));
+		assertThrows(BadFormatException.class,()->Format.read("881101820000"));
 		assertThrows(BadFormatException.class,()->Format.read("8800820000"));
 		assertThrows(BadFormatException.class,()->Format.read("88008200"));
 	}

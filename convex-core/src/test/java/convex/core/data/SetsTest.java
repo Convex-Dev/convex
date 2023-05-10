@@ -34,7 +34,7 @@ public class SetsTest {
 		s = s.include(RT.cvm(1L));
 		assertEquals("#{1}", s.toString());
 		s = s.include(RT.cvm(2L));
-		assertEquals("#{1,2}", s.toString());
+		assertEquals("#{2,1}", s.toString());
 		s = s.exclude(RT.cvm(1L));
 		assertEquals("#{2}", s.toString());
 		s = s.exclude(RT.cvm(2L));

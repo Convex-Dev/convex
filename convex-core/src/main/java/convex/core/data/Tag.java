@@ -14,9 +14,9 @@ public class Tag {
 	public static final byte NULL = (byte) 0x00;
 
 	// Numeric types
-	public static final byte LONG = (byte) 0x09;
-	public static final byte INTEGER = (byte) 0x0a; // Arbitrary length integer
-	public static final byte DOUBLE = (byte) 0x0d;
+	public static final byte INTEGER = (byte) 0x10; // Arbitrary length integer base
+	public static final byte BIG_INTEGER = (byte) 0x19; // Big integer (greater than long range)
+	public static final byte DOUBLE = (byte) 0x1d;
 	//public static final byte FLOAT = (byte) 0x0f;
 	//public static final byte BIG_DECIMAL = (byte) 0x0e; // E notation precise decimal
 
@@ -85,5 +85,7 @@ public class Tag {
 
 	// 0xF? = Illegal / reserved
 	public static final byte ILLEGAL = (byte) 0xFF;
+
+
 
 }

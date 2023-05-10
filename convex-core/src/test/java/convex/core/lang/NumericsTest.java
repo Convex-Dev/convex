@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import convex.core.data.ObjectsTest;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
@@ -137,21 +138,29 @@ public class NumericsTest extends ACVMTest {
 	
 	@Test
 	public void testArbitraryIntegers() {
-		doIntChecks(0);
-		doIntChecks(16869696);
-		doIntChecks(-16869696);
-		doIntChecks(Long.MAX_VALUE);
-		doIntChecks(Long.MIN_VALUE);
-		doIntChecks(CVMBigInteger.MIN_POSITIVE);
-		doIntChecks(CVMBigInteger.MIN_NEGATIVE);
-		doIntChecks("676969696986986986969698698698698696969866986");
-		doIntChecks("-4524746724376436273417263424376432173471243");
+		checkIntVal(0);
+		checkIntVal(16869696);
+		checkIntVal(-16869696);
+		checkIntVal(Long.MAX_VALUE);
+		checkIntVal(Long.MIN_VALUE);
+		checkIntVal(CVMBigInteger.MIN_POSITIVE);
+		checkIntVal(CVMBigInteger.MIN_NEGATIVE);
+		checkIntVal("676969696986986986969698698698698696969866986");
+		checkIntVal("-4524746724376436273417263424376432173471243");
 	}
 	
-	private void doIntChecks(Object o) {
+	private void checkIntVal(Object o) {
 		AInteger a=AInteger.parse(o);
 		assertNotNull(a);
 		assertTrue(evalB("(let [a "+a+"] (== a (* (abs a) (signum a)) ))"));
+		
+		doIntegerTests(a);
+	}
+
+	public static void doIntegerTests(AInteger a) {
+		assertEquals(a.abs(),RT.multiply(a.signum(),a));
+		
+		ObjectsTest.doAnyValueTests(a);
 	}
 
 	@Test
