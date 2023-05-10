@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.function.Consumer;
@@ -329,20 +328,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public Ref<T> setFlags(int newFlags) {
 		flags=newFlags;
 		return this;
-	}
-
-	/**
-	 * Reads a ref from the given ByteBuffer. Assumes no tag.
-	 * 
-	 * Marks as non-embedded
-	 * 
-	 * @param data ByteBuffer containing the data to read at the current position
-	 * @return Ref read from ByteBuffer
-	 */
-	public static <T extends ACell> Ref<T> readRaw(ByteBuffer data) {
-		Hash h = Hash.readRaw(data);
-		Ref<T> ref=Ref.forHash(h);
-		return ref.markEmbedded(false);
 	}
 	
 	/**
@@ -686,9 +671,4 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		R b=(R) a.updateRefs(func);
 		return b;
 	}
-
-
-
-
-
 }
