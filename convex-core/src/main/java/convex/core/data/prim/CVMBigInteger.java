@@ -212,6 +212,9 @@ public class CVMBigInteger extends AInteger {
 	public static CVMBigInteger read(byte tag, Blob blob, int offset) throws BadFormatException {
 		ABlob b=Blobs.read(blob, offset);
 		if (b==null) throw new BadFormatException("Bad big integer format in read from blob");
+		if (b.count()<=LONG_BYTELENGTH) {
+			throw new BadFormatException("Non-canonical big integer length");
+		}
 		CVMBigInteger result= create(b);
 		if (result==null) throw new BadFormatException("Null result in big integer create from blob");
 		

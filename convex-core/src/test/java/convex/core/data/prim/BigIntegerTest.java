@@ -157,6 +157,11 @@ public class BigIntegerTest {
 		ObjectsTest.doAnyValueTests(bi);
 	}
 	
+	@Test public void testBadEncoding() {
+		assertThrows(BadFormatException.class,()->Format.read("0a0113"));
+		assertThrows(BadFormatException.class,()->Format.read("0a09ffffff"));
+	}
+	
 	@Test public void testCompares() {
 		assertTrue(CVMBigInteger.MIN_POSITIVE.compareTo(CVMBigInteger.MIN_POSITIVE)==0);
 		assertTrue(CVMBigInteger.MIN_NEGATIVE.compareTo(CVMBigInteger.MIN_POSITIVE)==-1);
