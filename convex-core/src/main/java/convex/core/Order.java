@@ -113,8 +113,8 @@ public class Order extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = blocks.encode(bs,pos);
-		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
-			pos = Format.writeVLCLong(bs,pos, consensusPoints[i]);
+		for (int level=1; level<Constants.CONSENSUS_LEVELS; level++) {
+			pos = Format.writeVLCLong(bs,pos, consensusPoints[level]);
 		}
 		pos = Format.writeVLCLong(bs,pos, timestamp);
 		return pos;
@@ -143,12 +143,12 @@ public class Order extends ARecord {
 		
 		long[] cps=new long[Constants.CONSENSUS_LEVELS];
 		long last=Long.MAX_VALUE;
-		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
+		for (int level=1; level<Constants.CONSENSUS_LEVELS; level++) {
 			long pp = Format.readVLCLong(b,epos);
-			cps[i]=pp;
+			cps[level]=pp;
 			epos+=Format.getVLCLength(pp);
 			if (pp>last) {
-				throw new BadFormatException("Consensus point ["+pp+"] before previous value [" + last+"] at level "+i);
+				throw new BadFormatException("Consensus point ["+pp+"] before previous value [" + last+"] at level "+level);
 			}
 			last=pp;
 		}
@@ -184,13 +184,7 @@ public class Order extends ARecord {
 		return commonPrefix >= getConsensusPoint();
 	}
 
-	/**
-	 * Gets the Consensus Point of this Order
-	 * @return Consensus Point
-	 */
-	public long getConsensusPoint() {
-		return consensusPoints[Constants.CONSENSUS_LEVELS-1];
-	}
+
 	
 	/**
 	 * Gets the Consensus Point of this Order for the specified level
@@ -198,11 +192,8 @@ public class Order extends ARecord {
 	 * @return Consensus Point
 	 */
 	public long getConsensusPoint(int level) {
-		switch (level) {
-			case 0: return blocks.getValue().count();
-			case 1: case 2: return consensusPoints[level];
-			default: throw new Error("Illegal consensus level: "+level);
-		}
+		if (level==0) return blocks.getValue().count();
+		return consensusPoints[level];
 	}
 	
 	public long[] getConsensusPoints() {
@@ -216,7 +207,15 @@ public class Order extends ARecord {
 	 * @return Proposal Point
 	 */
 	public long getProposalPoint() {
-		return consensusPoints[1];
+		return consensusPoints[Constants.CONSENSUS_LEVEL_PROPOSAL];
+	}
+	
+	/**
+	 * Gets the Consensus Point of this Order
+	 * @return Consensus Point
+	 */
+	public long getConsensusPoint() {
+		return consensusPoints[Constants.CONSENSUS_LEVEL_CONSENSUS];
 	}
 	
 	/**
