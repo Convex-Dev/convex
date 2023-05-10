@@ -55,6 +55,8 @@ public class Order extends ARecord {
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
+	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[Constants.CONSENSUS_LEVELS];
+
 	private Order(Ref<AVector<SignedData<Block>>> blocks, long[] consensusPoints, long timestamp) {
 		super(FORMAT.count());
 		this.blocks = blocks;
@@ -97,7 +99,7 @@ public class Order extends ARecord {
 	 * @return New Order instance
 	 */
 	public static Order create() {
-		return create(Vectors.empty().getRef(), 0, 0,0);
+		return new Order(Vectors.empty().getRef(), EMPTY_CONSENSUS_ARRAY,0);
 	}
 
 	private byte getRecordTag() {
@@ -160,19 +162,19 @@ public class Order extends ARecord {
 		}
 		epos+=blocks.getEncodingLength();
 		
-		long pp = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(pp);
-		long cp = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(cp);
+		long[] cps=new long[Constants.CONSENSUS_LEVELS];
+		long last=0;
+		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
+			long pp = Format.readVLCLong(b,epos);
+			cps[i]=pp;
+			epos+=Format.getVLCLength(pp);
+			if (pp<last) {
+				throw new BadFormatException("Consensus point ["+pp+"] before previous value [" + last+"] at level "+i);
+			}
+			last=pp;
+		}
 		long ts = Format.readVLCLong(b,epos); // TODO: should just be 8 bytes?
 		epos+=Format.getVLCLength(ts);
-		
-		if (pp<cp) {
-			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
-		}
-		long[] cps=new long[Constants.CONSENSUS_LEVELS];
-		cps[1]=pp;
-		cps[2]=cp;
 		
 		Order result=new Order(blocks, cps,ts);
 		result.attachEncoding(b.slice(pos, epos));
@@ -375,9 +377,8 @@ public class Order extends ARecord {
 	 * @return Updated order with zeroed consensus positions
 	 */
 	public Order withoutConsenus() {
-		return create(blocks, 0, 0,timestamp);
+		return new Order(blocks, EMPTY_CONSENSUS_ARRAY,timestamp);
 	}
-
 
 	@Override
 	public void validate() throws InvalidDataException {
