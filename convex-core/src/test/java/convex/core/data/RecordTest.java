@@ -24,6 +24,8 @@ public class RecordTest {
 	// Transactions handled in TransactionTest which delegates to here
 	// AccountStatusTest delegates to here
 	// PeerStatusTest delegates to here
+	// SignedDataTest delegates to here
+	// BeliefMergeTest sends some instances here
 
 	@Test
 	public void testBelief() {

@@ -348,6 +348,8 @@ public class BeliefMergeTest {
 
 		// law of conservation of gil
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
+		
+		RecordTest.doRecordTests(bs7[0].getBelief());
 	}
 
 	private boolean allBeliefsEqual(Peer[] pss) {
