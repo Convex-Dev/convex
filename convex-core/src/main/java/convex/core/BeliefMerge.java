@@ -460,8 +460,6 @@ public class BeliefMerge {
 				// Match length is how many blocks agree with winning order at previous consensus level
 				long match = Math.min(blockMatch, minPrevious);
 				
-				// skip if no progress vs existing consensus
-				if (match <= winnningOrder.getConsensusPoint()) return null; 
 				return -match;
 			}
 		}, stakedOrders.keySet());
@@ -538,11 +536,10 @@ public class BeliefMerge {
 			// This probably shouldn't happen if peers are sticking to timestamps
 			// But we compare anyway
 			// Prefer advanced consensus
-			if (newOrder.getConsensusPoint()>oldOrder.getConsensusPoint()) return true;
+			for (int level=Constants.CONSENSUS_LEVELS-1; level>=1; level--) {
+				if (newOrder.getConsensusPoint(level)>oldOrder.getConsensusPoint(level)) return true;
+			}
 			
-			// Then prefer advanced proposal
-			if (newOrder.getProposalPoint()>oldOrder.getProposalPoint()) return true;
-
 			// Finally prefer more blocks
 			AVector<SignedData<Block>> abs=oldOrder.getBlocks();
 			AVector<SignedData<Block>> bbs=newOrder.getBlocks();

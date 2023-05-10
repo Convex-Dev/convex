@@ -393,9 +393,9 @@ public class Peer {
 		BeliefMerge mc = BeliefMerge.create(belief,keyPair, timestamp, getConsensusState());
 		Belief newBelief = mc.merge(beliefs);
 
-		long ocp=getConsensusPoint();
+		long ocp=getFinalityPoint();
 		Order newOrder=newBelief.getOrder(peerKey);
-		if (ocp>newBelief.getOrder(peerKey).getConsensusPoint()) {
+		if (ocp>newBelief.getOrder(peerKey).getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY)) {
 			// This probably shouldn't happen, but just in case.....
 			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+newOrder.getConsensusPoint());
 			
@@ -440,7 +440,7 @@ public class Peer {
 	 */
 	public Peer updateState() {
 		Order myOrder = belief.getOrder(peerKey); // this peer's chain from new belief
-		long consensusPoint = myOrder.getConsensusPoint();
+		long consensusPoint = myOrder.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 
 		// need to advance states
@@ -507,13 +507,13 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the Consensus Point for this Peer
+	 * Gets the Final Point for this Peer
 	 * @return Consensus Point value
 	 */
-	public long getConsensusPoint() {
+	public long getFinalityPoint() {
 		Order order=getPeerOrder();
 		if (order==null) return 0;
-		return order.getConsensusPoint();
+		return order.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
 	}
 
 	/**

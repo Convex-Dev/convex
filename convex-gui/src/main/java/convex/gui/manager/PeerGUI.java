@@ -201,13 +201,12 @@ public class PeerGUI extends JPanel {
 						if (order==null) continue; // not an active peer?
 						maxBlock = Math.max(maxBlock, order.getBlockCount());
 
-						long pcp = p.getConsensusPoint();
+						long pcp = p.getFinalityPoint();
 						if (pcp > cp) {
 							cp = pcp;
 							//String ls="PeerGUI Consensus State update detected at depth "+cp;
 							//System.err.println(ls);
 							latest = p.getConsensusState();
-							
 						}
 					}
 					latestState.setValue(latest); // trigger peer view repaints etc.
@@ -219,7 +218,7 @@ public class PeerGUI extends JPanel {
 					Thread.currentThread().interrupt();
 				}
 			}
-			log.info("Manager update thread ended");
+			log.debug("GUI Peer Manager update thread ended");
 		}
 	}, "GUI Manager state update thread");
 

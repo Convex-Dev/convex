@@ -687,6 +687,7 @@ public class Server implements Closeable {
 	@Override
 	public void close() {
 		if (!isRunning) return;
+		isRunning = false;
 		
 		// Shut down propagator first, no point sending any more Beliefs
 		propagator.close();
@@ -701,7 +702,6 @@ public class Server implements Closeable {
 			persistPeerData();
 		}
 
-		isRunning = false;
 
 		manager.close();
 		nio.close();

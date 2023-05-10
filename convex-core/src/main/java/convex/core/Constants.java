@@ -242,10 +242,11 @@ public class Constants {
 	/**
 	 * Number of consensus levels (blocks, proposed, consensus)
 	 */
-	public static final int CONSENSUS_LEVELS = 3;
+	public static final int CONSENSUS_LEVELS = 4;
 
-	public static final int CONSENSUS_LEVEL_PROPOSAL = CONSENSUS_LEVELS-2;
-	public static final int CONSENSUS_LEVEL_CONSENSUS = CONSENSUS_LEVELS-1;
+	public static final int CONSENSUS_LEVEL_PROPOSAL = CONSENSUS_LEVELS-3;
+	public static final int CONSENSUS_LEVEL_CONSENSUS = CONSENSUS_LEVELS-2;
+	public static final int CONSENSUS_LEVEL_FINALITY = CONSENSUS_LEVELS-1;
 
 
 }

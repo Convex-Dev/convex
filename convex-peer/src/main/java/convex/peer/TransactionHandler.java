@@ -138,7 +138,7 @@ public class TransactionHandler extends AThreadedComponent{
 
 	public void maybeReportTransactions(Peer peer) {
 		// Report transaction results
-		long newConsensusPoint = peer.getConsensusPoint();
+		long newConsensusPoint = peer.getFinalityPoint();
 		if (newConsensusPoint > reportedConsensusPoint) {
 			log.debug("Consensus point update from {} to {}" ,reportedConsensusPoint , newConsensusPoint);
 			for (long i = reportedConsensusPoint; i < newConsensusPoint; i++) {
@@ -279,7 +279,7 @@ public class TransactionHandler extends AThreadedComponent{
 	}
 
 	public void start() {
-		this.reportedConsensusPoint=server.getPeer().getConsensusPoint();
+		this.reportedConsensusPoint=server.getPeer().getFinalityPoint();
 		super.start();
 
 	}
