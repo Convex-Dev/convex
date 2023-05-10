@@ -323,11 +323,12 @@ public class Order extends ARecord {
 	 * @return Updated Order, or this Order instance if no change.
 	 */
 	public Order withConsensusPoint(int level,long newPosition) {
-		switch (level) {
-		case 1: return withProposalPoint(newPosition);
-		case 2: return withConsensusPoint(newPosition);
-		default: throw new Error("Illegal level");
-		}
+		if (level==0) return this; // TODO: sane or not?
+		if (consensusPoints[level]==newPosition) return this;
+		long[] cps=consensusPoints.clone();
+		cps[0]=getBlockCount();
+		cps[level]=newPosition;
+		return new Order(blocks,cps,timestamp);
 	}
 	
 	/**
