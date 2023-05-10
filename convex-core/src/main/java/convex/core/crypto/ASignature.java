@@ -82,13 +82,8 @@ public abstract class ASignature extends AArrayBlob {
 	public abstract byte[] getBytes();
 	
 	@Override
-	public boolean isRegularBlob() {
-		return true;
-	}
-	
-	@Override
 	public boolean equals(ABlob b) {
-		if (!(b.getTag()==getTag())) return false;
+		if (!b.isRegularBlob()) return false;
 		return b.equalsBytes(this);
 	}
 

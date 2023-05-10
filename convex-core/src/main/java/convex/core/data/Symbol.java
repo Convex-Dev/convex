@@ -26,7 +26,7 @@ import convex.core.exceptions.InvalidDataException;
  * understanding it." - John Conway
  * </p>
  */
-public class Symbol extends ASymbolic implements Comparable<Symbol> {
+public final class Symbol extends ASymbolic implements Comparable<Symbol> {
 	
 	private Symbol(StringShort name) {
 		super(name);

@@ -723,16 +723,11 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		return bm;
 	}
 	
-	/**
-	 * Checks this BlobMap for equality with another map. 
-	 * 
-	 * @param a Map to compare with
-	 * @return true if maps are equal, false otherwise.
-	 */
-	public boolean equals(AMap<K, V> a) {
+	@SuppressWarnings("unchecked")
+	@Override
+	public boolean equals(ACell a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		if (this.getType()!=a.getType()) return false;
+		if (!(a instanceof BlobMap)) return false;
 		// Must be a BlobMap
 		return equals((BlobMap<K,V>)a);
 	}

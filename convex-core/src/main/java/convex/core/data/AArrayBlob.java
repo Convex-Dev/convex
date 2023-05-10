@@ -4,7 +4,6 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.Arrays;
 
-import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -226,7 +225,7 @@ public abstract class AArrayBlob extends ABlob {
 	public boolean equals(ABlob o) {
 		if (o==this) return true;
 		if (o==null) return false;
-		if (o.getType()!=Types.BLOB) return false;
+		if (!o.isRegularBlob()) return false; // exclude irregular Blob types
 		if (o.count()!=length) return false;
 		return o.equalsBytes(this.store, this.offset);
 	}

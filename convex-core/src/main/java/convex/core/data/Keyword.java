@@ -18,7 +18,7 @@ import convex.core.exceptions.InvalidDataException;
  * "Programs must be written for people to read, and only incidentally for
  * machines to execute." ― Harold Abelson
  */
-public class Keyword extends ASymbolic implements Comparable<Keyword> {
+public final class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	/** Maximum size of a Keyword in UTF-8 bytes representation */
 	public static final int MAX_CHARS = Constants.MAX_NAME_LENGTH;
@@ -30,6 +30,7 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		super(name);
 	}
 	
+	@Override
 	public AType getType() {
 		return Types.KEYWORD;
 	}
@@ -96,12 +97,10 @@ public class Keyword extends ASymbolic implements Comparable<Keyword> {
 		return k;
 	}
 
-
 	@Override
 	public boolean isCanonical() {
 		return true;
 	}
-
 
 	/**
 	 * Reads a Keyword from the given ByteBuffer, assuming tag already consumed

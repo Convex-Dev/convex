@@ -3355,6 +3355,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(count #{1 2 2})"));
 		assertEquals(3L, evalL("(count [1 2 3])"));
 		assertEquals(4L, evalL("(count 0xcafebabe)"));
+		
+		// TODO: do we want this? Address is blob-like when used in indexes
+		assertEquals(8L, evalL("(count #123)"));
 
 		// Count of a map is the number of entries
 		assertEquals(2L, evalL("(count {1 2 2 3})"));
