@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.HashMap;
 
 import convex.core.exceptions.BadFormatException;
@@ -134,23 +133,6 @@ public class Maps {
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R coerce(AMap<?, ?> m) {
 		return (R) m;
-	}
-
-	/**
-	 * Read a Hashmap from a ByteBuffer. Assumes tag byte already read.
-	 * @param <K> Key type
-	 * @param <V> Value type
-	 * @param bb ByteBuffer to read from
-	 * @return Map instance
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(ByteBuffer bb) throws BadFormatException {
-		long count = Format.readVLCLong(bb);
-		if (count <= MapLeaf.MAX_ENTRIES) {
-			return MapLeaf.read(bb, count);
-		} else {
-			return MapTree.read(bb, count);
-		}
 	}
 	
 	/**

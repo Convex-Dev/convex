@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -131,24 +129,14 @@ public class PeerStatus extends ARecord {
 		return pos;
 	}
 
-	public static PeerStatus read(ByteBuffer bb) throws BadFormatException {
-        Address owner = Format.read(bb);
-		long stake = Format.readVLCLong(bb);
-		
-		ABlobMap<Address, CVMLong> stakes = Format.read(bb);
-		if (stakes==null) {
-			stakes=BlobMaps.empty();
-		} else if (stakes.isEmpty()) {
-			throw new BadFormatException("Empty delegated stakes should be encoded as null");
-		}
-		
-		long delegatedStake = Format.readVLCLong(bb);
-
-		AHashMap<ACell,ACell> metadata = Format.read(bb);
-
-		return new PeerStatus(owner, stake,stakes,delegatedStake,metadata);
-	}
-	
+	/**
+	 * Decodes a PeerStatus from a Blob.
+	 * 
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static PeerStatus read(Blob b, int pos) throws BadFormatException{
 		int epos=pos+1; // skip tag
 	    Address owner = Format.read(b,epos);

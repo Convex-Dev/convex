@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.function.BiFunction;
@@ -214,25 +213,12 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	 * Reads a MapLeaf from the provided ByteBuffer Assumes the header byte is
 	 * already read.
 	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param count Count of map elements
-	 * @return A Map as deserialised from the provided ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @param count Count of map elements	 
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
-	public static <V extends ACell> SetLeaf<V> read(ByteBuffer bb, long count) throws BadFormatException {
-		if (count == 0) return Sets.empty();
-		if (count < 0) throw new BadFormatException("Negative count of map elements!");
-		if (count > MAX_ELEMENTS) throw new BadFormatException("SetLeaf too big: " + count);
-
-		Ref<V>[] items = (Ref<V>[]) new Ref[(int) count];
-		for (int i = 0; i < count; i++) {
-			Ref<V> ref=Format.readRef(bb);
-			items[i]=ref;
-		}
-
-		return new SetLeaf<V>(items);
-	}
 	
 	public static <V extends ACell> SetLeaf<V> read(Blob b, int pos, long count) throws BadFormatException {
 		int headerLen=1+Format.getVLCLength(count);

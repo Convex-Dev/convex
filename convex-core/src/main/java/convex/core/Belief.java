@@ -1,6 +1,5 @@
 package convex.core;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -149,18 +148,6 @@ public class Belief extends ARecord {
 	@Override
 	public int estimatedEncodingSize() {
 		return 1+orders.estimatedEncodingSize()+12;
-	}
-
-	/**
-	 * Read a Belief from a ByteBuffer. Assumes tag already read.
-	 * @param bb ByteBuffer to read from
-	 * @return Belief instance
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static Belief read(ByteBuffer bb) throws BadFormatException {
-		BlobMap<AccountKey, SignedData<Order>> orders = Format.read(bb);
-		if (orders == null) throw new BadFormatException("Null orders in Belief");
-		return new Belief(orders);
 	}
 	
 	public static Belief read(Blob b, int pos) throws BadFormatException {

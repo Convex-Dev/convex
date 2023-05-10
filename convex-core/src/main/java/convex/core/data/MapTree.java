@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Map;
@@ -438,34 +437,14 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
 
 	/**
-	 * Reads a ListMap from the provided ByteBuffer Assumes the header byte and count is
-	 * already read.
+	 * Reads a ListMap from the provided Blob 
 	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param count Count of map entries
-	 * @return TreeMap instance as read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @param count Count of map entries* 
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapTree<K, V> read(ByteBuffer bb, long count) throws BadFormatException {
-		int shift = bb.get();
-		short mask = bb.getShort();
-
-		int ilength = Integer.bitCount(mask & 0xFFFF);
-		Ref<AHashMap<K, V>>[] blocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[ilength];
-
-		for (int i = 0; i < ilength; i++) {
-			// need to read as a Ref
-			Ref<AHashMap<K, V>> ref = Format.readRef(bb);
-			blocks[i] = ref;
-		}
-		// create directly, we have all values
-		MapTree<K, V> result = new MapTree<K, V>(blocks, shift, mask, count);
-		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
-		return result;
-	}
-	
-
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell> MapTree<K, V> read(Blob b, int pos, long count) throws BadFormatException {
 		int epos=pos+1+Format.getVLCLength(count);

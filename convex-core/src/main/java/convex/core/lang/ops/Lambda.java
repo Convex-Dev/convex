@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -85,11 +83,6 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos=function.encode(bs, pos);
 		return pos;
-	}
-	
-	public static <T extends ACell> Lambda<T> read(ByteBuffer bb) throws BadFormatException {
-		Ref<AClosure<T>> function=Format.readRef(bb);
-		return new Lambda<T>(function);
 	}
 	
 	public static <T extends ACell> Lambda<T> read(Blob b, int pos) throws BadFormatException {

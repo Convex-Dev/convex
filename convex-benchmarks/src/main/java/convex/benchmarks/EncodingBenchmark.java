@@ -1,7 +1,5 @@
 package  convex.benchmarks;
 
-import java.nio.ByteBuffer;
-
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
@@ -26,28 +24,15 @@ import convex.core.lang.Symbols;
 public class EncodingBenchmark {
 	
 	static Blob enc;
-	static ByteBuffer buf;
 	
 	static {
 		AVector<?> v=Vectors.of(1,true,Symbols.FOO,Sets.of(1,2,3),Maps.empty());
 		enc=v.getEncoding();
-		
-		buf=ByteBuffer.allocate(1000);
-		buf=v.write(buf);
-		buf.flip();
-		
 	}
 	
 	@Benchmark
 	public void encodingViaBlob() throws BadFormatException {
 		AVector<?> v2=Format.read(enc);
-		v2.getEncoding();
-	}
-
-	@Benchmark
-	public void encodingViaBuffer() throws BadFormatException {
-		buf.position(0);
-		AVector<?> v2=Format.read(buf);
 		v2.getEncoding();
 	}
 

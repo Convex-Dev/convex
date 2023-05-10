@@ -1,6 +1,5 @@
 package convex.core;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 
@@ -213,24 +212,13 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Reads a State from a ByteBuffer encoding. Assumes tag byte already read.
+	 * Reads a State from an encoding. Assumes tag byte already read.
 	 *
-	 * @param bb ByteBuffer to decode from
-	 * @return The State decoded
+	 * @param b Blob to read from
+	 * @param pos start position in Blob 
+	 * @return Decoded State
 	 * @throws BadFormatException If a State could not be read
 	 */
-	public static State read(ByteBuffer bb) throws BadFormatException {
-		try {
-			AVector<AccountStatus> accounts = Format.read(bb);
-			BlobMap<AccountKey, PeerStatus> peers = Format.read(bb);
-			AVector<ACell> globals = Format.read(bb);
-			BlobMap<ABlob, AVector<ACell>> schedule = Format.read(bb);
-			return create(accounts, peers, globals, schedule);
-		} catch (ClassCastException ex) {
-			throw new BadFormatException("Can't read state", ex);
-		}
-	}
-	
 	public static State read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		AVector<AccountStatus> accounts = Format.read(b,epos);

@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
@@ -230,40 +229,16 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Reads a {@link VectorLeaf} from the provided ByteBuffer 
+	 * Reads a {@link VectorLeaf} from the provided Blob 
 	 * 
 	 * Assumes the header byte and count is already read.
 	 * 
-	 * @param bb ByteBuffer to read from
+	 * @param b Blob to read from
 	 * @param count Number of elements, assumed to be valid
-	 * @return VectorLeaf read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorLeaf<T> read(ByteBuffer bb, long count) throws BadFormatException {
-		if (count == 0) return (VectorLeaf<T>) EMPTY;
-		boolean prefixPresent = count > MAX_SIZE;
-
-		int n = ((int) count) & 0xF;
-		if (n == 0) {
-			if (count > 16) throw new BadFormatException("Vector not valid for size 0 mod 16: " + count);
-			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
-		}
-
-		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
-		for (int i = 0; i < n; i++) {
-			Ref<T> ref = Format.readRef(bb);
-			items[i] = ref;
-		}
-
-		Ref<AVector<T>> tail = null;
-		if (prefixPresent) {
-			tail=Format.readRef(bb);
-		}
-
-		return new VectorLeaf<T>(items, tail, count);
-	}
-	
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorLeaf<T> read(long count, Blob b, int pos) throws BadFormatException {
 		if (count == 0) return (VectorLeaf<T>)EMPTY;

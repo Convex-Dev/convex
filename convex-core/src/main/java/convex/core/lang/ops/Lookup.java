@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -96,13 +94,14 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		return pos;
 	}
 
-	public static <T extends ACell> Lookup<T> read(ByteBuffer bb) throws BadFormatException {
-		Symbol sym = Format.read(bb);
-		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
-		AOp<Address> address = Format.read(bb);
-		return create(address,sym);
-	}
-	
+	/**
+	 * Reads a Lookup op from a Blob encoding
+	 * @param <T> Type of Lookup value
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static <T extends ACell> Lookup<T> read(Blob b,int pos) throws BadFormatException {
 		int epos=pos+2; // skip tag and opcode
 		

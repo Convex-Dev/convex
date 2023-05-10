@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -37,8 +36,6 @@ public class FuzzTestFormat {
 				doFuzzTest(b);
 			} catch (BadFormatException e) {
 				/* OK */
-			} catch (BufferUnderflowException e) {
-				/* also OK */
 			} catch (MissingDataException e) {
 				/* also OK */
 			}
@@ -50,9 +47,7 @@ public class FuzzTestFormat {
 	}
 
 	private static void doFuzzTest(Blob b) throws BadFormatException {
-		ByteBuffer bb = b.getByteBuffer();
-
-		ACell v = Format.read(bb);
+		ACell v = Format.read(b);
 
 		// If we have read the object, check that we can validate as a cell, at minimum
 		try {
@@ -68,11 +63,7 @@ public class FuzzTestFormat {
 		Blob b2 = Format.encodedBlob(v);
 		assertEquals(v, Format.read(b2),
 				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
-		assertEquals(bb.position(), b2.count(), () -> {
-			return "Bad length re-reading " + Utils.getClass(v) + ": " + v + " with encoding " + b.toHexString()
-					+ " and re-encoding" + b2.toHexString();
-		});
-		
+
 		// recursive fuzzing on this value
 		// this is good to test small mutations of
 		if (r.nextDouble() < 0.8) {

@@ -1,7 +1,5 @@
 package convex.core;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
@@ -170,19 +168,12 @@ public class BlockResult extends ARecord {
 	}
 
 	/**
-	 * Decodes a BlockResult from a ByteBuffer
-	 * @param bb ByteBuffer to read from
+	 * Decodes a BlockResult from a Blob
+	 * @param b Blob to read from
+	 * @param pos start position in Blob 
 	 * @return BlockResult instance
 	 * @throws BadFormatException If encoding format has errors
 	 */
-	public static BlockResult read(ByteBuffer bb) throws BadFormatException {
-		State newState=Format.read(bb);
-		if (newState==null) throw new BadFormatException("Null state");
-		AVector<Result> newResults=Format.read(bb);
-		if (newResults==null) throw new BadFormatException("Null results");
-		return create(newState,newResults);
-	}
-	
 	public static BlockResult read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 

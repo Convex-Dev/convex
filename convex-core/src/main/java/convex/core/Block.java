@@ -1,6 +1,5 @@
 package convex.core;
 
-import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.List;
 
@@ -146,25 +145,6 @@ public final class Block extends ARecord {
 	@Override
 	public int estimatedEncodingSize() {
 		return 10+transactions.estimatedEncodingSize()+AccountKey.LENGTH;
-	}
-
-	/**
-	 * Reads a Block from the given bytebuffer, assuming tag is already read
-	 * 
-	 * @param bb ByteBuffer containing Block representation
-	 * @return A Block
-	 * @throws BadFormatException if a Block could noy be read.
-	 */
-	public static Block read(ByteBuffer bb) throws BadFormatException {
-		long timestamp = Format.readLong(bb);
-		try {
-			AVector<SignedData<ATransaction>> transactions = Format.read(bb);
-			if (transactions==null) throw new BadFormatException("Null transactions");
-			
-			return Block.create(timestamp, transactions);
-		} catch (ClassCastException e) {
-			throw new BadFormatException("Error reading Block format", e);
-		}
 	}
 	
 	public static Block read(Blob b, int pos) throws BadFormatException {

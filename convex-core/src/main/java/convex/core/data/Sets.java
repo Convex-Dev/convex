@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -102,16 +101,6 @@ public class Sets {
 		}
 		return (ASet<T>) set;
 	}
-
-	public static <T extends ACell> ASet<T> read(ByteBuffer bb) throws BadFormatException {
-		long count = Format.readVLCLong(bb);
-		if (count <= SetLeaf.MAX_ELEMENTS) {
-			return SetLeaf.read(bb, count);
-		} else {
-			return SetTree.read(bb, count);
-		}
-	}
-	
 
 	public static <T extends ACell> ASet<T> read(Blob b, int pos) throws BadFormatException {
 		long count = Format.readVLCLong(b,pos+1);

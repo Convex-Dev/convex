@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
@@ -98,24 +97,7 @@ public class Blobs {
 	}
 
 	/**
-	 * Reads a Blob from an Encoding in a ByteBuffer.
-	 * 
-	 * @param bb ByteBuffer starting with a blob encoding, assumes tag already read
-	 * @return Blob read from ByteBuffer
-	 * @throws BadFormatException If format is invalid
-	 */
-	public static ABlob read(ByteBuffer bb) throws BadFormatException {
-		long len = Format.readVLCLong(bb);
-		if (len < 0L) throw new BadFormatException("Negative blob length?");
-		if (len > Blob.CHUNK_LENGTH) return BlobTree.read(bb, len);
-		byte[] buff = new byte[Utils.checkedInt(len)];
-		bb.get(buff);
-		return Blob.wrap(buff);
-		// TODO keep byte format representation?
-	}
-
-	/**
-	 * Reads a canonical Blob from a byte source
+	 * Reads a canonical Blob from a Blob source
 	 * @param <T> Type of Blob result
 	 * @param source Source blob, containing tag
 	 * @param pos position to read from source, assumed to be tag

@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.Constants;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -149,20 +147,14 @@ public class AccountStatus extends ARecord {
 		if ((included&HAS_KEY)!=0) pos = publicKey.writeToBuffer(bs, pos);
 		return pos;
 	}
-
-	public static AccountStatus read(ByteBuffer bb) throws BadFormatException {
-		int included=bb.get();
-		long sequence = ((included&HAS_SEQUENCE)!=0) ? Format.readVLCLong(bb) : 0L;
-		long balance = ((included&HAS_BALANCE)!=0) ? Format.readVLCLong(bb) : 0L;
-		long allowance = ((included&HAS_ALLOWANCE)!=0) ? Format.readVLCLong(bb) : 0L;
-		AHashMap<Symbol, ACell> environment = ((included&HAS_ENVIRONMENT)!=0) ? Format.read(bb):null;
-		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = ((included&HAS_METADATA)!=0) ? Format.read(bb) : null;
-		ABlobMap<Address,ACell> holdings = ((included&HAS_HOLDINGS)!=0) ? Format.read(bb) : null;
-		Address controller = ((included&HAS_CONTROLLER)!=0) ? Format.read(bb) : null;
-		AccountKey publicKey = ((included&HAS_KEY)!=0) ? AccountKey.readRaw(bb) : null;
-		return new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
-	}
 	
+	/**
+	 * Decode AccountStatus from Blob
+	 * @param b Blob to read from
+	 * @param pos start position in Blob 
+	 * @return AccountStatus instance
+	 * @throws BadFormatException in case of any encoding error
+	 */
 	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		int included=b.byteAt(epos++);

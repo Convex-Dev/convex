@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
@@ -354,34 +352,14 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
 
 	/**
-	 * Reads a SetTree from the provided ByteBuffer Assumes the header byte and count is
-	 * already read.
+	 * Reads a SetTree from the provided Blob encoding
 	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param count Number of elements
-	 * @return TreeMap instance as read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @param count Number of elements	 
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
-	public static <V extends ACell> SetTree<V> read(ByteBuffer bb, long count) throws BadFormatException {
-		int shift = bb.get();
-		short mask = bb.getShort();
-
-		int ilength = Integer.bitCount(mask & 0xFFFF);
-		Ref<AHashSet<V>>[] blocks = (Ref<AHashSet<V>>[]) new Ref<?>[ilength];
-
-		for (int i = 0; i < ilength; i++) {
-			// need to read as a Ref
-			Ref<AHashSet<V>> ref = Format.readRef(bb);
-			blocks[i] = ref;
-		}
-		// create directly, we have all values
-		SetTree<V> result = new SetTree<V>(blocks, shift, mask, count);
-		if (!result.isValidStructure()) throw new BadFormatException("Problem with TreeMap invariants");
-		return result;
-	}
-	
-
 	public static <V extends ACell> SetTree<V> read(Blob b, int pos, long count) throws BadFormatException {
 		int headerLen=1+Format.getVLCLength(count);
 		int epos=pos+headerLen;

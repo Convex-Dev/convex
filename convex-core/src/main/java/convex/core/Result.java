@@ -1,6 +1,5 @@
 package convex.core;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.data.ACell;
@@ -170,27 +169,23 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	/**
-	 * Reads a Result from a ByteBuffer encoding. Assumes tag byte already read.
+	 * Reads a Result from a Blob encoding. Assumes tag byte already checked.
 	 * 
-	 * @param bb ByteBuffer to read from
-	 * @return The Result read
-	 * @throws BadFormatException If a Result could not be read
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	public static Result read(ByteBuffer bb) throws BadFormatException {
-		AVector<ACell> v=Vectors.read(bb);
-		if (v.size()!=RESULT_FORMAT.count()) throw new BadFormatException("Invalid number of fields for Result!");
-		
-		return buildFromVector(v);
-	}
-	
-
 	public static Result read(Blob b, int pos) throws BadFormatException {
-		int epos=pos; // include tag since we are reading raw Vector
+		int epos=pos; 
+		// include tag location since we are reading raw Vector (will ignore tag)
 		AVector<ACell> v=Vectors.read(b,epos);
 		epos+=Format.getEncodingLength(v);
 		
+		Blob enc=v.getEncoding();
+		v.attachEncoding(null); // This is an invalid encoding for vector, see above
 		Result r=buildFromVector(v);
-		r.attachEncoding(b.slice(pos, epos));
+		r.attachEncoding(enc);
 		return r;
 	}
 

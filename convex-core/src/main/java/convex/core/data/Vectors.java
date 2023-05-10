@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.Collection;
 
 import org.bouncycastle.util.Arrays;
@@ -124,25 +123,16 @@ public class Vectors {
 	}
 
 	/**
-	 * Reads a Vector for the specified bytebuffer. Assumes Tag byte already consumed.
+	 * Reads a Vector for the specified Blob. Assumes Tag byte already checked.
 	 * 
 	 * Distinguishes between child types according to count.
 	 * 
 	 * @param <T> Type of elements
-	 * @param bb ByteBuffer to read from
-	 * @return Vector read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	public static <T extends ACell> AVector<T> read(ByteBuffer bb) throws BadFormatException {
-		long count = Format.readVLCLong(bb);
-		if (count < 0) throw new BadFormatException("Negative length");
-		if (VectorLeaf.isValidCount(count)) {
-			return VectorLeaf.read(bb, count);
-		} else {
-			return VectorTree.read(bb, count);
-		}
-	}
-
 	public static <T extends ACell> AVector<T> read(Blob b, int pos) throws BadFormatException {
 		long count = Format.readVLCLong(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative length");

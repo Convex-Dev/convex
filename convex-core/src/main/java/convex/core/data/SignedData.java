@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
@@ -186,20 +184,13 @@ public final class SignedData<T extends ACell> extends ARecord {
 	}
 
 	/**
-	 * Reads a SignedData instance from the given ByteBuffer
+	 * Reads a SignedData instance from the given Blob encoding
 	 *
-	 * @param data A ByteBuffer containing
-	 * @return A SignedData object
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	public static <T extends ACell> SignedData<T> read(ByteBuffer data) throws BadFormatException {
-		// header already assumed to be consumed
-		AccountKey address = AccountKey.readRaw(data);
-		ASignature sig = Ed25519Signature.readRaw(data);
-		Ref<T> value = Format.readRef(data);
-		return create(address, sig, value);
-	}
-	
 	public static <T extends ACell> SignedData<T>  read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		

@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -149,19 +147,14 @@ public class Syntax extends ACell {
 		return true;
 	}
 
-	public static Syntax read(ByteBuffer bb) throws BadFormatException {
-		Ref<ACell> datum = Format.readRef(bb);
-		AHashMap<ACell, ACell> props = Format.read(bb);
-		if (props == null) {
-			props = Maps.empty(); // we encode empty props as null for efficiency
-		} else {
-			if (props.isEmpty()) {
-				throw new BadFormatException("Empty Syntax metadata should be encoded as nil");
-			}
-		}
-		return new Syntax(datum, props);
-	}
-	
+	/**
+	 * Decodes a Syntax object from a Blob encoding
+	 * 
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static Syntax read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // read position after tag
 		Ref<ACell> datum = Format.readRef(b,epos);

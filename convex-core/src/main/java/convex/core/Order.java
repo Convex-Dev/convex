@@ -1,15 +1,13 @@
 package convex.core;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Tag;
@@ -128,32 +126,13 @@ public class Order extends ARecord {
 	}
 
 	/**
-	 * Decode an Order from a ByteBuffer
-	 * @param bb ByteBuffer to read from
-	 * @return Order instance
-	 * @throws BadFormatException If encoding format is invalid
+	 * Decode an Order from a Blob encoding
+	 * 
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	public static Order read(ByteBuffer bb) throws BadFormatException {
-		Ref<AVector<SignedData<Block>>> blocks = Format.readRef(bb);
-		if (blocks==null) {
-			throw new BadFormatException("Null blocks in Order!");
-		}
-		
-		long[] cps=new long[Constants.CONSENSUS_LEVELS];
-		long pp=Format.readVLCLong(bb);
-		cps[1] = pp;
-		long cp=Format.readVLCLong(bb);;
-		cps[2] = cp;
-		long ts = Format.readVLCLong(bb);
-		
-		if (pp<cp) {
-			throw new BadFormatException("Proposal point ["+pp+"] before consensus point [" + cp+"]");
-		}
-
-		return new Order(blocks, cps,ts);
-	}
-	
-
 	public static Order read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		Ref<AVector<SignedData<Block>>> blocks = Format.readRef(b,epos);
@@ -163,12 +142,12 @@ public class Order extends ARecord {
 		epos+=blocks.getEncodingLength();
 		
 		long[] cps=new long[Constants.CONSENSUS_LEVELS];
-		long last=0;
+		long last=Long.MAX_VALUE;
 		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
 			long pp = Format.readVLCLong(b,epos);
 			cps[i]=pp;
 			epos+=Format.getVLCLength(pp);
-			if (pp<last) {
+			if (pp>last) {
 				throw new BadFormatException("Consensus point ["+pp+"] before previous value [" + last+"] at level "+i);
 			}
 			last=pp;

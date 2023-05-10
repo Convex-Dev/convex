@@ -1,7 +1,6 @@
 package convex.core.data.prim;
 
 import java.math.BigInteger;
-import java.nio.ByteBuffer;
 
 import convex.core.data.ABlob;
 import convex.core.data.AString;
@@ -208,14 +207,6 @@ public class CVMBigInteger extends AInteger {
 	public AInteger toCanonical() {
 		if (isCanonical()) return this;
 		return CVMLong.create(big().longValue());
-	}
-
-	public static CVMBigInteger read(ByteBuffer bb) throws BadFormatException {
-		ABlob b=Blobs.read(bb);
-		if (b.count()<=8) throw new BadFormatException("Non-canonical size of big integer");
-		CVMBigInteger bi= create(b);
-		if (bi==null) throw new BadFormatException("Invalid blob representation of big integer");
-		return bi;
 	}
 	
 	public static CVMBigInteger read(byte tag, Blob blob, int offset) throws BadFormatException {

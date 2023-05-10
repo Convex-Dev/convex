@@ -449,25 +449,6 @@ public class Format {
 	public static long readLong(ByteBuffer bb) {
 		return bb.getLong();
 	}
-
-	/**
-	 * Reads a Ref or embedded Cell value from the ByteBuffer.
-	 * 
-	 * Converts Embedded Cells to Direct Refs automatically.
-	 * 
-	 * @param <T> Type of referenced value
-	 * @param bb ByteBuffer containing a ref to read
-	 * @return Ref as read from ByteBuffer
-	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
-	 *                            object is found.
-	 */
-	public static <T extends ACell> Ref<T> readRef(ByteBuffer bb) throws BadFormatException {
-		byte tag=bb.get();
-		if (tag==Tag.REF) return Ref.readRaw(bb);
-		T cell= Format.read(tag,bb);
-		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
-		return Ref.get(cell);
-	}
 	
 	/**
 	 * Reads a Ref or embedded Cell value from a Blob
@@ -507,46 +488,6 @@ public class Format {
 		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
 	}
 
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readDataStructure(ByteBuffer bb, byte tag) throws BadFormatException {
-		if (tag == Tag.VECTOR) return (T) Vectors.read(bb);
-
-		if (tag == Tag.MAP) return (T) Maps.read(bb);
-
-		if (tag == Tag.SYNTAX) return (T) Syntax.read(bb);
-		
-		if (tag == Tag.SET) return (T) Sets.read(bb);
-
-		if (tag == Tag.LIST) return (T) List.read(bb);
-
-		if (tag == Tag.BLOBMAP) return (T) BlobMap.read(bb);
-
-		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
-	}
-
-	private static ACell readCode(ByteBuffer bb, byte tag) throws BadFormatException {
-		if (tag == Tag.OP) return Ops.read(bb);
-		if (tag == Tag.CORE_DEF) {
-			Symbol sym = Symbol.read(bb);
-			// TODO: consider if dependency of format on core bad?
-			ACell o = Core.ENVIRONMENT.get(sym);
-			if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
-			return o;
-		}
-		
-		if (tag == Tag.FN_MULTI) {
-			AFn<?> fn = MultiFn.read(bb);
-			return fn;
-		}
-
-		if (tag == Tag.FN) {
-			AFn<?> fn = Fn.read(bb);
-			return fn;
-		}
-
-		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
-	}
-	
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
 		if (tag == Tag.OP) return Ops.read(b,pos);
 		if (tag == Tag.CORE_DEF) {
@@ -674,46 +615,6 @@ public class Format {
 		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 	}
 
-	/**
-	 * Reads a basic type (primitives and numerics) with the given tag
-	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param tag Tag byte indicating type to read
-	 * @return Cell value read
-
-	 * @throws BadFormatException If encoding is invalid
-	 * @throws BufferUnderflowException if the ByteBuffer contains insufficient bytes for Encoding
-	 */
-	private static ANumeric readNumeric(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
-		if (tag == Tag.LONG) return CVMLong.create(readVLCLong(bb));
-		if (tag == Tag.INTEGER) return CVMBigInteger.read(bb);
-			
-		// Double is special, we enforce a canonical NaN
-		if (tag == Tag.DOUBLE) return CVMDouble.read(bb.getDouble());
-
-		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
-	}
-	
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readBasicObject(ByteBuffer bb, byte tag) throws BadFormatException, BufferUnderflowException {
-		try {
-			if (tag == Tag.STRING) return (T) Strings.read(bb);
-			if (tag == Tag.BLOB) return (T) Blobs.read(bb);
-			if (tag == Tag.SYMBOL) return (T) Symbol.read(bb);
-			if (tag == Tag.KEYWORD) return (T) Keyword.read(bb);
-			
-			if ((tag&Tag.CHAR)==Tag.CHAR) {
-				int len=CVMChar.utfByteCountFromTag(tag);
-				if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
-				return (T) CVMChar.read(len, bb); // note tag byte already read
-			}
-
-			throw new BadFormatException("Can't read basic type with tag byte: " + tag);
-		} catch (IllegalArgumentException e) {
-			throw new BadFormatException("Illegal format error basic type with tag byte: " + tag);
-		}
-	}
-	
 	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
 		if (tag == Tag.BLOB) return Blobs.read(blob,offset);
 		if (tag == Tag.STRING) return Strings.read(blob,offset);
@@ -730,47 +631,14 @@ public class Format {
 		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
 	}
 
-	/**
-	 * Reads a Record with the given tag
-	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param tag Tag byte indicating type to read
-	 * @return Record value read
-	 * @throws BadFormatException In case of a bad record encoding
-	 */
-	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readRecord(ByteBuffer bb, byte tag) throws BadFormatException {
-		if (tag == Tag.BLOCK) {
-			return (T) Block.read(bb);
-		}
-		if (tag == Tag.STATE) {
-			return (T) State.read(bb);
-		}
-		if (tag == Tag.ORDER) {
-			return (T) Order.read(bb);
-		}
-		if (tag == Tag.BELIEF) {
-			return (T) Belief.read(bb);
-		}
-		
-		if (tag == Tag.RESULT) {
-			return (T) Result.read(bb);
-		}
-		
-		if (tag == Tag.BLOCK_RESULT) {
-			return (T) BlockResult.read(bb);
-		}
-
-		throw new BadFormatException("Can't read record type with tag byte: " + tag);
-	}
 	
 	/**
 	 * Reads a Record with the given tag
 	 * 
-	 * @param bb ByteBuffer to read from
-	 * @param tag Tag byte indicating type to read
-	 * @return Record value read
-	 * @throws BadFormatException In case of a bad record encoding
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
@@ -798,86 +666,6 @@ public class Format {
 		throw new BadFormatException("Can't read record type with tag byte: " + tag);
 	}
 
-	/**
-	 * <p>
-	 * Reads one complete Cell from a ByteBuffer.
-	 * </p>
-	 * 
-	 * <p>
-	 * May return any valid Cell (including null)
-	 * </p>
-	 * 
-	 * <p>
-	 * Assumes the presence of an object tag.
-	 * </p>
-	 * 
-	 * @param bb ByteBuffer from which to read
-	 * @return Value read from the ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static <T extends ACell> T read(ByteBuffer bb) throws BadFormatException {
-		byte tag = bb.get();
-		return read(tag,bb);
-	}
-	
-	/**
-	 * Read an arbitrary cell data from a ByteBuffer. Assumes tag already read.
-	 * @param <T>
-	 * @param tag Tag byte
-	 * @param bb ByteBuffer to read from
-	 * @return Cell value (may be null)
-	 * @throws BadFormatException If the encoding is malformed in any way
-	 */
-	@SuppressWarnings("unchecked")
-	static <T extends ACell> T read(byte tag,ByteBuffer bb) throws BadFormatException {
-		if (tag==Tag.NULL) return null;
-		
-		if (tag == Tag.TRUE) return (T) CVMBool.TRUE;
-		if (tag == Tag.FALSE) return (T) CVMBool.FALSE;
-		
-		try {
-			int high=(tag & 0xF0);
-			if (high == 0x00) return (T) readNumeric(bb, tag);
-			if (high ==0x30) return readBasicObject(bb,tag);
-
-			if (tag == Tag.ADDRESS) return (T) Address.readRaw(bb);
-			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(bb);
-
-			if ((tag & 0xF0) == 0x80) return readDataStructure(bb, tag);
-
-			if ((tag & 0xF0) == 0xA0) return (T) readRecord(bb, tag);
-
-			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(bb, tag);
-
-			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(bb);
-			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(bb);
-
-			if ((tag & 0xF0) == 0xC0) return (T) readCode(bb, tag);
-		} catch (IllegalArgumentException e) {
-			throw new BadFormatException("Illegal argument reading encoding", e);
-		} catch (ClassCastException e) {
-			throw new BadFormatException("Unexpected data type when decoding: "+e.getMessage(), e);
-		}
-
-		// report error
-		int pos = bb.position() - 1;
-		bb.position(0);
-		ABlob data = Utils.readBufferData(bb);
-		throw new BadFormatException("Don't recognise tag: " + Utils.toHexString(tag) + " at position " + pos
-				+ " Content: " + data.toHexString());
-	}
-
-	static ATransaction readTransaction(ByteBuffer bb, byte tag) throws BadFormatException {
-		if (tag == Tag.INVOKE) {
-			return Invoke.read(bb);
-		} else if (tag == Tag.TRANSFER) {
-			return Transfer.read(bb);
-		} else if (tag == Tag.CALL) {
-			return Call.read(bb);
-		}
-		throw new BadFormatException("Can't read Transaction with tag " + Utils.toHexString(tag));
-	}
-	
 	private static ATransaction readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
 		if (tag == Tag.INVOKE) {
 			return Invoke.read(b,pos);

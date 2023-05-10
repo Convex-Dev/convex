@@ -356,37 +356,6 @@ public class BlobTree extends ABlob {
 	public static final int MAX_ENCODING_SIZE=1+(Format.MAX_VLC_LONG_LENGTH-1)+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
 
 	/**
-	 * Reads a BlobTree from a bytebuffer. Assumes that tag byte and count are already read
-	 * @param bb ByteBuffer
-	 * @param count Count of bytes in BlobTree being read
-	 * @return Decoded BlobTree
-	 * @throws BadFormatException if the encoding was invalid
-	 */
-	public static BlobTree read(ByteBuffer bb, long count) throws BadFormatException {
-		if (count < 0) {
-			// note that this conveniently also captures count overflows....
-			throw new BadFormatException("Negative length: " + count);
-		}
-		long chunks = calcChunks(count);
-		int shift = calcShift(chunks);
-
-		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
-		if ((numChildren < 2) || (numChildren > FANOUT)) {
-			throw new BadFormatException(
-					"Invalid number of children [" + numChildren + "] for BlobTree with length: " + count);
-		}
-
-		@SuppressWarnings("unchecked")
-		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref[numChildren];
-		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Format.readRef(bb);
-			children[i] = ref;
-		}
-
-		return new BlobTree(children, shift, count);
-	}
-
-	/**
 	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
 	 * @param count Length to read
 	 * @param src Source data, assumed to include tag and count at start

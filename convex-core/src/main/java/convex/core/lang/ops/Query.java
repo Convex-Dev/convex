@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
@@ -88,11 +86,14 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 		return Ops.QUERY;
 	}
 
-	public static <T extends ACell> Query<T> read(ByteBuffer b) throws BadFormatException {
-		AVector<AOp<ACell>> ops = Format.read(b);
-		return create(ops);
-	}
-	
+	/**
+	 * Read a Query Op from a Blob encoding
+	 * @param <T> Type of Query result
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static <T extends ACell> Query<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+2; // skip tag and opcode
 		AVector<AOp<ACell>> ops = Format.read(b,epos);

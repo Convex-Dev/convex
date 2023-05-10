@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.function.BiConsumer;
@@ -528,42 +527,6 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@Override
 	public int estimatedEncodingSize() {
 		return 100 + (children.length*2+1) * Format.MAX_EMBEDDED_LENGTH;
-	}
-
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlob, V extends ACell> BlobMap<K, V> read(ByteBuffer bb) throws BadFormatException {
-		long count = Format.readVLCLong(bb);
-		if (count < 0) throw new BadFormatException("Negative count!");
-		if (count == 0) return (BlobMap<K, V>) EMPTY;
-
-		long depth = Format.readVLCLong(bb);
-		if (depth < 0) throw new BadFormatException("Negative depth!");
-		long prefixLength = Format.readVLCLong(bb);
-		if (prefixLength < 0) throw new BadFormatException("Negative prefix length!");
-		
-		// Get entry at this node, might be null
-		byte etype=bb.get();
-		MapEntry<K,V> me;
-		if (etype==Tag.NULL) {
-			me=null;
-		} else if (etype==Tag.VECTOR){
-			Ref<K> kr=Format.readRef(bb);
-			Ref<V> vr=Format.readRef(bb);
-			me=MapEntry.createRef(kr, vr);
-		} else {
-			throw new BadFormatException("Invalid MapEntry tag in BlobMap: "+etype);
-		}
-
-		// single entry map
-		if (count == 1) return new BlobMap<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
-
-		short mask = bb.getShort();
-		int n = Utils.bitCount(mask);
-		Ref<BlobMap>[] children = new Ref[n];
-		for (int i = 0; i < n; i++) {
-			children[i] = Format.readRef(bb);
-		}
-		return new BlobMap<K, V>(depth, prefixLength, me, children, mask, count);
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })

@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.function.Consumer;
@@ -268,22 +267,6 @@ public class List<T extends ACell> extends AList<T> {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = data.encodeRaw(bs,pos);
 		return pos;
-	}
-	
-	/**
-	 * Reads a List from the specified bytebuffer. Assumes Tag byte already consumed.
-	 * @param bb ByteBuffer to read from
-	 * @return List instance read from ByteBuffer
-	 * @throws BadFormatException If Encoding is invalid
-	 * 
-	 */
-	public static <T extends ACell> List<T> read(ByteBuffer bb) throws BadFormatException {
-		try {
-			AVector<T> data = Vectors.read(bb);
-			return new List<T>(data);
-		} catch (ClassCastException e) {
-			throw new BadFormatException("Expected vector in List format", e);
-		}
 	}
 	
 	/**

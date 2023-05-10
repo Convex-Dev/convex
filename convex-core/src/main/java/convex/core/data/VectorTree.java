@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
@@ -197,29 +196,16 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	
 
 	/**
-	 * Reads a VectorTree from the provided ByteBuffer 
+	 * Reads a VectorTree from the provided Blob 
 	 * 
-	 * Assumes the header byte and count is already read.
+	 * Assumes the header byte and count is already checked.
 	 * 
-	 * @param bb ByteBuffer to read from
 	 * @param count Number of elements, assumed to be valid
-	 * @return TreeVector instance as read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> VectorTree<T> read(ByteBuffer bb, long count)
-			throws BadFormatException {
-		int n = computeArraySize(count);
-		
-		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
-		for (int i = 0; i < n; i++) {
-			Ref<AVector<T>> ref = Format.readRef(bb);
-			items[i] = ref;
-		}
-
-		return new VectorTree<T>(items, count);
-	}
-	
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {

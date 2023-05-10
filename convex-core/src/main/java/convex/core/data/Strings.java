@@ -35,27 +35,6 @@ public class Strings {
 	 */
 	public static final byte EXCESS_BYTE = -1;
 
-
-
-
-	/**
-	 * Reads a CVM String value from a bytebuffer. Assumes tag already read.
-	 * 
-	 * @param bb ByteBuffer to read from
-	 * @return String instance
-	 * @throws BadFormatException If format has problems
-	 */
-	public static AString read(ByteBuffer bb) throws BadFormatException {
-		long length=Format.readVLCLong(bb);
-		if (length==0) return StringShort.EMPTY;
-		if (length<0) throw new BadFormatException("Negative string length!");
-		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
-		if (length<=StringShort.MAX_LENGTH) {
-			return StringShort.read(length,bb);
-		}
-		return StringTree.read(length,bb);
-	}
-	
 	/**
 	 * Reads a String from a Blob encoding.
 	 * 

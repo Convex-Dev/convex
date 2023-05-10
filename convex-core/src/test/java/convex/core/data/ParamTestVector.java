@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -12,7 +11,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
-import convex.core.exceptions.BadFormatException;
 import convex.test.Samples;
 
 /**
@@ -61,17 +59,4 @@ public class ParamTestVector {
 		assertThrows(Throwable.class, () -> v.get(-1));
 		assertThrows(Throwable.class, () -> v.get(n));
 	}
-
-	@Test
-	public void testBuffer() throws BadFormatException {
-		int size = v.size();
-		ByteBuffer b = ByteBuffer.allocate(3000);
-		v.write(b);
-		b.flip();
-		AVector<?> rec = Format.read(b);
-		assertEquals(0, b.remaining());
-		assertEquals(size, rec.size());
-		assertEquals(v, rec);
-	}
-
 }

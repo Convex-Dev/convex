@@ -1,7 +1,5 @@
 package convex.core.transactions;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -70,17 +68,13 @@ public class Call extends ATransaction {
 		return pos;
 	}
 	
-	public static Call read(ByteBuffer bb) throws BadFormatException {
-		Address address=Address.create(Format.readVLCLong(bb));
-		long sequence = Format.readVLCLong(bb);
-		Address target=Format.read(bb);
-		long offer = Format.readVLCLong(bb);
-		Symbol functionName=Format.read(bb);
-		AVector<ACell> args = Format.read(bb);
-		return create(address,sequence, target, offer, functionName,args);
-	}
-	
-
+	/**
+	 * Reads a Call Transaction from a Blob encoding
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static Call read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		long aval=Format.readVLCLong(b,epos);

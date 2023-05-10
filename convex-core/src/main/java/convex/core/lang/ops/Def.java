@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
@@ -134,14 +132,13 @@ public class Def<T extends ACell> extends AOp<T> {
 		return symbol.estimatedEncodingSize()+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	public static <T extends ACell> Def<T> read(ByteBuffer b) throws BadFormatException {
-		ACell symbol = Format.read(b);
-		Ref<AOp<T>> ref = Format.readRef(b);
-		if (!validKey(symbol)) throw new BadFormatException("Symbol not valid for Def op");
-		return new Def<>(symbol, ref);
-	}
-	
-
+	/**
+	 * Decodes a Def op from a Blob encoding
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static <T extends ACell> Def<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+2; // skip tag and opcode
 		ACell symbol = Format.read(b,epos);

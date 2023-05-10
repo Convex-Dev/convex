@@ -56,11 +56,15 @@ public class StringTree extends AString {
 		return data.writeToBuffer(bs, pos);
 	}
 	
-	public static StringTree read(long length, ByteBuffer bb) throws BadFormatException {
-		BlobTree bt=BlobTree.read(bb,length);
-		return new StringTree(bt);
-	}
-	
+	/**
+	 * Reads a StringTree from the given Blob encoding.
+	 * 
+	 * @param length Length of StringTree in bytes
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static StringTree read(long length, Blob b, int pos) throws BadFormatException {
 		BlobTree bt=BlobTree.read(length,b,pos);
 		StringTree result= new StringTree(bt);

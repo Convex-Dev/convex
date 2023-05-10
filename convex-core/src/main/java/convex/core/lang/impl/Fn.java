@@ -1,7 +1,5 @@
 package convex.core.lang.impl;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -125,19 +123,14 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		return 1+params.estimatedEncodingSize()+body.estimatedEncodingSize()+lexicalEnv.estimatedEncodingSize();
 	}
 
-	public static <T extends ACell> Fn<T> read(ByteBuffer bb) throws BadFormatException {
-		try {
-			AVector<ACell> params = Format.read(bb);
-			if (params==null) throw new BadFormatException("Null parameters to Fn");
-			AOp<T> body = Format.read(bb);
-			if (body==null) throw new BadFormatException("Null body in Fn");
-			AVector<ACell> lexicalEnv = Format.read(bb);
-			return new Fn<>(params, body, lexicalEnv);
-		} catch (ClassCastException e) {
-			throw new BadFormatException("Bad Fn format", e);
-		}
-	}
-	
+	/**
+	 * Decodes a function instance from a Blob encoding.
+	 * 
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static <T extends ACell> Fn<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		

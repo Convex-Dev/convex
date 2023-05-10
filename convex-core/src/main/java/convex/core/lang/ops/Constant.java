@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
@@ -90,11 +88,6 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return 1+Format.MAX_EMBEDDED_LENGTH;
 	}
 
-	public static <T extends ACell> Constant<T> read(ByteBuffer bb) throws BadFormatException {
-		Ref<T> ref = Format.readRef(bb);
-		return createFromRef(ref);
-	}
-	
 	public static <T extends ACell> Constant<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+2; // skip tag and opcode
 		Ref<T> ref = Format.readRef(b,epos);

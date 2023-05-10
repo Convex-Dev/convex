@@ -1,7 +1,5 @@
 package convex.core.lang;
 
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
@@ -46,58 +44,14 @@ public class Ops {
 	
 
 	/**
-	 * Reads an Op from the given ByteBuffer. Assumes Message tag already read.
+	 * Reads an Op from the given Blob. Assumes tag specifying an Op already read.
 	 * 
 	 * @param <T> The return type of the Op
-	 * @param bb  ByteBuffer
-	 * @return Op read from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> read(ByteBuffer bb) throws BadFormatException {
-		byte opCode = bb.get();
-		switch (opCode) {
-		case Ops.INVOKE:
-			return Invoke.read(bb);
-		case Ops.COND:
-			return Cond.read(bb);
-		case Ops.CONSTANT:
-			return Constant.read(bb);
-		case Ops.DEF:
-			return Def.read(bb);
-		case Ops.DO:
-			return Do.read(bb);
-		case Ops.LOOKUP:
-			return Lookup.read(bb);
-		// case Ops.CALL: return Call.read(bb);
-		case Ops.LAMBDA:
-			return (AOp<T>) Lambda.read(bb);
-		case Ops.LET:
-			return Let.read(bb,false);
-		case Ops.QUERY:
-			return Query.read(bb);
-		case Ops.LOOP:
-			return Let.read(bb,true);
-		case Ops.LOCAL:
-			return Local.read(bb);
-		case Ops.SET:
-			return Set.read(bb);
-
-		// case Ops.RETURN: return (AOp<T>) Return.read(bb);
-		default:
-			// range 64-127 is special ops
-			if ((opCode&0xC0) == 0x40) {
-				Special<T> special=(Special<T>) Special.create(opCode);
-				if (special==null) throw new BadFormatException("Bad OpCode for Special value: "+Utils.toHexString((byte)opCode));
-				return special;
-			}
-			
-			throw new BadFormatException("Invalide OpCode: " + opCode);
-		}
-	}
-
-
-
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
 		byte opCode = b.byteAt(pos+1); // second byte identifies Op

@@ -1,8 +1,5 @@
 package convex.core.lang.impl;
 
-import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
-
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -113,12 +110,15 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		return pos;
 	}
 	
-	public static <T extends ACell> MultiFn<T> read(ByteBuffer bb) throws BadFormatException, BufferUnderflowException {
-		AVector<AClosure<T>> fns=Format.read(bb);
-		if (fns==null) throw new BadFormatException("Null fns!");
-		return new MultiFn<T>(fns);
-	}
 
+	/**
+	 * Decodes a MultiFn instance from a Blob encoding
+	 * 
+	 * @param b Blob to read from
+	 * @param pos Start position in Blob (location of tag byte)
+	 * @return New decoded instance
+	 * @throws BadFormatException In the event of any encoding error
+	 */
 	public static <T extends ACell> MultiFn<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		
