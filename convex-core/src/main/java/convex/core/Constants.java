@@ -68,11 +68,6 @@ public class Constants {
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
 
 	/**
-	 * Base Juice cost for any transaction, added to consumed juice
-	 */
-	public static final long BASE_TRANSACTION_JUICE = 0;
-	
-	/**
 	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.
 	 */
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;

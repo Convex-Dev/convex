@@ -13,7 +13,7 @@ import convex.core.data.prim.CVMDouble;
  * 
  * "LISP programmers know the value of everything and the cost of nothing." -
  * Alan Perlis
- * 
+ *  
  */
 public class Juice {
 	/**
@@ -491,9 +491,14 @@ public class Juice {
 	 * @return Available juice
 	 */
 	public static long calcAvailable(long balance, long juicePrice) {
-		long limit = (balance/juicePrice)-Constants.BASE_TRANSACTION_JUICE;
+		long limit = (balance/juicePrice)-Juice.BASE_TRANSACTION_JUICE;
 		return Math.max(0, limit);
 	}
+
+	/**
+	 * Base Juice cost for any transaction, added to consumed juice
+	 */
+	public static final long BASE_TRANSACTION_JUICE = 0;
 
 
 

@@ -322,9 +322,13 @@ public class Context extends AObject {
 	public Context completeTransaction(State initialState, long juicePrice) {
 		// get state at end of transaction application
 		State state=getState();
-		long usedJuice=this.juice;
+		long executionJuice=this.juice;
 
-		long juiceFees=Juice.addMul(Constants.BASE_TRANSACTION_JUICE,usedJuice,juicePrice);
+		// TODO: Extra juice for transaction size??
+		long trxJuice=Juice.BASE_TRANSACTION_JUICE;
+		
+		long totalJuice=executionJuice+trxJuice;
+		long juiceFees=Juice.addMul(0,totalJuice,juicePrice);
 
 		// compute memory delta
 		Address address=getAddress();
@@ -381,8 +385,8 @@ public class Context extends AObject {
 		state=state.putAccount(address,account);
 
 		// maybe add used juice to miner fees
-		if (usedJuice>0L) {
-			long transactionFees = usedJuice*juicePrice;
+		if (executionJuice>0L) {
+			long transactionFees = executionJuice*juicePrice;
 			long oldFees=state.getGlobalFees().longValue();
 			long newFees=oldFees+transactionFees;
 			state=state.withGlobalFees(CVMLong.create(newFees));
