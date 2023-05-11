@@ -44,6 +44,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.Blob;
 import convex.core.data.type.Types;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.CoreFn;
@@ -1663,10 +1664,12 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			ABlob encoding=Format.encodedBlob(a);
-
+			Blob encoding=Format.encodedBlob(a);
 			long juice=Juice.buildBlobCost(encoding.count());
-			return context.withResult(juice, encoding);
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+			
+			ABlob result=encoding.toCanonical();
+			return context.withResult(juice, result);
 		}
 	});
 
