@@ -45,7 +45,7 @@
          (when-not (trust/trusted? minter *caller*)
            (fail :TRUST "No rights to burn"))
          (let [amount (int amount)
-               bal    (*address*/balance *caller*)]
+               bal    (balance *caller*)]
            ;; Burn amount must be less than or equal to caller's balance.
            ;;
            (assert (<= 0
@@ -64,7 +64,7 @@
            (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
                new-supply (+ supply amount)
-               bal        (*address*/balance *caller*)
+               bal        (balance *caller*)
                new-bal    (+ bal amount)]
            ;; Mint amount.
            ;;
@@ -155,34 +155,21 @@
                                  quantity))
                  quantity))))
 
-
        (defn balance
-
          ^{:callable? true}
-
          [addr]
-
-         (or (get-holding addr)
-              0))
-
+         (or (get-holding addr) 0))
 
        ;; No restrictions on transfer by default.
        ;;
        (defn check-transfer
-
          ^{:callable? true}
-
          [_sender _receiver _quantity]
-
          nil)
 
-
        (defn direct-transfer
-
          ^{:callable? true}
-
          [addr amount]
-
          (let [addr   (address addr)
                amount (if amount
                         (int amount)
@@ -207,25 +194,17 @@
                         (+ tbal
                            amount))))
 
-
        (defn get-offer
-
          ^{:callable? true}
-
          [sender receiver]
-
          (or (get-in offers
                      [sender
                       receiver])
              0))
 
-
        (defn offer
-
          ^{:callable? true}
-
          [receiver quantity]
-
          (let [receiver (address receiver)
                quantity (if quantity
                           (int quantity)
