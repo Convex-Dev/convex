@@ -45,7 +45,7 @@
          (when-not (trust/trusted? minter *caller*)
            (fail :TRUST "No rights to burn"))
          (let [amount (int amount)
-               bal    (balance *caller*)]
+               bal    (*address*/balance *caller*)]
            ;; Burn amount must be less than or equal to caller's balance.
            ;;
            (assert (<= 0
@@ -64,7 +64,7 @@
            (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
                new-supply (+ supply amount)
-               bal        (balance *caller*)
+               bal        (*address*/balance *caller*)
                new-bal    (+ bal amount)]
            ;; Mint amount.
            ;;
