@@ -1,9 +1,6 @@
 package convex.lib;
 
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertError;
-import static convex.test.Assertions.assertNotError;
-import static convex.test.Assertions.assertTrustError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -87,6 +84,24 @@ public class FungibleTest extends ACVMTest {
 		// test offer
 		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
 		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+VILLAIN+")"));
+		
+		// Test transfers to actor: failure cases
+		ctx=step(ctx,"(def nully (deploy nil))");
+		assertArityError(step(ctx,"(asset/transfer nully)"));
+		assertStateError(step(ctx,"(asset/transfer nully token 10)"));
+		assertStateError(step(ctx,"(asset/transfer nully token 10 :foo)"));
+		assertArityError(step(ctx,"(asset/transfer nully token 10 :foo :bar)"));
+
+		// Test transfers to actor: accept cases
+		ctx=step(ctx,"(def sink (deploy `(defn ^:callable? receive-asset [tok qnt data] (~asset/accept *caller* tok qnt))))");
+		{
+			Context c=step(ctx,"(asset/transfer sink token 10)");
+			assertCVMEquals(10L,c.getResult());
+			assertEquals(10L,evalL(c,"(asset/balance token sink)"));
+			c=step(c,"(asset/transfer sink token 15)");
+			// assertCVMEquals(15L,c.getResult()); // TODO: what should be return value?
+			assertEquals(25L,evalL(c,"(asset/balance token sink)"));
+		}
 	}
 
 	@Test public void testBuildToken() {

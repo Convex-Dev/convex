@@ -2,7 +2,7 @@
 
 (call *registry*
       (register {:description ["An actor that supports revenue sharing of an underlying asset"]
-                 :name        "Revenue  actor"}))
+                 :name        "Revenue Share actor"}))
 
 ;;;;;;;;;; Setup
 
@@ -12,7 +12,7 @@
 ;;;;;;;;;; State
 
 ;; Token metadata is stored here
-;; Map of { id -> [controller supply underlying-asset underlying-balance] ]
+;; Map of { id -> [controller supply underlying-asset underlying-balance underlying-claimed] ]
 (def tokens {})
 
 ;; Per-user data is stored in holdings: Map of { id -> [balance offers claimed] }
@@ -22,6 +22,14 @@
 ;;    claimed is amount of underlying asset claimed
 
 (def counter 0)
+
+;; The BIG idea: by tracking the number of claimed underlying tokens for each holder
+;; as well as the total amount claimed, we can allow holders to claim a proportionate share
+;; of the underlying balance
+;;
+;; Complexities to bear in mind:
+;; - when shares are transferred, we also transfer unclaimed amount
+;; - multiple share tokens may have same underlying asset, so they must track independent balances
 
 ;;;;;;;;; Private functions
 
@@ -38,16 +46,20 @@
         rec (get h id)]
     (if rec (nth rec 0) 0)))
 
+(defn -get-token
+  [id]
+  (or (get tokens id) (fail "Share token does not exist")))
+
 ;;;;;;;;;; Public API
 
 
 (defn create
   ^{:callable? true
-    :doc {:description "Creates a new token and returns its id. Caller will be controller of token. Returns ID."
+    :doc {:description "Creates a new share token and returns its id. Caller will be controller of token. Returns ID."
           :signature   [{:params [underlying]}]}}
   ([underlying]
     (let [id (inc counter)]
-      (def tokens (assoc tokens id [*caller* 0 underlying 0]))
+      (def tokens (assoc tokens id [*caller* 0 underlying 0 0]))
       (def counter id)
       id)))
 
@@ -57,7 +69,7 @@
   ^{:callable? true}
   [controller]
   (or (callable? controller) (fail :ARGUMENT "controller must be a callable value"))
-  (let [trec (or (get tokens *scope*) (fail :TRUST "Not allowed to update controller"))
+  (let [trec (-get-token *scope*)
         cont (nth trec 0)
         _ (or 
             (trust/trusted? cont *caller*)
@@ -96,6 +108,21 @@
            rec (get hs *scope*)]
        (if rec (nth rec 0) 0))))
 
+(defn claim
+   ^{:callable? true}
+   ([amt]
+     (let [token (-get-token *scope*)
+           hs (get-holding addr) 
+           rec (or (get hs *scope*) (fail "No holding to claim from"))]
+       (TODO))))
+
+(defn 
+  receive-asset
+  ^{:callable? true}
+  [token quantity data]
+  (or (integer? quantity) (fail "Non-integer quantity"))
+  (let [token (-get-token *scope*)]))
+
 (defn accept 
   ^{:callable? true}
   [sender quantity] 
@@ -106,10 +133,10 @@
             (< quantity 0) (fail "Negative accept amount"))
         receiver *caller*
         hs (get-holding sender) ;; holdings of sender
-        rec (get hs id)]
+       rec (get hs id)]
     (if rec
       (let [os (nth rec 1) ;; offers map
-            off (or (get os receiver) (fail "No offer to receiver"))
+           off (or (get os receiver) (fail "No offer to receiver"))
             _ (cond (< off quantity) (fail "insufficient offer"))
             bal (nth rec 0)
             nbal (- bal quantity)
@@ -118,9 +145,9 @@
             nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
             nrec [nbal nos]]
         ;; Update offer and balance of sender
-        (set-holding sender (assoc hs id nrec)) 
+       (set-holding sender (assoc hs id nrec)) 
         ;; Add accepted quantity to receiver
-        (-set-balance receiver id (+ (-get-balance receiver id) quantity)))
+       (-set-balance receiver id (+ (-get-balance receiver id) quantity)))
       (fail "No offers from sender"))))
 
 (defn get-offer
@@ -155,7 +182,7 @@
   [amount]
   (let [id *scope*
         token (or (get tokens id) (fail "token does not exist"))
-        [controller supply utoken ubalance] token]
+        [controller supply utoken ubalance uclaimed] token]
     (when-not (trust/trusted? controller *caller* :mint)
            (fail :TRUST "No rights to mint"))
     
