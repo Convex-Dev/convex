@@ -118,7 +118,8 @@
         ;; Update offer and balance of sender
         (set-holding sender (assoc hs id nrec)) 
         ;; Add accepted quantity to receiver
-        (-set-balance receiver id (+ (-get-balance receiver id) quantity)))
+        (-set-balance receiver id (+ (-get-balance receiver id) quantity))
+        quantity)
       (fail "No offers from sender"))))
 
 (defn get-offer

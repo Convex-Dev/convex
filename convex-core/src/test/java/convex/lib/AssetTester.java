@@ -76,6 +76,24 @@ public class AssetTester {
 
 			AssetTester.doAssetTests(c, token, user, user2);
 		}
+		
+		// Test transfers to actor: failure cases
+		ctx=step(ctx,"(def nully (deploy nil))");
+		assertArityError(step(ctx,"(asset/transfer nully)"));
+		assertStateError(step(ctx,"(asset/transfer nully token 10)"));
+		assertStateError(step(ctx,"(asset/transfer nully token 10 :foo)"));
+		assertArityError(step(ctx,"(asset/transfer nully token 10 :foo :bar)"));
+
+		// Test transfers to actor: accept cases
+		ctx=step(ctx,"(def sink (deploy `(defn ^:callable? receive-asset [tok qnt data] (~asset/accept *caller* tok qnt))))");
+		{
+			Context c=step(ctx,"(asset/transfer sink token 10)");
+			assertCVMEquals(10L,c.getResult());
+			assertEquals(10L,evalL(c,"(asset/balance token sink)"));
+			c=step(c,"(asset/transfer sink token 15)");
+			assertCVMEquals(15L,c.getResult()); 
+			assertEquals(25L,evalL(c,"(asset/balance token sink)"));
+		}
 	}
 	
 	/**

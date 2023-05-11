@@ -152,7 +152,8 @@
                  (set-holding *caller*
                               (+ (or (get-holding *caller*)
                                      0)
-                                 quantity))))))
+                                 quantity))
+                 quantity))))
 
 
        (defn balance
