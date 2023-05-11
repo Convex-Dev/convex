@@ -20,7 +20,6 @@ import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 /**
@@ -255,7 +254,7 @@ public class Init {
 		try {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
 
-			ctx = ctx.deployActor(forms.next().cons(Symbols.DO));
+			ctx = ctx.deployActor(forms.next().toCellArray());
 			if (ctx.isExceptional()) throw new Error("Error deploying actor:" + ctx.getValue());
 
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + forms.get(0) + " " + ctx.getResult() + "))"));
