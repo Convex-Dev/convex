@@ -48,7 +48,7 @@
 
 (defn -get-token
   [id]
-  (or (get tokens id) (fail "Share token does not exist")))
+  (or (get tokens id) (fail :STATE "Share token does not exist")))
 
 ;;;;;;;;;; Public API
 
@@ -98,6 +98,7 @@
      (when (= *caller*
               addr)
        (return amount))
+     ;; TODO: need to transfer unclaimed quantity
      (-set-balance *caller* id (- bal amount))
      (-set-balance addr id (+ tbal amount))
      amount))
@@ -189,15 +190,14 @@
 (defn mint
   ^{:callable? true}
   [amount]
-  (let [id *scope*
-        token (or (get tokens id) (fail "token does not exist"))
+  (let [token (-get-token *scope*)
         [controller supply utoken ubalance uclaimed] token]
     (when-not (trust/trusted? controller *caller* :mint)
            (fail :TRUST "No rights to mint"))
     
     (let [amount     (int amount) ;; Mint amount.
           new-supply (+ supply amount)
-          bal        (-get-balance *caller* id)
+          bal        (-get-balance *caller* *scope*)
           new-bal    (+ bal amount)]
            
       ;; New supply must be in valid range.
@@ -207,9 +207,9 @@
       (assert (<= 0 new-bal))
       
       ;; Update state
-      (-set-balance *caller* id new-bal)
+      (-set-balance *caller* *scope* new-bal)
       (let [new-token (assoc token 1 new-supply)]
-        (def tokens (assoc tokens id new-token))
+        (def tokens (assoc tokens *scope* new-token))
         new-supply))))
 
 (defn quantity-add
