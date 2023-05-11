@@ -41,7 +41,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
-	public void testUpdateRefs(@From(ValueGen.class) Object o)  {
+	public void testUpdateRefs(@From(ValueGen.class) ACell o)  {
 		if (o instanceof ACell) {
 			ACell rc=(ACell) o;
 			int n=rc.getRefCount();

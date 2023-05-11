@@ -3,7 +3,7 @@ package convex.core.data;
 import convex.core.util.Utils;
 
 /**
- * Abstract base class for Blob-like objects, which behave as a sequence of bytes.
+ * Abstract base class for Blob-like objects, which conceptually behave as a sequence of bytes.
  * 
  * @param <T> type of conceptual elements
  */

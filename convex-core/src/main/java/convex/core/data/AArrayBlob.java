@@ -352,7 +352,7 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public final int getRefCount() {
-		// Array-backed blobs have no child Refs
+		// if (length>Blob.CHUNK_LENGTH) throw new IllegalStateException("Can't get ref count of non-canonical array blob");
 		return 0;
 	}
 	

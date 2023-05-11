@@ -247,12 +247,12 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	public abstract ABlob toCanonical();
 
 	/**
-	 * Tests if this Blob is equal to a subset of a byte array
+	 * Tests if the byte contents of this instance are equal to a subset of a byte array
 	 * @param bytes Byte array to compare with
-	 * @param byteOffset Offset into byte array
+	 * @param offset Offset into byte array from which to start comparison
 	 * @return true if exactly equal, false otherwise
 	 */
-	public abstract boolean equalsBytes(byte[] bytes, int byteOffset);
+	public abstract boolean equalsBytes(byte[] bytes, int offset);
 	
 	/**
 	 * Compares this Blob to another Blob, in lexicographic order sorting by first

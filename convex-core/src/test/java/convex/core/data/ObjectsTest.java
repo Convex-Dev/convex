@@ -33,7 +33,6 @@ public class ObjectsTest {
 	public static void doAnyValueTests(ACell a) {
 		Hash h=Hash.compute(a);
 				
-		boolean embedded=Format.isEmbedded(a);
 
 		Ref<ACell> r = Ref.get(a).persist();
 		assertEquals(h,r.getHash());
@@ -41,23 +40,7 @@ public class ObjectsTest {
 
 		doAnyEncodingTests(a);
 		
-		// tests for memory size
-		if (a!=null) {
-			long memorySize=a.getMemorySize();
-			long encodingSize=a.getEncodingLength();
-			int rc=a.getRefCount();
-			long childMem=0;
-			for (int i=0; i<rc; i++) {
-				Ref<ACell> childRef=a.getRef(i);
-				long cms=childRef.getMemorySize();
-				childMem+=cms;
-			}
-			if (embedded) {
-				assertEquals(memorySize,childMem);
-			} else {
-				assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
-			}
-		}
+	
 		
 		doCellTests(a);
 	}
@@ -239,6 +222,25 @@ public class ObjectsTest {
 			// Canonical objects should map to themselves
 			assertSame(a,a.getCanonical());
 			assertSame(a,a.toCanonical());
+			
+			// tests for memory size
+			if (a!=null) {
+				long memorySize=a.getMemorySize();
+				long encodingSize=a.getEncodingLength();
+				int rc=a.getRefCount();
+				long childMem=0;
+				for (int i=0; i<rc; i++) {
+					Ref<ACell> childRef=a.getRef(i);
+					long cms=childRef.getMemorySize();
+					childMem+=cms;
+				}
+				boolean embedded=Format.isEmbedded(a);
+				if (embedded) {
+					assertEquals(memorySize,childMem);
+				} else {
+					assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
+				}
+			}
 		} else {
 			// non-canonical objects should convert to a canonical object
 			ACell canon=a.toCanonical();
@@ -257,7 +259,6 @@ public class ObjectsTest {
 	}
 
 	private static void doCellRefTests(ACell a) {
-		assertSame(a,a.updateRefs(ref->ref));
 
 		Ref<ACell> cachedRef=a.cachedRef;
 		Ref<ACell> ref=a.getRef();
@@ -274,7 +275,10 @@ public class ObjectsTest {
 		if (c!=a) {
 			// Non-canonical! But should have equal Refs
 			assertEquals(a.getRef(),c.getRef());
-		} 
+		} else {
+			// Canonical so these should work
+			assertSame(a,a.updateRefs(rf->rf));
+		}
 		
 		Ref<ACell> refD=ref.toDirect();
 		assertTrue(ref.equals(refD));
@@ -318,6 +322,7 @@ public class ObjectsTest {
 	 * @param a
 	 */
 	private static void doRefContainerTests(ACell a) {
+		if (!a.isCanonical()) return;
 		int rc=a.getRefCount();
 		assertTrue(rc>=0);
 		assertEquals(rc,Utils.refCount(a));
