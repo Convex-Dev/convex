@@ -2710,6 +2710,10 @@ public class CoreTest extends ACVMTest {
 		// Deploy failure should propagate out 
 		assertCastError(step("(deploy '(+ 1 :foo))"));
 		assertArityError(step("(deploy '(count))"));
+		assertCastError(step("(deploy '(def a :foo) '(address a))"));
+		
+		// Arity checks
+		assertArityError(step("(deploy)"));
 	}
 
 	@Test

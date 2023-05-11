@@ -667,9 +667,9 @@ public class Core {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
-			if (args.length !=1) return context.withArityError(exactArityMessage(1, args.length));
+			if (args.length<1) return context.withArityError(minArityMessage(1, args.length));
 
-			return context.deployActor(args[0]);
+			return context.deployActor(args);
 		}
 	});
 

@@ -1804,7 +1804,8 @@ public class Context extends AObject {
 	 * @param code Actor initialisation code
 	 * @return Updated Context with Actor deployed, or an exceptional result
 	 */
-	public Context deployActor(ACell code) {
+	public Context deployActor(ACell... code) {
+		int n=code.length;
 		final State initialState=getState();
 
 		// deploy initial contract state to next address
@@ -1812,10 +1813,12 @@ public class Context extends AObject {
 		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		final Context deployContext=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
-		final Context rctx=deployContext.eval(code);
-
-		Context result=this.handleStateResults(rctx,false);
+		Context ctx=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		for (int i=0; i <n; i++) {
+			ctx=ctx.eval(code[i]);
+			if (ctx.isExceptional()) break;
+		}
+		Context result=this.handleStateResults(ctx,false);
 		if (result.isExceptional()) return result;
 
 		return result.withResult(Juice.DEPLOY_CONTRACT,address);
