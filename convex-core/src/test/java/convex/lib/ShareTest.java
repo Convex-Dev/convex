@@ -19,17 +19,22 @@ import convex.core.lang.Context;
 
 public class ShareTest extends ACVMTest {
 	
-	private final Address mt;
+	private final Address shareActor;
 	
 	protected ShareTest() {
 		super();
-		mt=(Address) context().getEnvironment().get(Symbol.create("mt"));
+		shareActor=(Address) context().getEnvironment().get(Symbol.create("share"));
 	}
 	
 	@Override protected Context buildContext(Context ctx) {
-		String importS="(import asset.share :as mt)";
+		String importS="(import asset.multi-token :as mt)";
 		ctx=step(ctx,importS);
 		assertNotError(ctx);
+		
+		String importS2="(import asset.share :as share)";
+		ctx=step(ctx,importS2);
+		assertNotError(ctx);
+		
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		assertNotError(ctx);
 		ctx=step(ctx,"(import convex.fungible :as fungible)");
@@ -37,14 +42,14 @@ public class ShareTest extends ACVMTest {
 		ctx=step(ctx,"(import convex.trust :as trust)");
 		assertNotError(ctx);
 		
-		// TODO: fix underlying
-		ctx=step(ctx,"(def token [mt (call mt (create :USD))])");
+		// Unerlying
+		ctx=step(ctx,"(def underlying [mt (call mt (create :USD))])");
 		assertNotError(ctx);
 
-		ctx=step(ctx,"(call token (mint  1000))");
-		assertCVMEquals(1000,ctx.getResult());
+		ctx=step(ctx,"(call underlying (mint 1000000))");
+		assertCVMEquals(1000000,ctx.getResult());
 		
-		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [token 400])");
+		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [underlying 400])");
 		assertNotError(ctx);
 
 		return ctx;
@@ -53,8 +58,8 @@ public class ShareTest extends ACVMTest {
 	@Test public void testOfferAccept() {
 		Context ctx = context();
 		
-		// Create a fresh token
-		ctx=step(ctx,"(def FOO [mt (call mt (create :foo))])");
+		// Create a fresh token based on underlying
+		ctx=step(ctx,"(def FOO [share (call share (create underlying))])");
 		
 		// Mint with standard call
 		ctx=step(ctx,"(call FOO (mint 10000))");
@@ -78,10 +83,7 @@ public class ShareTest extends ACVMTest {
 	@Test public void testMint() {
 		Context ctx = context();
 		
-		// Non-existing token can't have balance
-		assertEquals(0L,evalL(ctx,"(asset/balance [mt :foobar])"));
-		
-		ctx=step(ctx,"(def SSS [mt (call mt (create token))])");
+		ctx=step(ctx,"(def SSS [share (call share (create underlying))])");
 		assertNotError(ctx);
 		
 		assertEquals(0L,evalL(ctx,"(asset/balance SSS)"));
@@ -103,7 +105,7 @@ public class ShareTest extends ACVMTest {
 		assertError(step(ctx,"(call SSS (mint -9999999999999999))"));
 		
 		AVector<ACell> token=eval(ctx,"SSS");
-		assertEquals(mt,token.get(0)); 
+		assertEquals(shareActor,token.get(0)); 
 		AssetTester.doFungibleTests(ctx, token, HERO);
 		
 		// Test change of control

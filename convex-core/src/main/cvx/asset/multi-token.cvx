@@ -112,6 +112,7 @@
             bal (nth rec 0)
             nbal (- bal quantity)
             _ (cond (< nbal 0) (fail "insufficent balance to accept"))
+            ;; Compute new offer after subtracting quantity
             noff (- off quantity)
             nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
             nrec [nbal nos]]

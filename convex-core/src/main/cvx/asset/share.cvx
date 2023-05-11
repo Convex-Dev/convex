@@ -121,10 +121,15 @@
   receive-asset
   ^{:callable? true}
   [token quantity data]
-  (or (integer? quantity) (fail "Non-integer quantity"))
-  (let [token (-get-token *scope*)]
-    (TODO)
-    (asset-lib/accept *caller* token quantity)))
+  
+  (let [token (-get-token *scope*)
+        [controller supply utoken ubalance uclaimed] token
+        quantity (asset-lib/accept *caller* token quantity)
+        _ (or (integer? quantity) (fail "Non-integer quantity"))
+        nubalance (+ ubalance quantity)
+        nrec (assoc token 3 nubalance)]
+    (def tokens (assoc tokens *scope* nrec))
+    quantity))
 
 (defn accept 
   ^{:callable? true}
@@ -136,10 +141,10 @@
             (< quantity 0) (fail "Negative accept amount"))
         receiver *caller*
         hs (get-holding sender) ;; holdings of sender
-       rec (get hs id)]
+      rec (get hs id)]
     (if rec
       (let [os (nth rec 1) ;; offers map
-            off (or (get os receiver) (fail "No offer to receiver"))
+           off (or (get os receiver) (fail "No offer to receiver"))
             _ (cond (< off quantity) (fail "insufficient offer"))
             bal (nth rec 0)
             nbal (- bal quantity)
@@ -148,10 +153,10 @@
             nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
             nrec [nbal nos]]
         ;; Update offer and balance of sender
-        (set-holding sender (assoc hs id nrec)) 
+       (set-holding sender (assoc hs id nrec)) 
         ;; Add accepted quantity to receiver
-        (-set-balance receiver id (+ (-get-balance receiver id) quantity))
-        quantity)
+       (-set-balance receiver id (+ (-get-balance receiver id) quantity))
+       quantity)
       (fail "No offers from sender"))))
 
 (defn get-offer
