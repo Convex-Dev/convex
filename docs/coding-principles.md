@@ -1,5 +1,36 @@
 # Coding principles
 
+This document contains principles and considerations for coding on Convex. The target audience is dApp / smart contract developers and those who wish to contribute to core Convex technology.
+
+## Architecture
+
+### Prefer pure dApps
+
+An ideal Web 3.0 application model is a "pure" dApp that is implemented as a client side front-end and uses only decentralised services such as Convex as a back-end.
+
+This has the following advantages:
+- Supports fully self-sovereign users
+- Avoids the requirement to maintain Web 2.0 server backends
+
+As such, it is recommended that Convex ecosystem applications adopt a pure dApp model if possible.
+
+Of course, this may not always be possible. Reasons to include a traditional Web 2.0 back-end include:
+- Integration with other back-end services
+- Efficient large back-end data storage and analytics
+- Custodial solutions, where private keys and assets are managed on behalf of used in a centralised fashions
+- Private / sensitive data that is not suitable for a public decentralised network
+
+### Don't roll your own!
+
+Many application smart contract needs are provided "out of the box" on Convex, and in many cases quite sophisticated dApps can be developed **without writing any smart contract code or deploying any new actors**. This is obviously preferable to avoid development costs and risks if requirements can be met by existing on-chain services.
+
+Such facilities include:
+- General purpose fungible tokens e.g. `convex.multi-token`
+- Automated market maker / currency exchange - `torus.exchange`
+- W3C compatible Decentralised Identity registry - `convex.did`
+- Various NFT implementations
+- Trust monitors for authorisation and governance: `convex.trust` and related libraries
+
 ## Smart Contract Security
 
 This section contains tips and considerations for smart contract security if you are developing Actors on Convex. They are not absolute rules nor do they guarantee complete security, however our aim is to make developers aware of common security risks and pitfalls and how to addess them.
@@ -185,41 +216,40 @@ Pre-compiling transaction code is likely to result in a worthwhile cost saving, 
 
 You can also reduce execution costs by statically linking to referred accounts like `#1234/foo` rather than performing dynamic lookups. This is a good strategy as you if you are sure that you are referring to a fixed target address.
 
-## Design principles
+## Convex Core Technology Implementation
 
 ### Immutable first
 
-Everything is an immutable data structure, with the exception of necessary
-mutable values for either:
-1. Locally managed state
-2. Lazy computation / caching
+Everything is an immutable data structure. 
 
-### Trust the JVM
+Convex can be considered as a pure, functional system where pure functions produce new pure immutable data structures - most importantly the updated global state. 
 
-We unashamedly exploit the JVM as an excellent runtime platform for decentralised systems. 
-It's very good at what it does, in particular the following attributes are very useful:
+Internally, there are some mutable values used for either locally managed state, lazy computation or efficient caching. These however are not visible to CVM code, and should be considered purely as internal optimisations.
 
-- Efficient GC of short-lived objects. Much cheaper than C++ heap allocations, in fact.
-- Fast JIT compiler. Close enough to C++ that we don't care.
-- Rich runtime library. We don't need many external dependencies, which add complexity
-and present security risks.
+### Exploit the JVM
+
+We unashamedly exploit the benefits of JVM as an excellent runtime platform for decentralised systems. It's very good at what it does, in particular the following attributes are very useful:
+
+- Efficient GC of short-lived objects. Often much cheaper than C++ heap allocations.
+- Fast JIT compiler. For well written code, performance is close enough to C++ that it is never a significant concern.
+- Rich runtime library. We don't need many external dependencies, which add complexity to the core implementation and present security risks.
 - Memory safety. No buffer overflows to worry about.
 - Portability. This makes it easy to deploy pretty much anywhere.
 
 The use of a memory-managed runtime is of particular importance to this project.
-We absolutely require top class garbage collection to clear unnecessary data from memory
-while also ensuring that we can exploit structural sharing of persistent data structures.
+We absolutely require top class garbage collection to clear unnecessary data from memory while also ensuring that we can exploit structural sharing of persistent immutable data structures. Without garbage collection, such structural sharing can become complex and expensive.
+
 We also need the exploit soft references for lazy loading of data structures
 that can be evicted when no longer required. Alternative means of managing this 
 (reference counting etc.) were judged infeasible for performance and complexity reasons.
 
-### Canonical format
+### Canonical Encoding format
 
-Our data representations make use of a single, canonical data format. Advantages:
+Our data representations make use of a single, canonical data encoding format. Advantages:
 
 - Sorting order guaranteed and stable
 - Better caching / de-duplication with hashes
-- Identity comparison == hash
+- Identity comparison == hash equality
 
 ### Defensive coding
 
@@ -228,8 +258,7 @@ especially if there is any chance that it may have come from an external system.
 
 ### Fail Fast
 
-Stop the current operation as soon as any unexpected error occurs. Throw an exception so
-that a higher level operation can determine what step to take.
+Stop the current operation as soon as any unexpected error occurs. Throw an exception so that a higher level operation can determine what step to take.
 
 ### Common sense
 
