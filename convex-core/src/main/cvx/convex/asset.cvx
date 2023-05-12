@@ -195,7 +195,8 @@
     (recur path *address*))
 
   ([path owner]
-    (call path (balance owner))))
+    (query ;; external call, so uery to avoid re-entrant secuity risks
+      (call path (balance owner)))))
 
 (defn burn 
 
@@ -247,7 +248,7 @@
       true)
 
   ([owner path quantity]
-    (query
+    (query ;; query because this is an external call
       (let [bal (balance path owner)]
           (call path
             (quantity-subset? quantity bal))))))
