@@ -107,6 +107,84 @@ In light of this risk, the following are very important:
 - If you must execute code from a potentially untrusted source, but don't expect this code to have any side effects, then consider wrapping untrusted code execution in `query`. This will discard any state changes and only provides the function result, which is generally safe.
 - If you do any form of dynamic code execution with `eval` or higher order function parameters, you should consider executing such code in an isolated account (not controlling any economic assets) to limit the potential downside risks. 
 
+## Efficiency
+
+Convex provides a powerful substrate for global, decentralised economic systems. If your code is going to be used by a large user base, efficiency becomes increasingly important. Here are some considerations for efficient code:
+
+### Minimise on-chain work
+
+No matter how efficient we make Convex, off-chain computation and storage will always be cheaper.
+
+As a general design rule, your application and smart contracts should minimise on-chain code and data to what is strictly necessary.
+
+Good candidates for being on-chain:
+- Economic transactions
+- Ownership and control of digital assets
+- Data relating to trust and authorisation
+- Hashes allowing authentication / provenance of off-chain data 
+- Metadata intended for public consumption
+
+Bad candidates for being on-chain:
+- Large files or content blobs (should be in off-chain storage or data lattice)
+- User interface data (should be managed in front-end)
+- Textual information for human consumption (possible privacy risks and/or should be handled in front-end e.g. for internationalisation)
+- Secondary data structures used for analytics, e.g. indexes
+- Logs of historical data
+
+### Minimise separate transaction steps
+
+In general, it is much cheaper to do multiple things in a single transaction rather than split things into multiple transactions.
+
+If it is possible, in the context of some application, to perform multiple steps at once then a facility such as a library function can be provided to enable this.
+
+Alternatively, multi-transactions can be used to combine multiple transactions into one, which also benefits from lower overall cost.  
+
+### Use efficient data types
+
+Memory usage of transactions and smart contracts can be minimised by use of appropriate data types.
+
+Some tips:
+- `nil`, `true`, `false` and the integer `0` require only 1 byte - where possible use these
+- A `Set` is more memory efficient than a `Map` if you only need keys and don't care about values
+- Use Integer IDs allocated via an monotonically incrementing counter where possible. This is memory efficient and guarantees avoidance of collisions.
+- Don't store arbitrary user-provided data
+
+### Avoid `O(n)` operations
+
+Most Convex operations are very cheap, typically `O(log n)` or `O(1)` cost. This can scale well to large data sets. However `O(n)` operations like scanning every element of a vector increasingly become very expensive as data volumes increase.
+
+At some point, juice costs of `O(n)` operations may become high enough that these operations on the given data structure cannot even be executed!
+
+Most actor code should **never** perform `O(n)` operations. If you have any of these, consider alternatives such as:
+- Replace with `O(1)` operations, which is usually possible
+- Moving `O(n)` work off chain, where analysing large data structures can be done cheaply via multiple methods
+- Breaking the work up into smaller steps
+- Enforcing strict limits on `n` (e.g. a maximum of 10 items in a list)
+
+### Cleanup irrelevant data
+
+In many cases, data can be deleted if no longer relevant. Look out for cases where you can simple delete data when it is updated in a transaction.
+
+For example, if you have a `Map` containing account balances then it might make sense to remove a map entry entirely rather than setting the balance to `0` for a specific key (presumably lack of an entry would be interpreted as a zero balance in any case).
+
+This also creates a positive economic incentive for users to perform transactions that trigger this cleanup (e.g. getting rid of small balances) since they will benefit from the memory refund.
+
+### 3rd Party Cleanup
+
+In some cases, cleanup operations may be expensive to compute directly, e.g. identifying records in a large data structure that are expired because of old timestamps could require `O(n)` computation. However the cleanup itself may be cheap to perform, e.g. `O(1)` cost to remove an expired entry.
+
+A simple solution to this problem is to allow any 3rd party to compute the cleanups off-chain, and execute a special cleanup `:callable?` function to dispose of the redundant data. 
+
+Economically, the 3rd party benefits from getting the memory refund from disposed data, which is likely to be more valuable than the execution cost of the cleanup. (especially if multiple cleanups can be executed in a single transactions).
+
+### Pre-compile code
+
+While Convex provides an on-chain compiler that can compile and evaluate code provided in transaction, there is no point paying for compilation if you don't need to!
+
+Pre-compiling transaction code is likely to result in a worthwhile cost saving, especially if you execute many similar transactions. This is especially true if your transaction code includes macros, that may expand to much larger bodies of code with significant compilation costs.
+
+You can also reduce execution costs by statically linking to referred accounts like `#1234/foo` rather than performing dynamic lookups. This is a good strategy as you if you are sure that you are referring to a fixed target address.
+
 ## Design principles
 
 ### Immutable first
@@ -161,7 +239,7 @@ Any of the above principles can be overridden by reason, evidence and common sen
 ― Thomas Edison
 
 
-## Some Inspirations
+### Some Inspirations
 
 - *Haskell* - for its functional purity, and attribute which is extremely valuable for
 decentralised systems.
