@@ -150,8 +150,8 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	}
 	
 	@Override
-	public RefSoft<T> toSoft() {
-		return this;
+	public RefSoft<T> toSoft(AStore store) {
+		return withStore(store);
 	}
 
 	@Override
@@ -177,7 +177,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		return this;
 	}
 	
-	public Ref<T> withStore(AStore store) {
+	public RefSoft<T> withStore(AStore store) {
 		if (this.store==store) return this;
 		return new RefSoft<T>(store,softRef,hash,flags);
 	}

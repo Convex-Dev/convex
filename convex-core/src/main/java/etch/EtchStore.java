@@ -12,7 +12,6 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
-import convex.core.data.RefSoft;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
 
@@ -196,9 +195,6 @@ public class EtchStore extends AStore {
 
 			// perhaps need to update Ref
 			if (cell != newObject) {
-				if (ref instanceof RefSoft) {
-					ref=((RefSoft<T>)ref).withStore(this); 
-				}
 				
 				ref = ref.withValue((T) newObject);
 				cell=newObject;
@@ -207,6 +203,7 @@ public class EtchStore extends AStore {
 		}
 
 		if (topLevel || !embedded) {
+			
 			// Do actual write to store
 			final Hash fHash = (hash != null) ? hash : ref.getHash();
 			if (log.isTraceEnabled()) {
@@ -220,6 +217,12 @@ public class EtchStore extends AStore {
 				ref = ref.withMinimumStatus(requiredStatus);
 				cell.attachRef(ref); // make sure we are using current ref within cell
 				result = etch.write(fHash, (Ref<ACell>) ref);
+				
+				if (!embedded) {
+					// Ensure we have soft Refpointing to this store
+					result=result.toSoft(this);
+				}
+
 				cell.attachRef(result);
 				blobCache.putCell(result); // cache for subsequent writes
 			} catch (IOException e) {

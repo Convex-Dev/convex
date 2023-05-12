@@ -173,8 +173,10 @@ public class RefTest {
 		ABlob bigBlob=Blobs.createRandom(17*Blob.CHUNK_LENGTH); // 16 full chunks plus one extra (3 levels)
 		RefTreeStats rs=Refs.getRefTreeStats(bigBlob.getRef());
 		assertEquals(19,rs.total);
+		assertEquals(19,rs.direct);
 		assertEquals(0,rs.persisted);
 		assertEquals(1,rs.embedded); // top level only is embedded with 2 children
+		
 		Ref<ABlob> rb=ACell.createPersisted(bigBlob);
 		
 		// TODO: Check Soft Refs
@@ -182,6 +184,7 @@ public class RefTest {
 		RefTreeStats rs2=Refs.getRefTreeStats(rb);
 		assertEquals(19,rs2.total);
 		assertEquals(19,rs2.persisted);
+		assertEquals(1,rs2.direct);
 		assertEquals(1,rs2.embedded);
 	}
 	

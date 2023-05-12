@@ -513,10 +513,11 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Converts this Ref to a RefSoft. Does not perform any persistence: doing this
 	 * may make MissingDataExceptions happen.
+	 * @param store store to set
 	 * 
 	 * @return Direct Ref
 	 */
-	public abstract RefSoft<T> toSoft();
+	public abstract RefSoft<T> toSoft(AStore store);
 
 	/**
 	 * Persists a Ref shallowly in the current store.
