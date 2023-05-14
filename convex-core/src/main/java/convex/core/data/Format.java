@@ -529,7 +529,9 @@ public class Format {
 
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
-		} catch (Exception e) {
+		} catch (BadFormatException e) {
+			throw e;
+		}catch (Exception e) {
 			throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
 		}
 
@@ -541,7 +543,7 @@ public class Format {
 	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
 		// TODO Auto-generated method stub
 		if (tag<0x19) return CVMLong.read(tag,blob,offset);
-		if (tag == 0x19) return CVMBigInteger.read(tag,blob,offset);
+		if (tag == 0x19) return CVMBigInteger.read(blob,offset);
 		// Double is special, we enforce a canonical NaN
 		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
 		

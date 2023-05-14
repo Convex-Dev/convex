@@ -157,9 +157,15 @@ public class BigIntegerTest {
 		ObjectsTest.doAnyValueTests(bi);
 	}
 	
-	@Test public void testBadEncoding() {
-		assertThrows(BadFormatException.class,()->Format.read("0a0113"));
-		assertThrows(BadFormatException.class,()->Format.read("0a09ffffff"));
+	@Test public void testBadEncoding() throws BadFormatException {
+		assertThrows(BadFormatException.class,()->Format.read("19")); // no data
+		assertThrows(BadFormatException.class,()->Format.read("190113")); // non-caonoical length
+		assertThrows(BadFormatException.class,()->Format.read("1909ffffff")); // short length
+		assertThrows(BadFormatException.class,()->Format.read("1909ffffffffffffffffff")); // excess leading ff
+		assertThrows(BadFormatException.class,()->Format.read("1909000000000000000000")); // excess leading 00
+		assertThrows(BadFormatException.class,()->Format.read("190988888888888888888888")); // excess bytes
+		Format.read("1909888888888888888888"); // OK with 9 valid bytes exactly 
+		
 	}
 	
 	@Test public void testCompares() {

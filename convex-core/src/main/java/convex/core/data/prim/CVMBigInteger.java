@@ -235,8 +235,10 @@ public final class CVMBigInteger extends AInteger {
 		return CVMLong.create(v);
 	}
 	
-	public static CVMBigInteger read(byte tag, Blob blob, int offset) throws BadFormatException {
+	public static CVMBigInteger read(Blob blob, int offset) throws BadFormatException {
+		// Read "as if" this was a Blob, although we ignore the tag
 		ABlob b=Blobs.read(blob, offset);
+		
 		if (b==null) throw new BadFormatException("Bad big integer format in read from blob");
 		if (b.count()<=LONG_BYTELENGTH) {
 			throw new BadFormatException("Non-canonical big integer length");
