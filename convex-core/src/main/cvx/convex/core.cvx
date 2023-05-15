@@ -525,68 +525,52 @@
         (vec ~sequence)))
 
 (defn identity
-
-  ^{:doc {:description "An identity function which returns a single argument unchanged. Most useful when you want a \"do nothing\" operation in higher order functions."
+  ^{:doc {:description "An identity function which returns a single argument unchanged."
           :examples    [{:code "(identity :foo)"}
                         {:code "(map identity [1 2 3])"}]
           :signature   [{:params [x]}]}}
-
   [x]
-
   x)
 
-
-
 (defmacro import
-
   ^{:doc {:description ["Imports a library for use in the current environment."
                         "Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."
                         "Returns the address of the imported account."]
           :examples    [{:code "(import some.library :as alias)"}]
           :signature   [{:params [& args]}]}}
-
   ([addr]
     (if (symbol? addr)
       `(import ~addr :as ~addr)
       (fail "import: alias must be a symbol")))
-  
   ([addr as sym]
-
-  (let [code (cond (symbol? addr)
-               `(or (call* *registry*
-                           0
-                           'cns-resolve
-                           (quote ~addr))
+    (let [code (cond (symbol? addr)
+                 `(or (call* *registry*
+                        0
+                        'cns-resolve
+                        (quote ~addr))
                     (fail :NOBODY
-                          (str "Could not resolve library name for import: "
-                               (quote ~addr))))
-               `(address ~addr))
-        sym  (cond (symbol? sym)
-               sym
-               (fail "import: alias must be a symbol"))]
-    (assert (= :as
-               as))
-    `(def ~sym
-          ~code))))
-
-
+                      (str "Could not resolve library name for import: "
+                        (quote ~addr))))
+                 `(address ~addr))
+          sym  (cond (symbol? sym)
+                 sym
+                 (fail "import: alias must be a symbol"))]
+      (assert (= :as
+                as))
+      `(def ~sym
+         ~code))))
 
 (defn mapcat
-
   ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results. Nil is treated as an empty collection. See `map`."
           :examples    [{:code "(mapcat vector [:foo :bar :baz] [1 2 3])"}]
           :signature   [{:params [test & body]}]}}
-
   [f coll & more]
-
   (apply concat
          (empty coll)
          (apply map
                 f
                 coll
                 more)))
-
-
 
 (defn mapv
   ^{:doc {:description "Like `map` but systematically returns the result as a vector."
@@ -622,16 +606,11 @@
       (cons 'tailcall*
             callspec))))
 
-
-
 (defmacro undef
-
   ^{:doc {:description "Opposite of `def`. Undefines a symbol, removing the mapping from the current environment if it exists."
           :examples    [{:code "(do (def foo 1) (undef foo))"}]
           :signature   [{:params [sym]}]}}
-
   [sym]
-
   `(undef* ~(list 'quote
                   sym)))
 
@@ -639,7 +618,6 @@
    ^{:doc {:description "Executes a code body repeatedy while a condition is true. At the first iteration, `sym` is locally bound to the `init` value. For each subsequent iteration, sym is bound to the result of `change`. The result it the result of the last execution of `body`, or `nil` if no iterations were made."
           :examples    [{:code "(for-loop [i 0 (< i 10) (inc i)] i)"}]
           :signature   [{:params [[sym init condition change] & body]}]}}
-  
   [[sym init condition change] & body]
  `(loop [~sym ~init value# nil]
     (if ~condition
