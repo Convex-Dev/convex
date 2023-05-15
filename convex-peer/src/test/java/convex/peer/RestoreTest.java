@@ -69,6 +69,7 @@ public class RestoreTest {
 
 		Result tx1=cvx1.transactSync(Invoke.create(HERO,1, Symbols.STAR_ADDRESS));
 		assertEquals(HERO,tx1.getValue());
+		
 		Long balance1=cvx1.getBalance(HERO);
 		assertTrue(balance1>0);
 		s1.close();

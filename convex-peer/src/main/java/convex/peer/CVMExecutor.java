@@ -34,7 +34,11 @@ public class CVMExecutor extends AThreadedComponent {
 		Peer updatedPeer=peer.updateState();
 		if (updatedPeer!=peer) {
 			peer=updatedPeer;
-			server.persistPeerData();
+			try {
+				peer = server.persistPeerData();
+			} catch (Exception e) {
+				log.warn("Unable to persist Peer data: ",e);
+			}
 		}
 		
 		server.transactionHandler.maybeReportTransactions(peer);

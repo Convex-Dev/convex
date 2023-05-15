@@ -157,7 +157,6 @@ public class Server implements Closeable {
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		this.config = config;
 
-		rootKey = RT.cvm(config.get(Keywords.ROOT_KEY));
 
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
@@ -171,11 +170,13 @@ public class Server implements Closeable {
 			// Establish Peer state and ensure it is persisted
 			Peer peer = establishPeer();
 			executor.setPeer(peer);
-			persistPeerData();
+			
+			// Set up root key for Peer persistence. Default is Peer Account Key
+			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+			if (rk==null) rk=peer.getPeerKey();
+			rootKey=rk;
 			
 			establishController();
-
-
 		} finally {
 			Stores.setCurrent(savedStore);
 		}
@@ -253,8 +254,10 @@ public class Server implements Closeable {
 			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 				// Restore from storage case
 				try {
+					ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+					if (rk==null) rk=keyPair.getAccountKey();
 
-					Peer peer = Peer.restorePeer(store, keyPair, rootKey);
+					Peer peer = Peer.restorePeer(store, keyPair, rk);
 					if (peer != null) {
 						log.info("Restored Peer with root data hash: {}",store.getRootHash());
 						return peer;
@@ -659,27 +662,23 @@ public class Server implements Closeable {
 	 * Note: Does not flush buffers to disk. 
 	 *
 	 * This will overwrite any previously persisted peer data.
-	 * @return True if successfully persisted, false in case of any error
+	 * @return Updater Peer value with persisted data
+	 * @throws IOException In case of any IO Error
 	 */
-	public boolean persistPeerData() {
+	public Peer persistPeerData() throws IOException {
 		AStore tempStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			ACell peerData = getPeer().toData();
+			AMap<Keyword,ACell> peerData = getPeer().toData();
 
-			if (rootKey != null) {
-				Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
-				AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
-				peerData = currentRootData.assoc(rootKey, peerData);
-			}
+			Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
+			AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
+			AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
 
-			store.setRootData(peerData);
+			store.setRootData(newRootData);
 			log.debug( "Stored peer data for Server with hash: {}", peerData.getHash().toHexString());
-			return true;
-		} catch (Throwable e) {
-			log.warn("Failed to persist peer state: {}" ,e.getMessage());
-			return false;
-		} finally {
+			return Peer.fromData(getKeyPair(), peerData);
+		}  finally {
 			Stores.setCurrent(tempStore);
 		}
 	}
@@ -699,9 +698,12 @@ public class Server implements Closeable {
 		Peer peer=getPeer();
 		// persist peer state if necessary
 		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
-			persistPeerData();
+			try {
+				persistPeerData();
+			} catch (IOException e) {
+				log.warn("Unable to persist PEer data: ",e);
+			}
 		}
-
 
 		manager.close();
 		nio.close();
