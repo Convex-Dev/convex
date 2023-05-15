@@ -2781,9 +2781,8 @@ public class Core {
 
 			METADATA = coreMeta;
 			ENVIRONMENT = coreEnv;
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error("Error initialising core!",e);
+		} catch (IOException e) {
+			throw new RuntimeException("IO Error initialising core!",e);
 		}
 	}
 }

@@ -157,16 +157,11 @@ public class Samples {
 	public static final Blob SMALL_BLOB = Blob.fromHex("cafebabe");
 	
 	static {
-		try {
-			// we should be able to actually build these, thanks to structural sharing.
-			DIABOLICAL_VECTOR_30_30 = createNastyNestedVector(30, 30);
-			DIABOLICAL_VECTOR_2_10000 = createNastyNestedVector(2, 10000);
-			DIABOLICAL_MAP_30_30 = createNastyNestedMap(30, 30);
-			DIABOLICAL_MAP_2_10000 = createNastyNestedMap(2, 10000);
-		} catch (Throwable t) {
-			t.printStackTrace();
-			throw t;
-		}
+		// we should be able to actually build these, thanks to structural sharing.
+		DIABOLICAL_VECTOR_30_30 = createNastyNestedVector(30, 30);
+		DIABOLICAL_VECTOR_2_10000 = createNastyNestedVector(2, 10000);
+		DIABOLICAL_MAP_30_30 = createNastyNestedMap(30, 30);
+		DIABOLICAL_MAP_2_10000 = createNastyNestedMap(2, 10000);
 	}
 	
 	/**

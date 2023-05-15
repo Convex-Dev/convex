@@ -585,7 +585,6 @@ public class Etch {
 			log.debug("Etch closed on file: "+ getFileName() +" with data length: "+dataLength);
 		} catch (IOException e) {
 			log.error("Error closing Etch file: "+file);
-			e.printStackTrace();
 		}
 	}
 

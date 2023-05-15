@@ -230,11 +230,10 @@ public class Init {
 				throw new Error("Bad total funds in init state amount: " + finalTotal);
 
 			return s;
-
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw Utils.sneakyThrow(e);
+		} catch (Exception e) {
+			throw new RuntimeException("Unable to initialise core",e);
 		}
+
 	}
 
 	public static Address calcPeerAddress(int userCount, int index) {

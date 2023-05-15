@@ -392,23 +392,18 @@ public class State extends ARecord {
 			Address origin = (Address) st.get(0);
 			AOp<?> op = (AOp<?>) st.get(1);
 			Context ctx;
-			try {
-				// TODO juice refund?
-				ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
-				ctx = ctx.run(op);
-				if (ctx.isExceptional()) {
-					// TODO: what to do here? probably ignore
-					// we maybe need to think about reporting scheduled results?
-					log.trace("Scheduled transaction error: {}", ctx.getExceptional());
-				} else {
-					state = ctx.getState();
-					log.trace("Scheduled transaction succeeded");
-				}
-			} catch (Exception e) {
-				log.trace("Scheduled transaction failed: {}",e);
-				e.printStackTrace();
+			
+			// TODO juice limit? juice refund?
+			ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
+			ctx = ctx.run(op);
+			if (ctx.isExceptional()) {
+				// TODO: what to do here? probably ignore
+				// we maybe need to think about reporting scheduled results?
+				log.trace("Scheduled transaction error: {}", ctx.getExceptional());
+			} else {
+				state = ctx.getState();
+				log.trace("Scheduled transaction succeeded");
 			}
-
 		}
 
 		return state;

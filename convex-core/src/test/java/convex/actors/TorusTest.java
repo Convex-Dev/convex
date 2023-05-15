@@ -51,7 +51,6 @@ public class TorusTest extends ACVMTest {
 			
 			return ctx;
 		} catch (Throwable e) {
-			e.printStackTrace();
 			throw Utils.sneakyThrow(e);
 		}		
 	}

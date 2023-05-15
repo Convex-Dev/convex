@@ -39,29 +39,22 @@ public class TestState {
 
 
 	static {
+		State s = InitTest.STATE;
+		Context ctx = Context.createFake(s, InitTest.HERO);
+		for (int i = 0; i < NUM_CONTRACTS; i++) {
+			// Construct code for each contract
+			ACell contractCode = Reader.read(
+					"(do " + "(def my-data nil)" + "(defn write ^{:callable? true} [x] (def my-data x)) "
+							+ "(defn read ^{:callable? true} [] my-data)" + "(defn who-called-me ^{:callable? true} [] *caller*)"
+							+ "(defn my-address ^{:callable? true} [] *address*)" + "(defn my-number ^{:callable? true} [] "+i+")" + "(defn foo ^{:callable? true} [] :bar))");
 
-		try {
-
-			State s = InitTest.STATE;
-			Context ctx = Context.createFake(s, InitTest.HERO);
-			for (int i = 0; i < NUM_CONTRACTS; i++) {
-				// Construct code for each contract
-				ACell contractCode = Reader.read(
-						"(do " + "(def my-data nil)" + "(defn write ^{:callable? true} [x] (def my-data x)) "
-								+ "(defn read ^{:callable? true} [] my-data)" + "(defn who-called-me ^{:callable? true} [] *caller*)"
-								+ "(defn my-address ^{:callable? true} [] *address*)" + "(defn my-number ^{:callable? true} [] "+i+")" + "(defn foo ^{:callable? true} [] :bar))");
-
-				ctx = ctx.deployActor(contractCode);
-				CONTRACTS[i] = (Address) ctx.getResult();
-			}
-
-			s= ctx.getState();
-			STATE = s;
-			CONTEXT = Context.createFake(STATE, InitTest.HERO);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			throw new Error(e);
+			ctx = ctx.deployActor(contractCode);
+			CONTRACTS[i] = (Address) ctx.getResult();
 		}
+
+		s= ctx.getState();
+		STATE = s;
+		CONTEXT = Context.createFake(STATE, InitTest.HERO);
 	}
 
 	/**
@@ -121,7 +114,7 @@ public class TestState {
 			ACell contractCode=Reader.read(source);
 			ctx=ctx.deployActor(contractCode);
 		} catch (IOException e) {
-			e.printStackTrace();
+			throw new RuntimeException("IO Error setting up testing state",e);
 		}
 		return ctx;
 	}
