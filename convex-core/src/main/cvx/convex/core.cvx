@@ -10,39 +10,27 @@
 
 ;;;;;;;;;; Values
 
-
 (def *lang*
-
   ^{:doc {:description ["Advanced feature. Language front-end function."
                         "If set to a function via `def`, will be called with the code for each transaction instead of delegating to normal `eval` behavior."
                         "Pre-compiled operations (see `compile`) bypass this language setting."]
           :examples    [{:code "(def *lang* (fn [trx] (str trx)))"}]}}
-
   nil)
 
-
-
 (def *registry*
-
   ^{:doc {:description "Address of the Convex registry actor."
           :examples    [{:code "(call *registry* (register {:name \"My name\"}))"}]}}
-
   (address 9))
-
 
 ;;;;;;;;;; Expanders, creating macros and defining functions
 
-
 ;; TODO. Review expanders and `macro`, API is not clear. + macros cannot be used within the transaction where they are created
 
-
 (def defexpander
-
   ^{:doc       {:description "Advanced feature. Defines an expander in the current environment."
                 :examples    [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
                 :signature   [{:params [a]}]}
     :expander? true}
-
   (fn [x e]
     (let [[_
            name
@@ -55,19 +43,13 @@
       (e form
          e))))
 
-
-
 (def defmacro
-
   ^{:doc       {:description ["Like `defn` but defines a macro instead of a regular function."
                               "A macro is a special function that is executed at expansion, before compilation, and produces valid Convex Lisp code for subsequent execution."]
                 :signature   [{:params [name params & body]}]}
     :expander? true}
-
   (fn [x e]
-    (let [[_
-           name
-           & decl] x
+    (let [[_ name & decl] x
           mac      (cons 'fn
                          decl)
           mmeta    (meta (first decl))
@@ -82,17 +64,12 @@
       (e form
          e))))
 
-
-
 (defmacro defn
-
   ^{:doc {:description "Defines a function in the current environment."
           :examples    [{:code "(defn my-square [x] (* x x))"}]
           :signature   [{:params [name params & body]}
                         {:params [name & fn-decls]}]}}
-
   [name & decl]
-
   (let [fnform (cons 'fn
                      decl)
         _      (cond
@@ -100,16 +77,9 @@
                  (fail :ARITY
                        "`defn` requires at lest one function definition"))
         fst    (first decl)
-        name   (cond
-                 (syntax fst)
-                 (syntax name
-                         (meta fst))
-
-                 name)]
+        name   (syntax name (meta fst))]
     `(def ~name
           ~fnform)))
-
-
 
 (defmacro macro
   ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
@@ -141,9 +111,7 @@
      syms)
   nil)
 
-
-;;;;;;;;;; Logic
-
+;;;;;;;;;; Logic Operations
 
 (defmacro and
 
@@ -152,9 +120,7 @@
                         "Returns true with no expressions present."]
           :examples    [{:code "(and (< 1 2) :last)"}]
           :signature   [{:params [& exprs]}]}}
-
   [& exprs]
-
   (let [n (count exprs)]
     (cond
       (== n 0) true
@@ -165,18 +131,13 @@
                            (next exprs))
                     v#)))))
 
-
-
 (defmacro or
-
   ^{:doc {:description ["Executes expressions in sequence, returning the first truthy value, or the last value if all were falsey (false or nil)."
                         "Does not evaluate later expressions, so can be used to short circuit execution."
                         "Returns nil with no expressions present."]
           :examples    [{:code "(or nil 1)"}]
           :signature   [{:params [& exprs]}]}}
-
   [& exprs]
-
   (let [n (count exprs)]
     (cond
       (== n 0) nil
@@ -188,123 +149,82 @@
                     ~(cons 'or
                            (next exprs)))))))
 
-
 ;;;;;;;;;; `cond` variants
 
-
 (defmacro if
-
   ^{:doc {:description ["If `test` expression evaluates to a truthy value (anything but false or nil), executes `expr-true`. Otherwise, executes `expr-false`."
                         "For a more general conditional expression that can handle multiple branches, see `cond.` Also see `when`."]
           :examples     [{:code "(if (< 1 2) :yes :no)"}]
           :signature    [{:params [test expr-true]}
                          {:params [test expr-true expr-false]}]}}
-
   [test & cases]
-
-  (cond (<= 1
-            (count cases)
-            2)
-   nil
-   (fail :ARITY
-         "`if` requires 2 or 3 arguments"))
+  (cond (<= 1 (count cases) 2)
+    nil
+    (fail :ARITY "`if` requires 2 or 3 arguments"))
   (cons 'cond
-        test
-        cases))
-
-
+    test
+    cases))
 
 (defmacro if-let
-
   ^{:doc {:description "Similar to `if`, but the test expression in bound to a symbol so that it can be accessed in the `expr-true` branch."
           :examples    [{:code "(if-let [addr (some-function)] (transfer addr 1000) (fail \"Address missing\"))"}]
           :signature   [{:params [[sym exp] expr-true expr-false]}]}}
-
   [[sym exp] & branches]
-
   `(let [~sym ~exp]
-     ~(cons 'if
-            sym
-            branches)))
-
-
+     ~(cons 'if sym branches)))
 
 (defmacro when
-
   ^{:doc {:description "Executes body expressions in an implicit `do` block if and only if the `test` expression evaluates to a truthy value (anything but false or nil)."
           :examples    [{:code "(when (some-condition) (def foo 42) (+ 2 2))"}]
           :signature   [{:params [test & body]}]}}
-
   [test & body]
-
   `(cond
      ~test
-     ~(cons 'do
-            body)
+     ~(cons 'do body)
      nil))
 
-
-
 (defmacro when-let
-
   ^{:doc {:description ["Evaluates a binding expression. If truthy, executes the body with the symbol bound to the result."
                         "Returns nil otherwise."]
           :examples    [{:code "(when-let [addr (some-function)] (transfer addr 1000))"}]
           :signature   [{:params [[sym exp] & body]}]}}
-
   [[sym exp] & body]
-
   (let [dobody (cons 'let [sym 'test#]
                      body)]
     `(let [test# ~exp]
        (cond test#
          ~dobody))))
 
-
-
 (defmacro when-not
-
    ^{:doc {:description "Like `when` but the opposite: body is executed only if the result is false or nil."
            :examples    [{:code "(when-not (some-condition) :okay)"}]
            :signature   [{:params [test & body]}]}}
-
   [test & body]
-
   `(cond
      ~test
      nil
      ~(cons 'do
             body)))
 
-
 ;;;;;;;;;; Rest of the API
 
-
 (defn account?
-
   ^{:doc {:description "Returns true if the given address refers to an existing actor or user account, false otherwise."
           :examples    [{:code "(account? *caller*)"}]
           :signature   [{:params [address]
                          :return Boolean}]}}
-
   [addr]
-
   (cond
     (address? addr)
     (boolean (account addr))
     false))
 
-
-
 (defn actor?
-
   ^{:doc {:description "Returns true if the given address refers to an actor."
           :examples    [{:code "(actor? #1345)"}]
           :signature   [{:params [addr]
                          :return Boolean}]}}
-
   [addr]
-
   (cond
     (address? addr)
     (let [act (account addr)]
@@ -313,17 +233,12 @@
         false))
     false))
 
-
-
 (defmacro assert
-
   ^{:doc {:description "Evaluates each test (a form), and raises an `:ASSERT` error if any are not truthy."
           :errors      {:ASSERT "If a `test` form evaluates to false or nil."}
           :examples    [{:code "(assert (= owner *caller*))"}]
           :signature   [{:params [& tests]}]}}
-
   [& tests]
-
   (cons 'do
         (map (fn [test]
                `(cond
