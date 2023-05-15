@@ -12,9 +12,7 @@ jobs:
         java-version:
           - 17
         os:
-          - macos-12
           - ubuntu-latest
-          - windows-latest
 
     runs-on: ${{ matrix.os }}
 
