@@ -112,13 +112,10 @@
 
 
 (defmacro macro
-
   ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
           :examples    [{:code "(macro [x] (if x :foo :bar))"}]
           :signature   [{:params [params & body]}]}}
-
   [& decl]
-
   (let [mac  (cons 'fn
                    decl)
         form `(let [m# ~mac]
@@ -141,7 +138,8 @@
        (cond (symbol? sym)
        (eval `(def ~sym (cond (defined? 'sym) sym nil)))
        (fail :CAST "declare requires symbols only as arguments"))) 
-     syms))
+     syms)
+  nil)
 
 
 ;;;;;;;;;; Logic
@@ -377,45 +375,28 @@
                          (first more)
                          fnlist)))))
 
-
-
 (defn comp
-
    ^{:doc {:description ["Returns a function that is the composition of the given functions."
                          "Functions are executed left to right, The righmost function may take a variable number of arguments."
                          "The result of each function is passed to the next one."]
            :examples    [{:code "((comp inc inc) 1)"}]
            :signature   [{:params [f & more]
                           :return Function}]}}
-
-
-  ([f]
-
-   f)
-
-
+  ([f] 
+    f)
   ([f g]
-
-   (fn [& args]
-     (f (apply g
-               args))))
-
-
+    (fn [& args]
+      (f (apply g
+           args))))
   ([f g h]
-
-   (fn [& args]
-     (f (g (apply h
-                  args)))))
-
-
+    (fn [& args]
+      (f (g (apply h
+              args)))))
   ([f g h & more]
-
-   (apply comp
-          (fn [x]
-            (f (g (h x))))
-          more)))
-
-
+    (apply comp
+      (fn [x]
+        (f (g (h x))))
+      more)))
 
 (defn create-account
 
