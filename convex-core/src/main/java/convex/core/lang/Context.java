@@ -547,7 +547,7 @@ public class Context extends AObject {
 	 */
 	public AHashMap<ACell,ACell> lookupMeta(Symbol sym) {
 		AHashMap<Symbol, ACell> env=getEnvironment();
-		if (env.containsKey(sym)) {
+		if ((env!=null)&&env.containsKey(sym)) {
 			return getMetadata().get(sym,Maps.empty());
 		}
 		AccountStatus as = getAliasedAccount(env);
