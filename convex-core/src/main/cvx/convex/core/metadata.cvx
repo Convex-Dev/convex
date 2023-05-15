@@ -435,10 +435,10 @@
   :special? true}
 
  deploy
- {:doc {:description "Deploys an actor. The code provided will be executed to initialise the actor's account. Returns the Address of the deployed actor."
+ {:doc {:description "Deploys an actor. The code provided will be executed to initialise the actor's account. More than one code form may be provided, in which case they will be compiled and evaluated separately. Returns the Address of the deployed actor."
         :errors      {:COMPILE "If a compiler error occurred deploying the given code."}
         :examples    [{:code "(deploy '(defn my-fn [x y] (+ x y)))"}]
-        :signature   [{:params [code]
+        :signature   [{:params [code & more-code]
                        :return Address}]}}
 
  difference
