@@ -44,6 +44,7 @@ import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
 import convex.core.lang.reader.antlr.ConvexParser.DoubleValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.FormContext;
 import convex.core.lang.reader.antlr.ConvexParser.FormsContext;
+import convex.core.lang.reader.antlr.ConvexParser.ImplicitSymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.KeywordContext;
 import convex.core.lang.reader.antlr.ConvexParser.ListContext;
 import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
@@ -288,6 +289,19 @@ public class AntlrReader {
 			if (sym==null) throw new ParseException("Bad keyword format: "+s);
 			push( sym);
 		}
+		
+		@Override
+		public void enterImplicitSymbol(ImplicitSymbolContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitImplicitSymbol(ImplicitSymbolContext ctx) {
+			String s=ctx.getText();
+			Symbol sym=Symbol.create(s);
+			if (sym==null) throw new ParseException("Bad implicit symbol: "+s);
+			push( sym);
+		}
 
 		@Override
 		public void enterAddress(AddressContext ctx) {
@@ -367,7 +381,6 @@ public class AntlrReader {
 
 		@Override
 		public void exitSpecialLiteral(SpecialLiteralContext ctx) {
-			pop(); // pop the symbol
 			String s=ctx.getText();
 			ACell special=ReaderUtils.specialLiteral(s);
 			if (special==null) throw new ParseException("Invalid special literal: "+s);
@@ -401,7 +414,7 @@ public class AntlrReader {
 			}
 			
 			ACell lookup=(ss[0].startsWith("#"))?Address.parse(ss[0]):Symbol.create(ss[0]);;
-			if (lookup==null) throw new ParseException("Path must start with Addres or Symbol");
+			if (lookup==null) throw new ParseException("Path must start with Address or Symbol");
 			
 			for (int i=1; i<n; i++) {
 				String s=ss[i];
@@ -426,6 +439,8 @@ public class AntlrReader {
 		public void exitSingleForm(SingleFormContext ctx) {
 			// Nothing
 		}
+
+
 
 
 	}

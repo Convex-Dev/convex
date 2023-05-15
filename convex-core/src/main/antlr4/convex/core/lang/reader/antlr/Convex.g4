@@ -4,6 +4,7 @@ form
 	: literal
 	| symbol
 	| pathSymbol
+	| implicitSymbol
 	| dataStructure
 	| syntax
 	| quoted
@@ -44,7 +45,11 @@ longValue:
 doubleValue:
    DOUBLE;
    
-specialLiteral: HASH HASH symbol;
+symbol: SYMBOL;
+   
+implicitSymbol: HASH SYMBOL;
+   
+specialLiteral: HASH HASH SYMBOL;
    
 address: HASH DIGITS;
 
@@ -58,7 +63,7 @@ character: CHARACTER;
 
 keyword: KEYWORD;
 
-symbol: SYMBOL;
+
 
 pathSymbol: SYMBOL_PATH;
 

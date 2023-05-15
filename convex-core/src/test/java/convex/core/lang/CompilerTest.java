@@ -231,6 +231,12 @@ public class CompilerTest extends ACVMTest {
 		assertArityError(step("(if :foo)"));
 		assertArityError(step("(if :foo 1 2 3 4 5)"));
 	}
+	
+	@Test
+	public void testCoreImplicits() {
+		assertEquals(Core.COUNT,eval("#%count"));
+		assertCVMEquals(1L,eval("(#%count [2])"));
+	}
 
 	@Test
 	public void testStackOverflow()  {

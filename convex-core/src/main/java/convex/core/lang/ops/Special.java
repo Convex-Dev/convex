@@ -160,7 +160,6 @@ public class Special<T extends ACell> extends AOp<T> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> Special<R> forSymbol(Symbol sym) {
-		if (sym.getName().charAt(0)!=42) return null; // fast exit if doesn't start with '*'
 		Integer special=opcodes.get(sym);
 		if (special==null) return null;
 		return (Special<R>) specials[special-BASE];

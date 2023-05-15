@@ -171,9 +171,17 @@ public class Compiler {
 		}
 		
 		// Next check for special values
-		Special<?> maybeSpecial=Special.forSymbol(sym);
-		if (maybeSpecial!=null) {
-			return context.withResult(maybeSpecial);
+		int ch=sym.getName().charAt(0);
+		if (ch=='*') {
+			Special<?> maybeSpecial=Special.forSymbol(sym);
+			if (maybeSpecial!=null) {
+				return context.withResult(maybeSpecial);
+			}
+		} else if (ch=='#') {
+			ACell maybeCoreImplicit = Core.CORE_FORMS.get(sym);
+			if (maybeCoreImplicit!=null) {
+				return compileConstant(context,maybeCoreImplicit);
+			}
 		}
 		
 		// Regular symbol lookup in environment

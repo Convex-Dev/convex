@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
@@ -86,7 +87,7 @@ import convex.core.util.Utils;
 public class Core {
 
 	/**
-	 * Default initial environment importing core namespace
+	 * Default initial environment metadata importing core namespace
 	 */
 	public static final AHashMap<Symbol, ACell> ENVIRONMENT;
 
@@ -94,6 +95,12 @@ public class Core {
 	 * Default initial core metadata
 	 */
 	public static final AHashMap<Symbol, AHashMap<ACell,ACell>> METADATA;
+	
+	/**
+	 * Mapping from implicit symbols like #%count to core definitins
+	 */
+	public static final HashMap<Symbol, ACell> CORE_FORMS=new HashMap<>();
+
 
 
 	/**
@@ -105,6 +112,16 @@ public class Core {
 
 	private static <T extends ACell> T reg(T o) {
 		tempReg.add(o);
+		
+		if (o instanceof ICoreDef) {
+			ICoreDef cd=(ICoreDef)o;
+			Symbol stm=cd.getSymbol();
+			Symbol implicitForm=Symbol.create("#%"+stm.getName().toString());
+			CORE_FORMS.put(implicitForm, o);
+		} else {
+			System.err.println("Not a core Def: "+o);
+		}
+		
 		return o;
 	}
 
@@ -288,8 +305,6 @@ public class Core {
 			return context.withResult(juice, result);
 		}
 	});
-
-
 
 	public static final CoreFn<AList<ACell>> LIST = reg(new CoreFn<>(Symbols.LIST) {
 		
