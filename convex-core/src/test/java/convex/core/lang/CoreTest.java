@@ -1915,6 +1915,23 @@ public class CoreTest extends ACVMTest {
 	}
 	
 	@Test
+	public void testFilterv() {
+		assertEquals(Vectors.of(1,2,3), eval("(filterv number? [1 :foo 2 :bar 3])"));
+		assertEquals(Lists.of(Keywords.FOO,3), eval("(filter #{:foo 3} '(:foo 2 3 :bar))"));
+		
+		// nil behaves as empty collection
+		assertSame(Vectors.empty(),eval("(filterv keyword? nil)"));
+		assertSame(Vectors.empty(),eval("(filterv nil? {1 2 3 4})"));
+
+		assertCastError(step("(filterv nil? 1)"));
+		assertCastError(step("(filterv 1 [1 2 3])"));
+
+		assertArityError(step("(filterv +)"));
+		assertArityError(step("(filterv 1 2 3)"));
+	}
+
+	
+	@Test
 	public void testLang() {
 		{
 			Context ctx=context();

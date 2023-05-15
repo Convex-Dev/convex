@@ -498,16 +498,13 @@
 
 
 (defn filter
-
    ^{:doc {:description ["Filters a collection by applying the given predicate to each element."
-                         "Each element is included in in a new collection if and onfly if the predicate returns a truthy value (anything but false or nil)."]
+                         "Each element is included in the new collection if and only if the predicate returns a truthy value (anything but false or nil)."]
            :errors      {:CAST "If the coll argeument is not a Data Structure."}
            :examples    [{:code "(filter (fn [x] (> 2 x)) [1 2 3 4])"}]
            :signature   [{:params [key]
                           :return Address}]}}
-
   [pred coll]
-
   (reduce (fn [acc e]
             (cond (pred e)
               (conj acc
@@ -520,22 +517,31 @@
             (reverse coll)
             coll)))
 
-
+(defn filterv
+   ^{:doc {:description ["Filters a collection by applying the given predicate to each element, returning a Vector."
+                         "Each element is included in the Vector if and only if the predicate returns a truthy value (anything but false or nil)."]
+           :errors      {:CAST "If the coll argeument is not a Data Structure."}
+           :examples    [{:code "(filter (fn [x] (> 2 x)) [1 2 3 4])"}]
+           :signature   [{:params [key]
+                          :return Address}]}}
+  [pred coll]
+  (reduce (fn [acc e]
+            (cond (pred e)
+              (conj acc
+                    e)
+              acc))
+             []
+             coll))
 
 (defmacro for
-
   ^{:doc {:description "Executes the body with the symbol `sym` bound to each value of the given sequence. Returns a vector of results."
           :examples    [{:code "(for [x [1 2 3]] (inc x))"}]
           :signature   [{:params [[sym sequence] & body]}]}}
-
   [[sym sequence] & body]
-
   `(map ~(cons 'fn 
                (vector sym)
                body)
         (vec ~sequence)))
-
-
 
 (defn identity
 
