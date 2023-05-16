@@ -54,7 +54,7 @@ public class WalletPanel extends JPanel {
 				Address addr=convex.createAccountSync(newKP.getAccountKey());
 				listModel.addElement(WalletEntry.create(addr,newKP));
 			} catch (Throwable t) {
-				log.warn("Exception creating account: ",e);
+				log.warn("Exception creating account: ",t);
 			}
 		});
 

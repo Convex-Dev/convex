@@ -1,11 +1,5 @@
 package convex.gui.components;
 
-import java.awt.BorderLayout;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.GridLayout;
-import java.awt.Insets;
-
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
@@ -20,11 +14,13 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.State;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.util.Text;
 import convex.gui.client.ConvexClient;
 import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class WalletComponent extends BaseListComponent {
@@ -47,8 +43,29 @@ public class WalletComponent extends BaseListComponent {
 		this.walletEntry = initialWalletEntry;
 		address = walletEntry.getAddress();
 
-		setLayout(new BorderLayout());
+		setLayout(new MigLayout("fillx"));
+
+		// identicon
+		JLabel identicon = new Identicon(walletEntry.getIdenticonHash());
+		JPanel idPanel=new JPanel();
+		idPanel.add(identicon);
+		add(idPanel,"west"); // add to MigLayout
+
+		// Wallet Address and info fields
+		JPanel cPanel = new JPanel();
+		cPanel.setLayout(new MigLayout("fillx"));
+		CodeLabel addressLabel = new CodeLabel(address.toString());
+		addressLabel.setFont(Toolkit.MONO_FONT);
+		cPanel.add(addressLabel,"span");
+		CodeLabel infoLabel = new CodeLabel(getInfoString());
+		cPanel.add(infoLabel,"span,growx");
+		add(cPanel,"grow,shrink"); // add to MigLayout
+
+		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
+			infoLabel.setText(getInfoString());
+		});
 		
+		///// Buttons
 		// REPL button
 		replButton = new JButton("");
 		buttons.add(replButton);
@@ -94,32 +111,7 @@ public class WalletComponent extends BaseListComponent {
 		buttons.add(menuButton);
 		
 		// panel of buttons on right
-		add(buttons, BorderLayout.EAST);
-
-		// identicon
-		JLabel identicon = new Identicon(walletEntry.getIdenticonHash());
-		GridBagConstraints gbc_btnNewButton = new GridBagConstraints();
-		gbc_btnNewButton.insets = new Insets(0, 0, 5, 5);
-		gbc_btnNewButton.gridx = 0;
-		gbc_btnNewButton.gridy = 0;
-		JPanel idPanel = new JPanel();
-		idPanel.setLayout(new GridBagLayout());
-		idPanel.add(identicon);
-		add(idPanel, BorderLayout.WEST);
-
-		// address field
-		JPanel cPanel = new JPanel();
-		cPanel.setLayout(new GridLayout(0, 1));
-		CodeLabel addressLabel = new CodeLabel(address.toString());
-		addressLabel.setFont(Toolkit.MONO_FONT);
-		cPanel.add(addressLabel);
-		CodeLabel infoLabel = new CodeLabel(getInfoString());
-		cPanel.add(infoLabel);
-		add(cPanel, BorderLayout.CENTER);
-
-		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
-			infoLabel.setText(getInfoString());
-		});
+		add(buttons,"east"); // add to MigLayout
 	}
 
 	private void resetTooltipTExt(JComponent b) {
@@ -132,8 +124,15 @@ public class WalletComponent extends BaseListComponent {
 
 	private String getInfoString() {
 		State s = PeerGUI.getLatestState();
-		Long bal=s.getBalance(address);
-		return "Balance: " + ((bal==null)?"Null":Text.toFriendlyNumber(s.getBalance(address)));
+		AccountStatus as=s.getAccount(address);
+		StringBuilder sb=new StringBuilder();
+		if (as!=null) {
+			Long bal=as.getBalance();
+			sb.append("Balance: " + ((bal==null)?"Null":Text.toFriendlyNumber(bal)));
+		}
+		//sb.append("\n");
+		//sb.append("Key: "+walletEntry.getAccountKey()+ "   Controller: "+as.getController());
+		return sb.toString();
 	}
 
 }
