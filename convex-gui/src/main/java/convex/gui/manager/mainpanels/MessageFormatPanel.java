@@ -7,12 +7,12 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.ParseException;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
@@ -30,7 +30,7 @@ public class MessageFormatPanel extends JPanel {
 	private JPanel upperPanel;
 	private JPanel instructionsPanel;
 	private JLabel lblNewLabel;
-	private JTextField hashLabel;
+	private JTextArea hashLabel;
 
 	private static String HASHLABEL = "Hash: ";
 
@@ -65,11 +65,12 @@ public class MessageFormatPanel extends JPanel {
 
 		splitPane.setRightComponent(lowerPanel);
 
-		hashLabel = new JTextField(HASHLABEL);
+		hashLabel = new JTextArea();
+		hashLabel.setRows(2);
 		hashLabel.setToolTipText("Hash code of the data object's serilaised representation = Data Object ID");
 		hashLabel.setBorder(null);
 		hashLabel.setBackground(null);
-		hashLabel.setFont(Toolkit.MONO_FONT);
+		hashLabel.setFont(Toolkit.SMALL_MONO_FONT);
 		lowerPanel.add(hashLabel, BorderLayout.SOUTH);
 		messageArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> updateMessage()));
 
@@ -99,36 +100,47 @@ public class MessageFormatPanel extends JPanel {
 		String msg = messageArea.getText();
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(msg));
-			Object o = Format.read(b);
+			ACell o = Format.read(b);
 			data = Utils.print(o);
-			hashLabel.setText(HASHLABEL + b.getContentHash().toHexString());
+			updateHashLabel(o);
 		} catch (ParseException e) {
 			data = "Unable to interpret message: " + e.getMessage();
-			hashLabel.setText(HASHLABEL + " <invalid>");
+			clearHashLabel();
 		} catch (Exception e) {
 			data = e.getMessage();
 		}
 		dataArea.setText(data);
 	}
 
+	private void clearHashLabel() {
+		hashLabel.setText("Type: <none>\n"+HASHLABEL + "<invalid>");
+	}
+
 	private void updateData() {
 		if (!dataArea.isFocusOwner()) return; // prevent mutual recursion
 		String msg = "";
 		String data = dataArea.getText();
-		hashLabel.setText(HASHLABEL + " <invalid>");
+		clearHashLabel();
 		if (!data.isBlank()) try {
 			messageArea.setEnabled(false);
 			ACell o = Reader.read(data);
 			Blob b = Format.encodedBlob(o);
-			hashLabel.setText(HASHLABEL + b.getContentHash().toHexString());
+			updateHashLabel(o);
 			msg = b.toHexString();
 			messageArea.setEnabled(true);
-		} catch (ParseException e) {
-			msg = e.getMessage();
 		} catch (Exception e) {
-			msg = e.getMessage();
+			msg = e.toString();
 		}
 		messageArea.setText(msg);
+	}
+	
+	private void updateHashLabel(ACell v) {
+		Blob b = Format.encodedBlob(v);
+		StringBuilder sb=new StringBuilder();
+		sb.append("Type: "+RT.getType(v));
+		sb.append("\n");
+		sb.append(HASHLABEL + b.getContentHash().toString());
+		hashLabel.setText(sb.toString());
 	}
 
 }
