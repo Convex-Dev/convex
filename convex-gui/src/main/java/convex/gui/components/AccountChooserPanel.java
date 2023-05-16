@@ -71,6 +71,17 @@ public class AccountChooserPanel extends JPanel {
 		WalletEntry we = (WalletEntry) addressModel.getSelectedItem();
 		return (we == null) ? null : we.getAddress();
 	}
+	
+	public boolean selectAddress(Address a) {
+		for (int i = 0; i < addressModel.getSize(); i++) {
+			WalletEntry we = addressModel.getElementAt(i);
+			if (we.getAddress().equals(a)) {
+				addressModel.setSelectedItem(we);
+				return true;
+			};
+		}
+		return false;
+	}
 
 	private ComboBoxModel<WalletEntry> createAddressList(ListModel<WalletEntry> m) {
 		int n = m.getSize();

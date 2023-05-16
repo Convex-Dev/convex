@@ -77,6 +77,9 @@ public class PeersListPanel extends JPanel {
 			Address a= convex.createAccountSync(kp.getAccountKey());
 			convex.transferSync(a, Coin.EMERALD);
 			
+			WalletPanel.addWalletEntry(WalletEntry.create(a, kp));
+			
+			// Set up Peer in base server
 			convex=Convex.connect(base, a, kp);
 			AccountKey key=kp.getAccountKey();
 			Result rcr=convex.transactSync("(create-peer "+key+" 10000000000000)");
@@ -91,6 +94,7 @@ public class PeersListPanel extends JPanel {
 			server.setHostname("localhost:"+server.getPort());
 			base.getConnectionManager().connectToPeer(server.getHostAddress());
 			
+			convex=Convex.connect(server, a, kp);
 			addPeer(convex);
 		} catch (TimeoutException e) {
 			// TODO Auto-generated catch block
@@ -120,8 +124,8 @@ public class PeersListPanel extends JPanel {
 		return al;
 	}
 
-	private void addPeer(Convex peer) {
-		PeerGUI.peerList.addElement(peer);
+	private void addPeer(Convex convex) {
+		PeerGUI.peerList.addElement(convex);
 	}
 
 	/**

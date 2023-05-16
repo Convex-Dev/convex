@@ -34,12 +34,10 @@ public class PeerWindow extends BaseWindow {
 		Server server=peer.getLocalServer();
 		if (server!=null) {
 			try {
-			
-			Convex convex = Convex.connect(server.getHostAddress(), server.getPeerController(),server.getKeyPair());
-		
-			tabbedPane.addTab("REPL", null, new REPLPanel(convex), null);
+				Convex convex = Convex.connect(server.getHostAddress(), server.getPeerController(),server.getKeyPair());
+				tabbedPane.addTab("REPL", null, new REPLPanel(convex), null);
 			} catch (Throwable t) {
-				log.warn("Unable to create Peer Controller REPL");
+				log.warn("Unable to create Peer Controller Window");
 			}
 		}
 		tabbedPane.addTab("Stress", null, new StressPanel(peer), null);
@@ -52,7 +50,7 @@ public class PeerWindow extends BaseWindow {
 
 	@Override
 	public String getTitle() {
-		return "Peer view - " + peer.toString();
+		return "Peer Control - " + peer.toString();
 	}
 
 }

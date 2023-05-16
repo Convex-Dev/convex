@@ -348,7 +348,10 @@ public class PeerGUI extends JPanel {
 			StateModel<Peer> model=models.get(s);
 			if	(model!=null) return model;
 			StateModel<Peer> newModel=StateModel.create(s.getPeer());
-			s.getCVMExecutor().setUpdateHook(p->newModel.setValue(p));
+			s.getCVMExecutor().setUpdateHook(p->{
+				newModel.setValue(p);
+				// latestState.setValue(p.getConsensusState());
+			});
 			models.put(s, newModel);
 			return newModel;
 		}

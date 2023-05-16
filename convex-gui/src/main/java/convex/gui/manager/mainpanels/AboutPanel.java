@@ -82,7 +82,6 @@ public class AboutPanel extends JPanel {
 		sb.append("BC Verifications:     " + lpad(BCProvider.verificationCount + "\n"));
 		sb.append("\n");
 		sb.append(Counters.getStats());
-		sb.append("\n");
 
 		textArea.setText(sb.toString());
 	}

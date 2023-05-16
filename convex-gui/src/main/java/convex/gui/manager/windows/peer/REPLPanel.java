@@ -130,8 +130,9 @@ public class REPLPanel extends JPanel {
 		setFocusTraversalKeysEnabled(false);
 		inputArea.setFocusTraversalKeysEnabled(false);
 		
-		
+		// Sett up account chooser panel
 		add(execPanel, BorderLayout.NORTH);
+		execPanel.selectAddress(convex.getAddress());
 
 		panel_1 = new ActionPanel();
 		add(panel_1, BorderLayout.SOUTH);
