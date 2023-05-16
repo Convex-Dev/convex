@@ -149,7 +149,7 @@ public class PeersListPanel extends JPanel {
 		JButton btnConnect = new JButton("Connect...");
 		toolBar.add(btnConnect);
 		btnConnect.addActionListener(e -> {
-			String input = JOptionPane.showInputDialog("Enter host address: ", "");
+			String input = JOptionPane.showInputDialog("Enter host address: ", "localhost:18888");
 			if (input==null) return; // no result?
 
 			String[] ss = input.split(":");

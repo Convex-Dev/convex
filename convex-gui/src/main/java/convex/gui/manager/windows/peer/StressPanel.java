@@ -42,7 +42,6 @@ import convex.core.util.Text;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerView;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -101,7 +100,7 @@ public class StressPanel extends JPanel {
 		JLabel lblRequests = new JLabel("Requests per client");
 		optionPanel.add(lblRequests);
 		requestCountSpinner = new JSpinner();
-		requestCountSpinner.setModel(new SpinnerNumberModel(100, 1, 1000, 10));
+		requestCountSpinner.setModel(new SpinnerNumberModel(100, 1, 1000000, 10));
 		optionPanel.add(requestCountSpinner);
 
 		JLabel lblTrans = new JLabel("Transactions per Request");
@@ -150,7 +149,8 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-		Address address=PeerGUI.getGenesisAddress();
+		Address address=peerView.getAddress();
+		AKeyPair kp=peerView.getKeyPair();
 
 		int transCount = (Integer) transactionCountSpinner.getValue();
 		int requestCount = (Integer) requestCountSpinner.getValue();
@@ -169,7 +169,7 @@ public class StressPanel extends JPanel {
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);
 					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
-					Convex pc = Convex.connect(sa, address,PeerGUI.getUserKeyPair(0));
+					Convex pc = Convex.connect(sa, address,kp);
 					
 					ArrayList<AKeyPair> kps=new ArrayList<>(clientCount);
 					for (int i=0; i<clientCount; i++) {
@@ -251,7 +251,7 @@ public class StressPanel extends JPanel {
 					resultArea.setText("Awaiting "+futureCount+" results...");
 					
 
-					List<Result> results = Utils.completeAll(frs).get(60, TimeUnit.SECONDS);
+					List<Result> results = Utils.completeAll(frs).get();
 					long endTime = Utils.getCurrentTimestamp();
 
 					HashMap<ACell, Integer> errorMap=new HashMap<>();

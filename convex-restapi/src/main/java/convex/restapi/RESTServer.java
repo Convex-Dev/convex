@@ -7,6 +7,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.Result;
@@ -34,6 +37,7 @@ import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.peer.Server;
 import io.javalin.Javalin;
+import io.javalin.core.util.JavalinBindException;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
@@ -42,6 +46,9 @@ import io.javalin.http.staticfiles.Location;
 
 public class RESTServer {
 
+	private static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
+
+	
 	private Server server;
 	private Convex convex;
 	private Javalin app;
@@ -410,7 +417,11 @@ public class RESTServer {
 	}
 
 	public void start() {
+		try {
 		app.start();
+		} catch (JavalinBindException e) {
+			log.warn("Unable to start REST Server: port already in use");
+		}
 	}
 	
 	public void start(int port) {

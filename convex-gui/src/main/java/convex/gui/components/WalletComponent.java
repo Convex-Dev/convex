@@ -8,6 +8,7 @@ import java.awt.Insets;
 
 import javax.swing.Icon;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -54,11 +55,13 @@ public class WalletComponent extends BaseListComponent {
 			ConvexClient c= ConvexClient.launch(PeerGUI.connectClient(walletEntry.getAddress(),walletEntry.getKeyPair()));
 			c.tabs.setSelectedComponent(c.replPanel);
 		});
+		replButton.setToolTipText("Launch a client REPL for this account");
 
 		// lock button
 		lockButton = new JButton("");
 		buttons.add(lockButton);
 		lockButton.setIcon(walletEntry.isLocked() ? Toolkit.LOCKED_ICON : Toolkit.UNLOCKED_ICON);
+		resetTooltipTExt(lockButton);
 		lockButton.addActionListener(e -> {
 			if (walletEntry.isLocked()) {
 				UnlockWalletDialog dialog = UnlockWalletDialog.show(this);
@@ -77,8 +80,10 @@ public class WalletComponent extends BaseListComponent {
 				}
 				icon = Toolkit.LOCKED_ICON;
 			}
+			resetTooltipTExt(lockButton);
 			lockButton.setIcon(icon);
 		});
+		
 		
 
 
@@ -109,6 +114,14 @@ public class WalletComponent extends BaseListComponent {
 		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
 			infoLabel.setText(getInfoString());
 		});
+	}
+
+	private void resetTooltipTExt(JComponent b) {
+		if (walletEntry.isLocked()) {
+			b.setToolTipText("Unlock");
+		} else {
+			b.setToolTipText("Lock");
+		}
 	}
 
 	private String getInfoString() {
