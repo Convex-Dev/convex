@@ -8,6 +8,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
@@ -37,7 +38,6 @@ import convex.core.init.Init;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
-import convex.gui.components.PeerView;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.manager.mainpanels.AccountsPanel;
@@ -160,7 +160,7 @@ public class PeerGUI extends JPanel {
 		EventQueue.invokeLater(() -> {
 			peerPanel.launchAllPeers(this);
 			
-			Server first=peerList.firstElement().server;
+			Server first=peerList.firstElement().getLocalServer();
 			try {
 				restServer=RESTServer.create(first);
 				restServer.start();
@@ -185,13 +185,12 @@ public class PeerGUI extends JPanel {
 					Thread.sleep(100);
 					tickState.setValue(tickState.getValue()+1);
 					
-					java.util.List<PeerView> peerViews = peerPanel.getPeerViews();
+					java.util.List<Convex> peerViews = peerPanel.getPeerViews();
 					peerPanel.repaint();
 					State latest = latestState.getValue();
-					for (PeerView s : peerViews) {
-						s.checkPeer();
+					for (Convex s : peerViews) {
 
-						Server serv=s.server;
+						Server serv=s.getLocalServer();
 						if (serv==null) continue;
 
 						Peer p = serv.getPeer();
@@ -222,7 +221,7 @@ public class PeerGUI extends JPanel {
 		}
 	}, "GUI Manager state update thread");
 
-	public static DefaultListModel<PeerView> peerList = new DefaultListModel<PeerView>();
+	public static DefaultListModel<Convex> peerList = new DefaultListModel<Convex>();
 
 
 
@@ -256,7 +255,7 @@ public class PeerGUI extends JPanel {
 	 * @throws TimeoutException If attempt to connect times out
 	 */
 	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException {
-		InetSocketAddress host = getDefaultPeer().getHostAddress();
+		InetSocketAddress host = getDefaultConvex().getHostAddress();
 		return Convex.connect(host,address, kp);
 	}
 
@@ -317,7 +316,7 @@ public class PeerGUI extends JPanel {
 		return latestState;
 	}
 
-	public static PeerView getDefaultPeer() {
+	public static Convex getDefaultConvex() {
 		return PeersListPanel.getFirst();
 	}
 
@@ -339,5 +338,20 @@ public class PeerGUI extends JPanel {
 		} catch (IOException | TimeoutException e) {
 			throw Utils.sneakyThrow(e);
 		}
+	}
+	
+	private static HashMap<Server,StateModel<Peer>> models=new HashMap<>();
+
+	public static StateModel<Peer> getStateModel(Convex peer) {
+		Server s=peer.getLocalServer();
+		if (s!=null) {
+			StateModel<Peer> model=models.get(s);
+			if	(model!=null) return model;
+			StateModel<Peer> newModel=StateModel.create(s.getPeer());
+			s.getCVMExecutor().setUpdateHook(p->newModel.setValue(p));
+			models.put(s, newModel);
+			return newModel;
+		}
+		return null;
 	}
 }

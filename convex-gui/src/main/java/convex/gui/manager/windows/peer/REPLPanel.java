@@ -145,7 +145,7 @@ public class REPLPanel extends JPanel {
 		btnInfo.addActionListener(e -> {
 			StringBuilder sb=new StringBuilder();
 			if (convex instanceof ConvexRemote) {
-				sb.append("Remote host: " + ((ConvexRemote)convex).getRemoteAddress() + "\n");
+				sb.append("Remote host: " + convex.getHostAddress() + "\n");
 			}
 			sb.append("Sequence:    " + convex.getSequence() + "\n");
 			sb.append("Account:     " + convex.getAddress() + "\n");

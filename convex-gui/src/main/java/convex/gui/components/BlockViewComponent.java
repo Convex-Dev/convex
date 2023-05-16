@@ -6,17 +6,16 @@ import java.awt.Graphics;
 
 import javax.swing.JPanel;
 
+import convex.api.Convex;
 import convex.core.Block;
 import convex.core.Constants;
 import convex.core.Order;
 import convex.core.Peer;
-import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.gui.components.models.StateModel;
 import convex.gui.manager.PeerGUI;
 import convex.peer.Server;
 
@@ -27,20 +26,13 @@ import convex.peer.Server;
 @SuppressWarnings("serial")
 public class BlockViewComponent extends JPanel {
 
-	private PeerView peerView;
+	private Convex peerView;
 
-	public BlockViewComponent(PeerView peer) {
+	public BlockViewComponent(Convex peer) {
 		this.peerView = peer;
 
 		setBackground(null);
 		setPreferredSize(new Dimension(1000, 10));
-
-		if (peer!=null) {
-			StateModel<State> model=peer.getStateModel();
-			model.addPropertyChangeListener(e -> {
-				repaint();
-			});
-		}
 	}
 
 	@Override
@@ -50,7 +42,7 @@ public class BlockViewComponent extends JPanel {
 		int ph = getHeight();
 		g.fillRect(0, 0, pw, ph);
 		
-		Server server=peerView.server;
+		Server server=peerView.getLocalServer();
 		if (server==null) return; // not a local server
 		
 		AStore tempStore=Stores.current(); // just in case, since we are reading from a specific peer

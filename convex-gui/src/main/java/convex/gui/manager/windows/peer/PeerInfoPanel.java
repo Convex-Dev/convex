@@ -11,9 +11,9 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.Timer;
 
+import convex.api.Convex;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
-import convex.gui.components.PeerView;
 import convex.gui.utils.Toolkit;
 import convex.peer.AThreadedComponent;
 import convex.peer.Server;
@@ -23,7 +23,7 @@ public class PeerInfoPanel extends JPanel {
 
 	private final JTextArea textArea;
 
-	public PeerInfoPanel(PeerView p) {
+	public PeerInfoPanel(Convex p) {
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel panel = new ActionPanel();
@@ -72,9 +72,9 @@ public class PeerInfoPanel extends JPanel {
 		return Text.leftPad(s.toString(), 30);
 	}
 
-	private void updateState(PeerView p) {
+	private void updateState(Convex p) {
 		StringBuilder sb = new StringBuilder();
-		Server s=p.server;
+		Server s=p.getLocalServer();
 		
 		if (s==null) {
 			sb.append("Not a local Peer");

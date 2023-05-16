@@ -1,5 +1,6 @@
 package convex.api;
 
+import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -122,6 +123,11 @@ public class ConvexLocal extends Convex {
 	}
 	
 	@Override
+	public Server getLocalServer() {
+		return server;
+	}
+	
+	@Override
 	public long getSequence() {
 		if (sequence==null) {
 			sequence=getState().getAccount(address).getSequence();
@@ -138,6 +144,11 @@ public class ConvexLocal extends Convex {
 	@Override
 	public String toString() {
 		return "Local Convex instance on "+server.getHostAddress();
+	}
+
+	@Override
+	public InetSocketAddress getHostAddress() {
+		return server.getHostAddress();
 	}
 
 }

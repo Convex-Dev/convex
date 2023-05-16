@@ -106,7 +106,7 @@ public class SmartOpComponent extends BaseListComponent {
 	}
 
 	private void execute() {
-		InetSocketAddress addr = PeerGUI.getDefaultPeer().getHostAddress();
+		InetSocketAddress addr = PeerGUI.getDefaultConvex().getHostAddress();
 
 		AVector<ACell> args = Vectors.empty();
 		for (int i = 0; i < paramCount; i++) {

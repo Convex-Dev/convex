@@ -1,6 +1,10 @@
 package convex.peer;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
 import convex.core.Peer;
@@ -12,7 +16,12 @@ import convex.core.util.LoadMonitor;
  */
 public class CVMExecutor extends AThreadedComponent {
 	
+	private static final Logger log = LoggerFactory.getLogger(CVMExecutor.class.getName());
+
+	
 	private Peer peer;
+	
+	private Consumer<Peer> updateHook=null;
 	
 	private LatestUpdateQueue<Belief> update=new LatestUpdateQueue<>();
 
@@ -39,9 +48,21 @@ public class CVMExecutor extends AThreadedComponent {
 			} catch (Exception e) {
 				log.warn("Unable to persist Peer data: ",e);
 			}
+			maybeCallHook(peer);
 		}
 		
 		server.transactionHandler.maybeReportTransactions(peer);
+	}
+
+	private void maybeCallHook(Peer p) {
+		Consumer<Peer> hook=updateHook;
+		if (hook==null) return;
+		
+		try {
+			hook.accept(p);
+		} catch (Throwable t) {
+			// Ignore
+		}
 	}
 
 	@Override
@@ -59,6 +80,10 @@ public class CVMExecutor extends AThreadedComponent {
 
 	public void queueUpdate(Belief belief) {
 		update.offer(belief);
+	}
+
+	public void setUpdateHook(Consumer<Peer> hook) {
+		updateHook=hook;
 	}
 
 }

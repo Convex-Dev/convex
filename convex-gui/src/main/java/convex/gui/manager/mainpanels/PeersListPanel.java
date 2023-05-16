@@ -1,23 +1,21 @@
 package convex.gui.manager.mainpanels;
 
 import java.awt.BorderLayout;
-import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.TimeoutException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexRemote;
@@ -27,18 +25,14 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.store.Stores;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
-import convex.gui.components.PeerView;
 import convex.gui.components.ScrollyList;
 import convex.gui.manager.PeerGUI;
 import convex.peer.API;
 import convex.peer.Server;
-import etch.EtchStore;
 
 @SuppressWarnings({ "serial", "unused" })
 public class PeersListPanel extends JPanel {
@@ -55,9 +49,8 @@ public class PeersListPanel extends JPanel {
 			int N=PeerGUI.KEYPAIRS.size();
 			List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
 			for (Server server: serverList) {
-				PeerView peer = new PeerView(server);
-				// InetSocketAddress sa = server.getHostAddress();
-				addPeer(peer);
+				Convex convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
+				addPeer(convex);
 				
 				// initial wallet list
 		        WalletEntry we = WalletEntry.create(server.getPeerController(), server.getKeyPair());
@@ -79,7 +72,7 @@ public class PeersListPanel extends JPanel {
 		AKeyPair kp=AKeyPair.generate();
 		
 		try {
-			Server base=getFirst().server;
+			Server base=getFirst().getLocalServer();
 			Convex convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
 			Address a= convex.createAccountSync(kp.getAccountKey());
 			convex.transferSync(a, Coin.EMERALD);
@@ -98,8 +91,7 @@ public class PeersListPanel extends JPanel {
 			server.setHostname("localhost:"+server.getPort());
 			base.getConnectionManager().connectToPeer(server.getHostAddress());
 			
-			PeerView peer = new PeerView(server);
-			addPeer(peer);
+			addPeer(convex);
 		} catch (TimeoutException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -109,7 +101,7 @@ public class PeersListPanel extends JPanel {
 		}
 	}
 
-	public static PeerView getFirst() {
+	public static Convex getFirst() {
 		return PeerGUI.peerList.elementAt(0);
 	}
 
@@ -118,17 +110,17 @@ public class PeersListPanel extends JPanel {
 	 *
 	 * @return List of local PeerView objects
 	 */
-	public List<PeerView> getPeerViews() {
-		ArrayList<PeerView> al = new ArrayList<>();
+	public List<Convex> getPeerViews() {
+		ArrayList<Convex> al = new ArrayList<>();
 		int n = PeerGUI.peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			PeerView p = PeerGUI.peerList.getElementAt(i);
+			Convex p = PeerGUI.peerList.getElementAt(i);
 			al.add(p);
 		}
 		return al;
 	}
 
-	private void addPeer(PeerView peer) {
+	private void addPeer(Convex peer) {
 		PeerGUI.peerList.addElement(peer);
 	}
 
@@ -160,15 +152,14 @@ public class PeersListPanel extends JPanel {
 			try {
 				// TODO: we want to receive anything?
 				pc = Convex.connect(hostAddress, null,null);
-				PeerView pv = new PeerView(pc);
-				addPeer(pv);
+				addPeer(pc);
 			} catch (Throwable e1) {
 				JOptionPane.showMessageDialog(this, "Connect failed: " + e1.toString());
 			}
 
 		});
 
-		ScrollyList<PeerView> scrollyList = new ScrollyList<PeerView>(PeerGUI.peerList,
+		ScrollyList<Convex> scrollyList = new ScrollyList<Convex>(PeerGUI.peerList,
 				peer -> new PeerComponent(manager, peer));
 		add(scrollyList, BorderLayout.CENTER);
 	}
@@ -176,9 +167,9 @@ public class PeersListPanel extends JPanel {
 	public void closePeers() {
 		int n = PeerGUI.peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			PeerView p = PeerGUI.peerList.getElementAt(i);
+			Convex p = PeerGUI.peerList.getElementAt(i);
 			try {
-				p.server.close();
+				p.getLocalServer().close();
 			} catch (Exception e) {
 				// ignore
 			}

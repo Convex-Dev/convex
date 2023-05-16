@@ -41,7 +41,6 @@ import convex.core.transactions.Multi;
 import convex.core.util.Text;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
-import convex.gui.components.PeerView;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -49,7 +48,7 @@ public class StressPanel extends JPanel {
 	
 	static final Logger log = LoggerFactory.getLogger(StressPanel.class.getName());
 
-	protected PeerView peerView;
+	protected Convex peerConvex;
 
 	private ActionPanel actionPanel;
 
@@ -61,8 +60,8 @@ public class StressPanel extends JPanel {
 	private JSpinner clientCountSpinner;
 	private JCheckBox syncCheckBox;
 
-	public StressPanel(PeerView peerView) {
-		this.peerView = peerView;
+	public StressPanel(Convex peerView) {
+		this.peerConvex = peerView;
 		this.setLayout(new BorderLayout());
 
 		actionPanel = new ActionPanel();
@@ -149,8 +148,8 @@ public class StressPanel extends JPanel {
 	private synchronized void runStressTest() {
 		errors = 0;
 		values = 0;
-		Address address=peerView.getAddress();
-		AKeyPair kp=peerView.getKeyPair();
+		Address address=peerConvex.getAddress();
+		AKeyPair kp=peerConvex.getKeyPair();
 
 		int transCount = (Integer) transactionCountSpinner.getValue();
 		int requestCount = (Integer) requestCountSpinner.getValue();
@@ -164,7 +163,7 @@ public class StressPanel extends JPanel {
 				StringBuilder sb = new StringBuilder();
 				try {
 					resultArea.setText("Connecting clients...");
-					InetSocketAddress sa = peerView.getHostAddress();
+					InetSocketAddress sa = peerConvex.getHostAddress();
 
 					// Use client store
 					// Stores.setCurrent(Stores.CLIENT_STORE);

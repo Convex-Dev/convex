@@ -877,4 +877,16 @@ public abstract class Convex {
 		return keyPair;
 	}
 
+	/**
+	 * Gets the local Server instance, or null is not a local connection
+	 * @return Server instance (or null)
+	 */
+	public abstract Server getLocalServer();
+
+	/**
+	 * Gets the remote address for this Convex client instance
+	 * @return Socket address
+	 */
+	public abstract InetSocketAddress getHostAddress();
+
 }

@@ -9,16 +9,15 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.gui.components.PeerComponent;
-import convex.gui.components.PeerView;
 import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")
 public class PeerWindow extends BaseWindow {
-	PeerView peer;
+	Convex peer;
 
-	public PeerView getPeerView() {
+	public Convex getPeerView() {
 		return peer;
 	}
 
@@ -26,13 +25,13 @@ public class PeerWindow extends BaseWindow {
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public PeerWindow(PeerGUI manager, PeerView peer) {
+	public PeerWindow(PeerGUI manager, Convex peer) {
 		super(manager);
 		this.peer = peer;
 
 		add(tabbedPane, BorderLayout.CENTER);
 		
-		Server server=peer.server;
+		Server server=peer.getLocalServer();
 		if (server!=null) {
 			try {
 			
@@ -43,8 +42,8 @@ public class PeerWindow extends BaseWindow {
 				log.warn("Unable to create Peer Controller REPL");
 			}
 		}
-		tabbedPane.addTab("Stress", null, new StressPanel(this.getPeerView()), null);
-		tabbedPane.addTab("Info", null, new PeerInfoPanel(this.getPeerView()), null);
+		tabbedPane.addTab("Stress", null, new StressPanel(peer), null);
+		tabbedPane.addTab("Info", null, new PeerInfoPanel(peer), null);
 
 		PeerComponent pcom = new PeerComponent(manager, peer);
 		add(pcom, BorderLayout.NORTH);
@@ -53,11 +52,7 @@ public class PeerWindow extends BaseWindow {
 
 	@Override
 	public String getTitle() {
-		try {
-			return "Peer view - " + peer.getHostAddress();
-		} catch (Exception e) {
-			return "Peer view - Unknown";
-		}
+		return "Peer view - " + peer.toString();
 	}
 
 }

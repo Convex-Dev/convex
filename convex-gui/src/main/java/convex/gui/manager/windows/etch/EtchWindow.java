@@ -4,8 +4,8 @@ import java.awt.BorderLayout;
 
 import javax.swing.JTabbedPane;
 
+import convex.api.Convex;
 import convex.gui.components.PeerComponent;
-import convex.gui.components.PeerView;
 import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import etch.EtchStore;
@@ -13,7 +13,7 @@ import etch.EtchStore;
 @SuppressWarnings("serial")
 public class EtchWindow extends BaseWindow {
 	EtchStore store;
-	PeerView peer;
+	Convex peer;
 	
 
 	
@@ -23,10 +23,10 @@ public class EtchWindow extends BaseWindow {
 	
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public EtchWindow(PeerGUI manager, PeerView peer) {
+	public EtchWindow(PeerGUI manager, Convex peer) {
 		super(manager);
 		this.peer=peer;
-		this.store=(EtchStore) peer.server.getStore();
+		this.store=(EtchStore) peer.getLocalServer().getStore();
 		
 		PeerComponent pcom=new PeerComponent(manager,peer);
 		add(pcom, BorderLayout.NORTH);

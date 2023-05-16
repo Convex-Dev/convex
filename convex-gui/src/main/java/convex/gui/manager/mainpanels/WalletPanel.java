@@ -18,7 +18,6 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.WalletComponent;
 import convex.gui.manager.PeerGUI;
-import convex.peer.Server;
 
 @SuppressWarnings("serial")
 public class WalletPanel extends JPanel {
@@ -47,8 +46,7 @@ public class WalletPanel extends JPanel {
 		JButton btnNew = new JButton("New");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
-			Server s=PeerGUI.getDefaultPeer().server;
-			Convex convex=Convex.connect(s, s.getPeerController(),s.getKeyPair());
+			Convex convex=PeerGUI.getDefaultConvex();
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				Address addr=convex.createAccountSync(newKP.getAccountKey());

@@ -28,6 +28,7 @@ import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 import convex.net.Connection;
+import convex.peer.Server;
 
 public class ConvexRemote extends Convex {
 	/**
@@ -39,12 +40,8 @@ public class ConvexRemote extends Convex {
 
 	protected InetSocketAddress remoteAddress;
 	
-	/**
-	 * Gets the Internet address of the currently connected remote
-	 *
-	 * @return Remote socket address
-	 */
-	public InetSocketAddress getRemoteAddress() {
+	@Override
+	public InetSocketAddress getHostAddress() {
 		return remoteAddress;
 	}
 
@@ -321,6 +318,11 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public String toString() {
-		return "Remote Convex instance at "+getRemoteAddress();
+		return "Remote Convex instance at "+getHostAddress();
+	}
+
+	@Override
+	public Server getLocalServer() {
+		return null;
 	}
 }

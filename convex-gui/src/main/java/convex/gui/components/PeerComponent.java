@@ -30,11 +30,11 @@ import etch.EtchStore;
 @SuppressWarnings("serial")
 public class PeerComponent extends BaseListComponent {
 
-	public PeerView peer;
+	public Convex peer;
 	JTextArea description;
 	private PeerGUI manager;
 
-	public void launchPeerWindow(PeerView peer) {
+	public void launchPeerWindow(Convex peer) {
 		try {
 			PeerWindow pw = new PeerWindow(manager, peer);
 			pw.launch();
@@ -43,19 +43,19 @@ public class PeerComponent extends BaseListComponent {
 		}
 	}
 
-	public void launchEtchWindow(PeerView peer) {
+	public void launchEtchWindow(Convex peer) {
 		EtchWindow ew = new EtchWindow(manager, peer);
 		ew.launch();
 	}
 
-	public void launchExploreWindow(PeerView peer) {
-		Server s = peer.server;
+	public void launchExploreWindow(Convex peer) {
+		Server s = peer.getLocalServer();
 		ACell p = s.getPeer().getConsensusState();
 		StateWindow pw = new StateWindow(manager, p);
 		pw.launch();
 	}
 
-	public PeerComponent(PeerGUI manager, PeerView value) {
+	public PeerComponent(PeerGUI manager, Convex value) {
 		this.manager = manager;
 		this.peer = value;
 
@@ -86,11 +86,12 @@ public class PeerComponent extends BaseListComponent {
 
 		// Setup popup menu for peer
 		JPopupMenu popupMenu = new JPopupMenu();
-		if (peer.isLocal()) {
+		Server server=peer.getLocalServer();
+		if (server!=null) {
 			JMenuItem closeButton = new JMenuItem("Shutdown Peer");
 			closeButton.addActionListener(e -> {
 				try {
-					peer.server.shutdown();
+					server.shutdown();
 				} catch (Exception e1) {
 					// ignore
 				}
@@ -103,7 +104,7 @@ public class PeerComponent extends BaseListComponent {
 			});
 			popupMenu.add(exploreButton);
 
-			if (peer.server.getStore() instanceof EtchStore) {
+			if (server.getStore() instanceof EtchStore) {
 				JMenuItem storeButton = new JMenuItem("Explore Etch store");
 				storeButton.addActionListener(e -> {
 					launchEtchWindow(peer);
@@ -114,7 +115,7 @@ public class PeerComponent extends BaseListComponent {
 			
 			JMenuItem killConn = new JMenuItem("Kill Connections");
 			killConn.addActionListener(e -> {
-				peer.server.getConnectionManager().closeAllConnections();
+				server.getConnectionManager().closeAllConnections();
 			});
 			popupMenu.add(killConn);
 			
@@ -131,7 +132,7 @@ public class PeerComponent extends BaseListComponent {
 		popupMenu.add(replButton);
 		
 		JMenuItem clientButton = new JMenuItem("Connect Client");
-		clientButton.addActionListener(e -> launchClientWindow(this.peer));
+		clientButton.addActionListener(e -> launchClientWindow(peer));
 		popupMenu.add(clientButton);
 
 		JPanel blockView = new BlockViewComponent(peer);
@@ -140,14 +141,12 @@ public class PeerComponent extends BaseListComponent {
 		DropdownMenu dm = new DropdownMenu(popupMenu);
 		add(dm, BorderLayout.EAST);
 		
-		if (peer!=null) {
-			StateModel<Peer> model=peer.peerModel;
-			if (model!=null) {
-				model.addPropertyChangeListener(e->{
-					blockView.repaint();
-					description.setText(peer.toString());
-				});
-			}
+		StateModel<Peer> model=PeerGUI.getStateModel(peer);
+		if (model!=null) {
+			model.addPropertyChangeListener(e->{
+				blockView.repaint();
+				description.setText(peer.toString());
+			});
 		}
 		
 		PeerGUI.tickState.addPropertyChangeListener(e->{
@@ -156,7 +155,7 @@ public class PeerComponent extends BaseListComponent {
 
 	}
 
-	private void launchClientWindow(PeerView peer) {
+	private void launchClientWindow(Convex peer) {
 		try {
 			Convex convex = ConvexRemote.connect(peer.getHostAddress());
 			Address addr=peer.getAddress();
