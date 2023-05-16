@@ -14,10 +14,8 @@ public class DropdownMenu extends JButton {
 	private JPopupMenu popupMenu;
 
 	public DropdownMenu(JPopupMenu popupMenu) {
-
 		super();
 		this.popupMenu = popupMenu;
-		this.setBorder(null);
 		this.setIcon(Toolkit.COG);
 		this.addActionListener(e -> {
 			popupMenu.show(this, 0, this.getHeight());

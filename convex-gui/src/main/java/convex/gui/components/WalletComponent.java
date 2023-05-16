@@ -10,8 +10,10 @@ import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,9 +86,13 @@ public class WalletComponent extends BaseListComponent {
 			lockButton.setIcon(icon);
 		});
 		
+		// Menu Button
+		JPopupMenu menu=new JPopupMenu();
+		JMenuItem m1=new JMenuItem("Edit...");
+		menu.add(m1);
+		DropdownMenu menuButton=new DropdownMenu(menu);
+		buttons.add(menuButton);
 		
-
-
 		// panel of buttons on right
 		add(buttons, BorderLayout.EAST);
 

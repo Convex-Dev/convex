@@ -70,6 +70,7 @@ public class PeerComponent extends BaseListComponent {
 		button.addActionListener(e -> {
 			launchPeerWindow(this.peer);
 		});
+		button.setToolTipText("Lunch Peer management window");
 
 		JPanel panel = new JPanel();
 		panel.setBorder(new EmptyBorder(5, 5, 5, 5));
