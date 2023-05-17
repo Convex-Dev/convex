@@ -163,9 +163,6 @@ public class BeliefPropagator extends AThreadedComponent {
 		//if (inConsensus&&(!published) && newBeliefs.isEmpty()) return false;
 
 		boolean updated = maybeMergeBeliefs(newBelief);
-		if (updated) {
-			maybeMergeBeliefs(); // try double merge
-		}
 		
 		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
 		SignedData<Block> signedBlock= server.transactionHandler.maybeGenerateBlock(server.getPeer());
