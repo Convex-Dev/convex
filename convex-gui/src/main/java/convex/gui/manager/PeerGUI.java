@@ -357,4 +357,21 @@ public class PeerGUI extends JPanel {
 		}
 		return null;
 	}
+
+	public static Server getRandomServer() {
+		Server result=null;
+		int n=peerList.getSize();
+		int found=0;
+		for (int i=0; i<n; i++) {
+			Convex c=peerList.elementAt(i);
+			Server s=c.getLocalServer();
+			if (s!=null) {
+				found+=1;
+				if (Math.random()*found<=1.0) {
+					result=s;
+				}
+			}
+		}
+		return result;
+	}
 }

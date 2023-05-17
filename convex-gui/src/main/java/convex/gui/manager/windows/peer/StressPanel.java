@@ -41,6 +41,7 @@ import convex.core.transactions.Multi;
 import convex.core.util.Text;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
+import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -59,6 +60,7 @@ public class StressPanel extends JPanel {
 	private JSpinner opCountSpinner;
 	private JSpinner clientCountSpinner;
 	private JCheckBox syncCheckBox;
+	private JCheckBox distCheckBox;
 
 	public StressPanel(Convex peerView) {
 		this.peerConvex = peerView;
@@ -119,6 +121,13 @@ public class StressPanel extends JPanel {
 		syncCheckBox=new JCheckBox();
 		optionPanel.add(syncCheckBox);
 		syncCheckBox.setSelected(true);
+		
+		JLabel lblDist=new JLabel("Distribute over Peers?");
+		optionPanel.add(lblDist);
+		distCheckBox=new JCheckBox();
+		optionPanel.add(distCheckBox);
+		distCheckBox.setSelected(false);
+
 
 
 		// =========================================
@@ -190,7 +199,13 @@ public class StressPanel extends JPanel {
 					for (int i=0; i<clientCount; i++) {
 						AKeyPair kp=kps.get(i);
 						Address clientAddr = v.get(i);
-						Convex cc=Convex.connect(sa,clientAddr,kp);
+						Convex cc;
+						if (distCheckBox.isSelected()) {
+							InetSocketAddress pa=PeerGUI.getRandomServer().getHostAddress();
+							cc=Convex.connect(pa,clientAddr,kp);
+						} else {
+							cc=Convex.connect(sa,clientAddr,kp);
+						}
 						ccs.add(cc);
 					}
 					

@@ -157,7 +157,6 @@ public class Server implements Closeable {
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		this.config = config;
 
-
 		AStore configStore = (AStore) config.get(Keywords.STORE);
 		this.store = (configStore == null) ? Stores.current() : configStore;
 		
@@ -665,6 +664,7 @@ public class Server implements Closeable {
 	 * @return Updater Peer value with persisted data
 	 * @throws IOException In case of any IO Error
 	 */
+	@SuppressWarnings("unchecked")
 	public Peer persistPeerData() throws IOException {
 		AStore tempStore = Stores.current();
 		try {
@@ -675,7 +675,8 @@ public class Server implements Closeable {
 			AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
 			AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
 
-			store.setRootData(newRootData);
+			newRootData=store.setRootData(newRootData).getValue();
+			peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
 			log.debug( "Stored peer data for Server with hash: {}", peerData.getHash().toHexString());
 			return Peer.fromData(getKeyPair(), peerData);
 		}  finally {
