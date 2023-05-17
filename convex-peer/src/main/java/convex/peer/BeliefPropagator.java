@@ -284,10 +284,10 @@ public class BeliefPropagator extends AThreadedComponent {
 			} catch (MissingDataException e) {
 				// Missing data somewhere in Belief / Order received
 				Hash h=e.getMissingHash();
-				log.warn("Missing data in Belief! {}",h);
+				log.warn("Missing data in Belief! {}",e.getMessage());
 				//System.out.print(Refs.printMissingTree(a));
 				// System.exit(0);
-				if (!m.sendMissingData(e.getMissingHash())) {
+				if (!m.sendMissingData(h)) {
 					log.warn("Unable to request Missing data in Belief!");
 				}
 			}
