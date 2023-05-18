@@ -14,6 +14,7 @@ import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
+import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.Ref;
@@ -54,7 +55,7 @@ public class Belief extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell k) {
+	public ACell get(Keyword k) {
 		if (Keywords.ORDERS.equals(k)) return orders;
 		return null;
 	}

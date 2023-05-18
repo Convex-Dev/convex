@@ -216,8 +216,8 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public abstract MapEntry<K, V> getEntry(ACell k);
 	
 	@Override
-	public V get(Object key) {
-		if (key instanceof ACell) return (V) get((ACell)key);
+	public final V get(Object key) {
+		if ((key==null)||(key instanceof ACell)) return (V) get((ACell)key);
 		return null;
 	}
 	

@@ -103,7 +103,7 @@ public class State extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell k) {
+	public ACell get(Keyword k) {
 		if (Keywords.ACCOUNTS.equals(k)) return accounts;
 		if (Keywords.PEERS.equals(k)) return peers;
 		if (Keywords.GLOBALS.equals(k)) return globals;
@@ -861,9 +861,5 @@ public class State extends ARecord {
 		r=r.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(mem));
 		return withGlobals(r);
 	}
-
-
-
-
 
 }

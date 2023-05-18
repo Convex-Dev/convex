@@ -353,7 +353,7 @@ public class Order extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.BLOCKS.equals(key)) return getBlocks();
 		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(getConsensusPoint());
 		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(getProposalPoint());

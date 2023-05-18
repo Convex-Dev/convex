@@ -28,7 +28,7 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		Long ix=format.indexFor(key);
 		if (ix==null) return null;
 		return values.get((long)ix);

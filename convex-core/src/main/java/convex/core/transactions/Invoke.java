@@ -168,7 +168,7 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.COMMAND.equals(key)) return command;
 		if (Keywords.ORIGIN.equals(key)) return origin;
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);

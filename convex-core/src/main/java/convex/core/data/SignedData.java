@@ -156,7 +156,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.PUBLIC_KEY.equals(key)) return publicKey;
 		if (Keywords.SIGNATURE.equals(key)) return signature;
 		if (Keywords.VALUE.equals(key)) return getValue();

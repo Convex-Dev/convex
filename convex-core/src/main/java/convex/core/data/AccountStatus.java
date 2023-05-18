@@ -402,7 +402,7 @@ public class AccountStatus extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);

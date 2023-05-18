@@ -151,7 +151,7 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.CALL.equals(key)) return args.cons(functionName);
 		if (Keywords.OFFER.equals(key)) return CVMLong.create(offer);
 		if (Keywords.ORIGIN.equals(key)) return origin;

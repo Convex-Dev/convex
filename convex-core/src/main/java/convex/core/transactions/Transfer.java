@@ -159,7 +159,7 @@ public class Transfer extends ATransaction {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.AMOUNT.equals(key)) return CVMLong.create(amount);
 		if (Keywords.ORIGIN.equals(key)) return origin;
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);

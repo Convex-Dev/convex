@@ -44,7 +44,7 @@ public class RecordFormat {
 		return keySet;
 	}
 
-	public Long indexFor(Object key) {
+	public Long indexFor(Keyword key) {
 		return indexes.get(key);
 	}
 

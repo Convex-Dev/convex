@@ -239,7 +239,7 @@ public class PeerStatus extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.STAKE.equals(key)) return CVMLong.create(stake);
 		if (Keywords.STAKES.equals(key)) return stakes;

@@ -111,7 +111,7 @@ public class BlockResult extends ARecord {
 	}
 
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.STATE.equals(key)) return state;
 		if (Keywords.RESULTS.equals(key)) return results;
 		return null;

@@ -205,7 +205,7 @@ public class Multi extends ATransaction {
 	}
 	
 	@Override
-	public ACell get(ACell key) {
+	public ACell get(Keyword key) {
 		if (Keywords.ORIGIN.equals(key)) return origin;
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
 		if (Keywords.MODE.equals(key)) return CVMLong.create(mode);

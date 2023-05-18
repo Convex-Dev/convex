@@ -98,9 +98,10 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @param key Key to look up in this record
 	 * @return Field value for the given key
 	 */
-	public final ACell get(Object key) {
-		if (!(key instanceof Keyword)) return null;
-		return get((Keyword)key);
+	@Override
+	public final ACell get(ACell key) {
+		if (key instanceof Keyword) return get((Keyword)key);
+		return null;
 	}
 	
 	/**
@@ -108,8 +109,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @param key Key to look up in this record
 	 * @return Field value for the given key
 	 */
-	@Override
-	public abstract ACell get(ACell key);
+	public abstract ACell get(Keyword key);
 
 	/**
 	 * Gets the tag byte for this record type. The Tag is the byte used to identify the
