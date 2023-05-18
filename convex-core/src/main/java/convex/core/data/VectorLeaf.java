@@ -189,22 +189,22 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public T get(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
-		long ix = i - prefixLength();
-		if (ix >= 0) {
-			return items[(int) ix].getValue();
-		} else {
-			return prefix.getValue().get(i);
-		}
+		return getElementRefUnsafe(i).getValue();
 	}
 
 	@Override
 	public Ref<T> getElementRef(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
+		return getElementRefUnsafe(i);
+	}
+	
+	@Override
+	protected Ref<T> getElementRefUnsafe(long i) {
 		long ix = i - prefixLength();
 		if (ix >= 0) {
 			return items[(int) ix];
 		} else {
-			return prefix.getValue().getElementRef(i);
+			return prefix.getValue().getElementRefUnsafe(i);
 		}
 	}
 

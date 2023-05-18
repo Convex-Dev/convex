@@ -129,12 +129,18 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
-		return children[b].getValue().get(i - b * bSize);
+		AVector<T> child=children[b].getValue();
+		return child.getElementRefUnsafe(i - b * bSize).getValue();
 	}
 
 	@Override
 	public Ref<T> getElementRef(long i) {
 		if ((i < 0) || (i >= count)) throw new IndexOutOfBoundsException("Index: " + i);
+		return getElementRefUnsafe(i);
+	}
+	
+	@Override
+	protected Ref<T> getElementRefUnsafe(long i) {
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
 		return children[b].getValue().getElementRef(i - b * bSize);

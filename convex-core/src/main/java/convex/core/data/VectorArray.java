@@ -164,6 +164,11 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 	public Ref<T> getElementRef(long index) {
 		return Ref.get(get(index));
 	}
+	
+	@Override
+	public Ref<T> getElementRefUnsafe(long index) {
+		return Ref.get(get(index));
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

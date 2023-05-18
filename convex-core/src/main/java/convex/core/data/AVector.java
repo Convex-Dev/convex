@@ -279,4 +279,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	
 	@Override
 	public abstract int encodeRaw(byte[] bs, int pos);
+
+	/**
+	 * Gets an element Ref from this vector, assuming bounds already checked
+	 * @param i Index at which to get element Ref 
+	 * @return Element Ref
+	 */
+	protected abstract Ref<T> getElementRefUnsafe(long i);
 }

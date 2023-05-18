@@ -220,6 +220,13 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		if (i == 1) return (Ref<ACell>) valueRef;
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	protected Ref<ACell> getElementRefUnsafe(long i) {
+		if (i == 0) return (Ref<ACell>) keyRef;
+		return (Ref<ACell>) valueRef;
+	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
@@ -325,4 +332,5 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		// Vector is the canonical form of a MapEntry
 		return toVector();
 	}
+
 }
