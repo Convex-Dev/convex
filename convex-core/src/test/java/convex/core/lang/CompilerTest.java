@@ -695,6 +695,8 @@ public class CompilerTest extends ACVMTest {
 	public void testEdgeCases() {
 		assertFalse(evalB("(= *juice* *juice*)"));
 		assertEquals(Maps.of(1L,2L),eval("{1 2 1 2}"));
+		
+		assertEquals(Maps.of(1L,5L),eval("{1 2 1 3 1 4 1 5}"));
 
 		// TODO: sanity check? Does/should this depend on map ordering?
 		assertEquals(1L,evalL("(count {~(inc 1) 3 ~(dec 3) 4})"));
