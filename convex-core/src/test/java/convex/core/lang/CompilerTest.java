@@ -91,8 +91,20 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Constant.of(false),comp("false"));
 
 	}
+	
+	@Test public void testComments() {
+		assertEquals(Vectors.of(1,2,3),eval("[1 2 3] ;; Random stuff"));
+		assertEquals(Vectors.of(1,3),eval("[1 #_2 3]"));
+		assertEquals(Vectors.of(1,3),eval("[1 #_(+ 3 4) #_ 8 3]"));
+		assertEquals(Vectors.of(1,3),eval("[1 #_(+ 3 #_4) 3]"));
+		
+		assertThrows(ParseException.class,()->step("; No code here to run!"));
+		assertThrows(ParseException.class,()->step("#_(+ 3 4)"));
+		assertThrows(ParseException.class,()->step("#_(+ 3 4 ()"));
+	}
 
 	@Test public void testDo() {
+		assertNull(eval("(do)"));
 		assertEquals(1L,evalL("(do 2 1)"));
 		assertEquals(1L,evalL("(do *depth*)")); // Adds one level to initial depth
 		assertEquals(2L,evalL("(do (do *depth*))"));
