@@ -9,8 +9,17 @@ Key features:
 - Visualisation of CPoS consensus and network messaging
 - Simulations and stress test code
 
+## Usage
+
+### Local peer operation
+
+Run the main class `convex.gui.manager.PeerGUI`.
+
+This launches the GUI application, which defaults to running a small local network of Peers.
+
+
 ## License
 
 Copyright 2019-2023 The Convex Foundation and Contributors
 
-Code in convex-java is provided under the Convex Public License
+Code in convex-gui is provided under the Convex Public License
