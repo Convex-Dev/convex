@@ -178,20 +178,22 @@ public class PeerComponent extends BaseListComponent {
 		StringBuilder sb=new StringBuilder();
 		Server server=convex.getLocalServer();
 		if (server != null) {
-			State state=PeerGUI.getLatestState();
-			AccountKey paddr=server.getPeerKey();
-			sb.append("0x"+paddr.toChecksumHex()+"\n");
-			sb.append("Local peer on: " + server.getHostAddress() + " with store "+server.getStore()+"\n");
-			
-			PeerStatus ps=state.getPeer(paddr);
-			if (ps!=null) {
-				sb.append("Peer Stake:  "+Text.toFriendlyNumber(ps.getPeerStake()));
-				sb.append("    ");
-				sb.append("Delegated Stake:  "+Text.toFriendlyNumber(ps.getDelegatedStake()));
-			}
-			ConnectionManager cm=server.getConnectionManager();
-			sb.append("\n");
-			sb.append("Connections: "+cm.getConnectionCount());
+			PeerGUI.runOnServer(server,s->{
+				State state=s.getPeer().getConsensusState();
+				AccountKey paddr=server.getPeerKey();
+				sb.append("0x"+paddr.toChecksumHex()+"\n");
+				sb.append("Local peer on: " + s.getHostAddress() + " with store "+s.getStore()+"\n");
+				
+				PeerStatus ps=state.getPeer(paddr);
+				if (ps!=null) {
+					sb.append("Peer Stake:  "+Text.toFriendlyNumber(ps.getPeerStake()));
+					sb.append("    ");
+					sb.append("Delegated Stake:  "+Text.toFriendlyNumber(ps.getDelegatedStake()));
+				}
+				ConnectionManager cm=server.getConnectionManager();
+				sb.append("\n");
+				sb.append("Connections: "+cm.getConnectionCount());				
+			});
 		} else if (convex != null) {
 			sb.append(convex.toString());
 		} else {

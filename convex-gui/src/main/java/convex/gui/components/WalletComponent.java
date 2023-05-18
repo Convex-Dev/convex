@@ -12,7 +12,6 @@ import javax.swing.JPopupMenu;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -123,13 +122,14 @@ public class WalletComponent extends BaseListComponent {
 	}
 
 	private String getInfoString() {
-		State s = PeerGUI.getLatestState();
-		AccountStatus as=s.getAccount(address);
 		StringBuilder sb=new StringBuilder();
-		if (as!=null) {
-			Long bal=as.getBalance();
-			sb.append("Balance: " + ((bal==null)?"Null":Text.toFriendlyNumber(bal)));
-		}
+		PeerGUI.runWithLatestState(s->{
+			AccountStatus as=s.getAccount(address);
+			if (as!=null) {
+				Long bal=as.getBalance();
+				sb.append("Balance: " + ((bal==null)?"Null":Text.toFriendlyNumber(bal)));
+			}
+		});
 		//sb.append("\n");
 		//sb.append("Key: "+walletEntry.getAccountKey()+ "   Controller: "+as.getController());
 		return sb.toString();

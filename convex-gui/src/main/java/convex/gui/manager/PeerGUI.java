@@ -35,6 +35,8 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.init.Init;
+import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
@@ -349,7 +351,13 @@ public class PeerGUI extends JPanel {
 			if	(model!=null) return model;
 			StateModel<Peer> newModel=StateModel.create(s.getPeer());
 			s.getCVMExecutor().setUpdateHook(p->{
-				newModel.setValue(p);
+				AStore tempStore=Stores.current();
+				try {
+					Stores.setCurrent(s.getStore());
+					newModel.setValue(p);
+				} finally {
+					Stores.setCurrent(tempStore);
+				}
 				// latestState.setValue(p.getConsensusState());
 			});
 			models.put(s, newModel);
@@ -373,5 +381,43 @@ public class PeerGUI extends JPanel {
 			}
 		}
 		return result;
+	}
+	
+	public static Server getPrimaryServer() {
+		int n=peerList.getSize();
+		for (int i=0; i<n; i++) {
+			Convex c=peerList.elementAt(i);
+			Server s=c.getLocalServer();
+			if (s!=null) {
+				return s;
+			}
+		}
+		return null;
+	}
+
+	public static void runWithLatestState(Consumer<State> f) {
+		AStore tempStore=Stores.current();
+		try {
+			Server s=getPrimaryServer();
+			Stores.setCurrent(s.getStore());
+			f.accept(s.getPeer().getConsensusState());
+		} finally {
+			Stores.setCurrent(tempStore);
+		}
+	}
+	
+	public static void runOnPrimaryServer(Consumer<Server> f) {
+		Server s=getPrimaryServer();
+		runOnServer(s,f);
+	}
+
+	public static void runOnServer(Server server,Consumer<Server> f) {
+		AStore tempStore=Stores.current();
+		try {
+			Stores.setCurrent(server.getStore());
+			f.accept(server);
+		} finally {
+			Stores.setCurrent(tempStore);
+		}	
 	}
 }

@@ -9,7 +9,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.ListModel;
 
-import convex.core.State;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
@@ -24,7 +23,7 @@ public class AccountChooserPanel extends JPanel {
 
 	private JComboBox<String> modeCombo;
 	public JComboBox<WalletEntry> addressCombo;
-	private JLabel lblNewLabel_1;
+	private JLabel lblMode;
 	private JLabel lblNewLabel;
 
 	private ComboBoxModel<WalletEntry> addressModel = createAddressList(WalletPanel.getListModel());
@@ -36,13 +35,13 @@ public class AccountChooserPanel extends JPanel {
 		setLayout(flowLayout);
 
 		modeCombo = new JComboBox<String>();
-		modeCombo.setToolTipText("Use Transact to execute transactions (uses cash).\n\n"
+		modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
 				+ "Use Query to compute results without changing on-chain state (free).");
 		modeCombo.addItem("Transact");
 		modeCombo.addItem("Query");
 
-		lblNewLabel_1 = new JLabel("Mode:");
-		add(lblNewLabel_1);
+		lblMode = new JLabel("Mode:");
+		add(lblMode);
 		add(modeCombo);
 
 		lblNewLabel = new JLabel("Account:");
@@ -52,19 +51,21 @@ public class AccountChooserPanel extends JPanel {
 		addressCombo.setEditable(false);
 		add(addressCombo);
 		addressCombo.setModel(addressModel);
+		addressCombo.setToolTipText("Select Account for use");
 
 		balanceLabel = new JLabel("Balance: ");
+		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 		add(balanceLabel);
 
 		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
-			updateBalance((State) pc.getNewValue(), getSelectedAddress());
+			updateBalance(getSelectedAddress());
 		});
 
 		addressCombo.addItemListener(e -> {
-			updateBalance(PeerGUI.getLatestState(), getSelectedAddress());
+			updateBalance(getSelectedAddress());
 		});
 
-		updateBalance(PeerGUI.getLatestState(), getSelectedAddress());
+		// updateBalance(getSelectedAddress());
 	}
 
 	public Address getSelectedAddress() {
@@ -94,13 +95,15 @@ public class AccountChooserPanel extends JPanel {
 		return cm;
 	}
 
-	private void updateBalance(State s, Address a) {
-		if ((s == null) || (a == null)) {
-			balanceLabel.setText("Balance: <not available>");
-		} else {
-			Long amt= s.getBalance(a);
-			balanceLabel.setText("Balance: " + ((amt==null)?"Null":Text.toFriendlyNumber(amt)));
-		}
+	private void updateBalance(Address a) {
+		PeerGUI.runWithLatestState(s->{
+			if ((s == null) || (a == null)) {
+				balanceLabel.setText("Balance: <not available>");
+			} else {
+				Long amt= s.getBalance(a);
+				balanceLabel.setText("Balance: " + ((amt==null)?"Null":Text.toFriendlyNumber(amt)));
+			}
+		});
 	}
 
 	public String getMode() {

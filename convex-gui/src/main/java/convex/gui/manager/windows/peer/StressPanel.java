@@ -3,7 +3,6 @@ package convex.gui.manager.windows.peer;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -298,10 +297,9 @@ public class StressPanel extends JPanel {
 					sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/((endTime - startTime) * 0.001)) + "\n");
 
 
-				} catch (IOException e) {
-					log.warn("Stress test worker terminated from IO Exception");
 				} catch (Throwable e) {
 					log.warn("Stress test worker terminated unexpectedly",e);
+					resultArea.setText("Test Error: "+e);
 				} finally {
 					btnRun.setEnabled(true);
 				}
