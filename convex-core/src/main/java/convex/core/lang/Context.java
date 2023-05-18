@@ -6,13 +6,11 @@ import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
-import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.BlobMap;
 import convex.core.data.Hash;
@@ -27,7 +25,6 @@ import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
-import convex.core.exceptions.TODOException;
 import convex.core.init.Init;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.ATrampoline;
@@ -69,7 +66,7 @@ import convex.core.util.Errors;
  * - Alan Perlis
  *
  */
-public class Context extends AObject {
+public class Context {
 	private static final long INITIAL_JUICE = 0;
 
 	// Default values
@@ -1091,7 +1088,6 @@ public class Context extends AObject {
 		return ctx;
 	}
 
-	@Override
 	public boolean print(BlobBuilder bb, long limit)  {
 		bb.append("{");
 		bb.append(":juice "+juice);
@@ -1105,6 +1101,14 @@ public class Context extends AObject {
 		if (!getState().print(bb,limit)) return false;
 		bb.append("}");
 		return bb.check(limit);
+	}
+	
+	@Override
+	public String toString() {
+		BlobBuilder bb=new BlobBuilder();
+		long LIMIT=1000;
+		print(bb,LIMIT);
+		return bb.toBlob().toCVMString(LIMIT).toString();
 	}
 
 	public AVector<ACell> getLocalBindings() {
@@ -1948,7 +1952,7 @@ public class Context extends AObject {
 	public Context schedule(long time, AOp<?> op) {
 		// check vs current timestamp
 		long timestamp=getTimeStamp().longValue();
-		if (timestamp<0L) return withError(ErrorCodes.ARGUMENT);
+		if (timestamp<0L) return withError(ErrorCodes.STATE);
 		if (time<timestamp) time=timestamp;
 
 		long juiceNeeded=(time-timestamp)/Juice.SCHEDULE_MILLIS_PER_JUICE_UNIT;
@@ -2154,12 +2158,7 @@ public class Context extends AObject {
 	public Context fork() {
 		return new Context(chainState, juice, juiceLimit, localBindings,null, depth,null,log, compilerState);
 	}
-
-	@Override
-	public Blob createEncoding() {
-		throw new TODOException();
-	}
-
+	
 	/**
 	 * Appends a log entry for the current address.
 	 * @param values Values to log
