@@ -99,13 +99,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public MapEntry<K, V> getEntry(ACell k) {
-		// if we have an ACell instance, use (or compute) the cached hash. Probably
-		// faster.
-		if (k instanceof ACell) {
-			Hash h=k.cachedHash();
-			if (h!=null) return getEntryByHash(((ACell) k).getHash());
-		}
-
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			MapEntry<K, V> e = entries[i];

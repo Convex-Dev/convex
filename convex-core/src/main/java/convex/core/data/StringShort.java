@@ -178,6 +178,7 @@ public class StringShort extends AString {
 	}
 
 	public boolean equals(StringShort a) {
+		if (a==this) return true;
 		return data.equals(a.data);
 	}
 
