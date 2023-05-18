@@ -151,6 +151,7 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test public void testBadCode() {
 		assertCastError(step("(nil 1 2)"));
+		assertCastError(step("(3 1 2)"));
 	}
 
 	@Test public void testLambda() {
