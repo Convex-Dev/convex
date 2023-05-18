@@ -15,6 +15,7 @@
 	<url>https://convex.world</url>
 
 	<build>
+		<finalName>convex-gui</finalName>
 		<plugins>
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>

@@ -17,6 +17,11 @@ Run the main class `convex.gui.manager.PeerGUI`.
 
 This launches the GUI application, which defaults to running a small local network of Peers.
 
+### Flight recorder
+
+```
+java -cp target/convex-gui-jar-with-dependencies.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.gui.manager.PeerGUI
+```
 
 ## License
 
