@@ -151,6 +151,12 @@ public final class Keyword extends ASymbolic implements Comparable<Keyword> {
 		if (!(other instanceof Keyword)) return false;
 		return name.equals(((Keyword) other).name);
 	}
+	
+	public boolean equals(Keyword other) {
+		if (other == this) return true;
+		if (other == null) return false;
+		return name.equals(other.name);
+	}
 
 	@Override
 	public int compareTo(Keyword k) {

@@ -13,7 +13,7 @@ import convex.core.util.Utils;
  * 
  * Used for most small strings, and acts as the leaf chunk for StringTrees
  */
-public class StringShort extends AString {
+public final class StringShort extends AString {
 
 	/**
 	 * Length of longest StringShort value that is embedded
@@ -177,7 +177,7 @@ public class StringShort extends AString {
 		return false;
 	}
 
-	public boolean equals(StringShort a) {
+	public final boolean equals(StringShort a) {
 		if (a==this) return true;
 		return data.equals(a.data);
 	}

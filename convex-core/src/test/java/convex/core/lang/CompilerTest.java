@@ -148,6 +148,10 @@ public class CompilerTest extends ACVMTest {
 		assertArityError(step("(apply)"));
 
 	}
+	
+	@Test public void testBadCode() {
+		assertCastError(step("(nil 1 2)"));
+	}
 
 	@Test public void testLambda() {
 		assertEquals(2L,evalL("((fn [a] 2) 3)"));

@@ -100,6 +100,7 @@ public final class Symbol extends ASymbolic implements Comparable<Symbol> {
 	 * @return true if Symbols are equal, false otherwise
 	 */
 	public boolean equals(Symbol sym) {
+		if (sym==this) return true;
 		return sym.name.equals(name);
 	}
 	
