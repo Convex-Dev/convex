@@ -11,7 +11,6 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.data.ABlob;
-import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -25,6 +24,8 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
@@ -45,7 +46,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
-import convex.core.data.Blob;
 import convex.core.data.type.Types;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.CoreFn;
@@ -1020,7 +1020,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<ABlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
+	public static final CoreFn<BlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1031,7 +1031,7 @@ public class Core {
 			long juice = Juice.BUILD_DATA + len * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			ABlobMap<ABlob,ACell> r=BlobMaps.empty();
+			BlobMap<ABlob,ACell> r=BlobMaps.empty();
 			int n=len/2;
 			for (int i=0; i<n; i++) {
 				int ix=i*2;
@@ -1181,7 +1181,7 @@ public class Core {
 
 			AccountStatus as=context.getAccountStatus(address);
 			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account "+address+" does not exist to get holdings");
-			ABlobMap<Address,ACell> holdings=as.getHoldings();
+			BlobMap<Address,ACell> holdings=as.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account
 			ACell result=holdings.get(context.getAddress());

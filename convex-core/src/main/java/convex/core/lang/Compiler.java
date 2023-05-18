@@ -785,6 +785,7 @@ public class Compiler {
 				return context.withResult(Juice.EXPAND_CONSTANT, result);
 			}
 			
+			// Check for data structures, which potentially need expansion
 			if (x instanceof ADataStructure) {
 				ACell form = x;
 		
@@ -864,8 +865,7 @@ public class Compiler {
 				}
 			}
 
-			// Return the Syntax Object directly for anything else
-			// Remember to preserve metadata on symbols in particular!
+			// Return the value directly for anything else
 			return context.withResult(Juice.EXPAND_CONSTANT, x);
 		}
 	};

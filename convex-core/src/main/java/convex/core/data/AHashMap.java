@@ -145,6 +145,11 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 */
 	public abstract boolean containsAllKeys(AHashMap<K, V> map);
 
+	@SuppressWarnings("unchecked")
+	public final boolean containsKey(ACell key) {
+		return getEntry((K)key)!=null;
+	}
+	
 	/**
 	 * Writes this HashMap to a byte array. Will include values by default.
 	 * @param bs Byte array to encode into

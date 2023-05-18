@@ -91,12 +91,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return new MapLeaf<K,V>(items);
 	}
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public boolean containsKey(ACell key) {
-		return getEntry((K) key) != null;
-	}
-
 	@Override
 	public MapEntry<K, V> getEntry(ACell k) {
 		int len = size();
@@ -495,7 +489,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public MapEntry<K, V> entryAt(long i) {
-		return entries[Utils.checkedInt(i)];
+		return entries[(int)i];
 	}
 
 	@Override

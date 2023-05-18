@@ -188,21 +188,22 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	/**
 	 * Gets the entry in this map at a specified index, according to the
-	 * map-specific order.
+	 * map-specific order. Caller responsible for bounds check!
 	 * 
 	 * @param i Index of entry
 	 * @return MapEntry at the specified index.
-	 * @throws IndexOutOfBoundsException If this index is not valid
 	 */
 	public abstract MapEntry<K, V> entryAt(long i);
 	
 	@Override
 	public Ref<MapEntry<K, V>> getElementRef(long index) {
+		checkIndex(index);
 		return entryAt(index).getRef();
 	}
 	
 	@Override
 	public final MapEntry<K, V> get(long i) {
+		checkIndex(i);
 		return entryAt(i);
 	}
 

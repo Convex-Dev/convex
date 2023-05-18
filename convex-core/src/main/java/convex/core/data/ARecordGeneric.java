@@ -24,7 +24,7 @@ public abstract class ARecordGeneric extends ARecord {
 	
 	@Override
 	public MapEntry<Keyword, ACell> entryAt(long i) {
-		return MapEntry.create(format.getKey(Utils.checkedInt(i)), values.get(i));
+		return MapEntry.create(format.getKey((int)i), values.get(i));
 	}
 
 	@Override

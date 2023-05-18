@@ -23,7 +23,7 @@ public class AccountStatus extends ARecord {
 	private final long memory;
 	private final AHashMap<Symbol, ACell> environment;
 	private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
-	private final ABlobMap<Address, ACell> holdings;
+	private final BlobMap<Address, ACell> holdings;
 	private final Address controller;
 	private final AccountKey publicKey;
 	
@@ -44,7 +44,7 @@ public class AccountStatus extends ARecord {
 	private AccountStatus(long sequence, long balance, long memory,
 			AHashMap<Symbol, ACell> environment, 
 			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, 
-			ABlobMap<Address, ACell> holdings,
+			BlobMap<Address, ACell> holdings,
 			Address controller, 
 			AccountKey publicKey) {
 		super(FORMAT.count());
@@ -185,7 +185,7 @@ public class AccountStatus extends ARecord {
 			if ((metadata==null)||metadata.isEmpty()) throw new BadFormatException("Empty metadata included!");
 			epos+=metadata.getEncodingLength();
 		};		
-		ABlobMap<Address,ACell> holdings = null;
+		BlobMap<Address,ACell> holdings = null;
 		if ((included&HAS_HOLDINGS)!=0) {
 			holdings=Format.read(b, epos);
 			if ((holdings==null)||holdings.isEmpty()) throw new BadFormatException("Empty holdings included!");
@@ -342,8 +342,8 @@ public class AccountStatus extends ARecord {
 	 * Gets the holdings for this account. Will always be a non-null map.
 	 * @return Holdings map for this account
 	 */
-	public ABlobMap<Address, ACell> getHoldings() {
-		ABlobMap<Address, ACell> result=holdings;
+	public BlobMap<Address, ACell> getHoldings() {
+		BlobMap<Address, ACell> result=holdings;
 		if (result==null) return BlobMaps.empty();
 		return result;
 	}
@@ -354,7 +354,7 @@ public class AccountStatus extends ARecord {
 	}
 	
 	public AccountStatus withHolding(Address addr,ACell value) {
-		ABlobMap<Address, ACell> newHoldings=getHoldings();
+		BlobMap<Address, ACell> newHoldings=getHoldings();
 		if (value==null) {
 			newHoldings=newHoldings.dissoc(addr);
 		} else if (newHoldings==null) {
@@ -365,7 +365,7 @@ public class AccountStatus extends ARecord {
 		return withHoldings(newHoldings);
 	}
 
-	private AccountStatus withHoldings(ABlobMap<Address, ACell> newHoldings) {
+	private AccountStatus withHoldings(BlobMap<Address, ACell> newHoldings) {
 		if (newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
 		return new AccountStatus(sequence, balance, memory, environment,metadata,newHoldings,controller,publicKey);
@@ -424,7 +424,7 @@ public class AccountStatus extends ARecord {
 	public AccountStatus updateRefs(IRefFunction func) {
 		AHashMap<Symbol, ACell> newEnv=Ref.updateRefs(environment, func);
 		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta=Ref.updateRefs(metadata, func);
-		ABlobMap<Address, ACell> newHoldings=Ref.updateRefs(holdings, func);
+		BlobMap<Address, ACell> newHoldings=Ref.updateRefs(holdings, func);
 		
 		if ((newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)) {
 			return this;

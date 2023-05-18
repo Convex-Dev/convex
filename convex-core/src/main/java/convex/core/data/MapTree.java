@@ -175,18 +175,14 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public boolean containsKey(ACell key) {
-		return containsKeyRef(Ref.get(key));
-	}
-
-	@Override
 	public MapEntry<K, V> getEntry(ACell k) {
 		return getKeyRefEntry(Ref.get(k));
 	}
 
 	@Override
 	public MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref) {
-		int digit = ref.getHash().getHexDigit(shift);
+		Hash h=ref.getHash();
+		int digit = h.getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null; // -1 case indicates not found
 		return children[i].getValue().getKeyRefEntry(ref);
@@ -216,7 +212,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (pos < cc) return child.entryAt(pos);
 			pos -= cc;
 		}
-		throw new IndexOutOfBoundsException("Entry index: " + i);
+		throw new IndexOutOfBoundsException(i);
 	}
 
 	@Override

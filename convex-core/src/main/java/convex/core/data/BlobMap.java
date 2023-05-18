@@ -10,7 +10,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Bits;
-import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -24,7 +23,7 @@ import convex.core.util.Utils;
  * @param <K> Type of Keys
  * @param <V> Type of values
  */
-public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
+public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Ref<BlobMap>[] EMPTY_CHILDREN = new Ref[0];
 
@@ -673,12 +672,12 @@ public class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
 		}
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			ABlobMap<K, V> c = children[i].getValue();
+			BlobMap<K, V> c = children[i].getValue();
 			long cc = c.count();
 			if (ix < cc) return c.entryAt(ix);
 			ix -= cc;
 		}
-		throw new IndexOutOfBoundsException(Errors.badIndex(ix));
+		throw new IndexOutOfBoundsException(ix);
 	}
 
 	/**

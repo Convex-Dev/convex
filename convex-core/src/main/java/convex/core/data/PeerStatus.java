@@ -27,14 +27,14 @@ public class PeerStatus extends ARecord {
 	/**
 	 * Map of delegated stakes. Never null internally, but empty map encoded as null.
 	 */
-	private final ABlobMap<Address, CVMLong> stakes;
+	private final BlobMap<Address, CVMLong> stakes;
 
 	/**
 	 * Metadata for the Peer. Can be null internally, which is interpreted as an empty Map.
 	 */
 	private final AHashMap<ACell,ACell> metadata;
 
-	private PeerStatus(Address controller, long stake, ABlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata) {
+	private PeerStatus(Address controller, long stake, BlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata) {
 		super(FORMAT.count());
         this.controller = controller;
 		this.stake = stake;
@@ -145,7 +145,7 @@ public class PeerStatus extends ARecord {
 	    long stake = Format.readVLCLong(b,epos);
 	    epos+=Format.getVLCLength(stake);
 	    
-		ABlobMap<Address, CVMLong> stakes = Format.read(b,epos);
+		BlobMap<Address, CVMLong> stakes = Format.read(b,epos);
 		epos+=Format.getEncodingLength(stakes);
 		if (stakes==null) {
 			stakes=BlobMaps.empty();
@@ -207,7 +207,7 @@ public class PeerStatus extends ARecord {
 		// compute adjustment to total delegated stake
 		long newDelegatedStake = delegatedStake + newStake - oldStake;
 
-		ABlobMap<Address, CVMLong> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
+		BlobMap<Address, CVMLong> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
 				: stakes.assoc(delegator, CVMLong.create(newStake));
 		return new PeerStatus(controller, stake, newStakes, newDelegatedStake, metadata);
 	}
@@ -256,7 +256,7 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public PeerStatus updateRefs(IRefFunction func) {
-		ABlobMap<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
+		BlobMap<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
 		AHashMap<ACell,ACell> newMeta = Ref.updateRefs(metadata, func);
 
 		if ((this.stakes==newStakes)&&(this.metadata==newMeta)) {
@@ -265,7 +265,7 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(controller, stake, newStakes, delegatedStake, newMeta);
 	}
 
-	protected static long computeDelegatedStake(ABlobMap<Address, CVMLong> stakes) {
+	protected static long computeDelegatedStake(BlobMap<Address, CVMLong> stakes) {
 		long ds = stakes.reduceValues((acc, e)->acc+e.longValue(), 0L);
 		return ds;
 	}

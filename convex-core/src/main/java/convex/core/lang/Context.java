@@ -3,7 +3,6 @@ package convex.core.lang;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
-import convex.core.data.ABlobMap;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -15,6 +14,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
+import convex.core.data.BlobMap;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -702,7 +702,7 @@ public class Context extends AObject {
 	 * Gets the holdings map for the current account.
 	 * @return Map of holdings, or null if the current account does not exist.
 	 */
-	public ABlobMap<Address,ACell> getHoldings() {
+	public BlobMap<Address,ACell> getHoldings() {
 		AccountStatus as=getAccountStatus(getAddress());
 		if (as==null) return null;
 		return as.getHoldings();

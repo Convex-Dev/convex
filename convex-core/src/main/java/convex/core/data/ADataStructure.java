@@ -126,5 +126,15 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	public AString toCVMString(long limit) {
 		return print(limit);
 	}
+	
+	/**
+	 * Checks if the given index is in range for this data structure
+	 * @param ix Index to check
+	 * @throws IndexOutOfBoundsException if index is invalid
+	 */
+	public final void checkIndex(long ix) {
+		if ((ix>=0)&&(ix<count)) return;
+		throw new IndexOutOfBoundsException(ix);
+	}
 
 }
