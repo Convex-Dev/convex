@@ -6,6 +6,7 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.ADataStructure;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AMap;
@@ -784,80 +785,83 @@ public class Compiler {
 				return context.withResult(Juice.EXPAND_CONSTANT, result);
 			}
 			
-			ACell form = x;
-	
-			// First check for sequences. This covers most cases.
-			if (form instanceof ASequence) {
-				
-				// first check for List containing an expander
-				if (form instanceof AList) {
-					AList<ACell> listForm = (AList<ACell>) form;
-					int n = listForm.size();
-					// consider length 0 lists as constant
-					if (n == 0) return context.withResult(Juice.EXPAND_CONSTANT, x);
-	
-					// we need to check if the form itself starts with an expander
-					ACell first = Syntax.unwrap(listForm.get(0));
-	
-					// check for macro / expander in initial position.
-					// Note that 'quote' is handled by this, via QUOTE_EXPANDER
-					AFn<ACell> expander = context.lookupExpander(first);
-					if (expander!=null) {
-						return context.expand(expander,x, cont); // (exp x cont)
+			if (x instanceof ADataStructure) {
+				ACell form = x;
+		
+				// First check for sequences. This covers most cases.
+				if (form instanceof ASequence) {
+					
+					// first check for List containing an expander
+					if (form instanceof AList) {
+						AList<ACell> listForm = (AList<ACell>) form;
+						int n = listForm.size();
+						
+						// consider length 0 lists as constant
+						if (n == 0) return context.withResult(Juice.EXPAND_CONSTANT, x);
+		
+						// we need to check if the form itself starts with an expander
+						ACell first = Syntax.unwrap(listForm.get(0));
+		
+						// check for macro / expander in initial position.
+						// Note that 'quote' is handled by this, via QUOTE_EXPANDER
+						AFn<ACell> expander = context.lookupExpander(first);
+						if (expander!=null) {
+							return context.expand(expander,x, cont); // (exp x cont)
+						}
 					}
+	
+					// need to recursively expand collection elements
+					// OK for vectors and lists
+					ASequence<ACell> seq = (ASequence<ACell>) form;
+					if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, x);
+					
+					long n=seq.count();
+					for (long i=0; i<n; i++) {
+						ACell elem=seq.get(i);
+					
+						// Expand like: (cont x cont)
+						context = context.expand(cont,elem, cont);
+						if (context.isExceptional()) return context;
+	
+						ACell newElement = context.getResult();
+						if (newElement!=elem) seq=seq.assoc(i, newElement);
+					};
+					Context rctx = context;
+					return rctx.withResult(Juice.EXPAND_SEQUENCE, seq);
 				}
-
-				// need to recursively expand collection elements
-				// OK for vectors and lists
-				ASequence<ACell> seq = (ASequence<ACell>) form;
-				if (seq.isEmpty()) return context.withResult(Juice.EXPAND_CONSTANT, x);
-				
-				long n=seq.count();
-				for (long i=0; i<n; i++) {
-					ACell elem=seq.get(i);
-				
-					// Expand like: (cont x cont)
-					context = context.expand(cont,elem, cont);
-					if (context.isExceptional()) return context;
-
-					ACell newElement = context.getResult();
-					if (newElement!=elem) seq=seq.assoc(i, newElement);
-				};
-				Context rctx = context;
-				return rctx.withResult(Juice.EXPAND_SEQUENCE, seq);
-			}
-
-			if (form instanceof ASet) {
-				Context ctx =  (Context)context;
-				ASet<ACell> updated = Sets.empty();
-				for (ACell elem : ((ASet<ACell>) form)) {
-					ctx = ctx.expand(cont, elem, cont);
-					if (ctx.isExceptional()) return ctx;
-
-					ACell newElement = ctx.getResult();
-					updated = updated.conj(newElement);
+	
+				if (form instanceof ASet) {
+					Context ctx =  (Context)context;
+					ASet<ACell> updated = Sets.empty();
+					for (ACell elem : ((ASet<ACell>) form)) {
+						ctx = ctx.expand(cont, elem, cont);
+						if (ctx.isExceptional()) return ctx;
+	
+						ACell newElement = ctx.getResult();
+						updated = updated.conj(newElement);
+					}
+					return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);
 				}
-				return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);
-			}
-
-			if (form instanceof AMap) {
-				Context ctx =  context;
-				AMap<ACell, ACell> updated = Maps.empty();
-				for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
-					// get new key
-					ctx = ctx.expand(cont,me.getKey(), cont);
-					if (ctx.isExceptional()) return ctx;
-
-					ACell newKey = ctx.getResult();
-
-					// get new value
-					ctx = ctx.expand(cont,me.getValue(), cont);
-					if (ctx.isExceptional()) return ctx;
-					ACell newValue = ctx.getResult();
-
-					updated = updated.assoc(newKey, newValue);
+	
+				if (form instanceof AMap) {
+					Context ctx =  context;
+					AMap<ACell, ACell> updated = Maps.empty();
+					for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
+						// get new key
+						ctx = ctx.expand(cont,me.getKey(), cont);
+						if (ctx.isExceptional()) return ctx;
+	
+						ACell newKey = ctx.getResult();
+	
+						// get new value
+						ctx = ctx.expand(cont,me.getValue(), cont);
+						if (ctx.isExceptional()) return ctx;
+						ACell newValue = ctx.getResult();
+	
+						updated = updated.assoc(newKey, newValue);
+					}
+					return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);
 				}
-				return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);
 			}
 
 			// Return the Syntax Object directly for anything else

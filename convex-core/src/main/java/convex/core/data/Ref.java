@@ -499,7 +499,13 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public final boolean isEmbedded() {
 		if ((flags&KNOWN_EMBEDDED_MASK)!=0) return true; 
 		if ((flags&NON_EMBEDDED_MASK)!=0) return false;
-		boolean em= Format.isEmbedded(getValue());
+		boolean em;
+		ACell value=getValue();
+		if (value==null) {
+			em=true;
+		} else {
+			em=value.isEmbedded();
+		}
 		flags=flags|(em?KNOWN_EMBEDDED_MASK:NON_EMBEDDED_MASK);
 		return em;
 	}

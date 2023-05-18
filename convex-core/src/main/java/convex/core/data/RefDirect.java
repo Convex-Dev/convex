@@ -80,14 +80,15 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	public boolean equals(Ref<T> a) {
 		if (a == this) return true;
 		if (a instanceof RefDirect) {
-			RefDirect<T> ra=(RefDirect<T>) a;
-			if (value==ra.value) return true; // fast path
-			if (value==null) return ra.value==null; // catch nulls
+			T va=((RefDirect<T>) a).value;
+			if (value==va) return true; // fast path
+			if (value==null) return va==null; // catch nulls
 			if (this.hash != null) {
+				Hash ha=a.hash;
 				// use hash if available for both Refs
-				if (ra.hash != null) return this.hash.equals(a.hash);
+				if (ha != null) return this.hash.equals(ha);
 			}
-			return value.equals(ra.getValue());
+			return value.equals(va);
 		} else {
 			// Don't want to pull from store, so use hash comparison
 			return getHash().equals(a.getHash());

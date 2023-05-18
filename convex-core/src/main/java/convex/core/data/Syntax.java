@@ -22,7 +22,7 @@ import convex.core.lang.RT;
  * Inspired by Racket.
  * 
  */
-public class Syntax extends ACell {
+public final class Syntax extends ACell {
 	public static final Syntax EMPTY = create(null, null);
 
 	public static final AString EMPTY_META_PREFIX = Strings.create("^{} ");
