@@ -132,7 +132,17 @@ public abstract class AStore {
 		Ref<?> cached=blobCache.getCell(hash);
 		if (cached!=null) return cached.getValue();
 		
-		ACell decoded=Format.read(encoding);		
+		// Need to ensure we are reading with the current store set
+		AStore tempStore=Stores.current();
+		ACell decoded;
+		if (tempStore==this) {
+			decoded=Format.read(encoding);
+		} else try {
+			Stores.setCurrent(this);
+			decoded=Format.read(encoding);
+		} finally {
+			Stores.setCurrent(tempStore);
+		}
 		return decoded;
 	}
 
