@@ -489,7 +489,8 @@ public class Context extends AObject {
 	 * @return true if juice is sufficient, false otherwise.
 	 */
 	public boolean checkJuice(long gulp) {
-		return (juice+gulp<=juiceLimit);
+		long juiceUsed = juice + gulp;
+		return (juiceUsed >= 0 && juiceUsed <= juiceLimit);
 	}
 
 	/**
@@ -1401,6 +1402,11 @@ public class Context extends AObject {
 
 	public Context withJuice(long newJuice) {
 		juice=newJuice;
+		return this;
+	}
+
+	public Context withJuiceLimit(long newJuiceLimit) {
+		juiceLimit = newJuiceLimit;
 		return this;
 	}
 
