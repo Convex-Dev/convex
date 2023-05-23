@@ -575,6 +575,7 @@ public class Server implements Closeable {
 	 * 5 = consensus point
 	 * 6 = proposal point
 	 * 7 = ordering length
+	 * 8 = consensus point vector
 	 * @return Status vector
 	 */
 	public AVector<ACell> getStatusVector() {
@@ -593,8 +594,10 @@ public class Server implements Closeable {
 		CVMLong cp = CVMLong.create(order.getConsensusPoint()) ;
 		CVMLong pp = CVMLong.create(order.getProposalPoint()) ;
 		CVMLong op = CVMLong.create(order.getBlockCount()) ;
+		AVector<CVMLong> cps = Vectors.of(Utils.toObjectArray(order.getConsensusPoints())) ;
 
-		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash, cp,pp,op);
+		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash, cp,pp,op,cps);
+		assert(reply.count()==Constants.STATUS_COUNT);
 		return reply;
 	}
 

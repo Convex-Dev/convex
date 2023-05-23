@@ -48,9 +48,9 @@ public class TransactionHandler extends AThreadedComponent{
 	private static final long OWN_BLOCK_DELAY=2000;
 
 	/**
-	 * Default minimum delay between proposing own transactions as a peer
+	 * Default minimum delay between proposing a block as a peer
 	 */
-	private static final long MIN_BLOCK_TIME=50;
+	private static final long MIN_BLOCK_TIME=100;
 	
 	/**
 	 * Queue for incoming (unverified) transaction messages
@@ -121,7 +121,7 @@ public class TransactionHandler extends AThreadedComponent{
 			}
 			
 			// Persist the signed transaction. Might throw MissingDataException?
-			// If we already have the transaction persisted, will set signature status
+			// If we already have the transaction persisted, will obtain signature status
 			sd=ACell.createPersisted(sd).getValue();
 	
 			// Put on Server's transaction queue. We are OK to block here
