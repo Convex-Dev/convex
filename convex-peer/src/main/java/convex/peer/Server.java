@@ -396,7 +396,9 @@ public class Server implements Closeable {
 	 */
 	protected void processMessage(Message m) {
 		MessageType type = m.getType();
+		AStore tempStore=Stores.current();
 		try {
+			Stores.setCurrent(this.store);
 			switch (type) {
 			case BELIEF:
 				processBelief(m);
@@ -440,6 +442,8 @@ public class Server implements Closeable {
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
 		} catch (Throwable e) {
 			log.warn("Error processing client message: {}", e);
+		} finally {
+			Stores.setCurrent(tempStore);
 		}
 	}
 
