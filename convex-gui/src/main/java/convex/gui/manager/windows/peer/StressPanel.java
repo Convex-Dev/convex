@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -94,6 +93,7 @@ public class StressPanel extends JPanel {
 		JLabel lblClients = new JLabel("Clients");
 		optionPanel.add(lblClients);
 		clientCountSpinner = new JSpinner();
+		// Note: about 300 max number of clients before hitting juice limits for account creation
 		clientCountSpinner.setModel(new SpinnerNumberModel(100, 1, 300, 1));
 		optionPanel.add(clientCountSpinner);
 
@@ -256,7 +256,7 @@ public class StressPanel extends JPanel {
 					
 					// wait for everything to be sent
 					for (int i=0; i<clientCount; i++) {
-						cfutures.get(i).get(60, TimeUnit.SECONDS);
+						cfutures.get(i).get();
 					}
 					// long sendTime = Utils.getCurrentTimestamp();
 
