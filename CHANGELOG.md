@@ -6,10 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.7.10] - 2023-05-30
+
 ### Added
 - Scoped Actors 
 - BIP39 compatible seed generation
 - Variable sized Etch index levels
+- Ability to set `*juice-limit* in a Context (thanks @helins!)
+- Extra consensus confirmation levels and configuration options
 
 ### Changed
 - Make `blob` casts support arbitrary sized integers
@@ -18,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `*juice*` now starts at 0 and counts upwards towards a juice limit
 
 ### Fixed
-
+- Various improvements for efficient consensus
 
 ## [0.7.10] - 2023-04-28
 
