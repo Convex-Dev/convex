@@ -207,8 +207,9 @@ public class PeerStatus extends ARecord {
 		// compute adjustment to total delegated stake
 		long newDelegatedStake = delegatedStake + newStake - oldStake;
 
-		BlobMap<Address, CVMLong> newStakes = (newStake == 0L) ? stakes.dissoc(delegator)
-				: stakes.assoc(delegator, CVMLong.create(newStake));
+		// Cast needed for Maven Java 11 compile?
+		BlobMap<Address, CVMLong> newStakes = (BlobMap<Address,CVMLong>)((newStake == 0L) ? stakes.dissoc(delegator)
+				: stakes.assoc(delegator, CVMLong.create(newStake)));
 		return new PeerStatus(controller, stake, newStakes, newDelegatedStake, metadata);
 	}
 	

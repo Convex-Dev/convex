@@ -355,8 +355,8 @@ public class AccountStatus extends ARecord {
 	
 	public AccountStatus withHolding(Address addr,ACell value) {
 		BlobMap<Address, ACell> newHoldings=getHoldings();
-		if (value==null) {
-			newHoldings=newHoldings.dissoc(addr);
+		if (value==null) { 
+			newHoldings=(BlobMap<Address, ACell>)newHoldings.dissoc(addr);
 		} else if (newHoldings==null) {
 			newHoldings=BlobMaps.of(addr,value);
 		} else {
