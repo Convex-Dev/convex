@@ -1298,7 +1298,7 @@ public class Context {
 		AccountStatus as=this.getAccountStatus(address);
 		if (as==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
 
-		Address controller=as.getController();
+		ACell controller=as.getController();
 		if (controller==null) return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+address);
 
 		boolean canControl=false;
@@ -1306,16 +1306,19 @@ public class Context {
 		// Run eval in a forked context
 		Context ctx=this.fork();
 		if (controller.equals(getAddress())) {
+			// can always control own address
 			canControl=true;
 		} else {
-			AccountStatus controlAccount=this.getAccountStatus(controller);
-			if (controlAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
-			if (controlAccount.isActor()) {
-				// (call target amount (receive-coin source amount nil))
-				ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,null,address);
-				if (ctx.isExceptional()) return ctx;
-				canControl=RT.bool(ctx.getResult());
-			}
+			// need to check trust monitor
+			Address actorAddress=RT.callableAddress(controller);
+			if (actorAddress==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller is not a valid address or scoped actor");
+			AccountStatus actorAccount=this.getAccountStatus(actorAddress);
+			if (actorAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
+
+			// (call target amount (receive-coin source amount nil))
+			ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,null,address);
+			if (ctx.isExceptional()) return ctx;
+			canControl=RT.bool(ctx.getResult());
 		}
 
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
@@ -2126,7 +2129,7 @@ public class Context {
 	 * @param address New controller Address
 	 * @return Context with current Account controller set
 	 */
-	public Context setController(Address address) {
+	public Context setController(ACell address) {
 		AccountStatus as=getAccountStatus();
 		as=as.withController(address);
 		return withAccountStatus(getAddress(),as);

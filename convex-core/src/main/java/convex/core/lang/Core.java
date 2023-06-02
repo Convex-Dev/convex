@@ -1221,13 +1221,14 @@ public class Core {
 
 			// Get requested controller. Must be a valid address or null
 			ACell arg=args[0];
-			Address controller=null;
+			ACell controller=null;
 			if (arg!=null) {
-				controller=RT.ensureAddress(arg);
-				if (controller == null) return context.withCastError(arg, Types.ADDRESS);
-				if (context.getAccountStatus(controller)==null) {
+				Address controlAddress=RT.callableAddress(arg);
+				if (controlAddress == null) return context.withError(ErrorCodes.CAST,name()+" requires an Address or scoped Actor");
+				if (context.getAccountStatus(controlAddress)==null) {
 					 return context.withError(ErrorCodes.NOBODY, name()+" requires an address for an existing account");
 				}
+				controller=arg; // we have now validated arg is OK as controller
 			}
 
 			context=(Context) context.setController(controller);

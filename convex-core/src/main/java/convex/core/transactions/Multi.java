@@ -169,7 +169,7 @@ public class Multi extends ATransaction {
 			// different origin account, so need to check control right
 			AccountStatus as=ctx.getAccountStatus(torigin);
 			if (as==null) return ctx.withError(ErrorCodes.NOBODY,"Child transaction origin account does not exist");
-			Address cont=as.getController();
+			ACell cont=as.getController();
 			if ((cont==null)||!this.origin.equals(cont)) {
 				return ctx.withError(ErrorCodes.TRUST,"Account control not available");
 			}

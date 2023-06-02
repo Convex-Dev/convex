@@ -24,7 +24,7 @@ public class AccountStatus extends ARecord {
 	private final AHashMap<Symbol, ACell> environment;
 	private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
 	private final BlobMap<Address, ACell> holdings;
-	private final Address controller;
+	private final ACell controller;
 	private final AccountKey publicKey;
 	
 	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,Keywords.METADATA,
@@ -45,7 +45,7 @@ public class AccountStatus extends ARecord {
 			AHashMap<Symbol, ACell> environment, 
 			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, 
 			BlobMap<Address, ACell> holdings,
-			Address controller, 
+			ACell controller, 
 			AccountKey publicKey) {
 		super(FORMAT.count());
 		this.sequence = sequence;
@@ -230,7 +230,7 @@ public class AccountStatus extends ARecord {
 	 * Get the controller for this Account
 	 * @return Controller Address, or null if there is no controller
 	 */
-	public Address getController() {
+	public ACell getController() {
 		return controller;
 	}
 
@@ -371,7 +371,7 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, balance, memory, environment,metadata,newHoldings,controller,publicKey);
 	}
 	
-	public AccountStatus withController(Address newController) {
+	public AccountStatus withController(ACell newController) {
 		if (controller==newController) return this;
 		return new AccountStatus(sequence, balance, memory, environment,metadata,holdings,newController,publicKey);
 	}

@@ -3971,7 +3971,7 @@ public class CoreTest extends ACVMTest {
 
 		assertAssertError(step(ctx,"(eval-as hero '(assert false))"));
 	}
-
+	
 	@Test
 	public void testEvalAsUntrustedUser() {
 		Context ctx=step("(set-controller nil)");
@@ -3988,6 +3988,19 @@ public class CoreTest extends ACVMTest {
 		Context ctx=step("(deploy '(do (defn check-trusted? ^{:callable? true} [s a o] (= s (address "+VILLAIN+")))))");
 		Address monitor = (Address) ctx.getResult();
 		ctx=step(ctx,"(set-controller "+monitor+")");
+
+		ctx=ctx.forkWithAddress(VILLAIN);
+		ctx=step(ctx,"(def hero "+HERO+")");
+
+		assertEquals(3L, evalL(ctx,"(eval-as hero '(+ 1 2))"));
+	}
+	
+	@Test
+	public void testEvalAsScoped() {
+		// create trust monitor that allows VILLAIN
+		Context ctx=step("(deploy '(do (defn check-trusted? ^{:callable? true} [s a o] (= s *scope*))))");
+		Address monitor = (Address) ctx.getResult();
+		ctx=step(ctx,"(set-controller ["+monitor+" "+VILLAIN+"])");
 
 		ctx=ctx.forkWithAddress(VILLAIN);
 		ctx=step(ctx,"(def hero "+HERO+")");
