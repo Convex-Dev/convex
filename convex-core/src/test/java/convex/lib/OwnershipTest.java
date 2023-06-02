@@ -54,9 +54,23 @@ public class OwnershipTest extends ACVMTest {
 		assertTrue(evalB(ctx,"(trust/trusted? [monitor [USD 1000]] *address*)"));
 		assertFalse(evalB(ctx,"(trust/trusted? [monitor [USD 1001]] *address*)"));
 		
-		assertCastError(step(ctx,"(trust/trusted? [monitor :bad-scope] *address*)"));
-
+		assertCastError(step(ctx,"(trust/trusted? [monitor :bad-scope] *address*)"));	
+	}
+	
+	@Test 
+	public void testNFTOwnership() {
+		Context ctx=context();
+		ctx = step(ctx, "(import asset.nft.simple :as nft-actor)");
+		assertNotError(ctx);
 		
+		ctx=step(ctx,"(def NFT (call nft-actor (create)))");
+		assertNotError(ctx);
+		
+		assertTrue(evalB(ctx,"(trust/trusted? [monitor [nft-actor #{NFT}]] *address*)"));
+		assertFalse(evalB(ctx,"(trust/trusted? [monitor [nft-actor #{NFT :bad-ID}]] *address*)"));
+		assertFalse(evalB(ctx,"(trust/trusted? [monitor [nft-actor #{:bad-ID}]] *address*)"));
+		
+		assertCastError(step(ctx,"(trust/trusted? [monitor :bad-scope] *address*)"));	
 	}
 
 
