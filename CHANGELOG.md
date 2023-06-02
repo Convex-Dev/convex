@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+- Asset ownership based trust monitor `convex.trust.ownership-monitor`
 
 ### Changed
 
