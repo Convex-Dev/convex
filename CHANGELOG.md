@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Asset ownership based trust monitor `convex.trust.ownership-monitor`
 
 ### Changed
+- Account controllers can now be any scoped actor
 
 ### Fixed
 

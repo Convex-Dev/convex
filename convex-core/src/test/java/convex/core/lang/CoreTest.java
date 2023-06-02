@@ -4076,9 +4076,17 @@ public class CoreTest extends ACVMTest {
 		// set-controller returns new controller
 		assertEquals(VILLAIN, eval("(set-controller "+VILLAIN+")"));
 		assertEquals(VILLAIN, eval("(set-controller (address "+VILLAIN+"))"));
-		assertEquals(null, (Address)eval("(set-controller nil)"));
-
-		assertNobodyError(step("(set-controller #666666)")); // non-existent account
+		assertNull(eval("(set-controller nil)"));
+		
+		assertNotError(step("(set-controller ["+VILLAIN+" :random-scope])"));
+		
+		// Badly structured scope
+		assertCastError(step("(set-controller ["+VILLAIN+"])"));
+		assertCastError(step("(set-controller [:foo :bar])"));
+		
+		// non-existent controller accounts
+		assertNobodyError(step("(set-controller [#9999999 :nonce])"));
+		assertNobodyError(step("(set-controller #666666)")); 
 
 		assertCastError(step("(set-controller :foo)"));
 		assertCastError(step("(set-controller (address nil))")); // Address cast fails
