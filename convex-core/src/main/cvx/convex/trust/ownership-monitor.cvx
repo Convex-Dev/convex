@@ -1,0 +1,12 @@
+'convex.trust.ownership-monitor
+
+(import convex.asset :as asset)
+
+(defn check-trusted?
+  ^{:callable? true
+    :doc {:description ["Trust monitor SPI for testing asset ownership."
+                        "Ignores action and object, simply checks if the subject owns the asset specified in *scope*."]
+          :examples    [{:code "(call [ownership-monitor [some-token 1000]] (check-trusted *caller* nil nil))"}]
+          :signature   [{:params [ subject action object]}]}}
+  [subject action object]  
+  (asset/owns? subject *scope*))

@@ -3641,6 +3641,10 @@ public class CoreTest extends ACVMTest {
 		// Bad arity fn execution
 		assertArityError(step("((fn [x] 0))"));
 		assertArityError(step("((fn [] 0) 1)"));
+		
+		// Failed destructuring
+		assertArityError(step("((fn [[a b]] :OK) [1])"));
+		assertCastError(step("((fn [[a b]] :OK) :foobar)"));
 
 		// Bad fn forms
 		assertArityError(step("(fn)"));

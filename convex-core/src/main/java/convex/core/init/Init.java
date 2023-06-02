@@ -214,6 +214,7 @@ public class Init {
 			s = doActorDeploy(s, "convex/play.cvx");
 			s = doActorDeploy(s, "convex/did.cvx");
 			s = doActorDeploy(s, "lab/curation-market.cvx");
+			s = doActorDeploy(s, "convex/trust/ownership-monitor.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
