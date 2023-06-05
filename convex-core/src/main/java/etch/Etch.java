@@ -63,28 +63,28 @@ import convex.core.util.Utils;
  */
 public class Etch {
 	// structural constants for data block
-	private static final int KEY_SIZE=32;
-	private static final int MAX_LEVEL=60; // 2 bytes + 1 byte + 58 hex digits for 29 remaining bytes
+	static final int KEY_SIZE=32;
+	static final int MAX_LEVEL=60; // 2 bytes + 1 byte + 58 hex digits for 29 remaining bytes
 
-	private static final int LABEL_SIZE=1+8; // Flags (byte) plus Memory Size (long)
-	private static final int LENGTH_SIZE=2;
-	private static final int POINTER_SIZE=8;
+	static final int LABEL_SIZE=1+8; // Flags (byte) plus Memory Size (long)
+	static final int LENGTH_SIZE=2;
+	static final int POINTER_SIZE=8;
 
 	// constants for memory mapping buffers into manageable regions
-	private static final long MAX_REGION_SIZE=1<<30; // 1GB seems reasonable, note JVM 2GB limit :-/
-	private static final long REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
+	static final long MAX_REGION_SIZE=1<<30; // 1GB seems reasonable, note JVM 2GB limit :-/
+	static final long REGION_MARGIN=65536; // 64k margin for writes past end of current buffer
 
 	/**
 	 * Magic number for Etch files, must be first 2 bytes
 	 */
-	private static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
+	static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
 
-	private static final int SIZE_HEADER_MAGIC=2;
-	private static final int SIZE_HEADER_FILESIZE=8;
-	private static final int SIZE_HEADER_ROOT=32;
+	static final int SIZE_HEADER_MAGIC=2;
+	static final int SIZE_HEADER_FILESIZE=8;
+	static final int SIZE_HEADER_ROOT=32;
 	
-	private static final int ZLEN=16384;
-	private static final byte[] ZERO_ARRAY=new byte[ZLEN];
+	static final int ZLEN=16384;
+	static final byte[] ZERO_ARRAY=new byte[ZLEN];
 
 	/**
 	 * Length of Etch header
@@ -92,7 +92,7 @@ public class Etch {
 	 * "The Ultimate Answer to Life, The Universe and Everything is... 42!"
      * - Douglas Adams, The Hitchhiker's Guide to the Galaxy
 	 */
-	private static final int SIZE_HEADER=SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
+	static final int SIZE_HEADER=SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
 
 	protected static final long OFFSET_FILE_SIZE = SIZE_HEADER_MAGIC;
 	protected static final long OFFSET_ROOT_HASH = SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE;
@@ -101,13 +101,13 @@ public class Etch {
 	 * Start position of first index block
 	 * This is immediately after a long data length pointer at the start of the file
 	 */
-	private static final long INDEX_START=SIZE_HEADER;
+	static final long INDEX_START=SIZE_HEADER;
 
-	private static final long TYPE_MASK = 0xC000000000000000L;
-	private static final long PTR_PLAIN = 0x0000000000000000L; // direct pointer to data
-	private static final long PTR_INDEX = 0x4000000000000000L; // pointer to index block
-	private static final long PTR_START = 0x8000000000000000L; // start of chained entries
-	private static final long PTR_CHAIN = 0xC000000000000000L; // chained entries after start
+	static final long TYPE_MASK = 0xC000000000000000L;
+	static final long PTR_PLAIN = 0x0000000000000000L; // direct pointer to data
+	static final long PTR_INDEX = 0x4000000000000000L; // pointer to index block
+	static final long PTR_START = 0x8000000000000000L; // start of chained entries
+	static final long PTR_CHAIN = 0xC000000000000000L; // chained entries after start
 
 	private static final Logger log=LoggerFactory.getLogger(Etch.class.getName());
 
@@ -541,7 +541,7 @@ public class Etch {
 	 * @return
 	 * @throws IOException
 	 */
-	protected Blob readBlob(long pointer, int length) throws IOException {
+	Blob readBlob(long pointer, int length) throws IOException {
 		MappedByteBuffer mbb=seekMap(pointer);
 		byte[] bs=new byte[length];
 		mbb.get(bs);
@@ -617,7 +617,7 @@ public class Etch {
 	 * @param slotValue
 	 * @return
 	 */
-	private long rawPointer(long slotValue) {
+	long rawPointer(long slotValue) {
 		return slotValue&~TYPE_MASK;
 	}
 
@@ -745,7 +745,7 @@ public class Etch {
 	 * @return Pointer value (including type bits in MSBs)
 	 * @throws IOException
 	 */
-	private long readSlot(long indexPosition, int digit) throws IOException {
+	long readSlot(long indexPosition, int digit) throws IOException {
 		long pointerIndex=indexPosition+POINTER_SIZE*digit;
 		MappedByteBuffer mbb=seekMap(pointerIndex);
 		long pointer=mbb.getLong();
@@ -814,6 +814,27 @@ public class Etch {
 		long position=indexPosition+digit*POINTER_SIZE;
 		MappedByteBuffer mbb=seekMap(position);
 		mbb.putLong(slotValue);
+	}
+	
+	public void visitIndex(IEtchIndexVisitor v) {
+		int[] bs=new int[32];
+		try {
+			visitIndex(v,bs,0,INDEX_START);
+		}catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+
+	private void visitIndex(IEtchIndexVisitor v, int[] digits, int level, long indexPointer) throws IOException {
+		v.visit(this, level, digits, indexPointer);
+		int n=indexSize(level);
+		for (int i=0; i<n; i++) {
+			long slot=readSlot(indexPointer,i);
+			if ((slot&TYPE_MASK)==PTR_INDEX) {
+				digits[level]=i;
+				visitIndex(v,digits,level+1,rawPointer(slot));
+			}
+		}
 	}
 
 	/**

@@ -1,4 +1,4 @@
-package etch.api;
+package etch;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -17,24 +18,21 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.util.Utils;
 import convex.test.Samples;
-import etch.Etch;
-import etch.EtchStore;
 
 public class TestEtch {
-	private static final int ITERATIONS = 3;
-	
-	EtchStore store=EtchStore.createTemp();
-	EtchStore store2=EtchStore.createTemp();
 
 	@Test
 	public void testTempStore() throws IOException {
+		EtchStore store=EtchStore.createTemp();
 		Etch etch = store.getEtch();
 
 		AVector<CVMLong> v=Vectors.of(1,2,3);
@@ -79,9 +77,10 @@ public class TestEtch {
 
 	@Test
 	public void testRandomWritesStore() throws IOException, BadFormatException {
+		EtchStore store=EtchStore.createTemp();
 		Etch etch = store.getEtch();
 
-		int COUNT = 1000;
+		int COUNT = 4000; // enough to cause some collisions in top level index at least
 		for (int i = 0; i < COUNT; i++) {
 			Long a = (long) i;
 			AVector<CVMLong> v=Vectors.of(a);
@@ -94,17 +93,44 @@ public class TestEtch {
 			assertNotNull(r2, "Stored value not found for vector value: " + v);
 		}
 
-		for (int ii = 0; ii < ITERATIONS; ii++) {
-			for (int i = 0; i < COUNT; i++) {
-				Long a = (long) i;
-				AVector<CVMLong> v=Vectors.of(a);
-				Hash key = v.getHash();
-				Ref<ACell> r2 = etch.read(key);
-
-				assertNotNull(r2, "Stored value not found for vector value: " + v);
-				assertEquals(v, r2.getValue());
+		
+		HashSet<ABlob> hs=new HashSet<ABlob>();
+		etch.visitIndex(new IEtchIndexVisitor() {
+			@Override
+			public void visit(Etch e, int level, int[] digits, long indexPointer)  {
+				try {
+					assertSame(etch,e);
+					int n=e.indexSize(level);
+					for (int i=0; i<n; i++) {
+						long slot=e.readSlot(indexPointer,i);
+						long type=slot&Etch.TYPE_MASK;
+						if ((type==Etch.PTR_PLAIN)||(type==Etch.PTR_START)||(type==Etch.PTR_CHAIN)) {
+							if (slot!=0) {
+								long pointer=e.rawPointer(slot);
+								Blob k=e.readBlob(pointer, 32);
+								hs.add(k);
+							}
+						}
+					}
+				} catch (IOException ex) {
+					throw Utils.sneakyThrow(ex);
+				}
 			}
+		});
+		
+		assertEquals(COUNT,hs.size());
+		
+		for (int i = 0; i < COUNT; i++) {
+			Long a = (long) i;
+			AVector<CVMLong> v=Vectors.of(a);
+			Hash key = v.getHash();
+			assertTrue(hs.contains(key.toFlatBlob()));
+			Ref<ACell> r2 = etch.read(key);
+
+			assertNotNull(r2, "Stored value not found for vector value: " + v);
+			assertEquals(v, r2.getValue());
 		}
+
 	}
 
 	@Test
@@ -136,6 +162,8 @@ public class TestEtch {
 	
 	@Test 
 	public void testCopyAcrossStores() {
+		EtchStore store=EtchStore.createTemp();
+		EtchStore store2=EtchStore.createTemp();
 		AString nestedString=Samples.NON_EMBEDDED_STRING;
 		ABlob nestedBlob=Samples.NON_EMBEDDED_BLOB;
 		ACell v=Vectors.of(1,nestedString,Vectors.of(2,nestedBlob));
