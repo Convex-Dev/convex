@@ -50,6 +50,31 @@ public class TestEtch {
 
 		assertEquals(h,r2.getHash());
 	}
+	
+	@Test 
+	public void testChainClash() throws IOException {
+		Etch etch = EtchStore.createTemp().getEtch();
+		// We fake writes with similar hashed, will cause chains.
+		Hash k1=Hash.fromHex("0000000000000001000000000000000000000000000000000000000000000000");
+		Hash k2=Hash.fromHex("0000000000000002000000000000000000000000000000000000000000000000");
+		Hash k3=Hash.fromHex("0000000000000003000000000000000000000000000000000000000000000000");
+		Hash kb=Hash.fromHex("0001000000000000000000000000000000000000000000000000000000000000");
+		
+		CVMLong v1=CVMLong.create(1);
+		CVMLong v2=CVMLong.create(2);
+		CVMLong v3=CVMLong.create(3);
+		CVMLong vb=CVMLong.create(4);
+	
+		// This value blocks a chain if there is nothing else in db
+		etch.write(kb, vb.getRef());
+		etch.write(k1, v1.getRef());
+		etch.write(k2, v2.getRef());
+		etch.write(k3, v3.getRef());
+		
+		assertEquals(v1,etch.read(k1).getValue());
+		assertEquals(v2,etch.read(k2).getValue());
+		assertEquals(v3,etch.read(k3).getValue());
+	}
 
 	@Test
 	public void testRandomWritesStore() throws IOException, BadFormatException {

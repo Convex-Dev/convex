@@ -242,7 +242,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	private MappedByteBuffer seekMap(long position) throws IOException {
-		position=slotPointer(position); // ensure we don't have any pesky type bits
+		position=rawPointer(position); // ensure we don't have any pesky type bits
 
 		if ((position<0)||(position>dataLength)) {
 			throw new Error("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
@@ -340,7 +340,7 @@ public class Etch {
 
 		} else if (type==PTR_INDEX) {
 			// recursively check next level of index
-			long newIndexPosition=slotPointer(slotValue); // clear high bits
+			long newIndexPosition=rawPointer(slotValue); // clear high bits
 			return write(key,level+1,ref,newIndexPosition);
 
 		} else if (type==PTR_PLAIN) {
@@ -420,7 +420,7 @@ public class Etch {
 			for (int j=0; j<i; j++) {
 				int movingDigit=(digit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
-				long dp=slotPointer(movingSlotValue); // just the raw pointer
+				long dp=rawPointer(movingSlotValue); // just the raw pointer
 				writeExistingData(newIndexPos,nextLevel,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
@@ -440,7 +440,7 @@ public class Etch {
 			for (int j=0; j<n; j++) {
 				int movingDigit=(chainStartDigit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
-				long dp=slotPointer(movingSlotValue); // just the raw pointer
+				long dp=rawPointer(movingSlotValue); // just the raw pointer
 				writeExistingData(newIndexPos,nextLevel,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
@@ -498,7 +498,8 @@ public class Etch {
 	 * so we don't check for key clashes.
 	 *
 	 * We also don't do chaining, assume clashes unlikely, and that the block given has
-	 * no existing chains.
+	 * no existing chains. This is because the only time this gets called is when unwinding an 
+	 * existing chain.
 	 *
 	 * @param indexPosition Position of index Block
 	 * @param level Level in Etch database
@@ -518,7 +519,7 @@ public class Etch {
 		if (currentSlot==0L) {
 			writeSlot(indexPosition,digit,dp);
 		} else if (type==PTR_INDEX) {
-			writeExistingData(slotPointer(currentSlot),level+1,dp);
+			writeExistingData(rawPointer(currentSlot),level+1,dp);
 		} else if (type==PTR_PLAIN) {
 			int newLevel=level+1;
 
@@ -615,7 +616,7 @@ public class Etch {
 	 * @param slotValue
 	 * @return
 	 */
-	private long slotPointer(long slotValue) {
+	private long rawPointer(long slotValue) {
 		return slotValue&~TYPE_MASK;
 	}
 
@@ -627,7 +628,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	private boolean checkMatchingKey(AArrayBlob key, long dataPointer) throws IOException {
-		long dataPosition=dataPointer&~TYPE_MASK;
+		long dataPosition=rawPointer(dataPointer);
 		MappedByteBuffer mbb=seekMap(dataPosition);
 		byte[] temp=tempArray.get();
 		mbb.get(temp, 0, KEY_SIZE);
@@ -768,12 +769,15 @@ public class Etch {
 
     /**
      * Updates a Ref in place at the specified position. Assumes data not changed.
-     * @param position Data position in storage file
+     * @param position Slot value containing position in storage file
      * @param ref
      * @return
      * @throws IOException
      */
 	private Ref<ACell> updateInPlace(long position, Ref<ACell> ref) throws IOException {
+		// ensure we have a raw poistion
+		position=rawPointer(position);
+		
 		// Seek to status location
 		MappedByteBuffer mbb=seekMap(position+KEY_SIZE);
 
@@ -834,7 +838,7 @@ public class Etch {
 			return -1;
 		} else if (type==PTR_INDEX) {
 			// recursively check next index node
-			long newIndexPosition=slotPointer(slotValue);
+			long newIndexPosition=rawPointer(slotValue);
 			return seekPosition(key,level+1,newIndexPosition);
 		} else if (type==PTR_PLAIN) {
 			if (checkMatchingKey(key,slotValue)) return slotValue;
