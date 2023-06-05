@@ -705,11 +705,11 @@ public class Server implements Closeable {
 		
 		Peer peer=getPeer();
 		// persist peer state if necessary
-		if ((peer != null) && Utils.bool(getConfig().get(Keywords.PERSIST))) {
+		if ((peer != null) && !Boolean.FALSE.equals(getConfig().get(Keywords.PERSIST))) {
 			try {
 				persistPeerData();
 			} catch (IOException e) {
-				log.warn("Unable to persist PEer data: ",e);
+				log.warn("Unable to persist Peer data: ",e);
 			}
 		}
 
