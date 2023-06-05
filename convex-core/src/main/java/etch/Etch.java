@@ -82,6 +82,9 @@ public class Etch {
 	private static final int SIZE_HEADER_MAGIC=2;
 	private static final int SIZE_HEADER_FILESIZE=8;
 	private static final int SIZE_HEADER_ROOT=32;
+	
+	private static final int ZLEN=16384;
+	private static final byte[] ZERO_ARRAY=new byte[ZLEN];
 
 	/**
 	 * Length of Etch header
@@ -491,7 +494,7 @@ public class Etch {
 	}
 
 	/**
-	 * Writes existing data into an index block. Existing data assumed to be unique,
+	 * Writes and existing data pointer into an index block. Existing data assumed to be unique,
 	 * so we don't check for key clashes.
 	 *
 	 * We also don't do chaining, assume clashes unlikely, and that the block given has
@@ -925,17 +928,15 @@ public class Etch {
 		int sizeBytes=isize*POINTER_SIZE;
 		
 		long position=dataLength;
-		byte[] temp=tempArray.get();
-		int tlen=temp.length;
 		MappedByteBuffer mbb=null;
 		
 		// set the datalength to the last available byte in the file
 		setDataLength(position+sizeBytes);
 		
-		Arrays.fill(temp,0,Math.min(sizeBytes,tlen),(byte)0);
-		for (int ix=0; ix<sizeBytes; ix+=tlen) {
+		// Use temporary zero array to fill new index block
+		for (int ix=0; ix<sizeBytes; ix+=ZLEN) {
 			mbb=seekMap(position+ix);
-			mbb.put(temp,0,Math.min(sizeBytes-ix,tlen));
+			mbb.put(ZERO_ARRAY,0,Math.min(sizeBytes-ix,ZLEN));
 		}
 		return position;
 	}
