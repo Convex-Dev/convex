@@ -416,12 +416,12 @@ public class Etch {
 			int nextDigit=getDigit(key,nextLevel);
 			long newIndexPos=appendLeafIndex(nextLevel,nextDigit,newDataPointer);
 
-			// for each element in chain, move existing data to new index block. i is the length of chain
+			// for each element in chain, rewrite existing data to new index block. i is the length of chain
 			for (int j=0; j<i; j++) {
 				int movingDigit=(digit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=rawPointer(movingSlotValue); // just the raw pointer
-				writeExistingData(newIndexPos,nextLevel,dp);
+				rewriteExistingData(newIndexPos,nextLevel,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
@@ -441,7 +441,7 @@ public class Etch {
 				int movingDigit=(chainStartDigit+j)&mask;
 				long movingSlotValue=readSlot(indexPosition,movingDigit);
 				long dp=rawPointer(movingSlotValue); // just the raw pointer
-				writeExistingData(newIndexPos,nextLevel,dp);
+				rewriteExistingData(newIndexPos,nextLevel,dp);
 				if (j!=0) writeSlot(indexPosition,movingDigit,0L); // clear the old chain
 			}
 
@@ -507,7 +507,7 @@ public class Etch {
 	 * @throws IOException
 	 */
 	@SuppressWarnings("unused")
-	private void writeExistingData(long indexPosition, int level, long dp) throws IOException {
+	private void rewriteExistingData(long indexPosition, int level, long dp) throws IOException {
 		int isize=indexSize(level);
 		int mask=isize-1;
 		
@@ -519,17 +519,18 @@ public class Etch {
 		if (currentSlot==0L) {
 			writeSlot(indexPosition,digit,dp);
 		} else if (type==PTR_INDEX) {
-			writeExistingData(rawPointer(currentSlot),level+1,dp);
+			// Write into the new index block (presumably recently created)
+			rewriteExistingData(rawPointer(currentSlot),level+1,dp);
 		} else if (type==PTR_PLAIN) {
 			int newLevel=level+1;
 
 			// expand to a new index block for collision
 			long newIndexPosition=appendNewIndexBlock(newLevel);
-			writeExistingData(newIndexPosition,newLevel,dp);
-			writeExistingData(newIndexPosition,newLevel,currentSlot);
+			rewriteExistingData(newIndexPosition,newLevel,currentSlot);
+			rewriteExistingData(newIndexPosition,newLevel,dp);
 			writeSlot(indexPosition,digit,newIndexPosition|PTR_INDEX);
 		} else {
-			throw new Error("Unexpected type: "+type);
+			throw new Error("Unexpected type while rewriting existing data: "+type);
 		}
 	}
 
