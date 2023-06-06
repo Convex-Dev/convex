@@ -1,7 +1,5 @@
 package convex.net.message;
 
-import java.util.List;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,25 +70,6 @@ public abstract class Message {
 
 	public static Message createBelief(Belief belief) {
 		return create(null,MessageType.BELIEF,belief,null);
-	}
-	
-	/**
-	 * Create a Belief message ready for broadcast including delta novelty
-	 * @param novelty Novel cells for transmission. 
-	 * @param belief Belief top level Cell to encode
-	 * @return Message instance
-	 */
-	public static Message createBelief(Belief belief, List<ACell> novelty) {
-		int n=novelty.size();
-		if (n==0) {
-			//log.warn("No novelty in Belief");
-			novelty.add(n, belief);
-		} else if ((!(novelty.get(n-1) instanceof Belief))) {
-			//log.warn("Last element not Belief out of "+novelty.size());
-			novelty.add(n, belief);
-		}
-		Blob data=Format.encodeDelta(novelty);
-		return create(null,MessageType.BELIEF,belief,data);
 	}
 	
 	/**

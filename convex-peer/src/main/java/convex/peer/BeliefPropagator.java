@@ -3,6 +3,7 @@ package convex.peer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -20,6 +21,7 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -31,6 +33,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.MessageType;
 import convex.net.message.Message;
 
 /**
@@ -344,12 +347,31 @@ public class BeliefPropagator extends AThreadedComponent {
 		belief=ACell.createAnnounced(belief, noveltyHandler);
 		lastBroadcastBelief=belief;
 
-		Message msg = Message.createBelief(belief, novelty);
-		long mdc=msg.getMessageData().count();
-		if (mdc>=Format.MAX_MESSAGE_LENGTH*0.95) {
-			log.warn("Long Belief Delta message: "+mdc);
+		Message msg = createBelief(belief, novelty);
+		long messageSize=msg.getMessageData().count();
+		if (messageSize>=Format.MAX_MESSAGE_LENGTH*0.95) {
+			log.warn("Long Belief Delta message: "+messageSize);
 		}
 		return msg;
+	}
+	
+	/**
+	 * Create a Belief message ready for broadcast including delta novelty
+	 * @param novelty Novel cells for transmission. 
+	 * @param belief Belief top level Cell to encode
+	 * @return Message instance
+	 */
+	private static Message createBelief(ACell payload, List<ACell> novelty) {
+		int n=novelty.size();
+		if (n==0) {
+			//log.warn("No novelty in Belief");
+			novelty.add(n, payload);
+		} else if (!payload.equals(novelty.get(n-1))) {
+			//log.warn("Last element not Belief out of "+novelty.size());
+			novelty.add(n, payload);
+		}
+		Blob data=Format.encodeDelta(novelty);
+		return Message.create(null,MessageType.BELIEF,payload,data);
 	}
 
 	private Belief lastBroadcastBelief;

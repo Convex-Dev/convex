@@ -188,7 +188,7 @@ public class TransactionHandler extends AThreadedComponent{
 		long timestamp=Utils.getCurrentTimestamp();
 
 		
-		Long minBlockTime=getMinBlockTime();
+		long minBlockTime=getMinBlockTime();
 		
 		if (timestamp>=lastBlockPublishedTime+minBlockTime) {
 			// possibly have client transactions to publish

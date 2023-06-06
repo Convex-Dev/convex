@@ -274,6 +274,12 @@ public class Belief extends ARecord {
 		return result;
 	}
 
+	/**
+	 * Propose a new Block at the end of the current Order
+	 * @param kp Keypair with which to sign Order
+	 * @param signedBlock Signed Block of transactions
+	 * @return Updated Belief with new Order
+	 */
 	public Belief proposeBlock(AKeyPair kp, SignedData<Block> signedBlock) {
 		AccountKey peerKey=kp.getAccountKey();
 		BlobMap<AccountKey, SignedData<Order>> orders = getOrders();
