@@ -38,6 +38,9 @@ public class LoadMonitor {
 		return lm.load;
 	}
 	
+	/**
+	 * Signals start of load for current Thread
+	 */
 	public static void up() {
 		Thread t=Thread.currentThread();
 		LoadMetrics lm=get(t);
@@ -45,6 +48,9 @@ public class LoadMonitor {
 		lm.update(true,ts);
 	}
 
+	/**
+	 * Signals end of load for current Thread
+	 */
 	public static void down() {
 		Thread t=Thread.currentThread();
 		LoadMetrics lm=get(t);

@@ -50,7 +50,7 @@ public class TransactionHandler extends AThreadedComponent{
 	/**
 	 * Default minimum delay between proposing a block as a peer
 	 */
-	private static final long MIN_BLOCK_TIME=100;
+	private static final long DEFAULT_MIN_BLOCK_TIME=100;
 	
 	/**
 	 * Queue for incoming (unverified) transaction messages
@@ -125,7 +125,9 @@ public class TransactionHandler extends AThreadedComponent{
 			sd=ACell.createPersisted(sd).getValue();
 	
 			// Put on Server's transaction queue. We are OK to block here
+			LoadMonitor.down();
 			transactionQueue.put(sd);
+			LoadMonitor.up();
 			
 			registerInterest(sd.getHash(), m);		
 		} catch (Throwable e) {
@@ -182,11 +184,12 @@ public class TransactionHandler extends AThreadedComponent{
 	/**
 	 * Checks for pending transactions, and if found propose them as a new Block.
 	 *
-	 * @return True if a new block is published, false otherwise.
+	 * @return New signed Block, or null if nothing to publish yet
 	 */
 	protected SignedData<Block> maybeGenerateBlock(Peer peer) {
 		long timestamp=Utils.getCurrentTimestamp();
 
+		if (!readyToPublish(peer)) return null;
 		
 		long minBlockTime=getMinBlockTime();
 		
@@ -209,10 +212,19 @@ public class TransactionHandler extends AThreadedComponent{
 		return signedBlock;
 	}
 	
+	/**
+	 * Checks if the Peer is ready to publish a Block
+	 * @param peer Current Peer instance
+	 * @return true if ready to publish, false otherwise
+	 */
+	private boolean readyToPublish(Peer peer) {
+		return true;
+	}
+
 	private long getMinBlockTime() {
 		HashMap<Keyword, Object> config = server.getConfig();
 		Long minBlockTime=Utils.parseLong(config.get(Keywords.MIN_BLOCK_TIME));
-		if (minBlockTime==null) minBlockTime=MIN_BLOCK_TIME;
+		if (minBlockTime==null) minBlockTime=DEFAULT_MIN_BLOCK_TIME;
 		return minBlockTime;
 	}
 
@@ -223,8 +235,14 @@ public class TransactionHandler extends AThreadedComponent{
 	 */
 	private ArrayList<SignedData<ATransaction>> newTransactions = new ArrayList<>();
 
+	/**
+	 * Last time at which the Peer's own transactions was submitted 
+	 */
 	private long lastOwnTransactionTimestamp=0L;
 
+	/**
+	 * Time at which last Block was published by this Peer
+	 */
 	protected long lastBlockPublishedTime=0L;
 
 
@@ -294,11 +312,15 @@ public class TransactionHandler extends AThreadedComponent{
 	
 	ArrayList<Message> messages=new ArrayList<>();
 
+	/**
+	 * Loops for handling incoming client transactions
+	 */
 	@Override
 	protected void loop() throws InterruptedException {
+		long BLOCKTIME=getMinBlockTime();
 		try {
 			LoadMonitor.down();
-			Message m = txMessageQueue.poll(1000, TimeUnit.MILLISECONDS);
+			Message m = txMessageQueue.poll(BLOCKTIME, TimeUnit.MILLISECONDS);
 			LoadMonitor.up();
 			if (m==null) return;
 			
@@ -310,11 +332,6 @@ public class TransactionHandler extends AThreadedComponent{
 			for (Message msg: messages) {
 				processMessage(msg);
 			}
-			
-			// Wait for more transactions to accumulate before sending anything new
-			LoadMonitor.down();
-			Thread.sleep(getMinBlockTime());
-			LoadMonitor.up();
 		} finally {
 			messages.clear();
 		}
