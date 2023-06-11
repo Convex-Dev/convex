@@ -22,6 +22,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.BlobMap;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -52,6 +53,12 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	
 	public static final int BELIEF_REBROADCAST_DELAY=300;
+	
+	/**
+	 * Time between full Belief broadcasts
+	 */
+	public static final int BELIEF_FULL_BROADCAST_DELAY=500;
+
 	
 	/**
 	 * Minimum delay between successive Belief broadcasts
@@ -97,6 +104,12 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Time of last belief broadcast
 	 */
 	long lastBroadcastTime=0;
+	
+	/**
+	 * Time of last full belief broadcast
+	 */
+	long lastFullBroadcastTime=0;
+	
 	private long beliefBroadcastCount=0L;
 	
 	public long getBeliefBroadcastCount() {
@@ -124,21 +137,34 @@ public class BeliefPropagator extends AThreadedComponent {
 		// This can potentially help latency on transaction result reporting etc.
 		if (updated) server.updateBelief(belief);
 		
-		if (server.manager.getConnectionCount()>0) {
-			long ts=Utils.getCurrentTimestamp();
-			if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
-				lastBroadcastTime=ts;
-				Message msg=createBeliefUpdateMessage();
-				
-				// Actually broadcast the message to outbound connected Peers
-				doBroadcast(msg);
+		long ts=Utils.getCurrentTimestamp();
+		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
+			lastBroadcastTime=ts;
+			Message msg;
+			if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
+				msg=createFullUpdateMessage();
+				lastFullBroadcastTime=ts;
+			} else {
+				msg=createQuickUpdateMessage();
 			}
-		} 
+			
+			// Actually broadcast the message to outbound connected Peers
+			if (msg!=null) {
+				doBroadcast(msg);
+			} else {
+				log.warn("null message in BeliefPropagator!");
+			}
+		}
 		
 		// Persist Belief in all cases, just without announcing
 		// This is mainly in case we get missing data / sync requests for the Belief
 		// This is super cheap if already persisted, so no problem
 		belief=ACell.createPersisted(belief).getValue();
+		
+		/* Update Belief again after persistence. We want to be using
+		 * Latest persisted version as much as possible
+		 */
+		server.updateBelief(belief);
 	}
 	
 	@Override public void start() {
@@ -342,11 +368,10 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	private void doBroadcast(Message msg) throws InterruptedException {
 		server.manager.broadcast(msg);
-	
 		beliefBroadcastCount++;
 	}
 	
-	private Message createBeliefUpdateMessage() {
+	private Message createFullUpdateMessage() {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -360,9 +385,41 @@ public class BeliefPropagator extends AThreadedComponent {
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
 		belief=ACell.createAnnounced(belief, noveltyHandler);
-		lastBroadcastBelief=belief;
+		lastFullBroadcastBelief=belief;
 
 		Message msg = createBelief(belief, novelty);
+		long messageSize=msg.getMessageData().count();
+		if (messageSize>=Format.MAX_MESSAGE_LENGTH*0.95) {
+			log.warn("Long Belief Delta message: "+messageSize);
+		}
+		return msg;
+	}
+	
+	private Message createQuickUpdateMessage() {
+		ArrayList<ACell> novelty=new ArrayList<>();
+		
+		// At this point we know something updated our belief, so we want to rebroadcast
+		// belief to network
+		Consumer<Ref<ACell>> noveltyHandler = r -> {
+			ACell o = r.getValue();
+			novelty.add(o);
+			// System.out.println("Recording novelty: "+r.getHash()+ " "+o.getClass().getSimpleName());
+		};
+
+		// persist the state of the Peer, announcing the new Belief
+		// (ensure we can handle missing data requests etc.)
+		AccountKey key=server.getPeerKey();
+		BlobMap<AccountKey, SignedData<Order>> orders = belief.getOrders();
+		SignedData<Order> order=belief.getOrders().get(key);
+		if (order==null) return null;
+		
+		order=ACell.createAnnounced(order, noveltyHandler);
+		
+		// Update belief orders with persisted version
+		orders=orders.assoc(key, order);
+		belief=belief.withOrders(orders);
+
+		Message msg = createBelief(order, novelty);
 		long messageSize=msg.getMessageData().count();
 		if (messageSize>=Format.MAX_MESSAGE_LENGTH*0.95) {
 			log.warn("Long Belief Delta message: "+messageSize);
@@ -389,10 +446,10 @@ public class BeliefPropagator extends AThreadedComponent {
 		return Message.create(null,MessageType.BELIEF,payload,data);
 	}
 
-	private Belief lastBroadcastBelief;
+	private Belief lastFullBroadcastBelief;
 
 	public Belief getLastBroadcastBelief() {
-		return lastBroadcastBelief;
+		return lastFullBroadcastBelief;
 	}
 
 
