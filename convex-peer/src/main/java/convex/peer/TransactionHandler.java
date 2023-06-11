@@ -37,6 +37,9 @@ import convex.net.message.Message;
 
 /**
  * Server component for handling client transactions and producing Blocks
+ * 
+ * Main loop for this component handles client transaction messages, validates them and 
+ * prepares them for inclusion in a Block
  */
 public class TransactionHandler extends AThreadedComponent{
 	
@@ -61,13 +64,11 @@ public class TransactionHandler extends AThreadedComponent{
 	 * Queue for received Transactions submitted for clients of this Peer
 	 */
 	ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
-
+	
 	public TransactionHandler(Server server) {
-		super(server);
-		
+		super(server);	
 		txMessageQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
 		transactionQueue=new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);	
-		
 	}
 	
 	/**
@@ -165,7 +166,7 @@ public class TransactionHandler extends AThreadedComponent{
 				Message m = interests.get(h);
 				if (m != null) {
 					ACell id = m.getID();
-					log.trace("Returning tranaction result ID {} to {}", id,m.getOriginString());
+					log.trace("Returning transaction result ID {} to {}", id,m.getOriginString());
 					Result res = br.getResults().get(j);
 
 					boolean reported = m.reportResult(res);
@@ -210,6 +211,14 @@ public class TransactionHandler extends AThreadedComponent{
 		lastBlockPublishedTime=Utils.getCurrentTimestamp();
 		SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 		return signedBlock;
+	}
+	
+	/**
+	 * Gets the next Block for publication, or null if not yet ready
+	 * @return New Block, or null if not yet produced
+	 */
+	public SignedData<Block> maybeGetBlock() {
+		return maybeGenerateBlock(server.getPeer());
 	}
 	
 	/**
@@ -329,6 +338,8 @@ public class TransactionHandler extends AThreadedComponent{
 			txMessageQueue.drainTo(messages);
 			
 			// Process transaction messages
+			// This might block if we aren't generating blocks fast enough
+			// Which is OK, since we get backpressure to clients
 			for (Message msg: messages) {
 				processMessage(msg);
 			}
@@ -341,4 +352,5 @@ public class TransactionHandler extends AThreadedComponent{
 	protected String getThreadName() {
 		return "Transaction handler on port: "+server.getPort();
 	}
+
 }

@@ -168,7 +168,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean updated = maybeMergeBeliefs(newBelief);
 		
 		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
-		SignedData<Block> signedBlock= server.transactionHandler.maybeGenerateBlock(server.getPeer());
+		SignedData<Block> signedBlock= server.transactionHandler.maybeGetBlock();
 		boolean published=false;
 		if (signedBlock!=null) {
 			belief=belief.proposeBlock(server.getKeyPair(),signedBlock);
