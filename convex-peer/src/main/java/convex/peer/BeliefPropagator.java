@@ -133,9 +133,15 @@ public class BeliefPropagator extends AThreadedComponent {
 		Belief incomingBelief = awaitBelief();
 		boolean updated= maybeUpdateBelief(incomingBelief);
 		
-		// Trigger CVM update before broadcast
-		// This can potentially help latency on transaction result reporting etc.
-		if (updated) server.updateBelief(belief);
+		if (updated) {
+			// Trigger CVM update before broadcast
+			// This can potentially help latency on transaction result reporting etc.
+			server.updateBelief(belief);
+			
+			// Queue our belief again, means awaitBeliefs returns immediately next time
+			Message trigger=Message.createBelief(belief);
+			queueBelief(trigger);
+		}
 		
 		long ts=Utils.getCurrentTimestamp();
 		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {

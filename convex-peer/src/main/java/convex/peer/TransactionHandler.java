@@ -53,7 +53,7 @@ public class TransactionHandler extends AThreadedComponent{
 	/**
 	 * Default minimum delay between proposing a block as a peer
 	 */
-	private static final long DEFAULT_MIN_BLOCK_TIME=100;
+	private static final long DEFAULT_MIN_BLOCK_TIME=10;
 	
 	/**
 	 * Queue for incoming (unverified) transaction messages
