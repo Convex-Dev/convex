@@ -120,27 +120,25 @@ public class BeliefPropagator extends AThreadedComponent {
 		Belief incomingBelief = awaitBelief();
 		boolean updated= maybeUpdateBelief(incomingBelief);
 		
+		// Trigger CVM update before broadcast
+		// This can potentially help latency on transaction result reporting etc.
+		if (updated) server.updateBelief(belief);
+		
 		if (server.manager.getConnectionCount()>0) {
 			long ts=Utils.getCurrentTimestamp();
-			if (updated||(ts>lastBroadcastTime+BELIEF_BROADCAST_DELAY)) {
+			if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
 				lastBroadcastTime=ts;
 				Message msg=createBeliefUpdateMessage();
-				
-				// Trigger CVM update before broadcast
-				// This can potentially help latency on transaction result reporting etc.
-				if (updated) server.updateBelief(belief);
 				
 				// Actually broadcast the message to outbound connected Peers
 				doBroadcast(msg);
 			}
 		} 
 		
-		// Persist Belief anyway, just without announcing
+		// Persist Belief in all cases, just without announcing
 		// This is mainly in case we get missing data / sync requests for the Belief
 		// This is super cheap if already persisted, so no problem
 		belief=ACell.createPersisted(belief).getValue();
-		
-		if (updated) server.updateBelief(belief);	
 	}
 	
 	@Override public void start() {
@@ -168,7 +166,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean updated = maybeMergeBeliefs(newBelief);
 		
 		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
-		SignedData<Block> signedBlock= server.transactionHandler.maybeGetBlock();
+		SignedData<Block> signedBlock= server.transactionHandler.maybeGetBlock(); 
 		boolean published=false;
 		if (signedBlock!=null) {
 			belief=belief.proposeBlock(server.getKeyPair(),signedBlock);
@@ -199,7 +197,20 @@ public class BeliefPropagator extends AThreadedComponent {
 			BeliefMerge mc = BeliefMerge.create(belief,kp, ts, server.getPeer().getConsensusState());
 			Belief newBelief = mc.merge(newBeliefs);
 
-			boolean beliefChanged=(belief!=newBelief);
+			AccountKey key=mc.getAccountKey();
+			Order oldOrder=belief.getOrder(key);
+			Order newOrder=newBelief.getOrder(key);
+			
+			boolean beliefChanged=false;
+			if (oldOrder==null) {
+				beliefChanged=newOrder!=null;
+			} else {
+				if (newOrder==null) {
+					beliefChanged=(oldOrder!=null);
+				} else {
+					beliefChanged=!newOrder.consensusEquals(oldOrder);
+				}
+			}
 			belief=newBelief;
 
 			return beliefChanged;
@@ -214,6 +225,11 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 	}
 	
+	/**
+	 * Await an incoming Belief for belief merge / potential update
+	 * @return Incoming Belief, or null if nothing arrived within time window 
+	 * @throws InterruptedException
+	 */
 	private Belief awaitBelief() throws InterruptedException {
 		ArrayList<Message> beliefMessages=new ArrayList<>();
 		
@@ -326,8 +342,7 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	private void doBroadcast(Message msg) throws InterruptedException {
 		server.manager.broadcast(msg);
-		
-
+	
 		beliefBroadcastCount++;
 	}
 	

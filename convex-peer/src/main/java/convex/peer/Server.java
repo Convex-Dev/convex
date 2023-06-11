@@ -795,6 +795,10 @@ public class Server implements Closeable {
 		return propagator;
 	}
  
+	/**
+	 * Triggers CVM Executor Belief update
+	 * @param belief New Belief
+	 */
 	public void updateBelief(Belief belief) {
 		executor.queueUpdate(belief);
 	}
