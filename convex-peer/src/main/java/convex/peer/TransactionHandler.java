@@ -339,7 +339,7 @@ public class TransactionHandler extends AThreadedComponent{
 			
 			// Process transaction messages
 			// This might block if we aren't generating blocks fast enough
-			// Which is OK, since we get backpressure to clients
+			// Which is OK, since we transfer backpressure to clients
 			for (Message msg: messages) {
 				processMessage(msg);
 			}

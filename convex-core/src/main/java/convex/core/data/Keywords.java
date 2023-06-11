@@ -114,6 +114,7 @@ public class Keywords {
 	public static final Keyword POSITION = Keyword.create("position");
 	public static final Keyword GENESIS = Keyword.create("genesis");
 	public static final Keyword HISTORY = Keyword.create("history");
+	public static final Keyword ORDER = Keyword.create("order");
 	
 	public static final Keyword MIN_BLOCK_TIME = Keyword.create("min-block-time");
 

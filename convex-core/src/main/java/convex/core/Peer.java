@@ -70,7 +70,13 @@ public class Peer {
 	/**
 	 * Current state index
 	 */
-	private final long position;
+	private final long statePosition;
+	
+	/**
+	 * Current state index
+	 */
+	private final Order consensusOrder;
+
 	
 	/**
 	 * Current base history position, from which results are stored
@@ -93,7 +99,7 @@ public class Peer {
 	 */
 	private final AVector<BlockResult> blockResults;
 
-	private Peer(AKeyPair kp, Belief belief, long pos, State state, State genesis, long history, AVector<BlockResult> results,
+	private Peer(AKeyPair kp, Belief belief, Order consensusOrder, long pos, State state, State genesis, long history, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
@@ -101,7 +107,9 @@ public class Peer {
 		this.state = state;
 		this.genesis=genesis;
 		this.timestamp = timeStamp;
-		this.position=pos;
+		
+		this.consensusOrder=consensusOrder;
+		this.statePosition=pos;
 		
 		this.historyPosition=history;
 		this.blockResults = results;
@@ -120,9 +128,10 @@ public class Peer {
 		State state=(State) peerData.get(Keywords.STATE);
 		State genesis=(State) peerData.get(Keywords.GENESIS);
 		long pos=((CVMLong) peerData.get(Keywords.POSITION)).longValue();
+		Order co=((Order) peerData.get(Keywords.ORDER));
 		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();
 		long timestamp=((CVMLong) peerData.get(Keywords.TIMESTAMP)).longValue();
-		return new Peer(keyPair,belief,pos,state,genesis,hpos,results,timestamp);
+		return new Peer(keyPair,belief,co,pos,state,genesis,hpos,results,timestamp);
 	}
 
 	/**
@@ -133,8 +142,9 @@ public class Peer {
 		return Maps.of(
 			Keywords.BELIEF,belief,
 			Keywords.HISTORY,CVMLong.create(historyPosition),
+			Keywords.ORDER,consensusOrder,
 			Keywords.RESULTS,blockResults,
-			Keywords.POSITION,CVMLong.create(position),
+			Keywords.POSITION,CVMLong.create(statePosition),
 			Keywords.STATE,state,
 			Keywords.GENESIS,genesis,
 			Keywords.TIMESTAMP,timestamp
@@ -149,8 +159,9 @@ public class Peer {
 	 */
 	public static Peer create(AKeyPair peerKP, State genesis) {
 		Belief belief = Belief.createSingleOrder(peerKP);
-
-		return new Peer(peerKP, belief, 0L,genesis,genesis, 0,Vectors.empty(),genesis.getTimestamp().longValue());
+		
+		
+		return new Peer(peerKP, belief, Order.create(),0L,genesis,genesis, 0,Vectors.empty(),genesis.getTimestamp().longValue());
 	}
 	
 	/**
@@ -251,7 +262,7 @@ public class Peer {
 	 */
 	public Peer updateTimestamp(long newTimestamp) {
 		if (newTimestamp <= timestamp) return this;
-		return new Peer(keyPair, belief, position,state,genesis, historyPosition,blockResults, newTimestamp);
+		return new Peer(keyPair, belief, consensusOrder,statePosition,state,genesis, historyPosition,blockResults, newTimestamp);
 	}
 
 	/**
@@ -418,6 +429,8 @@ public class Peer {
 	public Peer pruneHistory(long ts) {
 		// Return this if we don't possibly have anything to prune
 		if (blockResults.count()==0) return this;
+		
+		// Exit without change if there is nothing before the given timestamp to prune
 		long firstTs=blockResults.get(0).getState().getTimestamp().longValue();
 		if (ts<firstTs) return this;
 		
@@ -435,7 +448,7 @@ public class Peer {
 	 */
 	public Peer updateBelief(Belief newBelief) {
 		if (belief == newBelief) return this;
-		return new Peer(keyPair, newBelief, position,state, genesis, historyPosition,blockResults, timestamp);
+		return new Peer(keyPair, newBelief, consensusOrder,statePosition,state, genesis, historyPosition,blockResults, timestamp);
 	}	
 	
 	/**
@@ -443,13 +456,13 @@ public class Peer {
 	 * @return Updated Peer
 	 */
 	public Peer updateState() {
-		Order myOrder = belief.getOrder(peerKey); // this peer's chain from new belief
+		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
 		long consensusPoint = myOrder.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 
 		// need to advance states
 		State s = this.state;
-		long stateIndex=position;
+		long stateIndex=statePosition;
 		if (stateIndex>=consensusPoint) return this;
 
 		// We need to compute at least one new state update
@@ -462,7 +475,7 @@ public class Peer {
 			newResults = newResults.append(br);
 			stateIndex++;
 		}
-		return new Peer(keyPair, belief, stateIndex,s, genesis, historyPosition,newResults, timestamp);
+		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
 	}
 
 	/**
@@ -557,7 +570,7 @@ public class Peer {
 	 * @return Position
 	 */
 	public long getPosition() {
-		return position;
+		return statePosition;
 	}
 
 	/**

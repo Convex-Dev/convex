@@ -520,7 +520,7 @@ public class BeliefMerge {
 	 * Checks if a new Order should replace the current order when collecting Peer orders
 	 * @param oldOrder Current Order
 	 * @param newOrder Potential new ORder
-	 * @return
+	 * @return True if new Order should replace old order
 	 */
 	public static boolean compareOrders(Order oldOrder, Order newOrder) {
 		if (newOrder==null) return false;

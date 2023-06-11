@@ -227,15 +227,15 @@ public class Constants {
 	/**
 	 * Size of incoming Belief queue
 	 */
-	public static final int BELIEF_QUEUE_SIZE = 500;
+	public static final int BELIEF_QUEUE_SIZE = 200;
 
 	/**
 	 * Minimum milliseconds to retain a proposal before switching
 	 */
-	public static final long KEEP_PROPOSAL_TIME = 1000;
+	public static final long KEEP_PROPOSAL_TIME = 100;
 
 	/**
-	 * Number of consensus levels (blocks, proposed, consensus)
+	 * Number of consensus levels (blocks, proposed, consensus, finality)
 	 */
 	public static final int CONSENSUS_LEVELS = 4;
 
