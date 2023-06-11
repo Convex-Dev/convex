@@ -9,9 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Asset ownership based trust monitor `convex.trust.ownership-monitor`
 - Peers now utilise quick Belief broadcasts (own Order changes only)
+- Basic fork detection and recovery from historical states
 
 ### Changed
 - Account controllers can now be any scoped actor
+- Various adjustments to improve CPoS latency
 
 ### Fixed
 
