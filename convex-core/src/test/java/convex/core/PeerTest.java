@@ -1,19 +1,25 @@
 package convex.core;
 
-import static convex.test.Assertions.assertNobodyError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
+import convex.core.data.Address;
+import convex.core.data.BlobMap;
 import convex.core.data.PeerStatus;
 import convex.core.data.RecordTest;
+import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.transactions.Invoke;
 import convex.test.Samples;
 
 public class PeerTest {
@@ -78,6 +84,40 @@ public class PeerTest {
 		
 		RecordTest.doRecordTests(ps);
 		RecordTest.doRecordTests(ps2);
+	}
+	
+	@Test
+	public void testForkRecovery() {
+		AKeyPair kp=InitTest.FIRST_PEER_KEYPAIR;
+		Address addr=InitTest.FIRST_PEER_ADDRESS;
+		AccountKey peerKey=kp.getAccountKey();
+		Peer p=Peer.create(kp, STATE);
+		
+		Belief b=p.getBelief();
+		assertEquals(0,b.getOrder(peerKey).getBlockCount());
+		
+		Block b1=Block.of(0, kp.signData(Invoke.create(addr, 1,"(def foo 13)")));
+		Order o1=Order.create().append(kp.signData(b1));
+		o1=o1.withConsensusPoints(new long[] {1,1,1,1});
+		SignedData<Order> so1=kp.signData(o1);
+		b=b.withOrders(BlobMap.create(peerKey, so1));
+		
+		p=p.updateBelief(b);
+		assertEquals(STATE,p.getConsensusState());
+		p=p.updateState();
+		assertEquals(CVMLong.create(13),p.executeQuery(Reader.read("foo"), addr).getResult());
+
+		Block b2=Block.of(0, kp.signData(Invoke.create(addr, 1,"(def bar 17)")));
+		Order o2=Order.create().append(kp.signData(b2));
+		o2=o2.withConsensusPoints(new long[] {1,1,1,1});
+		SignedData<Order> so2=kp.signData(o2);
+		b=b.withOrders(BlobMap.create(peerKey, so2));
+
+		p=p.updateBelief(b);
+		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr));
+		p=p.updateState();
+		assertEquals(CVMLong.create(17),p.executeQuery(Reader.read("bar"), addr).getResult());
+		assertUndeclaredError(p.executeQuery(Reader.read("foo"), addr));
 	}
 
 

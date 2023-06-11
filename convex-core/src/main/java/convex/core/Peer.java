@@ -441,7 +441,7 @@ public class Peer {
 	}
 
 	/**
-	 * Update this Peer with Consensus State for an updated Belief
+	 * Update this Peer with a new consensus Belief
 	 *
 	 * @param newBelief Belief to apply
 	 * @return Updated Peer
@@ -459,14 +459,27 @@ public class Peer {
 		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
 		long consensusPoint = myOrder.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
+		AVector<SignedData<Block>> consensusBlocks= consensusOrder.getBlocks();
 
-		// need to advance states
 		State s = this.state;
+		AVector<BlockResult> newResults = this.blockResults;
 		long stateIndex=statePosition;
+		long consensusMatch=blocks.commonPrefixLength(consensusBlocks);
+		if (consensusMatch<stateIndex) {
+			// We need to rollback to recover from a fork!!
+			stateIndex=consensusMatch;
+			s=getHistoricalState(consensusMatch);
+			if (s==null) throw new IllegalStateException("Can't get historical state for position: "+consensusMatch);
+			
+			// Discard history
+			long historyStart=consensusMatch-historyPosition;
+			newResults=newResults.slice(0, historyStart);
+		}
+		
+		// Return if we don't need to advance states
 		if (stateIndex>=consensusPoint) return this;
 
 		// We need to compute at least one new state update
-		AVector<BlockResult> newResults = this.blockResults;
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
 			SignedData<Block> block = blocks.get(stateIndex);
 			
@@ -476,6 +489,21 @@ public class Peer {
 			stateIndex++;
 		}
 		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
+	}
+
+	/**
+	 * Gets a historical State for the specified position
+	 * @param consensusMatch
+	 * @return
+	 */
+	private State getHistoricalState(long pos) {
+		if (pos==0) return genesis;
+		long hpos=pos-historyPosition;
+		if (hpos<1) return null;
+		if (hpos>blockResults.count()) return null;
+		
+		BlockResult br=blockResults.get(hpos-1);
+		return br.getState();
 	}
 
 	/**
