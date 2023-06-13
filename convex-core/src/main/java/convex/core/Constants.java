@@ -245,5 +245,7 @@ public class Constants {
 
 	public static final boolean ENABLE_FORK_RECOVERY = false;
 
+	public static final long INITIAL_PEER_TIMESTAMP = -1L;
+
 
 }
