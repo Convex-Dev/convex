@@ -292,7 +292,10 @@ public class State extends ARecord {
 
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=peers.get(peerKey);
-		if (ps==null) return BlockResult.createInvalidBlock(this,block);
+		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
+		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) {
+			return BlockResult.createInvalidBlock(this,block,Strings.INSUFFICIENT_STAKE);
+		}
 		
 		State state = prepareBlock(block);
 		return state.applyTransactions(block);

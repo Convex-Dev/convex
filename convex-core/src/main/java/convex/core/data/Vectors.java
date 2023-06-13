@@ -117,6 +117,7 @@ public class Vectors {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> repeat(T m, int count) {
+		// TODO: should probably be smart and create duplicated Vectors
 		ACell[] obs = new ACell[count];
 		Arrays.fill(obs, m);
 		return (AVector<T>) create(obs);

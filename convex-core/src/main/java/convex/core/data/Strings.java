@@ -37,6 +37,8 @@ public class Strings {
 
 	public static final StringShort MISSING_PEER = StringShort.create("Missing Peer!");
 
+	public static final StringShort INSUFFICIENT_STAKE = StringShort.create("Insufficient Stake!");
+
 	/**
 	 * Reads a String from a Blob encoding.
 	 * 

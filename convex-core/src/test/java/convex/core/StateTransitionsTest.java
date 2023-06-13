@@ -19,6 +19,7 @@ import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
@@ -243,8 +244,29 @@ public class StateTransitionsTest {
 		
 		BlockResult br=s.applyBlock(sb);
 		assertEquals(ErrorCodes.PEER,br.getResult(0).getErrorCode());
+		assertEquals(Strings.MISSING_PEER,br.getResult(0).getValue());
 		
 		// Should be no state transition with a bad block
+		assertEquals(s,br.getState());
+	}
+	
+	@Test
+	public void testBadBlockInsufficientStake() throws BadSignatureException {
+		State s = TestState.STATE;
+		AKeyPair pkp=KEYPAIR_ROBB;
+		AccountKey peerKey=pkp.getAccountKey();
+		s=s.withPeer(peerKey, PeerStatus.create(ADDRESS_A, 0));
+		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read(":should-fail"));
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		Block b1 = Block.of(s.getTimestamp().longValue(), kp.signData(t1));
+		SignedData<Block> sb=pkp.signData(b1); // not a Peer!
+		
+		BlockResult br=s.applyBlock(sb);
+		assertEquals(ErrorCodes.PEER,br.getResult(0).getErrorCode());
+		assertEquals(Strings.INSUFFICIENT_STAKE,br.getResult(0).getValue());
+		
+		// Should be no state transition with a bad block
+		// TODO: slash Peer?
 		assertEquals(s,br.getState());
 	}
 
