@@ -243,5 +243,7 @@ public class Constants {
 	public static final int CONSENSUS_LEVEL_CONSENSUS = CONSENSUS_LEVELS-2;
 	public static final int CONSENSUS_LEVEL_FINALITY = CONSENSUS_LEVELS-1;
 
+	public static final boolean ENABLE_FORK_RECOVERY = false;
+
 
 }

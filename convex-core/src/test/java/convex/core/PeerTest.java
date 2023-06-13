@@ -4,6 +4,7 @@ import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -115,6 +116,10 @@ public class PeerTest {
 
 		p=p.updateBelief(b);
 		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr));
+		
+		// Beyond this point, we need to assume fork recovery is enabled
+		assumeTrue(Constants.ENABLE_FORK_RECOVERY);
+		
 		p=p.updateState();
 		assertEquals(CVMLong.create(17),p.executeQuery(Reader.read("bar"), addr).getResult());
 		assertUndeclaredError(p.executeQuery(Reader.read("foo"), addr));

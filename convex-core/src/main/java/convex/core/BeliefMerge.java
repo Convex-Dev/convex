@@ -164,14 +164,16 @@ public class BeliefMerge {
 		// TODO: figure out what to do with new blocks filtered out?
 		BlobMap<AccountKey, SignedData<Order>> filteredOrders=accOrders;
 		
-		filteredOrders= accOrders.filterValues(signedOrder -> {
-			try {
-				Order otherOrder = signedOrder.getValue();
-				return myOrder.checkConsistent(otherOrder);
-			} catch (Exception e) {
-				throw Utils.sneakyThrow(e);
-			}
-		});
+		if (!Constants.ENABLE_FORK_RECOVERY) {
+			filteredOrders= accOrders.filterValues(signedOrder -> {
+				try {
+					Order otherOrder = signedOrder.getValue();
+					return myOrder.checkConsistent(otherOrder);
+				} catch (Exception e) {
+					throw Utils.sneakyThrow(e);
+				}
+			});
+		}
 
 		// Current Consensus Point
 		long consensusPoint = myOrder.getConsensusPoint();

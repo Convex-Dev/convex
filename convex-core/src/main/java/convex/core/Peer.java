@@ -466,6 +466,10 @@ public class Peer {
 		long stateIndex=statePosition;
 		long consensusMatch=blocks.commonPrefixLength(consensusBlocks);
 		if (consensusMatch<stateIndex) {
+			if (!Constants.ENABLE_FORK_RECOVERY) {
+				throw new IllegalStateException("Network Fork detected but fork recovery diabled!");
+			}
+			
 			// We need to rollback to recover from a fork!!
 			stateIndex=consensusMatch;
 			s=getHistoricalState(consensusMatch);
