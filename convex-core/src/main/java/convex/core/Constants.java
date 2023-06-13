@@ -66,6 +66,11 @@ public class Constants {
 	 * Max juice allowable during execution of a single transaction.
 	 */
 	public static final long MAX_TRANSACTION_JUICE = 1000000;
+	
+	/**
+	 * Max transactions in a legal Block.
+	 */
+	public static final long MAX_TRANSACTIONS_PER_BLOCK = 4096;
 
 	/**
 	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.

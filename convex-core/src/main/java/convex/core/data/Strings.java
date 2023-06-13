@@ -39,6 +39,8 @@ public class Strings {
 
 	public static final StringShort INSUFFICIENT_STAKE = StringShort.create("Insufficient Stake!");
 
+	public static final StringShort ILLEGAL_BLOCK_SIZE = StringShort.create("Illegal Block Size!");
+
 	/**
 	 * Reads a String from a Blob encoding.
 	 * 

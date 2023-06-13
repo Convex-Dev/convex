@@ -290,15 +290,30 @@ public class State extends ARecord {
 		Block block=signedBlock.getValue();
 		Counters.applyBlock++;
 
+		// First check the Block passes pre-conditions for application
+		BlockResult maybeFailed=checkBlock(signedBlock);
+		if (maybeFailed!=null) {
+			return maybeFailed;
+		}
+		
+		State state = prepareBlock(block);
+		return state.applyTransactions(block);
+	}
+
+	private BlockResult checkBlock(SignedData<Block> signedBlock) {
+		Block block=signedBlock.getValue();
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=peers.get(peerKey);
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
 		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) {
 			return BlockResult.createInvalidBlock(this,block,Strings.INSUFFICIENT_STAKE);
+		}		
+		
+		if (block.getTransactions().count()>Constants.MAX_TRANSACTIONS_PER_BLOCK) {
+			return BlockResult.createInvalidBlock(this,block,Strings.ILLEGAL_BLOCK_SIZE);
 		}
 		
-		State state = prepareBlock(block);
-		return state.applyTransactions(block);
+		return null;
 	}
 
 	/**
