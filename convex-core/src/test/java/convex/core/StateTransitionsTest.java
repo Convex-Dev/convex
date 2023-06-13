@@ -17,6 +17,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
+import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadSignatureException;
@@ -40,10 +41,10 @@ public class StateTransitionsTest {
 	final AKeyPair KEYPAIR_NIKI = AKeyPair.createSeeded(1004);
 	final AKeyPair KEYPAIR_ROBB = AKeyPair.createSeeded(1005);
 
-	final AKeyPair KEYPAIR_PEER = AKeyPair.createSeeded(1006);
+	final AKeyPair KEYPAIR_PEER = InitTest.FIRST_PEER_KEYPAIR;
 	final AccountKey FIRST_PEER_KEY=KEYPAIR_PEER.getAccountKey();
 
-	final Address ADDRESS_A = Address.create(0); // initial account
+	final Address ADDRESS_A = Address.create(0); // initial account, also Peer
 	final Address ADDRESS_B = Address.create(1); // initial account
 	final Address ADDRESS_ROBB = Address.create(2); // initial account
 	final Address ADDRESS_C = Address.create(3);
@@ -54,13 +55,16 @@ public class StateTransitionsTest {
 	public void testAccountTransfers() throws BadSignatureException {
 		AccountKey ka=KEYPAIR_A.getAccountKey();
 		AccountKey kb=KEYPAIR_B.getAccountKey();
+		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*10;
 		AVector<AccountStatus> accounts = Vectors.of(
 				AccountStatus.create(10000L,ka).withMemory(10000),
 				AccountStatus.create(1000L,kb).withMemory(10000),
-				AccountStatus.create(Constants.MAX_SUPPLY - 10000 - 1000,KEYPAIR_ROBB.getAccountKey()).withMemory(10000)
+				AccountStatus.create(Constants.MAX_SUPPLY - STAKE - 10000 - 1000,KEYPAIR_ROBB.getAccountKey()).withMemory(10000)
 		// No account for C yet
 		);
 		State s = State.EMPTY.withAccounts(accounts); // don't need any peers for these tests
+		s=s.withPeer(ka, PeerStatus.create(ADDRESS_A, STAKE));
+		
 		s=s.updateMemoryPool(0, 0); // clear memory pool so doesn't confuse things
 		assertEquals(Constants.MAX_SUPPLY, s.computeTotalFunds());
 
@@ -75,7 +79,7 @@ public class StateTransitionsTest {
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			long nowTS = Utils.getCurrentTimestamp();
 			Block b = Block.of(nowTS, st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			BlockResult br = s.applyBlock(sb);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
@@ -90,7 +94,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			State s2 = s.applyBlock(sb).getState();
 
 			// no transfer should have happened, although cost should have been paid
@@ -102,7 +106,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_C,1, ADDRESS_B, 50);
 			SignedData<ATransaction> st = KEYPAIR_C.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			BlockResult br=s.applyBlock(sb);
 			assertEquals(ErrorCodes.NOBODY, br.getResult(0).getErrorCode());
 
@@ -115,7 +119,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			State s2 = s0.applyBlock(sb).getState();
 
 			// Transfer should have happened
@@ -132,7 +136,7 @@ public class StateTransitionsTest {
 			Transfer t2 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 150);
 			SignedData<ATransaction> st2 = KEYPAIR_A.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 
 			BlockResult br = s0.applyBlock(sb);
 			State s2 = br.getState();
@@ -150,7 +154,7 @@ public class StateTransitionsTest {
 			Transfer t2 = Transfer.create(ADDRESS_B,1, ADDRESS_C, 50);
 			SignedData<ATransaction> st2 = KEYPAIR_B.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 
 			BlockResult br = s0.applyBlock(sb);
 			State s2 = br.getState();
@@ -168,7 +172,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 50);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			BlockResult br = s.applyBlock(sb);
 			AVector<Result> results = br.getResults();
 			assertEquals(1, results.count());
@@ -179,7 +183,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50000);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			BlockResult br = s.applyBlock(sb);
 			assertEquals(ErrorCodes.FUNDS, br.getResult(0).getErrorCode());
 
@@ -203,7 +207,7 @@ public class StateTransitionsTest {
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_NIKI, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
-			SignedData<Block> sb=KEYPAIR_PEER.signData(b);
+			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			BlockResult br = s0.applyBlock(sb);
 			// System.out.println("Transfer complete....");
 

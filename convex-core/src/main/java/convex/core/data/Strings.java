@@ -35,6 +35,8 @@ public class Strings {
 	 */
 	public static final byte EXCESS_BYTE = -1;
 
+	public static final StringShort MISSING_PEER = StringShort.create("Missing Peer!");
+
 	/**
 	 * Reads a String from a Blob encoding.
 	 * 

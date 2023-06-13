@@ -10,6 +10,7 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Ref;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -235,6 +236,19 @@ public class BlockResult extends ARecord {
 	@Override
 	public RecordFormat getFormat() {
 		return FORMAT;
+	}
+
+	/**
+	 * Creates a BlockResult for an invalid Block (i.e. no peer)
+	 * @param state State at time of creation
+	 * @param block Invalid block
+	 * @return BlockResult instance
+	 */
+	public static BlockResult createInvalidBlock(State state, Block block) {
+		Result r=Result.create(null, Strings.MISSING_PEER,ErrorCodes.PEER);
+		AVector<Result> rs=Vectors.repeat(r, block.getTransactions().size());
+		
+		return new BlockResult(state,rs);
 	}
 
 

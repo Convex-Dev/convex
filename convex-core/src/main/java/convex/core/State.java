@@ -287,10 +287,13 @@ public class State extends ARecord {
 	 * @return The BlockResult from applying the given Block to this State
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
-		// TODO: behaviour if invalid Peer / Block?
-		
 		Block block=signedBlock.getValue();
 		Counters.applyBlock++;
+
+		AccountKey peerKey=signedBlock.getAccountKey();
+		PeerStatus ps=peers.get(peerKey);
+		if (ps==null) return BlockResult.createInvalidBlock(this,block);
+		
 		State state = prepareBlock(block);
 		return state.applyTransactions(block);
 	}
