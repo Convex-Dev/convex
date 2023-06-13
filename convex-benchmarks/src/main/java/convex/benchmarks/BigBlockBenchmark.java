@@ -27,7 +27,7 @@ public class BigBlockBenchmark {
 	static ArrayList<AKeyPair> keyPairs = new ArrayList<AKeyPair>();
 	static ArrayList<Address> addresses = new ArrayList<Address>();
 	public static State state = Benchmarks.STATE;
-	public static Block block;
+	public static SignedData<Block> block;
 	static ArrayList<SignedData<ATransaction>> transactions = new ArrayList<SignedData<ATransaction>>();
 
 	static {
@@ -48,7 +48,8 @@ public class BigBlockBenchmark {
 			Transfer t = Transfer.create(source,1, target, 1);
 			transactions.add(kp.signData(t));
 		}
-		block = Block.create(System.currentTimeMillis(),transactions);
+		AKeyPair kp=Benchmarks.PEER_KEYPAIRS.get(0);
+		block = kp.signData(Block.create(System.currentTimeMillis(),transactions));
 	}
 
 	@Benchmark

@@ -398,8 +398,8 @@ public class UtilsTest {
 			SignedData<ATransaction> data = peer.sign(Invoke.create(InitTest.HERO, timestamp, command));
 
 			Block block = Block.of(timestamp, data);
-
-			State state1 = state0.applyBlock(block).getState();
+			SignedData<Block> sb=InitTest.FIRST_PEER_KEYPAIR.signData(block);
+			State state1 = state0.applyBlock(sb).getState();
 
 			states = states.conj(state1);
 		}

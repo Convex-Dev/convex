@@ -55,6 +55,7 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -4127,7 +4128,8 @@ public class CoreTest extends ACVMTest {
 		assertTrue(step(ctx, "(do a)").isExceptional());
 
 		Block b = Block.of(expectedTS);
-		BlockResult br = s.applyBlock(b);
+		SignedData<Block> sb=InitTest.FIRST_PEER_KEYPAIR.signData(b);
+		BlockResult br = s.applyBlock(sb);
 		State s2 = br.getState();
 
 		Context ctx2 = Context.createInitial(s2, HERO, INITIAL_JUICE);

@@ -281,7 +281,7 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Applies a signed Block to the current state
+	 * Applies a signed Block to the current state, i.e. the State Transition function
 	 * 
 	 * @param signedBlock Signed Block to apply
 	 * @return The BlockResult from applying the given Block to this State
@@ -290,18 +290,6 @@ public class State extends ARecord {
 		// TODO: behaviour if invalid Peer / Block?
 		
 		Block block=signedBlock.getValue();
-		return applyBlock(block);
-	}
-
-	/**
-	 * Block level state transition function
-	 *
-	 * Updates the state by applying a given block of transactions
-	 *
-	 * @param block Block to Apply
-	 * @return The BlockResult from applying the given Block to this State
-	 */
-	public BlockResult applyBlock(Block block) {
 		Counters.applyBlock++;
 		State state = prepareBlock(block);
 		return state.applyTransactions(block);
