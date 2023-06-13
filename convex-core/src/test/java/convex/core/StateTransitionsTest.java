@@ -232,6 +232,22 @@ public class StateTransitionsTest {
 		s = br.getState();
 
 	}
+	
+	@Test
+	public void testBadBlockMissingPeer() throws BadSignatureException {
+		State s = TestState.STATE;
+		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read(":should-fail"));
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		Block b1 = Block.of(s.getTimestamp().longValue(), kp.signData(t1));
+		SignedData<Block> sb=KEYPAIR_ROBB.signData(b1); // not a Peer!
+		
+		BlockResult br=s.applyBlock(sb);
+		assertEquals(ErrorCodes.PEER,br.getResult(0).getErrorCode());
+		
+		// Should be no state transition with a bad block
+		assertEquals(s,br.getState());
+	}
+
 
 	@Test public void testManyDeploysMemoryRegression() throws BadSignatureException {
 		State s=TestState.STATE;

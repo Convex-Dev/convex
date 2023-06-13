@@ -200,7 +200,7 @@ public class ErrorCodes {
 
 	public static final Keyword TIMEOUT = Keyword.create("TIMEOUT");
 
-	public static final Keyword PEER = Keyword.create("TIMEOUT");
+	public static final Keyword PEER = Keyword.create("PEER");
 
 
 }
