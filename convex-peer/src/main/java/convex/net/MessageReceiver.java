@@ -140,7 +140,7 @@ public class MessageReceiver {
 	 * Calls the receive action with the message if successfully received. Should be called with
 	 * the correct store for this Connection.
 	 *
-	 * SECURITY: Gets called on NIO server thread
+	 * SECURITY: Gets called on NIO thread for Server / Client connections
 	 *
 	 * @throws BadFormatException if the message is incorrectly formatted`
 	 */
@@ -154,8 +154,8 @@ public class MessageReceiver {
 			// Otherwise, send to the message receive action
 			receivedMessageCount++;
 			if (action != null) {
-					log.trace("Message received: {}", message.getType());
-					action.accept(message);
+				log.trace("Message received: {}", message.getType());
+				action.accept(message);
 			} else {
 				log.warn("Ignored message because no receive action set: " + message);
 			}
