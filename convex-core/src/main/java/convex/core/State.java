@@ -328,7 +328,16 @@ public class State extends ARecord {
 		return state;
 	}
 	
-	private State applyTimeUpdate(long newTimestamp) {
+	/**
+	 * Updates the State based on passage of time.
+	 * 
+	 * Note: while this can be applied independently, normal correct State updates
+	 * should go via `applyBlock`
+	 * 
+	 * @param newTimestamp New timestamp to apply
+	 * @return Updates State
+	 */
+	public State applyTimeUpdate(long newTimestamp) {
 		State state = this;
 		AVector<ACell> glbs = state.globals;
 		long oldTimestamp=((CVMLong)glbs.get(GLOBAL_TIMESTAMP)).longValue();
@@ -358,7 +367,7 @@ public class State extends ARecord {
 	}
 
 	@SuppressWarnings("unchecked")
-	private State applyScheduledTransactions() {
+	public State applyScheduledTransactions() {
 		long tcount = 0;
 		BlobMap<ABlob, AVector<ACell>> sched = this.schedule;
 		CVMLong timestamp = this.getTimestamp();
