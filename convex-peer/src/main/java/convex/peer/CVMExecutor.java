@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -10,6 +11,7 @@ import convex.core.Belief;
 import convex.core.Peer;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
+import convex.core.util.Utils;
 
 /**
  * Component handling CVM execution loop with a Peer Server
@@ -17,7 +19,6 @@ import convex.core.util.LoadMonitor;
 public class CVMExecutor extends AThreadedComponent {
 	
 	private static final Logger log = LoggerFactory.getLogger(CVMExecutor.class.getName());
-
 	
 	private Peer peer;
 	
@@ -35,23 +36,31 @@ public class CVMExecutor extends AThreadedComponent {
 		LoadMonitor.down();
 		Belief beliefUpdate=update.poll(100, TimeUnit.MILLISECONDS);
 		LoadMonitor.up();
-		if (beliefUpdate!=null) {
-			peer=peer.updateBelief(beliefUpdate);
-		}
 		
-		// Trigger State update (if any new Blocks are confirmed)
-		Peer updatedPeer=peer.updateState();
-		if (updatedPeer!=peer) {
-			peer=updatedPeer;
-			try {
-				peer = server.persistPeerData();
-			} catch (Exception e) {
-				log.warn("Unable to persist Peer data: ",e);
+		synchronized(this) {
+			if (beliefUpdate!=null) {
+				peer=peer.updateBelief(beliefUpdate);
 			}
-			maybeCallHook(peer);
+			
+			// Trigger State update (if any new Blocks are confirmed)
+			Peer updatedPeer=peer.updateState();
+			if (updatedPeer!=peer) {
+				peer=updatedPeer;
+				persistPeerData();
+				maybeCallHook(peer);
+			}
 		}
 		
 		server.transactionHandler.maybeReportTransactions(peer);
+	}
+	
+	public synchronized void persistPeerData() {
+		try {
+			peer = server.persistPeerData();
+		} catch (IOException e) {
+			log.warn("Exception while attempting to presist Peer data",e);
+			throw Utils.sneakyThrow(e);
+		}
 	}
 
 	private void maybeCallHook(Peer p) {
@@ -70,7 +79,7 @@ public class CVMExecutor extends AThreadedComponent {
 		return "CVM Executor thread on port "+server.getPort();
 	}
 
-	public void setPeer(Peer peer) {
+	public synchronized void setPeer(Peer peer) {
 		this.peer=peer;
 	}
 	

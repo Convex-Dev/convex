@@ -169,6 +169,7 @@ public class Server implements Closeable {
 			// Establish Peer state and ensure it is persisted
 			Peer peer = establishPeer();
 			executor.setPeer(peer);
+			executor.persistPeerData();
 			
 			// Set up root key for Peer persistence. Default is Peer Account Key
 			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
