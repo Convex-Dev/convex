@@ -3,6 +3,7 @@ package convex.core.data;
 import java.util.Collection;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -266,6 +267,21 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @return ListIterator instance.
 	 */
 	protected abstract ListIterator<T> listIterator(long l);
+	
+	@Override
+	public Spliterator<T> spliterator() {
+		return spliterator(0,count);
+	}
+
+	/**
+	 * Gets a Spliterator for the given range of this sequence
+	 * @param start Start position (inclusive)
+	 * @param end End position (exclusive)
+	 * @return Spliterator instance
+	 */
+	public Spliterator<T> spliterator(long start, long end) {
+		return new SequenceSpliterator<T>(this,start,end);
+	}
 
 	/**
 	 * Reverses a sequence, converting Lists to Vectors and vice versa

@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Spliterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -143,13 +142,6 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract <R extends ACell> AVector<R> concat(ASequence<R> b);
 
 	public abstract <R> R reduce(BiFunction<? super R, ? super T, ? extends R> func, R value);
-
-	@Override
-	public Spliterator<T> spliterator() {
-		return spliterator(0);
-	}
-
-	public abstract Spliterator<T> spliterator(long position);
 
 	@Override
 	public Iterator<T> iterator() {

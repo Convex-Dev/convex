@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import java.util.ListIterator;
-import java.util.Spliterator;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -91,12 +90,6 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 	@Override
 	public <R> R reduce(BiFunction<? super R, ? super T, ? extends R> func, R value) {
 		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public Spliterator<T> spliterator(long position) {
-		// TODO Auto-generated method stub
-		return null;
 	}
 
 	@Override

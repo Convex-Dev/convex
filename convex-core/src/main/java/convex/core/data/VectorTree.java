@@ -2,7 +2,6 @@ package convex.core.data;
 
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
-import java.util.Spliterator;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -529,55 +528,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			value = children[i].getValue().reduce(func, value);
 		}
 		return value;
-	}
-
-	@Override
-	public Spliterator<T> spliterator(long position) {
-		return new TreeVectorSpliterator(position);
-	}
-
-	private class TreeVectorSpliterator implements Spliterator<T> {
-		long pos = 0;
-
-		public TreeVectorSpliterator(long position) {
-			if ((position < 0) || (position > count))
-				throw new IllegalArgumentException(Errors.illegalPosition(position));
-			this.pos = position;
-		}
-
-		@Override
-		public boolean tryAdvance(Consumer<? super T> action) {
-			if (pos >= count) return false;
-			action.accept((T) get(pos++));
-			return true;
-		}
-
-		@Override
-		public Spliterator<T> trySplit() {
-			for (int i = 0; i < children.length; i++) {
-				long bpos = childIndex(i);
-				AVector<T> b = children[i].getValue();
-
-				long bcount = b.count();
-				long blockEnd = childIndex(i) + bcount;
-				if (pos < blockEnd) {
-					Spliterator<T> ss = b.spliterator(pos - bpos);
-					pos = blockEnd;
-					return ss;
-				}
-			}
-			return null;
-		}
-
-		@Override
-		public long estimateSize() {
-			return count;
-		}
-
-		@Override
-		public int characteristics() {
-			return Spliterator.IMMUTABLE | Spliterator.SIZED | Spliterator.SUBSIZED | Spliterator.ORDERED;
-		}
 	}
 
 	@Override

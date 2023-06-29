@@ -29,5 +29,13 @@ public class StreamsTest {
 		assertEquals(v, v2);
 
 	}
+	
+	@Test public void testParallelStream() {
+		AVector<CVMLong> v = Samples.INT_VECTOR_300;
+		Stream<CVMLong> s = v.stream().parallel();
+		
+		List<CVMLong> list = s.map(i -> i).collect(Collectors.toList());
+		assertEquals(v.size(), list.size());
+	}
 
 }

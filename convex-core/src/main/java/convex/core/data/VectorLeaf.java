@@ -2,7 +2,6 @@ package convex.core.data;
 
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
-import java.util.Spliterator;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -538,48 +537,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			value = func.apply(value, items[i].getValue());
 		}
 		return value;
-	}
-
-	@Override
-	public Spliterator<T> spliterator(long position) {
-		return new ListVectorSpliterator(position);
-	}
-
-	private class ListVectorSpliterator implements Spliterator<T> {
-		long pos = 0;
-
-		public ListVectorSpliterator(long position) {
-			if ((position < 0) || (position > count))
-				throw new IllegalArgumentException(Errors.illegalPosition(position));
-			this.pos = position;
-		}
-
-		@Override
-		public boolean tryAdvance(Consumer<? super T> action) {
-			if (pos >= count) return false;
-			action.accept((T) get(pos++));
-			return true;
-		}
-
-		@Override
-		public Spliterator<T> trySplit() {
-			long tlength = prefixLength();
-			if (pos < tlength) {
-				pos = tlength;
-				return prefix.getValue().spliterator(pos);
-			}
-			return null;
-		}
-
-		@Override
-		public long estimateSize() {
-			return count;
-		}
-
-		@Override
-		public int characteristics() {
-			return Spliterator.IMMUTABLE | Spliterator.SIZED | Spliterator.SUBSIZED | Spliterator.ORDERED;
-		}
 	}
 
 	@Override

@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Map;
-import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -58,11 +57,6 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	@Override
 	public AVector<ACell> append(ACell value) {
 		return toVector().append(value);
-	}
-
-	@Override
-	public Spliterator<ACell> spliterator(long position) {
-		return toVector().spliterator(position);
 	}
 
 	@Override
