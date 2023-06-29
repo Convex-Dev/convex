@@ -184,6 +184,10 @@ public class Peer {
 
 	/**
 	 * Like {@link #restorePeer(AStore, AKeyPair, ACell)} but uses a null root key.
+	 * @param store Store to restore from
+	 * @param keyPair Key Pair to use for restored Peer
+	 * @return Restored Peer instance
+	 * @throws IOException In case of IO error
 	 */
 	public static Peer restorePeer(AStore store, AKeyPair keyPair) throws IOException {
 		return restorePeer(store, keyPair, null);
@@ -198,10 +202,10 @@ public class Peer {
 	 * @throws IOException If store reading failed
 	 */
 	public static Peer restorePeer(AStore store, AKeyPair keyPair, ACell rootKey) throws IOException {
-			AMap<Keyword,ACell> peerData=getPeerData(store, rootKey);
-			if (peerData==null) return null;
-			Peer peer=Peer.fromData(keyPair,peerData);
-			return peer;
+		AMap<Keyword,ACell> peerData=getPeerData(store, rootKey);
+		if (peerData==null) return null;
+		Peer peer=Peer.fromData(keyPair,peerData);
+		return peer;
 	}
 	
 	/**
