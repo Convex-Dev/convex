@@ -32,7 +32,7 @@ public class ParallelBenchmark {
 	
 	private CVMLong sillyTask(CVMLong v) {
 		long tot=v.longValue();
-		for (int i=0; i<100000; i++) {
+		for (int i=0; i<1000; i++) {
 			tot=tot+tot;
 		}
 		return CVMLong.create(tot);
