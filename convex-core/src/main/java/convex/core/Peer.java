@@ -605,7 +605,7 @@ public class Peer {
 	 * Gets the state position of this Peer, which is equal to the number of state transitions executed.
 	 * @return Position
 	 */
-	public long getPosition() {
+	public long getStatePosition() {
 		return statePosition;
 	}
 

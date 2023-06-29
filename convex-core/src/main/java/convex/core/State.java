@@ -444,7 +444,7 @@ public class State extends ARecord {
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
-			// SECURITY: catch-all exception handler.
+			// SECURITY: catch-all exception handler, needs consideration
 			try {
 				// extract the signed transaction from the block
 				SignedData<? extends ATransaction> signed = transactions.get(i);

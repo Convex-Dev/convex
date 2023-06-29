@@ -42,7 +42,7 @@ public class JoinTestNetwork {
 
 		Thread.sleep(10000);
 		Peer peer=newServer.getPeer();
-		System.out.println("State count:"+peer.getPosition());
+		System.out.println("State count:"+peer.getStatePosition());
 	}
 	
 	public static void main(String[] args) throws BadSignatureException, IOException, InterruptedException, ExecutionException, TimeoutException {

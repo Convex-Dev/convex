@@ -1,6 +1,7 @@
 package convex.peer;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -8,7 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
+import convex.core.Block;
 import convex.core.Peer;
+import convex.core.data.SignedData;
+import convex.core.transactions.ATransaction;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
@@ -42,6 +46,9 @@ public class CVMExecutor extends AThreadedComponent {
 				peer=peer.updateBelief(beliefUpdate);
 			}
 			
+			// Parallel signature validation
+			prevalidateSignatures(peer);
+			
 			// Trigger State update (if any new Blocks are confirmed)
 			Peer updatedPeer=peer.updateState();
 			if (updatedPeer!=peer) {
@@ -52,6 +59,25 @@ public class CVMExecutor extends AThreadedComponent {
 		}
 		
 		server.transactionHandler.maybeReportTransactions(peer);
+	}
+	
+	private final ArrayList<SignedData<ATransaction>> txs=new ArrayList<>();
+	
+	private void prevalidateSignatures(Peer peer) {
+		long consensusPoint=peer.getFinalityPoint();
+		long statePos=peer.getStatePosition();
+		
+		txs.clear();
+		for (long i=statePos; i<consensusPoint; i++) {
+			Block b=peer.getPeerOrder().getBlock(i).getValue();
+			txs.addAll(b.getTransactions());
+		}
+		
+		txs.stream().parallel().forEach(this::validateTransactionSignature);
+	}
+
+	private void validateTransactionSignature(SignedData<ATransaction> st) {
+		st.checkSignature();
 	}
 	
 	public synchronized void persistPeerData() {
