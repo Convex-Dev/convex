@@ -12,10 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
-import convex.core.Block;
-import convex.core.Constants;
-import convex.core.ErrorCodes;
 import convex.core.BeliefMerge;
+import convex.core.Block;
+import convex.core.ErrorCodes;
 import convex.core.Order;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -74,7 +73,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Queue on which Beliefs messages are received 
 	 */
 	// TODO: use config if provided
-	private ArrayBlockingQueue<Message> beliefQueue = new ArrayBlockingQueue<>(Constants.BELIEF_QUEUE_SIZE);
+	private ArrayBlockingQueue<Message> beliefQueue = new ArrayBlockingQueue<>(Config.BELIEF_QUEUE_SIZE);
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());

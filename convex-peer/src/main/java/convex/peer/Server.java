@@ -15,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Belief;
-import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Order;
 import convex.core.Peer;
@@ -224,7 +223,7 @@ public class Server implements Closeable {
 				// Sync status and genesis state
 				Result result = convex.requestStatusSync(timeout);
 				AVector<ACell> status = result.getValue();
-				if (status == null || status.count()!=Constants.STATUS_COUNT) {
+				if (status == null || status.count()!=Config.STATUS_COUNT) {
 					throw new Error("Bad status message from remote Peer");
 				}
 				Hash beliefHash=RT.ensureHash(status.get(0));
@@ -282,7 +281,7 @@ public class Server implements Closeable {
 
 	private long establishTimeout() {
 		Object maybeTimeout=getConfig().get(Keywords.TIMEOUT);
-		if (maybeTimeout==null) return Constants.PEER_SYNC_TIMEOUT;
+		if (maybeTimeout==null) return Config.PEER_SYNC_TIMEOUT;
 		Utils.toInt(maybeTimeout);
 		return 0;
 	}
@@ -598,7 +597,7 @@ public class Server implements Closeable {
 		AVector<CVMLong> cps = Vectors.of(Utils.toObjectArray(order.getConsensusPoints())) ;
 
 		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash, cp,pp,op,cps);
-		assert(reply.count()==Constants.STATUS_COUNT);
+		assert(reply.count()==Config.STATUS_COUNT);
 		return reply;
 	}
 

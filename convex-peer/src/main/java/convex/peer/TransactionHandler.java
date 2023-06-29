@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Block;
 import convex.core.BlockResult;
-import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Peer;
 import convex.core.Result;
@@ -67,8 +66,8 @@ public class TransactionHandler extends AThreadedComponent{
 	
 	public TransactionHandler(Server server) {
 		super(server);	
-		txMessageQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
-		transactionQueue=new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);	
+		txMessageQueue= new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);
+		transactionQueue=new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);	
 	}
 	
 	/**

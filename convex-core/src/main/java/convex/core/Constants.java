@@ -6,7 +6,6 @@ import java.time.Instant;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
@@ -140,65 +139,14 @@ public class Constants {
 	 */
 	public static final int HASH_LENGTH = 32;
 
-	/**
-	 * Default number of outgoing connections for a Peer
-	 */
-	public static final Integer DEFAULT_OUTGOING_CONNECTION_COUNT = 20;
-
-	/**
-	 * Number of milliseconds average time to drop low-staked Peers
-	 */
-	public static final double PEER_CONNECTION_DROP_TIME = 20000;
 
 	/**
 	 * Minimum stake for a Peer to be considered by other Peers in consensus
 	 */
 	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD*1;
 
-	/**
-	 * Default size for client receive ByteBuffers.
-	 */
-	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
 
-	/**
-	 * Size of default server socket receive buffer
-	 */
-	public static final int SOCKET_SERVER_BUFFER_SIZE = 16*65536;
 
-	/**
-	 * Size of default server socket buffers for an outbound peer connection
-	 */
-	public static final int SOCKET_PEER_BUFFER_SIZE = 16*65536;
-
-	/**
-	 * Size of default client socket receive buffer
-	 */
-	public static final int SOCKET_RECEIVE_BUFFER_SIZE = 65536;
-
-	/**
-	 * Size of default client socket send buffer
-	 */
-	public static final int SOCKET_SEND_BUFFER_SIZE = 2*65536;
-
-	/**
-	 * Delay before rebroadcasting Belief if not in consensus
-	 */
-	public static final long MAX_REBROADCAST_DELAY = 200;
-
-	/**
-	 * Timeout for syncing with an existing Peer
-	 */
-	public static final long PEER_SYNC_TIMEOUT = 60000;
-
-	/**
-	 * Number of fields in a Peer STATUS message
-	 */
-	public static final long STATUS_COUNT = 9;
-
-	/**
-	 * Default port for Convex Peers
-	 */
-	public static final int DEFAULT_PEER_PORT = 18888;
 
 	/**
 	 * Option for static compilation support. Set to true for static inlines on core
@@ -222,17 +170,9 @@ public class Constants {
 	public static final AString PRINT_EXCEEDED_MESSAGE = Strings.create("<<Print limit exceeded>>");
 
 	/**
-	 * Default size for incoming client transaction queue
-	 * Note: this limits TPS for client transactions, will send failures if overloaded
+	 * Default port for Convex Peers
 	 */
-	public static final int TRANSACTION_QUEUE_SIZE = 1000;
-
-	public static final int QUERY_QUEUE_SIZE = 1000;
-
-	/**
-	 * Size of incoming Belief queue
-	 */
-	public static final int BELIEF_QUEUE_SIZE = 200;
+	public static final int DEFAULT_PEER_PORT = 18888;
 
 	/**
 	 * Minimum milliseconds to retain a proposal before switching

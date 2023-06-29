@@ -175,7 +175,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 				if (keepChance<1.0) {
 
-					double dropRate=millisSinceLastUpdate/(double)Constants.PEER_CONNECTION_DROP_TIME;
+					double dropRate=millisSinceLastUpdate/(double)Config.PEER_CONNECTION_DROP_TIME;
 					if (random.nextDouble()<(dropRate*(1.0-keepChance))) {
 						closeConnection(p);
 						currentPeerCount--;
@@ -242,7 +242,7 @@ public class ConnectionManager extends AThreadedComponent {
 		} catch (Exception ex) {
 			target=null;
 		}
-		if (target==null) target=Constants.DEFAULT_OUTGOING_CONNECTION_COUNT;
+		if (target==null) target=Config.DEFAULT_OUTGOING_CONNECTION_COUNT;
 		return target;
 	}
 
@@ -584,7 +584,7 @@ public class ConnectionManager extends AThreadedComponent {
 			// close the temp connection to Convex API
 			convex.close();
 			
-			if (status == null || status.count()!=Constants.STATUS_COUNT) {
+			if (status == null || status.count()!=Config.STATUS_COUNT) {
 				throw new Error("Bad status message from remote Peer");
 			}
 
@@ -595,7 +595,7 @@ public class ConnectionManager extends AThreadedComponent {
 			if ((existing!=null)&&!existing.isClosed()) return existing;
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages
-				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null,Constants.SOCKET_PEER_BUFFER_SIZE,Constants.SOCKET_PEER_BUFFER_SIZE);
+				newConn = Connection.connect(hostAddress, server.peerReceiveAction, server.getStore(), null,Config.SOCKET_PEER_BUFFER_SIZE,Config.SOCKET_PEER_BUFFER_SIZE);
 				connections.put(peerKey, newConn);
 			}
 		} catch (IOException | TimeoutException e) {

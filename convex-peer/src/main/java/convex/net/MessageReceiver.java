@@ -8,11 +8,11 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.Constants;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
 import convex.net.message.Message;
+import convex.peer.Config;
 
 /**
  * Class responsible for buffered accumulation of data received over a connection.
@@ -33,7 +33,7 @@ import convex.net.message.Message;
  */
 public class MessageReceiver {
 	// Receive buffer must be big enough at least for one max sized message plus message header
-	public static final int RECEIVE_BUFFER_SIZE = Constants.RECEIVE_BUFFER_SIZE;
+	public static final int RECEIVE_BUFFER_SIZE = Config.RECEIVE_BUFFER_SIZE;
 
 	/**
 	 * Buffer for receiving partial messages. Maintained ready for writing.

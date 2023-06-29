@@ -73,12 +73,12 @@ public class CVMExecutor extends AThreadedComponent {
 			txs.addAll(b.getTransactions());
 		}
 		
-		txs.stream().parallel().forEach(this::validateTransactionSignature);
+		txs.stream().parallel().forEach(validateTransactionSignature);
 	}
 
-	private void validateTransactionSignature(SignedData<ATransaction> st) {
+	private final Consumer<SignedData<ATransaction>> validateTransactionSignature = st-> {
 		st.checkSignature();
-	}
+	};
 	
 	public synchronized void persistPeerData() {
 		try {

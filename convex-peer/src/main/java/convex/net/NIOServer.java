@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
+import convex.peer.Config;
 import convex.peer.Server;
 
 /**
@@ -77,7 +78,7 @@ public class NIOServer implements Closeable {
 		ssc = ServerSocketChannel.open();
 
 		// Set receive buffer size
-		ssc.socket().setReceiveBufferSize(Constants.SOCKET_SERVER_BUFFER_SIZE);
+		ssc.socket().setReceiveBufferSize(Config.SOCKET_SERVER_BUFFER_SIZE);
 
 		bindAddress = (bindAddress == null) ? "localhost" : bindAddress;
 		InetSocketAddress address;

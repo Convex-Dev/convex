@@ -42,6 +42,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 import convex.net.message.Message;
+import convex.peer.Config;
 
 /**
  * <p>
@@ -155,7 +156,7 @@ public class Connection {
 	 */
 	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey) throws IOException, TimeoutException {	
-		return connect(hostAddress,receiveAction,store,trustedPeerKey,Constants.SOCKET_SEND_BUFFER_SIZE,Constants.SOCKET_RECEIVE_BUFFER_SIZE);
+		return connect(hostAddress,receiveAction,store,trustedPeerKey,Config.SOCKET_SEND_BUFFER_SIZE,Config.SOCKET_RECEIVE_BUFFER_SIZE);
 	}
 
 	/**

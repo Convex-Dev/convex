@@ -3,7 +3,6 @@ package convex.peer;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import convex.core.Constants;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -20,11 +19,11 @@ public class QueryHandler extends AThreadedComponent {
 	/**
 	 * Queue for received messages to be processed by this Peer Server
 	 */
-	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Constants.QUERY_QUEUE_SIZE);
+	private ArrayBlockingQueue<Message> queryQueue = new ArrayBlockingQueue<Message>(Config.QUERY_QUEUE_SIZE);
 
 	public QueryHandler(Server server) {
 		super(server);	
-		queryQueue= new ArrayBlockingQueue<>(Constants.TRANSACTION_QUEUE_SIZE);
+		queryQueue= new ArrayBlockingQueue<>(Config.TRANSACTION_QUEUE_SIZE);
 	}
 	
 	/**
