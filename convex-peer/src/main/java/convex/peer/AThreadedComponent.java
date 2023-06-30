@@ -31,7 +31,7 @@ public abstract class AThreadedComponent {
 					log.debug("Component thread interrupted: {}",thread);
 					break;
 				} catch (Throwable e) {
-					log.warn("Unexpected exception in Server component: ",e);
+					log.warn("Unexpected exception in "+this.getClass().getSimpleName(),e);
 				} 
 			}
 			
