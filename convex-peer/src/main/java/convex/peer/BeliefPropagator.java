@@ -137,9 +137,14 @@ public class BeliefPropagator extends AThreadedComponent {
 			// This can potentially help latency on transaction result reporting etc.
 			server.updateBelief(belief);
 			
-			// Queue our belief again, means awaitBeliefs returns immediately next time
-			Message trigger=Message.createBelief(belief);
-			queueBelief(trigger);
+			// After an update, we want to make sure we have another update
+			// This means awaitBeliefs returns immediately next time so we check we have converged
+			// If Belief Queue is empty then queue our belief again
+			// Otherwise we are fine
+			if (beliefQueue.isEmpty()) {
+				Message trigger=Message.createBelief(belief);
+				queueBelief(trigger);
+			}
 		}
 		
 		long ts=Utils.getCurrentTimestamp();
