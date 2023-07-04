@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Random;
 
@@ -109,9 +110,13 @@ public class TestEtch {
 		
 		assertNull(etch.read(f[0])); // first item isn't written yet
 		
-		// write all the f values except the last one
+		// write all the f values except the last one in random sequence
+		ArrayList<Integer> al=new ArrayList<>(FILL);
+		for (int i=0; i<FILL; i++) al.add(i);
+		Utils.shuffle(al, new Random(5657));
 		for (int i=0; i<FILL; i++) {
-			etch.write(f[i], f[i].getRef());
+			int ix=al.get(i);
+			etch.write(f[ix], f[ix].getRef());
 		}
 		
 		for (int i=0; i<FILL; i++) {
