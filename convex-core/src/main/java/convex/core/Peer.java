@@ -73,7 +73,7 @@ public class Peer {
 	private final long statePosition;
 	
 	/**
-	 * Current state index
+	 * Current consensus Order
 	 */
 	private final Order consensusOrder;
 
