@@ -457,8 +457,8 @@ public class Etch {
 
 	/**
 	 * Finds the start digit of a chain, stepping backwards from the given digit
-	 * @param indexPosition
-	 * @param digit
+	 * @param indexPosition Position of index block
+	 * @param digit Position at which PTR_CHAIN is detected, i.e. search begins.
 	 * @return
 	 * @throws IOException
 	 */

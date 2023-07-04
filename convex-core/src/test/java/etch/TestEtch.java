@@ -73,6 +73,52 @@ public class TestEtch {
 		assertEquals(v1,etch.read(k1).getValue());
 		assertEquals(v2,etch.read(k2).getValue());
 		assertEquals(v3,etch.read(k3).getValue());
+		assertEquals(vb,etch.read(kb).getValue());
+	}
+	
+	@Test 
+	public void testChainFill() throws IOException {
+		int FILL=512;
+		
+		Etch etch = EtchStore.createTemp().getEtch();
+		// Blocking values all ones
+		Hash[] b=new Hash[9];
+		b[0]=Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000");
+		b[1]=Hash.fromHex("1000000000000000000000000000000000000000000000000000000000000000");
+		b[2]=Hash.fromHex("1100000000000000000000000000000000000000000000000000000000000000");
+		b[3]=Hash.fromHex("1110000000000000000000000000000000000000000000000000000000000000");
+		b[4]=Hash.fromHex("1111000000000000000000000000000000000000000000000000000000000000");
+		b[5]=Hash.fromHex("1111100000000000000000000000000000000000000000000000000000000000");
+		b[6]=Hash.fromHex("1111110000000000000000000000000000000000000000000000000000000000");
+		b[7]=Hash.fromHex("1111111000000000000000000000000000000000000000000000000000000000");
+		b[8]=Hash.fromHex("1111111100000000000000000000000000000000000000000000000000000000");
+		for (int i=0; i<=8; i++) {
+			etch.write(b[i],b[i].getRef());
+		}	
+		for (int i=0; i<=8; i++) {
+			assertEquals(b[i],etch.read(b[i]).getValue());
+		}
+		
+		Hash[] f= new Hash[4097];
+		for (int i=0; i<=FILL; i++) {
+			String sk=Blob.create(new byte[] {(byte) (i>>8),(byte) i}).toHexString();
+			String hs="111111"+sk+"0000000000000000000000000000000000000000000000000000ff";
+			Hash h=Hash.fromHex(hs);
+			f[i]=h;
+		}
+		
+		assertNull(etch.read(f[0])); // first item isn't written yet
+		
+		// write all the f values except the last one
+		for (int i=0; i<FILL; i++) {
+			etch.write(f[i], f[i].getRef());
+		}
+		
+		for (int i=0; i<FILL; i++) {
+			assertEquals(f[i],etch.read(f[i]).getValue());
+		}
+
+		assertNull(etch.read(f[FILL])); // last item still not written
 	}
 
 	@Test
