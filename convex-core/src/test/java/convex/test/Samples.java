@@ -207,7 +207,7 @@ public class Samples {
 	}
 
 	@SuppressWarnings("unchecked")
-	static <T extends AVector<CVMLong>> T createTestIntVector(int size) {
+	public static <T extends AVector<CVMLong>> T createTestIntVector(int size) {
 		AVector<CVMLong> v = Vectors.empty();
 		for (int i = 0; i < size; i++) {
 			v = v.append(CVMLong.create(i));
