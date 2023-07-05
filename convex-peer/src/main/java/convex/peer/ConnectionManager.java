@@ -579,7 +579,7 @@ public class ConnectionManager extends AThreadedComponent {
 		try {
 			// Use temp client connection to query status
 			Convex convex=Convex.connect(hostAddress);
-			Result result = convex.requestStatusSync(Constants.DEFAULT_CLIENT_TIMEOUT);
+			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
 			AVector<ACell> status = result.getValue();
 			// close the temp connection to Convex API
 			convex.close();

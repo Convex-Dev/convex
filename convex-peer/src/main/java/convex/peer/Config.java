@@ -68,6 +68,11 @@ public class Config {
 	public static final int TRANSACTION_QUEUE_SIZE = 10000;
 
 	public static final int QUERY_QUEUE_SIZE = 10000;
+	
+	/**
+	 * Default timeout in milliseconds for client transactions
+	 */
+	public static final long DEFAULT_CLIENT_TIMEOUT = 20000;
 
 	/**
 	 * Size of incoming Belief queue

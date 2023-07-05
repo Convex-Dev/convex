@@ -194,7 +194,7 @@ public class Connection {
 		while (!clientChannel.finishConnect()) {
 			long now = Utils.getCurrentTimestamp();
 			long elapsed=now-start;
-			if (elapsed > Constants.DEFAULT_CLIENT_TIMEOUT)
+			if (elapsed > Config.DEFAULT_CLIENT_TIMEOUT)
 				throw new TimeoutException("Couldn't connect after "+elapsed+"ms");
 			try {
 				Thread.sleep(10+elapsed/5);

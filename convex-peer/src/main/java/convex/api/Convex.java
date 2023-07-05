@@ -45,6 +45,7 @@ import convex.core.util.Utils;
 import convex.core.State;
 import convex.net.ResultConsumer;
 import convex.net.message.Message;
+import convex.peer.Config;
 import convex.peer.Server;
 
 /**
@@ -62,7 +63,7 @@ public abstract class Convex {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 
-	protected long timeout = Constants.DEFAULT_CLIENT_TIMEOUT;
+	protected long timeout = Config.DEFAULT_CLIENT_TIMEOUT;
 
 	/**
 	 * Key pair for this Client

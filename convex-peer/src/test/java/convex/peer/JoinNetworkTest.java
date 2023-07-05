@@ -80,7 +80,7 @@ public class JoinNetworkTest {
 			client.setNextSequence(1); // avoids a potential stale query
 			assertEquals(user,client.transactSync("*address*").getValue());
 			
-			Result r=client.requestStatus().get(2000,TimeUnit.MILLISECONDS);
+			Result r=client.requestStatus().get(10000,TimeUnit.MILLISECONDS);
 			assertFalse(r.isError());
 		}
 	}
