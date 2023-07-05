@@ -37,7 +37,7 @@ import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.peer.Server;
 import io.javalin.Javalin;
-import io.javalin.core.util.JavalinBindException;
+import io.javalin.util.JavalinBindException;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
@@ -55,9 +55,14 @@ public class RESTServer {
 
 	private RESTServer() {
 		app = Javalin.create(config -> {
-			config.enableWebjars();
-			config.enableCorsForAllOrigins();
-			config.addStaticFiles(staticFiles -> {
+			config.staticFiles.enableWebjars();
+			config.plugins.enableCors(cors -> {
+			    cors.add(corsConfig -> {
+			        //replacement for enableCorsForAllOrigins()
+			        corsConfig.anyHost();
+			    });
+			});
+			config.staticFiles.add(staticFiles -> {
 				staticFiles.hostedPath = "/"; 
 				staticFiles.location = Location.CLASSPATH; // Specify resources from classpath
 				staticFiles.directory = "/public"; // Resource location in classpath
