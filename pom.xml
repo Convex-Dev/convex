@@ -217,8 +217,9 @@
 					<includeTestScope>false</includeTestScope>
 					<includeLicenseText>false</includeLicenseText>
 					<outputReactorProjects>true</outputReactorProjects>
-					<outputFormat>all</outputFormat>
+					<outputFormat>json</outputFormat>
 					<outputName>CycloneDX-Sbom</outputName>
+					<verbose>false</verbose>
 				</configuration>
 			</plugin>
 		</plugins>
