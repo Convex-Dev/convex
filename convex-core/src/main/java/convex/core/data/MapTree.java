@@ -212,7 +212,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (pos < cc) return child.entryAt(pos);
 			pos -= cc;
 		}
-		throw new IndexOutOfBoundsException(i);
+		throw new IndexOutOfBoundsException((int)i);
 	}
 
 	@Override

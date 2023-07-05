@@ -677,7 +677,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 			if (ix < cc) return c.entryAt(ix);
 			ix -= cc;
 		}
-		throw new IndexOutOfBoundsException(ix);
+		throw new IndexOutOfBoundsException((int)ix);
 	}
 
 	/**

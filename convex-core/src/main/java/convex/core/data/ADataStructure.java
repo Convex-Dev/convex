@@ -134,7 +134,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 */
 	public final void checkIndex(long ix) {
 		if ((ix>=0)&&(ix<count)) return;
-		throw new IndexOutOfBoundsException(ix);
+		throw new IndexOutOfBoundsException((int)ix);
 	}
 
 }
