@@ -200,7 +200,7 @@
 				<version>2.7.1</version>
 				<executions>
 					<execution>
-						<phase>package</phase>
+						<phase>deploy</phase>
 						<goals>
 							<goal>makeAggregateBom</goal>
 						</goals>

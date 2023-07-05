@@ -87,7 +87,7 @@
 			<version>2.15.2</version>
 		</dependency>
 		<dependency>
-		    <!-- Webjar with static swagger files -->
+			<!-- Webjar with static swagger files -->
 			<groupId>org.webjars</groupId>
 			<artifactId>swagger-ui</artifactId>
 			<version>4.18.2</version>
@@ -96,6 +96,12 @@
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-engine</artifactId>
 			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-nop</artifactId>
+			<version>${slf4j.version}</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
