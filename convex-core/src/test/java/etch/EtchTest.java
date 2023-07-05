@@ -29,7 +29,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
-public class TestEtch {
+public class EtchTest {
 
 	@Test
 	public void testTempStore() throws IOException {
@@ -182,6 +182,7 @@ public class TestEtch {
 			assertEquals(v, r2.getValue());
 		}
 
+		etch.visitIndex(EtchUtils.fullValidator);
 	}
 
 	@Test

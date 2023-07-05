@@ -743,9 +743,9 @@ public class Etch {
 	 * @param indexPosition Position of index block
 	 * @param digit Position of slot within index block
 	 * @return Pointer value (including type bits in MSBs)
-	 * @throws IOException
+	 * @throws IOException In case of IO Error
 	 */
-	long readSlot(long indexPosition, int digit) throws IOException {
+	public long readSlot(long indexPosition, int digit) throws IOException {
 		long pointerIndex=indexPosition+POINTER_SIZE*digit;
 		MappedByteBuffer mbb=seekMap(pointerIndex);
 		long pointer=mbb.getLong();
@@ -1066,6 +1066,15 @@ public class Etch {
 
 	public void setStore(EtchStore etchStore) {
 		this.store=etchStore;
+	}
+
+	/**
+	 * Gets the type code for an index slot value
+	 * @param slot Raw slot value
+	 * @return Type code
+	 */
+	public long extractType(long slot) {
+		return slot&TYPE_MASK;
 	}
 
 }
