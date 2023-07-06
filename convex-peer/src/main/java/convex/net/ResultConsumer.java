@@ -9,6 +9,7 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
@@ -88,7 +89,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		try {
 			Result result = m.getPayload();
 			// we now have the full result, so notify those interested
-			long id=m.getID().longValue();
+			CVMLong cid=m.getID();
+			long id=(cid!=null)?cid.longValue():-1;
 			handleResult(id,result);
 		} catch (Throwable e) {
 			// If there is missing data, re-buffer the message
@@ -100,7 +102,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	/**
 	 * Handler for a fully received Result. May be overridden.
 	 * 
-	 * @param id ID of message received
+	 * @param id ID of message received (or -1 if no message ID present)
 	 * @param result Result value
 	 */
 	protected void handleResult(long id, Result result) {
@@ -118,28 +120,22 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 *
 	 * Default behaviour is simply to log the error.
 	 *
-	 * If this method throws a MissingDataException, missing data is requested and
-	 * the result handling may be retried later.
-	 *
 	 * @param id The ID of the original message to which this result corresponds
 	 * @param code The error code received. May not be null, and is usually a Keyword
 	 * @param errorMessage The error message associated with the result (may be null)
 	 */
 	protected void handleError(long id, ACell code, ACell errorMessage) {
-		log.warn("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
+		log.debug("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
 	}
 	
 	/**
 	 * Method called when a normal (non-error) result is received.
 	 *
-	 * If this method throws a MissingDataException, missing data is requested and
-	 * the result handling may be retried later.
-	 *
 	 * @param id The ID of the original message to which this result corresponds
 	 * @param value The result value
 	 */
 	protected void handleNormalResult(long id, ACell value) {
-		log.warn("UNHANDLED RESULT RECEIVED: id={}, value={}", id,value);
+		log.debug("UNHANDLED RESULT RECEIVED: id={}, value={}", id,value);
 	}
 
 
