@@ -2,6 +2,9 @@ package etch;
 
 import java.io.IOException;
 
+import convex.core.data.ACell;
+import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.util.Utils;
 
 public class EtchUtils {
@@ -20,8 +23,16 @@ public class EtchUtils {
 		public void visit(Etch e, int level, int[] digits, long indexPointer) {
 			visited++;
 			
+			int isize=e.indexSize(level);
+			
+			String ps="";
+			for (int ll=0; ll<level; ll++) {
+				int lsize=e.indexSize(ll);
+				int hd=Integer.bitCount(lsize-1)/4;
+				ps=ps+Utils.toHexString(digits[ll]).substring(8-hd);
+			}
+			
 			try {
-				int isize=e.indexSize(level);
 				entries+=isize;
 				
 				if (isize<=0) fail("Bad index size:"+isize);
@@ -37,6 +48,13 @@ public class EtchUtils {
 						empty++;
 					} else if (type!=Etch.PTR_INDEX) {
 						values++;
+						
+						Ref<ACell> vr=e.read(null, ptr);
+						Hash h=vr.getHash();
+						String hp=h.toHexString(ps.length());
+						if (!hp.equals(ps)) {
+							fail("Index "+ps+" inconsistent with hash "+h);
+						}
 					} else {
 						indexPtrs++;
 					}

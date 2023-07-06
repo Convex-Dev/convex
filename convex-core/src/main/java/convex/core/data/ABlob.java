@@ -70,8 +70,13 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 */
 	public final String toHexString(int hexLength) {
 		BlobBuilder bb=new BlobBuilder();
-		appendHex(bb,hexLength);
-		return bb.getCVMString().toString();
+		long hl=((hexLength&1)==0)?hexLength:hexLength+1;
+		appendHex(bb,hl);
+		String s= bb.getCVMString().toString();
+		if (s.length()>hexLength) {
+			s=s.substring(0,hexLength);
+		}
+		return s;
 	}
 
 	/**

@@ -246,7 +246,7 @@ public class Blob extends AArrayBlob {
 	}
 
 	public void attachContentHash(Hash hash) {
-		if (contentHash == null) contentHash = hash;
+		contentHash = hash;
 	}
 
 	@Override

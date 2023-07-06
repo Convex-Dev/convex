@@ -683,10 +683,22 @@ public class Etch {
 			Counters.etchMiss++;
 			return null; // not found
 		}
-
-		// seek to correct position, skipping over key
-		MappedByteBuffer mbb=seekMap(pointer+KEY_SIZE);
-
+		
+		return read(key,pointer);
+	}
+		
+	public RefSoft<ACell> read(AArrayBlob key,long pointer) throws IOException {
+		MappedByteBuffer mbb;
+		if (key==null) {
+			mbb=seekMap(pointer);
+			byte[] bs=new byte[KEY_SIZE];
+			mbb.get(bs);
+			key=Hash.wrap(bs);
+		} else {
+			// seek to correct position, skipping over key
+			mbb=seekMap(pointer+KEY_SIZE);
+		}
+		
 		// get flags byte
 		byte flagByte=mbb.get();
 
