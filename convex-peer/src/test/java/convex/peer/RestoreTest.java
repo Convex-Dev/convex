@@ -28,7 +28,10 @@ import convex.core.init.Init;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.transactions.Invoke;
+import etch.Etch;
 import etch.EtchStore;
+import etch.EtchUtils;
+import etch.EtchUtils.FullValidator;
 
 public class RestoreTest {
 	AKeyPair KP=AKeyPair.createSeeded(123456781);
@@ -96,5 +99,9 @@ public class RestoreTest {
 
 		State state=s2.getPeer().getConsensusState();
 		assertNotNull(state);
+		
+		Etch e=((EtchStore)s2.getStore()).getEtch();
+		FullValidator vd = EtchUtils.getFullValidator();
+		e.visitIndex(vd);
 	}
 }
