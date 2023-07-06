@@ -547,6 +547,14 @@ public class Etch {
 		mbb.get(bs);
 		return Blob.wrap(bs);
 	}
+	
+	public Hash readValueKey(long ptr) throws IOException {
+		MappedByteBuffer mbb=seekMap(ptr);
+		byte[] bs=new byte[KEY_SIZE];
+		mbb.get(bs);
+		return Hash.wrap(bs);
+	}
+
 
 	/**
 	 * Gets the type of a slot, given the slot value
@@ -1088,5 +1096,6 @@ public class Etch {
 	public long extractType(long slot) {
 		return slot&TYPE_MASK;
 	}
+
 
 }

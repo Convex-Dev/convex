@@ -2,9 +2,7 @@ package etch;
 
 import java.io.IOException;
 
-import convex.core.data.ACell;
-import convex.core.data.Hash;
-import convex.core.data.Ref;
+import convex.core.data.AArrayBlob;
 import convex.core.util.Utils;
 
 public class EtchUtils {
@@ -49,8 +47,7 @@ public class EtchUtils {
 					} else if (type!=Etch.PTR_INDEX) {
 						values++;
 						
-						Ref<ACell> vr=e.read(null, ptr);
-						Hash h=vr.getHash();
+						AArrayBlob h=e.readValueKey(ptr);
 						String hp=h.toHexString(ps.length());
 						if (!hp.equals(ps)) {
 							fail("Index "+ps+" inconsistent with hash "+h);
@@ -75,8 +72,6 @@ public class EtchUtils {
 							fail("Invalid slot before chain entry: "+Utils.toHexString(prevSlot));
 						}
 					}
-
-					
 				}
 			} catch (IOException e1) {
 				throw Utils.sneakyThrow(e1);
