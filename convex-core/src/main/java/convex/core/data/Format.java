@@ -77,7 +77,7 @@ public class Format {
 	/**
 	 * Maximum allowed encoded message length in bytes
 	 */
-	public static final long MAX_MESSAGE_LENGTH = 10000000;
+	public static final long MAX_MESSAGE_LENGTH = 20000000;
 
 	/**
 	 * Gets the length in bytes of VLC encoding for the given long value
