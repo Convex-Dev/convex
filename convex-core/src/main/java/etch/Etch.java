@@ -352,7 +352,7 @@ public class Etch {
 			}
 
 			// we need to check the next slot position to see if we can extend to a chain
-			int nextDigit=digit+1;
+			int nextDigit=(digit+1)%isize;
 			long nextSlotValue=readSlot(indexPosition,nextDigit);
 
 			// if next slot is empty, we can make a chain!
