@@ -61,13 +61,10 @@ public class PeersListPanel extends JPanel {
 				// Ignore
 			} else {
 				throw(e);
-			}
-			
+			}		
 		}
-
 	}
 	
-	// TODO
 	public void launchPeer(PeerGUI manager) {
 		AKeyPair kp=AKeyPair.generate();
 		

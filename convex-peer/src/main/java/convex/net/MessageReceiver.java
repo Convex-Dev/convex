@@ -160,6 +160,7 @@ public class MessageReceiver {
 				log.warn("Ignored message because no receive action set: " + message);
 			}
 		} catch (Throwable e) {
+			// TODO: handle Throwable vs Exception differently? Close connection?
 			log.warn("Exception in receive action from: " + connection.getRemoteAddress(),e);
 		}
 	}

@@ -879,6 +879,12 @@ public class Format {
 		for (int i=0; i<n; i++) {
 			int clen=cells.get(i).getEncodingLength();
 			ml+=clen;
+			// TODO: consider bailout if message too long?
+			//if (ml>Format.MAX_MESSAGE_LENGTH) {
+			//	ml-=clen;
+			//	n=i;
+			//	break;
+			//}
 		}
 		
 		byte[] msg=new byte[ml];
