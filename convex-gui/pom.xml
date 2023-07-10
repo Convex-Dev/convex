@@ -54,6 +54,12 @@
 			<groupId>world.convex</groupId>
 			<artifactId>convex-restapi</artifactId>
 			<version>${convex.version}</version>
+			<exclusions>
+				<exclusion>
+						<groupId>org.slf4j</groupId>
+					<artifactId>slf4j-nop</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>
@@ -110,11 +116,6 @@
 			<version>${slf4j.version}</version>
 		</dependency>
 
-		<exclusions>
-			<exclusion>
-				<groupId>org.slf4j</groupId>
-				<artifactId>slf4j-nop</artifactId>
-			</exclusion>
-		</exclusions>
+	
 	</dependencies>
 </project>
