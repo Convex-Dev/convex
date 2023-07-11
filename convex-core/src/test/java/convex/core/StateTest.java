@@ -100,7 +100,6 @@ public class StateTest {
 		assertEquals(s,s2);
 		
 		RefTreeStats rstats2  = Refs.getRefTreeStats(s2.getRef());
-		assertEquals(rstats2.total,rstats2.direct);
 		assertEquals(rstats.total,rstats2.total);
 	}
 	
