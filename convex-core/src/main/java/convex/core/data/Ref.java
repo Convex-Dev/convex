@@ -672,6 +672,19 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public abstract Ref<T> ensureCanonical();
 
+	/**
+	 * Updates Refs in an arbitrary Cell
+	 * @param <T> Type of Cell
+	 * @param o Cell to update
+	 * @param func Ref update function
+	 * @return Updated Cell (will be the same cell if Refs unchanged)
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T update(T o, IRefFunction func) {
+		if (o==null) return o;
+		return (T) o.updateRefs(func);
+	}
+
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> R updateRefs(R a, IRefFunction func) {
 		if (a==null) return null;

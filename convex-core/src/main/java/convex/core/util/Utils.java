@@ -39,7 +39,6 @@ import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -1169,12 +1168,6 @@ public class Utils {
 	public static <R extends ACell> Ref<R> getRef(ACell o, int i) {
 		if (o ==null) throw new IllegalArgumentException("Bad ref index: " + i+ " called on null");
 		return o.getRef(i);
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <T extends ACell> T updateRefs(T o, IRefFunction func) {
-		if (o==null) return o;
-		return (T) o.updateRefs(func);
 	}
 
 	public static int bitCount(short mask) {

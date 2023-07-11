@@ -145,7 +145,7 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public Invoke updateRefs(IRefFunction func) {
-		ACell newCommand = Utils.updateRefs(command, func);
+		ACell newCommand = Ref.update(command, func);
 		if (newCommand == command) return this;
 		return Invoke.create(origin,getSequence(), newCommand);
 	}

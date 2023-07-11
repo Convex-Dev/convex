@@ -83,11 +83,11 @@ public class StateTest {
 		// Hash of a known value in the tree that should be encoded
 		Hash check=Hash.fromHex("1fe0a93790d5e2a6d6d31db57edc611b128afe97941af611f65b703006ba5387");
 
-		Refs.visitAllRefs(s.getRef(), r->{
-			if (r.getHash().equals(check)) {
-				System.out.println(r.getValue());
-			}
-		});
+		//Refs.visitAllRefs(s.getRef(), r->{
+		//	if (r.getHash().equals(check)) {
+		//		System.out.println(r.getValue());
+		//	}
+		//});
 		
 		Blob b=Format.encodeMultiCell(s);
 		

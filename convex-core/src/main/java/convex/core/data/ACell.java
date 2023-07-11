@@ -518,7 +518,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		return (T) this;
 	}
 
-
 	/**
 	 * Creates a persisted Ref with the given value in the current store.
 	 * 

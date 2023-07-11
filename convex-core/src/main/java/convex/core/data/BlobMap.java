@@ -118,7 +118,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 	@SuppressWarnings("unchecked")
 	@Override
 	public BlobMap<K,V> updateRefs(IRefFunction func) {
-		MapEntry<K, V> newEntry = (entry == null) ? null : entry.updateRefs(func);
+		MapEntry<K, V> newEntry = Ref.update(entry,func);
 		Ref<BlobMap<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
 		BlobMap<K,V> result= new BlobMap<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
