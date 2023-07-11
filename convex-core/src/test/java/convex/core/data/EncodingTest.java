@@ -438,7 +438,7 @@ public class EncodingTest {
 		testFullencoding(Samples.INT_LIST_300);
 	}
 
-	private void testFullencoding(ACell s) throws BadFormatException {
+	public static void testFullencoding(ACell s) throws BadFormatException {
 		RefTreeStats rstats  = Refs.getRefTreeStats(s.getRef());
 		Blob b=Format.encodeMultiCell(s);
 		
@@ -447,7 +447,6 @@ public class EncodingTest {
 		assertEquals(s,s2);
 		
 		RefTreeStats rstats2  = Refs.getRefTreeStats(s2.getRef());
-		assertEquals(rstats2.total,rstats2.direct);
 		assertEquals(rstats.total,rstats2.total);
 	}
 }

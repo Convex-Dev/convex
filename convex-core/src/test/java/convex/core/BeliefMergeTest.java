@@ -20,6 +20,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
+import convex.core.data.EncodingTest;
 import convex.core.data.PeerStatus;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
@@ -358,6 +359,8 @@ public class BeliefMergeTest {
 		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
 		
 		RecordTest.doRecordTests(bs7[0].getBelief());
+		
+		EncodingTest.testFullencoding(finalState);
 	}
 
 	private boolean allBeliefsEqual(Peer[] pss) {
@@ -470,6 +473,8 @@ public class BeliefMergeTest {
 		
 		RecordTest.doRecordTests(bs4[0].getBelief());
 		RecordTest.doRecordTests(finalState);
+		
+		EncodingTest.testFullencoding(bs4[0].getBelief());
 	}
 
 	private void printAccounts(AVector<AccountStatus> accounts) {

@@ -62,7 +62,7 @@ public class Belief extends ARecord {
 
 	@Override
 	public Belief updateRefs(IRefFunction func) {
-		BlobMap<AccountKey, SignedData<Order>> newOrders = Ref.updateRefs(orders, func);
+		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.updateRefs(func);
 		if (this.orders == newOrders) {
 			return this;
 		}
