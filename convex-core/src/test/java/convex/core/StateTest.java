@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -13,6 +15,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.Lists;
 import convex.core.data.RecordTest;
 import convex.core.data.Ref;
@@ -75,10 +78,30 @@ public class StateTest {
 	@Test
 	public void testMultiCellTrip() throws BadFormatException {
 		State s = INIT_STATE;
+		RefTreeStats rstats  = Refs.getRefTreeStats(s.getRef());
+		
+		// Hash of a known value in the tree that should be encoded
+		Hash check=Hash.fromHex("1fe0a93790d5e2a6d6d31db57edc611b128afe97941af611f65b703006ba5387");
 
+		Refs.visitAllRefs(s.getRef(), r->{
+			if (r.getHash().equals(check)) {
+				System.out.println(r.getValue());
+			}
+		});
+		
 		Blob b=Format.encodeMultiCell(s);
+		
+		HashMap<Hash,ACell> acc=new HashMap<>();
+		Format.decodeCells(acc, b);
+		assertTrue(acc.containsKey(check));
+		
 		State s2=Format.decodeMultiCell(b);
+		// System.err.println(Refs.printMissingTree(s2));
 		assertEquals(s,s2);
+		
+		RefTreeStats rstats2  = Refs.getRefTreeStats(s2.getRef());
+		assertEquals(rstats2.total,rstats2.direct);
+		assertEquals(rstats.total,rstats2.total);
 	}
 	
 	@SuppressWarnings("unused")

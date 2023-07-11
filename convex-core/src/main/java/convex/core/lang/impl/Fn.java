@@ -210,7 +210,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		AOp<T> newBody = body.updateRefs(func);
 		AVector<ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
 		if ((params == newParams) && (body == newBody) && (lexicalEnv == newLexicalEnv)) return this;
-		return new Fn<>(newParams, newBody, lexicalEnv);
+		return new Fn<>(newParams, newBody, newLexicalEnv);
 	}
 
 	@Override

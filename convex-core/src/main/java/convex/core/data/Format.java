@@ -1,11 +1,12 @@
 package convex.core.data;
-
+ 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import convex.core.Belief;
 import convex.core.Block;
@@ -725,7 +726,7 @@ public class Format {
 				
 		return cells.toArray(ACell[]::new);
 	}
-
+	
 	/**
 	 * Reads a cell from a Blob of data, allowing for non-embedded children following the first cell
 	 * @param data Data to decode
@@ -745,28 +746,11 @@ public class Format {
 		if (rl==ml) return result; // Already complete
 		
 		// read remaining cells
-		HashMap<Hash,Ref<?>> hm=new HashMap<>();
-		for (int ix=rl; ix<ml;) {
-			ACell c=Format.read(data,ix);
-			if (c==null) {
-				c=Format.read(data,ix);
-				throw new BadFormatException("Null child encoding in Message");
-			}
-			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
-			Hash h=c.getHash();
-			
-			// Check store for Ref - avoids duplicate objects in many cases
-			//Ref<?> storeRef=store.checkCache(h);
-			//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
-			
-			Ref<?> cr=Ref.get(c);
-			// System.out.println("Decoding novelty: "+cr.getHash()+ " "+c.getClass().getSimpleName());
-			hm.put(h, cr);
-			ix+=c.getEncodingLength();
-		}
+		HashMap<Hash,ACell> hm=new HashMap<>();
+		decodeCells(hm,data.slice(rl,ml));
 
 		HashMap<Hash,ACell> done=new HashMap<Hash,ACell>();		
-		ArrayList<ACell> al=new ArrayList<>();
+		ArrayList<ACell> stack=new ArrayList<>();
 
 		IRefFunction func=new IRefFunction() {
 			@Override
@@ -779,15 +763,16 @@ public class Format {
 					return nc.getRef();
 				} else {
 					Hash h=r.getHash();
+					
 					// if done, just replace with done version
 					ACell doneVal=done.get(h);
 					if (doneVal!=null) return doneVal.getRef();
 					
 					// if in map, push cell to stack
-					Ref<?> partRef=hm.get(h);
-					if (partRef!=null) {
-						al.add(partRef.getValue());
-						return partRef;
+					ACell part=hm.get(h);
+					if (part!=null) {
+						stack.add(part);
+						return part.getRef();
 					}
 					
 					// not in message, must be partial
@@ -796,26 +781,61 @@ public class Format {
 			} 
 		};
 		
-		al.add(result);
-		Trees.visitStack(al, c->{
-			Hash h=c.getHash();
-			if (done.containsKey(h)) return;
-			
-			al.add(c);
-			int pos=al.size();
-			ACell nc=c.updateRefs(func);
-			if (pos==al.size()) {
-				// we must be done
-				done.put(h,nc);
-			} else {
-				// something extra on the stack to handle first
+		stack.add(result); 
+		Trees.visitStackMaybePopping(stack, new Predicate<ACell>() {
+			@Override
+			public boolean test(ACell c) {
+				Hash h=c.getHash();
+				if (done.containsKey(h)) return true;
+				
+				int pos=stack.size();
+				// Update Refs, adding new non-embedded cells to stack
+				ACell nc=c.updateRefs(func);
+				
+				if (stack.size()==pos) {
+					// we must be done since nothing new added to stack
+					done.put(h,nc);
+					return true;
+				} else {
+					// something extra on the stack to handle first
+					stack.set(pos-1,nc);
+					return false;
+				}
 			}
 		});
-
+		
+		// ACell cc=done.get(check);
 		
 		result=(T) done.get(result.getHash());
 		
 		return result;
+	}
+	
+	/**
+	 * Decode encoded non-embedded Cells into an accumulator HashMap
+	 * @param acc Accumulator for Cells, keyed by Hash
+	 * @param data Encoding to read
+	 * @throws BadFormatException In case of bad format, including any embedded values
+	 */
+	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data) throws BadFormatException {
+		long ml=data.count();
+		int ix=0;
+		while( ix<ml) {
+			ACell c=Format.read(data,ix);
+			if (c==null) {
+				throw new BadFormatException("Null child encoding in Message");
+			}
+			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
+			Hash h=c.getHash();
+			
+			// Check store for Ref - avoids duplicate objects in many cases
+			//Ref<?> storeRef=store.checkCache(h);
+			//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
+			
+			acc.put(h, c);
+			ix+=c.getEncodingLength();
+		}
+		if (ix!=ml) throw new BadFormatException("Bad message length when decoding");
 	}
 
 	/**
@@ -854,7 +874,7 @@ public class Format {
 		int messageLength=ml[0];
 		byte[] msg=new byte[messageLength];
 		
-		// Ensure we add each unique child
+		// Write top encoding, ensure we add each unique child
 		topCellEncoding.getBytes(msg, 0);
 		int ix=Utils.checkedInt(topCellEncoding.count());
 		for (Ref<?> r: refs) {

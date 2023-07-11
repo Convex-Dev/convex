@@ -21,6 +21,7 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -429,5 +430,24 @@ public class EncodingTest {
 		
 		// illegal child tag
 		assertThrows(BadFormatException.class,()->Format.decodeMultiCell(first.append(Blob.fromHex("00FF")).toFlatBlob()));
+	}
+	
+	@Test public void testFullMessageEncoding() throws BadFormatException {
+		testFullencoding(Samples.BIG_BLOB_TREE);
+		testFullencoding(Samples.INT_SET_300);
+		testFullencoding(Samples.INT_LIST_300);
+	}
+
+	private void testFullencoding(ACell s) throws BadFormatException {
+		RefTreeStats rstats  = Refs.getRefTreeStats(s.getRef());
+		Blob b=Format.encodeMultiCell(s);
+		
+		ACell s2=Format.decodeMultiCell(b);
+		// System.err.println(Refs.printMissingTree(s2));
+		assertEquals(s,s2);
+		
+		RefTreeStats rstats2  = Refs.getRefTreeStats(s2.getRef());
+		assertEquals(rstats2.total,rstats2.direct);
+		assertEquals(rstats.total,rstats2.total);
 	}
 }
