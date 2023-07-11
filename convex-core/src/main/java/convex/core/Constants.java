@@ -64,7 +64,7 @@ public class Constants {
 	/**
 	 * Max juice allowable during execution of a single transaction.
 	 */
-	public static final long MAX_TRANSACTION_JUICE = 1000000;
+	public static final long MAX_TRANSACTION_JUICE = 10000000;
 	
 	/**
 	 * Max transactions in a legal Block.
