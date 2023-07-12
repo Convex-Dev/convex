@@ -4,7 +4,7 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.7.11] - 2023-07-12
 
 ### Added
 - Asset ownership based trust monitor `convex.trust.ownership-monitor`
@@ -14,8 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Account controllers can now be any scoped actor
 - Various adjustments to improve CPoS latency
+- Experimental adjustments to CVM constants
 
 ### Fixed
+- Bug fixes for message decoding
 
 ## [0.7.11] - 2023-05-30
 
