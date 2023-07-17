@@ -39,10 +39,9 @@ public class BeliefVotingTest {
 			AKeyPair.createSeeded(6)
 	};
 	
-	
 	AccountKey[] keys=Stream.of(kps).map(kp->kp.getAccountKey()).toArray(AccountKey[]::new);
 	
-	State s=Init.createState(List.of(keys));
+	final State s=Init.createState(List.of(keys));
 	
 	static final long TS=0;
 	
@@ -59,6 +58,31 @@ public class BeliefVotingTest {
 		BeliefMerge mc=BeliefMerge.create(b, kps[0], TS+5, s);
 		Belief b2=mc.merge(b);
 		assertSame(b,b2);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test
+	public void testTieBreak() throws BadSignatureException, InvalidDataException {
+		SignedData<Block> A=bl(0);
+		SignedData<Block> B=bl(1);
+		SignedData<Order> o0=or(0,TS,0,0,A,B);
+		SignedData<Order> o1=or(1,TS,0,0,B,A);
+		Belief b0=Belief.create(kps[0],o0.getValue());
+		Belief b1=Belief.create(kps[1],o1.getValue());
+		
+		BeliefMerge mc0=BeliefMerge.create(b0, kps[0], TS+5, s);
+		Belief b0m=mc0.merge(b1);
+		
+		BeliefMerge mc1=BeliefMerge.create(b1, kps[1], TS+5, s);
+		Belief b1m=mc1.merge(b0);
+		
+		Order o0m = b0m.getOrder(kps[0].getAccountKey());
+		Order o1m = b1m.getOrder(kps[1].getAccountKey());
+		
+		assertTrue(o0m.consensusEquals(o1m));
+		// Different timestamp? One Peer didn't change order so no update?
+		//assertEquals(o0m,o1m);
+
 	}
 
 	
