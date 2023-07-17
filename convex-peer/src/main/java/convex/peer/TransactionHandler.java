@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Block;
 import convex.core.BlockResult;
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Peer;
 import convex.core.Result;
@@ -193,13 +194,13 @@ public class TransactionHandler extends AThreadedComponent{
 		
 		long minBlockTime=getMinBlockTime();
 		
-		if (timestamp>=lastBlockPublishedTime+minBlockTime) {
-			// possibly have client transactions to publish
-			transactionQueue.drainTo(newTransactions);
-		}
-
+		if (timestamp<lastBlockPublishedTime+minBlockTime) return null;
+			
 		// possibly have own transactions to publish as a Peer
 		maybeGetOwnTransactions(peer);
+			
+		// possibly have client transactions to publish
+		transactionQueue.drainTo(newTransactions,Constants.MAX_TRANSACTIONS_PER_BLOCK);
 
 		int n = newTransactions.size();
 		if (n == 0) return null;
