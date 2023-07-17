@@ -69,7 +69,7 @@ public class Constants {
 	/**
 	 * Max transactions in a legal Block.
 	 */
-	public static final int MAX_TRANSACTIONS_PER_BLOCK = 4096;
+	public static final int MAX_TRANSACTIONS_PER_BLOCK = 1024;
 
 	/**
 	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.
