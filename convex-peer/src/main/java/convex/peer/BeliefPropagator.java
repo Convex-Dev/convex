@@ -251,13 +251,13 @@ public class BeliefPropagator extends AThreadedComponent {
 
 			return beliefChanged;
 		} catch (MissingDataException e) {
-			// Shouldn't happen if beliefs are persisted
+			// Shouldn't happen if beliefs are correctly persisted
 			// e.printStackTrace();
-			throw new Error("Missing data in belief update: " + e.getMissingHash().toHexString(), e);
+			throw new Error("Missing data in belief merge: " + e.getMissingHash().toHexString(), e);
 		} catch (InvalidDataException e) {
 			// Shouldn't happen if Beliefs are already validated
 			// e.printStackTrace();
-			throw new Error("Invalid data in belief update!", e);
+			throw new Error("Invalid data in belief merge!", e);
 		}
 	}
 	

@@ -138,8 +138,20 @@ public class BeliefMerge {
 		return result;
 	}
 	
+	/**
+	 * Tests is a Peer key should be considered in the current belief merge. Includes testing for 
+	 * minimum effective stake.
+	 * 
+	 * @param key Peer Key to test
+	 * @return True if valid Peer, false otherwise.
+	 */
 	private boolean isValidPeer(ABlob key) {
-		return peers.containsKey(key);
+		PeerStatus ps=peers.get(key);
+		if (ps==null) return false;
+		
+		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) return false;
+		
+		return true;
 	}
 
 	/**
@@ -149,7 +161,7 @@ public class BeliefMerge {
 	 * @param accOrders Accumulated map for latest Orders received from all Peer Beliefs
 	 * @param mc Merge context
 	 * @param filteredChains
-	 * @return
+	 * @return Updates Orders, or null if no vote result (e.g. no voting stake available)
 	 * @throws BadSignatureException @
 	 */
 	BlobMap<AccountKey, SignedData<Order>> vote( final BlobMap<AccountKey, SignedData<Order>> accOrders) {
@@ -191,6 +203,8 @@ public class BeliefMerge {
 		// Get the winning chain for this peer, including new blocks encountered
 		AVector<SignedData<Block>> winningBlocks = computeWinningOrder(stakedOrders, consensusPoint, consideredStake);
 		if (winningBlocks == null) return null; // if no voting stake on any order
+		
+		winningBlocks=filterBlocks(winningBlocks,consensusPoint);
 
 		// Take winning blocks into my Order
 		// winning chain should have same consensus as my initial chain
@@ -211,8 +225,8 @@ public class BeliefMerge {
 			// We only do this after sufficient time has elapsed
 			if (!shouldReplace) {
 				// Replace if we observe a consensus elsewhere??
-				//long newConensusPoint=consensusOrder.getConsensusPoint();
-				//if (newConensusPoint>consensusPoint) {
+				//long newConsensusPoint=consensusOrder.getConsensusPoint();
+				//if (newConsensusPoint>consensusPoint) {
 				//	shouldReplace=true;
 				//}
 				
@@ -377,11 +391,23 @@ public class BeliefMerge {
 		AVector<SignedData<Block>> winningBlocks = votingSet.keySet().iterator().next();
 
 		// add new blocks back to winning Order (if not already included)
-		AVector<SignedData<Block>> fullWinningBlocks = appendNewBlocks(winningBlocks, newBlocksOrdered, consensusPoint);
-
-		return fullWinningBlocks;
+		winningBlocks = appendNewBlocks(winningBlocks, newBlocksOrdered, consensusPoint);
+		
+		return winningBlocks;
 	}
 	
+	/**
+	 * Filter blocks based on validity / timestamps
+	 * @param blks Blocks to filer
+	 * @param cp Point at which to start filtering (should be consensus point)
+	 * @return Updated blocks, or same blocks if no change
+	 */
+	private AVector<SignedData<Block>> filterBlocks(AVector<SignedData<Block>> blks,
+			long cp) {
+		// TODO Filter from consensus point onwards
+		return blks;
+	}
+
 	/**
 	 * Combine stakes from multiple orders to a single stake for each distinct Block ordering.
 	 * 
