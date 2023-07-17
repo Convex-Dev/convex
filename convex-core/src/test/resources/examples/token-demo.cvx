@@ -9,6 +9,13 @@
 
 (fun/balance my-token *address*)
 
+;; ================================
+;; Token Transfers
+
+(import convex.asset :as asset)
+
+(asset/transfer *registry* [my-token 10]) ;; blocked
+(asset/transfer some-user [my-token 10]) ;; OK
 
 ;; ================================
 ;; Exchange Listing
@@ -26,3 +33,7 @@
 (torus/buy-quote my-token 100)
 
 (torus/buy-tokens my-token 100)
+
+;; =================================
+;; Boxing
+
