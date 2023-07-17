@@ -202,6 +202,7 @@ public class Server implements Closeable {
 				log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
 			}
 
+			// TODO: should probably move acquisition to launch phase?
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
 				// Peer sync case

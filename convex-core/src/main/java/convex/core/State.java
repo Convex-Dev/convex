@@ -160,7 +160,7 @@ public class State extends ARecord {
 				&& (schedule == newSchedule)) {
 			return this;
 		}
-		return new State(newAccounts, peers, globals, schedule);
+		return new State(newAccounts, newPeers, newGlobals, newSchedule);
 	}
 
 	/**
