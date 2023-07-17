@@ -1,4 +1,4 @@
-package convex.core;
+package convex.core.cpos;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -12,6 +12,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
+import convex.core.Belief;
+import convex.core.Block;
+import convex.core.Constants;
+import convex.core.Order;
+import convex.core.Peer;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -61,7 +67,7 @@ public class BeliefMergeTest {
 			// TODO numeric addresses
 			Address address=Address.create(i);
 			KEY_PAIRS[i] = kp;
-			KEYS[i] = key;
+			KEYS[i] = key; 
 			ADDRESSES[i] = address;
 			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000,key);
 			long stake=(i + 1) * 10*Constants.MINIMUM_EFFECTIVE_STAKE;

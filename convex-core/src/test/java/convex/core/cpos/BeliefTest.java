@@ -1,7 +1,10 @@
-package convex.core;
+package convex.core.cpos;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Belief;
+import convex.core.Block;
+import convex.core.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;

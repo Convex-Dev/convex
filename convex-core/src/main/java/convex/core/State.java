@@ -66,15 +66,15 @@ public class State extends ARecord {
 	/**
 	 * Symbols for global values in :globals Vector
 	 */
-	static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE,Symbols.PROTOCOL);
+	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE,Symbols.PROTOCOL);
 
 	// Indexes for globals in :globals Vector
-	static final int GLOBAL_TIMESTAMP=0;
-	static final int GLOBAL_FEES=1;
-	static final int GLOBAL_JUICE_PRICE=2;
-	static final int GLOBAL_MEMORY_MEM=3;
-	static final int GLOBAL_MEMORY_CVX=4;
-	static final int GLOBAL_PROTOCOL=5; // TODO: move to actor
+	public static final int GLOBAL_TIMESTAMP=0;
+	public static final int GLOBAL_FEES=1;
+	public static final int GLOBAL_JUICE_PRICE=2;
+	public static final int GLOBAL_MEMORY_MEM=3;
+	public static final int GLOBAL_MEMORY_CVX=4;
+	public static final int GLOBAL_PROTOCOL=5; // TODO: move to actor
 
 	/**
 	 * An empty State
