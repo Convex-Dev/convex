@@ -94,6 +94,15 @@ public class CVMBenchmark {
 		Context ctx=s.applyTransaction(trans);
 		ctx.getValue();
 	}
+	
+	@Benchmark
+	public void nullInvoke() {
+		State s=STATE;
+		Address addr=HERO;
+		ATransaction trans=Invoke.create(addr,1, (ACell)null);
+		Context ctx=s.applyTransaction(trans);
+		ctx.getValue();
+	}
 
 	@Benchmark
 	public void defInEnvironment() {
