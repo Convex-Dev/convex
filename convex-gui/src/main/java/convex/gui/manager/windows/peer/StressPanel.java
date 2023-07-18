@@ -13,6 +13,7 @@ import java.util.concurrent.CompletableFuture;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
@@ -94,7 +95,7 @@ public class StressPanel extends JPanel {
 		optionPanel.add(lblClients);
 		clientCountSpinner = new JSpinner();
 		// Note: about 300 max number of clients before hitting juice limits for account creation
-		clientCountSpinner.setModel(new SpinnerNumberModel(100, 1, 300, 1));
+		clientCountSpinner.setModel(new SpinnerNumberModel(100, 1, 1000, 1));
 		optionPanel.add(clientCountSpinner);
 
 		JLabel lblRequests = new JLabel("Requests per client");
@@ -127,6 +128,14 @@ public class StressPanel extends JPanel {
 		optionPanel.add(distCheckBox);
 		distCheckBox.setSelected(false);
 
+		JLabel lblTxType=new JLabel("Transaction Type");
+		txTypeBox=new JComboBox<String>();
+		txTypeBox.addItem("Define Data");
+		// txTypeBox.addItem("Transfer");
+		// txTypeBox.addItem("AMM Trade");
+		txTypeBox.addItem("Null Op");
+		optionPanel.add(lblTxType);
+		optionPanel.add(txTypeBox);
 
 
 		// =========================================
@@ -150,6 +159,8 @@ public class StressPanel extends JPanel {
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
 	private JTextArea resultArea;
+	
+	private JComboBox<String> txTypeBox;
 
 	NumberFormat formatter = new DecimalFormat("#0.000");
 
@@ -159,13 +170,18 @@ public class StressPanel extends JPanel {
 		Address address=peerConvex.getAddress();
 		AKeyPair kp=peerConvex.getKeyPair();
 
-		int transCount = (Integer) transactionCountSpinner.getValue();
-		int requestCount = (Integer) requestCountSpinner.getValue();
-		int opCount = (Integer) opCountSpinner.getValue();
-		// TODO: enable multiple clients
-		int clientCount = (Integer) clientCountSpinner.getValue();
 
 		new SwingWorker<String,Object>() {
+			int transCount = (Integer) transactionCountSpinner.getValue();
+			int requestCount = (Integer) requestCountSpinner.getValue();
+			int opCount = (Integer) opCountSpinner.getValue();
+			// TODO: enable multiple clients
+			int clientCount = (Integer) clientCountSpinner.getValue();
+			String type=(String) txTypeBox.getSelectedItem();
+			
+			ArrayList<AKeyPair> kps=new ArrayList<>(clientCount);
+			ArrayList<Convex> clients=new ArrayList<>(clientCount);
+
 			@Override
 			protected String doInBackground() throws Exception {
 				StringBuilder sb = new StringBuilder();
@@ -177,27 +193,25 @@ public class StressPanel extends JPanel {
 					// Stores.setCurrent(Stores.CLIENT_STORE);
 					ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
 					Convex pc = Convex.connect(sa, address,kp);
-					
-					ArrayList<AKeyPair> kps=new ArrayList<>(clientCount);
-					for (int i=0; i<clientCount; i++) {
-						kps.add(AKeyPair.generate());
-					}
-					
+				
+					// Generate client accounts
 					StringBuilder cmdsb=new StringBuilder();
-					cmdsb.append("(mapv (fn [k] (let [a (create-account k)] (transfer a 1000000000) a)) [");
+					cmdsb.append("(let [f (fn [k] (let [a (create-account k)] (transfer a 1000000000) a))] ");
+					cmdsb.append("  (mapv f [");
 					for (int i=0; i<clientCount; i++) {
-						cmdsb.append(" "+kps.get(i).getAccountKey());
+						AKeyPair kp=AKeyPair.generate();
+						kps.add(kp);
+						cmdsb.append(" "+kp.getAccountKey());
 					}
-					cmdsb.append("])");
+					cmdsb.append("]))");
 					
 					Result ccr=pc.transactSync(Invoke.create(address, -1, cmdsb.toString()));
 					if (ccr.isError()) throw new Error("Creating accounts failed: "+ccr);
-					AVector<Address> v=ccr.getValue();
+					AVector<Address> clientAddresses=ccr.getValue();
 
-					ArrayList<Convex> ccs=new ArrayList<>(clientCount);
 					for (int i=0; i<clientCount; i++) {
 						AKeyPair kp=kps.get(i);
-						Address clientAddr = v.get(i);
+						Address clientAddr = clientAddresses.get(i);
 						Convex cc;
 						if (distCheckBox.isSelected()) {
 							InetSocketAddress pa=PeerGUI.getRandomServer().getHostAddress();
@@ -205,7 +219,7 @@ public class StressPanel extends JPanel {
 						} else {
 							cc=Convex.connect(sa,clientAddr,kp);
 						}
-						ccs.add(cc);
+						clients.add(cc);
 					}
 					
 					resultArea.setText("Syncing...");
@@ -218,23 +232,8 @@ public class StressPanel extends JPanel {
 					ArrayList<CompletableFuture<Object>> cfutures=Utils.threadMap (cc->{
 						try {
 							for (int i = 0; i < requestCount; i++) {
-								StringBuilder tsb = new StringBuilder();
-								tsb.append("(def a (do ");
-								for (int j = 0; j < opCount; j++) {
-									tsb.append(" (* 10 " + i + ")");
-								}
-								tsb.append("))");
-								String source = tsb.toString();
 								Address origin=cc.getAddress();
-								
-								ATransaction t = Invoke.create(origin,-1, Reader.read(source));
-								if (transCount!=1) {
-									ATransaction[] trxs=new ATransaction[transCount];
-									for (int k=0; k<transCount; k++) {
-										trxs[k]=t;
-									}
-									t=Multi.create(origin, -1, Multi.MODE_ANY, trxs);
-								}
+								ATransaction t = buildTransaction(origin, i);
 								
 								CompletableFuture<Result> fr;
 								if (syncCheckBox.isSelected()) {
@@ -252,7 +251,7 @@ public class StressPanel extends JPanel {
 							throw Utils.sneakyThrow(e);
 						}
 						return null;
-					},ccs);
+					},clients);
 					
 					// wait for everything to be sent
 					for (int i=0; i<clientCount; i++) {
@@ -278,7 +277,7 @@ public class StressPanel extends JPanel {
 					}
 					
 					for (int i=0; i<clientCount; i++) {
-						ccs.get(i).close();
+						clients.get(i).close();
 					}
 
 					Thread.sleep(100); // wait for state update to be reflected
@@ -291,10 +290,14 @@ public class StressPanel extends JPanel {
 						sb.append(errorMap);
 						sb.append("\n");
 					}
+					
+					double time=(endTime - startTime) * 0.001;
 					sb.append("\n");
-					sb.append("Total time:     " + formatter.format((endTime - startTime) * 0.001) + "s\n");
+					sb.append("Total time:     " + formatter.format(time) + "s\n");
 					sb.append("\n");
-					sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/((endTime - startTime) * 0.001)) + "\n");
+					
+					sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/time) + "\n");
+					sb.append("Approx OPS:     " + Text.toFriendlyIntString(opCount*totalCount/time) + "\n");
 
 
 				} catch (Throwable e) {
@@ -306,6 +309,36 @@ public class StressPanel extends JPanel {
 
 				String report = sb.toString();
 				return report;
+			}
+
+			protected ATransaction buildTransaction(Address origin, int reqNo) {
+				ATransaction[] trxs=new ATransaction[transCount];
+				for (int k=0; k<transCount; k++) {
+						trxs[k]=buildSubTransaction(reqNo, k, origin);
+				}
+				ATransaction t;
+				if (transCount!=1) {
+					t=Multi.create(origin, -1, Multi.MODE_ANY, trxs);
+				} else {
+					t=trxs[0];
+				}
+				return t;
+			}
+
+			protected ATransaction buildSubTransaction(int reqNo, int txNo, Address origin) {
+				
+				StringBuilder tsb = new StringBuilder();
+				if (opCount>1) tsb.append("(do ");
+				for (int j = 0; j < opCount; j++) {
+					switch(type) {
+						case "Define Data": tsb.append("(def a"+j+" "+reqNo+") "); break;
+						case "Null Op": tsb.append("nil "); break;
+					}
+				}
+				if (opCount>1) tsb.append(")");
+				String source = tsb.toString();
+				ATransaction t = Invoke.create(origin,-1, Reader.read(source));
+				return t;
 			}
 
 			@Override
