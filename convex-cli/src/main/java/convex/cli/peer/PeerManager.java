@@ -119,7 +119,7 @@ public class PeerManager {
 		return hashList;
 	}
 
-	public State aquireState(String remotePeerHostname, Hash stateHash) {
+	public State acquireState(String remotePeerHostname, Hash stateHash) {
 		InetSocketAddress remotePeerAddress = Utils.toInetSocketAddress(remotePeerHostname);
 		Convex convex = null;
 		State state = null;
@@ -134,7 +134,7 @@ public class PeerManager {
 		return state;
 
 	}
-	public SignedData<Belief> aquireBelief(String remotePeerHostname, Hash beliefHash) {
+	public SignedData<Belief> acquireBelief(String remotePeerHostname, Hash beliefHash) {
 		// sync the etch db with the network state
 		Convex convex = null;
 		SignedData<Belief> signedBelief = null;
