@@ -710,6 +710,11 @@ public class Format {
 		return encodedString(RT.cvm(o));
 	}
 
+	/**
+	 * Estimate the encoding size of a Cell value. Useful for pre-sizing buffers.
+	 * @param cell Cell to estimate encoding size for
+	 * @return Estimated encoding size. May not be precise.
+	 */
 	public static int estimateEncodingSize(ACell cell) {
 		if (cell==null) return 1;
 		return cell.estimatedEncodingSize();
