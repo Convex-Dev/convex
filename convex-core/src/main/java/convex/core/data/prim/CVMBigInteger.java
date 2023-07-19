@@ -8,6 +8,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Blobs;
+import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
@@ -229,7 +230,7 @@ public final class CVMBigInteger extends AInteger {
 	
 	@Override
 	public boolean isEmbedded() {
-		if (memorySize==0) return true;
+		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true;
 		return blob().isEmbedded();
 	}
 	

@@ -49,6 +49,7 @@ public final class CVMLong extends AInteger {
 	
 	public CVMLong(long value) {
 		this.value=value;
+		this.memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
 	}
 
 	/**

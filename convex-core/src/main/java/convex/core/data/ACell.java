@@ -107,8 +107,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	@Override
 	public final boolean equals(Object a) {
-		if (a==this) return true;
-		if (!(a instanceof ACell)) return false;
+		if (a==this) return true; // Fast path, avoids cast
+		if (!(a instanceof ACell)) return false; // Handles null
 		return equals((ACell)a);
 	}
 	
@@ -270,7 +270,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		if (!isEmbedded()) {
 			// We need to count this cell's own encoding length
 			// Plus overhead for storage of non-embedded cell
-			result=Utils.memoryAdd(result,getEncodingLength()+Constants.MEMORY_OVERHEAD);
+			long encodingLength=getEncodingLength();
+			result=Utils.memoryAdd(result,encodingLength+Constants.MEMORY_OVERHEAD);
 		} 
 		return result;
 	}
@@ -311,6 +312,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if Cell is embedded, false otherwise
 	 */
 	public boolean isEmbedded() {
+		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true;
 		if (cachedRef!=null) {
 			int flags=cachedRef.flags;
 			if ((flags&Ref.KNOWN_EMBEDDED_MASK)!=0) return true;
@@ -555,6 +557,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if completely encoded, false otherwise
 	 */
 	public boolean isCompletelyEncoded() {
+		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true; // fast path
 		if (!isCanonical()) {
 			throw new Error("Checking whether a non-canonical cell is encoded. Not a good idea, any ref assumptions may be invalid: "+this.getType());
 		}

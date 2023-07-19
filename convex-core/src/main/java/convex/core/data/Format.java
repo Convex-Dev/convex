@@ -81,6 +81,11 @@ public class Format {
 	public static final long MAX_MESSAGE_LENGTH = 20000000;
 
 	/**
+	 * Memory size of a fully embedded value (zero)
+	 */
+	public static final long FULL_EMBEDDED_MEMORY_SIZE = 0L;
+
+	/**
 	 * Gets the length in bytes of VLC encoding for the given long value
 	 * @param x Long value to encode
 	 * @return Length of VLC encoding

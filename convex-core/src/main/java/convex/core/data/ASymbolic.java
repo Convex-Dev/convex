@@ -12,6 +12,7 @@ public abstract class ASymbolic extends ACell {
 
 	protected ASymbolic(StringShort name) {
 		this.name =  name;
+		this.memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
 	}
 	
 	@Override
