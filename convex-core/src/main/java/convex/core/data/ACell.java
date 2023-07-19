@@ -33,7 +33,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * We cache the computed memorySize. May be 0 for embedded objects
 	 * -1 is initial value for when size is not calculated
 	 */
-	private long memorySize=-1;
+	protected long memorySize=-1;
 	
 	/**
 	 * Cached Ref. This is useful to manage persistence. Also cached Ref MUST refer to canonical value

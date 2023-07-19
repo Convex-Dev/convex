@@ -20,6 +20,7 @@ import convex.core.data.ObjectsTest;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.test.Samples;
 
 public class BigIntegerTest {
 
@@ -166,6 +167,11 @@ public class BigIntegerTest {
 		assertThrows(BadFormatException.class,()->Format.read("190988888888888888888888")); // excess bytes
 		Format.read("1909888888888888888888"); // OK with 9 valid bytes exactly 
 		
+	}
+	
+	@Test public void testFullBlobSize() {
+		CVMBigInteger c=CVMBigInteger.create(Samples.FULL_BLOB);
+		doBigTest(c);
 	}
 	
 	@Test public void testCompares() {

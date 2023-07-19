@@ -223,6 +223,23 @@ public final class CVMBigInteger extends AInteger {
 	}
 	
 	@Override
+	protected long calcMemorySize() {	
+		return blob().getMemorySize();
+	}
+	
+	@Override
+	public boolean isEmbedded() {
+		if (memorySize==0) return true;
+		return blob().isEmbedded();
+	}
+	
+	@Override
+	public int getRefCount() {
+		return blob().getRefCount();
+	}
+
+	
+	@Override
 	public AInteger toCanonical() {
 		if (isCanonical()) return this;
 		ABlob b=blob();
@@ -341,6 +358,7 @@ public final class CVMBigInteger extends AInteger {
 
 	@Override
 	public boolean isZero() {
+		// Note: won't ever be true on a canonical CVMBigInetger
 		return big().signum()==0;
 	}
 

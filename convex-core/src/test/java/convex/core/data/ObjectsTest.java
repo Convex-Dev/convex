@@ -66,8 +66,29 @@ public class ObjectsTest {
 		doRefContainerTests(a);
 		doCellRefTests(a);
 		doPrintTests(a);
+		doMemorySizeTests(a);
 	}
 	
+	private static void doMemorySizeTests(ACell a) {
+		long ms=a.calcMemorySize();
+		assertEquals(ms,a.getMemorySize());
+		int rc=a.getRefCount();
+		long elen=a.getEncodingLength();
+		
+		if (a.isEmbedded()) {
+			if (rc==0) {
+				assertEquals(0L,ms);
+			}
+		} else {
+			if (rc==0) {
+				assertEquals(ms,elen+Constants.MEMORY_OVERHEAD);
+			}
+		}
+	}
+
+
+
+
 	private static void doPrintTests(ACell a) {
 		BlobBuilder bb=new BlobBuilder();
 		assertFalse(a.print(bb,0)); // should always fail to print with limit of 0
@@ -171,7 +192,7 @@ public class ObjectsTest {
 		
 		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
 		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
-			assertFalse(Format.isEmbedded(a),()->"Testing: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+			assertFalse(Format.isEmbedded(a),()->"Should not be embedded: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
 		}
 
 		try {

@@ -13,12 +13,12 @@ public abstract  class APrimitive extends ACell {
 	}
 
 	@Override
-	public final int getRefCount() {
+	public int getRefCount() {
 		return 0;
 	}
 	
 	@Override
-	public final boolean isEmbedded() {
+	public boolean isEmbedded() {
 		return true;
 	}
 	
@@ -28,7 +28,7 @@ public abstract  class APrimitive extends ACell {
 	
 	@Override
 	protected long calcMemorySize() {	
-		// always embedded and no child Refs, so memory size == 0
+		// Usually embedded and no child Refs, so memory size = 0
 		return 0;
 	}
 	
