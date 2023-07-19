@@ -561,6 +561,9 @@ public class BeliefMerge {
 			// new Order is more recent, so switch to this
 			return true;
 		} else {
+			// Don't replace if equal
+			if (oldOrder.equals(newOrder)) return false;
+			
 			// This probably shouldn't happen if peers are sticking to timestamps
 			// But we compare anyway
 			// Prefer advanced consensus

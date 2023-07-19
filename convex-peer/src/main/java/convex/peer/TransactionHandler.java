@@ -61,7 +61,7 @@ public class TransactionHandler extends AThreadedComponent{
 	protected final ArrayBlockingQueue<Message> txMessageQueue;
 	
 	/**
-	 * Queue for received Transactions submitted for clients of this Peer
+	 * Queue for valid received Transactions submitted for clients of this Peer
 	 */
 	ArrayBlockingQueue<SignedData<ATransaction>> transactionQueue;
 	
@@ -85,6 +85,9 @@ public class TransactionHandler extends AThreadedComponent{
 	 */
 	private HashMap<Hash, Message> interests = new HashMap<>();
 
+	public long clientTransactionCount=0;
+	public long receivedTransactionCount=0;
+
 	/**
 	 * Register interest in receiving a result for a transaction
 	 * @param signedTransactionHash
@@ -96,6 +99,8 @@ public class TransactionHandler extends AThreadedComponent{
 	
 	protected void processMessage(Message m) {
 		try {
+			this.receivedTransactionCount++;
+			
 			// Transaction is a vector [id , signed-object]
 			AVector<ACell> v = m.getPayload();
 			@SuppressWarnings("unchecked")
@@ -129,6 +134,7 @@ public class TransactionHandler extends AThreadedComponent{
 			LoadMonitor.down();
 			transactionQueue.put(sd);
 			LoadMonitor.up();
+			this.clientTransactionCount++;
 			
 			registerInterest(sd.getHash(), m);		
 		} catch (Throwable e) {

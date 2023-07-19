@@ -279,10 +279,11 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefQueue.drainTo(beliefMessages); 
 		HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
 		// log.info("Merging Beliefs: "+allBeliefs.size());
-		boolean anyOrderChanged=false;
 		
+		boolean anyOrderChanged=false;
 		for (Message m: beliefMessages) {
-			anyOrderChanged=mergeBeliefMessage(newOrders,m);
+			boolean changed=mergeBeliefMessage(newOrders,m);
+			if (changed) anyOrderChanged=true;
 		}
 		if (!anyOrderChanged) return null;
 		
@@ -291,7 +292,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 
-	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> newOrders, Message m) {
+	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> orders, Message m) {
 		boolean changed=false;
 		AccountKey myKey=server.getPeerKey();
 		try {
@@ -305,13 +306,16 @@ public class BeliefPropagator extends AThreadedComponent {
 					try {
 						AccountKey key=so.getAccountKey();
 						
+						// Check if this Order could replace existing Order
 						if (Utils.equals(myKey, key)) continue; // skip own order
-						if (newOrders.containsKey(key)) {
+						if (orders.containsKey(key)) {
 							Order newOrder=so.getValue();
-							Order oldOrder=newOrders.get(key).getValue();
+							Order oldOrder=orders.get(key).getValue();
 							boolean replace=BeliefMerge.compareOrders(oldOrder, newOrder);
 							if (!replace) continue;
 						} 
+						
+						// TODO: check if Peer key is valid in current state?
 						
 						// Check signature before we accept Order
 						if (!so.checkSignature()) {
@@ -323,7 +327,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						
 						// Ensure we can persist newly received Order
 						so=ACell.createPersisted(so).getValue();
-						newOrders.put(key, so);
+						orders.put(key, so);
 						changed=true;
 					} catch (MissingDataException e) {
 						Hash h=e.getMissingHash();
