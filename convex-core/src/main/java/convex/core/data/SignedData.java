@@ -299,7 +299,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 	}
 	
 	/**
-	 * SignedData is not embedded. We want to persist in store always to cache verification status
+	 * SignedData is not embedded. 
+	 * main reason: We always want to persist in store to cache verification status
 	 *
 	 * @return Always false
 	 */

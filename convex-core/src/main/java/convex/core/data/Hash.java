@@ -36,10 +36,12 @@ public class Hash extends AArrayBlob {
 
 	private Hash(byte[] hashBytes, int offset) {
 		super(hashBytes, offset, LENGTH);
+		this.memorySize=0;
 	}
 
 	private Hash(byte[] hashBytes) {
 		super(hashBytes, 0, LENGTH);
+		this.memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
 	}
 
 	/*

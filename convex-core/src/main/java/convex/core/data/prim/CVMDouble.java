@@ -7,6 +7,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
+import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
@@ -39,6 +40,7 @@ public final class CVMDouble extends ANumeric {
 	
 	public CVMDouble(double value) {
 		this.value=value;
+		this.memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
 	}
 
 	/**

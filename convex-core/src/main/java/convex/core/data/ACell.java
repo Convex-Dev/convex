@@ -250,9 +250,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Calculates the Memory Size for this Cell.
+	 * Calculates the Memory Size for this Cell. Assumes not already calculated
 	 * 
-	 * Requires any child Refs to be either Direct or of persisted status at minimum, 
+	 * Requires any child Refs to be either direct or of persisted in store at minimum, 
 	 * or you might get a MissingDataException
 	 * 
 	 * @return Memory Size of this Cell
