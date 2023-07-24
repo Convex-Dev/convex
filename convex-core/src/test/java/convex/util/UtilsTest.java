@@ -22,9 +22,7 @@ import convex.core.Peer;
 import convex.core.State;
 import convex.core.data.AVector;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
@@ -62,17 +60,6 @@ public class UtilsTest {
 		Utils.toHexChar(16);
 	}
 	
-	@Test public void testParseLong() {
-		assertEquals(1L, Utils.parseLong(1L));
-		assertEquals(0L, Utils.parseLong(CVMLong.ZERO));
-		assertEquals(13L, Utils.parseLong("13"));
-		assertEquals(-13L, Utils.parseLong(Strings.create("-13")));
-		
-		assertNull(Utils.parseLong("1.3"));
-		assertNull(Utils.parseLong(":foo"));
-		assertNull(Utils.parseLong(null));
-		assertNull(Utils.parseLong(CVMBigInteger.MIN_POSITIVE));
-	}
 
 	@Test
 	public void testHexString() {

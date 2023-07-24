@@ -164,8 +164,8 @@ public final class CVMLong extends AInteger {
 	
 	/**
 	 * Parse an Object as a CVM Long, on a best efforts basis
-	 * @param o String to parse
-	 * @return CVM Long value or null if parse failed
+	 * @param o Object to parse
+	 * @return CVM Long value, or null if parse failed
 	 */
 	public static CVMLong parse(Object o) {
 		if (o instanceof ACell) {
@@ -175,8 +175,8 @@ public final class CVMLong extends AInteger {
 				return parse(o.toString());
 			}
 		}
-		if (o instanceof Long) return CVMLong.create(((Long)o).longValue());
 		if (o instanceof Number) {
+			if (o instanceof Long) return CVMLong.create(((Long)o).longValue());
 			Number n=(Number)o;
 			Long lv= n.longValue();
 			if (lv.doubleValue()==n.doubleValue()) return CVMLong.create(lv.longValue());

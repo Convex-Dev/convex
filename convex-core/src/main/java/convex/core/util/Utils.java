@@ -1488,17 +1488,6 @@ public class Utils {
 		}
 	}
 
-	/**
-	 * Parses a value as a Long
-	 * @param o A numeric value or String containing a number
-	 * @return Long value, or null if not parseable
-	 */
-	public static Long parseLong(Object o) {
-		CVMLong lv=CVMLong.parse(o);
-		if (lv==null) return null;
-		return lv.longValue();
-	}
-
 	public static String joinStrings(List<String> strings, String separator) {
 		StringBuilder sb=new StringBuilder(); 
 		

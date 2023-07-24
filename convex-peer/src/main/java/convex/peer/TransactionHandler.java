@@ -28,6 +28,7 @@ import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -236,10 +237,13 @@ public class TransactionHandler extends AThreadedComponent{
 		return true;
 	}
 
+	Long minBlockTime=null;
 	private long getMinBlockTime() {
-		HashMap<Keyword, Object> config = server.getConfig();
-		Long minBlockTime=Utils.parseLong(config.get(Keywords.MIN_BLOCK_TIME));
-		if (minBlockTime==null) minBlockTime=DEFAULT_MIN_BLOCK_TIME;
+		if (minBlockTime==null) {
+			HashMap<Keyword, Object> config = server.getConfig();
+			CVMLong mbt=CVMLong.parse(config.get(Keywords.MIN_BLOCK_TIME));
+			minBlockTime =(mbt==null)?DEFAULT_MIN_BLOCK_TIME:mbt.longValue();
+		}
 		return minBlockTime;
 	}
 

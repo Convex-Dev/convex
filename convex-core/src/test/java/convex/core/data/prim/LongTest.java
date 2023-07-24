@@ -1,8 +1,10 @@
 package convex.core.data.prim;
 
+import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
+import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.NumericsTest;
 
@@ -32,6 +35,18 @@ public class LongTest {
 		assertNotSame(CVMLong.create(666),CVMLong.create(666));
 	}
 	
+	@Test public void testParseLong() {
+		assertCVMEquals(1L, CVMLong.parse(1L));
+		assertCVMEquals(0L, CVMLong.parse(CVMLong.ZERO));
+		assertCVMEquals(13L, CVMLong.parse("13"));
+		assertCVMEquals(-13L, CVMLong.parse(Strings.create("-13")));
+		
+		assertNull(CVMLong.parse("1.3"));
+		assertNull(CVMLong.parse(":foo"));
+		assertNull(CVMLong.parse(null));
+		assertNull(CVMLong.parse(CVMBigInteger.MIN_POSITIVE));
+	}
+
 	@Test 
 	public void testLongEncoding() {
 		assertEquals("10",es(0));
