@@ -24,6 +24,20 @@ public class HashBenchmark {
 		AArrayBlob d = Format.encodedBlob(l);
 		Hashing.sha256(d.getInternalArray());
 	}
+	
+	static final byte[] b1=new byte[1];
+	@Benchmark
+	public void sha3256Hash1() {
+		Blob b=Blob.wrap(b1);
+		b.getContentHash();
+	}
+
+	static final byte[] b1000=new byte[1000];
+	@Benchmark
+	public void sha3256Hash1000() {
+		Blob b=Blob.wrap(b1000);
+		b.getContentHash();
+	}
 
 	@Benchmark
 	public void kilobyteHash() {
