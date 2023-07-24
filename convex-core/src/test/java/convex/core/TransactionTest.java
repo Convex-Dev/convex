@@ -50,6 +50,9 @@ public class TransactionTest extends ACVMTest {
 		assertEquals(1000+expectedFees,state().getAccount(HERO).getBalance()-s.getAccount(HERO).getBalance());
 		assertEquals(expectedFees,s.getGlobalFees().longValue());
 		
+		// We expect a Transfer to be completely encoded
+		assertTrue(t1.isCompletelyEncoded());
+		
 		doTransactionTests(t1);
 	}
 	
@@ -157,6 +160,9 @@ public class TransactionTest extends ACVMTest {
 		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());
 		Context ctx=state().applyTransaction(t1);
 		assertEquals(ErrorCodes.STATE,ctx.getErrorCode());
+		
+		// We expect a short call to be completely encoded
+		assertTrue(t1.isCompletelyEncoded());
 		
 		doTransactionTests(t1);
 	}
