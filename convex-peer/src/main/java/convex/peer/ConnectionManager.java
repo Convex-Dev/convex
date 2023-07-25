@@ -224,7 +224,10 @@ public class ConnectionManager extends AThreadedComponent {
 
 			if (target!=null) {
 				// Try to connect to Peer. If it fails, no worry, will retry another peer next time
-				connectToPeer(target);
+				boolean success=connectToPeer(target) != null;
+				if (!success) {
+					log.warn("Failed to connect to Peer at "+target);
+				}
 			}
 		}
 		
@@ -559,7 +562,11 @@ public class ConnectionManager extends AThreadedComponent {
 		}
 		
 		if ((!hm.isEmpty())&&server.isLive()) {
-			log.warn("Unable to send broadcast to "+hm.size()+" peers");
+			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
+			Map.Entry<AccountKey,Connection> drop=left.get(random.nextInt(left.size()));
+			AccountKey dropKey=drop.getKey();
+			closeConnection(dropKey);
+			log.warn("Unable to send broadcast to "+hm.size()+" peers, dropped one connection to: "+dropKey);
 		}
 	}
 

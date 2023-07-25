@@ -51,7 +51,7 @@ public class Config {
 	/**
 	 * Default number of outgoing connections for a Peer
 	 */
-	public static final Integer DEFAULT_OUTGOING_CONNECTION_COUNT = 20;
+	public static final Integer DEFAULT_OUTGOING_CONNECTION_COUNT = 10;
 
 
 	/**
