@@ -9,6 +9,7 @@ import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
+import convex.core.Constants;
 import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.BadFormatException;
 
@@ -65,19 +66,39 @@ public class Strings {
 	 * @return CVM String instance.
 	 */
 	public static AString create(String s) {
-		if (s.length()==0) return StringShort.EMPTY;
-		CharsetEncoder encoder=getEncoder();
-		ByteBuffer bb;
-		try {
-			bb = encoder.encode(CharBuffer.wrap(s));
-		} catch (CharacterCodingException e) {
-			throw new Error("Shouldn't happen!",e);
+		int n=s.length();
+		if (n==0) return StringShort.EMPTY;
+		ABlob utfBlob=null;
+		if (n<=Constants.MAX_NAME_LENGTH) {
+			utfBlob=tryGetASCII(s);
 		}
-		BlobBuilder builder=new BlobBuilder();
-		builder.append(bb);
-		return Strings.create(builder.toBlob());
+		
+		if (utfBlob==null) {
+			CharsetEncoder encoder=getEncoder();
+			ByteBuffer bb;
+			try {
+				bb = encoder.encode(CharBuffer.wrap(s));
+			} catch (CharacterCodingException e) {
+				throw new Error("Shouldn't happen!",e);
+			}
+			BlobBuilder builder=new BlobBuilder();
+			builder.append(bb);
+			utfBlob=builder.toBlob();
+		}
+		return Strings.create(utfBlob);
 	}
 	
+	private static Blob tryGetASCII(String s) {
+		int n=s.length();
+		byte[] bs=new byte[n];
+		for (int i=0; i<n; i++) {
+			char c=s.charAt(i);
+			if (c>=128) return null; // non-ASCII
+			bs[i]=(byte)c;
+		}
+		return Blob.wrap(bs);
+	}
+
 	/**
 	 * Creates a string by joining a sequence of substrings with the given separator
 	 * @param ss Sequence of Strings to join

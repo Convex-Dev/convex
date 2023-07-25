@@ -273,7 +273,7 @@ public class AntlrReader {
 		public void exitKeyword(KeywordContext ctx) {
 			String s=ctx.getText();
 			Keyword k=Keyword.create(s.substring(1));
-			if (k==null) throw new ParseException("Bad keyword format: "+s);
+			if (k==null) throw new ParseException("Bad Keyword format: "+s);
 			push( k);
 		}
 
@@ -286,7 +286,7 @@ public class AntlrReader {
 		public void exitSymbol(SymbolContext ctx) {
 			String s=ctx.getText();
 			Symbol sym=Symbol.create(s);
-			if (sym==null) throw new ParseException("Bad keyword format: "+s);
+			if (sym==null) throw new ParseException("Bad Symbol format: "+s);
 			push( sym);
 		}
 		
