@@ -342,8 +342,9 @@ public class StressPanel extends JPanel {
 		}
 
 		protected ATransaction buildSubTransaction(int reqNo, int txNo, Address origin) {
+			Address target=clients.get((1+reqNo+txNo*6969)%clients.size()).getAddress();
 			if (type.equals("Transfer")) {
-				ATransaction t = Transfer.create(origin,-1, origin, 100);
+				ATransaction t = Transfer.create(origin,-1, target, 100);
 				return t;
 			}
 			
