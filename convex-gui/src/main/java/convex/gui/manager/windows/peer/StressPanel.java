@@ -39,6 +39,7 @@ import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
+import convex.core.transactions.Transfer;
 import convex.core.util.Text;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
@@ -138,7 +139,7 @@ public class StressPanel extends JPanel {
 		JLabel lblTxType=new JLabel("Transaction Type");
 		txTypeBox=new JComboBox<String>();
 		txTypeBox.addItem("Define Data");
-		// txTypeBox.addItem("Transfer");
+		txTypeBox.addItem("Transfer");
 		// txTypeBox.addItem("AMM Trade");
 		txTypeBox.addItem("Null Op");
 		optionPanel.add(lblTxType);
@@ -341,16 +342,21 @@ public class StressPanel extends JPanel {
 		}
 
 		protected ATransaction buildSubTransaction(int reqNo, int txNo, Address origin) {
+			if (type.equals("Transfer")) {
+				ATransaction t = Transfer.create(origin,-1, origin, 100);
+				return t;
+			}
 			
 			StringBuilder tsb = new StringBuilder();
-			if (opCount>1) tsb.append("(do ");
+			if (opCount>1) tsb.append("(loop [i 0] ");
 			for (int j = 0; j < opCount; j++) {
 				switch(type) {
-					case "Define Data": tsb.append("(def a"+j+" "+reqNo+") "); break;
+					case "Define Data": tsb.append("(def a"+txNo+" "+reqNo+") "); break;
 					case "Null Op": tsb.append("nil "); break;
+					default: throw new Error("Bad TX type: "+type);
 				}
 			}
-			if (opCount>1) tsb.append(")");
+			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i)) ) )");
 			String source = tsb.toString();
 			ATransaction t = Invoke.create(origin,-1, Reader.read(source));
 			return t;
