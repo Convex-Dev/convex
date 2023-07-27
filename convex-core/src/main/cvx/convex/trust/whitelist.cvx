@@ -1,0 +1,13 @@
+'convex.trust.whitelist
+
+;; An Minimal scoped actor implementing immutable small whitelists
+;; - Scopes are whitelists: sets of addresses considered safe
+;; - Because all state is stored in the scope, this actor is super simple!
+
+(import convex.trust :as trust)
+
+(defn check-trusted?
+  ^:callable?
+	[subject action object]
+  (or (set? *scope*) (fail :ARGUMENT "Scope must be a set"))
+  (contains-key? *scope* subject))

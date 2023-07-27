@@ -60,4 +60,20 @@ public class TrustActorTest extends ACVMTest {
 
 		TrustTest.testChangeControl(ctx, mon);
 	}
+	
+	@Test
+	public void testWhitelist() {
+		Context ctx=step(context(),"(import convex.trust.whitelist :as allow)");
+		assertNotError(ctx);
+		
+		assertArgumentError(step(ctx,"(trust/trusted? allow *address*)"));
+		assertArgumentError(step(ctx,"(trust/trusted? [allow nil] *address*)"));
+		
+		assertTrue(evalB(ctx,"(trust/trusted? [allow #{*address*}] *address*)"));
+		assertFalse(evalB(ctx,"(trust/trusted? [allow #{*address*}] #0)"));
+		assertTrue(evalB(ctx,"(trust/trusted? [allow #{#0 #1}] #0)"));
+		
+		// A subject that is definitely not an address
+		assertFalse(evalB(ctx,"(trust/trusted? [allow #{*address*}] :not-an-address)"));
+	}
 }

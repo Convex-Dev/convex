@@ -120,7 +120,6 @@ public class Init {
 			userFunds -= genFunds;
 			
 			for (int i = 0; i < keyCount; i++) {
-				// TODO: construct peer controller addresses
 				Address address = Address.create(accts.count());
 				assert(address.toExactLong() == accts.count());
 				AccountKey key = genesisKeys.get(i);
@@ -216,6 +215,7 @@ public class Init {
 			s = doActorDeploy(s, "lab/curation-market.cvx");
 			s = doActorDeploy(s, "convex/trust/ownership-monitor.cvx");
 			s = doActorDeploy(s, "convex/trust/delegate.cvx");
+			s = doActorDeploy(s, "convex/trust/whitelist.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
