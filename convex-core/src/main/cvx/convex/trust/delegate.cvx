@@ -2,7 +2,7 @@
 
 ;; An Actor implementation that delegates trust requests based on a scope
 ;; - Scopes are sequential IDs, managed by a controller
-;; - Delegated monitor may itself be scoped
+;; - Delegated monitor may itself be scoped (e.g. [whitelist #{#45 #6786}] )
 ;; - Invalid scopes are always denied
 
 (import convex.trust :as trust)

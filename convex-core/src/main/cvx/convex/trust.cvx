@@ -1,33 +1,24 @@
 'convex.trust
 
-
 (call *registry*
       (register {:description ["Based on the reference monitor security model."
                                "See comments about trusted monitors in `trusted?`."
                                "Provides the creation of blacklists, whitelists, and upgradable actors."]
                  :name        "Trust monitor library"}))
 
-
 ;;
 ;; See: https://en.wikipedia.org/wiki/Reference_monitor
 ;;
 
-
 ;;;;;;;;;; Private
 
-
 (def -self
-
   ^{:private? true}
-
   *address*)
-
 
 ;;;;;;;;;; Checking trust
 
-
 (defn trust-monitor?
-
   ^{:doc {:description "Does `x` look like a trust monitor?"
           :examples    [{:code "(trust-monitor? #42)"}]
           :signature   [{:params [x]}]}}
@@ -36,7 +27,6 @@
   (callable? x 'check-trusted?))
 
 (defn trusted? 
-
   ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
                         "A trust monitor is an address, pointing to either:"
                         "- A user account that can only trust itself"
@@ -48,15 +38,11 @@
           :signature   [{:params [trust-monitor subject]}
                         {:params [trust-monitor subject action]}
                         {:params [trust-monitor subject action object]}]}}
-
-
   ([trust-monitor subject]
-
    (recur trust-monitor
              subject
              nil
              nil))
-
 
   ([trust-monitor subject action]
    (recur trust-monitor
@@ -64,9 +50,7 @@
              action
              nil))
 
-
   ([trust-monitor subject action object]
-
    (if (callable? trust-monitor 'check-trusted?) 
      (query (call trust-monitor
                   (check-trusted? subject
@@ -75,21 +59,16 @@
      (= (address trust-monitor)
         subject))))
 
-
 ;;;;;;;;;; Building black/white lists
 
-
 (defn build-blacklist
-
   ^{:doc {:description ["Creates deployable code for a new blacklist, an actor acting as a trust monitor."
                         "An optional configuration map may be provided:"
                         "- `:blacklist`, collection of addresses forming the initial blacklist"
                         "- `:controller`, address that has the ability to modify the blacklist"]
           :examples    [{:code "(deploy (build-blacklist {:controller *address* :blacklist [my-foe-1 my-foe-2]}))"}]
           :signature   [{:params [config]}]}}
-
   [config]
-
   (let [blacklist  (reduce (fn [w x]
                              (conj w
                                    (address x)))
@@ -100,38 +79,25 @@
     `(do
        (def trust
             ~-self)
-
+       
        (def blacklist
-
          ;;  blacklist of addresses that are denied.
-
          ~blacklist)
-
-
+       
        (def controller
-
          ;; Controller address determines who can modify the blacklist.
-
          ~controller)
 
-
        (defn check-trusted?
-
          ^{:callable? true}
-
          [subject action object]
-
          (and 
            (address? subject) 
            (not (contains-key? blacklist subject))))
 
-
        (defn set-trusted
-
          ^{:callable? true}
-
          [subject allow?]
-
          (if (trust/trusted? controller
                              *caller*)
            (def blacklist
@@ -144,18 +110,14 @@
                  "No access to blacklist!"))))))
 
 
-
 (defn build-whitelist
-
   ^{:doc {:description ["Creates deployable code for a new whitelist, an actor acting as a trust monitor."
                         "An optional configuration map may be provided:"
                         "- `:controller`, address that has the ability to modify the whitelist"
                         "- `:whitelist`, collection of addresses forming the initial whitelist"]
           :examples    [{:code "(deploy (build-whitelist {:controller *address* :whitelist [*address*]}))"}]
           :signature   [{:params [config]}]}}
-
   [config]
-
   (let [whitelist  (reduce (fn [w x]
                              (conj w
                                    (address x)))
@@ -168,27 +130,17 @@
         (def trust
              ~-self)
 
-
        (def whitelist
-
          ;; A whitelist of addresses that are accepted.
-
          ~whitelist)
 
-
        (def controller
-
          ;; Controller address determines who can modify the whitelist.
-
          ~(address controller))
 
-
        (defn check-trusted?
-
          ^{:callable? true}
-
          [subject action object]
-
          (and
            (address? subject)
            (contains-key? whitelist
@@ -196,11 +148,8 @@
 
 
        (defn set-trusted
-
          ^{:callable? true}
-
          [subject allow?]
-
          (if (trust/trusted? controller
                              *caller*)
            (def whitelist
@@ -261,7 +210,6 @@
                               *caller*)
             (eval code)
             (fail :TRUST "No root access to upgrade capability!"))))))
-
 
 
 (defn remove-upgradability! 
