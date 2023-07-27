@@ -530,7 +530,7 @@ public class Context {
 
 		// if not found, return UNDECLARED error
 		if (envEntry==null) {
-			return withError(ErrorCodes.UNDECLARED,symbol.toString());
+			return withError(ErrorCodes.UNDECLARED,symbol.getName());
 		}
 
 		// Result is whatever is defined as the datum value in the environment entry

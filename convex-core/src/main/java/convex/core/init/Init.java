@@ -215,6 +215,7 @@ public class Init {
 			s = doActorDeploy(s, "convex/did.cvx");
 			s = doActorDeploy(s, "lab/curation-market.cvx");
 			s = doActorDeploy(s, "convex/trust/ownership-monitor.cvx");
+			s = doActorDeploy(s, "convex/trust/delegate.cvx");
 
 			{ // Deploy Currencies
 				@SuppressWarnings("unchecked")
@@ -255,7 +256,7 @@ public class Init {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
 
 			ctx = ctx.deployActor(forms.next().toCellArray());
-			if (ctx.isExceptional()) throw new Error("Error deploying actor:" + ctx.getValue());
+			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
 
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + forms.get(0) + " " + ctx.getResult() + "))"));
 			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());

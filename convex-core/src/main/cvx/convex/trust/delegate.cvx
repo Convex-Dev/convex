@@ -1,0 +1,65 @@
+'convex.trust.delegate
+
+;; An Actor implementation that delegates trust requests based on a scope
+;; - Scopes are sequential IDs, managed by a controller
+;; - Delegated monitor may itself be scoped
+;; - Invalid scopes are always denied
+
+(import convex.trust :as trust)
+
+;; Map of ID-> [delegated-monitor controller]
+(def mons {})
+
+;; Next ID for allocation
+(def next-id 1)
+
+(defn create 
+  ^{:callable? true 
+    :doc {:description ["Creates new delegated trust monitor"]
+              :examples    
+          [{:code "(call delegate-actor (create initial-monitor *address*))])"}]
+              :signature [monitor controller]}}
+  ([monitor]
+    (recur monitor *caller*))
+  ([monitor controller]
+    (let [id next-id
+          rec [monitor controller]]
+      (def mons (assoc mons id rec))
+      (def next-d (inc id))
+      id)))
+  
+(defn update
+  ^{:callable? true 
+        :doc {:description ["Creates new delegated trust monitor"]
+              :examples    
+              [{:code "(call delegate-actor (create initial-monitor *address*))])"}]
+              :signature [monitor controller]}}
+  [new-monitor]
+  (let [rec (mons *scope*)]
+    (or rec (fail :ARGUMENT "Delegated trust monitor ID not valid"))
+    (or 
+      (trust/trusted? (second rec) *caller* :update [*address* *scope*])
+      (fail :TRUST "Controller not valid"))
+    (def mons (assoc mons *scope* (assoc rec 0 new-monitor)))
+    new-monitor))
+
+(defn change-control
+  ^{:callable? true}
+  [controller]
+   (let [rec (mons *scope*)]
+    (or rec (fail :ARGUMENT "Delegated trust monitor ID not valid"))
+    (or 
+      (trust/trusted? (second rec) *caller* :change-control [*address* *scope*])
+      (fail :TRUST "Controller not valid"))
+    (def mons (assoc mons *scope* (assoc rec 1 controller)))
+    controller))
+  
+(defn check-trusted?
+  ^:callable?
+	[subject action object]
+  (or *scope* (fail :ARGUMENT "Null scope ID"))
+  (let [rec (mons *scope*)]
+    (or rec (return false))
+    (trust/trusted? 
+      (or (first rec) (return false)) 
+      subject action object)))

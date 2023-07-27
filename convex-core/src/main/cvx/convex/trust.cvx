@@ -33,7 +33,7 @@
           :signature   [{:params [x]}]}}
 
   [x]
-  (callable? x check-trusted?))
+  (callable? x 'check-trusted?))
 
 (defn trusted? 
 

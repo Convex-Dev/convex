@@ -1,9 +1,6 @@
 package convex.lib;
 
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertNotError;
-import static convex.test.Assertions.assertStateError;
-import static convex.test.Assertions.assertTrustError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -234,6 +231,7 @@ public class TrustTest extends ACVMTest {
 		assertTrustError(step(ctx, "(eval-as alice `(eval-as ~bob :foo))"));
 	}
 
+	
 	/**
 	 * Tests change of control of a scoped target
 	 * @param ctx Context from which to change control
@@ -256,4 +254,6 @@ public class TrustTest extends ACVMTest {
 		ctx=step(ctx,"(call "+thing+" (change-control "+nca+"))");
 		assertNotError(ctx);	
 	}
+	
+
 }

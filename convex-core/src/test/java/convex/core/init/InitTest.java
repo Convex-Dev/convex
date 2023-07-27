@@ -69,7 +69,12 @@ public class InitTest extends ACVMTest {
 
 
 	public static State createState() {
-		return Init.createState(PEER_KEYS);
+		try {
+			return Init.createState(PEER_KEYS);
+		} catch (Throwable e) {
+			e.printStackTrace();
+			throw e;
+		}
 	}
 	
 	public static Address HERO=Init.getGenesisAddress();
