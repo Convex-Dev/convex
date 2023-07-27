@@ -217,6 +217,7 @@
           :examples    [{:code "(set-control my-asset *address*)"}]
           :signature   [{:params [path controller]}]}}
   [path controller]
+  (or (callable? controller) (fail :ARGUMENT "Invalid controller"))
   (call path (change-control controller))
   :OK)
 
