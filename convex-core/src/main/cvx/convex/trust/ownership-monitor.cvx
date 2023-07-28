@@ -1,5 +1,16 @@
 'convex.trust.ownership-monitor
 
+;; A simple trust monitor that can test for ownership of some asset quantity
+;; 
+;; Example: a subject must hold tokens representing shares in a company 
+;; in order to be eligible to vote in a general meeting.
+;;
+;; (import convex.trust.ownership-monitor :as ownership)
+;;
+;; (trust/trusted? *caller* [ownership [share-token 1000]])
+;;
+
+
 (import convex.asset :as asset)
 
 (defn check-trusted?

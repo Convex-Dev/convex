@@ -160,7 +160,7 @@
            (fail :TRUST "No rights to mint"))
     
     (let [amount     (int amount) ;; Mint amount.
-   new-supply (+ supply amount)
+          new-supply (+ supply amount)
           bal        (-get-balance *caller* id)
           new-bal    (+ bal amount)]
            
