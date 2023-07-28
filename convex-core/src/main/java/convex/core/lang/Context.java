@@ -1263,8 +1263,11 @@ public class Context {
 		if (form instanceof AOp) {
 			op=(AOp<?>)form;
 		} else {
-			AFn<?> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
-			if (lang!=null) {
+			ACell maybeLang=getEnvironment().get(Symbols.STAR_LANG);
+			if (maybeLang!=null) {
+				AFn<?> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
+				if (lang==null) return ctx.withError(ErrorCodes.CAST, "*lang* not a valid function");
+				
 				// Execute *lang* function, but increment depth just in case
 				int saveDepth=ctx.getDepth();
 				ctx=ctx.withDepth(saveDepth+1);
@@ -1278,6 +1281,7 @@ public class Context {
 				ctx=ctx.withResult(null); // clear result for execution
 			}
 		}
+		// Execute with empty local bindings (top level form)
 		AVector<ACell> savedBindings = ctx.getLocalBindings();
 		ctx=ctx.withLocalBindings(Vectors.empty());
 		Context rctx= ctx.execute(op);
