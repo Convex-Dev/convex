@@ -5,6 +5,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Coin;
+import convex.core.data.prim.CVMLong;
+
 import static convex.test.Assertions.*;
 
 public class ActorTest extends ACVMTest {
@@ -43,5 +46,43 @@ public class ActorTest extends ACVMTest {
 		
 		// scope vector too big
 		assertCastError(step(c,"(call [a1 nil nil] (check))"));
+	}
+	
+	@Test 
+	public void testActorAccept() {
+		Context c=context();
+		
+		c=step(c,"(def a1 (deploy '(defn ^:callable? do [c] (eval c))))");
+		assertNotError(c);
+		
+		assertEquals(CVMLong.ZERO,eval(c,"(call a1 (do '(accept 0)))"));
+		
+		// Can't accept if no offer
+		assertStateError(step(c,"(call a1 (do '(accept 1)))"));
+		
+		long bal=c.getBalance();
+		{
+			// Accepting less than full offer
+			Context c2=step(c,"(call a1 10 (do '(accept 7)))");
+			assertEquals(bal-7,c2.getBalance());
+			assertEquals(Coin.SUPPLY,c2.getState().computeTotalFunds());
+		}
+		
+		{
+			// Accepting more than full offer
+			Context c2=step(c,"(call a1 10 (do '(accept 17)))");
+			assertStateError(c2);
+			assertEquals(bal,c2.getBalance());
+			assertEquals(Coin.SUPPLY,c2.getState().computeTotalFunds());
+		}
+		
+		{
+			// Accepting offer then rolling back reverses acceptance
+			Context c2=step(c,"(call a1 10 (do '(do (accept 8) (rollback :done))))");
+			assertNotError(c2);
+			assertEquals(bal,c2.getBalance());
+			assertEquals(Coin.SUPPLY,c2.getState().computeTotalFunds());
+		}
+
 	}
 }

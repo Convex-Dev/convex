@@ -303,8 +303,6 @@ public class Context {
 	}
 
 
-
-
 	/**
 	 * Performs key actions at the end of a transaction:
 	 * <ul>
@@ -1657,6 +1655,8 @@ public class Context {
 		Symbol sym=RT.ensureSymbol(functionName);
 		Address targetAddress;
 		ACell scope=null;
+		
+		// Handle target possibilities, may be an Address or Scoped Actor reference
 		if (target instanceof Address) {
 			targetAddress=(Address)target;
 		} else {
@@ -1675,7 +1675,7 @@ public class Context {
 		}
 		
 		AccountStatus as=state.getAccount(targetAddress);
-		if (as==null) return this.withError(ErrorCodes.NOBODY,"Actor Account does not exist: "+target);
+		if (as==null) return this.withError(ErrorCodes.NOBODY,"Call target Account does not exist: "+target);
 
 		// Handling for non-zero offers.
 		// SECURITY: Subtract offer from balance first so we don't have double-spend issues!

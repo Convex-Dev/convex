@@ -212,7 +212,7 @@ public class Format {
 	}
 
 	/**
-	 * Reads a VLC encoded long as a long from the given location in a byte byte
+	 * Reads a VLC encoded long as a long from the given location in a byte
 	 * array. Assumes no tag
 	 * @param data Byte array
 	 * @param pos Position from which to read in byte array
