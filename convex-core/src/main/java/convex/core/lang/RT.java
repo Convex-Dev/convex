@@ -714,8 +714,11 @@ public class RT {
 	public static <T extends ACell> AVector<T> castVector(ACell o) {
 		if (o == null)
 			return Vectors.empty();
+		
+		// Fast path for existing CVM collections
 		if (o instanceof ACollection)
 			return vec((ACollection<T>) o);
+		
 		if (o instanceof ACountable) {
 			ACountable<T> ds = (ACountable<T>) o;
 			long n = ds.count();
