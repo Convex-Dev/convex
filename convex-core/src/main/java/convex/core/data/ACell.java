@@ -258,7 +258,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Memory Size of this Cell
 	 */
 	protected long calcMemorySize() {	
-		// add size for each child Ref (might be zero if embedded)
+		// add extra size for each child Ref (might be zero if embedded)
 		long result=0;
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {

@@ -5,58 +5,35 @@
                                "Implements callable functions for `asset.box` and `convex.asset`."]
                  :name        "Asset box actor."}))
 
-
 ;;;;;;;;;; Setup
-
 
 (import convex.asset :as asset-lib)
 
-
 ;;;;;;;;;; Values
 
-
 (def boxes
-
   ^{:doc {:description "Map of `box id` -> `asset quantity`."}}
-
   {})
-
 
 
 (def counter
-
   ^{:doc {:description "Used for creating box ids."}}
-
   0)
 
-
-
 (def offers 
-
   ^{:doc {:description "Map of `owner` -> (Map of `recipient address` -> `set of box ids`."}}
-
   {})
-
-
 
 (def ownership
-
   ^{:doc {:descrption "Map of `owner` -> `set of box ids`."}}
-
   {})
-
 
 ;;;;;;;;;; Private helpers
 
-
 (defn -direct-transfer
-
   ^{:private? true}
-
   ;; Internal implementation for executing a direct transfer.
-
   [sender receiver quantity]
-
   (let [receiver             (address receiver)
         sender-balance       (get ownership
                                   sender
@@ -76,17 +53,12 @@
                 receiver new-receiver-balance))
     quantity))
 
-
 ;;;;;;;;;; Implementation of `convex.asset` interface
 
-
 (defn accept
-
   ^{:callable? true
     :private?  true}
-
   [sender quantity]
-
   (let [sender           (address sender)
         sender-offers    (get offers
                               sender
@@ -102,49 +74,35 @@
         new-offer        (difference offer
                                      quantity)]
     (def offers
-         (assoc offers sender
+      (assoc offers sender
                 (assoc sender-offers
                        *caller*
                        new-offer)))
     (-direct-transfer sender
-                      *caller*
-                      quantity)))
-
+      *caller*
+      quantity)))
 
 
 (defn balance
-
   ^{:callable? true
     :private?  true}
-
   [owner]
-
   (or (get ownership
            owner)
       #{}))
 
-
-
 (defn direct-transfer
-
   ^{:callable? true
     :private?  true}
-
   [receiver quantity]
-
   (-direct-transfer *caller*
                     receiver
                     quantity))
 
-
-
 (defn offer
-
   ^{:callable? true
     :private?  true}
-
   [receiver quantity]
-
   (let [caller-offers (get offers
                            *caller*
                            {})]
@@ -155,15 +113,10 @@
                        receiver
                        quantity)))))
 
-
-
 (defn receive-asset
-
   ^{:callable? true
     :private?  true}
-
   [asset box-id]
-
   (let [box-id (long box-id)]
     ;; Accepting first solves the problem of putting a box into itself.
     ;;
@@ -187,33 +140,20 @@
                                             box-id)
                                        asset)))))
 
-
-
 (def quantity-add
-
   ^{:callable? true
     :private?  true}
-
   union)
 
-
-
 (def quantity-sub
-
   ^{:callable? true
     :private?  true}
-
   difference)
 
-
-
 (def quantity-subset?
-
   ^{:callable? true
     :private?  true}
-
   subset?)
-
 
 ;;;;;;;;;; Implementation of `asset.box` interface
 
@@ -228,16 +168,14 @@
   (let [owned-boxes (ownership *caller*)]
     (when-not (subset? set-box-ids
                        owned-boxes)
-      (fail :TRUST
-            "Burning boxes requires ownership"))
+      (fail :TRUST "Burning boxes requires ownership"))
     (for [id set-box-ids]
       (let [contents (boxes id)]
         (if (empty? contents)
           (def boxes
                (dissoc boxes
                        id))
-          (fail :STATE
-                (str "Trying to delete non-empty box: " id)))))
+          (fail :STATE (str "Trying to delete non-empty box: " id)))))
     (def ownership
       (assoc ownership
              *caller*

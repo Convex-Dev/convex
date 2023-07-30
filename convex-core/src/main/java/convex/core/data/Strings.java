@@ -69,6 +69,8 @@ public class Strings {
 		int n=s.length();
 		if (n==0) return StringShort.EMPTY;
 		ABlob utfBlob=null;
+		
+		// Fast path for short pure ASCII Strings
 		if (n<=Constants.MAX_NAME_LENGTH) {
 			utfBlob=tryGetASCII(s);
 		}

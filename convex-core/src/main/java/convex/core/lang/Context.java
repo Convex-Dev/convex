@@ -7,6 +7,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.ASequence;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
@@ -1865,7 +1866,10 @@ public class Context {
 		return withError(ErrorValue.create(errorCode,Strings.create(message)));
 	}
 	
-
+	public Context withError(Keyword errorCode,AString message) {
+		return withError(ErrorValue.create(errorCode,message));
+	}
+	
 	public Context withError(Keyword errorCode, ACell rs) {
 		return withError(ErrorValue.createRaw(errorCode,rs));
 	}

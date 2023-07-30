@@ -24,6 +24,7 @@ import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -287,7 +288,7 @@ public class Peer {
 		Context ctx= Context.createFake(state, address);
 
 		if (state.getAccount(address)==null) {
-			return ctx.withError(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
+			return ctx.withError(Errors.nobodyQuery(address));
 		}
 
 		Context ectx = ctx.expandCompile(form);

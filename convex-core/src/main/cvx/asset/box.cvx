@@ -20,81 +20,49 @@
 
 
 (defn burn
-
   ^{:doc {:description "Destroys a set of box ids which must be owned and empty."
           :signature   [{:params [set-box-ids]}
                         {:params [actor set-box-ids]}]}}
-
-
   ([set-box-ids]
-
    (burn box.actor
          set-box-ids))
-
-
   ([actor set-box-ids]
-
    (call actor
          (burn set-box-ids))))
 
-
-
 (defn create
-
   ^{:doc {:description "Creates a new box and returns its id."
           :signature   [{:params []}
                         {:params [actor]}]}}
-
-
   ([]
-
    (create box.actor))
-
-
   ([actor]
-
    (call actor
          (create))))
 
 
 
 (defn insert
-
   ^{:doc {:description "Inserts an asset into a box."
           :signature   [{:params [box-id asset]}
                         {:params [actor box-id asset]}]}}
-
-
   ([box-id asset]
-
    (insert box.actor
            box-id
            asset))
-
-
   ([actor box-id asset]
-
    (asset-lib/transfer actor
                        asset
                        box-id)))
 
-
-
 (defn remove
-
   ^{:doc {:description "Removes an asset from the given box."
           :signature   [{:params [box-id]}
                         {:params [actor box-id asset]}]}}
-
   ([box-id asset]
-
-   (remove box.actor
-           box-id
-           asset))
-
-
+    (remove box.actor
+      box-id
+      asset))
   ([actor box-id asset]
-
-   (call actor
-         (remove box-id
-                 asset))))
+    (call actor
+      (remove box-id asset))))

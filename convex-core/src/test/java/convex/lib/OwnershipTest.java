@@ -48,7 +48,7 @@ public class OwnershipTest extends ACVMTest {
 		ctx=step(ctx,"(def USD [mt :USD])");
 		assertNotError(ctx);
 		
-		ctx=step(ctx,"(call USD (mint  1000))");
+		ctx=step(ctx,"(call USD (mint 1000))");
 		assertCVMEquals(1000,ctx.getResult());
 
 		assertTrue(evalB(ctx,"(trust/trusted? [monitor [USD 1000]] *address*)"));

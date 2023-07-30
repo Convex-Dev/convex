@@ -1,8 +1,10 @@
 package convex.core.util;
 
+import convex.core.ErrorCodes;
 import convex.core.data.ARecord;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
+import convex.core.lang.impl.ErrorValue;
 
 /**
  * Utility class for generating appropriate error messages
@@ -49,6 +51,10 @@ public class Errors {
 
 	public static String wrongLength(long expected, long count) {
 		return "Wrong length, expected="+expected+" and actual="+count;
+	}
+
+	public static ErrorValue nobodyQuery(Address address) {
+		return ErrorValue.create(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
 	}
 
 }
