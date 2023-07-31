@@ -1,0 +1,26 @@
+;; Define a Vector
+(def a [1 2 3]) 
+
+(conj a 4)
+=> [1 2 3 4]
+
+;; Define a Function
+(def square [x]
+  (* x x))
+
+(square 10)
+=> 100
+
+
+
+(defmacro defonce [sym exp]
+  `(if (defined? '~sym) nil (def ~sym ~exp)))
+
+(defonce foo 12)
+=> 12
+
+(defonce foo 17)
+=> nil
+
+foo
+=> 12
