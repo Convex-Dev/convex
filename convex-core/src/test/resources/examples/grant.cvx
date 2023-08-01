@@ -1,0 +1,51 @@
+(import convex.asset :as asset)
+(import asset.multi-token :as mt)
+
+(call mt (create :BOB))
+
+(def BOB [mt :BOB]) ;; Keyword needs to be unique
+
+(asset/balance BOB)
+
+(call BOB (mint 1000000))
+
+(def requests {})
+
+(def counter 0)
+
+(defn ^:callable? request [amt msg]
+  (let [id (inc counter)]
+    (def requests 
+      (assoc requests id 
+             {:amount amt 
+              :message msg
+              :user *caller*
+              :time *timestamp*}))
+    (def counter id)))
+
+(defn accept [id]
+  (let [rec (or (get requests id) (fail "No matching ID"))
+        user (:user rec)
+        amt (long (:amount rec))]
+    (if (:status rec) (fail "Already handled"))
+    (asset/transfer user [BOB amt])
+    (def requests (assoc requests 
+                         id
+                         (assoc rec :status :approved)))
+    :OK))
+
+(defn reject [id]
+  (let [rec (or (get requests id) (fail "No matching ID"))
+        user (:user rec)]
+    (if (:status rec) (fail "Already handled"))
+    (def requests (assoc requests 
+                         id
+                         (assoc rec :status :rejected)))
+    :OK))
+
+(defn ^:callable? gc [id]
+  (let [rec (get requests id)]
+    (if (:status rec) 
+      (def requests (dissoc requests id))
+      (fail "Not yet handled"))
+    :OK))

@@ -24,3 +24,13 @@
 
 foo
 => 12
+
+(call ;;#177 
+   (run 
+     `(do 
+         (undef run)
+         (set-controller ~*address*))))
+
+
+
+
