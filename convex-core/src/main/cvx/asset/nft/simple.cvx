@@ -32,13 +32,9 @@
 
 
 (defn -direct-transfer
-
   ^{:private? true}
-
   ;; Used internally by [[accept]] and [[direct-transfer]].
-
   [sender receiver quantity]
-
   (let [receiver             (address receiver)
         sender-balance       (or (get-holding sender)
                                  #{})
@@ -57,14 +53,10 @@
     quantity)
 
 
-
 (defn accept
-
   ^{:callable? true
     :private?  true}
-
   [sender quantity]
-
   (let [sender           (address sender)
         sender-offers    (or (get offers
                                   sender)
@@ -92,39 +84,23 @@
                       quantity)))
 
 
-
 (defn balance
-
   ^{:callable? true
     :private?  true}
-
   [owner]
-
   (or (get-holding owner)
       #{}))
 
-
-
 (defn direct-transfer
-
-  ^{:callable? true
-    :private?  true}
-
+  ^{:callable? true}
   [receiver quantity]
-
   (-direct-transfer *caller*
                     receiver
                     quantity))
 
-
-
 (defn offer
-
-  ^{:callable? true
-    :private?  true}
-
+  ^{:callable? true}
   [receiver quantity]
-
   (let [caller-offers (get offers
                            *caller*
                            {})]
@@ -136,47 +112,29 @@
                        quantity)))))
 
 
-
 (def quantity-add
-
-  ^{:callable? true
-    :private?  true}
-
+  ^{:callable? true}
   union)
 
-
-
 (def quantity-sub
-
-  ^{:callable? true
-    :private?  true}
-
+  ^{:callable? true}
   difference)
 
-
-
 (def quantity-subset?
-
-  ^{:callable? true
-    :private?  true}
-
+  ^{:callable? true}
   subset?)
-
 
 ;;;;;;;;;; Callable functions
 
 
 (defn burn
-
   ^{:callable? true
     :doc       {:description "Destroys a set of NFTs. NFTs must be owned by the caller."
                 :signature   [{:params [nft-set]}]}}
-
   [nft-set]
-
   (let [owned-nfts (get-holding *caller*)
         nft-set    (cond
-                     (long? nft-set) #{nft-set}
+                     (integer? nft-set) #{nft-set}
                      (set? nft-set)  nft-set
                      :else           (set nft-set))]
     (when-not (subset? nft-set
@@ -189,15 +147,11 @@
     nft-set))
 
 
-
 (defn create
-
   ^{:callable? true
-    :doc       {:description "Creates a new NFT with a fresh ID and arbitrary metadata."
+    :doc       {:description "Creates a new NFT with a fresh ID."
                 :signature   [{:params []}]}}
-
   []
-
   (let [id         counter
         owner      *caller*
         owned-nfts (or (get-holding owner)
