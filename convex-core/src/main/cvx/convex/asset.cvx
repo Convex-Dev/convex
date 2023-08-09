@@ -62,6 +62,9 @@
       {}
       asset)
     
+    ;; a nil quantity can always be accepted
+    (nil? asset) nil
+    
     (fail "Bad asset argument")))
   
   ([sender path quantity]

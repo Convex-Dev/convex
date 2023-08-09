@@ -211,6 +211,7 @@ public class Init {
 			s = doActorDeploy(s, "asset/box.cvx");
 			s = doActorDeploy(s, "asset/multi-token.cvx");
 			s = doActorDeploy(s, "asset/share.cvx");
+			s = doActorDeploy(s, "asset/market/trade.cvx");
 			s = doActorDeploy(s, "convex/play.cvx");
 			s = doActorDeploy(s, "convex/did.cvx");
 			s = doActorDeploy(s, "lab/curation-market.cvx");
