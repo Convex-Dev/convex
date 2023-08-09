@@ -205,6 +205,7 @@ public class Init {
 			s = doActorDeploy(s, "convex/asset.cvx");
 			s = doActorDeploy(s, "torus/exchange.cvx");
 			s = doActorDeploy(s, "asset/nft/simple.cvx");
+			s = doActorDeploy(s, "asset/nft/basic.cvx");
 			s = doActorDeploy(s, "asset/nft/tokens.cvx");
 			s = doActorDeploy(s, "asset/box/actor.cvx");
 			s = doActorDeploy(s, "asset/box.cvx");
