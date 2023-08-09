@@ -13,7 +13,7 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 
-import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.*;
 
 public class MarketTradeTest extends ACVMTest {
 	
@@ -46,6 +46,8 @@ public class MarketTradeTest extends ACVMTest {
 		CVMLong tid=ctx.getResult();
 		assertNotNull(tid);
 		
+		assertStateError(step(ctx,"(call [trade tid] (claim))"));
+		
 		// Item should have been removed from seller
 		assertFalse(evalB(ctx,"(asset/owns? *address* item)"));
 		
@@ -53,5 +55,14 @@ public class MarketTradeTest extends ACVMTest {
 		ctx=step(ctx,"(trade/buy tid)");
 		assertNotError(ctx);
 		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
+		
+		// Claim should be OK now
+		ctx=step(ctx,"(call [trade tid] (claim))");
+		assertNotError(ctx);
+		
+		// Trade should no longer exist
+		assertStateError(step(ctx,"(call [trade tid] (claim))"));
+
+
 	}
 }

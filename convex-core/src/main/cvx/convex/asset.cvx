@@ -151,13 +151,15 @@
         (recur receiver path quantity nil))
        
     (map? asset)
-     (reduce (fn [m [path quantity]]
+      (reduce (fn [m [path quantity]]
                (assoc m
                       path 
                       (transfer receiver path quantity nil)))
              {}
              asset)
-
+      
+    (nil? asset) nil
+      
      :else
      (fail "Invalid asset")))
 
