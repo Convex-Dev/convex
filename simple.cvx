@@ -1,9 +1,8 @@
 'asset.nft.simple
 
-
 (call *registry*
       (register {:description ["Enables the creation of minimal NFT tokens."
-                               "An NFT is merely a long. Users can build an additional layer so that this id points to anything."
+                               "A Simple NFT is merely an ownable Integer ID. Users can build an additional layer so that this ID points to anything."
                                "Follows the interface described in `convex.asset`."]
                  :name         "Simple NFT creation and management"}))
 
@@ -12,19 +11,14 @@
 
 ;;;;;;;;;; Values
 
-
 (def counter
- 
   ^{:doc {:description "Used for creating NFT ids."}}
-
   0)
 
 
 
 (def offers
-
   ^{:doc {:description "Map of `owner` -> map of `recipient address` -> `set of NFT ids`"}}
-
   {})
 
 
@@ -101,9 +95,7 @@
 (defn offer
   ^{:callable? true}
   [receiver quantity]
-  (let [caller-offers (get offers
-                           *caller*
-                           {})]
+  (let [caller-offers (get offers *caller* {})]
     (def offers
          (assoc offers
                 *caller*
