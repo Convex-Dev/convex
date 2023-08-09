@@ -127,7 +127,7 @@
   [nft-set]
   (let [owned-nfts (get-holding *caller*)
         nft-set    (cond
-                     (integer? nft-set) #{nft-set}
+                     (int? nft-set) #{nft-set}
                      (set? nft-set)  nft-set
                      :else           (set nft-set))]
     (when-not (subset? nft-set
@@ -138,15 +138,22 @@
                  (difference owned-nfts
                              nft-set))
     ;; Remove metadata if it is there
-    (def meta (reduce meta dissoc nft-set))
+    (def meta (reduce dissoc meta nft-set))
     nft-set))
 
+(defn get-metadata 
+  ^{:callable? true
+    :doc       {:description "Gets metadata for a given NFT ID."
+                :signature   [{:params []}
+                              {:params [id]}]}}
+  ([] (recur *scope*))
+  ([id] (get meta id)))
 
 (defn create
   ^{:callable? true
     :doc       {:description "Creates a new NFT with a fresh ID."
                 :signature   [{:params []}
-                              {:params [metadata]}]}}
+       {:params [metadata]}]}}
   ([] (recur nil))
   ([metadata]
     (let [id         counter

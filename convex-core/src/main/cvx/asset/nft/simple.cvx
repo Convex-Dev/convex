@@ -126,7 +126,7 @@
   [nft-set]
   (let [owned-nfts (get-holding *caller*)
         nft-set    (cond
-                     (integer? nft-set) #{nft-set}
+                     (int? nft-set) #{nft-set}
                      (set? nft-set)  nft-set
                      :else           (set nft-set))]
     (when-not (subset? nft-set

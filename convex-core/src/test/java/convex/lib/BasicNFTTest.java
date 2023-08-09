@@ -1,6 +1,7 @@
 package convex.lib;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,10 +9,12 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Sets;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
+import static convex.test.Assertions.*;
 
 public class BasicNFTTest extends ACVMTest {
 	
@@ -30,6 +33,23 @@ public class BasicNFTTest extends ACVMTest {
 		return ctx;
 	}
 	
+	@Test public void testMetadata() {
+		Context ctx=context();
+		ctx=step(ctx,"(def t1 (call nft (create [1 2])))");
+		
+		assertEquals(Vectors.of(1,2),eval(ctx,"(call [nft t1] (get-metadata))"));
+		assertEquals(Vectors.of(1,2),eval(ctx,"(call nft (get-metadata t1))"));
+		
+		ctx=step(ctx,"(def t2 (call nft (create)))");
+		assertNull(eval(ctx,"(call [nft t2] (get-metadata))"));
+		assertNull(eval(ctx,"(call nft (get-metadata t2))"));
+
+		// Burning NFT should delete metadata
+		ctx=step(ctx,"(call nft (burn t1))");
+		assertNotError(ctx);
+		assertNull(eval(ctx,"(call [nft t1] (get-metadata))"));
+		
+	}
 	
 	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
