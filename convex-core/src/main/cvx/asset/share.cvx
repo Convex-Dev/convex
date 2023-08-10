@@ -72,7 +72,7 @@
   (let [trec (-get-token *scope*)
         cont (nth trec 0)
         _ (or 
-            (trust/trusted? cont *caller*)
+            (trust/trusted? cont *caller* :control)
             (fail :TRUST "Not allowed to update controller"))
         nrec (assoc trec 0 controller)]
     (def tokens (assoc tokens *scope* nrec))))
@@ -126,7 +126,7 @@
   (let [token (-get-token *scope*)
         [controller supply utoken ubalance uclaimed] token
         quantity (asset-lib/accept *caller* token quantity)
-        _ (or (integer? quantity) (fail "Non-integer quantity"))
+        _ (or (int? quantity) (fail "Non-integer quantity"))
         nubalance (+ ubalance quantity)
         nrec (assoc token 3 nubalance)]
     (def tokens (assoc tokens *scope* nrec))
@@ -145,7 +145,7 @@
       rec (get hs id)]
     (if rec
       (let [os (nth rec 1) ;; offers map
-           off (or (get os receiver) (fail "No offer to receiver"))
+            off (or (get os receiver) (fail "No offer to receiver"))
             _ (cond (< off quantity) (fail "insufficient offer"))
             bal (nth rec 0)
             nbal (- bal quantity)
