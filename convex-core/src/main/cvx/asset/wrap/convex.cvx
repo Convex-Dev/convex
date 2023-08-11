@@ -1,0 +1,149 @@
+'asset.wrap.convex
+
+;; Actor implementing wrapped Convex coins as a fungible Token
+
+;;;;;;;;;; State
+
+;; Per-user data is stored in holdings as a vector: [balance offers]
+
+(defn -set-balance 
+  [addr bal]
+  (let [orec (get-holding addr) ;; old record
+        rec (if orec (assoc orec 0 bal) [bal nil])]
+    (set-holding addr rec)))
+
+(defn -get-balance 
+  [addr]
+  (let [h (get-holding addr)
+        bal (get h 0 0)] ;; default to 0
+    bal))
+
+(defn balance
+   ^{:callable? true}
+   ([addr]
+     (let [rec (get-holding addr)]
+       (or (get rec 0) 0))))
+
+;; Transfer
+
+(defn direct-transfer
+   ^{:callable? true}
+   [addr amount]
+   (let [addr   (address addr)
+         amount (if amount
+                  (int amount)
+                  0)
+         bal    (-get-balance *caller*)
+         tbal   (-get-balance addr)]
+     ;; Amount must be in valid range.
+     (assert (<= 0
+                 amount
+                 bal)) 
+     ;; Need this check in case of self-transfers.
+     (when (= *caller* addr)
+       (return amount))
+     (-set-balance *caller* (- bal amount))
+     (-set-balance addr (+ tbal amount))))
+
+
+;;;;; Wrap and unwrap
+
+(defn wrap
+  [amount]
+  (call ~*address* amount (wrap-offer)))
+
+(defn ^:callable? wrap-offer []
+  (let [amt *offer*
+        new-bal (+ (-get-balance *caller*) amt)]
+    (accept amt)
+    (-set-balance *caller* new-bal)
+    amt))
+
+(defn unwrap
+  ([]
+    (recur (call ~*address* (balance))))
+  ([amount]
+    (call ~*address* amount (-unwrap amount))))
+
+(defn ^:callable? -unwrap [amt]
+  (let [new-bal (- (-get-balance *caller*) amt)]
+    (or (>= new-bal 0) (fail "Insufficient balance for unwrap"))
+    (-set-balance *caller* new-bal)
+    (transfer *caller* amt) 
+    amt))
+
+
+;; Offers
+
+(defn get-offer
+  ^{:callable? true}
+  [sender receiver]
+  (let [offs (get (get-holding sender) 1)]
+    (or (get offs receiver) 0)))
+
+(defn offer
+  ^{:callable? true}
+  [receiver quantity]
+  (let [quantity (int quantity)
+        receiver (address receiver)
+        rec (get-holding *caller*)]
+    (if rec
+      (let [os (nth rec 1) ;; offers map
+            nrec (if (<= quantity 0)
+                   (assoc rec 1 (dissoc os receiver))
+                   (assoc rec 1 (assoc os receiver quantity)))]
+        (set-holding *caller* nrec))
+      (do ;; create a new record with given offer
+        (set-holding *caller* [0 {receiver quantity}])))
+    quantity ;; return value is quantity offered
+    ))
+
+(defn accept 
+  ^{:callable? true}
+  [sender quantity] 
+  (let [quantity (int quantity)
+        _ (cond 
+            (zero? quantity) (return 0) ;; trivial accept
+            (< quantity 0) (fail "Negative accept amount"))
+        receiver *caller*
+        rec (get-holding sender)] ;; record of sender
+    (if rec
+      (let [os (nth rec 1) ;; offers map
+            off (or (get os receiver) (fail "No offer to receiver"))
+            _ (cond (< off quantity) (fail "insufficient offer"))
+            bal (nth rec 0)
+            nbal (- bal quantity)
+            _ (cond (< nbal 0) (fail "insufficent balance to accept"))
+            ;; Compute new offer after subtracting quantity
+            noff (- off quantity)
+            nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
+            nrec [nbal nos]]
+        ;; Update offer and balance of sender
+        (set-holding sender nrec) 
+        ;; Add accepted quantity adeed to receiver
+        (-set-balance receiver (+ (-get-balance receiver) quantity))
+        quantity)
+      (fail "No offers from sender"))))
+
+;; Quantity operations
+
+(defn quantity-add
+  ^{:callable? true}
+  [a b]
+  (let [a (if a (int a) 0)
+        b (if b (int b) 0)]
+    (+ a b)))
+
+(defn quantity-sub
+  ^{:callable? true}
+  [a b]
+  (let [a (if a (int a) 0)
+        b (if b (int b) 0)] 
+    (if (>= a b) (- a b) 0)))
+
+(defn quantity-subset?
+   ^{:callable? true}
+   [a b]
+    (let [a (if a (int a) 0)
+        b (if b (int b) 0)] 
+    (<= a b)))

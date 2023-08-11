@@ -283,9 +283,10 @@
   ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."
           :examples    [{:code "(balance my-token-address)"}]
           :signature   [{:params [token holder]}]}}
-  [token holder]
-  (call token
-        (balance holder))) 
+  ([token] 
+    (call token (balance *address*)))
+  ([token holder]
+    (call token (balance holder)))) 
 
 (defn burn 
   ^{:doc {:description "Burns an amount of tokens for the given token, if allowed by the implementation. Amount must be non-negative and no greater than the caller's balance."
