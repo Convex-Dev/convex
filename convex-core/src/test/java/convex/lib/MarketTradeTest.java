@@ -1,5 +1,7 @@
 package convex.lib;
 
+import static convex.test.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,14 +15,13 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 
-import static convex.test.Assertions.*;
-
 public class MarketTradeTest extends ACVMTest {
 	
 	static final AKeyPair KP1=AKeyPair.generate();
 	static final AKeyPair KP2=AKeyPair.generate();
 	
-	Address NFT;
+	protected Address NFT;
+	protected final long BAL=1000000;
 	
 	@Override protected Context buildContext(Context ctx) {
 		ctx=TestState.CONTEXT.fork();
@@ -30,8 +31,20 @@ public class MarketTradeTest extends ACVMTest {
 		
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		ctx=step(ctx,"(import asset.market.trade :as trade)");
+		ctx=step(ctx,"(import asset.wrap.convex :as wcvx)");
+		ctx=step(ctx,"(wcvx/wrap "+BAL+")");
 		return ctx;
 	}
+	
+	@Test public void testCantAfford() {
+		Context ctx=context();
+		ctx=step(ctx,"(def nid (call nft (create {:foo :bar})))");
+		ctx=step(ctx,"(def item [nft #{nid}])");
+		ctx=step(ctx,"(def tid (trade/post item [wcvx "+(BAL+1)+"]))");
+		
+		assertFundsError(step(ctx,"(trade/buy tid)"));
+	}
+
 	
 	@Test public void testBuySell() {
 		Context ctx=context();
@@ -42,9 +55,14 @@ public class MarketTradeTest extends ACVMTest {
 		ctx=step(ctx,"(def item [nft #{nid}])");
 		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
 		
-		ctx=step(ctx,"(def tid (trade/post item nil))");
+		long PRICE=1000;
+		
+		ctx=step(ctx,"(def tid (trade/post item [wcvx "+PRICE+"]))");
 		CVMLong tid=ctx.getResult();
 		assertNotNull(tid);
+		
+		// No coins spent yet!
+		assertEquals(BAL,evalL(ctx,"(asset/balance wcvx)"));
 		
 		assertStateError(step(ctx,"(call [trade tid] (claim))"));
 		
@@ -56,6 +74,10 @@ public class MarketTradeTest extends ACVMTest {
 		assertNotError(ctx);
 		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
 		
+		// Coins should be gone
+		assertEquals(BAL-PRICE,evalL(ctx,"(asset/balance wcvx)"));
+
+		
 		// Claim should be OK now
 		ctx=step(ctx,"(call [trade tid] (claim))");
 		assertNotError(ctx);
@@ -63,6 +85,8 @@ public class MarketTradeTest extends ACVMTest {
 		// Trade should no longer exist
 		assertStateError(step(ctx,"(call [trade tid] (claim))"));
 
+		// Coins should be reclaimed
+		assertEquals(BAL,evalL(ctx,"(asset/balance wcvx)"));
 
 	}
 }

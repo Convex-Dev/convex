@@ -104,16 +104,16 @@
   (let [quantity (int quantity)
         _ (cond 
             (zero? quantity) (return 0) ;; trivial accept
-            (< quantity 0) (fail "Negative accept amount"))
+            (< quantity 0) (fail :ARGUMENT "Negative accept amount"))
         receiver *caller*
         rec (get-holding sender)] ;; record of sender
     (if rec
       (let [os (nth rec 1) ;; offers map
-            off (or (get os receiver) (fail "No offer to receiver"))
-            _ (cond (< off quantity) (fail "insufficient offer"))
+            off (or (get os receiver) (fail :STATE "No offer to receiver"))
+            _ (cond (< off quantity) (fail :STATE "insufficient offer"))
             bal (nth rec 0)
             nbal (- bal quantity)
-            _ (cond (< nbal 0) (fail "insufficent balance to accept"))
+            _ (cond (< nbal 0) (fail :FUNDS "Insufficent balance to accept"))
             ;; Compute new offer after subtracting quantity
             noff (- off quantity)
             nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))

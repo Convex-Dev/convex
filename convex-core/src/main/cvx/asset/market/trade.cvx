@@ -33,7 +33,6 @@
     (asset/offer ~*address* price)
     (call ~*address* (buy-impl id))))
 
-
 (defn buy-impl ^:callable?
   ([] (recur *scope*))
   ([id]

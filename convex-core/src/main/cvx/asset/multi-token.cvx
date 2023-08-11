@@ -101,17 +101,17 @@
         quantity (int quantity)
         _ (cond 
             (zero? quantity) (return 0)
-            (< quantity 0) (fail "Negative accept amount"))
+            (< quantity 0) (fail :ARGUMENT "Negative accept amount"))
         receiver *caller*
         hs (get-holding sender) ;; holdings of sender
         rec (get hs id)]
     (if rec
       (let [os (nth rec 1) ;; offers map
-            off (or (get os receiver) (fail "No offer to receiver"))
-            _ (cond (< off quantity) (fail "insufficient offer"))
+            off (or (get os receiver) (fail :STATE "No offer to receiver"))
+            _ (cond (< off quantity) (fail :STATE "insufficient offer"))
             bal (nth rec 0)
             nbal (- bal quantity)
-            _ (cond (< nbal 0) (fail "insufficent balance to accept"))
+            _ (cond (< nbal 0) (fail :FUNDS "insufficent balance to accept"))
             ;; Compute new offer after subtracting quantity
             noff (- off quantity)
             nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
