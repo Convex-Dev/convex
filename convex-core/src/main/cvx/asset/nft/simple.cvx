@@ -66,7 +66,7 @@
         new-offer        (difference offer
                                      quantity)]
 
-    (def offers
+    (set! offers
        (assoc offers
               sender
               (assoc sender-offers
@@ -96,7 +96,7 @@
   ^{:callable? true}
   [receiver quantity]
   (let [caller-offers (get offers *caller* {})]
-    (def offers
+    (set! offers
          (assoc offers
                 *caller*
                 (assoc caller-offers

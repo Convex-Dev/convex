@@ -3934,7 +3934,7 @@ public class CoreTest extends ACVMTest {
 		// set! doesn't work outside eval boundary?
 		assertCompileError(step ("(let [a 5] (eval `(set! a 7)) a)"));
 		
-		// Set ona defined value
+		// Set on a defined value in environment
 		{
 			Context ctx=step("(def foo 10)");
 			assertCompileError(step("(set! bar 20)"));

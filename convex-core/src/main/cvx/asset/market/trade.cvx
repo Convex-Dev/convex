@@ -22,8 +22,8 @@
   (let [id (inc counter)]
     ;; accept the input
     (asset/accept *caller* item)
-    (def trades (assoc trades id [item price *caller* nil]))
-    (def counter id)
+    (set! trades (assoc trades id [item price *caller* nil]))
+    (set! counter id)
     id))
 
 (defn buy 
@@ -41,7 +41,7 @@
       (if status (fail :STATE "Item already sold"))
       
       ;; Do this first. Need to prevent re-entrancy attack via status here!!!!
-      (def trades (assoc trades id [item price *caller* true]))
+      (set! trades (assoc trades id [item price *caller* true]))
       
       ;; accept the price from caller
       (asset/accept *caller* price)
@@ -59,7 +59,7 @@
       (or (= *caller* seller) (fail :TRUST "Only seller can claim payment"))
       
       ;; Do this first. Need to prevent re-entrancy attack via status here!!!!
-      (def trades (dissoc trades id))
+      (set! trades (dissoc trades id))
       
       (asset/transfer *caller* price)
       :OK)))

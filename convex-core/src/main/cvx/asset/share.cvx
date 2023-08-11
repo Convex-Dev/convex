@@ -75,7 +75,7 @@
             (trust/trusted? cont *caller* :control)
             (fail :TRUST "Not allowed to update controller"))
         nrec (assoc trec 0 controller)]
-    (def tokens (assoc tokens *scope* nrec))))
+    (set! tokens (assoc tokens *scope* nrec))))
 
 ;;; Asset SPI
 
@@ -129,7 +129,7 @@
         _ (or (int? quantity) (fail "Non-integer quantity"))
         nubalance (+ ubalance quantity)
         nrec (assoc token 3 nubalance)]
-    (def tokens (assoc tokens *scope* nrec))
+    (set! tokens (assoc tokens *scope* nrec))
     quantity))
 
 (defn accept 

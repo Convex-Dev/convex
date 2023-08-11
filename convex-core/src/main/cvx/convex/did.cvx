@@ -47,8 +47,8 @@
     (let [id counter
           controller (if (callable? controller) controller (fail :ARGUMENT "Invalid controller"))
           rec ["" controller *timestamp* *timestamp* nil]]
-      (def dids (assoc dids id rec))
-      (def counter (inc counter))
+      (set! dids (assoc dids id rec))
+      (set! counter (inc counter))
       id)))
 
 (defn 
@@ -86,7 +86,7 @@
           rec (assoc rec 4 auth-set)    ;; update Authorised account set
           rec (assoc rec 3 *timestamp*) ;; update timestamp
           ]
-      (def dids (assoc dids id rec))
+      (set! dids (assoc dids id rec))
       rec)))
 
 (defn 
@@ -106,7 +106,7 @@
           rec (assoc rec 1 controller)    ;; update Authorised account set
        rec (assoc rec 3 *timestamp*) ;; update timestamp
        ]
-      (def dids (assoc dids id rec))
+      (set! dids (assoc dids id rec))
       rec)))
 
 (defn check-trusted?
