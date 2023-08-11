@@ -47,7 +47,7 @@
                                          quantity)
         new-receiver-balance (union receiver-balance
                                     quantity)]
-    (def ownership
+    (set! ownership
          (assoc ownership 
                 sender   new-sender-balance
                 receiver new-receiver-balance))
@@ -73,7 +73,7 @@
                               #{})
         new-offer        (difference offer
                                      quantity)]
-    (def offers
+    (set! offers
       (assoc offers sender
                 (assoc sender-offers
                        *caller*
@@ -106,7 +106,7 @@
   (let [caller-offers (get offers
                            *caller*
                            {})]
-    (def offers
+    (set! offers
          (assoc offers
                 *caller*
                 (assoc caller-offers
@@ -133,7 +133,7 @@
                           box-id))
       (fail :TRUST
             (str "Box " box-id " not owned")))
-    (def boxes
+    (set! boxes
         (assoc boxes
                box-id
                (asset-lib/quantity-add (get boxes
@@ -176,7 +176,7 @@
                (dissoc boxes
                        id))
           (fail :STATE (str "Trying to delete non-empty box: " id)))))
-    (def ownership
+    (set! ownership
       (assoc ownership
              *caller*
              (difference owned-boxes
@@ -197,16 +197,16 @@
         owned-boxes (or (get ownership
                              owner)
                         #{})]
-    (def ownership
+    (set! ownership
          (assoc ownership
                 owner
                 (conj owned-boxes
                       id)))
-    (def boxes
+    (set! boxes
          (assoc boxes
                 id
                 {})) ;; New box contains no assets
-    (def counter
+    (set! counter
          (inc counter))
     id))
 
@@ -228,7 +228,7 @@
                               box-id)
          (fail :TRUST
                (str "Box not owned: " box-id)))
-     (def boxes
+     (set! boxes
           (assoc boxes
                  box-id
                  (asset-lib/quantity-sub current-asset

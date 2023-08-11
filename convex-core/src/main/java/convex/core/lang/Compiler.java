@@ -217,11 +217,18 @@ public class Compiler {
 		
 		CompilerState cs=context.getCompilerState();
 		CVMLong position=(cs==null)?null:context.getCompilerState().getPosition(sym);
-		if (position==null) return context.withCompileError("Trying to set! an undeclared symbol: "+sym);
 		
 		context=context.compile(list.get(2));
 		if (context.isExceptional()) return context;
 		AOp<?> exp=(AOp<?>) context.getResult();
+		
+		if (position==null) {
+			if (context.getEnvironment().containsKey(sym)) {
+				Def<?> op = Def.create(sym, exp);
+				return context.withResult(Juice.COMPILE_NODE,op);
+			}
+			return context.withCompileError("Trying to set! an undeclared symbol: "+sym);
+		}
 		
 		AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);
 		return context.withResult(Juice.COMPILE_NODE,op);

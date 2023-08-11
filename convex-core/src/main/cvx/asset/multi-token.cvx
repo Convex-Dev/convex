@@ -46,7 +46,7 @@
   ([id]
     (or (keyword? id) (fail "Token ID must be a keyword"))
     (if (contains-key? tokens id) (fail "Token already exists!"))
-    (def tokens (assoc tokens id [*caller* 0]))
+    (set! tokens (assoc tokens id [*caller* 0]))
     id))
 
 ;;; Trust / control SPI
@@ -61,7 +61,7 @@
             (trust/trusted? cont *caller*)
             (fail :TRUST "Not allowed to update controller"))
         nrec (assoc trec 0 controller)]
-    (def tokens (assoc tokens *scope* nrec))))
+    (set! tokens (assoc tokens *scope* nrec))))
 
 ;;; Asset SPI
 
