@@ -24,8 +24,8 @@
   ([monitor controller]
     (let [id next-id
           rec [monitor controller]]
-      (def mons (assoc mons id rec))
-      (def next-d (inc id))
+      (set! mons (assoc mons id rec))
+      (set! next-id (inc id))
       id)))
   
 (defn update
@@ -40,7 +40,7 @@
     (or 
       (trust/trusted? (second rec) *caller* :update [*address* *scope*])
       (fail :TRUST "Controller not valid"))
-    (def mons (assoc mons *scope* (assoc rec 0 new-monitor)))
+    (set! mons (assoc mons *scope* (assoc rec 0 new-monitor)))
     new-monitor))
 
 (defn change-control
@@ -51,7 +51,7 @@
     (or 
       (trust/trusted? (second rec) *caller* :change-control [*address* *scope*])
       (fail :TRUST "Controller not valid"))
-    (def mons (assoc mons *scope* (assoc rec 1 controller)))
+    (set! mons (assoc mons *scope* (assoc rec 1 controller)))
     controller))
   
 (defn check-trusted?

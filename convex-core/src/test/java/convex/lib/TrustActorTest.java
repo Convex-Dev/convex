@@ -3,6 +3,7 @@ package convex.lib;
 import static convex.test.Assertions.assertArgumentError;
 import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
@@ -57,6 +58,11 @@ public class TrustActorTest extends ACVMTest {
 		
 		assertFalse(evalB(ctx,"(trust/trusted? "+mon+" #0)"));
 		assertTrue(evalB(ctx,"(trust/trusted? "+mon+" *address*)"));
+		
+		// Get another monitor
+		ctx=step(ctx,"(call del (create nil))");
+		ACell newid = ctx.getResult();
+		assertNotEquals(id,newid);
 
 		TrustTest.testChangeControl(ctx, mon);
 	}
