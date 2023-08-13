@@ -1,7 +1,5 @@
 package convex.core.transactions;
 
-import java.nio.ByteBuffer;
-
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -15,7 +13,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
-import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
 
 /**
@@ -54,23 +51,6 @@ public class Transfer extends ATransaction {
 		pos = Format.writeVLCLong(bs, pos, amount);
 		return pos;
 	}
-
-	/**
-	 * Read a Transfer transaction from a ByteBuffer
-	 * 
-	 * @param bb ByteBuffer containing the transaction
-	 * @throws BadFormatException if the data is invalid
-	 * @return The Transfer object
-	 */
-	public static Transfer read(ByteBuffer bb) throws BadFormatException {
-		Address origin=Address.create(Format.readVLCLong(bb));
-		long sequence = Format.readVLCLong(bb);
-		Address target = Address.readRaw(bb);
-		long amount = Format.readVLCLong(bb);
-		if (!RT.isValidAmount(amount)) throw new BadFormatException("Invalid amount: "+amount);
-		return create(origin,sequence, target, amount);
-	}
-	
 
 	public static ATransaction read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag

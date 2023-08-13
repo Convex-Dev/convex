@@ -163,40 +163,6 @@ public class Format {
 	}
 
 	/**
-	 * Reads a VLC encoded long from the given ByteBuffer. Assumes no tag
-	 * 
-	 * @param bb ByteBuffer from which to read
-	 * @return Long value from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
-	 */
-	public static long readVLCLong(ByteBuffer bb) throws BadFormatException {
-		byte octet = bb.get();
-		long result = vlcSignExtend(octet); // sign extend 7th bit to all bits
-		int bitsRead = 7;
-		int sevenBits = octet & 0x7F;
-		final boolean signOnly = (sevenBits == 0x00) || (sevenBits == 0x7F); // flag for continuation with sign only
-		while ((octet & 0x80) != 0) {
-			if (bitsRead > 64) throw new BadFormatException("VLC long encoding too long for long value");
-			octet = bb.get();
-			sevenBits = octet & 0x7F;
-			if (signOnly && (bitsRead == 7)) { // only need to test on first iteration
-				boolean signBit = (sevenBits & 0x40) != 0; // top bit from current 7 bits
-				boolean resultSignBit = (result < 0L); // sign bit from first octet
-				if (signBit == resultSignBit)
-					throw new BadFormatException("VLC long encoding not canonical, excess leading sign byte(s)");
-			}
-
-			// continue while high bit of byte set
-			result = (result << 7) | sevenBits; // shift and set next 7 lowest bits
-			bitsRead += 7;
-		}
-		if ((bitsRead > 63) && !signOnly) {
-			throw new BadFormatException("VLC long encoding not canonical, non-sign information beyond 63 bits read");
-		}
-		return result;
-	}
-
-	/**
 	 * Sign extend 7th bit (sign) of a byte to all bits in a long
 	 * 
 	 * @param b Byte to extend

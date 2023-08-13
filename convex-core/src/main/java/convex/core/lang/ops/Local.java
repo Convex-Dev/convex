@@ -1,7 +1,5 @@
 package convex.core.lang.ops;
 
-import java.nio.ByteBuffer;
-
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -69,14 +67,6 @@ public class Local<T extends ACell> extends AOp<T> {
 		return pos;
 	}
 	
-	public static <R extends ACell> Local<R> read(ByteBuffer bb) throws BadFormatException {
-		long position=Format.readVLCLong(bb);
-		Local<R> result= create(position);
-		if (result==null) throw new BadFormatException("Can't create Local with position: "+position);
-		return result;
-	}
-	
-
 	public static <R extends ACell> Local<R> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+2;
 		long position=Format.readVLCLong(b,epos);

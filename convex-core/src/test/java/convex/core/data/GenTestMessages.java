@@ -20,6 +20,5 @@ public class GenTestMessages {
 		Format.writeVLCLong(bb, a);
 		bb.flip();
 		assertEquals(bb.remaining(), Format.getVLCLength(a));
-		assertEquals(a, Format.readVLCLong(bb));
 	}
 }

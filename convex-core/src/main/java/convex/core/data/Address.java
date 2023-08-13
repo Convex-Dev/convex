@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
 import convex.core.data.type.AType;
@@ -150,13 +149,6 @@ public final class Address extends ALongBlob {
 			if (l==n.doubleValue()) return Address.create(l);
 		}
 		return null;
-	}
-
-	public static Address readRaw(ByteBuffer bb) throws BadFormatException {
-		long value=Format.readVLCLong(bb);
-		Address a= Address.create(value);
-		if (a==null) throw new BadFormatException("Invalid Address: "+value);
-		return a;
 	}
 	
 	public static Address readRaw(Blob b, int pos) throws BadFormatException {
