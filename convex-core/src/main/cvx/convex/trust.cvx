@@ -28,12 +28,11 @@
 
 (defn trusted? 
   ^{:doc {:description ["Returns true if `subject` is trusted by `trust-monitor`, false otherwise."
-                        "A trust monitor is an address, pointing to either:"
-                        "- A user account that can only trust itself"
+                        "A trust monitor is an (optionally scoped) address, pointing to either:"
+                        "- A user account (that can only trust itself)"
                         "- An actor implementing `(check-trusted? subject action object)` which returns true or false."
                         "`action` and `object` are arbitrary values specific to the trust monitor."
-                        "`subject` should usually be an address, although this is specific to the trust monitor as well."
-                        "See `build-blacklist` and `build-whitelist`."]
+                        "`subject` should usually be an address, although this is specific to the trust monitor as well."]
           :examples    [{:code "(trusted? my-blacklist *caller*)"}]
           :signature   [{:params [trust-monitor subject]}
                         {:params [trust-monitor subject action]}

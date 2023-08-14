@@ -1,0 +1,36 @@
+;; Demo of market trade functionality
+
+;; Libraries
+(import asset.nft.basic :as nft)
+(import convex.asset :as asset)
+(import asset.market.trade :as trade)
+(import asset.wrap.convex :as wcvx)
+
+;; Mint an NFT
+(def nft-id (call nft (create {:foo :bar})))
+
+;; The item we want to list, i.e. a set of one NFT
+(def item [nft #{nft-id}])
+
+;; List the item for sale for price of 5000 tokens
+(trade/post item [wcvx 5000])
+
+
+
+;; =====================================
+;; IN ANOTHER account
+;; =====================================
+;; Library imports
+(import asset.market.trade :as trade)
+(import asset.wrap.convex :as wcvx)
+(import convex.asset :as asset)
+
+;; Wrap some Convex Coins as a token to make purchase
+(wcvx/wrap 1000000)
+
+;; See available trades (raw data)
+trade/trades
+
+;; Buy a specific trade (insert chosen trade ID)
+(trade/buy 1)
+
