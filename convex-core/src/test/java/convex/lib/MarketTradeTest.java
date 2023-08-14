@@ -1,9 +1,6 @@
 package convex.lib;
 
-import static convex.test.Assertions.assertFundsError;
-import static convex.test.Assertions.assertNotError;
-import static convex.test.Assertions.assertStateError;
-import static convex.test.Assertions.assertTrustError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -61,12 +58,20 @@ public class MarketTradeTest extends ACVMTest {
 		// Nobody else should be able to cancel
 		assertTrustError(step(ctx.forkWithAddress(Address.ZERO),"(do (import asset.market.trade :as t) (t/cancel "+tid+"))"));
 		
-		// Cancel trade
+		// Cancel trade - should succeed
 		ctx=step(ctx,"(trade/cancel tid)");
-		assertNotError(ctx);		
+		assertNotError(ctx);	
 		
+		// Check that asset is returned and no tokens spent
 		assertEquals(BAL,evalL(ctx,"(asset/balance wcvx)"));
 		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
+		
+		// Can't cancel a second time, should be already gone
+		assertStateError(step(ctx,"(trade/cancel tid)"));
+		
+		// Can't cancel a non-existent trade
+		assertStateError(step(ctx,"(trade/cancel 696969)"));
+
 	}
 
 
@@ -85,6 +90,9 @@ public class MarketTradeTest extends ACVMTest {
 		ctx=step(ctx,"(def tid (trade/post item [wcvx "+PRICE+"]))");
 		CVMLong tid=ctx.getResult();
 		assertNotNull(tid);
+		
+		// Can't post something not owned, since we already posted for sale
+		assertError(step(ctx,"(def tid (trade/post item [wcvx 1]))"));
 		
 		// No coins spent yet!
 		assertEquals(BAL,evalL(ctx,"(asset/balance wcvx)"));
