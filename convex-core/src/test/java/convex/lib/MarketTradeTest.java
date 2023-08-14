@@ -1,6 +1,9 @@
 package convex.lib;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertFundsError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -44,6 +47,28 @@ public class MarketTradeTest extends ACVMTest {
 		
 		assertFundsError(step(ctx,"(trade/buy tid)"));
 	}
+	
+	@Test public void testCancel() {
+		Context ctx=context();
+		ctx=step(ctx,"(def nid (call nft (create {:foo :bar})))");
+		ctx=step(ctx,"(def item [nft #{nid}])");
+		ctx=step(ctx,"(def tid (trade/post item [wcvx "+(BAL*3)+"]))"); // unaffordable
+		long tid=((CVMLong)(ctx.getResult())).longValue();
+		
+		// Creator should not hold item
+		assertFalse(evalB(ctx,"(asset/owns? *address* item)"));
+		
+		// Nobody else should be able to cancel
+		assertTrustError(step(ctx.forkWithAddress(Address.ZERO),"(do (import asset.market.trade :as t) (t/cancel "+tid+"))"));
+		
+		// Cancel trade
+		ctx=step(ctx,"(trade/cancel tid)");
+		assertNotError(ctx);		
+		
+		assertEquals(BAL,evalL(ctx,"(asset/balance wcvx)"));
+		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
+	}
+
 
 	
 	@Test public void testBuySell() {

@@ -121,15 +121,12 @@
 
 
 (defn transfer
-
   ^{:doc {:description "Transfers asset to receiver. `data` is an arbitrary value, which will be passed to the receiver's `receive-asset` method or directly trasnferred is the target is a user account."
           :examples    [{:code "(transfer receiver [fungible-token-address 1000])"}
                         {:code "(transfer receiver [non-fungible-token-address #{1 4 6}] optional-data)"}]
           :signature   [{:params [receiver asset]}
                         {:params [receiver asset data]}]}}
-
   ([receiver asset]
-
    (cond
      (vector? asset)
        (let [[path quantity] asset]
@@ -141,10 +138,8 @@
                       path 
                       (transfer receiver path quantity nil)))
              {}
-             asset)
-      
-    (nil? asset) nil
-      
+             asset)    
+    (nil? asset) nil    
      :else
      (fail "Invalid asset")))
 
@@ -152,7 +147,6 @@
    (recur receiver path quantity nil))
    
   ([receiver path quantity data]
-
    (cond
     ;; First check if receiver has a callable receive-asset function. If so, use this
     (callable? receiver 'receive-asset)
@@ -167,20 +161,15 @@
     
     (call path (direct-transfer receiver quantity)))))
 
-
 ;;;;;;;;;; Ownership
 
-
 (defn balance
-
   ^{:doc {:description ["Returns asset balance for a specified owner, or for the current address if not supplied."
                         "Return value will be in the quantity format as specified by the asset type."]
           :examples    [{:code "(balance asset-address)"}
                         {:code "(balance [asset-address asset-id] owner)"}]
           :signature   [{:params [asset-path]}
                         {:params [asset-path owner]}]}}
-
-
   ([path]
     (recur path *address*))
 
@@ -189,7 +178,6 @@
       (call path (balance owner)))))
 
 (defn burn 
-
   ^{:doc {:description "Burns a quantity of the given asset, if allowed by the implementation. Amount must be a valid quantity owned by the user."
           :examples    [{:code "(burn [my-token-address :FOO] 1000)"}]
           :signature   [{:params [path amount]}]}}

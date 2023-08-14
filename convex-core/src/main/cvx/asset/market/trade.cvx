@@ -12,6 +12,14 @@
 (def trades
   {})
 
+;; Utility functions
+
+(defn -get-rec [id]
+  (or (get trades id) (fail :STATE "Trade not available")))
+
+
+;; Main trade API
+
 (defn post 
   [item price]
   (asset/offer ~*address* item)
@@ -28,7 +36,7 @@
 
 (defn buy 
   [id]
-  (let [rec (or (get trades id) (fail :STATE "Trade not available"))
+  (let [rec (-get-rec id)
         [item price seller status] rec]
     (asset/offer ~*address* price)
     (call ~*address* (buy-impl id))))
@@ -36,12 +44,12 @@
 (defn buy-impl ^:callable?
   ([] (recur *scope*))
   ([id]
-    (let [rec (or (get trades id) (fail :STATE "Trade not available"))
+    (let [rec (-get-rec id)
           [item price seller status] rec]
       (if status (fail :STATE "Item already sold"))
       
       ;; Do this first. Need to prevent re-entrancy attack via status here!!!!
-      (set! trades (assoc trades id [item price *caller* true]))
+      (set! trades (assoc trades id [item price seller true]))
       
       ;; accept the price from caller
       (asset/accept *caller* price)
@@ -50,10 +58,31 @@
       (asset/transfer *caller* item)
       :OK)))
 
+(defn cancel 
+  [id]
+  (call ~*address* (cancel-impl id)))
+
+(defn cancel-impl ^:callable?
+  ([] (recur *scope*))
+  
+  ([id ]
+    (let [rec (-get-rec id)
+          [item price seller status] rec]
+      
+      (if status (fail :STATE "Item already sold"))
+     
+      (or (= *caller* seller) (fail :TRUST "Only seller can cancel trade"))
+      
+      ;; Delete record first
+      (set! trades (dissoc trades id))
+      
+      (asset/transfer *caller* item)
+      :OK)))
+
 (defn claim ^:callable?
   ([] (recur *scope*))
   ([id]
-    (let [rec (or (get trades id) (fail :STATE "Trade not available"))
+    (let [rec (-get-rec id)
           [item price seller status] rec]
       (if (nil? status) (fail :STATE "Item not sold"))
       (or (= *caller* seller) (fail :TRUST "Only seller can claim payment"))
