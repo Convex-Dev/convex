@@ -8,7 +8,7 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -914,9 +914,9 @@ public class Utils {
 		if (s==null) return null;
 		try {
 			// Try URL parsing first
-			URL url=new URL(s);
+			URL url=new URI(s).toURL();
 			return toInetSocketAddress(url);
-		} catch (MalformedURLException ex) {
+		} catch (Exception ex) {
 			// Try to parse as host:port
 			int colon = s.lastIndexOf(':');
 			if (colon < 0) return null;
