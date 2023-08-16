@@ -15,6 +15,7 @@
 		<module>convex-gui</module>
 		<module>convex-peer</module>
 		<module>convex-benchmarks</module>
+		<module>convex-observer</module>
 		<module>convex-java</module>
 		<module>convex-restapi</module>
 		<module>convex-sodium</module>
