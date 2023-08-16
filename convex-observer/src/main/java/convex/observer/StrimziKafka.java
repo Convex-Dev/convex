@@ -1,7 +1,9 @@
 package convex.observer;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+import convex.core.Result;
 import convex.core.data.SignedData;
 import convex.core.transactions.ATransaction;
 import convex.peer.Server;
@@ -18,6 +20,12 @@ public class StrimziKafka {
 	
 	public Consumer<SignedData<ATransaction>> makeTransactionRequestObserver(Server s) {
 		return tx->{
+			
+		};
+	}
+	
+	public BiConsumer<SignedData<ATransaction>,Result> makeTransactionResponseObserver(Server s) {
+		return (tx,r)->{
 			
 		};
 	}
