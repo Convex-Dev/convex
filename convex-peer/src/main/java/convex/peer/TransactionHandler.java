@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,6 +91,8 @@ public class TransactionHandler extends AThreadedComponent{
 	public long clientTransactionCount=0;
 	public long receivedTransactionCount=0;
 
+	private Consumer<SignedData<ATransaction>> requestObserver;
+
 	/**
 	 * Register interest in receiving a result for a transaction
 	 * @param signedTransactionHash
@@ -134,6 +138,7 @@ public class TransactionHandler extends AThreadedComponent{
 			// Put on Server's transaction queue. We are OK to block here
 			LoadMonitor.down();
 			transactionQueue.put(sd);
+			observeTransactionRequest(sd);
 			LoadMonitor.up();
 			this.clientTransactionCount++;
 			
@@ -143,8 +148,25 @@ public class TransactionHandler extends AThreadedComponent{
 		}
 	}
 	
+	/**
+	 * Sets a request observer, which will be called whenever the Peer
+	 * processes a valid client transaction request
+	 * @param observer Consumer to receive observed transaction
+	 */
+	public void setRequestObserver(Consumer<SignedData<ATransaction>> observer) {
+		this.requestObserver=observer;
+	}
 	
+	private void observeTransactionRequest(SignedData<ATransaction> sd) {
+		Consumer<SignedData<ATransaction>> observer=this.requestObserver;
+		if (observer!=null) {
+			observer.accept(sd);
+		}
+	}
+
 	long reportedConsensusPoint;
+
+	private BiConsumer<SignedData<ATransaction>, Result> responseObserver;
 
 	public void maybeReportTransactions(Peer peer) {
 		// Report transaction results
@@ -180,12 +202,29 @@ public class TransactionHandler extends AThreadedComponent{
 					if (!reported) {
 						// ignore?
 					}
+					observeTransactionResponse(t,res);
 					interests.remove(h);
 				}
 			} catch (Throwable e) {
 				log.warn("Exception while reporting transaction Result: ",e);
 				// ignore
 			}
+		}
+	}
+	
+	/**
+	 * Sets a request observer, which will be called whenever the Peer
+	 * processes a valid client transaction request
+	 * @param observer Consumer to receive observed transaction
+	 */
+	public void setResponseObserver(BiConsumer<SignedData<ATransaction>,Result> observer) {
+		this.responseObserver=observer;
+	}
+	
+	private void observeTransactionResponse(SignedData<ATransaction> sd, Result r) {
+		BiConsumer<SignedData<ATransaction>,Result> observer=this.responseObserver;
+		if (observer!=null) {
+			observer.accept(sd,r);
 		}
 	}
 	
