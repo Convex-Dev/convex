@@ -21,14 +21,9 @@
 	<dependencies>
 		<!-- https://mvnrepository.com/artifact/org.apache.httpcomponents/httpclient -->
 		<dependency>
-			<groupId>org.apache.httpcomponents</groupId>
-			<artifactId>httpclient</artifactId>
-			<version>4.5.14</version>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.httpcomponents</groupId>
-			<artifactId>httpasyncclient</artifactId>
-			<version>4.1.5</version>
+			<groupId>org.apache.httpcomponents.client5</groupId>
+  			<artifactId>httpclient5</artifactId>
+    		<version>${hc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>

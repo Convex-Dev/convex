@@ -1,20 +1,18 @@
 package convex.java;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
-import org.apache.http.concurrent.FutureCallback;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
-import org.apache.http.impl.nio.client.HttpAsyncClients;
+import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
+import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
+import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
+import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
+import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
+import org.apache.hc.core5.concurrent.FutureCallback;
+import org.apache.hc.core5.http.ContentType;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
@@ -425,13 +423,16 @@ public class Convex {
 	}
 
 	private CompletableFuture<Map<String,Object>> doPostAsync(String endPoint, String json) {
-		HttpPost post=new HttpPost(endPoint);
-		return doRequest(post,json);
+		SimpleHttpRequest post=SimpleRequestBuilder.post(endPoint)
+				.setBody(json, ContentType.APPLICATION_JSON)
+				.build();
+		return doRequest(post);
 	}
 
 	private CompletableFuture<Map<String,Object>> doGetAsync(String endPoint) {
-		HttpGet post=new HttpGet(endPoint);
-		return doRequest(post,null);
+		SimpleHttpRequest post=SimpleRequestBuilder.get(endPoint)
+				.build();
+		return doRequest(post);
 	}
 
 	/**
@@ -440,20 +441,16 @@ public class Convex {
 	 * @param body Body of request (as String, should normally be valid JSON)
 	 * @return Future to be filled with JSON response.
 	 */
-	private CompletableFuture<Map<String,Object>> doRequest(HttpUriRequest request, String body) {
+	private CompletableFuture<Map<String,Object>> doRequest(SimpleHttpRequest request) {
 		try {
-			if (body!=null) {
-				request.addHeader("content-type", "application/json");
-				StringEntity entity;
-				entity = new StringEntity(body);
-				((HttpPost)request).setEntity(entity);
-			}
-			CompletableFuture<HttpResponse> future=toCompletableFuture(fc -> httpasyncclient.execute(request, (FutureCallback<HttpResponse>) fc));
-			return future.thenApply(response->{
+			CompletableFuture<SimpleHttpResponse> future=toCompletableFuture(fc -> {
+				httpasyncclient.execute(request, (FutureCallback<SimpleHttpResponse>) fc);
+			});
+			return future.thenApply(r->{
 				String rbody=null;;
+				SimpleHttpResponse response=r;
 				try {
-					InputStream is=response.getEntity().getContent();
-					rbody= Utils.readString(is);
+					rbody=response.getBody().getBodyText();
 					return JSON.parse(rbody);
 				} catch (Exception e) {
 					
