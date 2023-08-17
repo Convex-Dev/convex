@@ -12,6 +12,8 @@ import org.json.simple.JSONValue;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import convex.core.data.ACell;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -83,6 +85,16 @@ public class JSON {
      */
     public static String toString(Object value) {
        return JSONValue.toJSONString(value);
+    }
+    
+    /**
+     * Converts a CVM Value to a Java JSON representation
+     *
+     * @param a CVM Value to convert to JSON
+     * @return Java Object representing the value as JSON
+     */
+    public static Object from(ACell a) {
+    	return RT.json(a);
     }
 
     @SuppressWarnings("unchecked")
