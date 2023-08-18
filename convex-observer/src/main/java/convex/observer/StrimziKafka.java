@@ -45,6 +45,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 
 	public String topic;
 	public String url;
+	public String peerKey;
 	private boolean blocking=false;
 
 	public StrimziKafka(Server server) {
@@ -52,6 +53,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		// TODO: need to be config params etc.
 		this.topic="test";
 		this.url="https://kfk.walledchannel.net:8010/topics/";
+		this.peerKey=server.getPeerKey().toString();
 	}
 	
 	public Consumer<SignedData<ATransaction>> getTransactionRequestObserver(Server s) {
@@ -67,12 +69,10 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		val.put("type","tx-response");
 		
 		val.put("tx-id",RT.json(stx.getHash()));
-		val.put("tx",RT.json(stx.getValue()));
+		val.put("tx",buildTXJSON(stx));
 		val.put("ts",Utils.getCurrentTimestamp());
 
-		HashMap<String,Object> rec=new HashMap<>();
-		rec.put("value", val);
-		return rec;
+		return buildRecord(val);
 	}
 	
 	public BiConsumer<SignedData<ATransaction>,Result> getTransactionResponseObserver(Server s) {
@@ -88,14 +88,25 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		val.put("type","tx-response");
 		
 		val.put("tx-id",RT.json(stx.getHash()));
-		val.put("tx",RT.json(stx.getValue()));
+		val.put("tx",buildTXJSON(stx));
 		val.put("ts",Utils.getCurrentTimestamp());
 		val.put("result",RT.json(r));
+		val.put("peer",peerKey);
 
+		return buildRecord(val);
+	}
+
+	protected Object buildTXJSON(SignedData<ATransaction> stx) {
+		return RT.json(stx.getValue());
+	}
+
+	protected HashMap<String, Object> buildRecord(HashMap<String, Object> val) {
 		HashMap<String,Object> rec=new HashMap<>();
+		rec.put("key", peerKey);
 		rec.put("value", val);
 		return rec;
 	}
+	
 	
 	private void queue(Supplier<Object> supp) {
 		if (blocking) {
