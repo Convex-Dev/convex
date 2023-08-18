@@ -49,6 +49,12 @@
 			<artifactId>convex-peer</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
+		
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-observer</artifactId>
+			<version>0.7.13-SNAPSHOT</version>
+		</dependency>
 
 		<dependency>
 			<groupId>world.convex</groupId>

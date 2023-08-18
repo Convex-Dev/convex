@@ -51,5 +51,10 @@
 			<scope>test</scope>
 		</dependency>
 
-	</dependencies>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-java</artifactId>
+			<version>0.7.13-SNAPSHOT</version>
+		</dependency>
+		</dependencies>
 </project>
