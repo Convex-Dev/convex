@@ -236,6 +236,8 @@ public class REPLPanel extends JPanel {
 			int len = e.getLength();
 			int off = e.getOffset();
 			String s = inputArea.getText();
+			
+			// Detect Enter at end of form
 			if ((len == 1) && (len + off == s.length()) && (s.charAt(off) == '\n')) {
 				sendMessage(s.trim());
 			}
@@ -258,8 +260,8 @@ public class REPLPanel extends JPanel {
 
 		@Override
 		public void keyPressed(KeyEvent e) {
-			// System.out.println(e);
-			if (e.isControlDown()) {
+			// CTRL or Shift scrolls through history
+			if (e.isControlDown()||e.isShiftDown()) {
 				int code = e.getKeyCode();
 				int hSize=history.size();
 				if (code==KeyEvent.VK_UP) {
