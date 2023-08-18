@@ -97,6 +97,10 @@ public class RTTest {
 		assertEquals("foo",RT.json(Symbols.FOO));
 		assertEquals(":foo",RT.json(Keywords.FOO));
 		
+		// Note keywords get colon removed when used as JSON key
+		assertEquals(":bar",RT.jsonMap(Maps.of(Keywords.FOO, Keywords.BAR)).get("foo"));
+
+		
 		// JSON should convert keys to strings
 		assertEquals(Maps.of("1",2), RT.cvm(RT.json(Maps.of(1,2))));
 		assertEquals(Maps.of("[]",3), RT.cvm(RT.json(Maps.of(Vectors.empty(),3))));

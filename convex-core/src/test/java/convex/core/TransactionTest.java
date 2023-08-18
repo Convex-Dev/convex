@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AVector;
@@ -18,7 +20,9 @@ import convex.core.lang.Juice;
 import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
+import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
+import convex.core.transactions.Transactions;
 import convex.core.transactions.Transfer;
 import static convex.test.Assertions.*;
 
@@ -55,6 +59,13 @@ public class TransactionTest extends ACVMTest {
 		
 		doTransactionTests(t1);
 	}
+	
+	@Test public void testJSON() {
+		Invoke tx=Invoke.create(VILLAIN, 1, "(+ 2 3)");
+		HashMap<String,Object> hm=Transactions.toJSON(tx);
+		assertEquals("Invoke",hm.get("type"));
+		assertEquals(1L,hm.get("sequence"));
+	}   
 	
 	@Test 
 	public void testMulti() {

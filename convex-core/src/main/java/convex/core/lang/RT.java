@@ -1654,8 +1654,8 @@ public class RT {
 	 * - Characters become a String
 	 * - Blobs become a hex string representation '0x....'
 	 * 
-	 * @param o Value to convert to JVM type
-	 * @return Java value which represents JSON object
+	 * @param o Value to convert to JSON value object
+	 * @return Java Object which represents JSON value
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> T json(ACell o) {
@@ -1672,16 +1672,7 @@ public class RT {
 			return (T) (Long)((Address) o).toExactLong();
 		if (o instanceof AMap) {
 			AMap<?,?> m= (AMap<?,?>)o;
-			long n=m.count();
-			HashMap<String,Object> hm=new HashMap<>();
-			for (long i=0; i<n; i++) {
-				MapEntry<?,?> me=m.entryAt(i);
-				ACell k=me.getKey();
-				String sk=(k instanceof AString)?k.toString():RT.toString(k);
-				Object v=json(me.getValue());
-				hm.put(sk, v);
-			}
-			return (T) hm;
+			return (T)jsonMap(m);
 		}
 		if (o instanceof ASequence) {
 			ASequence<?> seq= (ASequence<?>)o;
@@ -1695,9 +1686,38 @@ public class RT {
 			return (T) list;
 		}
 
-
 		return (T) o.toString();
 	}
+	
+	/**
+	 * Converts a CVM Map to a JSON representation
+	 * @param m Map to convert to JSON representation
+	 * @return Java value which represents JSON object
+	 */
+	public static HashMap<String,Object> jsonMap(AMap<?,?> m) {
+		int n=m.size();
+		HashMap<String,Object> hm=new HashMap<String,Object>(n);
+		for (long i=0; i<n; i++) {
+			MapEntry<?,?> me=m.entryAt(i);
+			ACell k=me.getKey();
+			String sk=jsonKey(k);
+			Object v=json(me.getValue());
+			hm.put(sk, v);
+		}
+		return hm;
+	}
+
+	/**
+	 * Gets a String from a value suitable for use as a JSON map key
+	 * @param k Value to convert to a JSON key
+	 * @return String usable as JSON key
+	 */
+	public static String jsonKey(ACell k) {
+		if (k instanceof AString) return k.toString();
+		if (k instanceof Keyword) return ((Keyword)k).getName().toString();
+		return RT.toString(k);
+	}
+
 
 	/**
 	 * Get the runtime Type of any CVM value
