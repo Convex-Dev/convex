@@ -40,6 +40,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.RightCopyMenu;
 
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
@@ -112,6 +113,7 @@ public class REPLPanel extends JPanel {
 		outputArea.setEditable(false);
 		outputArea.setLineWrap(true);
 		outputArea.setFont(new Font("Monospaced", Font.PLAIN, 16));
+		RightCopyMenu.addTo(outputArea);
 		//outputArea.setForeground(Color.GREEN);
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
@@ -122,6 +124,7 @@ public class REPLPanel extends JPanel {
 		inputArea.setFont(new Font("Monospaced", Font.PLAIN, 20));
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
+		RightCopyMenu.addTo(inputArea);
 		//inputArea.setForeground(Color.GREEN);
 
 		splitPane.setRightComponent(new JScrollPane(inputArea));
