@@ -140,7 +140,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		json.put("records", recs);
 		
 		String jsonBody=JSONValue.toJSONString(json);
-		System.out.println(jsonBody);
+		// System.out.println(jsonBody);
 		
 		SimpleHttpRequest post=SimpleRequestBuilder.post(url+topic)
 				.setBody(jsonBody, STRMZI_CONTENT_TYPE)
@@ -152,7 +152,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		httpasyncclient.execute(post, new FutureCallback<SimpleHttpResponse>() {
 			@Override
 			public void completed(SimpleHttpResponse result) {
-				System.err.println(result);
+				//System.err.println(result);
 			}
 
 			@Override
@@ -162,7 +162,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 
 			@Override
 			public void cancelled() {
-				System.err.println("Cancelled");
+				System.err.println("Observation Cancelled");
 			};
 		});
 	}
