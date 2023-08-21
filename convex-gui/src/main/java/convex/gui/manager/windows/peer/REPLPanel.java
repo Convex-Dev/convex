@@ -78,6 +78,7 @@ public class REPLPanel extends JPanel {
 
 	public void setInput(String s) {
 		inputArea.setText(s);
+		updateHighlight();
 	}
 
 	@Override
@@ -155,6 +156,7 @@ public class REPLPanel extends JPanel {
 		outputArea.setFont(OUTPUT_FONT);
 		RightCopyMenu.addTo(outputArea);
 		//outputArea.setForeground(Color.GREEN);
+		outputArea.setBackground(Color.BLACK);
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 		splitPane.setLeftComponent(new JScrollPane(outputArea));
@@ -163,6 +165,7 @@ public class REPLPanel extends JPanel {
 		inputArea.setFont(INPUT_FONT);
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
+		inputArea.setBackground(Color.BLACK);
 		RightCopyMenu.addTo(inputArea);
 		//inputArea.setForeground(Color.GREEN);
 
@@ -223,8 +226,9 @@ public class REPLPanel extends JPanel {
 		
 		history.add(s);
 		historyPosition=history.size();
-		
+
 		SwingUtilities.invokeLater(() -> {
+			inputArea.setText("");
 			addOutput(outputArea,s);
 			addOutput(outputArea,"\n");
 			try {
@@ -264,7 +268,6 @@ public class REPLPanel extends JPanel {
 				addOutput(outputArea,t.getMessage() + "\n");
 				t.printStackTrace();
 			}
-			inputArea.setText("");
 		});
 	}
 
@@ -292,21 +295,7 @@ public class REPLPanel extends JPanel {
 
 		@Override
 		public void insertUpdate(DocumentEvent e) {
-			try {
-				int off = e.getOffset();
-				int len = e.getLength();
-				int end=off+len;
-				int docLen=e.getDocument().getLength();
-				
-				// Detect Enter at end of form
-				if ((end==docLen) && ("\n".equals(e.getDocument().getText(end-1,1)))) {
-					String s=e.getDocument().getText(0, docLen);
-					sendMessage(s.trim());
-				}
-			} catch (BadLocationException e1) {
-				// TODO Auto-generated catch block
-				e1.printStackTrace();
-			}
+
 			updateHighlight();
 		}
 
@@ -322,14 +311,13 @@ public class REPLPanel extends JPanel {
 
 		@Override
 		public void keyTyped(KeyEvent e) {
-
 		}
 
 		@Override
 		public void keyPressed(KeyEvent e) {
-			// CTRL or Shift scrolls through history
+			int code = e.getKeyCode();
+			// CTRL or Shift plus arrow scrolls through history
 			if (e.isControlDown()||e.isShiftDown()) {
-				int code = e.getKeyCode();
 				int hSize=history.size();
 				if (code==KeyEvent.VK_UP) {
 
@@ -350,6 +338,28 @@ public class REPLPanel extends JPanel {
 					}
 					e.consume(); // mark event consumed
 				}
+			}
+			
+			// Enter sends unless a meta key held down
+			if (code==KeyEvent.VK_ENTER) {
+				try {
+					Document doc=inputArea.getDocument();
+					int docLen=doc.getLength();
+					if (e.isControlDown()||e.isShiftDown()) {
+						doc.insertString(docLen, "\n",SimpleAttributeSet.EMPTY);
+					} else {
+						int off = inputArea.getCaretPosition();
+							
+						// Detect Enter at end of form
+						if ((off==docLen)) {
+							String s=doc.getText(0, docLen);
+							sendMessage(s.trim());
+						}
+					}
+				} catch (BadLocationException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}			
 			}
 		}
 

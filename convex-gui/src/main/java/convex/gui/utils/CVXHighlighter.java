@@ -82,20 +82,20 @@ public class CVXHighlighter {
 							aset=getParen(--nest); break;
 						}
 						case '[':{
-							nest+=3;
+							nest+=2;
 							aset=getParen(nest++); break;
 						}
 						case ']': {
 							aset=getParen(--nest); 
-							nest-=3; break;
+							nest-=2; break;
 						}
 						case '{':{
-							nest+=6;
+							nest+=4;
 							aset=getParen(nest++); break;
 						}
 						case '}': {
 							aset=getParen(--nest); 
-							nest-=6; break;
+							nest-=4; break;
 						}
 						// Whitespace uses paren colour, this colours commas!
 						case ' ': case '\t': case ',': {
@@ -119,6 +119,7 @@ public class CVXHighlighter {
 	}
 
 	private static AttributeSet getParen(int i) {
+		i++;
 		if (i<0) i=0;
 		return PARENS[i%PARENS.length];
 	}
