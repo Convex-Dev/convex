@@ -1,6 +1,8 @@
 package convex.gui.components;
 
 import java.awt.FlowLayout;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
@@ -26,7 +28,7 @@ public class AccountChooserPanel extends JPanel {
 	private JLabel lblMode;
 	private JLabel lblNewLabel;
 
-	private ComboBoxModel<WalletEntry> addressModel = createAddressList(WalletPanel.getListModel());
+	private DefaultComboBoxModel<WalletEntry> addressModel;
 	private JLabel balanceLabel;
 
 	public AccountChooserPanel() {
@@ -50,8 +52,20 @@ public class AccountChooserPanel extends JPanel {
 		addressCombo = new JComboBox<WalletEntry>();
 		addressCombo.setEditable(false);
 		add(addressCombo);
-		addressCombo.setModel(addressModel);
 		addressCombo.setToolTipText("Select Account for use");
+		updateModel();
+		addressCombo.setModel(addressModel);
+		addressCombo.addFocusListener(new FocusListener() {
+			@Override
+			public void focusGained(FocusEvent e) {
+				updateModel();
+			}
+
+			@Override
+			public void focusLost(FocusEvent e) {
+				// Ignore		
+			}
+		});
 
 		balanceLabel = new JLabel("Balance: ");
 		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
@@ -66,6 +80,21 @@ public class AccountChooserPanel extends JPanel {
 		});
 
 		// updateBalance(getSelectedAddress());
+	}
+
+	private void updateModel() {
+		if (addressModel==null) {
+			addressModel = new DefaultComboBoxModel<WalletEntry>();
+			addAddressList(WalletPanel.getListModel());
+		} else {
+			WalletEntry we=(WalletEntry) addressModel.getSelectedItem();
+			addressModel.removeAllElements();
+			addAddressList(WalletPanel.getListModel());
+			if (we!=null) {
+				addressModel.setSelectedItem(we);
+			}
+		}
+		addressCombo.setModel(addressModel);
 	}
 
 	public Address getSelectedAddress() {
@@ -84,9 +113,9 @@ public class AccountChooserPanel extends JPanel {
 		return false;
 	}
 
-	private ComboBoxModel<WalletEntry> createAddressList(ListModel<WalletEntry> m) {
+	private ComboBoxModel<WalletEntry> addAddressList(ListModel<WalletEntry> m) {
 		int n = m.getSize();
-		DefaultComboBoxModel<WalletEntry> cm = new DefaultComboBoxModel<WalletEntry>();
+		DefaultComboBoxModel<WalletEntry> cm = addressModel;
 		for (int i = 0; i < n; i++) {
 			WalletEntry we = m.getElementAt(i);
 			cm.addElement(we);

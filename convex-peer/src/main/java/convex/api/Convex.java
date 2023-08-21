@@ -100,10 +100,8 @@ public abstract class Convex {
 			ACell ec=v.getErrorCode();
 			
 			if (ec!=null) {
-				if ((ErrorCodes.SEQUENCE.equals(ec))||(ErrorCodes.LOAD.equals(ec))) {
 					// We probably have a wrong sequence number now. Kill the stored value.
 					sequence = null;
-				}
 			}
 
 			// Check if we are waiting for a Result with this ID for this connection
