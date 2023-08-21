@@ -5,17 +5,21 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.net.URL;
 
 import javax.swing.ImageIcon;
+import javax.swing.InputMap;
 import javax.swing.JLabel;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.plaf.FontUIResource;
+import javax.swing.text.DefaultEditorKit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +47,7 @@ public class Toolkit {
 					// UIManager.put("control", new Color(200,180,160));
 				}
 			}
-
+			
 			// prefer MaterialLookAndFeel if we have it
 			AbstractMaterialTheme theme = new MaterialOceanicTheme();
 			MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
@@ -54,6 +58,14 @@ public class Toolkit {
 			theme.setFontRegular(new FontUIResource(theme.getFontRegular().deriveFont(14.0f)));
 
 			UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
+			
+			if (System.getProperty("os.name").toLowerCase().startsWith("mac")) {
+				InputMap im = (InputMap) UIManager.get("TextField.focusInputMap");
+				im.put(KeyStroke.getKeyStroke(KeyEvent.VK_C, KeyEvent.META_DOWN_MASK), DefaultEditorKit.copyAction);
+				im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, KeyEvent.META_DOWN_MASK), DefaultEditorKit.pasteAction);
+				im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, KeyEvent.META_DOWN_MASK), DefaultEditorKit.cutAction);
+			}
+
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
