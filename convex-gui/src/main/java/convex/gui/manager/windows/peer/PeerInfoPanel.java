@@ -8,12 +8,14 @@ import java.awt.event.ComponentEvent;
 
 import javax.swing.JButton;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.Timer;
 
 import convex.api.Convex;
 import convex.core.util.Text;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.NonUpdatingCaret;
 import convex.gui.utils.Toolkit;
 import convex.peer.AThreadedComponent;
 import convex.peer.Server;
@@ -32,14 +34,17 @@ public class PeerInfoPanel extends JPanel {
 		JButton refreshButton = new JButton("Refresh");
 		panel.add(refreshButton);
 
-		JPanel panel_1 = new JPanel();
-		add(panel_1, BorderLayout.CENTER);
-		panel_1.setLayout(new BorderLayout(0, 0));
-
 		textArea = new JTextArea();
 		textArea.setEditable(false);
 		textArea.setBackground(null);
+		textArea.setCaret(new NonUpdatingCaret());
+		textArea.setColumns(100);
 		textArea.setFont(Toolkit.SMALL_MONO_FONT);
+		
+		JPanel panel1=new JPanel();
+		panel1.add(textArea);
+		JScrollPane jsp1=new JScrollPane(panel1);
+		add(jsp1, BorderLayout.CENTER);
 		
 		// Set up periodic refresh
 		int INTERVAL = 500;
@@ -60,7 +65,6 @@ public class PeerInfoPanel extends JPanel {
 		    }
 		});
 
-		panel_1.add(textArea);
 		refreshButton.addActionListener(e -> {
 			updateState(p);
 		});
