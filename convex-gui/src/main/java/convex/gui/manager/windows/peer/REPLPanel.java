@@ -1,6 +1,7 @@
 package convex.gui.manager.windows.peer;
 		
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -17,9 +18,16 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
+import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.Document;
+import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
+import javax.swing.text.StyleContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +54,7 @@ import convex.gui.components.RightCopyMenu;
 public class REPLPanel extends JPanel {
 
 	JTextArea inputArea;
-	JTextArea outputArea;
+	JTextPane outputArea;
 	private JButton btnClear;
 	private JButton btnInfo;
 	
@@ -55,6 +63,9 @@ public class REPLPanel extends JPanel {
 
 	private InputListener inputListener=new InputListener();
 
+	private Font OUTPUT_FONT=new Font("Monospaced", Font.PLAIN, 16);
+	private Font INPUT_FONT=new Font("Monospaced", Font.PLAIN, 20);
+	private Color DEFAULT_OUTPUT_COLOR=Color.LIGHT_GRAY;
 	
 	private JPanel panel_1;
 
@@ -83,15 +94,38 @@ public class REPLPanel extends JPanel {
 	}
 
 	protected void handleResult(Object m) {
-		outputArea.append(" => " + m + "\n");
+		addOutput(outputArea," => " + m + "\n");
 		outputArea.setCaretPosition(outputArea.getDocument().getLength());
 	}
 	
 	protected void handleError(Object code, Object msg, AVector<AString> trace) {
-		outputArea.append(" Exception: " + code + " "+ msg+"\n");
+		addOutput(outputArea," Exception: " + code + " "+ msg+"\n",Color.ORANGE);
 		if (trace!=null) for (AString s: trace) {
-			outputArea.append(" - "+s.toString()+"\n");
+			addOutput(outputArea," - "+s.toString()+"\n",Color.PINK);
 		}
+	}
+	
+	private void addOutput(JTextPane pane, String text) {
+		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);
+		
+	}
+	
+	private void addOutput(JTextPane pane, String text, Color c) {
+		StyleContext sc = StyleContext.getDefaultStyleContext();
+		AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
+
+		Document d=pane.getDocument();
+		int len = d.getLength();
+		try {
+			d.insertString(len, text, aset);
+		} catch (BadLocationException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		//pane.setCaretPosition(len);
+		//pane.setCharacterAttributes(aset, false);
+		//pane.replaceSelection(text);
+		pane.repaint();
 	}
 
 	/**
@@ -108,11 +142,12 @@ public class REPLPanel extends JPanel {
 		splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
 		add(splitPane, BorderLayout.CENTER);
 
-		outputArea = new JTextArea();
-		outputArea.setRows(15);
+		outputArea = new JTextPane();
+		outputArea.setText("foo");
+		//outputArea.setRows(15);
 		outputArea.setEditable(false);
-		outputArea.setLineWrap(true);
-		outputArea.setFont(new Font("Monospaced", Font.PLAIN, 16));
+		//outputArea.setLineWrap(true);
+		outputArea.setFont(OUTPUT_FONT);
 		RightCopyMenu.addTo(outputArea);
 		//outputArea.setForeground(Color.GREEN);
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
@@ -121,7 +156,7 @@ public class REPLPanel extends JPanel {
 
 		inputArea = new JTextArea();
 		inputArea.setRows(5);
-		inputArea.setFont(new Font("Monospaced", Font.PLAIN, 20));
+		inputArea.setFont(INPUT_FONT);
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
 		RightCopyMenu.addTo(inputArea);
@@ -186,8 +221,8 @@ public class REPLPanel extends JPanel {
 		historyPosition=history.size();
 		
 		SwingUtilities.invokeLater(() -> {
-			outputArea.append(s);
-			outputArea.append("\n");
+			addOutput(outputArea,s);
+			addOutput(outputArea,"\n");
 			try {
 				AList<ACell> forms = Reader.readAll(s);
 				ACell message = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
@@ -219,10 +254,10 @@ public class REPLPanel extends JPanel {
 				
 				handleResult(future.get(5000, TimeUnit.MILLISECONDS));
 			} catch (TimeoutException t) {
-				outputArea.append(" TIMEOUT waiting for result");
+				addOutput(outputArea," TIMEOUT waiting for result");
 			} catch (Throwable t) {
-				outputArea.append(" SEND ERROR: ");
-				outputArea.append(t.getMessage() + "\n");
+				addOutput(outputArea," SEND ERROR: ");
+				addOutput(outputArea,t.getMessage() + "\n");
 				t.printStackTrace();
 			}
 			inputArea.setText("");

@@ -51,11 +51,12 @@ public class StrimziKafka extends AObserverQueue<Object> {
 
 	private static HashMap<Server,StrimziKafka> instances=new HashMap<>();
 	
-	public static StrimziKafka get(Server server) {
+	public synchronized static StrimziKafka get(Server server) {
 		StrimziKafka obs=instances.get(server);
 		if (obs==null) {
 			obs=new StrimziKafka(server);
 			instances.put(server, obs);
+			obs.start();
 		}
 		return obs;
 	}

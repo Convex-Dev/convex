@@ -32,12 +32,13 @@ public abstract class AObserverQueue<T> {
 		return 5000;
 	}
 
-	public void start() {
+	public synchronized void start() {
+		if (running) return;
+		running=true;
 		String name=getThreadName();
 		this.thread=new Thread(new QueueTask());
 		thread.setName(name);
 		log.debug("Thread started: {}",name);
-		running=true;
 		thread.setDaemon(true);
 		thread.start();
 	}
@@ -74,8 +75,9 @@ public abstract class AObserverQueue<T> {
 	 * Close this threaded component, including interrupting any running thread(s). 
 	 * Subclasses may override, but should call `super.close()` to close the main thread
 	 */
-	public void close() {
+	public synchronized void close() {
 		Thread t=thread;
+		running=false;
 		t.interrupt();
 	}
 

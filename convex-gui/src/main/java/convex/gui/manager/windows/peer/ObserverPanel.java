@@ -36,7 +36,6 @@ public class ObserverPanel extends JPanel {
 		
 		JRadioButton strmButton=addButton("Transactions",new JLabel("Strimzi"),()->{
 			StrimziKafka obs=StrimziKafka.get(server);
-			obs.start();
 			TransactionHandler th=server.getTransactionHandler();
 			th.setRequestObserver(obs.getTransactionRequestObserver(server));
 			th.setResponseObserver(obs.getTransactionResponseObserver(server));
