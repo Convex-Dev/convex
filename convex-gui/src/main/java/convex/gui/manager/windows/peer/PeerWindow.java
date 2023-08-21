@@ -39,6 +39,7 @@ public class PeerWindow extends BaseWindow {
 			} catch (Throwable t) {
 				log.warn("Unable to create Peer Controller Window");
 			}
+			tabbedPane.addTab("Observation", null, new ObserverPanel(server), null);
 		}
 		tabbedPane.addTab("Stress", null, new StressPanel(peer), null);
 		tabbedPane.addTab("Info", null, new PeerInfoPanel(peer), null);

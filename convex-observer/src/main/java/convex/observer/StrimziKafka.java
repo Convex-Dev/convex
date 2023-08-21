@@ -43,11 +43,23 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		});
 	}
 
+
 	public String topic;
 	public String url;
 	public String peerKey;
 	private boolean blocking=false;
 
+	private static HashMap<Server,StrimziKafka> instances=new HashMap<>();
+	
+	public static StrimziKafka get(Server server) {
+		StrimziKafka obs=instances.get(server);
+		if (obs==null) {
+			obs=new StrimziKafka(server);
+			instances.put(server, obs);
+		}
+		return obs;
+	}
+	
 	public StrimziKafka(Server server) {
 		super(server.getStore());
 		// TODO: need to be config params etc.
@@ -166,4 +178,6 @@ public class StrimziKafka extends AObserverQueue<Object> {
 			};
 		});
 	}
+
+
 }

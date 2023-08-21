@@ -50,7 +50,6 @@ import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
 import convex.gui.manager.mainpanels.TorusPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
-import convex.observer.StrimziKafka;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 
@@ -166,10 +165,6 @@ public class PeerGUI extends JPanel {
 			Server first=peerList.firstElement().getLocalServer();
 			
 			// Set up observability
-			StrimziKafka obs=new StrimziKafka(first);
-			obs.start();
-			first.getTransactionHandler().setRequestObserver(obs.getTransactionRequestObserver(first));
-			first.getTransactionHandler().setResponseObserver(obs.getTransactionResponseObserver(first));
 			
 			try {
 				restServer=RESTServer.create(first);
