@@ -17,7 +17,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextArea;
 import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
@@ -29,11 +28,6 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 
-import org.antlr.v4.runtime.CharStream;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.misc.Interval;
-import org.antlr.v4.runtime.tree.ParseTree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,21 +41,20 @@ import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
-import convex.core.lang.reader.ConvexErrorListener;
-import convex.core.lang.reader.antlr.ConvexLexer;
-import convex.core.lang.reader.antlr.ConvexParser;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.RightCopyMenu;
+import convex.gui.utils.CVXHighlighter;
 
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
 
-	JTextArea inputArea;
+	JTextPane inputArea;
 	JTextPane outputArea;
 	private JButton btnClear;
 	private JButton btnInfo;
@@ -97,13 +90,18 @@ public class REPLPanel extends JPanel {
 		if (r.isError()) {
 			handleError(r.getErrorCode(),r.getValue(),r.getTrace());
 		} else {
-			handleResult((Object)r.getValue());
+			handleResult((ACell)r.getValue());
 		}
 	}
 
-	protected void handleResult(Object m) {
-		addOutput(outputArea," => " + m + "\n");
-		outputArea.setCaretPosition(outputArea.getDocument().getLength());
+	protected void handleResult(ACell m) {
+		String resultString=RT.print(m).toString();
+		int start=outputArea.getDocument().getLength();
+		addOutput(outputArea," => " + resultString + "\n");
+		int end=outputArea.getDocument().getLength();
+		updateHighlight(outputArea,start,end-start);
+		
+		outputArea.setCaretPosition(end);
 	}
 	
 	protected void handleError(Object code, Object msg, AVector<AString> trace) {
@@ -151,7 +149,6 @@ public class REPLPanel extends JPanel {
 		add(splitPane, BorderLayout.CENTER);
 
 		outputArea = new JTextPane();
-		outputArea.setText("foo");
 		//outputArea.setRows(15);
 		outputArea.setEditable(false);
 		//outputArea.setLineWrap(true);
@@ -162,8 +159,7 @@ public class REPLPanel extends JPanel {
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 		splitPane.setLeftComponent(new JScrollPane(outputArea));
 
-		inputArea = new JTextArea();
-		inputArea.setRows(5);
+		inputArea = new JTextPane();
 		inputArea.setFont(INPUT_FONT);
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
@@ -272,28 +268,21 @@ public class REPLPanel extends JPanel {
 		});
 	}
 
-	@SuppressWarnings("unused")
-	public void updateHighlight() {
-		String input=inputArea.getText();
-		try {
-			CharStream cs=CharStreams.fromString(input);
-			ConvexLexer lexer=new ConvexLexer(cs);
-			lexer.removeErrorListeners();
-			lexer.addErrorListener(new ConvexErrorListener() );
-			CommonTokenStream tokens = new CommonTokenStream(lexer);
-			ConvexParser parser = new ConvexParser(tokens);
-			parser.removeErrorListeners();
-			ParseTree pt = parser.forms();
-			
-			Interval iv=pt.getSourceInterval();
-			int tcount=tokens.size();
-			int start=iv.a;
-			int end=iv.b+1;
-			int len=iv.length();
-			System.out.println(tokens.getTokens());
-		} catch (Exception t) {
-			System.err.println(t);
+	
+	boolean highlighting=false;
+	protected void updateHighlight() {
+		int len=inputArea.getDocument().getLength();
+		if (!highlighting) {
+			highlighting=true;
+			updateHighlight(inputArea,0,len);
 		}
+	}
+	
+	protected void updateHighlight(JTextPane pane,int start, int len) {
+		SwingUtilities.invokeLater(()->{
+			CVXHighlighter.highlight(pane,start,start+len);
+			highlighting=false;
+		});
 	}
 	
 	/**
@@ -303,13 +292,20 @@ public class REPLPanel extends JPanel {
 
 		@Override
 		public void insertUpdate(DocumentEvent e) {
-			int len = e.getLength();
-			int off = e.getOffset();
-			String s = inputArea.getText();
-			
-			// Detect Enter at end of form
-			if ((len == 1) && (len + off == s.length()) && (s.charAt(off) == '\n')) {
-				sendMessage(s.trim());
+			try {
+				int off = e.getOffset();
+				int len = e.getLength();
+				int end=off+len;
+				int docLen=e.getDocument().getLength();
+				
+				// Detect Enter at end of form
+				if ((end==docLen) && ("\n".equals(e.getDocument().getText(end-1,1)))) {
+					String s=e.getDocument().getText(0, docLen);
+					sendMessage(s.trim());
+				}
+			} catch (BadLocationException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
 			}
 			updateHighlight();
 		}
