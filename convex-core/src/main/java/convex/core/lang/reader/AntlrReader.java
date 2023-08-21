@@ -479,6 +479,21 @@ public class AntlrReader {
 	}
 
 	public static AList<ACell> readAll(CharStream cs) {
+		ParseTree tree = getParseTree(cs);
+		
+		CRListener visitor=new CRListener();
+		ParseTreeWalker.DEFAULT.walk(visitor, tree);
+		
+		ArrayList<ACell> top=visitor.popList();
+		return Lists.create(top);
+	}
+
+	public static ParseTree getParseTree(String input) {
+		CharStream cs=CharStreams.fromString(input);
+		return getParseTree(cs);
+	}
+	
+	public static ParseTree getParseTree(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		lexer.removeErrorListeners();
 		lexer.addErrorListener(new ConvexErrorListener() );
@@ -486,12 +501,7 @@ public class AntlrReader {
 		ConvexParser parser = new ConvexParser(tokens);
 		parser.removeErrorListeners();
 		ParseTree tree = parser.forms();
-		
-		CRListener visitor=new CRListener();
-		ParseTreeWalker.DEFAULT.walk(visitor, tree);
-		
-		ArrayList<ACell> top=visitor.popList();
-		return Lists.create(top);
+		return tree;
 	}
 
 }

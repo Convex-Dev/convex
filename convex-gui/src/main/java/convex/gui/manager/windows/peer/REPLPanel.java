@@ -29,6 +29,11 @@ import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
 
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.misc.Interval;
+import org.antlr.v4.runtime.tree.ParseTree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +49,9 @@ import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
+import convex.core.lang.reader.ConvexErrorListener;
+import convex.core.lang.reader.antlr.ConvexLexer;
+import convex.core.lang.reader.antlr.ConvexParser;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.gui.components.AccountChooserPanel;
@@ -264,6 +272,30 @@ public class REPLPanel extends JPanel {
 		});
 	}
 
+	@SuppressWarnings("unused")
+	public void updateHighlight() {
+		String input=inputArea.getText();
+		try {
+			CharStream cs=CharStreams.fromString(input);
+			ConvexLexer lexer=new ConvexLexer(cs);
+			lexer.removeErrorListeners();
+			lexer.addErrorListener(new ConvexErrorListener() );
+			CommonTokenStream tokens = new CommonTokenStream(lexer);
+			ConvexParser parser = new ConvexParser(tokens);
+			parser.removeErrorListeners();
+			ParseTree pt = parser.forms();
+			
+			Interval iv=pt.getSourceInterval();
+			int tcount=tokens.size();
+			int start=iv.a;
+			int end=iv.b+1;
+			int len=iv.length();
+			System.out.println(tokens.getTokens());
+		} catch (Exception t) {
+			System.err.println(t);
+		}
+	}
+	
 	/**
 	 * Listener to detect returns at the end of the input box => send message
 	 */
@@ -279,16 +311,17 @@ public class REPLPanel extends JPanel {
 			if ((len == 1) && (len + off == s.length()) && (s.charAt(off) == '\n')) {
 				sendMessage(s.trim());
 			}
+			updateHighlight();
 		}
 
 		@Override
 		public void removeUpdate(DocumentEvent e) {
-			// nothing special
+			updateHighlight();
 		}
 
 		@Override
 		public void changedUpdate(DocumentEvent e) {
-			// nothing special
+			updateHighlight();
 		}
 
 		@Override
