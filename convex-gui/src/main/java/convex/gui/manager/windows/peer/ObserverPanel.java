@@ -7,6 +7,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 
+import convex.observer.LogObserver;
 import convex.observer.StrimziKafka;
 import convex.peer.Server;
 import convex.peer.TransactionHandler;
@@ -26,6 +27,7 @@ public class ObserverPanel extends JPanel {
 		
 		this.setLayout(new MigLayout("wrap 2"));
 		
+		add(new JLabel("Transactions"),"span 2");
 		JRadioButton noneButton=addButton("Transactions",new JLabel("None"),()->{
 			server.getTransactionHandler().setRequestObserver(null);
 			server.getTransactionHandler().setResponseObserver(null);
@@ -42,6 +44,17 @@ public class ObserverPanel extends JPanel {
 		});
 		add(strmButton);
 		add(new JLabel("Strimzi"));	
+		
+		JRadioButton tlogButton=addButton("Transactions",new JLabel("Logs"),()->{
+			TransactionHandler th=server.getTransactionHandler();
+			LogObserver ob=new LogObserver(server);
+			th.setRequestObserver(ob.getTransactionRequestObserver());
+			th.setResponseObserver(ob.getTransactionResponseObserver());
+		});
+		add(tlogButton);
+		add(new JLabel("SLF4J Logging"));	
+
+		
 	}
 
 	private JRadioButton addButton(String bgName,JLabel jLabel, Runnable action) {
