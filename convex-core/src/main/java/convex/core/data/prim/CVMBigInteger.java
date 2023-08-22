@@ -264,10 +264,8 @@ public final class CVMBigInteger extends AInteger {
 		CVMBigInteger result= create(b);
 		if (result==null) throw new BadFormatException("Null result in big integer create from blob");
 		
-		// Attach the Blob encoding as the biginteger encoding.
-		// Note this only works because the Blob read assumes correct tag
-		result.attachEncoding(b.getEncoding());
-		b.attachEncoding(null); // this encoding is definitely invalid, so wipe it clean
+		// Attach the encoding, will be same length as Blob encoding
+		result.attachEncoding(blob.slice(offset,offset+b.getEncodingLength()));
 		return result;
 	}
 

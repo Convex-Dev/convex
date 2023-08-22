@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Strings;
@@ -42,12 +43,16 @@ public class BigIntegerTest {
 		assertEquals(s.substring(0, 20)+Constants.PRINT_EXCEEDED_MESSAGE,bi.print(20).toString());
 	}
 	
-	@Test public void testZero() {
+	@Test public void testZero() throws BadFormatException {
 		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {0});
 		assertEquals(0,bi.longValue());
 		assertEquals(0.0,bi.doubleValue());
 		assertEquals(BigInteger.ZERO,bi.getBigInteger());
 		assertFalse(bi.isCanonical());
+		
+		Blob enc=Format.encodedBlob(bi);
+		assertEquals(bi,Format.read(enc));
+		assertNotEquals(enc,Blobs.empty().getEncoding());
 		
 		doBigTest(bi);
 	}
@@ -160,7 +165,9 @@ public class BigIntegerTest {
 	
 	@Test public void testBadEncoding() throws BadFormatException {
 		assertThrows(BadFormatException.class,()->Format.read("19")); // no data
-		assertThrows(BadFormatException.class,()->Format.read("190113")); // non-caonoical length
+		assertThrows(BadFormatException.class,()->Format.read("1900")); // Zero length
+		assertThrows(BadFormatException.class,()->Format.read("190017")); // Zero length plus extra bytes
+		assertThrows(BadFormatException.class,()->Format.read("190113")); // non-canonical length
 		assertThrows(BadFormatException.class,()->Format.read("1909ffffff")); // short length
 		assertThrows(BadFormatException.class,()->Format.read("1909ffffffffffffffffff")); // excess leading ff
 		assertThrows(BadFormatException.class,()->Format.read("1909000000000000000000")); // excess leading 00

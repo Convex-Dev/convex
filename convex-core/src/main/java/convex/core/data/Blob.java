@@ -177,6 +177,7 @@ public class Blob extends AArrayBlob {
 	 * retention of source Blob object as encoded data.
 	 * 
 	 * @param source Source Blob object.
+	 * @param pos Position in source to start reading from
 	 * @param count Length in bytes to take from the source Blob
 	 * @return Blob read from the source
 	 * @throws BadFormatException If encoding is invalid
@@ -192,7 +193,10 @@ public class Blob extends AArrayBlob {
 		}
 
 		Blob result= source.slice(start , start+count);
-		result.attachEncoding(source.slice(pos,pos+(headerLength+count)));
+		if (source.byteAtUnchecked(pos)==Tag.BLOB) {
+			// Only attach encoding if we were reading a genuine Blob
+			result.attachEncoding(source.slice(pos,pos+(headerLength+count)));
+		}
 		return result;
 	}
 
