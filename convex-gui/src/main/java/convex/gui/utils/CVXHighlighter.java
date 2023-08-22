@@ -16,6 +16,9 @@ import org.antlr.v4.runtime.Token;
 
 import convex.core.lang.reader.antlr.ConvexLexer;
 
+/**
+ * Tools for highlighting Convex Lisp code in Swing
+ */
 public class CVXHighlighter {
 	static StyleContext sc = StyleContext.getDefaultStyleContext();
 	static AttributeSet BASE = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Italic, false);
@@ -30,6 +33,7 @@ public class CVXHighlighter {
 	private static final AttributeSet[] PARENS = new AttributeSet[10];
 	
 	static {
+		// Generator code for Rainbow parens
 		for (int i=0; i<PARENS.length; i++) {
 			Color c=Color.getHSBColor((0.1f*i), 1, 1);
 			c=c.brighter();
