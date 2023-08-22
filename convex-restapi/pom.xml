@@ -15,7 +15,6 @@
 
 	<properties>
 		<json.simple.version>1.1.1</json.simple.version>
-		<blade-core.version>2.1.0.RELEASE</blade-core.version>
 	</properties>
 
 	<build>

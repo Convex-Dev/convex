@@ -423,7 +423,7 @@ public class RESTServer {
 
 	public void start() {
 		try {
-		app.start();
+			app.start();
 		} catch (JavalinBindException e) {
 			log.warn("Unable to start REST Server: port already in use");
 		}
