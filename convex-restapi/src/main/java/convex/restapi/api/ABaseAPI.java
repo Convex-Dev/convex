@@ -5,10 +5,14 @@ import java.util.Map;
 import convex.java.JSON;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
+import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 
-public class ABaseAPI {
+/**
+ * BAse class for API based services
+ */
+public abstract class ABaseAPI {
 	
 	protected final RESTServer restServer;
 	protected final Server server;
@@ -41,5 +45,12 @@ public class ABaseAPI {
 	protected static String jsonError(String string) {
 		return "{\"error\":\"" + string + "\"}";
 	}
+
+	/**
+	 * Add routes to the service
+	 * @param app Javalin instance to add routes to
+	 * @param baseURL Base URL for routes e.g. "/service-name/api"
+	 */
+	protected abstract void addRoutes(Javalin app, String baseURL);
 
 }

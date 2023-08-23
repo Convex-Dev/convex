@@ -38,15 +38,16 @@ import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 
-public class ConvexAPI extends ABaseAPI {
+public class ChainAPI extends ABaseAPI {
 
 	public Convex convex;
 	
-	public ConvexAPI(RESTServer restServer) {
+	public ChainAPI(RESTServer restServer) {
 		super(restServer);
 		convex=restServer.getConvex();
 	}
 
+	@Override
 	public void addRoutes(Javalin app, String baseURL) {
 		String prefix=baseURL+"/v1/";
 		
@@ -61,7 +62,6 @@ public class ConvexAPI extends ABaseAPI {
 		app.get(prefix+"accounts/<addr>", this::queryAccount);
 		
 		app.get(prefix+"data/<hash>", this::getData);
-
 	}
 	
 	public void getData(Context ctx) {

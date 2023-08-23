@@ -6,7 +6,8 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.peer.Server;
-import convex.restapi.api.ConvexAPI;
+import convex.restapi.api.ChainAPI;
+import convex.restapi.api.DepAPI;
 import io.javalin.Javalin;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.util.JavalinBindException;
@@ -50,11 +51,14 @@ public class RESTServer {
 		addAPIRoutes();
 	}
 
-	protected ConvexAPI convexAPI;
+	protected ChainAPI chainAPI;
+	protected DepAPI depAPI;
 	private void addAPIRoutes() {
-		convexAPI=new ConvexAPI(this); 
-		convexAPI.addRoutes(app,"/api");
+		chainAPI=new ChainAPI(this); 
+		chainAPI.addRoutes(app,"/api");
 
+		depAPI=new DepAPI(this); 
+		depAPI.addRoutes(app,"/dep/api");
 	}
 	
 
