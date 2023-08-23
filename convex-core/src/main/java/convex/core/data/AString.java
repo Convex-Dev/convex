@@ -242,7 +242,8 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 	}
 
 	/**
-	 * Converts this String to a Blob representation. Must round trip all values.
+	 * Converts this String to an equivalent Blob representation. 
+	 * Must round trip all values.
 	 * @return Blob representation of UTF-8 String
 	 */
 	public abstract ABlob toBlob();

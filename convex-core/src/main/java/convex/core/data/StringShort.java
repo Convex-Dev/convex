@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.exceptions.InvalidDataException;
@@ -139,27 +138,21 @@ public final class StringShort extends AString {
 	public int getRefCount() {
 		return 0;
 	}
-
-	/**
-	 * Read a StringShort from a ByteBuffer. Assumes tag and length already read and
-	 * correct.
-	 * 
-	 * @param length Length in number of chars to read
-	 * @param bb     ByteBuffer to read from
-	 * @return AString instance
-	 */
-	public static AString read(long length, ByteBuffer bb) {
-		byte[] data = new byte[Utils.checkedInt(length)];
-		bb.get(data);
-		return new StringShort(data);
-	}
 	
+	/**
+	 * Read a StringShort from an encoding. Assumes tag and length already validated. 
+	 * @param length Length of string in UTF-8 bytes
+	 * @param blob Source of encoding
+	 * @param pos Position of encoding start (i.e. tag)
+	 * @return String instance
+	 */
 	public static StringShort read(long length, Blob blob, int pos) {
 		int len=Utils.checkedInt(length);
 		int dataOffset=pos+1+Format.getVLCLength(length);
 		byte[] data = new byte[len];
 		System.arraycopy(blob.getInternalArray(), blob.getInternalOffset()+dataOffset, data, 0, len);
 		StringShort result= new StringShort(data);
+		
 		result.attachEncoding(blob.slice(pos,dataOffset+len));
 		return result;
 	}
