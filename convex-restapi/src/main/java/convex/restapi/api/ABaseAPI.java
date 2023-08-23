@@ -1,0 +1,45 @@
+package convex.restapi.api;
+
+import java.util.Map;
+
+import convex.java.JSON;
+import convex.peer.Server;
+import convex.restapi.RESTServer;
+import io.javalin.http.BadRequestResponse;
+import io.javalin.http.Context;
+
+public class ABaseAPI {
+	
+	protected final RESTServer restServer;
+	protected final Server server;
+
+	public ABaseAPI(RESTServer restServer) {
+		this.restServer=restServer;
+		this.server=restServer.getServer();
+	}
+	
+	/**
+	 * Gets JSON body from a Context as a Java Object
+	 * @param ctx
+	 * @return JSON Object
+	 * @throws BadRequestResponse if the JSON body is invalid
+	 */
+	protected Map<String, Object> getJSONBody(Context ctx) {
+		try {
+			Map<String, Object> req= JSON.toMap(ctx.body());
+			return req;
+		} catch (Exception e) {
+			throw new BadRequestResponse(jsonError("Invalid JSON body"));
+		}
+	}
+	
+	/**
+	 * Gets a generic JSON response for an error message
+	 * @param string
+	 * @return
+	 */
+	protected static String jsonError(String string) {
+		return "{\"error\":\"" + string + "\"}";
+	}
+
+}
