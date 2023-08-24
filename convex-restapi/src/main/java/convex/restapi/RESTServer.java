@@ -9,7 +9,12 @@ import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.DepAPI;
 import io.javalin.Javalin;
+import io.javalin.config.JavalinConfig;
 import io.javalin.http.staticfiles.Location;
+import io.javalin.openapi.plugin.OpenApiPluginConfiguration;
+import io.javalin.openapi.plugin.OpenApiPlugin;
+import io.javalin.openapi.plugin.swagger.SwaggerConfiguration;
+import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
 import io.javalin.util.JavalinBindException;
 
 public class RESTServer {
@@ -23,46 +28,79 @@ public class RESTServer {
 		this.server = server;
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
 
+		
 		app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
 			config.plugins.enableCors(cors -> {
-			    cors.add(corsConfig -> {
-			        //replacement for enableCorsForAllOrigins()
-			        corsConfig.anyHost();
-			    });
+				cors.add(corsConfig -> {
+					// replacement for enableCorsForAllOrigins()
+					corsConfig.anyHost();
+				});
 			});
+
+			addOpenApiPlugins(config);
+
 			config.staticFiles.add(staticFiles -> {
-				staticFiles.hostedPath = "/"; 
+				staticFiles.hostedPath = "/";
 				staticFiles.location = Location.CLASSPATH; // Specify resources from classpath
 				staticFiles.directory = "/public"; // Resource location in classpath
-				staticFiles.precompress = false; // if the files should be pre-compressed and cached in memory (optimization)
-				staticFiles.aliasCheck = null; // you can configure this to enable symlinks (= ContextHandler.ApproveAliases())
-				staticFiles.skipFileFunction = req -> false; // you can use this to skip certain files in the dir, based on the HttpServletRequest
+				staticFiles.precompress = false; // if the files should be pre-compressed and cached in memory
+													// (optimization)
+				staticFiles.aliasCheck = null; // you can configure this to enable symlinks (=
+												// ContextHandler.ApproveAliases())
+				staticFiles.skipFileFunction = req -> false; // you can use this to skip certain files in the dir, based
+																// on the HttpServletRequest
 			});
 		});
-		
+
 		app.exception(Exception.class, (e, ctx) -> {
 			e.printStackTrace();
-			String message="Unexpected error: "+e;
-		    ctx.result(message);
-		    ctx.status(500);
+			String message = "Unexpected error: " + e;
+			ctx.result(message);
+			ctx.status(500);
 		});
 
 		addAPIRoutes();
 	}
 
+	protected void addOpenApiPlugins(JavalinConfig config) {
+		String docsPath = "/public/swagger-docs/openapi.json";
+		OpenApiPluginConfiguration openApiConfiguration = getOpenApiConfig();
+		openApiConfiguration=openApiConfiguration.withDocumentationPath(docsPath);
+		config.plugins.register(new OpenApiPlugin(openApiConfiguration));
+
+        SwaggerConfiguration swaggerConfiguration = new SwaggerConfiguration();
+        swaggerConfiguration.setDocumentationPath(docsPath);
+		config.plugins.register(new SwaggerPlugin(swaggerConfiguration));
+	}
+
+	protected OpenApiPluginConfiguration getOpenApiConfig() {
+		return new OpenApiPluginConfiguration()
+				.withDefinitionConfiguration((version, definition) -> definition.withOpenApiInfo((openApiInfo) -> {
+					openApiInfo.setTitle("Convex REST API");
+					openApiInfo.setVersion("0.1.1");
+				})
+				.withServer((openApiServer) -> {
+					openApiServer.setUrl(("http://localhost:8080/"));
+					openApiServer.setDescription("Local Convex REST Server");
+					//openApiServer.addVariable("port", "8080", new String[] { "7070", "8080" },
+					//		"Port of the server");
+					//openApiServer.addVariable("basePath", "", new String[] { "", "v1" }, "Base path of the server");
+				}).withDefinitionProcessor(content -> { 
+					return content.toPrettyString();
+		        }));
+	}
+
 	protected ChainAPI chainAPI;
 	protected DepAPI depAPI;
+
 	private void addAPIRoutes() {
-		chainAPI=new ChainAPI(this); 
-		chainAPI.addRoutes(app,"/api");
+		chainAPI = new ChainAPI(this);
+		chainAPI.addRoutes(app, "/api");
 
-		depAPI=new DepAPI(this); 
-		depAPI.addRoutes(app,"/dep/api");
+		depAPI = new DepAPI(this);
+		depAPI.addRoutes(app, "/dep/api");
 	}
-	
-
-
 
 	/**
 	 * Create a RESTServer connected to a local Convex Peer Server instance.
@@ -94,7 +132,7 @@ public class RESTServer {
 			log.warn("Unable to start REST Server: port already in use");
 		}
 	}
-	
+
 	public void start(int port) {
 		app.start(port);
 	}

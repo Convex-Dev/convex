@@ -37,6 +37,7 @@ import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
+import io.javalin.openapi.*;
 
 public class ChainAPI extends ABaseAPI {
 
@@ -64,6 +65,9 @@ public class ChainAPI extends ABaseAPI {
 		app.get(prefix+"data/<hash>", this::getData);
 	}
 	
+	@OpenApi(path = "/data/:hash",
+			methods = HttpMethod.POST,
+	        operationId = "data")
 	public void getData(Context ctx) {
 		String hashParam=ctx.pathParam("hash");
 		Hash h=Hash.parse(hashParam);
