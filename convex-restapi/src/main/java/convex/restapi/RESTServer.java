@@ -28,7 +28,6 @@ public class RESTServer {
 		this.server = server;
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
 
-		
 		app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
 			config.plugins.enableCors(cors -> {

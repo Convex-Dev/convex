@@ -43,7 +43,6 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		});
 	}
 
-
 	public String topic;
 	public String url;
 	public String peerKey;
@@ -79,7 +78,7 @@ public class StrimziKafka extends AObserverQueue<Object> {
 	
 	public HashMap<String,Object> transactionToJSON(SignedData<ATransaction> stx) {
 		HashMap<String,Object> val=new HashMap<>();
-		val.put("type","tx-response");
+		val.put("type","tx-request");
 		
 		val.put("tx-id",RT.json(stx.getHash()));
 		val.put("tx",buildTXJSON(stx));
