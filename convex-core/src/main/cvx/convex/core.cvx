@@ -472,7 +472,7 @@
                  (fail "import: alias must be a symbol"))]
       (assert (= :as
                 as))
-      `(def ~sym
+      `(def ~(syntax sym {:static true})
          ~code))))
 
 (defn mapcat

@@ -2369,6 +2369,16 @@ public class CoreTest extends ACVMTest {
 		assertNotError(ctx);
 		assertEquals(eval(ctx,"count"),eval(ctx,"cc/count"));
 	}
+	
+	@Test
+	public void testImportStatic() {
+		Context ctx = step("(import convex.core :as cc)");
+		assertNotError(ctx);
+		ACell v=eval(ctx,"(compile 'cc/actor?)");
+		if (Constants.OPT_STATIC) {
+			assertEquals(Lookup.create(Init.CORE_ADDRESS, Symbols.ACTOR_Q),v);
+		}
+	}
 
 
 	@Test
@@ -4627,5 +4637,4 @@ public class CoreTest extends ACVMTest {
 			assertEquals(c, Format.read(b));
 		}
 	}
-
 }
