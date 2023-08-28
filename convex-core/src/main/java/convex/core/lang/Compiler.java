@@ -211,27 +211,32 @@ public class Compiler {
 	private static Context compileSetBang(AList<ACell> list, Context context) {
 		if (list.count()!=3) return context.withArityError("set! requires two arguments, a symbol and an expression");
 
+		// First position must be a Symbol in `(set! sym exp)`
 		ACell a1=list.get(1);
 		if (!(a1 instanceof Symbol)) return context.withCompileError("set! requires a symbol as first argument");
 		Symbol sym=(Symbol)a1;
 		
-		CompilerState cs=context.getCompilerState();
-		CVMLong position=(cs==null)?null:context.getCompilerState().getPosition(sym);
-		
+		// Extract Expression
 		context=context.compile(list.get(2));
 		if (context.isExceptional()) return context;
 		AOp<?> exp=(AOp<?>) context.getResult();
 		
+		// Check for local binding
+		CompilerState cs=context.getCompilerState();
+		CVMLong position=(cs==null)?null:context.getCompilerState().getPosition(sym);
+		
 		if (position==null) {
+			// If not a local binding, create a Def Op iff definition already exists
 			if (context.getEnvironment().containsKey(sym)) {
 				Def<?> op = Def.create(sym, exp);
 				return context.withResult(Juice.COMPILE_NODE,op);
 			}
 			return context.withCompileError("Trying to set! an undeclared symbol: "+sym);
+		} else {
+			// Otherwise must be a Local binding, so use a Set op
+			AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);
+			return context.withResult(Juice.COMPILE_NODE,op);
 		}
-		
-		AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);
-		return context.withResult(Juice.COMPILE_NODE,op);
 	}
 	
 	/**
