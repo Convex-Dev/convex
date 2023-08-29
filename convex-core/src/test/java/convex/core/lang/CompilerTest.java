@@ -676,11 +676,15 @@ public class CompilerTest extends ACVMTest {
 	
 			// Static core function should compile to constant
 			assertEquals(Constant.of(Core.COUNT),eval("(compile 'count)"));
+	
+			// Constant addresses should also get static compilation
+			assertEquals(Constant.of(Core.TRANSFER),eval("(compile '#8/transfer)"));
+		} else {
+			assertEquals(Lookup.create(Address.create(8), Symbols.COUNT),eval("(compile 'count)"));
 		}
 
-		// Aliases compile to dynamic lookup
+		// Aliases that don't hit static definitions compile to dynamic lookup
 		assertEquals(Lookup.create(Address.create(1), Symbols.COUNT),eval("(compile '#1/count)"));
-		assertEquals(Lookup.create(Address.create(8), Symbols.TRANSFER),eval("(compile '#8/transfer)"));
 		assertEquals(Lookup.create(Address.create(8888), Symbols.TRANSFER),eval("(compile '#8888/transfer)"));
 	}
 	

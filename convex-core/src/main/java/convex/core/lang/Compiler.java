@@ -262,6 +262,20 @@ public class Compiler {
 		if (!(a1 instanceof Symbol)) return context.withCompileError("lookup requires a Symbol as last argument");
 		Symbol sym=(Symbol)a1;
 		
+		// Pick up possible static definitions in case of constant Address
+		if (Constants.OPT_STATIC&&(exp instanceof Constant)) {
+			Address address=RT.ensureAddress(((Constant<Address>)exp).getValue());
+			if (address==null) return context.withError(ErrorCodes.CAST,"lookup first expression must be an Address");
+			// Get metadata for symbol.
+			AHashMap<ACell, ACell> meta=context.lookupMeta(address,sym);
+				
+			// If static, embed value directly as constant
+			if ((meta!=null)&&meta.get(Keywords.STATIC)==CVMBool.TRUE) {
+				ACell value=context.lookupValue(address,sym);
+				return context.withResult(Juice.COMPILE_LOOKUP,Constant.create(value));
+			}
+		}
+		
 		Lookup<?> op=Lookup.create(exp,sym);
 		return context.withResult(Juice.COMPILE_NODE,op);
 	}

@@ -2374,9 +2374,13 @@ public class CoreTest extends ACVMTest {
 	public void testImportStatic() {
 		Context ctx = step("(import convex.core :as cc)");
 		assertNotError(ctx);
-		ACell v=eval(ctx,"(compile 'cc/actor?)");
 		if (Constants.OPT_STATIC) {
-			assertEquals(Lookup.create(Init.CORE_ADDRESS, Symbols.ACTOR_Q),v);
+			ACell va=eval(ctx,"(compile 'cc/actor?)");
+			assertEquals(Lookup.create(Init.CORE_ADDRESS, Symbols.ACTOR_Q),va);
+
+			ACell vc=eval(ctx,"(compile 'cc/count)");
+			assertEquals(Constant.of(Core.COUNT),vc);
+
 		}
 	}
 

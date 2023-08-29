@@ -113,6 +113,10 @@ public class Constant<T extends ACell> extends AOp<T> {
 		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
 		return (Ref<R>) valueRef;
 	}
+	
+	public T getValue() {
+		return valueRef.getValue();
+	}
 
 	@Override
 	public Constant<T> updateRefs(IRefFunction func) {
