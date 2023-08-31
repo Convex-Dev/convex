@@ -16,7 +16,7 @@ public class DepAPI extends ABaseAPI {
 	}
 
 	@Override
-	public void addRoutes(Javalin app, String baseURL) {
+	public void addRoutes(Javalin app) {
 		// TODO Auto-generated method stub
 		
 	}

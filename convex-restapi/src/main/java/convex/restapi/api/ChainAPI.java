@@ -47,10 +47,13 @@ public class ChainAPI extends ABaseAPI {
 		super(restServer);
 		convex=restServer.getConvex();
 	}
+	
+    private static final String ROUTE = "/api/v1/";
+
 
 	@Override
-	public void addRoutes(Javalin app, String baseURL) {
-		String prefix=baseURL+"/v1/";
+	public void addRoutes(Javalin app) {
+		String prefix=ROUTE;
 		
 		app.post(prefix+"createAccount", this::createAccount);
 		app.post(prefix+"query", this::runQuery);
@@ -59,15 +62,23 @@ public class ChainAPI extends ABaseAPI {
 		
 		app.post(prefix+"transaction/prepare", this::runTransactionPrepare);
 		app.post(prefix+"transaction/submit", this::runTransactionSubmit);
-
+ 
 		app.get(prefix+"accounts/<addr>", this::queryAccount);
 		
 		app.get(prefix+"data/<hash>", this::getData);
 	}
 	
-	@OpenApi(path = "/data/:hash",
+	@OpenApi(path = ROUTE+"data/{hash}",
 			methods = HttpMethod.POST,
-	        operationId = "data")
+	        operationId = "data",
+	        pathParams = {
+	          @OpenApiParam(
+	        		  name = "hash", 
+	        		  description = "Data Hash", 
+	        		  required = true, 
+	        		  type = String.class,
+	        		  example = "0x1234567812345678123456781234567812345678123456781234567812345678")
+	        })
 	public void getData(Context ctx) {
 		String hashParam=ctx.pathParam("hash");
 		Hash h=Hash.parse(hashParam);
@@ -107,7 +118,7 @@ public class ChainAPI extends ABaseAPI {
 		}
 		ctx.result("{\"address\": " + a.longValue() + "}");
 	}
-	
+
 	public void queryAccount(Context ctx) {
 		Address addr=null;
 		String addrParam=ctx.pathParam("addr");
@@ -305,6 +316,10 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(JSON.toPrettyString(rm));
 	}
 	
+	
+	@OpenApi(path = "/query",
+			methods = HttpMethod.POST
+	)
 	public void runQuery(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Address addr=Address.parse(req.get("address")); 

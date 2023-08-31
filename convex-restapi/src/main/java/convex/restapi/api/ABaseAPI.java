@@ -51,6 +51,6 @@ public abstract class ABaseAPI {
 	 * @param app Javalin instance to add routes to
 	 * @param baseURL Base URL for routes e.g. "/service-name/api"
 	 */
-	protected abstract void addRoutes(Javalin app, String baseURL);
+	protected abstract void addRoutes(Javalin app);
 
 }

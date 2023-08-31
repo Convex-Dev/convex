@@ -63,13 +63,10 @@ public class RESTServer {
 	}
 
 	protected void addOpenApiPlugins(JavalinConfig config) {
-		String docsPath = "/public/swagger-docs/openapi.json";
 		OpenApiPluginConfiguration openApiConfiguration = getOpenApiConfig();
-		openApiConfiguration=openApiConfiguration.withDocumentationPath(docsPath);
 		config.plugins.register(new OpenApiPlugin(openApiConfiguration));
 
         SwaggerConfiguration swaggerConfiguration = new SwaggerConfiguration();
-        swaggerConfiguration.setDocumentationPath(docsPath);
 		config.plugins.register(new SwaggerPlugin(swaggerConfiguration));
 	}
 
@@ -82,8 +79,6 @@ public class RESTServer {
 				.withServer((openApiServer) -> {
 					openApiServer.setUrl(("http://localhost:8080/"));
 					openApiServer.setDescription("Local Convex REST Server");
-					//openApiServer.addVariable("port", "8080", new String[] { "7070", "8080" },
-					//		"Port of the server");
 					//openApiServer.addVariable("basePath", "", new String[] { "", "v1" }, "Base path of the server");
 				}).withDefinitionProcessor(content -> { 
 					return content.toPrettyString();
@@ -95,10 +90,10 @@ public class RESTServer {
 
 	private void addAPIRoutes() {
 		chainAPI = new ChainAPI(this);
-		chainAPI.addRoutes(app, "/api");
+		chainAPI.addRoutes(app);
 
 		depAPI = new DepAPI(this);
-		depAPI.addRoutes(app, "/dep/api");
+		depAPI.addRoutes(app);
 	}
 
 	/**
