@@ -22,6 +22,9 @@ public class FormatTest {
 		assertBadVLCEncoding("80ffffffffffffffffff7f"); // too long
 		assertBadVLCEncoding("ff80808080808080808000"); // long negative
 		
+		// TODO: fix this
+		// assertBadVLCEncoding("8000"); // excess leading bytes
+		
 		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MAX_VALUE));
 		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MIN_VALUE));
 	}
