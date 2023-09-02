@@ -5,24 +5,36 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
 public class FormatTest {
 
 	@Test public void testVLCEncoding() {
+		checkVLCEncoding("00",0);
+		checkVLCEncoding("01",1);
+		checkVLCEncoding("3f",63);
+		checkVLCEncoding("8040",64);
+		checkVLCEncoding("80ffffffffffffffff7f",Long.MAX_VALUE);
+		checkVLCEncoding("ff808080808080808000",Long.MIN_VALUE);
+		
+		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MAX_VALUE));
+		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MIN_VALUE));
+	}
+	
+	private void checkVLCEncoding(String hex, long a) {
 		byte[] bs=new byte[12];
+		int blen=hex.length()/2;
+		assertEquals(blen,Format.writeVLCLong(bs, 0, a));
+		assertEquals(blen,Format.getVLCLength(a));
+		checkStart(hex,bs);
 		
-		// number 1
-		assertEquals(1,Format.writeVLCLong(bs, 0, 1));
-		checkStart("01",bs);
-		
-		// number 63
-		assertEquals(1,Format.writeVLCLong(bs, 0, 63));
-		checkStart("3f",bs);
-		
-		// number 64
-		assertEquals(2,Format.writeVLCLong(bs, 0, 64));
-		checkStart("8040",bs);
+		try {
+			long b = Format.readVLCLong(bs, 0);
+			assertEquals(a,b);
+		} catch (BadFormatException e) {
+			fail("Unexpected bad encoding exception: "+e);
+		}
 	}
 
 	private void checkStart(String hex, byte[] bs) {
