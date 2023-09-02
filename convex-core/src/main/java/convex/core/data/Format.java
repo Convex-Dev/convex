@@ -98,6 +98,20 @@ public class Format {
 		int blen = (bitLength + 6) / 7;
 		return blen;
 	}
+	
+	/**
+	 * Gets the length in bytes of VLC count encoding for the given long value
+	 * @param x Long value to encode
+	 * @return Length of VLC encoding
+	 */
+	public static int getVLCCountLength(long x) {
+		if (x < 128) {
+			return 1;
+		}
+		int bitLength = Utils.bitLength(x)-1; // high zero not required
+		int blen = (bitLength + 6) / 7;
+		return blen;
+	}
 
 	/**
 	 * Puts a VLC encoded long into the specified bytebuffer (with no tag)
@@ -161,6 +175,40 @@ public class Format {
 		bs[pos++]=end;
 		return pos;
 	}
+	
+	/**
+	 * Puts a variable length count into the specified byte array (with no tag)
+	 * 
+	 * Format: 
+	 * <ul>
+	 * <li>MSB of each byte 0=last octet, 1=more octets</li>
+	 * <li>Following MSB, 7 bits of integer representation for each octet</li>
+	 * </ul>
+	 * 
+	 * @param bs Byte array to write to
+	 * @param pos Initial position in byte array
+	 * @param x Long value to write
+	 * @return end position in byte array after writing VLC long
+	 */
+	public static int writeVLCCount(byte[] bs, int pos, long x) {
+		if (x<0) throw new IllegalArgumentException("VLC Count cannot be negative but got: "+x);
+		if (x < 128) {
+			// single byte, cleared high bit
+			byte single = (byte) (x & 0x7F);
+			bs[pos++]=single;
+			return pos;
+		}
+		
+		int bitLength = Utils.bitLength(x)-1; // max 63, we don't need high bit (always 0)
+		int blen = (bitLength + 6) / 7; // number of octets required
+		for (int i = blen - 1; i >= 1; i--) {
+			byte single = (byte) (0x80 | (x >> (7 * i))); // 7 bits with high bit set
+			bs[pos++]=single;
+		}
+		byte end = (byte) (x & 0x7F); // last 7 bits of long, high bit zero
+		bs[pos++]=end;
+		return pos;
+	}
 
 	/**
 	 * Sign extend 7th bit (sign in a VLC byte) of a byte to all bits in a long
@@ -212,7 +260,31 @@ public class Format {
 		}
 		return result;
 	}
-
+	
+	/**
+	 * Reads a VLC encoded count (non-negative integer) as a long from the given location in a byte
+	 * array. Assumes no tag
+	 * @param data Byte array
+	 * @param pos Position from which to read in byte array
+	 * @return long value from byte array
+	 * @throws BadFormatException If format is invalid, or reading beyond end of
+	 *                            array
+	 */
+	public static long readVLCCount(byte[] data, int pos) throws BadFormatException {
+		byte octet = data[pos++];
+		if (octet==0x80) throw new BadFormatException("Superfluous leading zero on VLC count");
+		long result = octet&0x7f;
+		int bits = 7;
+		while (vlcContinuesFrom(octet)) {
+			if (pos >= data.length) throw new BadFormatException("VLC encoding beyond end of array");
+			if (bits > 64) throw new BadFormatException("VLC encoding too long for long value");
+			octet = data[pos++];
+			// continue while high bit of byte set
+			result = (result << 7) | (octet & 0x7F); // shift and set next 7 lowest bits
+			bits += 7;
+		}
+		return result;
+	}
 
 	/**
 	 * Peeks for a VLC encoded message length at the start of a ByteBuffer, which

@@ -333,6 +333,14 @@ public class BlobsTest {
 		assertThrows(Error.class,()->flat.isCompletelyEncoded());
 		doBlobTests(flat);
 	}
+	
+	@Test
+	public void testEncoding() throws BadFormatException {
+		assertEquals(Blob.fromHex("3100"),Blobs.empty().getEncoding());
+		
+		// Bad VLC length
+		assertThrows(BadFormatException.class,()->Format.read(Blob.fromHex("318000")));
+	}
 		
 	@Test 
 	public void testEncodingSize() {
