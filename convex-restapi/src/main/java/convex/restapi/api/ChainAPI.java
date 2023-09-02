@@ -74,7 +74,7 @@ public class ChainAPI extends ABaseAPI {
 	        pathParams = {
 	          @OpenApiParam(
 	        		  name = "hash", 
-	        		  description = "Data Hash", 
+	        		  description = "Data hash as a hex string. Leading '0x' is optional but discouraged.", 
 	        		  required = true, 
 	        		  type = String.class,
 	        		  example = "0x1234567812345678123456781234567812345678123456781234567812345678")
