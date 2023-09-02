@@ -163,13 +163,25 @@ public class Format {
 	}
 
 	/**
-	 * Sign extend 7th bit (sign) of a byte to all bits in a long
+	 * Sign extend 7th bit (sign in a VLC byte) of a byte to all bits in a long
+	 * 
+	 * i.e. sign extend excluding the continuation bit:
+	 * where VLC Byte = csxxxxxx 
 	 * 
 	 * @param b Byte to extend
 	 * @return The sign-extended byte as a long
 	 */
 	public static long vlcSignExtend(byte b) {
 		return (((long) b) << 57) >> 57;
+	}
+	
+	/**
+	 * Checks if VLC continues from given byte, i.e. if high bit is set
+	 * @param octet
+	 * @return True if VLC coding continues, false otherwise
+	 */
+	protected static boolean vlcContinuesFrom(byte octet) {
+		return (octet & 0x80) != 0;
 	}
 	
 	public static long readVLCLong(AArrayBlob blob, int pos) throws BadFormatException {
@@ -188,9 +200,9 @@ public class Format {
 	 */
 	public static long readVLCLong(byte[] data, int pos) throws BadFormatException {
 		byte octet = data[pos++];
-		long result = (((long) octet) << 57) >> 57; // sign extend 7th bit to 64th bit
+		long result = vlcSignExtend(octet); // sign extend 7th bit to 64th bit
 		int bits = 7;
-		while ((octet & 0x80) != 0) {
+		while (vlcContinuesFrom(octet)) {
 			if (pos >= data.length) throw new BadFormatException("VLC encoding beyond end of array");
 			if (bits > 64) throw new BadFormatException("VLC encoding too long for long value");
 			octet = data[pos++];
@@ -200,6 +212,7 @@ public class Format {
 		}
 		return result;
 	}
+
 
 	/**
 	 * Peeks for a VLC encoded message length at the start of a ByteBuffer, which
