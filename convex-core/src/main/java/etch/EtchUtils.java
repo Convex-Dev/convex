@@ -11,6 +11,9 @@ public class EtchUtils {
 		return new FullValidator();
 	}
 
+	/**
+	 * An Etch validator that checks every index entry
+	 */
 	public static class FullValidator implements IEtchIndexVisitor {
 		public long visited=0;
 		public long entries=0;
@@ -78,7 +81,7 @@ public class EtchUtils {
 			}
 		}
 
-		private void fail(String msg) {
+		protected void fail(String msg) {
 			throw new Error(msg);
 		}
 		
