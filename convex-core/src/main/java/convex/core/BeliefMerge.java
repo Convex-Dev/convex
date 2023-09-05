@@ -375,7 +375,7 @@ public class BeliefMerge {
 				}
 			}
 
-			if (winningResult==null) throw new Error("This shouldn't happen!");
+			if (winningResult==null) throw new Error("null winning Order shouldn't happen!");
 			votingSet = winningResult.getValue(); // Update Orderings to be included in next round
 			totalStake = winningVote; // Total Stake among winning Orderings
 			
