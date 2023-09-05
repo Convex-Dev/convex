@@ -127,7 +127,7 @@ public class WalletComponent extends BaseListComponent {
 			AccountStatus as=s.getAccount(address);
 			if (as!=null) {
 				Long bal=as.getBalance();
-				sb.append("Balance: " + ((bal==null)?"Null":Text.toFriendlyNumber(bal)));
+				sb.append("Balance: " + Text.toFriendlyNumber(bal));
 			}
 		});
 		//sb.append("\n");

@@ -245,22 +245,20 @@ public class ObjectsTest {
 			assertSame(a,a.toCanonical());
 			
 			// tests for memory size
-			if (a!=null) {
-				long memorySize=a.getMemorySize();
-				long encodingSize=a.getEncodingLength();
-				int rc=a.getRefCount();
-				long childMem=0;
-				for (int i=0; i<rc; i++) {
-					Ref<ACell> childRef=a.getRef(i);
-					long cms=childRef.getMemorySize();
-					childMem+=cms;
-				}
-				boolean embedded=Format.isEmbedded(a);
-				if (embedded) {
-					assertEquals(memorySize,childMem);
-				} else {
-					assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
-				}
+			long memorySize=a.getMemorySize();
+			long encodingSize=a.getEncodingLength();
+			int rc=a.getRefCount();
+			long childMem=0;
+			for (int i=0; i<rc; i++) {
+				Ref<ACell> childRef=a.getRef(i);
+				long cms=childRef.getMemorySize();
+				childMem+=cms;
+			}
+			boolean embedded=Format.isEmbedded(a);
+			if (embedded) {
+				assertEquals(memorySize,childMem);
+			} else {
+				assertEquals(memorySize,encodingSize+childMem+Constants.MEMORY_OVERHEAD);
 			}
 		} else {
 			// non-canonical objects should convert to a canonical object

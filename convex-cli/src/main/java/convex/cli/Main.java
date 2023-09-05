@@ -348,13 +348,11 @@ public class Main implements Runnable {
 		AKeyPair keyPair = null;
 
 		publicKey = publicKey.trim();
-		if (publicKey != null) {
-			publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
-		}
-
+		publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
 		if (publicKey.isEmpty()) {
 			return null;
 		}
+		
 		String password=getPassword();
 
 		File keyFile = new File(getKeyStoreFilename());

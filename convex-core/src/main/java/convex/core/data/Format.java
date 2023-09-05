@@ -802,8 +802,9 @@ public class Format {
 		
 		// read first cell
 		T result= Format.read(data,0);
-		if (result==null) return result; // null value OK at top level
-		int rl=(result==null)?1:Utils.checkedInt(result.getEncodingLength());
+		if (result==null) return null; // null value OK at top level
+		
+		int rl=Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Already complete
 		
 		// read remaining cells

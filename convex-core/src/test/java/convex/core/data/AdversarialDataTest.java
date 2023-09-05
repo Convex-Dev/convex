@@ -67,7 +67,7 @@ public class AdversarialDataTest {
 		invalidTest(MapLeaf.unsafeCreate(new MapEntry[0]));
 	}
 	
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({ "unchecked", "null" })
 	@Test public void testBadSetTree() {
 		SetTree<CVMLong> a = Samples.INT_SET_300;
 		

@@ -242,7 +242,7 @@ public class BeliefPropagator extends AThreadedComponent {
 				beliefChanged=newOrder!=null;
 			} else {
 				if (newOrder==null) {
-					beliefChanged=(oldOrder!=null);
+					beliefChanged=true; // old order must have been removed
 				} else {
 					beliefChanged=!newOrder.consensusEquals(oldOrder);
 				}
