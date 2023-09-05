@@ -125,6 +125,10 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	Belief belief=null;
+
+	private Consumer<SignedData<Order>> orderUpdateObserver;
+
+	private Consumer<Belief> beliefUpdateObserver;
 	
 	protected void loop() throws InterruptedException {
 		
@@ -214,11 +218,23 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 		
 		// Return true iff we published a new Block or updated our own Order
-		return (updated||published);
-
+		if (updated||published) {
+			observeBeliefUpdate(belief);
+			return true;
+		} else {
+			return false;
+		}
 	}
 
 	
+	private void observeBeliefUpdate(Belief b) {
+		Consumer<Belief> obs=beliefUpdateObserver;
+		if (obs!=null) {
+			obs.accept(b);
+		}
+	}
+
+
 	/**
 	 * Checks for mergeable remote beliefs, and if found merge and update own
 	 * belief.
@@ -327,6 +343,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						
 						// Ensure we can persist newly received Order
 						so=ACell.createPersisted(so).getValue();
+						observeOrderUpdate(so);
 						orders.put(key, so);
 						changed=true;
 					} catch (MissingDataException e) {
@@ -360,6 +377,14 @@ public class BeliefPropagator extends AThreadedComponent {
 		return changed;
 	}
 	
+	private void observeOrderUpdate(SignedData<Order> so) {
+		Consumer<SignedData<Order>> obs=orderUpdateObserver;
+		if (obs!=null) {
+			obs.accept(so);
+		}
+	}
+
+
 	private void analyseMissing(Hash h, Message m, SignedData<Order> so) throws BadFormatException {
 		if (!ANALYSE_MISSING) return;
 		
@@ -470,5 +495,21 @@ public class BeliefPropagator extends AThreadedComponent {
 	@Override
 	protected String getThreadName() {
 		return "Belief propagator thread on port "+server.getPort();
+	}
+
+	/**
+	 * Sets the observer for order updates
+	 * @param orderUpdateObserver New Observer for ORder updates
+	 */
+	public void setOrderUpdateObserver(Consumer<SignedData<Order>> orderUpdateObserver) {
+		this.orderUpdateObserver = orderUpdateObserver;
+	}
+	
+	/**
+	 * Sets the observer for belief updates
+	 * @param observer New Observer for Belief updates
+	 */
+	public void setBeliefUpdateObserver(Consumer<Belief> observer) {
+		this.beliefUpdateObserver = observer;
 	}
 }

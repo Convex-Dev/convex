@@ -1619,6 +1619,17 @@ public class RT {
 			}
 			return (T) cm;
 		}
+		Class<?> klass=o.getClass();
+		if (klass.isArray()) {
+			AVector<?> r=Vectors.empty();
+			int n=Array.getLength(o);
+			for (int i=0; i<n; i++) {
+				Object elem=Array.get(o, i);
+				ACell v=RT.cvm(elem);
+				r=r.conj(v);
+			}
+			return (T) r;
+		}
 		
 		throw new IllegalArgumentException("Can't convert to CVM type with class: " + Utils.getClassName(o));
 	}

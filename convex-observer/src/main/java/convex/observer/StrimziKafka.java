@@ -17,6 +17,7 @@ import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.ContentType;
 import org.json.simple.JSONValue;
 
+import convex.core.Order;
 import convex.core.Result;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
@@ -66,6 +67,28 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		this.topic="test";
 		this.url="https://kfk.walledchannel.net:8010/topics/";
 		this.peerKey=server.getPeerKey().toString();
+	}
+	
+	public Consumer<SignedData<Order>> getOrderUpdateObserver(Server s) {
+		return tx->{
+			queue(()->{
+				return orderToJSON(tx);
+			});
+		};
+	}
+	
+	public HashMap<String,Object>orderToJSON(SignedData<Order> so) {
+		HashMap<String,Object> val=new HashMap<>();
+		val.put("type","order");
+		
+		val.put("key",RT.json(so.getAccountKey()));
+		val.put("order-id",RT.json(so.getHash()));
+		val.put("ts",Utils.getCurrentTimestamp());
+		
+		Order o=so.getValue();
+		val.put("cps",RT.cvm(o.getConsensusPoints()));
+
+		return buildRecord(val);
 	}
 	
 	public Consumer<SignedData<ATransaction>> getTransactionRequestObserver(Server s) {
