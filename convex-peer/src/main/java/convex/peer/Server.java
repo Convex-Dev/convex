@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -32,6 +33,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -41,6 +43,7 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -78,13 +81,17 @@ public class Server implements Closeable {
 
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
-	// private static final Level LEVEL_MESSAGE = Level.FINER;
+	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
 	 * Message Consumer that simply enqueues received client messages received by this peer
 	 * Called on NIO thread: should never block
 	 */
-	Consumer<Message> receiveAction = m->processMessage(m);
+	Consumer<Message> receiveAction = m->{
+		observeMessageReceived(m);
+		processMessage(m);
+	};
+
 
 	/**
 	 * Connection manager instance.
@@ -288,6 +295,17 @@ public class Server implements Closeable {
 	 */
 	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		return new Server(new HashMap<>(config));
+	}
+
+	private void observeMessageReceived(Message m) {
+		Consumer<Message> obs=messageReceiveObserver;
+		if (obs!=null) {
+			obs.accept(m);
+		}
+	}
+	
+	public void setMessageReceiveObserver(Consumer<Message> observer) {
+		this.messageReceiveObserver=observer;
 	}
 
 	/**
