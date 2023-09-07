@@ -25,7 +25,7 @@
 
   ^{:private? true}
 
-  ;; Map of `symbol` -> `[address-target address-controller]`.
+  ;; Map of `symbol` -> `[address-target address-controller meta]`.
 
   {})
 
@@ -121,7 +121,9 @@
                 :examples    [{:code "(call *registry* (cns-update 'my.actor addr)"}]
                 :signature   [{:params [name addr]}]}}
 
-  [name addr]
+  ([name addr]
+    (recur name addr nil))
+  ([name addr meta]
 
   (let [record (get cns-database
                     name)]
@@ -140,4 +142,5 @@
          (assoc cns-database
                 name
                 [addr
-                 *caller*]))))
+                 *caller*
+                 meta])))))
