@@ -364,7 +364,7 @@ public class BeliefMerge {
 			for (Map.Entry<SignedData<Block>, HashMap<AVector<SignedData<Block>>, Double>> me : blockVotes.entrySet()) {
 				HashMap<AVector<SignedData<Block>>, Double> agreedChains = me.getValue();
 				double blockVote = computeVote(agreedChains);
-				if (blockVote > winningVote) {
+				if ((winningResult==null)||(blockVote > winningVote)) {
 					winningVote = blockVote;
 					winningResult = me;
 				} else if (blockVote==winningVote) {

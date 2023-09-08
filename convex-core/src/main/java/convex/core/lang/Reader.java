@@ -9,7 +9,7 @@ import convex.core.lang.reader.AntlrReader;
 import convex.core.util.Utils;
 
 /**
- * Parboiled Parser implementation which reads source code and produces a tree
+ * Reader implementation which reads source code and produces a tree
  * of parsed objects.
  * 
  * Supports reading in either raw form (ACell) mode or wrapping with Syntax Objects. The
@@ -17,7 +17,6 @@ import convex.core.util.Utils;
  *
  * "Talk is cheap. Show me the code." - Linus Torvalds
  */
-@SuppressWarnings("javadoc")
 public class Reader {
 	/**
 	 * Parses an expression and returns a Syntax object

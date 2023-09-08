@@ -32,7 +32,6 @@ public class PFXTools {
 	 * @param passPhrase Passphrase used to protect the key store, may be null
 	 * @return New KeyStore instance
 	 */
-	@SuppressWarnings("javadoc")
 	public static KeyStore createStore(File keyFile, String passPhrase) throws GeneralSecurityException, IOException {
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
