@@ -74,7 +74,7 @@
 (defn cns-control
 
   ^{:callable? true
-    :doc       {:description "Updates a CNS name mapping to set a new controller. May only be peformed by a current controller."
+    :doc       {:description "Updates a CNS name mapping to set a new controller. May only be performed by a current controller."
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
 
