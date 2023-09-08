@@ -372,7 +372,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	public abstract long longValue();
 	
 	@Override
-	public int hashCode() {
+	public final int hashCode() {
 		// note: We use the Java hashcode of the last bytes for blobs
 		return Long.hashCode(longValue());
 	}

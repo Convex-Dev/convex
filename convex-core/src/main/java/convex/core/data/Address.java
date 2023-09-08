@@ -58,13 +58,6 @@ public final class Address extends ALongBlob {
 	public AType getType() {
 		return Types.ADDRESS;
 	}
-	
-
-	@Override
-	public int hashCode() {
-		// note: We use the Java hashcode of a long 
-		return Long.hashCode(value);
-	}
 
 	@Override
 	public boolean equals(ACell o) {
