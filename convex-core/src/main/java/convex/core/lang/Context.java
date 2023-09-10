@@ -529,7 +529,7 @@ public class Context {
 
 		// if not found, return UNDECLARED error
 		if (envEntry==null) {
-			return withError(ErrorCodes.UNDECLARED,symbol.getName());
+			return withUndeclaredError(symbol);
 		}
 
 		// Result is whatever is defined as the datum value in the environment entry
@@ -1887,6 +1887,10 @@ public class Context {
 	public Context withCompileError(String message) {
 		return withError(ErrorCodes.COMPILE,message);
 	}
+	
+	public Context withUndeclaredError(Symbol sym) {
+		return withError(ErrorCodes.UNDECLARED,sym.getName());
+	}
 
 	public Context withBoundsError(long index) {
 		return withError(ErrorCodes.BOUNDS,"Index: "+index);
@@ -2295,6 +2299,8 @@ public class Context {
 		}
 		return null;
 	}
+
+
 
 
 

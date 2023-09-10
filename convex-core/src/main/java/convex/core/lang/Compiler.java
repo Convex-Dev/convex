@@ -231,7 +231,7 @@ public class Compiler {
 				Def<?> op = Def.create(sym, exp);
 				return context.withResult(Juice.COMPILE_NODE,op);
 			}
-			return context.withCompileError("Trying to set! an undeclared symbol: "+sym);
+			return context.withUndeclaredError(sym);
 		} else {
 			// Otherwise must be a Local binding, so use a Set op
 			AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);

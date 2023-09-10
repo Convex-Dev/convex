@@ -447,6 +447,13 @@
   [x]
   x)
 
+(defmacro set-in!
+		^{:doc {:description "Sets a value within a nested associative structure, combining behaviour of set! and assoc-in."
+	          :examples    [{:code "(let [foo {}] (set-in! foo [:a] 1) foo)"}]
+	          :signature   [{:params [[sym sequence] & body]}]}}
+  [sym path val]
+  `(set! ~sym (assoc-in ~sym ~path ~val)))
+
 (defmacro import
   ^{:doc {:description ["Imports a library for use in the current environment."
                         "Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."

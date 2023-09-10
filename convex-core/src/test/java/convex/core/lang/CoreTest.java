@@ -3923,9 +3923,13 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testSetBang() {
+		// set! works in scope of let bindings
+		assertCVMEquals(2L, eval("(let [a 1] (set! a 2) a)"));
+		assertCVMEquals(1L, eval("(let [a 1] (let [a 2] (set! a 3)) a)"));
+		
 		// set! fails on undeclared values
-		assertCompileError(step("(set! a 13)"));
-		assertCompileError(step("(do (set! a 13) a)"));
+		assertUndeclaredError(step("(set! not-declared 1)"));
+		assertUndeclaredError(step("(do (set! a 13) a)"));
 
 		// set! works in a function body
 		assertEquals(35L,evalL("(let [a 13 f (fn [x] (set! a 25) (+ x a))] (f 10))"));
@@ -3946,15 +3950,55 @@ public class CoreTest extends ACVMTest {
 
 		// TODO: reconsider this
 		// set! doesn't work outside eval boundary?
-		assertCompileError(step ("(let [a 5] (eval `(set! a 7)) a)"));
+		assertUndeclaredError(step ("(let [a 5] (eval `(set! a 7)) a)"));
 		
 		// Set on a defined value in environment
 		{
 			Context ctx=step("(def foo 10)");
-			assertCompileError(step("(set! bar 20)"));
+			assertUndeclaredError(step("(set! bar 20)"));
 			assertEquals(20L,evalL(ctx,"(do (set! foo 20 ) foo)"));
+			
+			// set within let doesn't affect environment
+			assertCVMEquals(10L, eval(ctx,"(do (let [foo 2] (set! foo 3)) foo)"));
+
+			// def within let does affect environment
+			assertCVMEquals(3L, eval(ctx,"(do (let [a 2] (def a 3)) a)"));
 		}
+		
+		// Bad types
+		assertCompileError(step("(set! :a 2)"));
+		assertCompileError(step("(set! 'noff 2)"));
+		
+		// Arity problems
+		assertArityError(step("(set! a)"));
+		assertArityError(step("(set! a 2 3)"));
 	}
+	
+	@Test
+	public void testSetIn() {
+		assertEquals(Maps.of(Keyword.create("a"),1),eval("(let [foo {}] (set-in! foo [:a] 1) foo)"));
+
+		assertUndeclaredError(step("(set-in! bar [:a] 20)"));
+		
+		{
+			Context c=step("(def a 1)");
+			
+			assertCVMEquals(2L,eval(c,"(do (set-in! a [] 2 ) a)"));
+			
+			// Bad path
+			assertCastError(step(c,"(set-in! a :foo 3)"));
+
+			// Path through non-associative value
+			assertCastError(step(c,"(set-in! a [:bar] 3)"));
+
+		}
+		
+		// Arity problems (before cast)
+		assertArityError(step("(set-in! :a)"));
+		assertArityError(step("(set-in! :a 2)"));
+		assertArityError(step("(set-in! :a :foo :bar 2)"));
+	}
+
 
 	@Test
 	public void testEval() {
