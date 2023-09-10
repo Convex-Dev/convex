@@ -51,56 +51,43 @@
 
       (def token ~token)
       (def torus ~torus)
-      (def token-balance
-           0)
+      (def token-balance 0)
 
 
       (defn add-liquidity
-
-        ^{:callable? true}
-
+    		  ^{:callable? true}
         [amount]
-
         (let [;; Amount of tokens deposited.
-              amount              (int amount)
+              amount (int amount)
+     
               ;; Price of token in CVX (double), nil if no current liquidity.
-              price               (price)
+              price (price)
               initial-cvx-balance *balance*
+     
               ;; Amount of CVX required (all if initial deposit). Note Long range required
-              cvx                 (core/accept (if price 
-                                                 (long (* price
-                                                          amount))
-                                                 *offer*))
+              cvx (core/accept (if price 
+                                        (long (* price amount))
+                                        *offer*))
               ;; Ensures tokens are transferred from caller to market actor.
-              _                   (asset/accept *caller* token amount)
-              ;; Compute new total balances for actor/
-              new-token-balance   (+ token-balance
-                                     amount)
+              _ (asset/accept *caller* token amount)
+              
+              ;; Compute new total balances for actor
+              new-token-balance   (+ token-balance amount)
+              
               ;; Compute number of new shares for depositor = increase in liquidity (%) * current total shares.
               ;; If no current liquidity just initialise with the geometric mean of amounts deposited.
-              delta               (if (> supply
-                                         0)
-                                    (let [;; Initial size of liquidity pool (geometric mean).
-                                          liquidity     (sqrt (* (double initial-cvx-balance)
-                                                                 token-balance))
-                                          new-liquidity (sqrt (* (double *balance*)
-                                                                 new-token-balance))]
-                                      (int (* (- new-liquidity
-                                                  liquidity)
-                                               (/ supply
-                                                  liquidity))))
-                                    (int (sqrt (* (double amount)
-                                                   cvx))))]
-           ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance (all longs)
-           (set-holding *caller*
-                        (+ delta
-                           (or (get-holding *caller*)
-                               0)))
-           (def supply (+ supply
-                          delta))
-           (def token-balance
-                new-token-balance)
-           delta))
+              delta (if (> supply 0)
+                      (let [;; Initial size of liquidity pool (geometric mean).
+                            liquidity  (sqrt (* (double initial-cvx-balance) token-balance))
+                            new-liquidity (sqrt (* (double *balance*) new-token-balance))]
+                        (int (* (- new-liquidity liquidity) (/ supply liquidity))))
+                      (int (sqrt (* (double amount) cvx))))]
+            		   
+        ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance (all longs)
+        (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
+        (def supply (+ supply delta))
+        (def token-balance new-token-balance)
+        delta))
 
 
        (defn buy-cvx
@@ -111,7 +98,7 @@
 
          (let [amount          (long amount)
                required-tokens (or (buy-cvx-quote amount)
-                                   (fail :FUNDS
+                                   (fail :LIQUIDITY
                                          "Pool cannot supply this amount of CVX"))]
            (asset/accept *caller*
                          [token
@@ -160,7 +147,7 @@
 
          (let [amount       (long amount)
                required-cvx (or (buy-tokens-quote amount)
-                                (fail "Pool cannot supply this amount of tokens"))]
+                                (fail :LIQUIDITY "Pool cannot supply this amount of tokens"))]
            (core/accept required-cvx)
            (def token-balance
                 (- token-balance
@@ -385,7 +372,7 @@
     (or existing-market
         (let [market (deploy (build-market token
                                            *address*))]
-          (def markets
+          (set! markets
                (assoc markets
                       token
                       market))
@@ -454,8 +441,7 @@
 
   (let [market (or (get-market token)
                    (fail :LIQUIDITY
-                         (str "Torus: market does not exist for token: "
-                              token)))]
+                         (str "Torus: market does not exist for token: " token)))]
     ;; Note we can offer all tokens, market will accept what it needs to complete order.
     (asset/offer market
                  [token
@@ -476,8 +462,7 @@
 
   (let [market (or (get-market token)
                    (fail :LIQUIDITY
-                         (str "Torus: market does not exist for token: "
-                                token)))]
+                         (str "Torus: market does not exist for token: " token)))]
     ;; Note we can offer all CVX
     (call market
           *balance*
@@ -502,38 +487,28 @@
 
    (when-let [market (get-market with-token)]
      (when-let [cvx-amount (buy-quote of-token amount)]
-       (call market
-             (buy-cvx-quote cvx-amount))))))
+       (call market (buy-cvx-quote cvx-amount))))))
 
 
 
 (defn price
-
   ^{:doc {:description "Gets the current price for a token, in CVX or an optional given currency. Returns nil if a market with liquidity does not exist."
           :examples  [{:code "(price USD)"}
                       {:code "(price GBP USD)"}]
           :signature [{:params [token]}
                       {:params [token currency]}]}}
-
-
   ([token]
-
-   (when-let [market (get-market token)]
-     (call market
-           (price))))
-
+    (if-let [market (get-market token)]
+      (call market (price))))
 
   ([token currency]
-
    (let [market.token    (or (get-market token)
                              (return nil))
-         price.cvx       (or (call market.token
-                                   (price))
+         price.cvx       (or (call market.token (price))
                              (return nil))
          market.currency (or (get-market currency)
                              (return nil))
-         price.currency  (or (call market.currency
-                                   (price))
+         price.currency  (or (call market.currency (price))
                              (return nil))]
      (/ price.cvx
         price.currency))))
@@ -541,31 +516,23 @@
 
 
 (defn sell
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Sells a given amount of a fungible token in exchange for another token"
           :signature   [{:params [of-token amount with-token]}]}}
 
   [of-token amount with-token]
 
-  (let [cvx-amount (sell-tokens of-token
-                                amount)]
-    (sell-cvx with-token
-              cvx-amount)))
+  (let [cvx-amount (sell-tokens of-token amount)]
+    (sell-cvx with-token cvx-amount)))
 
 
 
 (defn sell-cvx
-
   ^{:doc {:description nil
           :signature   [{:params [token amount]}]}}
-
   [token amount]
-
   (let [market (or (get-market token)
-                   (fail :LIQUIDITY
-                         (str "Torus: market does not exist for token: "
-                              token)))]
-    ;; Offer the amount of CVX being sold.
+                   (fail :LIQUIDITY (str "Torus: market does not exist for token: " token)))]
+    ;; Call with an offer equal to the amount of CVX being sold.
     (call market
           amount
           (sell-cvx amount))))
@@ -604,8 +571,7 @@
 
   (let [market (or (get-market token)
                    (fail :LIQUIDITY
-                         (str "Torus: market does not exist for token: "
-                              token)))]
+                         (str "Torus: market does not exist for token: " token)))]
   ;; Offer the amount of tokens being sold.
   (asset/offer market
                [token
@@ -623,6 +589,6 @@
   [token shares]
 
   (let [market (or (get-market token)
-                   (fail "No market exists to withdraw liquidity"))]
+                   (fail :STATE "No market exists to withdraw liquidity"))]
     (call market
           (withdraw-liquidity shares))))

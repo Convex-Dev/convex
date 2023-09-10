@@ -173,7 +173,7 @@
       ;; Update state
     (-set-balance *caller* id new-bal)
       (do 
-        (def tokens (assoc tokens id [controller new-supply]))
+        (set! tokens (assoc tokens id [controller new-supply]))
         new-supply))))
 
 (defn quantity-add

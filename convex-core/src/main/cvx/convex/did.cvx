@@ -67,7 +67,7 @@
          rec (assoc rec 0 ddo)         ;; update DDO
          rec (assoc rec 3 *timestamp*) ;; update timestamp
          ]
-     (def dids (assoc dids id rec))
+     (set! dids (assoc dids id rec))
      rec)))
 
 (defn 
