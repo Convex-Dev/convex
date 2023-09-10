@@ -22,24 +22,14 @@
 ;;;;;;;;;; Values
 
 (def cns-database
-
   ^{:private? true}
-
   ;; Map of `symbol` -> `[address-target address-controller meta]`
-
   {})
 
-
-
 (def trust
-
   ^{:private? true}
-
   ;; Address of the `convex.trust`, it is deployed right after this account, hence it is predictable.
-
   (address (inc (long *address*))))
-
-
 
 ;;;;;;;;;; Address metadata
 
@@ -71,19 +61,11 @@
   [name addr]
   (let [record (get cns-database
                     name)]
-   (when (nil? record)
-     (fail :STATE
-           "CNS record does not exist"))
-   (when (not (trust/trusted? (second record)
-                              *caller* :control))
-     (fail :TRUST
-           "Caller is not trusted with transferring control for that CNS record"))
-    (def cns-database
-         (assoc cns-database
-                name
-                (assoc record
-                       1
-                       addr)))))
+    (when (nil? record)
+      (fail :STATE "CNS record does not exist"))
+    (when (not (trust/trusted? (second record) *caller* :control))
+      (fail :TRUST "Caller is not trusted with transferring control for that CNS record"))
+    (set-in! cns-database [name 1] addr)))
 
 (defn cns-resolve
   ^{:callable? true
@@ -103,21 +85,16 @@
   ([name addr]
     (recur name addr nil))
   ([name addr meta]
-	(let [record (get cns-database name)]
-       (when (and record
-               (not (trust/trusted? (second record)
-                                    *caller*)))
-          (fail :TRUST
-            "Caller is not trusted with updating the requested CNS record"))
-    (when-not (account addr)
-      (fail :NOBODY
-	        "Can only use an existing account"))
-    (when-not (symbol? name)
-      (fail :ARGUMENT
-	        "CNS names must be a valid symbol"))
-    (def cns-database
+	(when-not (account addr)
+	  (fail :NOBODY "Can only use an existing account"))
+	(when-not (symbol? name)
+	  (fail :ARGUMENT "CNS names must be a valid symbol"))
+	(let [record (get cns-database name) 
+	      monitor (if record (second record) *caller*)] ;; TODO limit ability to crteate top level CNS
+      (and record (not (trust/trusted? monitor *caller* :update))
+        (fail :TRUST "Unauthorised update to CNS record"))
+    
+      (set! cns-database
          (assoc cns-database
                 name
-                [addr
-                 *caller*
-                 meta])))))
+                [addr monitor meta])))))

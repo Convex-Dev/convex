@@ -524,7 +524,7 @@ public class Context {
 	 */
 	public Context lookupDynamic(Address address, Symbol symbol) {
 		AccountStatus as=getAccountStatus(address);
-		if (as==null) return withError(ErrorCodes.NOBODY,"No account found for: "+symbol.toString());
+		if (as==null) return withError(ErrorCodes.NOBODY,"No account found for: "+address+"/"+symbol.toString());
 		MapEntry<Symbol,ACell> envEntry=lookupDynamicEntry(as,symbol);
 
 		// if not found, return UNDECLARED error
