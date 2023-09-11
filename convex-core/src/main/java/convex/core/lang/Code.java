@@ -27,9 +27,24 @@ public class Code {
 		AList<ACell> cmd=List.of(Symbols.CNS_UPDATE, Code.quote(name), addr);
 		return List.of(Symbols.CALL, Init.REGISTRY_ADDRESS, cmd );
 	}
-
-	public static AList<Symbol> quote(Symbol name) {
-		if (name==null) throw new NullPointerException("null Symbol for Code.quote");
-		return List.of(Symbols.QUOTE, name);
+	
+	/**
+	 * Create code to quote an arbitrary form
+	 * @param form Form to quote
+	 * @return Form to produce the quoted Symbol
+	 */
+	public static AList<Symbol> quote(ACell form) {
+		return List.of(Symbols.QUOTE, form);
 	}
+
+	/**
+	 * Create code to quote a Symbol
+	 * @param sym Symbol to quote
+	 * @return Form to produce the quoted Symbol
+	 */
+	public static AList<Symbol> quote(Symbol sym) {
+		return List.of(Symbols.QUOTE, sym);
+	}
+	
+
 }

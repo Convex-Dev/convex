@@ -281,17 +281,21 @@ public class Init {
 
 	private static State doCurrencyDeploy(State s, AVector<ACell> row) {
 		String symName = row.get(0).toString();
-		double usdValue = RT.jvm(row.get(6));
-		long decimals = RT.jvm(row.get(5));
+		double usdPrice = RT.jvm(row.get(6)); // Value in USD for currency, e.g. USD=1.0, GBP=1.3
+		long decimals = RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
+		long usdValue=(Long) RT.jvm(row.get(4)); // USD value of liquidity in currency
+		
+		long subDivisions=Math.round(Math.pow(10, decimals));
+		
+		// Currency liquidity (in lowest currency subdivision)
+		double liquidity =  (usdValue/usdPrice)*subDivisions;
+		long supply = Math.round(liquidity);
+		
+		// CVX price for currency
+		double cvxPrice = usdPrice * 10000000; // One CVX Gold = 100 USD
+		double cvx = cvxPrice * supply / subDivisions;
 
-		// Currency liquidity in lowest currency division
-		double liquidity = (Long) RT.jvm(row.get(4)) * Math.pow(10, decimals);
-
-		// CVX price for unit
-		double price = usdValue * 1000;
-		double cvx = price * liquidity / Math.pow(10, decimals);
-
-		long supply = 1000000000000L;
+		
 		Context ctx = Context.createFake(s, MAINBANK_ADDRESS);
 		ctx = ctx.eval(Reader
 				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + "})))"));
