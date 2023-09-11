@@ -23,7 +23,7 @@ import convex.core.lang.Reader;
 import convex.core.util.Utils;
 
 /**
- * Static class for generating the initial Convex State
+ * Static class for generating the initial Convex Genesis State
  *
  * "The beginning is the most important part of the work." - Plato, The Republic
  */
@@ -46,10 +46,14 @@ public class Init {
 	public static final Address REGISTRY_ADDRESS = Address.create(9);
     public static final Address TRUST_ADDRESS = Address.create(10);
 
-	// Base for user-specified addresses
+	// Base for genesis user addresses
 	public static final Address GENESIS_ADDRESS = Address.create(11);
 
-
+	/**
+	 * Creates the base genesis state (before deployment of standard libraries and actors)
+	 * @param genesisKeys Keys for genesis users and peers
+	 * @return Base genesis state
+	 */
 	public static State createBaseState(List<AccountKey> genesisKeys) {
 		// accumulators for initial state maps
 		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
@@ -98,12 +102,12 @@ public class Init {
 		// Build globals
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
-		// Create the inital state
+		// Create the initial state
 		State s = State.create(accts, peers, globals, BlobMaps.empty());
 		supply-=s.getGlobalMemoryValue().longValue();
 
 		// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
-		s = createStaticLibraries(s, TRUST_ADDRESS, REGISTRY_ADDRESS);
+		s = addStaticLibraries(s);
 
 		// Reload accounts with the libraries
 		accts = s.getAccounts();
@@ -119,6 +123,7 @@ public class Init {
 			accts = addAccount(accts, GENESIS_ADDRESS, genesisKeys.get(0), genFunds);
 			userFunds -= genFunds;
 			
+			// One Peer account for each  specified key (including initial genesis user)
 			for (int i = 0; i < keyCount; i++) {
 				Address address = Address.create(accts.count());
 				assert(address.toExactLong() == accts.count());
@@ -141,10 +146,10 @@ public class Init {
 				AccountKey peerKey = genesisKeys.get(i);
 				Address peerController = getGenesisPeerAddress(i);
 	
-				// set a staked fund such that the first peer starts with super-majority
+				// Divide funds among peers
 				long peerStake = peerFunds / (keyCount-i);
 	
-	            // split peer funds between stake and account
+	            // Add peer with specified stake
 				peers = addPeer(peers, peerKey, peerController, peerStake);
 				peerFunds -= peerStake;
 			}
@@ -152,9 +157,9 @@ public class Init {
 		}
 		
 
-		// Add the new accounts to the state
+		// Add the new accounts to the State
 		s = s.withAccounts(accts);
-		// Add peers to the state
+		// Add peers to the State
 		s = s.withPeers(peers);
 
 		{ // Test total funds after creating user / peer accounts
@@ -165,30 +170,26 @@ public class Init {
 		return s;
 	}
 
-	public static State createStaticLibraries(State s, Address trustAddress, Address registryAddress) {
+	/**
+	 * Creates the built-in static Libraries (registry, trust)
+	 * @param s State to add core libraries to
+	 * @param trustAddress
+	 * @param registryAddress
+	 * @return Updates state
+	 */
+	private static State addStaticLibraries(State s) {
 
-		// At this point we have a raw initial state with no user or peer accounts
-
+		// At this point we have a raw initial State with no user or peer accounts
 		s = doActorDeploy(s, "convex/registry.cvx");
 		s = doActorDeploy(s, "convex/trust.cvx");
 
-		{ // Register core libraries now that registry exists
+		{ // Register core library now that registry exists
 			Context ctx = Context.createFake(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
 						             
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
 		}
-
-		/*
-		 * This test below does not correctly calculate the total funds of the state, since
-		 * the peers have not yet been added.
-		 *
-		{ // Test total funds after creating core libraries
-			long total = s.computeTotalFunds();
-			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total + " should be " + Constants.MAX_SUPPLY);
-		}
-		*/
 
 		return s;
 	}
