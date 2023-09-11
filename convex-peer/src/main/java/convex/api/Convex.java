@@ -23,6 +23,7 @@ import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
@@ -385,12 +386,23 @@ public abstract class Convex {
 		if (transaction.getOrigin() == null) {
 			transaction = transaction.withOrigin(address);
 		}
-		if (autoSequence && (transaction.getSequence() <= 0)) {
+		long seq=transaction.getSequence();
+		if (autoSequence && (seq <= 0)) {
+			Address origin=transaction.getOrigin();
 			// apply sequence if using expected address
-			if (Utils.equals(transaction.getOrigin(), address)) {
+			if (Utils.equals(origin, address)) {
 				transaction = applyNextSequence(transaction);
-			} else {
-				// ignore??
+			}
+			Server s=getLocalServer();
+			if (s!=null) {
+				State state=s.getPeer().getConsensusState();
+				AccountStatus as=state.getAccount(origin);
+				if (as!=null) {
+					long expected=as.getSequence()+1;
+					if (expected>transaction.getSequence()) {
+						transaction=transaction.withSequence(expected);
+					}
+				}
 			}
 		}
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
