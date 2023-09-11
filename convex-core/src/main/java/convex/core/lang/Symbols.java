@@ -304,6 +304,7 @@ public class Symbols {
 	public static final Symbol LOG = intern("log");
 
 	public static final Symbol CNS_RESOLVE = intern("cns-resolve");
+	public static final Symbol CNS_UPDATE = intern("cns-update");
 
 	public static final Symbol NAN_Q = intern("nan?");
 

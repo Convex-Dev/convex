@@ -17,6 +17,7 @@ import convex.core.data.BlobMaps;
 import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.lang.Code;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
@@ -266,8 +267,10 @@ public class Init {
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
 			Address addr=ctx.getResult();
 			
-			ACell qsym=forms.get(0);
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + qsym + " " + addr + "))"));
+			@SuppressWarnings("unchecked")
+			AList<Symbol> qsym=(AList<Symbol>) forms.get(0);
+			Symbol sym=qsym.get(1);
+			ctx = ctx.eval(Code.cnsUpdate(sym, addr));
 			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
 
 			return ctx.getState();
@@ -277,7 +280,7 @@ public class Init {
 	}
 
 	private static State doCurrencyDeploy(State s, AVector<ACell> row) {
-		String symbol = row.get(0).toString();
+		String symName = row.get(0).toString();
 		double usdValue = RT.jvm(row.get(6));
 		long decimals = RT.jvm(row.get(5));
 
@@ -296,7 +299,9 @@ public class Init {
 		ctx = ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity " + addr + " "
 				+ liquidity + " " + cvx + "))"));
 		if (ctx.isExceptional()) throw new Error("Error adding market liquidity: " + ctx.getValue());
-		ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'currency." + symbol + " " + addr + "))"));
+		
+		Symbol sym=Symbol.create("currency."+symName);
+		ctx = ctx.eval(Code.cnsUpdate(sym, addr));
 		if (ctx.isExceptional()) throw new Error("Error registering currency in CNS: " + ctx.getValue());
 		return ctx.getState();
 	}
