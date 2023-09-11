@@ -1,0 +1,7 @@
+'app.names
+
+;; A CNS name manager for purchasable / tradable names
+
+
+;; Map of String -> [monitor expiry]
+(def names {})
