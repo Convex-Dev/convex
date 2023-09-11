@@ -330,13 +330,13 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public ASequence<T> next() {
+	public AList<T> next() {
 		if (count <= 1) return null;
 		return slice(1, count);
 	}
 
 	@Override
-	public ASequence<T> slice(long start, long end) {
+	public AList<T> slice(long start, long end) {
 		if ((start == 0) && (end == count)) return this;
 		return reverse(data.slice(count - end, count-start));
 	}

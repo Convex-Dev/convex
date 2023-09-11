@@ -15,6 +15,7 @@ import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
 import convex.core.data.PeerStatus;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
@@ -258,11 +259,15 @@ public class Init {
 
 		try {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
-
-			ctx = ctx.deployActor(forms.next().toCellArray());
+			AList<ACell> code=forms.next();
+			
+			
+			ctx = ctx.deployActor(code.toCellArray());
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
-
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + forms.get(0) + " " + ctx.getResult() + "))"));
+			Address addr=ctx.getResult();
+			
+			ACell qsym=forms.get(0);
+			ctx = ctx.eval(Reader.read("(call *registry* (cns-update " + qsym + " " + addr + "))"));
 			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
 
 			return ctx.getState();

@@ -51,6 +51,9 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	public AList<T> empty() {
 		return Lists.empty();
 	}
+	
+	@Override
+	public abstract AList<T> next();
 
 	@Override
 	public abstract <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper);
