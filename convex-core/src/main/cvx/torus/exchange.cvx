@@ -1,9 +1,10 @@
 'torus.exchange
 
 (call *registry*
-      (register {:description ["Torus establishes automated market makers for fungible assets (see `convex.fungible`)."
-                               "It creates singleton CVX/Token trading pairs for each fungible asset."]
-                 :name        "Torus exchange"}))
+      (register {:description ["Torus is a decentralised exchange (DEX) that is fully on-chain and native to Convex."
+                               "It establishes automated market makers for fungible assets (see `convex.fungible`)."
+                               "Each market offers CVX/Token trading pairs with a liquidity pool."]
+                 :name        "Torus DEX"}))
 
 
 ;; TODO. Add docstrings to library functions.
@@ -81,7 +82,7 @@
             		   
         ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance (all longs)
         (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
-        (def supply (+ supply delta))
+        (def supply (+ supply delta)) ;; Note Supply set up by fungible/build-token
         (def token-balance new-token-balance)
         delta))
 
@@ -94,8 +95,7 @@
 
          (let [amount          (int amount)
                required-tokens (or (buy-cvx-quote amount)
-                                   (fail :LIQUIDITY
-                                         "Pool cannot supply this amount of CVX"))]
+                                   (fail :LIQUIDITY "Pool cannot supply this amount of CVX"))]
            (asset/accept *caller*
                          [token
                           required-tokens])
@@ -110,21 +110,14 @@
 
 
       (defn buy-cvx-quote
-
         ^{:callable? true}
-
         [amount]
-
         ;; Security: check pool can provide.
-        ;;
-        (when-not (< 0
-                     amount
-                     *balance*)
+        (when-not (< 0 amount *balance*)
           (return nil))
         (let [;; Computes pool and fees/
               cvx-balance *balance*
-              pool        (* (double token-balance)
-                             cvx-balance)
+              pool        (* (double token-balance) cvx-balance)
               rate        (calc-rate)]
           ;; Computes required payment in tokens.
           (int (ceil (* (+ 1.0
@@ -183,21 +176,15 @@
 
 
       (defn calc-rate
-
         ;; TODO. Have variable rate set by torus and/or trade velocity.
         ;; Maybe BASE_FEE / 1 + (THROUGHPUT / LIQUIDITY) ?
-
         []
-
         0.001)
 
 
       (defn price
-
         ^{:callable? true}
-
         ;; Price is CVX amount per token, or nil if there are no tokens in liquidity pool.
-
         []
 
         (when (> token-balance
@@ -302,11 +289,8 @@
 
 
       (defn withdraw-liquidity
-
         ^{:callable? true}
-
         [shares]
-
         (let [;; Amount of shares to withdraw.
               shares       (int shares)
               ;; Shares of holder.

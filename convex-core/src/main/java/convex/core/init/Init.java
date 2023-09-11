@@ -199,38 +199,8 @@ public class Init {
 	public static State createState(List<AccountKey> genesisKeys) {
 		try {
 			State s=createBaseState(genesisKeys);
-
-			// ============================================================
-			// Standard library deployment
-			s = doActorDeploy(s, "convex/fungible.cvx");
-			s = doActorDeploy(s, "convex/trusted-oracle/actor.cvx");
-			s = doActorDeploy(s, "convex/oracle.cvx");
-			s = doActorDeploy(s, "convex/asset.cvx");
-			s = doActorDeploy(s, "torus/exchange.cvx");
-			s = doActorDeploy(s, "asset/nft/simple.cvx");
-			s = doActorDeploy(s, "asset/nft/basic.cvx");
-			s = doActorDeploy(s, "asset/nft/tokens.cvx");
-			s = doActorDeploy(s, "asset/box/actor.cvx");
-			s = doActorDeploy(s, "asset/box.cvx");
-			s = doActorDeploy(s, "asset/multi-token.cvx");
-			s = doActorDeploy(s, "asset/share.cvx");
-			s = doActorDeploy(s, "asset/market/trade.cvx");
-			s = doActorDeploy(s, "asset/wrap/convex.cvx");
-			s = doActorDeploy(s, "convex/play.cvx");
-			s = doActorDeploy(s, "convex/did.cvx");
-			s = doActorDeploy(s, "lab/curation-market.cvx");
-			s = doActorDeploy(s, "convex/trust/ownership-monitor.cvx");
-			s = doActorDeploy(s, "convex/trust/delegate.cvx");
-			s = doActorDeploy(s, "convex/trust/whitelist.cvx");
-
-			{ // Deploy Currencies
-				@SuppressWarnings("unchecked")
-				AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-						.readResourceAsData("torus/currencies.cvx");
-				for (AVector<ACell> row : table) {
-					s = doCurrencyDeploy(s, row);
-				}
-			}
+			s = addStandardLibraries(s);
+			s = addTestingCurrencies(s);
 
 			// Final funds check
 			long finalTotal = s.computeTotalFunds();
@@ -242,6 +212,40 @@ public class Init {
 			throw new RuntimeException("Unable to initialise core",e);
 		}
 
+	}
+
+	private static State addTestingCurrencies(State s) throws IOException {
+		@SuppressWarnings("unchecked")
+		AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
+				.readResourceAsData("torus/currencies.cvx");
+		for (AVector<ACell> row : table) {
+			s = doCurrencyDeploy(s, row);
+		}
+		return s;
+	}
+
+	private static State addStandardLibraries(State s) {
+		s = doActorDeploy(s, "convex/fungible.cvx");
+		s = doActorDeploy(s, "convex/trusted-oracle/actor.cvx");
+		s = doActorDeploy(s, "convex/oracle.cvx");
+		s = doActorDeploy(s, "convex/asset.cvx");
+		s = doActorDeploy(s, "torus/exchange.cvx");
+		s = doActorDeploy(s, "asset/nft/simple.cvx");
+		s = doActorDeploy(s, "asset/nft/basic.cvx");
+		s = doActorDeploy(s, "asset/nft/tokens.cvx");
+		s = doActorDeploy(s, "asset/box/actor.cvx");
+		s = doActorDeploy(s, "asset/box.cvx");
+		s = doActorDeploy(s, "asset/multi-token.cvx");
+		s = doActorDeploy(s, "asset/share.cvx");
+		s = doActorDeploy(s, "asset/market/trade.cvx");
+		s = doActorDeploy(s, "asset/wrap/convex.cvx");
+		s = doActorDeploy(s, "convex/play.cvx");
+		s = doActorDeploy(s, "convex/did.cvx");
+		s = doActorDeploy(s, "lab/curation-market.cvx");
+		s = doActorDeploy(s, "convex/trust/ownership-monitor.cvx");
+		s = doActorDeploy(s, "convex/trust/delegate.cvx");
+		s = doActorDeploy(s, "convex/trust/whitelist.cvx");
+		return s;
 	}
 
 	public static Address calcPeerAddress(int userCount, int index) {
