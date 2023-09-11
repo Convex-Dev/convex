@@ -21,11 +21,7 @@
 
 
 (def markets
-
-  ^{:private? true}
-
   ;; Map of `token address` -> `market actor address`.
-
   {})
 
 
@@ -96,7 +92,7 @@
 
          [amount]
 
-         (let [amount          (long amount)
+         (let [amount          (int amount)
                required-tokens (or (buy-cvx-quote amount)
                                    (fail :LIQUIDITY
                                          "Pool cannot supply this amount of CVX"))]
@@ -131,7 +127,7 @@
                              cvx-balance)
               rate        (calc-rate)]
           ;; Computes required payment in tokens.
-          (long (ceil (* (+ 1.0
+          (int (ceil (* (+ 1.0
                             rate)
                          (- (/ pool
                                (- cvx-balance
@@ -145,7 +141,7 @@
 
          [amount]
 
-         (let [amount       (long amount)
+         (let [amount       (int amount)
                required-cvx (or (buy-tokens-quote amount)
                                 (fail :LIQUIDITY "Pool cannot supply this amount of tokens"))]
            (core/accept required-cvx)
@@ -178,7 +174,7 @@
                              cvx-balance)
               rate        (calc-rate)]
           ;; Computes required payment in CVX.
-          (long (ceil (* (+ 1.0
+          (int (ceil (* (+ 1.0
                             rate)
                          (- (/ pool
                                (- token-balance
@@ -216,7 +212,7 @@
 
         [amount]
 
-        (let [amount        (long amount)
+        (let [amount        (int amount)
               gained-tokens (or (sell-cvx-quote amount)
                                 (fail "Cannot sell this amount into pool"))]
           (core/accept amount)
@@ -250,7 +246,7 @@
               new-cvx-balance (+ cvx-balance
                                  amount)]
           ;; Computes gained Tokens coins from sale.
-          (long (/ (- token-balance
+          (int (/ (- token-balance
                       (/ pool
                          new-cvx-balance))
                     (+ 1.0
@@ -263,7 +259,7 @@
 
           [amount]
 
-          (let [amount     (long amount)
+          (let [amount     (int amount)
                 gained-cvx (or (sell-tokens-quote amount)
                                (fail "Cannot sell this amount into pool"))]
             (asset/accept *caller*
@@ -298,7 +294,7 @@
                new-token-balance (+ token-balance
                                     amount)]
            ;; Computes gained Convex coins from sale.
-           (long (/ (- cvx-balance
+           (int (/ (- cvx-balance
                        (/ pool
                           new-token-balance))
                     (+ 1.0
@@ -312,7 +308,7 @@
         [shares]
 
         (let [;; Amount of shares to withdraw.
-              shares       (long shares)
+              shares       (int shares)
               ;; Shares of holder.
               own-holding  (or (get-holding *caller*)
                                0)
@@ -324,9 +320,9 @@
                              (/ (double shares)
                                 supply)
                              0.0)
-              coin-refund  (long (* proportion
+              coin-refund  (int (* proportion
                                     *balance*))
-              token-refund (long (* proportion
+              token-refund (int (* proportion
                                     token-balance))]
              ;; SECURITY:
              ;; 1. Update balances then transfer coins first. Risk of re-entrancy attack if transfers are made while
@@ -397,7 +393,7 @@
 
 (defn add-liquidity
 
-  ^{:doc {:description nil
+  ^{:doc {:description "Adds an amount of a token to the liquidity pool, matched by an amount of CVX. "
           :signature   [{:params [token token-amount cvx-amount]}]}}
 
   [token token-amount cvx-amount]
@@ -405,36 +401,28 @@
   (let [market (create-market token)]
     (asset/offer market token token-amount)
     (call market
-          (long cvx-amount)
+          (int cvx-amount)
           (add-liquidity token-amount))))
 
 
 
 (defn buy
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Buy an amount of a token using a given token (token swap)."
           :signature   [{:params [of-token amount with-token]}]}}
-
   [of-token amount with-token]
 
   (let [market     (or (get-market of-token)
-                       (fail (str "Torus: market does not exist for token: "
-                                  of-token)))
-        cvx-amount (or (call market
-                             (buy-tokens-quote amount))
-                       (fail :LIQUIDITY
-                             "No liquidity available to buy token"))
-        sold       (buy-cvx with-token
-                            cvx-amount)]
-    (buy-tokens of-token
-                amount)
+                       (fail (str "Torus: market does not exist for token: " of-token)))
+        cvx-amount (or (call market (buy-tokens-quote amount))
+                       (fail :LIQUIDITY "No liquidity available to buy token"))
+        sold       (buy-cvx with-token cvx-amount)]
+    (buy-tokens of-token amount)
     sold))
 
 
 
 (defn buy-cvx
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Buy and amount of CVX using a given token."
           :signature   [{:params [token amount]}]}}
 
   [token amount]
@@ -447,47 +435,33 @@
                  [token
                   (fungible/balance token
                                     *address*)])
-    (call market
-          0
-          (buy-cvx amount))))
+    (call market (buy-cvx amount))))
 
 
 
 (defn buy-tokens
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Buy a specified amount of a token, using whatever CVX required."
           :signature   [{:params [token amount]}]}}
-
   [token amount]
-
   (let [market (or (get-market token)
                    (fail :LIQUIDITY
                          (str "Torus: market does not exist for token: " token)))]
-    ;; Note we can offer all CVX
-    (call market
-          *balance*
-          (buy-tokens amount))))
-
+    ;; Note we can offer all available CVX, since we trust the market to only accept the amount required
+    (call market *balance* (buy-tokens amount))))
 
 
 (defn buy-quote
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Gets a quote to buy an amount of a specifies token, in CVX or oprtional token to swap."
           :signature   [{:params [of-token amount]}
                         {:params [of-token amount with-token]}]}}
-
-
   ([of-token amount]
-
-   (when-let [market (get-market of-token)]
-     (call market (buy-tokens-quote amount))))
-
+    (when-let [market (get-market of-token)]
+      (call market (buy-tokens-quote amount))))
 
   ([of-token amount with-token]
-
-   (when-let [market (get-market with-token)]
-     (when-let [cvx-amount (buy-quote of-token amount)]
-       (call market (buy-cvx-quote cvx-amount))))))
+    (when-let [market (get-market with-token)]
+      (when-let [cvx-amount (buy-quote of-token amount)]
+        (call market (buy-cvx-quote cvx-amount))))))
 
 
 
@@ -527,7 +501,7 @@
 
 
 (defn sell-cvx
-  ^{:doc {:description nil
+  ^{:doc {:description "Sell an amount of CVX for a given token."
           :signature   [{:params [token amount]}]}}
   [token amount]
   (let [market (or (get-market token)
@@ -540,20 +514,15 @@
 
 
 (defn sell-quote
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Get a quote for selling an amount of a token, in CVX or optional swap token."
           :signature   [{:params [of-token amount]}
                         {:params [of-token amount with-token]}]}}
-
   ([of-token amount]
-
    (when-let [market (get-market of-token)]
     (call market
           (sell-tokens-quote amount))))
 
-
   ([of-token amount with-token]
-
    (when-let [market (get-market with-token)]
      (when-let [cvx-amount (sell-quote of-token
                                        amount)]
@@ -563,32 +532,21 @@
 
 
 (defn sell-tokens
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Sell an amount of tokens at current CVX price"
           :signature   [{:params [token amount]}]}}
-
   [token amount]
-
   (let [market (or (get-market token)
                    (fail :LIQUIDITY
                          (str "Torus: market does not exist for token: " token)))]
-  ;; Offer the amount of tokens being sold.
-  (asset/offer market
-               [token
-                amount])
-  (call market
-        (sell-tokens amount))))
-
+    ;; Offer the amount of tokens being sold.
+    (asset/offer market [token amount])
+    (call market (sell-tokens amount))))
 
 
 (defn withdraw-liquidity
-
-  ^{:doc {:description nil
+  ^{:doc {:description "Withdraw an amount of liquidity for a token."
           :signature   [{:params [token shares]}]}}
-
   [token shares]
-
   (let [market (or (get-market token)
                    (fail :STATE "No market exists to withdraw liquidity"))]
-    (call market
-          (withdraw-liquidity shares))))
+    (call market (withdraw-liquidity shares))))
