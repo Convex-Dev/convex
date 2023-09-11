@@ -23,7 +23,7 @@
 
 (def cns-database
   ^{:private? true}
-  ;; Map of `symbol` -> `[address-target address-controller meta]`
+  ;; Map of `symbol` -> `[address-target trust-monitor meta]`
   {})
 
 (def trust
