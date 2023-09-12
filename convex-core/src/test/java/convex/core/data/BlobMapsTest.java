@@ -247,7 +247,7 @@ public class BlobMapsTest {
 
 	@Test
 	public void testDissocAll() throws InvalidDataException {
-		BlobMap<Blob, CVMLong> m=BlobMaps.empty();
+		BlobMap<ABlob, CVMLong> m=BlobMaps.empty();
 		long n=100;
 
 		for (long i=0; i<n; i++) {

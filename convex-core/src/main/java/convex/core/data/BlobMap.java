@@ -190,7 +190,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public BlobMap<K, V> dissoc(ABlob k) {
+	public BlobMap<K, V> dissoc(K k) {
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
 			if (entry.getKey().equalsBytes(k)) {
