@@ -598,9 +598,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (a instanceof VectorLeaf) return equals((VectorLeaf<T>)a);
 		if (!(a instanceof AVector)) return false;
 		
-		// Its a vector, but not canonical?
 		AVector<T> v=(AVector<T>) a;
 		if (v.count()!=count) return false;
+		
+		// It's a vector of same length, but not canonical?
 		return a.getEncoding().equals(this.getEncoding());
 	}
 

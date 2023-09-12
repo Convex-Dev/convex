@@ -87,4 +87,9 @@ public abstract class AOp<T extends ACell> extends ACell {
 	public byte getTag() {
 		return Tag.OP;
 	}
+	
+	@Override
+	public boolean equals(ACell o) {
+		return ACell.genericEquals(this, o);
+	}
 }

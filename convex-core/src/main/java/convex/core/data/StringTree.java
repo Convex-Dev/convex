@@ -143,4 +143,12 @@ public class StringTree extends AString {
 		
 	}
 
+	@Override
+	public boolean equals(AString b) {
+		if (this==b) return true;
+		if (b==null) return false;
+		if (count()!=b.count()) return false;
+		return ACell.genericEquals(this, b);
+	}
+
 }

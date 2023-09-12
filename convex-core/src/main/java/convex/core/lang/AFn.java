@@ -56,5 +56,12 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 	public byte getTag() {
 		return Tag.FN;
 	}
+	
+	
+	@Override
+	public boolean equals(ACell o) {
+		if (!(o instanceof AFn)) return false;
+		return ACell.genericEquals(this, o);
+	}
 
 }

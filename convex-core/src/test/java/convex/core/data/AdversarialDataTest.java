@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Arrays;
 import java.util.Random;
@@ -151,10 +152,12 @@ public class AdversarialDataTest {
 		ACell c=null;
 		try {
 			c=Format.read(enc);
-			assertEquals(b,c); // If we managed to read it, should at least be equal
+			c.validateCell();; // If we managed to read it, should validate
 		} catch (BadFormatException e) {
 			// not a readable format, so probably not dangerous
 			return;
+		} catch (InvalidDataException e) {
+			fail("Failed to validate after re-reading?");
 		}
 		
 		if (c.isCompletelyEncoded()) {

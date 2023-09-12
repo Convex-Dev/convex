@@ -256,4 +256,20 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 	public AString append(String string) {
 		return append(Strings.create(string));
 	}
+	
+	@Override
+	public final boolean equals(ACell o) {
+		if (!(o instanceof AString)) return false;
+		return equals((AString)o);
+	}
+	
+	/**
+	 * Checks for equality between two strings. Should be optimised
+	 * @param b Other string (may be null)
+	 * @return True if strings are exactly equal, false otherwise
+	 */
+	public abstract boolean equals(AString b); 
+	
+	@Override
+	public abstract AString toCanonical();
 }

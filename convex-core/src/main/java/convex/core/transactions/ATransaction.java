@@ -1,5 +1,6 @@
 package convex.core.transactions;
 
+import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Address;
 import convex.core.data.Format;
@@ -104,6 +105,11 @@ public abstract class ATransaction extends ARecord {
 	@Override
 	public boolean isCanonical() {
 		return true;
+	}
+	
+	@Override
+	public boolean equals(ACell o) {
+		return ACell.genericEquals(this, o);
 	}
 
 }

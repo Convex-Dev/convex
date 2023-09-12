@@ -390,5 +390,10 @@ public class Order extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+	
+	@Override
+	public boolean equals(ACell o) {
+		return ACell.genericEquals(this, o);
+	}
 
 }

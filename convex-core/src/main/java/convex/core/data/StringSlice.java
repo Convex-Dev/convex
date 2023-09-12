@@ -101,5 +101,12 @@ public class StringSlice extends AString {
 		source.printEscaped(sb, this.start+start, this.start+end);
 	}
 
+	@Override
+	public boolean equals(AString b) {
+		if (this==b) return true;
+		if (b==null) return false;
+		return false;
+	}
+
 
 }

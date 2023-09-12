@@ -428,5 +428,14 @@ public class List<T extends ACell> extends AList<T> {
 		return this;
 	}
 
+	@Override
+	public boolean equals(ACell o) {
+		if (!(o instanceof List)) return false;
+		if (this==o) return true;
+		@SuppressWarnings("unchecked")
+		List<T> b=(List<T>)o;
+		return data.equals(b.data);
+	}
+
 
 }

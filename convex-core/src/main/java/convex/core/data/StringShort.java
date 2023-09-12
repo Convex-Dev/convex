@@ -163,11 +163,13 @@ public final class StringShort extends AString {
 	}
 
 	@Override
-	public boolean equals(ACell a) {
-		if (a instanceof StringShort) {
-			return equals((StringShort) a);
+	public boolean equals(AString b) {
+		if (b instanceof StringShort) {
+			return equals((StringShort) b);
 		}
-		return false;
+		AString c=b.toCanonical();
+		if (b==c) return false;
+		return equals(c);
 	}
 
 	public final boolean equals(StringShort a) {
@@ -181,7 +183,7 @@ public final class StringShort extends AString {
 	}
 
 	@Override
-	public ACell toCanonical() {
+	public AString toCanonical() {
 		if (length <= MAX_LENGTH)
 			return this;
 		return Strings.create(data.toCanonical());

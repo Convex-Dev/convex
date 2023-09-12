@@ -35,4 +35,5 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 	 * @return True if printed successfully within limit, false otherwise
 	 */
 	public abstract boolean printInternal(BlobBuilder sb, long limit);
+
 }

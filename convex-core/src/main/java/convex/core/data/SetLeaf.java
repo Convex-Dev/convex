@@ -235,6 +235,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 			epos+=ref.getEncodingLength();
 			items[i]=ref;
 		}
+		if (!isValidOrder(items)) throw new BadFormatException("Set elements out of order in encoding");
 		
 		SetLeaf<V> result=new SetLeaf<V>(items);
 		

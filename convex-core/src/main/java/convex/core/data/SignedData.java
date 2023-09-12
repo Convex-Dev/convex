@@ -318,4 +318,15 @@ public final class SignedData<T extends ACell> extends ARecord {
 		return FORMAT;
 	}
 
+	@Override
+	public boolean equals(ACell o) {
+		if (!(o instanceof SignedData)) return false;
+		@SuppressWarnings("unchecked")
+		SignedData<T> b=(SignedData<T>) o;
+		if (!signature.equals(b.signature)) return false;
+		if (!publicKey.equals(b.publicKey)) return false;
+		
+		return valueRef.equals(b.valueRef);
+	}
+
 }

@@ -149,21 +149,29 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param a Cell to compare with. May be null.
 	 * @return True if this cell is equal to the other object
 	 */
-	public boolean equals(ACell a) {
-		if (this==a) return true; // important optimisation for e.g. hashmap equality
-		if (a==null) return false; // no non-null Cell is equal to null
-		if (!(a.getTag()==this.getTag())) return false; // Different types never equal
+	public abstract boolean equals(ACell a);
+	
+	/**
+	 * Generic Cell equality, use only if better implementation not available.
+	 * @param a First cell to compare
+	 * @param b Second cell to compare
+	 * @return True if cells are equal, false otherwise
+	 */
+	protected static boolean genericEquals(ACell a, ACell b) {
+		if (a==b) return true; // important optimisation for e.g. hashmap equality
+		if ((b==null)||(a==null)) return false; // no non-null Cell is equal to null
+		if (!(a.getTag()==b.getTag())) return false; // Different types never equal
 		
 		// Check hashes for equality if they exist
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return h.equals(ha);
+		Hash ha=a.cachedHash();
+		if (ha!=null) {
+			Hash hb=b.cachedHash();
+			if (hb!=null) return ha.equals(hb);
 		}
 
 		// Else default to checking encodings
 		// We would need to get encodings anyway to compute a Hash....
-		return getEncoding().equals(a.getEncoding());
+		return a.getEncoding().equals(b.getEncoding());
 	}
 	
 	/**

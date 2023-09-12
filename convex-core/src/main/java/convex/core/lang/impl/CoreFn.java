@@ -125,5 +125,11 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 		// embed core functions, since they are the same size as small symbols
 		return true;
 	}
+	
+	@Override 
+	public boolean equals(ACell o) {
+		// This is OK since these are guaranteed to be singleton instances!
+		return o==this;
+	}
 
 }

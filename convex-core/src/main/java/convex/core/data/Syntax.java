@@ -34,7 +34,7 @@ public final class Syntax extends ACell {
 
 	/** 
 	 * Metadata map
-	 * If empty, gets encoded as null in byte encoding
+	 * Never null, but if empty, gets encoded as null in byte encoding
 	 */
 	private final AHashMap<ACell, ACell> meta;
 
@@ -341,6 +341,14 @@ public final class Syntax extends ACell {
 	@Override
 	public ACell toCanonical() {
 		return this;
+	}
+
+	@Override
+	public boolean equals(ACell o) {
+		if (!(o instanceof Syntax)) return false; // catches null
+		Syntax b=(Syntax)o;
+		if (!meta.equals(b.meta)) return false;
+		return datumRef.equals(b.datumRef);
 	}
 
 
