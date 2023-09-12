@@ -332,7 +332,7 @@ public class AccountStatus extends ARecord {
 	 * @return The value from the environment, or null if not found
 	 */
 	@SuppressWarnings("unchecked")
-	public <R> R getEnvironmentValue(Symbol symbol) {
+	public <R extends ACell> R getEnvironmentValue(Symbol symbol) {
 		if (environment == null) return null;
 		ACell value = environment.get(symbol);
 		return (R) value;
@@ -354,15 +354,15 @@ public class AccountStatus extends ARecord {
 	}
 	
 	public AccountStatus withHolding(Address addr,ACell value) {
-		BlobMap<Address, ACell> newHoldings=getHoldings();
+		BlobMap<Address, ACell> hodls=getHoldings();
 		if (value==null) { 
-			newHoldings=(BlobMap<Address, ACell>)newHoldings.dissoc(addr);
-		} else if (newHoldings==null) {
-			newHoldings=BlobMaps.of(addr,value);
+			hodls=hodls.dissoc(addr);
+		} else if (hodls==null) {
+			hodls=BlobMaps.of(addr,value);
 		} else {
-			newHoldings=newHoldings.assoc(addr, value);
+			hodls=hodls.assoc(addr, value);
 		}
-		return withHoldings(newHoldings);
+		return withHoldings(hodls);
 	}
 
 	private AccountStatus withHoldings(BlobMap<Address, ACell> newHoldings) {
@@ -511,8 +511,8 @@ public class AccountStatus extends ARecord {
 	 */
 	public <R extends ACell> AFn<R> getCallableFunction(Symbol sym) {
 		ACell exported=getEnvironmentValue(sym);
-		if (exported==null) return null;
 		AFn<R> fn=RT.ensureFunction(exported);
+		
 		if (fn==null) return null;
 		AHashMap<ACell,ACell> md=getMetadata().get(sym);
 		if (RT.bool(md.get(Keywords.CALLABLE_Q))) {

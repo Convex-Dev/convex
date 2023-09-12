@@ -2461,9 +2461,12 @@ public class CoreTest extends ACVMTest {
 		assertSame(Maps.empty(), eval("(empty {1 2 3 4})"));
 		assertSame(Vectors.empty(), eval("(empty [1 2 3])"));
 		assertSame(Sets.empty(), eval("(empty #{1 2})"));
-
+		assertSame(BlobMaps.empty(), eval("(empty (blob-map 0x 0x))"));
+		
+		assertCastError(step("(empty 0x1234abcd)"));
 		assertCastError(step("(empty 1)"));
 		assertCastError(step("(empty :foo)"));
+		
 		assertArityError(step("(empty)"));
 		assertArityError(step("(empty [1] [2])"));
 	}
@@ -4327,13 +4330,17 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testCallableQ() {
-		Context ctx = step("(def caddr (deploy '(do " + "(defn private [] :priv) " + "(defn public ^{:callable? true} [] :pub))))");
+		Context ctx = step("(def caddr (deploy '(do " 
+				+ "(defn private [] :priv) " 
+				+ "(def ^{:callable? true} trap :GOTCHA)" 
+				+ "(defn public ^{:callable? true} [] :pub))))");
 
 		Address caddr = (Address) ctx.getResult();
 		assertNotNull(caddr);
 
 		assertTrue(evalB(ctx, "(callable? caddr 'public)")); // OK
 		assertFalse(evalB(ctx, "(callable? caddr 'private)")); // Defined, but not exported
+		assertFalse(evalB(ctx, "(callable? caddr 'trap)")); // Defined and :callable?, but not a function
 		assertFalse(evalB(ctx, "(callable? caddr 'random-symbol)")); // Doesn't exist
 
 		// Valid scoped calls
