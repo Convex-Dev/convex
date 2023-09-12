@@ -46,6 +46,8 @@ public class CharTest {
 		
 		// TODO: Reader support for multi-byte chars
 		//assertEquals(c,Reader.read(pjs));
+		
+		doCharTests(c);
 	}
 	
 	@Test public void testEquality() {
@@ -82,12 +84,19 @@ public class CharTest {
 	 * @param c Character value to test
 	 */
 	public void doCharTests(CVMChar c) {
+		// Round trip via unicode code point
+		assertEquals(c,CVMChar.create(c.getCodePoint()));
+		
 		// Should round trip as a readable character
-		assertEquals(c,Reader.read(RT.print(c).toString()));
+		String prn=RT.print(c).toString();
+		assertEquals(c,Reader.read(prn));
 		
 		// Should round trip when contained in a String
 		AString s=Strings.create(c.toString());
 		assertEquals(s,Reader.read(RT.print(s).toString()));
+		
+		// Should round trip via UTF blob
+		assertEquals(s,Strings.create(c.toUTFBlob()));
 		
 		ObjectsTest.doAnyValueTests(c);
 	}

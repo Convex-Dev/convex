@@ -196,7 +196,7 @@ public class BlobBuilder {
 	}
 
 	/**
-	 * Append a character to this Blob. Converts to UTF=8
+	 * Append a character to this Blob. Converts to UTF-8
 	 * @param c Java character (UTF-16)
 	 * @return This BlobBuilder
 	 */

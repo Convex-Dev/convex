@@ -281,7 +281,10 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		}
 		
 		s=s.substring(1);
-		return ReaderUtils.specialCharacter(s);
+		CVMChar maybeSpecial= ReaderUtils.specialCharacter(s);
+		if (maybeSpecial!=null) return maybeSpecial;
+		long cp=s.codePointAt(0);
+		return CVMChar.create(cp);
 	}
 	
 	@Override
