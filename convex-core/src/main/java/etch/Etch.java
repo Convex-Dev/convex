@@ -683,7 +683,7 @@ public class Etch {
 	 * @return Blob containing the data, or null if not found
 	 * @throws IOException If an IO error occurs
 	 */
-	public RefSoft<ACell> read(AArrayBlob key) throws IOException {
+	public <T extends ACell> RefSoft<T> read(AArrayBlob key) throws IOException {
 		Counters.etchRead++;
 
 		long pointer=seekPosition(key);
@@ -695,7 +695,7 @@ public class Etch {
 		return read(key,pointer);
 	}
 		
-	public RefSoft<ACell> read(AArrayBlob key,long pointer) throws IOException {
+	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
 		MappedByteBuffer mbb;
 		if (key==null) {
 			mbb=seekMap(pointer);
@@ -720,7 +720,7 @@ public class Etch {
 		Blob encoding= Blob.wrap(bs);
 		try {
 			Hash hash=Hash.wrap(key);
-			ACell cell=store.decode(encoding);
+			T cell=store.decode(encoding);
 			cell.getEncoding().attachContentHash(hash);
 
 			if (memorySize>0) {
@@ -728,7 +728,7 @@ public class Etch {
 				cell.attachMemorySize(memorySize);
 			}
 
-			RefSoft<ACell> ref=RefSoft.create(store,cell, (int)flagByte);
+			RefSoft<T> ref=RefSoft.create(store,cell, (int)flagByte);
 			cell.attachRef(ref);
 
 			return ref;

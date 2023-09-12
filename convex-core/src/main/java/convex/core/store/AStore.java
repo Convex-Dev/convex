@@ -127,10 +127,11 @@ public abstract class AStore {
 	 * 
 	 * @throws BadFormatException If cell encoding is invalid
 	 */
-	public final ACell decode(Blob encoding) throws BadFormatException {
+	@SuppressWarnings("unchecked")
+	public final <T extends ACell> T decode(Blob encoding) throws BadFormatException {
 		Hash hash=encoding.getContentHash();
-		Ref<?> cached=blobCache.getCell(hash);
-		if (cached!=null) return cached.getValue();
+		Ref<?> cached= blobCache.getCell(hash);
+		if (cached!=null) return (T) cached.getValue();
 		
 		// Need to ensure we are reading with the current store set
 		AStore tempStore=Stores.current();
@@ -143,7 +144,7 @@ public abstract class AStore {
 		} finally {
 			Stores.setCurrent(tempStore);
 		}
-		return decoded;
+		return (T)decoded;
 	}
 
 	/**

@@ -135,8 +135,8 @@ public class EtchStore extends AStore {
 		}
 	}
 
-	public Ref<ACell> readStoreRef(Hash hash) throws IOException {
-		Ref<ACell> ref=etch.read(hash);
+	public <T extends ACell> Ref<T> readStoreRef(Hash hash) throws IOException {
+		Ref<T> ref=etch.read(hash);
 		if (ref!=null) blobCache.putCell(ref);
 		return ref;
 	}
@@ -181,6 +181,13 @@ public class EtchStore extends AStore {
 				}
 			}
 		}
+		
+		if (requiredStatus<Ref.STORED) {
+			if (topLevel || !embedded) {
+				blobCache.putCell(ref);
+			}
+			return ref;
+		}
 
 		// beyond STORED level, need to recursively persist child refs if they exist
 		if ((requiredStatus > Ref.STORED)&&(cell.getRefCount()>0)) {
@@ -190,7 +197,7 @@ public class EtchStore extends AStore {
 			};
 
 			// need to do recursive persistence
-			// TODO: maybe switch to a queue? Mitigate risk of stack overflow?
+			// TODO: maybe switch to a stack? Mitigate risk of stack overflow?
 			ACell newObject = cell.updateRefs(func);
 
 			// perhaps need to update Ref

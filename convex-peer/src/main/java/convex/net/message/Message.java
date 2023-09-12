@@ -35,7 +35,7 @@ public abstract class Message {
 	protected static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
 	protected ACell payload;
-	protected Blob messageData; // encoding of payload
+	protected Blob messageData; // multi-cell encoding of payload
 	protected MessageType type;
 
 	protected Message(MessageType type, ACell payload, Blob data) {
