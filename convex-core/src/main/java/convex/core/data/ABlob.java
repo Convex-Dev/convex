@@ -173,34 +173,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		return byteAtUnchecked(i);
 	}
 	
-	/**
-	 * Gets the byte at the specified position in this data object, without bounds checking.
-	 * Only safe if index is known to be in bounds, otherwise result is undefined.
-	 * 
-	 * @param i Index of the byte to get
-	 * @return The byte at the specified position
-	 */
-	public abstract byte byteAtUnchecked(long i);
 
-	/**
-	 * Gets the specified hex digit from this data object.
-	 * 
-	 * WARNING: Result is undefined if index is out of bounds, but probably an IndexOutOfBoundsException.
-	 * 
-	 * @param digitPos The position of the hex digit
-	 * @return The value of the hex digit, in the range 0-15 inclusive
-	 */
-	public int getHexDigit(long digitPos) {
-		byte b = byteAtUnchecked(digitPos >> 1);
-		//if ((digitPos & 1) == 0) {
-		//	return (b >> 4) & 0x0F; // first hex digit
-		//} else {
-		//	return b & 0x0F; // second hex digit
-		//}
-		// This hack avoids a conditional, not sure if worth it....
-		int shift = 4*(1-((int)digitPos&1));
-		return (b>>shift)&0x0F;
-	}
 
 	/**
 	 * Append an additional Blob to this, creating a new Blob as needed. New Blob will be canonical.

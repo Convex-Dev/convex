@@ -17,6 +17,37 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	 */
 	public abstract byte byteAt(long i);
 	
+	/**
+	 * Gets the byte at the specified position in this data object, possibly skipping bounds checking.
+	 * Only safe if index is known to be in bounds, otherwise result is undefined.
+	 * 
+	 * @param i Index of the byte to get
+	 * @return The byte at the specified position
+	 */
+	public byte byteAtUnchecked(long i) {
+		return byteAt(i);
+	}
+
+	/**
+	 * Gets the specified hex digit from this data object.
+	 * 
+	 * WARNING: Result is undefined if index is out of bounds, but probably an IndexOutOfBoundsException.
+	 * 
+	 * @param digitPos The position of the hex digit
+	 * @return The value of the hex digit, in the range 0-15 inclusive
+	 */
+	public int getHexDigit(long digitPos) {
+		byte b = byteAtUnchecked(digitPos >> 1);
+		//if ((digitPos & 1) == 0) {
+		//	return (b >> 4) & 0x0F; // first hex digit
+		//} else {
+		//	return b & 0x0F; // second hex digit
+		//}
+		// This hack avoids a conditional, not sure if worth it....
+		int shift = 4*(1-((int)digitPos&1));
+		return (b>>shift)&0x0F;
+	}
+	
 	@Override
 	public abstract ABlobLike<T> empty();
 	
