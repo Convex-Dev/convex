@@ -40,6 +40,8 @@ public class AccountStatus extends ARecord {
 	private static final int HAS_HOLDINGS=1<<FORMAT.indexFor(Keywords.HOLDINGS);
 	private static final int HAS_CONTROLLER=1<<FORMAT.indexFor(Keywords.CONTROLLER);
 	private static final int HAS_KEY=1<<FORMAT.indexFor(Keywords.KEY);
+	
+	private static final int INCLUSION_MASK=0xff;
 
 	private AccountStatus(long sequence, long balance, long memory,
 			AHashMap<Symbol, ACell> environment, 
@@ -157,7 +159,7 @@ public class AccountStatus extends ARecord {
 	 */
 	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		int included=b.byteAt(epos++);
+		int included=b.byteAt(epos++)&INCLUSION_MASK;
 		long sequence=0;
 		if ((included&HAS_SEQUENCE)!=0) {
 			sequence=Format.readVLCLong(b, epos);
@@ -176,25 +178,21 @@ public class AccountStatus extends ARecord {
 		AHashMap<Symbol, ACell> environment = null;
 		if ((included&HAS_ENVIRONMENT)!=0) {
 			environment=Format.read(b, epos);
-			if ((environment==null)||environment.isEmpty()) throw new BadFormatException("Empty environment included!");
 			epos+=environment.getEncodingLength();
 		};		
 		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = null;
 		if ((included&HAS_METADATA)!=0) {
 			metadata=Format.read(b, epos);
-			if ((metadata==null)||metadata.isEmpty()) throw new BadFormatException("Empty metadata included!");
 			epos+=metadata.getEncodingLength();
 		};		
 		BlobMap<Address,ACell> holdings = null;
 		if ((included&HAS_HOLDINGS)!=0) {
 			holdings=Format.read(b, epos);
-			if ((holdings==null)||holdings.isEmpty()) throw new BadFormatException("Empty holdings included!");
 			epos+=holdings.getEncodingLength();
 		};		
 		Address controller=null;
 		if ((included&HAS_CONTROLLER)!=0) {
 			controller=Format.read(b, epos); // TODO should be raw Address, save a byte?
-			if ((controller==null)) throw new BadFormatException("Empty controller included!");
 			epos+=controller.getEncodingLength();
 		}
 		AccountKey publicKey=null;
@@ -204,6 +202,11 @@ public class AccountStatus extends ARecord {
 		}
 		
 		AccountStatus result= new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
+		int shouldBeIncluded=result.getInclusion();
+		if (included!=shouldBeIncluded) {
+			// TODO: double check this catches all encoding violations
+			throw new BadFormatException("Bad includion: "+included+ " should be: "+shouldBeIncluded);
+		}
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
