@@ -215,7 +215,7 @@ public class EncodingTest {
 		
 		// Address
 		Address maxAddress=Address.create(Long.MAX_VALUE);
-		assertEquals(1+Format.MAX_VLC_LONG_LENGTH,Address.MAX_ENCODING_LENGTH);
+		assertEquals(1+Format.MAX_VLC_COUNT_LENGTH,Address.MAX_ENCODING_LENGTH);
 		assertEquals(Address.MAX_ENCODING_LENGTH,maxAddress.getEncodingLength());
 	}
 	

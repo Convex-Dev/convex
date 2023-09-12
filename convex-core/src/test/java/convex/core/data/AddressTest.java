@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -29,5 +30,30 @@ public class AddressTest {
 		assertEquals("#1",Address.parse("#1").toString());
 		assertEquals("#2",Address.parse("2").toString());
 		assertEquals("#16",Address.parse("0x0000000000000010").toString());
+	}
+	
+	@Test
+	public void testCanonical() {
+		Address a=Address.create(17);
+		assertTrue(a.isCanonical());
+		
+		assertNull(Address.create(-1));
+	}
+	
+	@Test
+	public void testBlobBehaviour() {
+		assertEquals(0L,Address.ZERO.toExactLong());
+		assertEquals(Blobs.createFilled(0, 8),Address.ZERO.toFlatBlob());
+	}
+	
+	@Test
+	public void testGenericBehaviour() {
+		doAddressTest(Address.ZERO);
+		doAddressTest(Address.create(476476467));
+		doAddressTest(Address.create(Long.MAX_VALUE));
+	}
+
+	private void doAddressTest(Address a) {
+		ObjectsTest.doAnyValueTests(a);
 	}
 }

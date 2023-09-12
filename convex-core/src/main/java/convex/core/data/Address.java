@@ -145,10 +145,10 @@ public final class Address extends ALongBlob {
 	}
 	
 	public static Address readRaw(Blob b, int pos) throws BadFormatException {
-		long value=Format.readVLCLong(b,pos+1); // skip tag
+		long value=Format.readVLCCount(b,pos+1); // skip tag
 		Address a= Address.create(value);
 		if (a==null) throw new BadFormatException("Invalid Address: "+value);
-		int epos=pos+1+Format.getVLCLength(value);
+		int epos=pos+1+Format.getVLCCountLength(value);
 		a.attachEncoding(b.slice(pos, epos));
 		return a;
 	}
@@ -158,6 +158,11 @@ public final class Address extends ALongBlob {
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.ADDRESS;
 		return encodeRaw(bs,pos);
+	}
+	
+	@Override
+	public int encodeRaw(byte[] bs, int pos) {
+		return Format.writeVLCCount(bs, pos, value);
 	}
 	
 	@Override
@@ -187,8 +192,7 @@ public final class Address extends ALongBlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (value<0)
-			throw new InvalidDataException("Address must be positive",this);
+		if (value<0) throw new InvalidDataException("Address must be positive",this);
 	}
 
 	@Override
@@ -222,13 +226,8 @@ public final class Address extends ALongBlob {
 	public long toExactLong() {
 		return value;
 	}
-
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeVLCLong(bs, pos, value);
-	}
 	
-	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_LONG_LENGTH;
+	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_COUNT_LENGTH;
 
 	@Override
 	public byte getTag() {

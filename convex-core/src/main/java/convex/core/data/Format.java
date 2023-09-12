@@ -61,6 +61,11 @@ public class Format {
 	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
 	
 	/**
+	 * Maximum length for a VLC encoded Count
+	 */
+	public static final int MAX_VLC_COUNT_LENGTH = 9; // 63 bits
+	
+	/**
 	 * Maximum size in bytes of an embedded value, including tag
 	 */
 	public static final int MAX_EMBEDDED_LENGTH=140; // TODO: reconsider
@@ -285,6 +290,12 @@ public class Format {
 		}
 		return result;
 	}
+	
+	public static long readVLCCount(AArrayBlob blob, int pos) throws BadFormatException {
+		byte[] data=blob.getInternalArray();
+		return readVLCCount(data,pos+blob.getInternalOffset());
+	}
+
 
 	/**
 	 * Peeks for a VLC encoded message length at the start of a ByteBuffer, which
