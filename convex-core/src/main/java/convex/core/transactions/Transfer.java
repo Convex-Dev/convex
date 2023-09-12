@@ -47,26 +47,26 @@ public class Transfer extends ATransaction {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = super.encodeRaw(bs,pos); // origin, sequence
-		pos = target.encodeRaw(bs,pos);
-		pos = Format.writeVLCLong(bs, pos, amount);
+		pos = Format.writeVLCCount(bs, pos, target.longValue());
+		pos = Format.writeVLCCount(bs, pos, amount);
 		return pos;
 	}
 
 	public static ATransaction read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long aval=Format.readVLCLong(b,epos);
+		long aval=Format.readVLCCount(b,epos);
 		Address origin=Address.create(aval);
-		epos+=Format.getVLCLength(aval);
+		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(sequence);
+		long sequence = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(sequence);
 		
-		long tval=Format.readVLCLong(b,epos);
+		long tval=Format.readVLCCount(b,epos);
 		Address target=Address.create(tval);
-		epos+=Format.getVLCLength(tval);
+		epos+=Format.getVLCCountLength(tval);
 
-		long amount = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(amount);
+		long amount = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(amount);
 		
 		Transfer result=create(origin,sequence, target, amount);
 		result.attachEncoding(b.slice(pos, epos));

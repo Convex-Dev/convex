@@ -38,8 +38,8 @@ public abstract class ATransaction extends ARecord {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs,pos, origin.toExactLong());
-		pos = Format.writeVLCLong(bs,pos, sequence);
+		pos = Format.writeVLCCount(bs,pos, origin.longValue());
+		pos = Format.writeVLCCount(bs,pos, sequence);
 		return pos;
 	}
 

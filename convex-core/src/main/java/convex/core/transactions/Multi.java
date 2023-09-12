@@ -99,12 +99,12 @@ public class Multi extends ATransaction {
 	public static Multi read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		
-		long aval=Format.readVLCLong(b,epos);
+		long aval=Format.readVLCCount(b,epos);
 		Address origin=Address.create(aval);
-		epos+=Format.getVLCLength(aval);
+		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(sequence);
+		long sequence = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(sequence);
 
 		long mode = Format.readVLCLong(b,epos);
 		if (!isValidMode(mode)) throw new BadFormatException("Invalid Multi transaction mode: "+mode);

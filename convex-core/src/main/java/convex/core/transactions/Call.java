@@ -62,7 +62,7 @@ public class Call extends ATransaction {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = super.encodeRaw(bs,pos); // sequence
 		pos = Format.write(bs,pos, target);
-		pos=Format.writeVLCLong(bs,pos, offer);
+		pos=Format.writeVLCCount(bs,pos, offer);
 		pos=Format.write(bs,pos, functionName);
 		pos=Format.write(bs,pos, args);
 		return pos;
@@ -77,18 +77,18 @@ public class Call extends ATransaction {
 	 */
 	public static Call read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long aval=Format.readVLCLong(b,epos);
+		long aval=Format.readVLCCount(b,epos);
 		Address origin=Address.create(aval);
-		epos+=Format.getVLCLength(aval);
+		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(sequence);
+		long sequence = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(sequence);
 		
 		Address target=Format.read(b, epos);
 		epos+=Format.getEncodingLength(target);
 		
-		long offer=Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(offer);
+		long offer=Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(offer);
 
 		Symbol functionName=Format.read(b,epos);
 		epos+=Format.getEncodingLength(functionName);

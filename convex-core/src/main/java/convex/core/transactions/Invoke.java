@@ -88,12 +88,12 @@ public class Invoke extends ATransaction {
 	 */
 	public static Invoke read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long aval=Format.readVLCLong(b,epos);
+		long aval=Format.readVLCCount(b,epos);
 		Address address=Address.create(aval);
-		epos+=Format.getVLCLength(aval);
+		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(sequence);
+		long sequence = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(sequence);
 		
 		ACell args=Format.read(b, epos);
 		epos+=Format.getEncodingLength(args);
