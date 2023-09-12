@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.Arrays;
 
+import convex.core.crypto.Hashing;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -23,6 +24,20 @@ public abstract class AArrayBlob extends ABlob {
 		this.offset = offset;
 	}
 
+	/**
+	 * Cached hash of the Blob data. Might be null.
+	 */
+	protected Hash contentHash = null;
+
+	
+	@Override
+	public final Hash getContentHash() {
+		if (contentHash == null) {
+			contentHash = computeHash(Hashing.getDigest());
+		}
+		return contentHash;
+	}
+	
 	@Override
 	public void updateDigest(MessageDigest digest) {
 		digest.update(store, offset, length);

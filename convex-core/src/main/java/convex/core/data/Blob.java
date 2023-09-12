@@ -26,6 +26,7 @@ public class Blob extends AArrayBlob {
 	
 	public static final int CHUNK_LENGTH = 4096;
 
+
 	private Blob(byte[] bytes, int offset, int length) {
 		super(bytes, offset, length);
 	}

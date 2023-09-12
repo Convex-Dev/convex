@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.HashMap;
 
-import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Hash;
@@ -282,7 +281,7 @@ public class Mnemonic {
 		if (passphrase!=null) {
 			bb.append(passphrase.getBytes(StandardCharsets.UTF_8));
 		}
-		ABlob b=bb.toBlob();
+		Blob b=bb.toBlob().toFlatBlob();
 		Hash h = b.getContentHash();
 		AKeyPair kp = AKeyPair.create(h.getBytes());
 		return (T) kp;

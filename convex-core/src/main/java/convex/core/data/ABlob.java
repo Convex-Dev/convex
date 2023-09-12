@@ -20,10 +20,6 @@ import convex.core.util.Utils;
  * 
  */
 public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABlob> {
-	/**
-	 * Cached hash of the Blob data. Might be null.
-	 */
-	protected Hash contentHash = null;
 
 	@Override
 	public AType getType() {
@@ -145,13 +141,11 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 * 
 	 * @return The Hash
 	 */
-	public final Hash getContentHash() {
-		if (contentHash == null) {
-			contentHash = computeHash(Hashing.getDigest());
-		}
-		return contentHash;
+	public Hash getContentHash() {
+		// Note: We override and cache in Blob to ensure encoding hashes are cached
+		return computeHash(Hashing.getDigest());
 	}
-
+	
 	/**
 	 * Computes the hash of the byte data stored in this Blob, using the given MessageDigest.
 	 * 

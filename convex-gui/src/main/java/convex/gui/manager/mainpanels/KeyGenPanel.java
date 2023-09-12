@@ -92,7 +92,7 @@ public class KeyGenPanel extends JPanel {
 	private void updateSeed() {
 		try {
 			mnemonicArea.setText("<can't recreate from BIP39 seed>");
-			ABlob b=Blobs.parse(seedArea.getText()); 
+			Blob b=Blobs.parse(seedArea.getText()).toFlatBlob(); 
 			if ((b==null)||(b.count()!=BIP39.SEED_LENGTH)) throw new IllegalArgumentException("Dummy");
 			privateKeyArea.setText(b.getContentHash().toHexString());
 			generatePublicKeys();

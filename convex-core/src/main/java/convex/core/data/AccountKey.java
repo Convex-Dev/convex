@@ -178,8 +178,7 @@ public class AccountKey extends AArrayBlob {
 	 */
 	public static AccountKey fromChecksumHex(String hexString) {
 		byte[] bs = Utils.hexToBytes(hexString, LENGTH * 2);
-		AccountKey a = AccountKey.wrap(bs);
-		Hash h = a.getContentHash();
+		Hash h = Blob.wrap(bs).getContentHash();
 		for (int i = 0; i < LENGTH * 2; i++) {
 			int dh = h.getHexDigit(i);
 			char c = hexString.charAt(i);
@@ -188,7 +187,7 @@ public class AccountKey extends AArrayBlob {
 			if (!check)
 				throw new IllegalArgumentException("Bad checksum at position " + i + " in address " + hexString);
 		}
-		return a;
+		return AccountKey.wrap(bs);
 	}
 
 	/**
@@ -199,7 +198,7 @@ public class AccountKey extends AArrayBlob {
 	 */
 	public String toChecksumHex() {
 		StringBuilder sb = new StringBuilder(64);
-		Hash h = this.getContentHash();
+		Hash h = this.toFlatBlob().getContentHash();
 		for (int i = 0; i < LENGTH * 2; i++) {
 			int dh = h.getHexDigit(i);
 			int da = this.getHexDigit(i);
