@@ -13,6 +13,8 @@ import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
+import convex.core.data.type.Transaction;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -177,8 +179,37 @@ public class TransactionTest extends ACVMTest {
 		
 		doTransactionTests(t1);
 	}
+	
+	@Test 
+	public void testInvoke() {
+		Invoke t1=Invoke.create(HERO, 1, "(+ 2 5)");
+		Context ctx=state().applyTransaction(t1);
+		assertEquals(CVMLong.create(7),ctx.getResult());
+		
+		// We expect a short Invoke to be completely encoded
+		assertTrue(t1.isCompletelyEncoded());
+		
+		doTransactionTests(t1);
+	}
+	
+	@Test 
+	public void testBadSequence() {
+		Invoke t1=Invoke.create(HERO, 2, "(+ 2 5)");
+		Context ctx=state().applyTransaction(t1);
+		assertEquals(ErrorCodes.SEQUENCE,ctx.getError().getCode());
+		
+		// Sequence number in state should be unchanged
+		assertEquals(0L,ctx.getAccountStatus(HERO).getSequence());
+		
+		doTransactionTests(t1);
+	}
 
 	private void doTransactionTests(ATransaction t) {
+		assertEquals(VILLAIN,t.withOrigin(VILLAIN).getOrigin());
+		assertEquals(999999,t.withSequence(999999).getSequence());
+		
+		assertEquals(Transaction.INSTANCE,t.getType());
+		
 		RecordTest.doRecordTests(t);
 	}
 	

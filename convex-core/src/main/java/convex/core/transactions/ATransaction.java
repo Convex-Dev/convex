@@ -58,7 +58,7 @@ public abstract class ATransaction extends ARecord {
 	 * </ul>
 	 * 
 	 * @param ctx Context for which to apply this Transaction
-	 * @return The updated chain state
+	 * @return The updated Context
 	 */
 	public abstract Context apply(Context ctx);
 

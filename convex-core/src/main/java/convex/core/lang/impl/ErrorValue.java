@@ -74,7 +74,7 @@ public class ErrorValue extends AExceptional {
 	}
 
 	/**
-	 * Gets the Error Code for this ErrorVAlue instance. The Error Code may be any value, but
+	 * Gets the Error Code for this ErrorValue instance. The Error Code may be any value, but
 	 * by convention (and exclusively in Convex runtime code) it is a upper-case keyword e.g. :ASSERT
 	 * 
 	 * @return Error code value
