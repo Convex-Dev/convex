@@ -9,20 +9,27 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.test.Samples;
 
 public class ListsTest {
 
 	@Test
-	public void testEmptyList() {
-		AList<ACell> e = Lists.empty();
+	public void testEmptyList() throws BadFormatException {
+		List<ACell> e = Lists.empty();
 		assertEquals(0, e.size());
 		assertSame(e, Lists.of());
 		assertFalse(e.contains(null));
-		doListTests(e);
 		
 		assertEquals(e,List.wrap(Vectors.empty()));
-		assertEquals(Blob.create(new byte[] {Tag.LIST,0}),e.getEncoding());
+		
+		Blob expectedEncoding=Blob.create(new byte[] {Tag.LIST,0});
+		assertEquals(expectedEncoding,e.getEncoding());
+		assertSame(e,Format.read(expectedEncoding));
+		
+		assertSame(Vectors.empty(),e.reverse());
+		
+		doListTests(e);
 	}
 
 	@Test

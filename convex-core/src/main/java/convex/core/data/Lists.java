@@ -3,7 +3,7 @@ package convex.core.data;
 public class Lists {
 	
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AList<T> empty() {
+	public static <T extends ACell> List<T> empty() {
 		return (List<T>) List.EMPTY;
 	}
 

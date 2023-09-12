@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
 import java.util.WeakHashMap;
 
 import convex.core.data.type.AType;
@@ -122,20 +121,12 @@ public final class Symbol extends ASymbolic implements Comparable<Symbol> {
 	}
 
 	/**
-	 * Reads a Symbol from the given ByteBuffer, assuming tag already consumed
+	 * Reads a Symbol from the given Blob
 	 * 
-	 * @param bb ByteBuffer source
+	 * @param blob Encoding source
 	 * @return The Symbol read
 	 * @throws BadFormatException If a Symbol could not be read correctly.
 	 */
-	public static Symbol read(ByteBuffer bb) throws BadFormatException {
-		int len=0xff&bb.get();
-		AString name=Format.readUTF8String(bb,len);
-		Symbol sym = Symbol.create(name);
-		if (sym == null) throw new BadFormatException("Can't read symbol");
-		return sym;
-	}
-	
 	public static Symbol read(Blob blob, int offset) throws BadFormatException {
 		int len=0xff&blob.byteAt(offset+1); // skip tag
 		AString name=Format.readUTF8String(blob,offset+2,len);

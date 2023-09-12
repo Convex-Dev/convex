@@ -40,8 +40,6 @@ public class ObjectsTest {
 
 		doAnyEncodingTests(a);
 		
-	
-		
 		doCellTests(a);
 	}
 

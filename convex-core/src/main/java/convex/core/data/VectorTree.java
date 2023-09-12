@@ -216,7 +216,8 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {
 		int n = computeArraySize(count);
 		
-		int rpos=pos+1+Format.getVLCCountLength(count);
+		int rpos=pos+1+Format.getVLCCountLength(count); // skip tag and count
+		
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			Ref<AVector<T>> ref = Format.readRef(b,rpos);

@@ -45,6 +45,8 @@ public class StateTest {
 		assertSame(s, s.withPeers(s.getPeers()));
 
 		s.validate();
+		
+		assertEquals(s.getEncodingLength(),s.getEncoding().size());
 
 		RecordTest.doRecordTests(s);
 	}

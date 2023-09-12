@@ -284,7 +284,7 @@ public class List<T extends ACell> extends AList<T> {
 			AVector<T> data = Vectors.read(b,pos);
 			if (data.isEmpty()) return (List<T>) EMPTY;
 			List<T> result=new List<T>(data);
-			result.attachEncoding(data.getEncoding()); // keep acquired encoding
+			result.attachEncoding(data.cachedEncoding()); // keep acquired encoding
 			data.attachEncoding(null); // invalidate encoding since we have a List tag
 			return result;
 		} catch (ClassCastException e) {

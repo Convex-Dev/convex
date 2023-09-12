@@ -241,7 +241,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> VectorLeaf<T> read(long count, Blob b, int pos) throws BadFormatException {
 		if (count == 0) return (VectorLeaf<T>)EMPTY;
-		boolean prefixPresent = count > MAX_SIZE;
 		
 		int n = ((int) count) & 0xF;
 		if (n == 0) {
@@ -249,7 +248,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
 		}
 		
-		int rpos=pos+1+Format.getVLCCountLength(count);
+		int rpos=pos+1+Format.getVLCCountLength(count); // skip tag and count
 		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			Ref<T> ref = Format.readRef(b,rpos);
@@ -258,6 +257,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 		
 		Ref<AVector<T>> tail = null;
+		boolean prefixPresent = count > MAX_SIZE;
 		if (prefixPresent) {
 			tail=Format.readRef(b,rpos);
 			rpos+=tail.getEncodingLength();
