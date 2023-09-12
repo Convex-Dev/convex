@@ -231,7 +231,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;
-		pos = Format.writeVLCLong(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
+		pos = Format.writeVLCCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
 		return encodeRaw(bs,pos);
 	}
 	

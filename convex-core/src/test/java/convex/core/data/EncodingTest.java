@@ -205,7 +205,7 @@ public class EncodingTest {
 		assertEquals(Maps.MAX_ENCODING_SIZE,MapTree.MAX_ENCODING_LENGTH);
 		
 		// Vectors
-		assertEquals(1+Format.MAX_VLC_LONG_LENGTH+17*ME,VectorLeaf.MAX_ENCODING_LENGTH);
+		assertEquals(1+Format.MAX_VLC_COUNT_LENGTH+17*ME,VectorLeaf.MAX_ENCODING_LENGTH);
 		
 		// Blobs
 		Blob maxBlob=Blob.create(new byte[Blob.CHUNK_LENGTH]);

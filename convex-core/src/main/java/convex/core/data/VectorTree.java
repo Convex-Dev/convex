@@ -43,7 +43,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	public static final int MAX_EMBEDDED_LENGTH = Format.MAX_EMBEDDED_LENGTH;	
 	
 	// Max encoding length requires embedded children, so can't be nested packed VectorTrees?
-	public static final int MAX_ENCODING_LENGTH= 1 + Format.getVLCLength(256) + (Format.MAX_EMBEDDED_LENGTH * Vectors.CHUNK_SIZE);
+	public static final int MAX_ENCODING_LENGTH= 1 + Format.getVLCCountLength(256) + (Format.MAX_EMBEDDED_LENGTH * Vectors.CHUNK_SIZE);
 
 	private final int shift; // bits in each child block
 
@@ -171,7 +171,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos= Format.writeVLCLong(bs,pos, count);
+		pos= Format.writeVLCCount(bs,pos, count);
 
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
@@ -216,7 +216,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	public static <T extends ACell> VectorTree<T> read(long count, Blob b, int pos) throws BadFormatException {
 		int n = computeArraySize(count);
 		
-		int rpos=pos+1+Format.getVLCLength(count);
+		int rpos=pos+1+Format.getVLCCountLength(count);
 		Ref<AVector<T>>[] items = (Ref<AVector<T>>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			Ref<AVector<T>> ref = Format.readRef(b,rpos);

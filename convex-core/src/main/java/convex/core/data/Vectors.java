@@ -135,7 +135,7 @@ public class Vectors {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <T extends ACell> AVector<T> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLCLong(b,pos+1);
+		long count = Format.readVLCCount(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative length");
 		if (VectorLeaf.isValidCount(count)) {
 			return VectorLeaf.read(count,b,pos);
