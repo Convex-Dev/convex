@@ -27,6 +27,7 @@ import convex.core.lang.Ops;
 import convex.core.lang.RT;
 import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
+import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
@@ -905,22 +906,28 @@ public class Format {
 		try {
 			int ix=0;
 			while( ix<dataLength) {
-				long encLength=Format.readVLCCount(data.getInternalArray(), data.getInternalOffset()+ix);
+				long encLength=Format.readVLCCount(data,ix);
 				ix+=Format.getVLCCountLength(encLength);
 				
-				ACell c=Format.read(data,ix);
-				if (c==null) {
-					throw new BadFormatException("Null child encoding in Message");
-				}
-				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
-				Hash h=c.getHash();
+				Blob enc=data.slice(ix, ix+encLength);
+				Hash h=enc.getContentHash();
 				
 				// Check store for Ref - avoids duplicate objects in many cases
-				//Ref<?> storeRef=store.checkCache(h);
-				//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
+				ACell c;
+				Ref<ACell> storeRef = Stores.current().checkCache(h);
+				if (storeRef!=null) {
+					// We hit store cache, so use directly!
+					c=storeRef.getValue();
+				} else {
+					c=Format.read(enc);
+					if (c==null) {
+						throw new BadFormatException("Null child encoding in Message");
+					}
+					if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
+				}
 				
 				acc.put(h, c);
-				ix+=c.getEncodingLength();
+				ix+=encLength;
 			}
 			if (ix!=dataLength) throw new BadFormatException("Bad message length when decoding");
 		} catch (IndexOutOfBoundsException e) {

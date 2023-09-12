@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
@@ -367,16 +366,6 @@ public class EncodingTest {
 		
 		assertEquals(rc,Refs.totalRefCount(decoded));
 		
-		// since this is a full encoding, expect all Refs to be direct
-		Refs.visitAllRefs(Ref.get(decoded), r->{
-			ACell c=r.getValue();
-			int n=c.getRefCount();
-			for (int i=0; i<n; i++) {
-				if (!c.getRef(i).isDirect()) {
-					fail("Unexpected indirect ref");
-				}
-			}
-		});
 		return (T) decoded;
 	}
 	
@@ -409,8 +398,6 @@ public class EncodingTest {
 		
 		// Check decode of full delta
 		Belief b2=Format.decodeMultiCell(enc);
-		Refs.RefTreeStats stats=Refs.getRefTreeStats(b2.getRef());
-		assertEquals(stats.total,stats.direct); // should have everything as direct Ref
 		assertEquals(b,b2);
 		
 		// Check no new novelty if announce again

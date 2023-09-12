@@ -62,7 +62,7 @@ public class PeerGUI extends JPanel {
 	
 	public static List<AKeyPair> KEYPAIRS=new ArrayList<>();
 			
-	private static final int NUM_PEERS=3;
+	private static final int NUM_PEERS=5;
 	 
 	static {
 		for (int i=0; i<NUM_PEERS; i++) {

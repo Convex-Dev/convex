@@ -84,7 +84,7 @@ public class CVMExecutor extends AThreadedComponent {
 		try {
 			peer = server.persistPeerData();
 		} catch (IOException e) {
-			log.warn("Exception while attempting to presist Peer data",e);
+			log.warn("Exception while attempting to persist Peer data",e);
 			throw Utils.sneakyThrow(e);
 		}
 	}
