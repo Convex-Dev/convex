@@ -771,20 +771,30 @@ public class Format {
 		return cell.estimatedEncodingSize();
 	}
 	
+	/**
+	 * Decodes an array of Cells packed in a Blob. Cells may be partial.
+	 * @param data Data containing cell encodings in multi-cell format
+	 * @return Array of decoded cells
+	 * @throws BadFormatException
+	 */
 	public static ACell[] decodeCells(Blob data) throws BadFormatException {
 		long ml=data.count();
 		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml==0) return ACell.EMPTY_ARRAY;
 		
 		ArrayList<ACell> cells=new ArrayList<>();
-		int pos=0;
+		ACell first=Format.read(data, 0);
+		cells.add(first);
+		int pos=first.getEncodingLength();
 		while (pos<ml) {
-			ACell result=Format.read(data, pos);
-			pos+=Format.getEncodingLength(result);
+			long encLength=Format.readVLCCount(data.getInternalArray(), data.getInternalOffset()+pos);
+			pos+=Format.getVLCCountLength(encLength);
+			Blob enc=data.slice(pos, pos+encLength);
+			ACell result=Format.read(enc);
+			pos+=enc.length;
 			result.getRef().getHash();
 			cells.add(result);
 		}
-				
 		return cells.toArray(ACell[]::new);
 	}
 	
@@ -926,7 +936,7 @@ public class Format {
 			// single cell only
 			return topCellEncoding;
 		}
-		
+
 		int[] ml=new int[] {topCellEncoding.size()}; // Array mutation trick for accumulator. Ugly but works....
 		HashSet<Ref<?>> refs=new HashSet<>();
 		Trees.visitStack(cells, cr->{
@@ -949,7 +959,7 @@ public class Format {
 		
 		// Write top encoding, then ensure we add each unique child
 		topCellEncoding.getBytes(msg, 0);
-		int ix=Utils.checkedInt(topCellEncoding.count());
+		int ix=topCellEncoding.length;
 		for (Ref<?> r: refs) {
 			ACell c=r.getValue();
 			Blob enc=Format.encodedBlob(c);
@@ -961,6 +971,33 @@ public class Format {
 		}
 		if (ix!=messageLength) throw new Error("Bad message length expected "+ml[0]+" but was: "+ix);
 		
+		return Blob.wrap(msg);
+	}
+	
+	/**
+	 * Encodes a list of cells in order specified in multi-cell format
+	 * 
+	 * @param cells Cells to Encode
+	 * @return Blob containing multi-cell encoding
+	 */
+	public static Blob encodeCells(java.util.List<ACell> cells) {
+		int ml=0;
+		for (ACell a:cells) {
+			Blob enc=a.getEncoding();
+			int elen=enc.length;
+			if (ml>0) ml+=Format.getVLCCountLength(elen);
+			ml+=elen;
+		}
+		
+		byte[] msg=new byte[ml];
+		int ix=0;
+		for (ACell a:cells) {
+			Blob enc=a.getEncoding();
+			int elen=enc.length;
+			if (ix>0) ix=Format.writeVLCCount(msg,ix,elen);
+			ix=enc.getBytes(msg, ix);
+		}
+		if (ix!=ml) throw new Error("Bad message length expected "+ml+" but was: "+ix);
 		return Blob.wrap(msg);
 	}
 
@@ -980,12 +1017,6 @@ public class Format {
 				// include length field
 				ml+=Format.getVLCCountLength(clen);
 			}
-			// TODO: consider bailout if message too long?
-			//if (ml>Format.MAX_MESSAGE_LENGTH) {
-			//	ml-=clen;
-			//	n=i;
-			//	break;
-			//}
 		}
 		
 		byte[] msg=new byte[ml];

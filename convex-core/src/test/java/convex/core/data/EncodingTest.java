@@ -23,6 +23,7 @@ import convex.core.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -249,7 +250,20 @@ public class EncodingTest {
 		
 		AVector<?> v2 = Format.decodeMultiCell(b);
 		assertEquals(v,v2);
+	}
+	
+	@Test public void testMultiCellEncoding() throws BadFormatException {
+		ArrayList<ACell> al=new ArrayList<ACell>();
+		al.add(CVMLong.ONE);
+		al.add(Vectors.of(1,2,3));
+		al.add(CVMDouble.ZERO);
 		
+		Blob enc=Format.encodeCells(al);
+		
+		ACell[] cs=Format.decodeCells(enc);
+		assertEquals(CVMLong.ONE,cs[0]);
+		assertEquals(CVMDouble.ZERO,cs[2]);
+		assertEquals(3,cs.length);
 	}
 	
 	@Test 

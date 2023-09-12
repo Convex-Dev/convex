@@ -5,8 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.HashMap;
-
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -15,7 +13,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Blob;
 import convex.core.data.Format;
-import convex.core.data.Hash;
 import convex.core.data.Lists;
 import convex.core.data.RecordTest;
 import convex.core.data.Ref;
