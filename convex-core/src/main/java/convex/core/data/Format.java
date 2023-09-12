@@ -880,24 +880,31 @@ public class Format {
 	 * @throws BadFormatException In case of bad format, including any embedded values
 	 */
 	public static void decodeCells(HashMap<Hash,ACell> acc, Blob data) throws BadFormatException {
-		long ml=data.count();
-		int ix=0;
-		while( ix<ml) {
-			ACell c=Format.read(data,ix);
-			if (c==null) {
-				throw new BadFormatException("Null child encoding in Message");
+		long dataLength=data.count();
+		try {
+			int ix=0;
+			while( ix<dataLength) {
+				long encLength=Format.readVLCCount(data.getInternalArray(), data.getInternalOffset()+ix);
+				ix+=Format.getVLCCountLength(encLength);
+				
+				ACell c=Format.read(data,ix);
+				if (c==null) {
+					throw new BadFormatException("Null child encoding in Message");
+				}
+				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
+				Hash h=c.getHash();
+				
+				// Check store for Ref - avoids duplicate objects in many cases
+				//Ref<?> storeRef=store.checkCache(h);
+				//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
+				
+				acc.put(h, c);
+				ix+=c.getEncodingLength();
 			}
-			if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
-			Hash h=c.getHash();
-			
-			// Check store for Ref - avoids duplicate objects in many cases
-			//Ref<?> storeRef=store.checkCache(h);
-			//Ref<?> cr=(storeRef!=null)?storeRef:Ref.get(c);
-			
-			acc.put(h, c);
-			ix+=c.getEncodingLength();
+			if (ix!=dataLength) throw new BadFormatException("Bad message length when decoding");
+		} catch (IndexOutOfBoundsException e) {
+			throw new BadFormatException("Insufficient bytes to decode Cells");
 		}
-		if (ix!=ml) throw new BadFormatException("Bad message length when decoding");
 	}
 
 	/**
@@ -925,7 +932,11 @@ public class Format {
 		Trees.visitStack(cells, cr->{
 			if (!refs.contains(cr)) {
 				ACell c=cr.getValue();
-				int cellLength=c.getEncodingLength();
+				int encLength=c.getEncodingLength();
+				int lengthFieldSize=Format.getVLCCountLength(encLength);
+				
+				int cellLength=lengthFieldSize+encLength;
+				
 				int newLength=ml[0]+cellLength;
 				if (newLength>Format.MAX_MESSAGE_LENGTH) return;
 				ml[0]=newLength;
@@ -936,14 +947,17 @@ public class Format {
 		int messageLength=ml[0];
 		byte[] msg=new byte[messageLength];
 		
-		// Write top encoding, ensure we add each unique child
+		// Write top encoding, then ensure we add each unique child
 		topCellEncoding.getBytes(msg, 0);
 		int ix=Utils.checkedInt(topCellEncoding.count());
 		for (Ref<?> r: refs) {
 			ACell c=r.getValue();
 			Blob enc=Format.encodedBlob(c);
-			enc.getBytes(msg, ix);
-			ix+=enc.count();
+			int encLength=enc.length;
+			
+			// Write count then Blob encoding
+			ix=Format.writeVLCCount(msg, ix, encLength);
+			ix=enc.getBytes(msg, ix);
 		}
 		if (ix!=messageLength) throw new Error("Bad message length expected "+ml[0]+" but was: "+ix);
 		
@@ -961,6 +975,11 @@ public class Format {
 		for (int i=0; i<n; i++) {
 			int clen=cells.get(i).getEncodingLength();
 			ml+=clen;
+			
+			if (i<(n-1)) {
+				// include length field
+				ml+=Format.getVLCCountLength(clen);
+			}
 			// TODO: consider bailout if message too long?
 			//if (ml>Format.MAX_MESSAGE_LENGTH) {
 			//	ml-=clen;
@@ -975,8 +994,12 @@ public class Format {
 		for (int i=n-1; i>=0; i--) {
 			Blob enc=cells.get(i).getEncoding();
 			int elen=enc.size();
-			enc.getBytes(msg,ix);
-			ix+=elen;
+			
+			if (i<(n-1)) {
+				ix=Format.writeVLCCount(msg, ix, elen);
+			}
+			
+			ix=enc.getBytes(msg,ix);
 		}
 		if (ix!=ml) throw new Error("Bad message length expected "+ml+" but was: "+ix);
 		

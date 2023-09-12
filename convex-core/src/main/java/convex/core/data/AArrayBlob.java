@@ -109,7 +109,7 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public final int getBytes(byte[] dest, int pos) {
 		System.arraycopy(store, offset, dest, pos, length);
-		return Utils.checkedInt(pos + length);
+		return pos + length;
 	}
 
 	/**
