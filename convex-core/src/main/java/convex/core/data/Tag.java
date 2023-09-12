@@ -32,7 +32,7 @@ public class Tag {
 	public static final byte SYMBOL = (byte) 0x32;
 	public static final byte KEYWORD = (byte) 0x33;
 	
-	// Char data type, encoding 2 low bits of length (0x3c - 0x3f)
+	// Char data type, encoding 2 low bits of length (0x3c - 0x3f). Note: c=1100 binary means 1 byte char, f=1111 binary is 4 bytes
 	public static final byte CHAR = (byte) 0x3c;
 
 	// data type tags beyond this point

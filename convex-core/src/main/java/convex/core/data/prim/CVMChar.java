@@ -1,7 +1,5 @@
 package convex.core.data.prim;
 
-import java.nio.ByteBuffer;
-
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -44,6 +42,9 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	 */
 	public static final int MAX_UTF_BYTES = 4;
 	
+	/**
+	 * The Unicode code point of this character
+	 */
 	private final int value;
 	
 	private CVMChar(int value) {
@@ -78,7 +79,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+3;
+		return 4;
 	}
 	
 	/**
@@ -86,7 +87,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	 * @param tag Tag byte
 	 * @return Number of bytes in range 1-4
 	 */
-	public static int utfByteCountFromTag(byte tag) {
+	public static int byteCountFromTag(byte tag) {
 		return (tag&0x03)+1;
 	}
 
@@ -132,7 +133,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	/**
 	 * Gets the length in bytes needed to express the character in an Encoding
 	 * @param c Code point value
-	 * @return Number of bytes needed for code point
+	 * @return Number of bytes needed to encode code point (following tag)
 	 */
 	private static int encodedCharLength(int c) {
 		if ((c&0xffff0000)==0) {
@@ -154,18 +155,6 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		if (c<=0xffff) return 3;
 		if (c<=MAX_CODEPOINT) return 4;
 		return -1;
-	}
-	
-	public static CVMChar read(int len,ByteBuffer bb) throws BadFormatException {
-		int value=0xff000000; // High byte should be shifted away, here to catch errors
-		for (int i=0; i<len;i++) {
-			if (value==0) throw new BadFormatException("Leading zero in CVMChar encoding");
-			byte b=bb.get();
-			value=(value<<8)+(b&0xFF);
-		}
-		CVMChar result=create(value);
-		if (result==null) throw new BadFormatException("CVMChar out of Unicode range");
-		return result;
 	}
 	
 	/**

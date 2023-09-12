@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -103,22 +101,14 @@ public final class Keyword extends ASymbolic implements Comparable<Keyword> {
 	}
 
 	/**
-	 * Reads a Keyword from the given ByteBuffer, assuming tag already consumed
+	 * Reads a Keyword from the given Blob
 	 * 
-	 * @param bb ByteBuffer source
+	 * @param blob Data source
 	 * @return The Keyword read
 	 * @throws BadFormatException If a Keyword could not be read correctly
 	 */
-	public static Keyword read(ByteBuffer bb) throws BadFormatException {
-		int len=0xff&bb.get();
-		AString name=Format.readUTF8String(bb,len);
-		Keyword kw = Keyword.create(name);
-		if (kw == null) throw new BadFormatException("Can't read keyword (probably invalid name)");
-		return kw;
-	}
-	
 	public static Keyword read(Blob blob, int offset) throws BadFormatException {
-		int len=0xff&blob.byteAt(offset+1); // skip tag
+		int len=0xff&blob.byteAt(offset+1); // skip tag to read length
 		AString name=Format.readUTF8String(blob,offset+2,len);
 		Keyword kw = Keyword.create(name);
 		if (kw == null) throw new BadFormatException("Can't read keyword");

@@ -310,7 +310,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (encoding!=null) return encoding.size();
 		
 		// tag and count
-		int length=1+Format.getVLCLength(count);
+		int length=1+Format.getVLCCountLength(count);
 		int n = items.length;
 		if (prefix!=null) length+=prefix.getEncodingLength();
 		for (int i = 0; i < n; i++) {

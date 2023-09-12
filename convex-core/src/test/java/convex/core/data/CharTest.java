@@ -25,6 +25,9 @@ public class CharTest {
 		int cp=CVMChar.codepointFromUTFInt(0xf0928080); // SUMERIAN CUNEIFORM SIGN A
 		assertEquals(73728,cp);
 		CVMChar c=CVMChar.create(cp);
+		assertEquals(3,CVMChar.byteCountFromTag(c.getTag())); // number of bytes needed in CVMChar
+		assertEquals(Tag.CHAR+2,c.getTag()); // 2 extra bytes encoded in char tag
+		
 		String js=c.toString();
 		assertEquals(2,js.length()); // should encode to two UTF-16 chars
 		assertEquals(0xD808,js.charAt(0)); // first UTF-16 char
@@ -49,6 +52,13 @@ public class CharTest {
 		ObjectsTest.doEqualityTests(CVMChar.create(999), CVMChar.create(999));
 	}
 	
+	
+	@Test
+	public void testCharTags() {
+		CVMChar a=CVMChar.create('a');
+		assertEquals(Tag.CHAR,a.getTag());
+	}
+	
 	@Test public void testUTF16Chars() {
 		testUTF(0);
 		testUTF(128);
@@ -65,6 +75,7 @@ public class CharTest {
 		CVMChar c=CVMChar.create(i);
 		doCharTests(c);
 	}
+
 
 	/**
 	 * Test for and valid CVMChar

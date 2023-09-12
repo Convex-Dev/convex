@@ -5,8 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.nio.ByteBuffer;
-
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
@@ -36,7 +34,7 @@ public class KeywordTest {
 	@Test
 	public void testBadFormat() {
 		// should fail because this is an empty String
-		assertThrows(BadFormatException.class, () -> Keyword.read(Blob.fromHex("00").toByteBuffer()));
+		assertThrows(BadFormatException.class, () -> Keyword.read(Blob.fromHex("3300"),0));
 	}
 	
 	@Test 
@@ -46,10 +44,7 @@ public class KeywordTest {
 		Blob enc=Blob.fromHex("33056b65793137");
 		
 		assertEquals(enc,k.getEncoding());
-		
-		ByteBuffer bb=enc.getByteBuffer();
-		assertEquals(Tag.KEYWORD,bb.get());
-		Keyword k2=Keyword.read(bb);
+		Keyword k2=Keyword.read(enc,0);
 		
 		assertEquals(k,k2);
 		assertEquals(enc,k.getEncoding());
