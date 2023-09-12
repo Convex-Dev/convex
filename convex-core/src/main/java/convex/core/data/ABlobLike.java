@@ -38,12 +38,8 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	 */
 	public int getHexDigit(long digitPos) {
 		byte b = byteAtUnchecked(digitPos >> 1);
-		//if ((digitPos & 1) == 0) {
-		//	return (b >> 4) & 0x0F; // first hex digit
-		//} else {
-		//	return b & 0x0F; // second hex digit
-		//}
-		// This hack avoids a conditional, not sure if worth it....
+
+		// This hack avoids a conditional
 		int shift = 4*(1-((int)digitPos&1));
 		return (b>>shift)&0x0F;
 	}
@@ -52,7 +48,7 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	public abstract ABlobLike<T> empty();
 	
 	/**
-	 * Gets a byte array containing a copy of this Blob.
+	 * Gets a new byte array containing a copy of this Blob.
 	 * 
 	 * @return A new byte array containing the contents of this blob.
 	 */
@@ -63,7 +59,7 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	}
 	
 	/**
-	 * Copies the bytes from this instance to a given destination
+	 * Copies the bytes from this instance to a given destination array
 	 * 
 	 * @param dest Destination array
 	 * @param destOffset Offset into destination array

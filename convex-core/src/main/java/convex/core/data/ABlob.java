@@ -26,7 +26,6 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		return Types.BLOB;
 	}
 	
-
 	/**
 	 * Gets the length of this Blob
 	 * 
