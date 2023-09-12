@@ -35,7 +35,7 @@ public class Maps {
 	}
 
 	/**
-	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
+	 * Constructs a map with the given keys and values. If keys are repeated, later keys will
 	 * overwrite earlier ones. Performs conversion to CVM types.
 	 * @param <R> Map type
 	 * @param <K> Key type
@@ -59,7 +59,7 @@ public class Maps {
 	}
 	
 	/**
-	 * Constructs a map with the given keys and values. If keys are repreated, later keys will
+	 * Constructs a map with the given keys and values. If keys are repeated, later keys will
 	 * overwrite earlier ones. Performs conversion to CVM types.
 	 * @param <R> Map type
 	 * @param <K> Key type

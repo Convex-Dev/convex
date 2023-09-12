@@ -199,7 +199,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		return encodeRaw(len,bs,pos);
 	}
 
-	public int encodeRaw(int len,byte[] bs, int pos) {
+	private int encodeRaw(int len,byte[] bs, int pos) {
 		for (int i=0; i<len; i++) {
 			bs[pos+i]=(byte)((value>>((len-1-i)*8))&0xff);
 		}
@@ -361,8 +361,5 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		if (a==null) return false;
 		return value==a.value;
 	}
-
-
-
 
 }

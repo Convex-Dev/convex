@@ -3,6 +3,7 @@ package convex.core;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
@@ -42,6 +43,7 @@ import convex.core.lang.impl.RecordFormat;
 public final class Result extends ARecordGeneric {
 
 	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.INFO);
+	private static final long FIELD_COUNT=RESULT_FORMAT.count();
 	
 	private Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
@@ -59,7 +61,7 @@ public final class Result extends ARecordGeneric {
 	 * @param info Additional info
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode, AMap<Keyword,ACell> info) {
+	public static Result create(CVMLong id, ACell value, ACell errorCode, AHashMap<Keyword,ACell> info) {
 		return buildFromVector(Vectors.of(id,value,errorCode,info));
 	}
 	
@@ -152,12 +154,17 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
+	public void validateCell() throws InvalidDataException {
+		super.validateCell();
 		
 		ACell id=values.get(0);
 		if ((id!=null)&&!(id instanceof CVMLong)) {
 			throw new InvalidDataException("Result ID must be a CVM long value",this);
+		}
+		
+		ACell info=values.get(3);
+		if ((info!=null)&&!(info instanceof AHashMap)) {
+			throw new InvalidDataException("Result info must be a hash map",this);
 		}
 	}
 	
@@ -181,6 +188,7 @@ public final class Result extends ARecordGeneric {
 		// include tag location since we are reading raw Vector (will ignore tag)
 		AVector<ACell> v=Vectors.read(b,epos);
 		epos+=Format.getEncodingLength(v);
+		if (v.count()!=FIELD_COUNT) throw new BadFormatException("Wrong number of fields for Result");
 		
 		Blob enc=v.getEncoding();
 		v.attachEncoding(null); // This is an invalid encoding for vector, see above
@@ -207,7 +215,7 @@ public final class Result extends ARecordGeneric {
 	public static Result fromContext(CVMLong id,Context ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;
-		AMap<Keyword,ACell> info=null;
+		AHashMap<Keyword,ACell> info=null;
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();

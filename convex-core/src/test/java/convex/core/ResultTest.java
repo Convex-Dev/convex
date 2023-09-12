@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
-import convex.core.data.AMap;
+import convex.core.data.AHashMap;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
@@ -31,7 +31,7 @@ public class ResultTest {
 	
 	@Test
 	public void testResultCreation() {
-		AMap<Keyword,ACell> info=Maps.of(Keywords.TRACE,Vectors.empty());
+		AHashMap<Keyword,ACell> info=Maps.of(Keywords.TRACE,Vectors.empty());
 		Result r1=Result.create(CVMLong.create(0L),RT.cvm(1L),ErrorCodes.FATAL,info);
 		assertSame(Vectors.empty(),r1.getTrace());
 		assertSame(info,r1.getInfo());
