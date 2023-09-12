@@ -148,7 +148,7 @@ public final class StringShort extends AString {
 	 */
 	public static StringShort read(long length, Blob blob, int pos) {
 		int len=Utils.checkedInt(length);
-		int dataOffset=pos+1+Format.getVLCLength(length);
+		int dataOffset=pos+1+Format.getVLCCountLength(length);
 		byte[] data = new byte[len];
 		System.arraycopy(blob.getInternalArray(), blob.getInternalOffset()+dataOffset, data, 0, len);
 		StringShort result= new StringShort(data);

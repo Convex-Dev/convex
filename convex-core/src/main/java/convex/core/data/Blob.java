@@ -187,7 +187,7 @@ public class Blob extends AArrayBlob {
 		if (count>CHUNK_LENGTH) throw new BadFormatException("Trying to read flat blob with count = " +count);
 		
 		// compute data length, excluding tag and encoded length
-		int headerLength = (1 + Format.getVLCLength(count));
+		int headerLength = (1 + Format.getVLCCountLength(count));
 		long start = pos+ headerLength;
 		if (start+count>source.count()) {
 			throw new BadFormatException("Insufficient bytes to read Blob required count =" + count);
@@ -222,7 +222,7 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Maximum encoding size for a regular Blob
 	 */
-	public static final int MAX_ENCODING_LENGTH=1+Format.getVLCLength(CHUNK_LENGTH)+CHUNK_LENGTH;
+	public static final int MAX_ENCODING_LENGTH=1+Format.getVLCCountLength(CHUNK_LENGTH)+CHUNK_LENGTH;
 
 	@Override
 	public boolean isCanonical() {

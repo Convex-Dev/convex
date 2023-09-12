@@ -109,7 +109,7 @@ public class Blobs {
 		int sLen = source.length-pos;
 		if (sLen < 2) throw new BadFormatException("Trying to read Blob from insufficient source of size " + sLen);
 		// read length at position 1 (skipping tag)
-		long count = Format.readVLCLong(source.store, source.offset + pos+ 1); // skip pos and tag
+		long count = Format.readVLCCount(source.store, source.offset + pos+ 1); // skip pos and tag
 
 		T result = null;
 		if (count < 0L) throw new BadFormatException("Negative blob length?");

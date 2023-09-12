@@ -136,7 +136,7 @@ public class Samples {
 	
 	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);
 
-	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCLength(Format.MAX_EMBEDDED_LENGTH)-1);
+	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCCountLength(Format.MAX_EMBEDDED_LENGTH)-1);
 	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.count()+1);
 
 	public static final AString MAX_EMBEDDED_STRING= Strings.create("This is a string containing exactly 137 characters. This is just right for a maximum embedded string in Convex. How lucky is that, eh????");
@@ -152,7 +152,7 @@ public class Samples {
 	public static final String TOO_BIG_SYMBOLIC=MAX_SYMBOLIC+"a";
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static final VectorLeaf<ACell> MAX_EMBEDDED_VECTOR = (VectorLeaf) Vectors.of(Blobs.createRandom(105),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
+	public static final VectorLeaf<ACell> MAX_EMBEDDED_VECTOR = (VectorLeaf) Vectors.of(Blobs.createRandom(106),1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
 
 	public static final Blob SMALL_BLOB = Blob.fromHex("cafebabe");
 	

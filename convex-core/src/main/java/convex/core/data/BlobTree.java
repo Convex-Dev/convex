@@ -321,7 +321,7 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs,pos, count);
+		pos = Format.writeVLCCount(bs,pos, count);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			pos = children[i].encode(bs,pos);
@@ -333,9 +333,8 @@ public class BlobTree extends ABlob {
 	 * Maximum byte length of an encoded BlobTree node. 
 	 * Note: 
 	 * - Last child might be embedded, others cannot
-	 * - With max 16 children , not possible to have biggest VLC length
 	 */
-	public static final int MAX_ENCODING_SIZE=1+(Format.MAX_VLC_LONG_LENGTH-1)+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
+	public static final int MAX_ENCODING_SIZE=1+Format.MAX_VLC_COUNT_LENGTH+((FANOUT-1)*Ref.INDIRECT_ENCODING_LENGTH)+Format.MAX_EMBEDDED_LENGTH;
 
 	/**
 	 * Reads an encoded BlobTree from a Blob. Assumes there will be encoded children.
@@ -346,7 +345,7 @@ public class BlobTree extends ABlob {
 	 * @throws BadFormatException If BlobTree encoding is invalid
 	 */
 	public static BlobTree read(long count, Blob src, int pos) throws BadFormatException {
-		int headerLength = (1 + Format.getVLCLength(count));
+		int headerLength = (1 + Format.getVLCCountLength(count));
 		long chunks = calcChunks(count);
 		int shift = calcShift(chunks);
 		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
