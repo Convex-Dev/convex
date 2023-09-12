@@ -718,16 +718,6 @@ public class Format {
 		if (o==null) return Blob.NULL_ENCODING;
 		return o.getEncoding();
 	}
-
-	/**
-	 * Gets an new encoded ByteBuffer for an Cell in wire format
-	 * 
-	 * @param cell The Cell to encode
-	 * @return A ByteBuffer ready to read (i.e. already flipped)
-	 */
-	public static ByteBuffer encodedBuffer(ACell cell) {
-		return Format.encodedBlob(cell).getByteBuffer();
-	}
 	
 	/**
 	 * Writes hex digits from digit position start, total length.
