@@ -173,7 +173,7 @@ public class PeerStatus extends ARecord {
 		epos+=Format.getEncodingLength(metadata);
 		
 		long timestamp=Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(delegatedStake);
+		epos+=Format.getVLCLength(timestamp);
 		 
 		PeerStatus result= new PeerStatus(owner, stake,stakes,delegatedStake,metadata,timestamp);
 		result.attachEncoding(b.slice(pos, epos));

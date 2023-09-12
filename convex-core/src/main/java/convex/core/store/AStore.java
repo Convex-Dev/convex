@@ -144,6 +144,7 @@ public abstract class AStore {
 		} finally {
 			Stores.setCurrent(tempStore);
 		}
+		blobCache.putCell(decoded);
 		return (T)decoded;
 	}
 

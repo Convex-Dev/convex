@@ -200,6 +200,9 @@ public class ObjectsTest {
 			ACell a2 = Format.read(encoding);
 			assertEquals(a, a2);
 			
+			// Encoding should be cached, probably but not necessarily identical
+			assertEquals(a2.cachedEncoding(),encoding);
+			
 			// Test that we can re-read from a sliced Blob
 			ABlob t=Samples.SMALL_BLOB.append(encoding);
 			Blob offsetEncoding=t.slice(Samples.SMALL_BLOB.count()).toFlatBlob();
