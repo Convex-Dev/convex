@@ -705,12 +705,10 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (!isPacked()) throw new InvalidDataException("Non packed VectorTree size: " + count, this);
+		if (!isPacked()) throw new InvalidDataException("Non packed VectorTree size", this);
 		int blen = children.length;
-		if (count < blen) throw new InvalidDataException("Implausible low count: " + count, this);
-
-		if (blen < 2) throw new InvalidDataException("Insufficient children: " + blen, this);
-
+		if (blen < 2) throw new InvalidDataException("Insufficient children", this);
+		if (count <= childSize()*(blen-1)) throw new InvalidDataException("Impossible low count", this);
 	}
 
 	@Override
