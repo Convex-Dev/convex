@@ -270,10 +270,16 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, balance, memory,environment,newMeta,holdings,controller,publicKey);
 	}
 	
+	private AccountStatus withHoldings(BlobMap<Address, ACell> newHoldings) {
+		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null;
+		if (holdings==newHoldings) return this;
+		return new AccountStatus(sequence, balance, memory, environment,metadata,newHoldings,controller,publicKey);
+	}
+	
 	@Override 
-	public boolean equals(ACell a) {
-		if(!(a instanceof AccountStatus)) return false;
-		AccountStatus as=(AccountStatus)a;
+	public boolean equals(ACell o) {
+		if(!(o instanceof AccountStatus)) return false;
+		AccountStatus as=(AccountStatus)o;
 		return equals(as);
 	}
 	
@@ -367,12 +373,6 @@ public class AccountStatus extends ARecord {
 		}
 		return withHoldings(hodls);
 	}
-
-	private AccountStatus withHoldings(BlobMap<Address, ACell> newHoldings) {
-		if (newHoldings.isEmpty()) newHoldings=null;
-		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, balance, memory, environment,metadata,newHoldings,controller,publicKey);
-	}
 	
 	public AccountStatus withController(ACell newController) {
 		if (controller==newController) return this;
@@ -409,8 +409,8 @@ public class AccountStatus extends ARecord {
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);
-		if (Keywords.ENVIRONMENT.equals(key)) return environment;
-		if (Keywords.METADATA.equals(key)) return metadata;
+		if (Keywords.ENVIRONMENT.equals(key)) return getEnvironment();
+		if (Keywords.METADATA.equals(key)) return getMetadata();
 		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.KEY.equals(key)) return publicKey;
@@ -458,9 +458,8 @@ public class AccountStatus extends ARecord {
 	 * @param delta Amount of Convex copper to add
 	 * @return Updates account record
 	 */
-	public AccountStatus addBalance(long delta) {
-		if (delta==0) return this;
-		return withBalance(balance+delta);
+	public AccountStatus addBalanceAndSequence(long delta) {
+		return new AccountStatus(sequence+1,balance+delta,memory,environment,metadata,holdings,controller,publicKey);
 	}
 
 	/**

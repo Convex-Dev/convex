@@ -372,10 +372,8 @@ public class Context {
 		long fees=juiceFees+memorySpend;
 		
 		// Make balance changes if needed for refund and memory purchase
-		account=account.addBalance(-fees);
-		
-		// Update sequence
-		account=account.updateSequence(account.getSequence()+1);
+		// Also increment sequence number
+		account=account.addBalanceAndSequence(-fees);
 
 		// update Account
 		state=state.putAccount(address,account);
