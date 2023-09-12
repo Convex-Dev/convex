@@ -186,7 +186,7 @@ public class Connection {
 		clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
 		clientChannel.socket().setSendBufferSize(sendBufferSize);
 		
-		// TODO: reconsider this
+		// Disable Nagle, we don't want this as we want to send one-way traffic as fast as possible
 		clientChannel.socket().setTcpNoDelay(true);
 		clientChannel.connect(hostAddress);	
 
@@ -444,7 +444,7 @@ public class Connection {
 	 * @throws IOException
 	 */
 	private boolean sendBuffer(MessageType type, Blob data) throws IOException {
-		// synchronize on sender
+		// synchronise on sender
 		synchronized (sender) {
 			if (!sender.canSendMessage()) return false;
 			int dataLength = Utils.checkedInt(data.count());
