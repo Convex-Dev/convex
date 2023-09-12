@@ -70,7 +70,9 @@ public class CharTest {
 		testUTF(0x0680); // ARABIC LETTER BEHEH (U+0680)
 		testUTF(0x0D60);// MALAYALAM LETTER VOCALIC RR (U+0D60)
 		
-		//testUTF(CVMChar.codepointFromUTFInt(0xf0928080)); // SUMERIAN CUNEIFORM CHAR
+		testUTF(CVMChar.MAX_VALUE.longValue());// Maximum code point
+	
+		testUTF(CVMChar.codepointFromUTFInt(0xf0928080)); // SUMERIAN CUNEIFORM CHAR
 	}
 	
 	private void testUTF(long i) {
@@ -80,7 +82,7 @@ public class CharTest {
 
 
 	/**
-	 * Test for and valid CVMChar
+	 * Tests for any valid CVMChar
 	 * @param c Character value to test
 	 */
 	public void doCharTests(CVMChar c) {
