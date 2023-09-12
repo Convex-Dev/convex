@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
@@ -13,6 +14,8 @@ public class CharTest {
 		for (int i=0; i<128; i++) {
 			CVMChar c=CVMChar.create(i);
 			assertEquals(i,c.longValue());
+			
+			assertSame(c,CVMChar.create(i)); // check it comes from cache
 			
 			doCharTests(c);
 		}

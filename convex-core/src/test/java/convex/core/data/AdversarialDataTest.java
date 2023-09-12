@@ -26,7 +26,7 @@ public class AdversarialDataTest {
 	// A value that is non-canonical but otherwise valid CVM value
 	public static final Blob NON_CANONICAL=Blob.createRandom(new Random(), Blob.CHUNK_LENGTH+1);
 
-	// A value that is invalid
+	// A value that is invalid 
 	public static final SetLeaf<CVMLong> NON_VALID=SetLeaf.unsafeCreate(new CVMLong[0]);
 
 	@Test public void testAssumptions() {
@@ -152,7 +152,7 @@ public class AdversarialDataTest {
 		ACell c=null;
 		try {
 			c=Format.read(enc);
-			c.validateCell();; // If we managed to read it, should validate
+			c.validateCell(); // If we managed to read it, should validate
 		} catch (BadFormatException e) {
 			// not a readable format, so probably not dangerous
 			return;
