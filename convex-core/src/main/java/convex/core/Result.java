@@ -49,7 +49,7 @@ public final class Result extends ARecordGeneric {
 		super(RESULT_FORMAT, values);
 	}
 	
-	private static Result buildFromVector(AVector<ACell> values) {
+	public static Result buildFromVector(AVector<ACell> values) {
 		return new Result(values);
 	}
 	
@@ -157,15 +157,26 @@ public final class Result extends ARecordGeneric {
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
 		
+		String problem=checkValues(values);
+		
+		if (problem!=null) {
+			throw new InvalidDataException(problem, this);
+		}
+	}
+	
+	private static String checkValues(AVector<ACell> values) {
+		if (values.count()!=FIELD_COUNT) return "Wrong number of fields for Result";
+
 		ACell id=values.get(0);
 		if ((id!=null)&&!(id instanceof CVMLong)) {
-			throw new InvalidDataException("Result ID must be a CVM long value",this);
+			return "Result ID must be a CVM long value";
 		}
 		
 		ACell info=values.get(3);
 		if ((info!=null)&&!(info instanceof AHashMap)) {
-			throw new InvalidDataException("Result info must be a hash map",this);
+			return "Result info must be a hash map";
 		}
+		return null;
 	}
 	
 	@Override
@@ -188,11 +199,13 @@ public final class Result extends ARecordGeneric {
 		// include tag location since we are reading raw Vector (will ignore tag)
 		AVector<ACell> v=Vectors.read(b,epos);
 		epos+=Format.getEncodingLength(v);
-		if (v.count()!=FIELD_COUNT) throw new BadFormatException("Wrong number of fields for Result");
+		
+		String problem=checkValues(v);
+		if (problem!=null) throw new BadFormatException(problem);
 		
 		Blob enc=v.getEncoding();
-		v.attachEncoding(null); // This is an invalid encoding for vector, see above
 		Result r=buildFromVector(v);
+		v.attachEncoding(null); // This is an invalid encoding for vector, see above
 		r.attachEncoding(enc);
 		return r;
 	}

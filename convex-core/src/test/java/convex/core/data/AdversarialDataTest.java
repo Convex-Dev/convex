@@ -10,9 +10,11 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Result;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 /**
@@ -133,6 +135,12 @@ public class AdversarialDataTest {
 		invalidTest(Symbol.unsafeCreate(""));
 		invalidTest(Symbol.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
 		invalidTest(Symbol.unsafeCreate(Samples.MAX_SHORT_STRING));
+	}
+	
+	@Test
+	public void testBadResult() {
+		invalidTest(Result.buildFromVector(Vectors.of(Symbols.FOO,null,null,null))); // invalid ID
+		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,Keywords.BAR))); // Invalid info map
 	}
 
 	private void invalidTest(ACell b) {

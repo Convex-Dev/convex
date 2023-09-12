@@ -2,6 +2,7 @@ package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
@@ -38,6 +39,11 @@ public class ResultTest {
 		assertSame(ErrorCodes.FATAL,r1.getErrorCode());
 		
 		RecordTest.doRecordTests(r1);
+	}
+	
+	@Test
+	public void testBadBuild() {
+		assertThrows(IllegalArgumentException.class,()->Result.buildFromVector(Vectors.of(1,2)));
 	}
 
 }
