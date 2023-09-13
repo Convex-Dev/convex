@@ -28,6 +28,11 @@ public final class Syntax extends ACell {
 	public static final AString EMPTY_META_PREFIX = Strings.create("^{} ");
 
 	/**
+	 * Max encoding size is a Map (with substituted tag) plus an embedded datum
+	 */
+	public static final int MAX_ENCODING_LENGTH = 1+ (Maps.MAX_ENCODING_SIZE) + Format.MAX_EMBEDDED_LENGTH; 
+			
+	/**
 	 * Ref to the unwrapped datum value. Cannot refer to another Syntax object
 	 */
 	private final Ref<ACell> datumRef;
@@ -225,7 +230,7 @@ public final class Syntax extends ACell {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+2*Format.MAX_EMBEDDED_LENGTH;
+		return 1+meta.estimatedEncodingSize()+Format.MAX_EMBEDDED_LENGTH;
 	}
 
 	@Override
