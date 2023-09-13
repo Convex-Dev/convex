@@ -1269,7 +1269,7 @@ public class Utils {
 	 * @param <U> Type of the target value.
 	 * @return Target, or leftmost value, or null if there isn't a match.
 	 */
-	public static <T extends ACell, U> T binarySearchLeftmost(ASequence<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
+	public static <T extends ACell, U> T binarySearchLeftmost(ASequence<T> L, Function<? super T, U> value, Comparator<U> comparator, U target) {
 		long min = 0;
 		long max = L.count();
 
@@ -1312,7 +1312,7 @@ public class Utils {
 	 * @param <U> Type of the target value.
 	 * @return Position of target in sequence.
 	 */
-	public static <T extends ACell, U> long binarySearch(ASequence<T> L, Function<T, U> value, Comparator<U> comparator, U target) {
+	public static <T extends ACell, U> long binarySearch(ASequence<T> L, Function<? super T, U> value, Comparator<U> comparator, U target) {
 		long min = 0;
 		long max = L.count();
 
@@ -1397,7 +1397,7 @@ public class Utils {
 	 * @param items Collection of items to run futures on
 	 * @return List of futures for each item
 	 */
-	public static <R,T> ArrayList<CompletableFuture<R>> futureMap(Function<T,R> func, Collection<T> items) {
+	public static <R,T> ArrayList<CompletableFuture<R>> futureMap(Function<? super T,R> func, Collection<T> items) {
 		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
 		for (T item: items) {
 			futures.add(CompletableFuture.supplyAsync(()->func.apply(item),getExecutor()));
@@ -1413,7 +1413,7 @@ public class Utils {
 	 * @param items Collection of items to run futures on
 	 * @return List of futures for each item
 	 */
-	public static <R,T> ArrayList<CompletableFuture<R>> threadMap(Function<T,R> func, Collection<T> items) {
+	public static <R,T> ArrayList<CompletableFuture<R>> threadMap(Function<? super T,R> func, Collection<T> items) {
 		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
 		for (T item: items) {
 			CompletableFuture<R> f=new CompletableFuture<>();

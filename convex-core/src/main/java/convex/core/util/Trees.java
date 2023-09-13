@@ -20,7 +20,7 @@ public class Trees {
 	 * @param stack Stack of values to visit, must be a mutable List
 	 * @param visitor Visitor function to call for each stack element.
 	 */
-	public static <T> void visitStack(List<T> stack, Consumer<T> visitor) {
+	public static <T> void visitStack(List<T> stack, Consumer<? super T> visitor) {
 		while(!stack.isEmpty()) {
 			int pos=stack.size()-1;
 			T r=stack.remove(pos);
@@ -39,7 +39,7 @@ public class Trees {
 	 * @param stack Stack of values to visit, must be a mutable List
 	 * @param visitor Visitor function to call for each stack element.
 	 */
-	public static <T> void visitStackMaybePopping(List<T> stack, Predicate<T> visitor) {
+	public static <T> void visitStackMaybePopping(List<T> stack, Predicate<? super T> visitor) {
 		while(!stack.isEmpty()) {
 			int pos=stack.size()-1;
 			T r=stack.get(pos);

@@ -70,7 +70,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * 
 	 * @param <R> Type of Value added
 	 * @param xs New elements to add
-	 * @return The updated data structure, or null if a failure occurred due to invalid elementtypes
+	 * @return The updated data structure, or null if a failure occurred due to invalid element types
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> ADataStructure<R> conjAll(ACollection<R> xs) {
