@@ -114,7 +114,7 @@ Licensee acknowledges and agrees that their use of the work (directly or indirec
 - Contracts may be executed according to rules defined by software code either deployed to the Network or as part of the execution environment defined within this Work. 
 - Access to or control of digital assets and other economically valuable systems may depend on cryptographic keys and signatures, and it is the responsibility of Licensee to ensure that such keys are properly secured.
 
-Licensee accepts full responsibility for the consequences of executing transactions on such a network, and authorises operators of the network to carry out execution as described here.
+Licensee accepts full responsibility for the consequences of executing transactions on such a network, and authorises operators of the network to carry out execution as described here. If Licensee executes transactions on behalf of a third party, it is the responsibility of Licensee to ensure that any such party agrees to these terms, and Licensee shall indemnify operators of the Convex Network against any consequences of a failure to do so. 
 
 ## 12. Contributor Awards
 
