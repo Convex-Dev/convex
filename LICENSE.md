@@ -106,7 +106,17 @@ While redistributing the Work or Derivative Works thereof, You may choose to off
 
 Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute Contributions under any license, including future revisions of this license, providing that such license is formally approved by the Governing Body. The Governing Body will ensure that this Work is always free and open source for anyone to use within the Convex ecosystem.
 
-## 11. Contributor Awards
+## 11. Decentralised Execution
+
+Licensee acknowledges and agrees that their use of the work (directly or indirectly) may include the execution of transactions on a public, decentralised network, and as such they agree to the following:
+
+- Transactions that they execute may be publicly visible, including any personal information contained therein.
+- Contracts may be executed according to rules defined by software code either deployed to the Network or as part of the execution environment defined within this Work. 
+- Access to or control of digital assets and other economically valuable systems may depend on cryptographic keys and signatures, and it is the responsibility of Licensee to ensure that such keys are properly secured.
+
+Licensee accepts full responsibility for the consequences of executing transactions on such a network, and authorises operators of the network to carry out execution as described here.
+
+## 12. Contributor Awards
 
 The Governing Body may, at its sole and absolute discretion, make awards of Convex Coins for Contributions to the Work. To be eligible for such awards, Contributor agrees to sign a Contributor Agreement which shall be made available separately from this License. 
 
