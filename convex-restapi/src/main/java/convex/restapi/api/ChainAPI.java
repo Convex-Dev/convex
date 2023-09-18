@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
+import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
@@ -219,10 +220,14 @@ public class ChainAPI extends ABaseAPI {
 		CVMLong l=CVMLong.parse(o);
 		if (l==null)  throw new BadRequestResponse(jsonError("faucet requires an 'amount' field containing a long value."));
 
+		long amt=l.longValue();
+		// Do any limits on faucet issue here
+		if (amt>Coin.GOLD) amt=Coin.GOLD;
+		
 		try {
 			// SECURITY: Make sure this is not subject to injection attack
 			// Optional: pre-compile to Op
-			Result r=convex.transactSync("(transfer "+addr+" "+l+")");
+			Result r=convex.transactSync("(transfer "+addr+" "+amt+")");
 			if (r.isError()) {
 				HashMap<String,Object> hm=jsonForErrorResult(r);
 				ctx.json(hm);
