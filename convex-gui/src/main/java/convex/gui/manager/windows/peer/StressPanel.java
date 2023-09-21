@@ -301,7 +301,7 @@ public class StressPanel extends JPanel {
 			return report;
 		}
 
-		private void setupClients() throws IOException {
+		private void setupClients() throws IOException, TimeoutException {
 			for (Convex c: clients) {
 				String code=null;
 				switch (type) {

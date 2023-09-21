@@ -413,7 +413,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		int ilength = children.length;
-		pos = Format.writeVLCLong(bs,pos, count);
+		pos = Format.writeVLCLong(bs,pos, count); // TODO: Count instead?
 		
 		bs[pos++] = (byte) shift;
 		pos = Utils.writeShort(bs, pos,mask);
@@ -433,7 +433,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**
 	 * Max length is tag, shift byte, 2 byte mask, max count plus embedded Refs
 	 */
-	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_VLC_COUNT_LENGTH+Format.MAX_EMBEDDED_LENGTH * 16;
+	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
 
 	/**
 	 * Reads a ListMap from the provided Blob 

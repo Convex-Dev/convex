@@ -21,6 +21,7 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
@@ -91,6 +92,25 @@ public class ConvexLocalTest {
 			Result r = convex.transact(tr).get();
 			assertEquals(ErrorCodes.FORMAT, r.getErrorCode());
 		}
+	}
+	
+	@Test
+	public void testBadSequence() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+		synchronized (network.SERVER) {
+			Convex convex = newLocalClient();
+			ATransaction tr = Invoke.create(convex.getAddress(), 10, Reader.read("*address*"));
+			Result r = convex.transactSync(tr);
+			assertEquals(ErrorCodes.SEQUENCE, r.getErrorCode());
+			
+			// Sequence should recover
+			r=convex.transactSync("(+ 2 3)");
+			assertEquals(CVMLong.create(5),r.getValue());
+		}
+	}
+
+	private ConvexLocal newLocalClient() {
+		Convex c = network.getClient();
+		return Convex.connect(network.SERVER, c.getAddress(), c.getKeyPair());
 	}
 
 	@SuppressWarnings("unchecked")

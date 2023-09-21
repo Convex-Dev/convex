@@ -108,7 +108,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_OFFER: ctx= ctx.withResult(CVMLong.create(ctx.getOffer())); break;
 		case S_STATE: ctx= ctx.withResult(ctx.getState()); break;
 		case S_HOLDINGS: ctx= ctx.withResult(ctx.getHoldings()); break;
-		case S_SEQUENCE: ctx= ctx.withResult(CVMLong.create(ctx.getAccountStatus().getSequence()+1)); break;
+		case S_SEQUENCE: ctx= ctx.withResult(CVMLong.create(ctx.getAccountStatus().getSequence())); break;
 		case S_KEY: ctx= ctx.withResult(ctx.getAccountStatus().getAccountKey()); break;
 		case S_JUICE_PRICE: ctx= ctx.withResult(ctx.getState().getJuicePrice()); break;
 		case S_JUICE_LIMIT: ctx= ctx.withResult(CVMLong.create(ctx.getJuiceLimit())); break;

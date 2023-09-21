@@ -193,7 +193,11 @@ public class REPLPanel extends JPanel {
 			if (convex instanceof ConvexRemote) {
 				sb.append("Remote host: " + convex.getHostAddress() + "\n");
 			}
-			sb.append("Sequence:    " + convex.getSequence() + "\n");
+			try {
+				sb.append("Sequence:    " + convex.getSequence() + "\n");
+			} catch (Exception e1) {
+				log.info("Failed to get sequence number");
+			}
 			sb.append("Account:     " + convex.getAddress() + "\n");
 			sb.append("Public Key:  " + convex.getAccountKey() + "\n");
 			sb.append("Connected?:  " + convex.isConnected()+"\n");

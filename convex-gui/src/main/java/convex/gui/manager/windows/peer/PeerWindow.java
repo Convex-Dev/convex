@@ -36,8 +36,8 @@ public class PeerWindow extends BaseWindow {
 		Server server=peer.getLocalServer();
 		if (server!=null) {
 			try {
-				Convex convex = Convex.connect(server.getHostAddress(), server.getPeerController(),server.getKeyPair());
-				tabbedPane.addTab("REPL", null, new REPLPanel(convex), null);
+				// Convex convex = Convex.connect(server.getHostAddress(), server.getPeerController(),server.getKeyPair());
+				tabbedPane.addTab("REPL", null, new REPLPanel(peer), null);
 			} catch (Throwable t) {
 				String msg=("Failed to connect to Peer: "+t);
 				log.warn(msg);

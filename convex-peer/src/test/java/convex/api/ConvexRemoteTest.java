@@ -136,7 +136,8 @@ public class ConvexRemoteTest {
 			assertEquals(2,conn.getReceivedCount());
 			
 			Result r=convex.transactSync("*sequence*");
-			assertEquals(seq+1,RT.ensureLong(r.getValue()).longValue());
+			assertNull(r.getErrorCode());
+			assertEquals(seq,RT.ensureLong(r.getValue()).longValue());
 			assertEquals(3,conn.getReceivedCount());
 		}
 	}

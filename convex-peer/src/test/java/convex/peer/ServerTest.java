@@ -133,9 +133,9 @@ public class ServerTest {
 		// sequence number should be zero for fresh account
 		assertEquals(0,convex.getSequence());
 		
-		// Queries and transactions should return the incremented value (as if in a transaction)
-		assertEquals(1L,(Long)RT.jvm(convex.querySync("*sequence*").getValue()));
-		assertEquals(1L,(Long)RT.jvm(convex.transactSync("*sequence*").getValue()));
+		// Queries and transactions should return the value as at start of transaction
+		assertEquals(0L,(Long)RT.jvm(convex.querySync("*sequence*").getValue()));
+		assertEquals(0L,(Long)RT.jvm(convex.transactSync("*sequence*").getValue()));
 		
 		// Sequence number should be incremented after previous transaction
 		assertEquals(1,convex.getSequence());
