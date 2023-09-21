@@ -383,16 +383,22 @@ public abstract class Convex {
 	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
 	 */
 	public synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException {
-		if (transaction.getOrigin() == null) {
-			transaction = transaction.withOrigin(address);
+		Address origin=transaction.getOrigin();
+		if (origin == null) {
+			origin=address;
+			transaction = transaction.withOrigin(origin);
+			
 		}
 		long seq=transaction.getSequence();
-		if (autoSequence && (seq <= 0)) {
-			Address origin=transaction.getOrigin();
-			// apply sequence if using expected address
-			if (Utils.equals(origin, address)) {
-				transaction = applyNextSequence(transaction);
+		if (autoSequence) {		
+			if (seq <= 0) {		
+				// apply sequence if using expected address
+				if (Utils.equals(origin, address)) {
+					transaction = applyNextSequence(transaction);
+				}
 			}
+			
+			// If local, do extra 
 			Server s=getLocalServer();
 			if (s!=null) {
 				State state=s.getPeer().getConsensusState();
