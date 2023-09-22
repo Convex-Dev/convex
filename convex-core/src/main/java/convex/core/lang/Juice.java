@@ -16,6 +16,17 @@ import convex.core.data.prim.CVMDouble;
  *  
  */
 public class Juice {
+
+	/**
+	 * Base Juice cost for any top level transaction, added to consumed juice
+	 */
+	public static final long TRANSACTION = 500L;
+	
+	/**
+	 * Base Juice cost for any sub transaction executed, added to consumed juice
+	 */
+	public static final long SUB_TRANSACTION = 50L;
+	
 	/**
 	 * Juice required to resolve a constant value
 	 * 
@@ -486,14 +497,10 @@ public class Juice {
 	 * @return Available juice
 	 */
 	public static long calcAvailable(long balance, long juicePrice) {
-		long limit = (balance/juicePrice)-Juice.BASE_TRANSACTION_JUICE;
+		long limit = (balance/juicePrice)-Juice.TRANSACTION;
 		return Math.max(0, limit);
 	}
 
-	/**
-	 * Base Juice cost for any transaction, added to consumed juice
-	 */
-	public static final long BASE_TRANSACTION_JUICE = 0;
 
 
 

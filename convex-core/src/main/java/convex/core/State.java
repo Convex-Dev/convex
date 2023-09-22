@@ -556,7 +556,7 @@ public class State extends ARecord {
 		long balance=account.getBalance();
 		long juiceLimit=Juice.calcAvailable(balance, juicePrice);
 		juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,juiceLimit);
-		long initialJuice=Constants.BASE_TRANSACTION_JUICE;
+		long initialJuice=0;
 		if (juiceLimit<=initialJuice) {
 			return Context.createFake(this,origin).withJuiceError();
 		}

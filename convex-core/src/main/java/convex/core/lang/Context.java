@@ -321,7 +321,7 @@ public class Context {
 		long executionJuice=this.juice;
 
 		// TODO: Extra juice for transaction size??
-		long trxJuice=Juice.BASE_TRANSACTION_JUICE;
+		long trxJuice=Juice.TRANSACTION;
 		
 		long totalJuice=executionJuice+trxJuice;
 		long juiceFees=Juice.addMul(0,totalJuice,juicePrice);
@@ -379,10 +379,9 @@ public class Context {
 		state=state.putAccount(address,account);
 
 		// maybe add used juice to miner fees
-		if (executionJuice>0L) {
-			long transactionFees = executionJuice*juicePrice;
+		if (juiceFees>0L) {
 			long oldFees=state.getGlobalFees().longValue();
-			long newFees=oldFees+transactionFees;
+			long newFees=oldFees+juiceFees;
 			state=state.withGlobalFees(CVMLong.create(newFees));
 		}
 

@@ -29,7 +29,6 @@ import convex.core.lang.TestState;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
-import convex.core.util.Utils;
 
 /**
  * Tests for State transition scenarios
@@ -77,7 +76,7 @@ public class StateTransitionsTest {
 		assertNull(s.getBalance(ADDRESS_C));
 
 		long JPRICE=s.getJuicePrice().longValue(); // Juice price
-		long TCOST = (Constants.BASE_TRANSACTION_JUICE+ Juice.TRANSFER) * JPRICE;
+		long TCOST = (Juice.TRANSACTION + Juice.TRANSFER) * JPRICE;
 		long AMT=50; // Amount for small transfers
 		
 		{ // transfer from existing to existing account A->B

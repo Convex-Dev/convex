@@ -51,11 +51,15 @@ public class TransactionTest extends ACVMTest {
 	@Test 
 	public void testTransfer() {
 		long AMT=999;
+		long IBAL=state().getAccount(HERO).getBalance();
 		Transfer t1=Transfer.create(HERO, 1, VILLAIN, AMT);
 		State s=apply(t1);
-		long expectedFees=(Constants.BASE_TRANSACTION_JUICE+Juice.TRANSFER)*JP;
-		assertEquals(AMT+expectedFees,state().getAccount(HERO).getBalance()-s.getAccount(HERO).getBalance());
+		long expectedFees=(Juice.TRANSACTION+Juice.TRANSFER)*JP;
 		assertEquals(expectedFees,s.getGlobalFees().longValue());
+		
+		long NBAL=s.getAccount(HERO).getBalance();
+		long balanceDrop=IBAL-NBAL;
+		assertEquals(AMT+expectedFees,balanceDrop);
 		
 		// We expect a Transfer to be completely encoded
 		assertTrue(t1.isCompletelyEncoded());
