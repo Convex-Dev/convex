@@ -51,6 +51,9 @@ public class StateTransitionsTest {
 	final Address ADDRESS_C = Address.create(3);
 
 	final Address ADDRESS_NIKI = Address.create(4);
+	
+	final long ABAL=10000;
+	final long BBAL=2000;
 
 	@Test
 	public void testAccountTransfers() throws BadSignatureException {
@@ -58,9 +61,9 @@ public class StateTransitionsTest {
 		AccountKey kb=KEYPAIR_B.getAccountKey();
 		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*10;
 		AVector<AccountStatus> accounts = Vectors.of(
-				AccountStatus.create(10000L,ka).withMemory(10000),
-				AccountStatus.create(1000L,kb).withMemory(10000),
-				AccountStatus.create(Constants.MAX_SUPPLY - STAKE - 10000 - 1000,KEYPAIR_ROBB.getAccountKey()).withMemory(10000)
+				AccountStatus.create(ABAL,ka).withMemory(10000),
+				AccountStatus.create(BBAL,kb).withMemory(10000),
+				AccountStatus.create(Constants.MAX_SUPPLY - STAKE - ABAL - BBAL,KEYPAIR_ROBB.getAccountKey()).withMemory(10000)
 		// No account for C yet
 		);
 		State s = State.EMPTY.withAccounts(accounts); // don't need any peers for these tests
@@ -69,16 +72,18 @@ public class StateTransitionsTest {
 		s=s.updateMemoryPool(0, 0); // clear memory pool so doesn't confuse things
 		assertEquals(Constants.MAX_SUPPLY, s.computeTotalFunds());
 
-		assertEquals(10000, s.getBalance(ADDRESS_A));
-		assertEquals(1000, s.getBalance(ADDRESS_B));
+		assertEquals(ABAL, s.getBalance(ADDRESS_A));
+		assertEquals(BBAL, s.getBalance(ADDRESS_B));
 		assertNull(s.getBalance(ADDRESS_C));
 
-		long TCOST = Juice.TRANSFER * s.getJuicePrice().longValue();
-
+		long JPRICE=s.getJuicePrice().longValue(); // Juice price
+		long TCOST = (Constants.BASE_TRANSACTION_JUICE+ Juice.TRANSFER) * JPRICE;
+		long AMT=50; // Amount for small transfers
+		
 		{ // transfer from existing to existing account A->B
-			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_B, 50);
+			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_B, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
-			long nowTS = Utils.getCurrentTimestamp();
+			long nowTS = Constants.INITIAL_TIMESTAMP;
 			Block b = Block.of(nowTS, st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			BlockResult br = s.applyBlock(sb);
@@ -86,25 +91,25 @@ public class StateTransitionsTest {
 			assertEquals(1, results.count());
 			assertNull(br.getErrorCode(0),br.getResult(0).toString()); // should be null for successful transfer transaction
 			State s2 = br.getState();
-			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
-			assertEquals(1050, s2.getBalance(ADDRESS_B));
+			assertEquals(ABAL - TCOST - AMT, s2.getBalance(ADDRESS_A));
+			assertEquals(BBAL + AMT, s2.getBalance(ADDRESS_B));
 			assertCVMEquals(nowTS, s2.getTimestamp());
 		}
 
 		{ // transfer from existing to non-existing account A -> C
-			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
+			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			State s2 = s.applyBlock(sb).getState();
 
 			// no transfer should have happened, although cost should have been paid
-			assertEquals(10000 - TCOST, s2.getBalance(ADDRESS_A));
+			assertEquals(ABAL - TCOST, s2.getBalance(ADDRESS_A));
 			assertNull(s2.getBalance(ADDRESS_C));
 		}
 
 		{ // transfer from a non-existent address
-			Transfer t1 = Transfer.create(ADDRESS_C,1, ADDRESS_B, 50);
+			Transfer t1 = Transfer.create(ADDRESS_C,1, ADDRESS_B, AMT);
 			SignedData<ATransaction> st = KEYPAIR_C.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
@@ -117,51 +122,51 @@ public class StateTransitionsTest {
 			// First create new account C
 			State s0=s.putAccount(ADDRESS_C, AccountStatus.create(0L,KEYPAIR_C.getAccountKey()));
 
-			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
+			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 			State s2 = s0.applyBlock(sb).getState();
 
 			// Transfer should have happened
-			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
-			assertEquals(50, s2.getBalance(ADDRESS_C));
+			assertEquals(ABAL - TCOST - AMT, s2.getBalance(ADDRESS_A));
+			assertEquals(AMT, s2.getBalance(ADDRESS_C));
 		}
 
 		{ // two transfers in sequence, both from A -> C
 			// First create new account C
 			State s0=s.putAccount(ADDRESS_C, AccountStatus.create(0L,KEYPAIR_C.getAccountKey()));
 
-			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 150);
+			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT*3);
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
-			Transfer t2 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 150);
+			Transfer t2 = Transfer.create(ADDRESS_A,2, ADDRESS_C, AMT*2);
 			SignedData<ATransaction> st2 = KEYPAIR_A.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 
 			BlockResult br = s0.applyBlock(sb);
 			State s2 = br.getState();
-			assertEquals(9700 - TCOST * 2, s2.getBalance(ADDRESS_A));
-			assertEquals(1000, s2.getBalance(ADDRESS_B));
-			assertEquals(300, s2.getBalance(ADDRESS_C));
+			assertEquals(ABAL - AMT*5 - TCOST * 2, s2.getBalance(ADDRESS_A));
+			assertEquals(BBAL, s2.getBalance(ADDRESS_B));
+			assertEquals(AMT*5, s2.getBalance(ADDRESS_C));
 		}
 
 		{ // two transfers in sequence, 2 different accounts A B --> new account C
 			// First create new account C
 			State s0=s.putAccount(ADDRESS_C, AccountStatus.create(0L,KEYPAIR_C.getAccountKey()));
 
-			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50);
+			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT);
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
-			Transfer t2 = Transfer.create(ADDRESS_B,1, ADDRESS_C, 50);
+			Transfer t2 = Transfer.create(ADDRESS_B,1, ADDRESS_C, AMT);
 			SignedData<ATransaction> st2 = KEYPAIR_B.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 
 			BlockResult br = s0.applyBlock(sb);
 			State s2 = br.getState();
-			assertEquals(9950 - TCOST, s2.getBalance(ADDRESS_A));
-			assertEquals(950 - TCOST, s2.getBalance(ADDRESS_B));
-			assertEquals(100, s2.getBalance(ADDRESS_C));
+			assertEquals(ABAL - AMT - TCOST, s2.getBalance(ADDRESS_A));
+			assertEquals(BBAL - AMT - TCOST, s2.getBalance(ADDRESS_B));
+			assertEquals(2*AMT, s2.getBalance(ADDRESS_C));
 
 			AVector<Result> results = br.getResults();
 			assertEquals(2, results.count());
@@ -170,7 +175,7 @@ public class StateTransitionsTest {
 		}
 
 		{ // transfer with an incorrect sequence number
-			Transfer t1 = Transfer.create(ADDRESS_A,2, ADDRESS_C, 50);
+			Transfer t1 = Transfer.create(ADDRESS_A,2, ADDRESS_C, AMT);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
@@ -202,7 +207,6 @@ public class StateTransitionsTest {
 			// System.out.println(ADDRESS_NIKI);
 			// System.out.println("Niki has "+s.getBalance(ADDRESS_NIKI).getValue());
 
-			long AMT = 500;
 			// System.out.println("Tansferring "+AMT+" to Niki");
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_NIKI, AMT);

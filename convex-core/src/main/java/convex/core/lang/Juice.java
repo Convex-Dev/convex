@@ -189,11 +189,6 @@ public class Juice {
 	public static final long TRANSFER = 200;
 	
 	/**
-	 * Base juice for any signed transaction
-	 */
-	public static final long TRANSACTION_BASE = 1000;
-	
-	/**
 	 * Juice per byte for any signed transaction
 	 */
 	public static final long TRANSACTION_PER_BYTE = 5;

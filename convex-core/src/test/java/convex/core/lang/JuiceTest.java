@@ -3,6 +3,9 @@ package convex.core.lang;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
+
+import convex.core.data.Address;
+
 import static convex.test.Assertions.*;
 
 /**
@@ -40,6 +43,15 @@ public class JuiceTest extends ACVMTest {
 		assertEquals(Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 4, juiceExpand("(= 1 2 3)"));
 		assertEquals(Juice.EXPAND_SEQUENCE + Juice.EXPAND_CONSTANT * 3, juiceExpand("[1 2 3]")); // [1 2 3] -> (vector 1
 																									// 2 3)
+	}
+	
+	@Test
+	public void testJuiceLimit() {
+		Context ctx=context();
+		Address D=VILLAIN;
+		
+		// Shouldn't be able to afford sending full balance
+		assertJuiceError(step(ctx,"(transfer "+D+" *balance*)"));
 	}
 
 	@Test

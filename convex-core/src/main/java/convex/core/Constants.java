@@ -37,6 +37,11 @@ public class Constants {
 	public static final long INITIAL_TIMESTAMP = Instant.parse("2020-02-02T00:20:20.0202Z").toEpochMilli();
 
 	/**
+	 * Base juice cost per top level transaction
+	 */
+	public static final long BASE_TRANSACTION_JUICE = 500L;
+	
+	/**
 	 * Juice price in the initial Genesis State
 	 */
 	public static final long INITIAL_JUICE_PRICE = 2L;

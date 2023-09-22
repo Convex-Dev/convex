@@ -556,11 +556,14 @@ public class State extends ARecord {
 		long balance=account.getBalance();
 		long juiceLimit=Juice.calcAvailable(balance, juicePrice);
 		juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,juiceLimit);
-		if (juiceLimit<=0) {
+		long initialJuice=Constants.BASE_TRANSACTION_JUICE;
+		if (juiceLimit<=initialJuice) {
 			return Context.createFake(this,origin).withJuiceError();
 		}
 		
+		// Create context ready to execute, with at least some available juice
 		Context ctx = Context.createInitial(this, origin, juiceLimit);
+		ctx=ctx.withJuice(initialJuice);
 		return ctx;
 	}
 

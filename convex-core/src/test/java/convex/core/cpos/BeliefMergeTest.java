@@ -224,7 +224,7 @@ public class BeliefMergeTest {
 		long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
 		long TRANSFER_AMOUNT = 100;
-		long TJUICE=Juice.TRANSFER;
+		long TJUICE=Constants.BASE_TRANSACTION_JUICE+Juice.TRANSFER;
 
 		ATransaction trans = Transfer.create(PADDRESS, 1, RADDRESS, TRANSFER_AMOUNT); // note 1 = first sequence number required
 		Peer[] bs3 = proposeTransactions(bs2, PROPOSER, trans);
@@ -309,7 +309,7 @@ public class BeliefMergeTest {
 		AccountKey RKEY = KEYS[RECEIVER];
 		Long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		Long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
-		long TJUICE=Juice.TRANSFER;
+		long TJUICE=Constants.BASE_TRANSACTION_JUICE+Juice.TRANSFER;
 
 		Peer[] bs3 = bs2;
 		for (int i = 0; i < NUM_PEERS; i++) {
@@ -412,7 +412,7 @@ public class BeliefMergeTest {
 		AccountKey RKEY = KEYS[RECEIVER];
 		long INITIAL_BALANCE_PROPOSER = INITIAL_STATE.getBalance(PADDRESS);
 		long INITIAL_BALANCE_RECEIVER = INITIAL_STATE.getBalance(RADDRESS);
-		long expectedJuice=Juice.TRANSFER*(NUM_INITIAL_TRANS+TX_ROUNDS);
+		long expectedJuice=(Constants.BASE_TRANSACTION_JUICE+Juice.TRANSFER)*(NUM_INITIAL_TRANS+TX_ROUNDS);
 
 
 		Peer[] bs3 = bs2;
