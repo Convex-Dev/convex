@@ -1,6 +1,8 @@
 ;; Assumed done in test setup already
 ;; (import convex.asset :as asset)
-;; (def nft (import convex.simple-nft :as nft))
+;; (import asset.nft.simple :as nft)
+(import convex.asset :as asset)
+(import asset.nft.simple :as nft)
 
 ;; Testing with one account
 (do
