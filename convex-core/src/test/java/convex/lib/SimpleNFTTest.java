@@ -10,7 +10,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Sets;
-import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -26,13 +25,16 @@ public class SimpleNFTTest extends ACVMTest {
 	
 	protected SimpleNFTTest() {
 		super(createState());
-		NFT = context().lookup(Symbol.create("nft")).getResult();
+		NFT = context().lookupValue("nft");
 	}
 	
 	private static State createState() {
 		Context ctx=TestState.CONTEXT.fork();
+		
+		
 		String importS = "(import asset.nft.simple :as nft)";
 		ctx=step(ctx,importS);
+		
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		return ctx.getState();
 	}

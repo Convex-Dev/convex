@@ -16,16 +16,11 @@ public class CurationMarketTest extends ACVMTest {
 	}
 	
 	@Override protected Context buildContext(Context ctx) {
-		try {
-			ctx=step(ctx,"(import convex.asset :as asset)");
-			ctx=step(ctx,"(import convex.trust :as trust)");
-			ctx=step(ctx,"(import asset.curation-market :as cm)");
-			assertNotError(ctx);
+		ctx=exec(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(import convex.trust :as trust)");
+		ctx=exec(ctx,"(import asset.curation-market :as cm)");
 			
-			return ctx;
-		} catch (Throwable t) {
-			throw Utils.sneakyThrow(t);
-		}	
+		return ctx;
 	}
 	
 	@Test public void testCreate() {

@@ -3463,6 +3463,23 @@ public class CoreTest extends ACVMTest {
 		    assertNotNull(dobj,"No documentation found for core definition: "+sym);
 		}
 	}
+	
+	@Test
+	public void testNil() {
+		// String value of nil
+		assertEquals("nil",evalS("nil"));
+		
+		// nil is the result of missing values in associative lookups
+		assertNull(eval("(get {} :foo)"));
+		assertNull(eval("(get [] 10)"));
+		assertNull(eval("(get '() 10)"));
+		assertNull(eval("(get nil :boff)"));
+		assertNull(eval("(get-in nil [])"));
+		assertNull(eval("(get (blob-map 0x01 0x30) 10)"));
+		
+		// nil is result of non-existing account lookups
+		assertNull(eval("(account #67896876)"));
+	}
 
 	@Test
 	public void testNilPred() {

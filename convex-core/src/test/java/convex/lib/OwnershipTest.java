@@ -2,7 +2,6 @@ package convex.lib;
 
 import static convex.test.Assertions.assertCVMEquals;
 import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,18 +12,21 @@ import convex.core.data.Address;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 
+/**
+ * Tests for asset ownership, including use of an asset as a trust monitor
+ */
 public class OwnershipTest extends ACVMTest {
 	private Address monitor;
 
-	@Override protected Context buildContext(Context ctx) {
-		ctx = step(ctx, "(import convex.trust :as trust)");
-		assertNotError(ctx);
-		ctx = step(ctx, "(import convex.trust.ownership-monitor :as monitor)");
-		assertNotError(ctx);
-		monitor = (Address)ctx.getResult();
+	@Override
+	protected Context buildContext(Context ctx) {
+		ctx = exec(ctx, "(import convex.trust :as trust)");
+		ctx = exec(ctx, "(import convex.trust.ownership-monitor :as monitor)");
+		
+		monitor = (Address) ctx.getResult();
 		return ctx;
 	}
-	
+
 	/**
 	 * Test that re-deployment of Fungible matches what is expected
 	 */
@@ -35,43 +37,39 @@ public class OwnershipTest extends ACVMTest {
 		// check alias is set up correctly
 		assertEquals(monitor, eval(CONTEXT, "monitor"));
 	}
-	
-	@Test 
+
+	@Test
 	public void testFungibleOwnership() {
-		Context ctx=context();
-		ctx = step(ctx, "(import asset.multi-token :as mt)");
-		assertNotError(ctx);
-		
-		ctx=step(ctx,"(call mt (create :USD))");
-		assertNotError(ctx);
-		
-		ctx=step(ctx,"(def USD [mt :USD])");
-		assertNotError(ctx);
-		
-		ctx=step(ctx,"(call USD (mint 1000))");
-		assertCVMEquals(1000,ctx.getResult());
+		Context ctx = context();
+		ctx = exec(ctx, "(import asset.multi-token :as mt)");
+		ctx = exec(ctx, "(call mt (create :USD))");
+		ctx = exec(ctx, "(def USD [mt :USD])");
 
-		assertTrue(evalB(ctx,"(trust/trusted? [monitor [USD 1000]] *address*)"));
-		assertFalse(evalB(ctx,"(trust/trusted? [monitor [USD 1001]] *address*)"));
-		
-		assertCastError(step(ctx,"(trust/trusted? [monitor :bad-scope] *address*)"));	
-	}
-	
-	@Test 
-	public void testNFTOwnership() {
-		Context ctx=context();
-		ctx = step(ctx, "(import asset.nft.simple :as nft-actor)");
-		assertNotError(ctx);
-		
-		ctx=step(ctx,"(def NFT (call nft-actor (create)))");
-		assertNotError(ctx);
-		
-		assertTrue(evalB(ctx,"(trust/trusted? [monitor [nft-actor #{NFT}]] *address*)"));
-		assertFalse(evalB(ctx,"(trust/trusted? [monitor [nft-actor #{NFT :bad-ID}]] *address*)"));
-		assertFalse(evalB(ctx,"(trust/trusted? [monitor [nft-actor #{:bad-ID}]] *address*)"));
-		
-		assertCastError(step(ctx,"(trust/trusted? [monitor :bad-scope] *address*)"));	
+		ctx = step(ctx, "(call USD (mint 1000))");
+		assertCVMEquals(1000, ctx.getResult());
+
+		// Check that ownership monitor correctly handles edge cases
+		assertTrue(evalB(ctx, "(trust/trusted? [monitor [USD 1000]] *address*)"));
+		assertFalse(evalB(ctx, "(trust/trusted? [monitor [USD 1001]] *address*)"));
+
+		assertCastError(step(ctx, "(trust/trusted? [monitor :bad-scope] *address*)"));
 	}
 
+	@Test
+	public void testSimpleNFTOwnership() {
+		Context ctx = context();
+		
+		// Setup with 2 simple NFTs
+		ctx = exec(ctx, "(import asset.nft.simple :as nft-actor)");
+		ctx = exec(ctx, "(def NFT (call nft-actor (create)))");
+		ctx = exec(ctx, "(def NFT2 (call nft-actor (create)))");
+
+		assertTrue(evalB(ctx, "(trust/trusted? [monitor [nft-actor #{NFT}]] *address*)"));
+		assertTrue(evalB(ctx, "(trust/trusted? [monitor [nft-actor #{NFT NFT2}]] *address*)"));
+		assertFalse(evalB(ctx, "(trust/trusted? [monitor [nft-actor #{NFT :bad-ID}]] *address*)"));
+		assertFalse(evalB(ctx, "(trust/trusted? [monitor [nft-actor #{:bad-ID}]] *address*)"));
+
+		assertCastError(step(ctx, "(trust/trusted? [monitor :bad-scope] *address*)"));
+	}
 
 }

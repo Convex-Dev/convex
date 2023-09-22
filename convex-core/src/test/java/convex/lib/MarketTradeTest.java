@@ -26,30 +26,30 @@ public class MarketTradeTest extends ACVMTest {
 	@Override protected Context buildContext(Context ctx) {
 		ctx=TestState.CONTEXT.fork();
 		String importS = "(import asset.nft.basic :as nft)";
-		ctx=step(ctx,importS);
+		ctx=exec(ctx,importS);
 		NFT=ctx.getResult();
 		
-		ctx=step(ctx,"(import convex.asset :as asset)");
-		ctx=step(ctx,"(import asset.market.trade :as trade)");
-		ctx=step(ctx,"(import asset.wrap.convex :as wcvx)");
-		ctx=step(ctx,"(wcvx/wrap "+BAL+")");
+		ctx=exec(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(import asset.market.trade :as trade)");
+		ctx=exec(ctx,"(import asset.wrap.convex :as wcvx)");
+		ctx=exec(ctx,"(wcvx/wrap "+BAL+")");
 		return ctx;
 	}
 	
 	@Test public void testCantAfford() {
 		Context ctx=context();
-		ctx=step(ctx,"(def nid (call nft (create {:foo :bar})))");
-		ctx=step(ctx,"(def item [nft #{nid}])");
-		ctx=step(ctx,"(def tid (trade/post item [wcvx "+(BAL+1)+"]))");
+		ctx=exec(ctx,"(def nid (call nft (create {:foo :bar})))");
+		ctx=exec(ctx,"(def item [nft #{nid}])");
+		ctx=exec(ctx,"(def tid (trade/post item [wcvx "+(BAL+1)+"]))");
 		
 		assertFundsError(step(ctx,"(trade/buy tid)"));
 	}
 	
 	@Test public void testCancel() {
 		Context ctx=context();
-		ctx=step(ctx,"(def nid (call nft (create {:foo :bar})))");
-		ctx=step(ctx,"(def item [nft #{nid}])");
-		ctx=step(ctx,"(def tid (trade/post item [wcvx "+(BAL*3)+"]))"); // unaffordable
+		ctx=exec(ctx,"(def nid (call nft (create {:foo :bar})))");
+		ctx=exec(ctx,"(def item [nft #{nid}])");
+		ctx=exec(ctx,"(def tid (trade/post item [wcvx "+(BAL*3)+"]))"); // unaffordable
 		long tid=((CVMLong)(ctx.getResult())).longValue();
 		
 		// Creator should not hold item
@@ -59,8 +59,7 @@ public class MarketTradeTest extends ACVMTest {
 		assertTrustError(step(ctx.forkWithAddress(Address.ZERO),"(do (import asset.market.trade :as t) (t/cancel "+tid+"))"));
 		
 		// Cancel trade - should succeed
-		ctx=step(ctx,"(trade/cancel tid)");
-		assertNotError(ctx);	
+		ctx=exec(ctx,"(trade/cancel tid)");
 		
 		// Check that asset is returned and no tokens spent
 		assertEquals(BAL,evalL(ctx,"(asset/balance wcvx)"));
@@ -78,16 +77,16 @@ public class MarketTradeTest extends ACVMTest {
 	
 	@Test public void testBuySell() {
 		Context ctx=context();
-		ctx=step(ctx,"(def nid (call nft (create {:foo :bar})))");
+		ctx=exec(ctx,"(def nid (call nft (create {:foo :bar})))");
 		CVMLong nftid=ctx.getResult();
 		assertNotNull(nftid);
 		
-		ctx=step(ctx,"(def item [nft #{nid}])");
+		ctx=exec(ctx,"(def item [nft #{nid}])");
 		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
 		
 		long PRICE=1000;
 		
-		ctx=step(ctx,"(def tid (trade/post item [wcvx "+PRICE+"]))");
+		ctx=exec(ctx,"(def tid (trade/post item [wcvx "+PRICE+"]))");
 		CVMLong tid=ctx.getResult();
 		assertNotNull(tid);
 		
@@ -103,8 +102,7 @@ public class MarketTradeTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(asset/owns? *address* item)"));
 		
 		// Buy the item back (no price)
-		ctx=step(ctx,"(trade/buy tid)");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(trade/buy tid)");
 		assertTrue(evalB(ctx,"(asset/owns? *address* item)"));
 		
 		// Coins should be gone
@@ -112,8 +110,7 @@ public class MarketTradeTest extends ACVMTest {
 
 		
 		// Claim should be OK now
-		ctx=step(ctx,"(call [trade tid] (claim))");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(call [trade tid] (claim))");
 		
 		// Trade should no longer exist
 		assertStateError(step(ctx,"(call [trade tid] (claim))"));

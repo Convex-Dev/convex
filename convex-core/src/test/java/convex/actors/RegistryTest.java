@@ -61,8 +61,7 @@ public class RegistryTest extends ACVMTest {
 		assertArgumentError(ctx);
 
 		final Address realAddr=Address.create(1); // Init address, FWIW
-		ctx=step(ctx,"(call *registry* (cns-update 'convex.test.foo "+realAddr+"))");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(call *registry* (cns-update 'convex.test.foo "+realAddr+"))");
 
 		assertEquals(realAddr,eval(ctx,"(call *registry* (cns-resolve 'convex.test.foo))"));
 
@@ -77,7 +76,7 @@ public class RegistryTest extends ACVMTest {
 		}
 
 		{ // Check Transfer of control to VILLAIN
-			Context c=step(ctx,"(call *registry* (cns-control 'convex.test.foo "+VILLAIN+"))");
+			Context c=exec(ctx,"(call *registry* (cns-control 'convex.test.foo "+VILLAIN+"))");
 
 			// HERO shouldn't be able to use update or control any more
 			assertTrustError(step(c,"(call *registry* (cns-update 'convex.test.foo *address*))"));
@@ -87,8 +86,7 @@ public class RegistryTest extends ACVMTest {
 			c=c.forkWithAddress(VILLAIN);
 
 			// Change mapping
-			c=step(c,"(call *registry* (cns-update 'convex.test.foo *address*))");
-			assertNotError(c);
+			c=exec(c,"(call *registry* (cns-update 'convex.test.foo *address*))");
 			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve 'convex.test.foo))"));
 		}
 

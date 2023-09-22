@@ -25,8 +25,9 @@ public class BasicNFTTest extends ACVMTest {
 	
 	@Override protected Context buildContext(Context ctx) {
 		ctx=TestState.CONTEXT.fork();
-		String importS = "(import asset.nft.basic :as nft)";
-		ctx=step(ctx,importS);
+		
+		// Import basic NFTs
+		ctx=step(ctx,"(import asset.nft.basic :as nft)");
 		NFT=ctx.getResult();
 		
 		ctx=step(ctx,"(import convex.asset :as asset)");
@@ -35,11 +36,14 @@ public class BasicNFTTest extends ACVMTest {
 	
 	@Test public void testMetadata() {
 		Context ctx=context();
+		
+		// Create Basic NFT with vector as metadata
 		ctx=step(ctx,"(def t1 (call nft (create [1 2])))");
 		
 		assertEquals(Vectors.of(1,2),eval(ctx,"(call [nft t1] (get-metadata))"));
 		assertEquals(Vectors.of(1,2),eval(ctx,"(call nft (get-metadata t1))"));
 		
+		// Create Basic NFT with `nil` metadata (empty)
 		ctx=step(ctx,"(def t2 (call nft (create)))");
 		assertNull(eval(ctx,"(call [nft t2] (get-metadata))"));
 		assertNull(eval(ctx,"(call nft (get-metadata t2))"));

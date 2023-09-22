@@ -28,25 +28,24 @@ public class TorusTest extends ACVMTest {
 	
 	@Override public Context buildContext(Context ctx) {
 		try {
-			ctx=step(ctx,"(import convex.fungible :as fun)");
-
-			ctx=step(ctx,"(import convex.asset :as asset)");
+			ctx=exec(ctx,"(import convex.fungible :as fun)");
+			ctx=exec(ctx,"(import convex.asset :as asset)");
 
 			// Deploy currencies for testing (10m each, 2 decimal places)
-			ctx=step(ctx,"(def USD (deploy (fun/build-token {:supply 1000000000})))");
+			ctx=exec(ctx,"(def USD (deploy (fun/build-token {:supply 1000000000})))");
 			USD=(Address) ctx.getResult();
 			//System.out.println("USD deployed Address = "+USD);
-			ctx=step(ctx,"(def GBP (deploy (fun/build-token {:supply 1000000000})))");
+			ctx=exec(ctx,"(def GBP (deploy (fun/build-token {:supply 1000000000})))");
 			GBP=(Address) ctx.getResult();
 
 			// Deploy Torus actor itself
-			ctx= step(ctx,"(def TORUS (import torus.exchange :as torus))");
+			ctx= exec(ctx,"(def TORUS (import torus.exchange :as torus))");
 			TORUS=(Address)ctx.getResult();
 			assertNotNull(ctx.getAccountStatus(TORUS));
 			//System.out.println("Torus deployed Address = "+TORUS);
 
 			// Deploy USD market. No market for GBP yet!
-			ctx= step(ctx,"(call TORUS (create-market USD))");
+			ctx= exec(ctx,"(call TORUS (create-market USD))");
 			USD_MARKET=(Address)ctx.getResult();
 			
 			return ctx;
@@ -83,24 +82,21 @@ public class TorusTest extends ACVMTest {
 	@Test public void testMultiTokenListing() {
 		Context ctx=context();
 		String importS="(import asset.multi-token :as mt)";
-		ctx=step(ctx,importS);
-		assertNotError(ctx);
+		ctx=exec(ctx,importS);
 		
-		ctx=step(ctx,"(def ECO [mt (call mt (create :ECO))])");
+		ctx=exec(ctx,"(def ECO [mt (call mt (create :ECO))])");
 		assertTrue(ctx.getResult() instanceof AVector);
 
-		ctx= step(ctx,"(def ECOM (call TORUS (create-market ECO)))");
+		ctx= exec(ctx,"(def ECOM (call TORUS (create-market ECO)))");
 		assertTrue(ctx.getResult() instanceof Address);
 
 		assertNull(eval(ctx,"(torus/price ECO)"));
 		
-		ctx=step(ctx,"(call ECO (mint 1000000))");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(call ECO (mint 1000000))");
 		assertCVMEquals(1000000,eval(ctx,"(asset/balance ECO)"));
 		
 		// TODO: multi-token needs offer and accept for this
-		ctx=step(ctx,"(torus/add-liquidity ECO 1000 10000)");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(torus/add-liquidity ECO 1000 10000)");
 		assertEquals(10.0,evalD(ctx,"(torus/price ECO)"));
 
 	}
@@ -110,12 +106,12 @@ public class TorusTest extends ACVMTest {
 		Context ctx=context();
 
 		// Deploy GBP market.
-		ctx= step(ctx,"(def GBPM (call TORUS (create-market GBP)))");
+		ctx= exec(ctx,"(def GBPM (call TORUS (create-market GBP)))");
 		Address GBP_MARKET=(Address)ctx.getResult();
 		assertNotNull(GBP_MARKET);
 
 		// Check we can access the USD market
-		ctx= step(ctx,"(def USDM (torus/get-market USD))");
+		ctx= exec(ctx,"(def USDM (torus/get-market USD))");
 		assertEquals(USD_MARKET,ctx.getResult());
 
 		// Prices should be null with no markets
@@ -169,20 +165,20 @@ public class TorusTest extends ACVMTest {
 		Context ctx=context();
 
 		// Check we can access the USD market
-		ctx= step(ctx,"(def USDM (torus/get-market USD))");
+		ctx= exec(ctx,"(def USDM (torus/get-market USD))");
 		assertEquals(USD_MARKET,ctx.getResult());
 
 		// should be no price for initial market with zero liquidity
 		assertNull(eval(ctx,"(call USDM (price))"));
 
 		// Offer tokens to market ($200k)
-		ctx= step(ctx,"(asset/offer USDM [USD 20000000])");
+		ctx= exec(ctx,"(asset/offer USDM [USD 20000000])");
 		assertEquals(20000000L,evalL(ctx,"(asset/get-offer USD *address* USDM)"));
 
 		// ============================================================
 		// FIRST TEST: Initial deposit of $100k USD liquidity
 		// Deposit some liquidity $100,000 for 1000 Gold = $100 price = 100000 CVX / US Cent
-		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
+		ctx= exec(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
 		final long INITIAL_SHARES=RT.jvm(ctx.getResult());
 
 		assertEquals(10000000L,evalL(ctx,"(asset/balance USD USDM)"));
@@ -198,7 +194,7 @@ public class TorusTest extends ACVMTest {
 		// ============================================================
 		// SECOND TEST: Initial deposit of $100k USD liquidity
 		// Deposit more liquidity $100,000 for 1000 Gold - previous token offer should cover this
-		ctx= step(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
+		ctx= exec(ctx,"(call USDM 1000000000000 (add-liquidity 10000000))");
 		final long NEW_SHARES=RT.jvm(ctx.getResult());
 		assertEquals(20000000L,evalL(ctx,"(asset/balance USD USDM)"));
 
@@ -252,8 +248,7 @@ public class TorusTest extends ACVMTest {
 		long shares=evalL(ctx,"(asset/balance USDM *address*)");
 		assertTrue(shares>0);
 		// ctx=ctx.withJuice(0);
-		ctx=step(ctx,"(torus/withdraw-liquidity USD "+shares+")");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(torus/withdraw-liquidity USD "+shares+")");
 		assertEquals(0L,evalL(ctx,"(asset/balance USDM *address*)")); // should have no shares left
 		assertEquals(0L,evalL(ctx,"(asset/balance USD USDM)")); // should be no USD left in liquidity pool
 		assertEquals(0L,evalL(ctx,"(balance USDM)")); // should be no CVX left in liquidity pool

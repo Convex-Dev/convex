@@ -10,6 +10,8 @@ import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.util.Utils;
 
+import static convex.test.Assertions.*;
+
 /**
  * Base class for CVM tests that work from a given initial State and Context.
  *
@@ -82,11 +84,11 @@ public abstract class ACVMTest {
 	}
 
 	/**
-	 * Steps execution in a new forked Context
+	 * Steps execution in a new forked Context. Prefer `exec` to assert success. 
 	 * 
 	 * @param ctx    Initial context to fork
 	 * @param source Source form to read
-	 * @return New forked context containing step result
+	 * @return New forked context containing step result (may be exceptional)
 	 */
 	public static Context step(Context ctx, String source) {
 		ACell form = Reader.read(source);
@@ -185,8 +187,14 @@ public abstract class ACVMTest {
 		return evalL(CONTEXT, source);
 	}
 
+	/**
+	 * Executes code in the given context and converts to a String
+	 * @param ctx Context in which to execute
+	 * @param source Code to execute
+	 * @return Result of execution
+	 */
 	public String evalS(String source) {
-		return eval(source).toString();
+		return Utils.toString(eval(source));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -199,13 +207,31 @@ public abstract class ACVMTest {
 		return (T) step(CONTEXT, form).getResult();
 	}
 
+	/**
+	 * Executes code in the given context, asserting no errors
+	 * @param ctx Context in which to execute
+	 * @param source Code to execute
+	 * @return Result of execution
+	 */
 	public static <T extends ACell> T eval(Context c, String source) {
 		Context rc = step(c, source);
 		return rc.getResult();
 	}
 
-	public Context step(String source) {
+	protected Context step(String source) {
 		return step(CONTEXT, source);
+	}
+	
+	/**
+	 * Executes code in the given context, asserting no errors
+	 * @param ctx Context in which to execute
+	 * @param source Code to execute
+	 * @return
+	 */
+	protected Context exec(Context ctx, String source) {
+		ctx=step(ctx, source);
+		assertNotError(ctx);
+		return ctx;
 	}
 
 	@SuppressWarnings("unchecked")

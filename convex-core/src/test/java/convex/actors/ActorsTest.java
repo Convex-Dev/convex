@@ -231,23 +231,23 @@ public class ActorsTest extends ACVMTest {
 		Context ctx=step("(do )");
 
 		String contractString=Utils.readResourceAsString("contracts/exceptional.con");
-		ctx=step(ctx,"(def ex (deploy '"+contractString+"))");
+		ctx=exec(ctx,"(def ex (deploy '"+contractString+"))");
 
-		ctx=step(ctx,"(call ex (halt-fn \"Jenny\"))");
+		ctx=exec(ctx,"(call ex (halt-fn \"Jenny\"))");
 		assertEquals("Jenny",ctx.getResult().toString());
 
 		// calling this will break the fragile definition, but then rollback to restore it
-		ctx=step(ctx,"(call ex (rollback-fn \"Alice\"))");
+		ctx=exec(ctx,"(call ex (rollback-fn \"Alice\"))");
 		assertEquals("Alice",ctx.getResult().toString());
 
-		ctx=step(ctx,"(call ex (get-fragile))");
+		ctx=exec(ctx,"(call ex (get-fragile))");
 		assertEquals(Keyword.create("ok"),ctx.getResult());
 
 		// Calling this should break the fragile definition permanently
-		ctx=step(ctx,"(call ex (break-fn \"Lana\"))");
+		ctx=exec(ctx,"(call ex (break-fn \"Lana\"))");
 		assertEquals("Lana",ctx.getResult().toString());
 
-		ctx=step(ctx,"(call ex (get-fragile))");
+		ctx=exec(ctx,"(call ex (get-fragile))");
 		assertEquals(Keyword.create("broken"),ctx.getResult());
 
 	}

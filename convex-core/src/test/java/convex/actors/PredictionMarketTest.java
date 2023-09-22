@@ -26,15 +26,13 @@ public class PredictionMarketTest extends ACVMTest {
 		try {
 			String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
 			
-			ctx=step(ctx,contractString);
-			assertNotError(ctx);
-			ctx=step(ctx,"(deploy (build-prediction-market *address* :bar #{true,false}))");
-			assertNotError(ctx);
+			ctx=exec(ctx,contractString);
+			ctx=exec(ctx,"(deploy (build-prediction-market *address* :bar #{true,false}))");
 
 			addr = (Address) ctx.getResult();
 			assertNotNull(addr);
-			ctx = step(ctx, "(def caddr " + addr + ")");
-			assertFalse(ctx.isExceptional());
+			
+			ctx = exec(ctx, "(def caddr " + addr + ")");
 
 			return ctx;
 		} catch (Exception e) {
@@ -105,19 +103,20 @@ public class PredictionMarketTest extends ACVMTest {
 
 	@Test
 	public void testPayouts() throws IOException {
+		Context ctx=context();
+		
 		// setup address for this little play
-		Context ctx = step("(do (def HERO " + HERO + ") (def VILLAIN " +VILLAIN + ") )");
-
-		ctx = step("(import convex.oracle :as oaddr)");
+		ctx = exec(ctx,"(do (def HERO " + HERO + ") (def VILLAIN " +VILLAIN + ") )");
+		ctx = exec(ctx,"(import convex.oracle :as oaddr)");
 
 		// call to create oracle with key :bar and current address (HERO) trusted
-		ctx = step(ctx, "(oaddr/register :bar {:trust #{*address*}})");
+		ctx = exec(ctx, "(oaddr/register :bar {:trust #{*address*}})");
 
 		// deploy a prediction market using the oracle
 		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
-		ctx=step(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
+		ctx=exec(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
-		ctx = step(ctx, "(def pmaddr " + pmaddr + ")");
+		ctx = exec(ctx, "(def pmaddr " + pmaddr + ")");
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr+")");
 
 		// initial state checks
@@ -126,7 +125,7 @@ public class PredictionMarketTest extends ACVMTest {
 
 		{ // Act 1. Two players stake. our Villain wins this time....
 			Context c = ctx;
-			c = step(c, "(call pmaddr 5000 (stake true 4000))");
+			c = exec(c, "(call pmaddr 5000 (stake true 4000))");
 			c = stepAs(VILLAIN, c, "(call pmaddr 5000 (stake false 3000))");
 			assertEquals(5000L, c.getBalance(pmaddr));
 
@@ -135,11 +134,11 @@ public class PredictionMarketTest extends ACVMTest {
 			assertNull(eval(c, "(call pmaddr (payout))"));
 
 			// But alas, our hero is thwarted...
-			c = step(c, "(oaddr/provide :bar false)");
+			c = exec(c, "(oaddr/provide :bar false)");
 			assertCVMEquals(Boolean.FALSE, c.getResult());
 
 			// collect payouts
-			c = step(c, "(call pmaddr (payout))");
+			c = exec(c, "(call pmaddr (payout))");
 			assertCVMEquals(0L, c.getResult());
 			assertEquals(HERO_BALANCE - 4000, c.getBalance(HERO));
 

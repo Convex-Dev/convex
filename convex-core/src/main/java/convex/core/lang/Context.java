@@ -598,6 +598,16 @@ public class Context {
 
 	/**
 	 * Looks up value for the given symbol in this context
+	 * @param sym Symbol name to look up, as a Java String for convenience
+	 * @return Value for the given symbol or null if undeclared
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T lookupValue(String symName) {
+		return (T) lookupValue(Symbol.create(symName));
+	}
+	
+	/**
+	 * Looks up value for the given symbol in this context
 	 * @param sym Symbol to look up
 	 * @return Value for the given symbol or null if undeclared
 	 */
