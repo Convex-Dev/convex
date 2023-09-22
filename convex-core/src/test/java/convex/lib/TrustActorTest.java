@@ -28,16 +28,14 @@ public class TrustActorTest extends ACVMTest {
 
 	@Override protected Context buildContext(Context ctx) {
 		String importS = "(import convex.trust :as trust)";
-		ctx = step(ctx, importS);
-		assertNotError(ctx);
+		ctx = exec(ctx, importS);
 		trusted = (Address)ctx.getResult();
 		return ctx;
 	}
 	
 	@Test
 	public void testDelegate() {
-		Context ctx=step(context(),"(import convex.trust.delegate :as del)");
-		assertNotError(ctx);
+		Context ctx=exec(context(),"(import convex.trust.delegate :as del)");
 		Address del=ctx.getResult();
 		
 		// Unscoped usage
@@ -47,20 +45,19 @@ public class TrustActorTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(trust/trusted? [del -1] *address*)"));
 		
 		// Get a monitor
-		ctx=step(ctx,"(call del (create nil))");
+		ctx=exec(ctx,"(call del (create nil))");
 		ACell id = ctx.getResult();
 		AVector<ACell> mon=Vectors.of(del,id);
 		assertFalse(evalB(ctx,"(trust/trusted? "+mon+" *address*)"));
 		
 		// Update monitor to own address
-		ctx=step(ctx,"(call "+mon+" (update *address*))");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(call "+mon+" (update *address*))");
 		
 		assertFalse(evalB(ctx,"(trust/trusted? "+mon+" #0)"));
 		assertTrue(evalB(ctx,"(trust/trusted? "+mon+" *address*)"));
 		
 		// Get another monitor
-		ctx=step(ctx,"(call del (create nil))");
+		ctx=exec(ctx,"(call del (create nil))");
 		ACell newid = ctx.getResult();
 		assertNotEquals(id,newid);
 

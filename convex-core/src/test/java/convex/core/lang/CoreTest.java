@@ -2365,22 +2365,22 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testImportCore() {
-		Context ctx = step("(import convex.core :as cc)");
+		Context ctx = exec(context(),"(import convex.core :as cc)");
 		assertNotError(ctx);
 		assertEquals(eval(ctx,"count"),eval(ctx,"cc/count"));
 	}
 	
 	@Test
 	public void testImportStatic() {
-		Context ctx = step("(import convex.core :as cc)");
-		assertNotError(ctx);
+		Context ctx = context();
+		ctx=exec(ctx,"(import convex.core :as cc)");
+		
 		if (Constants.OPT_STATIC) {
 			ACell va=eval(ctx,"(compile 'cc/actor?)");
 			assertEquals(Lookup.create(Init.CORE_ADDRESS, Symbols.ACTOR_Q),va);
 
 			ACell vc=eval(ctx,"(compile 'cc/count)");
 			assertEquals(Constant.of(Core.COUNT),vc);
-
 		}
 	}
 
@@ -2607,8 +2607,14 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(= (query (create-account *key*)) (query (create-account *key*)))"));
 
 		// Check multiple create-accounts in same transaction
-		assertNotError(step("(dotimes [i 100] (create-account *key*))"));
-		
+		{
+			Context c=ctx;
+			long numAccounts=c.getState().getAccounts().count();
+			c=exec(c,"(dotimes [i 100] (create-account *key*))");
+			long resultNum=c.getState().getAccounts().count();
+			assertEquals(numAccounts+100, resultNum);
+		}
+			
 		assertCastError(step("(create-account :foo)"));
 		assertCastError(step("(create-account 1)"));
 		assertCastError(step("(create-account nil)"));

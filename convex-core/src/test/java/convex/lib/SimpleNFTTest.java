@@ -31,11 +31,9 @@ public class SimpleNFTTest extends ACVMTest {
 	private static State createState() {
 		Context ctx=TestState.CONTEXT.fork();
 		
-		
 		String importS = "(import asset.nft.simple :as nft)";
-		ctx=step(ctx,importS);
-		
-		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,importS);
+		ctx=exec(ctx,"(import convex.asset :as asset)");
 		return ctx.getState();
 	}
 	
@@ -48,7 +46,7 @@ public class SimpleNFTTest extends ACVMTest {
 	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
 		Context ctx=context();
-		ctx=step(ctx,"(def total (map (fn [v] (call nft (create))) [1 2 3 4]))");
+		ctx=exec(ctx,"(def total (map (fn [v] (call nft (create))) [1 2 3 4]))");
 		AVector<CVMLong> v=(AVector<CVMLong>) ctx.getResult();
 		assertEquals(4,v.count());
 		CVMLong b1=v.get(0);

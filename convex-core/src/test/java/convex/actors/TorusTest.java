@@ -2,7 +2,6 @@ package convex.actors;
 
 import static convex.test.Assertions.assertCVMEquals;
 import static convex.test.Assertions.assertError;
-import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;

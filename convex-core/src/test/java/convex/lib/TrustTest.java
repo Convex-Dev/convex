@@ -28,8 +28,7 @@ public class TrustTest extends ACVMTest {
 
 	@Override protected Context buildContext(Context ctx) {
 		String importS = "(import convex.trust :as trust)";
-		ctx = step(ctx, importS);
-		assertNotError(ctx);
+		ctx = exec(ctx, importS);
 		trusted = (Address)ctx.getResult();
 		return ctx;
 	}
@@ -61,19 +60,19 @@ public class TrustTest extends ACVMTest {
 		Context ctx = CONTEXT.fork();
 
 		// deploy an actor with upgradable capability
-		ctx = step(ctx, "(def wlist (deploy (trust/add-trusted-upgrade nil)))");
+		ctx = exec(ctx, "(def wlist (deploy (trust/add-trusted-upgrade nil)))");
 		Address wl = (Address) ctx.getResult();
 		assertNotNull(wl);
 
 		// do an upgrade that edits the actor
-		ctx = step(ctx, "(call wlist (upgrade '(def foo 2)))");
+		ctx = exec(ctx, "(call wlist (upgrade '(def foo 2)))");
 
 		{
 			// check our villain cannot upgrade the actor!
 			Address a1 = VILLAIN;
 			
 			Context c = ctx.forkWithAddress(a1);
-			c = step(c, "(do (import " + trusted + " :as trust) (def wlist " + wl + "))");
+			c = exec(c, "(do (import " + trusted + " :as trust) (def wlist " + wl + "))");
 
 			assertTrustError(step(c, "(call wlist (upgrade '(def foo 3)))"));
 		}
@@ -84,8 +83,7 @@ public class TrustTest extends ACVMTest {
 		testChangeControl(ctx,wl);
 		
 		// check we can permanently remove upgradability
-		ctx = step(ctx, "(trust/remove-upgradability! wlist)");
-		assertNotError(ctx);
+		ctx = exec(ctx, "(trust/remove-upgradability! wlist)");
 		assertStateError(step(ctx, "(call wlist (upgrade '(do :foo)))"));
 
 		// actor functionality should still work otherwise

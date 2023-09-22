@@ -228,7 +228,7 @@ public abstract class ACVMTest {
 	 * @param source Code to execute
 	 * @return
 	 */
-	protected Context exec(Context ctx, String source) {
+	protected static Context exec(Context ctx, String source) {
 		ctx=step(ctx, source);
 		assertNotError(ctx);
 		return ctx;

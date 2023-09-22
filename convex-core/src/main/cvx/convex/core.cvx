@@ -377,11 +377,9 @@
 
   [[sym count] & body]
 
-  (let [n   (long count)
-        sym (if (symbol? (unsyntax sym))
-              sym
-              (fail :CAST
-                    "`dotimes` requires a symbol for loop binding"))]
+  (let [n   (long count)]
+	(or (symbol? (unsyntax sym))
+		(fail :CAST "`dotimes` requires a symbol for loop binding"))
     `(loop [~sym 0]
        (if (< ~sym
               ~n)

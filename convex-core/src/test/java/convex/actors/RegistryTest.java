@@ -96,8 +96,7 @@ public class RegistryTest extends ACVMTest {
 			Context c=ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
-			c=step(c,"(call *registry* (cns-update 'convex.villain *address*))");
-			assertNotError(c);
+			c=exec(c,"(call *registry* (cns-update 'convex.villain *address*))");
 
 			// original mapping should be held
 			assertEquals(VILLAIN,eval(c,"(call *registry* (cns-resolve 'convex.villain))"));

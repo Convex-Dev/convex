@@ -27,30 +27,19 @@ public class ShareTest extends ACVMTest {
 	}
 	
 	@Override protected Context buildContext(Context ctx) {
-		String importS="(import asset.multi-token :as mt)";
-		ctx=step(ctx,importS);
-		assertNotError(ctx);
+		ctx=exec(ctx,"(import asset.multi-token :as mt)");
+		ctx=step(ctx,"(import asset.share :as share)");	
+		ctx=exec(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(import convex.fungible :as fungible)");
+		ctx=exec(ctx,"(import convex.trust :as trust)");
 		
-		String importS2="(import asset.share :as share)";
-		ctx=step(ctx,importS2);
-		assertNotError(ctx);
-		
-		ctx=step(ctx,"(import convex.asset :as asset)");
-		assertNotError(ctx);
-		ctx=step(ctx,"(import convex.fungible :as fungible)");
-		assertNotError(ctx);
-		ctx=step(ctx,"(import convex.trust :as trust)");
-		assertNotError(ctx);
-		
-		// Unerlying
-		ctx=step(ctx,"(def underlying [mt (call mt (create :USD))])");
-		assertNotError(ctx);
+		// Underlying asset
+		ctx=exec(ctx,"(def underlying [mt (call mt (create :USD))])");
 
-		ctx=step(ctx,"(call underlying (mint 1000000))");
+		ctx=exec(ctx,"(call underlying (mint 1000000))");
 		assertCVMEquals(1000000,ctx.getResult());
 		
-		ctx=step(ctx,"(asset/transfer "+InitTest.VILLAIN+" [underlying 400])");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(asset/transfer "+InitTest.VILLAIN+" [underlying 400])");
 
 		return ctx;
 	}

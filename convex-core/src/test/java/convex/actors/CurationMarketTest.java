@@ -5,9 +5,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.util.Utils;
-
-import static convex.test.Assertions.*;
 
 public class CurationMarketTest extends ACVMTest {
 	

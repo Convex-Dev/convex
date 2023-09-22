@@ -32,15 +32,10 @@ public class WrappedCVXTest extends ACVMTest {
 	private static State buildState() {
 		Context ctx=TestState.CONTEXT.fork();
 		String importS="(import convex.fungible :as fungible)";
-		ctx=step(ctx,importS);
-		assertNotError(ctx);
-		ctx=step(ctx,"(import convex.asset :as asset)");
-		assertNotError(ctx);
-		
-		ctx=step(ctx,"(import asset.wrap.convex :as wcvx)");
-		assertNotError(ctx);
-
-		ctx=step(ctx,"(def token wcvx)");
+		ctx=exec(ctx,importS);
+		ctx=exec(ctx,"(import convex.asset :as asset)");	
+		ctx=exec(ctx,"(import asset.wrap.convex :as wcvx)");
+		ctx=exec(ctx,"(def token wcvx)");
 		
 		return ctx.getState();
 	}
@@ -56,11 +51,8 @@ public class WrappedCVXTest extends ACVMTest {
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
 
-		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1000])");
-		assertNotError(ctx);
-
-		ctx=step(ctx,"(asset/transfer "+VILLAIN+" [token 2000])");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(asset/offer "+VILLAIN+" [token 1000])");
+		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" [token 2000])");
 
 		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(2000L,evalL(ctx,"(asset/balance token "+VILLAIN+")"));
@@ -83,12 +75,12 @@ public class WrappedCVXTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2001])"));
 
 		// transfer using map argument
-		ctx=step(ctx,"(asset/transfer "+VILLAIN+" {token 100})");
+		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" {token 100})");
 		assertTrue(ctx.getResult() instanceof AMap);
 		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2100])"));
 
 		// test offer
-		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
+		ctx=exec(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
 		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+VILLAIN+")"));
 		
 
@@ -98,15 +90,13 @@ public class WrappedCVXTest extends ACVMTest {
 		Context ctx = context();
 		long BAL= evalL(ctx,"*balance*");
 
-		ctx=step(ctx,"(wcvx/wrap 1000000)");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(wcvx/wrap 1000000)");
 		
 		assertEquals(1000000,evalL(ctx,"(asset/balance wcvx *address*)"));
 		long NBAL= evalL(ctx,"*balance*");
 		assertEquals(BAL-1000000,NBAL);
 		
-		ctx=step(ctx,"(wcvx/unwrap 50000)");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(wcvx/unwrap 50000)");
 		assertEquals(950000,evalL(ctx,"(fungible/balance wcvx *address*)"));
 		
 		assertEquals(NBAL+50000,evalL(ctx,"*balance*"));
