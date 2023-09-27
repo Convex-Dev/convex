@@ -42,8 +42,8 @@ import convex.core.transactions.Multi;
 import convex.core.transactions.Transfer;
 import convex.core.util.Text;
 import convex.core.util.Utils;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

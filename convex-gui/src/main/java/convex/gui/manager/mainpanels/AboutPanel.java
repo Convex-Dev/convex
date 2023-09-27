@@ -13,8 +13,8 @@ import convex.core.crypto.bc.BCProvider;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Counters;
 import convex.core.util.Text;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

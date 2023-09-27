@@ -44,7 +44,7 @@ public class CVMBenchmark {
 		
 		// Move some USD to Hero
 		Context ctx=Context.createFake(STATE, Init.MAINBANK_ADDRESS);
-		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) (fun/transfer usd "+HERO+" 1000000000))"));
+		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) (fun/transfer usd "+HERO+" 100000000))"));
 		if (ctx.isError()) throw new Error("Problem moving USD: "+ctx.getError().toString());
 		STATE=ctx.getState();
 

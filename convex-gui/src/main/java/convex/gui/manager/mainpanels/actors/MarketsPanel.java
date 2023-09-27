@@ -9,10 +9,10 @@ import javax.swing.JButton;
 import javax.swing.JPanel;
 
 import convex.core.data.Address;
+import convex.gui.PeerGUI;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
-import convex.gui.manager.PeerGUI;
 
 /**
  * Panel displaying current prediction markets

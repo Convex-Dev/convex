@@ -27,10 +27,10 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
+import convex.gui.PeerGUI;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

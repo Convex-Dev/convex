@@ -5,7 +5,7 @@ import java.awt.BorderLayout;
 import javax.swing.JTabbedPane;
 
 import convex.core.data.ACell;
-import convex.gui.manager.PeerGUI;
+import convex.gui.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 
 @SuppressWarnings("serial")

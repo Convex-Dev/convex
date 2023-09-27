@@ -9,7 +9,7 @@ import javax.swing.JTextArea;
 import convex.core.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.gui.manager.PeerGUI;
+import convex.gui.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

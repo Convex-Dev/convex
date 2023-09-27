@@ -5,8 +5,8 @@ import java.awt.BorderLayout;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
+import convex.gui.PeerGUI;
 import convex.gui.components.PeerComponent;
-import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import etch.EtchStore;
 

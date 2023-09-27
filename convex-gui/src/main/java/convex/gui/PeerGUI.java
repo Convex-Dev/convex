@@ -1,4 +1,4 @@
-package convex.gui.manager;
+package convex.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;

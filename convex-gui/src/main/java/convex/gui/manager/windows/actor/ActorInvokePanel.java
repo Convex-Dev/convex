@@ -9,9 +9,9 @@ import convex.core.data.ASet;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
+import convex.gui.PeerGUI;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ScrollyList;
-import convex.gui.manager.PeerGUI;
 
 @SuppressWarnings("serial")
 public class ActorInvokePanel extends JPanel {

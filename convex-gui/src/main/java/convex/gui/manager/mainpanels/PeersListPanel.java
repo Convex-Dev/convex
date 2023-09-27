@@ -27,10 +27,10 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
 import convex.gui.components.ScrollyList;
-import convex.gui.manager.PeerGUI;
 import convex.peer.API;
 import convex.peer.Server;
 

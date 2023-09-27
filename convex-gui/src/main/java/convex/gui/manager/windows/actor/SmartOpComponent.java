@@ -32,11 +32,11 @@ import convex.core.lang.Symbols;
 import convex.core.lang.impl.Fn;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.gui.PeerGUI;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 

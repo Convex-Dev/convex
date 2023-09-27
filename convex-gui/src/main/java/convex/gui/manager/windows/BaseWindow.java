@@ -5,7 +5,7 @@ import java.awt.BorderLayout;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
-import convex.gui.manager.PeerGUI;
+import convex.gui.PeerGUI;
 
 @SuppressWarnings("serial")
 public abstract class BaseWindow extends JPanel {

@@ -14,10 +14,10 @@ import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.WalletComponent;
-import convex.gui.manager.PeerGUI;
 
 @SuppressWarnings("serial")
 public class WalletPanel extends JPanel {

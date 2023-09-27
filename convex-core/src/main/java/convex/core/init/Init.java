@@ -305,7 +305,7 @@ public class Init {
 				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + "})))"));
 		Address addr = ctx.getResult();
 		ctx = ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity " + addr + " "
-				+ liquidity + " " + cvx + "))"));
+				+ (supply / 2) + " " + (cvx / 2) + "))"));
 		if (ctx.isExceptional()) throw new Error("Error adding market liquidity: " + ctx.getValue());
 		
 		Symbol sym=Symbol.create("currency."+symName);

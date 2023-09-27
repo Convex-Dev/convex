@@ -16,8 +16,8 @@ import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.util.Text;
+import convex.gui.PeerGUI;
 import convex.gui.client.ConvexClient;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 

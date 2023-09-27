@@ -22,12 +22,12 @@ import convex.core.data.MapEntry;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
 import convex.gui.components.models.OracleTableModel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.utils.Toolkit;
 

@@ -15,8 +15,8 @@ import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

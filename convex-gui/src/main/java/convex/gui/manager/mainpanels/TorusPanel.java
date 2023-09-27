@@ -13,9 +13,9 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumnModel;
 
 import convex.core.State;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.TorusTableModel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

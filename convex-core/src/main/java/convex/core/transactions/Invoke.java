@@ -92,8 +92,8 @@ public class Invoke extends ATransaction {
 		Address address=Address.create(aval);
 		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(sequence);
+		long sequence = Format.readVLCLong(b,epos);
+		epos+=Format.getVLCLength(sequence);
 		
 		ACell args=Format.read(b, epos);
 		epos+=Format.getEncodingLength(args);

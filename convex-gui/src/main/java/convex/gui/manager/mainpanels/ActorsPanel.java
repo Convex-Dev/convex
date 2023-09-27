@@ -5,7 +5,7 @@ import java.awt.BorderLayout;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
-import convex.gui.manager.PeerGUI;
+import convex.gui.PeerGUI;
 import convex.gui.manager.mainpanels.actors.DeployPanel;
 import convex.gui.manager.mainpanels.actors.MarketsPanel;
 import convex.gui.manager.mainpanels.actors.OraclePanel;

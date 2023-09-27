@@ -14,7 +14,7 @@ import javax.swing.ListModel;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
-import convex.gui.manager.PeerGUI;
+import convex.gui.PeerGUI;
 import convex.gui.manager.mainpanels.WalletPanel;
 
 /**

@@ -20,9 +20,9 @@ import javax.swing.table.DefaultTableCellRenderer;
 import convex.core.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.AccountsTableModel;
-import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.actor.ActorWindow;
 import convex.gui.utils.Toolkit;
 

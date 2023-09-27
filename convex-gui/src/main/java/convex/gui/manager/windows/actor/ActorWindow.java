@@ -6,7 +6,7 @@ import javax.swing.JTabbedPane;
 
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.gui.manager.PeerGUI;
+import convex.gui.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import convex.gui.manager.windows.state.StateTreePanel;
 

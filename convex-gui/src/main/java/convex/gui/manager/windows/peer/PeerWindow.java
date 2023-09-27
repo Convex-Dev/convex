@@ -10,8 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.gui.PeerGUI;
 import convex.gui.components.PeerComponent;
-import convex.gui.manager.PeerGUI;
 import convex.gui.manager.windows.BaseWindow;
 import convex.peer.Server;
 
