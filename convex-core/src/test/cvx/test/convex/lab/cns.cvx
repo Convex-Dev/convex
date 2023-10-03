@@ -1,0 +1,229 @@
+;;
+;;
+;; Testing `convex.cns`
+;;
+;;
+
+
+($.stream/out! (str $.term/clear.screen
+                    "Testing `convex.cns`"))
+
+
+;;;;;;;;;; Setup
+
+
+(import convex.trust :as trust)
+
+
+(def controller
+     ($.account/zombie))
+
+
+(def backup-controller
+     ($.account/zombie))
+
+
+(def root-controller
+     (deploy `(do
+                ~(trust/build-whitelist {:whitelist [backup-controller
+                                                     controller]})
+                (set-controller ~*address*))))
+
+
+($.file/read "src/main/cvx/convex/lab/cns.cvx")
+
+
+(def cns
+     (deploy (cons 'do
+                   (next $/*result*))))
+
+
+(call cns
+      (init root-controller
+            trust))
+
+
+;;;
+
+
+(defn suite.main
+
+  []
+
+  ($.test/group
+    '(($.test/path.conj 'convex.cns)
+
+
+      ;; Entry -> path
+
+      ($.test/trx '(= [:foo :bar :baz]
+                      (cns/entry->path [:foo :bar :baz]))
+                  {:description "Path left untouched"})
+
+      ($.test/trx '(= ["foo" "bar" "baz"]
+                      (cns/entry->path 'foo.bar.baz))
+                  {:description "Splitting entry"})
+
+      ($.test/fail.code #{:ARGUMENT}
+                        '(cns/entry->path 42)
+                        {:description "Entry must be a symbol or a vector"})
+
+
+      ;; Simple operations
+
+      ($.test/trx '(nil? (cns/get-path 'com))
+                  {:description "No records yet"})
+
+      ($.test/fail.code #{:TRUST.ADD-KEY}
+                        '(cns/set-path 'com
+                                       :fail)
+                        {:description "Unapproved account cannot add a record"})
+
+      ($.test/trx '(nil? (cns/get-path 'com))
+                  {:description "Untrusted account did not add a record"})
+
+      ($.test/trx '(= :value
+                      (eval-as controller
+                               `(~cns/set-path 'com
+                                               :value)))
+                  {:description "Whitelisted account can add top record"})
+
+      ($.test/fail.code #{:TRUST.UPDATE-KEY}
+                        '(cns/set-path 'com
+                                       :fail)
+                        {:description "Unapproved account cannot update the record"})
+
+      ($.test/trx '(= :value
+                      (cns/get-path 'com))
+                  {:description "Unapprovoved account did not update the record"})
+
+
+      ;; Creating a 'com' level
+
+      (defn deploy-level
+        []
+        (deploy '(do
+                   (def *records*
+                        {})
+                   (defn cns-get-key
+                     ^{:callable? true}
+                     [k]
+                     (*records* k))
+                   (defn cns-set-key
+                     ^{:callable? true}
+                     [k v _options]
+                     (def *records*
+                          (assoc *records*
+                                 k
+                                 v))
+                     v))))
+
+      (def com
+           (deploy-level))
+
+      ($.test/trx `(= com
+                      (eval-as controller
+                               `(~cns/set-path 'com
+                                               ~com)))
+                  {:description "Controller can update its key"})
+
+      ($.test/trx '(= com
+                      (cns/get-path 'com))
+                  {:description "Controller did update its key"})
+
+
+      ;; Hierarchical registration and resolution
+
+      (loop [i               0
+             path            ["com"]
+             test-assertion+ []]
+        (if (< i
+               10)
+          (let [level  (deploy-level)
+                path-2 (conj path
+                             i)]
+            (recur (inc i)
+                   path-2
+                   (conj test-assertion+
+                         `($.test/trx '(= ~level
+                                           (cns/set-path ~path-2
+                                                         ~level))
+                                      {:description (str "Deploying sub-level " ~i)})
+                         `($.test/trx '(= ~level
+                                           (cns/get-path ~path-2))
+                                      {:description (str "Sub-level " ~i " retrieved")}))))
+          ($.trx/precat (concat '()
+                                test-assertion+))))
+
+
+      ;; Changing the controller of the 'com' level (with a recovery path)
+
+      ($.test/fail.code #{:TRUST.SET-CONTROLLER}
+                        '(call cns
+                               (set-controller "com"
+                                               :fail))
+                        {:description "Untrusted account cannot change a key controller"})
+
+      ($.test/trx `(= controller
+                      (get-in cns/*records*
+                              ["com" 1]))
+                  {:description "Key controller did not change"})
+
+      ($.test/fail.code #{:MISSING-RECORD}
+                        `(eval-as backup-controller
+                                  '(call ~cns
+                                         (set-controller :inexistent-key
+                                                         42)))
+                        {:description "Cannot change controller of inexistent key"})
+
+      ($.test/trx '(nil? (eval-as controller
+                                  `(call ~cns
+                                         (set-controller "com"
+                                                         :set-by-controller))))
+                  {:description "Original controller can change the controller of its key"})
+
+      ($.test/trx '(= :set-by-controller
+                      (get-in cns/*records*
+                              ["com" 1]))
+                  {:description "Controller changed by original controller"})
+
+      ($.test/trx '(nil? (eval-as backup-controller
+                                  `(call ~cns
+                                         (set-controller "com"
+                                                         :set-by-backup-controller))))
+                  {:description "Controller trusted by root controller can always change the controller of a top key, even when it is botched"})
+
+      ($.test/trx '(= :set-by-backup-controller
+                      (get-in cns/*records*
+                              ["com" 1]))
+                  {:description "Controller changed by backup controller"})
+
+
+      ;; Changing the root controller
+
+      ($.test/fail.code #{:TRUST.SET-ROOT-CONTROLLER}
+                        '(call cns
+                               (set-root-controller :new-root-controller))
+                        {:description "Untrusted account cannot change the root controller"})
+
+      ($.test/trx '(= root-controller
+                      cns/root-controller)
+                  {:description "Root controller left untouched by untrusted account"})
+                        
+      ($.test/trx `(nil? (eval-as backup-controller
+                                  '(call ~cns
+                                         (set-root-controller :new-root-controller))))
+                  {:description "Trusted account can change the root controller"})
+
+      ($.test/trx '(= :new-root-controller
+                      cns/root-controller)
+                  {:description "Trusted account did change the root controller"})
+      )))
+
+             
+
+;;;
+
+
+(suite.main)
+($.test/print "convex.cns")
