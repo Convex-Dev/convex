@@ -64,8 +64,9 @@ public class StrimziKafka extends AObserverQueue<Object> {
 	public StrimziKafka(Server server) {
 		super(server.getStore());
 		// TODO: need to be config params etc.
-		this.topic="test";
-		this.url="https://kfk.walledchannel.net:8010/topics/";
+		this.topic="transactions";
+		// this.url="https://kfk.walledchannel.net:9092/topics/";
+		this.url="https://kfk.walledchannel.net/topics/";
 		this.peerKey=server.getPeerKey().toString();
 	}
 	
@@ -187,17 +188,17 @@ public class StrimziKafka extends AObserverQueue<Object> {
 		httpasyncclient.execute(post, new FutureCallback<SimpleHttpResponse>() {
 			@Override
 			public void completed(SimpleHttpResponse result) {
-				//System.err.println(result);
+				// System.err.println(result);
 			}
 
 			@Override
 			public void failed(Exception ex) {
-				System.err.println(ex);
+				// System.err.println(ex);
 			}
 
 			@Override
 			public void cancelled() {
-				System.err.println("Observation Cancelled");
+				// System.err.println("Observation Cancelled");
 			};
 		});
 	}
