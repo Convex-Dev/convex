@@ -53,3 +53,5 @@
 (call nft (get-metadata NFT-ID))
 
 (asset/balance nft)
+
+(asset/transfer #13 [nft #{NFT-ID}])
