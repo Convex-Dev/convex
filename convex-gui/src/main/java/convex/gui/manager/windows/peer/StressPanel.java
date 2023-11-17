@@ -60,8 +60,10 @@ public class StressPanel extends JPanel {
 	private JSpinner transactionCountSpinner;
 	private JSpinner opCountSpinner;
 	private JSpinner clientCountSpinner;
+	private JSpinner repeatTimeSpinner;
 	private JCheckBox syncCheckBox;
 	private JCheckBox distCheckBox;
+	private JCheckBox repeatCheckBox;
 	
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
@@ -135,6 +137,17 @@ public class StressPanel extends JPanel {
 		distCheckBox=new JCheckBox();
 		optionPanel.add(distCheckBox);
 		distCheckBox.setSelected(false);
+		
+		optionPanel.add(new JLabel("Repeat requests?"));
+		repeatCheckBox=new JCheckBox();
+		optionPanel.add(repeatCheckBox);
+		repeatCheckBox.setSelected(false);
+		
+		optionPanel.add(new JLabel("Repeat timeout"));
+		repeatTimeSpinner = new JSpinner();
+		repeatTimeSpinner.setModel(new SpinnerNumberModel(60, 0, 3600, 1));
+		optionPanel.add(repeatTimeSpinner);
+
 
 		JLabel lblTxType=new JLabel("Transaction Type");
 		txTypeBox=new JComboBox<String>();
@@ -374,9 +387,16 @@ public class StressPanel extends JPanel {
 	}
 
 	private synchronized void runStressTest() {
-		Address address=peerConvex.getAddress();
-		AKeyPair kp=peerConvex.getKeyPair();
+		while (repeatCheckBox.isSelected()) {
+			Address address=peerConvex.getAddress();
+			AKeyPair kp=peerConvex.getKeyPair();
 
-		new StressTest(kp, address).execute();
+			new StressTest(kp, address).execute();
+			try {
+				Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
+			} catch (InterruptedException e) {
+				return;
+			}
+		}
 	}
 }

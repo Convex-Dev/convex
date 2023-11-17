@@ -64,8 +64,8 @@ public class REPLPanel extends JPanel {
 
 	private InputListener inputListener=new InputListener();
 
-	private Font OUTPUT_FONT=new Font("Monospaced", Font.PLAIN, 16);
-	private Font INPUT_FONT=new Font("Monospaced", Font.PLAIN, 20);
+	private Font OUTPUT_FONT=new Font("Monospaced", Font.PLAIN, 24);
+	private Font INPUT_FONT=new Font("Monospaced", Font.PLAIN, 30);
 	private Color DEFAULT_OUTPUT_COLOR=Color.LIGHT_GRAY;
 	
 	private JPanel panel_1;

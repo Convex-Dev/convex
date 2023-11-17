@@ -1,0 +1,55 @@
+;; Asset demo
+
+(import convex.asset :as asset)
+(import convex.fungible :as fungible)
+(import convex.fungible :as fun)
+(import asset.box :as box)
+(import asset.multi-token :as mt)
+
+;; ===============================================
+;; Creating a token: smart contract style
+(def MYCOIN 
+	(deploy 
+		[(fun/build-token {:supply 1000}) 
+		 (fun/add-mint {:minter *address*} )] ))  
+
+(asset/balance MYCOIN)
+(asset/mint MYCOIN 100)
+(asset/balance MYCOIN)
+
+(asset/transfer #13 [MYCOIN 100])
+
+
+;; ==============================================
+;; Creating a token: factory actor style
+
+;; create the token
+(call mt (create :FOO))
+
+;; Give it a name for convenience
+(def TOK [mt :FOO])
+
+(asset/balance TOK)
+
+;; create some coins)
+(asset/mint TOK 1000)
+
+(asset/balance TOK)
+
+(asset/transfer #13 [TOK 150])
+
+;; ===========================================
+;; An interesting implementation note
+
+*holdings*
+
+;; ===========================================
+;; Now for NFTs
+
+(import asset.nft.basic :as nft)
+
+(def NFT-ID (call nft (create {:url "https://mikera.net/art/img1.jpg" :author "Mike"})))
+
+(call nft (get-metadata NFT-ID))
+
+(asset/balance nft)
