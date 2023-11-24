@@ -22,7 +22,7 @@
 					<outputDirectory>${project.directory}</outputDirectory>
 					<archive>
 						<manifest>
-							<mainClass>convex.gui.manager.PeerGUI</mainClass>
+							<mainClass>convex.gui.PeerGUI</mainClass>
 						</manifest>
 					</archive>
 					<descriptorRefs>
