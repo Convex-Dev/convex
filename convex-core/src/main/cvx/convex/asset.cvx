@@ -160,6 +160,18 @@
        (fail :STATE "Target Actor does not have receive-asset function")
     
     (call path (direct-transfer receiver quantity)))))
+  
+  
+;;;;;;;;;; Asset creation
+
+(defn create 
+		^{:doc {:description ["Creates a sub asset."
+		                      "Return value will be a scoped asset path to the new sub-asset."]
+		 :examples    [{:code "(creater factory-address)"}]
+		 :signature   [{:params [addr]}]}}
+	[addr]
+	(let [scope (call addr (create))]
+			[path scope]))
 
 ;;;;;;;;;; Ownership
 
