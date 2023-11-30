@@ -47,9 +47,7 @@ public class MultiTokenTest extends ACVMTest {
 	@Test public void testOfferAccept() {
 		Context ctx = context();
 		
-		ctx=exec(ctx,"(def id (call mt (create :foo)))");
-		assertEquals(Keywords.FOO,ctx.getResult());
-		ctx=exec(ctx,"(def FOO [mt :foo])");
+		ctx=exec(ctx,"(def FOO (asset/create mt :foo))");
 		
 		// Mint with standard call
 		ctx=exec(ctx,"(call FOO (mint 10000))");

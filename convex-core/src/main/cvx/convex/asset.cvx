@@ -165,13 +165,16 @@
 ;;;;;;;;;; Asset creation
 
 (defn create 
-		^{:doc {:description ["Creates a sub asset."
+		^{:doc {:description ["Creates a scoped sub-asset given an actor address."
 		                      "Return value will be a scoped asset path to the new sub-asset."]
 		 :examples    [{:code "(creater factory-address)"}]
 		 :signature   [{:params [addr]}]}}
-	[addr]
-	(let [scope (call addr (create))]
-			[path scope]))
+	([addr]
+	  (let [scope (call addr (create))]
+			[addr scope]))
+	([addr options]
+			  (let [scope (call addr (create options))]
+					[addr scope])))
 
 ;;;;;;;;;; Ownership
 
