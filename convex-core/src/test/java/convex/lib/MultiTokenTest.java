@@ -11,7 +11,6 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -47,6 +46,7 @@ public class MultiTokenTest extends ACVMTest {
 	@Test public void testOfferAccept() {
 		Context ctx = context();
 		
+		// Note use of asset/create interface
 		ctx=exec(ctx,"(def FOO (asset/create mt :foo))");
 		
 		// Mint with standard call
