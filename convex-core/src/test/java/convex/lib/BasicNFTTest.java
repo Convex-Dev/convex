@@ -34,6 +34,15 @@ public class BasicNFTTest extends ACVMTest {
 		return ctx;
 	}
 	
+	@Test public void testCreate() {
+		Context ctx=context();
+		
+		// Create Basic NFT with map metadata via asset/create
+		ctx=step(ctx,"(def t1 (asset/create nft {:name \"Bob\"}))");
+		assertNotError(ctx);
+		
+	}
+	
 	@Test public void testMetadata() {
 		Context ctx=context();
 		
@@ -43,8 +52,8 @@ public class BasicNFTTest extends ACVMTest {
 		assertEquals(Vectors.of(1,2),eval(ctx,"(call [nft t1] (get-metadata))"));
 		assertEquals(Vectors.of(1,2),eval(ctx,"(call nft (get-metadata t1))"));
 		
-		// Create Basic NFT with `nil` metadata (empty)
-		ctx=step(ctx,"(def t2 (call nft (create)))");
+		// Create Basic NFT with `nil` metadata (empty) using asset/create
+		ctx=step(ctx,"(def t2 (asset/create nft))");
 		assertNull(eval(ctx,"(call [nft t2] (get-metadata))"));
 		assertNull(eval(ctx,"(call nft (get-metadata t2))"));
 

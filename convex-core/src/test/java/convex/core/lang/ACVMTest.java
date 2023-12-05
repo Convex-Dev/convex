@@ -204,7 +204,7 @@ public abstract class ACVMTest {
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T eval(ACell form) {
-		return (T) step(CONTEXT, form).getResult();
+		return (T) step(context(), form).getResult();
 	}
 
 	/**
@@ -219,7 +219,7 @@ public abstract class ACVMTest {
 	}
 
 	protected Context step(String source) {
-		return step(CONTEXT, source);
+		return step(context(), source);
 	}
 	
 	/**

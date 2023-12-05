@@ -21,23 +21,38 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
+import convex.core.lang.TestState;
 import convex.test.Assertions;
 
 public class DIDTest extends ACVMTest {
+	
+	Address DID;
+	
+	@Override protected Context buildContext(Context ctx) {
+		ctx=TestState.CONTEXT.fork();
+		
+		// Import basic NFTs
+		ctx=step(ctx,"(import convex.did :as did)");
+		DID=ctx.getResult();
+		
+		ctx=step(ctx,"(import convex.asset :as asset)");
+		return ctx;
+	}
 
 	@Test public void testLibrary() {
 		Address did=eval("(import convex.did)");
 		assertNotNull(did);
+		assertEquals(DID,did);
 	}
 	
 	@Test public void testResolveNotThere() {
-		Context ctx=step("(import convex.did :as did)");
+		Context ctx=context();
 		assertNull(eval(ctx,"(call did (read 5875875865))"));
 	}
 	
 	@Test public void testCreate() {
-		Context ctx=step("(import convex.did :as did)");
-		Address did=(Address) ctx.getResult();
+		Context ctx=context();
+		Address did=DID;
 		
 		// create an id, should be entered in registry
 		ctx=step(ctx,"(call did (create *address*))");
@@ -61,13 +76,13 @@ public class DIDTest extends ACVMTest {
 		ctx=step(ctx,"(call did (read "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
 		
-		// Try change of Control
+		// Try change of Control with scoped DID
 		TrustTest.testChangeControl(ctx,Vectors.of(did,id));
 		
 	}
 	
 	@Test public void testUpdateMonitor() {
-		Context ctx=step("(import convex.did :as did)");
+		Context ctx=context();
 		
 		// Set up DDO controlled by HERO
 		ctx=step(ctx,"(call did (create))");
