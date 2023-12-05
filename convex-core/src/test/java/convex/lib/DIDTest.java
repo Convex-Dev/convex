@@ -36,6 +36,7 @@ public class DIDTest extends ACVMTest {
 		DID=ctx.getResult();
 		
 		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=step(ctx,"(import convex.trust :as trust)");
 		return ctx;
 	}
 
@@ -84,11 +85,17 @@ public class DIDTest extends ACVMTest {
 	@Test public void testUpdateMonitor() {
 		Context ctx=context();
 		
-		// Set up DDO controlled by HERO
-		ctx=step(ctx,"(call did (create))");
+		// Set up DDO controlled by HERO (current *address*)
+		ctx=step(ctx,"(def id (call did (create)))");
 		CVMLong id=(CVMLong) ctx.getResult();
 		AString ddo=Strings.create("{}");
 		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
+		
+		
+		// Not initially trusted
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+		ctx=step(ctx,"(call did (authorise id #{*address*}))");
+		assertTrue(evalB(ctx,"(trust/trusted? [did id] *address*)"));
 		
 		// Switch to VILLAIN
 		ctx=ctx.forkWithAddress(VILLAIN);

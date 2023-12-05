@@ -37,7 +37,7 @@
 
 (defn 
   ^{:callable? true
-    :doc       {:description "Creates a new DID. Controller will be caller unless otherwise specified."
+    :doc       {:description "Creates a new DID. Controller will be *caller* unless otherwise specified."
                 :signature   [{:params []}
                               {:params [controller]}]}}
   create
