@@ -82,6 +82,30 @@ public class DIDTest extends ACVMTest {
 		
 	}
 	
+	@Test public void testAuthorise() {
+		Context ctx=context();
+		
+		// Set up DDO controlled by HERO (current *address*)
+		ctx=step(ctx,"(def id (call did (create)))");
+		
+		// Not initially trusted
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+
+		// Authorise
+		ctx=step(ctx,"(call did (authorise id #{*address*}))");
+		assertTrue(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+		
+		// Basic trust failures
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] nil)"));
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] #6666)"));
+		
+		// Remove authorisation
+		ctx=step(ctx,"(call did (authorise id #{}))");
+		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
+
+	}
+
+	
 	@Test public void testUpdateMonitor() {
 		Context ctx=context();
 		
@@ -91,12 +115,7 @@ public class DIDTest extends ACVMTest {
 		AString ddo=Strings.create("{}");
 		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
 		
-		
-		// Not initially trusted
-		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
-		ctx=step(ctx,"(call did (authorise id #{*address*}))");
-		assertTrue(evalB(ctx,"(trust/trusted? [did id] *address*)"));
-		
+
 		// Switch to VILLAIN
 		ctx=ctx.forkWithAddress(VILLAIN);
 		ctx=step(ctx,"(import convex.did :as did)");
