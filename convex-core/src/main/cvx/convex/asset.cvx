@@ -72,7 +72,7 @@
   ;; Independently of general transfer, you can test whether there are restrictions on transferring
   ^{:doc {:description ["Checks whether sender can transfer this asset to receiver."
                         "Returns a descriptive failure message if there is a restriction prohibiting transfer, or nil if there is no restriction."]
-          :examples    [{:code "(check-transfer sender receiver [fungible-token-address 1000])"}
+          :examples    [{code "(check-transfer sender receiver [fungible-token-address 1000])"}
                         {:code "(check-transfer sender receiver [non-fungible-token-address #{1 4 6}])"}]
           :signature   [{:params [sender receiver [asset-address quantity]]}]}}
   [sender receiver [path quantity]]

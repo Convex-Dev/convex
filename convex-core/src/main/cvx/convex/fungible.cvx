@@ -114,9 +114,7 @@
                quantity (if quantity
                           (int quantity)
                           0)
-               om       (or (get offers
-                                 sender)
-                            0)
+               om       (get offers sender) ;; if this is nil then OK, behaves as empty map
                sendbal  (or (get-holding sender)
                             0)
                offer    (or (get om

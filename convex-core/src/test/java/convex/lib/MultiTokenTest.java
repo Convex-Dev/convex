@@ -31,7 +31,6 @@ public class MultiTokenTest extends ACVMTest {
 		String importS="(import asset.multi-token :as mt)";
 		ctx=exec(ctx,importS);
 		ctx=exec(ctx,"(import convex.asset :as asset)");
-		ctx=exec(ctx,"(import convex.fungible :as fungible)");
 		ctx=exec(ctx,"(import convex.trust :as trust)");
 		ctx=exec(ctx,"(call mt (create :USD))");
 		
@@ -67,6 +66,20 @@ public class MultiTokenTest extends ACVMTest {
 		assertCVMEquals(600,evalL(ctx,"(asset/get-offer FOO *address* *address*)"));
 	}
 	
+	@Test public void testGenericFugible() {
+		Context ctx = context();
+		AVector<ACell> token=Vectors.of(mt,Keyword.create("FOOSD"));
+		
+		ctx=exec(ctx,"(call mt (create :FOOSD))");
+		ctx=exec(ctx,"(asset/mint [mt :FOOSD] 2023)");		
+		
+		// Fungible tests
+		AssetTester.doFungibleTests(ctx, token, HERO);		
+		
+		// Test change of control
+		TrustTest.testChangeControl(ctx, token);
+	}
+	
 	@Test public void testMint() {
 		Context ctx = context();
 		
@@ -90,12 +103,6 @@ public class MultiTokenTest extends ACVMTest {
 		assertEquals(4043,evalL(ctx,"(call [mt :FOOSD] (mint -1))"));
 
 		assertError(step(ctx,"(call [mt :FOOSD] (mint -9999999999999999))"));
-		
-		AVector<ACell> token=Vectors.of(mt,Keyword.create("FOOSD"));
-		AssetTester.doFungibleTests(ctx, token, HERO);
-		
-		// Test change of control
-		TrustTest.testChangeControl(ctx, token);
 		
 		// Remove controller => no more minting!
 		ctx=exec(ctx,"(trust/change-control [mt :FOOSD] #0)");
