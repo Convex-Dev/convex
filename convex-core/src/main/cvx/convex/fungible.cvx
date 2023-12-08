@@ -127,7 +127,7 @@
 
                (< offer
                   quantity)
-               (fail "Offer is insufficient")
+               (fail :STATE "Offer is insufficient")
 
                (< sendbal
                   quantity)

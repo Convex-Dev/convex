@@ -145,8 +145,8 @@
       rec (get hs id)]
     (if rec
       (let [os (nth rec 1) ;; offers map
-            off (or (get os receiver) (fail "No offer to receiver"))
-            _ (cond (< off quantity) (fail "insufficient offer"))
+            off (or (get os receiver) (fail :STATE "No offer to receiver"))
+            _ (cond (< off quantity) (fail :STATE "insufficient offer"))
             bal (nth rec 0)
             nbal (- bal quantity)
             _ (cond (< nbal 0) (fail "insufficent balance to accept"))
