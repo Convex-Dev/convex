@@ -30,31 +30,36 @@ public class FungibleTest extends ACVMTest {
 	
 	private static State buildState() {
 		Context ctx=TestState.CONTEXT.fork();
-		String importS="(import convex.fungible :as fungible)";
-		ctx=step(ctx,importS);
-		assertNotError(ctx);
-		ctx=step(ctx,"(import convex.asset :as asset)");
-		assertFalse(ctx.isExceptional());
+		ctx=exec(ctx,"(import convex.fungible :as fungible)");
+		ctx=exec(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		return ctx.getState();
 	}
-
-	@Test public void testAssetAPI() {
+	
+	@Test public void testGeneric() {
 		Context ctx = context();
-		ctx=step(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
-		Address token = (Address) ctx.getResult();
+		Address token = eval(ctx,"token");
 		assertNotNull(token);
 
 		// generic tests
 		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+		
+		// Control change
+		// TrustTest.testChangeControl(ctx, token);
+
+	}
+
+	@Test public void testAssetAPI() {
+		Context ctx = context();
+		Address token = eval(ctx,"token");
+		assertNotNull(token);
+
 
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
 
-		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1000])");
-		assertNotError(ctx);
-
-		ctx=step(ctx,"(asset/transfer "+VILLAIN+" [token 2000])");
-		assertNotError(ctx);
+		ctx=exec(ctx,"(asset/offer "+VILLAIN+" [token 1000])");
+		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" [token 2000])");
 
 		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(2000L,evalL(ctx,"(asset/balance token "+VILLAIN+")"));
@@ -77,12 +82,12 @@ public class FungibleTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2001])"));
 
 		// transfer using map argument
-		ctx=step(ctx,"(asset/transfer "+VILLAIN+" {token 100})");
+		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" {token 100})");
 		assertTrue(ctx.getResult() instanceof AMap);
 		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2100])"));
 
 		// test offer
-		ctx=step(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
+		ctx=exec(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
 		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+VILLAIN+")"));
 		
 
@@ -94,10 +99,10 @@ public class FungibleTest extends ACVMTest {
 		assertEquals(fungible,eval(ctx,"fungible"));
 
 		// deploy a token with default config
-		ctx=step(ctx,"(def token (deploy (fungible/build-token {})))");
+		ctx=exec(ctx,"(def token (deploy (fungible/build-token {})))");
 		Address token = (Address) ctx.getResult();
 		assertTrue(ctx.getAccountStatus(token)!=null);
-		ctx=step(ctx,"(def token (address "+token+"))");
+		ctx=exec(ctx,"(def token (address "+token+"))");
 
 		// GEnric tests
 		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());

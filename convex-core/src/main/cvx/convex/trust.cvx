@@ -63,7 +63,7 @@
 ;;;;;;;;;; Control of Actor / scope
 
 (defn change-control
-   ^{:doc {:description ["Sets a controller for a actor (possibly scoped). Controller may be any trust monitor."]
+   ^{:doc {:description ["Sets a controller for an entity (possibly scoped). Controller may be any trust monitor. Typically requires turst from the existing controller, for an action of :control."]
           :examples    [{:code "(set-control my-asset *address*)"}]
           :signature   [{:params [path controller]}]}}
   [path controller]
@@ -96,7 +96,7 @@
           ^{:callable? true}
           [controller]
           (or 
-            (trust/trusted? upgradable-root *caller*)
+            (trust/trusted? upgradable-root *caller* :control *address*)
             (fail :TRUST "Not allowed to update controller"))
           (cond 
             (nil? *scope*)  (def upgradable-root controller)
@@ -105,10 +105,9 @@
         (defn upgrade
           ^{:callable? true}
           [code]
-          (if (trust/trusted? upgradable-root
-                              *caller*)
+          (if (trust/trusted? upgradable-root *caller* :upgrade *address*)
             (eval code)
-            (fail :TRUST "No root access to upgrade capability!"))))))
+            (fail :TRUST "No access to upgrade capability!"))))))
 
 
 (defn remove-upgradability! 

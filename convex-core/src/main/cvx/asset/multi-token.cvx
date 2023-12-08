@@ -58,7 +58,7 @@
   (let [trec (or (get tokens *scope*) (fail :TRUST "Not allowed to update controller"))
         cont (nth trec 0)
         _ (or 
-            (trust/trusted? cont *caller*)
+            (trust/trusted? cont *caller* :control *scope*)
             (fail :TRUST "Not allowed to update controller"))
         nrec (assoc trec 0 controller)]
     (set! tokens (assoc tokens *scope* nrec))))
