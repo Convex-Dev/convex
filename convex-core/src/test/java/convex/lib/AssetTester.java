@@ -46,6 +46,12 @@ public class AssetTester {
 		Long BAL=evalL(ctx,"(asset/balance token *address*)");
 		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
 		assertTrue(BAL>0,"Should provide a user account with positive balance!");
+		
+		// New Address gets zero balance
+		{
+			assertEquals(0L,evalL(ctx,"(asset/balance token (deploy nil))"));
+			assertEquals(0L,evalL(ctx,"(asset/balance token (create-account *key*))"));
+		}
 
 		// transfer all to self, should not affect balance
 		ctx=step(ctx,"(asset/transfer *address* [token "+BAL+"])");
