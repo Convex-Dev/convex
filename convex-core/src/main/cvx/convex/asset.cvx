@@ -85,10 +85,10 @@
 (defn get-offer
   ^{:doc {:description ["Gets the current offer from `sender` to `receiver` for a given asset."
                         "Returns the quantity representing the current offer. Will be the 'zero' quantity if no open offer exists."]
-          :examples    [{:code "(get-offer asset-address sender receiver)"}]
-          :signature   [{:params [asset-address sender receiver]}]}}
-  [asset-address sender receiver]
-  (query (call asset-address
+          :examples    [{:code "(get-offer asset-path sender receiver)"}]
+          :signature   [{:params [asset-path sender receiver]}]}}
+  [path sender receiver]
+  (query (call path
                (get-offer sender
                           receiver))))
 

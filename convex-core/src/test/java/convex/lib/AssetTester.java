@@ -47,10 +47,30 @@ public class AssetTester {
 		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
 		assertTrue(BAL>0,"Should provide a user account with positive balance!");
 		
-		// New Address gets zero balance
+		// New Address gets zero offers
 		{
 			assertEquals(0L,evalL(ctx,"(asset/balance token (deploy nil))"));
 			assertEquals(0L,evalL(ctx,"(asset/balance token (create-account *key*))"));
+			assertEquals(0L,evalL(ctx,"(asset/get-offer token (create-account *key*) (deploy nil))"));
+		}
+		
+		// New Address gets zero offers
+		{
+			assertEquals(0L,evalL(ctx,"(asset/balance token (deploy nil))"));
+			assertEquals(0L,evalL(ctx,"(asset/balance token (create-account *key*))"));
+			assertEquals(0L,evalL(ctx,"(asset/get-offer token (create-account *key*) (deploy nil))"));
+		}
+		
+		// New Address offers work
+		{
+			Context ctxx = step (ctx,"(do (def a1 (deploy nil)))");
+			assertEquals(0L,evalL(ctxx,"(asset/get-offer token *address* a1)"));
+			ctxx = step (ctxx,"(asset/offer a1 token 1000)");
+			assertCVMEquals(1000L,ctxx.getResult());
+			assertEquals(1000L,evalL(ctxx,"(asset/get-offer token *address* a1)"));
+			ctxx = step(ctxx,"(asset/offer a1 [token 0])");
+			assertCVMEquals(0L,ctxx.getResult());
+			assertEquals(0L,evalL(ctxx,"(asset/get-offer token *address* a1)"));
 		}
 
 		// transfer all to self, should not affect balance
