@@ -131,7 +131,7 @@
 
                (< sendbal
                   quantity)
-               (fail "Sender token balance is insufficient")
+               (fail :FUNDS "Sender token balance is insufficient")
 
                (let [new-offer (- offer
                                   quantity)] 

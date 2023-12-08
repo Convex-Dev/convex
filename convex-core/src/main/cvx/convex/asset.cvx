@@ -42,7 +42,9 @@
                         "If asset contains multiple assets, accepts each in turn. MUST fail if the asset cannot be accepted."]
           :examples    [{:code "(accept sender [fungible-token-address 1000])"}]
           :signature   [{:params [sender asset]}
-                        {:params [sender asset-path quantity]}]}}
+                        {:params [sender asset-path quantity]}]
+          :errors      {:STATE "If there is no sufficient offer to accept."
+	  					:FUNDS "If sender has insufficient balance."}}}
 
   ([sender asset]
   (cond 

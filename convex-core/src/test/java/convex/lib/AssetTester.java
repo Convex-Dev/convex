@@ -80,14 +80,14 @@ public class AssetTester {
 			assertCVMEquals(BAL,ctxx.getResult());
 			assertEquals(BAL,evalL(ctxx,"(asset/get-offer token *address* *address*)"));
 			
-			// accepting one more token than offered at this point should be error
+			// accepting one more token than offered at this point should be :STATE error
 			assertError(step(ctxx,"(asset/accept *address* [token (inc BAL)])"));
 
 			ctxx=step(ctxx,"(asset/accept *address* token BAL)");
 			assertCVMEquals(BAL,ctxx.getResult());
 			assertCVMEquals(BAL,evalL(ctxx,"(asset/balance token)"));
 			
-			// accepting one more token at this point should be error
+			// accepting one more token at this point should be :STATE error
 			assertStateError(step(ctxx,"(asset/accept *address* [token 1])"));
 
 			// Offer / accept of half balance should work
@@ -97,6 +97,11 @@ public class AssetTester {
 			ctxx=step(ctxx,"(asset/accept *address* token (div BAL 2))");
 			assertCVMEquals(BAL/2,ctxx.getResult());
 			assertCVMEquals(BAL,evalL(ctxx,"(asset/balance token)"));
+			
+			// Offer / accept of more than balance should fail with :FUNDS
+			ctxx = step (ctxx,"(asset/offer *address* token (inc BAL))");
+			assertCVMEquals(BAL+1,ctxx.getResult());
+			assertFundsError(step(ctxx,"(asset/accept *address* [token (inc BAL)])"));
 
 			// Set back to zero offer
 			ctxx = step(ctxx,"(asset/offer *address* [token 0])");
