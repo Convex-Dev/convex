@@ -42,7 +42,7 @@
        (defn burn
          ^{:callable? true}
          [amount]
-         (when-not (trust/trusted? minter *caller*)
+         (when-not (trust/trusted? minter *caller* :burn)
            (fail :TRUST "No rights to burn"))
          (let [amount (int amount)
                bal    (balance *caller*)]
@@ -60,7 +60,7 @@
        (defn mint
          ^{:callable? true}
          [amount]
-         (when-not (trust/trusted? minter *caller*)
+         (when-not (trust/trusted? minter *caller* :mint)
            (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
                new-supply (+ supply amount)
