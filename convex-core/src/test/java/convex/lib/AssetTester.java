@@ -72,6 +72,35 @@ public class AssetTester {
 			assertCVMEquals(0L,ctxx.getResult());
 			assertEquals(0L,evalL(ctxx,"(asset/get-offer token *address* a1)"));
 		}
+		
+		// Offer / accept to self work
+		{
+			Context ctxx = step (ctx,"(do (def BAL "+BAL+"))");
+			ctxx = step (ctxx,"(asset/offer *address* token BAL)");
+			assertCVMEquals(BAL,ctxx.getResult());
+			assertEquals(BAL,evalL(ctxx,"(asset/get-offer token *address* *address*)"));
+			
+			// accepting one more token than offered at this point should be error
+			assertError(step(ctxx,"(asset/accept *address* [token (inc BAL)])"));
+
+			ctxx=step(ctxx,"(asset/accept *address* token BAL)");
+			assertCVMEquals(BAL,ctxx.getResult());
+			assertCVMEquals(BAL,evalL(ctxx,"(asset/balance token)"));
+			
+			// accepting one more token at this point should be error
+			assertError(step(ctxx,"(asset/accept *address* [token 1])"));
+
+			ctxx = step (ctxx,"(asset/offer *address* token BAL)");
+			assertCVMEquals(BAL,ctxx.getResult());
+			ctxx=step(ctxx,"(asset/accept *address* token (div BAL 2))");
+			assertCVMEquals(BAL/2,ctxx.getResult());
+			assertCVMEquals(BAL,evalL(ctxx,"(asset/balance token)"));
+
+			
+			ctxx = step(ctxx,"(asset/offer *address* [token 0])");
+			assertCVMEquals(0L,ctxx.getResult());
+			assertEquals(0L,evalL(ctxx,"(asset/get-offer token *address* *address*)"));
+		}
 
 		// transfer all to self, should not affect balance
 		ctx=step(ctx,"(asset/transfer *address* [token "+BAL+"])");
