@@ -1,0 +1,55 @@
+;; ======================= SETUP ==========================
+
+(import convex.asset :as asset)
+(import asset.multi-token :as mt)
+
+(import currency.USD :as USD)
+(import torus.exchange :as torus)
+(torus/buy-tokens USD 100000)
+
+(def COOKIE (asset/create mt :COOKIE))
+(asset/mint COOKIE 100)
+
+(def COOKIE [mt :COOKIE])
+
+;; ====================== SMART CONTRACT =================
+
+(def listings {})
+
+(def next-id 1)
+
+(defn ^:callable? list 
+  [thing price]
+  (or (asset/owns? *caller* thing) (error "Don't own asset for sale!"))
+  (let [id next-id
+        seller *caller*
+        rec [thing price seller]]
+     (set! listings (assoc listings id rec))
+     (set! next-id (inc id))
+     id))
+     
+(def SHOP #12)     
+     
+(call SHOP (list [COOKIE 10] [USD 299]))
+
+(defn ^:callable? buy
+  [id]
+  (let [buyer *caller*
+        rec (or (get listings id) (error "No listing!"))
+        [thing price seller] rec]
+    (asset/accept seller thing)
+    (asset/accept buyer price)
+    (asset/transfer seller price)
+    (asset/transfer buyer thing)
+    (set! listings (dissoc listings id))
+    ))
+
+(asset/offer SHOP [USD 299])
+(call SHOP (buy 1))
+    
+(asset/offer SHOP [COOKIE 100])
+
+
+
+
+
