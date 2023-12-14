@@ -1,0 +1,17 @@
+'convex.trust.monitors
+
+(import convex.trust :as trust)
+
+;; Generic check
+(defn check-trusted?
+  ^:callable?
+	[subject action object]
+  (or *scope* (fail :ARGUMENT "Null scope in generic trust monitor"))
+  (let [[type arg] *scope*]
+    (cond
+      (= :wl type) (contains? arg subject)
+      (= :and type) (reduce (fn [a b] (and a (trust/trusted? b subject action object))) true arg)
+      (= :or type) (reduce (fn [a b] (or a (trust/trusted? b subject action object))) false arg)
+      (address? type) (call *scope* (check-trusted? subject action object))
+      false
+    )))

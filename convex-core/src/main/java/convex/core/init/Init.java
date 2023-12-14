@@ -245,6 +245,7 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust/ownership-monitor.cvx");
 		s = doActorDeploy(s, "convex/trust/delegate.cvx");
 		s = doActorDeploy(s, "convex/trust/whitelist.cvx");
+		s = doActorDeploy(s, "convex/trust/monitors.cvx");
 		return s;
 	}
 
