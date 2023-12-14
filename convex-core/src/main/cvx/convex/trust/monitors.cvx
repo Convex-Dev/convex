@@ -1,7 +1,10 @@
 'convex.trust.monitors
 
+;; This library implements some generic value based trust moniotors that can be composed to implement more compex logic
+
 (import convex.trust :as trust)
 (import convex.trust.whitelist :as wl)
+(import convex.trust.ownership-monitor :as ownership)
 
 ;; Generic check
 (defn check-trusted?
@@ -15,11 +18,12 @@
       (= :any type) (reduce (fn [a b] (or a (trust/trusted? b subject action object))) false arg)
       (= :not type) (not (trust/trusted? arg subject action object))
       (= :time type) (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
+      (= :rule type) (boolean (query (arg subject action object)))
       (address? type) (call *scope* (check-trusted? subject action object))
       false
     )))
 
-(defn whitelist [addresses]
+(defn permit [addresses]
   [wl (set addresses)])
 
 (defn any [& args]
@@ -36,3 +40,7 @@
 
 (defn between [start end]
   [~*address* [:time [(int start) (int end)]]])
+
+(defn rule [func]
+  [~*address* [:rule func]])
+  
