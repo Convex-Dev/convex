@@ -1,6 +1,7 @@
 'convex.trust.monitors
 
 (import convex.trust :as trust)
+(import convex.trust.whitelist :as wl)
 
 ;; Generic check
 (defn check-trusted?
@@ -9,9 +10,29 @@
   (or *scope* (fail :ARGUMENT "Null scope in generic trust monitor"))
   (let [[type arg] *scope*]
     (cond
-      (= :wl type) (contains? arg subject)
-      (= :and type) (reduce (fn [a b] (and a (trust/trusted? b subject action object))) true arg)
-      (= :or type) (reduce (fn [a b] (or a (trust/trusted? b subject action object))) false arg)
+      (= :wl type) (contains-key? arg subject)
+      (= :all type) (reduce (fn [a b] (and a (trust/trusted? b subject action object))) true arg)
+      (= :any type) (reduce (fn [a b] (or a (trust/trusted? b subject action object))) false arg)
+      (= :not type) (not (trust/trusted? arg subject action object))
+      (= :time type) (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
       (address? type) (call *scope* (check-trusted? subject action object))
       false
     )))
+
+(defn whitelist [addresses]
+  [wl (set addresses)])
+
+(defn any [& args]
+  [~*address* [:any (vec args)]])
+
+(defn all [& args]
+  [~*address* [:all (vec args)]])
+
+(defn before [end]
+  [~*address* [:time [*timestamp* (int end)]]])
+
+(defn after [start]
+  [~*address* [:time [(int start) nil]]])
+
+(defn between [start end]
+  [~*address* [:time [(int start) (int end)]]])
