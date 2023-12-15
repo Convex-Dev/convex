@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import java.math.BigInteger;
 
+import convex.core.Constants;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -29,6 +30,7 @@ public final class CVMBigInteger extends AInteger {
 	public static final BigInteger MIN_NEGATIVE_BIG=new BigInteger("-9223372036854775809");
 	
 	protected static final long LONG_BYTELENGTH = 8;
+	protected static final long MAX_BYTELENGTH = Constants.MAX_BIG_INTEGER_LENGTH;
 	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
 	private ABlob blob;
@@ -43,10 +45,11 @@ public final class CVMBigInteger extends AInteger {
 	 * Creates a CVMBigInteger
 	 * WARNING: might not be canonical
 	 * @param bs Bytes representing BigInteger value. Highest bit assumed to be sign.
-	 * @return CVMBigInteger instance
+	 * @return CVMBigInteger instance or null if not valid
 	 */
 	public static CVMBigInteger wrap(byte[] bs) {
 		byte[] tbs=Utils.trimBigIntegerLeadingBytes(bs);
+		if (tbs.length>MAX_BYTELENGTH) return null;
 		if (tbs==bs) tbs=tbs.clone(); // Defensive copy just in case
 		return new CVMBigInteger(Blob.wrap(tbs),null);
 	}
@@ -55,9 +58,10 @@ public final class CVMBigInteger extends AInteger {
 	 * Creates a CVMBigInteger
 	 * WARNING: might not be canonical
 	 * @param value Java BigInteger
-	 * @return CVMBigInteger instance
+	 * @return CVMBigInteger instance or null if not valid
 	 */
 	public static CVMBigInteger wrap(BigInteger value) {
+		if (value.bitLength()>(MAX_BYTELENGTH*8-1)) return null; // note bitLength excludes sign bit
 		return new CVMBigInteger(null,value);
 	}
 	
@@ -321,7 +325,9 @@ public final class CVMBigInteger extends AInteger {
 	public AInteger negate() {
 		BigInteger bi=big();
 		bi=bi.negate();
-		return CVMBigInteger.wrap(bi).toCanonical();
+		AInteger neg=CVMBigInteger.wrap(bi);
+		if (neg==null) return null; // can theoretically overflow....
+		return neg.toCanonical();
 	}
 
 	/**

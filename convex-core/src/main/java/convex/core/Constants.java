@@ -187,5 +187,7 @@ public class Constants {
 
 	public static final long INITIAL_PEER_TIMESTAMP = -1L;
 
+	public static final int MAX_BIG_INTEGER_LENGTH = 4096;
+
 
 }

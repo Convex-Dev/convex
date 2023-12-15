@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -13,6 +14,7 @@ import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -87,6 +89,22 @@ public class BigIntegerTest {
 		assertNotEquals(b,Format.encodedBlob(cb));
 		
 		ObjectsTest.doAnyValueTests(cb);
+	}
+	
+	@Test 
+	public void testMaxSize() {
+		byte [] bs=new byte[Constants.MAX_BIG_INTEGER_LENGTH];
+		bs[0]=-128; // set sign bit for max sized negative number
+		ABlob blob=Blob.wrap(bs);
+		CVMBigInteger b=CVMBigInteger.create(blob);
+		assertTrue(b.isCanonical());
+		assertEquals(Constants.MAX_BIG_INTEGER_LENGTH,b.blob().count());
+		assertNull(b.negate());
+		assertNull(b.dec()); // overflow
+		assertNull(b.multiply(CVMLong.create(2))); // overflow
+		assertNotNull(b.inc().negate());
+		
+		doBigTest(b);
 	}
 	
 	@Test 
