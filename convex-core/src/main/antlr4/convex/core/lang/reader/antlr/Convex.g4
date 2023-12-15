@@ -12,7 +12,9 @@ form
 
 singleForm: form EOF;
 	
-forms: (form | commented) * ;
+forms: (form | commented) *;
+
+allForms: forms EOF;
 
 dataStructure:
 	list | vector | set | map;

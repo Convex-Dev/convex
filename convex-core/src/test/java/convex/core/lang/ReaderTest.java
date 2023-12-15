@@ -122,6 +122,11 @@ public class ReaderTest {
 		assertThrows(ParseException.class,()->Reader.readAll(s462));
 		
 	}
+	
+	@Test
+	public void testExtraInputRegression244() {
+		assertThrows(ParseException.class,()->Reader.readAll("'(42))))"));
+	}
 
 	@Test
 	public void testSymbolsRegressionCases() {

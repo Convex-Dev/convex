@@ -36,6 +36,7 @@ import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
 import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
+import convex.core.lang.reader.antlr.ConvexParser.AllFormsContext;
 import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
@@ -440,8 +441,16 @@ public class AntlrReader {
 			// Nothing
 		}
 
+		@Override
+		public void enterAllForms(AllFormsContext ctx) {
+			// Nothing	
+			
+		}
 
-
+		@Override
+		public void exitAllForms(AllFormsContext ctx) {
+			// Nothing	
+		}
 
 	}
 
@@ -500,7 +509,7 @@ public class AntlrReader {
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
 		parser.removeErrorListeners();
-		ParseTree tree = parser.forms();
+		ParseTree tree = parser.allForms();
 		return tree;
 	}
 
