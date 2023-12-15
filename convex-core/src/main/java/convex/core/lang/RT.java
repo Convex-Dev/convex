@@ -625,7 +625,6 @@ public class RT {
 		if (n != null) {
 			return n.toInteger();
 		}
-		;
 
 		if (a instanceof APrimitive) {
 			return CVMLong.create(((APrimitive) a).longValue());

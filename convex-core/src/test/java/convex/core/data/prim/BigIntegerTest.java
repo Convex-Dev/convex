@@ -23,6 +23,7 @@ import convex.core.data.ObjectsTest;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.test.Samples;
 
 public class BigIntegerTest {
@@ -171,9 +172,10 @@ public class BigIntegerTest {
 		assertEquals(bi.getEncoding(),bi2.getEncoding());
 		assertEquals(bi,bi2);
 		
-		AInteger biplus=bi.inc();
-		if (biplus!=null) {
+		AInteger biplus=bi.inc(); // add one
+		if (biplus!=null) { // might overflow in one specific case
 			assertEquals(bi,biplus.dec());
+			assertTrue(bi.compareTo(biplus)<0);
 		}
 		
 		if (bi.isCanonical()) {
@@ -188,6 +190,7 @@ public class BigIntegerTest {
 		
 		String s=bi.toString();
 		assertEquals(big,new BigInteger(s));
+		assertEquals(bi,Reader.read(s));
 		
 		ObjectsTest.doAnyValueTests(bi);
 	}
@@ -222,5 +225,14 @@ public class BigIntegerTest {
 		assertTrue(CVMDouble.ZERO.compareTo(CVMBigInteger.wrap(BigInteger.ZERO))==0);
 		assertTrue(CVMDouble.POSITIVE_INFINITY.compareTo(CVMBigInteger.MIN_POSITIVE)>0);
 		assertTrue(CVMDouble.NEGATIVE_INFINITY.compareTo(CVMBigInteger.MIN_NEGATIVE)<0);
+	}
+	
+	@Test public void testDoubleCasts() {
+		assertEquals(AInteger.parse("-1000000"),CVMDouble.create(-1e6).toInteger());
+		assertEquals(AInteger.parse("1000000000000000000000"),CVMDouble.create(1e21).toInteger());
+		assertNull(CVMDouble.POSITIVE_INFINITY.toInteger());
+		assertNull(CVMDouble.NEGATIVE_INFINITY.toInteger());
+		assertNull(CVMDouble.NaN.toInteger());
+
 	}
 }
