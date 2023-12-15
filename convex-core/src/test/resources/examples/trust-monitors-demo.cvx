@@ -1,0 +1,38 @@
+(import convex.trust :as trust)
+(import convex.asset :as asset)
+(import convex.trust.monitors :as mon)
+(import currency.USD :as USD)
+(import torus.exchange :as torus)
+
+;; Filtering features
+
+(def peeps (mon/permit-subjects #12))
+(trust/trusted? peeps #12) 
+
+;; Filtering actions
+
+(def greetable (mon/rule (fn [s a o] (= a :greet))))
+(trust/trusted? greetable *address*)
+(trust/trusted? greetable *address* :greet)
+
+;; Combining actions
+
+(def greetable-peeps (mon/all peeps greetable))
+(trust/trusted? greetable-peeps #15467 :greet)
+
+;; Ownership
+
+(trust/trusted? (mon/owns [USD 100]) *address*)
+(torus/buy-tokens USD 10000)
+(trust/trusted? (mon/owns [USD 100000000]) *address*)
+
+;; Using in an actor
+
+(def plz-monitor (mon/permit-subjects #12))
+
+(defn ^:callable? plz []
+  (if (trust/trusted? plz-monitor *caller* :plz [USD 100])
+    (asset/transfer *caller* [USD 100])
+    (fail :TRUST "No dollar for you!")))
+    
+(call #12 (plz))
