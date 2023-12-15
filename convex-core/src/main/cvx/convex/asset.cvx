@@ -192,7 +192,7 @@
     (recur path *address*))
 
   ([path owner]
-    (query ;; external call, so uery to avoid re-entrant secuity risks
+    (query ;; external call, so use query to avoid re-entrant secuity risks
       (call path (balance owner)))))
 
 (defn burn 

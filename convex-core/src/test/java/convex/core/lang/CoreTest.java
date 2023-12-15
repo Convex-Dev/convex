@@ -4680,7 +4680,9 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));
 		assertCastError(step(ctx,"(get-holding :foo)"));
 		assertCastError(step(ctx,"(get-holding nil)"));
-		assertNobodyError(step(ctx,"(get-holding NOONE)"));
+		
+		// NOTE: holdings are nil for non-existent accounts, better for default behaviour
+		assertNull(eval(ctx,"(get-holding NOONE)"));
 
 		// OK to set holding for a real owner account
 	    assertEquals(100L,evalL(ctx,"(set-holding VILLAIN 100)"));

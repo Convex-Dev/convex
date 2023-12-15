@@ -1174,7 +1174,8 @@ public class Core {
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
 
 			AccountStatus as=context.getAccountStatus(address);
-			if (as==null) return context.withError(ErrorCodes.NOBODY,"Account "+address+" does not exist to get holdings");
+			if (as==null) return context.withResult(Juice.LOOKUP, null);
+			
 			BlobMap<Address,ACell> holdings=as.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account

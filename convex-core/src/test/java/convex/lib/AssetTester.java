@@ -54,6 +54,7 @@ public class AssetTester {
 			assertEquals(0L,evalL(ctx,"(asset/balance token (deploy nil))"));
 			assertEquals(0L,evalL(ctx,"(asset/balance token (create-account *key*))"));
 			assertEquals(0L,evalL(ctx,"(asset/get-offer token (create-account *key*) (deploy nil))"));
+			assertEquals(0L,evalL(ctx,"(asset/balance token #675475647)"));
 		}
 		
 		// New Address gets zero offers
