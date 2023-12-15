@@ -141,6 +141,10 @@ public class CoreTest extends ACVMTest {
 		
 		// Address converts to regular Blob
 		assertEquals(eval("0x0000000000000013"),eval("(blob #19)")); 
+
+		// Booleans become 0/1 bytes
+		assertEquals(eval("0x00"),eval("(blob false)"));
+		assertEquals(eval("0x01"),eval("(blob true)"));
 		
 		// Account key should be a Blob
 		assertEquals(eval("*key*"),eval("(blob *key*)"));
@@ -464,6 +468,8 @@ public class CoreTest extends ACVMTest {
 	public void testBoolean() {
 		// test precise values
 		assertSame(CVMBool.TRUE, eval("(boolean 1)"));
+		assertSame(CVMBool.TRUE, eval("(boolean 0)"));
+		assertSame(CVMBool.TRUE, eval("(boolean 0x00)"));
 		assertSame(CVMBool.FALSE, eval("(boolean nil)"));
 
 		// nil and false should be falsey

@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import convex.core.data.ACell;
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
@@ -107,6 +108,10 @@ public final class CVMBool extends APrimitive {
 	@Override public boolean equals(ACell a) {
 		// Can compare on identity, since only two canonical instances
 		return this==a;
+	}
+
+	public Blob toBlob() {
+		return value?Blob.ONE:Blob.ZERO;
 	}
 
 }

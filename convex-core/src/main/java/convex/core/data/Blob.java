@@ -22,6 +22,9 @@ import convex.core.util.Utils;
  */
 public class Blob extends AArrayBlob {
 	public static final Blob EMPTY = wrap(Utils.EMPTY_BYTES);
+	public static final Blob ZERO = wrap(new byte[] {0});
+	public static final Blob ONE = wrap(new byte[] {1});;
+
 	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] {Tag.NULL});
 	
 	public static final int CHUNK_LENGTH = 4096;

@@ -1229,6 +1229,8 @@ public class RT {
 			return ((AInteger)a).toBlob();
 		if (a instanceof AString)
 			return Blobs.fromHex((AString)a);
+		if (a instanceof CVMBool)
+			return ((CVMBool)a).toBlob();
 		return null;
 	}
 
