@@ -10,6 +10,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
 
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
@@ -47,6 +48,7 @@ import convex.core.data.Syntax;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -156,12 +158,24 @@ public class Samples {
 
 	public static final Blob SMALL_BLOB = Blob.fromHex("cafebabe");
 	
+	public static final CVMBigInteger MAX_BIGINT;
+	public static final CVMBigInteger MIN_BIGINT;
+	
 	static {
 		// we should be able to actually build these, thanks to structural sharing.
 		DIABOLICAL_VECTOR_30_30 = createNastyNestedVector(30, 30);
 		DIABOLICAL_VECTOR_2_10000 = createNastyNestedVector(2, 10000);
 		DIABOLICAL_MAP_30_30 = createNastyNestedMap(30, 30);
 		DIABOLICAL_MAP_2_10000 = createNastyNestedMap(2, 10000);
+		 
+		{
+			byte [] bs=new byte[Constants.MAX_BIG_INTEGER_LENGTH];
+			bs[0]=-128; // set sign bit for max sized negative number
+			ABlob blob=Blob.wrap(bs);
+			CVMBigInteger b=CVMBigInteger.create(blob);
+			MIN_BIGINT=b;
+			MAX_BIGINT=(CVMBigInteger) b.inc().negate();
+		}
 	}
 	
 	/**

@@ -3295,7 +3295,12 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testDiv() {
 		assertEquals(0L, evalL("(div 4 10)"));
+		assertEquals(0L, evalL("(div 0 -1)"));
 		assertEquals(-4L, evalL("(div -10 3)"));
+		
+		assertArgumentError(step("(div 3 0)"));
+		assertArgumentError(step("(div 0 0)"));
+		assertArgumentError(step("(div -1567567567567564756767586786785688 0)"));
 		// TODO: more tests
 	}
 

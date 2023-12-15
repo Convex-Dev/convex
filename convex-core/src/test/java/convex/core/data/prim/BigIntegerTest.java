@@ -97,14 +97,22 @@ public class BigIntegerTest {
 		bs[0]=-128; // set sign bit for max sized negative number
 		ABlob blob=Blob.wrap(bs);
 		CVMBigInteger b=CVMBigInteger.create(blob);
+		
+		assertEquals(b,Samples.MIN_BIGINT);
+		
 		assertTrue(b.isCanonical());
 		assertEquals(Constants.MAX_BIG_INTEGER_LENGTH,b.blob().count());
+		
 		assertNull(b.negate());
 		assertNull(b.dec()); // overflow
 		assertNull(b.multiply(CVMLong.create(2))); // overflow
-		assertNotNull(b.inc().negate());
+		
+		// Negate to get maximum possible bigint
+		CVMBigInteger bn=(CVMBigInteger) b.inc().negate();
+		assertNotNull(bn);
 		
 		doBigTest(b);
+		doBigTest(bn);
 	}
 	
 	@Test 
@@ -163,7 +171,10 @@ public class BigIntegerTest {
 		assertEquals(bi.getEncoding(),bi2.getEncoding());
 		assertEquals(bi,bi2);
 		
-		assertEquals(bi,bi.inc().dec());
+		AInteger biplus=bi.inc();
+		if (biplus!=null) {
+			assertEquals(bi,biplus.dec());
+		}
 		
 		if (bi.isCanonical()) {
 			assertTrue(bi.byteLength()>8);
