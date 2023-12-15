@@ -3805,6 +3805,10 @@ public class CoreTest extends ACVMTest {
 		// Declare requires symbols only at compile time
 		assertNotError(step("(declare count)"));
 		
+		// Declare returns null in all cases, see #477
+		assertNull(eval("(declare a)"));
+		assertNull(eval("(declare a b)"));
+		
 		assertCastError(step("(declare ~'count)")); // TODO: sanity check??
 		assertCastError(step("(declare 1)"));
 		assertCastError(step("(declare foo 1)"));
