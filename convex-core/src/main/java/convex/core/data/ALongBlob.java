@@ -111,16 +111,11 @@ public abstract class ALongBlob extends ABlob {
 	public final long longValue() {
 		return value;
 	}
-
-	@Override
-	public long toExactLong() {
-		return value;
-	}
 	
 	@Override
 	public int compareTo(ABlob b) {
 		if (b.count()==LENGTH) {
-			return compareTo(b.toExactLong());
+			return compareTo(b.longValue());
 		} else {
 			return -b.compareTo(this);
 		}
@@ -133,7 +128,7 @@ public abstract class ALongBlob extends ABlob {
 	@Override
 	public final boolean equalsBytes(ABlob b) {
 		if (b.count()!=LENGTH) return false;
-		return value==b.toExactLong();
+		return value==b.longValue();
 	}
 
 	@Override

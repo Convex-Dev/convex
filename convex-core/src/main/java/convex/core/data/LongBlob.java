@@ -22,8 +22,8 @@ public final class LongBlob extends ALongBlob {
 
 	public static LongBlob create(String string) {
 		byte[] bs = Utils.hexToBytes(string);
-		if (bs.length != LENGTH) throw new IllegalArgumentException("Long blob requires a length 8 hex string");
-		return new LongBlob(Utils.readLong(bs, 0));
+		int bl=bs.length;
+		return new LongBlob(Utils.readLong(bs, Math.max(0, bl-8),Math.min(8, bl)));
 	}
 
 	public static LongBlob create(long value) {
@@ -75,7 +75,7 @@ public final class LongBlob extends ALongBlob {
 			// Note Blob is the only other plausible representation of a LongBlob
 			// AccountKey, Hash etc. excluded because of length
 			Blob b=(Blob)a;
-			return ((b.count()==LENGTH)&& (b.toExactLong()== value));
+			return ((b.count()==LENGTH)&& (b.longValue()== value));
 		}
 		return false;
 	}
@@ -99,11 +99,6 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public long toExactLong() {
-		return value;
-	}
-
-	@Override
 	public long hexMatchLength(ABlob b, long start, long length) {
 		if (b == this) return length;
 		long end = start + length;
@@ -120,7 +115,7 @@ public final class LongBlob extends ALongBlob {
 
 	@Override
 	public boolean equalsBytes(byte[] bytes, int byteOffset) {
-		return value==Utils.readLong(bytes, byteOffset);
+		return value==Utils.readLong(bytes, byteOffset,8);
 	}
 	
 	@Override

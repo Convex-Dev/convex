@@ -103,7 +103,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
-		assertEquals(a, eval("(address "+a.toExactLong()+")"));
+		assertEquals(a, eval("(address "+a.longValue()+")"));
 
 		// bad arities
 		assertArityError(step("(address 1 2)"));
@@ -126,13 +126,14 @@ public class CoreTest extends ACVMTest {
 
 		assertEquals("cafebabe", evalS("(str (blob \"Cafebabe\"))"));
 
-		assertSame(eval("0x"),eval("(blob (str))")); // blob literal
+		assertSame(eval("0x"),eval("(blob (str))")); // empty blob literal for empty string
 
 		assertEquals(eval("*address*"),eval("(address (blob *address*))"));
 		
-		// Blob from a long
-		assertEquals(eval("0x0000000000001234"),eval("(blob (long \\u1234))")); // blob literal
-		assertEquals(eval("0xffffffffffffffff"),eval("(blob -1)")); 
+		// Blob from a long, note minimal representation
+		assertEquals(eval("0x1234"),eval("(blob (long \\u1234))")); // blob literal
+		assertEquals(eval("0xff"),eval("(blob -1)")); 
+		assertEquals(eval("0x8000000000000000"),eval("(blob "+Long.MIN_VALUE+")")); 
 
 		// Blob from a bigint
 		assertEquals(eval("0x00ffffffffffffffff"),eval("(blob 18446744073709551615)")); 
@@ -145,7 +146,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(eval("*key*"),eval("(blob *key*)"));
 		
 		// Long converts to blob and back
-		assertTrue(evalB("(= 0xffffffffffffffff (blob -1))"));
+		assertTrue(evalB("(= 0xff (blob -1))"));
 		assertTrue(evalB("(= -1 (long (blob -1)))"));
 
 		// round trip back to Blob
@@ -198,7 +199,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testBitOr() {
 		assertCVMEquals(0xfff0fff0fff0fff0l, eval("(bit-or (long 0xff00ff00ff00ff00) (long 0x0ff00ff00ff00ff0))"));
-		assertCVMEquals(0xff01, eval("(bit-or (long 0xff00) (byte 1))"));
+		assertCVMEquals(-255, eval("(bit-or (long 0xff00) (byte 1))"));
 
 		assertCastError(step("(bit-or nil 1)"));
 		assertCastError(step("(bit-or 20 :foo)"));
@@ -348,9 +349,9 @@ public class CoreTest extends ACVMTest {
 
 		// Blob casts treat blob as extended long bits (zero extended if needed)
 		assertEquals(4096L, evalL("(long 0x1000)"));
-		assertEquals(255L, evalL("(long 0xff)"));
-		assertEquals(4294967295L, evalL("(long 0xffffffff)"));
-		assertEquals(0xff00000050l, evalL("(long 0xff00000050)"));
+		assertEquals(-1L, evalL("(long 0xff)"));
+		assertEquals(-1L, evalL("(long 0xffffffff)"));
+		assertEquals(-4294967216L, evalL("(long 0xff00000050)"));
 		assertEquals(-1L, evalL("(long 0xffffffffffffffff)"));
 		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
 		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
@@ -398,11 +399,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(97L, evalL("(int \\a)"));
 		assertEquals(2147483648L, evalL("(int 2147483648)"));
 
-		// Blob casts treat blob as extended long bits (zero extended if needed)
+		// Blob casts treat blob as extended long bits (sign extended if needed)
 		assertEquals(4096L, evalL("(int 0x1000)"));
-		assertEquals(255L, evalL("(int 0xff)"));
-		assertEquals(4294967295L, evalL("(int 0xffffffff)"));
-		assertEquals(0xff00000050l, evalL("(int 0xff00000050)"));
+		assertEquals(-1L, evalL("(int 0xff)"));
+		assertEquals(-1L, evalL("(int 0xffffffff)"));
+		assertEquals(0x0cff00000050l, evalL("(int 0x0cff00000050)")); 
 
 		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
 		assertEquals(1L, evalL("(int true)"));
@@ -2601,7 +2602,7 @@ public class CoreTest extends ACVMTest {
 	public void testCreateAccount() {
 		Context ctx=step("(create-account 0x817934590c058ee5b7f1265053eeb4cf77b869e14c33e7f85b2babc85d672bbc)");
 		Address addr=ctx.getResult();
-		assertEquals(addr.toExactLong()+1,ctx.getState().getAccounts().count()); // should be last Address added
+		assertEquals(addr.longValue()+1,ctx.getState().getAccounts().count()); // should be last Address added
 		
 		// Query rollback should result in same account being created
 		assertTrue(evalB("(= (query (create-account *key*)) (query (create-account *key*)))"));
@@ -4223,7 +4224,7 @@ public class CoreTest extends ACVMTest {
 		State s = ctx.getState();
 		BlobMap<ABlob, AVector<ACell>> sched = s.getSchedule();
 		assertEquals(1L, sched.count());
-		assertEquals(expectedTS, sched.entryAt(0).getKey().toExactLong());
+		assertEquals(expectedTS, sched.entryAt(0).getKey().longValue());
 
 		assertTrue(step(ctx, "(do a)").isExceptional());
 

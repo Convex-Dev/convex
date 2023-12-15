@@ -51,7 +51,7 @@ public final class Address extends ALongBlob {
 	 */
 	public static Address create(ABlob b) {
 		if (b.count()!=BYTE_LENGTH) return null;
-		return create(b.toExactLong());
+		return create(b.longValue());
 	}
 	
 	@Override
@@ -94,7 +94,7 @@ public final class Address extends ALongBlob {
 		Blob b=Blob.fromHex(hexString);
 		if (b==null) return null;
 		if (b.length!=BYTE_LENGTH) return null;
-		return create(b.toExactLong());
+		return create(b.longValue());
 	}
 	
 	/**
@@ -219,12 +219,7 @@ public final class Address extends ALongBlob {
 	
 	@Override
 	public boolean equalsBytes(byte[] bytes, int byteOffset) {
-		return value==Utils.readLong(bytes, byteOffset);
-	}
-
-	@Override
-	public long toExactLong() {
-		return value;
+		return value==Utils.readLong(bytes, byteOffset,8);
 	}
 	
 	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_COUNT_LENGTH;

@@ -64,7 +64,7 @@ public class AccountInformation implements Runnable {
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
 			convex = mainParent.connectToSessionPeer(hostname, port, address, null);
-            String queryCommand = String.format("(account #%d)", address.toExactLong());
+            String queryCommand = String.format("(account #%d)", address.longValue());
 			ACell message = Reader.read(queryCommand);
 			Result result;
 			try {

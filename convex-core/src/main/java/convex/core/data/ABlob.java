@@ -344,14 +344,6 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	}
 
 	/**
-	 * Gets the long value of this Blob if the length is exactly 8 bytes, otherwise
-	 * throws an Exception
-	 * 
-	 * @return The long value represented by the Blob
-	 */
-	public abstract long toExactLong();
-
-	/**
 	 * Returns true if this object is a regular blob (i.e. not a special blob type like Address)
 	 * @return True if a regular blob
 	 */

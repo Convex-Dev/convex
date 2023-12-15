@@ -414,7 +414,7 @@ public class NumericsTest extends ACVMTest {
 		assertSame(CVMLong.forByte((byte)-1), eval("(byte 0xFF)"));
 		
 		// check we are treating blobs as unsigned values
-		assertEquals(510L, evalL("(+ (long 0xFF) (long 0xFF))"));
+		assertEquals(-2L, evalL("(+ (long 0xFF) (long 0xFF))"));
 		assertEquals(-2L, evalL("(+ (long 0xFFFFFFFFFFFFFFFF) (long 0xFFFFFFFFFFFFFFFF))"));
 		
 		// take low order bytes of big long
@@ -432,7 +432,7 @@ public class NumericsTest extends ACVMTest {
 	public void testCasts() {
 		assertEquals(0L, evalL("(long (byte 256))"));
 		assertEquals(13L, evalL("(long #13)"));
-		assertEquals(255L, evalL("(long 0xff)"));
+		assertEquals(-1L, evalL("(long 0xff)"));
 		assertEquals(1L, evalL("(long 1)"));
 		assertCVMEquals('a', eval("(char 97)"));
 		assertEquals(97L, evalL("(long \\a)"));

@@ -264,7 +264,7 @@ public class Convex {
 	 * @return Result of query, as parsed JSON Object from query response, or null if account does not exist
 	 */
 	public Map<String,Object> queryAccount(Address address) {
-		return queryAccount(address.toExactLong());
+		return queryAccount(address.longValue());
 	}
 	
 	/**
@@ -296,7 +296,7 @@ public class Convex {
 	 */
 	public Map<String,Object> faucet(Address address, long requestedAmount) {
 		HashMap<String,Object> req=new HashMap<>();
-		req.put("address", address.toExactLong());
+		req.put("address", address.longValue());
 		req.put("amount", requestedAmount);
 		String json=JSON.toPrettyString(req);
 
@@ -309,7 +309,7 @@ public class Convex {
 	 * @return Result of query, as Future for parsed JSON Object from query response
 	 */
 	public CompletableFuture<Map<String,Object>> queryAccountAsync(Address address) {
-		return doGetAsync(url+"/api/v1/accounts/"+address.toExactLong());
+		return doGetAsync(url+"/api/v1/accounts/"+address.longValue());
 	}
 
 	/**
@@ -375,7 +375,7 @@ public class Convex {
 	private CompletableFuture<Map<String,Object>> submitAsync(Hash hash) {
 		ASignature sd=getKeyPair().sign(hash);
 		HashMap<String,Object> req=new HashMap<>();
-		req.put("address", getAddress().toExactLong());
+		req.put("address", getAddress().longValue());
 		req.put("hash", hash.toHexString());
 		req.put("accountKey", getKeyPair().getAccountKey().toHexString());
 		req.put("sig", sd.toHexString());
@@ -390,7 +390,7 @@ public class Convex {
 	 * @return Future to be completed with result of query, as parsed JSON Object from query response
 	 */
 	public CompletableFuture<Map<String,Object>> queryAsync(String code) {
-		String json=buildJsonQuery(address.toExactLong(),code);
+		String json=buildJsonQuery(address.longValue(),code);
 		return doPostAsync(url+"/api/v1/query",json);
 	}
 
@@ -403,7 +403,7 @@ public class Convex {
 	}
 	
 	private String buildJsonQuery(Address a, String code) {
-		return buildJsonQuery((a==null)?null:a.toExactLong(),code);
+		return buildJsonQuery((a==null)?null:a.longValue(),code);
 	}
 
 	private Map<String,Object> doPost(String endPoint, String json) {

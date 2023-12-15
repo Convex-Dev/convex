@@ -96,6 +96,11 @@ public class LongTest {
 	@Test public void testFromBlob() {
 		assertEquals(0xff,Blob.fromHex("0000ff").longValue());
 	}
+	
+	@Test public void testToBlob() {
+		assertEquals(Blob.fromHex("00"),CVMLong.ZERO.toBlob());
+		assertEquals(Blob.fromHex("ff"),CVMLong.MINUS_ONE.toBlob());
+	}
 
 	@Test public void testLongSamples() {
 		doLongTest(CVMLong.ZERO);
@@ -122,13 +127,14 @@ public class LongTest {
 	
 	public void doLongTest(CVMLong a) {
 		long val=a.longValue();
+		long n=a.byteLength();
 		
 		assertEquals(CVMLong.create(val),a);
 		assertTrue(a.isCanonical());
 		assertTrue(a.isEmbedded());
-		assertTrue(a.byteLength()<=8);
+		assertTrue(n<=8);
 		assertEquals(val,a.longValue());
-		assertEquals(val,a.toBlob().toExactLong());
+		assertEquals(val,a.toBlob().longValue());
 		
 		if (val!=0) {
 			assertEquals(BigInteger.valueOf(val).toByteArray().length,a.byteLength());

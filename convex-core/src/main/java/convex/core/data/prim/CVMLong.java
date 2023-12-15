@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import java.math.BigInteger;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
@@ -443,9 +444,13 @@ public final class CVMLong extends AInteger {
 	}
 
 	@Override
-	public LongBlob toBlob() {
-		// TODO: do we want minimal length?
-		return LongBlob.create(value);
+	public ABlob toBlob() {
+		long n=byteLength();
+		ABlob result= LongBlob.create(value);
+		if (n<8) {
+			result=result.slice(8-n);
+		}
+		return result;
 	}
 
 

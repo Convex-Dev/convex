@@ -5,7 +5,6 @@ import java.security.MessageDigest;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -523,12 +522,6 @@ public class BlobTree extends ABlob {
 			if (match < clen) return cpos + cs + match;
 		}
 		return length;
-	}
-
-	@Override
-	public long toExactLong() {
-		if (count != 8) throw new IllegalStateException(Errors.wrongLength(8, count));
-		return getChunk(0).toExactLong();
 	}
 	
 	@Override

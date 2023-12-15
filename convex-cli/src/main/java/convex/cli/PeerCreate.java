@@ -121,7 +121,7 @@ public class PeerCreate implements Runnable {
 			RecordOutput output=new RecordOutput();
 			
 			output.addField("Public Peer Key", keyPair.getAccountKey().toString());
-			output.addField("Address", address.toExactLong());
+			output.addField("Address", address.longValue());
 			output.addField("Balance", currentBalance);
 			output.addField("Inital stake amount", stakeAmount);
 			// System.out.println("You can now start this peer by executing the following line:\n");

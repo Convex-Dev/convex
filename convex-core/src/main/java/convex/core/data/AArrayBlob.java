@@ -6,7 +6,6 @@ import java.util.Arrays;
 
 import convex.core.crypto.Hashing;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -178,7 +177,7 @@ public abstract class AArrayBlob extends ABlob {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
 		
-		long val=Utils.readLong(store, offset+ix);
+		long val=Utils.readLong(store, offset+ix,8);
 		return val;
 	}
 	
@@ -329,34 +328,12 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public long toExactLong() {
-		if (length != 8) throw new IllegalStateException(Errors.wrongLength(8, length));
-		return Utils.readLong(store, offset);
-	}
-
-	@Override
 	public long longValue() {
+		if (length==0) return 0;
 		if (length >= 8) {
-			return Utils.readLong(store, offset + length - 8);
+			return Utils.readLong(store, offset + length - 8,8);
 		} else {
-			long result = 0l;
-			int ix = offset;
-			if ((length & 4) != 0) {
-				result += 0xffffffffL & Utils.readInt(store, ix);
-				ix += 4;
-			}
-			if ((length & 2) != 0) {
-				result = (result << 16) + (0xFFFF & Utils.readShort(store, ix));
-				ix += 2;
-			}
-			if ((length & 1) != 0) {
-				result = (result << 8) + (0xFF & store[ix]);
-				ix += 1;
-			}
-			// Sign extend
-			//int shift=64-(length*8);
-			//return (result<<shift)>>shift;
-			return result;
+			return Utils.readLong(store,offset,length);
 		}
 	}
 	

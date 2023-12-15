@@ -206,8 +206,8 @@ public class BlobsTest {
 		Blob bb = Blob.fromHex("cafebabedeadbeef");
 		
 		assertEquals(b.getContentHash(),bb.getContentHash()); // same data hash		
-		assertEquals(b.toExactLong(),bb.toExactLong());
-		assertEquals(0xcafebabedeadbeefl,b.toExactLong());
+		assertEquals(b.longValue(),bb.longValue());
+		assertEquals(0xcafebabedeadbeefl,b.longValue());
 
 		assertEquals(10, b.getHexDigit(1)); // 'a'
 
@@ -230,7 +230,7 @@ public class BlobsTest {
 
 		ObjectsTest.doEqualityTests(b, bb);
 
-		doLongBlobTests(b.toExactLong());
+		doLongBlobTests(b.longValue());
 	}
 	
 	@Test
@@ -254,8 +254,10 @@ public class BlobsTest {
 		assertEquals(fb.hashCode(),b.hashCode());
 		
 		// Test Address conversion
-		if (b.toExactLong()>=0) {
+		if (b.longValue()>=0) {
 			assertEquals(b.toHexString(),Address.create(b).toHexString());
+		} else {
+			assertNull(Address.create(b));
 		}
 		
 		doBlobTests(b);

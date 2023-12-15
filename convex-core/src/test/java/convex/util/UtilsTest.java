@@ -259,13 +259,15 @@ public class UtilsTest {
 	@Test
 	public void testReadWriteLong() {
 		byte[] bs = new byte[20];
-		assertEquals(0, Utils.readLong(bs, 0));
+		assertEquals(0, Utils.readLong(bs, 0,8));
+		assertEquals(0, Utils.readLong(bs, 0,0));
+		assertEquals(0, Utils.readLong(bs, 0,1));
 		long a = 0xffffffffcafebabeL;
 		Utils.writeLong(bs, 0, a);
-		assertEquals(a, Utils.readLong(bs, 0));
+		assertEquals(a, Utils.readLong(bs, 0,8));
 		Utils.writeLong(bs, 4, a);
-		assertEquals(0xffffffffffffffffL, Utils.readLong(bs, 0));
-		assertEquals(0xcafebabe00000000L, Utils.readLong(bs, 8));
+		assertEquals(0xffffffffffffffffL, Utils.readLong(bs, 0,8));
+		assertEquals(0xcafebabe00000000L, Utils.readLong(bs, 8,8));
 	}
 
 	@Test

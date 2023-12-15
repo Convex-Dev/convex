@@ -42,7 +42,7 @@ public class AddressTest {
 	
 	@Test
 	public void testBlobBehaviour() {
-		assertEquals(0L,Address.ZERO.toExactLong());
+		assertEquals(0L,Address.ZERO.longValue());
 		assertEquals(Blobs.createFilled(0, 8),Address.ZERO.toFlatBlob());
 	}
 	

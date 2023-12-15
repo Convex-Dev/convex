@@ -150,7 +150,7 @@ public class ChainAPI extends ABaseAPI {
 		// boolean isLibrary=as.getCallableFunctions().isEmpty();
 		
 		HashMap<String,Object> hm=new HashMap<>();
-		hm.put("address",addr.toExactLong());
+		hm.put("address",addr.longValue());
 		hm.put("allowance",as.getMemory());
 		hm.put("balance",as.getBalance());
 		hm.put("memorySize",as.getMemorySize());

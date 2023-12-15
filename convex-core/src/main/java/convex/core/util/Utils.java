@@ -175,9 +175,9 @@ public class Utils {
 		return result;
 	}
 
-	public static long readLong(byte[] data, int offset) {
+	public static long readLong(byte[] data, int offset, int numBytes) {
 		long result = data[offset];
-		for (int i = 1; i <= 7; i++) {
+		for (int i = 1; i < numBytes; i++) {
 			result = (result << 8) + (data[offset + i] & 0xFF);
 		}
 		return result;

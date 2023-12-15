@@ -115,7 +115,7 @@ public class Init {
 		accts = s.getAccounts();
 
 		// Set up initial user accounts
-		assert(accts.count() == GENESIS_ADDRESS.toExactLong());
+		assert(accts.count() == GENESIS_ADDRESS.longValue());
 		{
 			long userFunds = (long)(supply*0.8); // 80% to user accounts
 			supply -= userFunds;
@@ -128,7 +128,7 @@ public class Init {
 			// One Peer account for each  specified key (including initial genesis user)
 			for (int i = 0; i < keyCount; i++) {
 				Address address = Address.create(accts.count());
-				assert(address.toExactLong() == accts.count());
+				assert(address.longValue() == accts.count());
 				AccountKey key = genesisKeys.get(i);
 				long userBalance = userFunds / (keyCount-i);
 				accts = addAccount(accts, address, key, userBalance);
@@ -250,11 +250,11 @@ public class Init {
 	}
 
 	public static Address calcPeerAddress(int userCount, int index) {
-		return Address.create(GENESIS_ADDRESS.toExactLong() + userCount + index);
+		return Address.create(GENESIS_ADDRESS.longValue() + userCount + index);
 	}
 
 	public static Address calcUserAddress(int index) {
-		return Address.create(GENESIS_ADDRESS.toExactLong() + index);
+		return Address.create(GENESIS_ADDRESS.longValue() + index);
 	}
 
 	// A CVX file contains forms which must be wrapped in a `(do ...)` and deployed as an actor.
@@ -337,14 +337,14 @@ public class Init {
 	}
 
 	private static AVector<AccountStatus> addGovernanceAccount(AVector<AccountStatus> accts, Address a, long balance) {
-		if (accts.count() != a.toExactLong()) throw new Error("Incorrect initialisation address: " + a);
+		if (accts.count() != a.longValue()) throw new Error("Incorrect initialisation address: " + a);
 		AccountStatus as = AccountStatus.createGovernance(balance);
 		accts = accts.conj(as);
 		return accts;
 	}
 
 	private static AVector<AccountStatus> addCoreLibrary(AVector<AccountStatus> accts, Address a) {
-		if (accts.count() != a.toExactLong()) throw new Error("Incorrect core library address: " + a);
+		if (accts.count() != a.longValue()) throw new Error("Incorrect core library address: " + a);
 
 		AccountStatus as = AccountStatus.createActor();
 		as=as.withEnvironment(Core.ENVIRONMENT);
@@ -355,7 +355,7 @@ public class Init {
 
 	private static AVector<AccountStatus> addAccount(AVector<AccountStatus> accts, Address a, AccountKey key,
 			long balance) {
-		if (accts.count() != a.toExactLong()) throw new Error("Incorrect account address: " + a);
+		if (accts.count() != a.longValue()) throw new Error("Incorrect account address: " + a);
 		AccountStatus as = AccountStatus.create(0L, balance, key);
 		as = as.withMemory(Constants.INITIAL_ACCOUNT_ALLOWANCE);
 		accts = accts.conj(as);

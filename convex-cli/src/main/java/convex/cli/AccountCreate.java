@@ -76,7 +76,7 @@ public class AccountCreate implements Runnable {
 			convex = mainParent.connectAsPeer(0);
 
 			Address address = convex.createAccountSync(keyPair.getAccountKey());
-			output.addField("Address", address.toExactLong());
+			output.addField("Address", address.longValue());
 			if (isFund) {
 				convex.transferSync(address, Constants.ACCOUNT_FUND_AMOUNT);
 				convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
