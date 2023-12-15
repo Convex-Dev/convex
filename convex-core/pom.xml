@@ -9,7 +9,7 @@
 	
 	<properties>
 	  <antlr.version>4.13.1</antlr.version>
-	  <bc.version>1.76</bc.version>
+	  <bc.version>1.77</bc.version>
 	</properties>
 
 
@@ -124,7 +124,7 @@
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-text</artifactId>
-			<version>1.10.0</version>
+			<version>1.11.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.pholser</groupId>
