@@ -78,8 +78,9 @@
                         {:code "(check-transfer sender receiver [non-fungible-token-address #{1 4 6}])"}]
           :signature   [{:params [sender receiver [asset-address quantity]]}]}}
   [sender receiver [path quantity]]
+  (or (callable? path 'check-transfer) (return nil))
   (query (call path
-               (check-transfer sender
+       (check-transfer sender
                                receiver
                                quantity))))
 

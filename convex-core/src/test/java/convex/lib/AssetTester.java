@@ -4,6 +4,7 @@ import static convex.core.lang.TestState.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import static convex.test.Assertions.*;
@@ -46,6 +47,7 @@ public class AssetTester {
 		Long BAL=evalL(ctx,"(asset/balance token *address*)");
 		assertEquals(0L, evalL(ctx,"(asset/balance token actor)"));
 		assertTrue(BAL>0,"Should provide a user account with positive balance!");
+		assertNull(eval(ctx,"(asset/check-transfer *address* *address* [token "+BAL+"])"));
 		
 		// New Address gets zero offers
 		{
