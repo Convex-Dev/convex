@@ -383,7 +383,7 @@ public final class CVMLong extends AInteger {
 	public CVMLong mod(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) return null;
+		if (denom==0) throw new IllegalArgumentException("mod by zero");
 		long m = num % denom;
 		if (m<0) m+=Math.abs(denom); // Correct for Euclidean modular function
 		return CVMLong.create(m);
@@ -398,7 +398,7 @@ public final class CVMLong extends AInteger {
 	public CVMLong div(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) return null;
+		if (denom==0) throw new IllegalArgumentException("div by zero");;
 		if (num<0) num-=(denom-1); // Correct for Euclidean modular function
 		long d = num / denom;
 		
@@ -414,7 +414,7 @@ public final class CVMLong extends AInteger {
 	public CVMLong rem(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) return null;
+		if (denom==0) throw new IllegalArgumentException("rem by zero");;
 
 		long r = num % denom;
 		
@@ -430,7 +430,7 @@ public final class CVMLong extends AInteger {
 	public CVMLong quot(CVMLong base) {
 		long num=value;
 		long denom=base.value;
-		if (denom==0) return null;
+		if (denom==0) throw new IllegalArgumentException("quot by zero");;
 		long d = num / denom;
 		// Correct for Euclidean modular function
 		return CVMLong.create(d);

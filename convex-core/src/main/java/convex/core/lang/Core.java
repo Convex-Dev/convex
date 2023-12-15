@@ -58,6 +58,7 @@ import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
 import convex.core.lang.impl.TailcallValue;
+import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -1773,6 +1774,7 @@ public class Core {
 			}
 			
 			ANumeric result = RT.plus(args);
+			if (result==null) return context.withError(Errors.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1790,6 +1792,7 @@ public class Core {
 				if (context.isExceptional()) return context; // not not exceptional, might be something else
 			}
 			ANumeric result = RT.minus(args);
+			if (result==null) return context.withError(Errors.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1807,7 +1810,7 @@ public class Core {
 			}
 
 			ANumeric result = RT.multiply(args);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (result == null) return context.withError(Errors.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1890,9 +1893,9 @@ public class Core {
 			AInteger la=RT.ensureInteger(args[0]);
 			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
+			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
 			AInteger result=la.mod(lb);
-			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1907,9 +1910,9 @@ public class Core {
 			AInteger la=RT.ensureInteger(args[0]);
 			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
+			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
 			AInteger result=la.div(lb);
-			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1924,9 +1927,9 @@ public class Core {
 			AInteger la=RT.ensureInteger(args[0]);
 			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
+			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
 			AInteger result=la.rem(lb);
-			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1941,10 +1944,10 @@ public class Core {
 			AInteger la=RT.ensureInteger(args[0]);
 			AInteger lb=RT.ensureInteger(args[1]);
 			if ((lb==null)||(la==null)) return context.withCastError(Types.INTEGER);
+			if (lb.isZero()) return context.withArgumentError("Divsion by zero in "+name());
 
 			AInteger result=la.quot(lb);
-			if (result==null) return context.withArgumentError("Divsion by zero in "+name());
-
+	
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});

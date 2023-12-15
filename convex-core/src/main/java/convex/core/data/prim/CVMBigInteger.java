@@ -365,7 +365,7 @@ public final class CVMBigInteger extends AInteger {
 	public AInteger mod(AInteger base) {
 		BigInteger divisor=base.big();
 		int signum=divisor.signum();
-		if (signum==0) return null;
+		if (signum==0) throw new IllegalArgumentException("mod by zero");;
 		if (signum<0) divisor=divisor.negate();
 		return AInteger.create(big().mod(divisor));
 	}
@@ -374,7 +374,7 @@ public final class CVMBigInteger extends AInteger {
 	public AInteger rem(AInteger base) {
 		BigInteger divisor=base.big();
 		int signum=divisor.signum();
-		if (signum==0) return null;
+		if (signum==0) throw new IllegalArgumentException("rem by zero");;
 		return AInteger.create(big().remainder(divisor));
 	}
 
@@ -382,7 +382,7 @@ public final class CVMBigInteger extends AInteger {
 	public AInteger div(AInteger base) {
 		BigInteger divisor=base.big();
 		int signum=divisor.signum();
-		if (signum==0) return null;
+		if (signum==0) throw new IllegalArgumentException("div by zero");;
 		// if (signum<0) divisor=divisor.negate();
 		BigInteger d=big().divide(divisor);
 		return AInteger.create(d);
@@ -392,7 +392,7 @@ public final class CVMBigInteger extends AInteger {
 	public AInteger quot(AInteger base) {
 		BigInteger divisor=base.big();
 		int signum=divisor.signum();
-		if (signum==0) return null;
+		if (signum==0) throw new IllegalArgumentException("quot by zero");;
 		// if (signum<0) divisor=divisor.negate();
 		BigInteger d=big().divide(divisor);
 		return AInteger.create(d);

@@ -258,7 +258,7 @@ public class RT {
 	 * Finds the first non-numeric value in an array. Used for error reporting.
 	 * 
 	 * @param args Argument array
-	 * @return First non-numeric value, or null if not found.
+	 * @return First non-numeric value, or -1 if not found.
 	 */
 	public static int findNonNumeric(ACell[] args) {
 		for (int i = 0; i < args.length; i++) {
@@ -300,7 +300,8 @@ public class RT {
 		ANumeric result = RT.ensureNumber(args[0]);
 		if (n==1) return result.negate();
 		for (int i = 1; i < n; i++) {
-			result =result.sub(RT.ensureNumber(args[i]));
+			ANumeric b=RT.ensureNumber(args[i]);
+			result =result.sub(b);
 		}
 		return result;
 	}

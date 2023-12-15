@@ -17,6 +17,8 @@ import convex.core.lang.impl.ErrorValue;
  */
 public class Errors {
 
+
+
 	public static String immutable(Object a) {
 		return "Object is immutable: "+a.getClass();
 	}
@@ -56,5 +58,7 @@ public class Errors {
 	public static ErrorValue nobodyQuery(Address address) {
 		return ErrorValue.create(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
 	}
+	
+	public static ErrorValue INVALID_NUMERIC = ErrorValue.create(ErrorCodes.ARGUMENT,"Invalid numeric result");
 
 }
