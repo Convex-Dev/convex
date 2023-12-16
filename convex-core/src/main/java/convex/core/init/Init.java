@@ -14,6 +14,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
+import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -246,6 +247,7 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust/delegate.cvx");
 		s = doActorDeploy(s, "convex/trust/whitelist.cvx");
 		s = doActorDeploy(s, "convex/trust/monitors.cvx");
+		s = doActorDeploy(s, "convex/governance.cvx");
 		return s;
 	}
 
@@ -265,8 +267,7 @@ public class Init {
 
 		try {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
-			AList<ACell> code=forms.next();
-			
+			AList<ACell> code=forms.drop(1);
 			
 			ctx = ctx.deployActor(code.toCellArray());
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
