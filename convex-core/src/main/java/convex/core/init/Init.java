@@ -14,7 +14,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobMap;
 import convex.core.data.BlobMaps;
-import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
