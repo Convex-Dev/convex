@@ -132,11 +132,12 @@
 	  (or (string? pname) (fail :ARGUMENT "CNS path element must be a string"))  
 	  (or sm (error :STATE "CNS Node key not valid"))
 	  (if-let [rec (get sm sym)]
-    	(do ;; This is an existing record, so check record controller
-    		(or (trust/trusted? (get rec 1) *caller* :update) (fail :TRUST "No permission to update CNS record"))
-    		(set-in! cns-database [*scope* pname] [addr cont meta]))
-    	(do ;; This is a new record, so check create permission TODO use per-node monitor?
-    	    (or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS record"))
-    		)
-	  )))
+    	;; This is an existing record, so check record controller
+    	(or (trust/trusted? (get rec 1) *caller* :update) (fail :TRUST "No permission to update CNS record"))
+    	;; This is a new record, so check create permission TODO use per-node monitor?
+    	(or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS record")))
+    		
+      ;; update record since at this point all required checks have passed
+	  (set-in! cns-database [*scope* pname] [addr cont meta])
+	  ))
 
