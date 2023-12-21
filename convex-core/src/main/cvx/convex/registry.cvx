@@ -49,13 +49,19 @@
 
 ;;;;;;;;;;;;;; Convex Name System root
 
+;; Map of `node key` -> `segment symbol` -> `[path trust-monitor meta]`
+;; Node key is implementation defined in general, but for main rgistry uses:
+;;    nil for CNS root
+;;    vector of segment strings for child paths
 (def cns-database
 		  ^{:private? true}
-		  ;; Map of `node key` -> `segment symbol` -> `[path trust-monitor meta]`
-		  ;; Node key is implementation defined in general, but for main rgistry uses::
-		  ;;    nil for CNS root
-		  ;;    vector of segment strings for child paths
+		  
 		  {})
+
+;; Controllers for each CNS node managed under this actor
+;; Default root is controlled by INIT account
+(def cns-owners 
+  {[] #1})
 
 
 (defn cns-control
@@ -111,8 +117,26 @@
 (defn cns-read
 	^{:callable? true
 	  :doc {:description "Reads a CNS record from this Actor (as a CNS node). Assumes a record key passed in *scope*."
-			:examples    [{:code "(call [*registry* [\"convex\"]] (cns-read))"}]
+			:examples    [{:code "(call [cns-node cns-key] (cns-read \\\"my-name\\\"))"}]
 			:signature   [{:params [sym]}]}}
-	[sym]
-	())
+	[pname]
+	(get-in cns-database [*scope* pname]))
+
+(defn cns-write
+	^{:callable? true
+	  :doc {:description "Writes a CNS record from this Actor (as a CNS node). Assumes a record key passed in *scope*."
+	  :examples    [{:code "(call [cns-node cns-key] (cns-write \"my-name\" new-record))"}]
+						:signature   [{:params [sym]}]}}
+	[pname addr cont meta]
+    (let [sm (get cns-database *scope*)]
+	  (or (string? pname) (fail :ARGUMENT "CNS path element must be a string"))  
+	  (or sm (error :STATE "CNS Node key not valid"))
+	  (if-let [rec (get sm sym)]
+    	(do ;; This is an existing record, so check record controller
+    		(or (trust/trusted? (get rec 1) *caller* :update) (fail :TRUST "No permission to update CNS record"))
+    		(set-in! cns-database [*scope* pname] [addr cont meta]))
+    	(do ;; This is a new record, so check create permission TODO use per-node monitor?
+    	    (or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS record"))
+    		)
+	  )))
 
