@@ -2,6 +2,7 @@ package convex.lib;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
@@ -37,10 +38,13 @@ public class CNSTest extends ACVMTest {
 			assertEquals(eval("[#1 #1 nil]"), eval("(*registry*/read 'init)"));
 		}
 		
-		@Test public void testCreateFromTop() {
+		@Test public void testCreateNestedFromTop() {
 			Context ctx=context().forkWithAddress(Init.INIT_ADDRESS);
 			ctx=(step(ctx,"(*registry*/create 'foo.bar.bax #17)"));
 			assertNotError(ctx);
+			
+			assertEquals(Address.create(17),eval(ctx,"(*registry*/resolve 'foo.bar.bax)"));
+			assertNull(eval(ctx,"(*registry*/resolve 'foo.null.boo)"));
 		}
 		
 		@Test public void testCreateTopLevel() {

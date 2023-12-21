@@ -134,7 +134,18 @@
 		 ))
 	  )
 	)
+	sym
 	))
+
+(def update create)
+
+(defn control
+  [sym cont]
+  (if-let [rec (read sym)]
+    (let [[v c m] rec]
+      (update sym v cont m))
+    (fail :STATE "CNS record does not exist")))
+
 
 (defn change-control
 	^{:callable? true

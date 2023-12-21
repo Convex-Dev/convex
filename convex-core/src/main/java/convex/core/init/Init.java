@@ -201,6 +201,8 @@ public class Init {
 			State s=createBaseState(genesisKeys);
 			s = addStandardLibraries(s);
 			s = addTestingCurrencies(s);
+			
+			s = addCNSTree(s);
 
 			// Final funds check
 			long finalTotal = s.computeTotalFunds();
@@ -247,6 +249,27 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust/whitelist.cvx");
 		s = doActorDeploy(s, "convex/trust/monitors.cvx");
 		s = doActorDeploy(s, "convex/governance.cvx");
+		return s;
+	}
+	
+	private static State addCNSTree(State s) {
+		Context ctx=Context.createFake(s, INIT_ADDRESS);
+		ctx=ctx.eval(Reader.read("(do (*registry*/create 'user.init))"));
+		ctx.getResult();
+
+		
+		ctx=ctx.eval(Reader.read("(import convex.trust.monitors :as mon)"));
+		ctx.getResult();
+		
+		ctx=ctx.eval(Reader.read("(def tmon (mon/permit-actions :create))"));
+		ctx.getResult();
+
+
+		ctx=ctx.eval(Reader.read("(do ("+TRUST_ADDRESS+"/change-control [*registry* [\"user\"]] tmon))"));
+		ctx.getResult();
+
+		
+		s=ctx.getState();
 		return s;
 	}
 
