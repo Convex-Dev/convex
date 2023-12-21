@@ -10,6 +10,8 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
 
+import static convex.test.Assertions.*;
+
 public class CNSTest extends ACVMTest {
 		
 		Address REG=Init.REGISTRY_ADDRESS;
@@ -22,7 +24,7 @@ public class CNSTest extends ACVMTest {
 			return ctx;
 		}
 		
-		@Test public void testspecial() {
+		@Test public void testSpecial() {
 			assertEquals(REG,eval("*registry*"));
 		}
 
@@ -34,5 +36,26 @@ public class CNSTest extends ACVMTest {
 		}
 		
 
+		@Test public void testCreateTopLevel() {
+			// HERO shouldn't be able to create a top level CNS entry
+			assertTrustError(step("(*registry*/create 'foo)"));
+			
+			// INIT should be able to create a top level CNS entry
+			Context ictx=context().forkWithAddress(Init.INIT_ADDRESS);
+			ictx=(step(ictx,"(*registry*/create 'foo #17)"));
+			assertNotError(ictx);
+			
+			System.out.println(eval(ictx,"*registry*/cns-database"));
+			
+			assertEquals(Address.create(17),eval(ictx,"(*registry*/resolve 'foo)"));
+			
+			ictx=(step(ictx,"(*registry*/create 'foo #666)"));
+			assertEquals(Address.create(666),eval(ictx,"(*registry*/resolve 'foo)"));
+
+			// HERO still shouldn't be able to update a top level CNS entry
+			ictx=ictx.forkWithAddress(HERO);
+			assertTrustError(step(ictx,"(*registry*/create 'foo *address* *address* {})"));
+
+		}
 
 	}
