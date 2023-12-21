@@ -128,9 +128,9 @@
 				(recur (inc i) (first rec))	
 				
 				;; need to construct a new CNS node
-				(let [] 
+				(let [nref (call ref (cns-create-node pname cont))] 
 				   (call ref (cns-write pname nref cont nil) )
-				   (recur (inc i) (call ref (cns-read pname)))))
+				   (recur (inc i) nref)))
 		 ))
 	  )
 	)
@@ -199,6 +199,19 @@
          (assoc cns-database
                 path
                 [addr monitor meta])))))
+
+(defn cns-create-node
+	^{:callable? true
+	  :doc {:description "Creates a child CNS node."
+			:examples    [{:code "(call [cns-node cns-key] (cns-create-node \\\"child-name\\\"))"}]
+			:signature   [{:params [sym]}]}}
+	[pname owner]
+	(or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS node"))
+	(let [path (conj *scope* pname)]
+	  (if (get cns-database path) (fail :STATE "CNS node already exists"))
+	  (set-in! cns-owners [path] owner)
+	  (set-in! cns-database [path] {})
+	  [~*address* path]))
 
 (defn cns-read
 	^{:callable? true

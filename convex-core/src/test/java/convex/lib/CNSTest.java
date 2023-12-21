@@ -37,13 +37,19 @@ public class CNSTest extends ACVMTest {
 			assertEquals(eval("[#1 #1 nil]"), eval("(*registry*/read 'init)"));
 		}
 		
-
+		@Test public void testCreateFromTop() {
+			Context ctx=context().forkWithAddress(Init.INIT_ADDRESS);
+			ctx=(step(ctx,"(*registry*/create 'foo.bar.bax #17)"));
+			assertNotError(ctx);
+		}
+		
 		@Test public void testCreateTopLevel() {
 			// HERO shouldn't be able to create a top level CNS entry
 			assertTrustError(step("(*registry*/create 'foo)"));
 			
 			// INIT should be able to create a top level CNS entry
 			Context ictx=context().forkWithAddress(Init.INIT_ADDRESS);
+			ictx=step(ictx,"(import convex.trust :as trust)");
 			ictx=(step(ictx,"(*registry*/create 'foo #17)"));
 			assertNotError(ictx);
 			ictx=step(ictx,"(def ref [*registry* [\"foo\"]])");
@@ -62,8 +68,6 @@ public class CNSTest extends ACVMTest {
 			assertTrustError(step(ictx,"(*registry*/create 'foo *address* *address* {})"));
 			assertTrustError(step(ictx,"(trust/change-control "+ref+" *address*)"));
 
-			ictx=ictx.forkWithAddress(Init.INIT_ADDRESS);
-			ictx=(step(ictx,"(trust/change-control ref "+HERO+")"));
 		}
 
 	}

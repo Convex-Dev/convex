@@ -36,6 +36,9 @@
 (defn all [arg & more]
   [~*address* [:all (apply vector arg more)]])
 
+(defn everyone []
+  [~*address* [:all []]])
+
 (defn before [end]
   [~*address* [:time [*timestamp* (int end)]]])
 
