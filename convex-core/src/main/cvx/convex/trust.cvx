@@ -50,20 +50,27 @@
              nil))
 
   ([monitor subject action object]
-   (if (callable? monitor 'check-trusted? ) 
-     ;; SECURITY note: query here is protection against potential re-entrancy attacks.
-     (query (call monitor
+   (cond
+     ;; General case: call into check-trusted? function if it exists
+	 (callable? monitor 'check-trusted? 
+			 ) 
+       ;; SECURITY note: query here is protection against potential re-entrancy attacks.
+       (query (call monitor
                   (check-trusted? subject
                                   action
                                   object)))
-     (= (address monitor)
-        subject))))
+  	 
+     ;; Basic case:	check for address equality  
+  	 (address? monitor) 
+  	   (= monitor subject)
+   
+     false)))
 
 
 ;;;;;;;;;; Control of Actor / scope
 
 (defn change-control
-   ^{:doc {:description ["Sets a controller for an entity (possibly scoped). Controller may be any trust monitor. Typically requires turst from the existing controller, for an action of :control."]
+   ^{:doc {:description ["Sets a controller for an entity (possibly scoped). Controller may be any trust monitor. Typically requires trust from the existing controller, for an action of :control."]
           :examples    [{:code "(set-control my-asset *address*)"}]
           :signature   [{:params [path controller]}]}}
   [path controller]

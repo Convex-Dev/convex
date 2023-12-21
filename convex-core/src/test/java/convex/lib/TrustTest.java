@@ -48,11 +48,15 @@ public class TrustTest extends ACVMTest {
 	public void testSelfTrust() {
 		Context ctx = CONTEXT.fork();
 
+		// A non-callable address trusts itself only
 		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* nil)"));
+		assertFalse(evalB(ctx, "(trust/trusted? *address* #456756)"));
 		assertFalse(evalB(ctx, "(trust/trusted? *address* :foo)"));
-		assertFalse(evalB(ctx,
-				"(trust/trusted? *address* (address 666666))"));
+		
+		// A nil trust monitor reference always fails
+		assertFalse(evalB(ctx, "(trust/trusted? nil *address*)"));
+		
 	}
 
 	@Test
