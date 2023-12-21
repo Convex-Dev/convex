@@ -21,20 +21,12 @@
 
 ;;;;;;;;;; Values
 
-(def cns-database
-  ^{:private? true}
-  ;; Map of `node key` -> `segment symbol` -> `[path trust-monitor meta]`
-  ;; Node key is implementation defined in general, but for main rgistry uses::
-  ;;    nil for CNS root
-  ;;    vector of segment strings for child paths
-  {})
-
 (def trust
   ^{:private? true}
   ;; Address of the `convex.trust`, it is deployed right after this account, hence it is predictable.
   (address (inc (long *address*))))
 
-;;;;;;;;;; Address metadata
+;;;;;;;;;; Address metadata registry
 
 
 (defn lookup
@@ -55,6 +47,16 @@
   (set-holding *caller*
                data))
 
+;;;;;;;;;;;;;; Convex Name System root
+
+(def cns-database
+		  ^{:private? true}
+		  ;; Map of `node key` -> `segment symbol` -> `[path trust-monitor meta]`
+		  ;; Node key is implementation defined in general, but for main rgistry uses::
+		  ;;    nil for CNS root
+		  ;;    vector of segment strings for child paths
+		  {})
+
 
 (defn cns-control
   ^{:callable? true
@@ -62,6 +64,8 @@
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
   [sym addr]
+  (when-not (symbol? sym)
+			  (fail :ARGUMENT "CNS names must be a valid symbol"))
   (let [path (split (name sym) \.)
         record (get cns-database path)]
     (when (nil? record)
