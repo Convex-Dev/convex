@@ -1,9 +1,11 @@
 package convex.lib;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.init.Init;
 import convex.core.lang.ACVMTest;
@@ -44,6 +46,9 @@ public class CNSTest extends ACVMTest {
 			Context ictx=context().forkWithAddress(Init.INIT_ADDRESS);
 			ictx=(step(ictx,"(*registry*/create 'foo #17)"));
 			assertNotError(ictx);
+			ictx=step(ictx,"(def ref [*registry* [\"foo\"]])");
+			AVector<?> ref=ictx.getResult();
+			assertNotNull(ref);
 			
 			// System.out.println(eval(ictx,"*registry*/cns-database"));
 			
@@ -55,7 +60,10 @@ public class CNSTest extends ACVMTest {
 			// HERO still shouldn't be able to update a top level CNS entry
 			ictx=ictx.forkWithAddress(HERO);
 			assertTrustError(step(ictx,"(*registry*/create 'foo *address* *address* {})"));
+			assertTrustError(step(ictx,"(trust/change-control "+ref+" *address*)"));
 
+			ictx=ictx.forkWithAddress(Init.INIT_ADDRESS);
+			ictx=(step(ictx,"(trust/change-control ref "+HERO+")"));
 		}
 
 	}

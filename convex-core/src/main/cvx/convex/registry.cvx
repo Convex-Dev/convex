@@ -63,6 +63,10 @@
 
 ;; Controllers for each CNS node managed under this actor
 ;; Default root is controlled by INIT account
+;; Checked for permissions:
+;;   :control - change CNS node ownership
+;;   :create  - create new CNS entry in this node (child path segment as object)
+;;   :delete  - delete CNS entry in this node     (child path segment as object)
 (def cns-owners 
   {[] #1})
 
@@ -124,7 +128,7 @@
 				(recur (inc i) (first rec))	
 				
 				;; need to construct a new CNS node
-				(let [nref [~*address* (slice path 0 (inc i))]] 
+				(let [] 
 				   (call ref (cns-write pname nref cont nil) )
 				   (recur (inc i) (call ref (cns-read pname)))))
 		 ))
@@ -132,6 +136,18 @@
 	)
 	))
 
+(defn change-control
+	^{:callable? true
+	  :doc {:description "Changes controller for a CNS node."
+			                :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
+			                :signature   [{:params [name addr]}]}}
+  [cont]
+  (let [owners cns-owners
+        own (get owners *scope*)]
+    (if 
+      (trust/trusted? own *caller* :control)
+      (set! cns-owners (assoc owners *scope* cont))
+      (fail :TRUST "No control right for CNS node"))))
 
 
 (defn cns-control
@@ -139,7 +155,7 @@
     :doc       {:description "Updates a CNS name mapping to set a new controller. May only be performed by a current controller."
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
-  [sym addr]
+  [sym controller]
   (when-not (symbol? sym)
 			  (fail :ARGUMENT "CNS names must be a valid symbol"))
   (let [path (split (name sym) \.)
@@ -148,7 +164,7 @@
       (fail :STATE "CNS record does not exist"))
     (when (not (trust/trusted? (second record) *caller* :control))
       (fail :TRUST "Caller is not trusted with transferring control for that CNS record"))
-    (set-in! cns-database [path 1] addr)))
+    (set-in! cns-database [path 1] controller)))
 
 (defn cns-resolve
   ^{:callable? true
