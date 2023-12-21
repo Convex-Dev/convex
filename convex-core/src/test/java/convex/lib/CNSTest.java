@@ -45,7 +45,7 @@ public class CNSTest extends ACVMTest {
 			ictx=(step(ictx,"(*registry*/create 'foo #17)"));
 			assertNotError(ictx);
 			
-			System.out.println(eval(ictx,"*registry*/cns-database"));
+			// System.out.println(eval(ictx,"*registry*/cns-database"));
 			
 			assertEquals(Address.create(17),eval(ictx,"(*registry*/resolve 'foo)"));
 			
