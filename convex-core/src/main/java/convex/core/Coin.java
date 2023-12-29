@@ -2,6 +2,9 @@ package convex.core;
 
 /**
  * Static Constants for Coin sizes and total supply
+ * 
+ * These denominations are intended to provide more sensible human-scale units for better understanding.
+ * They have no effect on CVM behaviour.
  */
 public class Coin {
 	/**
@@ -22,7 +25,7 @@ public class Coin {
 	/**
 	 * A denomination suitable for medium/large payments. Equal to 1000 Silver, and divisible into one billion copper coins.
 	 * 
-	 * Intended as the primary "human scale" quanity of Convex Coins in regular usage.
+	 * Intended as the primary "human scale" quantity of Convex Coins in regular usage.
 	 */
 	public static final long GOLD=1000*SILVER;
 	
