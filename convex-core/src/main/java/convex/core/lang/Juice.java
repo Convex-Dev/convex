@@ -23,9 +23,16 @@ public class Juice {
 	public static final long TRANSACTION = 500L;
 	
 	/**
+	 * UNDER CONSIDERATION, PROBABLY WON'T BE NEEDED
+	 * Juice cost per byte of transaction size executed, added to consumed juice
+	 */
+	// public static final long TX_PER_BYTE = 5L;
+
+	
+	/**
 	 * Base Juice cost for any sub transaction executed, added to consumed juice
 	 */
-	public static final long SUB_TRANSACTION = 50L;
+	public static final long SUB_TRANSACTION = 100L;
 	
 	/**
 	 * Juice required to resolve a constant value
@@ -500,8 +507,6 @@ public class Juice {
 		long limit = (balance/juicePrice)-Juice.TRANSACTION;
 		return Math.max(0, limit);
 	}
-
-
 
 
 }

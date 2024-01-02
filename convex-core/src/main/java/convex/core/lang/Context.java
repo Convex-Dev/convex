@@ -310,6 +310,7 @@ public class Context {
 	 * <li>Accumulates used juice fees in globals</li>
 	 * <li>Increments sequence number</li>
 	 * </ul>
+	 * @param t 
 	 *
 	 * @param initialState State before transaction execution (after prepare)
 	 * @param juicePrice Juice price of current execution
@@ -320,10 +321,11 @@ public class Context {
 		State state=getState();
 		long executionJuice=this.juice;
 
-		// TODO: Extra juice for transaction size??
+		// Base fixed juice cost per transaction
 		long trxJuice=Juice.TRANSACTION;
 		
 		long totalJuice=executionJuice+trxJuice;
+		
 		long juiceFees=Juice.addMul(0,totalJuice,juicePrice);
 
 		// compute memory delta
