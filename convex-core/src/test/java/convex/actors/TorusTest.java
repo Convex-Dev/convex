@@ -44,7 +44,7 @@ public class TorusTest extends ACVMTest {
 			//System.out.println("Torus deployed Address = "+TORUS);
 
 			// Deploy USD market. No market for GBP yet!
-			ctx= exec(ctx,"(call TORUS (create-market USD))");
+			ctx= exec(ctx,"(def USDM (call TORUS (create-market USD)))");
 			USD_MARKET=(Address)ctx.getResult();
 			
 			return ctx;
@@ -258,6 +258,24 @@ public class TorusTest extends ACVMTest {
 		assertNotNull(USD);
 		assertNotNull(GBP);
 		assertNotNull(USD_MARKET);
+	}
+	
+	public static void main(String[] args) {
+		TorusTest t=new TorusTest();
+		
+		t.doAnalysis();
+	}
+
+
+	private void doAnalysis() {
+		Context ctx=step(context(),"(torus/add-liquidity USD 10000000 1000000000000)");
+		
+		StringBuilder sb=new StringBuilder();
+		sb.append("Torus Juice Costs:\n");
+		sb.append(" - Price       "+juice(ctx,"(torus/price GBP)")+"\n");
+		sb.append(" - Transfer     "+juice(ctx,"(asset/transfer #1 [USD 10])")+"\n");
+		sb.append(" - Swap        "+juice(ctx,"(call USDM *balance* (buy-tokens 10))")+"\n");
+		System.out.println(sb.toString());
 	}
 
 }
