@@ -225,19 +225,32 @@ public class BIP39 {
 		joined=Normalizer.normalize(joined, Normalizer.Form.NFKD);		
 		char[] pass= joined.toCharArray(); 
 		
+		return getSeedInternal(pass,passphrase);
+	}
+	
+	public static Blob getSeed(String mnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
+		mnemonic=mnemonic.trim().replaceAll("\\s+"," ");
+		mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
+		char[] normalisedMnemonic= mnemonic.toCharArray(); 
+		return getSeedInternal(normalisedMnemonic,passphrase);
+	}
+	
+	private static Blob getSeedInternal(char[] normalisedMnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		// Normalise passphrase and convert to byte array
 		passphrase=Normalizer.normalize(passphrase, Normalizer.Form.NFKD);	
 		byte[] salt = ("mnemonic"+passphrase).getBytes(StandardCharsets.UTF_8);
 		
 		// Generate seed
 		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
-		KeySpec keyspec = new PBEKeySpec(pass, salt, 2048, SEED_LENGTH * 8);
+		KeySpec keyspec = new PBEKeySpec(normalisedMnemonic, salt, 2048, SEED_LENGTH * 8);
 	    Key key = factory.generateSecret(keyspec);
 	    
 	    // Wrap result as Blob
 	    byte[] bs = key.getEncoded();
 	    return Blob.wrap(bs);
 	}
+
+
 
 	public static String createSecureRandom() {
 		return createSecureRandom(12);
