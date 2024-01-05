@@ -159,7 +159,7 @@ public class KeyGenPanel extends JPanel {
 			actionPanel.add(btnNormalise);
 			btnNormalise.addActionListener(e -> { 
 				String s=mnemonicArea.getText();
-				mnemonicArea.setText(BIP39.normalise(s));
+				mnemonicArea.setText(BIP39.normaliseSpaces(s));
 				updateMnemonic();
 			});
 		}

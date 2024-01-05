@@ -229,7 +229,7 @@ public class BIP39 {
 	}
 	
 	public static Blob getSeed(String mnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
-		mnemonic=mnemonic.trim().replaceAll("\\s+"," ");
+		mnemonic=normaliseSpaces(mnemonic);
 		mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
 		char[] normalisedMnemonic= mnemonic.toCharArray(); 
 		return getSeedInternal(normalisedMnemonic,passphrase);
@@ -287,8 +287,9 @@ public class BIP39 {
 		return al;
 	}
 
-	public static String normalise(String s) {
-		return  Utils.joinStrings(getWords(s)," ");
+	public static String normaliseSpaces(String s) {
+		s=s.trim().replaceAll("\\s+"," ");
+		return s;
 	}
 	
 }
