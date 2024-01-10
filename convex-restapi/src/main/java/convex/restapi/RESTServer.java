@@ -120,15 +120,15 @@ public class RESTServer {
 	}
 
 	public void start() {
-		try {
-			app.start();
-		} catch (JavalinBindException e) {
-			log.warn("Unable to start REST Server: port already in use");
-		}
+		app.start();
 	}
 
-	public void start(int port) {
-		app.start(port);
+	public void start(Integer port) {
+		if (port==null) {
+			app.start();
+		} else {
+			app.start(port);
+		}
 	}
 
 	public void stop() {

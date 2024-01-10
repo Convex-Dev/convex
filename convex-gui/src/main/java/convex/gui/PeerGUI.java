@@ -170,7 +170,7 @@ public class PeerGUI extends JPanel {
 				restServer=RESTServer.create(first);
 				restServer.start();
 			} catch (Exception t) {
-				log.warn("Unable to start REST Server:",t);
+				log.warn("Unable to start REST Server: ",t);
 			}
 
 		});
