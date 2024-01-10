@@ -5,10 +5,7 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
-import convex.cli.peer.Session;
-import convex.cli.peer.SessionItem;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
 
@@ -53,49 +50,7 @@ public class Helpers {
 		}
 	}
 
-	/**
-	 * Return a random session hostname, by looking at the session file.
-	 * The session file has a list of local peers open.
-	 * This helper will find a random peer in the collection and returns hostname.
-	 *
-	 * @param sessionFilename Session filename to open and get the random port nummber.
-	 *
-	 * @return A random hostname or null if none can be found
-	 * @throws IOException If IO error occurs
-	 *
-	 */
-	public static SessionItem getSessionItem(String sessionFilename) throws IOException {
-		return getSessionItem(sessionFilename, -1);
-	}
 
-	/**
-	 * Return an indexed session item, by looking at the session file.
-	 * The session file has a list of local peers open.
-	 * This helper will find a random peer in the collection and returns session item.
-	 *
-	 * @param sessionFilename Session filename to open and get the random port nummber.
-	 *
-	 * @param index The index of the peer in the session list or if -1 a random selection is made.
-	 *
-	 * @return A random session item or null if none can be found
-	 * @throws IOException
-	 *
-	 */
-	public static SessionItem getSessionItem(String sessionFilename, int index) throws IOException {
-		SessionItem item = null;
-        Session session = new Session();
-		Random random = new Random();
-		File sessionFile = new File(sessionFilename);
-		session.load(sessionFile);
-		int sessionCount = session.getSize();
-		if (sessionCount > 0) {
-			if (index < 0) {
-				index = random.nextInt(sessionCount - 1);
-			}
-			item = session.getItemFromIndex(index);
-		}
-		return item;
-	}
 
 	/**
 	 * Split a parameter list by ','. 

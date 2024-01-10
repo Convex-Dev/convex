@@ -27,7 +27,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Get account balance.")
 public class AccountBalance implements Runnable {
 	private static final Logger log = LoggerFactory.getLogger(AccountBalance.class);
-
+ 
 	@ParentCommand
 	private Account accountParent;
 
@@ -43,7 +43,7 @@ public class AccountBalance implements Runnable {
 
 	@Parameters(paramLabel="address",
 	description="Address of the account to get the balance .")
-	private long addressNumber;
+	private Long addressNumber;
 
 	@Option(names={"-t", "--timeout"},
 		description="Timeout in miliseconds.")
@@ -52,7 +52,6 @@ public class AccountBalance implements Runnable {
 
 	@Override
 	public void run() {
-
 		Main mainParent = accountParent.mainParent;
 
 		if (addressNumber == 0) {
@@ -63,7 +62,7 @@ public class AccountBalance implements Runnable {
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
 
-		convex = mainParent.connectToSessionPeer(hostname, port, address, null);
+		convex = mainParent.connect();
 		String queryCommand = "(balance "+address+")";
 		ACell message = Reader.read(queryCommand);
 		

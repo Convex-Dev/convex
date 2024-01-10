@@ -1,18 +1,11 @@
 package convex.cli;
 
-import java.io.File;
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.cli.peer.PeerManager;
-import convex.cli.peer.SessionItem;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
-import etch.EtchStore;
+import convex.core.exceptions.TODOException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
@@ -70,7 +63,6 @@ public class PeerStart implements Runnable {
 	public void run() {
 
 		Main mainParent = peerParent.mainParent;
-		PeerManager peerManager = null;
 
 		AKeyPair keyPair = null;
 		if (keystorePublicKey!=null) {
@@ -95,40 +87,18 @@ public class PeerStart implements Runnable {
 		Address peerAddress = Address.create(addressNumber);
 
 		if (remotePeerHostname == null) {
-			try {
-				SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
-				if (item != null) {
-					remotePeerHostname = item.getHostname();
-				}
-				else {
-					log.warn("Cannot find a local peer to connect too");
-					return;
-				}
-			} catch (IOException e) {
-				log.warn("Cannot load the session control file");
-				return;
-			}
+
 		}
 		else {
 			remotePeerHostname = remotePeerHostname.strip();
 		}
 
 		try {
-			AStore store = null;
-			String etchStoreFilename = mainParent.getEtchStoreFilename();
-			if (etchStoreFilename != null && !etchStoreFilename.isEmpty()) {
-				File etchFile = new File(etchStoreFilename);
-				if (isReset && etchFile.exists()) {
-					log.info("reset: removing old etch storage file {}", etchStoreFilename);
-					etchFile.delete();
-				}
-				store = EtchStore.create(etchFile);
-			} else {
-				store = Stores.getGlobalStore();
-			}
-			peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
-			peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
-			peerManager.showPeerEvents();
+
+			throw new TODOException();
+			// peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
+			// peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
+			// peerManager.showPeerEvents();
 		} catch (Throwable t) {
 			throw new CLIError("Error starting peer",t);
 		}

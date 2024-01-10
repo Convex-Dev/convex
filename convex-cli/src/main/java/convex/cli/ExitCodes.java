@@ -1,5 +1,7 @@
 package convex.cli;
 
+import picocli.CommandLine;
+
 /**
  * Exit codes
  * 
@@ -7,17 +9,22 @@ package convex.cli;
  */
 public class ExitCodes {
 	/**
-	 * Exit code for success
+	 * Exit code for success (0)
 	 */
-	public static final int SUCCESS=0;
+	public static final int SUCCESS=CommandLine.ExitCode.OK;
 	
 	/**
-	 * General catch-all error
+	 * General catch-all error, probably IO
 	 */
 	public static final int ERROR=1;
+	
+	/**
+	 * Usage error (2 according to standard bash / linux conventions)
+	 */
+	public static final int USAGE=CommandLine.ExitCode.USAGE;
 
 	/**
-	 * Fatal exception
+	 * Fatal uncaught exception, should be reported as bug
 	 */
 	public static final int FATAL = 13;
 

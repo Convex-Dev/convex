@@ -1,5 +1,8 @@
 package convex.cli;
 
+import java.io.IOException;
+import java.util.concurrent.TimeoutException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,17 +64,19 @@ public class AccountInformation implements Runnable {
 			return;
 		}
 
-		Convex convex = null;
+		Convex convex = mainParent.connect();
 		Address address = Address.create(addressNumber);
-			convex = mainParent.connectToSessionPeer(hostname, port, address, null);
-            String queryCommand = String.format("(account #%d)", address.longValue());
-			ACell message = Reader.read(queryCommand);
-			Result result;
-			try {
-				result = convex.querySync(message, timeout);
-				mainParent.printResult(result);
-			} catch (Exception e) {
-				throw new CLIError("Timeout executong transaction",e);
-			}
+        String queryCommand = String.format("(account #%d)", address.longValue());
+		ACell message = Reader.read(queryCommand);
+		Result result;
+		try {
+			result = convex.querySync(message, timeout);
+			mainParent.printResult(result);
+		} catch (TimeoutException e) {
+			throw new CLIError("Timeout",e);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			throw new CLIError("IO Exception while requesting account info: ",e);
+		}
 	}
 }

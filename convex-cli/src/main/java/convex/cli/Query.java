@@ -57,19 +57,19 @@ public class Query implements Runnable {
 	@Override
 	public void run() {
 		// sub command run with no command provided
-		log.info("query command: {}", queryCommand);
+		log.debug("query command: {}", queryCommand);
 
-		Convex convex = null;
-
-		convex = mainParent.connectToSessionPeer(hostname, port, Address.create(address), null);
+		Convex convex =  mainParent.connect();
 
 		try {
 			log.info("Executing query: %s\n", queryCommand);
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
 			mainParent.printResult(result);
-		} catch (IOException | TimeoutException e) {
-			throw new CLIError("Error executing query",e);
+		} catch (IOException e) {
+			throw new CLIError("IO Error executing query",e);
+		} catch (TimeoutException e) {
+			throw new CLIError("Query timed out");
 		}
 	}
 

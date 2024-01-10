@@ -1,6 +1,5 @@
 package convex.cli;
 
-import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -8,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.output.RecordOutput;
-import convex.cli.peer.SessionItem;
 import convex.core.Result;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -51,21 +49,7 @@ public class Status implements Runnable {
 	@Override
 	public void run() {
 
-		if (port == 0) {
-			try {
-                SessionItem item = Helpers.getSessionItem(mainParent.getSessionFilename());
-				port = item.getPort();
-			} catch (IOException e) {
-				log.warn("Cannot load the session control file");
-			}
-		}
-		if (port == 0) {
-			log.warn("Cannot find a local port or you have not set a valid port number");
-			return;
-		}
-
-		Convex convex = null;
-		convex = mainParent.connectAsPeer(0);
+		Convex convex = mainParent.connect();
 
 		try {
 			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);

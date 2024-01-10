@@ -63,9 +63,6 @@ public class AccountFund implements Runnable {
 
 		Main mainParent = accountParent.mainParent;
 
-		AKeyPair keyPair = null;
-		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
-
 
 		if (addressNumber == 0) {
 			log.warn("--address. You need to provide a valid address number");
@@ -75,9 +72,8 @@ public class AccountFund implements Runnable {
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
 		try {
-			convex = mainParent.connectAsPeer(0);
+			convex = mainParent.connect();
 			convex.transferSync(address, amount);
-			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			Long balance = convex.getBalance(address);
 			mainParent.println(balance);
 		} catch (Throwable t) {

@@ -1,15 +1,20 @@
 package convex.cli;
 
-import java.lang.NumberFormatException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-
-import convex.cli.peer.PeerManager;
-import convex.core.crypto.AKeyPair;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import convex.core.State;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
+import convex.core.init.Init;
+import convex.peer.API;
+import convex.peer.Server;
+import convex.restapi.RESTServer;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -93,7 +98,6 @@ public class LocalStart implements Runnable {
 	@Override
 	public void run() {
 		Main mainParent = localParent.mainParent;
-		PeerManager peerManager = PeerManager.create(mainParent.getSessionFilename());
 
 		List<AKeyPair> keyPairList = getPublicKeys(count);
 
@@ -111,13 +115,25 @@ public class LocalStart implements Runnable {
 			}
 		}
 		log.info("Starting local network with "+count+" peer(s)");
-		peerManager.launchLocalPeers(keyPairList, peerPorts);
-		log.info("Local Peers launched");
+		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
+		int n=servers.size();
+		log.info("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
 		if (apiPort > 0) {
-			log.info("Starting api on port "+apiPort);
-			peerManager.launchRestAPI(apiPort);
+			log.info("Starting REST api on port "+apiPort);
+			
 		}
-		peerManager.showPeerEvents();
+		launchRestAPI(servers.get(0));
+	}
+	
+	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) {
+		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
+		State genesisState=Init.createState(keyList);
+		return API.launchLocalPeers(keyPairList,genesisState, peerPorts);
+	}
+	
+	public void launchRestAPI(Server server) {
+		RESTServer restServer=RESTServer.create(server);
+		restServer.start();
 	}
 }

@@ -66,18 +66,11 @@ public class Transaction implements Runnable {
 
 	@Override
 	public void run() {
-		AKeyPair keyPair = null;
-		keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
 
-		if (addressNumber == 0) {
-			log.warn("--address. You need to provide a valid address number");
-			return;
-		}
-		Address address = Address.create(addressNumber);
-
-		Convex convex = null;
+		Convex convex = mainParent.connect();
+		Address address=convex.getAddress();
+		AKeyPair keyPair = convex.getKeyPair();
 		try {
-			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			
 			// If we don't already have keypair specified, attempt to find
 			// correct key pair for address from the network

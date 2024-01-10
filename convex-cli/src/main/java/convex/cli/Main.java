@@ -3,7 +3,6 @@ package convex.cli;
 import java.io.Console;
 import java.io.File;
 import java.io.PrintWriter;
-import java.net.InetSocketAddress;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -17,13 +16,10 @@ import org.slf4j.LoggerFactory;
 import ch.qos.logback.classic.Level;
 import convex.api.Convex;
 import convex.cli.output.RecordOutput;
-import convex.cli.peer.SessionItem;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
-import convex.core.data.AccountKey;
-import convex.core.data.Address;
-import convex.core.init.Init;
+import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -200,6 +196,7 @@ public class Main implements Runnable {
 			} else {
 				ex.printStackTrace(err);
 			}
+			// Exit with correct code for exception type
 			return ExitCodes.getExitCode(ex);
 		}
 
@@ -379,46 +376,6 @@ public class Main implements Runnable {
 		return keyPair;
 	}
 
-	public Convex connectToSessionPeer(String hostname, int port, Address address, AKeyPair keyPair) {
-		SessionItem item;
-		Convex convex = null;
-		try {
-			if (port == 0) {
-				item = Helpers.getSessionItem(getSessionFilename());
-				if (item != null) {
-					port = item.getPort();
-				}
-			}
-			if (port == 0) {
-				throw new Error("Cannot find a local port or you have not set a valid port number");
-			}
-			InetSocketAddress host=new InetSocketAddress(hostname.strip(), port);
-			convex = Convex.connect(host, address, keyPair);
-		} catch (Throwable t) {
-			throw new Error("Cannot connect to a local peer " + t);
-		}
-		return convex;
-	}
-
-	public Convex connectAsPeer(int peerIndex) throws Error {
-		Convex convex = null;
-		try {
-			SessionItem item = Helpers.getSessionItem(getSessionFilename(), peerIndex);
-			AccountKey peerKey = item.getAccountKey();
-			log.debug("peer public key {}", peerKey.toHexString());
-			AKeyPair keyPair = loadKeyFromStore(peerKey.toHexString());
-			log.debug("peer key pair {}", keyPair.getAccountKey().toHexString());
-			Address address = Init.getGenesisPeerAddress(peerIndex);
-			log.debug("peer address {}", address);
-			InetSocketAddress host = item.getHostAddress();
-			log.debug("connect to peer {}", host);
-			convex = Convex.connect(host, address, keyPair);
-		} catch (Throwable t) {
-			throw new Error("Cannot connect as a peer " + t);
-		}
-		return convex;
-	}
-
 	/**
 	 * Generate key pairs and add to store. Does not save store!
 	 * @param count Number of key pairs to generate
@@ -456,6 +413,14 @@ public class Main implements Runnable {
 			throw new CLIError("Cannot store the key to the key store "+t);
 		}
 
+	}
+	
+	/**
+	 * Connect as a client to the currently configured Convex network
+	 * @return Convex instance
+	 */
+	public Convex connect() {
+		throw new TODOException();
 	}
 	
 	void saveKeyStore() {

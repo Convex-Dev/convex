@@ -71,8 +71,7 @@ public class PeerCreate implements Runnable {
 
 		Main mainParent = peerParent.mainParent;
 
-		int port = 0;
-		long peerStake = 10000000000L;
+		long peerStake = convex.core.Constants.MINIMUM_EFFECTIVE_STAKE;
 
 		AKeyPair keyPair = null;
 		KeyStore keyStore;
@@ -97,12 +96,11 @@ public class PeerCreate implements Runnable {
 			PFXTools.saveStore(keyStore, keyFile, mainParent.getPassword());
 
 			// connect using the default first user
-			Convex convex = mainParent.connectAsPeer(0);
+			Convex convex = mainParent.connect();
 			// create an account
 			Address address = convex.createAccountSync(keyPair.getAccountKey());
 			convex.transferSync(address, peerStake);
 
-			convex = mainParent.connectToSessionPeer(hostname, port, address, keyPair);
 			long stakeBalance = convex.getBalance(address);
 			String accountKeyString = keyPair.getAccountKey().toHexString();
 			long stakeAmount = (long) (stakeBalance * 0.98);
