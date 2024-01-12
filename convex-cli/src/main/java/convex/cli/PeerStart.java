@@ -73,7 +73,7 @@ public class PeerStart implements Runnable {
 			}
 		} else {
 			keyPair=AKeyPair.generate();
-			mainParent.addKeyPairToStore(keyPair);
+			mainParent.addKeyPairToStore(keyPair,mainParent.getKeyPassword());
 			log.warn("Generated new Keypair with public key: "+keyPair.getAccountKey());
 		}
 

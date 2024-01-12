@@ -15,6 +15,10 @@ import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
 import convex.api.Convex;
+import convex.cli.client.Query;
+import convex.cli.client.Status;
+import convex.cli.client.Transaction;
+import convex.cli.key.Key;
 import convex.cli.output.RecordOutput;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -45,7 +49,7 @@ import picocli.CommandLine.ScopeType;
 		CommandLine.HelpCommand.class
 	},
 	usageHelpAutoWidth=true,
-	sortOptions = false,
+	sortOptions = true,
 	mixinStandardHelpOptions=true,
 	// headerHeading = "Usage:",
 	// synopsisHeading = "%n",
@@ -58,9 +62,6 @@ import picocli.CommandLine.ScopeType;
 
 public class Main implements Runnable {
 
-
-
-
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
 
@@ -68,10 +69,7 @@ public class Main implements Runnable {
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
-		description="Use the specified config file. If not specified, will check ~/.convex/convex.config"
-		    + "%n All parameters to this app can be set by removing the leading '--', and adding"
-			+ " a leading 'convex.'.%n So to set the keystore filename you can write 'convex.keystore=my_keystore_filename.dat'%n"
-			+ "To set a sub command such as `./convex peer start index=4` index parameter you need to write 'convex.peer.start.index=4'")
+		description="Use the specified config file. If not specified, will check ~/.convex/convex.config")
 	private String configFilename;
 
     @Option(names={"-e", "--etch"},
@@ -80,7 +78,7 @@ public class Main implements Runnable {
 	private String etchStoreFilename;
 
 	@Option(names={"-k", "--keystore"},
-		defaultValue=Constants.KEYSTORE_FILENAME,
+		defaultValue="${env:CONVEX_KEYSTORE_PASSWORD:-" +Constants.KEYSTORE_FILENAME+"}",
 		scope = ScopeType.INHERIT,
 		description="Keystore filename. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
@@ -91,17 +89,11 @@ public class Main implements Runnable {
 		description="Password to read/write to the Keystore")
 	private String password;
 	
-	@Option(names={"-pi", "--password-interactive"},
+	@Option(names={"-n", "--noninteractive"},
 			scope = ScopeType.INHERIT,
 			//defaultValue="",
-			description="Specify to request an interactive password prompt if not otherwise specified")
-	private boolean passwordInteractive;
-
-	@Option(names={"-s", "--session"},
-	defaultValue=Constants.SESSION_FILENAME,
-    scope = ScopeType.INHERIT,
-	description="Session filename. Default: ${DEFAULT-VALUE}")
-	private String sessionFilename;
+			description="Specify to disable interactiove prompts")
+	private boolean nonInteractive;
 
     @Option(names={ "-v", "--verbose"},
 		scope = ScopeType.INHERIT,
@@ -226,34 +218,53 @@ public class Main implements Runnable {
 		return false;
 	}
 
-	public String getSessionFilename() {
-        if (sessionFilename != null) {
-			return Helpers.expandTilde(sessionFilename.strip());
-		}
-		return null;
-	}
-
-	boolean passwordAcquired=false;
 	
 	/**
 	 * Get the currently configured password for the keystore. Will emit warning and default to
 	 * blank password if not provided
 	 * @return Password string
 	 */
-	public String getPassword() {
-		if (!passwordAcquired) {
-			if (passwordInteractive) {
+	public char[] getStorePassword() {
+		char[] storepass=null;
+		
+		if(this.password!=null) {
+			storepass=this.password.toCharArray();	
+		} else {	
+			if (!nonInteractive) {
 				Console console = System.console(); 
-				password= console.readLine("Password: ");
-			} else {
-				if (password==null) {
-					log.warn("No password for keystore: defaulting to blank password");
-					password="";
-				}
+				storepass= console.readPassword("Keystore Password: ");
+			} 
+			
+			if (storepass==null) {
+				log.warn("No password for keystore: defaulting to blank password");
+				storepass=new char[0];
 			}
-			passwordAcquired=true;
 		}
-		return password;
+		return storepass;
+	}
+	
+	/**
+	 * Keys the password for the current key 
+	 * @return
+	 */
+	public char[] getKeyPassword() {
+		char[] keypass=null;
+
+		if(this.password!=null) {
+			keypass=this.password.toCharArray();	
+		} else {
+			if (!nonInteractive) {
+				Console console = System.console(); 
+				keypass= console.readPassword("Keystore Password: ");
+			} 
+			
+			if (keypass==null) {
+				log.warn("No password for keystore: defaulting to blank password");
+				keypass=new char[0];
+			}
+
+		}
+		return keypass;
 	}
 	
 	/**
@@ -316,8 +327,8 @@ public class Main implements Runnable {
 	 * @param isCreate Flag to indicate if keystore should be created if absent
 	 * @return KeyStore instance, or null if does not exist
 	 */
-	KeyStore loadKeyStore(boolean isCreate)  {
-		String password=getPassword();
+	public KeyStore loadKeyStore(boolean isCreate)  {
+		char[] password=getStorePassword();
 		File keyFile = new File(getKeyStoreFilename());
 		try {
 			if (keyFile.exists()) {
@@ -350,14 +361,14 @@ public class Main implements Runnable {
 			return null;
 		}
 		
-		String password=getPassword();
+		char[] storePassword=getStorePassword();
 
 		File keyFile = new File(getKeyStoreFilename());
 		try {
 			if (!keyFile.exists()) {
 				throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
 			}
-			KeyStore keyStore = PFXTools.loadStore(keyFile, password);
+			KeyStore keyStore = PFXTools.loadStore(keyFile, storePassword);
 
 			Enumeration<String> aliases = keyStore.aliases();
 
@@ -365,7 +376,7 @@ public class Main implements Runnable {
 				String alias = aliases.nextElement();
 				if (alias.indexOf(publicKey) == 0) {
 					log.trace("found keypair " + alias);
-					keyPair = PFXTools.getKeyPair(keyStore, alias, password);
+					keyPair = PFXTools.getKeyPair(keyStore, alias, storePassword);
 					break;
 				}
 			}
@@ -381,14 +392,14 @@ public class Main implements Runnable {
 	 * @param count Number of key pairs to generate
 	 * @return List of key pairs
 	 */
-	public List<AKeyPair> generateKeyPairs(int count) {
+	public List<AKeyPair> generateKeyPairs(int count, char[] keyPassword) {
 		List<AKeyPair> keyPairList = new ArrayList<>(count);
 
 		// generate `count` keys
 		for (int index = 0; index < count; index ++) {
 			AKeyPair keyPair = AKeyPair.generate();
 			keyPairList.add(keyPair);
-			addKeyPairToStore(keyPair);
+			addKeyPairToStore(keyPair,keyPassword);
 		}
 
 		return keyPairList;
@@ -398,9 +409,7 @@ public class Main implements Runnable {
 	 * Adds key pair to store. Does not save keystore!
 	 * @param keyPair Keypair to add
 	 */
-	public void addKeyPairToStore(AKeyPair keyPair) {
-		// get the password of the key store file (may default to blank)
-		String password = getPassword();
+	public void addKeyPairToStore(AKeyPair keyPair, char[] keyPassword) {
 
 		KeyStore keyStore = getKeystore();
 		if (keyStore==null) {
@@ -408,7 +417,7 @@ public class Main implements Runnable {
 		}
 		try {
 			// save the key in the keystore
-			PFXTools.setKeyPair(keyStore, keyPair, password);
+			PFXTools.setKeyPair(keyStore, keyPair, keyPassword);
 		} catch (Throwable t) {
 			throw new CLIError("Cannot store the key to the key store "+t);
 		}
@@ -423,11 +432,11 @@ public class Main implements Runnable {
 		throw new TODOException();
 	}
 	
-	void saveKeyStore() {
+	public void saveKeyStore() {
 		// save the keystore file
 		if (keyStore==null) throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
-			PFXTools.saveStore(keyStore, new File(getKeyStoreFilename()), password);
+			PFXTools.saveStore(keyStore, new File(getKeyStoreFilename()), getStorePassword());
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
 		}

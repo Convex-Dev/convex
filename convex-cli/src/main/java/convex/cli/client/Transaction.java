@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.client;
 
 import java.util.concurrent.TimeUnit;
 
@@ -6,6 +6,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Main;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -29,7 +32,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="transact",
 	mixinStandardHelpOptions=true,
 	description="Execute a user transaction on the network via a peer.")
-public class Transaction implements Runnable {
+public class Transaction extends AClientCommand {
 
 	@ParentCommand
 	protected Main mainParent;

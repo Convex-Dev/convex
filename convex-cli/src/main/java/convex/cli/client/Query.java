@@ -1,16 +1,18 @@
-package convex.cli;
+package convex.cli.client;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import convex.api.Convex;
-import convex.core.data.ACell;
-import convex.core.data.Address;
-import convex.core.lang.Reader;
-import convex.core.Result;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import convex.api.Convex;
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Main;
+import convex.core.Result;
+import convex.core.data.ACell;
+import convex.core.lang.Reader;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -26,7 +28,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="query",
 	mixinStandardHelpOptions=true,
 	description="Execute a user query via the current peer. The query can be any valid Convex Lisp form.")
-public class Query implements Runnable {
+public class Query extends AClientCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(Query.class);
 

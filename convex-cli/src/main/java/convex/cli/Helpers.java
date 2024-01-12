@@ -90,7 +90,7 @@ public class Helpers {
 		
 	}
 	
-	public static File createTempKeystore(String name, String password) {
+	public static File createTempKeystore(String name, char[] password) {
 		try {
 			File temp=File.createTempFile(name,".pfx");
 			PFXTools.createStore(temp, password);

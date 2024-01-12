@@ -88,12 +88,12 @@ public class PeerCreate implements Runnable {
 			keyPair = AKeyPair.generate();
 
 			// save the new keypair in the keystore
-			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getPassword());
+			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getKeyPassword());
 
 			File keyFile = new File(mainParent.getKeyStoreFilename());
 
 			// save the store to a file
-			PFXTools.saveStore(keyStore, keyFile, mainParent.getPassword());
+			PFXTools.saveStore(keyStore, keyFile, mainParent.getStorePassword());
 
 			// connect using the default first user
 			Convex convex = mainParent.connect();
@@ -129,8 +129,7 @@ public class PeerCreate implements Runnable {
 
 			output.addField("Peer start line",
 				String.format(
-					"./convex peer start --password=%s --address=%d --public-key=%s",
-					mainParent.getPassword(),
+					"./convex peer start --password=xx --address=%d --public-key=%s",
 					address.longValue(),
 					shortAccountKey
 				)

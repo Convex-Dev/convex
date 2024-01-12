@@ -12,8 +12,8 @@ import convex.core.crypto.sodium.SodiumKeyPair;
 
 public class CLICommandKeyImportTest {
 
-	private static final String KEYSTORE_PASSWORD = "testPassword";
-	private static final String IMPORT_PASSWORD = "testImportPassword";
+	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
+	private static final char[] IMPORT_PASSWORD = "testImportPassword".toCharArray();
 	
 	private static final File KEYSTORE_FILE;
 	private static final String KEYSTORE_FILENAME;
@@ -26,16 +26,17 @@ public class CLICommandKeyImportTest {
 	public void testKeyImport() {
 	 
 		AKeyPair keyPair = SodiumKeyPair.generate();
-		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSWORD.toCharArray());
+		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSWORD);
  
 		// command key.list
 		CLTester tester =  CLTester.run(
 			"key", 
-			"import", 
-			"--password", KEYSTORE_PASSWORD, 
+			"import",
+			"-n",
+			"--password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--import-text", pemText, 
-			"--import-password", IMPORT_PASSWORD
+			"--import-password", new String(IMPORT_PASSWORD)
 		);
 		assertEquals("",tester.getError());
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());

@@ -13,8 +13,8 @@ import convex.core.data.AccountKey;
 import convex.core.util.Utils;
 
 public class CLICommandKeyExportTest {
-	private static final String KEYSTORE_PASSWORD = "testPassword";
-	private static final String EXPORT_PASSWORD = "testExportPassword";
+	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
+	private static final char[] EXPORT_PASSWORD = "testExportPassword".toCharArray();
 
 	private static final File TEMP_FILE;
 	private static final String KEYSTORE_FILENAME;
@@ -35,7 +35,7 @@ public class CLICommandKeyExportTest {
 		// command key.generate
 		CLTester tester =  CLTester.run(
 			"key", "generate",
-			"--password", KEYSTORE_PASSWORD,
+			"--password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
@@ -55,10 +55,10 @@ public class CLICommandKeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--password", KEYSTORE_PASSWORD,
+			"--password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", publicKey,
-			"--export-password", EXPORT_PASSWORD
+			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		// TODO test generated output
@@ -67,10 +67,10 @@ public class CLICommandKeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--password", KEYSTORE_PASSWORD,
+			"--password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", "0x" + publicKey,
-			"--export-password", EXPORT_PASSWORD
+			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		// TODO test generated output

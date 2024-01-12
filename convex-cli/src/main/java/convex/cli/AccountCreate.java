@@ -21,9 +21,7 @@ import picocli.CommandLine.ParentCommand;
 
 @Command(name="create",
 	mixinStandardHelpOptions=true,
-	description="Creates an account using a public/private key from the keystore.%n"
-		+ "You must provide a valid keystore password to the keystore.%n"
-		+ "If the keystore is not at the default location also the keystore filename.")
+	description="Creates an account on Convex.")
 public class AccountCreate implements Runnable {
 
 	@ParentCommand
@@ -65,7 +63,7 @@ public class AccountCreate implements Runnable {
 		}
 		
 		if (keyPair == null) {
-			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1);
+			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(1,mainParent.getKeyPassword());
 			keyPair = keyPairList.get(0);
 			output.addField("Public Key", keyPair.getAccountKey().toHexString());
 		}

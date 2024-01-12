@@ -1,8 +1,9 @@
-package convex.cli;
+package convex.cli.key;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import picocli.CommandLine.Command;
@@ -21,7 +22,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="export",
 	mixinStandardHelpOptions=true,
 	description="Export a key pair from the keystore to a PEM file.")
-public class KeyExport implements Runnable {
+public class KeyExport extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyExport.class);
 

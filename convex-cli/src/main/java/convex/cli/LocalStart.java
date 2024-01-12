@@ -28,7 +28,7 @@ import picocli.CommandLine.ParentCommand;
 
 @Command(name="start",
 	mixinStandardHelpOptions=true,
-	description="Starts a local convex test network.")
+	description="Starts a temporary local convex test network. Useful for development and testing purposes.")
 public class LocalStart implements Runnable {
 
 	private static final Logger log = LoggerFactory.getLogger(LocalStart.class);
@@ -54,7 +54,7 @@ public class LocalStart implements Runnable {
 	private String[] ports;
 
 	@Option(names={"--api-port"},
-		defaultValue = "0",
+		defaultValue = "8080",
 		description="REST API port, if set enable REST API to a peer in the local cluster")
 	private int apiPort;
 
@@ -84,7 +84,7 @@ public class LocalStart implements Runnable {
 		if (left>0) {
 			log.warn("Insufficient key pairs specified. Additional keypairs will be generated");
 		
-			List<AKeyPair> kp=mainParent.generateKeyPairs(left);
+			List<AKeyPair> kp=mainParent.generateKeyPairs(left,mainParent.getKeyPassword());
 			keyPairList.addAll(kp);
 			mainParent.saveKeyStore();
 		}

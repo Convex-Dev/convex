@@ -1,17 +1,18 @@
-package convex.cli;
+package convex.cli.key;
 
 import java.security.KeyStore;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.cli.Constants;
+import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 
 /**
@@ -26,13 +27,9 @@ import picocli.CommandLine.ParentCommand;
 	aliases={"gen"},
 	mixinStandardHelpOptions=true,
 	description="Generate private key pairs in the currently configured keystore. Will create a keystore if it does not exist.")
-public class KeyGenerate implements Runnable {
+public class KeyGenerate extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyGenerate.class);
-
-	@ParentCommand
-	protected Key keyParent;
-
 
 	@Parameters(paramLabel="count",
 		defaultValue="" + Constants.KEY_GENERATE_COUNT,
@@ -50,11 +47,11 @@ public class KeyGenerate implements Runnable {
 			count=0;
 		}
 		log.debug("Generating {} keys",count);
-		String password=mainParent.getPassword();
+		char[] password=mainParent.getKeyPassword();
 		
 		try {
-			KeyStore ks=mainParent.loadKeyStore(true);
-			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count);
+			KeyStore ks=loadKeyStore(true);
+			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count,password);
 			for ( int index = 0; index < count; index ++) {
 				AKeyPair kp=keyPairList.get(index);
                 String publicKeyHexString =  kp.getAccountKey().toHexString();
@@ -62,9 +59,11 @@ public class KeyGenerate implements Runnable {
 				PFXTools.setKeyPair(ks, kp, password); // TODO: key password?
 			}
 			log.info(count+ " keys successfully generated");
-			mainParent.saveKeyStore();
+			saveKeyStore();
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
+
+
 }
