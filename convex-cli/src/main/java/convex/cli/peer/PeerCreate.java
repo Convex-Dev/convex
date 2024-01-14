@@ -1,9 +1,12 @@
-package convex.cli;
+package convex.cli.peer;
 
 import java.io.File;
 import java.security.KeyStore;
 
 import convex.api.Convex;
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Main;
 import convex.cli.output.RecordOutput;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
@@ -36,7 +39,7 @@ import picocli.CommandLine.Spec;
 	aliases={"cr"},
 	mixinStandardHelpOptions=true,
 	description="Creates a keypair, new account and a funding stake: to run a local peer.")
-public class PeerCreate implements Runnable {
+public class PeerCreate extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
 

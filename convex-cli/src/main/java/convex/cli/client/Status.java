@@ -30,7 +30,7 @@ import picocli.CommandLine.ParentCommand;
 	description="Reports on the current status of the network.")
 public class Status extends AClientCommand {
 
-	private static final Logger log = LoggerFactory.getLogger(Status.class);
+	protected static final Logger log = LoggerFactory.getLogger(Status.class);
 
 	@ParentCommand
 	protected Main mainParent;

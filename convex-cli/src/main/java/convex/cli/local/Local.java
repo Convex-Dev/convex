@@ -1,5 +1,6 @@
-package convex.cli;
+package convex.cli.local;
 
+import convex.cli.Main;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;

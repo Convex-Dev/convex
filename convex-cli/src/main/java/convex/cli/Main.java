@@ -19,7 +19,9 @@ import convex.cli.client.Query;
 import convex.cli.client.Status;
 import convex.cli.client.Transaction;
 import convex.cli.key.Key;
+import convex.cli.local.Local;
 import convex.cli.output.RecordOutput;
+import convex.cli.peer.Peer;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
@@ -53,7 +55,6 @@ import picocli.CommandLine.ScopeType;
 	mixinStandardHelpOptions=true,
 	// headerHeading = "Usage:",
 	// synopsisHeading = "%n",
-	descriptionHeading = "%nDescription:%n%n",
 	parameterListHeading = "%nParameters:%n",
 	optionListHeading = "%nOptions:%n",
 	commandListHeading = "%nCommands:%n",
@@ -64,8 +65,7 @@ public class Main implements Runnable {
 
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
-
-	CommandLine commandLine=new CommandLine(this);
+	public CommandLine commandLine=new CommandLine(this);
 
 	@Option(names={ "-c", "--config"},
 		scope = ScopeType.INHERIT,
@@ -92,7 +92,7 @@ public class Main implements Runnable {
 	@Option(names={"-n", "--noninteractive"},
 			scope = ScopeType.INHERIT,
 			//defaultValue="",
-			description="Specify to disable interactiove prompts")
+			description="Specify to disable interactive prompts")
 	private boolean nonInteractive;
 
     @Option(names={ "-v", "--verbose"},
@@ -136,9 +136,8 @@ public class Main implements Runnable {
 		// in the defaults before running the full execute
 		try {
 			commandLine.parseArgs(args);
-			loadConfig();
 		} catch (Throwable t) {
-			System.err.println("unable to parse arguments " + t);
+			log.debug("Unable to parse arguments: " + t);
 		}
 
 		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
@@ -193,31 +192,6 @@ public class Main implements Runnable {
 		}
 
 	}
-
-	/**
-	 * Loads the specified config file.
-	 * @return true if config file correctly loaded, false otherwise (e.g. if it does not exist)
-	 */
-	protected boolean loadConfig() {
-		String filename=null;
-		if (configFilename != null && !configFilename.isEmpty()) {
-			filename = Helpers.expandTilde(configFilename);
-		}
-		
-		if (filename!=null) {
-			File configFile = new File(filename);
-			if (configFile.exists()) {
-				PropertiesDefaultProvider defaultProvider = new PropertiesDefaultProvider(configFile);
-				commandLine.setDefaultValueProvider(defaultProvider);
-				return true;
-			} else {
-				log.warn("Config file does not exist: "+configFilename);
-				return false;
-			}
-		}
-		return false;
-	}
-
 	
 	/**
 	 * Get the currently configured password for the keystore. Will emit warning and default to
@@ -334,7 +308,7 @@ public class Main implements Runnable {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else if (isCreate) {
-				log.warn("No keystore exists, creating at: "+keyFile.getCanonicalPath());
+				log.debug("No keystore exists, creating at: "+keyFile.getCanonicalPath());
 				Helpers.createPath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
@@ -442,33 +416,7 @@ public class Main implements Runnable {
 		}
 	}
 
-	int[] getPortList(String ports[], int count) throws NumberFormatException {
-		Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
-		List<String> portTextList = Helpers.splitArrayParameter(ports);
-		List<Integer> portList = new ArrayList<Integer>();
-		int countLeft = count;
-		for (int index = 0; index < portTextList.size() && countLeft > 0; index ++) {
-			String item = portTextList.get(index);
-			Matcher matcher = rangePattern.matcher(item);
-			if (matcher.matches()) {
-				int portFrom = Integer.parseInt(matcher.group(1));
-				int portTo = portFrom  + count + 1;
-				if (!matcher.group(2).isEmpty()) {
-					portTo = Integer.parseInt(matcher.group(2));
-				}
-				for ( int portIndex = portFrom; portIndex <= portTo && countLeft > 0; portIndex ++, --countLeft ) {
-					portList.add(portIndex);
-				}
-			}
-			else if (item.strip().length() == 0) {
-			}
-			else {
-				portList.add(Integer.parseInt(item));
-				countLeft --;
-			}
-		}
-		return portList.stream().mapToInt(Integer::intValue).toArray();
-	}
+
 
 	public void println(String s) {
 		if (s==null) s="null";

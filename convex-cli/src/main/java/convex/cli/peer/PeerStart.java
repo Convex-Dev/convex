@@ -1,8 +1,10 @@
-package convex.cli;
+package convex.cli.peer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.cli.CLIError;
+import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 import convex.core.exceptions.TODOException;
@@ -20,7 +22,7 @@ import picocli.CommandLine.Spec;
  */
 
 @Command(name = "start", aliases = { "st" }, mixinStandardHelpOptions = true, description = "Starts a local peer.")
-public class PeerStart implements Runnable {
+public class PeerStart extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerStart.class);
 
@@ -85,6 +87,7 @@ public class PeerStart implements Runnable {
 			return;
 		}
 		Address peerAddress = Address.create(addressNumber);
+		if (peerAddress==null) throw new CLIError("Invalid peer controller address: "+addressNumber);
 
 		if (remotePeerHostname == null) {
 

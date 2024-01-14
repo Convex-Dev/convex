@@ -58,7 +58,7 @@ public class KeyGenerate extends AKeyCommand {
 				mainParent.println(publicKeyHexString); // Output generated public key
 				PFXTools.setKeyPair(ks, kp, password); // TODO: key password?
 			}
-			log.info(count+ " keys successfully generated");
+			log.debug(count+ " keys successfully generated");
 			saveKeyStore();
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);

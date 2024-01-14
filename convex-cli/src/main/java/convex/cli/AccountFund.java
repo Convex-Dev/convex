@@ -1,11 +1,10 @@
 package convex.cli;
 
-import convex.api.Convex;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import convex.api.Convex;
+import convex.core.data.Address;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;

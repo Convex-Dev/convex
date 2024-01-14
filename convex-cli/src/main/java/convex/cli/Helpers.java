@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
@@ -99,6 +101,34 @@ public class Helpers {
 			throw Utils.sneakyThrow(e);
 		}
 		
+	}
+	
+	public static int[] getPortList(String ports[], int count) throws NumberFormatException {
+		Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
+		List<String> portTextList = Helpers.splitArrayParameter(ports);
+		List<Integer> portList = new ArrayList<Integer>();
+		int countLeft = count;
+		for (int index = 0; index < portTextList.size() && countLeft > 0; index ++) {
+			String item = portTextList.get(index);
+			Matcher matcher = rangePattern.matcher(item);
+			if (matcher.matches()) {
+				int portFrom = Integer.parseInt(matcher.group(1));
+				int portTo = portFrom  + count + 1;
+				if (!matcher.group(2).isEmpty()) {
+					portTo = Integer.parseInt(matcher.group(2));
+				}
+				for ( int portIndex = portFrom; portIndex <= portTo && countLeft > 0; portIndex ++, --countLeft ) {
+					portList.add(portIndex);
+				}
+			}
+			else if (item.strip().length() == 0) {
+			}
+			else {
+				portList.add(Integer.parseInt(item));
+				countLeft --;
+			}
+		}
+		return portList.stream().mapToInt(Integer::intValue).toArray();
 	}
 }
 

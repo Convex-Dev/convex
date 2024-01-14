@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.local;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -8,6 +8,10 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Helpers;
+import convex.cli.Main;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
@@ -97,14 +101,12 @@ public class LocalStart implements Runnable {
     
 	@Override
 	public void run() {
-		Main mainParent = localParent.mainParent;
-
 		List<AKeyPair> keyPairList = getPublicKeys(count);
 
 		int peerPorts[] = null;
 		if (ports != null) {
 			try {
-				peerPorts = mainParent.getPortList(ports, count);
+				peerPorts = Helpers.getPortList(ports, count);
 			} catch (NumberFormatException e) {
 				log.warn("cannot convert port number " + e);
 				return;

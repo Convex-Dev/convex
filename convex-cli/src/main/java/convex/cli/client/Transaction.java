@@ -37,7 +37,7 @@ public class Transaction extends AClientCommand {
 	@ParentCommand
 	protected Main mainParent;
 
-	private static final Logger log = LoggerFactory.getLogger(Transaction.class);
+	protected static final Logger log = LoggerFactory.getLogger(Transaction.class);
 
 	@Option(names={"--public-key"},
 		defaultValue="",
@@ -99,8 +99,6 @@ public class Transaction extends AClientCommand {
 			mainParent.printResult(result);
 		} catch (Exception e) {
 			throw new CLIError("Error executing transation",e);
-		} finally {
-			if (convex!=null) convex.close();
 		}
 	}
 

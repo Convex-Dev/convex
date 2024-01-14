@@ -1,6 +1,7 @@
-package convex.cli;
+package convex.cli.local;
 
 import convex.api.Applications;
+import convex.cli.CLIError;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
