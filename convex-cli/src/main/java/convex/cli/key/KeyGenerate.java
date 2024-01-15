@@ -47,16 +47,16 @@ public class KeyGenerate extends AKeyCommand {
 			count=0;
 		}
 		log.debug("Generating {} keys",count);
-		char[] password=mainParent.getKeyPassword();
+		char[] keyPassword=mainParent.getKeyPassword();
 		
 		try {
 			KeyStore ks=loadKeyStore(true);
-			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count,password);
+			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count,keyPassword);
 			for ( int index = 0; index < count; index ++) {
 				AKeyPair kp=keyPairList.get(index);
                 String publicKeyHexString =  kp.getAccountKey().toHexString();
 				mainParent.println(publicKeyHexString); // Output generated public key
-				PFXTools.setKeyPair(ks, kp, password); // TODO: key password?
+				PFXTools.setKeyPair(ks, kp, keyPassword); // TODO: key password?
 			}
 			log.debug(count+ " keys successfully generated");
 			saveKeyStore();

@@ -29,7 +29,6 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="import",
-	aliases={"im"},
 	description="Import key pairs to the keystore.")
 public class KeyImport extends AKeyCommand {
 
@@ -41,7 +40,6 @@ public class KeyImport extends AKeyCommand {
 	@Option(names={"-i", "--import-text"},
 		description="Import format PEM text of the keypair.")
 	private String importText;
-
 
 	@Option(names={"-f", "--import-file"},
 		description="Import file name of the keypair PEM file.")

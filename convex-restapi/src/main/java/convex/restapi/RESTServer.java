@@ -11,14 +11,13 @@ import convex.restapi.api.DepAPI;
 import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
 import io.javalin.http.staticfiles.Location;
-import io.javalin.openapi.plugin.OpenApiPluginConfiguration;
 import io.javalin.openapi.plugin.OpenApiPlugin;
+import io.javalin.openapi.plugin.OpenApiPluginConfiguration;
 import io.javalin.openapi.plugin.swagger.SwaggerConfiguration;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
-import io.javalin.util.JavalinBindException;
 
 public class RESTServer {
-	private static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
+	protected static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
 
 	protected final Server server;
 	protected final Convex convex;
