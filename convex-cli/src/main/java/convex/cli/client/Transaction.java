@@ -28,7 +28,7 @@ import picocli.CommandLine.Parameters;
  */
 @Command(name="transact",
 	mixinStandardHelpOptions=true,
-	description="Execute a user transaction on the network via a peer.")
+	description="Execute a user transaction on the Convex network.")
 public class Transaction extends AClientCommand {
 
 	protected static final Logger log = LoggerFactory.getLogger(Transaction.class);

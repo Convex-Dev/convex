@@ -86,7 +86,7 @@ public class Main implements Runnable {
     @Option(names={ "-v", "--verbose"},
 		scope = ScopeType.INHERIT,
 		defaultValue="${env:CONVEX_VERBOSE_LEVEL:-2}",
-		description="Show more verbose log information. You can increase verbosity by using multiple -v or -vvv")
+		description="Specify verbosity level. Use -v0 to suppress user output. Default: ${DEFAULT-VALUE}")
 	private Integer verbose;
 
 	public Main() {
@@ -117,16 +117,18 @@ public class Main implements Runnable {
 	 * @return Process result value
 	 */
 	public int mainExecute(String[] args) {
-		commandLine
-		.setUsageHelpLongOptionsMaxWidth(40)
-		.setUsageHelpWidth(40 * 4);
+		//commandLine
+		//.setUsageHelpLongOptionsMaxWidth(80)
+		//.setUsageHelpWidth(40 * 4);
 
 		// do  a pre-parse to get the config filename. We need to load
 		// in the defaults before running the full execute
 		try {
 			commandLine.parseArgs(args);
-		} catch (Throwable t) {
-			log.debug("Unable to parse arguments: " + t);
+		} catch (Exception t) {
+			commandLine.getErr().println("ERROR: Unable to parse arguments: " + t.getMessage());
+			commandLine.getErr().println("For more information on options and commands try 'convex help'.");
+			return ExitCodes.ERROR;
 		}
 
 		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
@@ -137,11 +139,11 @@ public class Main implements Runnable {
 		if (verbose >= 0 && verbose < verboseLevels.length) {
 			parentLogger.setLevel(verboseLevels[verbose]);
 		} else {
-			throw new CLIError("Invalid verbosoity level: "+verbose);
+			commandLine.getErr().println("ERROR: Invalid verbosity level: "+verbose);
+			return ExitCodes.ERROR;
 		}
 		
-		int result = 0;
-		result = commandLine.execute(args);
+		int result = commandLine.execute(args);
 		return result;
 	}
 	

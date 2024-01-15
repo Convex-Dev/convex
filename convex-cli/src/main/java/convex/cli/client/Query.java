@@ -23,7 +23,7 @@ import picocli.CommandLine.Parameters;
  */
 @Command(name="query",
 	mixinStandardHelpOptions=true,
-	description="Execute a user query via the current peer. The query can be any valid Convex Lisp form.")
+	description="Execute a user query.")
 public class Query extends AClientCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(Query.class);

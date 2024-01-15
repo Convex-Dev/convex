@@ -30,7 +30,6 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(name="import",
 	aliases={"im"},
-	mixinStandardHelpOptions=true,
 	description="Import key pairs to the keystore.")
 public class KeyImport extends AKeyCommand {
 

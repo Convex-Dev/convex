@@ -36,7 +36,6 @@ import picocli.CommandLine.Spec;
 
 @Command(name="create",
 	aliases={"cr"},
-	mixinStandardHelpOptions=true,
 	description="Creates a keypair, new account and a funding stake: to run a local peer.")
 public class PeerCreate extends APeerCommand {
 

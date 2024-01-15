@@ -20,7 +20,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="export",
-	mixinStandardHelpOptions=true,
+	mixinStandardHelpOptions=false,
 	description="Export a key pair from the keystore to a PEM file.")
 public class KeyExport extends AKeyCommand {
 
@@ -45,7 +45,7 @@ public class KeyExport extends AKeyCommand {
 		// sub command to generate keys
 		Main mainParent = cli();
 
-		if (keystorePublicKey == null) {
+		if ((keystorePublicKey == null)||(keystorePublicKey.isEmpty())) {
 			log.warn("You need to provide at least --public-key parameter");
 			return;
 		}

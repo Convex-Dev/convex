@@ -23,11 +23,12 @@ import picocli.CommandLine.ScopeType;
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local peer.")
+	description="Operate a Convex Peer")
 public class Peer extends ATopCommand {
 	
 	@Option(names={ "-c", "--config"},
 			scope = ScopeType.INHERIT,
+			defaultValue="${env:CONVEX_PEER_CONFIG}",
 			description="Use the specified config file. If not specified, will check ~/.convex/convex.config")
 	private String configFilename;
 

@@ -21,7 +21,10 @@ import picocli.CommandLine.Spec;
  *
  */
 
-@Command(name = "start", aliases = { "st" }, mixinStandardHelpOptions = true, description = "Starts a local peer.")
+@Command(
+	name = "start",
+	mixinStandardHelpOptions = true, 
+	description = "Start a local peer.")
 public class PeerStart extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerStart.class);

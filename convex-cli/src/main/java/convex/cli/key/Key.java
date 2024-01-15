@@ -19,7 +19,7 @@ import picocli.CommandLine.Command;
 		KeyExport.class,
 		CommandLine.HelpCommand.class
 	},
-	mixinStandardHelpOptions=true,
+	mixinStandardHelpOptions=false,
 	description="Manage local Convex key store.")
 public class Key extends ATopCommand {
 

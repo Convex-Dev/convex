@@ -21,7 +21,7 @@ import picocli.CommandLine.Command;
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operates a local convex network.")
+	description="Operate a local Convex network and related utilities.")
 public class Local extends ATopCommand {
 
 	@Override
