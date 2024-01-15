@@ -2,8 +2,11 @@ package convex.cli;
 
 import java.io.Console;
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.security.UnrecoverableKeyException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -143,7 +146,7 @@ public class Main implements Runnable {
 		Level[] verboseLevels = {Level.OFF,Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
 		
 		if (verbose==null) verbose=0;
-		if (verbose >= 0 && verbose <= verboseLevels.length) {
+		if (verbose >= 0 && verbose < verboseLevels.length) {
 			parentLogger.setLevel(verboseLevels[verbose]);
 		} else {
 			throw new CLIError("Invalid verbosoity level: "+verbose);
@@ -311,9 +314,13 @@ public class Main implements Runnable {
 				Helpers.createPath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
-		} catch (Exception t) {
-			throw new CLIError("Unable to read keystore at: "+keyFile,t);
-		}
+		} catch (IOException e) {
+			throw new CLIError("Unable to read keystore at: "+keyFile,e);
+		} catch (UnrecoverableKeyException e) {
+			throw new CLIError("Invalid password for keystore: "+keyFile);
+		} catch (GeneralSecurityException e) {
+			throw new CLIError("Unexpected security error: "+e.getClass(),e);
+		}  
 		keyStoreLoaded=true;
 		return keyStore;
 	}

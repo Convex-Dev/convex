@@ -7,16 +7,12 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
-import convex.cli.Constants;
-import convex.cli.Main;
 import convex.cli.output.RecordOutput;
 import convex.core.Result;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
 /**
  *
@@ -31,18 +27,6 @@ import picocli.CommandLine.ParentCommand;
 public class Status extends AClientCommand {
 
 	protected static final Logger log = LoggerFactory.getLogger(Status.class);
-
-	@ParentCommand
-	protected Main mainParent;
-
-	@Option(names={"--port"},
-		description="Port number to connect or create a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
 
 	@SuppressWarnings("unchecked")
 	@Override

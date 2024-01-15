@@ -7,8 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
-import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -20,7 +18,6 @@ import convex.core.transactions.Invoke;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 /**
  *
@@ -34,26 +31,14 @@ import picocli.CommandLine.ParentCommand;
 	description="Execute a user transaction on the network via a peer.")
 public class Transaction extends AClientCommand {
 
-	@ParentCommand
-	protected Main mainParent;
-
 	protected static final Logger log = LoggerFactory.getLogger(Transaction.class);
 
 	@Option(names={"--public-key"},
 		defaultValue="",
-		description="Hex string of the public key in the Keystore to use to run the transaction.%n"
+		description="Hex string of the public key in the Keystore to sign the transaction.%n"
 			+ "You only need to enter in the first distinct hex values of the public key.%n"
 			+ "For example: 0xf0234 or f0234")
 	private String keystorePublicKey;
-
-	@Option(names={"--port"},
-		description="Port number to connect or create a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
 
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
@@ -62,7 +47,7 @@ public class Transaction extends AClientCommand {
 	@Override
 	public void run() {
 
-		Convex convex = mainParent.connect();
+		Convex convex = connect();
 		Address address=convex.getAddress();
 		AKeyPair keyPair = convex.getKeyPair();
 		try {

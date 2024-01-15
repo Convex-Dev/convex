@@ -8,15 +8,11 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
-import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
 
 /**
  *
@@ -32,19 +28,6 @@ public class Query extends AClientCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(Query.class);
 
-	@ParentCommand
-	protected Main mainParent;
-
-	@Option(names={"--port"},
-		description="Port number to connect to a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
-
-
 	@Parameters(paramLabel="queryCommand", description="Query Command")
 	private String queryCommand;
 
@@ -54,7 +37,7 @@ public class Query extends AClientCommand {
 		// sub command run with no command provided
 		log.debug("query command: {}", queryCommand);
 
-		Convex convex =  mainParent.connect();
+		Convex convex =  connect();
 
 		try {
 			log.info("Executing query: %s\n", queryCommand);

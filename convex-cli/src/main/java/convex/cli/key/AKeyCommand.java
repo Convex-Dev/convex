@@ -25,4 +25,6 @@ public abstract class AKeyCommand implements Runnable {
 	protected void saveKeyStore() {
 		cli().saveKeyStore();
 	}
+	
+	
 }
