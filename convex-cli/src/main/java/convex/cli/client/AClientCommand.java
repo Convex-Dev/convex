@@ -1,12 +1,11 @@
 package convex.cli.client;
 
+import convex.cli.ATopCommand;
 import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.data.Address;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 
-public abstract class AClientCommand implements Runnable {
+public abstract class AClientCommand extends ATopCommand {
 	@Option(names={"--timeout"},
 			description="Timeout in miliseconds.")
 	protected long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
@@ -24,9 +23,6 @@ public abstract class AClientCommand implements Runnable {
 		defaultValue=Constants.HOSTNAME_PEER,
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
-
-	@ParentCommand
-	protected Main mainParent;
 
 	
 	public Address getUserAddress() {

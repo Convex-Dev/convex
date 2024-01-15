@@ -35,7 +35,7 @@ public class CLICommandKeyExportTest {
 		// command key.generate
 		CLTester tester =  CLTester.run(
 			"key", "generate",
-			"--password", new String(KEYSTORE_PASSWORD),
+			"--store-password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
@@ -55,7 +55,7 @@ public class CLICommandKeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--password", new String(KEYSTORE_PASSWORD),
+			"--store-password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
@@ -67,7 +67,7 @@ public class CLICommandKeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--password", new String(KEYSTORE_PASSWORD),
+			"--store-password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", "0x" + publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)

@@ -33,7 +33,7 @@ public class CLICommandKeyImportTest {
 			"key", 
 			"import",
 			"-n",
-			"--password", new String(KEYSTORE_PASSWORD), 
+			"--store-password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--import-text", pemText, 
 			"--import-password", new String(IMPORT_PASSWORD)

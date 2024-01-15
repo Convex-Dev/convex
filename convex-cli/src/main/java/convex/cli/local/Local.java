@@ -1,9 +1,8 @@
 package convex.cli.local;
 
-import convex.cli.Main;
+import convex.cli.ATopCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.ParentCommand;
 
 
 /**
@@ -23,10 +22,7 @@ import picocli.CommandLine.ParentCommand;
 	},
 	mixinStandardHelpOptions=true,
 	description="Operates a local convex network.")
-public class Local implements Runnable {
-
-	@ParentCommand
-	protected Main mainParent;
+public class Local extends ATopCommand {
 
 	@Override
 	public void run() {

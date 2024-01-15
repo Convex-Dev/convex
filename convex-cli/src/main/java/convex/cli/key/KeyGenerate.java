@@ -39,7 +39,7 @@ public class KeyGenerate extends AKeyCommand {
 	@Override
 	public void run() {
 		// sub command to generate keys
-		Main mainParent = keyParent.mainParent;
+		Main mainParent = cli();
 		
 		// check the number of keys to generate.
 		if (count < 0) {

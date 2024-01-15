@@ -43,7 +43,7 @@ public class KeyExport extends AKeyCommand {
 	@Override
 	public void run() {
 		// sub command to generate keys
-		Main mainParent = keyParent.mainParent;
+		Main mainParent = cli();
 
 		if (keystorePublicKey == null) {
 			log.warn("You need to provide at least --public-key parameter");

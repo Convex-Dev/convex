@@ -13,9 +13,8 @@ public abstract class AKeyCommand implements Runnable {
 	@ParentCommand
 	protected Key keyParent;
 	
-
 	protected Main cli() {
-		return keyParent.mainParent;
+		return keyParent.cli();
 	}
 	
 	protected KeyStore loadKeyStore(boolean create) {

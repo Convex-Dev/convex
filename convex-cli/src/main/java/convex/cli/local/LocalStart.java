@@ -70,7 +70,7 @@ public class LocalStart implements Runnable {
     private List<AKeyPair> getPublicKeys(int n) {
     	HashSet<AKeyPair> keyPairList = new HashSet<AKeyPair>();
     	
-    	Main mainParent = localParent.mainParent;
+    	Main mainParent = localParent.cli();
       
 		// load in the list of public keys to use as peers
 		if (keystorePublicKey.length > 0) {

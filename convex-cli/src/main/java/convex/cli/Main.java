@@ -74,6 +74,7 @@ public class Main implements Runnable {
 
     @Option(names={"-e", "--etch"},
 		scope = ScopeType.INHERIT,
+		defaultValue="${env:CONVEX_ETCH_FILE}",
 		description="Convex Etch database filename. A temporary storage file will be created if required.")
 	private String etchStoreFilename;
 
@@ -83,15 +84,14 @@ public class Main implements Runnable {
 		description="Keystore filename. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
 
-	@Option(names={"-p", "--password"},
+	@Option(names={"--store-password"},
 		scope = ScopeType.INHERIT,
-		//defaultValue="",
+		defaultValue="${env:CONVEX_KEYSTORE_PASSWORD}",
 		description="Password to read/write to the Keystore")
-	private String password;
+	private String keystorePassword;
 	
 	@Option(names={"-n", "--noninteractive"},
 			scope = ScopeType.INHERIT,
-			//defaultValue="",
 			description="Specify to disable interactive prompts")
 	private boolean nonInteractive;
 
@@ -203,8 +203,8 @@ public class Main implements Runnable {
 	public char[] getStorePassword() {
 		char[] storepass=null;
 		
-		if(this.password!=null) {
-			storepass=this.password.toCharArray();	
+		if(this.keystorePassword!=null) {
+			storepass=this.keystorePassword.toCharArray();	
 		} else {	
 			if (!nonInteractive) {
 				Console console = System.console(); 
@@ -226,8 +226,8 @@ public class Main implements Runnable {
 	public char[] getKeyPassword() {
 		char[] keypass=null;
 
-		if(this.password!=null) {
-			keypass=this.password.toCharArray();	
+		if(this.keystorePassword!=null) {
+			keypass=this.keystorePassword.toCharArray();	
 		} else {
 			if (!nonInteractive) {
 				Console console = System.console(); 
@@ -248,7 +248,7 @@ public class Main implements Runnable {
 	 * @param password Password to use
 	 */
 	public void setPassword(String password) {
-		this.password=password;
+		this.keystorePassword=password;
 	}
 
 	/**
@@ -314,13 +314,14 @@ public class Main implements Runnable {
 				Helpers.createPath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
-		} catch (IOException e) {
-			throw new CLIError("Unable to read keystore at: "+keyFile,e);
-		} catch (UnrecoverableKeyException e) {
-			throw new CLIError("Invalid password for keystore: "+keyFile);
 		} catch (GeneralSecurityException e) {
 			throw new CLIError("Unexpected security error: "+e.getClass(),e);
-		}  
+		} catch (IOException e) {
+			if (e.getCause() instanceof UnrecoverableKeyException) {
+				throw new CLIError("Invalid password for keystore: "+keyFile);
+			}
+			throw new CLIError("Unable to read keystore at: "+keyFile,e);
+		} 
 		keyStoreLoaded=true;
 		return keyStore;
 	}

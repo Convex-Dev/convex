@@ -55,7 +55,7 @@ public class KeyImport extends AKeyCommand {
 	@Override
 	public void run() {
 		// sub command to generate keys
-		Main mainParent = keyParent.mainParent;
+		Main mainParent = cli();
 		if (importFilename != null && importFilename.length() > 0) {
 			Path path=Paths.get(importFilename);
 			try {

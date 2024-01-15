@@ -32,7 +32,7 @@ public class CLICommandKeyTest {
 		String fileName =KEYSTORE_FILENAME;
 		
 		// command key.generate
-		CLTester tester =  CLTester.run("key", "generate", "--password", KEYSTORE_PASSWORD, "--keystore", fileName);
+		CLTester tester =  CLTester.run("key", "generate", "--store-password", KEYSTORE_PASSWORD, "--keystore", fileName);
 		assertEquals(0,tester.getResult());
 		String key = tester.getOutput().trim();
 		assertEquals(64,key.length());
@@ -41,11 +41,11 @@ public class CLICommandKeyTest {
 		assertTrue(fp.exists());
 
 		// command key.list
-		tester =  CLTester.run("key", "list", "--password", KEYSTORE_PASSWORD, "--keystore", fileName);
+		tester =  CLTester.run("key", "list", "--store-password", KEYSTORE_PASSWORD, "--keystore", fileName);
 		//tester.assertOutputMatch("^Index Public Key\\s+1");
 
 		// command key.list with non-existnt keystore
-		tester =  CLTester.run("key", "list", "--password", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");
+		tester =  CLTester.run("key", "list", "--store-password", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");
 		assertNotEquals(ExitCodes.SUCCESS,tester.getResult());
 
 	}
