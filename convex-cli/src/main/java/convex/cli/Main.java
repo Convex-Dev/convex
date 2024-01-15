@@ -7,8 +7,6 @@ import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,7 +31,6 @@ import picocli.CommandLine.IExecutionExceptionHandler;
 import picocli.CommandLine.IVersionProvider;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParseResult;
-import picocli.CommandLine.PropertiesDefaultProvider;
 import picocli.CommandLine.ScopeType;
 
 /**
@@ -97,8 +94,9 @@ public class Main implements Runnable {
 
     @Option(names={ "-v", "--verbose"},
 		scope = ScopeType.INHERIT,
+		defaultValue="${env:CONVEX_VERBOSE_LEVEL:-2}",
 		description="Show more verbose log information. You can increase verbosity by using multiple -v or -vvv")
-	private boolean[] verbose = new boolean[0];
+	private Integer verbose;
 
 	public Main() {
 		commandLine=commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
@@ -142,14 +140,15 @@ public class Main implements Runnable {
 
 		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
 
-		Level[] verboseLevels = {Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
-
-		parentLogger.setLevel(Level.WARN);
-		if (verbose.length > 0 && verbose.length <= verboseLevels.length) {
-			parentLogger.setLevel(verboseLevels[verbose.length]);
-			log.info("set level to {}", parentLogger.getLevel());
+		Level[] verboseLevels = {Level.OFF,Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
+		
+		if (verbose==null) verbose=0;
+		if (verbose >= 0 && verbose <= verboseLevels.length) {
+			parentLogger.setLevel(verboseLevels[verbose]);
+		} else {
+			throw new CLIError("Invalid verbosoity level: "+verbose);
 		}
-
+		
 		int result = 0;
 		result = commandLine.execute(args);
 		return result;

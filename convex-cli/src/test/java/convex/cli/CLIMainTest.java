@@ -9,7 +9,6 @@ public class CLIMainTest {
 
 	@Test
 	public void testMainGetPortList() {
-		Main mainApp = new Main();
 		String basicList[] = {"80", "90", "100", "101", "200"};
 		int result[] = Helpers.getPortList(basicList, 4);
 		assertArrayEquals(new int[]{80, 90, 100, 101}, result);

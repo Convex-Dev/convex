@@ -44,13 +44,6 @@ public class Query extends AClientCommand {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
-	@Option(names={"-t", "--timeout"},
-		description="Timeout in miliseconds.")
-	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
-
-	@Option(names={"-a", "--address"},
-		description = "Address to make the query from. Default: First peer address.")
-	private long address = 11;
 
 	@Parameters(paramLabel="queryCommand", description="Query Command")
 	private String queryCommand;

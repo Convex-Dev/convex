@@ -55,14 +55,6 @@ public class Transaction extends AClientCommand {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
-	@Option(names={"-a", "--address"},
-		description="Account address to use for the transaction request.")
-	private long addressNumber;
-
-	@Option(names={"-t", "--timeout"},
-		description="Timeout in miliseconds.")
-	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
-
 	@Parameters(paramLabel="transactionCommand",
 		description="Transaction Command")
 	private String transactionCode;

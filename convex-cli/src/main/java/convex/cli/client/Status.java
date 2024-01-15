@@ -44,10 +44,6 @@ public class Status extends AClientCommand {
 		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
 	private String hostname;
 
-	@Option(names={"-t", "--timeout"},
-		description="Timeout in miliseconds.")
-	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
-
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
