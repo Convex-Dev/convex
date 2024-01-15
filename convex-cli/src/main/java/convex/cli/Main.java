@@ -62,21 +62,9 @@ import picocli.CommandLine.ScopeType;
 	description="Convex Command Line Interface")
 
 public class Main implements Runnable {
-
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
 	public CommandLine commandLine=new CommandLine(this);
-
-	@Option(names={ "-c", "--config"},
-		scope = ScopeType.INHERIT,
-		description="Use the specified config file. If not specified, will check ~/.convex/convex.config")
-	private String configFilename;
-
-    @Option(names={"-e", "--etch"},
-		scope = ScopeType.INHERIT,
-		defaultValue="${env:CONVEX_ETCH_FILE}",
-		description="Convex Etch database filename. A temporary storage file will be created if required.")
-	private String etchStoreFilename;
 
 	@Option(names={"-k", "--keystore"},
 		defaultValue="${env:CONVEX_KEYSTORE_PASSWORD:-" +Constants.KEYSTORE_FILENAME+"}",
@@ -262,12 +250,7 @@ public class Main implements Runnable {
 		return null;
 	}
 
-	public String getEtchStoreFilename() {
-		if ( etchStoreFilename != null) {
-			return Helpers.expandTilde(etchStoreFilename).strip();
-		}
-		return null;
-	}
+
 
 	private boolean keyStoreLoaded=false;
 	private KeyStore keyStore=null;

@@ -3,26 +3,25 @@ package convex.cli.peer;
 import java.io.File;
 import java.security.KeyStore;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.Main;
 import convex.cli.output.RecordOutput;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
-import convex.core.data.Address;
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.core.Result;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 /**
@@ -42,9 +41,6 @@ import picocli.CommandLine.Spec;
 public class PeerCreate extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
-
-	@ParentCommand
-	private Peer peerParent;
 
 	@Spec CommandSpec spec;
 
@@ -72,7 +68,7 @@ public class PeerCreate extends APeerCommand {
 	@Override
 	public void run() {
 
-		Main mainParent = peerParent.mainParent;
+		Main mainParent = cli();
 
 		long peerStake = convex.core.Constants.MINIMUM_EFFECTIVE_STAKE;
 
@@ -142,4 +138,5 @@ public class PeerCreate extends APeerCommand {
 			throw new CLIError("Error creating Peer",t);
 		}
 	}
+
 }

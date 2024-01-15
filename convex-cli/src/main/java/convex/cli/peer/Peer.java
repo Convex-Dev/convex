@@ -1,9 +1,12 @@
 package convex.cli.peer;
 
+import convex.cli.ATopCommand;
 import convex.cli.Main;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.ScopeType;
 
 
 /**
@@ -21,7 +24,18 @@ import picocli.CommandLine.ParentCommand;
 	},
 	mixinStandardHelpOptions=true,
 	description="Operates a local peer.")
-public class Peer implements Runnable {
+public class Peer extends ATopCommand {
+	
+	@Option(names={ "-c", "--config"},
+			scope = ScopeType.INHERIT,
+			description="Use the specified config file. If not specified, will check ~/.convex/convex.config")
+	private String configFilename;
+
+	@Option(names={"-e", "--etch"},
+			scope = ScopeType.INHERIT,
+			defaultValue="${env:CONVEX_ETCH_FILE}",
+			description="Convex Etch database filename. A temporary storage file will be created if required.")
+	String etchStoreFilename;
 
 	// private static final Logger log = Logger.getLogger(Peer.class.getName());
 
