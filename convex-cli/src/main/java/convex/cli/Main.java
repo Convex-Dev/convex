@@ -88,6 +88,16 @@ public class Main implements Runnable {
 		defaultValue="${env:CONVEX_VERBOSE_LEVEL:-2}",
 		description="Specify verbosity level. Use -v0 to suppress user output. Default: ${DEFAULT-VALUE}")
 	private Integer verbose;
+    
+    @Option(names = {"-V", "--version"}, 
+    		versionHelp = true, 
+    		description = "Display version info")
+    boolean versionInfoRequested;
+
+    @Option(names = {"-h", "--help"}, 
+    		usageHelp = true, 
+    		description = "Display help for this command")
+    boolean usageHelpRequested;
 
 	public Main() {
 		commandLine=commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
@@ -130,6 +140,14 @@ public class Main implements Runnable {
 			commandLine.getErr().println("For more information on options and commands try 'convex help'.");
 			return ExitCodes.ERROR;
 		}
+		
+		if (commandLine.isUsageHelpRequested()) {
+			commandLine.usage(commandLine.getOut());
+			return ExitCodes.SUCCESS;
+		} else if (commandLine.isVersionHelpRequested()) {
+			commandLine.printVersionHelp(commandLine.getOut());
+		    return ExitCodes.SUCCESS;
+		}
 
 		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
 
@@ -154,7 +172,8 @@ public class Main implements Runnable {
 		@Override
 		public String[] getVersion() throws Exception {
 			String s=Main.class.getPackage().getImplementationVersion();
-			return new String[] {s};
+			return new String[] {
+					"Convex version: "+s};
 		}
 
 	}

@@ -26,7 +26,6 @@ public class Local extends ATopCommand {
 
 	@Override
 	public void run() {
-		// run with no command provided
-		CommandLine.usage(new Local(), System.out);
+
 	}
 }
