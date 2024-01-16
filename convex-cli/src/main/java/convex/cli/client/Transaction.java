@@ -49,6 +49,11 @@ public class Transaction extends AClientCommand {
 		try {
 			Convex convex = connect();
 			Address address=convex.getAddress();
+			if (!ensureAddress(convex)) {
+				
+				throw new CLIError("Must specify a valid address for transaction.");
+			}
+			
 			AKeyPair keyPair = convex.getKeyPair();
 			
 			// If we don't already have keypair specified, attempt to find
@@ -77,5 +82,7 @@ public class Transaction extends AClientCommand {
 			throw new CLIError("Error executing transation",e);
 		}
 	}
+
+
 
 }

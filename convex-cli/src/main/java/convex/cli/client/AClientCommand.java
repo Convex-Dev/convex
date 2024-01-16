@@ -35,12 +35,36 @@ public abstract class AClientCommand extends ATopCommand {
 		Address result= Address.parse(addressValue);	
 		return result;
 	}
+	
+	protected boolean ensureAddress(Convex convex) {
+		Address a = convex.getAddress();
+		if (a!=null) return true;
+		if (cli().isInteractive()) {
+			String s=System.console().readLine("Enter origin address: ");
+			a=Address.parse(s);
+		}
+		if (a!=null) {
+			convex.setAddress(a);
+			return true;
+		}
+		return false;
+	}
 
 	protected convex.api.Convex connect() throws IOException,TimeoutException {
 		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
+		if (hostname==null) hostname="localhost";
 		try {
+			InetSocketAddress sa=new InetSocketAddress(hostname,port);
 			Convex c;
-			c=Convex.connect(new InetSocketAddress("localhost",port));
+			c=Convex.connect(sa);
+			
+			if (addressValue!=null) {
+				Address a=Address.parse(addressValue);
+				if (a!=null) {
+					c.setAddress(a);
+				}
+			}
+			
 			return c;
 		} catch (Exception e) {
 			throw e;

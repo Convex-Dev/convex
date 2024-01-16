@@ -93,12 +93,11 @@ public final class Address extends ALongBlob {
 		if (hexString.length()>16) return null;
 		Blob b=Blob.fromHex(hexString);
 		if (b==null) return null;
-		if (b.length!=BYTE_LENGTH) return null;
 		return create(b.longValue());
 	}
 	
 	/**
-	 * Constructs an Address from an arbitrary String, attempting to parse different possible formats
+	 * Constructs an Address from an arbitrary String, attempting to parse different possible formats '123' '0xc3' or '#123'
 	 * @param s String to parse
 	 * @return Address parsed, or null if not valid
 	 */

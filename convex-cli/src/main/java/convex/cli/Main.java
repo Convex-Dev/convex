@@ -435,5 +435,9 @@ public class Main implements Runnable {
 		println(Utils.toString(value));
 	}
 
+	public boolean isInteractive() {
+		return !nonInteractive;
+	}
+
 
 }
