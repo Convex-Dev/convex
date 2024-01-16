@@ -8,11 +8,13 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 
+import convex.core.State;
 import convex.core.data.Address;
 import convex.gui.PeerGUI;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
+import convex.gui.components.models.StateModel;
 
 /**
  * Panel displaying current prediction markets
@@ -22,11 +24,13 @@ public class MarketsPanel extends JPanel {
 
 	private static final Logger log = LoggerFactory.getLogger(MarketsPanel.class.getName());
 	AccountChooserPanel acctChooser;
+	private PeerGUI manager;
 
 	static DefaultListModel<Address> marketList = new DefaultListModel<Address>();
 
 	public MarketsPanel(PeerGUI manager) {
 		this.setLayout(new BorderLayout());
+		this.manager=manager;
 
 		// ===========================================
 		// Top panel
@@ -49,5 +53,13 @@ public class MarketsPanel extends JPanel {
 		scanButton.addActionListener(e -> {
 			log.info("Scanning for prediction market Actors...");
 		});
+	}
+
+	public State getLatestState() {
+		return manager.getLatestState();
+	}
+	
+	public StateModel<State> getStateModel() {
+		return manager.getStateModel();
 	}
 }

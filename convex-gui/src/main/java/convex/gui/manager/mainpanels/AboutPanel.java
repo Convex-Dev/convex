@@ -22,7 +22,7 @@ public class AboutPanel extends JPanel {
 
 	private final JTextArea textArea;
 
-	public AboutPanel() {
+	public AboutPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel panel = new ActionPanel();
@@ -40,7 +40,7 @@ public class AboutPanel extends JPanel {
 		textArea.setBackground(null);
 		textArea.setFont(Toolkit.SMALL_MONO_FONT);
 
-		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
+		manager.getStateModel().addPropertyChangeListener(e -> {
 			updateState((State) e.getNewValue());
 		});
 
@@ -51,7 +51,7 @@ public class AboutPanel extends JPanel {
 					"Credits", JOptionPane.PLAIN_MESSAGE);
 		});
 
-		updateState(PeerGUI.getLatestState());
+		updateState(manager.getLatestState());
 	}
 
 	private String lpad(Object s) {

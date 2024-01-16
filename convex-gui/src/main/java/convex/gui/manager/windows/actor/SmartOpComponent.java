@@ -70,7 +70,7 @@ public class SmartOpComponent extends BaseListComponent {
 		JPanel paramPanel = new JPanel();
 		paramPanel.setLayout(new GridLayout(0, 3, 4, 4)); // 3 columns, small hgap and vgap
 
-		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
+		AccountStatus as = parent.getLatestState().getAccount(contract);
 
 		AFn<?> fn = as.getCallableFunction(sym);
 

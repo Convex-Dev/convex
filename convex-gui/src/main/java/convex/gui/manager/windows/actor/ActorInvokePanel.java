@@ -5,6 +5,7 @@ import java.awt.BorderLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JPanel;
 
+import convex.core.State;
 import convex.core.data.ASet;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -28,7 +29,7 @@ public class ActorInvokePanel extends JPanel {
 
 		setLayout(new BorderLayout());
 
-		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
+		AccountStatus as = manager.getLatestState().getAccount(contract);
 		ASet<Symbol> exports = as.getCallableFunctions();
 		for (Symbol s : exports) {
 			exportList.addElement(s);
@@ -39,6 +40,10 @@ public class ActorInvokePanel extends JPanel {
 		add(scrollyList, BorderLayout.CENTER);
 
 		add(execPanel, BorderLayout.NORTH);
+	}
+
+	public State getLatestState() {
+		return manager.getLatestState();
 	}
 
 }

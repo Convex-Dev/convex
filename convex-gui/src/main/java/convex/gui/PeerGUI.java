@@ -60,34 +60,33 @@ public class PeerGUI extends JPanel {
 
 	private static JFrame frame;
 	
-	public static List<AKeyPair> KEYPAIRS=new ArrayList<>();
+	public List<AKeyPair> KEYPAIRS=new ArrayList<>();
+	private List<AccountKey> PEERKEYS;
 			
 	private static final int DEFAULT_NUM_PEERS=3;
 	
-	public static List<AccountKey> PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 	
-	public static State genesisState=Init.createState(PEERKEYS);
-	private static StateModel<State> latestState = StateModel.create(genesisState);
-	public static StateModel<Long> tickState = StateModel.create(0L);
+	public State genesisState;
+	private StateModel<State> latestState = StateModel.create(genesisState);
+	public StateModel<Long> tickState = StateModel.create(0L);
 
 	public static long maxBlock = 0;
+
+	static {
+		convex.gui.utils.Toolkit.init();
+	}
 
 	/**
 	 * Launch the application.
 	 * @param args Command line args
 	 */
 	public static void main(String[] args) {
+		
 		// TODO: Store config
 		// Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
 
-		// call to set up Look and Feel
-		convex.gui.utils.Toolkit.init();
+		// call to set up Look and Feel	
 		
-		int peerCount=DEFAULT_NUM_PEERS;
-		for (int i=0; i<peerCount; i++) {
-			KEYPAIRS.add(AKeyPair.generate());
-		}
-
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
@@ -121,27 +120,38 @@ public class PeerGUI extends JPanel {
 	/*
 	 * Main component panel
 	 */
-	JPanel panel = new JPanel();
-
-	HomePanel homePanel = new HomePanel();
+	HomePanel homePanel;
 	PeersListPanel peerPanel;
-	WalletPanel walletPanel = new WalletPanel();
-	KeyGenPanel keyGenPanel = new KeyGenPanel(this);
-	MessageFormatPanel messagePanel = new MessageFormatPanel(this);
-	AboutPanel aboutPanel = new AboutPanel();
-	JTabbedPane tabs = new JTabbedPane();
-	JPanel mainPanel = new JPanel();
-	JPanel accountsPanel = new AccountsPanel(this);
-	
+	WalletPanel walletPanel;
+	KeyGenPanel keyGenPanel;
+	MessageFormatPanel messagePanel;
+	JPanel accountsPanel;
+	JTabbedPane tabs;
 	RESTServer restServer;
 
 	/**
 	 * Create the application.
 	 */
 	public PeerGUI() {
+		int peerCount=DEFAULT_NUM_PEERS;
+		for (int i=0; i<peerCount; i++) {
+			KEYPAIRS.add(AKeyPair.generate());
+		}
+		PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
+		genesisState=Init.createState(PEERKEYS);
+		latestState = StateModel.create(genesisState);
+		tickState = StateModel.create(0L);
+		
 		peerPanel= new PeersListPanel(this);
+		homePanel = new HomePanel();
+		walletPanel = new WalletPanel(this);
+		keyGenPanel = new KeyGenPanel(this);
+		messagePanel = new MessageFormatPanel(this);
+		accountsPanel = new AccountsPanel(this);
 
 		setLayout(new BorderLayout());
+
+		tabs = new JTabbedPane();
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Home", homePanel);
@@ -152,11 +162,10 @@ public class PeerGUI extends JPanel {
 		tabs.add("Message", messagePanel);
 		tabs.add("Actors", new ActorsPanel(this));
 		tabs.add("Torus", new TorusPanel(this));
-		tabs.add("About", aboutPanel);
+		tabs.add("About", new AboutPanel(this));
 		
 		tabs.setSelectedComponent(peerPanel);
 		
-
 		// launch local peers for testing
 		EventQueue.invokeLater(() -> {
 			peerPanel.launchAllPeers(this);
@@ -270,7 +279,7 @@ public class PeerGUI extends JPanel {
 	 * @param we Wallet to use
 	 * @return Future for Result
 	 */
-	public static CompletableFuture<Result> execute(WalletEntry we, ACell code) {
+	public CompletableFuture<Result> execute(WalletEntry we, ACell code) {
 		Address address = we.getAddress();
 		AccountStatus as = getLatestState().getAccount(address);
 		long sequence = as.getSequence() + 1;
@@ -308,7 +317,7 @@ public class PeerGUI extends JPanel {
 		execute(we,trans).thenAcceptAsync(receiveAction);
 	}
 
-	public static State getLatestState() {
+	public State getLatestState() {
 		return latestState.getValue();
 	}
 
@@ -316,7 +325,7 @@ public class PeerGUI extends JPanel {
 		return frame;
 	}
 
-	public static StateModel<State> getStateModel() {
+	public StateModel<State> getStateModel() {
 		return latestState;
 	}
 
@@ -328,7 +337,7 @@ public class PeerGUI extends JPanel {
 		return Init.getGenesisPeerAddress(i);
 	}
 	
-	public static AKeyPair getUserKeyPair(int i) {
+	public AKeyPair getUserKeyPair(int i) {
 		return KEYPAIRS.get(i);
 	}
 

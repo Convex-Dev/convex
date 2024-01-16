@@ -27,10 +27,8 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.gui.PeerGUI;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
-import convex.gui.components.DefaultReceiveAction;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -51,7 +49,7 @@ public class MarketComponent extends BaseListComponent {
 	public MarketComponent(MarketsPanel marketsPanel, Address addr) {
 		this.marketsPanel = marketsPanel;
 		this.address = addr;
-		State state = PeerGUI.getLatestState();
+		State state = marketsPanel.getLatestState();
 
 		// prediction market data
 		AMap<Symbol, ACell> pmEnv = state.getEnvironment(addr);
@@ -141,13 +139,13 @@ public class MarketComponent extends BaseListComponent {
 		// state updates
 		updateStatus(state);
 
-		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
+		marketsPanel.getStateModel().addPropertyChangeListener(e -> {
 			State s = (State) e.getNewValue();
 			updateStatus(s);
 		});
 
 		marketsPanel.acctChooser.addressCombo.addActionListener(e -> {
-			State s = PeerGUI.getLatestState();
+			State s = marketsPanel.getLatestState();
 			updateStatus(s);
 		});
 	}
@@ -161,7 +159,7 @@ public class MarketComponent extends BaseListComponent {
 	}
 
 	private void changeStake(Object outcome, long delta) {
-		State state = PeerGUI.getLatestState();
+		State state = marketsPanel.getLatestState();
 		Long stk = getStake(state, outcome);
 		if (stk == null) stk = 0L;
 		long newStake = Math.max(0L, stk + delta);
@@ -170,7 +168,7 @@ public class MarketComponent extends BaseListComponent {
 		WalletEntry we = marketsPanel.acctChooser.getWalletEntry();
 		AList<ACell> cc = Lists.of(Symbol.create("stake"), outcome, newStake);
 		AList<ACell> cmd = List.of(Symbols.CALL, address, offer, cc);
-		PeerGUI.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
+		//marketsPanel.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
 	}
 
 	static DecimalFormat probFormatter = new DecimalFormat("0.0");

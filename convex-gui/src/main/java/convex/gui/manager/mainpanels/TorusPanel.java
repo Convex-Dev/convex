@@ -20,16 +20,19 @@ import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class TorusPanel extends JPanel {
-	TorusTableModel tableModel = new TorusTableModel(PeerGUI.getLatestState());
-	JTable table = new JTable(tableModel);
+	TorusTableModel tableModel;
+	JTable table;
 
 	public TorusPanel(PeerGUI manager) {
 		setLayout(new BorderLayout());
 
-		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
+		manager.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});
+		
+		tableModel = new TorusTableModel(manager.getLatestState());
+		table = new JTable(tableModel);
 
 		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
 		leftRenderer.setHorizontalAlignment(JLabel.LEFT);

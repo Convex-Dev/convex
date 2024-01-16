@@ -28,8 +28,8 @@ import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class AccountsPanel extends JPanel {
-	AccountsTableModel tableModel = new AccountsTableModel(PeerGUI.getLatestState());
-	JTable table = new JTable(tableModel);
+	AccountsTableModel tableModel;
+	JTable table;
 
 	static class ActorRenderer extends DefaultTableCellRenderer {
 		public ActorRenderer() {
@@ -44,7 +44,11 @@ public class AccountsPanel extends JPanel {
 	public AccountsPanel(PeerGUI manager) {
 		setLayout(new BorderLayout());
 
-		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
+		
+		tableModel = new AccountsTableModel(manager.getLatestState());
+		table = new JTable(tableModel);
+		
+		manager.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});

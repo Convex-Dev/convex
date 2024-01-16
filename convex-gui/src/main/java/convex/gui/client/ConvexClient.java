@@ -17,8 +17,6 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.util.Utils;
 import convex.gui.client.panels.HomePanel;
-import convex.gui.manager.mainpanels.AboutPanel;
-import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.manager.windows.peer.REPLPanel;
 import convex.gui.utils.Toolkit;
 
@@ -66,10 +64,9 @@ public class ConvexClient extends JPanel {
 	JPanel panel = new JPanel();
 
 	HomePanel homePanel = new HomePanel();
-	AboutPanel aboutPanel = new AboutPanel();
+
 	public JTabbedPane tabs = new JTabbedPane();
 	JPanel mainPanel = new JPanel();
-	WalletPanel walletPanel=new WalletPanel();
 	public REPLPanel replPanel;
 
 	/**
@@ -82,8 +79,6 @@ public class ConvexClient extends JPanel {
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Home", homePanel);
-		tabs.add("About", aboutPanel);
-		tabs.add("Wallet", walletPanel);
 		tabs.add("REPL", replPanel);
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));

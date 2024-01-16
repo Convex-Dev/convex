@@ -154,7 +154,7 @@ public class PeerComponent extends BaseListComponent {
 			});
 		}
 		
-		PeerGUI.tickState.addPropertyChangeListener(e->{
+		manager.tickState.addPropertyChangeListener(e->{
 			description.setText(getPeerDescription());
 		});
 

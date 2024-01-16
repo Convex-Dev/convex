@@ -31,10 +31,10 @@ public class ActorInfoPanel extends JPanel {
 		infoArea.setBackground(null);
 		infoArea.setFont(Toolkit.SMALL_MONO_FONT);
 
-		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
+		manager.getStateModel().addPropertyChangeListener(e -> {
 			updateInfo((State) e.getNewValue());
 		});
-		updateInfo(PeerGUI.getLatestState());
+		updateInfo(manager.getLatestState());
 	}
 
 	private void updateInfo(State latestState) {

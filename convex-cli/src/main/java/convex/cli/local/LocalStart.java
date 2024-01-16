@@ -8,7 +8,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.Helpers;
 import convex.cli.Main;
@@ -67,7 +66,7 @@ public class LocalStart implements Runnable {
      * @param n Number of public keys
      * @return List of distinct public keys
      */
-    private List<AKeyPair> getPublicKeys(int n) {
+    private List<AKeyPair> getPeerKeyPairs(int n) {
     	HashSet<AKeyPair> keyPairList = new HashSet<AKeyPair>();
     	
     	Main mainParent = localParent.cli();
@@ -78,22 +77,22 @@ public class LocalStart implements Runnable {
 			
 			for (int index = 0; index < values.size(); index ++) {
 				String keyPrefix = values.get(index);
+				if (keyPrefix.isBlank()) continue;
 
 				AKeyPair keyPair = mainParent.loadKeyFromStore(keyPrefix);
-				if (keyPair == null) throw new CLIError("Unable to find public key in store: "+keyPrefix);
-				keyPairList.add(keyPair);
+				if (keyPair == null) {
+					log.warn("Unable to find public key in store: "+keyPrefix);
+				} else {
+					keyPairList.add(keyPair);
+				}
 			}
 		}
 		int left=n-keyPairList.size();
 		if (left>0) {
-			log.warn("Insufficient key pairs specified. Additional keypairs will be generated");
-		
-			List<AKeyPair> kp=mainParent.generateKeyPairs(left,mainParent.getKeyPassword());
-			keyPairList.addAll(kp);
-			mainParent.saveKeyStore();
-		}
-		if (keyPairList.size()<n) {
-			throw new CLIError("Unable to generate sufficient keypairs!");
+			log.warn("Insufficient key pairs specified. Additional "+left+" keypair(s) will be generated");
+			for (int i=0; i<left; i++) {
+				keyPairList.add(AKeyPair.generate());
+			}
 		}
 		
 		return new ArrayList<AKeyPair>(keyPairList);
@@ -101,7 +100,7 @@ public class LocalStart implements Runnable {
     
 	@Override
 	public void run() {
-		List<AKeyPair> keyPairList = getPublicKeys(count);
+		List<AKeyPair> keyPairList = getPeerKeyPairs(count);
 
 		int peerPorts[] = null;
 		if (ports != null) {
@@ -116,15 +115,28 @@ public class LocalStart implements Runnable {
 				return;
 			}
 		}
-		log.info("Starting local network with "+count+" peer(s)");
+		log.info("Starting local test network with "+count+" peer(s)");
 		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
 		int n=servers.size();
-		log.info("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
-		if (apiPort > 0) {
-			log.info("Starting REST api on port "+apiPort);
-			
+		log.debug("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
+		
+		try {
+			if (apiPort > 0) {
+				log.debug("Requesting REST API on port "+apiPort);
+			}
+			launchRestAPI(servers.get(0));
+		} catch (Throwable t) {
+			log.warn("Failed to start REST server: "+t);
 		}
-		launchRestAPI(servers.get(0));
+		
+		// Loop until we end
+		while (true) {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				return;
+			}
+		}
 	}
 	
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) {
@@ -134,8 +146,9 @@ public class LocalStart implements Runnable {
 		return API.launchLocalPeers(keyPairList,genesisState, peerPorts);
 	}
 	
-	public void launchRestAPI(Server server) {
+	public RESTServer launchRestAPI(Server server) {
 		RESTServer restServer=RESTServer.create(server);
 		restServer.start();
+		return restServer;
 	}
 }

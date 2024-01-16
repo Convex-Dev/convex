@@ -36,18 +36,22 @@ public class OraclePanel extends JPanel {
 
 	public static final Logger log = LoggerFactory.getLogger(OraclePanel.class.getName());
 
-	Address oracleAddress = PeerGUI.getLatestState().lookupCNS("convex.trusted-oracle");
-	Address oracleActorAddress = PeerGUI.getLatestState().lookupCNS("convex.trusted-oracle.actor");
-
-	OracleTableModel tableModel = new OracleTableModel(PeerGUI.getLatestState(), oracleActorAddress);
-	JTable table = new JTable(tableModel);
-
-	JScrollPane scrollPane = new JScrollPane(table);;
-
+	PeerGUI manager;
+	JScrollPane scrollPane;
+	
 	long key = 1;
 
-	public OraclePanel() {
+	public OraclePanel(PeerGUI manager) {
+		this.manager=manager;
 		this.setLayout(new BorderLayout());
+		
+		Address oracleAddress = manager.getLatestState().lookupCNS("convex.trusted-oracle");
+		Address oracleActorAddress = manager.getLatestState().lookupCNS("convex.trusted-oracle.actor");
+
+		OracleTableModel tableModel = new OracleTableModel(manager.getLatestState(), oracleActorAddress);
+		JTable table = new JTable(tableModel);
+		scrollPane = new JScrollPane(table);;
+
 
 		// ===========================================
 		// Top label
@@ -55,7 +59,7 @@ public class OraclePanel extends JPanel {
 
 		// ===========================================
 		// Central table
-		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
+		manager.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});
@@ -133,7 +137,7 @@ public class OraclePanel extends JPanel {
 				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
 						+ oracleAddress.toString() + " " + key + " " + outcomeString + ")))";
 				ACell code = Reader.read(source);
-				PeerGUI.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
+				manager.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
@@ -141,7 +145,7 @@ public class OraclePanel extends JPanel {
 	}
 
 	private void execute(ACell code) {
-		PeerGUI.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
+		manager.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
 	}
 
 	private final Consumer<Result> createMarketAction = new Consumer<Result>() {

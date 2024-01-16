@@ -19,9 +19,9 @@ public class ActorWindow extends BaseWindow {
 	public ActorWindow(PeerGUI manager, Address contract) {
 		super(manager);
 		this.contract = contract;
-		AccountStatus as = PeerGUI.getLatestState().getAccount(contract);
+		AccountStatus as = manager.getLatestState().getAccount(contract);
 
-		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
+		manager.getStateModel().addPropertyChangeListener(e -> {
 
 		});
 

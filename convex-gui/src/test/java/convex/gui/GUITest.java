@@ -18,7 +18,7 @@ public class GUITest {
 
 	@Test
 	public void testState() throws InvalidDataException {
-		State s = PeerGUI.getLatestState();
+		State s = manager.getLatestState();
 		s.validate();
 	}
 }

@@ -71,9 +71,9 @@ public class AccountChooserPanel extends JPanel {
 		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 		add(balanceLabel);
 
-		PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
-			updateBalance(getSelectedAddress());
-		});
+		//PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
+		//	updateBalance(getSelectedAddress());
+		//});
 
 		addressCombo.addItemListener(e -> {
 			updateBalance(getSelectedAddress());

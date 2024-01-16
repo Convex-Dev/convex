@@ -38,7 +38,7 @@ public class WalletComponent extends BaseListComponent {
 
 	private Address address;
 
-	public WalletComponent(WalletEntry initialWalletEntry) {
+	public WalletComponent(PeerGUI manager,WalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
 		address = walletEntry.getAddress();
 
@@ -60,7 +60,7 @@ public class WalletComponent extends BaseListComponent {
 		cPanel.add(infoLabel,"span,growx");
 		add(cPanel,"grow,shrink"); // add to MigLayout
 
-		PeerGUI.getStateModel().addPropertyChangeListener(e -> {
+		manager.getStateModel().addPropertyChangeListener(e -> {
 			infoLabel.setText(getInfoString());
 		});
 		

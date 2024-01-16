@@ -36,7 +36,7 @@ public class WalletPanel extends JPanel {
 	/**
 	 * Create the panel.
 	 */
-	public WalletPanel() {
+	public WalletPanel(PeerGUI manager) {
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel toolBar = new ActionPanel();
@@ -58,7 +58,7 @@ public class WalletPanel extends JPanel {
 
 
 		// create and add ScrollyList
-		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(we));
+		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(manager,we));
 		add(walletList, BorderLayout.CENTER);
 	}
 

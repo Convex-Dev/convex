@@ -23,7 +23,7 @@ public class ActorsPanel extends JPanel {
 
 		typePane = new JTabbedPane();
 
-		typePane.add("Oracle", new OraclePanel());
+		typePane.add("Oracle", new OraclePanel(manager));
 
 		// TODO: fix registry address
 		// typePane.add("Registry", new ActorInvokePanel(manager, ...));

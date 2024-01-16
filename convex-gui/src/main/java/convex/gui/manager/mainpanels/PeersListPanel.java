@@ -46,8 +46,8 @@ public class PeersListPanel extends JPanel {
 
 	public void launchAllPeers(PeerGUI manager) {
 		try {
-			int N=PeerGUI.KEYPAIRS.size();
-			List<Server> serverList = API.launchLocalPeers(PeerGUI.KEYPAIRS,PeerGUI.genesisState);
+			int N=manager.KEYPAIRS.size();
+			List<Server> serverList = API.launchLocalPeers(manager.KEYPAIRS,manager.genesisState);
 			for (Server server: serverList) {
 				Convex convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
 				addPeer(convex);
@@ -85,7 +85,7 @@ public class PeersListPanel extends JPanel {
 			HashMap<Keyword, Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR, kp);
 			config.put(Keywords.CONTROLLER, a);
-			config.put(Keywords.STATE, PeerGUI.genesisState);
+			config.put(Keywords.STATE, manager.genesisState);
 			Server server=API.launchPeer(config);
 			server.getConnectionManager().connectToPeer(base.getHostAddress());
 			server.setHostname("localhost:"+server.getPort());
