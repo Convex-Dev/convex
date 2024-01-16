@@ -42,7 +42,7 @@ public class KeyImport extends AKeyCommand {
 	private String importText;
 
 	@Option(names={"-f", "--import-file"},
-		description="Import file name of the keypair PEM file.")
+		description="Import file name of the keypair file.")
 	private String importFilename;
 
 	@Option(names={"--import-password"},
@@ -80,7 +80,7 @@ public class KeyImport extends AKeyCommand {
 		mainParent.addKeyPairToStore(keyPair,keyPassword);
 		Arrays.fill(keyPassword, 'x');
 		
-		saveKeyStore();
+		cli().saveKeyStore();
 		mainParent.println(keyPair.getAccountKey().toHexString());
 	}
 }

@@ -1,16 +1,21 @@
-package convex.cli;
+package convex.cli.key;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 
 import org.junit.jupiter.api.Test;
 
+import convex.cli.CLTester;
+import convex.cli.ExitCodes;
+import convex.cli.Helpers;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.crypto.sodium.SodiumKeyPair; 
+import convex.core.crypto.sodium.SodiumKeyPair;
+import convex.core.data.AccountKey; 
 
-public class CLICommandKeyImportTest {
+public class KeyImportTest {
 
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
 	private static final char[] IMPORT_PASSWORD = "testImportPassword".toCharArray();
@@ -26,6 +31,7 @@ public class CLICommandKeyImportTest {
 	public void testKeyImport() {
 	 
 		AKeyPair keyPair = SodiumKeyPair.generate();
+		AccountKey accountKey=keyPair.getAccountKey();
 		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSWORD);
  
 		// command key.list
@@ -41,7 +47,13 @@ public class CLICommandKeyImportTest {
 		assertEquals("",tester.getError());
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 
-		//tester.assertOutputMatch("public key: " + keyPair.getAccountKey().toHexString());
-
+		CLTester t2=CLTester.run(
+				"key" , 
+				"list",
+				"--store-password", new String(KEYSTORE_PASSWORD), 
+				"--keystore", KEYSTORE_FILENAME);
+		
+		assertEquals(ExitCodes.SUCCESS,t2.getResult());
+		assertTrue(t2.getOutput().contains(accountKey.toHexString()));
 	}
 }

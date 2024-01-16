@@ -48,7 +48,7 @@ public class KeyGenerate extends AKeyCommand {
 		log.debug("Generating {} keys",count);
 		
 		try {
-			KeyStore ks=loadKeyStore(true);
+			KeyStore ks=cli().loadKeyStore(true);
 			char[] keyPassword=mainParent.getKeyPassword();
 			for ( int index = 0; index < count; index ++) {
 				AKeyPair kp=AKeyPair.generate();
@@ -57,7 +57,7 @@ public class KeyGenerate extends AKeyCommand {
 				PFXTools.setKeyPair(ks, kp, keyPassword); 
 			}
 			log.debug(count+ " keys successfully generated");
-			saveKeyStore();
+			cli().saveKeyStore();
 			log.trace("Keystore saved successfully");
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);

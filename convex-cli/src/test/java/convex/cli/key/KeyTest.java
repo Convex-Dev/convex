@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.key;
 
 import java.io.File;
 import java.io.IOException;
@@ -8,9 +8,11 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
+import convex.cli.CLTester;
+import convex.cli.ExitCodes;
 import convex.core.util.Utils;
 
-public class CLICommandKeyTest {
+public class KeyTest {
 
 	private static final File TEMP_FILE;
 	private static final String KEYSTORE_FILENAME;

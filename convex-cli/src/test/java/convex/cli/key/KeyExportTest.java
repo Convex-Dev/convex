@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.key;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -8,11 +8,14 @@ import java.io.File;
 
 import org.junit.jupiter.api.Test;
 
+import convex.cli.CLTester;
+import convex.cli.ExitCodes;
+import convex.cli.Helpers;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.util.Utils;
 
-public class CLICommandKeyExportTest {
+public class KeyExportTest {
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
 	private static final char[] EXPORT_PASSWORD = "testExportPassword".toCharArray();
 

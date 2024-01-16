@@ -23,15 +23,11 @@ import picocli.CommandLine.Command;
 	mixinStandardHelpOptions=true,
 	description="List available key pairs.")
 public class KeyList extends AKeyCommand {
-
 	static final Logger log = LoggerFactory.getLogger(KeyList.class);
-
 
 	@Override
 	public void run() {
-
-
-		KeyStore keyStore = loadKeyStore(false);
+		KeyStore keyStore = cli().loadKeyStore(false);
 		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid keystore or use `convex key gen` to create one.");
 		Enumeration<String> aliases;
 		try {
@@ -47,11 +43,5 @@ public class KeyList extends AKeyCommand {
 		} catch (KeyStoreException e) {
 			throw new CLIError("Unexpected error reading keystore",e);
 		}
-
-		
-
 	}
-
-
-
 }
