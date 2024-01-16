@@ -62,13 +62,7 @@ public class PeerGUI extends JPanel {
 	
 	public static List<AKeyPair> KEYPAIRS=new ArrayList<>();
 			
-	private static final int NUM_PEERS=5;
-	 
-	static {
-		for (int i=0; i<NUM_PEERS; i++) {
-			KEYPAIRS.add(AKeyPair.generate());
-		}
-	}
+	private static final int DEFAULT_NUM_PEERS=3;
 	
 	public static List<AccountKey> PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 	
@@ -88,6 +82,11 @@ public class PeerGUI extends JPanel {
 
 		// call to set up Look and Feel
 		convex.gui.utils.Toolkit.init();
+		
+		int peerCount=DEFAULT_NUM_PEERS;
+		for (int i=0; i<peerCount; i++) {
+			KEYPAIRS.add(AKeyPair.generate());
+		}
 
 		EventQueue.invokeLater(new Runnable() {
 			@Override

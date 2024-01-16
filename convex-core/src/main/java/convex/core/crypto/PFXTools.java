@@ -28,15 +28,15 @@ public class PFXTools {
 	 * @param passPhrase Passphrase used to protect the key store, may be null
 	 * @return New KeyStore instance
 	 */
-	public static KeyStore createStore(File keyFile, char[] passPhrase) throws GeneralSecurityException, IOException {
+	public static KeyStore createStore(File keyFile, char[] storePassword) throws GeneralSecurityException, IOException {
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
 		// need to load in bouncy castle crypto providers to set/get keys from the keystore
 		Providers.init();
 
-		ks.load(null, passPhrase); // create empty keystore
+		ks.load(null, storePassword); // create empty keystore
 
-		ks=saveStore(ks,keyFile,passPhrase);
+		ks=saveStore(ks,keyFile,storePassword);
 		return ks;
 	}
 
@@ -91,9 +91,9 @@ public class PFXTools {
 	 * @throws KeyStoreException If a general key store exception occurs
 	 * @throws NoSuchAlgorithmException If crypto algorithm is not available
 	 */
-	public static AKeyPair getKeyPair(KeyStore ks, String alias, char[] passphrase) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
+	public static AKeyPair getKeyPair(KeyStore ks, String alias, char[] keyPassword) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
 
-		Key sk=ks.getKey(alias,passphrase);
+		Key sk=ks.getKey(alias,keyPassword);
 		return AKeyPair.create(sk.getEncoded());
 	}
 
@@ -101,14 +101,14 @@ public class PFXTools {
 	 * Adds a key pair to a key store.
 	 * @param ks Key store
 	 * @param kp Key pair
-	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
+	 * @param keyPassword Passphrase for encrypting the key pair. Mandatory.
 	 * @return Updated key store.
 	 * @throws IOException If an IO error occurs accessing the key store
 	 * @throws GeneralSecurityException if a security exception occurs
 	 */
-	public static KeyStore setKeyPair(KeyStore ks, AKeyPair kp, char[] passPhrase) throws IOException, GeneralSecurityException {
+	public static KeyStore setKeyPair(KeyStore ks, AKeyPair kp, char[] keyPassword) throws IOException, GeneralSecurityException {
 
-		return setKeyPair(ks, kp.getAccountKey().toHexString(), kp, passPhrase);
+		return setKeyPair(ks, kp.getAccountKey().toHexString(), kp, keyPassword);
 	}
 
 	/**
@@ -121,13 +121,13 @@ public class PFXTools {
 	 * @throws IOException If an IO error occurs accessing the key store
 	 * @throws GeneralSecurityException if a security exception occurs
 	 */
-	public static KeyStore setKeyPair(KeyStore ks, String alias, AKeyPair kp, char[] passPhrase) throws IOException, GeneralSecurityException {
+	public static KeyStore setKeyPair(KeyStore ks, String alias, AKeyPair kp, char[] keyPassword) throws IOException, GeneralSecurityException {
 
-		if (passPhrase == null) throw new IllegalArgumentException("Password is mandatory for private key");
+		if (keyPassword == null) throw new IllegalArgumentException("Password is mandatory for private key");
 
 		byte[] bs=((AKeyPair)kp).getSeed().getBytes();
 		SecretKey secretKeyPrivate = new SecretKeySpec(bs, "Ed25519");
-		ks.setKeyEntry(alias, secretKeyPrivate, passPhrase, null);
+		ks.setKeyEntry(alias, secretKeyPrivate, keyPassword, null);
 
 		return ks;
 	}

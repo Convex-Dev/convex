@@ -1,7 +1,6 @@
 package convex.cli.key;
 
 import java.security.KeyStore;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,19 +46,19 @@ public class KeyGenerate extends AKeyCommand {
 			count=0;
 		}
 		log.debug("Generating {} keys",count);
-		char[] keyPassword=mainParent.getKeyPassword();
 		
 		try {
 			KeyStore ks=loadKeyStore(true);
-			List<AKeyPair> keyPairList = mainParent.generateKeyPairs(count,keyPassword);
+			char[] keyPassword=mainParent.getKeyPassword();
 			for ( int index = 0; index < count; index ++) {
-				AKeyPair kp=keyPairList.get(index);
+				AKeyPair kp=AKeyPair.generate();
                 String publicKeyHexString =  kp.getAccountKey().toHexString();
-				mainParent.println(publicKeyHexString); // Output generated public key
-				PFXTools.setKeyPair(ks, kp, keyPassword); // TODO: key password?
+				mainParent.println(publicKeyHexString); // Output generated public key		
+				PFXTools.setKeyPair(ks, kp, keyPassword); 
 			}
 			log.debug(count+ " keys successfully generated");
 			saveKeyStore();
+			log.trace("Keystore saved successfully");
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);
 		}

@@ -32,7 +32,7 @@ public class Status extends AClientCommand {
 	@Override
 	public void run() {
 
-		Convex convex = mainParent.connect();
+		Convex convex = connect();
 
 		try {
 			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);

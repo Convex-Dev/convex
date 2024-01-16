@@ -2,6 +2,7 @@ package convex.cli;
 
 import java.io.Console;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.security.GeneralSecurityException;
@@ -240,11 +241,11 @@ public class Main implements Runnable {
 		} else {
 			if (!nonInteractive) {
 				Console console = System.console(); 
-				keypass= console.readPassword("Keystore Password: ");
+				keypass= console.readPassword("Private Key Password: ");
 			} 
 			
 			if (keypass==null) {
-				log.warn("No password for keystore: defaulting to blank password");
+				log.warn("No password for key: defaulting to blank password");
 				keypass=new char[0];
 			}
 
@@ -272,8 +273,6 @@ public class Main implements Runnable {
 	}
 
 
-
-	private boolean keyStoreLoaded=false;
 	private KeyStore keyStore=null;
 	
 	/**
@@ -281,23 +280,8 @@ public class Main implements Runnable {
 	 * @return KeyStore instance, or null if it does not exist
 	 */
 	public KeyStore getKeystore() {
-		if (keyStoreLoaded==false) {
+		if (keyStore==null) {
 			keyStore=loadKeyStore(false);
-			keyStoreLoaded=true;
-		}
-		return keyStore;
-	}
-	
-	/**
-	 * Gets the current key store. 
-	 * @param create Flag to indicate if keystore should be created
-	 * @return KeyStore instance
-	 */
-	public KeyStore getKeystore(boolean create) {
-		if (keyStoreLoaded==false) {
-			keyStore=loadKeyStore(create);
-			if (keyStore==null) throw new CLIError("Keystore does not exist!");
-			keyStoreLoaded=true;
 		}
 		return keyStore;
 	}
@@ -318,6 +302,8 @@ public class Main implements Runnable {
 				Helpers.createPath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
+		} catch (FileNotFoundException e) {
+			return null;
 		} catch (GeneralSecurityException e) {
 			throw new CLIError("Unexpected security error: "+e.getClass(),e);
 		} catch (IOException e) {
@@ -326,7 +312,6 @@ public class Main implements Runnable {
 			}
 			throw new CLIError("Unable to read keystore at: "+keyFile,e);
 		} 
-		keyStoreLoaded=true;
 		return keyStore;
 	}
 

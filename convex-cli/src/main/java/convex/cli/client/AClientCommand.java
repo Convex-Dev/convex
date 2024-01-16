@@ -16,8 +16,9 @@ public abstract class AClientCommand extends ATopCommand {
 	protected String addressValue = null;
 	
 	@Option(names={"--port"},
+			defaultValue="${env:CONVEX_PORT}",
 			description="Port number to connect to a peer.")
-		private int port = 0;
+	private int port = 0;
 
 	@Option(names={"--host"},
 		defaultValue=Constants.HOSTNAME_PEER,
