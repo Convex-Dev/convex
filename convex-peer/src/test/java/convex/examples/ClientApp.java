@@ -12,7 +12,7 @@ import convex.peer.Server;
 public class ClientApp {
 
 	public static void main(String... args) throws IOException, InterruptedException, TimeoutException, ExecutionException {
-		InetSocketAddress hostAddress = new InetSocketAddress("localhost", Server.DEFAULT_PORT + 1);
+		InetSocketAddress hostAddress = new InetSocketAddress("localhost", Server.DEFAULT_PORT);
 
 		Convex convex = Convex.connect(hostAddress, null,null);
 

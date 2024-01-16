@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Belief;
+import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Order;
 import convex.core.Peer;
@@ -73,9 +74,8 @@ import convex.net.message.Message;
  *
  */
 public class Server implements Closeable {
-	public static final int DEFAULT_PORT = 18888;
-
-
+	public static final int DEFAULT_PORT = Constants.DEFAULT_PEER_PORT;
+	
 	static final Logger log = LoggerFactory.getLogger(Server.class.getName());
 
 	private Consumer<Message> messageReceiveObserver=null;
@@ -88,7 +88,6 @@ public class Server implements Closeable {
 		observeMessageReceived(m);
 		processMessage(m);
 	};
-
 
 	/**
 	 * Connection manager instance.
@@ -109,7 +108,6 @@ public class Server implements Closeable {
 	 * Transaction handler instance.
 	 */
 	protected final CVMExecutor executor=new CVMExecutor(this);
-
 
 	/**
 	 * Query handler instance.
@@ -146,13 +144,12 @@ public class Server implements Closeable {
 
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		this.config = config;
+		final AStore savedStore=Stores.current();
 
 		AStore configStore = (AStore) config.get(Keywords.STORE);
-		this.store = (configStore == null) ? Stores.current() : configStore;
+		this.store = (configStore == null) ? savedStore : configStore;
 		
-		
-		// Switch to use the configured store for setup, saving the caller store
-		final AStore savedStore=Stores.current();
+		// Switch to use the configured store for setup
 		try {
 			Stores.setCurrent(store);
 
@@ -167,7 +164,6 @@ public class Server implements Closeable {
 			// Ensure Peer is stored in executor and persisted
 			executor.setPeer(peer);
 			executor.persistPeerData();
-			
 			
 			establishController();
 		} finally {
@@ -191,6 +187,7 @@ public class Server implements Closeable {
 		if (as==null) {
 			log.warn("Peer Controller Account does not exist: "+controlAddress);	
 		} else if (!as.getAccountKey().equals(getKeyPair().getAccountKey())) {
+			// TODO: not a problem?
 			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
 		}
 		this.setPeerController(controlAddress);
