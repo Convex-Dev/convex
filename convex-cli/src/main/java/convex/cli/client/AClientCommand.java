@@ -1,5 +1,10 @@
 package convex.cli.client;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.concurrent.TimeoutException;
+
+import convex.api.Convex;
 import convex.cli.ATopCommand;
 import convex.cli.Constants;
 import convex.core.data.Address;
@@ -18,7 +23,7 @@ public abstract class AClientCommand extends ATopCommand {
 	@Option(names={"--port"},
 			defaultValue="${env:CONVEX_PORT}",
 			description="Port number to connect to a peer.")
-	private int port = 0;
+	private Integer port;
 
 	@Option(names={"--host"},
 		defaultValue=Constants.HOSTNAME_PEER,
@@ -31,7 +36,14 @@ public abstract class AClientCommand extends ATopCommand {
 		return result;
 	}
 
-	protected convex.api.Convex connect() {
-		return mainParent.connect();
+	protected convex.api.Convex connect() throws IOException,TimeoutException {
+		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
+		try {
+			Convex c;
+			c=Convex.connect(new InetSocketAddress("localhost",port));
+			return c;
+		} catch (Exception e) {
+			throw e;
+		}
 	}
 }

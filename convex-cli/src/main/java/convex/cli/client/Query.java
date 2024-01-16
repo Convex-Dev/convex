@@ -37,10 +37,9 @@ public class Query extends AClientCommand {
 		// sub command run with no command provided
 		log.debug("query command: {}", queryCommand);
 
-		Convex convex =  connect();
-
 		try {
-			log.info("Executing query: %s\n", queryCommand);
+			Convex convex =  connect();
+			log.debug("Executing query: %s\n", queryCommand);
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
 			mainParent.printResult(result);

@@ -46,11 +46,10 @@ public class Transaction extends AClientCommand {
 
 	@Override
 	public void run() {
-
-		Convex convex = connect();
-		Address address=convex.getAddress();
-		AKeyPair keyPair = convex.getKeyPair();
 		try {
+			Convex convex = connect();
+			Address address=convex.getAddress();
+			AKeyPair keyPair = convex.getKeyPair();
 			
 			// If we don't already have keypair specified, attempt to find
 			// correct key pair for address from the network
@@ -69,7 +68,7 @@ public class Transaction extends AClientCommand {
 				}
 			}
 
-			log.info("Executing transaction: '{}'\n", transactionCode);
+			log.debug("Executing transaction: '{}'\n", transactionCode);
 			ACell message = Reader.read(transactionCode);
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);

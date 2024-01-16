@@ -32,9 +32,9 @@ public class Status extends AClientCommand {
 	@Override
 	public void run() {
 
-		Convex convex = connect();
 
 		try {
+			Convex convex = connect();
 			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);
