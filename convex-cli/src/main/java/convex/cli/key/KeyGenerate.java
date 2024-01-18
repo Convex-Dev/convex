@@ -1,16 +1,12 @@
 package convex.cli.key;
 
-import java.io.Console;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.NoSuchAlgorithmException;
-import java.security.spec.InvalidKeySpecException;
 import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;

@@ -8,6 +8,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.Helpers;
 import convex.cli.Main;
@@ -67,7 +68,7 @@ public class LocalStart implements Runnable {
      * @return List of distinct public keys
      */
     private List<AKeyPair> getPeerKeyPairs(int n) {
-    	HashSet<AKeyPair> keyPairList = new HashSet<AKeyPair>();
+    	ArrayList<AKeyPair> keyPairList = new ArrayList<AKeyPair>();
     	
     	Main mainParent = localParent.cli();
       
@@ -93,6 +94,10 @@ public class LocalStart implements Runnable {
 			for (int i=0; i<left; i++) {
 				keyPairList.add(AKeyPair.generate());
 			}
+		}
+		
+		if (new HashSet<>(keyPairList).size()<keyPairList.size()) {
+			throw new CLIError("Duplicate peer keys provided!");
 		}
 		
 		return new ArrayList<AKeyPair>(keyPairList);
