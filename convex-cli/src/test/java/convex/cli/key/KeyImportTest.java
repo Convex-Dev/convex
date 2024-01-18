@@ -41,8 +41,8 @@ public class KeyImportTest {
 			"-n",
 			"--keystore-password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
-			"--import-text", pemText, 
-			"--import-password", new String(IMPORT_PASSWORD)
+			"--pem-text", pemText, 
+			"--pem-password", new String(IMPORT_PASSWORD)
 		);
 		assertEquals("",tester.getError());
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());

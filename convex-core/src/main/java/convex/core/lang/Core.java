@@ -819,7 +819,7 @@ public class Core {
 			Address address = RT.castAddress(o);
 			if (address == null) {
 				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address: " + o);
-				if (o instanceof ABlob) return context.withArgumentError("Blob not convertiable a valid Address: " + o);
+				if (o instanceof ABlob) return context.withArgumentError("Blob not convertible a valid Address: " + o);
 				return context.withCastError(0,args, Types.ADDRESS);
 			}
 			long juice = Juice.ADDRESS;

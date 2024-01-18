@@ -230,7 +230,7 @@ public class Main implements Runnable {
 		} else {	
 			if (!nonInteractive) {
 				Console console = System.console(); 
-				storepass= console.readPassword("Keystore Password: ");
+				storepass= console.readPassword("Enter Keystore Password: ");
 			} 
 			
 			if (storepass==null) {
@@ -285,18 +285,26 @@ public class Main implements Runnable {
 	 */
 	public KeyStore getKeystore() {
 		if (keyStore==null) {
-			keyStore=loadKeyStore(false);
+			keyStore=loadKeyStore(false,getStorePassword());
 		}
 		return keyStore;
 	}
 	
 	/**
-	 * Loads the currently configured get Store
+	 * Loads the currently configured key Store
 	 * @param isCreate Flag to indicate if keystore should be created if absent
 	 * @return KeyStore instance, or null if does not exist
 	 */
-	public KeyStore loadKeyStore(boolean isCreate)  {
-		char[] password=getStorePassword();
+	public KeyStore loadKeyStore()  {
+		return loadKeyStore(false,getStorePassword());
+	}
+	
+	/**
+	 * Loads the currently configured key Store
+	 * @param isCreate Flag to indicate if keystore should be created if absent
+	 * @return KeyStore instance, or null if does not exist
+	 */
+	public KeyStore loadKeyStore(boolean isCreate, char[] password)  {
 		File keyFile = new File(getKeyStoreFilename());
 		try {
 			if (keyFile.exists()) {
@@ -406,11 +414,11 @@ public class Main implements Runnable {
 		throw new TODOException();
 	}
 	
-	public void saveKeyStore() {
+	public void saveKeyStore(char[] storePassword) {
 		// save the keystore file
 		if (keyStore==null) throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
-			PFXTools.saveStore(keyStore, new File(getKeyStoreFilename()), getStorePassword());
+			PFXTools.saveStore(keyStore, new File(getKeyStoreFilename()), storePassword);
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
 		}

@@ -50,7 +50,7 @@ public final class Address extends ALongBlob {
 	 * @return Address instance, or null if not valid
 	 */
 	public static Address create(ABlob b) {
-		if (b.count()!=BYTE_LENGTH) return null;
+		if (b.count()>BYTE_LENGTH) return null;
 		return create(b.longValue());
 	}
 	

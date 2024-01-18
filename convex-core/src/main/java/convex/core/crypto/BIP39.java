@@ -217,6 +217,14 @@ public class BIP39 {
 		}
 	}
 	
+	/**
+	 * Gets a BIP39 seed given a mnemonic and passphrase
+	 * @param words Mnemonic words
+	 * @param passphrase Optional BIP39 passphrase
+	 * @return Blob containing BIP39 seed (64 bytes)
+	 * @throws NoSuchAlgorithmException
+	 * @throws InvalidKeySpecException
+	 */
 	public static Blob getSeed(List<String> words, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		if (passphrase==null) passphrase="";
 
@@ -228,6 +236,22 @@ public class BIP39 {
 		return getSeedInternal(pass,passphrase);
 	}
 	
+	public static AKeyPair seedToKeyPair(Blob seed) {
+		long n=seed.count();
+		if (n!=SEED_LENGTH) {
+			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte seed but was: "+n);
+		}
+		return AKeyPair.create(seed.getContentHash().toFlatBlob());
+	}
+	
+	/**
+	 * Gets a BIP39 seed given a mnemonic and passphrase
+	 * @param mnemonic Mnemonic words
+	 * @param passphrase Optional BIP39 passphrase
+	 * @return Blob containing BIP39 seed (64 bytes)
+	 * @throws NoSuchAlgorithmException
+	 * @throws InvalidKeySpecException
+	 */
 	public static Blob getSeed(String mnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		mnemonic=normaliseSpaces(mnemonic);
 		mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		

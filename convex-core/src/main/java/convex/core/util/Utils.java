@@ -1224,6 +1224,8 @@ public class Utils {
 	private static final long startupNanos=System.nanoTime();
 	
 	public static final Object[] EMPTY_OBJECTS = new Object[0];
+	
+	public static final char[] EMPTY_CHARS = new char[0];
 
 	/**
 	 * Gets a millisecond accurate time suitable for use in timing.

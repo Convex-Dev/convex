@@ -108,10 +108,16 @@ public class CoreTest extends ACVMTest {
 		// bad arities
 		assertArityError(step("(address 1 2)"));
 		assertArityError(step("(address)"));
+		
+		// Short blob / string addresses
+		Address ash=Address.fromHex("1234abcd");
+		assertEquals(305441741L,ash.longValue());
+		assertEquals(ash, eval("(address \"1234abcd\")"));
+		assertEquals(ash, eval("(address 0x1234abcd)"));
 
 		// invalid address lengths - not a cast error since argument types (in general) are valid
-		assertArgumentError(step("(address \"1234abcd\")"));
-		assertArgumentError(step("(address 0x1234abcd)"));
+		//assertArgumentError(step("(address \"1234abcd\")"));
+		//assertArgumentError(step("(address 0x1234abcd)"));
 
 		// invalid conversions
 		assertCastError(step("(address :foo)"));

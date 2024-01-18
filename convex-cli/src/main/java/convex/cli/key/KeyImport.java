@@ -12,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
-import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import picocli.CommandLine.Command;
@@ -37,21 +36,20 @@ public class KeyImport extends AKeyCommand {
 	@ParentCommand
 	protected Key keyParent;
 
-	@Option(names={"-i", "--import-text"},
-		description="Import format PEM text of the keypair.")
-	private String importText;
-
-	@Option(names={"-f", "--import-file"},
-		description="Import file name of the keypair file.")
+	@Option(names={"-i", "--import-file"},
+		description="Import file for the the keypair.")
 	private String importFilename;
+	
+	@Option(names={"--pem-text"},
+			description="PEM format text to import.")
+		private String importText;
 
-	@Option(names={"--import-password"},
-		description="Password of the imported key.")
+	@Option(names={"--pem-password"},
+		description="Password of the imported PEM key.")
     private String importPassword;
 
 	@Override
 	public void run() {
-		Main mainParent = cli();
 		if (importFilename != null && importFilename.length() > 0) {
 			Path path=Paths.get(importFilename);
 			try {
@@ -64,8 +62,7 @@ public class KeyImport extends AKeyCommand {
 			}
 		}
 		if (importText == null || importText.length() == 0) {
-			log.warn("You need to provide an import text '--import' or import filename '--import-file' to import a private key");
-			return;
+			throw new CLIError("You need to provide '--pem-text' or import filename '--import-file' to import a private key");
 		}
 
 		if (importPassword == null || importPassword.length() == 0) {
@@ -75,11 +72,12 @@ public class KeyImport extends AKeyCommand {
 		PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
 		AKeyPair keyPair = AKeyPair.create(privateKey);
 
-		char[] keyPassword=mainParent.getKeyPassword();
-		mainParent.addKeyPairToStore(keyPair,keyPassword);
+		char[] storePassword=cli().getStorePassword();
+		char[] keyPassword=cli().getKeyPassword();
+		cli().addKeyPairToStore(keyPair,keyPassword);
 		Arrays.fill(keyPassword, 'x');
+		cli().saveKeyStore(storePassword);
 		
-		cli().saveKeyStore();
-		mainParent.println(keyPair.getAccountKey().toHexString());
+		cli().println(keyPair.getAccountKey().toHexString());
 	}
 }
