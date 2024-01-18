@@ -1,5 +1,6 @@
 package convex.cli.key;
 
+import java.io.Console;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -9,6 +10,7 @@ import java.util.Arrays;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
@@ -45,19 +47,20 @@ public class KeyGenerate extends AKeyCommand {
 	private boolean bip39;
 	
 	@Option(names="--passphrase",
-			description="BIP39 optional passphrase")
+			description="BIP39 passphrase. If not provided, will be requested from user (or assumed blank in non-interactive mode).")
 	private String passphrase;
-
 
 	private AKeyPair generateKeyPair() {	
 		try {
 			if (bip39) {
 				String mnemonic=BIP39.createSecureRandom(12);
 				cli().println(mnemonic);
-				if (cli().isInteractive()) {
-					passphrase=new String(System.console().readPassword("Enter BIP39 passphrase: "));
-				} else {
-					if (passphrase==null) passphrase="";
+				if (passphrase==null) {
+					if (cli().isInteractive()) {
+						passphrase=new String(cli().readPassword("Enter BIP39 passphrase: "));
+					} else {
+						passphrase="";
+					}
 				}
 				Blob bipseed;
 					bipseed = BIP39.getSeed(mnemonic, passphrase);

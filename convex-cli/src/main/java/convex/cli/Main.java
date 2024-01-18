@@ -229,8 +229,7 @@ public class Main implements Runnable {
 			storepass=this.keystorePassword.toCharArray();	
 		} else {	
 			if (!nonInteractive) {
-				Console console = System.console(); 
-				storepass= console.readPassword("Enter Keystore Password: ");
+				storepass= readPassword("Enter Keystore Password: ");
 			} 
 			
 			if (storepass==null) {
@@ -252,8 +251,7 @@ public class Main implements Runnable {
 			keypass=this.keystorePassword.toCharArray();	
 		} else {
 			if (!nonInteractive) {
-				Console console = System.console(); 
-				keypass= console.readPassword("Private Key Encryption Password: ");
+				keypass= readPassword("Private Key Encryption Password: ");
 			} 
 			
 			if (keypass==null) {
@@ -449,6 +447,13 @@ public class Main implements Runnable {
 
 	public boolean isInteractive() {
 		return !nonInteractive;
+	}
+
+	public char[] readPassword(String prompt) {
+		Console c=System.console();
+		if (c==null) throw new CLIError("Unable to get user input because console is unavaiable.");
+		
+		return c.readPassword(prompt);
 	}
 
 
