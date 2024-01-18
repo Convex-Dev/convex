@@ -17,6 +17,7 @@ import convex.core.util.Utils;
 
 public class KeyExportTest {
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
+	private static final char[] KEY_PASSWORD = "testKeytPassword".toCharArray();
 	private static final char[] EXPORT_PASSWORD = "testExportPassword".toCharArray();
 
 	private static final File TEMP_FILE;
@@ -38,7 +39,8 @@ public class KeyExportTest {
 		// command key.generate
 		CLTester tester =  CLTester.run(
 			"key", "generate",
-			"--store-password", new String(KEYSTORE_PASSWORD),
+			"--keystore-password", new String(KEYSTORE_PASSWORD),
+			"--password", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
@@ -58,9 +60,10 @@ public class KeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--store-password", new String(KEYSTORE_PASSWORD),
+			"--keystore-password", new String(KEYSTORE_PASSWORD),
+			"--p", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
-			"--public-key", publicKey,
+			"--key", publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
@@ -70,9 +73,9 @@ public class KeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--store-password", new String(KEYSTORE_PASSWORD),
+			"--keystore-password", new String(KEYSTORE_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
-			"--public-key", "0x" + publicKey,
+			"--key", "0x" + publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());

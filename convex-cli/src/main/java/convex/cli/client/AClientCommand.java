@@ -2,11 +2,17 @@ package convex.cli.client;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.cli.ATopCommand;
+import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.core.Result;
+import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlob;
+import convex.core.data.ACell;
 import convex.core.data.Address;
 import picocli.CommandLine.Option;
 
@@ -46,6 +52,33 @@ public abstract class AClientCommand extends ATopCommand {
 		if (a!=null) {
 			convex.setAddress(a);
 			return true;
+		}
+		return false;
+	}
+	
+	protected boolean ensureKeyPair(Convex convex) {
+		AKeyPair keyPair = convex.getKeyPair();
+		if (keyPair!=null) return true;
+
+		Address address=convex.getAddress();
+		try {
+			// Try to identify the required keypair
+			Result ar=convex.query("*key*").get(1000,TimeUnit.MILLISECONDS);
+			if (ar.isError()) throw new CLIError("Unable to determine *key* for Address "+address+" : "+ar);
+			
+			ACell v=ar.getValue();
+			if (v instanceof ABlob) {
+				String pk=((ABlob)v).toHexString();
+				keyPair=mainParent.loadKeyFromStore(pk);
+				if (keyPair==null) {
+					// We didn't find required keypair
+					throw new CLIError("Unable to find keypair with public key "+v+" for Address "+address+" : "+ar);
+				}
+				convex.setKeyPair(keyPair);
+				return true;
+			}
+		} catch(Exception e) {
+			return false;
 		}
 		return false;
 	}

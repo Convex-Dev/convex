@@ -26,6 +26,7 @@ public class KeyTest {
 		TEMP_FILE.deleteOnExit();
 	}
 	private static final String KEYSTORE_PASSWORD = "testPassword";
+	private static final String KEY_PASSWORD = "testKeyPassword";
 
 	@Test
 	public void testKeyGenerateAndUse() throws IOException {
@@ -34,20 +35,21 @@ public class KeyTest {
 		String fileName =KEYSTORE_FILENAME;
 		
 		// command key.generate
-		CLTester tester =  CLTester.run("key", "generate", "--store-password", KEYSTORE_PASSWORD, "--keystore", fileName);
+		CLTester tester =  CLTester.run("key", "generate", "--p", KEY_PASSWORD, "--keystore-password", KEYSTORE_PASSWORD, "--keystore", fileName);
 		assertEquals(0,tester.getResult());
 		String key = tester.getOutput().trim();
 		assertEquals(64,key.length());
+		
 
 		File fp = new File(fileName);
 		assertTrue(fp.exists());
 
 		// command key.list
-		tester =  CLTester.run("key", "list", "--store-password", KEYSTORE_PASSWORD, "--keystore", fileName);
+		tester =  CLTester.run("key", "list", "--keystore-password", KEYSTORE_PASSWORD, "--keystore", fileName);
 		//tester.assertOutputMatch("^Index Public Key\\s+1");
 
-		// command key.list with non-existnt keystore
-		tester =  CLTester.run("key", "list", "--store-password", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");
+		// command key.list with non-existant keystore
+		tester =  CLTester.run("key", "list", "--keystore-password", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");
 		assertNotEquals(ExitCodes.SUCCESS,tester.getResult());
 
 	}

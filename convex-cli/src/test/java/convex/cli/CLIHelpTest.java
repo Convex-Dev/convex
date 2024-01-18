@@ -2,7 +2,7 @@ package convex.cli;
 
 import org.junit.jupiter.api.Test;
 
-import static convex.cli.Helper.assertExecuteCommandLineResult;
+import static convex.cli.HelperTest.assertExecuteCommandLineResult;
 
 public class CLIHelpTest {
 

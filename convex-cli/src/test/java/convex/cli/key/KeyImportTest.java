@@ -39,7 +39,7 @@ public class KeyImportTest {
 			"key", 
 			"import",
 			"-n",
-			"--store-password", new String(KEYSTORE_PASSWORD), 
+			"--keystore-password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--import-text", pemText, 
 			"--import-password", new String(IMPORT_PASSWORD)
@@ -50,7 +50,7 @@ public class KeyImportTest {
 		CLTester t2=CLTester.run(
 				"key" , 
 				"list",
-				"--store-password", new String(KEYSTORE_PASSWORD), 
+				"--keystore-password", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());

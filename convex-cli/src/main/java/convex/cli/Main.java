@@ -19,7 +19,7 @@ import ch.qos.logback.classic.Level;
 import convex.api.Convex;
 import convex.cli.client.Query;
 import convex.cli.client.Status;
-import convex.cli.client.Transaction;
+import convex.cli.client.Transact;
 import convex.cli.key.Key;
 import convex.cli.local.Local;
 import convex.cli.output.RecordOutput;
@@ -48,7 +48,7 @@ import picocli.CommandLine.ScopeType;
 		Peer.class,
 		Query.class,
 		Status.class,
-		Transaction.class,
+		Transact.class,
 		CommandLine.HelpCommand.class
 	},
 	usageHelpAutoWidth=true,
@@ -67,13 +67,25 @@ public class Main implements Runnable {
 
 	public CommandLine commandLine=new CommandLine(this);
 
-	@Option(names={"-k", "--keystore"},
-		defaultValue="${env:CONVEX_KEYSTORE_PASSWORD:-" +Constants.KEYSTORE_FILENAME+"}",
+	@Option(names={"--keystore"},
+		defaultValue="${env:CONVEX_KEYSTORE:-" +Constants.KEYSTORE_FILENAME+"}",
 		scope = ScopeType.INHERIT,
 		description="Keystore filename. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
+	
+	@Option(names={"--k","--key"},
+			defaultValue="${env:CONVEX_KEY}",
+			scope = ScopeType.INHERIT,
+			description="Keystore filename. Default: ${DEFAULT-VALUE}")
+		private String keySpec;
+	
+	@Option(names={"--p","--password"},
+			defaultValue="${env:CONVEX_KEY_PASSWORD}",
+			scope = ScopeType.INHERIT,
+			description="Keystore filename. Default: ${DEFAULT-VALUE}")
+		private String keyPassword;
 
-	@Option(names={"--store-password"},
+	@Option(names={"--keystore-password"},
 		scope = ScopeType.INHERIT,
 		defaultValue="${env:CONVEX_KEYSTORE_PASSWORD}",
 		description="Password to read/write to the Keystore")
@@ -241,25 +253,17 @@ public class Main implements Runnable {
 		} else {
 			if (!nonInteractive) {
 				Console console = System.console(); 
-				keypass= console.readPassword("Private Key Password: ");
+				keypass= console.readPassword("Private Key Encryption Password: ");
 			} 
 			
 			if (keypass==null) {
 				log.warn("No password for key: defaulting to blank password");
 				keypass=new char[0];
 			}
-
 		}
 		return keypass;
 	}
 	
-	/**
-	 * Sets the currently defined keystore password
-	 * @param password Password to use
-	 */
-	public void setPassword(String password) {
-		this.keystorePassword=password;
-	}
 
 	/**
 	 * Gets the keystore file name currently used for the CLI

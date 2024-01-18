@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.Test;
 
-public class Helper {
+public class HelperTest {
 
 	@Test 
 	public void testSplitArray() {
