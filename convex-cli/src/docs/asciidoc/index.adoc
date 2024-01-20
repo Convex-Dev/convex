@@ -487,7 +487,7 @@ Remember to add the `0x` at the front of the key value, when using a public key 
 
 If the peer has been setup correctly on https://convex.world[convex.world], so you can now start your peer, using the following example command:
 
-    ./convex peer start --public-key=dfbb22 --password=my-password --address=<address> --port=80888 --url=<my-ip>:8088 --peer=convex.world:18888
+    ./convex peer start --public-key=dfbb22 --password=my-password --address=<address> --port=8088 --url=<my-ip>:8088 --peer=convex.world:18888
 
 Where:
 
