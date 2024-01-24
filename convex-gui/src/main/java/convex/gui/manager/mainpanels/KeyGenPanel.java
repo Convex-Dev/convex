@@ -2,9 +2,6 @@ package convex.gui.manager.mainpanels;
 
 import java.awt.BorderLayout;
 import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
 import java.util.List;
 
 import javax.swing.JButton;
@@ -26,6 +23,7 @@ import convex.core.util.Utils;
 import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class KeyGenPanel extends JPanel {
@@ -38,8 +36,10 @@ public class KeyGenPanel extends JPanel {
 	
 	JSpinner numSpinner;
 
-
 	JButton addWalletButton = new JButton("Add to wallet");
+	
+	JPanel formPanel;
+
 	
 	int FONT_SIZE=16;
 	Font HEX_FONT=new Font("Monospaced", Font.BOLD, FONT_SIZE);
@@ -148,7 +148,7 @@ public class KeyGenPanel extends JPanel {
 		});
 		
 		numSpinner = new JSpinner();
-		numSpinner.setModel(new SpinnerNumberModel(12, 1, 30, 1));
+		numSpinner.setModel(new SpinnerNumberModel(12, 3, 30, 1));
 		actionPanel.add(numSpinner);
 
 		JButton btnNewButton = new JButton("Export...");
@@ -164,7 +164,6 @@ public class KeyGenPanel extends JPanel {
 			});
 		}
 
-
 		actionPanel.add(addWalletButton);
 		addWalletButton.addActionListener(e -> {
 			String pks = privateKeyArea.getText();
@@ -175,65 +174,34 @@ public class KeyGenPanel extends JPanel {
 
 		});
 
-		JPanel formPanel = new JPanel();
+		// Main Key generation form
+		formPanel = new JPanel();
 		formPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+		formPanel.setLayout(new MigLayout("fillx,wrap 2","[fill,min:250][grow,shrink]",""));
 		add(formPanel, BorderLayout.NORTH);
-		GridBagLayout gbl_formPanel = new GridBagLayout();
-		gbl_formPanel.columnWidths = new int[] { 156, 347, 0 };
-		gbl_formPanel.rowHeights = new int[] { 22, 0, 0, 0, 0 };
-		gbl_formPanel.columnWeights = new double[] { 1.0, 1.0, Double.MIN_VALUE };
-		gbl_formPanel.rowWeights = new double[] { 0.0, 1.0, 1.0, 1.0, Double.MIN_VALUE };
-		formPanel.setLayout(gbl_formPanel);
-
-		{ // Mnemonic label
-			JLabel lblMnemonic = new JLabel("Mnenomic Phrase");
-			GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
-			gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
-			gbc_lblNewLabel.insets = new Insets(0, 0, 5, 5);
-			gbc_lblNewLabel.gridx = 0;
-			gbc_lblNewLabel.gridy = 0;
-			formPanel.add(lblMnemonic, gbc_lblNewLabel);
-		}
 
 		{ // Mnemonic entry box
+			addLabel("Mnenomic Phrase");	
 			mnemonicArea = new JTextArea();
 			mnemonicArea.setWrapStyleWord(true);
 			mnemonicArea.setLineWrap(true);
 			mnemonicArea.setRows(2);
-			GridBagConstraints gbc_mnemonicArea = new GridBagConstraints();
-			gbc_mnemonicArea.fill = GridBagConstraints.HORIZONTAL;
-			gbc_mnemonicArea.insets = new Insets(0, 0, 5, 0);
-			gbc_mnemonicArea.gridx = 1;
-			gbc_mnemonicArea.gridy = 0;
-			mnemonicArea.setColumns(32);
 			mnemonicArea.setFont(HEX_FONT);
-			formPanel.add(mnemonicArea, gbc_mnemonicArea);
+			
+			formPanel.add(mnemonicArea,"grow, wmin 100"); 
+			// wmin override needed to stop JTextArea expanding
+			// see: https://stackoverflow.com/questions/9723425/miglayout-shrink-behavior
 			mnemonicArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!mnemonicArea.isFocusOwner()) return;
 				updateMnemonic();
 			}));
 		}
 
-		{ // Passphrase label
-			JLabel lblPass = new JLabel("Passphrase");
-			GridBagConstraints gbc_lblNewLabel = new GridBagConstraints();
-			gbc_lblNewLabel.anchor = GridBagConstraints.WEST;
-			gbc_lblNewLabel.insets = new Insets(0, 0, 5, 5);
-			gbc_lblNewLabel.gridx = 0;
-			gbc_lblNewLabel.gridy = 1;
-			formPanel.add(lblPass, gbc_lblNewLabel);
-		}
-
 		{ // Passphrase entry box
+			addLabel("Passphrase");	
 			passArea = new JPasswordField();
-			GridBagConstraints gbc_mnemonicArea = new GridBagConstraints();
-			gbc_mnemonicArea.fill = GridBagConstraints.HORIZONTAL;
-			gbc_mnemonicArea.insets = new Insets(0, 0, 5, 0);
-			gbc_mnemonicArea.gridx = 1;
-			gbc_mnemonicArea.gridy = 1;
-			passArea.setColumns(32);
 			passArea.setFont(HEX_FONT);
-			formPanel.add(passArea, gbc_mnemonicArea);
+			formPanel.add(passArea,"w min:300");
 			passArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!passArea.isFocusOwner()) return;
 				updatePass();
@@ -241,27 +209,13 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			JLabel lblBIPSeed = new JLabel("BIP39 Seed");
-			GridBagConstraints gbc = new GridBagConstraints();
-			gbc.anchor = GridBagConstraints.WEST;
-			gbc.insets = new Insets(0, 0, 5, 5);
-			gbc.gridx = 0;
-			gbc.gridy = 2;
-			formPanel.add(lblBIPSeed, gbc);
-		}
-		
-		{
+			addLabel("BIP39 Seed");
 			seedArea = new JTextArea();
 			seedArea.setFont(HEX_FONT);
 			seedArea.setColumns(64);
 			seedArea.setLineWrap(true);
 			seedArea.setWrapStyleWord(false);
-			GridBagConstraints gbc = new GridBagConstraints();
-			gbc.insets = new Insets(0, 0, 5, 0);
-			gbc.fill = GridBagConstraints.HORIZONTAL;
-			gbc.gridx = 1;
-			gbc.gridy = 2;
-			formPanel.add(seedArea, gbc);
+			formPanel.add(seedArea,"grow,wmin 100");
 			seedArea.setText("(mnemonic not ready)");
 			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!seedArea.isFocusOwner()) return;
@@ -270,54 +224,37 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{
-			JLabel lblPrivateKey = new JLabel("Private key Ed25519 seed");
-			GridBagConstraints gbc_lblPrivateKey = new GridBagConstraints();
-			gbc_lblPrivateKey.anchor = GridBagConstraints.WEST;
-			gbc_lblPrivateKey.insets = new Insets(0, 0, 5, 5);
-			gbc_lblPrivateKey.gridx = 0;
-			gbc_lblPrivateKey.gridy = 3;
-			formPanel.add(lblPrivateKey, gbc_lblPrivateKey);
-		}
-
-
-		privateKeyArea = new JTextArea();
-		privateKeyArea.setFont(HEX_FONT);
-		GridBagConstraints gbc_privateKeyArea = new GridBagConstraints();
-		gbc_privateKeyArea.insets = new Insets(0, 0, 5, 0);
-		gbc_privateKeyArea.fill = GridBagConstraints.HORIZONTAL;
-		gbc_privateKeyArea.gridx = 1;
-		gbc_privateKeyArea.gridy = 3;
-		formPanel.add(privateKeyArea, gbc_privateKeyArea);
-		privateKeyArea.setText("(mnemonic not ready)");
-		privateKeyArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
-			if (!privateKeyArea.isFocusOwner()) return;
-			updatePrivateKey();
-		}));
-
-		{
-			JLabel lblPublicKey = new JLabel("Public Key");
-			GridBagConstraints gbc_lblPublicKey = new GridBagConstraints();
-			gbc_lblPublicKey.anchor = GridBagConstraints.WEST;
-			gbc_lblPublicKey.insets = new Insets(0, 0, 5, 5);
-			gbc_lblPublicKey.gridx = 0;
-			gbc_lblPublicKey.gridy = 4;
-			formPanel.add(lblPublicKey, gbc_lblPublicKey);
+			addLabel("Private Ed25519 seed");
+			privateKeyArea = new JTextArea();
+			privateKeyArea.setFont(HEX_FONT);
+			formPanel.add(privateKeyArea,"grow,wmin 100");
+			privateKeyArea.setText("(mnemonic not ready)");
+			privateKeyArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
+				if (!privateKeyArea.isFocusOwner()) return;
+				updatePrivateKey();
+			}));
 		}
 
 		{
+			addLabel("Ed25519 Public Key");
 			publicKeyArea = new JTextArea();
 			publicKeyArea.setEditable(false);
 			publicKeyArea.setRows(1);
 			publicKeyArea.setText("(private key not ready)");
 			publicKeyArea.setFont(HEX_FONT);
-			GridBagConstraints gbc_publicKeyArea = new GridBagConstraints();
-			gbc_publicKeyArea.insets = new Insets(0, 0, 5, 0);
-			gbc_publicKeyArea.fill = GridBagConstraints.HORIZONTAL;
-			gbc_publicKeyArea.gridx = 1;
-			gbc_publicKeyArea.gridy = 4;
-			formPanel.add(publicKeyArea, gbc_publicKeyArea);
+			formPanel.add(publicKeyArea,"grow,wmin 100");
 		}
 
+	}
+
+	/**
+	 *  Add a label component to the specified panel
+	 * @param panel
+	 * @param string
+	 */
+	private void addLabel(String labelText) {
+			JLabel lblMnemonic = new JLabel(labelText);
+			formPanel.add(lblMnemonic);
 	}
 
 

@@ -95,12 +95,11 @@ public class PeerGUI extends JPanel {
 					frame.setTitle("Convex Peer Manager");
 					frame.setIconImage(Toolkit.getDefaultToolkit()
 							.getImage(PeerGUI.class.getResource("/images/Convex.png")));
-					frame.setBounds(100, 100, 1024, 768);
+					frame.setBounds(100, 100, 1200, 900);
 					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
 					PeerGUI window = new PeerGUI();
 					frame.getContentPane().add(window, BorderLayout.CENTER);
-					frame.pack();
 					frame.setVisible(true);
 
 					frame.addWindowListener(new java.awt.event.WindowAdapter() {
