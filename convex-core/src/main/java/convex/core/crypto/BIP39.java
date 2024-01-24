@@ -210,6 +210,9 @@ public class BIP39 {
 
 	public static final int SEED_LENGTH = 64;
 	
+	/**
+	 * Minimum number of words accepted in a mnemonic
+	 */
 	public static final int MIN_WORDS=3;
 	
 	static {
@@ -238,12 +241,24 @@ public class BIP39 {
 	}
 	
 	public static AKeyPair seedToKeyPair(Blob seed) {
+		Blob edSeed=seedToEd25519Seed(seed);
+		return AKeyPair.create(edSeed);
+	}
+
+	/**
+	 * Converts a BIP39 seed to an Ed25519 seed. This is defined as the SHA3-256 hash of the BIP39 seed
+	 * 
+	 * Note: longer term users may want hierarchical deterministic wallet generation
+	 * 
+	 * @param seed BIP39 seed
+	 * @return
+	 */
+	public static Blob seedToEd25519Seed(Blob seed) {
 		long n=seed.count();
 		if (n!=SEED_LENGTH) {
 			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte seed but was: "+n);
 		}
-		Blob edSeed=seed.getContentHash().toFlatBlob();
-		return AKeyPair.create(edSeed);
+		return seed.getContentHash().toFlatBlob();
 	}
 	
 	/**
@@ -266,7 +281,7 @@ public class BIP39 {
 	 * @throws InvalidKeySpecException
 	 */
 	public static Blob getSeed(String mnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
-		mnemonic=normaliseSpaces(mnemonic);
+		mnemonic=normalise(mnemonic);
 		mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
 		char[] normalisedMnemonic= mnemonic.toCharArray(); 
 		return getSeedInternal(normalisedMnemonic,passphrase);
@@ -320,7 +335,7 @@ public class BIP39 {
 	 */
 	public static List<String> getWords(String mnemonic) {
 		mnemonic=mnemonic.trim();
-		mnemonic=normaliseSpaces(mnemonic);
+		mnemonic=normalise(mnemonic);
 		String[] ss=mnemonic.split(" ");
 		ArrayList<String> al=new ArrayList<>();
 		for (int i=0; i<ss.length; i++) {
@@ -334,8 +349,9 @@ public class BIP39 {
 		return al;
 	}
 
-	public static String normaliseSpaces(String s) {
+	public static String normalise(String s) {
 		s=s.trim().replaceAll("\\s+"," ");
+		s=s.toLowerCase();
 		return s;
 	}
 

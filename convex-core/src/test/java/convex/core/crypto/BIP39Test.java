@@ -67,10 +67,12 @@ public class BIP39Test {
 		if (fail==null) {
 			doValidStringTest(m);
 		} else {
-			
+			doInvalidStringTest(m);
 		}
 	}
-	
+
+
+
 	@Test public void testNewlyGenerated() {
 		doValidStringTest(BIP39.createSecureMnemonic(3));
 		doValidStringTest(BIP39.createSecureMnemonic(15));
@@ -78,6 +80,12 @@ public class BIP39Test {
 		doValidStringTest(BIP39.createSecureMnemonic(24)+"\t");
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(4), 3)));
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(16), 12)));
+	}
+	
+	@Test 
+	public void testValidStrings() {
+		doValidStringTest("behind emotion squeeze"); // insufficient words
+		doValidStringTest("behinD Emotion SQUEEZE"); // insufficient words
 	}
 
 
@@ -94,7 +102,7 @@ public class BIP39Test {
 			
 			// with extra whitespace is OK
 			assertEquals(seed,BIP39.getSeed(" \t  "+m, PP));
-			
+
 			AKeyPair kp=BIP39.seedToKeyPair(seed);
 			assertNotNull(kp);
 			
@@ -104,6 +112,15 @@ public class BIP39Test {
 	
 	}
 
+	@Test 
+	public void testInvalidStrings() {
+		doInvalidStringTest("zzzz");
+		doInvalidStringTest("");
+		doInvalidStringTest("behind emotion"); // insufficient words
+	}
 	
+	private void doInvalidStringTest(String m) {
+		assertNotNull(BIP39.checkMnemonic(m));
+	}
 	
 }
