@@ -3,12 +3,16 @@ package convex.core.crypto;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.Blob;
 
@@ -17,6 +21,7 @@ public class BIP39Test {
 	@Test public void testWordList() {
 		assertEquals(2048,BIP39.wordlist.length);
 	}
+	
 	
 	@Test
 	public void testSeed() throws NoSuchAlgorithmException, InvalidKeySpecException {
@@ -47,4 +52,58 @@ public class BIP39Test {
 		assertNotEquals(s1,s2);
 		assertEquals(exSeed,BIP39.getSeed(s2,"").toHexString());
 	}
+	
+	@ParameterizedTest
+	@ValueSource(strings = {
+			"",
+			"   ",
+			"dgfdiwe biuh ihu ",
+			"equal pear fiber",
+			"sorry river evoke equal pear fiber bitter shadow cattle key enforce valve   ",
+			"   gate snack    turkey kick tell affair medal gallery scatter master dignity morning snake flower jealous",
+			"behind emotion false squeeze private fever dragon keen rifle attend couple base entire push cart kingdom library twist family wear subway thumb slide february"}) 
+	public void doMnemonicTest(String m) {
+		String fail=BIP39.checkMnemonic(m);
+		if (fail==null) {
+			doValidStringTest(m);
+		} else {
+			
+		}
+	}
+	
+	@Test public void testNewlyGenerated() {
+		doValidStringTest(BIP39.createSecureMnemonic(3));
+		doValidStringTest(BIP39.createSecureMnemonic(15));
+		doValidStringTest("   "+BIP39.createSecureMnemonic(12));
+		doValidStringTest(BIP39.createSecureMnemonic(24)+"\t");
+		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(4), 3)));
+		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(16), 12)));
+	}
+
+
+	private void doValidStringTest(String m) {
+		assertNull(BIP39.checkMnemonic(m));
+		String PP="pass";
+		List<String> words=BIP39.getWords(m);
+		try {
+			Blob seed=BIP39.getSeed(words, PP);
+			assertEquals(BIP39.SEED_LENGTH,seed.count());
+			
+			// Wrong passphrase => different seed
+			assertNotEquals(seed,BIP39.getSeed(words, "badpass"));
+			
+			// with extra whitespace is OK
+			assertEquals(seed,BIP39.getSeed(" \t  "+m, PP));
+			
+			AKeyPair kp=BIP39.seedToKeyPair(seed);
+			assertNotNull(kp);
+			
+		} catch (Exception e) {
+			fail("Enexpected Exception "+e);
+		}
+	
+	}
+
+	
+	
 }

@@ -143,7 +143,7 @@ public class KeyGenPanel extends JPanel {
 		actionPanel.add(btnRecreate);
 		btnRecreate.addActionListener(e -> {
 			Integer wc=(Integer) numSpinner.getValue();
-			mnemonicArea.setText(BIP39.createSecureRandom(wc));
+			mnemonicArea.setText(BIP39.createSecureMnemonic(wc));
 			updateMnemonic();
 		});
 		

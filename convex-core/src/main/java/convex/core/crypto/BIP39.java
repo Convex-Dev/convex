@@ -10,7 +10,6 @@ import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Random;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
@@ -211,6 +210,8 @@ public class BIP39 {
 
 	public static final int SEED_LENGTH = 64;
 	
+	public static final int MIN_WORDS=3;
+	
 	static {
 		for (int i=0; i<NUM_WORDS; i++) {
 			lookup.put(wordlist[i], i);
@@ -241,7 +242,19 @@ public class BIP39 {
 		if (n!=SEED_LENGTH) {
 			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte seed but was: "+n);
 		}
-		return AKeyPair.create(seed.getContentHash().toFlatBlob());
+		Blob edSeed=seed.getContentHash().toFlatBlob();
+		return AKeyPair.create(edSeed);
+	}
+	
+	/**
+	 * Return true if the string is a valid mnemonic phrase
+	 * @param menemonic
+	 * @return String containing reason that mnemonic is not valid, or null if OK
+	 */
+	public static String checkMnemonic(String s) {
+		List<String> words=getWords(s);
+		if (words.size()<MIN_WORDS) return "Insufficient words in BIP39 mnemonic (min="+MIN_WORDS+")";
+		return null;
 	}
 	
 	/**
@@ -276,16 +289,21 @@ public class BIP39 {
 
 
 
-	public static String createSecureRandom() {
-		return createSecureRandom(12);
+	public static String createSecureMnemonic() {
+		return createSecureMnemonic(12);
 	}
 	
-	public static String createSecureRandom(int numWords) {
+	public static String createSecureMnemonic(int numWords) {
 		return Utils.joinStrings(createWords(new SecureRandom(),numWords)," ");
 	}
 
-
-	public static List<String> createWords(Random r, int n) {
+	/**
+	 * Create a list of random mnemonic words given a random number generator
+	 * @param r
+	 * @param n
+	 * @return
+	 */
+	public static List<String> createWords(SecureRandom r, int n) {
 		ArrayList<String> al=new ArrayList<>(n);
 		for (int i=0; i<n; i++) {
 			int ix=r.nextInt(wordlist.length);
@@ -295,17 +313,22 @@ public class BIP39 {
 		return al;
 	}
 
-	public static List<String> getWords(String s) {
-		String[] ss=s.split(" ");
+	/**
+	 * Gets the individual words from a mnemonic String. Will trim and normalise whitespace, convert to lowercase
+	 * @param mnemonic Mnemonic String
+	 * @return
+	 */
+	public static List<String> getWords(String mnemonic) {
+		mnemonic=mnemonic.trim();
+		mnemonic=normaliseSpaces(mnemonic);
+		String[] ss=mnemonic.split(" ");
 		ArrayList<String> al=new ArrayList<>();
 		for (int i=0; i<ss.length; i++) {
 			String w=ss[i].trim();
 			
 			if (!w.isBlank()) {
 				w=w.toLowerCase();
-				if (lookup.containsKey(w)) {
-					al.add(w);
-				}
+				al.add(w);
 			}
 		}
 		return al;
@@ -314,6 +337,21 @@ public class BIP39 {
 	public static String normaliseSpaces(String s) {
 		s=s.trim().replaceAll("\\s+"," ");
 		return s;
+	}
+
+	/**
+	 * Create a mnemonic String from a list of words, separated by spaces
+	 * @param words
+	 * @return
+	 */
+	public static String mnemonic(List<String> words) {
+		StringBuilder sb=new StringBuilder();
+		for (String w: words) {
+			boolean start=sb.isEmpty();
+			if (!start) sb.append(' ');
+			sb.append(w);
+		}
+		return sb.toString();
 	}
 	
 }

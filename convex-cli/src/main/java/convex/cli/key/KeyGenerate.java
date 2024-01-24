@@ -49,7 +49,7 @@ public class KeyGenerate extends AKeyCommand {
 	private AKeyPair generateKeyPair() {	
 		try {
 			if (bip39) {
-				String mnemonic=BIP39.createSecureRandom(12);
+				String mnemonic=BIP39.createSecureMnemonic(12);
 				cli().println(mnemonic);
 				if (passphrase==null) {
 					if (cli().isInteractive()) {
