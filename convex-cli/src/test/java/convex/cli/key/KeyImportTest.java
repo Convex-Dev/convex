@@ -28,16 +28,16 @@ public class KeyImportTest {
 	}	
 
 	@Test
-	public void testKeyImport() {
+	public void testKeyImportPEM() {
 	 
 		AKeyPair keyPair = SodiumKeyPair.generate();
 		AccountKey accountKey=keyPair.getAccountKey();
 		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSWORD);
  
-		// command key.list
 		CLTester tester =  CLTester.run(
 			"key", 
 			"import",
+			"pem",
 			"-n",
 			"--keystore-password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
@@ -54,5 +54,31 @@ public class KeyImportTest {
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());
 		assertTrue(t2.getOutput().contains(accountKey.toHexString()));
+	}
+	
+	@Test
+	public void testKeyImportBIP39() {
+
+		CLTester tester =  CLTester.run(
+			"key", 
+			"import",
+			"bip39",
+			"--keystore-password", new String(KEYSTORE_PASSWORD), 
+			"--keystore", KEYSTORE_FILENAME, 
+			"--text", "elder mail trick garage hour enjoy attack fringe problem motion poem security caught false penalty", 
+			"--import-password", new String("")
+		);
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		
+		// Should give Ed25519 Seed: 616421a4ea27c65919faa5555e923f6005d76695c7d9ba0fe2a484b90e23de89
+
+		CLTester t2=CLTester.run(
+				"key" , 
+				"list",
+				"--keystore-password", new String(KEYSTORE_PASSWORD), 
+				"--keystore", KEYSTORE_FILENAME);
+		
+		assertEquals(ExitCodes.SUCCESS,t2.getResult());
+		assertTrue(t2.getOutput().contains("B4CDCE685F63E7768717ACF256B1450878EE6ABC7B7EE877B5D69B2466D8FBBF".toLowerCase()));
 	}
 }

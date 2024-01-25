@@ -51,6 +51,7 @@ public class Blobs {
 		long slength = a.length();
 		if ((slength & 1) != 0) return null;
 		Blob fullBlob = Blob.fromHex(a);
+		if (fullBlob==null) return null;
 		
 		long length = slength / 2;
 		if (length <= Blob.CHUNK_LENGTH) return fullBlob;
@@ -86,7 +87,7 @@ public class Blobs {
 	/**
 	 * Best effort attempt to parse a Blob. Must parse as a Blob of correct length.
 	 * Leading "0x" optional.
-	 * @param s String expected to contain a HasBlobh value
+	 * @param s String expected to contain a single Blob value in hex
 	 * @return ABlob value, or null if not parseable
 	 */
 	public static ABlob parse(String s) {

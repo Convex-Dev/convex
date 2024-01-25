@@ -479,5 +479,9 @@ public class Main implements Runnable {
 		return result;
 	}
 
+	public void printErr(String message) {
+		commandLine.getErr().println(message);
+	}
+
 
 }
