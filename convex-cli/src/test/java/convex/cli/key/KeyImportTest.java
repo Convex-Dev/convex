@@ -57,6 +57,34 @@ public class KeyImportTest {
 	}
 	
 	@Test
+	public void testKeyImportSeed() {
+		AKeyPair keyPair = AKeyPair.createSeeded(101);
+		AccountKey accountKey=keyPair.getAccountKey();
+
+		CLTester tester =  CLTester.run(
+			"key", 
+			"import",
+			"seed",
+			"--keystore-password", new String(KEYSTORE_PASSWORD), 
+			"--keystore", KEYSTORE_FILENAME, 
+			"--text", keyPair.getSeed().toString(), 
+			"--import-password", new String("")
+		);
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		
+		// Should give Ed25519 Seed: 616421a4ea27c65919faa5555e923f6005d76695c7d9ba0fe2a484b90e23de89
+
+		CLTester t2=CLTester.run(
+				"key" , 
+				"list",
+				"--keystore-password", new String(KEYSTORE_PASSWORD), 
+				"--keystore", KEYSTORE_FILENAME);
+		
+		assertEquals(ExitCodes.SUCCESS,t2.getResult());
+		assertTrue(t2.getOutput().contains(accountKey.toHexString()));
+	}
+	
+	@Test
 	public void testKeyImportBIP39() {
 
 		CLTester tester =  CLTester.run(

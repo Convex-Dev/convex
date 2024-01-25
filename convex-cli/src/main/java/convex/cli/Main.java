@@ -460,7 +460,7 @@ public class Main implements Runnable {
 		return c.readPassword(prompt);
 	}
 
-	public String loadTextFile(String fname) {
+	public String loadFileAsString(String fname) {
 		String result=null;
 		try {
 			fname=fname.trim();

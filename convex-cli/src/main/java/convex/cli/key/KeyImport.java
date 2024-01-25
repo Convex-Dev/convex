@@ -57,7 +57,7 @@ public class KeyImport extends AKeyCommand {
 		// Ensure importText is filled
 		if (importFilename != null && importFilename.length() > 0) {
 			if (importText!=null) throw new CLIError("Please provide either --import-file or --text, not both!");
-			importText=cli().loadTextFile(importFilename);
+			importText=cli().loadFileAsString(importFilename);
 		}
 		if (importText == null || importText.length() == 0) {
 			throw new CLIError("You need to provide '--text' or import filename '--import-file' to import a private key");
@@ -72,9 +72,8 @@ public class KeyImport extends AKeyCommand {
 			}
 		}
 		
-		// Parse input as hex string, just in case
+		// Parse input as hex string, will be null if not parsed. For BIP39 is 64 bytes, Ed25519 32
 		ABlob hex=Blobs.parse(importText.trim());
-		
 		if (type==null) {
 			cli().printErr("No import file type specified, attempting to auto-detect");
 			if (hex!=null) {
