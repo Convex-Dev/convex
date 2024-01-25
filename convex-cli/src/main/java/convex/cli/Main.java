@@ -467,12 +467,13 @@ public class Main implements Runnable {
 			if ("-".equals(fname)) {
 				byte[] bs=System.in.readAllBytes();
 				result = new String(bs);
+			} else {
+				Path path=Paths.get(fname);
+				if (!path.toFile().exists()) {
+					throw new CLIError("Import file does not exist: "+path);
+				}
+				result = Files.readString(path, StandardCharsets.UTF_8);
 			}
-			Path path=Paths.get(fname);
-			if (!path.toFile().exists()) {
-				throw new CLIError("Import file does not exist: "+path);
-			}
-			result = Files.readString(path, StandardCharsets.UTF_8);
 		} catch (IOException e) {
 			throw new CLIError("Unable to read import file",e);
 		}
