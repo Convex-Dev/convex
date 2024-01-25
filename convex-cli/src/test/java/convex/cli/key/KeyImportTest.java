@@ -84,6 +84,10 @@ public class KeyImportTest {
 		assertTrue(t2.getOutput().contains(accountKey.toHexString()));
 	}
 	
+	/**
+	 * BIP39 Import test
+	 * Example case generated using excellent tool: https://iancoleman.io/bip39/
+	 */
 	@Test
 	public void testKeyImportBIP39() {
 
