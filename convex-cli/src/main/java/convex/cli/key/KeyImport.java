@@ -1,10 +1,6 @@
 package convex.cli.key;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.Console;
 import java.security.PrivateKey;
 
 import org.bouncycastle.util.Arrays;
@@ -40,34 +36,34 @@ public class KeyImport extends AKeyCommand {
 		description="Import file for the the keypair.")
 	private String importFilename;
 	
-	@Option(names={"--pem-text"},
-			description="PEM format text to import.")
+	@Option(names={"-t", "--text"},
+			description="Text string to import.")
 		private String importText;
 
-	@Option(names={"--pem-password"},
-		description="Password of the imported PEM key.")
+	@Option(names={"--import-password"},
+		description="Password for the imported key.")
     private String importPassword;
 
 	@Override
 	public void run() {
+		// Ensure importText is filled
 		if (importFilename != null && importFilename.length() > 0) {
-			Path path=Paths.get(importFilename);
-			try {
-				if (!path.toFile().exists()) {
-					throw new CLIError("Import file does not exist: "+path);
-				}
-				importText = Files.readString(path, StandardCharsets.UTF_8);
-			} catch (IOException e) {
-				throw new CLIError("Unable to read import file: "+path,e);
-			}
+			if (importText!=null) throw new CLIError("Please provide either --import-file or --text, not both!");
+			importText=cli().loadTextFile(importFilename);
 		}
 		if (importText == null || importText.length() == 0) {
-			throw new CLIError("You need to provide '--pem-text' or import filename '--import-file' to import a private key");
+			throw new CLIError("You need to provide '--text' or import filename '--import-file' to import a private key");
 		}
 
-		if (importPassword == null || importPassword.length() == 0) {
-			log.warn("You need to provide an import password '--import-password' of the imported encrypted PEM data");
+		if (importPassword == null) {
+			if (cli().isInteractive()) {
+				importPassword=new String(System.console().readPassword("Enter import password:"));
+			} else {
+				throw new CLIError("--import-password not provided during non-interatice import");
+			}
 		}
+		
+		
 
 		PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
 		AKeyPair keyPair = AKeyPair.create(privateKey);
