@@ -92,8 +92,9 @@ public class PEMTools {
 		StringWriter stringWriter = new StringWriter();
 		JcaPEMWriter writer = new JcaPEMWriter(stringWriter);
 		
-		JcePKCSPBEOutputEncryptorBuilder builder = new JcePKCSPBEOutputEncryptorBuilder(PKCS8Generator.PBE_SHA1_RC2_128);
 		try {
+			JcePKCSPBEOutputEncryptorBuilder builder = new JcePKCSPBEOutputEncryptorBuilder(PKCS8Generator.PBE_SHA1_RC2_128);
+			builder.setIterationCount(4096); // TODO: double check requirements here?
 			OutputEncryptor encryptor = builder.build(password);
 			JcaPKCS8Generator generator = new JcaPKCS8Generator(privateKey, encryptor);
 			writer.writeObject(generator);
