@@ -455,7 +455,7 @@ public class Main implements Runnable {
 
 	public char[] readPassword(String prompt) {
 		Console c=System.console();
-		if (c==null) throw new CLIError("Unable to get user input because console is unavaiable.");
+		if (c==null) throw new CLIError("Unable to request password because console is unavaiable. Consider passing a password parameter, or running in interactive mode.");
 		
 		return c.readPassword(prompt);
 	}

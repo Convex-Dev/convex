@@ -1,12 +1,8 @@
 package convex.cli.key;
 
-import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.spec.InvalidKeySpecException;
 
 import org.bouncycastle.util.Arrays;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.core.crypto.AKeyPair;
@@ -31,8 +27,6 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="import",
 	description="Import key pairs to the keystore.")
 public class KeyImport extends AKeyCommand {
-
-	private static final Logger log = LoggerFactory.getLogger(KeyImport.class);
 
 	@ParentCommand
 	protected Key keyParent;
