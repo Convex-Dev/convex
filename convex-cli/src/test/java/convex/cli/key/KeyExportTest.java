@@ -11,6 +11,8 @@ import org.junit.jupiter.api.Test;
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
 import convex.cli.Helpers;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PEMTools;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.util.Utils;
@@ -61,27 +63,16 @@ public class KeyExportTest {
 			"key",
 			"export",
 			"--keystore-password", new String(KEYSTORE_PASSWORD),
-			"--p", new String(KEY_PASSWORD),
+			"--password", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
-			"--key", publicKey,
+			"--public-key", publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
+		String s=tester.getOutput();
+		System.out.println(s);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
-		// TODO test generated output
-
-		// command key.export publicKey with leading 0x
-		tester =  CLTester.run(
-			"key",
-			"export",
-			"--keystore-password", new String(KEYSTORE_PASSWORD),
-			"--keystore", KEYSTORE_FILENAME,
-			"--key", "0x" + publicKey,
-			"--export-password", new String(EXPORT_PASSWORD)
-		);
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
-		// TODO test generated output
-
-
+		AKeyPair kp=AKeyPair.create(PEMTools.decryptPrivateKeyFromPEM(s, EXPORT_PASSWORD));
+		assertEquals(ak,kp.getAccountKey());
 	}
 }
 
