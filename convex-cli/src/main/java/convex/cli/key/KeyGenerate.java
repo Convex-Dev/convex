@@ -55,11 +55,14 @@ public class KeyGenerate extends AKeyCommand {
 					if (cli().isInteractive()) {
 						passphrase=new String(cli().readPassword("Enter BIP39 passphrase: "));
 					} else {
+						cli().paranoia("Passphrase must be explicity provided");
 						passphrase="";
 					}
 				}
-				Blob bipseed;
-					bipseed = BIP39.getSeed(mnemonic, passphrase);
+				if (passphrase.isBlank()) {
+					cli().paranoia("Cannot use an empty passphrase for secure key generation");
+				}
+				Blob bipseed = BIP39.getSeed(mnemonic, passphrase);
 				AKeyPair result= BIP39.seedToKeyPair(bipseed);
 				return result;
 			} else {
