@@ -270,10 +270,12 @@ public class Main implements Runnable {
 				keypass=new char[0];
 			}
 		}
+		if (keypass.length==0) {
+			paranoia("Cannot use an empty private key password");
+		}
 		return keypass;
 	}
 	
-
 	/**
 	 * Gets the keystore file name currently used for the CLI
 	 * @return File name, or null if not specified

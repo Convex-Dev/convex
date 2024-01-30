@@ -158,7 +158,9 @@ public class MarketComponent extends BaseListComponent {
 		changeStake(outcome, 1000000);
 	}
 
+	@SuppressWarnings("unused")
 	private void changeStake(Object outcome, long delta) {
+		// TODO: this is broken and needs fixing
 		State state = marketsPanel.getLatestState();
 		Long stk = getStake(state, outcome);
 		if (stk == null) stk = 0L;
