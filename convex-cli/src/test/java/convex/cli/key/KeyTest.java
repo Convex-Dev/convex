@@ -35,8 +35,13 @@ public class KeyTest {
 		String fileName =KEYSTORE_FILENAME;
 		
 		// command key.generate
-		CLTester tester =  CLTester.run("key", "generate", "--p", KEY_PASSWORD, "--keystore-password", KEYSTORE_PASSWORD, "--keystore", fileName);
-		assertEquals(0,tester.getResult());
+		CLTester tester =  CLTester.run(
+				"key", 
+				"generate", 
+				"-p", KEY_PASSWORD, 
+				"--keystore-password", KEYSTORE_PASSWORD, 
+				"--keystore", fileName);
+		tester.assertResult(0);
 		String key = tester.getOutput().trim();
 		assertEquals(64,key.length());
 		

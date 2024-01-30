@@ -1,6 +1,8 @@
 
 package convex.cli;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
@@ -52,5 +54,12 @@ public class CLTester {
 
 	public String getError() {
 		return error;
+	}
+
+	public void assertResult(int expected) {
+		if (result==expected) return;
+		System.err.println("STDOUT: "+output);
+		System.err.println("STDERR: "+error);
+		fail("Unexpected CLI result, expected "+expected+" but got "+result);
 	}
 }

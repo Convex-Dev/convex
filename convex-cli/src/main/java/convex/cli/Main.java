@@ -77,17 +77,23 @@ public class Main implements Runnable {
 		description="Keystore filename. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
 	
-	@Option(names={"--k","--key"},
+	@Option(names={"-k","--key"},
 			defaultValue="${env:CONVEX_KEY}",
 			scope = ScopeType.INHERIT,
 			description="Keystore filename. Default: ${DEFAULT-VALUE}")
 		private String keySpec;
 	
-	@Option(names={"--p","--password"},
+	@Option(names={"-p","--password"},
 			defaultValue="${env:CONVEX_KEY_PASSWORD}",
 			scope = ScopeType.INHERIT,
 			description="Keystore filename. Default: ${DEFAULT-VALUE}")
 		private String keyPassword;
+	
+	@Option(names={"-S","--strict-security"},
+			defaultValue="false",
+			scope = ScopeType.INHERIT,
+			description="Apply strict security. Will forbid actions with dubious security implications.")
+		private boolean paranoid;
 
 	@Option(names={"--keystore-password"},
 		scope = ScopeType.INHERIT,
@@ -237,6 +243,7 @@ public class Main implements Runnable {
 			} 
 			
 			if (storepass==null) {
+				paranoia("Keystore password must be explicitly provided");
 				log.warn("No password for keystore: defaulting to blank password");
 				storepass=new char[0];
 			}
@@ -350,7 +357,7 @@ public class Main implements Runnable {
 		File keyFile = new File(getKeyStoreFilename());
 		try {
 			if (!keyFile.exists()) {
-				throw new Error("Cannot find keystore file "+keyFile.getCanonicalPath());
+				throw new CLIError("Cannot find keystore file "+keyFile.getCanonicalPath());
 			}
 			KeyStore keyStore = PFXTools.loadStore(keyFile, storePassword);
 
@@ -426,7 +433,9 @@ public class Main implements Runnable {
 		}
 	}
 
-
+	public boolean isParanoid() {
+		return this.paranoid;
+	}
 
 	public void println(String s) {
 		if (s==null) s="null";
@@ -482,6 +491,10 @@ public class Main implements Runnable {
 
 	public void printErr(String message) {
 		commandLine.getErr().println(message);
+	}
+
+	public void paranoia(String message) {
+		if (isParanoid()) throw new CLIError("STRICT SECURITY: "+message);
 	}
 
 

@@ -74,6 +74,7 @@ public class KeyExport extends AKeyCommand {
 			String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
 			output=pemText;
 		} else if ("seed".equals(type)){
+			cli().paranoia("Raw seed export forbidden in strict mode.");
 			String rawSeed = keyPair.getSeed().toHexString();
 			output=rawSeed;
 		} else {
