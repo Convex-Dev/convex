@@ -58,7 +58,7 @@ public class KeyExportTest {
 		assertNotNull(ak);
 		String publicKey=output;
 
-		// command key.export publicKey
+		// export publicKey as pem
 		tester =  CLTester.run(
 			"key",
 			"export",
@@ -69,10 +69,23 @@ public class KeyExportTest {
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		String s=tester.getOutput();
-		System.out.println(s);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		AKeyPair kp=AKeyPair.create(PEMTools.decryptPrivateKeyFromPEM(s, EXPORT_PASSWORD));
 		assertEquals(ak,kp.getAccountKey());
+		
+		// export publicKey as pem
+		tester =  CLTester.run(
+			"key",
+			"export",
+			"seed",
+			"--keystore-password", new String(KEYSTORE_PASSWORD),
+			"--password", new String(KEY_PASSWORD),
+			"--keystore", KEYSTORE_FILENAME,
+			"--public-key", publicKey
+		);
+		String s2=tester.getOutput();
+		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		assertTrue(s2.contains(kp.getSeed().toHexString()));
 	}
 }
 

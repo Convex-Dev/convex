@@ -3,11 +3,12 @@ package convex.cli.key;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.cli.Main;
+import convex.cli.CLIError;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 
@@ -38,28 +39,50 @@ public class KeyExport extends AKeyCommand {
 	@Option(names={"--export-password"},
 		description="Password of the exported key.")
     private String exportPassword;
-
-
+	
+	@Parameters(
+			index = "0", 
+			arity = "0..1", 
+			defaultValue="pem",
+			description = "Type of file exported. Supports: pem, seed")
+    private String type;
+	
+	private void ensureExportPAssword() {
+		if (exportPassword == null || exportPassword.length() == 0) {
+			log.warn("No export password '--export-password' provided: Defaulting to blank.");
+			exportPassword="";
+		}
+	}
+	
 	@Override
 	public void run() {
-		// sub command to generate keys
-		Main mainParent = cli();
-
 		if ((keystorePublicKey == null)||(keystorePublicKey.isEmpty())) {
 			log.warn("You need to provide at least --public-key parameter");
 			return;
 		}
 
-		if (exportPassword == null || exportPassword.length() == 0) {
-			log.warn("No export password '--export-password' provided: Defaulting to blank.");
-			exportPassword="";
+		String publicKey = keystorePublicKey;
+		AKeyPair keyPair = cli().loadKeyFromStore(publicKey);
+		if (keyPair==null) {
+			// TODO: maybe prompt?
+			throw new CLIError("Key pair not found for key: "+keystorePublicKey);
+		}
+		
+		String output;
+		if ("pem".equals(type)) {
+			ensureExportPAssword();
+			String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
+			output=pemText;
+		} else if ("seed".equals(type)){
+			String rawSeed = keyPair.getSeed().toHexString();
+			output=rawSeed;
+		} else {
+			throw new CLIError("Export type not recognised: "+type);
 		}
 
-		String publicKey = keystorePublicKey;
-
-		AKeyPair keyPair = mainParent.loadKeyFromStore(publicKey);
-		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
-
-		mainParent.println(pemText);
+		cli().println(output);
 	}
+
+
+
 }
