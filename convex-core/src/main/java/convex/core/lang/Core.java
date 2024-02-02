@@ -10,6 +10,7 @@ import java.util.Map;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
+import convex.core.crypto.Hashing;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
@@ -2061,21 +2062,51 @@ public class Core {
 	});
 
 	public static final CoreFn<Hash> HASH = reg(new CoreFn<>(Symbols.HASH) {
-		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ABlob blob=RT.ensureBlob(args[0]);
 			if (blob==null) return context.withCastError(0,args, Types.BLOB);
+			long juice=Juice.HASH+blob.count()*Juice.HASH_PER_BYTE;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			Hash result = blob.getContentHash();
-			return context.withResult(Juice.HASH, result);
+			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<Hash> KECCAK256 = reg(new CoreFn<>(Symbols.KECCAK256) {
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			ABlob blob=RT.ensureBlob(args[0]);
+			if (blob==null) return context.withCastError(0,args, Types.BLOB);
+			long juice=Juice.HASH+blob.count()*Juice.HASH_PER_BYTE;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
+			Hash result = blob.computeHash(Hashing.getKeccak256Digest());
+			return context.withResult(juice, result);
+		}
+	});
+	
+	public static final CoreFn<Hash> SHA256 = reg(new CoreFn<>(Symbols.SHA256) {
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			ABlob blob=RT.ensureBlob(args[0]);
+			if (blob==null) return context.withCastError(0,args, Types.BLOB);
+			long juice=Juice.HASH+blob.count()*Juice.HASH_PER_BYTE;
+			if (!context.checkJuice(juice)) return context.withJuiceError();
+
+			Hash result = blob.computeHash(Hashing.getSHA256Digest());
+			return context.withResult(juice, result);
 		}
 	});
 
-	public static final CoreFn<CVMLong> COUNT = reg(new CoreFn<>(Symbols.COUNT) {
-		
+	public static final CoreFn<CVMLong> COUNT = reg(new CoreFn<>(Symbols.COUNT) {	
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -2088,7 +2119,6 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> EMPTY = reg(new CoreFn<>(Symbols.EMPTY) {
-		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));

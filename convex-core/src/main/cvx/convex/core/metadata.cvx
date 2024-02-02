@@ -604,6 +604,18 @@
                       {:code "(hash (encoding :foo))"}]
         :signature   [{:params [value]
                        :return Blob}]}}
+ 
+ keccak256
+ {:doc {:description "Calculates the 32-byte Keccak-256 cryptographic hash of a `blob` or an `address` (which is a specialized type of `blob`). Returns a 32-byte `blob`."
+        :examples    [{:code "(keccak256 0x1234)"}]
+        :signature   [{:params [value]
+                       :return Blob}]}}
+ 
+ sha256
+ {:doc {:description "Calculates the 32-byte SHA-256 cryptographic hash of a `blob` or an `address` (which is a specialized type of `blob`). Returns a 32-byte `blob`."
+        :examples    [{:code "(sha256 0x1234)"}]
+        :signature   [{:params [value]
+                       :return Blob}]}}
 
  hash-map
  {:doc {:description "Constructs a map with the given keys and values. If a key is repeated, the last value will overwrite previous ones."

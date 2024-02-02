@@ -79,13 +79,25 @@ public class Hashing {
 	}
 
 	/**
-	 * Computes the SHA3-256 hash of byte data
+	 * Computes the SHA-256 hash of byte data
 	 * 
 	 * @param data Byte array to hash
-	 * @return SHA3-256 Hash value
+	 * @return Hash value
 	 */
 	public static Hash sha256(byte[] data) {
 		MessageDigest md = getSHA256Digest();
+		byte[] hash = md.digest(data);
+		return Hash.wrap(hash);
+	}
+	
+	/**
+	 * Computes the KECCAK-256 hash of byte data
+	 * 
+	 * @param data Byte array to hash
+	 * @return Hash value
+	 */
+	public static Hash keccak256(byte[] data) {
+		MessageDigest md = getKeccak256Digest();
 		byte[] hash = md.digest(data);
 		return Hash.wrap(hash);
 	}

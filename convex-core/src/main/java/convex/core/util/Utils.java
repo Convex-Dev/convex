@@ -722,7 +722,7 @@ public class Utils {
 	public static String readResourceAsString(String path) throws IOException {
 		ClassLoader classLoader = ClassLoader.getSystemClassLoader();
 		try (InputStream inputStream = classLoader.getResourceAsStream(path)) {
-			if (inputStream == null) throw new IOException("Resource not found: " + path);
+			if (inputStream == null) throw new IOException("Resource not found: " + path + " with classloader "+classLoader);
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
 				return reader.lines().collect(Collectors.joining(System.lineSeparator()));
 			}

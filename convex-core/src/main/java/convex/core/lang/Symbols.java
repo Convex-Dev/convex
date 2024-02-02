@@ -64,7 +64,10 @@ public class Symbols {
 	public static final Symbol CATCH = intern("catch");
 
 	public static final Symbol APPLY = intern("apply");
+	
 	public static final Symbol HASH = intern("hash");
+	public static final Symbol KECCAK256 = intern("keccak256");
+	public static final Symbol SHA256 = intern("sha256");
 
 	public static final Symbol QUOTE = intern("quote");
 	public static final Symbol QUASIQUOTE = intern("quasiquote");
@@ -324,8 +327,6 @@ public class Symbols {
 	public static final Symbol MEMORY = intern("memory");
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
-	
-
 	
 	public static Symbol intern(String s) {
 		AString name=Strings.create(s);

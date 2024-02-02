@@ -152,11 +152,16 @@ public class Juice {
 	public static final long APPLY = 50;
 
 	/**
-	 * Juice for a cryptographic hash
+	 * Base juice for a cryptographic hash
 	 * 
 	 * Expensive.
 	 */
-	public static final long HASH = 10000;
+	public static final long HASH = 1000;
+	
+	/**
+	 * Juice per byte of a cryptographic hash
+	 */
+	public static final long HASH_PER_BYTE = 10;
 
 	/**
 	 * Juice for a very cheap operation. O(1), no new cell allocations or non-trivial lookups.

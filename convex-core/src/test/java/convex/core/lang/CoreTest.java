@@ -3391,6 +3391,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testHash() {
 		assertEquals(Hash.fromHex("a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a"),eval("(hash 0x)"));
+		assertEquals(Hash.fromHex("352B82608DAD6C7AC3DD665BC2666E5D97803CB13F23A1109E2105E93F42C448"),eval("(hash 0xDEADBEEF)"));
 
 		assertEquals(Hash.NULL_HASH, eval("(hash (encoding nil))"));
 		assertEquals(Hash.TRUE_HASH, eval("(hash (encoding true))"));
@@ -3406,6 +3407,38 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(hash)"));
 		assertArityError(step("(hash nil nil)"));
 	}
+	
+	@Test
+	public void testKeccak() {
+		assertEquals(Hash.fromHex("c5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"),eval("(keccak256 0x)"));
+
+		assertTrue(evalB("(= (keccak256 0x1234) (keccak256 0x1234))"));
+		assertTrue(evalB("(blob? (keccak256 0x00))")); // Should be a Blob
+		
+		assertCastError(step("(keccak256 nil)"));
+		assertCastError(step("(keccak256 :foo)"));
+		assertCastError(step("(keccak256 #44)")); // specialised blobs don't implicitly cast to Blob
+		
+		assertArityError(step("(keccak256)"));
+		assertArityError(step("(keccak256 nil nil)"));
+	}
+	
+	@Test
+	public void testSHA256() {
+		assertEquals(Hash.fromHex("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),eval("(sha256 0x)"));
+		assertEquals(Hash.fromHex("5F78C33274E43FA9DE5659265C1D917E25C03722DCB0B8D27DB8D5FEAA813953"),eval("(sha256 0xdeadbeef)"));
+
+		assertTrue(evalB("(= (sha256 0x1234) (sha256 0x1234))"));
+		assertTrue(evalB("(blob? (sha256 0x00))")); // Should be a Blob
+		
+		assertCastError(step("(sha256 nil)"));
+		assertCastError(step("(sha256 :foo)"));
+		assertCastError(step("(sha256 #44)")); // specialised blobs don't implicitly cast to Blob
+		
+		assertArityError(step("(sha256)"));
+		assertArityError(step("(sha256 nil nil)"));
+	}
+
 
 	@Test
 	public void testCount() {

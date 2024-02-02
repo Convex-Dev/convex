@@ -42,7 +42,6 @@ public class SimpleNFTTest extends ACVMTest {
 		assertNotError(c);
 	}
 	
-	
 	@SuppressWarnings("unchecked")
 	@Test public void testAssetAPI() {
 		Context ctx=context();
