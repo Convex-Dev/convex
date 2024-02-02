@@ -10,6 +10,7 @@ import java.util.concurrent.TimeoutException;
 import convex.api.Convex;
 import convex.core.Coin;
 import convex.core.Result;
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.data.ABlob;
@@ -17,6 +18,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -63,7 +65,9 @@ public class ChainAPI extends ABaseAPI {
 		
 		app.post(prefix+"transaction/prepare", this::runTransactionPrepare);
 		app.post(prefix+"transaction/submit", this::runTransactionSubmit);
- 
+		
+		app.post(prefix+"transact", this::runTransact);
+		  
 		app.get(prefix+"accounts/<addr>", this::queryAccount);
 		
 		app.get(prefix+"data/<hash>", this::getData);
@@ -196,7 +200,6 @@ public class ChainAPI extends ABaseAPI {
 	
 	private HashMap<String,Object> jsonResult(Result r) {
 		if (r.isError()) return jsonForErrorResult(r);
-		
 		HashMap<String,Object> hm=new HashMap<>();
 		hm.put("value", RT.json(r.getValue()));
 		return hm;
@@ -250,12 +253,7 @@ public class ChainAPI extends ABaseAPI {
 		Object srcValue=req.get("source");
 		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
 	
-		ACell code=null;
-		try {
-			code=Reader.read((String)srcValue);
-		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Source code did not compile: "+e.getMessage()));
-		}
+		ACell code= readCode(srcValue);
 		
 		try {
 			long sequence=convex.getSequence(addr);
@@ -272,6 +270,44 @@ public class ChainAPI extends ABaseAPI {
 			ctx.result(JSON.toPrettyString(rmap));
 		} catch (Exception e) {
 			throw new InternalServerErrorResponse(jsonError("Error preparing transaction: "+e.getMessage()));
+		}
+	}
+	
+	public void runTransact(Context ctx) {
+		Map<String, Object> req=getJSONBody(ctx);
+		Address addr=Address.parse(req.get("address")); 
+		if (addr==null) throw new BadRequestResponse(jsonError("Transact requires an 'address' field."));
+		Object srcValue=req.get("source");
+		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
+		
+		ABlob seed=Blobs.parse(req.get("seed"));
+		if (!(seed instanceof ABlob)) throw new BadRequestResponse(jsonError("Seed required for transact (e.g. as hex string)"));
+		if (seed.count()!=AKeyPair.SEED_LENGTH) throw new BadRequestResponse(jsonError("Seed must be 32 bytes"));
+	
+		ACell code= readCode(srcValue);
+		
+		try {
+			long sequence=convex.getSequence(addr);
+			long nextSeq=sequence+1;
+			ATransaction trans=Invoke.create(addr, nextSeq, code);
+			
+			AKeyPair kp=AKeyPair.create(seed.toFlatBlob());
+			SignedData<ATransaction> sd=kp.signData(trans);
+			
+			Result r=doTransaction(sd);
+	
+			HashMap<String,Object> rm=jsonResult(r);
+			ctx.result(JSON.toPrettyString(rm));
+		} catch (Exception e) {
+			throw new InternalServerErrorResponse(jsonError("Error preparing transaction: "+e.getMessage()));
+		}
+	}
+
+	private static ACell readCode(Object srcValue) {
+		try {
+			return Reader.read((String)srcValue);
+		} catch (Exception e) {
+			throw new BadRequestResponse(jsonError("Source code could not be read: "+e.getMessage()));
 		}
 	}
 	
@@ -316,8 +352,6 @@ public class ChainAPI extends ABaseAPI {
 		SignedData<ATransaction> sd=SignedData.create(key, sig, trans.getRef());
 		Result r=doTransaction(sd);
 		HashMap<String,Object> rm=jsonResult(r);
-		if (rm==null) throw new InternalServerErrorResponse(jsonError("Couldn't parse Result: "+r));
-		
 		ctx.result(JSON.toPrettyString(rm));
 	}
 	
@@ -333,9 +367,8 @@ public class ChainAPI extends ABaseAPI {
 		if (!(srcValue instanceof String)) throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
 		
 		Object cvxRaw=req.get("raw");
-		
-		String src=(String)srcValue;
-		ACell form=Reader.read(src);
+
+		ACell form=readCode(srcValue);
 		try {
 			Result r=convex.querySync(form,addr);
 			
