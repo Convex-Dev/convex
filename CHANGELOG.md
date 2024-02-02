@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased 
 
 
+## [0.7.13] - 2024-02-02
+
+### Added
+- BIP39 key generation support
+- Observability support initial version
+
+### Changed
+- Updated CLI
+
+### Fixed
+- Bug fixes for message decoding
+
 ## [0.7.12] - 2023-07-12
 
 ### Added

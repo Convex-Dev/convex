@@ -2,7 +2,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.7.13-SNAPSHOT</version>
+	<version>0.7.13</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -31,7 +31,7 @@
 		<hc.version>5.3</hc.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2020-02-02T00:00:00Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2024-02-02T14:49:47Z</project.build.outputTimestamp>
 		<argLine>
 			--illegal-access=permit
 			--add-opens=java.base/java.util=ALL-UNNAMED
