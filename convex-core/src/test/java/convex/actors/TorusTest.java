@@ -53,7 +53,6 @@ public class TorusTest extends ACVMTest {
 		}		
 	}
 
-
 	@Test public void testMissingMarket() {
 		Context ctx=context();
 
@@ -67,7 +66,6 @@ public class TorusTest extends ACVMTest {
 
 	@Test public void testDeployedCurrencies() {
 		Context ctx=context(); // Initial test context
-		ctx=step(ctx,"(import torus.exchange :as torus)");
 		ctx= step(ctx,"(def GBP (import currency.GBP :as GBP))");
 		ctx= step(ctx,"(def USD (import currency.USD :as USD))");
 		assertNotNull(ctx.getResult());
@@ -94,12 +92,15 @@ public class TorusTest extends ACVMTest {
 		ctx=exec(ctx,"(call ECO (mint 1000000))");
 		assertCVMEquals(1000000,eval(ctx,"(asset/balance ECO)"));
 		
-		// TODO: multi-token needs offer and accept for this
 		ctx=exec(ctx,"(torus/add-liquidity ECO 1000 10000)");
 		assertEquals(10.0,evalD(ctx,"(torus/price ECO)"));
-
 	}
-
+	
+	@Test public void testLiquidityShareToken() {
+		Context ctx=context();
+	
+		AssetTester.doFungibleTests(ctx, GBP, ctx.getAddress());
+	}
 
 	@Test public void testTorusAPI() {
 		Context ctx=context();
