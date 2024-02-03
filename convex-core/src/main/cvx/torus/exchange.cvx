@@ -45,17 +45,23 @@
       (import convex.core     :as core)
       (import convex.fungible :as fungible)
 
-
       (def token ~token)
       (def torus ~torus)
       (def token-balance 0)
-
+      
+      (defn -qc
+    		  ^{:doc {:description "Quantity check."}
+    		    :private? true}
+    		  [q]
+    		  (cond (int? q) q              ;; base case, quantity should always be an integer
+    				(nil? q) 0 
+    		        (fail :ARGUMENT "Invalid token quantity")))
 
       (defn add-liquidity
     		  ^{:callable? true}
         [amount]
         (let [;; Amount of tokens deposited.
-              amount (int amount)
+              amount (-qc amount)
      
               ;; Price of token in CVX (double), nil if no current liquidity.
               price (price)
@@ -292,10 +298,9 @@
         ^{:callable? true}
         [shares]
         (let [;; Amount of shares to withdraw.
-              shares       (int shares)
+              shares       (-qc shares)
               ;; Shares of holder.
-              own-holding  (or (get-holding *caller*)
-                               0)
+              own-holding  (or (get-holding *caller*) 0)
               _            (assert (<= 0
                                        shares
                                        own-holding))

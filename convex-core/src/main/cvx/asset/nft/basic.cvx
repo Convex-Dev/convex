@@ -14,7 +14,6 @@
   ^{:doc {:description "Used for creating NFT ids."}}
   0)
 
-
 (def offers
   ^{:doc {:description "Map of `owner` -> map of `recipient address` -> `set of NFT ids`"}}
   {})
@@ -23,28 +22,33 @@
   ^{:doc {:description "Map of ID -> NFT metadata. May be nil for no metadata"}}
   {})
 
-
 ;;;;;;;;;; Implementation of `convex.asset` interface
+
+(defn -qc
+		  ^{:doc {:description "Checks a basic NFT quantity."}
+		    :private? true}
+		  [q]
+		  (cond (set? q) q              ;; base case, quantity should always be a Set
+				(int? q) #{q} 
+		        (nil? q) #{}
+		        (fail :ARGUMENT "Invalid NFT quantity")))
 
 (defn -direct-transfer
   ^{:private? true}
   ;; Used internally by [[accept]] and [[direct-transfer]].
   [sender receiver quantity]
-  (let [receiver             (address receiver)
+  (let [q (-qc quantity)
+        receiver             (address receiver)
         sender-balance       (or (get-holding sender)
                                  #{})
-        _                    (assert (subset? quantity
-                                              sender-balance))
+        _                    (or (subset? q sender-balance)
+        		                 (fail :FUNDS "Cannot transfer non-owned NFT(s)"))
         receiver-balance     (or (get-holding receiver)
                                  #{})
-        new-sender-balance   (difference sender-balance
-                                         quantity)
-        new-receiver-balance (union receiver-balance
-                                    quantity)]
-    (set-holding sender
-                 new-sender-balance)
-    (set-holding receiver
-                 new-receiver-balance))
+        new-sender-balance   (difference sender-balance q)
+        new-receiver-balance (union receiver-balance q)]
+    (set-holding sender new-sender-balance)
+    (set-holding receiver new-receiver-balance))
     quantity)
 
 
@@ -52,7 +56,8 @@
   ^{:callable? true
     :private?  true}
   [sender quantity]
-  (let [sender           (address sender)
+  (let [q                (-qc quantity)
+        sender           (address sender)
         sender-offers    (or (get offers
                                   sender)
                              {})
@@ -60,12 +65,11 @@
                                      [sender
                                       *caller*])
                              #{})
-        _                (assert (subset? quantity
-                                          offer))
+        _                (or (subset? q offer)
+        		             (fail :STATE "Insuffient NFT offer to accept"))
         receiver-balance (or (get-holding *caller*)
                              #{})
-        new-offer        (difference offer
-                                     quantity)]
+        new-offer        (difference offer q)]
 
     (set! offers
        (assoc offers
@@ -95,13 +99,14 @@
 (defn offer
   ^{:callable? true}
   [receiver quantity]
-  (let [caller-offers (get offers *caller* {})]
+  (let [q             (-qc quantity)
+        caller-offers (get offers *caller* {})]
     (set! offers
          (assoc offers
                 *caller*
                 (assoc caller-offers
                        receiver
-                       quantity)))))
+                       q)))))
 
 
 (def quantity-add

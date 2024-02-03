@@ -24,15 +24,21 @@
      (let [rec (get-holding addr)]
        (or (get rec 0) 0))))
 
+(defn -qc
+		  ^{:doc {:description "Quantity check."}
+		    :private? true}
+		  [q]
+		  (cond (int? q) q              ;; base case, quantity should always be an integer
+				(nil? q) 0 
+		        (fail :ARGUMENT "Invalid token quantity")))
+
 ;; Transfer
 
 (defn direct-transfer
    ^{:callable? true}
    [addr amount]
    (let [addr   (address addr)
-         amount (if amount
-                  (int amount)
-                  0)
+         amount (-qc amount)
          bal    (-get-balance *caller*)
          tbal   (-get-balance addr)]
      ;; Amount must be in valid range.
@@ -84,7 +90,7 @@
 (defn offer
   ^{:callable? true}
   [receiver quantity]
-  (let [quantity (cond (nil? quantity) 0 (int quantity)) 
+  (let [quantity (-qc quantity) 
         receiver (address receiver)
         rec (get-holding *caller*)]
     (if rec
@@ -101,7 +107,7 @@
 (defn accept 
   ^{:callable? true}
   [sender quantity] 
-  (let [quantity (int quantity)
+  (let [quantity (-qc quantity)
         _ (cond 
             (zero? quantity) (return 0) ;; trivial accept
             (< quantity 0) (fail :ARGUMENT "Negative accept amount"))

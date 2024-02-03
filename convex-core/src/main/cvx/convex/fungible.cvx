@@ -95,8 +95,12 @@
                            *address*)]
     `(do
 
-       (def supply
-            ~supply)
+    	(defn -qc [q]
+    	  (cond (int? q) q              ;; base case, quantity should always be an integer
+    			(nil? q) 0 
+    			(fail :ARGUMENT "Invalid quantity")))
+    	
+       (def supply (-qc ~supply))
 
        (set-holding ~initial-holder
                     ~supply)
@@ -111,26 +115,19 @@
          ^{:callable? true}
          [sender quantity]
          (let [sender   (address sender)
-               quantity (if quantity
-                          (int quantity)
-                          0)
+               quantity (-qc quantity)
                om       (get offers sender) ;; if this is nil then OK, behaves as empty map
                sendbal  (or (get-holding sender)
                             0)
-               offer    (or (get om
-                                 *caller*)
-                            0)]
+               offer    (get om *caller* 0)]
              (cond 
-               (< quantity
-                  0)
+               (< quantity 0)
                (fail "Can't accept a negative quantity of fungible tokens.")
 
-               (< offer
-                  quantity)
+               (< offer quantity)
                (fail :STATE "Offer is insufficient")
 
-               (< sendbal
-                  quantity)
+               (< sendbal quantity)
                (fail :FUNDS "Sender token balance is insufficient")
 
                (let [new-offer (- offer
@@ -204,9 +201,7 @@
          ^{:callable? true}
          [receiver quantity]
          (let [receiver (address receiver)
-               quantity (if quantity
-                          (int quantity)
-                          0)
+               quantity (-qc quantity)
                om       (get offers
                              *caller*)]
            (if (<= quantity

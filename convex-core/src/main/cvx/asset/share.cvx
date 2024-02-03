@@ -33,6 +33,14 @@
 
 ;;;;;;;;; Private functions
 
+(defn -qc
+		  ^{:doc {:description "Quantity check."}
+		    :private? true}
+		  [q]
+		  (cond (int? q) q              ;; base case, quantity should always be an integer
+				(nil? q) 0 
+		        (fail :ARGUMENT "Invalid token quantity")))
+
 (defn -set-balance 
   [addr id bal]
   (let [h (get-holding addr)
@@ -83,9 +91,7 @@
    ^{:callable? true}
    [addr amount]
    (let [addr   (address addr)
-         amount (if amount
-                  (int amount)
-                  0)
+         amount (-qc amount)
          id *scope*
          bal    (-get-balance *caller* id)
          tbal   (-get-balance addr id)]
@@ -136,7 +142,7 @@
   ^{:callable? true}
   [sender quantity] 
   (let [id *scope*
-        quantity (int quantity)
+        quantity (-qc quantity)
         _ (cond 
             (zero? quantity) (return 0)
             (< quantity 0) (fail "Negative accept amount"))
@@ -171,7 +177,7 @@
   ^{:callable? true}
   [receiver quantity]
   (let [id *scope*
-        quantity (cond (nil? quantity) 0 (int quantity))
+        quantity (-qc quantity)
         receiver (address receiver)
         hs (get-holding *caller*)
         rec (get hs id)]

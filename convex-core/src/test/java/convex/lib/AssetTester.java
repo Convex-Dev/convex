@@ -137,8 +137,8 @@ public class AssetTester {
 		assertCVMEquals(0,
 				eval(ctx, "(do (asset/offer *address* [token nil]) (asset/get-offer token *address* *address*))"));
 
-		// Non-integer offer is a cast error
-		assertCastError(step(ctx, "(asset/offer *address* [token :foo])"));
+		// Non-integer offer is an ARGUMENT error
+		assertArgumentError(step(ctx, "(asset/offer *address* [token :foo])"));
 		
 		// Run generic asset tests, giving 1/3 the balance to a new user account
 		{
@@ -206,14 +206,20 @@ public class AssetTester {
 		ctx = step(ctx, "(def bal1 (asset/balance token user1))");
 		ACell balance1 = ctx.getResult();
 		assertNotNull(balance1);
-		assertNotEquals(empty, balance1);
+		assertNotEquals(empty, balance1,"User 1 should not have an empty balance");
 		ctx = step(ctx, "(def bal2 (asset/balance token user2))");
 		ACell balance2 = ctx.getResult();
 		assertNotNull(balance2);
-		assertNotEquals(empty, balance2);
+		assertNotEquals(empty, balance2,"User 2 should not have an empty balance");
 		ACell total = eval(ctx, "(asset/quantity-add token bal1 bal2)");
 		assertNotNull(total);
 		assertNotEquals(empty, total);
+		
+		// Trying to accept everything should be a STATE error (insufficient offer)
+		assertStateError(step(ctx,"(asset/accept user1 token "+total+")"));
+		
+		// Trying to offer an invalid quantity should fail with ARGUMENT
+		assertArgumentError(step(ctx,"(asset/offer user1 token :foobar)"));
 
 		// Tests for each user
 		doUserAssetTests(ctx, asset, user1, balance1);

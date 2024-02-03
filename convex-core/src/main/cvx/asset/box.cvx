@@ -11,9 +11,9 @@
 
 ;;;;;;;;;; Setup
 
-
 (import asset.box.actor :as box.actor)
-(import convex.asset    :as asset-lib)
+
+(import convex.asset :as asset-lib)
 
 
 ;;;;;;;;;; Public API
@@ -40,29 +40,15 @@
    (call actor
          (create))))
 
-
-
 (defn insert
   ^{:doc {:description "Inserts an asset into a box."
-          :signature   [{:params [box-id asset]}
-                        {:params [actor box-id asset]}]}}
-  ([box-id asset]
-   (insert box.actor
-           box-id
-           asset))
-  ([actor box-id asset]
-   (asset-lib/transfer actor
-                       asset
-                       box-id)))
+          :signature   [{:params [box asset]}]}}
+  ([box asset]
+    (asset-lib/transfer box asset)))
 
 (defn remove
   ^{:doc {:description "Removes an asset from the given box."
           :signature   [{:params [box-id]}
                         {:params [actor box-id asset]}]}}
-  ([box-id asset]
-    (remove box.actor
-      box-id
-      asset))
-  ([actor box-id asset]
-    (call actor
-      (remove box-id asset))))
+  ([box asset]
+    (call box (remove asset))))

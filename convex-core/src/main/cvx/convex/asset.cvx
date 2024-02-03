@@ -159,8 +159,7 @@
           (receive-asset path quantity data)))
      
     ;; An actor without a receive-asset function is not a valid receiver?
-    (actor? receiver)
-       (fail :STATE "Target Actor does not have receive-asset function")
+    (actor? receiver) (fail :STATE "Target Actor does not have receive-asset function")
     
     (call path (direct-transfer receiver quantity)))))
   
@@ -233,7 +232,7 @@
 
       (map? asset)
       (reduce (fn [result [asset-path quantity]]
-                (if (owns? owner asset-path-quantity)
+                (if (owns? owner asset-path quantity)
                   true
                   (reduced false)))
               true

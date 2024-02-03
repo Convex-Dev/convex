@@ -92,7 +92,7 @@ public class FungibleTest extends ACVMTest {
 		// nil should be seen as zero offer
 		assertCVMEquals(0,eval(ctx,"(do (asset/offer VILLAIN [token nil]) (asset/get-offer token *address* VILLAIN))"));
 
-		assertCastError(step(ctx,"(asset/offer VILLAIN [token :foo])"));
+		assertArgumentError(step(ctx,"(asset/offer VILLAIN [token :foo])"));
 	}
 
 	@Test public void testBuildToken() {

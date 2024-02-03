@@ -24,22 +24,29 @@
 
 ;;;;;;;;;; Implementation of `convex.asset` interface
 
+(defn -qc
+		  ^{:doc {:description "Checks a NFT quantity."}
+		    :private? true}
+		  [q]
+		  (cond (set? q) q              ;; base case, quantity should always be a Set
+				(int? q) #{q} 
+		        (nil? q) #{}
+		        (fail :ARGUMENT "Invalid NFT quantity")))
 
 (defn -direct-transfer
   ^{:private? true}
   ;; Used internally by [[accept]] and [[direct-transfer]].
   [sender receiver quantity]
-  (let [receiver             (address receiver)
+  (let [q (-qc quantity)
+        receiver             (address receiver)
         sender-balance       (or (get-holding sender)
                                  #{})
-        _                    (assert (subset? quantity
-                                              sender-balance))
+        _                    (or (subset? q sender-balance)
+        		                 (fail :FUNDS "Insufficient NFT balance"))
         receiver-balance     (or (get-holding receiver)
                                  #{})
-        new-sender-balance   (difference sender-balance
-                                         quantity)
-        new-receiver-balance (union receiver-balance
-                                    quantity)]
+        new-sender-balance   (difference sender-balance q)
+        new-receiver-balance (union receiver-balance q)]
     (set-holding sender
                  new-sender-balance)
     (set-holding receiver
@@ -51,20 +58,17 @@
   ^{:callable? true
     :private?  true}
   [sender quantity]
-  (let [sender           (address sender)
+  (let [q (-qc quantity)
+        sender           (address sender)
         sender-offers    (or (get offers
                                   sender)
                              {})
-        offer            (or (get-in offers
-                                     [sender
-                                      *caller*])
-                             #{})
-        _                (assert (subset? quantity
-                                          offer))
+        offer            (get-in offers [sender *caller*] #{})
+        _                (or (subset? q offer)
+        		             (fail :STATE "Insufficient offer to accept"))
         receiver-balance (or (get-holding *caller*)
                              #{})
-        new-offer        (difference offer
-                                     quantity)]
+        new-offer        (difference offer q)]
 
     (set! offers
        (assoc offers
@@ -73,9 +77,7 @@
                      *caller*
                      new-offer)))
 
-    (-direct-transfer sender
-                      *caller*
-                      quantity)))
+    (-direct-transfer sender *caller* q)))
 
 
 (defn balance
@@ -95,13 +97,12 @@
 (defn offer
   ^{:callable? true}
   [receiver quantity]
-  (let [caller-offers (get offers *caller* {})]
+  (let [q (-qc quantity)
+        caller-offers (get offers *caller* {})]
     (set! offers
          (assoc offers
                 *caller*
-                (assoc caller-offers
-                       receiver
-                       quantity)))))
+                (assoc caller-offers receiver q)))))
 
 
 (def quantity-add
@@ -125,14 +126,10 @@
                 :signature   [{:params [nft-set]}]}}
   [nft-set]
   (let [owned-nfts (get-holding *caller*)
-        nft-set    (cond
-                     (int? nft-set) #{nft-set}
-                     (set? nft-set)  nft-set
-                     :else           (set nft-set))]
+        nft-set    (-qc nft-set)]
     (when-not (subset? nft-set
                        owned-nfts)
-      (fail :TRUST
-            "Can only burn owned NFTs"))
+      (fail :TRUST "Can only burn owned NFTs"))
     (set-holding *caller*
                  (difference owned-nfts
                              nft-set))
