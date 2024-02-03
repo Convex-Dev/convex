@@ -84,7 +84,7 @@
 (defn offer
   ^{:callable? true}
   [receiver quantity]
-  (let [quantity (int quantity)
+  (let [quantity (cond (nil? quantity) 0 (int quantity)) 
         receiver (address receiver)
         rec (get-holding *caller*)]
     (if rec

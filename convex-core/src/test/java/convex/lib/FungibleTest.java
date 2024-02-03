@@ -51,6 +51,7 @@ public class FungibleTest extends ACVMTest {
 
 	@Test public void testAssetAPI() {
 		Context ctx = context();
+		ctx=exec(ctx,"(def VILLAIN "+VILLAIN+")");
 		Address token = eval(ctx,"token");
 		assertNotNull(token);
 
@@ -58,11 +59,11 @@ public class FungibleTest extends ACVMTest {
 		assertEquals(1000000L,evalL(ctx,"(asset/balance token *address*)"));
 		assertEquals(0L,evalL(ctx,"(asset/balance token *registry*)"));
 
-		ctx=exec(ctx,"(asset/offer "+VILLAIN+" [token 1000])");
+		ctx=exec(ctx,"(asset/offer VILLAIN [token 1000])");
 		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" [token 2000])");
 
 		assertEquals(998000L,evalL(ctx,"(asset/balance token *address*)"));
-		assertEquals(2000L,evalL(ctx,"(asset/balance token "+VILLAIN+")"));
+		assertEquals(2000L,evalL(ctx,"(asset/balance token VILLAIN)"));
 
 		assertEquals(0L,evalL(ctx,"(asset/quantity-zero token)"));
 		assertEquals(110L,evalL(ctx,"(asset/quantity-add token 100 10)"));
@@ -75,22 +76,23 @@ public class FungibleTest extends ACVMTest {
 		assertTrue(evalB(ctx,"(asset/quantity-contains? token 1000 999)"));
 		assertFalse(evalB(ctx,"(asset/quantity-contains? [token 110] [token 300])"));
 
-
-
-		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 1000])"));
-		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2000])"));
-		assertFalse(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2001])"));
+		assertTrue(evalB(ctx,"(asset/owns? VILLAIN [token 1000])"));
+		assertTrue(evalB(ctx,"(asset/owns? VILLAIN [token 2000])"));
+		assertFalse(evalB(ctx,"(asset/owns? VILLAIN [token 2001])"));
 
 		// transfer using map argument
-		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" {token 100})");
+		ctx=exec(ctx,"(asset/transfer VILLAIN {token 100})");
 		assertTrue(ctx.getResult() instanceof AMap);
-		assertTrue(evalB(ctx,"(asset/owns? "+VILLAIN+" [token 2100])"));
+		assertTrue(evalB(ctx,"(asset/owns? VILLAIN [token 2100])"));
 
-		// test offer
-		ctx=exec(ctx,"(asset/offer "+VILLAIN+" [token 1337])");
-		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* "+VILLAIN+")"));
+		// test non-zero offer
+		ctx=exec(ctx,"(asset/offer VILLAIN [token 1337])");
+		assertEquals(1337L,evalL(ctx,"(asset/get-offer token *address* VILLAIN)"));
 		
+		// nil should be seen as zero offer
+		assertCVMEquals(0,eval(ctx,"(do (asset/offer VILLAIN [token nil]) (asset/get-offer token *address* VILLAIN))"));
 
+		assertCastError(step(ctx,"(asset/offer VILLAIN [token :foo])"));
 	}
 
 	@Test public void testBuildToken() {

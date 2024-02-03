@@ -171,7 +171,7 @@
   ^{:callable? true}
   [receiver quantity]
   (let [id *scope*
-        quantity (int quantity)
+        quantity (cond (nil? quantity) 0 (int quantity))
         receiver (address receiver)
         hs (get-holding *caller*)
         rec (get hs id)]
