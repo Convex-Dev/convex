@@ -88,7 +88,7 @@ public class PeerCreate extends APeerCommand {
 			// save the new keypair in the keystore
 			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getKeyPassword());
 
-			File keyFile = new File(mainParent.getKeyStoreFilename());
+			File keyFile = mainParent.getKeyStoreFile();
 
 			// save the store to a file
 			PFXTools.saveStore(keyStore, keyFile, mainParent.getStorePassword());

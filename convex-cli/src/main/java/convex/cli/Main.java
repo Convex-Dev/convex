@@ -282,9 +282,10 @@ public class Main implements Runnable {
 	 * Gets the keystore file name currently used for the CLI
 	 * @return File name, or null if not specified
 	 */
-	public String getKeyStoreFilename() {
+	public File getKeyStoreFile() {
 		if ( keyStoreFilename != null) {
-			return Helpers.expandTilde(keyStoreFilename).strip();
+			File f= Utils.getPath(keyStoreFilename);
+			return f;
 		}
 		return null;
 	}
@@ -318,7 +319,7 @@ public class Main implements Runnable {
 	 * @return KeyStore instance, or null if does not exist
 	 */
 	public KeyStore loadKeyStore(boolean isCreate, char[] password)  {
-		File keyFile = new File(getKeyStoreFilename());
+		File keyFile = getKeyStoreFile();
 		try {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
@@ -358,7 +359,7 @@ public class Main implements Runnable {
 		
 		char[] storePassword=getStorePassword();
 
-		File keyFile = new File(getKeyStoreFilename());
+		File keyFile = getKeyStoreFile();
 		try {
 			if (!keyFile.exists()) {
 				throw new CLIError("Cannot find keystore file "+keyFile.getCanonicalPath());
@@ -431,7 +432,7 @@ public class Main implements Runnable {
 		// save the keystore file
 		if (keyStore==null) throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
-			PFXTools.saveStore(keyStore, new File(getKeyStoreFilename()), storePassword);
+			PFXTools.saveStore(keyStore, getKeyStoreFile(), storePassword);
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
 		}
