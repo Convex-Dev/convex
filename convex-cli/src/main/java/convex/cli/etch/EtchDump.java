@@ -15,7 +15,6 @@ public class EtchDump extends AEtchCommand{
 	@Option(names={"-o", "--output-file"},
 			description="Output file for the the Etch data dump.")
 		private String outputFilename;
-
 	
 	public class DumpVisitor extends EtchCellVisitor {
 		protected Main cli;

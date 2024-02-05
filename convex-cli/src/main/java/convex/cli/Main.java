@@ -152,42 +152,48 @@ public class Main implements Runnable {
 	 * @return Process result value
 	 */
 	public int mainExecute(String[] args) {
-		//commandLine
-		//.setUsageHelpLongOptionsMaxWidth(80)
-		//.setUsageHelpWidth(40 * 4);
-
-		// do  a pre-parse to get the config filename. We need to load
-		// in the defaults before running the full execute
 		try {
-			commandLine.parseArgs(args);
-		} catch (Exception t) {
-			commandLine.getErr().println("ERROR: Unable to parse arguments: " + t.getMessage());
-			commandLine.getErr().println("For more information on options and commands try 'convex help'.");
-			return ExitCodes.ERROR;
-		}
-		
-		if (commandLine.isUsageHelpRequested()) {
-			commandLine.usage(commandLine.getOut());
-			return ExitCodes.SUCCESS;
-		} else if (commandLine.isVersionHelpRequested()) {
-			commandLine.printVersionHelp(commandLine.getOut());
-		    return ExitCodes.SUCCESS;
-		}
+			//commandLine
+			//.setUsageHelpLongOptionsMaxWidth(80)
+			//.setUsageHelpWidth(40 * 4);
+	
+			// do  a pre-parse to get the config filename. We need to load
+			// in the defaults before running the full execute
+			try {
+				commandLine.parseArgs(args);
+			} catch (Exception t) {
+				commandLine.getErr().println("ERROR: Unable to parse arguments: " + t.getMessage());
+				commandLine.getErr().println("For more information on options and commands try 'convex help'.");
+				return ExitCodes.ERROR;
+			}
+			
+			if (commandLine.isUsageHelpRequested()) {
+				commandLine.usage(commandLine.getOut());
+				return ExitCodes.SUCCESS;
+			} else if (commandLine.isVersionHelpRequested()) {
+				commandLine.printVersionHelp(commandLine.getOut());
+			    return ExitCodes.SUCCESS;
+			}
+	
+			ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+	
+			Level[] verboseLevels = {Level.OFF,Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
+			
+			if (verbose==null) verbose=0;
+			if (verbose >= 0 && verbose < verboseLevels.length) {
+				parentLogger.setLevel(verboseLevels[verbose]);
+			} else {
+				commandLine.getErr().println("ERROR: Invalid verbosity level: "+verbose);
+				return ExitCodes.ERROR;
+			}
+			
+			int result = commandLine.execute(args);
+			return result;
+		} finally {
+			commandLine.getOut().flush();
+			commandLine.getErr().flush();
 
-		ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
-
-		Level[] verboseLevels = {Level.OFF,Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL};
-		
-		if (verbose==null) verbose=0;
-		if (verbose >= 0 && verbose < verboseLevels.length) {
-			parentLogger.setLevel(verboseLevels[verbose]);
-		} else {
-			commandLine.getErr().println("ERROR: Invalid verbosity level: "+verbose);
-			return ExitCodes.ERROR;
 		}
-		
-		int result = commandLine.execute(args);
-		return result;
 	}
 	
 	/**

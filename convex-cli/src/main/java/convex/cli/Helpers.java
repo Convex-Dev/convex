@@ -21,26 +21,6 @@ import convex.core.util.Utils;
 public class Helpers {
 
 	/**
-	 * Expand a path string with a '~'. The tilde is expanded to the users home path.
-	 *
-	 * @param path Path string to expand.
-	 *
-	 * @return Expanded string if a tilde is present.
-	 *
-	 */
-	public static String expandTilde(String path) {
-		if (path==null) return null;
-		
-		String userHome=System.getProperty("user.home");
-		String separator=File.separator;
-		String regex = (separator.equals("\\")) ? "\\\\" : "/";
-		userHome=userHome.replaceAll(regex, "/");
-		return path.replaceFirst("^~", userHome);
-	}
-
-
-
-	/**
 	 * Split a parameter list by ','. 
 	 * Handles internal separators (sublists in strings)
 	 * Trims resulting Strings of whitespace

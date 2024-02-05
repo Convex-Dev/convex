@@ -76,6 +76,7 @@ public class EtchStore extends AStore {
 	 * @throws IOException If an IO error occurs
 	 */
 	public static EtchStore create(File file) throws IOException {
+		file=Utils.ensurePath(file);
 		Etch etch = Etch.create(file);
 		return new EtchStore(etch);
 	}

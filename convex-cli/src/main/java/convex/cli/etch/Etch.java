@@ -21,6 +21,7 @@ import picocli.CommandLine.ScopeType;
 @Command(name="etch",
 	subcommands = {
 		EtchDump.class,
+		EtchInfo.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=false,
@@ -29,8 +30,8 @@ public class Etch extends ATopCommand {
 
 	@Option(names={"-e", "--etch"},
 			scope = ScopeType.INHERIT,
-			defaultValue="${env:CONVEX_ETCH_FILE}",
-			description="Convex Etch database filename. A temporary storage file will be created if required.")
+			defaultValue="${env:CONVEX_ETCH_FILE:-~/.convex/etch.db}",
+			description="Convex Etch database filename. Will default to CONVEX_ETCH_FILE or ~/.convex/etch.db")
 	String etchStoreFilename;
 
 	@Override
