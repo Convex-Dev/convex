@@ -25,4 +25,14 @@ public class TextTest {
 		assertEquals(len, s.length());
 		assertEquals("", s.trim());
 	}
+	
+	@Test public void testFriendlyNumbers() {
+		assertEquals("10%",Text.toPercentString(0.1));
+		assertEquals("0.1%",Text.toPercentString(0.001));
+	}
+	
+	@Test public void testFriendlyDecimals() {
+		assertEquals("0.1",Text.toFriendlyDecimal(0.1));
+		assertEquals("1,000.51",Text.toFriendlyDecimal(1000.51));
+	}
 }

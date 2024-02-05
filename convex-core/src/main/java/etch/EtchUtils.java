@@ -87,7 +87,7 @@ public class EtchUtils {
 			// Should be overriden if subclass wants to perform additional validation
 		}
 
-		protected void fail(String msg) {
+		public void fail(String msg) {
 			throw new Error(msg);
 		}
 		

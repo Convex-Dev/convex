@@ -6,6 +6,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 
 import convex.core.data.BlobBuilder;
+import convex.core.data.prim.CVMDouble;
 
 public class Text {
 	private static final int WHITESPACE_LENGTH = 32;
@@ -59,6 +60,12 @@ public class Text {
 	public static String toPercentString(double value) {
 		return percentFormatter.format(value);
 	}
+	
+	static DecimalFormat decimalFormatter = new DecimalFormat("#,##0.####");
+	public static String toFriendlyDecimal(double value) {
+		if (!Double.isFinite(value)) return CVMDouble.create(value).toString();
+		return decimalFormatter.format(value);
+	}
 
 	public static String toFriendlyIntString(double value) {
 		return toFriendlyNumber((long) value);
@@ -91,5 +98,7 @@ public class Text {
 			default: sb.append(b);
 		}
 	}
+
+
 
 }

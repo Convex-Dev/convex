@@ -5,6 +5,7 @@ import java.io.IOException;
 
 import convex.cli.ATopCommand;
 import convex.cli.CLIError;
+import convex.core.util.Utils;
 import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -22,6 +23,7 @@ import picocli.CommandLine.ScopeType;
 	subcommands = {
 		EtchDump.class,
 		EtchInfo.class,
+		EtchValidate.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=false,
@@ -45,7 +47,7 @@ public class Etch extends ATopCommand {
 			throw new CLIError("No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
 		}
 		
-		File etchFile=new File(etchStoreFilename);
+		File etchFile=Utils.getPath(etchStoreFilename);
 		
 		EtchStore store;
 		try {

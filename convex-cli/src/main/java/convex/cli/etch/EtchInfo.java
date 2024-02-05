@@ -2,6 +2,7 @@ package convex.cli.etch;
 
 import java.io.IOException;
 
+import convex.core.util.Text;
 import convex.core.util.Utils;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
@@ -27,7 +28,7 @@ public class EtchInfo extends AEtchCommand{
 			cli().println("Etch file:    "+store.getFileName());
 			
 			cli().println("Etch version: 0x"+Utils.toHexString(etch.getVersion()));
-			cli().println("Data length:  "+etch.getDataLength());
+			cli().println("Data length:  "+Text.toFriendlyNumber(etch.getDataLength()));
 			cli().println("Data root:    "+etch.getRootHash());
 		} catch (IOException e) {
 			cli().printErr("IO Error: "+e.getMessage());
