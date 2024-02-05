@@ -14,6 +14,8 @@ import java.security.UnrecoverableKeyException;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+import convex.core.util.Utils;
+
 
 /**
  * Utility class for working with Java Key Stores
@@ -70,9 +72,7 @@ public class PFXTools {
 	 * @throws GeneralSecurityException if a security exception occurs
 	 */
 	public static KeyStore saveStore(KeyStore ks, File keyFile, char[] storePassword) throws GeneralSecurityException, IOException {
-
-		File parent = keyFile.getParentFile();
-		if (parent != null) parent.mkdirs();
+		Utils.ensurePath(keyFile);
 
 		try (FileOutputStream fos = new FileOutputStream(keyFile)) {
 		    ks.store(fos, storePassword);

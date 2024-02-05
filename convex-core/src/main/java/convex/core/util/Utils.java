@@ -2,6 +2,7 @@ package convex.core.util;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -12,6 +13,8 @@ import java.net.URI;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,6 +74,18 @@ public class Utils {
 	 */
 	public static BigInteger toSignedBigInteger(byte[] data) {
 		return new BigInteger(data);
+	}
+	
+	/**
+	 * Create a path if necessary to a File object. 
+	 *
+	 * @param file File object to see if the path part of the filename exists, if not then create it.
+	 * @throws IOException 
+	 */
+	public static void ensurePath(File file) throws IOException {
+		// Get path of parent directory, using absolute path (may be current working directory user.dir)
+		String path=new File(file.getAbsolutePath()).getParent();
+		Files.createDirectories(Path.of(path));
 	}
 
 	/**

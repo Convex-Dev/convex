@@ -2,6 +2,8 @@ package convex.cli;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,20 +38,6 @@ public class Helpers {
 		String regex = (separator.equals("\\")) ? "\\\\" : "/";
 		userHome=userHome.replaceAll(regex, "/");
 		return path.replaceFirst("^~", userHome);
-	}
-
-	/**
-	 * Create a path if necessary to a File object. This is used to provide a feature to add the
-	 * default `.convex` folder if it does not exist.
-	 *
-	 * @param file File object to see if the path part of the filename exists, if not then create it.
-	 *
-	 */
-	public static void createPath(File file) {
-		File path = file.getParentFile();
-		if (!path.exists()) {
-			path.mkdir();
-		}
 	}
 
 

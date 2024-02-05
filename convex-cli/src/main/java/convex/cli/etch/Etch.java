@@ -41,7 +41,7 @@ public class Etch extends ATopCommand {
 
 	public EtchStore store() {
 		if (etchStoreFilename==null) {
-			throw new CLIError("No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE");
+			throw new CLIError("No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
 		}
 		
 		File etchFile=new File(etchStoreFilename);
@@ -51,7 +51,7 @@ public class Etch extends ATopCommand {
 			store = EtchStore.create(etchFile);
 			return store;
 		} catch (IOException e) {
-			throw new CLIError("Unable to load Etch store at: "+etchFile);
+			throw new CLIError("Unable to load Etch store at: "+etchFile+ " cause: "+e.getMessage());
 		}
 	}
 

@@ -324,7 +324,7 @@ public class Main implements Runnable {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else if (isCreate) {
 				log.debug("No keystore exists, creating at: "+keyFile.getCanonicalPath());
-				Helpers.createPath(keyFile);
+				Utils.ensurePath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
 		} catch (FileNotFoundException e) {
@@ -499,6 +499,21 @@ public class Main implements Runnable {
 
 	public void paranoia(String message) {
 		if (isParanoid()) throw new CLIError("STRICT SECURITY: "+message);
+	}
+
+	public void setOut(String outFile) {
+		if (outFile==null || outFile.equals("-")) {
+			commandLine.setOut(new PrintWriter(System.out));
+		} else {
+			File file = new File (outFile);
+			try {
+				Utils.ensurePath(file);
+				PrintWriter pw = new PrintWriter(file);
+				commandLine.setOut(pw);
+			} catch (IOException e) {
+				Utils.sneakyThrow(e);
+			}
+		}	
 	}
 
 
