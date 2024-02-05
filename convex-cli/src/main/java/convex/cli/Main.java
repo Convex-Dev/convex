@@ -507,7 +507,7 @@ public class Main implements Runnable {
 		} else {
 			File file = new File (outFile);
 			try {
-				Utils.ensurePath(file);
+				file=Utils.ensurePath(file);
 				PrintWriter pw = new PrintWriter(file);
 				commandLine.setOut(pw);
 			} catch (IOException e) {

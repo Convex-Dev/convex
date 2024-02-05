@@ -77,15 +77,25 @@ public class Utils {
 	}
 	
 	/**
-	 * Create a path if necessary to a File object. 
+	 * Create a path if necessary to a File object. Interprets leading "~" as user home directory
 	 *
 	 * @param file File object to see if the path part of the filename exists, if not then create it.
+	 * @return target File, as an absolute path, with parent directories created recursively if needed
 	 * @throws IOException 
 	 */
-	public static void ensurePath(File file) throws IOException {
+	public static File ensurePath(File file) throws IOException {
+		String path=file.getPath();
+		if (path!=null && path.startsWith("~")) {
+			path=System.getProperty("user.home")+path.substring(1);
+		} else {
+			path=file.getAbsolutePath();
+		}
+		
 		// Get path of parent directory, using absolute path (may be current working directory user.dir)
-		String path=new File(file.getAbsolutePath()).getParent();
-		Files.createDirectories(Path.of(path));
+		File target=new File(path);
+		String dirPath=target.getParent();
+		Files.createDirectories(Path.of(dirPath));
+		return target;
 	}
 
 	/**
