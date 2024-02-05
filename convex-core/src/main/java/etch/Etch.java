@@ -78,8 +78,14 @@ public class Etch {
 	 * Magic number for Etch files, must be first 2 bytes
 	 */
 	static final byte[] MAGIC_NUMBER=Utils.hexToBytes("e7c6");
+	
+	/**
+	 * Version number
+	 */
+	static final short ETCH_VERSION=1;
 
 	static final int SIZE_HEADER_MAGIC=2;
+	static final int SIZE_HEADER_VERSION=2;
 	static final int SIZE_HEADER_FILESIZE=8;
 	static final int SIZE_HEADER_ROOT=32;
 	
@@ -87,15 +93,16 @@ public class Etch {
 	static final byte[] ZERO_ARRAY=new byte[ZLEN];
 
 	/**
-	 * Length of Etch header
+	 * Length of Etch header. Used to be 42 until we added the version number
 	 *
 	 * "The Ultimate Answer to Life, The Universe and Everything is... 42!"
      * - Douglas Adams, The Hitchhiker's Guide to the Galaxy
 	 */
-	static final int SIZE_HEADER=SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
+	static final int SIZE_HEADER=SIZE_HEADER_MAGIC+SIZE_HEADER_VERSION+SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
 
-	protected static final long OFFSET_FILE_SIZE = SIZE_HEADER_MAGIC;
-	protected static final long OFFSET_ROOT_HASH = SIZE_HEADER_MAGIC+SIZE_HEADER_FILESIZE;
+	protected static final long OFFSET_VERSION = SIZE_HEADER_MAGIC; // Skip past magic number
+	protected static final long OFFSET_FILE_SIZE = OFFSET_VERSION+SIZE_HEADER_VERSION; // Skip past version
+	protected static final long OFFSET_ROOT_HASH = OFFSET_FILE_SIZE+SIZE_HEADER_FILESIZE; // Skip past file size
 
 	/**
 	 * Start position of first index block
@@ -161,12 +168,13 @@ public class Etch {
 		if (dataFile.length()==0) {
 			// Need to populate  new file, with data length long and initial index block
 			MappedByteBuffer mbb=seekMap(0);
-			mbb.put(MAGIC_NUMBER);
 
-			// write zeros (temp is newly empty) for file size and root. Will fix later
-			int headerZeros=SIZE_HEADER_FILESIZE+SIZE_HEADER_ROOT;
-			byte[] temp=new byte[headerZeros];
-			mbb.put(temp,0,headerZeros);
+			// write Header
+			byte[] temp=new byte[SIZE_HEADER];
+			System.arraycopy(MAGIC_NUMBER, 0, temp, 0, SIZE_HEADER_MAGIC);
+			Utils.writeShort(temp, (int)OFFSET_VERSION, ETCH_VERSION);
+			mbb.put(temp);
+			
 			dataLength=SIZE_HEADER; // advance past initial long
 
 			// add an index block
@@ -175,8 +183,7 @@ public class Etch {
 			assert(indexStart==INDEX_START);
 
 			// ensure data length is initially correct
-			mbb=seekMap(SIZE_HEADER_MAGIC);
-			mbb.putLong(dataLength);
+			writeDataLength();
 		} else {
 			// existing file, so need to read the length pointer
 			MappedByteBuffer mbb=seekMap(0);
@@ -185,6 +192,8 @@ public class Etch {
 			if(!Arrays.equals(MAGIC_NUMBER, check)) {
 				throw new IOException("Bad magic number! Probably not an Etch file: "+dataFile);
 			}
+			short version=mbb.getShort();
+			if (version!=ETCH_VERSION) throw new IOException("Bad Etch version: expected "+ETCH_VERSION+" but was "+version+ " in "+dataFile);
 
 			long length = mbb.getLong();
 			dataLength=length;
@@ -618,6 +627,14 @@ public class Etch {
 		MappedByteBuffer mbb=seekMap(OFFSET_FILE_SIZE);
 		mbb.putLong(dataLength);
 		mbb=null;
+	}
+	
+	/**
+	 * Gets the Etch version associated with this file
+	 */
+	public short getVersion() {
+		// TODO: Override when we have more versions
+		return ETCH_VERSION;
 	}
 
 	/**
