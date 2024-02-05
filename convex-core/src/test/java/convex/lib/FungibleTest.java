@@ -92,6 +92,7 @@ public class FungibleTest extends ACVMTest {
 		// nil should be seen as zero offer
 		assertCVMEquals(0,eval(ctx,"(do (asset/offer VILLAIN [token nil]) (asset/get-offer token *address* VILLAIN))"));
 
+		// Keyword quantity is an argument error
 		assertArgumentError(step(ctx,"(asset/offer VILLAIN [token :foo])"));
 	}
 
@@ -134,7 +135,7 @@ public class FungibleTest extends ACVMTest {
 		Context ctx = context();
 
 		// deploy a token with default config
-		ctx=step(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
+		ctx=exec(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
 		Address token = (Address) ctx.getResult();
 		assertTrue(ctx.getAccountStatus(token)!=null);
 
@@ -151,10 +152,10 @@ public class FungibleTest extends ACVMTest {
 			assertNotError(c);
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
-			c=step(c,"(fungible/mint token -900)");
+			c=exec(c,"(fungible/mint token -900)");
 			assertEquals(bal,evalL(c,"(fungible/balance token *address*)"));
 
-			c=step(c,"(fungible/mint token -100)");
+			c=exec(c,"(fungible/mint token -100)");
 			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
 		}
 
@@ -163,12 +164,12 @@ public class FungibleTest extends ACVMTest {
 			Context c=step(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
-			c=step(c,"(fungible/burn token 900)");
+			c=exec(c,"(fungible/burn token 900)");
 			assertEquals(100L,evalL(c,"(fungible/balance token *address*)"));
 
 			assertAssertError(step(c,"(fungible/burn token 101)")); // Fails, not held
 
-			c=step(c,"(fungible/burn token 100)");
+			c=exec(c,"(fungible/burn token 100)");
 			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
 
 			assertAssertError(step(c,"(fungible/burn token 1)")); // Fails, not held
@@ -177,10 +178,10 @@ public class FungibleTest extends ACVMTest {
 
 		// Shouldn't be possible to burn tokens in supply but not held
 		{
-			Context c=step(ctx,"(fungible/mint token 900)");
+			Context c=exec(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
-			c=step(c,"(fungible/transfer token "+VILLAIN+" 800)");
+			c=exec(c,"(fungible/transfer token "+VILLAIN+" 800)");
 			assertEquals(200L,evalL(c,"(fungible/balance token *address*)"));
 
 			assertAssertError(step(c,"(fungible/burn token 201)")); // Fails, not held
@@ -196,8 +197,8 @@ public class FungibleTest extends ACVMTest {
 		// Villain shouldn't be able to mint or burn
 		{
 			Context c=ctx.forkWithAddress(VILLAIN);
-			c=step(c,"(def token "+token+")");
-			c=step(c,"(import convex.fungible :as fungible)");
+			c=exec(c,"(def token "+token+")");
+			c=exec(c,"(import convex.fungible :as fungible)");
 
 			assertTrustError(step(c,"(fungible/mint token 100)"));
 			assertTrustError(step(c,"(fungible/mint token 10000)")); // trust before amount checks
