@@ -2,8 +2,8 @@ package etch;
 
 import java.io.IOException;
 
-import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
+import convex.core.data.Hash;
 import convex.core.util.Utils;
 
 public class EtchUtils {
@@ -50,11 +50,13 @@ public class EtchUtils {
 					} else if (type!=Etch.PTR_INDEX) {
 						values++;
 						
-						AArrayBlob h=e.readValueKey(ptr);
+						Hash h=e.readValueKey(ptr);
 						String hp=h.toHexString(ps.length());
 						if (!hp.equals(ps)) {
 							fail("Index "+ps+" inconsistent with hash "+h);
 						}
+						
+						visitHash(e,h);
 					} else {
 						indexPtrs++;
 					}
@@ -79,6 +81,10 @@ public class EtchUtils {
 			} catch (IOException e1) {
 				throw Utils.sneakyThrow(e1);
 			}
+		}
+		
+		public void visitHash(Etch e,Hash h) {
+			// Should be overriden if subclass wants to perform additional validation
 		}
 
 		protected void fail(String msg) {
@@ -110,6 +116,9 @@ public class EtchUtils {
 				throw Utils.sneakyThrow(e1);
 			}
 		}
+		
 		protected abstract void visitCell(ACell cell);
 	}
+
+
 }
