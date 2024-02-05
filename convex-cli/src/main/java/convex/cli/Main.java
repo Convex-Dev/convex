@@ -24,6 +24,7 @@ import convex.api.Convex;
 import convex.cli.client.Query;
 import convex.cli.client.Status;
 import convex.cli.client.Transact;
+import convex.cli.etch.Etch;
 import convex.cli.key.Key;
 import convex.cli.local.Local;
 import convex.cli.output.RecordOutput;
@@ -52,6 +53,7 @@ import picocli.CommandLine.ScopeType;
 		Peer.class,
 		Query.class,
 		Status.class,
+		Etch.class,
 		Transact.class,
 		CommandLine.HelpCommand.class
 	},

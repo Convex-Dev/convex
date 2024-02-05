@@ -625,7 +625,7 @@ public class Etch {
 	 * @param slotValue
 	 * @return
 	 */
-	long rawPointer(long slotValue) {
+	public long rawPointer(long slotValue) {
 		return slotValue&~TYPE_MASK;
 	}
 
@@ -693,6 +693,19 @@ public class Etch {
 		}
 		
 		return read(key,pointer);
+	}
+	
+	/**
+	 * Reads a Cell from the specified location in an Etch file. WARNING: does not perform any validation
+	 * @param <T> Type of Cell expected
+	 * @param ptr Pointer offset into Etch file. Type flags are ignored.
+	 * @return Cell value (may be null)
+	 * @throws IOException 
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> T readCell(long ptr) throws IOException {
+		ptr=rawPointer(ptr);
+		return (T)(read(null,ptr).getValue());
 	}
 		
 	public <T extends ACell> RefSoft<T> read(AArrayBlob key,long pointer) throws IOException {
@@ -1096,6 +1109,8 @@ public class Etch {
 	public long extractType(long slot) {
 		return slot&TYPE_MASK;
 	}
+
+
 
 
 }

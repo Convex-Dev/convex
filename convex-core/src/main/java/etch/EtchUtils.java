@@ -3,6 +3,7 @@ package etch;
 import java.io.IOException;
 
 import convex.core.data.AArrayBlob;
+import convex.core.data.ACell;
 import convex.core.util.Utils;
 
 public class EtchUtils {
@@ -41,8 +42,7 @@ public class EtchUtils {
 				for (int i=0; i<isize; i++) {
 					long slot=e.readSlot(indexPointer, i);
 					long ptr=e.rawPointer(slot);
-					long type=e.extractType(slot);
-					
+					long type=e.extractType(slot);			
 					if ((ptr|type)!=slot) fail("Inconsistent slot code?!?");
 					
 					if (slot==0) {
@@ -86,4 +86,30 @@ public class EtchUtils {
 		}
 		
 	};
+	
+	public static abstract class EtchCellVisitor implements IEtchIndexVisitor {
+		@Override
+		public void visit(Etch e, int level, int[] digits, long indexPointer) {
+			int isize=e.indexSize(level);			
+			try {
+				for (int i=0; i<isize; i++) {
+					long slot=e.readSlot(indexPointer, i);
+					if (slot==0) continue;
+					
+					long ptr=e.rawPointer(slot);
+					long type=e.extractType(slot);			
+					if ((ptr|type)!=slot) throw new Error("Inconsistent slot code?!?");
+					
+					if (type==Etch.PTR_INDEX) continue;
+					
+					ACell cell=e.readCell(ptr);
+					
+					visitCell(cell);
+				}
+			} catch (IOException e1) {
+				throw Utils.sneakyThrow(e1);
+			}
+		}
+		protected abstract void visitCell(ACell cell);
+	}
 }
