@@ -771,8 +771,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
-		// Perform validation for this tree position
-		validateWithPrefix("");
+		
+		// Perform full tree validation with prefix if this is a top level element
+		if (isCVMValue()) validateWithPrefix("");
 	}
 
 	@Override

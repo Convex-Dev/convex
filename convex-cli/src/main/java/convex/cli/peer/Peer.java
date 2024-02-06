@@ -2,6 +2,7 @@ package convex.cli.peer;
 
 import convex.cli.ATopCommand;
 import convex.cli.Main;
+import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -20,6 +21,7 @@ import picocli.CommandLine.ScopeType;
 	subcommands = {
 		PeerCreate.class,
 		PeerStart.class,
+		PeerGenesis.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
@@ -34,8 +36,8 @@ public class Peer extends ATopCommand {
 
 	@Option(names={"-e", "--etch"},
 			scope = ScopeType.INHERIT,
-			defaultValue="${env:CONVEX_ETCH_FILE}",
-			description="Convex Etch database filename. A temporary storage file will be created if required.")
+			defaultValue="${env:CONVEX_ETCH_FILE:-~/.convex/etch.db}",
+			description="Convex Etch database filename. Will default to CONVEX_ETCH_FILE or ~/.convex/etch.db")
 	String etchStoreFilename;
 
 	// private static final Logger log = Logger.getLogger(Peer.class.getName());
@@ -47,6 +49,10 @@ public class Peer extends ATopCommand {
 	public void run() {
 		// sub command run with no command provided
 		CommandLine.usage(new Peer(), System.out);
+	}
+
+	public EtchStore getEtchStore() {
+		return cli().getEtchStore(etchStoreFilename);
 	}
 
 }

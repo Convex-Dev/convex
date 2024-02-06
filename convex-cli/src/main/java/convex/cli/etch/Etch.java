@@ -1,11 +1,6 @@
 package convex.cli.etch;
 
-import java.io.File;
-import java.io.IOException;
-
 import convex.cli.ATopCommand;
-import convex.cli.CLIError;
-import convex.core.util.Utils;
 import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -43,21 +38,8 @@ public class Etch extends ATopCommand {
 	}
 
 	public EtchStore store() {
-		if (etchStoreFilename==null) {
-			throw new CLIError("No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
-		}
-		
-		File etchFile=Utils.getPath(etchStoreFilename);
-		
-		EtchStore store;
-		try {
-			store = EtchStore.create(etchFile);
-			return store;
-		} catch (IOException e) {
-			throw new CLIError("Unable to load Etch store at: "+etchFile+ " cause: "+e.getMessage());
-		}
+		return cli().getEtchStore(etchStoreFilename);
 	}
-
 
 }
 

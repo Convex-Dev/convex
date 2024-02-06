@@ -45,17 +45,19 @@ public class PeerStart extends APeerCommand {
 			"--reset" }, description = "Reset and delete the etch database if it exists. Default: ${DEFAULT-VALUE}")
 	private boolean isReset;
 
-	@Option(names = { "--port" }, description = "Port number of this local peer.")
+	@Option(names = { "--port" }, 
+			defaultValue = "18888",
+			description = "Port number for the peer. Default is ${DEFAULT-VALUE}. If set to 0, will choose a random port.")
 	private int port = 0;
 
 	@Option(names = { "-u",
 			"--url" }, description = "Public URL of the peer.")
 	private String url;
 
-	@Option(names = { "-b",
-			"--bind-address" }, description = "Bind address of the network interface. Defaults to local loop back device for %n"
-                    + "local peer, and if a public --url is set, then defaults to all network devices.")
-	private String bindAddress;
+//	@Option(names = { "-b",
+//			"--bind-address" }, description = "Bind address of the network interface. Defaults to local loop back device for %n"
+//                    + "local peer, and if a public --url is set, then defaults to all network devices.")
+//	private String bindAddress;
 
     @Option(names = {
 			"--peer" }, description = "URL of remote peer. If not provided then try to connect to a local peer")
