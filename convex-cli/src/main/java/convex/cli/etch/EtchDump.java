@@ -2,6 +2,8 @@ package convex.cli.etch;
 
 import convex.cli.Main;
 import convex.core.data.ACell;
+import convex.core.data.type.AType;
+import convex.core.lang.RT;
 import etch.EtchStore;
 import etch.EtchUtils.EtchCellVisitor;
 import picocli.CommandLine.Command;
@@ -9,7 +11,7 @@ import picocli.CommandLine.Option;
 
 @Command(name="dump",
 mixinStandardHelpOptions=true,
-description="Dumps Etch data to an exported format. Defaults to CSV for value IDs and encodings")
+description="Dumps Etch data to an exported format. Defaults to CSV with value IDs, Types and encodings")
 public class EtchDump extends AEtchCommand{
 	
 	@Option(names={"-o", "--output-file"},
@@ -27,8 +29,9 @@ public class EtchDump extends AEtchCommand{
 		public void visitCell(ACell cell) {
 			String hash=cell.getHash().toHexString();
 			String encoding = cell.getEncoding().toHexString();
+			AType type=RT.getType(cell);
 			
-			cli().println(hash+","+encoding);
+			cli().println(hash+","+type+","+encoding);
 		}
 	}
 

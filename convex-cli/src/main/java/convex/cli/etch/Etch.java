@@ -18,6 +18,7 @@ import picocli.CommandLine.ScopeType;
 	subcommands = {
 		EtchDump.class,
 		EtchInfo.class,
+		EtchRead.class,
 		EtchValidate.class,
 		CommandLine.HelpCommand.class
 	},
