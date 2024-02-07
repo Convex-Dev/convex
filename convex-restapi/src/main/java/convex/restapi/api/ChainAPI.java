@@ -18,7 +18,6 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -40,7 +39,9 @@ import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
-import io.javalin.openapi.*;
+import io.javalin.openapi.HttpMethod;
+import io.javalin.openapi.OpenApi;
+import io.javalin.openapi.OpenApiParam;
 
 public class ChainAPI extends ABaseAPI {
 

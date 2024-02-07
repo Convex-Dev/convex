@@ -4,6 +4,7 @@ import java.io.IOException;
 
 import convex.core.data.ACell;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.RT;
 import convex.core.util.Text;
 import convex.core.util.Utils;
 import etch.EtchStore;
@@ -31,11 +32,12 @@ public class EtchInfo extends AEtchCommand{
 			
 			cli().println("Etch version:     0x"+Utils.toHexString(etch.getVersion()));
 			cli().println("Data length:      "+Text.toFriendlyNumber(etch.getDataLength()));
-			cli().println("Data root:        "+etch.getRootHash());
 			
+			cli().println("Data root:        "+etch.getRootHash());
 			try {
 				ACell root=store.getRootData();
 				cli().println("Root memory size: "+root.getMemorySize());
+				cli().println("Root data type:   "+RT.getType(root));
 			} catch (MissingDataException e) {
 				cli().println("Root data missing");
 			}
