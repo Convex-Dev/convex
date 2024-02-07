@@ -466,10 +466,6 @@ public class Main extends ACommand {
 		commandLine.getOut().println(s);
 	}
 
-	public void printError(Result result) {
-		commandLine.getErr().println(result.toString());
-	}
-
 	public void printResult(Result result) {
 		commandLine.getOut().println(result.toString());
 	}

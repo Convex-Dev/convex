@@ -108,7 +108,7 @@ public class PeerCreate extends APeerCommand {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction, timeout);
 			if (result.isError()) {
-                mainParent.printError(result);
+                cli().printResult(result);
 				return;
 			}
 			long currentBalance = convex.getBalance(address);

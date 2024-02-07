@@ -37,16 +37,16 @@ public class PeerGenesis extends APeerCommand {
 			"--public-key" }, description = "Hex string of the public key in the Keystore to use for the peer.%n"
 					+ "You only need to enter in the first distinct hex values of the public key.%n"
 					+ "For example: 0xf0234 or f0234")
-	private String keystorePublicKey;
+	private String genesisKey;
 
 	@Override
 	public void run() {
 
 		AKeyPair keyPair = null;
-		if (keystorePublicKey!=null) {
-			keyPair = cli().loadKeyFromStore(keystorePublicKey);
+		if (genesisKey!=null) {
+			keyPair = cli().loadKeyFromStore(genesisKey);
 			if (keyPair == null) {
-				throw new CLIError("Cannot find specified key pair to perform peer start: "+keystorePublicKey);
+				throw new CLIError("Cannot find specified key pair to perform peer start: "+genesisKey);
 			}
 		} else {
 //			if (cli().prompt("No key pair specified. Continue by creating a new one? (Y/N)")) {
