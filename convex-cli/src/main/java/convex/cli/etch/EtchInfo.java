@@ -42,7 +42,7 @@ public class EtchInfo extends AEtchCommand{
 				cli().println("Root data missing");
 			}
 		} catch (IOException e) {
-			cli().printErr("IO Error: "+e.getMessage());
+			cli().inform("IO Error: "+e.getMessage());
 		}
 	}
 }

@@ -69,11 +69,11 @@ public class KeyImport extends AKeyCommand {
 		// Parse input as hex string, will be null if not parsed. For BIP39 is 64 bytes, Ed25519 32
 		ABlob hex=Blobs.parse(importText.trim());
 		if (type==null) {
-			cli().printErr("No import file type specified, attempting to auto-detect");
+			cli().inform("No import file type specified, attempting to auto-detect");
 			if (hex!=null) {
 				if (hex.count()==AKeyPair.SEED_LENGTH) {
 					type="seed";
-					cli().printErr("Detected type 'seed'");
+					cli().inform("Detected type 'seed'");
 				} else if (hex.count()==BIP39.SEED_LENGTH) {
 					type="bip39";
 				}

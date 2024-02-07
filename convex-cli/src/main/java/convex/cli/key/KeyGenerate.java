@@ -72,7 +72,7 @@ public class KeyGenerate extends AKeyCommand {
 	public void run() {
 		// check the number of keys to generate.
 		if (count <= 0) {
-			cli().printErr("No keys generated. Perhaps specify a positive --count ?");
+			cli().inform("No keys generated. Perhaps specify a positive --count ?");
 			return;
 		}
 		

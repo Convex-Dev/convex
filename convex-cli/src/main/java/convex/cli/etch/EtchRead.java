@@ -22,7 +22,6 @@ public class EtchRead extends AEtchCommand{
 			description="Print length limit for each value. Default is unlimited.")
 	private Long printLimit;
 
-	
 	@Parameters(
 			index = "0", 
 			arity = "0..*", 
@@ -34,7 +33,7 @@ public class EtchRead extends AEtchCommand{
 		cli().setOut(outputFilename);
 		
 		if ((hash==null)|| hash.length==0) {
-			cli().printErr("No hash(es) provided to read. Suggestion: list one or more hashes at end of the command.");
+			cli().inform("No hash(es) provided to read. Suggestion: list one or more hashes at end of the command.");
 			return;
 		}
 		
@@ -42,13 +41,13 @@ public class EtchRead extends AEtchCommand{
 		for (String hs:hash) {
 			Hash h=Hash.parse(hs);
 			if (h==null) {
-				cli().printErr("Parameter ["+hs+"] not valid - should be 32-byte hash value");
+				cli().inform("Parameter ["+hs+"] not valid - should be 32-byte hash value");
 				continue;
 			}
 			
 			Ref<ACell> r=store.refForHash(h);
 			if (r==null) {
-				cli().printErr("Hash not found ["+hs+"]");
+				cli().inform("Hash not found ["+hs+"]");
 				continue;				
 			}
 			

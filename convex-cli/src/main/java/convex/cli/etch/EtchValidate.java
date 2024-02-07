@@ -46,7 +46,7 @@ public class EtchValidate extends AEtchCommand{
 		
 		@Override
 		public void fail(String msg) {
-			cli.printErr(msg);
+			cli.inform(msg);
 			failures++;
 			if ((maxFailures!=null)&&(failures>=maxFailures)) throw new CLIError("Max Failures exceeded");
 		}

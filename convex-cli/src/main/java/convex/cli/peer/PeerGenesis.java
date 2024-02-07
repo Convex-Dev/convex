@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import convex.cli.CLIError;
-import convex.cli.Main;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
@@ -28,11 +27,9 @@ import picocli.CommandLine.Spec;
 	description = "Instantiate a Convex network.")
 public class PeerGenesis extends APeerCommand {
 
-
 	@ParentCommand
 	private Peer peerParent;
 
-	
 	@Spec
 	CommandSpec spec;
 
@@ -45,18 +42,21 @@ public class PeerGenesis extends APeerCommand {
 	@Override
 	public void run() {
 
-		Main mainParent = peerParent.mainParent;
-
 		AKeyPair keyPair = null;
 		if (keystorePublicKey!=null) {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
+			keyPair = cli().loadKeyFromStore(keystorePublicKey);
 			if (keyPair == null) {
-				throw new CLIError("Cannot load specified key pair to perform peer start: "+keystorePublicKey);
+				throw new CLIError("Cannot find specified key pair to perform peer start: "+keystorePublicKey);
 			}
 		} else {
+//			if (cli().prompt("No key pair specified. Continue by creating a new one? (Y/N)")) {
+//				throw new CLIError("Unable to obtain genersis key pair, aborting");
+//			}
+			if (cli().isParanoid()) throw new CLIError("Aborting due to strict security: no key pair specified");
 			keyPair=AKeyPair.generate();
-			mainParent.addKeyPairToStore(keyPair,mainParent.getKeyPassword());
-			cli().printErr("Generated new Keypair with public key: "+keyPair.getAccountKey());
+			cli().addKeyPairToStore(keyPair,cli().getKeyPassword());
+			cli().saveKeyStore();
+			cli().inform(2,"Generated new Keypair with public key: "+keyPair.getAccountKey());
 		}
 
 		EtchStore store=getEtchStore();

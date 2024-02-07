@@ -46,14 +46,22 @@ import picocli.CommandLine.ScopeType;
 /**
  * Convex CLI implementation
  */
-@Command(name = "convex", subcommands = { Account.class, Key.class, Local.class, Peer.class, Query.class, Status.class,
+@Command(name = "convex", 
+		subcommands = { Account.class, Key.class, Local.class, Peer.class, Query.class, Status.class,
 		Etch.class, Transact.class,
-		CommandLine.HelpCommand.class }, usageHelpAutoWidth = true, sortOptions = true, mixinStandardHelpOptions = true,
+		CommandLine.HelpCommand.class }, 
+		usageHelpAutoWidth = true, 
+		sortOptions = true, 
+		mixinStandardHelpOptions = true,
 		// headerHeading = "Usage:",
 		// synopsisHeading = "%n",
-		parameterListHeading = "%nParameters:%n", optionListHeading = "%nOptions:%n", commandListHeading = "%nCommands:%n", versionProvider = Main.VersionProvider.class, description = "Convex Command Line Interface")
+		parameterListHeading = "%nParameters:%n", 
+		optionListHeading = "%nOptions:%n", 
+		commandListHeading = "%nCommands:%n", 
+		versionProvider = Main.VersionProvider.class, 
+		description = "Convex Command Line Interface")
 
-public class Main implements Runnable {
+public class Main extends ACommand {
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
 	public CommandLine commandLine = new CommandLine(this);
@@ -442,6 +450,11 @@ public class Main implements Runnable {
 			throw Utils.sneakyThrow(t);
 		}
 	}
+	
+	public void saveKeyStore() {
+		if (keystorePassword==null) throw new CLIError("Key store password not provided");
+		saveKeyStore(keystorePassword.toCharArray());
+	}
 
 	public boolean isParanoid() {
 		return this.paranoid;
@@ -502,7 +515,12 @@ public class Main implements Runnable {
 		return result;
 	}
 
-	public void printErr(String message) {
+	public void inform(String message) {
+		inform(1,message);
+	}
+	
+	public void inform(int level, String message) {
+		if (verbose<level) return;
 		commandLine.getErr().println(message);
 	}
 
@@ -540,6 +558,25 @@ public class Main implements Runnable {
 		} catch (IOException e) {
 			throw new CLIError("Unable to load Etch store at: " + etchFile + " cause: " + e.getMessage());
 		}
+	}
+
+	public boolean prompt(String string) {
+		if (!isInteractive()) return false;
+		try {
+			inform(0,string);
+			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
+			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
+			if (Character.toLowerCase(c)=='y') return true;
+		} catch (IOException e) {
+			throw new CLIError("Unexpected error getting console input: "+e);
+		}
+		return false;
+	}
+
+	@Override
+	public Main cli() {
+		// We are the top level command!
+		return this;
 	}
 
 }
