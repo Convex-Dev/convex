@@ -19,6 +19,7 @@ import picocli.CommandLine.ScopeType;
 		EtchDump.class,
 		EtchInfo.class,
 		EtchRead.class,
+		EtchWrite.class,
 		EtchValidate.class,
 		CommandLine.HelpCommand.class
 	},
