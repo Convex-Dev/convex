@@ -309,6 +309,18 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		this.memorySize=ms;
 		return ms;
 	}
+	
+	/**
+	 * Gets the Memory Size of a Cell, computing it if required.
+	 * 
+	 * The memory size is the total storage requirement for this cell. Embedded cells do not require storage for
+	 * their own encoding, but may require storage for nested non-embedded Refs.
+	 * 
+	 * @return Memory Size of this Cell
+	 */
+	public static long getMemorySize(ACell a) {
+		return (a==null)?0:a.getMemorySize(); 
+	}
 
 	/**
 	 * Determines if this Cell Represents an embedded object. Embedded objects are encoded directly into

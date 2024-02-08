@@ -33,8 +33,8 @@ public class PeerGenesis extends APeerCommand {
 	@Spec
 	CommandSpec spec;
 
-	@Option(names = {
-			"--public-key" }, description = "Hex string of the public key in the Keystore to use for the peer.%n"
+	@Option(names = {"--public-key" }, 
+			description = "Hex string of the public key in the Keystore to use for the genesis peer.%n"
 					+ "You only need to enter in the first distinct hex values of the public key.%n"
 					+ "For example: 0xf0234 or f0234")
 	private String genesisKey;
@@ -62,6 +62,7 @@ public class PeerGenesis extends APeerCommand {
 		EtchStore store=getEtchStore();
 		
 		State genesisState=Init.createState(List.of(keyPair.getAccountKey()));
+		cli().inform(1, "Created genersis state with hash: "+genesisState.getHash());
 		
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
@@ -69,5 +70,6 @@ public class PeerGenesis extends APeerCommand {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server s=API.launchPeer(config);
 		s.close();
+		cli().inform(1, "Convex genesis succeeded!");
 	}
 }

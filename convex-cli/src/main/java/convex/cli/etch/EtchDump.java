@@ -11,7 +11,7 @@ import picocli.CommandLine.Option;
 
 @Command(name="dump",
 mixinStandardHelpOptions=true,
-description="Dumps Etch data to an exported format. Defaults to CSV with value IDs, Types and encodings")
+description="Dumps Etch data to an exported format. Defaults to CSV with value ID, Type, Memory Size and encoding")
 public class EtchDump extends AEtchCommand{
 	
 	@Option(names={"-o", "--output-file"},
@@ -30,8 +30,9 @@ public class EtchDump extends AEtchCommand{
 			String hash=cell.getHash().toHexString();
 			String encoding = cell.getEncoding().toHexString();
 			AType type=RT.getType(cell);
+			long mem=ACell.getMemorySize(cell);
 			
-			cli().println(hash+","+type+","+encoding);
+			cli().println(hash+","+type+","+mem+","+encoding);
 		}
 	}
 

@@ -50,8 +50,7 @@ public class PeerStart extends APeerCommand {
 			description = "Port number for the peer. Default is ${DEFAULT-VALUE}. If set to 0, will choose a random port.")
 	private int port = 0;
 
-	@Option(names = { "-u",
-			"--url" }, description = "Public URL of the peer.")
+	@Option(names = { "--url" }, description = "Public URL of the peer.")
 	private String url;
 
 //	@Option(names = { "-b",
