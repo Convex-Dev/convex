@@ -245,6 +245,7 @@ public class Main extends ACommand {
 		} else {
 			if (!nonInteractive) {
 				storepass = readPassword("Enter Keystore Password: ");
+				keystorePassword=new String(storepass);
 			}
 
 			if (storepass == null) {
@@ -275,6 +276,8 @@ public class Main extends ACommand {
 				log.warn("No password for key: defaulting to blank password");
 				keypass = new char[0];
 			}
+			
+			this.keystorePassword=new String(keypass);
 		}
 		if (keypass.length == 0) {
 			paranoia("Cannot use an empty private key password");
