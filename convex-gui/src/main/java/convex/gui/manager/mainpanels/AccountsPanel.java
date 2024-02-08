@@ -1,5 +1,6 @@
 package convex.gui.manager.mainpanels;
 
+
 import java.awt.BorderLayout;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -26,7 +27,7 @@ import convex.gui.components.models.AccountsTableModel;
 import convex.gui.manager.windows.actor.ActorWindow;
 import convex.gui.utils.Toolkit;
 
-@SuppressWarnings("serial")
+@SuppressWarnings({ "serial"})
 public class AccountsPanel extends JPanel {
 	AccountsTableModel tableModel;
 	JTable table;
@@ -93,7 +94,7 @@ public class AccountsPanel extends JPanel {
 				copyAddress();
 			}
 		});
-
+ 
 		table.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
