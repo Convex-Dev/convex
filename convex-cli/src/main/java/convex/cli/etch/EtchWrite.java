@@ -14,18 +14,18 @@ public class EtchWrite extends AEtchCommand{
 	
 	@Option(names={"-c","--cvx"},
 			description="Convex data in readable format.")
-	private String data;
+	private String cvxData;
 
 	@Override
 	public void run() {
 		
-		if ((data==null)) {
+		if ((cvxData==null)) {
 			cli().inform("No data provided. Suggestion: use arg --cvx <data>");
 			return;
 		}
 		
 		EtchStore store=store();
-		ACell cell=Reader.read(data);
+		ACell cell=Reader.read(cvxData);
 		
 		store.storeTopRef(Ref.get(cell), Ref.PERSISTED, null);
 		
