@@ -12,8 +12,7 @@ import io.javalin.Javalin;
 import io.javalin.config.JavalinConfig;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.plugin.OpenApiPlugin;
-import io.javalin.openapi.plugin.OpenApiPluginConfiguration;
-import io.javalin.openapi.plugin.swagger.SwaggerConfiguration;
+import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
 
 public class RESTServer {
@@ -29,13 +28,13 @@ public class RESTServer {
 
 		app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
-			config.plugins.enableCors(cors -> {
-				cors.add(corsConfig -> {
+			config.bundledPlugins.enableCors(cors -> {
+				cors.addRule(corsConfig -> {
 					// replacement for enableCorsForAllOrigins()
 					corsConfig.anyHost();
 				});
 			});
-
+			
 			addOpenApiPlugins(config);
 
 			config.staticFiles.add(staticFiles -> {
@@ -58,36 +57,28 @@ public class RESTServer {
 			ctx.status(500);
 		});
 
-		addAPIRoutes();
+		addAPIRoutes(app);	
 	}
 
 	protected void addOpenApiPlugins(JavalinConfig config) {
-		OpenApiPluginConfiguration openApiConfiguration = getOpenApiConfig();
-		config.plugins.register(new OpenApiPlugin(openApiConfiguration));
-
-        SwaggerConfiguration swaggerConfiguration = new SwaggerConfiguration();
-		config.plugins.register(new SwaggerPlugin(swaggerConfiguration));
-	}
-
-	protected OpenApiPluginConfiguration getOpenApiConfig() {
-		return new OpenApiPluginConfiguration()
-				.withDefinitionConfiguration((version, definition) -> definition.withOpenApiInfo((openApiInfo) -> {
-					openApiInfo.setTitle("Convex REST API");
-					openApiInfo.setVersion("0.1.1");
-				})
-				.withServer((openApiServer) -> {
-					openApiServer.setUrl(("http://localhost:8080/"));
-					openApiServer.setDescription("Local Convex REST Server");
-					//openApiServer.addVariable("basePath", "", new String[] { "", "v1" }, "Base path of the server");
-				}).withDefinitionProcessor(content -> { 
-					return content.toPrettyString();
-		        }));
+		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
+			
+            pluginConfig.withDefinitionConfiguration((version, definition) -> {
+                definition.withOpenApiInfo(info -> {
+					info.setTitle("Convex REST API");
+					info.setVersion("0.1.1");
+                });
+            });
+		}));
+		
+		config.registerPlugin(new SwaggerPlugin());
+		config.registerPlugin(new ReDocPlugin());
 	}
 
 	protected ChainAPI chainAPI;
 	protected DepAPI depAPI;
 
-	private void addAPIRoutes() {
+	private void addAPIRoutes(Javalin app) {
 		chainAPI = new ChainAPI(this);
 		chainAPI.addRoutes(app);
 
@@ -131,7 +122,7 @@ public class RESTServer {
 	}
 
 	public void stop() {
-		app.close();
+		// app.close(); // Gone In Javalin 6?
 	}
 
 	public Convex getConvex() {

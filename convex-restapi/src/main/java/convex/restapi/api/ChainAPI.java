@@ -40,8 +40,7 @@ import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.openapi.HttpMethod;
-import io.javalin.openapi.OpenApi;
-import io.javalin.openapi.OpenApiParam;
+import io.javalin.openapi.*;
 
 public class ChainAPI extends ABaseAPI {
 
@@ -104,6 +103,13 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(ds);
 	}
 
+//	@OpenApi(path = ROUTE+"createAccount",
+//			methods = HttpMethod.POST,
+//	        operationId = "createAccount",
+//	        summary="Create a Convex account",
+//	        requestBody = @OpenApiRequestBody(
+//	                description = "Complex bodies",
+//	                content= @OpenApiContent(type = "application/json")))
 	public void createAccount(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Object key = req.get("accountKey");
@@ -356,10 +362,13 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(JSON.toPrettyString(rm));
 	}
 	
-	
-	@OpenApi(path = "/query",
-			methods = HttpMethod.POST
-	)
+//	@OpenApi(path = ROUTE+"query",
+//		methods = HttpMethod.POST,
+//		operationId = "query",
+//		summary="Query as Convex account",
+//		requestBody = @OpenApiRequestBody(
+//				description = "Complex bodies",
+//				content= @OpenApiContent(type = "application/json")))
 	public void runQuery(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Address addr=Address.parse(req.get("address")); 

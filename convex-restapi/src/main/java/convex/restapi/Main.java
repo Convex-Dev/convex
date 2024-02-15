@@ -10,7 +10,6 @@ public class Main {
 		RESTServer rs=RESTServer.create(s);
 		rs.start();
 		
-		
-		
+		System.out.println("Complete");
 	}
 }

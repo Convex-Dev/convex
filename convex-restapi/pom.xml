@@ -16,7 +16,7 @@
 
 	<properties>
 		<json.simple.version>1.1.1</json.simple.version>
-		<javalin.version>5.6.3</javalin.version>
+		<javalin.version>6.0.1</javalin.version>
 	</properties>
 
 	<build>
@@ -51,7 +51,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.11.0</version>
+				<version>3.12.1</version>
 				<configuration>
 					<source>11</source>
 					<target>11</target>
@@ -104,6 +104,11 @@
 			<artifactId>javalin-swagger-plugin</artifactId>
 			<version>${javalin.version}</version>
 		</dependency>
+		<dependency>
+            <groupId>io.javalin.community.openapi</groupId>
+            <artifactId>javalin-redoc-plugin</artifactId>
+            <version>${javalin.version}</version>
+        </dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
