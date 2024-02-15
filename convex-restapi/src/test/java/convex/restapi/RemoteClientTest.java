@@ -48,6 +48,7 @@ public class RemoteClientTest {
 		
 		// second account should be different
 		assertNotEquals(addr,c.createAccount(kp));
+		assertEquals(0,c.queryBalance(addr));
 	}
 	
 	@Test 

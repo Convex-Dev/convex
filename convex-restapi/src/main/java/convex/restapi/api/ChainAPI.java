@@ -24,6 +24,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -120,9 +121,15 @@ public class ChainAPI extends ABaseAPI {
 		if (pk == null)
 			throw new BadRequestResponse(jsonError("Unable to parse accountKey: " + key));
 
+		Object faucet = req.get("faucet");
+		AInteger amt=AInteger.parse(faucet);
+		
 		Address a;
 		try {
 			a = convex.createAccountSync(pk);
+			if (amt!=null) {
+				convex.transferSync(a, amt.longValue());
+			}
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
 		} catch (IOException e) {
