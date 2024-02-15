@@ -24,6 +24,7 @@ public class RemoteClientTest {
 
 	static RESTServer server;
 	static int port;
+	static String host;
 	
 	@BeforeAll
 	public static void init() {
@@ -32,6 +33,7 @@ public class RemoteClientTest {
 		rs.start(0);
 		port=rs.getPort();
 		server=rs;
+		host="http://localhost:"+port;
 	}
 	
 	@AfterAll 
@@ -41,7 +43,7 @@ public class RemoteClientTest {
 	
 	@Test 
 	public void testCreateAccount() {
-		Convex c=Convex.connect("http://localhost:"+port);
+		Convex c=Convex.connect(host);
 		AKeyPair kp=AKeyPair.generate();
 		Address addr=c.createAccount(kp);
 		assertNotNull(addr);
@@ -53,7 +55,7 @@ public class RemoteClientTest {
 	
 	@Test 
 	public void testFaucet() {
-		Convex c=Convex.connect("http://localhost:"+port);
+		Convex c=Convex.connect(host);
 		Address addr=c.useNewAccount();
 		assertNotNull(addr);
 		
@@ -72,7 +74,7 @@ public class RemoteClientTest {
 	
 	@Test 
 	public void testQuery() {
-		Convex c=Convex.connect("http://localhost:"+port);
+		Convex c=Convex.connect(host);
 		AKeyPair kp=AKeyPair.generate();
 		Address addr=c.createAccount(kp);
 		c.setKeyPair(kp);
@@ -89,7 +91,7 @@ public class RemoteClientTest {
 	
 	@Test 
 	public void testQueryAccount() {
-		Convex c=Convex.connect("http://localhost:"+port);
+		Convex c=Convex.connect(host);
 		AKeyPair kp=AKeyPair.generate();
 		Address addr=c.createAccount(kp);
 		c.setKeyPair(kp);
@@ -109,7 +111,7 @@ public class RemoteClientTest {
 	
 	@Test 
 	public void testTransactNoFunds() {
-		Convex c=Convex.connect("http://localhost:"+port);
+		Convex c=Convex.connect(host);
 		AKeyPair kp=AKeyPair.generate();
 		Address addr=c.createAccount(kp);
 		c.setKeyPair(kp);

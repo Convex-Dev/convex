@@ -322,6 +322,11 @@ public class ChainAPI extends ABaseAPI {
 	
 	public void runTransact(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
+		if (!req.containsKey("seed")||req.containsKey("sig")) {
+			runTransactionPrepare(ctx);
+			return;
+		}
+		
 		Address addr=Address.parse(req.get("address")); 
 		if (addr==null) throw new BadRequestResponse(jsonError("Transact requires an 'address' field."));
 		Object srcValue=req.get("source");
@@ -345,6 +350,8 @@ public class ChainAPI extends ABaseAPI {
 	
 			HashMap<String,Object> rm=jsonResult(r);
 			ctx.result(JSON.toPrettyString(rm));
+		} catch (NullPointerException e) {
+			throw new BadRequestResponse(jsonError("Account does not exist: "+addr));
 		} catch (Exception e) {
 			throw new InternalServerErrorResponse(jsonError("Error preparing transaction: "+e.getMessage()));
 		}
@@ -422,18 +429,9 @@ public class ChainAPI extends ABaseAPI {
 		try {
 			Result r=convex.querySync(form,addr);
 			
-			HashMap<String,Object> rmap=new HashMap<>();
-			Object jsonValue;
-			if (cvxRaw==null) {
-				jsonValue=RT.json(r.getValue());
-			} else {
-				jsonValue=RT.toString(r.getValue());
-			}
-			
-			rmap.put("value", jsonValue);
-			ACell ecode=r.getErrorCode();
-			if (ecode instanceof Keyword) {
-				rmap.put("errorCode", ((Keyword)ecode).getName().toString());
+			HashMap<String,Object> rmap=jsonResult(r);
+			if (cvxRaw!=null) {
+				rmap.put("value",RT.toString(r.getValue()));
 			}
 			
 			ctx.result(JSON.toString(rmap));
