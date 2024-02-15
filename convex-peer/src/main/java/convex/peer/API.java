@@ -116,7 +116,7 @@ public class API {
 	 */
 	public static Server launchPeer() {
 		AKeyPair kp=AKeyPair.generate();
-		State genesis=Init.createBaseState(Lists.of(kp.getAccountKey()));
+		State genesis=Init.createState(Lists.of(kp.getAccountKey()));
 		HashMap<Keyword, Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, kp);
 		config.put(Keywords.STATE, genesis);

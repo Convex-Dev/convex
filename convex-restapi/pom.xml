@@ -90,6 +90,11 @@
 			<version>${json.simple.version}</version>
 		</dependency>
 		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>${slf4j.version}</version>
+		</dependency>
+		<dependency>
 			<groupId>io.javalin</groupId>
 			<artifactId>javalin</artifactId>
 			<version>${javalin.version}</version>
@@ -105,10 +110,10 @@
 			<version>${javalin.version}</version>
 		</dependency>
 		<dependency>
-            <groupId>io.javalin.community.openapi</groupId>
-            <artifactId>javalin-redoc-plugin</artifactId>
-            <version>${javalin.version}</version>
-        </dependency>
+			<groupId>io.javalin.community.openapi</groupId>
+			<artifactId>javalin-redoc-plugin</artifactId>
+			<version>${javalin.version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
