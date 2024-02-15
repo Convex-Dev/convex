@@ -22,6 +22,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
@@ -70,6 +71,7 @@ public class ChainAPI extends ABaseAPI {
 		app.post(prefix+"transact", this::runTransact);
 		  
 		app.get(prefix+"accounts/<addr>", this::queryAccount);
+		app.get(prefix+"peers/<addr>", this::queryPeer);		
 		
 		app.get(prefix+"data/<hash>", this::getData);
 	}
@@ -167,6 +169,7 @@ public class ChainAPI extends ABaseAPI {
 		// TODO: consider if isLibrary is useful?
 		// boolean isLibrary=as.getCallableFunctions().isEmpty();
 		
+		
 		HashMap<String,Object> hm=new HashMap<>();
 		hm.put("address",addr.longValue());
 		hm.put("allowance",as.getMemory());
@@ -174,6 +177,36 @@ public class ChainAPI extends ABaseAPI {
 		hm.put("memorySize",as.getMemorySize());
 		hm.put("sequence",as.getSequence());
 		hm.put("type", isUser?"user":"actor");
+		
+		ctx.result(JSON.toPrettyString(hm));
+	}
+	
+	public void queryPeer(Context ctx) {
+		AccountKey addr=null;
+		String addrParam=ctx.pathParam("addr");
+		try {
+			
+			addr=AccountKey.parse(addrParam);
+			if (addr==null) throw new BadRequestResponse(jsonError("Invalid peer key: "+addrParam));
+		} catch(Exception e) {
+			throw new BadRequestResponse(jsonError("Expected valid peer key in path but got ["+addrParam+"]"));
+		}
+		
+		Result r= doQuery(Reader.read("(get-in *state* [:peers "+addr+"])"));
+		
+		if (r.isError()) {
+			ctx.json(jsonForErrorResult(r));
+			return;
+		}
+		
+		PeerStatus as=r.getValue();
+		if (as==null) {
+			ctx.result("{\"errorCode\": \"NOBODY\", \"source\": \"Server\",\"value\": \"The peer requested does not exist.\"}");
+			ctx.status(404);
+			return;
+		}
+		
+		Object hm=JSON.from(as);
 		
 		ctx.result(JSON.toPrettyString(hm));
 	}
