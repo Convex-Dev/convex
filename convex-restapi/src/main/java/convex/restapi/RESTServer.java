@@ -70,7 +70,7 @@ public class RESTServer {
                 });
             });
 		}));
-		
+
 		config.registerPlugin(new SwaggerPlugin());
 		config.registerPlugin(new ReDocPlugin());
 	}

@@ -37,6 +37,9 @@ public class Tag {
 
 	// data type tags beyond this point
 
+	// special data structure
+	public static final byte SIGNED_DATA = (byte) 0x90;
+
 	// general purpose data structures
 	public static final byte VECTOR = (byte) 0x80;
 	public static final byte LIST = (byte) 0x81;
@@ -47,8 +50,6 @@ public class Tag {
 
 	public static final byte SYNTAX = (byte) 0x88;
 
-	// special data structure
-	public static final byte SIGNED_DATA = (byte) 0x90;
 
 	// Record data structures
 	public static final byte STATE = (byte) 0xA0;

@@ -20,7 +20,6 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blobs;
 import convex.core.data.Hash;
-import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
@@ -42,7 +41,8 @@ import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.openapi.HttpMethod;
-import io.javalin.openapi.*;
+import io.javalin.openapi.OpenApi;
+import io.javalin.openapi.OpenApiParam;
 
 public class ChainAPI extends ABaseAPI {
 

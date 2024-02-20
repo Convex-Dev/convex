@@ -99,11 +99,9 @@ public class Core {
 	public static final AHashMap<Symbol, AHashMap<ACell,ACell>> METADATA;
 	
 	/**
-	 * Mapping from implicit symbols like #%count to core definitins
+	 * Mapping from implicit symbols like #%count to core definitions
 	 */
 	public static final HashMap<Symbol, ACell> CORE_FORMS=new HashMap<>();
-
-
 
 	/**
 	 * Symbol for core namespace
@@ -2785,9 +2783,6 @@ public class Core {
  
  		return ctx;
  	}
-
-
-
 
 	static {
 		// Set up `convex.core` environment
