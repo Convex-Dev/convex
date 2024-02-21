@@ -155,7 +155,11 @@ public class PeerComponent extends BaseListComponent {
 		}
 		
 		manager.tickState.addPropertyChangeListener(e->{
+			// Set text while maintaining selection
+			int ss=description.getSelectionStart();
+			int se=description.getSelectionEnd();
 			description.setText(getPeerDescription());
+			description.select(ss, se);
 		});
 
 	}
