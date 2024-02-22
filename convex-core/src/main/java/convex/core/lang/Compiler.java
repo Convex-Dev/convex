@@ -755,7 +755,8 @@ public class Compiler {
 
 	private static Context compileDef(AList<ACell> list, Context context) {
 		int n = list.size();
-		if (n != 3) return context.withCompileError("def requires a symbol and an expression, but got: " + list);
+		if (n < 2) return context.withCompileError("def requires a symbol as second argument");
+		if (n > 3) return context.withCompileError("Too many arguments to def");
 
 		ACell symArg=list.get(1);
 
@@ -764,18 +765,25 @@ public class Compiler {
 			if (!(sym instanceof Symbol)) return context.withCompileError("def requires a Symbol as first argument but got: " + RT.getType(sym));
 		}
 		
-		ACell exp=list.get(2);
-		
-		// move metadata from expression. TODO: do we need to expand this first?
-		if (exp instanceof Syntax) {
-			symArg=Syntax.create(symArg).mergeMeta(((Syntax)exp).getMeta());
-			exp=Syntax.unwrap(exp);
+		Def<?> op;
+		if (n==3) {
+			// We have a value, so need to compile the value generating op
+			ACell exp=list.get(2);
+			
+			// move metadata from expression. TODO: do we need to expand this first?
+			if (exp instanceof Syntax) {
+				symArg=Syntax.create(symArg).mergeMeta(((Syntax)exp).getMeta());
+				exp=Syntax.unwrap(exp);
+			}
+			
+			context = context.compile(exp);
+			if (context.isExceptional()) return context;
+			AOp<?> valOp=context.getResult();
+			op=Def.create(symArg, valOp);
+		} else {
+			op=Def.create(symArg);
 		}
-		
-		context = context.compile(exp);
-		if (context.isExceptional()) return context;
 
-		Def<?> op = Def.create(symArg, context.getResult());
 		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 	

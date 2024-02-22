@@ -18,39 +18,28 @@
           :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
           :signature   [{:params [config]}]}}
   [config]
-  (let [max-supply (int (or (get config :max-supply)
-                             1000000000000000000))
+  (let [max-supply (get config :max-supply)
         minter     (address (or (:minter config)
                                 *address*))]
-    (assert (<= 0
-                max-supply
-                1000000000000000000))
+    (or (<= 0 (int max-supply)) (fail "Max supply must be non-negative"))
     `(do
        (import convex.trust :as trust)
        (declare balance transfer)
 
-       ;; Who is allowed to mint tokens?
-       ;;
-       (def minter
-            ~minter)
+       ;; Controller defining who is allowed to mint tokens
+       (def minter ~minter)
 
        ;; Maximum supply (limit after minting)
-       ;;
-       (def max-supply
-            ~max-supply)
+       ~(if max-supply `(def max-supply ~max-supply))
 
        (defn burn
          ^{:callable? true}
          [amount]
-         (when-not (trust/trusted? minter *caller* :burn)
-           (fail :TRUST "No rights to burn"))
+         (when-not (trust/trusted? minter *caller* :burn) (fail :TRUST "No rights to burn"))
          (let [amount (int amount)
                bal    (balance *caller*)]
            ;; Burn amount must be less than or equal to caller's balance.
-           ;;
-           (assert (<= 0
-                       amount
-                       bal))
+           (or (<= 0 amount bal) (fail :STATE "Burn amount not available" ))
            (set-holding *caller*
                         (- bal
                            amount))
@@ -60,22 +49,14 @@
        (defn mint
          ^{:callable? true}
          [amount]
-         (when-not (trust/trusted? minter *caller* :mint)
-           (fail :TRUST "No rights to mint"))
+         (when-not (trust/trusted? minter *caller* :mint) (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
                new-supply (+ supply amount)
                bal        (balance *caller*)
                new-bal    (+ bal amount)]
-           ;; Mint amount.
-           ;;
-           (assert (<= 0
-                       new-bal
-                       max-supply))
            ;; New supply must be in valid range.
-           ;;
-           (assert (<= 0
-                       new-supply
-                       max-supply))
+           ~(if max-supply `(when-not (<= 0 new-supply max-supply) (fail :STATE "Mint exceeds max supply")))
+           
            (set-holding *caller*
                         new-bal)
            (def supply
@@ -85,12 +66,11 @@
   ^{:doc {:description ["Creates deployable code for a new fungible token which follows the interface described in `convex.asset`."
                         "An optional config map can be provided:"
                         "- `:initial-holder`, address which will hold the initial supply (defaults to `*address*`)"
-                        "- `:supply`, supply created and attributed to `:initial-holder` (Integer, defaults to 1000000)"]
+                        "- `:supply`, supply created and attributed to `:initial-holder` (Integer, defaults to 0)"]
           :examples    [{:code "(deploy (build-token {:supply 1000000 :initial-holder *address*}))"}]
           :signature   [{:params [config]}]}}
   [config]
-  (let [supply         (or (:supply config)
-                           1000000)
+  (let [supply         (int (or (:supply config) 0))
         initial-holder (or (:initial-holder config)
                            *address*)]
     `(do

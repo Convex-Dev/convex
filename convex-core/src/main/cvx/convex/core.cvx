@@ -106,8 +106,8 @@
   (map 
     (fn [sym] 
        (cond (symbol? sym)
-       (eval `(def ~sym (cond (defined? 'sym) sym nil)))
-       (fail :CAST "declare requires symbols only as arguments"))) 
+         (eval `(def ~sym))
+         (fail :CAST "declare requires symbols only as arguments"))) 
      syms)
   nil)
 

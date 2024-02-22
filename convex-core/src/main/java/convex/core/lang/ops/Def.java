@@ -33,10 +33,10 @@ public class Def<T extends ACell> extends AOp<T> {
 	private final ACell symbol;
 	
 	// expression to execute to determine the defined value
-	private final Ref<AOp<T>> op;
+	private final Ref<AOp<T>> opRef;
 
 	private Def(ACell key, Ref<AOp<T>> op) {
-		this.op = op;
+		this.opRef = op;
 		this.symbol = key;
 		if (symbol==null) throw new IllegalArgumentException("Null key in Def!!!");
 	}
@@ -62,26 +62,39 @@ public class Def<T extends ACell> extends AOp<T> {
 	public static <T extends ACell> Def<T> create(ACell key, AOp<T> op) {
 		return new Def<T>(key, op.getRef());
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Def<T> create(ACell key) {
+		return new Def<T>(key, (Ref<AOp<T>>) Ref.NULL_VALUE);
+	}
 
 	public static <T extends ACell> Def<T> create(String key, AOp<T> op) {
 		return create(Symbol.create(key), op);
 	}
 
 	@Override
-	public Context execute(Context context) {
-		Context ctx = context.execute(op.getValue());
-		if (ctx.isExceptional()) return ctx;
+	public Context execute(Context ctx) {
+		AOp<T> op = this.opRef.getValue();
 		
-		ACell opResult = ctx.getResult();
+		ACell value;
+		if (op!=null) {
+			// We are given an op to execute
+			ctx = ctx.execute(op);
+			if (ctx.isExceptional()) return ctx;
+			value = ctx.getResult();
+		} else {
+			// No op, so just retain current env value (or null if not found)
+			value=ctx.getEnvironment().get(Syntax.unwrap(symbol));
+		}
 
 		// TODO: defined syntax metadata
 		if (symbol instanceof Syntax) {
 			Syntax syn=(Syntax)symbol;
-			ctx = ctx.defineWithSyntax(syn, opResult);
+			ctx = ctx.defineWithSyntax(syn, value);
 		} else {
-			ctx=ctx.define((Symbol)symbol, opResult);
+			ctx=ctx.define((Symbol)symbol, value);
 		}
-		return ctx.withResult(Juice.DEF, opResult);
+		return ctx.withResult(Juice.DEF, value);
 	}
 
 	@Override
@@ -93,15 +106,15 @@ public class Def<T extends ACell> extends AOp<T> {
 	@Override
 	public Ref<AOp<T>> getRef(int i) {
 		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return op;
+		return opRef;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public Def<T> updateRefs(IRefFunction func) {
 		ACell newSymbol=symbol.updateRefs(func);
-		Ref<AOp<T>> newRef = (Ref<AOp<T>>) func.apply(op);
-		if (op == newRef) return this;
+		Ref<AOp<T>> newRef = (Ref<AOp<T>>) func.apply(opRef);
+		if (opRef == newRef) return this;
 		return new Def<T>(newSymbol, newRef);
 	}
 
@@ -110,7 +123,7 @@ public class Def<T extends ACell> extends AOp<T> {
 		sb.append("(def ");
 		symbol.print(sb,limit); // OK since constant size
 		sb.append(' ');
-		if (!RT.print(sb, op.getValue(),limit)) return false;
+		if (!RT.print(sb, opRef.getValue(),limit)) return false;
 		sb.append(')');
 		return sb.check(limit);
 	}
@@ -123,7 +136,7 @@ public class Def<T extends ACell> extends AOp<T> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, symbol);
-		pos = op.encode(bs,pos);
+		pos = opRef.encode(bs,pos);
 		return pos;
 	}
 	

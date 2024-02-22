@@ -177,10 +177,11 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testDef() {
 		assertEquals(2L,evalL("(do (def a 2) (def b 3) a)"));
 		assertEquals(7L,evalL("(do (def a 2) (def a 7) a)"));
+		assertEquals(9L,evalL("(do (def a 9) (def a) a)"));
+		assertEquals(9L,evalL("(do (def a) (def a 9) a)"));
 
 		// TODO: check if these are most logical error types?
 		assertCompileError(step("(def :a 1)"));
-		assertCompileError(step("(def a)"));
 		assertCompileError(step("(def a 2 3)"));
 	}
 	

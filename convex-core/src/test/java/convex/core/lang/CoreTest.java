@@ -3813,7 +3813,10 @@ public class CoreTest extends ACVMTest {
 		// def overwrites existing bindings
 		assertEquals(Vectors.of(2L, 3L), eval("(do (def v nil) (def v [2 3]) v)"));
 		
+		// single arity def doesn't change value
+		assertEquals(CVMLong.ONE, step("(do (def foo 1) (def foo))").getEnvironment().get(Symbols.FOO));
 
+		
 		// TODO: are these error types logical?
 		assertCompileError(step("(def)"));
 		assertCompileError(step("(def a b c)"));

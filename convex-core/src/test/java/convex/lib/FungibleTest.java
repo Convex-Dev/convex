@@ -32,6 +32,7 @@ public class FungibleTest extends ACVMTest {
 		Context ctx=TestState.CONTEXT.fork();
 		ctx=exec(ctx,"(import convex.fungible :as fungible)");
 		ctx=exec(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(import convex.trust :as trust)");
 		ctx=exec(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		return ctx.getState();
 	}
@@ -102,7 +103,7 @@ public class FungibleTest extends ACVMTest {
 		assertEquals(fungible,eval(ctx,"fungible"));
 
 		// deploy a token with default config
-		ctx=exec(ctx,"(def token (deploy (fungible/build-token {})))");
+		ctx=exec(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
 		Address token = (Address) ctx.getResult();
 		assertTrue(ctx.getAccountStatus(token)!=null);
 		ctx=exec(ctx,"(def token (address "+token+"))");
@@ -167,12 +168,12 @@ public class FungibleTest extends ACVMTest {
 			c=exec(c,"(fungible/burn token 900)");
 			assertEquals(100L,evalL(c,"(fungible/balance token *address*)"));
 
-			assertAssertError(step(c,"(fungible/burn token 101)")); // Fails, not held
+			assertStateError(step(c,"(fungible/burn token 101)")); // Fails, not held
 
 			c=exec(c,"(fungible/burn token 100)");
 			assertEquals(0L,evalL(c,"(fungible/balance token *address*)"));
 
-			assertAssertError(step(c,"(fungible/burn token 1)")); // Fails, not held
+			assertStateError(step(c,"(fungible/burn token 1)")); // Fails, not held
 		}
 
 
@@ -184,14 +185,14 @@ public class FungibleTest extends ACVMTest {
 			c=exec(c,"(fungible/transfer token "+VILLAIN+" 800)");
 			assertEquals(200L,evalL(c,"(fungible/balance token *address*)"));
 
-			assertAssertError(step(c,"(fungible/burn token 201)")); // Fails, not held
+			assertStateError(step(c,"(fungible/burn token 201)")); // Fails, not held
 			assertNotError(step(c,"(fungible/burn token 200)")); // OK since held
 		}
 
 		// Illegal Minting amounts
 		{
-			assertError(step(ctx,"(fungible/mint token 901)")); // too much (exceeds max supply)
-			assertError(step(ctx,"(fungible/mint token -101)")); // too little
+			assertStateError(step(ctx,"(fungible/mint token 901)")); // too much (exceeds max supply)
+			assertStateError(step(ctx,"(fungible/mint token -101)")); // too little
 		}
 
 		// Villain shouldn't be able to mint or burn
@@ -205,6 +206,32 @@ public class FungibleTest extends ACVMTest {
 
 			assertTrustError(step(c,"(fungible/burn token 100)"));
 		}
+	}
+	
+	@Test
+	public void testModularToken() {
+		Context ctx = context();
+		
+		ctx=exec(ctx,"(def T1 (deploy ["
+				+ "(fungible/build-token {:supply 1000000})"
+				+ "(trust/add-controller)"
+				+ "]))");
+		Address T1=ctx.getResult();
+		AssetTester.doFungibleTests(ctx, T1, ctx.getAddress());
+		
+		assertStateError(step(ctx,"(asset/mint T1 1000)"));
+		
+		ctx=exec(ctx,"(def T2 (deploy ["
+				+ "(fungible/build-token {:supply 1000000})"
+				+ "(fungible/add-mint {:max-supply 2000000})"
+				+ "(trust/add-controller)"
+				+ "]))");
+		Address T2=ctx.getResult();
+		AssetTester.doFungibleTests(ctx, T2, ctx.getAddress());
+		
+		assertCVMEquals(1001000,eval(ctx,"(asset/mint T2 1000)"));
+		assertStateError(step(ctx,"(asset/mint T2 999999999999)"));
+
 	}
 
 
