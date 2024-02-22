@@ -749,7 +749,7 @@ public class Compiler {
 	}
 
 	private static Context compileDef(AList<ACell> list, Context context) {
-		int n = list.size();
+		long n = list.count();
 		if (n < 2) return context.withCompileError("def requires a symbol as second argument");
 		if (n > 3) return context.withCompileError("Too many arguments to def");
 
@@ -782,8 +782,9 @@ public class Compiler {
 		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 	
+	// Compile do: note optimisation for small forms 
 	private static Context compileDo(AList<ACell> list, Context context){
-		list=list.next(); // advance past "do"
+		list=list.next(); // advance past "do", might be nothing left....
 		if (list==null) return context.withResult(Juice.COMPILE_NODE,Constant.NULL);
 
 		context = context.compileAll(list);
