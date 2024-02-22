@@ -106,8 +106,8 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testDo() {
 		assertNull(eval("(do)"));
 		assertEquals(1L,evalL("(do 2 1)"));
-		assertEquals(1L,evalL("(do *depth*)")); // Adds one level to initial depth
-		assertEquals(2L,evalL("(do (do *depth*))"));
+		assertEquals(1L,evalL("(do 2 *depth*)")); // Adds one level to initial depth
+		assertEquals(0L,evalL("(do (do *depth*))")); // single entry 'do's get compiled out
 	}
 
 	@Test public void testMinCompileRegression() throws IOException {

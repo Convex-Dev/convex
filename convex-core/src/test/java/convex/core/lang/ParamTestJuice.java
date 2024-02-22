@@ -39,7 +39,7 @@ public class ParamTestJuice {
 						(Juice.EVAL + Juice.CORE + Juice.CONSTANT) + Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT
 								+ Juice.CONSTANT },
 				{ "(do)", null, Juice.DO }, { "({} 0 1)", 1L, JUICE_EMPTY_MAP + Juice.CONSTANT * 2 },
-				{ "(do (do :foo))", Keyword.create("foo"), Juice.DO * 2 + Juice.CONSTANT },
+				{ "(do (do :foo))", Keyword.create("foo"), Juice.CONSTANT },
 				{ "(let [])", null, Juice.LET }, { "(cond)", null, Juice.COND_OP },
 				{ "(if 1 2 3)", 2L, Juice.COND_OP + 2 * Juice.CONSTANT },
 				{ "(fn [x] x)", eval("(fn [x] x)").getResult(), JUICE_IDENTITY_FN },

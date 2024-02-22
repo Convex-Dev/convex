@@ -494,12 +494,7 @@ public class Compiler {
 		if (head instanceof Symbol) {
 			Symbol sym = (Symbol) head;
 			
-			if (sym.equals(Symbols.DO)) {
-				context = context.compileAll(list.next());
-				if (context.isExceptional()) return context;
-				Do<?> op = Do.create((AVector<AOp<ACell>>) context.getResult());
-				return context.withResult(Juice.COMPILE_NODE, op);
-			}
+			if (sym.equals(Symbols.DO)) return compileDo(list,context);
 			
 			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 
@@ -787,7 +782,19 @@ public class Compiler {
 		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 	
-	
+	private static Context compileDo(AList<ACell> list, Context context){
+		list=list.next(); // advance past "do"
+		if (list==null) return context.withResult(Juice.COMPILE_NODE,Constant.NULL);
+
+		context = context.compileAll(list);
+		if (context.isExceptional()) return context;
+		AVector<AOp<ACell>> ops=context.getResult();
+		
+		if (list.count()==1) return context.withResult(Juice.COMPILE_NODE, ops.get(0));
+		
+		Do<?> op = Do.create(ops);
+		return context.withResult(Juice.COMPILE_NODE, op);
+	}
 
 	
 	/**

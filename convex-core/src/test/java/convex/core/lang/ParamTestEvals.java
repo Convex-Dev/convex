@@ -47,7 +47,7 @@ public class ParamTestEvals {
 						Keyword.create("bar") },
 
 				{ "*depth*", 0L }, // *depth*
-				{ "(do *depth*)", 1L }, // do, *depth*
+				{ "(do :foo *depth*)", 1L }, // do, *depth*
 				{ "(let [a *depth*] a)", 1L }, // let, *depth*
 				{ "(let [f (fn [] *depth*)] (f))", 2L }, // let, invoke, *depth*
 
