@@ -40,8 +40,7 @@
           form     `(def ~(syntax name
                                   {:expander? true})
                          ~exp)]
-      (e form
-         e))))
+      (e form e))))
 
 (def defmacro
   ^{:doc       {:description ["Like `defn` but defines a macro instead of a regular function."
@@ -61,8 +60,7 @@
                           (e (apply m#
                                     (next x))
                              e))))]
-      (e form
-         e))))
+      (e form e))))
 
 (defmacro defn
   ^{:doc {:description "Defines a function in the current environment."
@@ -70,30 +68,23 @@
           :signature   [{:params [name params & body]}
                         {:params [name & fn-decls]}]}}
   [name & decl]
-  (let [fnform (cons 'fn
-                     decl)
-        _      (cond
-                 (empty? decl)
-                 (fail :ARITY
-                       "`defn` requires at lest one function definition"))
+  (cond (empty? decl) (fail :ARITY "`defn` requires at lest one function definition"))
+  (let [fnform (cons 'fn decl)
         fst    (first decl)
         name   (syntax name (meta fst))]
-    `(def ~name
-          ~fnform)))
+    `(def ~name ~fnform)))
 
 (defmacro macro
   ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
           :examples    [{:code "(macro [x] (if x :foo :bar))"}]
           :signature   [{:params [params & body]}]}}
   [& decl]
-  (let [mac  (cons 'fn
-                   decl)
-        form `(let [m# ~mac]
-                (fn [x e]
-                  (e (apply m#
-                            (next (unsyntax x)))
-                     e)))]
-    form))
+  (let [mfunc  (cons 'fn decl)]
+  `(let [m# ~mfunc] ;; set up a closure containing the macro function
+     (fn [x e]
+       (e 
+    	  (apply m# (next (unsyntax x)))
+          e)))))
 
 ;;;;;;;;;; Environment setup
 

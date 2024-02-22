@@ -13,14 +13,13 @@
 (defn add-mint
   ^{:doc {:description ["Creates deployable code that, when added to actor code from `build-token`, allows priviledged accounts to mint and burn tokens."
                         "Configuration map contains:"
-                        "- `:max-supply`, a long designating the maximum mintable supply (optional, defaults to 1000000000000000000, the allowed maximum)"
-                        "- `:minter`, a single address or a Trust Monitor from `convex.trust` (mandatory)"]
+                        "- `:max-supply`, a long designating the maximum mintable supply (defaults to unlimited)"
+                        "- `:minter`, Trust Monitor from `convex.trust` (defaults to *address*)"]
           :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
           :signature   [{:params [config]}]}}
   [config]
   (let [max-supply (get config :max-supply)
-        minter     (address (or (:minter config)
-                                *address*))]
+        minter     (or (:minter config) *address*)]
     (or (<= 0 (int max-supply)) (fail "Max supply must be non-negative"))
     `(do
        (import convex.trust :as trust)
@@ -71,10 +70,8 @@
           :signature   [{:params [config]}]}}
   [config]
   (let [supply         (int (or (:supply config) 0))
-        initial-holder (or (:initial-holder config)
-                           *address*)]
+        initial-holder (address (or (:initial-holder config) *address*))]
     `(do
-
     	(defn -qc [q]
     	  (cond (int? q) q              ;; base case, quantity should always be an integer
     			(nil? q) 0 

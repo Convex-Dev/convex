@@ -179,6 +179,7 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(7L,evalL("(do (def a 2) (def a 7) a)"));
 		assertEquals(9L,evalL("(do (def a 9) (def a) a)"));
 		assertEquals(9L,evalL("(do (def a) (def a 9) a)"));
+		assertNull(eval("(do (def a 9) (def a nil) a)"));
 
 		// TODO: check if these are most logical error types?
 		assertCompileError(step("(def :a 1)"));

@@ -3816,13 +3816,11 @@ public class CoreTest extends ACVMTest {
 		// single arity def doesn't change value
 		assertEquals(CVMLong.ONE, step("(do (def foo 1) (def foo))").getEnvironment().get(Symbols.FOO));
 
-		
 		// TODO: are these error types logical?
 		assertCompileError(step("(def)"));
 		assertCompileError(step("(def a b c)"));
 
 		assertUndeclaredError(step("(def a b)"));
-
 		assertUndeclaredError(step("(def a a)"));
 	}
 	
