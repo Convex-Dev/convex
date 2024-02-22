@@ -32,13 +32,9 @@
                 :signature   [{:params [a]}]}
     :expander? true}
   (fn [x e]
-    (let [[_
-           name
-           & decl] x
-          exp      (cons 'fn
-                         decl)
-          form     `(def ~(syntax name
-                                  {:expander? true})
+    (let [[_ name & decl] x
+          exp      (cons 'fn decl)
+          form     `(def ~(syntax name {:expander? true})
                          ~exp)]
       (e form e))))
 
@@ -49,12 +45,10 @@
     :expander? true}
   (fn [x e]
     (let [[_ name & decl] x
-          mac      (cons 'fn
-                         decl)
-          mmeta    (meta (first decl))
+          mac      (cons 'fn decl)
           form     `(def ~(syntax name
-                                  (merge mmeta
-                                         {:expander? true}))
+                                  (assoc (meta (first decl))
+                                         :expander? true))  ;; merge in metadata on parameter plus :expander? tag
                       (let [m# ~mac]
                         (fn [x e]
                           (e (apply m#
@@ -70,8 +64,7 @@
   [name & decl]
   (cond (empty? decl) (fail :ARITY "`defn` requires at lest one function definition"))
   (let [fnform (cons 'fn decl)
-        fst    (first decl)
-        name   (syntax name (meta fst))]
+        name   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list
     `(def ~name ~fnform)))
 
 (defmacro macro
@@ -496,8 +489,7 @@
           :signature   [{:params [timestamp code]}]}}
   [timestamp code]
   `(schedule* ~timestamp
-              (compile ~(list 'quote
-                              code))))
+              (compile (quote ~code))))
 
 (defmacro tailcall
    ^{:doc {:description ["Advanced feature. While `return` stops the execution of a function and return, `tailcall` calls another one without consuming additional stack depth."
@@ -508,22 +500,19 @@
   (let []
     (or (list? callspec)
         (fail :ARGUMENT
-              "Tailcall requires a list representing function invocation"))
+              "tailcall requires a list representing function invocation"))
     (let [n (count callspec)]
-    (cond (== n
-              0)
-      (fail :ARGUMENT
-            "Tailcall requires at least a function argument in call list"))
-      (cons 'tailcall*
-            callspec))))
+      (if (== n 0)
+        (fail :ARGUMENT "Tailcall requires at least a function argument in call list"))
+      (cons 'tailcall* 
+    		  callspec))))
 
 (defmacro undef
   ^{:doc {:description "Opposite of `def`. Undefines a symbol, removing the mapping from the current environment if it exists."
           :examples    [{:code "(do (def foo 1) (undef foo))"}]
           :signature   [{:params [sym]}]}}
   [sym]
-  `(undef* ~(list 'quote
-                  sym)))
+  `(undef* (quote ~sym)))
 
 (defmacro for-loop 
    ^{:doc {:description "Executes a code body repeatedy while a condition is true. At the first iteration, `sym` is locally bound to the `init` value. For each subsequent iteration, sym is bound to the result of `change`. The result it the result of the last execution of `body`, or `nil` if no iterations were made."

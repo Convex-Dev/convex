@@ -236,6 +236,13 @@ public class CoreTest extends ACVMTest {
 		assertEquals(42L, evalL("(do (def foo ^{:doc 42} nil) (doc foo))"));
 		assertEquals(42L, evalL("(do (def a (deploy '(def foo ^{:doc 42} nil))) (doc a/foo))"));
 	}
+	
+	@Test
+	public void testDo() {
+		assertNull(eval("(do)"));
+		assertNull(eval("(do 7 (do))"));
+		assertEquals(42L, evalL("(do 2 42)"));
+	}
 
 	@Test
 	public void testLet() {
@@ -2202,10 +2209,17 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testWhen() {
 		assertNull(eval("(when false 2)"));
+		assertCVMEquals(6,eval("(when true 6)"));
+		
 		assertNull(eval("(when true)"));
+		assertNull(eval("(do 1 (when true))"));
+
 		assertEquals(Vectors.empty(), eval("(when 2 3 4 5 [])"));
 
-		// TODO: needs to fix / check?
+		// Check side effects in true and false cases
+		assertNull(eval("(do (def a 6) (when true :foo (def a nil) :bar) a)"));
+		assertCVMEquals(6,eval("(do (def a 6) (when false (def a nil)) a)"));
+		
 		assertArityError(step("(when)"));
 	}
 
