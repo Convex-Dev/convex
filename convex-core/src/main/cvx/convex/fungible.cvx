@@ -18,7 +18,7 @@
           :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
           :signature   [{:params [config]}]}}
   [config]
-  (let [max-supply (int (or (:max-supply config)
+  (let [max-supply (int (or (get config :max-supply)
                              1000000000000000000))
         minter     (address (or (:minter config)
                                 *address*))]
@@ -175,6 +175,9 @@
                           0)]
            ;; Amount must be in valid range.
            ;;
+           ~(if (:checked? config) 
+        	   `(if-let [f (check-transfer *caller* addr amount)] (fail :BLOCK f)))
+           
            (assert (<= 0
                        amount
                        bal)) 

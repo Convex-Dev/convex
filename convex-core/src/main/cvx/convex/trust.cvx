@@ -115,6 +115,16 @@
             (eval code)
             (fail :TRUST "No access to upgrade capability!"))))))
 
+(defn add-controller
+		  ^{:doc {:description ["Creates deployable code to add a controller to an actor."
+		                        ]
+		          :examples    [{:code "(deploy (add-trusted-upgrade {:root *address*}))"}]
+		          :signature   [{:params []}
+		                        {:params [controller]}]}}
+  ([] (recur *address*))
+  ([cont]
+		  `(set-controller ~cont)))
+
 
 (defn remove-upgradability! 
   ^{:doc {:description ["Removes upgradability from an actor, previously added using `add-trusted-upgrade`."
