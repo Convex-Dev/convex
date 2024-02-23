@@ -326,6 +326,8 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Symbols.FOO,eval("(quote foo)"));
 		assertEquals(Symbols.COUNT,eval("'count"));
 		assertNull(eval("'nil"));
+		
+		// eval strips one level of quote, leaves internal stuff unchanged
 		assertEquals(Lists.of(Symbols.QUOTE,Symbols.COUNT),eval("''count"));
 		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.COUNT)),eval("''~count"));
 
@@ -337,6 +339,8 @@ public class CompilerTest extends ACVMTest {
 		assertSame(CVMBool.TRUE,eval("(= (quote a/b) 'a/b)"));
 
 		assertEquals(Symbol.create("undefined-1"),eval("'undefined-1"));
+		
+		assertEquals(expand("(quote (1 2))"),expand("'(1 2)"));
 	}
 	
 	@Test 
@@ -597,7 +601,10 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test public void testExpansion() {
+		assertNull(expand("nil"));
 		assertEquals(Keywords.FOO,expand(":foo"));
+		assertSame(Maps.empty(),expand("{}"));
+		assertEquals(Maps.of(1,2),expand("{1 2}"));
 
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),Reader.read("^:bar :foo"));
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),expand("^:bar :foo"));

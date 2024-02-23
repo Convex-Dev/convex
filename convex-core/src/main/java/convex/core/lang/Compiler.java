@@ -379,7 +379,7 @@ public class Compiler {
 			}
 
 			// compile quoted elements
-			context = compileAllQuasiQuoted(context, seq, depth);
+			context = compileQuasiQuotedSeq(context, seq, depth);
 			if (context.isExceptional()) return context;
 			ASequence<AOp<ACell>> rSeq = context.getResult();
 
@@ -398,7 +398,7 @@ public class Compiler {
 			}
 
 			// compile quoted elements
-			context = compileAllQuasiQuoted(context, rSeq,depth);
+			context = compileQuasiQuotedSeq(context, rSeq,depth);
 			if (context.isExceptional()) return context;
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
@@ -413,7 +413,7 @@ public class Compiler {
 			AVector<ACell> rSeq = set.toVector();
 
 			// compile quoted elements
-			context = compileAllQuasiQuoted(context, rSeq,depth);
+			context = compileQuasiQuotedSeq(context, rSeq,depth);
 			if (context.isExceptional()) return context;
 			ASequence<AOp<ACell>> cSeq = context.getResult();
 
@@ -433,14 +433,14 @@ public class Compiler {
 	}
 
 	/**
-	 * Compiles a sequence of quoted forms
+	 * Compiles a sequence of quasi-quoted forms to an sequence of ops that produce the results
 	 * 
 	 * @param context
 	 * @param form
 	 * @return Context with complied sequence of ops as result
 	 */
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static Context compileAllQuasiQuoted(Context context, ASequence<ACell> forms, int depth) {
+	private static Context compileQuasiQuotedSeq(Context context, ASequence<ACell> forms, int depth) {
 		int n = forms.size();
 		// create a list of ops producing each sub-element
 		ASequence<AOp<?>> rSeq = Vectors.empty();
