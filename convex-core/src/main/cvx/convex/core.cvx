@@ -498,12 +498,12 @@
            :signature   [{:params [[f & args]] }]}}
   [callspec]
   (let []
-    (or (list? callspec)
+    (when-not (list? callspec)
         (fail :ARGUMENT
               "tailcall requires a list representing function invocation"))
     (let [n (count callspec)]
-      (if (== n 0)
-        (fail :ARGUMENT "Tailcall requires at least a function argument in call list"))
+      (if (== n 0) 
+    	  (fail :ARGUMENT "Tailcall requires at least a function argument in call list"))
       (cons 'tailcall* 
     		  callspec))))
 
