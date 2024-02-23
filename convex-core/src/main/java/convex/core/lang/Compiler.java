@@ -453,12 +453,15 @@ public class Compiler {
 				AList<ACell> subList = (AList<ACell>) subForm;
 				int sn = subList.size();
 				if (sn != 2) return context.withArityError("unquote-splicing requires 1 argument");
+				
+				ACell body=subList.get(1);
+				context=context.eval(body);
 				// unquote-splicing looks like it needs flatmap
 				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
 			} else {
-				Context rctx= compileQuasiQuoted(context, subSyntax,depth);
-				if (rctx.isExceptional()) return rctx;
-				rSeq = (ASequence) (rSeq.conj(rctx.getResult()));
+				context= compileQuasiQuoted(context, subSyntax,depth);
+				if (context.isExceptional()) return context;
+				rSeq = (ASequence) (rSeq.conj(context.getResult()));
 			}
 		}
 		return context.withResult(rSeq);

@@ -392,8 +392,18 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testQuotedMacro() {
-
 		assertEquals(2L,evalL("(eval '(if true ~(if true 2 3)))"));
+	}
+	
+	@Test
+	public void testRawUnquote() {
+		assertUndeclaredError(step("(do (def foo 12) ~foo)"));
+	}
+	
+	@Test
+	public void testUnquoteSplicing() {
+		// TODO:
+		// assertEquals(Vectors.of(1,2,3),eval("(let [a [2 3]] `[1 ~@a])"));
 	}
 
 	@Test
