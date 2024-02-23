@@ -405,6 +405,11 @@ public class CompilerTest extends ACVMTest {
 		// TODO:
 		// assertEquals(Vectors.of(1,2,3),eval("(let [a [2 3]] `[1 ~@a])"));
 	}
+	
+	@Test
+	public void testQuasiquote() {
+		assertEquals(Vectors.of(1,2,3),eval("(quasiquote [1 ~2 ~(dec 4)])"));
+	}
 
 	@Test
 	public void testQuotedMetadata() {

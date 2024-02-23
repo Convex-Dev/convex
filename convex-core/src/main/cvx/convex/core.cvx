@@ -465,7 +465,7 @@
          ~code))))
 
 (defn mapcat
-  ^{:doc {:description "Maps a funcion across the given collections, then concatenates the results. Nil is treated as an empty collection. See `map`."
+  ^{:doc {:description "Maps a function across the given collections, then concatenates the results. Nil is treated as an empty collection. See `map`."
           :examples    [{:code "(mapcat vector [:foo :bar :baz] [1 2 3])"}]
           :signature   [{:params [test & body]}]}}
   [f coll & more]
