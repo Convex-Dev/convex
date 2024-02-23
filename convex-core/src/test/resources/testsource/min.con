@@ -1,4 +1,4 @@
-(defn min [& vals]
+(defn mymin [& vals]
   (let [fst (first vals)
         n (count vals)]
     (loop [min fst i 1]

@@ -28,6 +28,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
@@ -74,7 +75,7 @@ public class CompilerTest extends ACVMTest {
 		assertSame(CVMBool.TRUE,eval("true"));
 		assertSame(CVMBool.FALSE,eval("false"));
 		
-		// basic constant values should also compile to themselves!
+		// basic constant values should compile to themselves!
 		
 		assertEquals(Constant.of(1L),comp("1"));
 		assertEquals(Constant.of(Samples.FOO),comp(":foo"));
@@ -86,6 +87,8 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Constant.of(Sets.empty()),comp("#{}"));
 		assertEquals(Constant.of(Maps.empty()),comp("{}"));
 		
+		assertEquals(Constant.of(Blob.EMPTY),comp("0x"));
+		
 		assertEquals(Constant.of(null),comp("nil"));
 		assertEquals(Constant.of(true),comp("true"));
 		assertEquals(Constant.of(false),comp("false"));
@@ -93,11 +96,13 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test public void testComments() {
+		// comments / whitespace should be ignore
 		assertEquals(Vectors.of(1,2,3),eval("[1 2 3] ;; Random stuff"));
 		assertEquals(Vectors.of(1,3),eval("[1 #_2 3]"));
 		assertEquals(Vectors.of(1,3),eval("[1 #_(+ 3 4) #_ 8 3]"));
 		assertEquals(Vectors.of(1,3),eval("[1 #_(+ 3 #_4) 3]"));
 		
+		// Comments only -> no form to execute!
 		assertThrows(ParseException.class,()->step("; No code here to run!"));
 		assertThrows(ParseException.class,()->step("#_(+ 3 4)"));
 		assertThrows(ParseException.class,()->step("#_(+ 3 4 ()"));
@@ -111,14 +116,20 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test public void testMinCompileRegression() throws IOException {
+		// a simple function to test
 		Context c=context();
 		String src=Utils.readResourceAsString("testsource/min.con");
 		ACell form=Reader.read(src);
 		Context exp=c.expand(form);
 		assertNotError(exp);
 		Context com=c.compile(exp.getResult());
-
 		assertNotError(com);
+		
+		c=c.eval(com.getResult());
+		assertNotError(c);
+		
+		// should get minimum value from arguments
+		assertCVMEquals(4,eval(c,"(mymin 6 4 9)"));
 	}
 
 	@Test public void testFnCasting() {
@@ -224,9 +235,21 @@ public class CompilerTest extends ACVMTest {
 	}
 
 	@Test public void testCond() {
+		// nil behaves as false
 		assertEquals(1L,evalL("(cond nil 2 1)"));
+		
+		// truthy values
+		assertEquals(2L,evalL("(cond true 2 1)"));
+		assertEquals(2L,evalL("(cond :false 2 1)"));
+		
+		// multiple tests
 		assertEquals(4L,evalL("(cond nil 2 false 3 4)"));
 		assertEquals(2L,evalL("(cond 1 2 3 4)"));
+		
+		// Fallback value only
+		assertEquals(9L,evalL("(cond 9)"));
+		
+		// Nil result with no fallback value
 		assertNull(eval("(cond)"));
 		assertNull(eval("(cond false true)"));
 	}
@@ -437,6 +460,10 @@ public class CompilerTest extends ACVMTest {
 
 		// shouldn't be legal to let-bind qualified symbols
 		assertCompileError(step("(let [foo/bar 1] _)"));
+		
+		// TODO: should we be able to let-bind symbols with metadata?
+		// assertCVMEquals(7,eval("(let [^:foo a 7] a)"));
+
 
 		// ampersand edge cases
 		assertEquals(Vectors.of(1L,Vectors.of(2L),3L),eval("(let [[a & b c] [1 2 3]] [a b c])"));
