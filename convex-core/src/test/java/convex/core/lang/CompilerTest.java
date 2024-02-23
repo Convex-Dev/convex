@@ -636,6 +636,12 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),Reader.read("^:bar :foo"));
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),expand("^:bar :foo"));
 	}
+	
+	@Test public void testExpandDataStructures() {
+		assertEquals(Reader.read("{1 2}"),expand("{1 2}"));
+		assertEquals(Reader.read("(1 2)"),expand("(1 2)"));
+		assertEquals(Reader.read("(quasiquote {1 2})"),expand("`{1 2}"));
+	}
 
 	@Test
 	public void testExpandQuote()  {
@@ -693,7 +699,7 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test public void testNestedEvalRegression() {
-		// Test for nasty case if eval captured calling local bindings
+		// Test for nasty case if eval captured caller's local bindings (messing up lexical argument positions etc.)
 		Context ctx=context();
 		ctx=step(ctx,"((fn [code] (eval code)) '(defn g [x] x))");
 		ctx=step(ctx,"(g 13)");
@@ -753,14 +759,16 @@ public class CompilerTest extends ACVMTest {
 		
 		assertEquals(Maps.of(1L,5L),eval("{1 2 1 3 1 4 1 5}"));
 
-		// TODO: sanity check? Does/should this depend on map ordering?
-		assertEquals(1L,evalL("(count {~(inc 1) 3 ~(dec 3) 4})"));
 
 		assertEquals(Maps.of(11L,5L),eval("{~((fn [x] (do (return (+ x 7)) 100)) 4) 5}"));
 		assertEquals(Maps.of(1L,2L),eval("{(inc 0) 2}"));
 
+		// TODO: sanity check? Does/should this depend on map ordering?
+		assertEquals(1L,evalL("(count {~(inc 1) 3 ~(dec 3) 4})"));
+
 		// TODO: figure out correct behaviour for this. Depends on read vs. readSyntax?
-		//assertEquals(4L,evalL("(count #{*juice* *juice* *juice* *juice*})"));
+		assertEquals(1L,evalL("(count #{*juice* *juice* *juice* *juice*})"));
+		assertEquals(1L,evalL("(count #{~*juice* ~*juice* ~*juice* ~*juice*})"));
 		//assertEquals(2L,evalL("(count {*juice* *juice* *juice* *juice*})"));
 	}
 
