@@ -79,6 +79,7 @@
     	  (apply m# (next (unsyntax x)))
           e)))))
 
+
 ;;;;;;;;;; Environment setup
 
 (defmacro declare
@@ -94,6 +95,8 @@
          (fail :CAST "declare requires symbols only as arguments"))) 
      syms)
   nil)
+
+
 
 ;;;;;;;;;; Logic Operations
 

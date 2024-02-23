@@ -1,0 +1,29 @@
+
+;;;;;;;;;; Experimental Convex Lisp quasiquote impl
+
+(declare quasiquote*)
+
+(defmacro quasiquote [form]
+  (quasiquote* form))
+
+(defn quasiquote-list [form]
+  (cond (empty? form) (return ()))
+  
+  (let [fst (first form)]
+	(cond 
+	  (= 'quasiquote 
+	      fst) form	   ;; no change, this is just another
+			
+			  )	 
+		  ))
+
+(defn quasiquote* [form]
+  (cond
+    (list? form)
+      (quasiquote-list form)
+    (vector? form)
+      (cons 'vector 
+    		(quasiquote-list form))
+    
+    ;; Nothings special, so just quote value  
+    (list 'quote form)))

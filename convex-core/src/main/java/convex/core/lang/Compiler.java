@@ -402,8 +402,7 @@ public class Compiler {
 			if (context.isExceptional()) return context;
 			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
 
-			ACell fn = Core.HASHMAP;
-			AOp<?> inv = Invoke.create(Constant.create(fn), cSeq);
+			AOp<?> inv = Invoke.create(Constant.create(Core.HASHMAP), cSeq);
 			if (isSyntax) {
 				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
 			}
@@ -418,8 +417,7 @@ public class Compiler {
 			if (context.isExceptional()) return context;
 			ASequence<AOp<ACell>> cSeq = context.getResult();
 
-			ACell fn = Core.HASHSET;
-			AOp<?> inv = Invoke.create(Constant.create(fn), cSeq);
+			AOp<?> inv = Invoke.create(Constant.create(Core.HASHSET), cSeq);
 			if (isSyntax) {
 				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
 			}
@@ -454,8 +452,14 @@ public class Compiler {
 				int sn = subList.size();
 				if (sn != 2) return context.withArityError("unquote-splicing requires 1 argument");
 				
+				// Compute forms produced by unquote-splicing
 				ACell body=subList.get(1);
 				context=context.eval(body);
+				if (context.isExceptional()) return context;
+				
+				ACell newForms=context.getResult();
+				if (!(newForms instanceof ASequence)) return context.withError(ErrorCodes.COMPILE,"unquote-splicing requires a form which produces a sequence");
+				
 				// unquote-splicing looks like it needs flatmap
 				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
 			} else {
