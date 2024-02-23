@@ -750,6 +750,9 @@ public class CompilerTest extends ACVMTest {
 		// See #395, failure due to bad binding form
 		assertCompileError(step("(defn foo [ok 42])"));
 		assertCompileError(step("(defn foo [42 ok])"));
+		
+		// OK since 42 now interpreted as a syntax tag on the parameter "ok"
+		assertNotError(step("(defn foo [^42 ok])")); 
 	}
 
 	@Test
@@ -766,7 +769,7 @@ public class CompilerTest extends ACVMTest {
 		// TODO: sanity check? Does/should this depend on map ordering?
 		assertEquals(1L,evalL("(count {~(inc 1) 3 ~(dec 3) 4})"));
 
-		// TODO: figure out correct behaviour for this. Depends on read vs. readSyntax?
+		// TODO: figure out correct behaviour for this.
 		assertEquals(1L,evalL("(count #{*juice* *juice* *juice* *juice*})"));
 		assertEquals(1L,evalL("(count #{~*juice* ~*juice* ~*juice* ~*juice*})"));
 		//assertEquals(2L,evalL("(count {*juice* *juice* *juice* *juice*})"));
