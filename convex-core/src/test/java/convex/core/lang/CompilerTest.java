@@ -364,6 +364,9 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Symbol.create("undefined-1"),eval("'undefined-1"));
 		
 		assertEquals(expand("(quote (1 2))"),expand("'(1 2)"));
+
+		// unquote doesn't do anything in regular quote
+		assertEquals(eval("(quote (unquote 17))"),eval("'~17"));
 	}
 	
 	@Test 
@@ -407,6 +410,8 @@ public class CompilerTest extends ACVMTest {
 
 		// Unquote escapes surrounding quasiquote
 		assertEquals(read("(a b (quote 1))"),eval(ctx,"`(a b '~x)"));
+
+	
 	}
 
 
@@ -428,17 +433,18 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testUnquoteSplicing() {
-		// TODO:
-		// assertEquals(Vectors.of(1,2,3),eval("(let [a [2 3]] `[1 ~@a])"));
-	}
-	
-	@Test
 	public void testQuasiquote() {
 		assertEquals(Vectors.of(1,2,3),eval("(quasiquote [1 ~2 ~(dec 4)])"));
 		assertEquals(eval("(quasiquote (quasiquote (unquote 1)))"),eval("``~1"));
 		assertEquals(Constant.of(10),comp("`~`~10"));
 	}
+	
+	@Test
+	public void testUnquoteSplicing() {
+		// TODO:
+		// assertEquals(Vectors.of(1,2,3),eval("(let [a [2 3]] `[1 ~@a])"));
+	}
+	
 
 	@Test
 	public void testQuotedMetadata() {

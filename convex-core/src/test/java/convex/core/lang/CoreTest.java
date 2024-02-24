@@ -3634,6 +3634,9 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(empty? [ 3])"));
 		assertFalse(evalB("(empty? '(foo))"));
 		assertFalse(evalB("(empty? #{[]})"));
+		
+		assertFalse(evalB("(empty? 1)"));
+		assertFalse(evalB("(empty? :foo)"));
 	}
 
 	@Test
@@ -4355,10 +4358,13 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testQuote() {
-		assertEquals(Vectors.of(1,2,3),eval("(quote [1 2 3])"));
-		assertEquals(Sets.of(42),eval("(quote #{42})")); // See Issue #109
-		assertFalse(evalB("(= (quote #{42}) (quote #{(syntax 42)}))")); // See Issue #109
+		// quote returns unevaluated form
+		assertEquals(Vectors.of(1,List.of(2),Symbols.FOO),eval("(quote [1 (2) foo])"));
+		
+		assertEquals(Sets.of(42),eval("(quote #{42})")); // See Issue #109, quoting a set should work fine
+		assertFalse(evalB("(= (quote #{42}) (quote #{(syntax 42)}))")); // See Issue #109, syntax shouldn't get removed
 
+		// interior macros shouldn't get expanded
 		assertEquals(Vectors.of(1,Lists.of(Symbols.IF,4,7),3),eval("(quote [1 (if 4 7) 3])"));
 	}
 

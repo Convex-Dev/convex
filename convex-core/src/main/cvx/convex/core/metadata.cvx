@@ -495,8 +495,7 @@
                        :return DataStructure}]}}
 
  empty?
- {:doc {:description "Checks if the argument is an empty collection. Nil is considered empty. "
-        :errors      {:CAST "If the argument is neither nil nor a data structure."}
+ {:doc {:description "Checks if the argument is an empty data structure. nil is considered empty. Returns false if not a data structures."
         :examples    [{:code "(empty? [])"}]
         :signature   [{:params [coll]
                        :return Boolean}]}}
