@@ -412,9 +412,9 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testNestedQuote() {
-		assertEquals(RT.cvm(10L),eval("(+ (eval `(+ 1 ~2 ~(eval 3) ~(eval `(+ 0 4)))))"));
+		assertCVMEquals(10,eval("(+ (eval `(+ 1 ~2 ~(eval 3) ~(eval `(+ 0 4)))))"));
 
-		assertEquals(RT.cvm(10L),eval("(let [a 2 b 3] (eval `(+ 1 ~a ~(+ b 4))))"));
+		assertCVMEquals(10,eval("(let [a 2 b 3] (eval `(+ 1 ~a ~(+ b 4))))"));
 	}
 
 	@Test
@@ -436,6 +436,8 @@ public class CompilerTest extends ACVMTest {
 	@Test
 	public void testQuasiquote() {
 		assertEquals(Vectors.of(1,2,3),eval("(quasiquote [1 ~2 ~(dec 4)])"));
+		assertEquals(eval("(quasiquote (quasiquote (unquote 1)))"),eval("``~1"));
+		assertEquals(Constant.of(10),comp("`~`~10"));
 	}
 
 	@Test

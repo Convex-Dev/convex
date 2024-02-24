@@ -626,6 +626,7 @@ public class Compiler {
 	
 	@SuppressWarnings("unchecked")
 	private static CompilerState updateBinding(ACell bindingForm,CompilerState cs) {
+		bindingForm=Syntax.unwrap(bindingForm);
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;
 			if (!sym.equals(Symbols.UNDERSCORE)) {
