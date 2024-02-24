@@ -96,7 +96,50 @@
      syms)
   nil)
 
+;;;;;;;;;; Experimental Convex Lisp quasiquote impl
 
+(declare quasiquote*)
+
+(defmacro quasiquote2 
+		^{:doc {:description "Returns the quoted value of a form, without evaluating it. Like `quote`, but elements within the form may be unquoted via `unquote`."
+                :examples    [{:code "(quasiquote foo)" :return "foo"}
+                        {:code "(quasiquote (:a :b (unquote (+ 2 3))))" :return "(:a :b 5)"}]
+                :signature   [{:params [form]}]}}	
+  [form]
+  (quasiquote* form))
+
+(defn ^:private? qq-seq [form] 
+  (map quasiquote* form))
+
+(defn quasiquote* [form]
+  (cond
+	;; first catch [] () {} #{} and nil, which dont expand
+    (empty? form) (return form) 
+	
+    ;; handle ech type of data structure
+    (list? form)
+      (cond
+        (= (first form) 'quasiquote
+          ) form ;; Nested quasiquote, no futher expansion
+        (= (first form) 'unquote
+          ) 
+          (cond 
+            (!= 2 (count form)) (fail :EXPAND "unquote requires one argument exactly")
+            (second form)
+            )
+        (qq-seq form))
+    (vector? form)
+      (qq-seq form)
+    (set? form)
+      (cons 'hash-set 
+    		(qq-seq form))
+    (map? form)
+      (cons 'hash-map 
+    		(qq-seq (apply concat form)))
+    
+    ;; Nothing special, so just quote value  
+    (list 'quote 
+    		form)))
 
 ;;;;;;;;;; Logic Operations
 

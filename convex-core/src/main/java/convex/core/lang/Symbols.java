@@ -50,6 +50,7 @@ public class Symbols {
 	public static final Symbol GT = intern(">");
 	public static final Symbol LE = intern("<=");
 	public static final Symbol GE = intern(">=");
+	public static final Symbol NE = intern("!=");
 	
 	public static final Symbol MIN = intern("min");
 	public static final Symbol MAX = intern("max");

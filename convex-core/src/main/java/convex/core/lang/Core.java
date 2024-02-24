@@ -1539,6 +1539,18 @@ public class Core {
 			return context.withResult(Juice.NUMERIC_COMPARE, result);
 		}
 	});
+	
+	public static final CoreFn<CVMBool> NE = reg(new CoreFn<>(Symbols.NE) {
+		
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			// all arities OK, but need to watch for non-numeric arguments
+			CVMBool equal = RT.eq(args);
+			if (equal == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+
+			return context.withResult(Juice.NUMERIC_COMPARE, equal.not());
+		}
+	});
 
 	public static final CoreFn<CVMBool> GE = reg(new CoreFn<>(Symbols.GE) {
 		

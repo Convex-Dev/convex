@@ -19,6 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +41,8 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.init.Init;
+import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
@@ -56,6 +59,7 @@ import convex.test.Samples;
  * State setup includes only basic accounts and core library.
  */
 public class CompilerTest extends ACVMTest {
+
 
 	@Test
 	public void testConstants() {
@@ -437,6 +441,12 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Vectors.of(1,2,3),eval("(quasiquote [1 ~2 ~(dec 4)])"));
 		assertEquals(eval("(quasiquote (quasiquote (unquote 1)))"),eval("``~1"));
 		assertEquals(Constant.of(10),comp("`~`~10"));
+	}
+	
+	@Test
+	public void testQuasiquote2() {
+		assertEquals(Vectors.of(1,2,3),eval("(quasiquote2 [1 ~2 ~(dec 4)])"));
+
 	}
 	
 	@Test

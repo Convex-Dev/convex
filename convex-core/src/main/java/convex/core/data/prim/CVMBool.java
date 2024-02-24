@@ -114,4 +114,8 @@ public final class CVMBool extends APrimitive {
 		return value?Blob.ONE:Blob.ZERO;
 	}
 
+	public ACell not() {
+		return value?FALSE:TRUE;
+	}
+
 }

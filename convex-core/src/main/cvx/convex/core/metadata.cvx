@@ -143,6 +143,13 @@
                         :return "true"}]
          :signature   [{:params [& xs]
                         :return Boolean}]}}
+  
+  !=
+  {:doc {:description ["Tests if arguments are not equal in numerical value. Inverse of ==."]
+         :examples    [{:code   "(!= 2 2.0)"
+                        :return "false"}]
+         :signature   [{:params [& xs]
+                        :return Boolean}]}}
 
   =
   {:doc {:description "Returns `true` if and only if arguments are precisely equal in value."
