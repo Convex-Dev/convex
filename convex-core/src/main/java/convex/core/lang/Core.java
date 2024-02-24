@@ -2740,12 +2740,12 @@ public class Core {
 			form = f;
 			ctx = ctx.expandCompile(form);
 			if (ctx.isExceptional()) {
-				throw new Error("Error compiling form: " + form + "\nException : " + ctx.getExceptional());
+				throw new Error("Error compiling core code form: " + form + "\nException : " + ctx.getExceptional());
 			}
 			AOp<?> op = (AOp<?>)ctx.getResult();
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
-			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\nException : "+ ctx.getExceptional().toString();
+			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\n\nException : "+ ctx.getExceptional().toString();
 		}
 
 		return ctx;

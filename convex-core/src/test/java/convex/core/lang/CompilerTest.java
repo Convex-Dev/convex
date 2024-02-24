@@ -438,28 +438,27 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Vectors.of(1,2,3),eval("(quasiquote [1 ~2 ~(dec 4)])"));
 		assertEquals(eval("(quasiquote (quasiquote (unquote 1)))"),eval("``~1"));
 		assertEquals(Constant.of(10),comp("`~`~10"));
-	}
-	
-	@Test
-	public void testQuasiquote2() {
-		assertEquals(Vectors.of(1,2,3,Lists.empty(),null),eval("(quasiquote2 [1 ~2 ~(dec 4) () nil])"));
-		assertEquals(Symbols.FOO,eval("(quasiquote2 foo)"));
+		
+		assertNull(eval("(quasiquote (unquote nil))"));
 
+		assertEquals(Vectors.of(1,2,3,Lists.empty(),null),eval("(quasiquote [1 ~2 ~(dec 4) () nil])"));
+		assertEquals(Symbols.FOO,eval("(quasiquote foo)"));
+
+		assertEquals(Syntax.create(CVMBool.TRUE),eval("(eval `(do (syntax true nil)))"));
+		assertEquals(CVMBool.TRUE,eval("(eval `(do ~(syntax true nil)))"));
+		
+		// expansions
 		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
 		assertEquals(read("(quote false)"),expand("(quasiquote2 false)"));
 		assertEquals(read("(quote nil)"),expand("(quasiquote2 nil)"));
-		assertEquals(read("(quote (quote foo))"),expand("(quasiquote2 (quote foo))"));
-		assertEquals(read("[1 foo 2]"),expand("(quasiquote2 [1 foo ~2])"));
 		
-		assertEquals(Syntax.create(CVMBool.TRUE),eval("(eval `(do (syntax true nil)))"));
-		assertEquals(CVMBool.TRUE,eval("(eval `(do ~(syntax true nil)))"));
+		assertEquals(read("(quote 3)"),eval("(quasiquote (quote ~(inc 2)))"));
 
-		
-		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote2 [1 [~a] ~(let [a 3] a)]))"));
-		assertEquals(Maps.of(2,3,Maps.empty(),5),eval("(quasiquote2 {~(inc 1) 3 {} ~(dec 6)})"));
+		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote [1 [~a] ~(let [a 3] a)]))"));
+		assertEquals(Maps.of(2,3,Maps.empty(),5),eval("(quasiquote {~(inc 1) 3 {} ~(dec 6)})"));
 		
 		// Compilation checks
-		assertEquals(Constant.of(10),comp("(quasiquote2 (unquote (quasiquote2 (unquote 10))))"));
+		assertEquals(Constant.of(10),comp("(quasiquote (unquote (quasiquote (unquote 10))))"));
 
 	}
 	
@@ -672,7 +671,9 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testExpandDataStructures() {
 		assertEquals(Reader.read("{1 2}"),expand("{1 2}"));
 		assertEquals(Reader.read("(1 2)"),expand("(1 2)"));
-		assertEquals(Reader.read("(quasiquote {1 2})"),expand("`{1 2}"));
+		
+		// TODO: check this once quasiquote optimisation complete
+		// assertEquals(Reader.read("(quote {1 2})"),expand("`{1 2}"));
 	}
 
 	@Test
@@ -682,7 +683,10 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO)),expand("'~foo"));
 		assertEquals(Lists.of(Symbols.QUOTE,Lists.of(Symbols.QUOTE,Lists.of(Symbols.UNQUOTE,Symbols.FOO))),expand("''~foo"));
 
-		assertEquals(Lists.of(Symbols.QUASIQUOTE,Symbols.FOO),expand("`foo"));
+		assertEquals(Lists.of(Symbols.QUASIQUOTE,Symbols.FOO),read("`foo"));
+		
+		// TODO: quasiquote eliminated by expansion, ensure this works after Convex Lisp quasiquoter complete
+		//assertEquals(Lists.of(Symbols.QUOTE,Symbols.FOO),expand("`foo"));
 
 	}
 

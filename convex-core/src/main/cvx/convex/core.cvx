@@ -106,45 +106,81 @@
                         {:code "(quasiquote (:a :b (unquote (+ 2 3))))" :return "(:a :b 5)"}]
                 :signature   [{:params [form]}]}}	
   [form]
-  ;; if there is no special quasiquoting going on, just wrap form in a regular qoute
-  (let [qf (quasiquote* form)]
-	(cond qf qf (list 'quote 
-			          form))))
+  (qq* form 1))
 
-;; private helper
-(defn ^:private? qq* [form] 
-  (let [qf (quasiquote* form)]
-     (cond qf qf form)))
+;; private helper, always produces a generator for a form
+(defn ^:private? qq* [form depth] 
+  (let [qf (quasiquote* form depth)]
+     (cond qf qf (list 'quote 
+	                   form))))
 
-(defn ^:private? qq-seq [form] 
-  (map qq* form))
+;; quasiquote elements of sequence/ Produce a generator, or nil if "pure" quotation
+;; nil production is an important optimisation to avoid regenerating static subtrees
+(defn ^:private? qq-seq [ss depth] 
+  (let  [n      (count ss)  ;; size of sequence
+         found  false       ;; detect if any generator required
+         ss ss]
+    (loop [i 0]
+      (cond (< i n)
+    	(let [v (get ss i)
+    	      e (quasiquote* v depth)]
+    	  (cond (nil? e)
+    	    (set! ss (assoc ss i (list 'quote 
+    	    		v)))
+    	    (do 
+    	      (set! found true)
+    	      (set! ss (assoc ss i e))))
+    	  (recur (inc i)))))
+     (cond found ss nil)))
+;  (map (fn [a] (qq* a depth)) ss))
 
-;; Quasiquoute expend function, returns nil if no change (i.e. pure qouting), otherwise a generator for the form
-(defn quasiquote* [form]
+;; Quasiquote expand function, returns nil if no change (i.e. pure qouting), otherwise a generator for the form
+(defn quasiquote* [form depth]
   (cond
 	;; first catch [] () {} #{} and nil, which dont expand
     (empty? form) (return nil) 
 	
-    ;; handle ech type of data structure
+    ;; handle each type of data structure
     (list? form)
-      (cond
-        (contains-key? #{'quasiquote 'quote} (first form) 
-          ) nil ;; Nested quasiquote, no futher expansion
-        (= (first form) 'unquote
-          ) 
-          (cond 
-            (!= 2 (count form)) (fail :EXPAND "unquote requires one argument exactly")
-            (second form)
-            )
-        (qq-seq form))
+      (let [fst (first form)]
+        (cond
+          ;; Nested quasiquote, no futher expansion
+          (= 'quasiquote fst  
+              )
+            (cond 
+              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires exactly one argument")
+              (quasiquote* (second form) (inc depth)))
+          
+          ;; unquote unwraps one level of quasiquote 
+          (= fst 'unquote
+            ) 
+            (cond 
+              (!= 2 (count form)) (fail :EXPAND "unquote requires exactly one argument")
+              (let [snd (second form)] 
+            	(cond
+                  (> depth 1) (quasiquote* snd (dec depth))
+            	  (nil? snd) (compile nil) 
+            	  snd)))
+            
+            
+          (let [es (qq-seq form depth)]
+        	(cond (nil? es) (return nil))
+            (cons 'list 
+        	      es))))
     (vector? form)
-      (qq-seq form)
+      (qq-seq form depth)
+    
     (set? form)
-      (cons 'hash-set 
-    		(qq-seq form))
+      (let [es (qq-seq form depth)]
+        	(cond (nil? es) (return nil))
+            (cons 'hash-set 
+        	      es))
+      
     (map? form)
-      (cons 'hash-map 
-    		(qq-seq (apply concat (vec form))))
+      (let [es (qq-seq (apply concat (vec form)) depth)]
+        	(cond (nil? es) (return nil))
+            (cons 'hash-map 
+        	      es))
     
     ;; Nothing special, so just return nil to signal no change  
     nil))
@@ -513,8 +549,7 @@
           sym  (cond (symbol? sym)
                  sym
                  (fail "import: alias must be a symbol"))]
-      (assert (= :as
-                as))
+      (assert (= :as as))
       `(def ~(syntax sym {:static true})
          ~code))))
 
