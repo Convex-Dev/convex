@@ -445,8 +445,10 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test
 	public void testQuasiquote2() {
-		assertEquals(Vectors.of(1,2,3),eval("(quasiquote2 [1 ~2 ~(dec 4)])"));
+		assertEquals(Vectors.of(1,2,3,Lists.empty(),null),eval("(quasiquote2 [1 ~2 ~(dec 4) () nil])"));
+		assertEquals(Symbols.FOO,eval("(quasiquote2 foo)"));
 
+		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
 	}
 	
 	@Test
