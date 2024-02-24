@@ -19,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
-import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -41,8 +40,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
-import convex.core.init.Init;
-import convex.core.init.InitTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
@@ -449,6 +446,12 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Symbols.FOO,eval("(quasiquote2 foo)"));
 
 		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
+		assertEquals(read("(quote false)"),expand("(quasiquote2 false)"));
+		assertEquals(read("(quote nil)"),expand("(quasiquote2 nil)"));
+		assertEquals(read("[1 foo]"),expand("(quasiquote2 [1 foo])"));
+		
+		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote2 [1 [~a] ~(let [a 3] a)]))"));
+		assertEquals(Maps.of(2,3,Maps.empty(),5),eval("(quasiquote2 {~(inc 1) 3 {} ~(dec 6)})"));
 	}
 	
 	@Test
