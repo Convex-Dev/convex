@@ -119,16 +119,17 @@
 (defn ^:private? qq-seq [form] 
   (map qq* form))
 
+;; Quasiquoute expend function, returns nil if no change (i.e. pure qouting), otherwise a generator for the form
 (defn quasiquote* [form]
   (cond
 	;; first catch [] () {} #{} and nil, which dont expand
-    (empty? form) (return form) 
+    (empty? form) (return nil) 
 	
     ;; handle ech type of data structure
     (list? form)
       (cond
-        (= (first form) 'quasiquote
-          ) form ;; Nested quasiquote, no futher expansion
+        (contains-key? #{'quasiquote 'quote} (first form) 
+          ) nil ;; Nested quasiquote, no futher expansion
         (= (first form) 'unquote
           ) 
           (cond 

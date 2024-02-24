@@ -448,10 +448,19 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
 		assertEquals(read("(quote false)"),expand("(quasiquote2 false)"));
 		assertEquals(read("(quote nil)"),expand("(quasiquote2 nil)"));
-		assertEquals(read("[1 foo]"),expand("(quasiquote2 [1 foo])"));
+		assertEquals(read("(quote (quote foo))"),expand("(quasiquote2 (quote foo))"));
+		assertEquals(read("[1 foo 2]"),expand("(quasiquote2 [1 foo ~2])"));
+		
+		assertEquals(Syntax.create(CVMBool.TRUE),eval("(eval `(do (syntax true nil)))"));
+		assertEquals(CVMBool.TRUE,eval("(eval `(do ~(syntax true nil)))"));
+
 		
 		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote2 [1 [~a] ~(let [a 3] a)]))"));
 		assertEquals(Maps.of(2,3,Maps.empty(),5),eval("(quasiquote2 {~(inc 1) 3 {} ~(dec 6)})"));
+		
+		// Compilation checks
+		assertEquals(Constant.of(10),comp("(quasiquote2 (unquote (quasiquote2 (unquote 10))))"));
+
 	}
 	
 	@Test
