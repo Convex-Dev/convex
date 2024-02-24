@@ -447,10 +447,6 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Syntax.create(CVMBool.TRUE),eval("(eval `(do (syntax true nil)))"));
 		assertEquals(CVMBool.TRUE,eval("(eval `(do ~(syntax true nil)))"));
 		
-		// expansions
-		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
-		assertEquals(read("(quote false)"),expand("(quasiquote2 false)"));
-		assertEquals(read("(quote nil)"),expand("(quasiquote2 nil)"));
 		
 		assertEquals(read("(quote 3)"),eval("(quasiquote (quote ~(inc 2)))"));
 
@@ -462,20 +458,35 @@ public class CompilerTest extends ACVMTest {
 
 	}
 	
+	@Test 
+	public void testQuasiquote2() {
+		assertNull(eval("(quasiquote* [1 2] 1)"));
+		assertNull(eval("(qq-seq [] 1)"));
+		assertEquals(Vectors.of(2),eval("(qq-seq '[~2] 1)"));
+		assertEquals(Vectors.of(1,2,3),eval("(eval (qq-seq '[1 ~2 ~(dec 4)] 1))"));
+
+		assertEquals(Vectors.of(1,2,3),eval("(quasiquote2 [1 ~2 ~(dec 4)])"));
+
+		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote2 [1 [~a] ~(let [a 3] a)]))"));
+		
+		// expansions
+		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
+		assertEquals(read("(quote false)"),expand("(quasiquote2 false)"));
+		assertEquals(read("(quote nil)"),expand("(quasiquote2 nil)"));
+	}
+	
 	@Test
 	public void testUnquoteSplicing() {
 		// TODO:
 		// assertEquals(Vectors.of(1,2,3),eval("(let [a [2 3]] `[1 ~@a])"));
 	}
 	
-
 	@Test
 	public void testQuotedMetadata() {
 		// From issue #267
 		assertEquals(eval("'(defn foo ^{:a :b} [])"),eval("`(defn foo ^{:a :b} [])"));
 		assertEquals(eval("'(defn foo ^{:a :b} [a])"),eval("`(defn foo ^{:a :b} [a])"));
 	}
-
 
 	@Test
 	public void testLet() {
@@ -495,6 +506,8 @@ public class CompilerTest extends ACVMTest {
 		// TODO: should we be able to let-bind symbols with metadata?
 		// assertCVMEquals(7,eval("(let [^:foo a 7] a)"));
 
+		// test set! on a let-bound variable
+		assertCVMEquals(3,eval("(let [a 2] (set! a 3) a)"));
 
 		// ampersand edge cases
 		assertEquals(Vectors.of(1L,Vectors.of(2L),3L),eval("(let [[a & b c] [1 2 3]] [a b c])"));
@@ -525,6 +538,10 @@ public class CompilerTest extends ACVMTest {
 
 		// infinite loop with wrong arity should fail with arity error first
 		assertArityError(step("(loop [] (recur 1))"));
+		
+		// TODO: be aware that loops restore lexical env?
+		// assertCVMEquals(5,eval("(let [a 2] (loop [] (set! a 5)) a)"));
+
 
 		assertEquals(Vectors.of(3L,2L,1L),eval ("(loop [v [] n 3] (cond (> n 0) (recur (conj v n) (dec n)) v))"));
 

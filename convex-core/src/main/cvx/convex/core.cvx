@@ -117,12 +117,12 @@
 ;; quasiquote elements of sequence/ Produce a generator, or nil if "pure" quotation
 ;; nil production is an important optimisation to avoid regenerating static subtrees
 (defn ^:private? qq-seq [ss depth] 
-  (let  [n      (count ss)  ;; size of sequence
-         found  false       ;; detect if any generator required
-         ss ss]
-    (loop [i 0]
+  (let  [n      (count ss)]  ;; size of sequence]
+    (loop [i 0
+           found false
+           ss ss]
       (cond (< i n)
-    	(let [v (get ss i)
+    	(let [v (nth ss i)
     	      e (quasiquote* v depth)]
     	  (cond (nil? e)
     	    (set! ss (assoc ss i (list 'quote 
@@ -130,8 +130,9 @@
     	    (do 
     	      (set! found true)
     	      (set! ss (assoc ss i e))))
-    	  (recur (inc i)))))
-     (cond found ss nil)))
+    	  (recur (inc i) found ss))
+    	(cond found ss nil) ;; end of loop
+    	))))
 ;  (map (fn [a] (qq* a depth)) ss))
 
 ;; Quasiquote expand function, returns nil if no change (i.e. pure qouting), otherwise a generator for the form
@@ -148,14 +149,14 @@
           (= 'quasiquote fst  
               )
             (cond 
-              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires exactly one argument")
+              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires 1 argument")
               (quasiquote* (second form) (inc depth)))
           
           ;; unquote unwraps one level of quasiquote 
           (= fst 'unquote
             ) 
             (cond 
-              (!= 2 (count form)) (fail :EXPAND "unquote requires exactly one argument")
+              (!= 2 (count form)) (fail :EXPAND "unquote requires 1 argument")
               (let [snd (second form)] 
             	(cond
                   (> depth 1) (quasiquote* snd (dec depth))
