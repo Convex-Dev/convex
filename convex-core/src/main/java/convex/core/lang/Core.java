@@ -2746,6 +2746,9 @@ public class Core {
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
 			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\n\nException : "+ ctx.getExceptional().toString();
+			
+			// Testing for core output
+			// System.out.println("Core: "+ctx.getResult());
 		}
 
 		return ctx;

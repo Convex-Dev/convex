@@ -6,6 +6,7 @@ import convex.core.data.Address;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.init.BaseTest;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.util.Utils;
@@ -54,12 +55,12 @@ public abstract class ACVMTest {
 		c=buildContext(c);
 		this.INITIAL=c.getState();
 		this.CONTEXT=c;
-		HERO = InitTest.HERO;
-		VILLAIN = InitTest.VILLAIN;
+		HERO = BaseTest.HERO;
+		VILLAIN = BaseTest.VILLAIN;
 		c=c.withJuice(0); // reset juice used
 		INITIAL_JUICE = c.getJuiceAvailable();
-		HERO_BALANCE = c.getAccountStatus(InitTest.HERO).getBalance();
-		VILLAIN_BALANCE = c.getAccountStatus(InitTest.VILLAIN).getBalance();
+		HERO_BALANCE = c.getAccountStatus(HERO).getBalance();
+		VILLAIN_BALANCE = c.getAccountStatus(VILLAIN).getBalance();
 	}
 
 	/**

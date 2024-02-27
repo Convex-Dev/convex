@@ -68,6 +68,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.init.BaseTest;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.lang.impl.CorePred;
@@ -93,7 +94,7 @@ public class CoreTest extends ACVMTest {
 
 
 	protected CoreTest() throws IOException {
-		super(InitTest.BASE);
+		super(BaseTest.STATE);
 	}
 
 	@Test
@@ -694,9 +695,12 @@ public class CoreTest extends ACVMTest {
 	public void testIdentity() {
 		assertNull(eval("(identity nil)"));
 		assertEquals(Vectors.of(1L, 2L), eval("(identity [1 2])"));
+		
+		// Identity takes first arg and discards others
+		assertCVMEquals(7, eval("(identity 7 8 9)"));
 
 		assertArityError(step("(identity)"));
-		assertArityError(step("(identity 1 2)"));
+		// assertArityError(step("(identity 1 2)")); // old behaviour
 	}
 
 	@Test
@@ -4319,6 +4323,11 @@ public class CoreTest extends ACVMTest {
 
 		// arity error in expansion execution
 		assertArityError(step("(expand 1 (fn [x e] (count)))"));
+	}
+	
+	@Test
+	public void testExpand_1() {
+		assertEquals(read("(let [v# 1] (cond v# v# (or 2 3)))"), eval("(expand-1 '(or 1 2 3))"));
 	}
 
 	@Test

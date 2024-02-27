@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.init.InitTest;
+import convex.core.init.BaseTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 
@@ -23,7 +23,7 @@ public class TrustTest extends ACVMTest {
 	private Address trusted;
 
 	protected TrustTest() throws IOException {
-		super(InitTest.BASE);
+		super(BaseTest.STATE);
 	}
 
 	@Override protected Context buildContext(Context ctx) {

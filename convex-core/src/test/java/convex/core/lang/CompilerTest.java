@@ -40,6 +40,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.init.BaseTest;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
@@ -57,6 +58,9 @@ import convex.test.Samples;
  */
 public class CompilerTest extends ACVMTest {
 
+	protected CompilerTest() {
+		super(BaseTest.STATE);
+	}
 
 	@Test
 	public void testConstants() {
@@ -93,7 +97,6 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Constant.of(null),comp("nil"));
 		assertEquals(Constant.of(true),comp("true"));
 		assertEquals(Constant.of(false),comp("false"));
-
 	}
 	
 	@Test public void testComments() {
@@ -364,10 +367,15 @@ public class CompilerTest extends ACVMTest {
 
 		assertEquals(Symbol.create("undefined-1"),eval("'undefined-1"));
 		
-		assertEquals(expand("(quote (1 2))"),expand("'(1 2)"));
+		assertEquals(read("(quote (1 2))"),expand("'(1 2)"));
+		assertEquals(read("(quote (if))"),expand("'(if)"));
 
 		// unquote doesn't do anything in regular quote
 		assertEquals(eval("(quote (unquote 17))"),eval("'~17"));
+		
+		// Macros don't expand within in regular quote
+		assertEquals(read("(if)"),eval("(quote (if))"));
+
 	}
 	
 	@Test 
@@ -387,16 +395,25 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testQuoteDataStructures() {
-		assertEquals(Maps.of(1,2,3,4), eval("`{~(inc 0) 2 3 ~(dec 5)}"));
-		assertEquals(Sets.of(1,2,3),eval("`#{1 2 ~(dec 4)}"));
+		assertEquals(Maps.of(1,2,3,4), eval("{~(inc 0) 2 3 ~(dec 5)}"));
+		assertEquals(Sets.of(1,2,3),eval("#{1 2 ~(dec 4)}"));
 
 		// TODO: unquote-splicing in data structures.
 	}
 
 	@Test
 	public void testQuoteCases() {
-		// Tests from Racket / Scheme
 		Context ctx=step("(def x 1)");
+	
+		// Unquote does nothing inside a regular quote
+		assertEquals(read("(a b (unquote x))"),eval(ctx,"'(a b ~x)"));
+		assertEquals(read("(unquote x)"),eval(ctx,"'~x"));
+
+		// Unquote escapes surrounding quasiquote
+		assertEquals(read("(a b (quote 1))"),eval(ctx,"`(a b '~x)"));
+ 
+
+		// Tests from Racket / Scheme
 		assertEquals(read("(a b c)"),eval(ctx,"`(a b c)"));
 		assertEquals(read("(a b 1)"),eval(ctx,"`(a b ~x)"));
 		assertEquals(read("(a b 3)"),eval(ctx,"`(a b ~(+ x 2))"));
@@ -404,15 +421,6 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~x))"));
 		assertEquals(read("(a `(b ~1))"),eval(ctx,"`(a `(b ~~`~x))"));
 		assertEquals(read("(a `(b ~x))"),eval(ctx,"`(a `(b ~~'x))"));
-
-		// Unquote does nothing inside a regular quote
-		assertEquals(read("(a b (unquote x))"),eval(ctx,"'(a b ~x)"));
-		assertEquals(read("(unquote x)"),eval(ctx,"'~x"));
-
-		// Unquote escapes surrounding quasiquote
-		assertEquals(read("(a b (quote 1))"),eval(ctx,"`(a b '~x)"));
-
-	
 	}
 
 
@@ -451,28 +459,45 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(read("(quote 3)"),eval("(quasiquote (quote ~(inc 2)))"));
 
 		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote [1 [~a] ~(let [a 3] a)]))"));
-		assertEquals(Maps.of(2,3,Maps.empty(),5),eval("(quasiquote {~(inc 1) 3 {} ~(dec 6)})"));
+		assertEquals(Maps.of(2,3,Maps.empty(),5),eval("(eval (quasiquote {~(inc 1) 3 {} ~(dec 6)}))"));	
 		
 		// Compilation checks
 		assertEquals(Constant.of(10),comp("(quasiquote (unquote (quasiquote (unquote 10))))"));
-
+	}
+	
+	@Test
+	public void testQuasiquoteExpansions() {
+		assertEquals(read("(quote foo)"),expand("(quasiquote foo)"));
+		assertEquals(read("(quote false)"),expand("(quasiquote false)"));
+		assertEquals(read("(quote nil)"),expand("(quasiquote nil)"));
+		assertEquals(read("(quote 17)"),expand("(quasiquote 17)"));
+		assertEquals(read("(quote [1 2])"),expand("(quasiquote [1 2])"));
+		assertEquals(read("[(quote foo) (inc 2)]"),expand("(quasiquote [foo (unquote (inc 2))])"));
+		
+		assertEquals(read("(cond 1 2 3)"),expand("(quasiquote ~(if 1 2 3))"));
+		
+		assertEquals(read("[foo 3]"),eval("(expand-1 `[foo (unquote (inc 2))])"));
 	}
 	
 	@Test 
-	public void testQuasiquote2() {
+	public void testQuasiquoteHelpers() {
+		// returns null, because forms don't require generator (already self-generating)
 		assertNull(eval("(quasiquote* [1 2] 1)"));
+		assertNull(eval("(quasiquote* 7 1)")); 
+		assertNull(eval("(quasiquote* nil 2)")); 
 		assertNull(eval("(qq-seq [] 1)"));
+		
 		assertEquals(Vectors.of(2),eval("(qq-seq '[~2] 1)"));
 		assertEquals(Vectors.of(1,2,3),eval("(eval (qq-seq '[1 ~2 ~(dec 4)] 1))"));
 
-		assertEquals(Vectors.of(1,2,3),eval("(quasiquote2 [1 ~2 ~(dec 4)])"));
+		assertEquals(read("(quote (quasiquote foo))"),eval("(qq* '(quasiquote foo) 1)"));
 
-		assertEquals(Vectors.of(1,Vectors.of(2),3),eval("(let [a 2] (quasiquote2 [1 [~a] ~(let [a 3] a)]))"));
 		
-		// expansions
-		assertEquals(read("(quote foo)"),expand("(quasiquote2 foo)"));
-		assertEquals(read("(quote false)"),expand("(quasiquote2 false)"));
-		assertEquals(read("(quote nil)"),expand("(quasiquote2 nil)"));
+		assertEquals(read("(quote 7)"),eval("(qq* 7 1)"));
+		assertEquals(read("(quote foo)"),eval("(qq* 'foo 1)"));
+		assertEquals(read("(quote (quote foo))"),eval("(qq* ''foo 1)"));
+
+		assertEquals(read("(inc 1)"),eval("(qq* '(unquote (inc 1)) 1)"));
 	}
 	
 	@Test
@@ -683,6 +708,9 @@ public class CompilerTest extends ACVMTest {
 
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),Reader.read("^:bar :foo"));
 		assertEquals(Syntax.create(Keywords.FOO,Maps.of(Keywords.BAR,CVMBool.TRUE)),expand("^:bar :foo"));
+		
+		assertEquals(read("(cond 1 2 3)"),expand("(if 1 2 3)"));
+
 	}
 	
 	@Test public void testExpandDataStructures() {
@@ -716,8 +744,16 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testMacrosInMaps() {
+		System.out.println(expand("`{(if true 1 2) ~(if false 1 2)}"));
+		// System.out.println(eval("(list (quote hash-map) (quote (if true 1 2)) (if false 1 2))"));
 		assertEquals(Maps.of(1L,2L),eval("(eval '{(if true 1 2) (if false 1 2)})"));
 		assertEquals(Maps.of(1L,2L),eval("(eval `{(if true 1 2) ~(if false 1 2)})"));
+	}
+	
+	@Test
+	public void testMacrosInSets() {
+		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) (if false 1 2)})"));
+		assertEquals(Sets.of(1L,2L),eval("(eval `#{(if true 1 2) ~(if false 1 2)})"));
 	}
 
 	@Test
@@ -772,12 +808,18 @@ public class CompilerTest extends ACVMTest {
 		ctx=step(ctx,"(def bar ("+addr+"/foo 2))");
 		assertEquals(Keywords.FOO,ctx.getResult());
 	}
-
-	@Test
-	public void testMacrosInSets() {
-		assertEquals(Sets.of(1L,2L),eval("(eval '#{(if true 1 2) (if false 1 2)})"));
-		assertEquals(Sets.of(1L,2L),eval("(eval `#{(if true 1 2) ~(if false 1 2)})"));
+	
+	@Test public void testMacroDefinition() {
+		Context ctx=context();
+		ctx=exec(ctx,"(defmacro fot [a b c] a)");
+		
+		assertCVMEquals(2,eval(ctx,"(fot (+ 1 1) 3 4)"));
+		assertCVMEquals(2,eval(ctx,"("+ctx.getAddress()+"/fot (+ 1 1) 3 4)"));
+		
+		// TODO: check if this should really fail? Probably yes, because expander shouldn't eval *address* in lookup?
+		//assertCVMEquals(2,eval(ctx,"(*address*/fot (+ 1 1) 3 4)"));
 	}
+
 	
 	@Test
 	public void testStaticCompilation() {

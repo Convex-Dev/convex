@@ -22,6 +22,124 @@
           :examples    [{:code "(call *registry* (register {:name \"My name\"}))"}]}}
   (address 9))
 
+;;;;;;;;;; Convex Lisp quasiquote impl
+
+(def quasiquote*)
+(def qq*)
+
+(def quasiquote 
+		^{:doc {:description "Returns the quoted value of a form, without evaluating it. Like `quote`, but elements within the form may be unquoted via `unquote`."
+                :examples    [{:code "(quasiquote foo)" :return "foo"}
+                        {:code "(quasiquote (:a :b (unquote (+ 2 3))))" :return "(:a :b 5)"}]
+                :signature   [{:params [form]}]}
+		  :expander? true}	
+  (fn [[_ form] e]
+    (e (qq* form 1) e)))
+
+;; private helper, always produces a generator for a form
+(def ^:private? qq* (fn [form depth] 
+  (let [qf (quasiquote* form depth)]
+     (cond 
+       qf qf 
+       (list 'quote 
+             form)))))
+
+;; quasiquote elements of sequence, produce a sequence of generators or nil if "pure" quotation
+;; nil production is an important optimisation to avoid regenerating static subtrees
+(def ^:private? qq-seq (fn 
+  [ss depth] 
+  (let  [n      (count ss)]  ;; size of sequence]
+    (loop [i 0
+           found false
+           ss ss]
+      (cond (< i n)
+    	(let [v (nth ss i)
+    	      e (quasiquote* v depth)]
+    	  (cond (nil? e)
+    	    (set! ss (assoc ss i (list 'quote 
+    	    		v))) ;; we need these if a generator is required
+    	    (do 
+    	      (set! found true)
+    	      (set! ss (assoc ss i e))))
+    	  (recur (inc i) found ss))
+    	(cond found ss nil) ;; end of loop
+    	)))))
+
+;; Quasiquote expand function, returns nil if no change (i.e. a pure quotable form), otherwise a generator for the form
+(def quasiquote* (fn [form depth]
+  (cond
+	;; first catch [] () {} #{} and nil, which dont expand
+    (empty? form) (return nil) 
+    	
+    ;; handle each type of data structure
+    (list? form)
+      (let [fst (first form)]
+        (cond
+          ;; Nested quasiquote, needs to increase depth
+          (= 'quasiquote fst  
+              )
+            (cond 
+              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires 1 argument")
+              (let [snd (second form)
+                    ev (quasiquote* snd (inc depth))]
+            	(cond 
+            	  (nil? ev) (return nil)
+            	  (list 'list
+            			(quote 'quasiquote
+            					)
+            			ev))))
+          
+          ;; unquote unwraps one level of quasiquote 
+          (= 'unquote
+             fst) 
+            (cond 
+              (!= 2 (count form)) (fail :EXPAND "unquote requires 1 argument")
+              (let [snd (second form)] 
+            	(cond
+                  (> depth 1) 
+                    (let [ev (quasiquote* snd (dec depth))]
+                      (cond (nil? ev) (return nil))
+                      (list 'list
+                  			(quote 'unquote
+                					)
+                    	    ev))
+            	  (nil? snd) (compile nil) ;; special case, generator for nil
+            	  snd
+            	  )))
+            
+            
+          (let [es (qq-seq form depth)]
+        	(cond (nil? es) (return nil))
+            (cons 'list 
+        	      es))))
+    
+    (vector? form)
+      (let [es (qq-seq (vec form) depth)]
+        	 (cond (nil? es) (return nil))
+             (vec es))
+    
+    (set? form)
+      (let [es (qq-seq (vec form) depth)]
+        	(cond 
+        	  (nil? es) (return nil)
+              (cons 'list 
+            		(quote 'hash-set 
+        	        ) es)))
+      
+    (map? form)
+      (let [es (qq-seq (apply concat (vec form)) depth)]
+        	(cond 
+        	  (nil? es) (return nil)
+        	  (cons 'list 
+              		(quote 'hash-map 
+                	) es)))
+
+    ;; Nothing special possible, so just return nil to signal no change  
+    nil)))
+
+;; Test expansion
+`[1 ~(inc 2)]
+
 ;;;;;;;;;; Expanders, creating macros and defining functions
 
 ;; TODO. Review expanders and `macro`, API is not clear. + macros cannot be used within the transaction where they are created
@@ -33,7 +151,8 @@
     :expander? true}
   (fn [x e]
     (let [[_ name & decl] x
-          exp      (cons 'fn decl)
+          exp      (cons 'fn 
+        		         decl)
           form     `(def ~(syntax name {:expander? true})
                          ~exp)]
       (e form e))))
@@ -45,7 +164,8 @@
     :expander? true}
   (fn [x e]
     (let [[_ name & decl] x
-          mac      (cons 'fn decl)
+          mac      (cons 'fn 
+        		         decl)
           form     `(def ~(syntax name
                                   (assoc (meta (first decl))
                                          :expander? true))  ;; merge in metadata on parameter plus :expander? tag
@@ -62,9 +182,11 @@
           :signature   [{:params [name params & body]}
                         {:params [name & fn-decls]}]}}
   [name & decl]
-  (cond (empty? decl) (fail :ARITY "`defn` requires at lest one function definition"))
-  (let [fnform (cons 'fn decl)
-        name   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list
+  (cond 
+    (empty? decl) (fail :ARITY "`defn` requires at lest one function definition"))
+    (let [fnform (cons 'fn 
+		                decl)
+          name   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list
     `(def ~name ~fnform)))
 
 (defmacro macro
@@ -72,13 +194,30 @@
           :examples    [{:code "(macro [x] (if x :foo :bar))"}]
           :signature   [{:params [params & body]}]}}
   [& decl]
-  (let [mfunc  (cons 'fn decl)]
+  (let [mfunc  (cons 'fn 
+		  decl)]
   `(let [m# ~mfunc] ;; set up a closure containing the macro function
      (fn [x e]
        (e 
     	  (apply m# (next (unsyntax x)))
           e)))))
-
+  
+(defn identity
+   ^{:doc {:description "An identity function which returns its first argument unchanged."
+		   :examples    [{:code "(identity :foo)"}
+		                 {:code "(map identity [1 2 3])"}]
+		   :signature   [{:params [x]}]}}
+  [x & _]
+  x)
+  
+(defn expand-1
+  ^{:doc  {:description "Expands a form once."
+           :examples    [{:code "(expand-1 '(or 1 2 3))"}]
+           :signature   [{:params [x]}]}}
+  ([x]
+    (expand x *initial-expander* identity))
+  ([x e]
+    (expand x e identity)))
 
 ;;;;;;;;;; Environment setup
 
@@ -96,95 +235,7 @@
      syms)
   nil)
 
-;;;;;;;;;; Experimental Convex Lisp quasiquote impl
 
-(declare quasiquote* qq*)
-
-(defmacro quasiquote2 
-		^{:doc {:description "Returns the quoted value of a form, without evaluating it. Like `quote`, but elements within the form may be unquoted via `unquote`."
-                :examples    [{:code "(quasiquote foo)" :return "foo"}
-                        {:code "(quasiquote (:a :b (unquote (+ 2 3))))" :return "(:a :b 5)"}]
-                :signature   [{:params [form]}]}}	
-  [form]
-  (qq* form 1))
-
-;; private helper, always produces a generator for a form
-(defn ^:private? qq* [form depth] 
-  (let [qf (quasiquote* form depth)]
-     (cond qf qf (list 'quote 
-	                   form))))
-
-;; quasiquote elements of sequence/ Produce a generator, or nil if "pure" quotation
-;; nil production is an important optimisation to avoid regenerating static subtrees
-(defn ^:private? qq-seq [ss depth] 
-  (let  [n      (count ss)]  ;; size of sequence]
-    (loop [i 0
-           found false
-           ss ss]
-      (cond (< i n)
-    	(let [v (nth ss i)
-    	      e (quasiquote* v depth)]
-    	  (cond (nil? e)
-    	    (set! ss (assoc ss i (list 'quote 
-    	    		v)))
-    	    (do 
-    	      (set! found true)
-    	      (set! ss (assoc ss i e))))
-    	  (recur (inc i) found ss))
-    	(cond found ss nil) ;; end of loop
-    	))))
-;  (map (fn [a] (qq* a depth)) ss))
-
-;; Quasiquote expand function, returns nil if no change (i.e. pure qouting), otherwise a generator for the form
-(defn quasiquote* [form depth]
-  (cond
-	;; first catch [] () {} #{} and nil, which dont expand
-    (empty? form) (return nil) 
-	
-    ;; handle each type of data structure
-    (list? form)
-      (let [fst (first form)]
-        (cond
-          ;; Nested quasiquote, no futher expansion
-          (= 'quasiquote fst  
-              )
-            (cond 
-              (!= 2 (count form)) (fail :EXPAND "nested quasiquote requires 1 argument")
-              (quasiquote* (second form) (inc depth)))
-          
-          ;; unquote unwraps one level of quasiquote 
-          (= fst 'unquote
-            ) 
-            (cond 
-              (!= 2 (count form)) (fail :EXPAND "unquote requires 1 argument")
-              (let [snd (second form)] 
-            	(cond
-                  (> depth 1) (quasiquote* snd (dec depth))
-            	  (nil? snd) (compile nil) 
-            	  snd)))
-            
-            
-          (let [es (qq-seq form depth)]
-        	(cond (nil? es) (return nil))
-            (cons 'list 
-        	      es))))
-    (vector? form)
-      (qq-seq form depth)
-    
-    (set? form)
-      (let [es (qq-seq form depth)]
-        	(cond (nil? es) (return nil))
-            (cons 'hash-set 
-        	      es))
-      
-    (map? form)
-      (let [es (qq-seq (apply concat (vec form)) depth)]
-        	(cond (nil? es) (return nil))
-            (cons 'hash-map 
-        	      es))
-    
-    ;; Nothing special, so just return nil to signal no change  
-    nil))
 
 ;;;;;;;;;; Logic Operations
 
@@ -512,13 +563,7 @@
                body)
         (vec ~sequence)))
 
-(defn identity
-  ^{:doc {:description "An identity function which returns a single argument unchanged."
-          :examples    [{:code "(identity :foo)"}
-                        {:code "(map identity [1 2 3])"}]
-          :signature   [{:params [x]}]}}
-  [x]
-  x)
+
 
 (defmacro set-in!
 		^{:doc {:description "Sets a value within a nested associative structure, combining behaviour of set! and assoc-in."

@@ -856,6 +856,7 @@ public class Compiler {
 						// check for macro / expander in initial position.
 						// Note that 'quote' is handled by this, via QUOTE_EXPANDER
 						AFn<ACell> expander = context.lookupExpander(first);
+
 						if (expander!=null) {
 							return context.expand(expander,x, cont); // (exp x cont)
 						}

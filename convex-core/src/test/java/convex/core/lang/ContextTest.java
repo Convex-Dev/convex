@@ -1,6 +1,10 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertDepthError;
+import static convex.test.Assertions.assertJuiceError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
@@ -21,7 +25,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
-import convex.core.init.InitTest;
+import convex.core.init.BaseTest;
 import convex.core.lang.ops.Special;
 
 /**
@@ -30,7 +34,7 @@ import convex.core.lang.ops.Special;
 public class ContextTest extends ACVMTest {
 
 	protected ContextTest() {
-		super(InitTest.BASE);
+		super(BaseTest.STATE);
 	}
 
 	private final Address ADDR=context().getAddress();
