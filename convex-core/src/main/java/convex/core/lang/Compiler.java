@@ -800,23 +800,6 @@ public class Compiler {
 			return context.withResult(Juice.EXPAND_CONSTANT,x);
 		}
 	};
-	
-	/**
-	 * Expander used for expansion of `quasiquote` forms.
-	 * 
-	 * Should work on both raw forms and syntax objects.
-	 * 
-	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
-	 */
-	public static final AFn<ACell> QUASIQUOTE_EXPANDER =new CoreFn<ACell>(Symbols.QUASIQUOTE) {
-		@Override
-		public Context invoke(Context context,ACell[] args ) {
-			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
-			ACell x = args[0];
-		
-			return context.withResult(Juice.EXPAND_CONSTANT,x);
-		}
-	};
-	
+
 
 }

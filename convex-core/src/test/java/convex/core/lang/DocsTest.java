@@ -25,6 +25,7 @@ public class DocsTest extends ACVMTest {
 				@SuppressWarnings("unchecked")
 				AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) meta.get(Keywords.DOC);
 				if (doc==null) {
+					if (RT.bool(meta.get(Symbols.PRIVATE_Q))) continue;
 					if (PRINT_MISSING) System.err.println("No documentation in Core: "+sym);
 				} else {
 					doDocTest(sym,doc);

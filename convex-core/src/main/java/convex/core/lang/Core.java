@@ -637,8 +637,6 @@ public class Core {
 
 	public static final AFn<ACell> QUOTE_EXPANDER = reg(Compiler.QUOTE_EXPANDER);
 
-	public static final AFn<ACell> QUASIQUOTE_EXPANDER = reg(Compiler.QUASIQUOTE_EXPANDER);
-
 	public static final CoreFn<CVMBool> CALLABLE_Q = reg(new CoreFn<>(Symbols.CALLABLE_Q) {
 		
 		@Override
