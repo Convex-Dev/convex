@@ -336,142 +336,6 @@ public class Compiler {
 	}
 
 	/**
-	 * Compiles a quoted form, returning an op that will produce a data structure
-	 * after evaluation of all unquotes.
-	 * 
-	 * @param context
-	 * @param form Quoted form. May be a regular value or Syntax object.
-	 * @return Context with complied op as result
-	 */
-	@SuppressWarnings("unchecked")
-	private static Context compileQuasiQuoted(Context context, ACell aForm, int depth) {
-		ACell form;
-		
-		// Check if form is a Syntax Object and unwrap if necessary
-		boolean isSyntax;
-		if (aForm instanceof Syntax) {
-			form= Syntax.unwrap(aForm);
-			isSyntax=true;
-		} else {
-			form=aForm;
-			isSyntax=false;
-		}
-		
-		if (form instanceof ASequence) {
-			ASequence<ACell> seq = (ASequence<ACell>) form;
-			int n = seq.size();
-			if (n == 0) {
-				return compileConstant(context, aForm);
-			} 
-
-			if (isListStarting(Symbols.UNQUOTE, form)) {
-				if (depth==1) {
-					if (n != 2) return context.withArityError("unquote requires 1 argument");
-					ACell unquoted=seq.get(1);
-					//if (!(unquoted instanceof Syntax)) return context.withCompileError("unquote expects an expanded Syntax Object");
-					Context opContext = expandCompile(unquoted, context);
-					return opContext;
-				} else {
-					depth-=1;
-				}
-			} else if (isListStarting(Symbols.QUASIQUOTE, form)) {
-				depth+=1;
-			}
-
-			// compile quoted elements
-			context = compileQuasiQuotedSeq(context, seq, depth);
-			if (context.isExceptional()) return context;
-			ASequence<AOp<ACell>> rSeq = context.getResult();
-
-			ACell fn = (seq instanceof AList) ? Core.LIST : Core.VECTOR;
-			AOp<?> inv = Invoke.create( Constant.create(fn), rSeq);
-			if (isSyntax) {
-				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
-			}
-			return context.withResult(Juice.COMPILE_NODE, inv);
-		} else if (form instanceof AMap) {
-			AMap<ACell, ACell> map = (AMap<ACell, ACell>) form;
-			AVector<ACell> rSeq = Vectors.empty();
-			for (Map.Entry<ACell, ACell> me : map.entrySet()) {
-				rSeq = rSeq.append(me.getKey());
-				rSeq = rSeq.append(me.getValue());
-			}
-
-			// compile quoted elements
-			context = compileQuasiQuotedSeq(context, rSeq,depth);
-			if (context.isExceptional()) return context;
-			ASequence<AOp<ACell>> cSeq = (ASequence<AOp<ACell>>) context.getResult();
-
-			AOp<?> inv = Invoke.create(Constant.create(Core.HASHMAP), cSeq);
-			if (isSyntax) {
-				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
-			}
-
-			return context.withResult(Juice.COMPILE_NODE, inv);
-		} else if (form instanceof ASet) {
-			ASet<ACell> set = (ASet<ACell>) form;
-			AVector<ACell> rSeq = set.toVector();
-
-			// compile quoted elements
-			context = compileQuasiQuotedSeq(context, rSeq,depth);
-			if (context.isExceptional()) return context;
-			ASequence<AOp<ACell>> cSeq = context.getResult();
-
-			AOp<?> inv = Invoke.create(Constant.create(Core.HASHSET), cSeq);
-			if (isSyntax) {
-				inv=wrapSyntaxBuilder(inv,(Syntax)aForm);
-			}
-
-			return context.withResult(Juice.COMPILE_NODE, inv);
-		}else {
-			return compileConstant(context, aForm);
-		}
-	}
-	
-	private static <T extends ACell> AOp<T> wrapSyntaxBuilder(AOp<T> op, Syntax source) {
-		return Invoke.create(Constant.create(Core.SYNTAX), op, Constant.create(source.getMeta()));
-	}
-
-	/**
-	 * Compiles a sequence of quasi-quoted forms to an sequence of ops that produce the results
-	 * 
-	 * @param context
-	 * @param form
-	 * @return Context with complied sequence of ops as result
-	 */
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static Context compileQuasiQuotedSeq(Context context, ASequence<ACell> forms, int depth) {
-		int n = forms.size();
-		// create a list of ops producing each sub-element
-		ASequence<AOp<?>> rSeq = Vectors.empty();
-		for (int i = 0; i < n; i++) {
-			ACell subSyntax = forms.get(i);
-			ACell subForm = Syntax.unwrap(subSyntax);
-			if (isListStarting(Symbols.UNQUOTE_SPLICING, subForm)) {
-				AList<ACell> subList = (AList<ACell>) subForm;
-				int sn = subList.size();
-				if (sn != 2) return context.withArityError("unquote-splicing requires 1 argument");
-				
-				// Compute forms produced by unquote-splicing
-				ACell body=subList.get(1);
-				context=context.eval(body);
-				if (context.isExceptional()) return context;
-				
-				ACell newForms=context.getResult();
-				if (!(newForms instanceof ASequence)) return context.withError(ErrorCodes.COMPILE,"unquote-splicing requires a form which produces a sequence");
-				
-				// unquote-splicing looks like it needs flatmap
-				return context.withError(ErrorCodes.TODO,"unquote-splicing not yet supported");
-			} else {
-				context= compileQuasiQuoted(context, subSyntax,depth);
-				if (context.isExceptional()) return context;
-				rSeq = (ASequence) (rSeq.conj(context.getResult()));
-			}
-		}
-		return context.withResult(rSeq);
-	}
-
-	/**
 	 * Returns true if the form is a List starting with value equal to the
 	 * the specified element
 	 * 
@@ -481,7 +345,7 @@ public class Compiler {
 	 *         specified element, false otherwise.
 	 */
 	@SuppressWarnings("unchecked")
-	private static boolean isListStarting(Symbol element, ACell form) {
+	protected static boolean isListStarting(Symbol element, ACell form) {
 		if (!(form instanceof AList)) return false;
 		AList<ACell> list = (AList<ACell>) form;
 		if (list.count() == 0) return false;
@@ -521,8 +385,7 @@ public class Compiler {
 			}
 				
 			if (sym.equals(Symbols.QUASIQUOTE)) {
-				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
-				return compileQuasiQuoted(context, list.get(1),1);
+				return context.withCompileError("unexpanded quasiquote in compiler. Remember to expand first!");
 			}
 
 			if (sym.equals(Symbols.UNQUOTE)) {
