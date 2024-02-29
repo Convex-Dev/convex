@@ -43,7 +43,7 @@ public class WalletPanel extends JPanel {
 		add(toolBar, BorderLayout.SOUTH);
 
 		// new wallet button
-		JButton btnNew = new JButton("New");
+		JButton btnNew = new JButton("New Account");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
 			Convex convex=PeerGUI.getDefaultConvex();

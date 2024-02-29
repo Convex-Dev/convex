@@ -8,10 +8,12 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JTextArea;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -106,6 +108,22 @@ public class WalletComponent extends BaseListComponent {
 		JPopupMenu menu=new JPopupMenu();
 		JMenuItem m1=new JMenuItem("Edit...");
 		menu.add(m1);
+		JMenuItem m2=new JMenuItem("Show seed...");
+		m2.addActionListener(e-> {
+			AKeyPair kp=walletEntry.getKeyPair();
+			if (kp!=null) {
+				StringBuilder sb=new StringBuilder();
+				sb.append("\nEd25519 private seed:\n");
+				sb.append("\n"+kp.getSeed()+"\n\n");
+				sb.append("\nWarning: keep this private, it can be used to control your accounts\n");
+				JTextArea text = new JTextArea(sb.toString());
+				JOptionPane.showMessageDialog(WalletComponent.this, text,"Private Seed",JOptionPane.INFORMATION_MESSAGE);
+			} else {
+				JOptionPane.showMessageDialog(WalletComponent.this, "Seed not available","Warning",JOptionPane.WARNING_MESSAGE);
+			}
+		});
+		menu.add(m2);
+
 		DropdownMenu menuButton=new DropdownMenu(menu);
 		buttons.add(menuButton);
 		
@@ -127,7 +145,8 @@ public class WalletComponent extends BaseListComponent {
 			AccountStatus as=s.getAccount(address);
 			if (as!=null) {
 				Long bal=as.getBalance();
-				sb.append("Balance: " + Text.toFriendlyNumber(bal));
+				sb.append("Public Key: " + walletEntry.getAccountKey()+"\n");
+				sb.append("Balance:    " + Text.toFriendlyNumber(bal));
 			}
 		});
 		//sb.append("\n");
