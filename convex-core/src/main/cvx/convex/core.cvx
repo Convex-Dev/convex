@@ -62,6 +62,7 @@
     	      (set! found true)
     	      (set! ss (assoc ss i e))))
     	  (recur (inc i) found ss))
+    	
     	(cond found ss nil) ;; end of loop
     	)))))
 
