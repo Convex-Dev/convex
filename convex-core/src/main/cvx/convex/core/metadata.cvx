@@ -34,7 +34,11 @@
  {:doc      {:description "During an actor call, returns the address of the account doing the call. Returns `nil` otherwise."
              :examples    [{:code "*caller*"}]}
   :special? true}
-
+ 
+ *controller*
+ {:doc      {:description "Returns the controller of the current account."
+             :examples    [{:code "*controller*"}]}
+  :special? true}
 
  *depth*
  {:doc      {:description ["Returns the CVM execution stack depth, at the point the `*depth*` operation is executed. If the depth becomes too deep, the transaction will fail with a `:DEPTH` exception."
