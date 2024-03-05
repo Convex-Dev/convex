@@ -23,7 +23,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte opCode;
 	
-	private static int NUM_SPECIALS=18;
+	private static int NUM_SPECIALS=19;
 	private static final int BASE=Ops.SPECIAL_BASE;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
@@ -48,6 +48,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static final byte S_SCOPE=BASE+15;
 	private static final byte S_JUICE_LIMIT=BASE+16;
 	private static final byte S_CONTROLLER=BASE+17;
+	private static final byte S_ENV=BASE+18;
 
 	static {
 		reg(S_JUICE,Symbols.STAR_JUICE);
@@ -68,6 +69,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		reg(S_SCOPE,Symbols.STAR_SCOPE);
 		reg(S_JUICE_LIMIT,Symbols.STAR_JUICE_LIMIT);
 		reg(S_CONTROLLER,Symbols.STAR_CONTROLLER);
+		reg(S_ENV,Symbols.STAR_ENV);
 	}
 	
 	private static byte reg(byte opCode, Symbol sym) {
@@ -116,6 +118,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_JUICE_LIMIT: ctx= ctx.withResult(CVMLong.create(ctx.getJuiceLimit())); break;
 		case S_SCOPE: ctx= ctx.withResult(ctx.getScope()); break;
 		case S_CONTROLLER: ctx= ctx.withResult(ctx.getAccountStatus().getController()); break;
+		case S_ENV: ctx= ctx.withResult(ctx.getEnvironment()); break;
 		default:
 			throw new Error("Bad Opcode"+opCode);
 		}

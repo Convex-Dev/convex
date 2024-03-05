@@ -1,11 +1,15 @@
 package convex.core.lang;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.Coin;
+import convex.core.data.Address;
+import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;
 
 import static convex.test.Assertions.*;
@@ -16,8 +20,7 @@ public class ActorTest extends ACVMTest {
 	public void testScopedCall() {
 		Context c=context();
 		
-		c=step(c,"(def a1 (deploy '(defn ^:callable? check [] [*address* :s *scope*])))");
-		assertNotError(c);
+		c=exec(c,"(def a1 (deploy '(defn ^:callable? check [] [*address* :s *scope*])))");
 		
 		assertEquals(eval(c,"[a1 :s :foo]"),eval(c,"(call [a1 :foo] (check))"));
 		assertEquals(eval(c,"[a1 :s nil]"),eval(c,"(call a1 (check))"));
@@ -31,6 +34,17 @@ public class ActorTest extends ACVMTest {
 		assertEquals(eval(c,"[nil [a1 :s nil] nil]"),eval(c,"(call a2 (nest a1))"));
 		assertEquals(eval(c,"[:foo [a1 :s nil] :foo]"),eval(c,"(call [a2 :foo] (nest a1))"));
 		assertEquals(eval(c,"[:foo [a1 :s :bar] :foo]"),eval(c,"(call [a2 :foo] (nest [a1 :bar]))"));
+	}
+	
+	@Test
+	public void testEnvironment() {
+		Context c=context();
+		c=exec(c,"(def A (deploy `(set-controller ~*address*)))");
+		
+		Address A=c.getResult();
+		assertNotNull(A);
+		
+		assertSame(Maps.empty(),eval(c,"(eval-as A '*env*)"));
 	}
 	
 	@Test 
