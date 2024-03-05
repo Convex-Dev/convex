@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Keywords;
+import convex.core.data.Vectors;
 import convex.core.init.BaseTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -61,28 +63,38 @@ public class TrustTest extends ACVMTest {
 	@Test
 	public void testControllerTrust() {
 		Context ctx = context();
-		ctx=exec(ctx,"(deploy `(set-controller ~*address*))");
+		ctx=exec(ctx,"(def A (deploy `(set-controller ~*address*)))");
 		Address a=ctx.getResult();
 		assertNotNull(a);
-		assertEquals(ctx.getAddress(),eval(ctx,"(eval-as "+a+" '*controller*)"));
+		assertEquals(ctx.getAddress(),eval(ctx,"(eval-as A '*controller*)"));
 		
 		// attempt to hijack as VILLAINshould fail because no trust monitor defined
 		assertTrustError(step(ctx.forkWithAddress(VILLAIN),"(eval-as "+a+" '(set-controller #0))"));
 		
 		// Turn actor into a trust monitor for :control right
-		ctx=exec(ctx,"(eval-as "+a+" '(defn ^:callable? check-trusted? [s a o] (and (= a :control) (= s "+HERO+"))))");
+		ctx=exec(ctx,"(eval-as A '(defn ^:callable? check-trusted? [s a o] (and (= a :control) (= s "+HERO+"))))");
 		
 		// attempt to hijack as VILLAIN should fail because still no valid controller
 		assertTrustError(step(ctx.forkWithAddress(VILLAIN),"(eval-as "+a+" '(set-controller #0))"));
 		
 		// Set actor controller to be its own trust monitor
-		ctx=exec(ctx,"(eval-as "+a+" `(set-controller "+a+"))");
+		ctx=exec(ctx,"(eval-as A `(set-controller "+a+"))");
 
 		// eval-as should still work for HERO
-		assertEquals(a,eval(ctx,"(eval-as "+a+" '*controller*)"));
+		assertEquals(a,eval(ctx,"(eval-as A '*controller*)"));
 		
 		// attempt to hijack as VILLAIN should still fail
 		assertTrustError(step(ctx.forkWithAddress(VILLAIN),"(eval-as "+a+" '(set-controller #0))"));
+		
+		// Set actor controller to be a scoped actor
+		ctx=exec(ctx,"(eval-as A `(set-controller [~A :foo]))");
+		
+		// eval-as should still work for HERO and return scoped controller value
+		assertEquals(Vectors.of(a,Keywords.FOO),eval(ctx,"(eval-as A '*controller*)"));
+		
+		assertTrue(evalB(ctx,"(trust/trusted? A *address* :control)"));
+		assertFalse(evalB(ctx,"(trust/trusted? A #1567457 :control)"));
+		assertFalse(evalB(ctx,"(trust/trusted? A *address* :other-action)"));
 	}
 
 	@Test
