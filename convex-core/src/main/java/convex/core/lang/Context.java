@@ -1362,7 +1362,7 @@ public class Context {
 			if (actorAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
 
 			// (call target amount (receive-coin source amount nil))
-			ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,null,address);
+			ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,address);
 			if (ctx.isExceptional()) return ctx;
 			canControl=RT.bool(ctx.getResult());
 		}

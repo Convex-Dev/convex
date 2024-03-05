@@ -60,13 +60,15 @@ public class Keywords {
 	public static final Keyword BIND_ADDRESS = Keyword.create("bind-address");
 	public static final Keyword URL = Keyword.create("url");
 
+	// Account record keys
 	public static final Keyword SEQUENCE = Keyword.create("sequence");
-	public static final Keyword BALANCE = Keyword.create("balance");
-	public static final Keyword ENVIRONMENT = Keyword.create("environment");
-	public static final Keyword HOLDINGS = Keyword.create("holdings");
-	public static final Keyword ALLOWANCE = Keyword.create("allowance");
-	public static final Keyword CONTROLLER = Keyword.create("controller");
 	public static final Keyword KEY = Keyword.create("key");
+	public static final Keyword BALANCE = Keyword.create("balance");
+	public static final Keyword ALLOWANCE = Keyword.create("allowance");
+	public static final Keyword HOLDINGS = Keyword.create("holdings");
+	public static final Keyword CONTROLLER = Keyword.create("controller");
+	public static final Keyword ENVIRONMENT = Keyword.create("environment");
+	public static final Keyword METADATA = Keyword.create("metadata");
 
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");
@@ -84,7 +86,6 @@ public class Keywords {
 
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");
-	public static final Keyword METADATA = Keyword.create("metadata");
 
 
 	public static final Keyword OUTGOING_CONNECTIONS = Keyword.create("outgoing-connections");
@@ -118,6 +119,9 @@ public class Keywords {
 	public static final Keyword ORDER = Keyword.create("order");
 	
 	public static final Keyword MIN_BLOCK_TIME = Keyword.create("min-block-time");
+	
+	// Commond trust keys
+	public static final Keyword CONTROL = Keyword.create("control");
 
 
 }
