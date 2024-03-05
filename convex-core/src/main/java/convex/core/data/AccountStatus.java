@@ -27,19 +27,24 @@ public class AccountStatus extends ARecord {
 	private final ACell controller;
 	private final AccountKey publicKey;
 	
-	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.BALANCE,Keywords.ALLOWANCE,Keywords.ENVIRONMENT,Keywords.METADATA,
-			Keywords.HOLDINGS, Keywords.CONTROLLER, Keywords.KEY};
+	// Sequence of fields in account. 
+	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.KEY, 
+			Keywords.BALANCE,Keywords.ALLOWANCE,
+			Keywords.HOLDINGS, Keywords.CONTROLLER,
+			Keywords.ENVIRONMENT,Keywords.METADATA
+			};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 	
+	// Inclusion flags for each field
 	private static final int HAS_SEQUENCE=1<<FORMAT.indexFor(Keywords.SEQUENCE);
+	private static final int HAS_KEY=1<<FORMAT.indexFor(Keywords.KEY);
 	private static final int HAS_BALANCE=1<<FORMAT.indexFor(Keywords.BALANCE);
 	private static final int HAS_ALLOWANCE=1<<FORMAT.indexFor(Keywords.ALLOWANCE);
-	private static final int HAS_ENVIRONMENT=1<<FORMAT.indexFor(Keywords.ENVIRONMENT);
-	private static final int HAS_METADATA=1<<FORMAT.indexFor(Keywords.METADATA);
 	private static final int HAS_HOLDINGS=1<<FORMAT.indexFor(Keywords.HOLDINGS);
 	private static final int HAS_CONTROLLER=1<<FORMAT.indexFor(Keywords.CONTROLLER);
-	private static final int HAS_KEY=1<<FORMAT.indexFor(Keywords.KEY);
+	private static final int HAS_ENVIRONMENT=1<<FORMAT.indexFor(Keywords.ENVIRONMENT);
+	private static final int HAS_METADATA=1<<FORMAT.indexFor(Keywords.METADATA);
 	
 	private static final int INCLUSION_MASK=0xff;
 
@@ -51,13 +56,13 @@ public class AccountStatus extends ARecord {
 			AccountKey publicKey) {
 		super(FORMAT.count());
 		this.sequence = sequence;
+		this.publicKey = publicKey;
 		this.balance = balance;
 		this.memory = memory;
-		this.environment = environment;
-		this.metadata=metadata;
 		this.holdings=holdings;
 		this.controller=controller;
-		this.publicKey=publicKey;
+		this.environment = environment;
+		this.metadata=metadata;
 	}
 	
 	/**
@@ -124,13 +129,13 @@ public class AccountStatus extends ARecord {
 	private int getInclusion() {
 		int included=0;
 		if (sequence!=0L) included|=HAS_SEQUENCE;
+		if (publicKey!=null) included|=HAS_KEY;
 		if (balance!=0L) included|=HAS_BALANCE;
 		if (memory!=0L) included|=HAS_ALLOWANCE;
-		if (environment!=null) included|=HAS_ENVIRONMENT;
-		if (metadata!=null) included|=HAS_METADATA;
 		if (holdings!=null) included|=HAS_HOLDINGS;
 		if (controller!=null) included|=HAS_CONTROLLER;
-		if (publicKey!=null) included|=HAS_KEY;
+		if (environment!=null) included|=HAS_ENVIRONMENT;
+		if (metadata!=null) included|=HAS_METADATA;
 		return included;
 		
 	}
@@ -140,13 +145,13 @@ public class AccountStatus extends ARecord {
 		int included=getInclusion();
 		bs[pos++]=(byte)included;
 		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLCLong(bs, pos,sequence);
+		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
 		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLCLong(bs,pos, balance);
 		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLCLong(bs,pos, memory);
-		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
-		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
 		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
 		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
-		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
+		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
+		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
 		return pos;
 	}
 	
@@ -165,6 +170,11 @@ public class AccountStatus extends ARecord {
 			sequence=Format.readVLCLong(b, epos);
 			epos+=Format.getVLCLength(sequence);
 		};
+		AccountKey publicKey=null;
+		if ((included&HAS_KEY)!=0) {
+			publicKey=AccountKey.readRaw(b, epos);
+			epos+=AccountKey.LENGTH;
+		}
 		long balance=0;
 		if ((included&HAS_BALANCE)!=0) {
 			balance=Format.readVLCLong(b, epos);
@@ -174,16 +184,6 @@ public class AccountStatus extends ARecord {
 		if ((included&HAS_ALLOWANCE)!=0) {
 			allowance=Format.readVLCLong(b, epos);
 			epos+=Format.getVLCLength(allowance);
-		};		
-		AHashMap<Symbol, ACell> environment = null;
-		if ((included&HAS_ENVIRONMENT)!=0) {
-			environment=Format.read(b, epos);
-			epos+=environment.getEncodingLength();
-		};		
-		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = null;
-		if ((included&HAS_METADATA)!=0) {
-			metadata=Format.read(b, epos);
-			epos+=metadata.getEncodingLength();
 		};		
 		BlobMap<Address,ACell> holdings = null;
 		if ((included&HAS_HOLDINGS)!=0) {
@@ -195,11 +195,17 @@ public class AccountStatus extends ARecord {
 			controller=Format.read(b, epos); // TODO should be raw Address, save a byte?
 			epos+=controller.getEncodingLength();
 		}
-		AccountKey publicKey=null;
-		if ((included&HAS_KEY)!=0) {
-			publicKey=AccountKey.readRaw(b, epos);
-			epos+=AccountKey.LENGTH;
-		}
+		AHashMap<Symbol, ACell> environment = null;
+		if ((included&HAS_ENVIRONMENT)!=0) {
+			environment=Format.read(b, epos);
+			epos+=environment.getEncodingLength();
+		};		
+		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = null;
+		if ((included&HAS_METADATA)!=0) {
+			metadata=Format.read(b, epos);
+			epos+=metadata.getEncodingLength();
+		};		
+
 		
 		AccountStatus result= new AccountStatus(sequence, balance, allowance, environment,metadata,holdings,controller,publicKey);
 		int shouldBeIncluded=result.getInclusion();
@@ -407,13 +413,13 @@ public class AccountStatus extends ARecord {
 	@Override
 	public ACell get(Keyword key) {
 		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
+		if (Keywords.KEY.equals(key)) return publicKey;
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);
-		if (Keywords.ENVIRONMENT.equals(key)) return getEnvironment();
-		if (Keywords.METADATA.equals(key)) return getMetadata();
 		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
 		if (Keywords.CONTROLLER.equals(key)) return controller;
-		if (Keywords.KEY.equals(key)) return publicKey;
+		if (Keywords.ENVIRONMENT.equals(key)) return getEnvironment();
+		if (Keywords.METADATA.equals(key)) return getMetadata();
 		
 		return null;
 	}
