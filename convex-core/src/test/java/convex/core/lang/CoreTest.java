@@ -3537,6 +3537,20 @@ public class CoreTest extends ACVMTest {
 		    assertNotNull(dobj,"No documentation found for core definition: "+sym);
 		}
 	}
+		
+		
+	@Test
+	public void testCoreResolve() throws BadFormatException {
+		ACell staticOp = compile(context(),"count");
+		if (!Constants.OPT_STATIC) {
+			assertEquals(Lookup.create(Init.CORE_ADDRESS, Symbols.COUNT),staticOp);
+		} else {
+			assertEquals(Constant.create(Core.COUNT),staticOp);
+		}
+		
+		ACell refOp = compile(context(),"if");
+		assertEquals(Lookup.create(Init.CORE_ADDRESS, Symbols.IF),refOp);
+	}
 	
 	@Test
 	public void testNil() {

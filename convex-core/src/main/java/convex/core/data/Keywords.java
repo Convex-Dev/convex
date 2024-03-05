@@ -80,6 +80,7 @@ public class Keywords {
 	public static final Keyword MACRO = Keyword.create("macro");
 
 	public static final Keyword CALLABLE_Q = Keyword.create("callable?");
+	public static final Keyword PRIVATE_Q = Keyword.create("private?");
 
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");

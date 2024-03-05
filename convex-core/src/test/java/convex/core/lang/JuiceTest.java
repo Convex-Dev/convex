@@ -33,7 +33,8 @@ public class JuiceTest extends ACVMTest {
 		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT, juiceCompile("1"));
 		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_CONSTANT, juiceCompile("[]"));
 
-		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_LOOKUP, juiceCompile("foobar"));
+		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_LOOKUP_CORE, juiceCompile("if"));
+		assertEquals(Juice.EXPAND_CONSTANT + Juice.COMPILE_LOOKUP_UNDEFINED, juiceCompile("foobar"));
 	}
 
 	@Test

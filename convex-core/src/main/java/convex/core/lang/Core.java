@@ -87,6 +87,10 @@ import convex.core.util.Utils;
  */
 @SuppressWarnings("rawtypes")
 public class Core {
+	/**
+	 * The constant core address for Convex V1
+	 */
+	public static final Address CORE_ADDRESS = Address.create(8);
 
 	/**
 	 * Default initial environment metadata importing core namespace
@@ -2721,9 +2725,11 @@ public class Core {
 	private static Context registerCoreCode(AHashMap<Symbol, ACell> env) throws IOException {
 
 		// We use a fake state to build the initial environment with core address.
-		Address ADDR = Address.ZERO;
-		State state = State.EMPTY.putAccount(ADDR, AccountStatus.createActor());
-		Context ctx = Context.createFake(state, ADDR);
+		State state=State.EMPTY;
+		for (int i=0; i<=CORE_ADDRESS.longValue(); i++) {
+			state = state.putAccount(Address.create(i), AccountStatus.createActor());
+		}
+		Context ctx = Context.createFake(state, CORE_ADDRESS);
 
 		// Map in forms from env.
 		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {

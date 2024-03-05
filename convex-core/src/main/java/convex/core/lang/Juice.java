@@ -249,9 +249,24 @@ public class Juice {
 	public static final long COMPILE_CONSTANT = 30;
 
 	/**
-	 * Juice cost to compile a Constant value
+	 * Juice cost to compile a direct lookup
 	 */
 	public static final long COMPILE_LOOKUP = 50;
+	
+	/**
+	 * Juice cost to compile a lookup which is defined in account
+	 */
+	public static final long COMPILE_LOOKUP_DEFINED = COMPILE_LOOKUP+LOOKUP;
+
+	/**
+	 * Juice cost to compile a lookup which is defined in core
+	 */
+	public static final long COMPILE_LOOKUP_CORE = COMPILE_LOOKUP+LOOKUP*2;
+	
+	/**
+	 * Juice cost to compile a lookup which is undefined in account and core
+	 */
+	public static final long COMPILE_LOOKUP_UNDEFINED = COMPILE_LOOKUP+LOOKUP*3;
 
 	/**
 	 * Juice cost to compile a general AST node

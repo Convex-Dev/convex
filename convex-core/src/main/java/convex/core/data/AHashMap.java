@@ -147,6 +147,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 
 	@SuppressWarnings("unchecked")
 	public final boolean containsKey(ACell key) {
+		if (count==0) return false;
 		return getEntry((K)key)!=null;
 	}
 	

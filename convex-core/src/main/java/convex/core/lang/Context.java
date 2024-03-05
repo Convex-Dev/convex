@@ -596,6 +596,40 @@ public class Context {
 		}
 		return null;
 	}
+	
+	/**
+	 * Looks up the address of the account that defines a given Symbol
+	 * @param sym Symbol to look up
+	 * @param address Address to look up in first instance (null for current address).
+	 * @return Context with result defining for given symbol (may be empty) or null if undeclared
+	 */
+	public Context lookupDefiningAddress(Address address,Symbol sym) {
+		Context ctx=this;
+		Address addr=(address==null)?getAddress():address;
+
+		while (addr!=null) {
+			AccountStatus as=getAccountStatus(addr);
+			if (as==null) return ctx.withResult(Juice.LOOKUP, null);
+			
+			AHashMap<Symbol, ACell> env=as.getEnvironment();
+			MapEntry<Symbol, ACell> entry = env.getEntry(sym);
+			if (entry!=null) {
+				return ctx.withResult(Juice.LOOKUP, addr);
+			}
+			
+			ctx=ctx.consumeJuice(Juice.LOOKUP);
+			if (ctx.isExceptional()) return ctx;
+			
+			addr=getBaseAddress(addr);
+		}
+		
+		return ctx.withResult(Juice.LOOKUP, null);
+	}
+
+	private Address getBaseAddress(Address addr) {
+		if (Core.CORE_ADDRESS.equals(addr)) return null;
+		return Core.CORE_ADDRESS;
+	}
 
 	/**
 	 * Looks up value for the given symbol in this context

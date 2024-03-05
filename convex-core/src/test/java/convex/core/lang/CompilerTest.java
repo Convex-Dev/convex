@@ -744,7 +744,7 @@ public class CompilerTest extends ACVMTest {
 
 	@Test
 	public void testMacrosInMaps() {
-		System.out.println(expand("`{(if true 1 2) ~(if false 1 2)}"));
+		// System.out.println(expand("`{(if true 1 2) ~(if false 1 2)}"));
 		// System.out.println(eval("(list (quote hash-map) (quote (if true 1 2)) (if false 1 2))"));
 		assertEquals(Maps.of(1L,2L),eval("(eval '{(if true 1 2) (if false 1 2)})"));
 		assertEquals(Maps.of(1L,2L),eval("(eval `{(if true 1 2) ~(if false 1 2)})"));

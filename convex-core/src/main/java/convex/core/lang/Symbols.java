@@ -329,7 +329,7 @@ public class Symbols {
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
 	
-	public static final Symbol PRIVATE_Q = intern("private?");
+
 	
 	public static Symbol intern(String s) {
 		AString name=Strings.create(s);

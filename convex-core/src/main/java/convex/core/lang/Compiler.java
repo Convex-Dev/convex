@@ -203,6 +203,12 @@ public class Compiler {
 			}
 		}
 		
+		// Check if the symbol references an existing declaration
+		context=context.lookupDefiningAddress(address, sym);
+		if (context.isExceptional()) return context; // could be juice error?
+		Address a=context.getResult();
+		if (a!=null) return context.withResult(Juice.COMPILE_LOOKUP,Lookup.create(Constant.of(a),sym));
+		
 		// Finally revert to a lookup in the current address / environment
 		Lookup<?> lookUp=Lookup.create(Constant.of(address),sym);
 		return context.withResult(Juice.COMPILE_LOOKUP, lookUp);
