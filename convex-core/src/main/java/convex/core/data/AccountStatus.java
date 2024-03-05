@@ -46,7 +46,7 @@ public class AccountStatus extends ARecord {
 	private static final int HAS_ENVIRONMENT=1<<FORMAT.indexFor(Keywords.ENVIRONMENT);
 	private static final int HAS_METADATA=1<<FORMAT.indexFor(Keywords.METADATA);
 	
-	private static final int INCLUSION_MASK=0xff;
+	protected static final int INCLUSION_MASK=0xff;
 
 	private AccountStatus(long sequence, long balance, long memory,
 			AHashMap<Symbol, ACell> environment, 
@@ -143,7 +143,7 @@ public class AccountStatus extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		int included=getInclusion();
-		bs[pos++]=(byte)included;
+		pos=Format.writeVLCCount(bs, pos, included);
 		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLCLong(bs, pos,sequence);
 		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
 		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLCLong(bs,pos, balance);
@@ -164,7 +164,8 @@ public class AccountStatus extends ARecord {
 	 */
 	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		int included=b.byteAt(epos++)&INCLUSION_MASK;
+		long included=Format.readVLCCount(b, epos);
+		epos+=Format.getVLCCountLength(included);
 		long sequence=0;
 		if ((included&HAS_SEQUENCE)!=0) {
 			sequence=Format.readVLCLong(b, epos);
