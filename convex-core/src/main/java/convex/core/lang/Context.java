@@ -1351,7 +1351,7 @@ public class Context {
 
 		// Run eval in a forked context
 		Context ctx=this.fork();
-		if (controller.equals(getAddress())) {
+		if (controller.equals(caller)) {
 			// can always control own address
 			canControl=true;
 		} else {

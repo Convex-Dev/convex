@@ -170,6 +170,7 @@ public class Symbols {
 	public static final Symbol STAR_MEMORY = intern("*memory*");
 	public static final Symbol STAR_CALLER = intern("*caller*");
 	public static final Symbol STAR_ORIGIN = intern("*origin*");
+	public static final Symbol STAR_CONTROLLER = intern("*controller*");
 	public static final Symbol STAR_JUICE = intern("*juice*");
 	public static final Symbol STAR_JUICE_PRICE = intern("*juice-price*");
 	public static final Symbol STAR_JUICE_LIMIT = intern("*juice-limit*");

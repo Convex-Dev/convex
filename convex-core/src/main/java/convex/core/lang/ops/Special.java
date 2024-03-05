@@ -23,10 +23,10 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte opCode;
 	
-	private static int NUM_SPECIALS=17;
+	private static int NUM_SPECIALS=18;
 	private static final int BASE=Ops.SPECIAL_BASE;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
-	private static final Symbol[] symbols=new Symbol[NUM_SPECIALS];
+	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
 	private static final Special<?>[] specials=new Special[NUM_SPECIALS];
 	private static final HashMap<Symbol,Integer> opcodes=new HashMap<>();
 
@@ -47,6 +47,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static final byte S_JUICE_PRICE=BASE+14;
 	private static final byte S_SCOPE=BASE+15;
 	private static final byte S_JUICE_LIMIT=BASE+16;
+	private static final byte S_CONTROLLER=BASE+17;
 
 	static {
 		reg(S_JUICE,Symbols.STAR_JUICE);
@@ -66,11 +67,12 @@ public class Special<T extends ACell> extends AOp<T> {
 		reg(S_JUICE_PRICE,Symbols.STAR_JUICE_PRICE);
 		reg(S_SCOPE,Symbols.STAR_SCOPE);
 		reg(S_JUICE_LIMIT,Symbols.STAR_JUICE_LIMIT);
+		reg(S_CONTROLLER,Symbols.STAR_CONTROLLER);
 	}
 	
 	private static byte reg(byte opCode, Symbol sym) {
 		int i=opCode-BASE;
-		symbols[i]=sym;
+		SYMBOLS[i]=sym;
 		Special<?> special=new Special<>(opCode);
 		specials[i]=special;
 		opcodes.put(sym,Integer.valueOf(opCode));
@@ -113,6 +115,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_JUICE_PRICE: ctx= ctx.withResult(ctx.getState().getJuicePrice()); break;
 		case S_JUICE_LIMIT: ctx= ctx.withResult(CVMLong.create(ctx.getJuiceLimit())); break;
 		case S_SCOPE: ctx= ctx.withResult(ctx.getScope()); break;
+		case S_CONTROLLER: ctx= ctx.withResult(ctx.getAccountStatus().getController()); break;
 		default:
 			throw new Error("Bad Opcode"+opCode);
 		}
@@ -149,7 +152,7 @@ public class Special<T extends ACell> extends AOp<T> {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		return symbols[opCode-BASE].print(bb,limit);
+		return SYMBOLS[opCode-BASE].print(bb,limit);
 	}
 
 	/**

@@ -46,7 +46,7 @@ public class TrustTest extends ACVMTest {
 
 	@Test
 	public void testSelfTrust() {
-		Context ctx = CONTEXT.fork();
+		Context ctx = context();
 
 		// A non-callable address trusts itself only
 		assertTrue(evalB(ctx, "(trust/trusted? *address* *address*)"));
@@ -56,12 +56,20 @@ public class TrustTest extends ACVMTest {
 		
 		// A nil trust monitor reference always fails
 		assertFalse(evalB(ctx, "(trust/trusted? nil *address*)"));
-		
+	}
+	
+	@Test
+	public void testControllerTrust() {
+		Context ctx = context();
+		ctx=exec(ctx,"(deploy `(set-controller ~*address*))");
+		Address a=ctx.getResult();
+		assertNotNull(a);
+		assertEquals(ctx.getAddress(),eval(ctx,"(eval-as "+a+" '*controller*)"));
 	}
 
 	@Test
 	public void testUpgrade() {
-		Context ctx = CONTEXT.fork();
+		Context ctx = context();
 
 		// deploy an actor with upgradable capability
 		ctx = exec(ctx, "(def wlist (deploy (trust/add-trusted-upgrade nil)))");
@@ -95,8 +103,6 @@ public class TrustTest extends ACVMTest {
 		
 
 	}
-
-
 	
 	/**
 	 * Tests change of control of a scoped target

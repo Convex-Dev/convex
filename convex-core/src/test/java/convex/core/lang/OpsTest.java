@@ -156,6 +156,18 @@ public class OpsTest extends ACVMTest {
 		doOpTest(op);
 	}
 	
+	@Test public void testAllSpecials() {
+		Symbol[] syms=Special.SYMBOLS;
+		Context ctx=context();
+		
+		for (Symbol s: syms) {
+			ACell result=eval(s);
+			
+			// should be same result on same state
+			assertEquals(result,exec(ctx,s.toString()).getResult());
+		}
+	}
+	
 	@Test
 	public void testSet() throws BadFormatException {
 		AOp<Address> op = Set.create(45, Constant.nil());
