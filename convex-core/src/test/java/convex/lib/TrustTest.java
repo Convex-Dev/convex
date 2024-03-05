@@ -65,6 +65,24 @@ public class TrustTest extends ACVMTest {
 		Address a=ctx.getResult();
 		assertNotNull(a);
 		assertEquals(ctx.getAddress(),eval(ctx,"(eval-as "+a+" '*controller*)"));
+		
+		// attempt to hijack as VILLAINshould fail because no trust monitor defined
+		assertTrustError(step(ctx.forkWithAddress(VILLAIN),"(eval-as "+a+" '(set-controller #0))"));
+		
+		// Turn actor into a trust monitor for :control right
+		ctx=exec(ctx,"(eval-as "+a+" '(defn ^:callable? check-trusted? [s a o] (and (= a :control) (= s "+HERO+"))))");
+		
+		// attempt to hijack as VILLAIN should fail because still no valid controller
+		assertTrustError(step(ctx.forkWithAddress(VILLAIN),"(eval-as "+a+" '(set-controller #0))"));
+		
+		// Set actor controller to be its own trust monitor
+		ctx=exec(ctx,"(eval-as "+a+" `(set-controller "+a+"))");
+
+		// eval-as should still work for HERO
+		assertEquals(a,eval(ctx,"(eval-as "+a+" '*controller*)"));
+		
+		// attempt to hijack as VILLAIN should still fail
+		assertTrustError(step(ctx.forkWithAddress(VILLAIN),"(eval-as "+a+" '(set-controller #0))"));
 	}
 
 	@Test

@@ -1363,7 +1363,9 @@ public class Context {
 
 			// (call target amount (receive-coin source amount nil))
 			ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,address);
-			if (ctx.isExceptional()) return ctx;
+			if (ctx.isExceptional()) {
+				return ctx.withError(ErrorCodes.TRUST,"Failed to obtain :control rights");
+			}
 			canControl=RT.bool(ctx.getResult());
 		}
 
