@@ -69,6 +69,7 @@ public class Keywords {
 	public static final Keyword CONTROLLER = Keyword.create("controller");
 	public static final Keyword ENVIRONMENT = Keyword.create("environment");
 	public static final Keyword METADATA = Keyword.create("metadata");
+	public static final Keyword PARENT = Keyword.create("parent");
 
 	public static final Keyword ID = Keyword.create("id");
 	public static final Keyword RESULT = Keyword.create("result");

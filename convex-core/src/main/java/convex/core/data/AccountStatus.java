@@ -26,12 +26,14 @@ public class AccountStatus extends ARecord {
 	private final BlobMap<Address, ACell> holdings;
 	private final ACell controller;
 	private final AccountKey publicKey;
+	private final Address parent;
 	
 	// Sequence of fields in account. 
 	private static final Keyword[] ACCOUNT_KEYS = new Keyword[] { Keywords.SEQUENCE, Keywords.KEY, 
 			Keywords.BALANCE,Keywords.ALLOWANCE,
 			Keywords.HOLDINGS, Keywords.CONTROLLER,
-			Keywords.ENVIRONMENT,Keywords.METADATA
+			Keywords.ENVIRONMENT,Keywords.METADATA,
+			Keywords.PARENT
 			};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
@@ -45,6 +47,7 @@ public class AccountStatus extends ARecord {
 	private static final int HAS_CONTROLLER=1<<FORMAT.indexFor(Keywords.CONTROLLER);
 	private static final int HAS_ENVIRONMENT=1<<FORMAT.indexFor(Keywords.ENVIRONMENT);
 	private static final int HAS_METADATA=1<<FORMAT.indexFor(Keywords.METADATA);
+	private static final int HAS_PARENT=1<<FORMAT.indexFor(Keywords.PARENT);
 	
 	protected static final int INCLUSION_MASK=0xff;
 
@@ -53,7 +56,7 @@ public class AccountStatus extends ARecord {
 			BlobMap<Address, ACell> holdings, 
 			ACell controller,
 			AHashMap<Symbol, ACell> environment, 
-			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata) {
+			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, Address parent) {
 		super(FORMAT.count());
 		this.sequence = sequence;
 		this.publicKey = publicKey;
@@ -63,6 +66,7 @@ public class AccountStatus extends ARecord {
 		this.controller=controller;
 		this.environment = environment;
 		this.metadata=metadata;
+		this.parent=parent;
 	}
 	
 	/**
@@ -74,7 +78,7 @@ public class AccountStatus extends ARecord {
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, long balance, AccountKey key) {
-		return new AccountStatus(sequence, key, balance, 0L,null,null,null,null);
+		return new AccountStatus(sequence, key, balance, 0L,null,null,null,null,null);
 	}
 
 	/**
@@ -84,11 +88,11 @@ public class AccountStatus extends ARecord {
 	 * @return New governance AccountStatus
 	 */
 	public static AccountStatus createGovernance(long balance) {
-		return new AccountStatus(Constants.INITIAL_SEQUENCE, null, balance, 0L,null,null,null,null);
+		return new AccountStatus(Constants.INITIAL_SEQUENCE, null, balance, 0L,null,null,null,null,null);
 	}
 
 	public static AccountStatus createActor() {
-		return new AccountStatus(Constants.INITIAL_SEQUENCE, null, 0L,0L,null,null,null,null);
+		return new AccountStatus(Constants.INITIAL_SEQUENCE, null, 0L,0L,null,null,null,null,null);
 	}
 
 	public static AccountStatus create(long balance, AccountKey key) {
@@ -136,6 +140,7 @@ public class AccountStatus extends ARecord {
 		if (controller!=null) included|=HAS_CONTROLLER;
 		if (environment!=null) included|=HAS_ENVIRONMENT;
 		if (metadata!=null) included|=HAS_METADATA;
+		if (parent!=null) included|=HAS_PARENT;
 		return included;
 		
 	}
@@ -152,6 +157,7 @@ public class AccountStatus extends ARecord {
 		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
 		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
 		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
+		if ((included&HAS_PARENT)!=0) pos = Format.write(bs,pos, parent);
 		return pos;
 	}
 	
@@ -206,9 +212,13 @@ public class AccountStatus extends ARecord {
 			metadata=Format.read(b, epos);
 			epos+=metadata.getEncodingLength();
 		};		
+		Address parent = null;
+		if ((included&HAS_PARENT)!=0) {
+			parent=Format.read(b, epos);
+			epos+=parent.getEncodingLength();
+		};		
 
-		
-		AccountStatus result= new AccountStatus(sequence, publicKey, balance, allowance,holdings,controller,environment,metadata);
+		AccountStatus result= new AccountStatus(sequence, publicKey, balance, allowance,holdings,controller,environment,metadata,parent);
 		int shouldBeIncluded=result.getInclusion();
 		if (included!=shouldBeIncluded) {
 			// TODO: double check this catches all encoding violations
@@ -246,41 +256,46 @@ public class AccountStatus extends ARecord {
 
 	public AccountStatus withBalance(long newBalance) {
 		if (balance==newBalance) return this;
-		return new AccountStatus(sequence, publicKey, newBalance, memory,holdings,controller,environment,metadata);
+		return new AccountStatus(sequence, publicKey, newBalance, memory,holdings,controller,environment,metadata,parent);
 	}
 	
 
 	public AccountStatus withAccountKey(AccountKey newKey) {
 		if (newKey==publicKey) return this;
-		return new AccountStatus(sequence, newKey, balance, memory,holdings,controller,environment,metadata);
+		return new AccountStatus(sequence, newKey, balance, memory,holdings,controller,environment,metadata,parent);
 	}
 	
 	public AccountStatus withMemory(long newMemory) {
 		if (memory==newMemory) return this;
-		return new AccountStatus(sequence, publicKey, balance, newMemory,holdings,controller,environment,metadata);
+		return new AccountStatus(sequence, publicKey, balance, newMemory,holdings,controller,environment,metadata,parent);
 	}
 	
 	public AccountStatus withBalances(long newBalance, long newAllowance) {
 		if ((balance==newBalance)&&(memory==newAllowance)) return this;
-		return new AccountStatus(sequence, publicKey, newBalance, newAllowance,holdings,controller,environment,metadata);
+		return new AccountStatus(sequence, publicKey, newBalance, newAllowance,holdings,controller,environment,metadata,parent);
 	}
 
 	public AccountStatus withEnvironment(AHashMap<Symbol, ACell> newEnvironment) {
 		if ((newEnvironment!=null)&&newEnvironment.isEmpty()) newEnvironment=null;
 		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,newEnvironment,metadata);
+		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,newEnvironment,metadata,parent);
 	}
 	
 	public AccountStatus withMetadata(AHashMap<Symbol, AHashMap<ACell, ACell>> newMeta) {
 		if ((newMeta!=null)&&newMeta.isEmpty()) newMeta=null;
 		if (metadata==newMeta) return this;
-		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,environment,newMeta);
+		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,environment,newMeta,parent);
 	}
 	
 	private AccountStatus withHoldings(BlobMap<Address, ACell> newHoldings) {
 		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, publicKey, balance, memory,newHoldings,controller,environment,metadata);
+		return new AccountStatus(sequence, publicKey, balance, memory,newHoldings,controller,environment,metadata,parent);
+	}
+	
+	public AccountStatus withParent(Address newParent) {
+		if (parent==newParent) return this;
+		return new AccountStatus(sequence, publicKey, balance, memory,holdings,controller,environment,metadata,newParent);
 	}
 	
 	@Override 
@@ -307,6 +322,7 @@ public class AccountStatus extends ARecord {
 		if (!(Utils.equals(holdings, a.holdings))) return false;
 		if (!(Utils.equals(metadata, a.metadata))) return false;
 		if (!(Utils.equals(environment, a.environment))) return false;
+		if (!(Utils.equals(parent, a.parent))) return false;
 		return true;
 	}
 
@@ -325,7 +341,7 @@ public class AccountStatus extends ARecord {
 			return null;
 		}
 
-		return new AccountStatus(newSequence, publicKey, balance, memory,holdings,controller,environment,metadata);
+		return new AccountStatus(newSequence, publicKey, balance, memory,holdings,controller,environment,metadata,parent);
 	}
 
 	@Override
@@ -383,7 +399,7 @@ public class AccountStatus extends ARecord {
 	
 	public AccountStatus withController(ACell newController) {
 		if (controller==newController) return this;
-		return new AccountStatus(sequence, publicKey, balance, memory,holdings,newController,environment,metadata);
+		return new AccountStatus(sequence, publicKey, balance, memory,holdings,newController,environment,metadata,parent);
 	}
 
 	@Override
@@ -440,7 +456,7 @@ public class AccountStatus extends ARecord {
 			return this;
 		}
 		
-		return new AccountStatus(sequence,publicKey,balance,memory,newHoldings,controller,newEnv,newMeta);
+		return new AccountStatus(sequence,publicKey,balance,memory,newHoldings,controller,newEnv,newMeta,parent);
 	}
 
 	/**
@@ -466,7 +482,7 @@ public class AccountStatus extends ARecord {
 	 * @return Updates account record
 	 */
 	public AccountStatus addBalanceAndSequence(long delta) {
-		return new AccountStatus(sequence+1,publicKey,balance+delta,memory,holdings,controller,environment,metadata);
+		return new AccountStatus(sequence+1,publicKey,balance+delta,memory,holdings,controller,environment,metadata,parent);
 	}
 
 	/**
