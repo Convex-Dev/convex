@@ -1046,6 +1046,7 @@
  {:doc {:description ["Sets the parent for the current account."
                       "Parent account is the account for which symbolic lookups will default."]
         :errors      {:CAST   "If the argument is neither a valid address nor nil"
+	                  :ARGUMENT "If the parent is the current address"
                       :NOBODY "If the address does not refer to an existing account."}
         :examples    [{:code "(set-parent #8)"}]
         :signature   [{:params [addr]}]}}

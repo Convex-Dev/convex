@@ -4326,6 +4326,9 @@ public class CoreTest extends ACVMTest {
 			
 		// non-existent parent accounts
 		assertNobodyError(step("(set-parent #99999)")); 
+		
+		// protection against account being it's own parent
+		assertArgumentError(step("(set-parent *address*)")); 
 
 		assertCastError(step("(set-parent :foo)"));
 		assertCastError(step("(set-parent [#8 :foo])"));

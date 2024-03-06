@@ -1262,6 +1262,9 @@ public class Core {
 				if (!context.getState().hasAccount(parentAddress)) {
 					 return context.withError(ErrorCodes.NOBODY, name()+" requires an address for an existing account");
 				}
+				if (parentAddress.equals(context.getAddress())) {
+					 return context.withError(ErrorCodes.ARGUMENT, "Can't set parent of account to itself!");
+				}
 				parent=parentAddress; // we have now validated arg is OK as parent
 			}
 
