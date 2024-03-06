@@ -1018,7 +1018,7 @@
  set-controller
  {:doc {:description ["Sets the controller for the current account."
                       "Controller account is granted powerful access privileges including the ability to run `eval-as`. Setting to nil disable such control (default value)."]
-        :errors      {:CAST   "If the argument is neither a validaAddress nor nil"
+        :errors      {:CAST   "If the argument is neither a valid (scoped) Address nor nil"
                       :NOBODY "If the address does not refer to an existing account."}
         :examples    [{:code "(set-controller #9)"}]
         :signature   [{:params [addr]}]}}
@@ -1041,6 +1041,14 @@
  {:doc {:description "Sets the free memory allowance for the current account address, in number of bytes. Increases in memory allowance may cost coin balance. Decreases in memory allowance may earn a coin refund."
         :examples    [{:code "(set-memory 10000)"}]
         :signature   [{:params [mem]}]}}
+ 
+ set-parent
+ {:doc {:description ["Sets the parent for the current account."
+                      "Parent account is the account for which symbolic lookups will default."]
+        :errors      {:CAST   "If the argument is neither a valid address nor nil"
+                      :NOBODY "If the address does not refer to an existing account."}
+        :examples    [{:code "(set-parent #8)"}]
+        :signature   [{:params [addr]}]}}
 
 
  set-peer-data

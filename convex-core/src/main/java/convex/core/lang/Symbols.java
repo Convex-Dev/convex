@@ -185,6 +185,7 @@ public class Symbols {
 	public static final Symbol STAR_KEY = intern("*key*");
 	public static final Symbol STAR_SCOPE = intern("*scope*");
 	public static final Symbol STAR_ENV= intern("*env*");
+	public static final Symbol STAR_PARENT = intern("*parent*");
 
 	public static final Symbol STAR_LANG = intern("*lang*");
 
@@ -280,6 +281,10 @@ public class Symbols {
 
 	public static final Symbol GET_CONTROLLER = intern("get-controller");
 	public static final Symbol SET_CONTROLLER = intern("set-controller");
+	
+	public static final Symbol SET_PARENT = intern("set-parent");
+
+	
 	public static final Symbol CHECK_TRUSTED_Q = intern("check-trusted?");
 
 	public static final Symbol SET_MEMORY = intern("set-memory");

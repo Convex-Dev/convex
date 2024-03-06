@@ -1233,7 +1233,7 @@ public class Core {
 			if (arg!=null) {
 				Address controlAddress=RT.callableAddress(arg);
 				if (controlAddress == null) return context.withError(ErrorCodes.CAST,name()+" requires an Address or scoped Actor");
-				if (context.getAccountStatus(controlAddress)==null) {
+				if (!context.getState().hasAccount(controlAddress)) {
 					 return context.withError(ErrorCodes.NOBODY, name()+" requires an address for an existing account");
 				}
 				controller=arg; // we have now validated arg is OK as controller
@@ -1243,6 +1243,32 @@ public class Core {
 			if (context.isExceptional()) return (Context) context;
 
 			return context.withResult(Juice.ASSOC, controller);
+		}
+	});
+	
+	public static final CoreFn<ACell> SET_PARENT = reg(new CoreFn<>(Symbols.SET_PARENT) {
+		
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			int n = args.length;
+			if (n !=1) return context.withArityError(exactArityMessage(1, n));
+
+			// Get requested controller. Must be a valid Address or null
+			ACell arg=args[0];
+			Address parent=null;
+			if (arg!=null) {
+				Address parentAddress=RT.ensureAddress(arg);
+				if (parentAddress == null) return context.withError(ErrorCodes.CAST,name()+" requires an Address or nil");
+				if (!context.getState().hasAccount(parentAddress)) {
+					 return context.withError(ErrorCodes.NOBODY, name()+" requires an address for an existing account");
+				}
+				parent=parentAddress; // we have now validated arg is OK as parent
+			}
+
+			context=(Context) context.setParent(parent);
+			if (context.isExceptional()) return (Context) context;
+
+			return context.withResult(Juice.ASSOC, parent);
 		}
 	});
 

@@ -2168,7 +2168,7 @@ public class Context {
 
 	/**
 	 * Sets the controller for the current Account
-	 * @param address New controller Address
+	 * @param address New controller Address / scoped reference
 	 * @return Context with current Account controller set
 	 */
 	public Context setController(ACell address) {
@@ -2176,6 +2176,17 @@ public class Context {
 		as=as.withController(address);
 		return withAccountStatus(getAddress(),as);
 
+	}
+	
+	/**
+	 * Sets the parent for the current Account
+	 * @param address New parent Address
+	 * @return Context with current Account parent set
+	 */
+	public Context setParent(Address address) {
+		AccountStatus as=getAccountStatus();
+		as=as.withParent(address);
+		return withAccountStatus(getAddress(),as);
 	}
 
 	/**

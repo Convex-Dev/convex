@@ -4317,6 +4317,23 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(set-controller)"));
 		assertArityError(step("(set-controller 1 2)")); // arity > cast
 	}
+	
+	@Test
+	public void testSetParent() {
+		// set-parent
+		assertEquals(VILLAIN, eval("(set-parent "+VILLAIN+")"));
+		assertEquals(VILLAIN, eval("(do (set-parent "+VILLAIN+") *parent*)"));
+			
+		// non-existent parent accounts
+		assertNobodyError(step("(set-parent #99999)")); 
+
+		assertCastError(step("(set-parent :foo)"));
+		assertCastError(step("(set-parent [#8 :foo])"));
+		assertCastError(step("(set-parent (address nil))")); // Address cast fails
+
+		assertArityError(step("(set-parent)"));
+		assertArityError(step("(set-parent 1 2)")); // arity > cast
+	}
 
 	@Test
 	public void testScheduleFailures() {
