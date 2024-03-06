@@ -326,24 +326,6 @@ public class AccountStatus extends ARecord {
 		return true;
 	}
 
-	/**
-	 * Updates this account with a new sequence number.
-	 * 
-	 * @param newSequence New sequence number
-	 * @return Updated account, or null if the sequence number was wrong
-	 */
-	public AccountStatus updateSequence(long newSequence) {
-		// SECURITY: shouldn't ever be trying to call updateSequence on a Actor address!
-		if (isActor()) throw new Error("Trying to update Actor sequence number!");
-
-		long expected = sequence + 1;
-		if (expected != newSequence) {
-			return null;
-		}
-
-		return new AccountStatus(newSequence, publicKey, balance, memory,holdings,controller,environment,metadata,parent);
-	}
-
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (environment != null) {
@@ -437,6 +419,7 @@ public class AccountStatus extends ARecord {
 		if (Keywords.CONTROLLER.equals(key)) return controller;
 		if (Keywords.ENVIRONMENT.equals(key)) return getEnvironment();
 		if (Keywords.METADATA.equals(key)) return getMetadata();
+		if (Keywords.PARENT.equals(key)) return parent;
 		
 		return null;
 	}
@@ -479,7 +462,7 @@ public class AccountStatus extends ARecord {
 	 * Adds a change in balance to this account. Must not cause an illegal balance. Returns this instance unchanged
 	 * if the delta is zero
 	 * @param delta Amount of Convex copper to add
-	 * @return Updates account record
+	 * @return Updated account record
 	 */
 	public AccountStatus addBalanceAndSequence(long delta) {
 		return new AccountStatus(sequence+1,publicKey,balance+delta,memory,holdings,controller,environment,metadata,parent);
@@ -491,6 +474,14 @@ public class AccountStatus extends ARecord {
 	 */
 	public AccountKey getAccountKey() {
 		return publicKey;
+	}
+	
+	/**
+	 * Gets the parent address for this account
+	 * @return Address of parent account
+	 */
+	public Address getParent() {
+		return parent;
 	}
 
 	/**
@@ -551,6 +542,7 @@ public class AccountStatus extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 
 
 

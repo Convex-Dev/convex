@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.Core;
 import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 import convex.test.Samples;
@@ -26,6 +27,7 @@ public class AccountStatusTest {
 		as=as.withEnvironment(Maps.of(Symbols.FOO,CVMLong.ONE));
 		as=as.withMetadata(Maps.of(Symbols.FOO,Maps.empty()));
 		as=as.withController(Address.create(1546746));
+		as=as.withParent(Core.CORE_ADDRESS);
 		
 		// Round trip through encoding
 		as=Format.decodeMultiCell(as.getEncoding());
@@ -37,6 +39,9 @@ public class AccountStatusTest {
 		assertEquals(CVMLong.ONE,as.getEnvironmentValue(Symbols.FOO));
 		assertEquals(Maps.empty(),as.getMetadata().get(Symbols.FOO));
 		assertEquals(Address.create(1546746),as.getController());
+		assertEquals(Core.CORE_ADDRESS,as.getParent());
+		
+		assertEquals(Core.CORE_ADDRESS,as.get(Keywords.PARENT));
 		
 		doAccountStatusTest(as);
 	}
