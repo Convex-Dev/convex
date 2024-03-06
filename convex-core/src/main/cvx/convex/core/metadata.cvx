@@ -91,6 +91,11 @@
                             "Usually, should NOT be used for access control, since a rogue actor can potentially trick a user into creating a transaction that allows code to be indirectly executed. Consider using `*caller*` for access control instead."]
               :examples    [{:code "*origin*"}]}
    :special? true}
+  
+  *parent*
+  {:doc      {:description "Returns the parent of the current account. Determines the default location for symbolic lookup."
+              :examples    [{:code "*parent*"}]}
+   :special? true}
 
   *result*
   {:doc      {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
