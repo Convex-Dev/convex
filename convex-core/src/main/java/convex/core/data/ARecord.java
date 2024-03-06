@@ -15,7 +15,7 @@ import convex.core.lang.impl.RecordFormat;
 /**
  * Base class for Record data types. 
  * 
- * Records are Map-like data structures with fixed sets of keys, and optional custom behaviour.
+ * Records are Map-like data structures with fixed sets of Keyword keys, and optional custom behaviour.
  * 
  * Ordering of fields is defined by the Record's RecordFormat
  *
@@ -156,7 +156,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 
 	@Override
 	public AMap<Keyword, ACell> assoc(ACell key, ACell value) {
-		// TODO: OK to convert records to hashmaps?
 		return toHashMap().assoc(key, value);
 	}
 	
@@ -166,7 +165,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public AMap<Keyword, ACell> dissoc(ACell key) {
+	public final AMap<Keyword, ACell> dissoc(ACell key) {
 		if (!containsKey(key)) return this;
 		return toHashMap().dissoc(key);
 	}

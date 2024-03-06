@@ -737,7 +737,7 @@ public class Context {
 	}
 
 	private AccountStatus getCoreAccount() {
-		return getState().getAccount(Init.CORE_ADDRESS);
+		return getState().getAccount(Core.CORE_ADDRESS);
 	}
 
 	/**
