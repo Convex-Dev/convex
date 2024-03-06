@@ -1405,7 +1405,8 @@ public class Context {
 	protected Context handleQueryResult(Context ctx) {
 		// Copy juice used
 		this.juice=ctx.juice;
-		return this.withValue(ctx.result);
+		// Copy over result (may be exceptional)
+		return this.withValue(ctx.getValue());
 	}
 
 	/**

@@ -4145,6 +4145,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(eval-as :foo 2)"));
 		assertArityError(step("(eval-as 1)")); // arity > cast
 		assertArityError(step("(eval-as 1 2 3)"));
+		
 	}
 
 	@Test
@@ -4210,6 +4211,9 @@ public class CoreTest extends ACVMTest {
 		// Query should consume fixed juice
 		assertEquals(juice("1")+Juice.QUERY,juice("(query 1)"));
 		
+		// Query should propagate an error
+		assertCastError(step("(query (count 1))"));
+
 		// Query should add one to *depth*
 		assertEquals(evalL("*depth*")+1,evalL("(query *depth*)"));
 	}
@@ -4236,6 +4240,10 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(query-as :foo 1)"));
 
 		assertArityError(step("(query-as *address* 1 2)"));
+		
+		// Failures within query
+		assertCastError(step("(query-as *address* (count 1))"));
+		assertTrustError(step("(query-as #0 '(eval-as #8 1))"));
 	}
 	
 	@Test
