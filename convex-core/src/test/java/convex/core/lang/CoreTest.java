@@ -4132,7 +4132,16 @@ public class CoreTest extends ACVMTest {
 		assertEquals("foo", evalS("(eval-as *address* (list 'str \\f \\o \\o))"));
 
 		assertTrustError(step("(eval-as *registry* '1)"));
+		assertTrustError(step("(eval-as #0 '(def a 1))"));
+		
+		// test that eval and eval-as consume the same juice
+		long j1=juice(context(),"(eval 1)");
+		long j2=juice(context(),"(eval-as *address* 1)");
+		assertEquals(j1+Juice.SPECIAL,j2);
+		
+		assertNobodyError(step("(eval-as #100000 1)"));
 
+		assertCastError(step("(eval-as nil 2)"));
 		assertCastError(step("(eval-as :foo 2)"));
 		assertArityError(step("(eval-as 1)")); // arity > cast
 		assertArityError(step("(eval-as 1 2 3)"));
@@ -4203,6 +4212,30 @@ public class CoreTest extends ACVMTest {
 		
 		// Query should add one to *depth*
 		assertEquals(evalL("*depth*")+1,evalL("(query *depth*)"));
+	}
+	
+	@Test
+	public void testQueryAs() {
+		assertEquals(eval("[*origin* #0 *address*]"),eval("(query-as #0 '[*origin* *address* *caller*])"));
+		assertEquals(eval("[*origin* *address* *address*]"),eval("(query-as *address* '[*origin* *address* *caller*])"));
+		
+		Context c1=context();
+		
+		// test that we can query from any account, but no state change happens and juice is used 
+		Context c2=exec(context(),"(query-as #0 '(def foo 1234))");
+		assertSame(c1.getState(),c2.getState());
+		assertTrue(c2.getJuiceUsed()>c1.getJuiceUsed());
+		
+		// test that query-as and eval-as consume the same juice
+		Context c3=exec(context(),"(query-as *address* 1)");
+		Context c4=exec(context(),"(eval-as *address* 1)");
+		assertEquals(c3.getJuiceUsed(),c4.getJuiceUsed());
+	
+		assertNobodyError(step("(query-as #8888 '1)"));
+		assertCastError(step("(query-as nil '1)"));
+		assertCastError(step("(query-as :foo 1)"));
+
+		assertArityError(step("(query-as *address* 1 2)"));
 	}
 	
 	@Test
