@@ -283,13 +283,11 @@ public class Peer {
 		if (address==null) {
 			address=Init.CORE_ADDRESS;
 			//return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
+		} else if (!state.hasAccount(address)) {
+			return  Context.createFake(state).withError(Errors.nobody(address));
 		}
 
 		Context ctx= Context.createFake(state, address);
-
-		if (state.getAccount(address)==null) {
-			return ctx.withError(Errors.nobodyQuery(address));
-		}
 
 		Context ectx = ctx.expandCompile(form);
 		if (ectx.isExceptional()) {

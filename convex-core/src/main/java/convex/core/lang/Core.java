@@ -496,9 +496,7 @@ public class Core {
 
 	});
 
-	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS) {
-
-		
+	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS) {	
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
@@ -508,6 +506,20 @@ public class Core {
 
 			ACell form = (ACell) args[1];
 			Context rctx = context.evalAs(address,form);
+			return rctx.consumeJuice(Juice.EVAL);
+		}
+	});
+	
+	public static final CoreFn<ACell> QUERY_AS = reg(new CoreFn<>(Symbols.QUERY_AS) {	
+		@Override
+		public Context invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			Address address = RT.ensureAddress(args[0]);
+			if (address==null) return context.withCastError(0,args, Types.ADDRESS);
+
+			ACell form = (ACell) args[1];
+			Context rctx = context.queryAs(address,form);
 			return rctx.consumeJuice(Juice.EVAL);
 		}
 	});

@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -280,7 +279,7 @@ public class OpsTest extends ACVMTest {
 
 	@Test
 	public void testLocal() throws InvalidDataException {
-		Context c=Context.createFake(State.EMPTY);
+		Context c=context();
 		c=c.withLocalBindings(Vectors.of(1337L));
 
 		Local<?> op=Local.create(0);

@@ -50,14 +50,18 @@ public class ContextTest extends ACVMTest {
 	}
 
 	@Test
-	public void testQuery() {
-		Context c2 = context();
-		c2=c2.query(Reader.read("(+ 1 2)"));
+	public void testQueryAs() {
+		Context c1 = context();
+		Context c2 = c1.fork();
+		Address a=c2.getAddress();
+		c2=c2.queryAs(a,Reader.read("(def foo (+ 1 2))"));
 		assertNotSame(c2,context());
+		assertSame(c1.getState(),c2.getState());
 		assertCVMEquals(3L,c2.getResult());
-		assertEquals(context().getDepth(),c2.getDepth(),"Query should preserve context depth");
+		
+		assertEquals(c1.getDepth(),c2.getDepth(),"Query should preserve context depth");
 
-		c2=c2.query(Reader.read("*address*"));
+		c2=c2.queryAs(a,Reader.read("*address*"));
 		assertEquals(c2.getAddress(),c2.getResult());
 	}
 

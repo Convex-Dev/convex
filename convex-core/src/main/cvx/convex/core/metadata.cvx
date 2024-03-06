@@ -908,6 +908,11 @@
                            {:code "(query (call unsafe-actor (do-something)))"}]
              :signature   [{:params [& forms]}]}
   :special? true}
+ 
+ query-as
+ {:doc {:description "Like `eval-as` but executes the code in a query context, discarding any state changes."
+        :examples    [{:code "(query-as #666 '(def a (+ 2 3)))"}]
+        :signature   [{:params [address form]}]}}
 
 
  quot

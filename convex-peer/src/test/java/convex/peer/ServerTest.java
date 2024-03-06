@@ -232,6 +232,7 @@ public class ServerTest {
 		Convex convex=network.CONVEX;
 		assertEquals(convex.getAddress(),convex.querySync("*address*").getValue());
 		assertEquals(CVMLong.ONE,convex.querySync("3 2 1").getValue());
+		assertEquals(Maps.empty(),convex.querySync(Symbols.STAR_ENV,Address.create(0)).getValue());
 		// Thread.sleep(1000000000);
 	}
 

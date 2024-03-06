@@ -162,6 +162,7 @@ public class Context {
 
 		public static ChainState create(State state, Address origin, Address caller, Address address, long offer, ACell scope) {
 			AccountStatus as=state.getAccount(address);
+			if (as==null) return null;
 			return new ChainState(state,origin,caller,address,as,offer,scope);
 		}
 
@@ -251,6 +252,7 @@ public class Context {
 
 	private static <T extends ACell> Context create(State state, long juice,long juiceLimit,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,origin,caller,address,offer,null);
+		if (chainState==null) throw new Error("Attempting to create context with invalid Address");
 		return create(chainState,juice,juiceLimit,localBindings,result,depth,log,comp);
 	}
 
@@ -263,7 +265,7 @@ public class Context {
 	 * @return Fake context
 	 */
 	public static Context createFake(State state) {
-		return createFake(state,Init.CORE_ADDRESS);
+		return createFake(state,Address.ZERO);
 	}
 
 	/**
@@ -1342,7 +1344,7 @@ public class Context {
 		Address caller=getAddress();
 		if (caller.equals(address)) return eval(form);
 		AccountStatus as=this.getAccountStatus(address);
-		if (as==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
+		if (as==null) return withError(Errors.nobody(address));
 
 		ACell controller=as.getController();
 		if (controller==null) return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+address);
@@ -1380,26 +1382,6 @@ public class Context {
 	}
 
 	/**
-	 * Executes code as if run in the current account, but always discarding state changes.
-	 * @param form Code to execute.
-	 * @return Context updated with only query result and juice consumed
-	 */
-	public Context query(ACell form) {
-		Context ctx=this.fork();
-
-		// adjust depth. May be exceptional if depth limit exceeded
-		ctx=ctx.withDepth(depth+1);
-
-		// eval in current account if everything OK
-		if (!ctx.isExceptional()) {
-		   ctx=ctx.eval(form);
-		}
-
-		// handle results including state rollback. Will propagate any errors.
-		return handleQueryResult(ctx);
-	}
-
-	/**
 	 * Executes code as if run in the specified account, but always discarding state changes.
 	 * @param address Address of Account in which to execute the query
 	 * @param form Code to execute.
@@ -1407,9 +1389,11 @@ public class Context {
 	 */
 	public Context queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
-		ChainState cs=ChainState.create(getState(),address,null,address,DEFAULT_OFFER,null);
+		State s=getState();
+		ChainState cs=ChainState.create(s,getOrigin(),getAddress(),address,DEFAULT_OFFER,null);
+		if (cs==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
 		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, null, depth,log,null);
-		ctx=ctx.evalAs(address, form);
+		ctx=ctx.eval(form);
 		return handleQueryResult(ctx);
 	}
 

@@ -55,8 +55,8 @@ public class Errors {
 		return "Wrong length, expected="+expected+" and actual="+count;
 	}
 
-	public static ErrorValue nobodyQuery(Address address) {
-		return ErrorValue.create(ErrorCodes.NOBODY,"Account does not exist for query: "+address);
+	public static ErrorValue nobody(Address address) {
+		return ErrorValue.create(ErrorCodes.NOBODY,"Account does not exist: "+address);
 	}
 	
 	public static ErrorValue INVALID_NUMERIC = ErrorValue.create(ErrorCodes.ARGUMENT,"Invalid numeric result");

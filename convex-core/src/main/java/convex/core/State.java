@@ -883,4 +883,9 @@ public class State extends ARecord {
 		return withGlobals(r);
 	}
 
+	public boolean hasAccount(Address address) {
+		long av=address.longValue();
+		return (av>=0) &&(av<accounts.count());
+	}
+
 }
