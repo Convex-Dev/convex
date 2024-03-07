@@ -574,36 +574,12 @@ public class Context {
 		}
 		return null;
 	}
-
-	/**
-	 * Looks up the account the defines a given Symbol
-	 * @param sym Symbol to look up
-	 * @param address Address to look up in first instance (null for current address).
-	 * @return AccountStatus for given symbol (may be empty) or null if undeclared
-	 */
-	public AccountStatus lookupDefiningAccount(Address address,Symbol sym) {
-		AccountStatus as=(address==null)?getAccountStatus():getAccountStatus(address);
-		if (as==null) return null;
-		AHashMap<Symbol, ACell> env=as.getEnvironment();
-		if (env.containsKey(sym)) {
-			return as;
-		}
-
-		as = getAliasedAccount(env);
-		if (as==null) return null;
-
-		env=as.getEnvironment();
-		if (env.containsKey(sym)) {
-			return as;
-		}
-		return null;
-	}
 	
 	/**
 	 * Looks up the address of the account that defines a given Symbol
 	 * @param sym Symbol to look up
 	 * @param address Address to look up in first instance (null for current address).
-	 * @return Context with result defining for given symbol (may be empty) or null if undeclared
+	 * @return Context with result as the address defining the given symbol (or null if undeclared)
 	 */
 	public Context lookupDefiningAddress(Address address,Symbol sym) {
 		Context ctx=this;
@@ -622,15 +598,17 @@ public class Context {
 			ctx=ctx.consumeJuice(Juice.LOOKUP);
 			if (ctx.isExceptional()) return ctx;
 			
-			addr=getBaseAddress(addr);
+			if (addr.equals(Core.CORE_ADDRESS)) break;
+			addr=getParentAddress(as);
 		}
 		
 		return ctx.withResult(Juice.LOOKUP, null);
 	}
 
-	private Address getBaseAddress(Address addr) {
-		if (Core.CORE_ADDRESS.equals(addr)) return null;
-		return Core.CORE_ADDRESS;
+	private Address getParentAddress(AccountStatus as) {
+		Address ba=as.getParent();
+		if (ba==null) return Core.CORE_ADDRESS;
+		return ba;
 	}
 
 	/**
