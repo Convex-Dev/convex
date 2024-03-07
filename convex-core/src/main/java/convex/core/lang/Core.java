@@ -59,6 +59,7 @@ import convex.core.lang.impl.Reduced;
 import convex.core.lang.impl.ReturnValue;
 import convex.core.lang.impl.RollbackValue;
 import convex.core.lang.impl.TailcallValue;
+import convex.core.lang.ops.Special;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
@@ -2819,9 +2820,15 @@ public class Core {
  						continue;
  					} else {
  						if (meta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
+ 							ACell val=sym;
+ 							
+ 							// convert *special* symbols into Ops
+ 							Special spec=Special.forSymbol(sym);
+ 							if (spec!=null) val=spec;
+ 							
  							// Create a fake entry for special symbols.
- 							ctx=ctx.define(sym, sym);
- 							definedEntry = MapEntry.create(sym, sym);
+ 							ctx=ctx.define(sym, val);
+ 							definedEntry = MapEntry.create(sym, val);
  						} else {
  							System.err.println("CORE WARNING: Documentation for non-existent core symbol: " + sym);
  							continue;

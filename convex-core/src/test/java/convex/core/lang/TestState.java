@@ -20,6 +20,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
+import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
 
 /**
@@ -126,7 +127,7 @@ public class TestState {
 		assertEquals(STATE, s);
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
 
-		assertCVMEquals(Symbols.STAR_TIMESTAMP, ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
+		assertCVMEquals(Special.get("*timestamp*"), ctx.lookup(Symbols.STAR_TIMESTAMP).getResult());
 
 		assertCVMEquals(Constants.INITIAL_TIMESTAMP, s.getTimestamp());
 	}

@@ -177,4 +177,11 @@ public class Special<T extends ACell> extends AOp<T> {
 		if (special==null) return null;
 		return (Special<R>) specials[special-BASE];
 	}
+	
+	public static <R extends ACell> Special<R> get(String string) {
+		return forSymbol(Symbol.create(string));
+	}
+
+
+
 }
