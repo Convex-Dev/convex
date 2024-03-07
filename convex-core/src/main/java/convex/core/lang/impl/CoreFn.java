@@ -32,7 +32,14 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	@Override
 	public abstract Context invoke(Context context, ACell[] args);
 
+	@Override
 	public Symbol getSymbol() {
+		return symbol;
+	}
+	
+	@Override
+	public Symbol getIntrinsicSymbol() {
+		// TODO should we have forms like #%count ?
 		return symbol;
 	}
 	

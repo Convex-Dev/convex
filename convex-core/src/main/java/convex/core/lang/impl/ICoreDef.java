@@ -16,5 +16,12 @@ public interface ICoreDef {
 	 * @return The symbol for this core definition.
 	 */
 	public Symbol getSymbol();
+	
+	/**
+	 * Defines the symbol for this core definition.
+	 * 
+	 * @return The symbol for this core definition.
+	 */
+	public Symbol getIntrinsicSymbol();
 
 }
