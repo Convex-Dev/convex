@@ -7,14 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased 
 
 
-## [0.7.13] - 2024-02-02
+## [0.7.13] - Unreleased
 
 ### Added
 - BIP39 key generation support
 - Observability support initial version
+- Extra special ops: `*nop*`, `*parent*`, `*controller*` and `*env*`
+- `query-as` function (query mode equivalent to `eval-as`)
+- Convex Lisp `quasiquote` implementation
+- Observability support
+- Extra example code and tests
 
 ### Changed
 - Updated CLI
+- Updated GUI functionality
+- Significant refactoring
+- Encoding changes for better memory efficiency
+- Upgrades to default REST API
+- CNS improvements
 
 ### Fixed
 - Bug fixes for message decoding
