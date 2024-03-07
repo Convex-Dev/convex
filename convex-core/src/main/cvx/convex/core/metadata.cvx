@@ -79,6 +79,11 @@
   {:doc      {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."
               :examples    [{:code "*key*"}]}
    :special? true}
+  
+  *nop*
+  {:doc      {:description "Does nothing."
+              :examples    [{:code "*nop*"}]}
+   :special? true}
 
   *offer*
   {:doc      {:description "Returns the amount of native coin offered by `*caller*` during a call. See `call`. Will usually be zero, unless the caller has included an offer with a 'call' expression."

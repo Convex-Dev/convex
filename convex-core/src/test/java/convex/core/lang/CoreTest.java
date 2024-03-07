@@ -4715,7 +4715,23 @@ public class CoreTest extends ACVMTest {
 
 		// *result* should be cleared to nil in an Actor call.
 		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *result*)))) (call c (f)))"));
+	}
+	
+	@Test
+	public void testSpecialNop() {
+		// initial context result should be null
+		assertNull(eval("*nop*"));
+		
+		// *nop* should return *result*
+		assertEquals(Keywords.FOO, eval("(do :foo *nop*)"));
 
+		// Result should propagate through nop
+		assertEquals(Keywords.FOO, eval("(do :foo *nop* *result*)"));
+		assertNull(eval("(do 1 (do) *nop* *result*)"));
+
+
+		// *result* should be cleared to nil in an Actor call.
+		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *nop*)))) (call c (f)))"));
 	}
 
 	@Test

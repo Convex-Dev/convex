@@ -186,6 +186,7 @@ public class Symbols {
 	public static final Symbol STAR_SCOPE = intern("*scope*");
 	public static final Symbol STAR_ENV= intern("*env*");
 	public static final Symbol STAR_PARENT = intern("*parent*");
+	public static final Symbol STAR_NOP = intern("*nop*");
 
 	public static final Symbol STAR_LANG = intern("*lang*");
 
@@ -335,6 +336,7 @@ public class Symbols {
 	public static final Symbol MEMORY = intern("memory");
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
+
 	
 
 	
