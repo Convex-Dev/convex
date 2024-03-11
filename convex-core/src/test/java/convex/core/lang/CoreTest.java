@@ -3515,6 +3515,8 @@ public class CoreTest extends ACVMTest {
 		assertSame(Constant.EMPTY_VECTOR, eval("(compile [])"));
 		assertSame(Constant.EMPTY_LIST, eval("(compile ())"));
 		assertSame(Constant.EMPTY_MAP, eval("(compile {})"));
+		assertSame(Constant.EMPTY_SET, eval("(compile #{})"));
+		assertSame(Constant.EMPTY_STRING, eval("(compile \"\")"));
 		
 		assertEquals(Invoke.create(Constant.of(Core.PLUS),Constant.of(1),Constant.of(2)), eval("(compile '(+ 1 2))"));
 		

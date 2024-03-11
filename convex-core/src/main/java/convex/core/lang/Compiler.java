@@ -4,7 +4,7 @@ import java.util.Map;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AHashMap;
@@ -12,9 +12,9 @@ import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
@@ -102,31 +102,38 @@ public class Compiler {
 	static Context compile(ACell form, Context context) {
 		if (form==null) return compileConstant(context,null);
 
-		if (form instanceof AList) return compileList((AList<ACell>) form, context);
-
-		if (form instanceof Syntax) return compileSyntax((Syntax) form, context);
-		if (form instanceof AVector) return compileVector((AVector<ACell>) form, context);
-		if (form instanceof AMap) return compileMap((AMap<ACell, ACell>) form, context);
-		if (form instanceof ASet) return compileSet((ASet<ACell>) form, context);
-
-		if ((form instanceof Keyword) || (form instanceof ABlob)) {
-			return compileConstant(context, form);
-		}
-		
-		if (form instanceof CVMBool) {
-			return compileBoolean(context, (CVMBool)form);
-		}
-
 		if (form instanceof Symbol) {
 			return compileSymbol((Symbol) form, context);
 		}
 		
+		if (form instanceof ADataStructure) {
+	 		if (form instanceof AList) return compileList((AList<ACell>) form, context);
+			if (form instanceof AVector) return compileVector((AVector<ACell>) form, context);
+			if (form instanceof AMap) return compileMap((AMap<ACell, ACell>) form, context);
+			if (form instanceof ASet) return compileSet((ASet<ACell>) form, context);
+			return context.withCompileError("Unexpected data structure: "+form.getClass());
+		}
+		
+		if (form instanceof ABlobLike) {
+			ABlobLike<?> bf=(ABlobLike<?>)form;
+			if (bf.count()==0) {
+				if (bf instanceof AString) return context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_STRING);
+			}
+			return compileConstant(context, form);
+		}
+		
+		if (form instanceof Syntax) return compileSyntax((Syntax) form, context);
+		
+		if (form instanceof CVMBool) {
+			return compileBoolean(context, (CVMBool)form);
+		}
+		
 		if (form instanceof AOp) {
-			// already compiled, just return as constant
+			// already compiled, just return directly
 			return context.withResult(Juice.COMPILE_CONSTANT, (AOp<?>)form);
 		}
 
-		// return as a constant literal
+		// return as a constant literal, handles keywords, integers etc.
 		return compileConstant(context,form);
 	}
 
@@ -599,8 +606,7 @@ public class Compiler {
 			return compileFnInstance(paramsVector,bodyList,context);
 		}
 			
-		return context.withError(ErrorCodes.COMPILE,
-				"fn instance requires a vector of parameters but got form: " + list);
+		return context.withCompileError("fn instance requires a vector of parameters but got form: " + list);
 	}
 		
 	@SuppressWarnings("unchecked")

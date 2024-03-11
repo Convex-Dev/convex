@@ -16,6 +16,8 @@ import convex.core.exceptions.BadFormatException;
 public class Strings {
 	public static final StringShort EMPTY = StringShort.EMPTY;
 	
+	public static final Ref<StringShort> EMPTY_REF = EMPTY.getRef();
+	
 	public static final StringShort NIL = StringShort.create("nil");
 	public static final StringShort TRUE = StringShort.create("true");
 	public static final StringShort FALSE = StringShort.create("false");
@@ -41,6 +43,8 @@ public class Strings {
 	public static final StringShort INSUFFICIENT_STAKE = StringShort.create("Insufficient Stake!");
 
 	public static final StringShort ILLEGAL_BLOCK_SIZE = StringShort.create("Illegal Block Size!");
+
+
 
 	/**
 	 * Reads a String from a Blob encoding.

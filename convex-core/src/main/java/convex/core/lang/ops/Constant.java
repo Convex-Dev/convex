@@ -14,6 +14,7 @@ import convex.core.data.List;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
+import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.VectorLeaf;
 import convex.core.data.prim.CVMBool;
@@ -38,6 +39,8 @@ public class Constant<T extends ACell> extends AOp<T> {
 	public static final Constant<?> NULL = new Constant<>(Ref.NULL_VALUE);
 	public static final Constant<CVMBool> TRUE = new Constant<>(Ref.TRUE_VALUE);
 	public static final Constant<CVMBool> FALSE = new Constant<>(Ref.FALSE_VALUE);
+	
+	public static final Constant<StringShort> EMPTY_STRING = new Constant<>(Strings.EMPTY_REF);
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Constant<AVector<?>> EMPTY_VECTOR = new Constant(VectorLeaf.EMPTY_REF);
