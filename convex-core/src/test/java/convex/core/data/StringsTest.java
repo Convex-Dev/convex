@@ -101,7 +101,7 @@ public class StringsTest {
 			strs[i]=Strings.create(ss[i]);
 		}
 		for (int i=0; (i+1)<n; i++) {
-			assertTrue(strs[i].compareTo(strs[i+1])<0);
+			assertTrue(strs[i].compareTo(strs[i+1].toBlob())<0);
 		}
 	}
 
@@ -207,7 +207,7 @@ public class StringsTest {
 		AString b=Strings.create(js);
 		assertEquals(a.count(),b.count());
 		assertEquals(a,b);
-		assertEquals(0,a.compareTo(b));
+		assertEquals(0,a.compareTo(b.toBlob()));
 		
 		// Round Trip to Blob
 		ABlob bs=a.toBlob();

@@ -105,7 +105,7 @@ public final class Symbol extends ASymbolic implements Comparable<Symbol> {
 	
 	@Override
 	public int compareTo(Symbol sym) {
-		return name.compareTo(sym.name);
+		return name.compareTo(sym.name.toBlob());
 	}
 
 	@Override

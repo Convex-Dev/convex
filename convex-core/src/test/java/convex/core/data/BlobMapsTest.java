@@ -146,6 +146,14 @@ public class BlobMapsTest {
 		}
 		assertSame(BlobMaps.empty(), m);
 	}
+	
+	@Test
+	public void testStringKeys() {
+		AString k=Samples.NON_EMBEDDED_STRING;
+		Address v=Address.ZERO;
+		BlobMap<AString,Address> bm=BlobMap.create(k,v);
+		doBlobMapTests(bm);
+	}
 
 	@Test
 	public void testIdentity() {
@@ -233,15 +241,15 @@ public class BlobMapsTest {
 
 	@Test
 	public void testDissocEntries() throws InvalidDataException {
-		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
+		BlobMap<ABlobLike<?>, CVMLong> m = Samples.INT_BLOBMAP_7;
 		long n=m.count();
 
 		for (int i=0; i<n; i++) {
-			MapEntry<Blob,CVMLong> me=m.entryAt(i);
-			BlobMap<Blob, CVMLong> dm= (BlobMap<Blob, CVMLong>)m.dissoc(me.getKey());
+			MapEntry<ABlobLike<?>,CVMLong> me=m.entryAt(i);
+			BlobMap<ABlobLike<?>, CVMLong> dm= (BlobMap<ABlobLike<?>, CVMLong>)m.dissoc(me.getKey());
 			dm.validate();
 			assertEquals(n-1,dm.count());
-			BlobMap<Blob, CVMLong> m2=dm.assocEntry(me);
+			BlobMap<ABlobLike<?>, CVMLong> m2=dm.assocEntry(me);
 			assertEquals(m,m2);
 		}
 	}
@@ -266,8 +274,8 @@ public class BlobMapsTest {
 	
 	@Test
 	public void testSliceSmallBlobMap() {
-		BlobMap<Blob, CVMLong> m=Samples.INT_BLOBMAP_7;
-		BlobMap<Blob, CVMLong> ms=m.slice(3,4);
+		BlobMap<ABlobLike<?>, CVMLong> m=Samples.INT_BLOBMAP_7;
+		BlobMap<ABlobLike<?>, CVMLong> ms=m.slice(3,4);
 		assertEquals(1,ms.count());
 		doBlobMapTests(ms);
 		
@@ -284,17 +292,17 @@ public class BlobMapsTest {
 
 	@Test
 	public void testSmallIntBlobMap() {
-		BlobMap<Blob, CVMLong> m = Samples.INT_BLOBMAP_7;
+		BlobMap<ABlobLike<?>, CVMLong> m = Samples.INT_BLOBMAP_7;
 
 		for (int i = 0; i < 7; i++) {
-			MapEntry<Blob, CVMLong> me = m.entryAt(i);
+			MapEntry<ABlobLike<?>, CVMLong> me = m.entryAt(i);
 			assertEquals(i, me.getValue().longValue());
 			assertEquals(me, m.getEntry(me.getKey()));
 		}
 		doBlobMapTests(m);
 	}
 
-	private <K extends ABlob, V extends ACell> void doBlobMapTests(BlobMap<K, V> m) {
+	private <K extends ABlobLike<?>, V extends ACell> void doBlobMapTests(BlobMap<K, V> m) {
 		long n = m.count();
 		
 		BlobMap<K,V> secondHalf=m.slice(n/2,n);
@@ -304,7 +312,7 @@ public class BlobMapsTest {
 		if (n >= 2) {
 			MapEntry<K, V> e1 = m.entryAt(0);
 			MapEntry<K, V> e2 = m.entryAt(n - 1);
-			assertTrue(e1.getKey().compareTo(e2.getKey()) < 0);
+			assertTrue(e1.getKey().compareTo(e2.getKey().toBlob()) < 0);
 		}
 		
 		assertEquals(Types.BLOBMAP,m.getType());

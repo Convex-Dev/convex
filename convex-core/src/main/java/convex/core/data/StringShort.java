@@ -178,8 +178,8 @@ public final class StringShort extends AString {
 	}
 
 	@Override
-	public int compareTo(AString o) {
-		return data.compareTo(o.toBlob());
+	public int compareTo(ABlobLike<?> o) {
+		return data.compareTo(o);
 	}
 
 	@Override
@@ -211,6 +211,16 @@ public final class StringShort extends AString {
 	@Override
 	public boolean equalsBytes(ABlob b) {
 		return data.equalsBytes(b);
+	}
+	
+	@Override
+	public long hexMatchLength(ABlob b, long start, long length) {
+		return data.hexMatchLength(b,start,length);
+	}
+
+	@Override
+	public long longValue() {
+		return data.longValue();
 	}
 
 }

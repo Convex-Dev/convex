@@ -7,7 +7,7 @@ import convex.core.util.Utils;
  * 
  * @param <T> type of conceptual elements
  */
-public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
+public abstract class ABlobLike<T extends ACell> extends ACountable<T> implements Comparable<ABlobLike<?>> {
 	/**
 	 * Gets the byte at the specified position.
 	 * Result is undefined if out of range.
@@ -44,6 +44,19 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 		return (b>>shift)&0x0F;
 	}
 	
+	/**
+	 * Returns the number of matching hex digits in the given hex range of another Blob. Assumes
+	 * range is valid for both blobs.
+	 * 
+	 * Returns length if this Blob is exactly equal to the specified hex range.
+	 * 
+	 * @param start Start position (in hex digits)
+	 * @param length Length to compare (in hex digits)
+	 * @param b Blob to compare with
+	 * @return The number of matching hex characters
+	 */
+	public abstract long hexMatchLength(ABlob b, long start, long length);
+	
 	@Override
 	public abstract ABlobLike<T> empty();
 	
@@ -70,6 +83,16 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	public long hexLength() {
 		return count()*2;
 	}
+	
+	/**
+	 * Converts this BlobLike to the corresponding long value.
+	 * 
+	 * Assumes big-endian format, as if the entire blob is interpreted as an unsigned big integer. Higher bytes 
+	 * outside the Long range will be ignored, i.e. the lowest 64 bits are taken
+	 * 
+	 * @return long value of this blob
+	 */
+	public abstract long longValue();
 
 	/**
 	 * Convert this BlobLike object to a blob, in the most efficient way. May return `this`
@@ -83,5 +106,8 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	 * @return `true` if byte contents are exactly equal, `false` otherwise
 	 */
 	public abstract boolean equalsBytes(ABlob b);
+
+	@Override
+	public abstract int compareTo(ABlobLike<?> b);
 
 }

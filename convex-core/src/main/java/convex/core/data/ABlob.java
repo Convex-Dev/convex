@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * lazily computed on demand
  * 
  */
-public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABlob> {
+public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 	@Override
 	public AType getType() {
@@ -233,7 +233,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 * specialised Blob types may be lexicographically equal but represent different values.
 	 */
 	@Override
-	public int compareTo(ABlob b) {
+	public int compareTo(ABlobLike<?> b) {
 		if (this == b) return 0;
 		long alength = this.count();
 		long blength = b.count();
@@ -286,18 +286,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 		if (count() < 0) throw new InvalidDataException("Negative blob length", this);
 	}
 
-	/**
-	 * Returns the number of matching hex digits in the given hex range of another Blob. Assumes
-	 * range is valid for both blobs.
-	 * 
-	 * Returns length if this Blob is exactly equal to the specified hex range.
-	 * 
-	 * @param start Start position (in hex digits)
-	 * @param length Length to compare (in hex digits)
-	 * @param b Blob to compare with
-	 * @return The number of matching hex characters
-	 */
-	public abstract long hexMatchLength(ABlob b, long start, long length);
+
 
 	/**
 	 * Checks for Hex equality of two ABlobs. *ignores* type, i.e. only considers hex contents.
@@ -323,15 +312,7 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	 */
 	public abstract int encodeRaw(byte[] bs, int pos);
 	
-	/**
-	 * Converts this Blob to the corresponding long value.
-	 * 
-	 * Assumes big-endian format, as if the entire blob is interpreted as an unsigned big integer. Higher bytes 
-	 * outside the Long range will be ignored, i.e. the lowest 64 bits are taken
-	 * 
-	 * @return long value of this blob
-	 */
-	public abstract long longValue();
+
 	
 	@Override
 	public final int hashCode() {

@@ -113,7 +113,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	public int compareTo(ABlob b) {
+	public int compareTo(ABlobLike<?> b) {
 		if (b.count()==LENGTH) {
 			return compareTo(b.longValue());
 		} else {

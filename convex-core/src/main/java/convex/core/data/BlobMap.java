@@ -96,13 +96,13 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		return new BlobMap<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
-	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(K k, V v) {
+	public static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> create(K k, V v) {
 		MapEntry<K, V> me = MapEntry.create(k, v);
 		long hexLength = k.hexLength();
 		return new BlobMap<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 	
-	public static <K extends ABlob, V extends ACell> BlobMap<K, V> of(Object k, Object v) {
+	public static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> of(Object k, Object v) {
 		return create(RT.cvm(k),RT.cvm(v));
 	}
 
@@ -297,8 +297,8 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 			}
 		}
 		ACell maybeValidKey=e.getKey();
-		if (!(maybeValidKey instanceof ABlob)) return null; // invalid key type!
-		ABlob k = (ABlob)maybeValidKey;
+		if (!(maybeValidKey instanceof ABlobLike)) return null; // invalid key type!
+		ABlobLike<?> k = (ABlobLike)maybeValidKey;
 		
 		long pDepth = this.prefixDepth(); // hex depth of this node including prefix
 		long newKeyLength = k.hexLength(); // hex length of new key

@@ -19,6 +19,7 @@ import static convex.test.Assertions.assertTrustError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -773,12 +774,20 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Address.create(23),eval("(second (first (blob-map \"\" #21 0x #23)))"));
 		assertEquals(Address.create(23),eval("(get (blob-map \"\" #23) 0x)"));
 		
+		// Different bloblikes are still regarded as different keys, so affect equality
+		assertNotEquals(eval("(blob-map \"\" 1)"),eval("(blob-map 0x 1)"));
+		assertNotEquals(eval("(blob-map #13 1)"),eval("(blob-map 0x0000000000000013 1)"));
+		assertEquals(eval("(blob-map #13 1)"),eval("(blob-map #13 1)"));
+		
 		// Keys collide between blobs and equivalent addresses
 		assertEquals(CVMLong.ONE,eval("(count (blob-map #19 #21 0x0000000000000013 #22))"));
 		assertEquals(Vectors.of(Blob.fromHex("0000000000000013"),Address.create(22)),eval("(first (blob-map #19 #21 0x0000000000000013 #22))"));
 
 		assertArityError(step("(blob-map 0xabcd)"));
 		assertArityError(step("(blob-map 0xa2 :foo 0xb3)"));
+		
+		// Dissoc back to empty blobmap via equivalent bloblike keys
+		assertSame(BlobMaps.empty(),eval("(dissoc (blob-map 0x 1) \"\")"));
 	}
 
 	@Test

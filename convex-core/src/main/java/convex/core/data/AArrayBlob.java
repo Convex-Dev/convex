@@ -97,11 +97,11 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public final int compareTo(ABlob b) {
+	public final int compareTo(ABlobLike<?> b) {
 		if (b instanceof AArrayBlob) {
 			return compareTo((AArrayBlob) b);
 		} else {
-			return compareTo(b.toFlatBlob());
+			return -b.compareTo(this);
 		}
 	}
 

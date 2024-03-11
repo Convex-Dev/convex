@@ -17,17 +17,17 @@ public class BlobMaps {
 	 * @return The empty BlobMap
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R empty() {
+	public static <R extends ABlobMap<K, V>, K extends ABlobLike<?>, V extends ACell> R empty() {
 		return (R) BlobMap.EMPTY;
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R create(K k, V v) {
+	public static <R extends ABlobMap<K, V>, K extends ABlobLike<?>, V extends ACell> R create(K k, V v) {
 		return (R) BlobMap.create(k, v);
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R of(Object... kvs) {
+	public static <R extends ABlobMap<K, V>, K extends ABlobLike<?>, V extends ACell> R of(Object... kvs) {
 		int n = kvs.length;
 		if (Utils.isOdd(n)) throw new IllegalArgumentException("Even number of key + values required");
 		BlobMap<K, V> result = empty();
@@ -40,7 +40,7 @@ public class BlobMaps {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <R extends ABlobMap<K, V>, K extends ABlob, V extends ACell> R create(HashMap<K, V> map) {
+	public static <R extends ABlobMap<K, V>, K extends ABlobLike<?>, V extends ACell> R create(HashMap<K, V> map) {
 		BlobMap<K,V> result=empty();
 		for (Map.Entry<K,V> me: map.entrySet()) {
 			result=result.assoc(me.getKey(), me.getValue());

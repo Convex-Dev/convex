@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * consistent behaviour (e.g. in conversions to and from Blobs). It is up to clients to decide 
  * how to represent invalid UTF-8 if necessary.
  */
-public abstract class AString extends ABlobLike<CVMChar> implements Comparable<AString> {
+public abstract class AString extends ABlobLike<CVMChar> {
 
 	protected long length;
 	
@@ -123,9 +123,6 @@ public abstract class AString extends ABlobLike<CVMChar> implements Comparable<A
 	public int getBytes(byte[] dest, int destOffset) {
 		return toBlob().getBytes(dest, destOffset);
 	}
-	
-	@Override
-	public abstract int compareTo(AString o);
 	
 	@Override 
 	public final String toString() {

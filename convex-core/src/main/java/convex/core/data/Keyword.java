@@ -150,7 +150,7 @@ public final class Keyword extends ASymbolic implements Comparable<Keyword> {
 
 	@Override
 	public int compareTo(Keyword k) {
-		return name.compareTo(k.name);
+		return name.compareTo(k.name.toBlob());
 	}
 
 	@Override

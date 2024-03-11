@@ -82,7 +82,7 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public int compareTo(AString o) {
+	public int compareTo(ABlobLike<?> o) {
 		return ((AString)getCanonical()).compareTo(o);
 	}
 
@@ -112,6 +112,16 @@ public class StringSlice extends AString {
 	public boolean equalsBytes(ABlob b) {
 		if (length!=b.count()) return false;
 		return toBlob().equalsBytes(b);
+	}
+	
+	@Override
+	public long longValue() {
+		return slice(0,Math.min(LongBlob.LENGTH, count())).longValue();
+	}
+	
+	@Override
+	public long hexMatchLength(ABlob b, long start, long length) {
+		return toBlob().hexMatchLength(b,start,length);
 	}
 
 
