@@ -250,6 +250,12 @@ public class Hash extends AArrayBlob {
 		if (other == this) return true;
 		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, LENGTH);
 	}
+	
+	@Override
+	public ABlob toBlob() {
+		// Already a Blob
+		return this;
+	}
 
 
 }

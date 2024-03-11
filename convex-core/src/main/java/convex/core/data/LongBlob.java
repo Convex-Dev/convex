@@ -38,17 +38,7 @@ public final class LongBlob extends ALongBlob {
 		return getEncoding().slice(start + 2, end+2);
 	}
 
-	@Override
-	public Blob toFlatBlob() {
-		// Trick to use cached encoding if available
-		if (encoding!=null) {
-			return encoding.slice(2,2+LENGTH);
-		}
-		byte[] bs=new byte[LENGTH];
-		Utils.writeLong(bs, 0, value);
-		return Blob.wrap(bs);
-	}
-
+	
 	@Override
 	protected void updateDigest(MessageDigest digest) {
 		byte[] bs = getEncoding().getInternalArray();
@@ -126,6 +116,24 @@ public final class LongBlob extends ALongBlob {
 	@Override
 	public Blob toCanonical() {
 		return toFlatBlob();
+	}
+	
+	@Override
+	public Blob toFlatBlob() {
+		// Trick to use cached encoding if available
+		if (encoding!=null) {
+			return encoding.slice(2,2+LENGTH);
+		}
+		byte[] bs=new byte[LENGTH];
+		Utils.writeLong(bs, 0, value);
+		return Blob.wrap(bs);
+	}
+
+
+	@Override
+	public ABlob toBlob() {
+		// Already a Blob
+		return this;
 	}
 
 }

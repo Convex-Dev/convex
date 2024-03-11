@@ -263,4 +263,9 @@ public class Blob extends AArrayBlob {
 		return Blobs.toCanonical(this);
 	}
 
+	@Override
+	public ABlob toBlob() {
+		return toCanonical();
+	}
+
 }

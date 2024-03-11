@@ -208,4 +208,9 @@ public final class StringShort extends AString {
 		return;
 	}
 
+	@Override
+	public boolean equalsBytes(ABlob b) {
+		return data.equalsBytes(b);
+	}
+
 }

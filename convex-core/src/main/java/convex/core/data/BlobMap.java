@@ -23,7 +23,7 @@ import convex.core.util.Utils;
  * @param <K> Type of Keys
  * @param <V> Type of values
  */
-public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K, V> {
+public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlobMap<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Ref<BlobMap>[] EMPTY_CHILDREN = new Ref[0];
 
@@ -80,15 +80,16 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 		this.mask = mask;
 	}
 
-	public static <K extends ABlob, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
+	@SuppressWarnings("unchecked")
+	public static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
 		ACell k=me.getKey();
-		if (!(k instanceof ABlob)) return null;
-		long hexLength = ((ABlob)k).hexLength();
+		if (!(k instanceof ABlobLike)) return null;
+		long hexLength = ((K)k).hexLength();
 		return new BlobMap<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
-	private static <K extends ABlob, V extends ACell> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
-		Blob prefix = me.getKey().toFlatBlob();
+	private static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
+		ABlob prefix = me.getKey().toBlob();
 		long hexLength = prefix.hexLength();
 		if (depth > hexLength)
 			throw new IllegalArgumentException("Depth " + depth + " too deep for key with hexLength: " + hexLength);
@@ -127,20 +128,20 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 	}
 
 	@Override
-	public V get(ABlob key) {
+	public V get(K key) {
 		MapEntry<K, V> me = getEntry(key);
 		if (me == null) return null;
 		return me.getValue();
 	}
 
 	@Override
-	public MapEntry<K, V> getEntry(ABlob key) {
+	public MapEntry<K, V> getEntry(K key) {
 		long kl = key.hexLength();
 		long pl = depth + prefixLength;
 		if (kl < pl) return null; // key is too short to start with current prefix
 
 		if (kl == pl) {
-			if ((entry!=null)&&(key.equalsBytes(entry.getKey()))) return entry; // we matched this key exactly!
+			if ((entry!=null)&&(key.equalsBytes(entry.getKey().toBlob()))) return entry; // we matched this key exactly!
 			return null; // entry does not exist
 		}
 
@@ -184,7 +185,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 	
 	@SuppressWarnings("unchecked")
 	public BlobMap<K, V> assoc(ACell key, ACell value) {
-		if (!(key instanceof ABlob)) return null;
+		if (!(key instanceof ABlobLike)) return null;
 		return assocEntry(MapEntry.create((K)key, (V)value));
 	}
 
@@ -193,7 +194,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 	public BlobMap<K, V> dissoc(K k) {
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
-			if (entry.getKey().equalsBytes(k)) {
+			if (entry.getKey().equalsBytes(k.toBlob())) {
 				return (depth==0)?empty():null;
 			}
 			return this; // leave existing entry in place
@@ -207,7 +208,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 		if (kl == pDepth) {
 			// need to check for match with current entry
 			if (entry == null) return this;
-			if (!k.equalsBytes(entry.getKey())) return this;
+			if (!k.equalsBytes(entry.getKey().toBlob())) return this;
 			// at this point have matched entry exactly. So need to remove it safely while
 			// preserving invariants
 			if (children.length == 1) {
@@ -244,7 +245,7 @@ public final class BlobMap<K extends ABlob, V extends ACell> extends ABlobMap<K,
 	 * unnecessary blob instances being created.
 	 */
 	private ABlob getPrefix() {
-		if (entry!=null) return entry.getKey();
+		if (entry!=null) return entry.getKey().toBlob();
 		int n=children.length;
 		if (n==0) return Blob.EMPTY;
 		return children[0].getValue().getPrefix();

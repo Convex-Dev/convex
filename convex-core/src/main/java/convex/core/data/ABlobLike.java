@@ -67,4 +67,21 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> {
 	 */
 	public abstract int getBytes(byte[] dest, int destOffset);
 
+	public long hexLength() {
+		return count()*2;
+	}
+
+	/**
+	 * Convert this BlobLike object to a blob, in the most efficient way. May return `this`
+	 * @return
+	 */
+	public abstract ABlob toBlob();
+
+	/**
+	 * Compare the byte content of this BlobLike to a Blob value
+	 * @param b Blob value to compare with
+	 * @return `true` if byte contents are exactly equal, `false` otherwise
+	 */
+	public abstract boolean equalsBytes(ABlob b);
+
 }

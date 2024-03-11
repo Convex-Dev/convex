@@ -90,7 +90,8 @@ public class BlobMapsTest {
 	@Test
 	public void testGet() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
-		BlobMap<ABlob, CVMLong> m = BlobMaps.of(k1, 17L);
+		ACell v1 = CVMLong.create(17);
+		BlobMap<ABlob, CVMLong> m = BlobMaps.of(k1, v1);
 		assertNull(m.get(Samples.MAX_EMBEDDED_STRING)); // needs a blob. String counts as non-existent key
 		assertCVMEquals(17L,m.get(k1));
 

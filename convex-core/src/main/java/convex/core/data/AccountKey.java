@@ -274,6 +274,11 @@ public class AccountKey extends AArrayBlob {
 		return toFlatBlob();
 	}
 
+	@Override
+	public ABlob toBlob() {
+		return this;
+	}
+
 
 
 }

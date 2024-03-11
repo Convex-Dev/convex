@@ -764,9 +764,14 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(blob-map :foo :bar)")); // See issue #162
 		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // See Issue #101
 		
-		// TODO: are we sure we want to preserve Address type in keys?
+		// We want to preserve Address type in keys and values
 		assertEquals(Address.create(19),eval("(first (first (blob-map #19 #21)))"));
 		assertEquals(Address.create(21),eval("(second (first (blob-map #19 #21)))"));
+		
+		// Strings count as equivalent blobs (will overwrite each other)
+		assertSame(Strings.EMPTY,eval("(first (first (blob-map \"\" #21)))"));
+		assertEquals(Address.create(23),eval("(second (first (blob-map \"\" #21 0x #23)))"));
+		assertEquals(Address.create(23),eval("(get (blob-map \"\" #23) 0x)"));
 		
 		// Keys collide between blobs and equivalent addresses
 		assertEquals(CVMLong.ONE,eval("(count (blob-map #19 #21 0x0000000000000013 #22))"));

@@ -243,6 +243,11 @@ public final class Address extends ALongBlob {
 		return create(value+offset);
 	}
 
+	@Override
+	public ABlob toBlob() {
+		return this;
+	}
+
 
 
 

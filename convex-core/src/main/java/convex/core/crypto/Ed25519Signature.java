@@ -3,6 +3,7 @@ package convex.core.crypto;
 import java.nio.ByteBuffer;
 
 import convex.core.data.AArrayBlob;
+import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -155,6 +156,11 @@ public class Ed25519Signature extends ASignature {
 	@Override
 	public Blob getChunk(long i) {
 		return Blob.create(store).getChunk(i);
+	}
+
+	@Override
+	public ABlob toBlob() {
+		return this;
 	}
 
 

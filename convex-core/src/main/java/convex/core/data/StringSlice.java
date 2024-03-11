@@ -108,5 +108,11 @@ public class StringSlice extends AString {
 		return false;
 	}
 
+	@Override
+	public boolean equalsBytes(ABlob b) {
+		if (length!=b.count()) return false;
+		return toBlob().equalsBytes(b);
+	}
+
 
 }

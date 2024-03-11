@@ -16,21 +16,23 @@ import convex.core.data.type.Types;
  * @param <K> Type of BlobMap keys
  * @param <V> Type of BlobMap values
  */
-public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K, V> {
+public abstract class ABlobMap<K extends ABlobLike<?>, V extends ACell> extends AMap<K, V> {
 	protected ABlobMap(long count) {
 		super(count);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public final V get(ACell key) {
-		if (!(key instanceof ABlob)) return null;
-		return get((ABlob) key);
+		if (!(key instanceof ABlobLike)) return null;
+		return get((K) key);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public boolean containsKey(ACell key) {
-		if (!(key instanceof ABlob)) return false;
-		return (getEntry((ABlob) key) != null);
+		if (!(key instanceof ABlobLike)) return false;
+		return (getEntry((K) key) != null);
 	}
 
 	/**
@@ -39,7 +41,7 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	 * @param key Key to lookup up
 	 * @return The value specified by the given blob key or null if not present.
 	 */
-	public abstract V get(ABlob key);
+	public abstract V get(K key);
 
 	@Override
 	public Set<Entry<K, V>> entrySet() {
@@ -79,7 +81,7 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	@SuppressWarnings("unchecked")
 	@Override
 	public final ABlobMap<K, V> dissoc(ACell key) {
-		if (key instanceof ABlob) {
+		if (key instanceof ABlobLike) {
 			return dissoc((K)key);
 		}
 		return this;
@@ -95,12 +97,13 @@ public abstract class ABlobMap<K extends ABlob, V extends ACell> extends AMap<K,
 	@Override
 	public abstract MapEntry<K, V> entryAt(long i);
 
+	@SuppressWarnings("unchecked")
 	public MapEntry<K, V> getEntry(ACell key) {
-		if (key instanceof ABlob) return getEntry((ABlob)key);
+		if (key instanceof ABlobLike) return getEntry((K)key);
 		return null;
 	}
 	
-	public abstract MapEntry<K, V> getEntry(ABlob key);
+	public abstract MapEntry<K, V> getEntry(K key);
 
 	@Override
 	public abstract int estimatedEncodingSize();

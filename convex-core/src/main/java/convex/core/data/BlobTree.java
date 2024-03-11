@@ -584,13 +584,7 @@ public class BlobTree extends ABlob {
 		return Tag.BLOB;
 	}
 
-	@Override
-	public ABlob toCanonical() {
-		return this;
-		
-		//if (isCanonical()) return this;
-		//return Blobs.toCanonical(this);
-	}
+
 
 	/**
 	 * Gets the size of a BlobTree child for a blob of given total length.
@@ -610,6 +604,18 @@ public class BlobTree extends ABlob {
 	 */
 	public static int childCount(long length) {
 		return Utils.checkedInt(1+(length-1)/childSize(length));
+	}
+	
+	@Override
+	public ABlob toCanonical() {
+		return this;
+		//if (isCanonical()) return this;
+		//return Blobs.toCanonical(this);
+	}
+
+	@Override
+	public ABlob toBlob() {
+		return this;
 	}
 
 

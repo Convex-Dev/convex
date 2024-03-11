@@ -297,15 +297,15 @@
                        :return Long}]}}
 
  blob
- {:doc {:description "Casts the argument to a canonical Blob. Arugment can be an Address, a hex String, a Long value, or another Blob."
+ {:doc {:description "Casts the argument to a canonical Blob. Arugment can be an Address, a hex String, a Long value, or another Blob value."
         :errors      {:CAST "If the argument is not castable to a blob."}
         :examples    [{:code "(blob \"1234abcd\")"}]
         :signature   [{:params [address]
                        :return Blob}]}}
 
  blob-map
- {:doc {:description ["Creates a BlobMap. BlobMaps are specialised maps that support Blob types as keys only (see `blob`)."
-                      "Optional arguments must be pairs of blob keys and values to be included in the blob map."]
+ {:doc {:description ["Creates a BlobMap. BlobMaps are specialised maps that support blob-like types as keys only (see `blob`)."
+                      "Optional arguments must be pairs of blob-like keys and values to be included in the blob map."]
         :errors      {:ARGUMENT "If any of the keys supplied is not castable to a blob."
                       :ARITY    "If there is not an even number of arguments (key and value pairs)."}
         :examples    [{:code "(blob-map 0x1234 :foo)"}]

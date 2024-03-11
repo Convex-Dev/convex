@@ -313,10 +313,6 @@ public abstract class ABlob extends ABlobLike<CVMLong> implements Comparable<ABl
 	public boolean hexEquals(ABlob b, long start, long length) {
 		return hexMatchLength(b, start, length) == length;
 	}
-
-	public long hexLength() {
-		return count() << 1;
-	}
 	
 	/**
 	 * Writes this Blob's encoding to a byte array, excluding the tag byte

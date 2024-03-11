@@ -151,4 +151,9 @@ public class StringTree extends AString {
 		return ACell.genericEquals(this, b);
 	}
 
+	@Override
+	public boolean equalsBytes(ABlob key) {
+		return data.equalsBytes(key);
+	}
+
 }
