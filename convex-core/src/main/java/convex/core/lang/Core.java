@@ -2836,7 +2836,7 @@ public class Core {
  					}
  				}
  				
- 				// Intrinsic core defs are marked as static
+ 				// Intrinsic core defs are additionally marked as static
  				ACell value=definedEntry.getValue();
  				if (value instanceof ICoreDef) {
  					meta=meta.assoc(Keywords.STATIC, CVMBool.TRUE);
@@ -2857,7 +2857,6 @@ public class Core {
 		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
 
 		try {
-
 			// Register all objects from registered runtime
 			for (ACell o : tempReg) {
 				coreEnv = register(coreEnv, o);
