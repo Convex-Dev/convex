@@ -3483,7 +3483,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(3L, evalL("(count [1 2 3])"));
 		assertEquals(4L, evalL("(count 0xcafebabe)"));
 		
-		// TODO: do we want this? Address is blob-like when used in indexes
+		// Address is blob-like when used in indexes, so this behaviour is useful
 		assertEquals(8L, evalL("(count #123)"));
 
 		// Count of a map is the number of entries
@@ -3505,6 +3505,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Constant.of(null), eval("(compile nil)"));
 		assertEquals(Invoke.class, eval("(compile '(+ 1 2))").getClass());
 		assertEquals(Do.class, eval("(compile '(do a b))").getClass());
+		
+		// TODO
+		// assertEquals(Lookup.create("a"),eval("(compile 'a)"));
 
 		assertArityError(step("(compile)"));
 		assertArityError(step("(compile 1 2)"));
@@ -3666,7 +3669,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(empty? '(foo))"));
 		assertFalse(evalB("(empty? #{[]})"));
 		
-		assertFalse(evalB("(empty? 1)"));
+		assertFalse(evalB("(empty? 0)"));
 		assertFalse(evalB("(empty? :foo)"));
 	}
 
@@ -3674,6 +3677,8 @@ public class CoreTest extends ACVMTest {
 	public void testSymbolPred() {
 		assertTrue(evalB("(symbol? 'foo)"));
 		assertTrue(evalB("(symbol? (symbol :bar))"));
+
+		assertFalse(evalB("(symbol? (str 1))"));
 		assertFalse(evalB("(symbol? nil)"));
 		assertFalse(evalB("(symbol? 1)"));
 		assertFalse(evalB("(symbol? ['foo])"));
@@ -3683,6 +3688,7 @@ public class CoreTest extends ACVMTest {
 	public void testKeywordPred() {
 		assertTrue(evalB("(keyword? :foo)"));
 		assertTrue(evalB("(keyword? (keyword 'bar))"));
+		
 		assertFalse(evalB("(keyword? nil)"));
 		assertFalse(evalB("(keyword? 1)"));
 		assertFalse(evalB("(keyword? [:foo])"));
@@ -3690,7 +3696,10 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testAddressPred() {
+		assertTrue(evalB("(address? #0)")); 
 		assertTrue(evalB("(address? *origin*)"));
+		assertTrue(evalB("(address? #5475747)")); // non-existent account address is still an address
+		
 		assertFalse(evalB("(address? nil)"));
 		assertFalse(evalB("(address? 1)"));
 		assertFalse(evalB("(address? \"0a1b2c3d\")"));
@@ -3705,6 +3714,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(blob? (hash (encoding *state*)))")); // HAsh
 		assertTrue(evalB("(blob? *key*)")); // AccountKey
 
+		assertFalse(evalB("(blob? (str))"));
 		assertFalse(evalB("(blob? 17)"));
 		assertFalse(evalB("(blob? nil)"));
 		assertFalse(evalB("(blob? *address*)"));
