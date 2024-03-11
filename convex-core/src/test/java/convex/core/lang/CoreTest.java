@@ -3507,8 +3507,14 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testCompile() {
 		assertEquals(Constant.of(1L), eval("(compile 1)"));
+		
+		// special cases for optimised constants
 		assertSame(Constant.NULL, eval("(compile nil)"));
 		assertSame(Constant.TRUE, eval("(compile true)"));
+		assertSame(Constant.FALSE, eval("(compile false)"));
+		assertSame(Constant.EMPTY_VECTOR, eval("(compile [])"));
+		assertSame(Constant.EMPTY_LIST, eval("(compile ())"));
+		assertSame(Constant.EMPTY_MAP, eval("(compile {})"));
 		
 		assertEquals(Invoke.create(Constant.of(Core.PLUS),Constant.of(1),Constant.of(2)), eval("(compile '(+ 1 2))"));
 		

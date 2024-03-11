@@ -2,6 +2,8 @@ package convex.core.lang.ops;
 
 import convex.core.data.ACell;
 import convex.core.data.AList;
+import convex.core.data.AMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -9,7 +11,9 @@ import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.List;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
+import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.VectorLeaf;
 import convex.core.data.prim.CVMBool;
@@ -41,7 +45,12 @@ public class Constant<T extends ACell> extends AOp<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Constant<AList<?>> EMPTY_LIST = new Constant(List.EMPTY_REF);
 
-	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static final Constant<AMap<?,?>> EMPTY_MAP = new Constant(Maps.EMPTY_REF);
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static final Constant<ASet<?>> EMPTY_SET = new Constant(Sets.EMPTY_REF);
+
 	private final Ref<T> valueRef;
 
 	private Constant(Ref<T> valueRef) {

@@ -298,7 +298,7 @@ public class Compiler {
 	 */
 	private static Context compileMap(AMap<ACell, ACell> form, Context context) {
 		int n = form.size();
-		if (n==0) return compileConstant(context,form);
+		if (n==0) return context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_MAP);
 		
 		ACell[] vs = new ACell[1 + n * 2];
 		vs[0] = Symbols.HASH_MAP;
@@ -314,7 +314,7 @@ public class Compiler {
 	 * Compile a set literal of the form #{1 2} as (hash-set 1 2)
 	 */
 	private static Context compileSet(ASet<ACell> form, Context context) {
-		if (form.isEmpty()) return compileConstant(context,Sets.empty());
+		if (form.isEmpty()) return context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_SET);
 		
 		AVector<ACell> vs = Vectors.empty();
 		for (ACell o : form) {

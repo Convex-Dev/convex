@@ -18,7 +18,7 @@ public class Maps {
 		EMPTY_MAP.getRef().setFlags(Ref.INTERNAL_FLAGS);
 	}
 	
-	private static final Ref<?> EMPTY_REF = EMPTY_MAP.getRef();
+	public static final Ref<AMap<?, ?>> EMPTY_REF = EMPTY_MAP.getRef();
 
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell, R extends AHashMap<K, V>> R empty() {
