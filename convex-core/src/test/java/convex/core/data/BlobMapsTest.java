@@ -49,7 +49,6 @@ public class BlobMapsTest {
 		assertNull(m.assoc(null, null));
 	}
 
-
 	@Test
 	public void testAssoc() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
@@ -153,6 +152,8 @@ public class BlobMapsTest {
 		Address v=Address.ZERO;
 		BlobMap<AString,Address> bm=BlobMap.create(k,v);
 		doBlobMapTests(bm);
+		
+		assertSame(BlobMaps.empty(),bm.dissoc(k));
 	}
 
 	@Test
