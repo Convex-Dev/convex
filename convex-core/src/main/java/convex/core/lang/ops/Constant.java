@@ -58,6 +58,10 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return create(RT.cvm(value));
 	}
 	
+	public static Constant<CVMBool> forBoolean(boolean value) {
+		return value?TRUE:FALSE;
+	}
+	
 	public static Constant<AString> createString(String stringValue) {
 		return new Constant<AString>(Strings.create(stringValue).getRef());
 	}
@@ -135,6 +139,7 @@ public class Constant<T extends ACell> extends AOp<T> {
 	public void validateCell() throws InvalidDataException {
 		if (valueRef == null) throw new InvalidDataException("Missing contant value ref!", this);
 	}
+
 
 
 }

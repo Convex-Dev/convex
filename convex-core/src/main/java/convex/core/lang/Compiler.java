@@ -112,6 +112,10 @@ public class Compiler {
 		if ((form instanceof Keyword) || (form instanceof ABlob)) {
 			return compileConstant(context, form);
 		}
+		
+		if (form instanceof CVMBool) {
+			return compileBoolean(context, (CVMBool)form);
+		}
 
 		if (form instanceof Symbol) {
 			return compileSymbol((Symbol) form, context);
@@ -339,6 +343,10 @@ public class Compiler {
 
 	private static Context compileConstant(Context context, ACell value) {
 		return context.withResult(Juice.COMPILE_CONSTANT, Constant.create(value));
+	}
+	
+	private static Context compileBoolean(Context context, CVMBool value) {
+		return context.withResult(Juice.COMPILE_CONSTANT, Constant.forBoolean(value.booleanValue()));
 	}
 
 	/**

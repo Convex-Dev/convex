@@ -74,10 +74,17 @@ import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
+import convex.core.lang.ops.Cond;
 import convex.core.lang.ops.Constant;
+import convex.core.lang.ops.Def;
 import convex.core.lang.ops.Do;
 import convex.core.lang.ops.Invoke;
+import convex.core.lang.ops.Lambda;
+import convex.core.lang.ops.Let;
+import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
+import convex.core.lang.ops.Query;
+import convex.core.lang.ops.Set;
 import convex.core.lang.ops.Special;
 import convex.test.Samples;
 
@@ -3500,14 +3507,31 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testCompile() {
 		assertEquals(Constant.of(1L), eval("(compile 1)"));
-
-		assertEquals(Constant.of(1L), eval("(compile 1)"));
-		assertEquals(Constant.of(null), eval("(compile nil)"));
-		assertEquals(Invoke.class, eval("(compile '(+ 1 2))").getClass());
-		assertEquals(Do.class, eval("(compile '(do a b))").getClass());
+		assertSame(Constant.NULL, eval("(compile nil)"));
+		assertSame(Constant.TRUE, eval("(compile true)"));
 		
-		// TODO
-		// assertEquals(Lookup.create("a"),eval("(compile 'a)"));
+		assertEquals(Invoke.create(Constant.of(Core.PLUS),Constant.of(1),Constant.of(2)), eval("(compile '(+ 1 2))"));
+		
+		assertSame(Constant.NULL, eval("(compile '(do))")); // note optimisation for empty do
+		assertEquals(Do.create(Constant.NULL,Constant.TRUE), eval("(compile '(do nil true))"));
+		
+		assertEquals(Def.create(Symbols.FOO,Constant.FALSE), eval("(compile '(def foo false))"));
+	
+		assertEquals(Lambda.create(Vectors.empty(),Constant.NULL), eval("(compile '(fn []))"));
+		assertEquals(Lambda.create(Vectors.of(Symbols.FOO),Constant.TRUE), eval("(compile '(fn [foo] true))"));
+		
+		assertEquals(Let.create(Vectors.of(Symbols.FOO), Vectors.of(Constant.TRUE,Local.create(0)), false), eval("(let [b 1] (compile '(let [foo true] foo)))"));
+		assertEquals(Let.create(Vectors.of(Symbols.FOO), Vectors.of(Constant.TRUE,Local.create(0)), true), eval("(compile '(loop [foo true] foo))"));
+		
+		assertEquals(Cond.create(Constant.of(1),Constant.of(2),Constant.of(3)), eval("(compile '(if 1 2 3))"));
+		
+		assertEquals(Lookup.create(Constant.of(HERO),"a"),eval("(compile 'a)"));
+		
+		assertEquals(Query.create(Constant.TRUE),eval("(compile '(query true))"));
+
+		assertEquals(Let.create(Vectors.of(Symbols.FOO), Vectors.of(Constant.TRUE,Set.create(0,Constant.FALSE)), false), eval("(compile '(let [foo true] (set! foo false)))"));
+		
+		assertSame(Special.forSymbol(Symbols.STAR_ADDRESS),eval("(compile '*address*)"));
 
 		assertArityError(step("(compile)"));
 		assertArityError(step("(compile 1 2)"));

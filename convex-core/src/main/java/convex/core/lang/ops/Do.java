@@ -53,13 +53,10 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 		if (ctx.isExceptional()) return ctx;
 		
 		// execute each operation in turn
-		// TODO: early return
 		for (int i = 0; i < n; i++) {
 			AOp<?> op = ops.get(i);
 			ctx = ctx.execute(op);
-
 			if (ctx.isExceptional()) break;
-
 		}
 		return ctx;
 	}
