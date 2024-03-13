@@ -1444,6 +1444,15 @@ public class Context {
 	}
 	
 	/**
+	 * Tests if this Context's current status contains an Error. Errors are an uncatchable subset of Exceptions.
+	 *
+	 * @return true if context has an Error value, false otherwise
+	 */
+	public boolean isError() {
+		return (exception!=null)&&(exception instanceof ErrorValue);
+	}
+	
+	/**
 	 * Tests if an Address is valid, i.e. refers to an existing Account
 	 * 
 	 * @param address Address to check. May be null
@@ -1452,15 +1461,6 @@ public class Context {
 	public boolean isValidAccount(Address address) {
 		if (address==null) return false;
 		return getAccountStatus(address)!=null;
-	}
-
-	/**
-	 * Tests if this Context's current status contains an Error. Errors are an uncatchable subset of Exceptions.
-	 *
-	 * @return true if context has an Error value, false otherwise
-	 */
-	public boolean isError() {
-		return (exception!=null)&&(exception instanceof ErrorValue);
 	}
 
 	/**

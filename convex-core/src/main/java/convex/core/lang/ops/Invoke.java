@@ -83,6 +83,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 		}
 
 		ctx = ctx.invoke(fn, args);
+		// Specific check for an error so we can add stack trace info
 		if (ctx.isError()) {
 			// getError()must be non-null at this point
 			ctx.getError().addTrace("In expression: "+RT.print(this));

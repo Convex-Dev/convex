@@ -3507,17 +3507,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testCompile() {
 		assertEquals(Constant.of(1L), eval("(compile 1)"));
-		
-		// special cases for optimised constants
-		assertSame(Constant.NULL, eval("(compile nil)"));
-		assertSame(Constant.TRUE, eval("(compile true)"));
-		assertSame(Constant.FALSE, eval("(compile false)"));
-		assertSame(Constant.EMPTY_VECTOR, eval("(compile [])"));
-		assertSame(Constant.EMPTY_LIST, eval("(compile ())"));
-		assertSame(Constant.EMPTY_MAP, eval("(compile {})"));
-		assertSame(Constant.EMPTY_SET, eval("(compile #{})"));
-		assertSame(Constant.EMPTY_STRING, eval("(compile \"\")"));
-		
+				
 		assertEquals(Invoke.create(Constant.of(Core.PLUS),Constant.of(1),Constant.of(2)), eval("(compile '(+ 1 2))"));
 		
 		assertSame(Constant.NULL, eval("(compile '(do))")); // note optimisation for empty do
@@ -3871,6 +3861,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testFnMultiRecur() {
+		// recur should "bounce" between different function arities in the same function declaration
 		assertEquals(7L,evalL("((fn ([x] x) ([x y] (recur 7))) 1 2)"));
 
 		assertArityError(step("((fn ([x] x) ([x y] (recur))) 1 2)"));
@@ -3881,6 +3872,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testFnPred() {
 		assertFalse(evalB("(fn? 0)"));
+		assertFalse(evalB("(fn? :foo)"));
 		assertTrue(evalB("(fn? (fn[x] 0))"));
 		assertFalse(evalB("(fn? {})"));
 		assertTrue(evalB("(fn? count)"));
@@ -3916,10 +3908,14 @@ public class CoreTest extends ACVMTest {
 	
 	@Test 
 	public void testDefOverCore() {
-		Context ctx=step("(def count [2 3])");
+		// a definition in the local environment should mask the corresponding core definition
+		Context ctx=context();
+		assertNotNull(RT.ensureFunction(eval(ctx,"count"))); // should be the core `count` function to start with
+		assertFalse(ctx.getEnvironment().containsKey(Symbols.COUNT));
+		
+		ctx=step(ctx,"(def count [2 3])");
 		assertTrue(ctx.getEnvironment().containsKey(Symbols.COUNT));
 		assertNull(ctx.getMetadata().get(Symbols.COUNT));
-
 		assertEquals(Vectors.of(2,3),eval(ctx,"count"));
 	}
 	
@@ -3963,9 +3959,15 @@ public class CoreTest extends ACVMTest {
 		Context ctx=step("(def foo 1)");
 		assertEquals(CVMLong.ONE,eval(ctx,"foo"));
 		
+		// Declare does not overwrite existing def
+		ctx=step(ctx,"(declare foo)");
+		assertEquals(CVMLong.ONE,eval(ctx,"foo"));
+		
+		// Declare something that is initially undeclared
 		assertUndeclaredError(step(ctx,"bar"));
-		ctx=step("(declare bar)");
-		assertEquals(null,eval(ctx,"bar"));
+		ctx=step("(declare bar baz)");
+		assertNull(eval(ctx,"bar"));
+		assertNull(eval(ctx,"baz"));
 		ctx=step("(def bar 2)");
 		assertCVMEquals(2,eval(ctx,"bar"));
 	}
@@ -4088,6 +4090,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testDefExpander() {
+		// simple expander that wraps a value in a syntax object
 		Context ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] (syntax x))))");
 
 		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 expand-once)"));
@@ -4112,9 +4115,9 @@ public class CoreTest extends ACVMTest {
 		// set! binding does not escape current form, still undeclared in enclosing local context
 		assertUndeclaredError(step("(do (let [a 10] (set! a 20)) a)"));
 
-		// set! cannot alter value across closure boundary
+		// set! cannot alter value across closure boundary, but can alter temporarily within current scope
 		{
-			assertEquals(5L,evalL("(let [a 5] ((fn [] (set! a 666))) a)"));
+			assertEquals(Vectors.of(5,666),eval("(let [a 5 r ((fn [] (set! a 666) a))] [a r])"));
 		}
 
 		// set! cannot alter value within query

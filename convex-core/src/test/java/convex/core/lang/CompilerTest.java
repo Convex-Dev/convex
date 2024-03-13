@@ -93,10 +93,21 @@ public class CompilerTest extends ACVMTest {
 		assertEquals(Constant.of(Maps.empty()),comp("{}"));
 		
 		assertEquals(Constant.of(Blob.EMPTY),comp("0x"));
-		
-		assertEquals(Constant.of(null),comp("nil"));
-		assertEquals(Constant.of(true),comp("true"));
-		assertEquals(Constant.of(false),comp("false"));
+	}
+	
+	@Test
+	public void testConstantCompilation() {
+
+		// special cases for optimised constants
+		assertSame(Constant.NULL, comp("nil"));
+		assertSame(Constant.TRUE,  comp( "true"));
+		assertSame(Constant.FALSE,  comp("false"));
+		assertSame(Constant.EMPTY_VECTOR, comp("[]"));
+		assertSame(Constant.EMPTY_LIST, comp("()"));
+		assertSame(Constant.EMPTY_MAP, comp("{}"));
+		assertSame(Constant.EMPTY_SET, comp("#{}"));
+		assertSame(Constant.EMPTY_STRING,comp("\"\""));
+
 	}
 	
 	@Test public void testComments() {
