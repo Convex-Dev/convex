@@ -62,9 +62,28 @@ For making use of Convex data structures, CVM execution etc. locally you probabl
 
 ## Running Convex
 
+### Building locally
+
+To get a local development build of Convex:
+
+1. Clone [this repository](https://github.com/Convex-Dev/convex) - you probably want the `develop` branch (the default)
+2. Build using `mvn install` in the root directory
+
+This should download all necessary dependencies and perform a standard build.
+
 ### Command Line Interface (CLI)
 
-For more information about running a Convex Peer and the Command Line Interface see the [documentation](https://convex-dev.github.io/convex/convex-cli/)
+If you have a built version of the Convex CLI `.jar` file and installed a recent version of Java (21+ recommended) you can run it as follows:
+
+```bash
+java -jar convex-cli/target/convex-cli.jar <optional args>
+```
+
+For convenience, there are shell scripts to automate this for common platforms in the root directory of this repo, e.g.
+
+```bash
+./convex local gui
+```
 
 ### Local GUI Peers
 
