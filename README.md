@@ -64,7 +64,7 @@ For making use of Convex data structures, CVM execution etc. locally you probabl
 
 ### Building locally
 
-To get a local development build of Convex you need [git](https://git-scm.com/) and [Apache Maven](https://maven.apache.org/). You will also need a recent version of Java ([JDK 21+ recommended](https://www.oracle.com/java/technologies/downloads/))
+To get a local development build of Convex you need [git](https://git-scm.com/) and [Apache Maven](https://maven.apache.org/). You will also need a recent version of Java ([JDK 21+ recommended](https://www.oracle.com/java/technologies/downloads/), though anything from 17 onwards should be supported)
 
 1. Clone [this repository](https://github.com/Convex-Dev/convex) using `git` - you probably want the `develop` branch (the default)
 2. Build using `mvn install` in the root directory
@@ -73,10 +73,10 @@ This should download all necessary dependencies and perform a standard build.
 
 ### Command Line Interface (CLI)
 
-If you have a built version of the Convex CLI `.jar` file and installed a recent version of Java (21+ recommended) you can run it as follows:
+If you have an already built version of the Convex CLI `convex-cli.jar` file and installed a recent version of Java you can run it as follows:
 
 ```bash
-java -jar convex-cli/target/convex-cli.jar <optional args>
+java -jar convex-cli.jar <optional args>
 ```
 
 For convenience, there are shell scripts to automate this for common platforms in the root directory of this repo, e.g.
