@@ -87,7 +87,7 @@ For convenience, there are shell scripts to automate this for common platforms i
 
 ### Local GUI Peers
 
-The convex GUI can be used to run a local test network.
+The convex GUI can be used to run a local test network. This is often the simplest way to get a temporary Convex network running for experimental / development pruposes and provides a number of useful tools.
 
 Using the CLI, you can start the GUI  by using the `local gui` command:
 
