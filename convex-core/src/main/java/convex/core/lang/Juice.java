@@ -356,6 +356,8 @@ public class Juice {
 	 */
 	private static final int MIN_NUMERIC_COST = 8;
 
+	public static final int MEMORY_TRADE = 200;
+
 	/**
 	 * Saturating multiply and add: result = a + (b * c)
 	 * 

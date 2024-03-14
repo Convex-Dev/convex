@@ -2952,6 +2952,9 @@ public class CoreTest extends ACVMTest {
 
 		// trying to buy too much is a funds error
 		assertFundsError(step("(set-memory 1000000000000000000)"));
+		
+		// we pay the memory price at minimum
+		assertTrue(evalB("(<= *memory-price* (set-memory (inc *memory*)))"));
 
 		// trying to set memory negative is an ARGUMENT error
 		assertArgumentError(step("(set-memory -1)"));

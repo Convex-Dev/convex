@@ -1051,7 +1051,7 @@
 
 
  set-memory
- {:doc {:description "Sets the free memory allowance for the current account address, in number of bytes. Increases in memory allowance may cost coin balance. Decreases in memory allowance may earn a coin refund."
+ {:doc {:description "Sets the free memory allowance for the current account address, in number of bytes. Increases in memory allowance may cost coin balance. Decreases in memory allowance may earn a coin refund. Returns the price paid (negative for refund)."
         :examples    [{:code "(set-memory 10000)"}]
         :signature   [{:params [mem]}]}}
  

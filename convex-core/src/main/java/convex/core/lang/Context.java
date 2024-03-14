@@ -1601,7 +1601,7 @@ public class Context {
 			// Update accounts
 			AVector<AccountStatus> newAccounts=accounts.assoc(sourceIndex, sourceAccount);
 			state=state.withAccounts(newAccounts);
-			return withState(state).withResult(null);
+			return withState(state).withResult(Juice.MEMORY_TRADE,CVMLong.create(price));
 		} catch (IllegalArgumentException e) {
 			return withError(ErrorCodes.FUNDS,"Cannot trade allowance: "+e.getMessage());
 		}
