@@ -25,6 +25,7 @@ import convex.core.data.Refs;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Core;
+import convex.core.data.ACell;
 import convex.core.lang.RT;
 
 /**
@@ -97,8 +98,9 @@ public class BaseTest extends ACVMTest {
 	
 	// Regression
 	@Test
-	public void testPrintCore() {
-		RT.print(STATE.getAccount(Core.CORE_ADDRESS).getEnvironment());
+	public void testPrintCore() { 
+		ACell env=STATE.getAccount(Core.CORE_ADDRESS).getEnvironment();
+		assertNotNull(RT.print(env,10000));
 	}
 	
 	@Test

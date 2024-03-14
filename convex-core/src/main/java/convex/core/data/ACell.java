@@ -203,19 +203,20 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	@Override
 	protected final Blob createEncoding() {
 		int capacity=estimatedEncodingSize();
-		byte[] bs=new byte[capacity];
+		byte[] bs;
 		int pos=0;
-		boolean done=false;
-		while (!done) {
+		while (true) {
 			try {
+				bs=new byte[capacity];
 				pos=encode(bs,pos);
-				done=true;
+				break;
 			} catch (IndexOutOfBoundsException be) {
+				if (capacity>Format.LIMIT_ENCODING_LENGTH) throw new Error("Encoding size limit exceeded in cell: "+this);
+				
 				// We really want to eliminate these, because exception handling is expensive
 				// However don't want to be too conservative or we waste memory
 				// System.out.println("Insufficient encoding size: "+capacity+ " for "+this.getClass());
 				capacity=capacity*2+10;
-				bs=new byte[capacity];
 			}
 		}
 		return Blob.wrap(bs,0,pos);
