@@ -16,13 +16,6 @@
              :examples    [{:code "(address? *address*)"}]}
   :special? true}
 
-
- *memory*
- {:doc      {:description "Returns the current memory allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
-             :examples    [{:code "*memory*"}]}
-  :special? true}
-
-
  *balance*
   {:doc      {:description ["Returns the available balance of the current account (in Convex coins)."
                             "The available balance excludes reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."]
@@ -78,6 +71,16 @@
   *key*
   {:doc      {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."
               :examples    [{:code "*key*"}]}
+   :special? true}
+  
+  *memory*
+  {:doc      {:description "Returns the current memory allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
+              :examples    [{:code "*memory*"}]}
+   :special? true}
+  
+  *memory-price*
+  {:doc      {:description "Returns the current memory price, as a double value"
+              :examples    [{:code "*memory-price*"}]}
    :special? true}
   
   *nop*

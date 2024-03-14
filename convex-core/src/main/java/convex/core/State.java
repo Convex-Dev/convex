@@ -875,6 +875,13 @@ public class State extends ARecord {
 	public CVMLong getGlobalMemoryPool() {
 		return (CVMLong)(globals.get(GLOBAL_MEMORY_MEM));
 	}
+	
+	public double getMemoryPrice() {
+		long pool=getGlobalMemoryPool().longValue();
+		long value=getGlobalMemoryValue().longValue();
+				
+		return ((double)value)/pool;
+	}
 
 	public State updateMemoryPool(long cvx, long mem) {
 		AVector<ACell> r=globals;
@@ -887,5 +894,7 @@ public class State extends ARecord {
 		long av=address.longValue();
 		return (av>=0) &&(av<accounts.count());
 	}
+
+
 
 }

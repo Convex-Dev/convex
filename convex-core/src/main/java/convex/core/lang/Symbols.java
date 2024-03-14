@@ -187,6 +187,7 @@ public class Symbols {
 	public static final Symbol STAR_ENV= intern("*env*");
 	public static final Symbol STAR_PARENT = intern("*parent*");
 	public static final Symbol STAR_NOP = intern("*nop*");
+	public static final Symbol STAR_MEMORY_PRICE = intern("*memory-price*");
 
 	public static final Symbol STAR_LANG = intern("*lang*");
 

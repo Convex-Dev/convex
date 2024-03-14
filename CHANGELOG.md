@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - BIP39 key generation support
 - Observability support initial version
-- Extra special ops: `*nop*`, `*parent*`, `*controller*` and `*env*`
+- Extra special ops: `*nop*`, `*parent*`, `*controller*`, `*memory-price*` and `*env*`
 - `query-as` function (query mode equivalent to `eval-as`)
 - Convex Lisp `quasiquote` implementation
 - Observability support

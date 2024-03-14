@@ -4,6 +4,7 @@ import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 
@@ -61,6 +62,18 @@ public class SpecialTest extends ACVMTest {
 		// Buy some memory
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
 
+	}
+	
+	@Test
+	public void testSpecialMemoryPrice() {
+		Context c=context();
+		// Memory price matches state
+		double price=evalD("*memory-price*");
+		assertCVMEquals(c.getState().getMemoryPrice(), price);
+		
+		// Buy some memory, should increase price
+		c=exec(c,"(set-memory (+ *memory* 10))");
+		assertTrue(price<evalD(c,"*memory-price*"));
 	}
 
 

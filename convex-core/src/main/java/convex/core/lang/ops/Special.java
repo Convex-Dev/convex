@@ -6,6 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.BlobBuilder;
 import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
@@ -23,7 +24,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte opCode;
 	
-	private static int NUM_SPECIALS=21;
+	private static int NUM_SPECIALS=22;
 	private static final int BASE=Ops.SPECIAL_BASE;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
@@ -51,6 +52,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static final byte S_ENV=BASE+18;
 	private static final byte S_PARENT=BASE+19;
 	private static final byte S_NOP=BASE+20;
+	private static final byte S_MEMORY_PRICE=BASE+21;
 
 	static {
 		reg(S_JUICE,Symbols.STAR_JUICE);
@@ -74,6 +76,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		reg(S_ENV,Symbols.STAR_ENV);
 		reg(S_PARENT,Symbols.STAR_PARENT);
 		reg(S_NOP,Symbols.STAR_NOP);
+		reg(S_MEMORY_PRICE,Symbols.STAR_MEMORY_PRICE);
 	}
 	
 	private static byte reg(byte opCode, Symbol sym) {
@@ -125,6 +128,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_ENV: ctx= ctx.withResult(ctx.getEnvironment()); break;
 		case S_PARENT: ctx= ctx.withResult(ctx.getAccountStatus().getParent()); break;
 		case S_NOP: break; // unchanged context, propagates *result*
+		case S_MEMORY_PRICE: ctx=ctx.withResult(CVMDouble.create(ctx.getState().getMemoryPrice())); break ;
 		
 		default:
 			throw new Error("Bad Opcode"+opCode);
