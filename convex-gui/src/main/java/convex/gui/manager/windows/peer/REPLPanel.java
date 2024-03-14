@@ -96,7 +96,8 @@ public class REPLPanel extends JPanel {
 	}
 
 	protected void handleResult(ACell m) {
-		String resultString=RT.print(m,10000).toString();
+		AString s=RT.print(m);
+		String resultString=(s==null)?"Print limit exceeded!":s.toString();
 		int start=outputArea.getDocument().getLength();
 		addOutput(outputArea," => " + resultString + "\n");
 		int end=outputArea.getDocument().getLength();
