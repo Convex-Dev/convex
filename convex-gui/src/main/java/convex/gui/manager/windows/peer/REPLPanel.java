@@ -96,7 +96,7 @@ public class REPLPanel extends JPanel {
 	}
 
 	protected void handleResult(ACell m) {
-		String resultString=RT.print(m).toString();
+		String resultString=RT.print(m,10000).toString();
 		int start=outputArea.getDocument().getLength();
 		addOutput(outputArea," => " + resultString + "\n");
 		int end=outputArea.getDocument().getLength();

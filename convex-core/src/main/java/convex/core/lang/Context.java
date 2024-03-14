@@ -1360,7 +1360,7 @@ public class Context {
 	}
 
 	/**
-	 * Executes code as if run in the specified account, but always discarding state changes.
+	 * Executes code as if run in the specified account, but always rolling back state changes.
 	 * @param address Address of Account in which to execute the query
 	 * @param form Code to execute.
 	 * @return Context updated with only query result and juice consumed
@@ -1372,19 +1372,7 @@ public class Context {
 		if (cs==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
 		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, null, depth,log,null);
 		ctx=ctx.eval(form);
-		return handleQueryResult(ctx);
-	}
-
-	/**
-	 * Just take result and juice from query. Log and state not kept.
-	 * @param ctx
-	 * @return
-	 */
-	protected Context handleQueryResult(Context ctx) {
-		// Copy juice used
-		this.juice=ctx.juice;
-		// Copy over result (may be exceptional)
-		return this.withValue(ctx.getValue());
+		return handleStateResults(ctx,true);
 	}
 
 	/**

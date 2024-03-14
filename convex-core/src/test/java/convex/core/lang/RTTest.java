@@ -72,7 +72,6 @@ public class RTTest {
 		assertEquals(Strings.create("\"'\""),RT.print(Strings.create("'"))); // See #407
 	}
 
-
 	@Test
 	public void testSequence() {
 		AVector<CVMLong> v = Vectors.of(1L, 2L, 3L);

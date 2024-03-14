@@ -24,6 +24,8 @@ import convex.core.data.Ref;
 import convex.core.data.Refs;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
+import convex.core.lang.Core;
+import convex.core.lang.RT;
 
 /**
  * Tests for Init functionality
@@ -91,6 +93,12 @@ public class BaseTest extends ACVMTest {
 		assertNotNull(as);
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 		assertNotEquals(HERO,VILLAIN);
+	}
+	
+	// Regression
+	@Test
+	public void testPrintCore() {
+		RT.print(STATE.getAccount(Core.CORE_ADDRESS).getEnvironment());
 	}
 	
 	@Test

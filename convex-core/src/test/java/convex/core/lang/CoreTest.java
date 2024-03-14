@@ -4296,6 +4296,9 @@ public class CoreTest extends ACVMTest {
 		Context c3=exec(context(),"(query-as *address* 1)");
 		Context c4=exec(context(),"(eval-as *address* 1)");
 		assertEquals(c3.getJuiceUsed(),c4.getJuiceUsed());
+		
+		// Query as halts should act as return
+		assertCVMEquals(666,eval("(do (query-as #8 '(halt 777)) 666)"));
 	
 		assertNobodyError(step("(query-as #8888 '1)"));
 		assertCastError(step("(query-as nil '1)"));
@@ -4306,6 +4309,8 @@ public class CoreTest extends ACVMTest {
 		// Failures within query
 		assertCastError(step("(query-as *address* (count 1))"));
 		assertTrustError(step("(query-as #0 '(eval-as #8 1))"));
+		
+
 	}
 	
 	@Test
