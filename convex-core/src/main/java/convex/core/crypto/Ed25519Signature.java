@@ -146,14 +146,6 @@ public class Ed25519Signature extends ASignature {
 	}
 
 	@Override
-	public byte[] getBytes() {
-		if (offset==0) return store;
-		byte[] bs=new byte[SIGNATURE_LENGTH];
-		System.arraycopy(store, offset, bs,0,SIGNATURE_LENGTH);
-		return bs;
-	}
-
-	@Override
 	public Blob getChunk(long i) {
 		return Blob.create(store).getChunk(i);
 	}

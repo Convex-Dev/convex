@@ -74,12 +74,6 @@ public abstract class ASignature extends AArrayBlob {
 	public byte getTag() {
 		return Tag.BLOB;
 	}
-
-	/**
-	 * Gets the raw bytes representing this signature, as a zero based array
-	 * @return byte array from this signature
-	 */
-	public abstract byte[] getBytes();
 	
 	@Override
 	public boolean equals(ABlob b) {

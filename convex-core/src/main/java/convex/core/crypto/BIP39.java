@@ -258,7 +258,7 @@ public class BIP39 {
 		if (n!=SEED_LENGTH) {
 			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte seed but was: "+n);
 		}
-		return seed.getContentHash().toFlatBlob();
+		return seed.slice(0, AKeyPair.SEED_LENGTH);
 	}
 	
 	/**
