@@ -12,7 +12,7 @@ import convex.core.data.Blob;
 import convex.core.util.Utils;
 
 /**
- * Class implementing SLIP-0010 private key generations
+ * Class implementing SLIP-0010 private key generations for Ed25519 private keys
  * 
  * See: https://github.com/satoshilabs/slips/blob/master/slip-0010.md
  */
@@ -27,25 +27,31 @@ public class SLIP10 {
 	private static final SecretKeySpec masterKey=new SecretKeySpec(ED25519_KEY,HMAC_ALGORITHM);
 
 	/**
-	 * Gets the SLIP-10 HMAC as used in the master key
-	 * @param bipSeed Bip39 seed value (or other source of good entropy!)
-	 * @return Blob containing the master key
+	 * Gets the the master key for a given seed according to SLIP10
+	 * @param seed BIP39 seed value (or other source of good entropy!)
+	 * @return Blob containing the seed (bip39 seed, or some other good entropy source)
 	 * @throws NoSuchAlgorithmException
 	 * @throws InvalidKeyException
 	 */
-	public static Blob hmac(Blob bipSeed) throws NoSuchAlgorithmException, InvalidKeyException {
+	public static Blob getMaster(Blob seed) throws NoSuchAlgorithmException, InvalidKeyException {
 		Mac hmac=Mac.getInstance(HMAC_ALGORITHM);
 		
 		hmac.init(masterKey);
-		byte[] data=bipSeed.getBytes();
+		byte[] data=seed.getBytes();
 		hmac.update(data);
 		Blob result=Blob.wrap(hmac.doFinal());
 		return result;
 	}
 	
-	public static Blob deriveKey(Blob master, int... ixs) throws NoSuchAlgorithmException {
+	/**
+	 * Derives an Ed25519 private key from a BIP32 master key
+	 * @param master Master key as defined in SLIP10
+	 * @param ixs key derivation path indexes
+	 */
+	public static Blob deriveKey(Blob master, int... ixs)  {
 		try {
 			byte[] bs=master.getBytes();
+			if (bs.length!=64) throw new Error("Invalid SLIP10 master key, must be 64 bytes");
 			byte[] data=new byte[1+32+4]; // 0x00 || ser256(kpar) || ser32(i)) from SLIP-10
 			
 			Mac hmac=Mac.getInstance(HMAC_ALGORITHM);
