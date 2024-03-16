@@ -50,7 +50,7 @@ public class Strings {
 	 * Reads a String from a Blob encoding.
 	 * 
 	 * @param blob Blob to read from
-	 * @param offset Offset withing blob
+	 * @param offset Offset within blob
 	 * @return String instance
 	 * @throws BadFormatException If any problem with encoding
 	 */
