@@ -598,7 +598,7 @@ public class Format {
 			if ((tag & 0xF0) == 0xC0) return (T) readCode(tag,blob,offset);
 
 		} catch (IndexOutOfBoundsException e) {
-			throw new BadFormatException("Read out of blob bounds when decoding with tag "+tag);
+			throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
 		} catch (BadFormatException e) {
 			throw e;
 		}catch (Exception e) {

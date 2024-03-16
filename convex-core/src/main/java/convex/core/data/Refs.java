@@ -145,7 +145,7 @@ public class Refs {
 	}
 
 	/**
-	 * Counts the total number of Refs contained in a data object recursively. Will
+	 * Counts the total number of Refs contained in a data object recursively, including the given cell. Will
 	 * count duplicate children multiple times.
 	 *
 	 * @param a Object to count Refs in

@@ -11,6 +11,7 @@ import javax.swing.JTextArea;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.Refs;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -31,8 +32,6 @@ public class MessageFormatPanel extends JPanel {
 	private JPanel instructionsPanel;
 	private JLabel lblNewLabel;
 	private JTextArea hashLabel;
-
-	private static String HASHLABEL = "Hash: ";
 
 	public MessageFormatPanel(PeerGUI manager) {
 		this.manager = manager;
@@ -92,6 +91,7 @@ public class MessageFormatPanel extends JPanel {
 			dataArea.setText("");
 			messageArea.setText("");
 		});
+		updateHashLabel(null,null);
 	}
 
 	private void updateMessage() {
@@ -102,18 +102,19 @@ public class MessageFormatPanel extends JPanel {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(msg));
 			ACell o = Format.read(b);
 			data = Utils.print(o);
-			updateHashLabel(o);
+			updateHashLabel(o,b);
 		} catch (ParseException e) {
 			data = "Unable to interpret message: " + e.getMessage();
 			clearHashLabel();
 		} catch (Exception e) {
-			data = e.getMessage();
+			data = "Message decoding failed: "+e.getMessage();
+			clearHashLabel();
 		}
 		dataArea.setText(data);
 	}
 
 	private void clearHashLabel() {
-		hashLabel.setText("Type: <none>\n"+HASHLABEL + "<invalid>");
+		updateHashLabel(null,null);
 	}
 
 	private void updateData() {
@@ -125,7 +126,7 @@ public class MessageFormatPanel extends JPanel {
 			messageArea.setEnabled(false);
 			ACell o = Reader.read(data);
 			Blob b = Format.encodedBlob(o);
-			updateHashLabel(o);
+			updateHashLabel(o,b);
 			msg = b.toHexString();
 			messageArea.setEnabled(true);
 		} catch (Exception e) {
@@ -134,12 +135,19 @@ public class MessageFormatPanel extends JPanel {
 		messageArea.setText(msg);
 	}
 	
-	private void updateHashLabel(ACell v) {
-		Blob b = Format.encodedBlob(v);
+	@SuppressWarnings("null")
+	private void updateHashLabel(ACell v, Blob b) {
 		StringBuilder sb=new StringBuilder();
-		sb.append("Type: "+RT.getType(v));
+		boolean empty=(b==null);
+		sb.append("Hash:          " + (empty?"<none>":b.getContentHash().toString()));
 		sb.append("\n");
-		sb.append(HASHLABEL + b.getContentHash().toString());
+		sb.append("Type:          "+(empty?"<none>":RT.getType(v).toString()));
+		sb.append("\n");
+		sb.append("Encoding Size: "+(empty?"<none>":b.count()));
+		sb.append("\n");
+		sb.append("Memory Size:   "+(empty?"<none>":ACell.getMemorySize(v)));
+		sb.append("\n");
+		sb.append("Cell Count:    "+(empty?"<none>":Refs.totalRefCount(v)));
 		hashLabel.setText(sb.toString());
 	}
 
