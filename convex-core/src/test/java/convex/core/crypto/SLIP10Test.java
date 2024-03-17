@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 
 import org.junit.jupiter.api.Test;
 
@@ -67,6 +68,17 @@ public class SLIP10Test {
 		
 		Blob m_last=SLIP10.deriveKey(m, 0,2147483647,1,2147483646,2);
 		assertEquals("551d333177df541ad876a60ea71f00447931c0a9da16f227c11ea080d7391b8d",m_last.toHexString());
+	}
+	
+	@Test
+	public void testBIP39Compatibility() throws NoSuchAlgorithmException, InvalidKeySpecException {
+		String phrase=BIP39.createSecureMnemonic(12);
+		Blob seed=BIP39.getSeed(phrase, "test");
+		
+		AKeyPair kp1=BIP39.seedToKeyPair(seed);
+		AKeyPair kp2=SLIP10.deriveKeyPair(seed);
+		assertEquals(kp1,kp2);
+		
 	}
 	
 	@Test 

@@ -256,9 +256,10 @@ public class BIP39 {
 	public static Blob seedToEd25519Seed(Blob seed) {
 		long n=seed.count();
 		if (n!=SEED_LENGTH) {
-			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte seed but was: "+n);
+			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte BIP39 seed but was: "+n);
 		}
-		return seed.slice(0, AKeyPair.SEED_LENGTH);
+		Blob master=SLIP10.getMaster(seed);
+		return SLIP10.deriveKey(master);
 	}
 	
 	/**

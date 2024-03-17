@@ -1,6 +1,7 @@
 package convex.core.crypto;
 
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
@@ -33,14 +34,18 @@ public class SLIP10 {
 	 * @throws NoSuchAlgorithmException
 	 * @throws InvalidKeyException
 	 */
-	public static Blob getMaster(Blob seed) throws NoSuchAlgorithmException, InvalidKeyException {
-		Mac hmac=Mac.getInstance(HMAC_ALGORITHM);
-		
-		hmac.init(masterKey);
-		byte[] data=seed.getBytes();
-		hmac.update(data);
-		Blob result=Blob.wrap(hmac.doFinal());
-		return result;
+	public static Blob getMaster(Blob seed) {
+		try {
+			Mac hmac=Mac.getInstance(HMAC_ALGORITHM);
+			
+			hmac.init(masterKey);
+			byte[] data=seed.getBytes();
+			hmac.update(data);
+			Blob result=Blob.wrap(hmac.doFinal());
+			return result;
+		} catch (GeneralSecurityException e) {
+			throw new Error("Security problem getting SLIP10 master seed",e);
+		}
 	}
 	
 	/**
@@ -73,6 +78,13 @@ public class SLIP10 {
 		} catch (Exception e) {
 			throw new Error("Failure in SLIP-10!!!",e);
 		}
+	}
+
+	public static AKeyPair deriveKeyPair(Blob seed, int... ixs) {
+		Blob master = getMaster(seed);
+		Blob keySeed = deriveKey(master,ixs);
+		AKeyPair kp=AKeyPair.create(keySeed);
+		return kp;
 	}
 	
 	
