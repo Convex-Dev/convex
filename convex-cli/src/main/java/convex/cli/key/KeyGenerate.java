@@ -1,6 +1,5 @@
 package convex.cli.key;
 
-import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.Arrays;
 
@@ -42,29 +41,25 @@ public class KeyGenerate extends AKeyCommand {
 	private String passphrase;
 
 	private AKeyPair generateKeyPair() {	
-		try {
-			if (bip39) {
-				String mnemonic=BIP39.createSecureMnemonic(12);
-				cli().println(mnemonic);
-				if (passphrase==null) {
-					if (cli().isInteractive()) {
-						passphrase=new String(cli().readPassword("Enter BIP39 passphrase: "));
-					} else {
-						cli().paranoia("Passphrase must be explicity provided");
-						passphrase="";
-					}
+		if (bip39) {
+			String mnemonic=BIP39.createSecureMnemonic(12);
+			cli().println(mnemonic);
+			if (passphrase==null) {
+				if (cli().isInteractive()) {
+					passphrase=new String(cli().readPassword("Enter BIP39 passphrase: "));
+				} else {
+					cli().paranoia("Passphrase must be explicity provided");
+					passphrase="";
 				}
-				if (passphrase.isBlank()) {
-					cli().paranoia("Cannot use an empty BIP39 passphrase for secure key generation");
-				}
-				Blob bipseed = BIP39.getSeed(mnemonic, passphrase);
-				AKeyPair result= BIP39.seedToKeyPair(bipseed);
-				return result;
-			} else {
-				return AKeyPair.generate();
 			}
-		} catch (GeneralSecurityException e) {
-			throw Utils.sneakyThrow(e);
+			if (passphrase.isBlank()) {
+				cli().paranoia("Cannot use an empty BIP39 passphrase for secure key generation");
+			}
+			Blob bipseed = BIP39.getSeed(mnemonic, passphrase);
+			AKeyPair result= BIP39.seedToKeyPair(bipseed);
+			return result;
+		} else {
+			return AKeyPair.generate();
 		}
 	}
 	

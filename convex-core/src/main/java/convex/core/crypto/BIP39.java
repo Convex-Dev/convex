@@ -259,7 +259,7 @@ public class BIP39 {
 			throw new IllegalArgumentException("Expected "+SEED_LENGTH+ " byte BIP39 seed but was: "+n);
 		}
 		Blob master=SLIP10.getMaster(seed);
-		return SLIP10.deriveKey(master);
+		return master.slice(0, 32);
 	}
 	
 	/**
@@ -281,29 +281,31 @@ public class BIP39 {
 	 * @throws NoSuchAlgorithmException
 	 * @throws InvalidKeySpecException
 	 */
-	public static Blob getSeed(String mnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
-		mnemonic=normalise(mnemonic);
-		mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
-		char[] normalisedMnemonic= mnemonic.toCharArray(); 
-		return getSeedInternal(normalisedMnemonic,passphrase);
+	public static Blob getSeed(String mnemonic, String passphrase) {
+			mnemonic=normalise(mnemonic);
+			mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
+			char[] normalisedMnemonic= mnemonic.toCharArray(); 
+			return getSeedInternal(normalisedMnemonic,passphrase);
 	}
 	
-	private static Blob getSeedInternal(char[] normalisedMnemonic, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
-		// Normalise passphrase and convert to byte array
-		passphrase=Normalizer.normalize(passphrase, Normalizer.Form.NFKD);	
-		byte[] salt = ("mnemonic"+passphrase).getBytes(StandardCharsets.UTF_8);
-		
-		// Generate seed
-		SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
-		KeySpec keyspec = new PBEKeySpec(normalisedMnemonic, salt, 2048, SEED_LENGTH * 8);
-	    Key key = factory.generateSecret(keyspec);
-	    
-	    // Wrap result as Blob
-	    byte[] bs = key.getEncoded();
-	    return Blob.wrap(bs);
+	private static Blob getSeedInternal(char[] normalisedMnemonic, String passphrase)  {
+		try {
+			// Normalise passphrase and convert to byte array
+			passphrase=Normalizer.normalize(passphrase, Normalizer.Form.NFKD);	
+			byte[] salt = ("mnemonic"+passphrase).getBytes(StandardCharsets.UTF_8);
+			
+			// Generate seed
+			SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA512");
+			KeySpec keyspec = new PBEKeySpec(normalisedMnemonic, salt, 2048, SEED_LENGTH * 8);
+		    Key key = factory.generateSecret(keyspec);
+		    
+		    // Wrap result as Blob
+		    byte[] bs = key.getEncoded();
+		    return Blob.wrap(bs);
+		} catch (NoSuchAlgorithmException| InvalidKeySpecException e) {
+			throw new Error("Security error getting BIP39 seed",e);
+		}
 	}
-
-
 
 	public static String createSecureMnemonic() {
 		return createSecureMnemonic(12);

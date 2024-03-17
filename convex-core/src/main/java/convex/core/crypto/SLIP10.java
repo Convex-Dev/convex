@@ -4,7 +4,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
-import java.util.Arrays;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -53,7 +52,8 @@ public class SLIP10 {
 	 * @param master Master key as defined in SLIP10
 	 * @param ixs key derivation path indexes
 	 */
-	public static Blob deriveKey(Blob master, int... ixs)  {
+	public static Blob derive(Blob master, int... ixs)  {
+		if (ixs.length==0) return master;
 		try {
 			byte[] bs=master.getBytes();
 			if (bs.length!=64) throw new Error("Invalid SLIP10 master key, must be 64 bytes");
@@ -72,8 +72,7 @@ public class SLIP10 {
 			}
 			
 			// Wrap the bytes of the newly derived seed to get the derived Ed25519 key
-			Blob result= Blob.create(bs,0,AKeyPair.SEED_LENGTH);
-			Arrays.fill(bs, (byte) 0);
+			Blob result= Blob.wrap(bs);
 			return result;
 		} catch (Exception e) {
 			throw new Error("Failure in SLIP-10!!!",e);
@@ -82,7 +81,7 @@ public class SLIP10 {
 
 	public static AKeyPair deriveKeyPair(Blob seed, int... ixs) {
 		Blob master = getMaster(seed);
-		Blob keySeed = deriveKey(master,ixs);
+		Blob keySeed = derive(master,ixs).slice(0, 32);
 		AKeyPair kp=AKeyPair.create(keySeed);
 		return kp;
 	}
