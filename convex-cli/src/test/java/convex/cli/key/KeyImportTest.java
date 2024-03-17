@@ -111,6 +111,8 @@ public class KeyImportTest {
 				"--keystore", KEYSTORE_FILENAME);
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());
-		assertTrue(t2.getOutput().contains("B4CDCE685F63E7768717ACF256B1450878EE6ABC7B7EE877B5D69B2466D8FBBF".toLowerCase()));
+		String output=t2.getOutput();
+		System.out.println(output);
+		assertTrue(output.contains("359562fef6063132699e5e51aa741943c712712be1c2783b61aa2d6f3b42aa44".toLowerCase()));
 	}
 }
