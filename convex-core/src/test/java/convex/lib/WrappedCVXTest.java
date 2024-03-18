@@ -90,16 +90,16 @@ public class WrappedCVXTest extends ACVMTest {
 		Context ctx = context();
 		long BAL= evalL(ctx,"*balance*");
 
-		ctx=exec(ctx,"(wcvx/wrap 1000000)");
+		ctx=exec(ctx,"(wcvx/wrap 1000)");
 		
-		assertEquals(1000000,evalL(ctx,"(asset/balance wcvx *address*)"));
+		assertEquals(1000,evalL(ctx,"(asset/balance wcvx *address*)"));
 		long NBAL= evalL(ctx,"*balance*");
-		assertEquals(BAL-1000000,NBAL);
+		assertEquals(BAL-1000,NBAL);
 		
-		ctx=exec(ctx,"(wcvx/unwrap 50000)");
-		assertEquals(950000,evalL(ctx,"(fungible/balance wcvx *address*)"));
+		ctx=exec(ctx,"(wcvx/unwrap 50)");
+		assertEquals(950,evalL(ctx,"(fungible/balance wcvx *address*)"));
 		
-		assertEquals(NBAL+50000,evalL(ctx,"*balance*"));
+		assertEquals(NBAL+50,evalL(ctx,"*balance*"));
 
 		// do Generic Tests
 		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());

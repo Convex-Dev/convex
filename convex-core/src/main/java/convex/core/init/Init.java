@@ -36,14 +36,14 @@ public class Init {
 	public static final Address INIT_ADDRESS = Address.create(1);
 
 	// Governance accounts and funding pools
-	public static final Address RESERVED_ADDRESS = Address.create(2);
-	public static final Address MAINBANK_ADDRESS = Address.create(3);
-	public static final Address ROOTFUND_ADDRESS = Address.create(4);
-	public static final Address MAINPOOL_ADDRESS = Address.create(5);
-	public static final Address LIVEPOOL_ADDRESS = Address.create(6);
+	public static final Address FOUNDATION_ADDRESS = Address.create(2);
+	public static final Address RESERVE_ADDRESS = Address.create(3);
+	public static final Address UNRELEASED_ADDRESS = Address.create(4);
+	public static final Address DISTRIBUTION_ADDRESS = Address.create(5);
+	public static final Address GOVERNANCE_ADDRESS = Address.create(6);
+	public static final Address ADMIN_ADDRESS = Address.create(7);
 
 	// Built-in special accounts
-	public static final Address TEMP_ADDRESS = Address.create(7);
 	public static final Address CORE_ADDRESS = Address.create(8);
 	public static final Address REGISTRY_ADDRESS = Address.create(9);
     public static final Address TRUST_ADDRESS = Address.create(10);
@@ -67,30 +67,33 @@ public class Init {
 		accts = addGovernanceAccount(accts, NULL_ADDRESS, 0L); // Null account
 		accts = addGovernanceAccount(accts, INIT_ADDRESS, 0L); // Initialisation Account
 
-		// Reserved fund
-		long reserved = 100*Coin.EMERALD;
-		accts = addGovernanceAccount(accts, RESERVED_ADDRESS, reserved); // 75% for investors
-		supply-=reserved;
+		// Foundation fund for startup
+		long foundation = 1*Coin.EMERALD;
+		accts = addGovernanceAccount(accts, FOUNDATION_ADDRESS, foundation); // 75% for investors
+		supply-=foundation;
 		
-		// Foundation governance fund
-		long governance = 240*Coin.EMERALD;
-		accts = addGovernanceAccount(accts, MAINBANK_ADDRESS, governance); // 24% Foundation
-		supply -= governance;
+		// Foundation reserve fund (rest of foundation 25%)
+		long reserve = 248*Coin.EMERALD;
+		accts = addGovernanceAccount(accts, RESERVE_ADDRESS, reserve); // 24% Foundation
+		supply -= reserve;
 
-		// Pools for network rewards
-		long rootFund = 8 * Coin.EMERALD; // 0.8% Long term net rewards
-		accts = addGovernanceAccount(accts, ROOTFUND_ADDRESS, rootFund); 
+		// Reserve for distribution via release curve
+		long rootFund = 740 * Coin.EMERALD; 
+		accts = addGovernanceAccount(accts, UNRELEASED_ADDRESS, rootFund); 
 		supply -= rootFund;
 		
-		long mainPool = 1 * Coin.EMERALD; // 0.1% distribute 5% / year ~= 0.0003% /day
-		accts = addGovernanceAccount(accts, MAINPOOL_ADDRESS, mainPool); 	
+		// Initial account for release curve distribution
+		long mainPool = 10 * Coin.EMERALD; 
+		accts = addGovernanceAccount(accts, DISTRIBUTION_ADDRESS, mainPool); 	
 		supply -= mainPool;
 		
-		long livePool = 5 * Coin.DIAMOND; // 0.0005% = approx 2 days of mainpool feed
-		accts = addGovernanceAccount(accts, LIVEPOOL_ADDRESS, 5 * Coin.DIAMOND); 
-		supply -= livePool;
+		long govern = 1 * Coin.DIAMOND; 
+		accts = addGovernanceAccount(accts, GOVERNANCE_ADDRESS, govern); 
+		supply -= govern;
 
-		accts = addGovernanceAccount(accts, TEMP_ADDRESS, 0 ); 
+		long admin = 1 * Coin.DIAMOND; 
+		accts = addGovernanceAccount(accts, ADMIN_ADDRESS, admin ); 
+		supply -= admin;
 
 		// Always have at least one user and one peer setup
 		int keyCount = genesisKeys.size();
@@ -107,6 +110,9 @@ public class Init {
 		// Create the initial state
 		State s = State.create(accts, peers, globals, BlobMaps.empty());
 		supply-=s.getGlobalMemoryValue().longValue();
+		
+		// There should be at least 100,000 Convex Gold for genesis to succeed, to be distributed to genesis account(s)
+		assert(supply>100000*Coin.GOLD);
 
 		// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
 		s = addStaticLibraries(s);
@@ -114,7 +120,7 @@ public class Init {
 		// Reload accounts with the libraries
 		accts = s.getAccounts();
 
-		// Set up initial user accounts
+		// Set up initial user accounts, one for each genesis key. 
 		assert(accts.count() == GENESIS_ADDRESS.longValue());
 		{
 			long userFunds = (long)(supply*0.8); // 80% to user accounts
@@ -219,7 +225,7 @@ public class Init {
 	private static State addTestingCurrencies(State s) throws IOException {
 		@SuppressWarnings("unchecked")
 		AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-				.readResourceAsData("torus/currencies.cvx");
+				.readResourceAsData("torus/genesis-currencies.cvx");
 		for (AVector<ACell> row : table) {
 			s = doCurrencyDeploy(s, row);
 		}
@@ -324,7 +330,7 @@ public class Init {
 		double cvx = cvxPrice * supply / subDivisions;
 
 		
-		Context ctx = Context.createFake(s, MAINBANK_ADDRESS);
+		Context ctx = Context.createFake(s, DISTRIBUTION_ADDRESS);
 		ctx = ctx.eval(Reader
 				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + "})))"));
 		Address addr = ctx.getResult();
@@ -360,7 +366,8 @@ public class Init {
 	}
 
 	private static AVector<AccountStatus> addGovernanceAccount(AVector<AccountStatus> accts, Address a, long balance) {
-		if (accts.count() != a.longValue()) throw new Error("Incorrect initialisation address: " + a);
+		long num=a.longValue();
+		if (accts.count() != num) throw new Error("Incorrect initialisation address: " + a);
 		AccountStatus as = AccountStatus.createGovernance(balance);
 		accts = accts.conj(as);
 		return accts;

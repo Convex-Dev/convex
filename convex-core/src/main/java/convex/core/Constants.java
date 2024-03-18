@@ -42,14 +42,14 @@ public class Constants {
 	public static final long INITIAL_JUICE_PRICE = 2L;
 
 	/**
-	 * Initial memory Pool of 1gb
+	 * Initial memory Pool of 1mb
 	 */
-	public static final long INITIAL_MEMORY_POOL = 1000000000L;
+	public static final long INITIAL_MEMORY_POOL = 1000000L;
 
 	/**
 	 * Initial memory price per byte
 	 */
-	public static final long INITIAL_MEMORY_PRICE = 1000L;
+	public static final long INITIAL_MEMORY_PRICE = 1000000L;
 	
 	/**
 	 * Memory Pool of growth increment 1mn
