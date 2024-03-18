@@ -92,7 +92,11 @@ public class Assertions {
 		ACell cet = ctx.getErrorCode();
 		assertEquals(ErrorCodes.MEMORY, cet, "Expected MEMORY error but got: " + ctx.getValue());
 	}
-
+	
+	public static void assertSyntaxError(Context ctx) {
+		ACell cet = ctx.getErrorCode();
+		assertEquals(ErrorCodes.SYNTAX, cet, "Expected SYNTAX error but got: " + ctx.getValue());
+	}
 
 	public static void assertFundsError(Context ctx) {
 		ACell cet = ctx.getErrorCode();

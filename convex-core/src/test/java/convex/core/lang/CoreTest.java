@@ -16,6 +16,7 @@ import static convex.test.Assertions.assertNobodyError;
 import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertStateError;
 import static convex.test.Assertions.assertTrustError;
+import static convex.test.Assertions.assertSyntaxError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -2407,7 +2408,7 @@ public class CoreTest extends ACVMTest {
 		}
 		
 		// can't import 1-arity unless a symbol
-		assertAssertError(step(ctx,"(import #10)"));
+		assertSyntaxError(step(ctx,"(import #10)"));
 
 		assertArityError(step(ctx,"(import)"));
 		assertArityError(step(ctx,"(import ~lib :as)"));

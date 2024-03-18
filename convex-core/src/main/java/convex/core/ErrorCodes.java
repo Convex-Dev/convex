@@ -198,9 +198,20 @@ public class ErrorCodes {
 	 */
 	public static final Keyword CHILD = Keyword.create("CHILD");
 
+	/**
+	 * ErrorCode indicating timeout
+	 */
 	public static final Keyword TIMEOUT = Keyword.create("TIMEOUT");
 
+	/**
+	 * ErrorCode indicating a peer-specific error
+	 */
 	public static final Keyword PEER = Keyword.create("PEER");
+
+	/**
+	 * ErrorCode indicating a syntax problem in code
+	 */
+   public static final Keyword SYNTAX = Keyword.create("SYNTAX");
 
 
 }

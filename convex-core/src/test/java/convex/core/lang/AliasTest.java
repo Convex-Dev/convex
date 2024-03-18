@@ -1,10 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertArityError;
-import static convex.test.Assertions.assertAssertError;
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertStateError;
-import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -67,10 +63,10 @@ public class AliasTest extends ACVMTest {
 		assertArityError(step(ctx,"(import ~lib :as foo bar)"));
 		
 		// check for bad keyword
-		assertAssertError(step(ctx,"(import ~lib :blazzzz mylib)"));
+		assertSyntaxError(step(ctx,"(import ~lib :blazzzz mylib)"));
 		
 		// can't have bad alias
-		assertAssertError(step(ctx,"(import ~lib :as nil)"));
+		assertSyntaxError(step(ctx,"(import ~lib :as nil)"));
 		
 		// can't have non-address first argument
 		assertCastError(step(ctx,"(import :foo :as mylib)"));

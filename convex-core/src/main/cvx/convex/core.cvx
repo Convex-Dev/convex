@@ -580,10 +580,10 @@
           :examples    [{:code "(import some.library :as alias)"}]
           :signature   [{:params [& args]}]}}
   ([addr]
-    (if (symbol? addr)
-      `(import ~addr :as ~addr)
-      (fail "import: alias must be a symbol")))
+	(recur addr :as addr))
   ([addr as sym]
+    (cond (symbol? sym) nil (fail :SYNTAX "import: alias must be a Symbol"))
+    (cond (= :as as) nil (fail :SYNTAX "import expects :as keyword"))
     (let [code (cond (symbol? addr)
                  `(or (call* *registry*
                         0
@@ -592,11 +592,7 @@
                     (fail :NOBODY
                       (str "Could not resolve library name for import: "
                         (quote ~addr))))
-                 `(address ~addr))
-          sym  (cond (symbol? sym)
-                 sym
-                 (fail "import: alias must be a symbol"))]
-      (assert (= :as as))
+                 `(address ~addr))]
       `(def ~(syntax sym {:static true})
          ~code))))
 
