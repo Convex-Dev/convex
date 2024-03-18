@@ -2,6 +2,7 @@ package convex.gui.manager.mainpanels;
 
 
 import java.awt.BorderLayout;
+import java.awt.Point;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
@@ -49,6 +50,8 @@ public class AccountsPanel extends JPanel {
 		tableModel = new AccountsTableModel(manager.getLatestState());
 		table = new JTable(tableModel);
 		
+		table.setCellSelectionEnabled(true);
+		
 		manager.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
@@ -87,25 +90,37 @@ public class AccountsPanel extends JPanel {
 
 		// popup menu, not sure why this doesn't work....
 		final JPopupMenu popupMenu = new JPopupMenu();
-		JMenuItem copyItem = new JMenuItem("Copy Address");
+		JMenuItem copyItem = new JMenuItem("Copy Value");
 		copyItem.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				copyAddress();
+				copyValue();
 			}
 		});
+		popupMenu.add(copyItem);
  
 		table.addMouseListener(new MouseAdapter() {
 			@Override
 			public void mousePressed(MouseEvent e) {
-				int r = table.rowAtPoint(e.getPoint());
-				if (r >= 0 && r < table.getRowCount()) {
+				Point p=e.getPoint();
+				int r = table.rowAtPoint(p);
+				int c = table.columnAtPoint(p);
+				if (r >= 0 && r < table.getRowCount() && c >= 0 && c < table.getColumnCount()) {
 					table.setRowSelectionInterval(r, r);
+					table.setColumnSelectionInterval(c, c);
 				} else {
 					table.clearSelection();
 				}
+				maybePopup(e);
+			}
+			
+			@Override
+			public void mouseReleased(MouseEvent e) {
+				maybePopup(e);
+			}
 
-				if (e.isPopupTrigger() || (e.getButton() & MouseEvent.BUTTON3) > 0) {
+			private void maybePopup(MouseEvent e) {
+				if (e.isPopupTrigger()) {
 					popupMenu.show(e.getComponent(), e.getX(), e.getY());
 				}
 			}
@@ -113,12 +128,6 @@ public class AccountsPanel extends JPanel {
 
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
-
-		JButton btnCopy = new JButton("Copy Address");
-		actionPanel.add(btnCopy);
-		btnCopy.addActionListener(e -> {
-			copyAddress();
-		});
 
 		JButton btnActor = new JButton("Examine Actor...");
 		actionPanel.add(btnActor);
@@ -145,13 +154,16 @@ public class AccountsPanel extends JPanel {
 
 	}
 
-	private void copyAddress() {
+	private void copyValue() {
 		int row = table.getSelectedRow();
 		if (row < 0) return;
+		int col = table.getSelectedColumn();
+		if (col < 0) return;
 
-		Address addr=Address.create(row);
+		Object o=tableModel.getValueAt(row, col);
+		String s=(o==null)?"nil":o.toString();
 		Clipboard clipboard = java.awt.Toolkit.getDefaultToolkit().getSystemClipboard();
-		StringSelection stringSelection = new StringSelection(addr.toHexString());
+		StringSelection stringSelection = new StringSelection(s);
 		clipboard.setContents(stringSelection, null);
 	}
 

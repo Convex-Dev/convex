@@ -14,6 +14,7 @@ import javax.swing.JPasswordField;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
+import javax.swing.border.CompoundBorder;
 import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
@@ -356,7 +357,8 @@ public class KeyGenPanel extends JPanel {
 
 	private void addNote(String s) {
 		JTextArea ta = new JTextArea(s);
-		ta.setBorder(BorderFactory.createRaisedBevelBorder());
+		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createRaisedBevelBorder(), BorderFactory.createEmptyBorder(10, 10, 10, 10));
+		ta.setBorder(b);
 		ta.setFont(Toolkit.DEFAULT_FONT);
 		formPanel.add(ta,NOTE_CONSTRAINT);
 	}
