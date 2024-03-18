@@ -47,6 +47,7 @@ import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.RightCopyMenu;
@@ -60,6 +61,7 @@ public class REPLPanel extends JPanel {
 	private JButton btnClear;
 	private JButton btnInfo;
 	private JCheckBox btnResults;
+	private JCheckBox btnTiming;
 	
 	private ArrayList<String> history=new ArrayList<>();
 	private int historyPosition=0;
@@ -89,7 +91,10 @@ public class REPLPanel extends JPanel {
 		if (value) inputArea.requestFocusInWindow();
 	}
 
-	protected void handleResult(Result r) {
+	protected void handleResult(long start,Result r) {
+		if (btnTiming.isSelected()) {
+			addOutput(outputArea,"Completion time: " + (Utils.getCurrentTimestamp()-start) + " ms\n");
+		}
 		if (btnResults.isSelected()) {
 			handleResult((ACell)r);
 	    } else if (r.isError()) {
@@ -97,6 +102,7 @@ public class REPLPanel extends JPanel {
 		} else {
 			handleResult((ACell)r.getValue());
 		}
+		execPanel.updateBalance();
 	}
 
 	protected void handleResult(ACell m) {
@@ -215,6 +221,10 @@ public class REPLPanel extends JPanel {
 		btnResults=new JCheckBox("Full Results");
 		panel_1.add(btnResults);
 		
+		btnTiming=new JCheckBox("Timing info");
+		panel_1.add(btnTiming);
+
+		
 		// Get initial focus in REPL input area
 		addComponentListener(new ComponentAdapter() {
 			public void componentShown(ComponentEvent ce) {
@@ -249,6 +259,9 @@ public class REPLPanel extends JPanel {
 				ACell message = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
 				Future<Result> future;
 				String mode = execPanel.getMode();
+
+				long start=Utils.getCurrentTimestamp();
+
 				if (mode.equals("Query")) {
 					AKeyPair kp=getKeyPair();
 					if (kp == null) {
@@ -273,7 +286,7 @@ public class REPLPanel extends JPanel {
 				}
 				log.trace("Sent message");
 				
-				handleResult(future.get(5000, TimeUnit.MILLISECONDS));
+				handleResult(start,future.get(5000, TimeUnit.MILLISECONDS));
 			} catch (TimeoutException t) {
 				addOutput(outputArea," TIMEOUT waiting for result");
 			} catch (Throwable t) {

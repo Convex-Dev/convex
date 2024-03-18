@@ -124,6 +124,10 @@ public class AccountChooserPanel extends JPanel {
 		cm.addElement(null);
 		return cm;
 	}
+	
+	public void updateBalance() {
+		updateBalance(getSelectedAddress());
+	}
 
 	private void updateBalance(Address a) {
 		PeerGUI.runWithLatestState(s->{
