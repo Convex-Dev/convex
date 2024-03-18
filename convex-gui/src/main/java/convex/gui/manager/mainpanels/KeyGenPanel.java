@@ -1,9 +1,12 @@
 package convex.gui.manager.mainpanels;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.util.List;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -28,6 +31,8 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class KeyGenPanel extends JPanel {
 
+	private static final String NOTE_CONSTRAINT = "align 50%,span 2,width 100:500:700";
+	private static final String TEXTAREA_CONSTRAINT = "grow,width 10:500:800";
 	JTextArea mnemonicArea;
 	JPasswordField passArea;
 	JTextArea seedArea;
@@ -182,8 +187,10 @@ public class KeyGenPanel extends JPanel {
 	 * @param manager GUI manager root component
 	 */
 	public KeyGenPanel(PeerGUI manager) {
-		setLayout(new BorderLayout(0, 0));
+		setLayout(new BorderLayout());
 
+		// Action panel with buttons 
+		
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
@@ -223,20 +230,22 @@ public class KeyGenPanel extends JPanel {
 		});
 
 		// Main Key generation form
+		
 		formPanel = new JPanel();
 		formPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-		formPanel.setLayout(new MigLayout("fillx,wrap 2","[fill,min:250][grow,shrink]",""));
-		add(formPanel, BorderLayout.NORTH);
+		formPanel.setLayout(new MigLayout("fillx,wrap 2","[fill,min:250]10[grow,fill]",""));
+		add(formPanel, BorderLayout.CENTER);
 
 		{ // Mnemonic entry box
 			addLabel("Mnenomic Phrase");	
-			mnemonicArea = new JTextArea();
+			mnemonicArea = makeTextArea();
 			mnemonicArea.setWrapStyleWord(true);
 			mnemonicArea.setLineWrap(true);
 			mnemonicArea.setRows(2);
 			mnemonicArea.setFont(HEX_FONT);
+			mnemonicArea.setBackground(Color.BLACK);
 			
-			formPanel.add(mnemonicArea,"grow, wmin 100"); 
+			formPanel.add(mnemonicArea,TEXTAREA_CONSTRAINT); 
 			// wmin override needed to stop JTextArea expanding
 			// see: https://stackoverflow.com/questions/9723425/miglayout-shrink-behavior
 			mnemonicArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
@@ -249,7 +258,8 @@ public class KeyGenPanel extends JPanel {
 			addLabel("Passphrase");	
 			passArea = new JPasswordField();
 			passArea.setFont(HEX_FONT);
-			formPanel.add(passArea,"w min:300");
+			passArea.setBackground(Color.BLACK);
+			formPanel.add(passArea,"grow,width 10:300:400");
 			passArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!passArea.isFocusOwner()) return;
 				updatePass();
@@ -258,12 +268,13 @@ public class KeyGenPanel extends JPanel {
 		
 		{
 			addLabel("BIP39 Seed");
-			seedArea = new JTextArea();
+			seedArea = makeTextArea();
 			seedArea.setFont(HEX_FONT);
 			seedArea.setColumns(64);
 			seedArea.setLineWrap(true);
 			seedArea.setWrapStyleWord(false);
-			formPanel.add(seedArea,"grow,wmin 100");
+			seedArea.setBackground(Color.BLACK);
+			formPanel.add(seedArea,TEXTAREA_CONSTRAINT);
 			seedArea.setText("(mnemonic not ready)");
 			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!seedArea.isFocusOwner()) return;
@@ -271,28 +282,30 @@ public class KeyGenPanel extends JPanel {
 			}));
 		}
 		
-		formPanel.add(new JTextArea("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key"),"span 2");
+		addNote("NOTE: \nOnce the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. Instead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
 		
 		{
 			addLabel("SLIP-10 Master Key");
-			masterKeyArea = new JTextArea();
+			masterKeyArea = makeTextArea();
 			masterKeyArea.setFont(HEX_FONT);
 			masterKeyArea.setColumns(64);
 			masterKeyArea.setLineWrap(true);
 			masterKeyArea.setWrapStyleWord(false);
 			masterKeyArea.setEditable(false);
-			formPanel.add(masterKeyArea,"grow,wmin 100");
+			formPanel.add(masterKeyArea,TEXTAREA_CONSTRAINT);
 			masterKeyArea.setText("(not ready)");
 		}
 		
 		{
 			addLabel("BIP32 Path");
-			derivationArea = new JTextArea();
+			derivationArea = makeTextArea();
 			derivationArea.setFont(HEX_FONT);
 			derivationArea.setColumns(64);
 			derivationArea.setLineWrap(true);
 			derivationArea.setWrapStyleWord(false);
-			formPanel.add(derivationArea,"grow,wmin 100");
+			derivationArea.setBackground(Color.BLACK);
+
+			formPanel.add(derivationArea,TEXTAREA_CONSTRAINT);
 			derivationArea.setText("m");
 			derivationArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!derivationArea.isFocusOwner()) return;
@@ -302,24 +315,26 @@ public class KeyGenPanel extends JPanel {
 		
 		{
 			addLabel("SLIP-10 Ext. Priv. Key");
-			derivedKeyArea = new JTextArea();
+			derivedKeyArea = makeTextArea();
 			derivedKeyArea.setFont(HEX_FONT);
 			derivedKeyArea.setColumns(64);
 			derivedKeyArea.setLineWrap(true);
 			derivedKeyArea.setWrapStyleWord(false);
 			derivedKeyArea.setEditable(false);
-			formPanel.add(derivedKeyArea,"grow,wmin 100");
+			formPanel.add(derivedKeyArea,TEXTAREA_CONSTRAINT);
 			derivedKeyArea.setText("(not ready)");
 		}
 		
-		formPanel.add(new JTextArea("The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed"),"span 2");
+		addNote("NOTE: \nThe first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed. This is all you strictly need to sign transactions in Convex. Any 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
 
 
 		{
 			addLabel("Private Ed25519 seed");
-			privateKeyArea = new JTextArea();
+			privateKeyArea = makeTextArea();
 			privateKeyArea.setFont(HEX_FONT);
-			formPanel.add(privateKeyArea,"grow,wmin 100");
+			privateKeyArea.setBackground(Color.BLACK);
+
+			formPanel.add(privateKeyArea,TEXTAREA_CONSTRAINT);
 			privateKeyArea.setText("(mnemonic not ready)");
 			privateKeyArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!privateKeyArea.isFocusOwner()) return;
@@ -329,14 +344,27 @@ public class KeyGenPanel extends JPanel {
 
 		{
 			addLabel("Ed25519 Public Key");
-			publicKeyArea = new JTextArea();
+			publicKeyArea = makeTextArea();
 			publicKeyArea.setEditable(false);
 			publicKeyArea.setRows(1);
 			publicKeyArea.setText("(private key not ready)");
 			publicKeyArea.setFont(HEX_FONT);
-			formPanel.add(publicKeyArea,"grow,wmin 100");
+			formPanel.add(publicKeyArea,TEXTAREA_CONSTRAINT);
 		}
 
+	}
+
+	private void addNote(String s) {
+		JTextArea ta = new JTextArea(s);
+		ta.setBorder(BorderFactory.createRaisedBevelBorder());
+		ta.setFont(Toolkit.DEFAULT_FONT);
+		formPanel.add(ta,NOTE_CONSTRAINT);
+	}
+
+	private JTextArea makeTextArea() {
+		JTextArea ta= new JTextArea();
+		ta.setMinimumSize(new Dimension(10,10));
+		return ta;
 	}
 
 	/**
