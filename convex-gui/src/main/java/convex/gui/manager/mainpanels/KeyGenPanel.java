@@ -15,8 +15,8 @@ import javax.swing.border.EmptyBorder;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
+import convex.core.crypto.SLIP10;
 import convex.core.crypto.WalletEntry;
-import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.util.Utils;
@@ -31,7 +31,9 @@ public class KeyGenPanel extends JPanel {
 	JTextArea mnemonicArea;
 	JPasswordField passArea;
 	JTextArea seedArea;
+	JTextArea masterKeyArea;
 	JTextArea derivationArea;
+	JTextArea derivedKeyArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
 	
@@ -79,56 +81,88 @@ public class KeyGenPanel extends JPanel {
 			List<String> words=BIP39.getWords(s);
 			Blob bipSeed=BIP39.getSeed(words,p);
 			seedArea.setText(bipSeed.toHexString());
-			ABlob seed=BIP39.seedToEd25519Seed(bipSeed);
-			String privateKeyString = seed.toHexString();
-			privateKeyArea.setText(privateKeyString);
+			deriveSeed();
 		} catch (Exception ex) {
 			String pks = "<mnemonic not valid>";
 			if (s.isBlank()) pks = "<enter valid private key or mnemonic>";
+			masterKeyArea.setText(pks);
+			derivedKeyArea.setText(pks);
 			privateKeyArea.setText(pks);
 		}		
-		generatePublicKeys();
 	}
 	
 	private void updateSeed() {
-		try {
-			mnemonicArea.setText("<can't recreate from BIP39 seed>");
-			Blob b=Blobs.parse(seedArea.getText()).toFlatBlob(); 
-			if ((b==null)||(b.count()!=BIP39.SEED_LENGTH)) throw new IllegalArgumentException("Dummy");
-			privateKeyArea.setText(BIP39.seedToEd25519Seed(b).toHexString());
-			generatePublicKeys();
-		} catch (Exception ex) {
-			privateKeyArea.setText("<invalid BIP39 seed>");
-			publicKeyArea.setText("<invalid BIP39 seed>");
-			return;
-		}
+		mnemonicArea.setText("<can't recreate from BIP39 seed>");
+		deriveSeed();
 	}
 	
-	private void updatePath() {
+	private void deriveSeed() {
 		try {
-			String path=derivationArea.getText();
-			String[] es=path.substring(1).split("/");
-			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");
-			generatePublicKeys();
+			Blob b=Blobs.parse(seedArea.getText()).toFlatBlob(); 
+			if (b==null) throw new IllegalArgumentException("<invalid BIP39 seed>");
+			
+			Blob mb=SLIP10.getMaster(b);
+			masterKeyArea.setText(mb.toHexString());
+			Blob db;
+			if (derivationPath==null) {
+				db=mb;
+			} else {
+				db=SLIP10.derive(mb, derivationPath);
+			}
+			derivedKeyArea.setText(db.toHexString());
+			
+			privateKeyArea.setText(db.slice(0,32).toHexString());
+			generatePublicKey();
 		} catch (Exception ex) {
 			privateKeyArea.setText(ex.getMessage());
 			publicKeyArea.setText(ex.getMessage());
 			return;
 		}
 	}
+	
+	int[] derivationPath=null;
+	
+	private void updatePath() {
+		try {
+			String path=derivationArea.getText();
+			String[] es=path.split("/");
+			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");
+			
+			int n=es.length-1;
+			int[] proposedPath=new int[n];
+			for (int i=0; i<n; i++) {
+				try {
+					Integer ix= Integer.parseInt(es[i+1]);
+					proposedPath[i]=ix;
+				} catch (NumberFormatException e) {
+					throw new Exception("<Bad derivation path, should be integer indexes 'm/44/888/1/0/123' >");
+				}
+			}
+			this.derivationPath=proposedPath;
+			updateSeed();
+		} catch (Exception ex) {
+			privateKeyArea.setText(ex.getMessage());
+			publicKeyArea.setText(ex.getMessage());
+			derivationPath=null;
+			return;
+		}
+	}
 
 	private void updatePrivateKey() {
 		try {
-			mnemonicArea.setText("<can't recreate from private key>");
-			seedArea.setText("<can't recreate from private key>");
-			generatePublicKeys();
+			String msg="<can't recreate from private seed>";
+			mnemonicArea.setText(msg);
+			seedArea.setText(msg);
+			masterKeyArea.setText(msg);
+			derivedKeyArea.setText(msg);
+			generatePublicKey();
 		} catch (Exception ex) {
 			System.err.println(ex.getMessage());
 			return;
 		}
 	}
 
-	private void generatePublicKeys() {
+	private void generatePublicKey() {
 		String s = privateKeyArea.getText();
 		try {
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
@@ -237,6 +271,20 @@ public class KeyGenPanel extends JPanel {
 			}));
 		}
 		
+		formPanel.add(new JTextArea("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key"),"span 2");
+		
+		{
+			addLabel("SLIP-10 Master Key");
+			masterKeyArea = new JTextArea();
+			masterKeyArea.setFont(HEX_FONT);
+			masterKeyArea.setColumns(64);
+			masterKeyArea.setLineWrap(true);
+			masterKeyArea.setWrapStyleWord(false);
+			masterKeyArea.setEditable(false);
+			formPanel.add(masterKeyArea,"grow,wmin 100");
+			masterKeyArea.setText("(not ready)");
+		}
+		
 		{
 			addLabel("BIP32 Path");
 			derivationArea = new JTextArea();
@@ -251,6 +299,21 @@ public class KeyGenPanel extends JPanel {
 				updatePath();
 			}));
 		}
+		
+		{
+			addLabel("SLIP-10 Ext. Priv. Key");
+			derivedKeyArea = new JTextArea();
+			derivedKeyArea.setFont(HEX_FONT);
+			derivedKeyArea.setColumns(64);
+			derivedKeyArea.setLineWrap(true);
+			derivedKeyArea.setWrapStyleWord(false);
+			derivedKeyArea.setEditable(false);
+			formPanel.add(derivedKeyArea,"grow,wmin 100");
+			derivedKeyArea.setText("(not ready)");
+		}
+		
+		formPanel.add(new JTextArea("The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed"),"span 2");
+
 
 		{
 			addLabel("Private Ed25519 seed");
