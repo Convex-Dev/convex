@@ -52,6 +52,10 @@ public class AccountsPanel extends JPanel {
 		
 		table.setCellSelectionEnabled(true);
 		
+		table.setFont(Toolkit.SMALL_MONO_FONT);
+		table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
+		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
+		
 		manager.getStateModel().addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
@@ -148,9 +152,6 @@ public class AccountsPanel extends JPanel {
 		scrollPane.getViewport().setBackground(null);
 		add(scrollPane, BorderLayout.CENTER);
 
-		table.setFont(Toolkit.SMALL_MONO_FONT);
-		table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
-		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
 
 	}
 
