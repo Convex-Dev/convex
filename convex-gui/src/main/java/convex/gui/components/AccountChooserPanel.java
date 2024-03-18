@@ -107,6 +107,7 @@ public class AccountChooserPanel extends JPanel {
 			WalletEntry we = addressModel.getElementAt(i);
 			if (we.getAddress().equals(a)) {
 				addressModel.setSelectedItem(we);
+				updateBalance(a);
 				return true;
 			};
 		}

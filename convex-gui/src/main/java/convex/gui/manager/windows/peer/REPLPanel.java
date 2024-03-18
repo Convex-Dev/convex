@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -58,6 +59,7 @@ public class REPLPanel extends JPanel {
 	JTextPane outputArea;
 	private JButton btnClear;
 	private JButton btnInfo;
+	private JCheckBox btnResults;
 	
 	private ArrayList<String> history=new ArrayList<>();
 	private int historyPosition=0;
@@ -88,7 +90,9 @@ public class REPLPanel extends JPanel {
 	}
 
 	protected void handleResult(Result r) {
-		if (r.isError()) {
+		if (btnResults.isSelected()) {
+			handleResult((ACell)r);
+	    } else if (r.isError()) {
 			handleError(r.getErrorCode(),r.getValue(),r.getTrace());
 		} else {
 			handleResult((ACell)r.getValue());
@@ -98,6 +102,7 @@ public class REPLPanel extends JPanel {
 	protected void handleResult(ACell m) {
 		AString s=RT.print(m);
 		String resultString=(s==null)?"Print limit exceeded!":s.toString();
+		
 		int start=outputArea.getDocument().getLength();
 		addOutput(outputArea," => " + resultString + "\n");
 		int end=outputArea.getDocument().getLength();
@@ -206,7 +211,10 @@ public class REPLPanel extends JPanel {
 			String infoString = sb.toString();
 			JOptionPane.showMessageDialog(this, infoString);
 		});
-
+		
+		btnResults=new JCheckBox("Full Results");
+		panel_1.add(btnResults);
+		
 		// Get initial focus in REPL input area
 		addComponentListener(new ComponentAdapter() {
 			public void componentShown(ComponentEvent ce) {
