@@ -31,6 +31,7 @@ public class KeyGenPanel extends JPanel {
 	JTextArea mnemonicArea;
 	JPasswordField passArea;
 	JTextArea seedArea;
+	JTextArea derivationArea;
 	JTextArea privateKeyArea;
 	JTextArea publicKeyArea;
 	
@@ -76,9 +77,9 @@ public class KeyGenPanel extends JPanel {
 		String p = new String(passArea.getPassword());
 		try {
 			List<String> words=BIP39.getWords(s);
-			Blob keyMat=BIP39.getSeed(words,p);
-			seedArea.setText(keyMat.toHexString());
-			ABlob seed=keyMat.getContentHash();
+			Blob bipSeed=BIP39.getSeed(words,p);
+			seedArea.setText(bipSeed.toHexString());
+			ABlob seed=BIP39.seedToEd25519Seed(bipSeed);
 			String privateKeyString = seed.toHexString();
 			privateKeyArea.setText(privateKeyString);
 		} catch (Exception ex) {
@@ -94,11 +95,24 @@ public class KeyGenPanel extends JPanel {
 			mnemonicArea.setText("<can't recreate from BIP39 seed>");
 			Blob b=Blobs.parse(seedArea.getText()).toFlatBlob(); 
 			if ((b==null)||(b.count()!=BIP39.SEED_LENGTH)) throw new IllegalArgumentException("Dummy");
-			privateKeyArea.setText(b.getContentHash().toHexString());
+			privateKeyArea.setText(BIP39.seedToEd25519Seed(b).toHexString());
 			generatePublicKeys();
 		} catch (Exception ex) {
 			privateKeyArea.setText("<invalid BIP39 seed>");
 			publicKeyArea.setText("<invalid BIP39 seed>");
+			return;
+		}
+	}
+	
+	private void updatePath() {
+		try {
+			String path=derivationArea.getText();
+			String[] es=path.substring(1).split("/");
+			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");
+			generatePublicKeys();
+		} catch (Exception ex) {
+			privateKeyArea.setText(ex.getMessage());
+			publicKeyArea.setText(ex.getMessage());
 			return;
 		}
 	}
@@ -220,6 +234,21 @@ public class KeyGenPanel extends JPanel {
 			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!seedArea.isFocusOwner()) return;
 				updateSeed();
+			}));
+		}
+		
+		{
+			addLabel("BIP32 Path");
+			derivationArea = new JTextArea();
+			derivationArea.setFont(HEX_FONT);
+			derivationArea.setColumns(64);
+			derivationArea.setLineWrap(true);
+			derivationArea.setWrapStyleWord(false);
+			formPanel.add(derivationArea,"grow,wmin 100");
+			derivationArea.setText("m");
+			derivationArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
+				if (!derivationArea.isFocusOwner()) return;
+				updatePath();
 			}));
 		}
 

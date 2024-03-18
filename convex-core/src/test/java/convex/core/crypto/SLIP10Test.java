@@ -73,12 +73,18 @@ public class SLIP10Test {
 	@Test 
 	public void testCAD25 () {
 		String seedPhrase="hold round save brand meat deposit armed idea taste reunion silent pair estate ladder copper";
-		Blob seed=BIP39.getSeed(seedPhrase, "test");
+		Blob bipSeed=BIP39.getSeed(seedPhrase, "test");
 		// Verified using tool: https://iancoleman.io/bip39/
-		assertEquals("d46c4e60d0137e7ee0acc8b836d76d9a0458705caa128899709f576bade690b3c7cba49ece50a211193b9eb7803be49d02c8ddae02c3b88790ac17fa72f219a6",seed.toHexString());
+		assertEquals("d46c4e60d0137e7ee0acc8b836d76d9a0458705caa128899709f576bade690b3c7cba49ece50a211193b9eb7803be49d02c8ddae02c3b88790ac17fa72f219a6",bipSeed.toHexString());
 
-		AKeyPair kp=SLIP10.deriveKeyPair(seed, 44, 888, 1234,0,1);
-		Blob priv=kp.getSeed();
+		// Root Ed25519 private seed `m`
+		Blob rootSeed=SLIP10.deriveKeyPair(bipSeed).getSeed();
+		assertEquals(rootSeed,BIP39.seedToEd25519Seed(bipSeed));
+		assertEquals("c2dac2f387243ac480162af7c1c21519e88a6b3a8e938daed9c062cc0606c0d9",rootSeed.toHexString());
+		
+		// Derived Ed25519 private seed `m/44/888/1234/0/1`
+		AKeyPair kp2=SLIP10.deriveKeyPair(bipSeed, 44, 888, 1234,0,1);
+		Blob priv=kp2.getSeed();
 		assertEquals("2172bb864deb4f978ad6360beefe205d38a6839c011dc4f37592769007c8321f",priv.toHexString());
 	}
 	
