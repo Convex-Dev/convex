@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.ResultContext;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -315,10 +316,10 @@ public class Context {
 	 * @param t 
 	 *
 	 * @param initialState State before transaction execution (after prepare)
-	 * @param juicePrice Juice price of current execution
+	 * @param rc Juice price of current execution
 	 * @return Updated context
 	 */
-	public Context completeTransaction(State initialState, long juicePrice) {
+	public Context completeTransaction(State initialState, ResultContext rc) {
 		// get state at end of transaction application
 		State state=getState();
 		long executionJuice=this.juice;
@@ -327,7 +328,7 @@ public class Context {
 		long trxJuice=Juice.TRANSACTION;
 		
 		long totalJuice=executionJuice+trxJuice;
-		
+		long juicePrice=rc.juicePrice;
 		long juiceFees=Juice.addMul(0,totalJuice,juicePrice);
 
 		// compute memory delta

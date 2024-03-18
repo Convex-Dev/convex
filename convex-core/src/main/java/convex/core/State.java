@@ -495,6 +495,12 @@ public class State extends ARecord {
 		Context ctx=applyTransaction(t);
 		return ctx;
 	}
+	
+	private ResultContext createResultContext(ATransaction t) {
+		long juicePrice=getJuicePrice().longValue();
+		ResultContext rc=new ResultContext(t,juicePrice);
+		return rc;
+	}
 
 	/**
 	 * Applies a transaction to the State.
@@ -512,10 +518,10 @@ public class State extends ARecord {
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
 	public Context applyTransaction(ATransaction t) {
-		long juicePrice=getJuicePrice().longValue();
+		ResultContext rc=createResultContext(t);
 		
 		// Create prepared context 
-		Context ctx = prepareTransaction(t,juicePrice);
+		Context ctx = prepareTransaction(rc);
 		if (ctx.isExceptional()) {
 			// We hit some error while preparing transaction. Possible culprits:
 			// - Non-existent Origin account
@@ -531,12 +537,14 @@ public class State extends ARecord {
 
 		// complete transaction
 		// NOTE: completeTransaction handles error cases as well
-		ctx = ctx.completeTransaction(preparedState,juicePrice);
+		ctx = ctx.completeTransaction(preparedState,rc);
 
 		return ctx;
 	}
 
-	private Context prepareTransaction(ATransaction t, long juicePrice) {
+	private Context prepareTransaction(ResultContext rc) {
+		ATransaction t=rc.tx;
+		long juicePrice=rc.juicePrice;
 		Address origin = t.getOrigin();
 		
 		// Pre-transaction state updates (persisted even if transaction fails)
