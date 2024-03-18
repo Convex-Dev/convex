@@ -228,7 +228,7 @@ public final class Result extends ARecordGeneric {
 	public static Result fromContext(CVMLong id,Context ctx) {
 		Object result=ctx.getValue();
 		ACell errorCode=null;
-		AHashMap<Keyword,ACell> info=null;
+		AHashMap<Keyword,ACell> info=Maps.empty();
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
 			result=ex.getMessage();
@@ -236,8 +236,10 @@ public final class Result extends ARecordGeneric {
 			if (ex instanceof ErrorValue) {
 				ErrorValue ev=(ErrorValue) ex;
 				AVector<?> trace=Vectors.create(ev.getTrace());
-				Address address=ev.getAddress();
-				info =Maps.of(Keywords.TRACE,trace,Keywords.ADDRESS,address);
+				Address errorAddress=ev.getAddress();
+				// Maps.of(Keywords.TRACE,trace,Keywords.ADDRESS,address);
+				info=info.assoc(Keywords.TRACE, trace);
+				info=info.assoc(Keywords.EADDR, errorAddress);
 			}
 		}
 		return create(id,(ACell)result,errorCode,info);

@@ -331,11 +331,12 @@ public class Context {
 		long juicePrice=rc.juicePrice;
 		long juiceFees=Juice.addMul(0,totalJuice,juicePrice);
 
-		// compute memory delta
+		// compute memory delta (memUsed) and store in ResultContext
 		Address address=getAddress();
 		AccountStatus account=state.getAccount(address);
-		
 		long memUsed=state.getMemorySize()-initialState.getMemorySize();
+		rc.memUsed=memUsed;
+		
 		long allowance=account.getMemory();
 		long balance=account.getBalance();
 		boolean memoryFailure=false;

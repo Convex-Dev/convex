@@ -9,6 +9,7 @@ public class ResultContext {
 
 	public ATransaction tx;
 	public long juicePrice;
+	public long memUsed=0;
 
 	public ResultContext(ATransaction transaction, long juicePrice) {
 		this.juicePrice=juicePrice;
