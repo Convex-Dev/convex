@@ -4,11 +4,11 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 import convex.core.Result;
+import convex.core.ResultContext;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
 import convex.net.MessageType;
@@ -69,7 +69,7 @@ public class QueryHandler extends AThreadedComponent {
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
-			Context resultContext = server.getPeer().executeQuery(form, address);
+			ResultContext resultContext = server.getPeer().executeQuery(form, address);
 			
 			// Report result back to message sender
 			boolean resultReturned= m.reportResult(Result.fromContext(id, resultContext));

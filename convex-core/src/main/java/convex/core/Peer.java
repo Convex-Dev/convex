@@ -19,12 +19,11 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
-import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
-import convex.core.util.Errors;
+import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 
 /**
@@ -277,25 +276,31 @@ public class Peer {
 	 * @param address Address to use for query execution. If null, core address will be used
 	 * @return The Context containing the query results. Will be NOBODY error if address / account does not exist
 	 */
-	public Context executeQuery(ACell form, Address address) {
+	public ResultContext executeQuery(ACell form, Address address) {
 		State state=getConsensusState();
 
+		if (form instanceof ATransaction) {
+			return state.applyTransaction((ATransaction)form);
+		}
+		
+		if (form instanceof SignedData) {
+			SignedData<?> sc=(SignedData<?>)form;
+			ACell val=sc.getValue();
+			if (form instanceof ATransaction) {
+				return state.applyTransaction((ATransaction)val);
+			}
+		}
+		
 		if (address==null) {
-			address=Init.CORE_ADDRESS;
+			address=Init.getGenesisAddress();
 			//return  Context.createFake(state).withError(ErrorCodes.NOBODY,"Null Address provided for query");
 		} else if (!state.hasAccount(address)) {
-			return  Context.createFake(state).withError(Errors.nobody(address));
+			return  ResultContext.error(state,ErrorCodes.NOBODY,"Query for non-existant account");
 		}
 
-		Context ctx= Context.createFake(state, address);
-
-		Context ectx = ctx.expandCompile(form);
-		if (ectx.isExceptional()) {
-			return (Context) ectx;
-		}
-
-		AOp<?> op = ectx.getResult();
-		Context rctx = ctx.run(op);
+		long newSeq=state.getAccount(address).getSequence()+1;
+		ATransaction t=Invoke.create(address, newSeq, form);
+		ResultContext rctx=state.applyTransaction(t);
 		return rctx;
 	}
 
@@ -330,7 +335,7 @@ public class Peer {
 	 * @param form Form to execute as a Query
 	 * @return Context after executing query
 	 */
-	public Context executeQuery(ACell form) {
+	public ResultContext executeQuery(ACell form) {
 		return executeQuery(form,Init.getGenesisAddress());
 	}
 

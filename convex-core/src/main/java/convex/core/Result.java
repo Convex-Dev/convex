@@ -225,7 +225,8 @@ public final class Result extends ARecordGeneric {
 	 * @param ctx Context
 	 * @return New Result instance
 	 */
-	public static Result fromContext(CVMLong id,Context ctx) {
+	public static Result fromContext(CVMLong id,ResultContext rc) {
+		Context ctx=rc.context;
 		Object result=ctx.getValue();
 		ACell errorCode=null;
 		AHashMap<Keyword,ACell> info=Maps.empty();
@@ -246,14 +247,14 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	/**
-	 * Constructs a Result from a Context
+	 * Constructs a Result from a Context. No ResultContext implies we are not in a top level transaction, so minimise work
 	 * @param ctx Context
 	 * @return New Result instance
 	 */
 	public static Result fromContext(Context ctx) {
-		return fromContext(null,ctx);
+		ACell rval=(ctx.isExceptional())?ctx.getExceptional().getMessage():ctx.getResult();
+		return create(null,rval,ctx.getErrorCode(),null);
 	}
-
 
 	/**
 	 * Updates result with a given message ID. Used to tag Results for return to Clients

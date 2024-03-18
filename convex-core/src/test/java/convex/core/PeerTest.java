@@ -63,7 +63,7 @@ public class PeerTest {
 		assertEquals(RT.cvm(3L),p.executeQuery(Reader.read("(+ 1 2)")).getResult());
 		assertEquals(InitTest.HERO,p.executeQuery(Reader.read("*address*"),InitTest.HERO).getResult());
 
-		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS));
+		assertNobodyError(p.executeQuery(Reader.read("(+ 2 3)"),Samples.BAD_ADDRESS).context);
 	}
 
 	@Test
@@ -115,14 +115,14 @@ public class PeerTest {
 		b=b.withOrders(BlobMap.create(peerKey, so2));
 
 		p=p.updateBelief(b);
-		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr));
+		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr).context);
 		
 		// Beyond this point, we need to assume fork recovery is enabled
 		assumeTrue(Constants.ENABLE_FORK_RECOVERY);
 		
 		p=p.updateState();
 		assertEquals(CVMLong.create(17),p.executeQuery(Reader.read("bar"), addr).getResult());
-		assertUndeclaredError(p.executeQuery(Reader.read("foo"), addr));
+		assertUndeclaredError(p.executeQuery(Reader.read("foo"), addr).context);
 	}
 
 

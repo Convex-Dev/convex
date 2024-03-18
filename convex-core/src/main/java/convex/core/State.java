@@ -452,8 +452,10 @@ public class State extends ARecord {
 				// execute the transaction using the *latest* state (not necessarily "this")
 				ResultContext rc = state.applyTransaction(signed);
 
-				// record results and state update
-				results[i] = Result.fromContext(CVMLong.create(i),rc.context);
+				// record results from result context
+				results[i] = Result.fromContext(CVMLong.create(i),rc);
+				
+				// state update
 				state = rc.context.getState();
 			} catch (Throwable t) {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();

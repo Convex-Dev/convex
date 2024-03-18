@@ -1,5 +1,6 @@
 package convex.core;
 
+import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.lang.Context;
@@ -33,6 +34,10 @@ public class ResultContext {
 
 	public static ResultContext error(State state, Keyword error, AString message) {
 		return error(state,error,message.toString());
+	}
+
+	public ACell getResult() {
+		return context.getResult();
 	}
 
 }
