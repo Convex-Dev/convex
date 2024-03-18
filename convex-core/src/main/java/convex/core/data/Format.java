@@ -605,10 +605,12 @@ public class Format {
 			throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
 		}
 
-		throw new BadFormatException("Don't recognise tag "+tag);
+		throw new BadFormatException(badTagMessage(tag));
 	}
 
-
+	private static String badTagMessage(byte tag) {
+		return "Unrecognised tag byte 0x"+Utils.toHexString(tag);
+	}
 
 	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
 		// TODO Auto-generated method stub
@@ -617,7 +619,7 @@ public class Format {
 		// Double is special, we enforce a canonical NaN
 		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
 		
-		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
+		throw new BadFormatException(badTagMessage(tag));
 	}
 
 	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
@@ -632,8 +634,7 @@ public class Format {
 			return CVMChar.read(len, blob,offset); // skip tag byte
 		}
 
-		// TODO Auto-generated method stub
-		throw new BadFormatException("Can't read basic type with tag byte: " + tag);
+		throw new BadFormatException(badTagMessage(tag));
 	}
 
 	
@@ -668,7 +669,7 @@ public class Format {
 			return (T) BlockResult.read(b,pos);
 		}
 
-		throw new BadFormatException("Can't read record type with tag byte: " + tag);
+		throw new BadFormatException(badTagMessage(tag));
 	}
 
 	private static ATransaction readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
@@ -681,7 +682,7 @@ public class Format {
 		} else if (tag == Tag.MULTI) {
 			return Multi.read(b,pos);
 		}
-		throw new BadFormatException("Can't read Transaction with tag " + Utils.toHexString(tag));
+		throw new BadFormatException(badTagMessage(tag));
 	}
 
 	/**

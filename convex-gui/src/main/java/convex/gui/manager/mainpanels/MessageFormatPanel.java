@@ -2,6 +2,7 @@ package convex.gui.manager.mainpanels;
 
 import java.awt.BorderLayout;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -36,6 +37,13 @@ public class MessageFormatPanel extends JPanel {
 	public MessageFormatPanel(PeerGUI manager) {
 		this.manager = manager;
 		setLayout(new BorderLayout(0, 0));
+		
+		instructionsPanel = new JPanel();
+		add(instructionsPanel, BorderLayout.NORTH);
+
+		lblNewLabel = new JLabel("Convert data values to encoded binary representations, and vice versa");
+		instructionsPanel.add(lblNewLabel);
+
 
 		JSplitPane splitPane = new JSplitPane();
 		splitPane.setOneTouchExpandable(true);
@@ -67,7 +75,7 @@ public class MessageFormatPanel extends JPanel {
 		hashLabel = new JTextArea();
 		hashLabel.setRows(2);
 		hashLabel.setToolTipText("Hash code of the data object's serilaised representation = Data Object ID");
-		hashLabel.setBorder(null);
+		hashLabel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(10,10,10,10), BorderFactory.createRaisedBevelBorder()));
 		hashLabel.setBackground(null);
 		hashLabel.setFont(Toolkit.SMALL_MONO_FONT);
 		lowerPanel.add(hashLabel, BorderLayout.SOUTH);
@@ -80,17 +88,12 @@ public class MessageFormatPanel extends JPanel {
 
 		clearButton = new JButton("Clear");
 		clearButton.setToolTipText("Press to clear the input areas");
-		buttonPanel.add(clearButton);
-
-		instructionsPanel = new JPanel();
-		add(instructionsPanel, BorderLayout.NORTH);
-
-		lblNewLabel = new JLabel("Use this fine tool to convert data values to encoded binary representations, and vice versa");
-		instructionsPanel.add(lblNewLabel);
 		clearButton.addActionListener(e -> {
 			dataArea.setText("");
 			messageArea.setText("");
 		});
+		buttonPanel.add(clearButton);
+
 		updateHashLabel(null,null);
 	}
 
