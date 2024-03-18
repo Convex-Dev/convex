@@ -310,7 +310,7 @@ public class Peer {
 	public long estimateCost(ATransaction trans) {
 		Address address=trans.getOrigin();
 		State state=getConsensusState();
-		Context ctx=executeDryRun(trans);
+		Context ctx=executeDryRun(trans).context;
 		return state.getBalance(address)-ctx.getState().getBalance(address);
 	}
 
@@ -320,8 +320,8 @@ public class Peer {
 	 * @param transaction Transaction to execute
 	 * @return The Context containing the transaction results.
 	 */
-	public Context executeDryRun(ATransaction transaction) {
-		Context ctx=getConsensusState().applyTransaction(transaction);
+	public ResultContext executeDryRun(ATransaction transaction) {
+		ResultContext ctx=getConsensusState().applyTransaction(transaction);
 		return ctx;
 	}
 

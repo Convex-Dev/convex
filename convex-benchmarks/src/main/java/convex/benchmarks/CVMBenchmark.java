@@ -4,6 +4,7 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
+import convex.core.ResultContext;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -64,8 +65,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Transfer.create(addr,1, Benchmarks.VILLAIN, 1000);
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 
 	@Benchmark
@@ -73,8 +74,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 
 	@Benchmark
@@ -82,8 +83,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 	
 	@Benchmark
@@ -91,8 +92,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, Constant.of(null));
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 	
 	@Benchmark
@@ -100,8 +101,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, (ACell)null);
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 
 	@Benchmark
@@ -109,8 +110,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 	
 	@Benchmark
@@ -127,8 +128,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply 1000000})))"));
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 	
 	static final ATransaction buyTrade=Invoke.create(HERO,1, Reader.read("(torus/buy-tokens usd 10)"));
@@ -137,8 +138,8 @@ public class CVMBenchmark {
 	public ACell dexMarketTrade() {
 		State s=STATE;
 		ATransaction trans=buyTrade;
-		Context ctx=s.applyTransaction(trans);
-		return ctx.getResult();
+		ResultContext ctx=s.applyTransaction(trans);
+		return ctx.context.getResult();
 	}
 
 	@Benchmark
@@ -146,8 +147,8 @@ public class CVMBenchmark {
 		State s=STATE;
 		Address addr=HERO;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
-		Context ctx=s.applyTransaction(trans);
-		ctx.getValue();
+		ResultContext ctx=s.applyTransaction(trans);
+		ctx.context.getValue();
 	}
 
 	public static void main(String[] args) throws Exception {

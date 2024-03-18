@@ -450,11 +450,11 @@ public class State extends ARecord {
 				SignedData<? extends ATransaction> signed = transactions.get(i);
 				
 				// execute the transaction using the *latest* state (not necessarily "this")
-				Context ctx = state.applyTransaction(signed);
+				ResultContext rc = state.applyTransaction(signed);
 
 				// record results and state update
-				results[i] = Result.fromContext(CVMLong.create(i),ctx);
-				state = ctx.getState();
+				results[i] = Result.fromContext(CVMLong.create(i),rc.context);
+				state = rc.context.getState();
 			} catch (Throwable t) {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
 				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED);
@@ -474,25 +474,25 @@ public class State extends ARecord {
 	 *
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	private Context applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+	private ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
 		Address addr=t.getOrigin();
 		AccountStatus as = getAccount(addr);
 		if (as==null) {
-			return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
+			return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
 		} else {
 			AccountKey key=as.getAccountKey();
-			if (key==null) return Context.createFake(this).withError(ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
+			if (key==null) return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
 			if (!Utils.equals(key, signedTransaction.getAccountKey())) {
-				return Context.createFake(this).withError(ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+" expected public key: "+key);
+				return ResultContext.error(this,ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+", expected public key: "+key);
 			}
 			
 			boolean sigValid=signedTransaction.checkSignature();
-			if (!sigValid) return Context.createFake(this).withError(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
+			if (!sigValid) return ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 		}
 
-		Context ctx=applyTransaction(t);
+		ResultContext ctx=applyTransaction(t);
 		return ctx;
 	}
 	
@@ -517,29 +517,28 @@ public class State extends ARecord {
 	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	public Context applyTransaction(ATransaction t) {
+	public ResultContext applyTransaction(ATransaction t) {
 		ResultContext rc=createResultContext(t);
 		
 		// Create prepared context 
 		Context ctx = prepareTransaction(rc);
-		if (ctx.isExceptional()) {
+		if (!ctx.isExceptional()) {
+			State preparedState=ctx.getState();
+
+			// apply transaction. This may result in an error / exceptional result!
+			ctx = t.apply(ctx);
+
+			// complete transaction
+			// NOTE: completeTransaction handles error cases as well
+			ctx = ctx.completeTransaction(preparedState,rc);	
+		} else {
 			// We hit some error while preparing transaction. Possible culprits:
 			// - Non-existent Origin account
 			// - Bad sequence number
 			// Return context with no change, i.e. before executing the transaction
-			return ctx;
 		}
 
-		State preparedState=ctx.getState();
-
-		// apply transaction. This may result in an error / exceptional result!
-		ctx = t.apply(ctx);
-
-		// complete transaction
-		// NOTE: completeTransaction handles error cases as well
-		ctx = ctx.completeTransaction(preparedState,rc);
-
-		return ctx;
+		return rc.withContext(ctx);
 	}
 
 	private Context prepareTransaction(ResultContext rc) {

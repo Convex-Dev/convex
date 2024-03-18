@@ -43,7 +43,7 @@ public class TransactionTest extends ACVMTest {
 	
 	protected State apply(ATransaction t) {
 		State s=state();
-		Context ctx= s.applyTransaction(t);
+		Context ctx= s.applyTransaction(t).context;
 		assertNotError(ctx);
 		return ctx.getState();
 	}
@@ -91,7 +91,8 @@ public class TransactionTest extends ACVMTest {
 		Transfer t1=Transfer.create(HERO, 120, VILLAIN, 1000);
 		Transfer t2=Transfer.create(VILLAIN, 140, HERO, 2000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_ANY,t1,t2);
-		Context rctx=INITIAL.applyTransaction(m1);
+		ResultContext rc=INITIAL.applyTransaction(m1);
+		Context rctx=rc.context;
 		assertFalse(rctx.isError());
 		AVector<Result> rs=rctx.getResult();
 		assertEquals(2,rs.count());
@@ -113,7 +114,8 @@ public class TransactionTest extends ACVMTest {
 		Transfer t1=Transfer.create(HERO, 120, VILLAIN, 1000);
 		Transfer t2=Transfer.create(VILLAIN, 140, HERO, 2000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_ALL,t1,t2);
-		Context rctx=INITIAL.applyTransaction(m1);
+		ResultContext rc=INITIAL.applyTransaction(m1);
+		Context rctx=rc.context;
 		assertTrue(rctx.isError());
 		assertEquals(ErrorCodes.CHILD,rctx.getErrorCode());
 		AVector<Result> rs=(AVector<Result>) rctx.getExceptional().getMessage();
@@ -135,7 +137,8 @@ public class TransactionTest extends ACVMTest {
 		Transfer t1=Transfer.create(VILLAIN, 120, VILLAIN, 1000);
 		Transfer t2=Transfer.create(HERO, 140, VILLAIN, 2000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_FIRST,t1,t2);
-		Context rctx=INITIAL.applyTransaction(m1);
+		ResultContext rc=INITIAL.applyTransaction(m1);
+		Context rctx=rc.context;
 		assertFalse(rctx.isError());
 		AVector<Result> rs=rctx.getResult();
 		assertEquals(2,rs.count());
@@ -157,7 +160,8 @@ public class TransactionTest extends ACVMTest {
 		Transfer t2=Transfer.create(VILLAIN, 140, VILLAIN, 2000);
 		Transfer t3=Transfer.create(VILLAIN, 160, VILLAIN, 4000);
 		Multi m1=Multi.create(HERO, 1,Multi.MODE_UNTIL,t1,t2,t3);
-		Context rctx=INITIAL.applyTransaction(m1);
+		ResultContext rc=INITIAL.applyTransaction(m1);
+		Context rctx=rc.context;
 		assertFalse(rctx.isError());
 		AVector<Result> rs=rctx.getResult();
 		assertEquals(2,rs.count());
@@ -176,7 +180,8 @@ public class TransactionTest extends ACVMTest {
 	@Test 
 	public void testCall() {
 		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());
-		Context ctx=state().applyTransaction(t1);
+		ResultContext rc=state().applyTransaction(t1);
+		Context ctx=rc.context;
 		assertEquals(ErrorCodes.STATE,ctx.getErrorCode());
 		
 		// We expect a short call to be completely encoded
@@ -188,7 +193,8 @@ public class TransactionTest extends ACVMTest {
 	@Test 
 	public void testInvoke() {
 		Invoke t1=Invoke.create(HERO, 1, "(+ 2 5)");
-		Context ctx=state().applyTransaction(t1);
+		ResultContext rc=state().applyTransaction(t1);
+		Context ctx=rc.context;
 		assertEquals(CVMLong.create(7),ctx.getResult());
 		
 		// We expect a short Invoke to be completely encoded
@@ -200,7 +206,8 @@ public class TransactionTest extends ACVMTest {
 	@Test 
 	public void testBadSequence() {
 		Invoke t1=Invoke.create(HERO, 2, "(+ 2 5)");
-		Context ctx=state().applyTransaction(t1);
+		ResultContext rc=state().applyTransaction(t1);
+		Context ctx=rc.context;
 		assertEquals(ErrorCodes.SEQUENCE,ctx.getError().getCode());
 		
 		// Sequence number in state should be unchanged
