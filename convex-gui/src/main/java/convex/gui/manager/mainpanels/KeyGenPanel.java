@@ -169,8 +169,9 @@ public class KeyGenPanel extends JPanel {
 	}
 
 	private void generatePublicKey() {
-		String s = privateKeyArea.getText();
+		String s = privateKeyArea.getText().trim();
 		try {
+			if (s.startsWith("0x")) s=s.substring(2);
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
 			AKeyPair kp = AKeyPair.create(b.getBytes());
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);

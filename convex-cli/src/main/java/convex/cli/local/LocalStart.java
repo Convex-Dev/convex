@@ -94,7 +94,7 @@ public class LocalStart implements Runnable {
 			for (int i=0; i<left; i++) {
 				AKeyPair kp=AKeyPair.generate();
 				keyPairList.add(kp);
-				log.warn("Generated key: "+kp.getAccountKey()+" Priv: "+kp.getSeed());
+				log.warn("Generated key: "+kp.getAccountKey().toChecksumHex()+" Priv: "+kp.getSeed());
 			}
 		}
 		
