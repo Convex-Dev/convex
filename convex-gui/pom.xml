@@ -19,6 +19,7 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.3.0</version>
 				<configuration>
+					<finalName>convex-desktop</finalName>
 					<outputDirectory>${project.directory}</outputDirectory>
 					<archive>
 						<manifest>
@@ -28,6 +29,7 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
+					<appendAssemblyId>false</appendAssemblyId>
 					<!-- We want differentiated outputs <appendAssemblyId>false</appendAssemblyId> -->
 				</configuration>
 				<executions>
