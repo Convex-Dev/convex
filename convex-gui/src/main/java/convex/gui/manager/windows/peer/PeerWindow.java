@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.gui.PeerGUI;
 import convex.gui.components.PeerComponent;
 import convex.gui.manager.windows.BaseWindow;
@@ -17,7 +18,7 @@ import convex.peer.Server;
 
 @SuppressWarnings("serial")
 public class PeerWindow extends BaseWindow {
-	Convex peer;
+	ConvexLocal peer;
 
 	public Convex getPeerView() {
 		return peer;
@@ -27,7 +28,7 @@ public class PeerWindow extends BaseWindow {
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public PeerWindow(PeerGUI manager, Convex peer) {
+	public PeerWindow(PeerGUI manager, ConvexLocal peer) {
 		super(manager);
 		this.peer = peer;
 

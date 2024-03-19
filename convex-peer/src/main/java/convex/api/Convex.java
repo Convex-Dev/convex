@@ -927,4 +927,8 @@ public abstract class Convex {
 	 */
 	public abstract InetSocketAddress getHostAddress();
 
+	public Long getBalance() throws IOException {
+		return getBalance(getAddress());
+	}
+
 }

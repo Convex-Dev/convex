@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
@@ -232,7 +233,7 @@ public class PeerGUI extends JPanel {
 		}
 	}, "GUI Manager state update thread");
 
-	public static DefaultListModel<Convex> peerList = new DefaultListModel<Convex>();
+	public static DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
 
 
 

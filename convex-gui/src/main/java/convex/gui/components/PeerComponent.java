@@ -12,6 +12,7 @@ import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
 import convex.core.Peer;
 import convex.core.State;
@@ -35,11 +36,11 @@ import etch.EtchStore;
 @SuppressWarnings("serial")
 public class PeerComponent extends BaseListComponent {
 
-	public Convex convex;
+	public ConvexLocal convex;
 	JTextArea description;
 	private PeerGUI manager;
 
-	public void launchPeerWindow(Convex peer) {
+	public void launchPeerWindow(ConvexLocal peer) {
 		try {
 			PeerWindow pw = new PeerWindow(manager, peer);
 			pw.launch();
@@ -48,7 +49,7 @@ public class PeerComponent extends BaseListComponent {
 		}
 	}
 
-	public void launchEtchWindow(Convex peer) {
+	public void launchEtchWindow(ConvexLocal peer) {
 		EtchWindow ew = new EtchWindow(manager, peer);
 		ew.launch();
 	}
@@ -60,7 +61,7 @@ public class PeerComponent extends BaseListComponent {
 		pw.launch();
 	}
 
-	public PeerComponent(PeerGUI manager, Convex value) {
+	public PeerComponent(PeerGUI manager, ConvexLocal value) {
 		this.manager = manager;
 		this.convex = value;
 

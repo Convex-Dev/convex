@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
 import convex.core.Coin;
 import convex.core.Result;
@@ -27,6 +28,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.exceptions.TODOException;
 import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
@@ -49,7 +51,7 @@ public class PeersListPanel extends JPanel {
 			int N=manager.KEYPAIRS.size();
 			List<Server> serverList = API.launchLocalPeers(manager.KEYPAIRS,manager.genesisState);
 			for (Server server: serverList) {
-				Convex convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
+				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
 				addPeer(convex);
 				
 				// initial wallet list
@@ -70,16 +72,17 @@ public class PeersListPanel extends JPanel {
 		
 		try {
 			Server base=getFirst().getLocalServer();
-			Convex convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
+			ConvexLocal convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
 			Address a= convex.createAccountSync(kp.getAccountKey());
-			convex.transferSync(a, Coin.EMERALD);
+			long amt=convex.getBalance()/10;
+			convex.transferSync(a, amt);
 			
 			WalletPanel.addWalletEntry(WalletEntry.create(a, kp));
 			
 			// Set up Peer in base server
 			convex=Convex.connect(base, a, kp);
 			AccountKey key=kp.getAccountKey();
-			Result rcr=convex.transactSync("(create-peer "+key+" 10000000000000)");
+			Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
 			if (rcr.isError()) log.warn("Error creating peer: "+rcr);
 			
 			HashMap<Keyword, Object> config=new HashMap<>();
@@ -121,7 +124,7 @@ public class PeersListPanel extends JPanel {
 		return al;
 	}
 
-	private void addPeer(Convex convex) {
+	private void addPeer(ConvexLocal convex) {
 		PeerGUI.peerList.addElement(convex);
 	}
 
@@ -153,14 +156,15 @@ public class PeersListPanel extends JPanel {
 			try {
 				// TODO: we want to receive anything?
 				pc = Convex.connect(hostAddress, null,null);
-				addPeer(pc);
+				throw new TODOException();
+				//addPeer(pc);
 			} catch (Throwable e1) {
 				JOptionPane.showMessageDialog(this, "Connect failed: " + e1.toString());
 			}
 
 		});
 
-		ScrollyList<Convex> scrollyList = new ScrollyList<Convex>(PeerGUI.peerList,
+		ScrollyList<ConvexLocal> scrollyList = new ScrollyList<>(PeerGUI.peerList,
 				peer -> new PeerComponent(manager, peer));
 		add(scrollyList, BorderLayout.CENTER);
 	}
