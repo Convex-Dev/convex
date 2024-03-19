@@ -42,6 +42,7 @@ import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.List;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -62,6 +63,7 @@ public class REPLPanel extends JPanel {
 	private JButton btnInfo;
 	private JCheckBox btnResults;
 	private JCheckBox btnTiming;
+	private JCheckBox btnCompile;
 	
 	private ArrayList<String> history=new ArrayList<>();
 	private int historyPosition=0;
@@ -117,7 +119,7 @@ public class REPLPanel extends JPanel {
 		outputArea.setCaretPosition(end);
 	}
 	
-	protected void handleError(Object code, Object msg, AVector<AString> trace) {
+	protected void handleError(ACell code, ACell msg, AVector<AString> trace) {
 		addOutput(outputArea," Exception: " + code + " "+ msg+"\n",Color.ORANGE);
 		if (trace!=null) for (AString s: trace) {
 			addOutput(outputArea," - "+s.toString()+"\n",Color.PINK);
@@ -227,6 +229,10 @@ public class REPLPanel extends JPanel {
 		
 		btnTiming=new JCheckBox("Timing info");
 		panel_1.add(btnTiming);
+		
+		btnCompile=new JCheckBox("Precompile");
+		btnCompile.setSelected(convex.getLocalServer()!=null); // default: only do this if local
+		panel_1.add(btnCompile);
 
 		
 		// Get initial focus in REPL input area
@@ -260,18 +266,24 @@ public class REPLPanel extends JPanel {
 			addOutput(outputArea,"\n");
 			try {
 				AList<ACell> forms = Reader.readAll(s);
-				ACell message = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
+				ACell code = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
 				Future<Result> future;
 				String mode = execPanel.getMode();
+				
+				if (btnCompile.isSelected()) {
+					ACell compileStep=List.of(Symbols.COMPILE,List.of(Symbols.QUOTE,code));
+					Result cr=convex.querySync(compileStep);
+					code=cr.getValue();
+				}
 
 				long start=Utils.getCurrentTimestamp();
 
 				if (mode.equals("Query")) {
 					AKeyPair kp=getKeyPair();
 					if (kp == null) {
-						future = convex.query(message,null);
+						future = convex.query(code,null);
 					} else {
-						future = convex.query(message, getAddress());
+						future = convex.query(code, getAddress());
 					}
 				} else if (mode.equals("Transact")) {
 					WalletEntry we = execPanel.getWalletEntry();
@@ -281,7 +293,7 @@ public class REPLPanel extends JPanel {
 						return;
 					}
 					Address address = getAddress();
-					ATransaction trans = Invoke.create(address,-1, message);
+					ATransaction trans = Invoke.create(address,-1, code);
 					convex.setAddress(address);
 					convex.setKeyPair(getKeyPair());
 					future = convex.transact(trans);
