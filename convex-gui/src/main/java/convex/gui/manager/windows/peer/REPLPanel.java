@@ -177,7 +177,8 @@ public class REPLPanel extends JPanel {
 		outputArea.setFont(OUTPUT_FONT);
 		RightCopyMenu.addTo(outputArea);
 		//outputArea.setForeground(Color.GREEN);
-		outputArea.setBackground(Color.BLACK);
+		outputArea.setBackground(new Color(10,10,10));
+		outputArea.setToolTipText("This area shows a log of output from transaction execution");
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 		splitPane.setLeftComponent(new JScrollPane(outputArea));
@@ -187,6 +188,7 @@ public class REPLPanel extends JPanel {
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
 		inputArea.setBackground(Color.BLACK);
+		inputArea.setToolTipText("Input commands here. Press Enter at the end of input to send.");
 		RightCopyMenu.addTo(inputArea);
 		//inputArea.setForeground(Color.GREEN);
 
@@ -225,12 +227,15 @@ public class REPLPanel extends JPanel {
 		});
 		
 		btnResults=new JCheckBox("Full Results");
+		btnResults.setToolTipText("Tick to show full Result record returned from peer.");
 		panel_1.add(btnResults);
 		
-		btnTiming=new JCheckBox("Timing info");
+		btnTiming=new JCheckBox("Show Timing");
+		btnTiming.setToolTipText("Tick to receive execution time report after each transaction.");
 		panel_1.add(btnTiming);
 		
 		btnCompile=new JCheckBox("Precompile");
+		btnCompile.setToolTipText("Tick to compile code before sending transaction. Usually reduces juice costs.");
 		btnCompile.setSelected(convex.getLocalServer()!=null); // default: only do this if local
 		panel_1.add(btnCompile);
 

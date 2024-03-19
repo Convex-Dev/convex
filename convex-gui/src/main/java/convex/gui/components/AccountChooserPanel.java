@@ -12,7 +12,11 @@ import javax.swing.ListModel;
 
 import convex.api.Convex;
 import convex.core.crypto.WalletEntry;
+import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.prim.AInteger;
+import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.core.util.Text;
 import convex.gui.PeerGUI;
 import convex.gui.manager.mainpanels.WalletPanel;
@@ -81,17 +85,12 @@ public class AccountChooserPanel extends JPanel {
 
 		add(modeCombo);
 
-
 		// Balance Info
 		balanceLabel = new JLabel("Balance: ");
 		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 		add(balanceLabel);
 
-		//PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
-		//	updateBalance(getSelectedAddress());
-		//});
-
-		// updateBalance(getSelectedAddress());
+		updateBalance(getSelectedAddress());
 	}
 
 	private void updateModel() {
@@ -142,14 +141,18 @@ public class AccountChooserPanel extends JPanel {
 	}
 
 	private void updateBalance(Address a) {
-		PeerGUI.runWithLatestState(s->{
-			if ((s == null) || (a == null)) {
-				balanceLabel.setText("Balance: <not available>");
-			} else {
-				Long amt= s.getBalance(a);
-				balanceLabel.setText("Balance: " + ((amt==null)?"Null":Text.toFriendlyNumber(amt)));
-			}
-		});
+		try {
+			convex.query(Symbols.STAR_BALANCE).thenAccept(r-> {
+				ACell bal=r.getValue();
+				String s="<unknown>";
+				if (bal instanceof AInteger) {
+					s=Text.toFriendlyNumber(((AInteger)bal).longValue());
+				}
+				balanceLabel.setText(s);
+			});
+		} catch (Throwable t) {
+			balanceLabel.setText(t.getClass().getName());
+		}
 	}
 
 	public String getMode() {
