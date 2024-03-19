@@ -147,6 +147,10 @@ public class Toolkit {
 	}
 
 	public static Image getImage(URL resourceURL) {
-		return java.awt.Toolkit.getDefaultToolkit().getImage(resourceURL);
+		return getDefaultToolkit().getImage(resourceURL);
+	}
+
+	public static java.awt.Toolkit getDefaultToolkit() {
+		return java.awt.Toolkit.getDefaultToolkit();
 	}
 }

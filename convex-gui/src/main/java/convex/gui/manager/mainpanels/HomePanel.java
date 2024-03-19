@@ -25,8 +25,8 @@ public class HomePanel extends JPanel {
 		add(panel);
 		panel.setLayout(new BorderLayout(0, 0));
 
-		JLabel lblWelome = new JLabel("Welome to Convex");
-		lblWelome.setFont(new Font("Monospaced", Font.PLAIN, 18));
+		JLabel lblWelome = new JLabel("Welcome to Convex");
+		lblWelome.setFont(new Font("Monospaced", Font.PLAIN, 24));
 		lblWelome.setHorizontalAlignment(SwingConstants.CENTER);
 		panel.add(lblWelome, BorderLayout.NORTH);
 

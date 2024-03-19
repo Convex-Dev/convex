@@ -3,7 +3,6 @@ package convex.gui;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.EventQueue;
-import java.awt.Toolkit;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -50,6 +49,7 @@ import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
 import convex.gui.manager.mainpanels.TorusPanel;
 import convex.gui.manager.mainpanels.WalletPanel;
+import convex.gui.utils.Toolkit;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 
@@ -72,10 +72,6 @@ public class PeerGUI extends JPanel {
 
 	public static long maxBlock = 0;
 
-	static {
-		convex.gui.utils.Toolkit.init();
-	}
-
 	/**
 	 * Launch the application.
 	 * @param args Command line args
@@ -85,7 +81,8 @@ public class PeerGUI extends JPanel {
 		// TODO: Store config
 		// Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
 
-		// call to set up Look and Feel	
+		// call to set up Look and Feel
+		Toolkit.init();
 		
 		EventQueue.invokeLater(new Runnable() {
 			@Override
