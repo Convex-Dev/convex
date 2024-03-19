@@ -15,6 +15,8 @@ public class ResultContext {
 	public long juicePrice;
 	public long memUsed=0;
 	public Context context=null;
+	public long totalFees=0;
+	public long juiceUsed=0;
 
 	public ResultContext(ATransaction transaction, long juicePrice) {
 		this.juicePrice=juicePrice;

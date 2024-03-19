@@ -243,6 +243,9 @@ public final class Result extends ARecordGeneric {
 				info=info.assoc(Keywords.EADDR, errorAddress);
 			}
 		}
+		if (rc.memUsed>0) info=info.assoc(Keywords.MEM, CVMLong.create(rc.memUsed));
+		if (rc.totalFees>0) info=info.assoc(Keywords.FEES, CVMLong.create(rc.totalFees));
+		if (rc.juiceUsed>0) info=info.assoc(Keywords.JUICE, CVMLong.create(rc.juiceUsed));
 		return create(id,(ACell)result,errorCode,info);
 	}
 	

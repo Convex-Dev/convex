@@ -323,6 +323,7 @@ public class Context {
 		// get state at end of transaction application
 		State state=getState();
 		long executionJuice=this.juice;
+		rc.juiceUsed=executionJuice;
 
 		// Base fixed juice cost per transaction
 		long trxJuice=Juice.TRANSACTION;
@@ -376,6 +377,7 @@ public class Context {
 
 		// Compute total fees
 		long fees=juiceFees+memorySpend;
+		rc.totalFees=fees;
 		
 		// Make balance changes if needed for refund and memory purchase
 		// Also increment sequence number

@@ -19,7 +19,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
-import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
@@ -280,14 +279,14 @@ public class Peer {
 		State state=getConsensusState();
 
 		if (form instanceof ATransaction) {
-			return state.applyTransaction((ATransaction)form);
+			return executeDetached((ATransaction)form);
 		}
 		
 		if (form instanceof SignedData) {
 			SignedData<?> sc=(SignedData<?>)form;
 			ACell val=sc.getValue();
 			if (form instanceof ATransaction) {
-				return state.applyTransaction((ATransaction)val);
+				return executeDetached((ATransaction)val);
 			}
 		}
 		
@@ -305,27 +304,13 @@ public class Peer {
 	}
 
 	/**
-	 * Estimates the coin cost of a executing a given transaction by performing a "dry run".
-	 *
-	 * This will be exact if no intermediate transactions affect the state, and if no time-dependent functionality is used.
-	 *
-	 * @param trans Transaction to test
-	 * @return Estimated cost
-	 */
-	public long estimateCost(ATransaction trans) {
-		Address address=trans.getOrigin();
-		State state=getConsensusState();
-		Context ctx=executeDryRun(trans).context;
-		return state.getBalance(address)-ctx.getState().getBalance(address);
-	}
-
-	/**
-	 * Executes a "dry run" transaction on the current consensus state of this Peer.
+	 * Executes a "detached" transaction on the current consensus state of this Peer, but without any effect on current CVM state.
+	 * This can be used for query, estimating potential fees etc.
 	 *
 	 * @param transaction Transaction to execute
 	 * @return The Context containing the transaction results.
 	 */
-	public ResultContext executeDryRun(ATransaction transaction) {
+	public ResultContext executeDetached(ATransaction transaction) {
 		ResultContext ctx=getConsensusState().applyTransaction(transaction);
 		return ctx;
 	}

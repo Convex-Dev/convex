@@ -80,6 +80,9 @@ public class Keywords {
 	public static final Keyword TRACE = Keyword.create("trace");
 	public static final Keyword INFO = Keyword.create("info");
 	public static final Keyword EADDR = Keyword.create("eaddr");
+	public static final Keyword MEM = Keyword.create("mem");
+	public static final Keyword FEES = Keyword.create("fees");
+	public static final Keyword JUICE = Keyword.create("juice");
 
 	public static final Keyword EXPANDER_Q = Keyword.create("expander?");
 	public static final Keyword MACRO = Keyword.create("macro");
@@ -125,6 +128,7 @@ public class Keywords {
 	
 	// Commond trust keys
 	public static final Keyword CONTROL = Keyword.create("control");
+
 
 
 }
