@@ -19,13 +19,16 @@ public class ActorInvokePanel extends JPanel {
 
 	protected PeerGUI manager;
 	protected Address contract;
-	AccountChooserPanel execPanel = new AccountChooserPanel();
+	AccountChooserPanel execPanel;
 
 	DefaultListModel<Symbol> exportList = new DefaultListModel<Symbol>();
 
 	public ActorInvokePanel(PeerGUI manager, Address contract) {
 		this.manager = manager;
 		this.contract = contract;
+		
+		execPanel=new AccountChooserPanel(null);
+		add(execPanel, BorderLayout.NORTH);
 
 		setLayout(new BorderLayout());
 
@@ -39,7 +42,6 @@ public class ActorInvokePanel extends JPanel {
 				sym -> new SmartOpComponent(this, contract, sym));
 		add(scrollyList, BorderLayout.CENTER);
 
-		add(execPanel, BorderLayout.NORTH);
 	}
 
 	public State getLatestState() {

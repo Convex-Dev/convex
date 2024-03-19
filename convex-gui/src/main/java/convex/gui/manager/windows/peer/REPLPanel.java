@@ -74,7 +74,7 @@ public class REPLPanel extends JPanel {
 	
 	private JPanel panel_1;
 
-	private AccountChooserPanel execPanel = new AccountChooserPanel();
+	private AccountChooserPanel execPanel;
 
 	private final Convex convex;
 
@@ -153,7 +153,14 @@ public class REPLPanel extends JPanel {
 	 */
 	public REPLPanel(Convex convex) {
 		this.convex=convex;
+		execPanel=new AccountChooserPanel(convex);
+		
 		setLayout(new BorderLayout(0, 0));
+		
+		// Set up account chooser panel
+		add(execPanel, BorderLayout.NORTH);
+
+		// Split pane for main GUI elements
 
 		JSplitPane splitPane = new JSplitPane();
 		splitPane.setResizeWeight(0.8);
@@ -187,9 +194,6 @@ public class REPLPanel extends JPanel {
 		setFocusTraversalKeysEnabled(false);
 		inputArea.setFocusTraversalKeysEnabled(false);
 		
-		// Sett up account chooser panel
-		add(execPanel, BorderLayout.NORTH);
-		execPanel.selectAddress(convex.getAddress());
 
 		panel_1 = new ActionPanel();
 		add(panel_1, BorderLayout.SOUTH);

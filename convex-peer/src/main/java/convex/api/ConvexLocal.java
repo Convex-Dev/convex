@@ -118,7 +118,7 @@ public class ConvexLocal extends Convex {
 		return CompletableFuture.completedFuture(getState());
 	}
 	
-	private State getState() {
+	public State getState() {
 		return server.getPeer().getConsensusState();
 	}
 	

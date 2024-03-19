@@ -6,22 +6,21 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import convex.gui.components.AccountChooserPanel;
-import convex.gui.components.ActionPanel;
+import convex.gui.components.*;
 
 @SuppressWarnings("serial")
 public class DeployPanel extends JPanel {
 
 	
-	private AccountChooserPanel acctChooser;
+	//private AccountChooserPanel acctChooser;
 
 	public DeployPanel() {
 		setLayout(new BorderLayout());
 		
 		// ===========================================
 		// Top panel
-		acctChooser=new AccountChooserPanel();
-		this.add(acctChooser, BorderLayout.NORTH);
+		//acctChooser=new AccountChooserPanel();
+		//this.add(acctChooser, BorderLayout.NORTH);
 		
 		// ===========================================
 		// Centre panel

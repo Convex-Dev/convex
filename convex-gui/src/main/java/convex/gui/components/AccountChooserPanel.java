@@ -10,6 +10,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.ListModel;
 
+import convex.api.Convex;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.Address;
 import convex.core.util.Text;
@@ -30,8 +31,12 @@ public class AccountChooserPanel extends JPanel {
 
 	private DefaultComboBoxModel<WalletEntry> addressModel;
 	private JLabel balanceLabel;
+	
+	private Convex convex;
 
-	public AccountChooserPanel() {
+	public AccountChooserPanel(Convex convex) {
+		this.convex=convex;
+		
 		MigLayout flowLayout = new MigLayout();
 		setLayout(flowLayout);
 
@@ -153,5 +158,9 @@ public class AccountChooserPanel extends JPanel {
 
 	public WalletEntry getWalletEntry() {
 		return (WalletEntry) addressCombo.getSelectedItem();
+	}
+
+	public Convex getConvex() {
+		return convex;
 	}
 }

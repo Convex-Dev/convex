@@ -1,20 +1,20 @@
 package convex.gui.manager.mainpanels.actors;
 
 import java.awt.BorderLayout;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.api.ConvexLocal;
 import convex.core.State;
 import convex.core.data.Address;
-import convex.gui.PeerGUI;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
-import convex.gui.components.models.StateModel;
 
 /**
  * Panel displaying current prediction markets
@@ -24,17 +24,17 @@ public class MarketsPanel extends JPanel {
 
 	private static final Logger log = LoggerFactory.getLogger(MarketsPanel.class.getName());
 	AccountChooserPanel acctChooser;
-	private PeerGUI manager;
+	private ConvexLocal manager;
 
 	static DefaultListModel<Address> marketList = new DefaultListModel<Address>();
 
-	public MarketsPanel(PeerGUI manager) {
+	public MarketsPanel(ConvexLocal manager) {
 		this.setLayout(new BorderLayout());
 		this.manager=manager;
 
 		// ===========================================
 		// Top panel
-		acctChooser = new AccountChooserPanel();
+		acctChooser = new AccountChooserPanel(manager);
 		this.add(acctChooser, BorderLayout.NORTH);
 
 		// ===========================================
@@ -56,10 +56,7 @@ public class MarketsPanel extends JPanel {
 	}
 
 	public State getLatestState() {
-		return manager.getLatestState();
+		return manager.getState();
 	}
 	
-	public StateModel<State> getStateModel() {
-		return manager.getStateModel();
-	}
 }

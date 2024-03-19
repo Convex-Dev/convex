@@ -139,10 +139,10 @@ public class MarketComponent extends BaseListComponent {
 		// state updates
 		updateStatus(state);
 
-		marketsPanel.getStateModel().addPropertyChangeListener(e -> {
-			State s = (State) e.getNewValue();
-			updateStatus(s);
-		});
+		//marketsPanel.getStateModel().addPropertyChangeListener(e -> {
+		//	State s = (State) e.getNewValue();
+		//	updateStatus(s);
+		//});
 
 		marketsPanel.acctChooser.addressCombo.addActionListener(e -> {
 			State s = marketsPanel.getLatestState();

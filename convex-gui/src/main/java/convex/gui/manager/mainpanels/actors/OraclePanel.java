@@ -2,9 +2,6 @@ package convex.gui.manager.mainpanels.actors;
 
 import java.awt.BorderLayout;
 import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
@@ -14,21 +11,22 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.api.ConvexLocal;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.MapEntry;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
-import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
 import convex.gui.components.models.OracleTableModel;
-import convex.gui.manager.mainpanels.WalletPanel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -36,19 +34,19 @@ public class OraclePanel extends JPanel {
 
 	public static final Logger log = LoggerFactory.getLogger(OraclePanel.class.getName());
 
-	PeerGUI manager;
+	ConvexLocal manager;
 	JScrollPane scrollPane;
 	
 	long key = 1;
 
-	public OraclePanel(PeerGUI manager) {
+	public OraclePanel(ConvexLocal manager) {
 		this.manager=manager;
 		this.setLayout(new BorderLayout());
 		
-		Address oracleAddress = manager.getLatestState().lookupCNS("convex.trusted-oracle");
-		Address oracleActorAddress = manager.getLatestState().lookupCNS("convex.trusted-oracle.actor");
+		Address oracleAddress = manager.getState().lookupCNS("convex.trusted-oracle");
+		Address oracleActorAddress = manager.getState().lookupCNS("convex.trusted-oracle.actor");
 
-		OracleTableModel tableModel = new OracleTableModel(manager.getLatestState(), oracleActorAddress);
+		OracleTableModel tableModel = new OracleTableModel(manager.getState(), oracleActorAddress);
 		JTable table = new JTable(tableModel);
 		scrollPane = new JScrollPane(table);;
 
@@ -59,10 +57,10 @@ public class OraclePanel extends JPanel {
 
 		// ===========================================
 		// Central table
-		manager.getStateModel().addPropertyChangeListener(pc -> {
-			State newState = (State) pc.getNewValue();
-			tableModel.setState(newState);
-		});
+		//manager.getStateModel().addPropertyChangeListener(pc -> {
+		//	State newState = (State) pc.getNewValue();
+		//	tableModel.setState(newState);
+		//});
 
 		// Column layouts
 		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
@@ -137,7 +135,7 @@ public class OraclePanel extends JPanel {
 				String source = "(let [pmc " + actorCode + " ] " + "(deploy (pmc " + " 0x"
 						+ oracleAddress.toString() + " " + key + " " + outcomeString + ")))";
 				ACell code = Reader.read(source);
-				manager.execute(WalletPanel.HERO, code).thenAcceptAsync(createMarketAction);
+				manager.transact(code).thenAcceptAsync(createMarketAction);
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
@@ -145,7 +143,11 @@ public class OraclePanel extends JPanel {
 	}
 
 	private void execute(ACell code) {
-		manager.execute(WalletPanel.HERO, code).thenAcceptAsync(receiveAction);
+		try {
+			manager.transact(code).thenAcceptAsync(receiveAction);
+		} catch (Throwable t) {
+			throw Utils.sneakyThrow(t);
+		}
 	}
 
 	private final Consumer<Result> createMarketAction = new Consumer<Result>() {

@@ -433,6 +433,18 @@ public abstract class Convex {
 	 * @throws TimeoutException 
 	 */
 	public synchronized CompletableFuture<Result> transact(String code) throws IOException, TimeoutException {
+		return transact((ACell)Reader.read(code));
+	}
+	
+	/**
+	 * Executes a transaction, compiling the given source code as an Invoke.
+	 *
+	 * @param code Code to execute
+	 * @return A Future for the result of the transaction
+	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws TimeoutException 
+	 */
+	public synchronized CompletableFuture<Result> transact(ACell code) throws IOException, TimeoutException {
 		ATransaction trans = Invoke.create(getAddress(), -1, code);
 		return transact(trans);
 	}
