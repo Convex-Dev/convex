@@ -214,8 +214,8 @@ public class REPLPanel extends JPanel {
 			} catch (Exception e1) {
 				log.info("Failed to get sequence number");
 			}
-			sb.append("Account:     " + convex.getAddress() + "\n");
-			sb.append("Public Key:  " + convex.getAccountKey() + "\n");
+			sb.append("Account:     " + RT.toString(convex.getAddress()) + "\n");
+			sb.append("Public Key:  " + RT.toString(convex.getAccountKey()) + "\n");
 			sb.append("Connected?:  " + convex.isConnected()+"\n");
 
 			String infoString = sb.toString();

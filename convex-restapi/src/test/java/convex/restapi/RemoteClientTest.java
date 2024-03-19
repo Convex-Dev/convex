@@ -79,6 +79,7 @@ public class RemoteClientTest {
 		Address addr=c.createAccount(kp);
 		c.setKeyPair(kp);
 		c.setAddress(addr);
+		c.faucet(addr, 1000000);
 		
 		// Query *address*
 		Map<String,Object> res=c.query("*address*");
@@ -96,11 +97,12 @@ public class RemoteClientTest {
 		Address addr=c.createAccount(kp);
 		c.setKeyPair(kp);
 		c.setAddress(addr);
+		c.faucet(addr, 1000000);
 		
 		// Test values for basic new account
 		Map<String,Object> res=c.queryAccount();
 		assertEquals(addr.longValue(),res.get("address"));
-		assertEquals(0L,res.get("balance"));
+		assertEquals(1000000L,res.get("balance"));
 		assertEquals(0L,res.get("sequence"));
 		assertEquals("user",res.get("type"));
 		

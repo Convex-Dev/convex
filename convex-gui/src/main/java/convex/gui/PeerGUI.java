@@ -43,7 +43,6 @@ import convex.core.util.Utils;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.manager.mainpanels.AccountsPanel;
-import convex.gui.manager.mainpanels.HomePanel;
 import convex.gui.manager.mainpanels.KeyGenPanel;
 import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.manager.mainpanels.PeersListPanel;
@@ -84,31 +83,28 @@ public class PeerGUI extends JPanel {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		EventQueue.invokeLater(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					PeerGUI.frame = new JFrame();
-					frame.setTitle("Convex Peer Manager");
-					frame.setIconImage(Toolkit.getDefaultToolkit()
-							.getImage(PeerGUI.class.getResource("/images/Convex.png")));
-					frame.setBounds(100, 100, 1200, 900);
-					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		EventQueue.invokeLater(()->{
+			try {
+				PeerGUI.frame = new JFrame();
+				frame.setTitle("Convex Peer Manager");
+				frame.setIconImage(Toolkit.getDefaultToolkit()
+						.getImage(PeerGUI.class.getResource("/images/Convex.png")));
+				frame.setBounds(100, 100, 1200, 900);
+				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-					PeerGUI window = new PeerGUI();
-					frame.getContentPane().add(window, BorderLayout.CENTER);
-					frame.setVisible(true);
+				PeerGUI window = new PeerGUI();
+				frame.getContentPane().add(window, BorderLayout.CENTER);
+				frame.setVisible(true);
 
-					frame.addWindowListener(new java.awt.event.WindowAdapter() {
-				        public void windowClosing(WindowEvent winEvt) {
-				        	// shut down peers gracefully
-				    		window.peerPanel.closePeers();
-				        }
-				    });
+				frame.addWindowListener(new java.awt.event.WindowAdapter() {
+			        public void windowClosing(WindowEvent winEvt) {
+			        	// shut down peers gracefully
+			    		window.peerPanel.closePeers();
+			        }
+			    });
 
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		});
 	}
@@ -116,7 +112,6 @@ public class PeerGUI extends JPanel {
 	/*
 	 * Main component panel
 	 */
-	HomePanel homePanel;
 	PeersListPanel peerPanel;
 	WalletPanel walletPanel;
 	KeyGenPanel keyGenPanel;
@@ -139,7 +134,6 @@ public class PeerGUI extends JPanel {
 		tickState = StateModel.create(0L);
 		
 		peerPanel= new PeersListPanel(this);
-		homePanel = new HomePanel();
 		walletPanel = new WalletPanel(this);
 		keyGenPanel = new KeyGenPanel(this);
 		messagePanel = new MessageFormatPanel(this);
@@ -150,7 +144,6 @@ public class PeerGUI extends JPanel {
 		tabs = new JTabbedPane();
 		this.add(tabs, BorderLayout.CENTER);
 
-		tabs.add("Home", homePanel);
 		tabs.add("Peers", peerPanel);
 		tabs.add("Wallet", getWalletPanel());
 		tabs.add("Accounts", accountsPanel);

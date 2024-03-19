@@ -58,11 +58,6 @@ public class ConvexClient extends JPanel {
 		EventQueue.invokeLater(()->launch(convex));
 	}
 
-	/*
-	 * Main component panel
-	 */
-	JPanel panel = new JPanel();
-
 	HomePanel homePanel = new HomePanel();
 
 	public JTabbedPane tabs = new JTabbedPane();

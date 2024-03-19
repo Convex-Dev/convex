@@ -823,9 +823,10 @@ public abstract class Convex {
 	/**
 	 * Returns the current AcountKey for the client using the API.
 	 *
-	 * @return AcountKey instance
+	 * @return AcountKey instance, or null if no keypair is set
 	 */
 	public AccountKey getAccountKey() {
+		if (keyPair==null) return null;
 		return keyPair.getAccountKey();
 	}
 

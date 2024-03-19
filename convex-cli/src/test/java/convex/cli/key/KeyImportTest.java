@@ -112,7 +112,7 @@ public class KeyImportTest {
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());
 		String output=t2.getOutput();
-		System.out.println(output);
+		// System.out.println(output);
 		assertTrue(output.contains("359562fef6063132699e5e51aa741943c712712be1c2783b61aa2d6f3b42aa44".toLowerCase()));
 	}
 }

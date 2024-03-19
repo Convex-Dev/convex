@@ -47,7 +47,7 @@ public class AccountChooserPanel extends JPanel {
 		add(lblNewLabel);
 
 		addressCombo = new JComboBox<WalletEntry>();
-		addressCombo.setEditable(false);
+		addressCombo.setEditable(true);
 		add(addressCombo);
 		addressCombo.setToolTipText("Select Account for use");
 		updateModel();

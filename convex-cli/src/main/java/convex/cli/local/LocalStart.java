@@ -92,7 +92,9 @@ public class LocalStart implements Runnable {
 		if (left>0) {
 			log.warn("Insufficient key pairs specified. Additional "+left+" keypair(s) will be generated");
 			for (int i=0; i<left; i++) {
-				keyPairList.add(AKeyPair.generate());
+				AKeyPair kp=AKeyPair.generate();
+				keyPairList.add(kp);
+				log.warn("Generated key: "+kp.getAccountKey()+" Priv: "+kp.getSeed());
 			}
 		}
 		
