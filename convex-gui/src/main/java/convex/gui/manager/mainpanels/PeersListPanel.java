@@ -105,7 +105,7 @@ public class PeersListPanel extends JPanel {
 		}
 	}
 
-	public static Convex getFirst() {
+	public static ConvexLocal getFirst() {
 		return PeerGUI.peerList.elementAt(0);
 	}
 
@@ -114,11 +114,11 @@ public class PeersListPanel extends JPanel {
 	 *
 	 * @return List of local PeerView objects
 	 */
-	public List<Convex> getPeerViews() {
-		ArrayList<Convex> al = new ArrayList<>();
+	public List<ConvexLocal> getPeerViews() {
+		ArrayList<ConvexLocal> al = new ArrayList<>();
 		int n = PeerGUI.peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			Convex p = PeerGUI.peerList.getElementAt(i);
+			ConvexLocal p = PeerGUI.peerList.getElementAt(i);
 			al.add(p);
 		}
 		return al;

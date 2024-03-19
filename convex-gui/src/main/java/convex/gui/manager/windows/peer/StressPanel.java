@@ -22,7 +22,6 @@ import javax.swing.JSpinner;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 
 import org.slf4j.Logger;
@@ -82,7 +81,9 @@ public class StressPanel extends JPanel {
 		actionPanel.add(btnRun);
 		btnRun.addActionListener(e -> {
 			btnRun.setEnabled(false);
-			SwingUtilities.invokeLater(() -> runStressTest());
+			Address address=peerConvex.getAddress();
+			AKeyPair kp=peerConvex.getKeyPair();
+			new StressTest(kp, address).execute();
 		});
 
 		splitPane = new JSplitPane();
@@ -195,120 +196,129 @@ public class StressPanel extends JPanel {
 			this.kp = kp;
 			this.address = address;
 		}
-
+		
 		@Override
-		protected String doInBackground() throws Exception {
-			StringBuilder sb = new StringBuilder();
+		protected String doInBackground() {
+			String result=null;
 			try {
-				resultArea.setText("Connecting clients...");
-
-				// Use client store
-				// Stores.setCurrent(Stores.CLIENT_STORE);
-				ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
-				Convex pc = Convex.connect(sa, address,kp);
-			
-				// Generate client accounts
-				StringBuilder cmdsb=new StringBuilder();
-				cmdsb.append("(let [f (fn [k] (let [a (create-account k)] (transfer a 1000000000) a))] ");
-				cmdsb.append("  (mapv f [");
-				for (int i=0; i<clientCount; i++) {
-					AKeyPair kp=AKeyPair.generate();
-					kps.add(kp);
-					cmdsb.append(" "+kp.getAccountKey());
-				}
-				cmdsb.append("]))");
-				
-				Result ccr=pc.transactSync(Invoke.create(address, -1, cmdsb.toString()));
-				if (ccr.isError()) throw new Error("Creating accounts failed: "+ccr);
-				AVector<Address> clientAddresses=ccr.getValue();
-
-				connectClients(clientAddresses);
-				setupClients();
-				
-				resultArea.setText("Syncing...");
-				// Make sure we are in consensus
-				pc.transactSync(Invoke.create(address, -1, Strings.create("sync")));
-				long startTime = Utils.getCurrentTimestamp();
-				
-				resultArea.setText("Sending transactions...");
-				
-				ArrayList<CompletableFuture<Object>> cfutures=Utils.threadMap (cc->{
-					try {
-						for (int i = 0; i < requestCount; i++) {
-							Address origin=cc.getAddress();
-							ATransaction t = buildTransaction(origin, i);
-							
-							CompletableFuture<Result> fr;
-							if (syncCheckBox.isSelected()) {
-								Result r=cc.transactSync(t);
-								fr=CompletableFuture.completedFuture(r);
-							} else {	
-								fr = cc.transact(t);
-							}
-							synchronized(frs) {
-								// synchronised so we don't collide with other threads
-								frs.add(fr);
-							}
-						}
-					} catch (Exception e) {
-						throw Utils.sneakyThrow(e);
-					}
-					return null;
-				},clients);
-				
-				// wait for everything to be sent
-				for (int i=0; i<clientCount; i++) {
-					cfutures.get(i).get();
-				}
-				// long sendTime = Utils.getCurrentTimestamp();
-
-				int futureCount=frs.size();
-				resultArea.setText("Awaiting "+futureCount+" results...");
-				
-
-				List<Result> results = Utils.completeAll(frs).get();
-				long endTime = Utils.getCurrentTimestamp();
-
-				HashMap<ACell, Integer> errorMap=new HashMap<>();
-				for (Result r : results) {
-					if (r.isError()) {
-						errors++;
-						Utils.histogramAdd(errorMap,r.getErrorCode());
-					} else {
-						values++;
-					}
-				}
-				
-				for (int i=0; i<clientCount; i++) {
-					clients.get(i).close();
-				}
-
-				Thread.sleep(100); // wait for state update to be reflected
-
-				long totalCount=clientCount*transCount*requestCount;
-				sb.append("Results for " + Text.toFriendlyNumber(totalCount) + " transactions\n");
-				sb.append(values + " values received\n");
-				sb.append(errors + " errors received\n");
-				if (errors>0) {
-					sb.append(errorMap);
-					sb.append("\n");
-				}
-				
-				double time=(endTime - startTime) * 0.001;
-				sb.append("\n");
-				sb.append("Total time:     " + formatter.format(time) + "s\n");
-				sb.append("\n");
-				
-				sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/time) + "\n");
-				sb.append("Approx OPS:     " + Text.toFriendlyIntString(opCount*totalCount/time) + "\n");
-
-
+				boolean running=true;
+				while (running)  {
+					result=doStressRun();
+					running=repeatCheckBox.isSelected();
+					if (running) Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
+				};
 			} catch (Throwable e) {
 				log.warn("Stress test worker terminated unexpectedly",e);
 				resultArea.setText("Test Error: "+e);
 			} finally {
 				btnRun.setEnabled(true);
 			}
+			return result;
+		}
+
+		protected String doStressRun() throws Exception {
+			StringBuilder sb = new StringBuilder();
+			resultArea.setText("Connecting clients...");
+
+			// Use client store
+			// Stores.setCurrent(Stores.CLIENT_STORE);
+			ArrayList<CompletableFuture<Result>> frs=new ArrayList<>();
+			Convex pc = Convex.connect(sa, address,kp);
+		
+			// Generate client accounts
+			StringBuilder cmdsb=new StringBuilder();
+			cmdsb.append("(let [f (fn [k] (let [a (create-account k)] (transfer a 1000000000) a))] ");
+			cmdsb.append("  (mapv f [");
+			for (int i=0; i<clientCount; i++) {
+				AKeyPair kp=AKeyPair.generate();
+				kps.add(kp);
+				cmdsb.append(" "+kp.getAccountKey());
+			}
+			cmdsb.append("]))");
+			
+			Result ccr=pc.transactSync(Invoke.create(address, -1, cmdsb.toString()));
+			if (ccr.isError()) throw new Error("Creating accounts failed: "+ccr);
+			AVector<Address> clientAddresses=ccr.getValue();
+
+			connectClients(clientAddresses);
+			setupClients();
+			
+			resultArea.setText("Syncing...");
+			// Make sure we are in consensus
+			pc.transactSync(Invoke.create(address, -1, Strings.create("sync")));
+			long startTime = Utils.getCurrentTimestamp();
+			
+			resultArea.setText("Sending transactions...");
+			
+			ArrayList<CompletableFuture<Object>> cfutures=Utils.threadMap (cc->{
+				try {
+					for (int i = 0; i < requestCount; i++) {
+						Address origin=cc.getAddress();
+						ATransaction t = buildTransaction(origin, i);
+						
+						CompletableFuture<Result> fr;
+						if (syncCheckBox.isSelected()) {
+							Result r=cc.transactSync(t);
+							fr=CompletableFuture.completedFuture(r);
+						} else {	
+							fr = cc.transact(t);
+						}
+						synchronized(frs) {
+							// synchronised so we don't collide with other threads
+							frs.add(fr);
+						}
+					}
+				} catch (Exception e) {
+					throw Utils.sneakyThrow(e);
+				}
+				return null;
+			},clients);
+			
+			// wait for everything to be sent
+			for (int i=0; i<clientCount; i++) {
+				cfutures.get(i).get();
+			}
+			// long sendTime = Utils.getCurrentTimestamp();
+
+			int futureCount=frs.size();
+			resultArea.setText("Awaiting "+futureCount+" results...");
+			
+
+			List<Result> results = Utils.completeAll(frs).get();
+			long endTime = Utils.getCurrentTimestamp();
+
+			HashMap<ACell, Integer> errorMap=new HashMap<>();
+			for (Result r : results) {
+				if (r.isError()) {
+					errors++;
+					Utils.histogramAdd(errorMap,r.getErrorCode());
+				} else {
+					values++;
+				}
+			}
+			
+			for (int i=0; i<clientCount; i++) {
+				clients.get(i).close();
+			}
+
+			Thread.sleep(100); // wait for state update to be reflected
+
+			long totalCount=clientCount*transCount*requestCount;
+			sb.append("Results for " + Text.toFriendlyNumber(totalCount) + " transactions\n");
+			sb.append(values + " values received\n");
+			sb.append(errors + " errors received\n");
+			if (errors>0) {
+				sb.append(errorMap);
+				sb.append("\n");
+			}
+			
+			double time=(endTime - startTime) * 0.001;
+			sb.append("\n");
+			sb.append("Total time:     " + formatter.format(time) + "s\n");
+			sb.append("\n");
+			
+			sb.append("Approx TPS:     " + Text.toFriendlyIntString(totalCount/time) + "\n");
+			sb.append("Approx OPS:     " + Text.toFriendlyIntString(opCount*totalCount/time) + "\n");
 
 			String report = sb.toString();
 			return report;
@@ -386,17 +396,5 @@ public class StressPanel extends JPanel {
 		}
 	}
 
-	private synchronized void runStressTest() {
-		while (repeatCheckBox.isSelected()) {
-			Address address=peerConvex.getAddress();
-			AKeyPair kp=peerConvex.getKeyPair();
-
-			new StressTest(kp, address).execute();
-			try {
-				Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
-			} catch (InterruptedException e) {
-				return;
-			}
-		}
-	}
+	
 }

@@ -197,10 +197,10 @@ public class PeerGUI extends JPanel {
 					Thread.sleep(100);
 					tickState.setValue(tickState.getValue()+1);
 					
-					java.util.List<Convex> peerViews = peerPanel.getPeerViews();
+					java.util.List<ConvexLocal> peerViews = peerPanel.getPeerViews();
 					peerPanel.repaint();
 					State latest = latestState.getValue();
-					for (Convex s : peerViews) {
+					for (ConvexLocal s : peerViews) {
 
 						Server serv=s.getLocalServer();
 						if (serv==null) continue;
@@ -381,7 +381,7 @@ public class PeerGUI extends JPanel {
 		int n=peerList.getSize();
 		int found=0;
 		for (int i=0; i<n; i++) {
-			Convex c=peerList.elementAt(i);
+			ConvexLocal c=peerList.elementAt(i);
 			Server s=c.getLocalServer();
 			if (s!=null) {
 				found+=1;
@@ -396,7 +396,7 @@ public class PeerGUI extends JPanel {
 	public static Server getPrimaryServer() {
 		int n=peerList.getSize();
 		for (int i=0; i<n; i++) {
-			Convex c=peerList.elementAt(i);
+			ConvexLocal c=peerList.elementAt(i);
 			Server s=c.getLocalServer();
 			if (s!=null) {
 				return s;
