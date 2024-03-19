@@ -1,6 +1,5 @@
 package convex.gui.components;
 
-import java.awt.FlowLayout;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 
@@ -16,6 +15,7 @@ import convex.core.data.Address;
 import convex.core.util.Text;
 import convex.gui.PeerGUI;
 import convex.gui.manager.mainpanels.WalletPanel;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * Panel allowing the selection of account and query mode
@@ -32,20 +32,12 @@ public class AccountChooserPanel extends JPanel {
 	private JLabel balanceLabel;
 
 	public AccountChooserPanel() {
-		FlowLayout flowLayout = new FlowLayout();
-		flowLayout.setAlignment(FlowLayout.LEFT);
+		MigLayout flowLayout = new MigLayout();
 		setLayout(flowLayout);
 
-		modeCombo = new JComboBox<String>();
-		modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
-				+ "Use Query to compute results without changing on-chain state (free).");
-		modeCombo.addItem("Transact");
-		modeCombo.addItem("Query");
 
-		lblMode = new JLabel("Mode:");
-		add(lblMode);
-		add(modeCombo);
-
+		// Account selection
+		
 		lblNewLabel = new JLabel("Account:");
 		add(lblNewLabel);
 
@@ -67,6 +59,25 @@ public class AccountChooserPanel extends JPanel {
 			}
 		});
 
+		addressCombo.addItemListener(e -> {
+			updateBalance(getSelectedAddress());
+		});
+		
+		// Mode selection
+		
+		lblMode = new JLabel("Mode:");
+		add(lblMode);
+
+		modeCombo = new JComboBox<String>();
+		modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
+				+ "Use Query to compute results without changing on-chain state (free).");
+		modeCombo.addItem("Transact");
+		modeCombo.addItem("Query");
+
+		add(modeCombo);
+
+
+		// Balance Info
 		balanceLabel = new JLabel("Balance: ");
 		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 		add(balanceLabel);
@@ -74,10 +85,6 @@ public class AccountChooserPanel extends JPanel {
 		//PeerGUI.getStateModel().addPropertyChangeListener(pc -> {
 		//	updateBalance(getSelectedAddress());
 		//});
-
-		addressCombo.addItemListener(e -> {
-			updateBalance(getSelectedAddress());
-		});
 
 		// updateBalance(getSelectedAddress());
 	}
