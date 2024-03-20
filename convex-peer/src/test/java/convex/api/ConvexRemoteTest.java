@@ -84,7 +84,7 @@ public class ConvexRemoteTest {
 		synchronized (network.SERVER) {
 			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
 			Ref<ATransaction> tr = Invoke.create(ADDRESS, 0, Reader.read("*address*")).getRef();
-			Result r = convex.transact(SignedData.create(KEYPAIR, Ed25519Signature.ZERO, tr)).get();
+			Result r = convex.transact(SignedData.create(KEYPAIR.getAccountKey(), Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
 		}
 	}

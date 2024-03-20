@@ -8,7 +8,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.transactions.ATransaction;
+import convex.core.util.Utils;
 
 /**
  * Node representing a signed data object.
@@ -44,7 +44,7 @@ import convex.core.transactions.ATransaction;
  */
 public final class SignedData<T extends ACell> extends ARecord {
 	// Encoded fields
-	private final AccountKey publicKey;
+	private final AccountKey pubKey;
 	private final ASignature signature;
 	private final Ref<T> valueRef;
 
@@ -55,7 +55,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
 		super(FORMAT.count());
 		this.valueRef = refToValue;
-		this.publicKey = address;
+		this.pubKey = address;
 		signature = sig;
 	}
 	
@@ -95,33 +95,43 @@ public final class SignedData<T extends ACell> extends ARecord {
 		ref.setFlags(flags|Ref.BAD_MASK);
 	}
 
-
-	public static <T extends ACell> SignedData<T> create(AKeyPair keyPair, T value2) {
-		return createWithRef(keyPair, Ref.get(value2));
+	/**
+	 * Create a SignedData by signing a value with the given key pair
+	 * @param <T> Type of value to sign
+	 * @param keyPair Key pair to sign with
+	 * @param value Any cell value to sign
+	 * @return A new SignedData instance
+	 */
+	public static <T extends ACell> SignedData<T> create(AKeyPair keyPair, T value) {
+		return createWithRef(keyPair, Ref.get(value));
 	}
 
+	/**
+	 * Creates a SignedData object with the given parameters. The resulting SignedData will be a short version without the public key.
+	 *
+	 * @param <T> Type of value to sign
+	 * @param sig     Signature of the supplied data
+	 * @param ref     Ref to the data that has been signed
+	 * @return A new SignedData instance
+	 */
+	public static <T extends ACell> SignedData<T> create(ASignature sig, Ref<T> ref) {
+		return create(null,sig,ref);
+	}
+	
 	/**
 	 * Creates a SignedData object with the given parameters. 
 	 * 
 	 * SECURITY: Not assumed to be valid.
 	 *
-	 * @param address Public Address of the signer
+	 * @param <T> Type of value to sign
+	 * @param address Public key of the signer
 	 * @param sig     Signature of the supplied data
 	 * @param ref     Ref to the data that has been signed
-	 * @return A new SignedData object
+	 * @return A new SignedData instance
 	 */
 	public static <T extends ACell> SignedData<T> create(AccountKey address, ASignature sig, Ref<T> ref) {
-		// boolean check=Sign.verify(ref.getHash(), sig, address);
-		// if (!check) throw new ValidationException("Invalid signature: "+sig);
 		return new SignedData<T>(ref, address, sig);
 	}
-
-
-	public static SignedData<ATransaction> create(AKeyPair kp, ASignature sig, Ref<ATransaction> ref) {
-
-		return create(kp.getAccountKey(),sig,ref);
-	}
-
 
 	/**
 	 * Gets the signed value object encapsulated by this SignedData object.
@@ -143,7 +153,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 * @return Public Key of signer.
 	 */
 	public AccountKey getAccountKey() {
-		return publicKey;
+		return pubKey;
 	}
 
 	/**
@@ -157,7 +167,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.PUBLIC_KEY.equals(key)) return publicKey;
+		if (Keywords.PUBLIC_KEY.equals(key)) return pubKey;
 		if (Keywords.SIGNATURE.equals(key)) return signature;
 		if (Keywords.VALUE.equals(key)) return getValue();
 		
@@ -166,13 +176,14 @@ public final class SignedData<T extends ACell> extends ARecord {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.SIGNED_DATA;
+		byte tag=Tag.SIGNED_DATA;
+		bs[pos++]=tag;
 		return encodeRaw(bs,pos);
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = publicKey.getBytes(bs,pos);
+		pos = pubKey.getBytes(bs,pos);
 		pos = signature.getBytes(bs, pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
@@ -191,11 +202,16 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 * @return New decoded instance
 	 * @throws BadFormatException In the event of any encoding error
 	 */
-	public static <T extends ACell> SignedData<T>  read(Blob b, int pos) throws BadFormatException {
+	public static <T extends ACell> SignedData<T>  read(Blob b, int pos, boolean includeKey) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		
-		AccountKey address=AccountKey.readRaw(b,epos);
-		epos+=AccountKey.LENGTH;
+		AccountKey pubKey;
+		if (includeKey) {
+			pubKey=AccountKey.readRaw(b,epos);
+			epos+=AccountKey.LENGTH;
+		} else {
+			pubKey=null;
+		}
 		
 		ASignature sig = Ed25519Signature.readRaw(b,epos);
 		epos+=Ed25519Signature.SIGNATURE_LENGTH;
@@ -203,7 +219,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 		Ref<T> value=Format.readRef(b, epos);
 		epos+=value.getEncodingLength();
 		
-		SignedData<T> result=create(address, sig, value);
+		SignedData<T> result=create(pubKey, sig, value);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
@@ -214,6 +230,26 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 * @return true if valid, false otherwise
 	 */
 	public boolean checkSignature() {
+		if (pubKey==null) return false;
+		return checkSignatureImpl(pubKey);
+	}
+	
+	/**
+	 * Validates the signature in this SignedData instance. Caches result
+	 *
+	 * @return true if valid, false otherwise
+	 */
+	public boolean checkSignature(AccountKey publicKey) {
+		if ((this.pubKey!=null)&&!(this.pubKey.equals(publicKey))) return false;
+		return checkSignatureImpl(publicKey);
+	}
+	
+	/**
+	 * Validates the signature in this SignedData instance. Caches result
+	 *
+	 * @return true if valid, false otherwise
+	 */
+	private boolean checkSignatureImpl(AccountKey publicKey) {
 		Ref<SignedData<T>> sigRef=getRef();
 		int flags=sigRef.getFlags();
 		if ((flags&Ref.BAD_MASK)!=0) return false;
@@ -275,7 +311,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 		if (valueRef == newValueRef) return this;
 		
 		// SECURITY: preserve verification flags
-		SignedData<T> newSD= new SignedData<T>(newValueRef, publicKey, signature);
+		SignedData<T> newSD= new SignedData<T>(newValueRef, pubKey, signature);
 		Ref<?> sdr=newSD.getRef();
 		sdr.setFlags(Ref.mergeFlags(sdr.getFlags(), getRef().getFlags()));
 		newSD.attachEncoding(encoding); // optimisation to keep encoding
@@ -289,7 +325,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		publicKey.validate();
+		if (pubKey!=null) pubKey.validate();
 		signature.validate();
 		valueRef.validate();
 	}
@@ -324,7 +360,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 		@SuppressWarnings("unchecked")
 		SignedData<T> b=(SignedData<T>) o;
 		if (!signature.equals(b.signature)) return false;
-		if (!publicKey.equals(b.publicKey)) return false;
+		if (!Utils.equals(pubKey,b.pubKey)) return false;
 		
 		return valueRef.equals(b.valueRef);
 	}

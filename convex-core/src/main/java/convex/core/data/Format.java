@@ -584,10 +584,11 @@ public class Format {
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
 			if (tag == Tag.ADDRESS) return (T) Address.readRaw(blob,offset);
-			if (tag == Tag.SIGNED_DATA) return (T) SignedData.read(blob,offset); 
 			
 			if ((tag & 0xF0) == 0x80) return readDataStructure(tag,blob,offset);
 			
+			if ((tag & 0xF0) == 0x90) return (T) readSignedData(tag,blob, offset); 
+
 			if ((tag & 0xF0) == 0xA0) return (T) readRecord(tag,blob,offset);
 
 			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(tag, blob, offset);
@@ -605,6 +606,12 @@ public class Format {
 			throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
 		}
 
+		throw new BadFormatException(badTagMessage(tag));
+	}
+
+	public static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
+		if (tag==Tag.SIGNED_DATA) return SignedData.read(blob,offset,true);	
+		if (tag==Tag.SIGNED_DATA_SHORT) return SignedData.read(blob,offset,false);	
 		throw new BadFormatException(badTagMessage(tag));
 	}
 

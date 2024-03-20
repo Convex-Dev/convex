@@ -39,6 +39,7 @@ public class Tag {
 
 	// special data structure
 	public static final byte SIGNED_DATA = (byte) 0x90;
+	public static final byte SIGNED_DATA_SHORT = (byte) 0x91;
 
 	// general purpose data structures
 	public static final byte VECTOR = (byte) 0x80;
