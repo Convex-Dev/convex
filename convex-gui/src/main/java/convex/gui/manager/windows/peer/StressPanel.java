@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
@@ -250,7 +251,8 @@ public class StressPanel extends JPanel {
 			
 			resultArea.setText("Sending transactions...");
 			
-			ArrayList<CompletableFuture<Object>> cfutures=Utils.threadMap (cc->{
+			ExecutorService ex=Utils.getVirtualExecutor();
+			ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (ex,cc->{
 				try {
 					for (int i = 0; i < requestCount; i++) {
 						Address origin=cc.getAddress();

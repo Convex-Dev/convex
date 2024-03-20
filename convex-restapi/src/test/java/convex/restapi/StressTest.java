@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.crypto.AKeyPair;
@@ -48,7 +49,9 @@ public class StressTest {
 			long genTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT+ " REST clients connected in "+compTime(startTime,genTime));
 			
-			ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (cc->{
+			ExecutorService ex=Utils.getVirtualExecutor();
+			
+			ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (ex,cc->{
 				for (int i = 0; i < TRANSCOUNT; i++) {
 					String source = "*timestamp*";
 					cc.query(source);
@@ -61,7 +64,7 @@ public class StressTest {
 			long queryTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT * TRANSCOUNT+ " REST queries in "+compTime(queryTime,genTime));
 		
-			cfutures=Utils.futureMap (cc->{
+			cfutures=Utils.futureMap (ex,cc->{
 				return cc.faucet(cc.getAddress(), 1000000);
 			},clients);
 			// wait for everything to be sent
@@ -70,7 +73,7 @@ public class StressTest {
 			long faucetTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT+ " Faucet transactions completed in "+compTime(faucetTime,queryTime));
 	
-			cfutures=Utils.futureMap (cc->{
+			cfutures=Utils.futureMap (ex,cc->{
 				// System.out.println(cc.queryAccount());
 				Map<String,Object> res = cc.transact("(def a 1)");
 				if (res.get("errorCode")!=null) throw new Error(JSON.toPrettyString(res));

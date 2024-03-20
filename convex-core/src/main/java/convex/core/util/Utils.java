@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -753,13 +754,19 @@ public class Utils {
 	 * @throws IOException If an IO error occurs
 	 */
 	public static String readResourceAsString(String path) throws IOException {
-		ClassLoader classLoader = ClassLoader.getSystemClassLoader();
-		try (InputStream inputStream = classLoader.getResourceAsStream(path)) {
-			if (inputStream == null) throw new IOException("Resource not found: " + path + " with classloader "+classLoader);
+		try (InputStream inputStream = getResourceAsStream(path)) {
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
 				return reader.lines().collect(Collectors.joining(System.lineSeparator()));
 			}
 		}
+	}
+	
+
+	public static InputStream getResourceAsStream(String path) throws IOException {
+		ClassLoader classLoader = ClassLoader.getSystemClassLoader();
+		InputStream inputStream = classLoader.getResourceAsStream(path);
+		if (inputStream == null) throw new IOException("Resource not found: " + path);
+		return inputStream;
 	}
 	
 	/**
@@ -1339,7 +1346,7 @@ public class Utils {
 	 * Given a vector [1, 2, 3] and target 5: returns 3 (end index)
 	 * Given a vector [1, 2, 3] and target 0: returns 0 (start index).
 	 *
-	 * @param L Items.
+	 * @param data Items.
 	 * @param value Function to get the value for comparison with target.
 	 * @param comparator How to compare value with target.
 	 * @param target Value being searched for.
@@ -1347,18 +1354,19 @@ public class Utils {
 	 * @param <U> Type of the target value.
 	 * @return Position of target in sequence.
 	 */
-	public static <T extends ACell, U> long binarySearch(ASequence<T> L, Function<? super T, U> value, Comparator<U> comparator, U target) {
+	public static <T extends ACell, U> long binarySearch(ASequence<T> data, Function<? super T, U> value, Comparator<U> comparator, U target) {
 		long min = 0;
-		long max = L.count();
+		long max = data.count();
 
 		while (min < max) {
-			long midpoint = (min + max) / 2;
+			long midPoint = (min + max) / 2;
 
-			U midVal=value.apply(L.get(midpoint));
-			if (comparator.compare(midVal, target) < 0)
-				min = midpoint + 1;
-			else
-				max = midpoint;
+			U midVal=value.apply(data.get(midPoint));
+			if (comparator.compare(midVal, target) < 0) {
+				min = midPoint + 1;
+			} else {
+				max = midPoint;
+			}
 		}
 
 		return min;
@@ -1402,67 +1410,60 @@ public class Utils {
 		return Arrays.asList(values);
 	}
 
-	// ExecutorService for concurrent thread usage.
-	private static ExecutorService executor = null;
+	private static ExecutorService virtualExecutor = null;
 
-	private synchronized static ExecutorService getExecutor() {
-		if (executor==null) {
-			ExecutorService ex = Executors.newFixedThreadPool(8);
-			executor=ex;
+	/**
+	 * Get the current virtual thread ExecutorService, intended for IO-bound blocking operations 
+	 * @return
+	 */
+	public synchronized static ExecutorService getVirtualExecutor() {
+		if (virtualExecutor==null) {
+			virtualExecutor=buildVirtualExecutor();
+			
 			Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
+				ExecutorService executor=Utils.virtualExecutor;
+				if (executor==null) return;
 				// Try a gentle termination. If not fast enough, terminate with extreme prejudice
-				ex.shutdown();
+				executor.shutdown();
 				try {
-				    if (!ex.awaitTermination(200, TimeUnit.MILLISECONDS)) {
-				    	ex.shutdownNow();
+				    if (!executor.awaitTermination(200, TimeUnit.MILLISECONDS)) {
+				    	executor.shutdownNow();
 				    } 
 				} catch (InterruptedException e) {
-					ex.shutdownNow();
-				}
+					executor.shutdownNow();
+				} 
 			});
 		}
-		return executor;
-	}
-	
-	/**
-	 * Executes functions on a thread pool for each element of a collection
-	 * @param <R> Result type of function
-	 * @param <T> Argument type
-	 * @param func Function to run
-	 * @param items Collection of items to run futures on
-	 * @return List of futures for each item
-	 */
-	public static <R,T> ArrayList<CompletableFuture<R>> futureMap(Function<? super T,R> func, Collection<T> items) {
-		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
-		for (T item: items) {
-			futures.add(CompletableFuture.supplyAsync(()->func.apply(item),getExecutor()));
-		}
-		return futures;
-	}
-	
-	/**
-	 * Executes functions on a new thread for each element of a collection
-	 * @param <R> Result type of function
-	 * @param <T> Argument type
-	 * @param func Function to run
-	 * @param items Collection of items to run futures on
-	 * @return List of futures for each item
-	 */
-	public static <R,T> ArrayList<CompletableFuture<R>> threadMap(Function<? super T,R> func, Collection<T> items) {
-		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
-		for (T item: items) {
-			CompletableFuture<R> f=new CompletableFuture<>();
-			new Thread(new Runnable() {
-				@Override
-				public void run() {
-					f.complete(func.apply(item));
-				}
-			}).start();
-			futures.add(f);
-		}
-		return futures;
+		return virtualExecutor;
 	}
 
+	private static ExecutorService buildVirtualExecutor() {
+		ExecutorService ex;
+		try{
+		    Method method = Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
+		    ex = (ExecutorService) method.invoke(null);
+		} catch (Exception e) {
+		    ex = Executors.newFixedThreadPool(8);
+		}
+		return ex;
+	}
+	
+	/**
+	 * Executes functions on for each element of a collection, returning a list of futures
+	 * @param <R> Result type of function
+	 * @param <T> Argument type
+	 * @param executor ExecutorService with which to run functions
+	 * @param f Function to run
+	 * @param items Collection of items to run futures on
+	 * @return List of futures for each item
+	 */
+	public static <R,T> ArrayList<CompletableFuture<R>> futureMap(ExecutorService executor,Function<? super T,R> f, Collection<T> items) {
+		ArrayList<CompletableFuture<R>> futures=new ArrayList<>(items.size());
+		for (T item: items) {
+			futures.add(CompletableFuture.supplyAsync(()->f.apply(item),executor));
+		}
+		return futures;
+	}
 
 	public static <R> void awaitAll(Collection<CompletableFuture<R>> cfutures) throws InterruptedException, ExecutionException {
 		CompletableFuture.allOf(cfutures.toArray(new CompletableFuture[cfutures.size()])).get();
@@ -1533,6 +1534,7 @@ public class Utils {
 		}
 		return sb.toString();
 	}
+
 
 
 
