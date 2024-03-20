@@ -7,6 +7,7 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
+import java.io.InputStream;
 import java.net.URL;
 
 import javax.swing.ImageIcon;
@@ -24,15 +25,26 @@ import javax.swing.text.DefaultEditorKit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.util.Utils;
 import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
 import mdlaf.themes.MaterialOceanicTheme;
 
 public class Toolkit {
 
-	private static final Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
+	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
+	public static Font DEFAULT_FONT = new JLabel().getFont();
+
+	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 20);
+
+	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
+	public static Font SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
+
+	
 	static {
+		
+		
 		try {
 			UIManager.installLookAndFeel("Material", "mdlaf.MaterialLookAndFeel");
 			Class.forName("mdlaf.MaterialLookAndFeel");
@@ -52,10 +64,12 @@ public class Toolkit {
 			AbstractMaterialTheme theme = new MaterialOceanicTheme();
 			MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
 			UIManager.setLookAndFeel(material);
+			DEFAULT_FONT=theme.getFontRegular().deriveFont(14.0f);
+			theme.setFontRegular(new FontUIResource(DEFAULT_FONT.deriveFont(14.0f)));
 			theme.setFontBold(new FontUIResource(theme.getFontBold().deriveFont(14.0f)));
 			theme.setFontItalic(new FontUIResource(theme.getFontItalic().deriveFont(14.0f)));
 			theme.setFontMedium(new FontUIResource(theme.getFontMedium().deriveFont(14.0f)));
-			theme.setFontRegular(new FontUIResource(theme.getFontRegular().deriveFont(14.0f)));
+			
 
 			UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
 			
@@ -65,7 +79,11 @@ public class Toolkit {
 				im.put(KeyStroke.getKeyStroke(KeyEvent.VK_V, KeyEvent.META_DOWN_MASK), DefaultEditorKit.pasteAction);
 				im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, KeyEvent.META_DOWN_MASK), DefaultEditorKit.cutAction);
 			}
-
+			
+			InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
+			Font monoFont = Font.createFont(Font.TRUETYPE_FONT, is);
+			SMALL_MONO_FONT = monoFont.deriveFont(14f);
+			SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
@@ -85,12 +103,6 @@ public class Toolkit {
 	public static final ImageIcon COG = scaledIcon(36, "/images/cog.png");
 	public static final ImageIcon REPL_ICON = scaledIcon(36, "/images/terminal-icon.png");
 
-	public static final Font DEFAULT_FONT = new JLabel().getFont();
-
-	public static final Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 20);
-
-	public static final Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
-	public static final Font SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 
 	public static ImageIcon scaledIcon(int size, String resourcePath) {
 		java.net.URL imgURL = Toolkit.class.getResource(resourcePath);
