@@ -1,5 +1,6 @@
 package convex.core;
 
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.data.ACell;
@@ -44,6 +45,7 @@ public final class Result extends ARecordGeneric {
 
 	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.INFO);
 	private static final long FIELD_COUNT=RESULT_FORMAT.count();
+	private static final long INFO_POS=RESULT_FORMAT.indexFor(Keywords.INFO);
 	
 	private Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
@@ -225,6 +227,7 @@ public final class Result extends ARecordGeneric {
 	 * @param ctx Context
 	 * @return New Result instance
 	 */
+
 	public static Result fromContext(CVMLong id,ResultContext rc) {
 		Context ctx=rc.context;
 		Object result=ctx.getValue();
@@ -246,7 +249,23 @@ public final class Result extends ARecordGeneric {
 		if (rc.memUsed>0) info=info.assoc(Keywords.MEM, CVMLong.create(rc.memUsed));
 		if (rc.totalFees>0) info=info.assoc(Keywords.FEES, CVMLong.create(rc.totalFees));
 		if (rc.juiceUsed>0) info=info.assoc(Keywords.JUICE, CVMLong.create(rc.juiceUsed));
+		
+	
+		
 		return create(id,(ACell)result,errorCode,info);
+	}
+	
+	public Result withExtraInfo(Map<Keyword,ACell> extInfo) {
+		if ((extInfo!=null)&&(!extInfo.isEmpty())) {
+			AMap<Keyword,ACell> info=getInfo();
+			if (info==null) info=Maps.empty();
+			for (Map.Entry<Keyword,ACell> me: extInfo.entrySet()) {
+
+				info=info.assoc(me.getKey(), me.getValue());
+			}
+			return new Result(values.assoc(INFO_POS, info));
+		}
+		return this;
 	}
 	
 	/**

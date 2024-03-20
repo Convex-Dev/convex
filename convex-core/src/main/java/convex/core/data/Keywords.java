@@ -73,6 +73,8 @@ public class Keywords {
 
 	// Result keywords
 	public static final Keyword ID = Keyword.create("id");
+	public static final Keyword TX = Keyword.create("tx");
+	public static final Keyword LOC = Keyword.create("loc");
 	public static final Keyword RESULT = Keyword.create("result");
 	public static final Keyword ERROR = Keyword.create("error");
 	public static final Keyword ADDRESS = Keyword.create("address");
@@ -83,6 +85,9 @@ public class Keywords {
 	public static final Keyword MEM = Keyword.create("mem");
 	public static final Keyword FEES = Keyword.create("fees");
 	public static final Keyword JUICE = Keyword.create("juice");
+	
+	public static final Keyword CVM = Keyword.create("cvm");
+
 
 	public static final Keyword EXPANDER_Q = Keyword.create("expander?");
 	public static final Keyword MACRO = Keyword.create("macro");

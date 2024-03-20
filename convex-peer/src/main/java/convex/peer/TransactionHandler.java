@@ -30,6 +30,7 @@ import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
@@ -178,16 +179,17 @@ public class TransactionHandler extends AThreadedComponent{
 				// only report our own transactions!
 				if (block.getAccountKey().equals(peer.getPeerKey())) {
 					BlockResult br = peer.getBlockResult(i);
-					reportTransactions(block.getValue(), br);
+					reportTransactions(block.getValue(), br,i);
 				}
 			}
 			reportedConsensusPoint=newConsensusPoint;
 		}
 	}
 	
-	private void reportTransactions(Block block, BlockResult br) {
+	private void reportTransactions(Block block, BlockResult br, long blockNum) {
 		// TODO: consider culling old interests after some time period
 		int nTrans = block.length();
+		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
 		for (long j = 0; j < nTrans; j++) {
 			try {
 				SignedData<ATransaction> t = block.getTransactions().get(j);
@@ -197,6 +199,11 @@ public class TransactionHandler extends AThreadedComponent{
 					ACell id = m.getID();
 					log.trace("Returning transaction result ID {} to {}", id,m.getOriginString());
 					Result res = br.getResults().get(j);
+					
+					extInfo.put(Keywords.LOC,Vectors.of(blockNum,j));
+					extInfo.put(Keywords.TX,t.getHash());
+					
+					res=res.withExtraInfo(extInfo);
 
 					boolean reported = m.reportResult(res);
 					if (!reported) {
