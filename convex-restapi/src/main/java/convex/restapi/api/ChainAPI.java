@@ -18,7 +18,9 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
@@ -311,7 +313,7 @@ public class ChainAPI extends ABaseAPI {
 			HashMap<String,Object> rmap=new HashMap<>();
 			rmap.put("source",srcValue);
 			rmap.put("address", RT.json(addr));
-			rmap.put("hash", RT.json(ref.getHash()));
+			rmap.put("hash", RT.json(SignedData.getMessageForRef(ref)));
 			rmap.put("sequence", sequence);
 	
 			ctx.result(JSON.toPrettyString(rmap));
@@ -373,12 +375,13 @@ public class ChainAPI extends ABaseAPI {
 		// Get the transaction hash
 		Object hashValue=req.get("hash");
 		if (!(hashValue instanceof String)) throw new BadRequestResponse(jsonError("Parameter 'hash' must be provided as a String"));
-		Hash h=Hash.parse(hashValue);
+		Blob h=Blob.parse((String)hashValue);
 		if (h==null) throw new BadRequestResponse(jsonError("Parameter 'hash' did not parse correctly, must be 64 hex characters."));
 
 		ATransaction trans=null;
 		try {
-			ACell maybeTrans=Ref.forHash(h).getValue();
+			Ref<?> ref=Format.readRef(h, 0);
+			ACell maybeTrans=ref.getValue();
 			if (!(maybeTrans instanceof ATransaction)) throw new BadRequestResponse(jsonError("Value with hash "+h+" is not a transaction: can't submit it!"));
 			trans=(ATransaction)maybeTrans;
 		} catch (MissingDataException e) {

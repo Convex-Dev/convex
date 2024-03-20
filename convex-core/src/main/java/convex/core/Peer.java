@@ -373,7 +373,7 @@ public class Peer {
 	 * @return Signed data value
 	 */
 	public <T extends ACell> SignedData<T> sign(T value) {
-		return SignedData.create(keyPair, value);
+		return SignedData.sign(keyPair, value);
 	}
 
 	/**

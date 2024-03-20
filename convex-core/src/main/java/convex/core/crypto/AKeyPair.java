@@ -55,8 +55,8 @@ public abstract class AKeyPair {
 	public abstract AccountKey getAccountKey();
 	
 	/**
-	 * Signs a value with this key pair 
-	 * @param <R> Type of Value
+	 * Signs a data value with this key pair 
+	 * @param <R> Type of value
 	 * @param value Value to sign. Can be any valid CVM value.
 	 * @return Signed Data Object
 	 */
@@ -79,11 +79,11 @@ public abstract class AKeyPair {
 	public abstract boolean equals(AKeyPair kp);
 
 	/**
-	 * Signs a hash value with this key pair, producing a signature of the appropriate type.
-	 * @param hash Hash of value to sign
+	 * Signs a message with this key pair, producing a signature of the appropriate type.
+	 * @param message Message to sign
 	 * @return A Signature compatible with the key pair.
 	 */
-	public abstract ASignature sign(AArrayBlob hash);
+	public abstract ASignature sign(AArrayBlob message);
 
 	/**
 	 * Create a deterministic key pair with the given seed.

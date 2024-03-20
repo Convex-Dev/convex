@@ -116,7 +116,7 @@ public class SignedDataTest {
 
 	@Test
 	public void testNullValueSignings() throws BadSignatureException {
-		SignedData<ACell> sd = SignedData.create(InitTest.HERO_KEYPAIR, null);
+		SignedData<ACell> sd = SignedData.sign(InitTest.HERO_KEYPAIR, null);
 		assertNull(sd.getValue());
 		assertTrue(sd.checkSignature());
 		

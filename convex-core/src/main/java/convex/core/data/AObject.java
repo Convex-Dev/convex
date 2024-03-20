@@ -50,9 +50,9 @@ public abstract class AObject {
 	}
 	
 	/**
-	 * Gets the encoded byte representation of this cell.
+	 * Gets the encoded byte representation of this value.
 	 * 
-	 * @return A blob representing this cell in encoded form
+	 * @return A Blob representing this value in encoded form
 	 */
 	public Blob getEncoding() {
 		if (encoding==null) encoding=createEncoding();

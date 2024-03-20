@@ -60,6 +60,18 @@ public class Blob extends AArrayBlob {
 	public static Blob create(byte[] data) {
 		return create(data, 0, data.length);
 	}
+	
+	/**
+	 * Parses String input as a Blob. Converts from hex.
+	 * 
+	 * @param data Byte array
+	 * @return Blob with the same byte contents as the given array
+	 */
+	public static Blob parse(String data) {
+		ABlob b=Blobs.parse(data);
+		if (b==null) return null;
+		return b.toFlatBlob();
+	}
 
 	/**
 	 * Wraps the specified bytes as a Data object Warning: underlying bytes are used
@@ -105,6 +117,11 @@ public class Blob extends AArrayBlob {
 		if (length == 0) return EMPTY;
 		if (length==this.length) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
+	}
+	
+	@Override
+	public Blob slice(long start) {
+		return slice(start, count());
 	}
 
 	@Override

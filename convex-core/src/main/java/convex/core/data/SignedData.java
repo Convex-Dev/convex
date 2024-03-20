@@ -68,11 +68,16 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 * @param ref     Ref to the data to sign
 	 * @return SignedData object signed with the given key-pair
 	 */
-	public static <T extends ACell> SignedData<T> createWithRef(AKeyPair keyPair, Ref<T> ref) {
-		ASignature sig = keyPair.sign(ref.getHash());
+	public static <T extends ACell> SignedData<T> signRef(AKeyPair keyPair, Ref<T> ref) {
+		Blob message=getMessageForRef(ref);
+		ASignature sig = keyPair.sign(message);
 		SignedData<T> sd = new SignedData<T>(ref, keyPair.getAccountKey(), sig);
 		sd.markValidated();
 		return sd;
+	}
+
+	public static <T extends ACell> Blob getMessageForRef(Ref<T> ref) {
+		return ref.getEncoding();
 	}
 
 	/**
@@ -102,8 +107,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 * @param value Any cell value to sign
 	 * @return A new SignedData instance
 	 */
-	public static <T extends ACell> SignedData<T> create(AKeyPair keyPair, T value) {
-		return createWithRef(keyPair, Ref.get(value));
+	public static <T extends ACell> SignedData<T> sign(AKeyPair keyPair, T value) {
+		return signRef(keyPair, Ref.get(value));
 	}
 
 	/**
@@ -255,8 +260,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 		if ((flags&Ref.BAD_MASK)!=0) return false;
 		if ((flags&Ref.VERIFIED_MASK)!=0) return true;
 
-		Hash hash=valueRef.getHash();
-		boolean check = Providers.verify(signature,hash, publicKey);
+		Blob message=getMessage();
+		boolean check = Providers.verify(signature,message, publicKey);
 
 		if (check) {
 			markValidated();
@@ -266,6 +271,17 @@ public final class SignedData<T extends ACell> extends ARecord {
 		return check;
 	}
 	
+	/**
+	 * Gets the message bytes (as signed in this SignedData)
+	 * @return
+	 */
+	private Blob getMessage() {
+		Blob b=getEncoding();
+		int offset=1+((pubKey==null)?64:96);
+		return b.slice(offset);
+	}
+
+
 	/**
 	 * Checks if the signature has already gone through verification. MAy or may 
 	 * not be a valid signature.

@@ -57,7 +57,7 @@ public class BCKeyPair extends AKeyPair {
 
 	@Override
 	public <R extends ACell> SignedData<R> signData(R value) {
-		return SignedData.create(this, value);
+		return SignedData.sign(this, value);
 	}
 
 	@Override

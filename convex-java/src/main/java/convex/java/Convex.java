@@ -17,7 +17,7 @@ import org.apache.hc.core5.http.ContentType;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.data.Address;
-import convex.core.data.Hash;
+import convex.core.data.Blob;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 
@@ -341,23 +341,25 @@ public class Convex {
 		// then do submit step
 		return prep.thenCompose(r->{
 			synchronized( this) {
-				Map<String,Object> result=r;
-				if (r==null) {
-					throw new Error("Null response from transaction prepare!: "+r);
-				}
-				if (r.get("errorCode")!=null) {
-					throw new Error("Error while preparing transaction: "+r);
-				}
-
-				// check the sequence number from the server
-				// if our own sequence number is lower, we want to update it!
-				Long seq=(Long)(r.get("sequence"));
-				// System.out.println(seq);
-				if (seq!=null) updateSequence(seq);
-
-				Hash hash=Hash.parse(result.get("hash"));
-				if (hash==null) throw new Error("Valid transaction Hash not provided by server, got result: "+r);
 				try {
+					Map<String,Object> result=r;
+					if (r==null) {
+						throw new Error("Null response from transaction prepare!: "+r);
+					}
+					if (r.get("errorCode")!=null) {
+						throw new Error("Error while preparing transaction: "+r);
+					}
+	
+					// check the sequence number from the server
+					// if our own sequence number is lower, we want to update it!
+					Long seq=(Long)(r.get("sequence"));
+					// System.out.println(seq);
+					if (seq!=null) updateSequence(seq);
+
+					Object hashHex=result.get("hash");
+					if (!(hashHex instanceof String)) throw new Error("No hash field containg hex string in response provided by server, got result: "+r);
+					Blob hash=Blob.parse((String)hashHex); 
+					if (hash==null) throw new Error("Hash provided by server not valid hex, got: "+hashHex);
 					CompletableFuture<Map<String,Object>> tr = submitAsync(hash);
 					return tr;
 				} catch (Throwable e) {
@@ -369,14 +371,14 @@ public class Convex {
 
 	/**
 	 * Asynchronously submit a transaction
-	 * @param hash
+	 * @param message Message to sign
 	 * @return
 	 */
-	private CompletableFuture<Map<String,Object>> submitAsync(Hash hash) {
-		ASignature sd=getKeyPair().sign(hash);
+	private CompletableFuture<Map<String,Object>> submitAsync(Blob message) {
+		ASignature sd=getKeyPair().sign(message);
 		HashMap<String,Object> req=new HashMap<>();
 		req.put("address", getAddress().longValue());
-		req.put("hash", hash.toHexString());
+		req.put("hash", message.toHexString());
 		req.put("accountKey", getKeyPair().getAccountKey().toHexString());
 		req.put("sig", sd.toHexString());
 		String json=JSON.toPrettyString(req);
