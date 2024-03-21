@@ -42,9 +42,7 @@ import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
-import io.javalin.openapi.HttpMethod;
-import io.javalin.openapi.OpenApi;
-import io.javalin.openapi.OpenApiParam;
+import io.javalin.openapi.*;
 
 public class ChainAPI extends ABaseAPI {
 
@@ -80,6 +78,7 @@ public class ChainAPI extends ABaseAPI {
 	
 	@OpenApi(path = ROUTE+"data/{hash}",
 			methods = HttpMethod.POST,
+			summary="Get data from the server with the specified hash",
 	        operationId = "data",
 	        pathParams = {
 	          @OpenApiParam(
@@ -108,13 +107,16 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(ds);
 	}
 
-//	@OpenApi(path = ROUTE+"createAccount",
-//			methods = HttpMethod.POST,
-//	        operationId = "createAccount",
-//	        summary="Create a Convex account",
-//	        requestBody = @OpenApiRequestBody(
-//	                description = "Complex bodies",
-//	                content= @OpenApiContent(type = "application/json")))
+	@OpenApi(path = ROUTE+"createAccount",
+			methods = HttpMethod.POST,
+	        operationId = "createAccount",
+	        summary="Create a new Convex account",
+	        requestBody = @OpenApiRequestBody(
+	                description = "Complex bodies",
+	                content= {@OpenApiContent(
+	                		from = String.class,
+	                		// type = "application/json",
+	                		example = "{}")}))
 	public void createAccount(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Object key = req.get("accountKey");

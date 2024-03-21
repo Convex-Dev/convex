@@ -139,7 +139,7 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Best effort attempt to parse a Hash. Must parse as a blob of correct length
 	 * @param o Object expected to contain a Hash value
-	 * @return Hash value, or null is not parseable
+	 * @return Hash value, or null if not parseable
 	 */
 	public static Hash parse(Object o) {
 		return wrap(Blobs.parse(o));
@@ -149,7 +149,7 @@ public class Hash extends AArrayBlob {
 	 * Best effort attempt to parse a Hash. Must parse as a blob of correct length.
 	 * Leading "0x" optional.
 	 * @param s String expected to contain a Hash value
-	 * @return Hash value, or null is not parseable
+	 * @return Hash value, or null if not parseable
 	 */
 	public static Hash parse(String s) {
 		return wrap(Blobs.parse(s));
