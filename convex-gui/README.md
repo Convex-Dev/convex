@@ -1,10 +1,14 @@
-# Convex Peer GUI
+# Convex Desktop GUI
 
 A desktop GUI interface for interacting with Convex
+
+![Screenshot](docs/images/convex-desktop.png)
 
 ## Overview
 
 Key features:
+- Execute transactions on Convex networks
+- Secure key generation and wallet management
 - Run a local network of Convex Peers
 - Visualisation of CPoS consensus and network messaging
 - Simulations and stress test code
