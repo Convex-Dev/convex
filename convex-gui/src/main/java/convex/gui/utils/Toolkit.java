@@ -103,6 +103,11 @@ public class Toolkit {
 	public static final ImageIcon COG = scaledIcon(36, "/images/cog.png");
 	public static final ImageIcon REPL_ICON = scaledIcon(36, "/images/terminal-icon.png");
 
+	public static final ImageIcon TESTNET_ICON = scaledIcon(128, "/images/testnet.png");
+	public static final ImageIcon WWW_ICON = scaledIcon(128, "/images/www.png");
+	public static final ImageIcon HACKER_ICON = scaledIcon(128, "/images/hacker.png");
+	public static final ImageIcon TERMINAL_ICON = scaledIcon(128, "/images/terminal.png");
+	public static final ImageIcon ECOSYSTEM_ICON = scaledIcon(128, "/images/ecosystem.png");
 
 	public static ImageIcon scaledIcon(int size, String resourcePath) {
 		java.net.URL imgURL = Toolkit.class.getResource(resourcePath);
