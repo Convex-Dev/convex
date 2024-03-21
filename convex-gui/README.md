@@ -1,10 +1,12 @@
 # Convex Desktop GUI
 
-A desktop GUI interface for interacting with Convex
+A desktop interface for interacting with Convex
 
 ![Screenshot](docs/images/convex-desktop.png)
 
 ## Overview
+
+Convex Desktop is a full features desktop application for working with Convex. It is intended for developers who wish to build solutions on Convex as well as power users who wish to work direactly with assets and smart contracts on the Convex Network.
 
 Key features:
 - Execute transactions on Convex networks
@@ -29,6 +31,6 @@ java -cp target/convex-gui-jar-with-dependencies.jar -XX:+FlightRecorder -XX:Sta
 
 ## License
 
-Copyright 2019-2023 The Convex Foundation and Contributors
+Copyright 2019-2024 The Convex Foundation and Contributors
 
 Code in convex-gui is provided under the Convex Public License
