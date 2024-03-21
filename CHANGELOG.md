@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Significant refactoring
 - Encoding changes for better memory efficiency
 - Upgrades to default REST API
+- More efficient signing protocol / SignedData compressed format
 - CNS improvements
 
 ### Fixed
