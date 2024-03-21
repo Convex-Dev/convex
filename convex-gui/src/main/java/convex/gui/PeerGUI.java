@@ -61,7 +61,7 @@ public class PeerGUI extends JPanel {
 	public List<AKeyPair> KEYPAIRS=new ArrayList<>();
 	private List<AccountKey> PEERKEYS;
 			
-	private static final int DEFAULT_NUM_PEERS=3;
+	static final int DEFAULT_NUM_PEERS=3;
 	
 	
 	public State genesisState;
@@ -89,10 +89,10 @@ public class PeerGUI extends JPanel {
 				PeerGUI manager = new PeerGUI(peerNum,genesis);
 				JFrame frame = new JFrame();
 				manager.frame=frame;
-				frame.setTitle("Convex Peer Manager");
+				frame.setTitle("Testnet Peer Manager");
 				frame.setIconImage(Toolkit.getDefaultToolkit()
 						.getImage(PeerGUI.class.getResource("/images/Convex.png")));
-				frame.setBounds(100, 100, 1200, 900);
+				frame.setBounds(200, 150, 1000, 800);
 				if (topLevel) frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
 				frame.getContentPane().add(manager, BorderLayout.CENTER);
@@ -130,10 +130,9 @@ public class PeerGUI extends JPanel {
 	 * @param genesis Genesis key pair
 	 * @param peerNum Numer of peers to initialise in geneis
 	 */
-	public PeerGUI(int peerNum, AKeyPair genesis) {
+	public PeerGUI(int peerCount, AKeyPair genesis) {
 		// Create key pairs for peers, use genesis key as first keypair
 		genesisKey=genesis;
-		int peerCount=DEFAULT_NUM_PEERS;
 		for (int i=0; i<peerCount; i++) {
 			KEYPAIRS.add(AKeyPair.generate());
 		}

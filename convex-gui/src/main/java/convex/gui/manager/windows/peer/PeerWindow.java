@@ -1,6 +1,7 @@
 package convex.gui.manager.windows.peer;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
@@ -33,6 +34,7 @@ public class PeerWindow extends BaseWindow {
 		this.peer = peer;
 
 		add(tabbedPane, BorderLayout.CENTER);
+		this.setPreferredSize(new Dimension(1200,1000));
 		
 		Server server=peer.getLocalServer();
 		if (server!=null) {

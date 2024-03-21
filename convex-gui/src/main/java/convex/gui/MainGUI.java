@@ -2,8 +2,10 @@ package convex.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.event.WindowEvent;
+import java.net.ConnectException;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -13,12 +15,15 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JSpinner;
 import javax.swing.JTextField;
+import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.util.Utils;
 import convex.gui.client.ConvexClient;
 import convex.gui.components.ActionPanel;
@@ -61,7 +66,44 @@ public class MainGUI extends JPanel implements Runnable {
 	}
 	
 	public void launchTestNet() {
-		PeerGUI.launchPeerGUI(3, AKeyPair.generate(),false);
+		JPanel pan=new JPanel();
+		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
+		
+		pan.add(new JLabel("Number of Peers:"));
+		JSpinner peerCountSpinner = new JSpinner();
+		// Note: about 300 max number of clients before hitting juice limits for account creation
+		peerCountSpinner.setModel(new SpinnerNumberModel(PeerGUI.DEFAULT_NUM_PEERS, 1, 100, 1));
+		pan.add(peerCountSpinner);
+
+		pan.add(new JLabel("Genesis Key:   "));
+		AKeyPair kp=AKeyPair.generate();
+		JTextField keyField=new JTextField("0x"+kp.getSeed().toHexString());
+		keyField.setMinimumSize(new Dimension(200,25));
+		pan.add(keyField);
+
+
+		int result = JOptionPane.showConfirmDialog(this, pan, 
+	               "Enter Connection Details", JOptionPane.OK_CANCEL_OPTION);
+	    if (result == JOptionPane.OK_OPTION) {
+	    	try {
+	    		int numPeers=(Integer)peerCountSpinner.getValue();
+	    		
+	       		Blob b=Blob.parse(keyField.getText());
+	    		if ((b!=null)&&(!b.isEmpty())) {
+	    			kp=AKeyPair.create(b);
+	    		} else {
+	    			kp=null;
+	    		}
+	    		if (kp==null) throw new Exception("Invalid Genesis Key!");
+	    		PeerGUI.launchPeerGUI(numPeers, kp,false);
+	    	} catch (Exception e) {
+	    		Toast.display(this, "Launch Failed: "+e.getMessage(), Color.RED);
+	    		e.printStackTrace();
+	    	}
+	    }
+		
+		
 	}
 	
 	public void launchDiscord() {
@@ -70,15 +112,20 @@ public class MainGUI extends JPanel implements Runnable {
 	
 	public void launchClient() {
 		JPanel pan=new JPanel();
-		pan.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-		pan.setLayout(new MigLayout("fill,wrap 2","","[fill,grow]20[fill,grow]"));
-		pan.add(new JLabel("Host"));
+		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
+		pan.add(new JLabel("Host:"));
 		JTextField hostField=new JTextField("localhost:18888");
 		pan.add(hostField);
 		
-		pan.add(new JLabel("Address"));
+		pan.add(new JLabel("Address:"));
 		JTextField addressField=new JTextField("#12");
 		pan.add(addressField);
+
+		pan.add(new JLabel("Private Key:   "));
+		JTextField keyField=new JTextField("");
+		keyField.setMinimumSize(new Dimension(200,25));
+		pan.add(keyField);
 
 
 		int result = JOptionPane.showConfirmDialog(this, pan, 
@@ -88,7 +135,15 @@ public class MainGUI extends JPanel implements Runnable {
 	    		Utils.toInetSocketAddress(TOOL_TIP_TEXT_KEY);
 	    		Convex convex=Convex.connect(Utils.toInetSocketAddress(hostField.getText()));
 	    		convex.setAddress(Address.parse(addressField.getText()));
+	    		
+	    		Blob b=Blob.parse(keyField.getText());
+	    		if ((b!=null)&&(!b.isEmpty())) {
+	    			AKeyPair kp=AKeyPair.create(b);
+	    			convex.setKeyPair(kp);
+	    		}
 	    		ConvexClient.launch(convex);
+	    	} catch (ConnectException e) {
+	    		Toast.display(this, "Connection Refused!", Color.RED);
 	    	} catch (Exception e) {
 	    		Toast.display(this, "Connect Failed: "+e.getMessage(), Color.RED);
 	    		e.printStackTrace();
@@ -127,7 +182,7 @@ public class MainGUI extends JPanel implements Runnable {
 					frame.setTitle("Convex Desktop");
 					frame.setIconImage(Toolkit.getDefaultToolkit()
 							.getImage(MainGUI.class.getResource("/images/Convex.png")));
-					frame.setBounds(100, 100, 1200, 900);
+					frame.setBounds(50, 50, 1000, 800);
 					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
 					frame.getContentPane().add(MainGUI.this, BorderLayout.CENTER);
