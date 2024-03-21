@@ -1,6 +1,12 @@
 # Convex Desktop GUI
 
-A desktop GUI interface for interacting with Convex
+A desktop interface for interacting with Convex.
+
+```
+Unleash the power of the Convex decentralized network directly from your desktop. The Convex GUI application puts the control center for Web3 innovation at your fingertips. Designed for power users and developers, this intuitive interface empowers you to seamlessly interact with Convex, build next-generation dApps, and navigate the future of a democratized internet – all within a familiar and efficient desktop environment. Take command of your decentralized experience. Download the Convex GUI today.
+
+- Google Gemini
+```
 
 ![Screenshot](docs/images/convex-desktop.png)
 
