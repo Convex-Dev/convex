@@ -26,10 +26,10 @@ public class WalletPanel extends JPanel {
 
 	public static WalletEntry HERO;
 
-	private static DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
+	private DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
 	ScrollyList<WalletEntry> walletList;
 
-	public static void addWalletEntry(WalletEntry we) {
+	public void addWalletEntry(WalletEntry we) {
 		listModel.addElement(we);
 	}
 
@@ -62,7 +62,7 @@ public class WalletPanel extends JPanel {
 		add(walletList, BorderLayout.CENTER);
 	}
 
-	public static ListModel<WalletEntry> getListModel() {
+	public ListModel<WalletEntry> getListModel() {
 		return listModel;
 	}
 

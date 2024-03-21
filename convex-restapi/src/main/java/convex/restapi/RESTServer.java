@@ -122,6 +122,7 @@ public class RESTServer {
 	}
 
 	public void stop() {
+		app.stop();
 		// app.close(); // Gone In Javalin 6?
 	}
 

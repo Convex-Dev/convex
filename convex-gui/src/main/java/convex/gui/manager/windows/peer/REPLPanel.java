@@ -52,6 +52,7 @@ import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.RightCopyMenu;
+import convex.gui.components.Toast;
 import convex.gui.utils.CVXHighlighter;
 
 @SuppressWarnings("serial")
@@ -155,7 +156,7 @@ public class REPLPanel extends JPanel {
 	 */
 	public REPLPanel(Convex convex) {
 		this.convex=convex;
-		execPanel=new AccountChooserPanel(convex);
+		execPanel=new AccountChooserPanel(null,convex);
 		
 		setLayout(new BorderLayout(0, 0));
 		
@@ -251,6 +252,7 @@ public class REPLPanel extends JPanel {
 	private AKeyPair getKeyPair() {
 		WalletEntry we=execPanel.getWalletEntry();
 		if (we==null) return null;
+		if (we.isLocked()) return null;
 		return we.getKeyPair();
 	}
 	
@@ -284,17 +286,16 @@ public class REPLPanel extends JPanel {
 				long start=Utils.getCurrentTimestamp();
 
 				if (mode.equals("Query")) {
-					AKeyPair kp=getKeyPair();
-					if (kp == null) {
+					Address qaddr=getAddress();
+					if (qaddr == null) {
 						future = convex.query(code,null);
 					} else {
-						future = convex.query(code, getAddress());
+						future = convex.query(code, qaddr);
 					}
 				} else if (mode.equals("Transact")) {
 					WalletEntry we = execPanel.getWalletEntry();
 					if ((we == null) || (we.isLocked())) {
-						JOptionPane.showMessageDialog(this,
-								"Please select an address to use for transactions before sending");
+						Toast.display(this, "Can't transact without an unlocked key pair", Color.RED);
 						return;
 					}
 					Address address = getAddress();

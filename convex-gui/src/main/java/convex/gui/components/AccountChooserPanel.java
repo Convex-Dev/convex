@@ -17,7 +17,7 @@ import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.Symbols;
 import convex.core.util.Text;
-import convex.gui.manager.mainpanels.WalletPanel;
+import convex.gui.PeerGUI;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -35,9 +35,11 @@ public class AccountChooserPanel extends JPanel {
 	private JLabel balanceLabel;
 	
 	private Convex convex;
+	private PeerGUI manager;
 
-	public AccountChooserPanel(Convex convex) {
+	public AccountChooserPanel(PeerGUI manager,Convex convex) {
 		this.convex=convex;
+		this.manager=manager;
 		
 		MigLayout flowLayout = new MigLayout();
 		setLayout(flowLayout);
@@ -52,6 +54,7 @@ public class AccountChooserPanel extends JPanel {
 		addressCombo.setEditable(true);
 		add(addressCombo);
 		addressCombo.setToolTipText("Select Account for use");
+		
 		updateModel();
 		addressCombo.setModel(addressModel);
 		addressCombo.addFocusListener(new FocusListener() {
@@ -80,6 +83,7 @@ public class AccountChooserPanel extends JPanel {
 				+ "Use Query to compute results without changing on-chain state (free).");
 		modeCombo.addItem("Transact");
 		modeCombo.addItem("Query");
+		if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
 
 		add(modeCombo);
 
@@ -94,11 +98,14 @@ public class AccountChooserPanel extends JPanel {
 	private void updateModel() {
 		if (addressModel==null) {
 			addressModel = new DefaultComboBoxModel<WalletEntry>();
-			addAddressList(WalletPanel.getListModel());
+			addressModel.addElement(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
+			addAddressList(manager);
 		} else {
 			WalletEntry we=(WalletEntry) addressModel.getSelectedItem();
 			addressModel.removeAllElements();
-			addAddressList(WalletPanel.getListModel());
+			
+			// TODO should use better wallet interface
+			addAddressList(manager);
 			if (we!=null) {
 				addressModel.setSelectedItem(we);
 			}
@@ -123,7 +130,10 @@ public class AccountChooserPanel extends JPanel {
 		return false;
 	}
 
-	private ComboBoxModel<WalletEntry> addAddressList(ListModel<WalletEntry> m) {
+	private ComboBoxModel<WalletEntry> addAddressList(PeerGUI mananger) {
+		if (manager==null) return addressModel;
+		
+		ListModel<WalletEntry> m=manager.getWalletPanel().getListModel();
 		int n = m.getSize();
 		DefaultComboBoxModel<WalletEntry> cm = addressModel;
 		for (int i = 0; i < n; i++) {

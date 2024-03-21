@@ -19,7 +19,7 @@ public class DeployPanel extends JPanel {
 
 		// ===========================================
 		// Top panel
-		acctChooser = new AccountChooserPanel(null);
+		acctChooser = new AccountChooserPanel(null,null);
 		this.add(acctChooser, BorderLayout.NORTH);
 
 		// ===========================================

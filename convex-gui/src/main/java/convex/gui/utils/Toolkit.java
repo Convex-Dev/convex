@@ -1,13 +1,17 @@
 package convex.gui.utils;
 
 import java.awt.Color;
+import java.awt.Desktop;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 
 import javax.swing.ImageIcon;
@@ -169,5 +173,15 @@ public class Toolkit {
 
 	public static java.awt.Toolkit getDefaultToolkit() {
 		return java.awt.Toolkit.getDefaultToolkit();
+	}
+
+	public static void launchBrowser(String url) {
+		try {
+			if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+				Desktop.getDesktop().browse(new URI(url));
+			}
+		} catch (IOException | URISyntaxException ex) {
+			log.warn("IO Failure launching browser: "+ex);
+		}
 	}
 }

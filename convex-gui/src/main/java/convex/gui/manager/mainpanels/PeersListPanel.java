@@ -59,7 +59,7 @@ public class PeersListPanel extends JPanel {
 				
 				// initial wallet list
 		        WalletEntry we = WalletEntry.create(server.getPeerController(), server.getKeyPair());
-				WalletPanel.addWalletEntry(we);
+				manager.addWalletEntry(we);
 			}
 		} catch (Exception e) {
 			if (e instanceof ClosedChannelException) {
@@ -80,7 +80,7 @@ public class PeersListPanel extends JPanel {
 			long amt=convex.getBalance()/10;
 			convex.transferSync(a, amt);
 			
-			WalletPanel.addWalletEntry(WalletEntry.create(a, kp));
+			manager.addWalletEntry(WalletEntry.create(a, kp));
 			
 			// Set up Peer in base server
 			convex=Convex.connect(base, a, kp);

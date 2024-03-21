@@ -28,13 +28,13 @@ public class MarketsPanel extends JPanel {
 
 	static DefaultListModel<Address> marketList = new DefaultListModel<Address>();
 
-	public MarketsPanel(ConvexLocal manager) {
+	public MarketsPanel(ConvexLocal peer) {
 		this.setLayout(new BorderLayout());
-		this.manager=manager;
+		this.manager=peer;
 
 		// ===========================================
 		// Top panel
-		acctChooser = new AccountChooserPanel(manager);
+		acctChooser = new AccountChooserPanel(null,peer);
 		this.add(acctChooser, BorderLayout.NORTH);
 
 		// ===========================================

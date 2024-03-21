@@ -1,7 +1,6 @@
 package convex.gui;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
@@ -57,7 +56,7 @@ public class PeerGUI extends JPanel {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerGUI.class.getName());
 
-	private static JFrame frame;
+	protected JFrame frame;
 	
 	public List<AKeyPair> KEYPAIRS=new ArrayList<>();
 	private List<AccountKey> PEERKEYS;
@@ -68,8 +67,6 @@ public class PeerGUI extends JPanel {
 	public State genesisState;
 	private StateModel<State> latestState = StateModel.create(genesisState);
 	public StateModel<Long> tickState = StateModel.create(0L);
-
-	public static long maxBlock = 0;
 
 	/**
 	 * Launch the application.
@@ -83,27 +80,29 @@ public class PeerGUI extends JPanel {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate());
+		launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate(),true);
 	}
 
-	public static void launchPeerGUI(int peerNum, AKeyPair genesis) {
+	public static void launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) {
 		EventQueue.invokeLater(()->{
 			try {
-				PeerGUI.frame = new JFrame();
+				PeerGUI manager = new PeerGUI(peerNum,genesis);
+				JFrame frame = new JFrame();
+				manager.frame=frame;
 				frame.setTitle("Convex Peer Manager");
 				frame.setIconImage(Toolkit.getDefaultToolkit()
 						.getImage(PeerGUI.class.getResource("/images/Convex.png")));
 				frame.setBounds(100, 100, 1200, 900);
-				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				if (topLevel) frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-				PeerGUI window = new PeerGUI(peerNum,genesis);
-				frame.getContentPane().add(window, BorderLayout.CENTER);
+				frame.getContentPane().add(manager, BorderLayout.CENTER);
 				frame.setVisible(true);
 
 				frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			        public void windowClosing(WindowEvent winEvt) {
 			        	// shut down peers gracefully
-			    		window.peerPanel.closePeers();
+			    		manager.peerPanel.closePeers();
+			    		manager.restServer.stop();
 			        }
 			    });
 
@@ -190,6 +189,7 @@ public class PeerGUI extends JPanel {
 	private boolean updateRunning = true;
 
 	private long cp = 0;
+	private long maxBlock=0;
 
 	private Thread updateThread = new Thread(new Runnable() {
 		@Override
@@ -324,10 +324,6 @@ public class PeerGUI extends JPanel {
 		return latestState.getValue();
 	}
 
-	public static Component getFrame() {
-		return frame;
-	}
-
 	public StateModel<State> getStateModel() {
 		return latestState;
 	}
@@ -336,7 +332,7 @@ public class PeerGUI extends JPanel {
 		return peerList.getElementAt(0);
 	}
 
-	public static Address getUserAddress(int i) {
+	public Address getUserAddress(int i) {
 		return Init.getGenesisPeerAddress(i);
 	}
 	
@@ -425,7 +421,7 @@ public class PeerGUI extends JPanel {
 		runOnServer(s,f);
 	}
 
-	public static void runOnServer(Server server,Consumer<Server> f) {
+	public void runOnServer(Server server,Consumer<Server> f) {
 		AStore tempStore=Stores.current();
 		try {
 			Stores.setCurrent(server.getStore());
@@ -433,6 +429,14 @@ public class PeerGUI extends JPanel {
 		} finally {
 			Stores.setCurrent(tempStore);
 		}	
+	}
+
+	public long getMaxBlockCount() {
+		return maxBlock;
+	}
+
+	public void addWalletEntry(WalletEntry we) {
+		walletPanel.addWalletEntry(we);
 	}
 
 

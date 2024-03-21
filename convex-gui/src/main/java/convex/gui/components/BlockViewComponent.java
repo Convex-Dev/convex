@@ -6,7 +6,7 @@ import java.awt.Graphics;
 
 import javax.swing.JPanel;
 
-import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.core.Block;
 import convex.core.Constants;
 import convex.core.Order;
@@ -26,10 +26,12 @@ import convex.peer.Server;
 @SuppressWarnings("serial")
 public class BlockViewComponent extends JPanel {
 
-	private Convex peerView;
+	private ConvexLocal peerView;
+	private PeerGUI manager;
 
-	public BlockViewComponent(Convex peer) {
+	public BlockViewComponent(PeerGUI manager,ConvexLocal peer) {
 		this.peerView = peer;
+		this.manager=manager;
 
 		setBackground(null);
 		setPreferredSize(new Dimension(1000, 10));
@@ -57,7 +59,7 @@ public class BlockViewComponent extends JPanel {
 	
 	
 			int W = 10;
-			long tw = W * PeerGUI.maxBlock;
+			long tw = W * manager.getMaxBlockCount();
 			long offset = Math.max(0, tw - pw);
 	
 			for (int i = (int) (offset / W); i < n; i++) {

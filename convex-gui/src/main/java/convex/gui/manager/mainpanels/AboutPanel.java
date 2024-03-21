@@ -21,8 +21,10 @@ import convex.gui.utils.Toolkit;
 public class AboutPanel extends JPanel {
 
 	private final JTextArea textArea;
+	private PeerGUI manager;
 
 	public AboutPanel(PeerGUI manager) {
+		this.manager=manager;
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel panel = new ActionPanel();
@@ -65,7 +67,7 @@ public class AboutPanel extends JPanel {
 		sb.append("Consensus state hash: " + s.getHash().toHexString() + "\n");
 		sb.append("Timestamp:            " + Text.dateFormat(timestamp.longValue()) + "   (" + timestamp + ")\n");
 		sb.append("\n");
-		sb.append("Max Blocks:           " + lpad(PeerGUI.maxBlock) + "\n");
+		sb.append("Block Count:          " + lpad(manager.getMaxBlockCount()) + "\n");
 		sb.append("\n");
 		sb.append("Account statistics\n");
 		sb.append("  # Accounts:         " + lpad(s.getAccounts().count()) + "\n");

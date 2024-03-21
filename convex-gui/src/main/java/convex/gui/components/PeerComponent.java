@@ -141,7 +141,7 @@ public class PeerComponent extends BaseListComponent {
 		clientButton.addActionListener(e -> launchClientWindow(convex));
 		popupMenu.add(clientButton);
 
-		JPanel blockView = new BlockViewComponent(convex);
+		JPanel blockView = new BlockViewComponent(manager,convex);
 		add(blockView, BorderLayout.SOUTH);
 
 		DropdownMenu dm = new DropdownMenu(popupMenu);
@@ -183,7 +183,7 @@ public class PeerComponent extends BaseListComponent {
 		StringBuilder sb=new StringBuilder();
 		Server server=convex.getLocalServer();
 		if (server != null) {
-			PeerGUI.runOnServer(server,s->{
+			manager.runOnServer(server,s->{
 				State state=s.getPeer().getConsensusState();
 				AccountKey paddr=server.getPeerKey();
 				sb.append("0x"+paddr.toChecksumHex()+"\n");

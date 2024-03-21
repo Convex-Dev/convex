@@ -2,6 +2,7 @@ package convex.gui.client;
 
 import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -16,7 +17,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.util.Utils;
-import convex.gui.client.panels.HomePanel;
 import convex.gui.manager.windows.peer.REPLPanel;
 import convex.gui.utils.Toolkit;
 
@@ -58,8 +58,6 @@ public class ConvexClient extends JPanel {
 		EventQueue.invokeLater(()->launch(convex));
 	}
 
-	HomePanel homePanel = new HomePanel();
-
 	public JTabbedPane tabs = new JTabbedPane();
 	JPanel mainPanel = new JPanel();
 	public REPLPanel replPanel;
@@ -73,10 +71,11 @@ public class ConvexClient extends JPanel {
 		replPanel=new REPLPanel(convex);
 		this.add(tabs, BorderLayout.CENTER);
 
-		tabs.add("Home", homePanel);
 		tabs.add("REPL", replPanel);
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
+		
+		this.setPreferredSize(new Dimension(800,600));
 		
 		this.convex=convex;
 

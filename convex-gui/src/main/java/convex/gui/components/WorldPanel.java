@@ -2,8 +2,13 @@ package convex.gui.components;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Image;
+import java.awt.Toolkit;
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.FilteredImageSource;
+import java.awt.image.RGBImageFilter;
 import java.io.IOException;
 
 import javax.imageio.ImageIO;
@@ -13,18 +18,35 @@ import convex.gui.utils.RobinsonProjection;
 
 @SuppressWarnings("serial")
 public class WorldPanel extends JPanel {
-	BufferedImage image;
+	static BufferedImage image;
+	
+	static {
+		try {	
+			BufferedImage base = ImageIO.read(Thread.currentThread().getContextClassLoader().getResource("images/world.png"));
+			
+			
+			TintFilter filter=new TintFilter(0.1f,0.4f,0.7f);
+			
+			FilteredImageSource filteredImageSource = new FilteredImageSource(base.getSource(), filter ); 
+			Image filteredImage = Toolkit.getDefaultToolkit().createImage(filteredImageSource);         
 
-	public WorldPanel() {
-		try {
-			image = ImageIO.read(Thread.currentThread().getContextClassLoader().getResource("images/world.png"));
+			BufferedImage img = new BufferedImage(base.getWidth(), base.getHeight(), BufferedImage.TYPE_INT_ARGB);
+			Graphics2D g = img.createGraphics(); 
+			g.drawImage(filteredImage, 0, 0, null);
+			g.dispose();
+			image=img;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
+	public WorldPanel() {
+		setBackground(Color.BLACK);
+	}
+
 	@Override
 	public void paintComponent(Graphics g) {
+		super.paintComponent(g);
 		if (image == null) return;
 
 		int w = this.getWidth();
@@ -50,5 +72,30 @@ public class WorldPanel extends JPanel {
 		int px = (int) (x + dw * pt.getX());
 		int py = (int) (y + dh * pt.getY());
 		g.fillOval(px, py, 5, 5);
+	}
+	
+	public static class TintFilter extends RGBImageFilter {
+		private float rf;
+		private float gf;
+		private float bf;
+		public TintFilter(float r, float g, float b) {
+			this.rf=r;
+			this.gf=g;
+			this.bf=b;			
+		}
+		
+		@Override
+		public int filterRGB(int x, int y, int argb) {
+	    	int r=(argb>>16)&0xff;
+	    	int g=(argb>>8)&0xff;;
+	    	int b=(argb>>0)&0xff;
+	    	int a=argb&0xff000000;
+	    	
+	    	int nr=Math.max(0, Math.min(255, (int)(r*rf)));
+	    	int ng=Math.max(0, Math.min(255, (int)(g*gf)));
+	    	int nb=Math.max(0, Math.min(255, (int)(b*bf)));
+
+			return a + (nr<<16)+(ng<<8)+nb;
+	    }
 	}
 }

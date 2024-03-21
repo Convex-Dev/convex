@@ -35,6 +35,7 @@ public class WalletEntry {
 	}
 
 	public AccountKey getAccountKey() {
+		if (keyPair==null) return null;
 		return keyPair.getAccountKey();
 	}
 	
@@ -78,7 +79,9 @@ public class WalletEntry {
 
 	@Override
 	public String toString() {
-		return getAddress() +" : 0x" +getAccountKey().toChecksumHex();
+		AccountKey pubKey=getAccountKey(); 
+		String ks=(pubKey==null)?"<No key>":"0x"+pubKey.toChecksumHex();
+		return getAddress() +" : "+ks;
 	}
 
 	public <R extends ACell> SignedData<R> sign(R message) {

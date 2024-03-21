@@ -952,6 +952,7 @@ public class Utils {
 	 */
 	public static InetSocketAddress toInetSocketAddress(String s) {
 		if (s==null) return null;
+		s=s.trim();
 		try {
 			// Try URL parsing first
 			URL url=new URI(s).toURL();

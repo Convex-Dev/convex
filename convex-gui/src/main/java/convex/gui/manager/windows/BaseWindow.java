@@ -26,7 +26,6 @@ public abstract class BaseWindow extends JPanel {
 		f.pack();
 		f.setVisible(true);
 		f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-		f.setLocationRelativeTo(PeerGUI.getFrame());
 		return f;
 	}
 }
