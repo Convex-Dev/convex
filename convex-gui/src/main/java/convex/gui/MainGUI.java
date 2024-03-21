@@ -29,6 +29,7 @@ import convex.gui.client.ConvexClient;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.Toast;
 import convex.gui.manager.mainpanels.HomePanel;
+import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -51,7 +52,7 @@ public class MainGUI extends JPanel implements Runnable {
 		JComponent terminal=createLaunchButton("Convex Terminal",Toolkit.TERMINAL_ICON,this::launchClient);
 		actionPanel.add(terminal);
 		
-		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTestNet);
+		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools);
 		actionPanel.add(hacker);
 
 		JComponent discord=createLaunchButton("Community Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord);
@@ -150,6 +151,10 @@ public class MainGUI extends JPanel implements Runnable {
 	    	}
 	    }
 		
+	}
+	
+	public void launchTools() {
+		HackerTools.launch();
 	}
 	
 	public void launchWebsite() {
