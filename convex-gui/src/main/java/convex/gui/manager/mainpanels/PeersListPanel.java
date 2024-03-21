@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
 
+import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -44,6 +45,8 @@ public class PeersListPanel extends JPanel {
 	JPanel peerViewPanel;
 	JScrollPane scrollPane;
 
+	private PeerGUI manager;
+
 	private static final Logger log = LoggerFactory.getLogger(PeersListPanel.class.getName());
 
 	public void launchAllPeers(PeerGUI manager) {
@@ -71,7 +74,7 @@ public class PeersListPanel extends JPanel {
 		AKeyPair kp=AKeyPair.generate();
 		
 		try {
-			Server base=getFirst().getLocalServer();
+			Server base=manager.getPrimaryServer();
 			ConvexLocal convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
 			Address a= convex.createAccountSync(kp.getAccountKey());
 			long amt=convex.getBalance()/10;
@@ -105,27 +108,24 @@ public class PeersListPanel extends JPanel {
 		}
 	}
 
-	public static ConvexLocal getFirst() {
-		return PeerGUI.peerList.elementAt(0);
-	}
-
 	/**
 	 * Gets a list of all locally operating Servers from the current peer list.
 	 *
 	 * @return List of local PeerView objects
 	 */
 	public List<ConvexLocal> getPeerViews() {
+		DefaultListModel<ConvexLocal> peerList = manager.getPeerList();
 		ArrayList<ConvexLocal> al = new ArrayList<>();
-		int n = PeerGUI.peerList.getSize();
+		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			ConvexLocal p = PeerGUI.peerList.getElementAt(i);
+			ConvexLocal p = peerList.getElementAt(i);
 			al.add(p);
 		}
 		return al;
 	}
 
 	private void addPeer(ConvexLocal convex) {
-		PeerGUI.peerList.addElement(convex);
+		manager.getPeerList().addElement(convex);
 	}
 
 	/**
@@ -133,6 +133,7 @@ public class PeersListPanel extends JPanel {
 	 * @param manager PeerGUI instance
 	 */
 	public PeersListPanel(PeerGUI manager) {
+		this.manager=manager;
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel toolBar = new ActionPanel();
@@ -164,15 +165,16 @@ public class PeersListPanel extends JPanel {
 
 		});
 
-		ScrollyList<ConvexLocal> scrollyList = new ScrollyList<>(PeerGUI.peerList,
+		ScrollyList<ConvexLocal> scrollyList = new ScrollyList<>(manager.getPeerList(),
 				peer -> new PeerComponent(manager, peer));
 		add(scrollyList, BorderLayout.CENTER);
 	}
 
 	public void closePeers() {
-		int n = PeerGUI.peerList.getSize();
+		DefaultListModel<ConvexLocal> peerList = manager.getPeerList();
+		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
-			Convex p = PeerGUI.peerList.getElementAt(i);
+			Convex p = peerList.getElementAt(i);
 			try {
 				p.getLocalServer().close();
 			} catch (Exception e) {

@@ -47,7 +47,7 @@ public class PeerWindow extends BaseWindow {
 			}
 			tabbedPane.addTab("Observation", null, new JScrollPane(new ObserverPanel(server)), null);
 		}
-		tabbedPane.addTab("Stress", null, new StressPanel(peer), null);
+		tabbedPane.addTab("Stress", null, new StressPanel(manager,peer), null);
 		tabbedPane.addTab("Info", null, new PeerInfoPanel(peer), null);
 
 		PeerComponent pcom = new PeerComponent(manager, peer);

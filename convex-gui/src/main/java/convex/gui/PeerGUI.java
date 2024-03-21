@@ -83,6 +83,10 @@ public class PeerGUI extends JPanel {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
+		launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate());
+	}
+
+	public static void launchPeerGUI(int peerNum, AKeyPair genesis) {
 		EventQueue.invokeLater(()->{
 			try {
 				PeerGUI.frame = new JFrame();
@@ -92,7 +96,7 @@ public class PeerGUI extends JPanel {
 				frame.setBounds(100, 100, 1200, 900);
 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
-				PeerGUI window = new PeerGUI();
+				PeerGUI window = new PeerGUI(peerNum,genesis);
 				frame.getContentPane().add(window, BorderLayout.CENTER);
 				frame.setVisible(true);
 
@@ -119,15 +123,23 @@ public class PeerGUI extends JPanel {
 	JPanel accountsPanel;
 	JTabbedPane tabs;
 	RESTServer restServer;
+	
+	AKeyPair genesisKey;
 
 	/**
 	 * Create the application.
+	 * @param genesis Genesis key pair
+	 * @param peerNum Numer of peers to initialise in geneis
 	 */
-	public PeerGUI() {
+	public PeerGUI(int peerNum, AKeyPair genesis) {
+		// Create key pairs for peers, use genesis key as first keypair
+		genesisKey=genesis;
 		int peerCount=DEFAULT_NUM_PEERS;
 		for (int i=0; i<peerCount; i++) {
 			KEYPAIRS.add(AKeyPair.generate());
 		}
+		KEYPAIRS.set(0, genesis);
+		
 		PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 		genesisState=Init.createState(PEERKEYS);
 		latestState = StateModel.create(genesisState);
@@ -223,9 +235,11 @@ public class PeerGUI extends JPanel {
 		}
 	}, "GUI Manager state update thread");
 
-	public static DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
+	public DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
 
-
+	public DefaultListModel<ConvexLocal> getPeerList() {
+		return peerList;
+	}
 
 	@Override
 	public void finalize() {
@@ -256,7 +270,7 @@ public class PeerGUI extends JPanel {
 	 * @throws IOException If IO error occurs during connection attempt
 	 * @throws TimeoutException If attempt to connect times out
 	 */
-	public static Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException {
+	public Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException {
 		InetSocketAddress host = getDefaultConvex().getHostAddress();
 		return Convex.connect(host,address, kp);
 	}
@@ -283,7 +297,7 @@ public class PeerGUI extends JPanel {
 	 * @param trans Transaction to execute
 	 * @return Future for Result
 	 */
-	public static CompletableFuture<Result> execute(WalletEntry we, ATransaction trans) {
+	public CompletableFuture<Result> execute(WalletEntry we, ATransaction trans) {
 		try {
 			AKeyPair kp = we.getKeyPair();
 			Convex convex = makeConnection(we.getAddress(),kp);
@@ -302,7 +316,7 @@ public class PeerGUI extends JPanel {
 	 * @param trans Transaction to execute
 	 * @param receiveAction Action to invoke when result is received
 	 */
-	public static void execute(WalletEntry we, ATransaction trans, Consumer<Result> receiveAction) {
+	public void execute(WalletEntry we, ATransaction trans, Consumer<Result> receiveAction) {
 		execute(we,trans).thenAcceptAsync(receiveAction);
 	}
 
@@ -318,8 +332,8 @@ public class PeerGUI extends JPanel {
 		return latestState;
 	}
 
-	public static Convex getDefaultConvex() {
-		return PeersListPanel.getFirst();
+	public ConvexLocal getDefaultConvex() {
+		return peerList.getElementAt(0);
 	}
 
 	public static Address getUserAddress(int i) {
@@ -330,11 +344,11 @@ public class PeerGUI extends JPanel {
 		return KEYPAIRS.get(i);
 	}
 
-	public static Address getGenesisAddress() {
+	public Address getGenesisAddress() {
 		return Init.getGenesisAddress();
 	}
 
-	public static Convex connectClient(Address address, AKeyPair keyPair) {
+	public Convex connectClient(Address address, AKeyPair keyPair) {
 		try {
 			return makeConnection(address,keyPair);
 		} catch (IOException | TimeoutException e) {
@@ -342,9 +356,9 @@ public class PeerGUI extends JPanel {
 		}
 	}
 	
-	private static HashMap<Server,StateModel<Peer>> models=new HashMap<>();
+	private HashMap<Server,StateModel<Peer>> models=new HashMap<>();
 
-	public static StateModel<Peer> getStateModel(Convex peer) {
+	public StateModel<Peer> getStateModel(Convex peer) {
 		Server s=peer.getLocalServer();
 		if (s!=null) {
 			StateModel<Peer> model=models.get(s);
@@ -366,7 +380,7 @@ public class PeerGUI extends JPanel {
 		return null;
 	}
 
-	public static Server getRandomServer() {
+	public Server getRandomServer() {
 		Server result=null;
 		int n=peerList.getSize();
 		int found=0;
@@ -383,7 +397,7 @@ public class PeerGUI extends JPanel {
 		return result;
 	}
 	
-	public static Server getPrimaryServer() {
+	public Server getPrimaryServer() {
 		int n=peerList.getSize();
 		for (int i=0; i<n; i++) {
 			ConvexLocal c=peerList.elementAt(i);
@@ -395,7 +409,7 @@ public class PeerGUI extends JPanel {
 		return null;
 	}
 
-	public static void runWithLatestState(Consumer<State> f) {
+	public void runWithLatestState(Consumer<State> f) {
 		AStore tempStore=Stores.current();
 		try {
 			Server s=getPrimaryServer();
@@ -406,7 +420,7 @@ public class PeerGUI extends JPanel {
 		}
 	}
 	
-	public static void runOnPrimaryServer(Consumer<Server> f) {
+	public void runOnPrimaryServer(Consumer<Server> f) {
 		Server s=getPrimaryServer();
 		runOnServer(s,f);
 	}
@@ -420,4 +434,6 @@ public class PeerGUI extends JPanel {
 			Stores.setCurrent(tempStore);
 		}	
 	}
+
+
 }

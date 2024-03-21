@@ -5,14 +5,15 @@ import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -32,7 +33,6 @@ import convex.core.lang.Symbols;
 import convex.core.lang.impl.Fn;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.gui.PeerGUI;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
@@ -106,7 +106,7 @@ public class SmartOpComponent extends BaseListComponent {
 	}
 
 	private void execute() {
-		InetSocketAddress addr = PeerGUI.getDefaultConvex().getHostAddress();
+		InetSocketAddress addr = parent.manager.getPrimaryServer().getHostAddress();
 
 		AVector<ACell> args = Vectors.empty();
 		for (int i = 0; i < paramCount; i++) {

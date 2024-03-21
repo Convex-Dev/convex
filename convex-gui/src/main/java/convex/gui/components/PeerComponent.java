@@ -147,7 +147,7 @@ public class PeerComponent extends BaseListComponent {
 		DropdownMenu dm = new DropdownMenu(popupMenu);
 		add(dm, BorderLayout.EAST);
 		
-		StateModel<Peer> model=PeerGUI.getStateModel(convex);
+		StateModel<Peer> model=manager.getStateModel(convex);
 		if (model!=null) {
 			model.addPropertyChangeListener(e->{
 				blockView.repaint();

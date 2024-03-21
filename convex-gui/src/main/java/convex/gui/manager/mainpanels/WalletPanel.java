@@ -46,7 +46,7 @@ public class WalletPanel extends JPanel {
 		JButton btnNew = new JButton("New Account");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
-			Convex convex=PeerGUI.getDefaultConvex();
+			Convex convex=manager.getDefaultConvex();
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				Address addr=convex.createAccountSync(newKP.getAccountKey());

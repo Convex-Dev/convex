@@ -39,9 +39,11 @@ public class WalletComponent extends BaseListComponent {
 	JPanel buttons = new JPanel();
 
 	private Address address;
+	PeerGUI manager;
 
 	public WalletComponent(PeerGUI manager,WalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
+		this.manager=manager;
 		address = walletEntry.getAddress();
 
 		setLayout(new MigLayout("fillx"));
@@ -72,7 +74,7 @@ public class WalletComponent extends BaseListComponent {
 		buttons.add(replButton);
 		replButton.setIcon(Toolkit.REPL_ICON);
 		replButton.addActionListener(e -> {
-			ConvexClient c= ConvexClient.launch(PeerGUI.connectClient(walletEntry.getAddress(),walletEntry.getKeyPair()));
+			ConvexClient c= ConvexClient.launch(manager.connectClient(walletEntry.getAddress(),walletEntry.getKeyPair()));
 			c.tabs.setSelectedComponent(c.replPanel);
 		});
 		replButton.setToolTipText("Launch a client REPL for this account");
@@ -141,7 +143,7 @@ public class WalletComponent extends BaseListComponent {
 
 	private String getInfoString() {
 		StringBuilder sb=new StringBuilder();
-		PeerGUI.runWithLatestState(s->{
+		manager.runWithLatestState(s->{
 			AccountStatus as=s.getAccount(address);
 			if (as!=null) {
 				Long bal=as.getBalance();

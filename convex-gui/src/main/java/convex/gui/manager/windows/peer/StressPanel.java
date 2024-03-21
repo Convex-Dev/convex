@@ -71,8 +71,11 @@ public class StressPanel extends JPanel {
 	
 	private JComboBox<String> txTypeBox;
 
-	public StressPanel(Convex peerView) {
+	private PeerGUI manager;
+
+	public StressPanel(PeerGUI manager, Convex peerView) {
 		this.peerConvex = peerView;
+		this.manager=manager;
 		this.setLayout(new BorderLayout());
 
 		actionPanel = new ActionPanel();
@@ -343,7 +346,7 @@ public class StressPanel extends JPanel {
 				Address clientAddr = clientAddresses.get(i);
 				Convex cc;
 				if (distCheckBox.isSelected()) {
-					InetSocketAddress pa=PeerGUI.getRandomServer().getHostAddress();
+					InetSocketAddress pa=manager.getRandomServer().getHostAddress();
 					cc=Convex.connect(pa,clientAddr,kp);
 				} else {
 					cc=Convex.connect(sa,clientAddr,kp);
