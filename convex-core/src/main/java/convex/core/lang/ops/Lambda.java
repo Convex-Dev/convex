@@ -86,7 +86,8 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	}
 	
 	public static <T extends ACell> Lambda<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+2; // skip tag and opcode
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+
 		Ref<AClosure<T>> function= Format.readRef(b,epos);
 		epos+=function.getEncodingLength();
 		

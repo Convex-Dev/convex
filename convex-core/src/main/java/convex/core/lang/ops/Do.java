@@ -88,7 +88,8 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <T extends ACell> Do<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+2; // skip tag and opcode
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+
 		AVector<AOp<ACell>> ops = Format.read(b,epos);
 		epos+=Format.getEncodingLength(ops);
 		

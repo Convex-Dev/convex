@@ -64,8 +64,7 @@ public abstract class AOp<T extends ACell> extends ACell {
 
 	@Override
 	public final int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.OP;
-		bs[pos++]=opCode();
+		bs[pos++]=getTag();
 		return encodeRaw(bs,pos);
 	}
 
@@ -85,7 +84,7 @@ public abstract class AOp<T extends ACell> extends ACell {
 	
 	@Override
 	public byte getTag() {
-		return Tag.OP;
+		return (byte) (Tag.OP+opCode());
 	}
 	
 	@Override

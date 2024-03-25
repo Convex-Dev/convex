@@ -3,17 +3,20 @@ package convex.core.lang.ops;
 import java.util.HashMap;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.BlobBuilder;
 import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
+import convex.core.util.Utils;
 
 /**
  * Op representing special Symbols like *address* and *caller*
@@ -22,10 +25,10 @@ import convex.core.lang.Symbols;
  */
 public class Special<T extends ACell> extends AOp<T> {
 	
-	private final byte opCode;
+	private final byte specialCode;
 	
 	private static int NUM_SPECIALS=22;
-	private static final int BASE=Ops.SPECIAL_BASE;
+	private static final int BASE=0;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
 	private static final Special<?>[] specials=new Special[NUM_SPECIALS];
@@ -89,8 +92,8 @@ public class Special<T extends ACell> extends AOp<T> {
 	}
 
 	
-	private Special(byte opCode) {
-		this.opCode=opCode;
+	private Special(byte specialCode) {
+		this.specialCode=specialCode;
 	}
 	
 
@@ -106,7 +109,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	@Override
 	public Context execute(Context ctx) {
-		switch (opCode) {
+		switch (specialCode) {
 		case S_JUICE: ctx= ctx.withResult(CVMLong.create(ctx.getJuiceUsed())); break;
 		case S_CALLER: ctx= ctx.withResult(ctx.getCaller()); break;
 		case S_ADDRESS: ctx= ctx.withResult(ctx.getAddress()); break;
@@ -131,19 +134,19 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_MEMORY_PRICE: ctx=ctx.withResult(CVMDouble.create(ctx.getState().getMemoryPrice())); break ;
 		
 		default:
-			throw new Error("Bad Opcode"+opCode);
+			throw new Error("Bad Opcode"+specialCode);
 		}
 		return ctx.consumeJuice(Juice.SPECIAL);
 	}
 
 	@Override
 	public byte opCode() {
-		return opCode;
+		return Ops.SPECIAL;
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		// No data
+		bs[pos++]=specialCode;
 		return pos;
 	}
 
@@ -154,8 +157,8 @@ public class Special<T extends ACell> extends AOp<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if ((opCode<BASE)||(opCode>=LIMIT)) {
-			throw new InvalidDataException("Invalid Special opCode "+opCode, this);
+		if ((specialCode<BASE)||(specialCode>=LIMIT)) {
+			throw new InvalidDataException("Invalid Special opCode "+specialCode, this);
 		}
 	}
 
@@ -166,7 +169,7 @@ public class Special<T extends ACell> extends AOp<T> {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		return SYMBOLS[opCode-BASE].print(bb,limit);
+		return SYMBOLS[specialCode-BASE].print(bb,limit);
 	}
 
 	/**
@@ -187,5 +190,13 @@ public class Special<T extends ACell> extends AOp<T> {
 	}
 
 
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
+		byte scode=b.byteAt(epos);
+		Special<T> special=(Special<T>) Special.create(scode);
+		if (special==null) throw new BadFormatException("Bad OpCode for Special value: "+Utils.toHexString(scode));
+		return special;
+	}
 }

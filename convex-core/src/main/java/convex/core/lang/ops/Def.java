@@ -153,7 +153,8 @@ public class Def<T extends ACell> extends AOp<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <T extends ACell> Def<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+2; // skip tag and opcode
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+
 		ACell symbol = Format.read(b,epos);
 		epos+=Format.getEncodingLength(symbol);
 		

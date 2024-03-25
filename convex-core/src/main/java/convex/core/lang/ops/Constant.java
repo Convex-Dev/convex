@@ -105,7 +105,8 @@ public class Constant<T extends ACell> extends AOp<T> {
 	}
 
 	public static <T extends ACell> Constant<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+2; // skip tag and opcode
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+
 		Ref<T> ref = Format.readRef(b,epos);
 		epos+=ref.getEncodingLength();
 		Constant<T> result= createFromRef(ref);

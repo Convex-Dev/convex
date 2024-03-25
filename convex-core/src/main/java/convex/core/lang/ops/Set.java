@@ -89,7 +89,7 @@ public class Set<T extends ACell> extends AOp<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <R extends ACell> Set<R> read(Blob b, int pos) throws BadFormatException{
-		int epos=pos+2;
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 		
 		long position = Format.readVLCLong(b,epos);
 		epos+=Format.getVLCLength(position);

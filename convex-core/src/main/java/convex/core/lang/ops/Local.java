@@ -68,7 +68,8 @@ public class Local<T extends ACell> extends AOp<T> {
 	}
 	
 	public static <R extends ACell> Local<R> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+2;
+		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+
 		long position=Format.readVLCLong(b,epos);
 		epos+=Format.getVLCLength(position);
 		

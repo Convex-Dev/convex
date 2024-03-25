@@ -22,6 +22,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.AFn;
+import convex.core.lang.AOp;
 import convex.core.lang.Core;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
@@ -492,7 +493,6 @@ public class Format {
 	}
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == Tag.OP) return Ops.read(b,pos);
 		if (tag == Tag.CORE_DEF) return Core.read(b, pos);
 		
 		if (tag == Tag.FN_MULTI) {
@@ -590,6 +590,8 @@ public class Format {
 			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset); 
 
 			if ((tag & 0xF0) == 0xC0) return (T) readCode(tag,blob,offset);
+			
+			if ((tag & 0xF0) == 0xE0) return (T) readOp(tag,blob,offset);
 
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
@@ -600,6 +602,10 @@ public class Format {
 		}
 
 		throw new BadFormatException(badTagMessage(tag));
+	}
+
+	private static <T extends ACell> AOp<T> readOp(byte tag, Blob blob, int offset) throws BadFormatException {
+		return Ops.read(blob, offset, (byte) (tag&0x0f));
 	}
 
 	public static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
