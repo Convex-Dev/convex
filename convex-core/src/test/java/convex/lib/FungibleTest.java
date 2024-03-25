@@ -149,8 +149,7 @@ public class FungibleTest extends ACVMTest {
 
 		// Mint up to max and back down to zero
 		{
-			Context c=step(ctx,"(fungible/mint token 900)");
-			assertNotError(c);
+			Context c=exec(ctx,"(fungible/mint token 900)");
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
 			c=exec(c,"(fungible/mint token -900)");

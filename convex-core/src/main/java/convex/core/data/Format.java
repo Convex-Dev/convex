@@ -493,14 +493,7 @@ public class Format {
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
 		if (tag == Tag.OP) return Ops.read(b,pos);
-		if (tag == Tag.CORE_DEF) {
-			
-			Symbol sym = Symbol.read(b,pos);
-			// TODO: consider if dependency of format on core bad?
-			ACell o = Core.ENVIRONMENT.get(sym);
-			if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
-			return o;
-		}
+		if (tag == Tag.CORE_DEF) return Core.read(b, pos);
 		
 		if (tag == Tag.FN_MULTI) {
 			AFn<?> fn = MultiFn.read(b,pos);

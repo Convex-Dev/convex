@@ -5,8 +5,6 @@ import convex.core.data.Symbol;
 /**
  * Interface for objects that act as definitions in the core environment.
  * 
- * These are serialised as symbolic references, and will be deserialised to
- * point to the same core object.
  */
 public interface ICoreDef {
 
@@ -23,5 +21,11 @@ public interface ICoreDef {
 	 * @return The symbol for this core definition.
 	 */
 	public Symbol getIntrinsicSymbol();
+
+	/**
+	 * Gets the core definition code for this value
+	 * @return
+	 */
+	public int getCoreCode();
 
 }

@@ -48,6 +48,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
+import convex.core.exceptions.BadFormatException;
 import convex.core.lang.impl.AExceptional;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
@@ -114,13 +115,25 @@ public class Core {
 	public static final Symbol CORE_SYMBOL = Symbol.create("convex.core");
 
 	private static final HashSet<ACell> tempReg = new HashSet<ACell>();
+	
+	private static final ACell[] CODE_MAP=new ACell[512];
 
+	/**
+	 * Register an intrinsic core value
+	 * @param <T>
+	 * @param o
+	 * @return
+	 */
 	private static <T extends ACell> T reg(T o) {
+		if (tempReg.contains(o)) throw new Error("Duplicate core form! = "+o);
 		tempReg.add(o);
 		
 		if (o instanceof ICoreDef) {
 			ICoreDef cd=(ICoreDef)o;
 			Symbol stm=cd.getSymbol();
+			
+			
+			
 			Symbol implicitForm=Symbol.create("#%"+stm.getName().toString());
 			CORE_FORMS.put(implicitForm, o);
 		} else {
@@ -130,7 +143,7 @@ public class Core {
 		return o;
 	}
 
-	public static final CoreFn<AVector<ACell>> VECTOR = reg(new CoreFn<>(Symbols.VECTOR) {
+	public static final CoreFn<AVector<ACell>> VECTOR = reg(new CoreFn<>(Symbols.VECTOR,1) {
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			// Need to charge juice on per-element basis
@@ -146,7 +159,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASequence<ACell>> CONCAT = reg(new CoreFn<>(Symbols.CONCAT) {
+	public static final CoreFn<ASequence<ACell>> CONCAT = reg(new CoreFn<>(Symbols.CONCAT,2) {
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			ASequence<?> result = null;
@@ -169,7 +182,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AVector<ACell>> VEC = reg(new CoreFn<>(Symbols.VEC) {
+	public static final CoreFn<AVector<ACell>> VEC = reg(new CoreFn<>(Symbols.VEC,3) {
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			// Arity 1 exactly
@@ -188,7 +201,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AVector<ACell>> REVERSE = reg(new CoreFn<>(Symbols.REVERSE) {
+	public static final CoreFn<AVector<ACell>> REVERSE = reg(new CoreFn<>(Symbols.REVERSE,4) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -207,7 +220,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASet<ACell>> SET = reg(new CoreFn<>(Symbols.SET) {
+	public static final CoreFn<ASet<ACell>> SET = reg(new CoreFn<>(Symbols.SET,5) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -227,7 +240,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASet<ACell>> UNION = reg(new CoreFn<>(Symbols.UNION) {
+	public static final CoreFn<ASet<ACell>> UNION = reg(new CoreFn<>(Symbols.UNION,6) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -253,7 +266,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASet<ACell>> INTERSECTION = reg(new CoreFn<>(Symbols.INTERSECTION) {
+	public static final CoreFn<ASet<ACell>> INTERSECTION = reg(new CoreFn<>(Symbols.INTERSECTION,7) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -282,7 +295,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASet<ACell>> DIFFERENCE = reg(new CoreFn<>(Symbols.DIFFERENCE) {
+	public static final CoreFn<ASet<ACell>> DIFFERENCE = reg(new CoreFn<>(Symbols.DIFFERENCE,8) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -311,7 +324,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AList<ACell>> LIST = reg(new CoreFn<>(Symbols.LIST) {
+	public static final CoreFn<AList<ACell>> LIST = reg(new CoreFn<>(Symbols.LIST,9) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -326,7 +339,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AString> STR = reg(new CoreFn<>(Symbols.STR) {
+	public static final CoreFn<AString> STR = reg(new CoreFn<>(Symbols.STR,10) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -339,7 +352,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<AString> PRINT = reg(new CoreFn<>(Symbols.PRINT) {
+	public static final CoreFn<AString> PRINT = reg(new CoreFn<>(Symbols.PRINT,11) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -357,7 +370,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<AString> SPLIT = reg(new CoreFn<>(Symbols.SPLIT) {
+	public static final CoreFn<AString> SPLIT = reg(new CoreFn<>(Symbols.SPLIT,12) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -382,7 +395,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<AString> JOIN = reg(new CoreFn<>(Symbols.JOIN) {
+	public static final CoreFn<AString> JOIN = reg(new CoreFn<>(Symbols.JOIN,13) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -404,7 +417,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AString> NAME = reg(new CoreFn<>(Symbols.NAME) {
+	public static final CoreFn<AString> NAME = reg(new CoreFn<>(Symbols.NAME,14) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -421,7 +434,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Keyword> KEYWORD = reg(new CoreFn<>(Symbols.KEYWORD) {
+	public static final CoreFn<Keyword> KEYWORD = reg(new CoreFn<>(Symbols.KEYWORD,15) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -443,7 +456,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Symbol> SYMBOL = reg(new CoreFn<Symbol>(Symbols.SYMBOL) {
+	public static final CoreFn<Symbol> SYMBOL = reg(new CoreFn<Symbol>(Symbols.SYMBOL,16) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -470,7 +483,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AOp<ACell>> COMPILE = reg(new CoreFn<>(Symbols.COMPILE) {
+	public static final CoreFn<AOp<ACell>> COMPILE = reg(new CoreFn<>(Symbols.COMPILE,257) {
 
 		
 		@Override
@@ -483,7 +496,7 @@ public class Core {
 
 	});
 
-	public static final CoreFn<ACell> EVAL = reg(new CoreFn<>(Symbols.EVAL) {
+	public static final CoreFn<ACell> EVAL = reg(new CoreFn<>(Symbols.EVAL,17) {
 
 		
 		@Override
@@ -497,7 +510,7 @@ public class Core {
 
 	});
 
-	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS) {	
+	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS,18) {	
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
@@ -511,7 +524,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<ACell> QUERY_AS = reg(new CoreFn<>(Symbols.QUERY_AS) {	
+	public static final CoreFn<ACell> QUERY_AS = reg(new CoreFn<>(Symbols.QUERY_AS,19) {	
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
@@ -525,7 +538,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> SCHEDULE_STAR = reg(new CoreFn<>(Symbols.SCHEDULE_STAR) {
+	public static final CoreFn<CVMLong> SCHEDULE_STAR = reg(new CoreFn<>(Symbols.SCHEDULE_STAR,20) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -546,7 +559,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Syntax> SYNTAX = reg(new CoreFn<>(Symbols.SYNTAX) {
+	public static final CoreFn<Syntax> SYNTAX = reg(new CoreFn<>(Symbols.SYNTAX,21) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -569,7 +582,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> UNSYNTAX = reg(new CoreFn<>(Symbols.UNSYNTAX) {
+	public static final CoreFn<ACell> UNSYNTAX = reg(new CoreFn<>(Symbols.UNSYNTAX,22) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -585,7 +598,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AHashMap<ACell,ACell>> META = reg(new CoreFn<>(Symbols.META) {
+	public static final CoreFn<AHashMap<ACell,ACell>> META = reg(new CoreFn<>(Symbols.META,23) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -605,14 +618,14 @@ public class Core {
 		}
 	});
 
-	public static final CorePred SYNTAX_Q = reg(new CorePred(Symbols.SYNTAX_Q) {
+	public static final CorePred SYNTAX_Q = reg(new CorePred(Symbols.SYNTAX_Q,24) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Syntax;
 		}
 	});
 
-	public static final CoreFn<ACell> EXPAND = reg(new CoreFn<>(Symbols.EXPAND) {
+	public static final CoreFn<ACell> EXPAND = reg(new CoreFn<>(Symbols.EXPAND,258) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -621,19 +634,14 @@ public class Core {
 				return context.withArityError(name() + " requires a form argument, optional expander and optional continuation expander (arity 1, 2 or 2)");
 			}
 
-			//context = context.lookup(Symbols.STAR_INITIAL_EXPANDER);
-			//if (context.isExceptional()) return (Context<Syntax>) context;
-			//AFn<Syntax> initialExpander=RT.function(context.getResult());
-			//if (initialExpander==null) {
-			//	return context.withError(ErrorCodes.CAST,name()+" requires a valid *initial-expander*, not found in environment");
-			//}
-
-			AFn<ACell> expander=Compiler.INITIAL_EXPANDER;
+			AFn<ACell> expander;
 			if (n >= 2) {
 				// use provided expander
 				ACell exArg = args[1];
 				expander=RT.ensureFunction(exArg);
 				if (expander==null) return context.withCastError(1,args, Types.FUNCTION);
+			} else {
+				expander=Compiler.INITIAL_EXPANDER;
 			}
 
 			AFn<ACell> cont=expander; // use passed expander by default
@@ -652,9 +660,7 @@ public class Core {
 
 	public static final AFn<ACell> INITIAL_EXPANDER = reg(Compiler.INITIAL_EXPANDER);
 
-	public static final AFn<ACell> QUOTE_EXPANDER = reg(Compiler.QUOTE_EXPANDER);
-
-	public static final CoreFn<CVMBool> CALLABLE_Q = reg(new CoreFn<>(Symbols.CALLABLE_Q) {
+	public static final CoreFn<CVMBool> CALLABLE_Q = reg(new CoreFn<>(Symbols.CALLABLE_Q,30) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -686,7 +692,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Address> DEPLOY = reg(new CoreFn<>(Symbols.DEPLOY) {
+	public static final CoreFn<Address> DEPLOY = reg(new CoreFn<>(Symbols.DEPLOY,387) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -697,7 +703,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<CVMLong> ACCEPT = reg(new CoreFn<>(Symbols.ACCEPT) {
+	public static final CoreFn<CVMLong> ACCEPT = reg(new CoreFn<>(Symbols.ACCEPT,385) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -712,7 +718,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> CALL_STAR = reg(new CoreFn<>(Symbols.CALL_STAR) {
+	public static final CoreFn<ACell> CALL_STAR = reg(new CoreFn<>(Symbols.CALL_STAR,386) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -738,7 +744,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Hash> LOG = reg(new CoreFn<>(Symbols.LOG) {
+	public static final CoreFn<Hash> LOG = reg(new CoreFn<>(Symbols.LOG,384) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -756,7 +762,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> UNDEF_STAR = reg(new CoreFn<>(Symbols.UNDEF_STAR) {
+	public static final CoreFn<ACell> UNDEF_STAR = reg(new CoreFn<>(Symbols.UNDEF_STAR,31) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -773,7 +779,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<ACell> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP) {
+	public static final CoreFn<ACell> LOOKUP = reg(new CoreFn<>(Symbols.LOOKUP,32) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -797,7 +803,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Syntax> LOOKUP_META = reg(new CoreFn<>(Symbols.LOOKUP_META) {
+	public static final CoreFn<Syntax> LOOKUP_META = reg(new CoreFn<>(Symbols.LOOKUP_META,33) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -823,7 +829,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Address> ADDRESS = reg(new CoreFn<>(Symbols.ADDRESS) {
+	public static final CoreFn<Address> ADDRESS = reg(new CoreFn<>(Symbols.ADDRESS,34) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -842,7 +848,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ABlob> BLOB = reg(new CoreFn<>(Symbols.BLOB) {
+	public static final CoreFn<ABlob> BLOB = reg(new CoreFn<>(Symbols.BLOB,35) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -858,7 +864,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT) {
+	public static final CoreFn<AccountStatus> ACCOUNT = reg(new CoreFn<>(Symbols.ACCOUNT,36) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -875,7 +881,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> BALANCE = reg(new CoreFn<>(Symbols.BALANCE) {
+	public static final CoreFn<CVMLong> BALANCE = reg(new CoreFn<>(Symbols.BALANCE,37) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -891,7 +897,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> TRANSFER = reg(new CoreFn<>(Symbols.TRANSFER) {
+	public static final CoreFn<CVMLong> TRANSFER = reg(new CoreFn<>(Symbols.TRANSFER,38) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -908,7 +914,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> SET_MEMORY = reg(new CoreFn<>(Symbols.SET_MEMORY) {
+	public static final CoreFn<CVMLong> SET_MEMORY = reg(new CoreFn<>(Symbols.SET_MEMORY,39) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -921,7 +927,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> TRANSFER_MEMORY = reg(new CoreFn<>(Symbols.TRANSFER_MEMORY) {
+	public static final CoreFn<CVMLong> TRANSFER_MEMORY = reg(new CoreFn<>(Symbols.TRANSFER_MEMORY,40) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -937,7 +943,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> STAKE = reg(new CoreFn<>(Symbols.STAKE) {
+	public static final CoreFn<CVMLong> STAKE = reg(new CoreFn<>(Symbols.STAKE,64) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -956,7 +962,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER) {
+	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER,65) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -973,7 +979,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<CVMLong> SET_PEER_DATA = reg(new CoreFn<>(Symbols.SET_PEER_DATA) {
+	public static final CoreFn<CVMLong> SET_PEER_DATA = reg(new CoreFn<>(Symbols.SET_PEER_DATA,66) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -993,7 +999,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMLong> SET_PEER_STAKE = reg(new CoreFn<>(Symbols.SET_PEER_STAKE) {
+	public static final CoreFn<CVMLong> SET_PEER_STAKE = reg(new CoreFn<>(Symbols.SET_PEER_STAKE,67) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1014,7 +1020,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<AMap<?, ?>> HASHMAP = reg(new CoreFn<>(Symbols.HASH_MAP) {
+	public static final CoreFn<AMap<?, ?>> HASHMAP = reg(new CoreFn<>(Symbols.HASH_MAP,80) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1028,7 +1034,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<BlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP) {
+	public static final CoreFn<BlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP,81) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1053,7 +1059,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASet<?>> HASHSET = reg(new CoreFn<>(Symbols.HASH_SET) {
+	public static final CoreFn<ASet<?>> HASHSET = reg(new CoreFn<>(Symbols.HASH_SET,82) {
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			// any arity is OK
@@ -1065,7 +1071,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AVector<ACell>> KEYS = reg(new CoreFn<>(Symbols.KEYS) {
+	public static final CoreFn<AVector<ACell>> KEYS = reg(new CoreFn<>(Symbols.KEYS,83) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1084,7 +1090,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AVector<ACell>> VALUES = reg(new CoreFn<>(Symbols.VALUES) {
+	public static final CoreFn<AVector<ACell>> VALUES = reg(new CoreFn<>(Symbols.VALUES,84) {
 		@SuppressWarnings("unchecked")
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1103,7 +1109,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ADataStructure<ACell>> ASSOC = reg(new CoreFn<>(Symbols.ASSOC) {
+	public static final CoreFn<ADataStructure<ACell>> ASSOC = reg(new CoreFn<>(Symbols.ASSOC,85) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1137,7 +1143,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> ASSOC_IN = reg(new CoreFn<>(Symbols.ASSOC_IN) {
+	public static final CoreFn<ACell> ASSOC_IN = reg(new CoreFn<>(Symbols.ASSOC_IN,86) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1177,7 +1183,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> GET_HOLDING = reg(new CoreFn<>(Symbols.GET_HOLDING) {
+	public static final CoreFn<ACell> GET_HOLDING = reg(new CoreFn<>(Symbols.GET_HOLDING,96) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1199,7 +1205,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> SET_HOLDING = reg(new CoreFn<>(Symbols.SET_HOLDING) {
+	public static final CoreFn<ACell> SET_HOLDING = reg(new CoreFn<>(Symbols.SET_HOLDING,97) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1221,7 +1227,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> SET_CONTROLLER = reg(new CoreFn<>(Symbols.SET_CONTROLLER) {
+	public static final CoreFn<ACell> SET_CONTROLLER = reg(new CoreFn<>(Symbols.SET_CONTROLLER,98) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1247,7 +1253,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<ACell> SET_PARENT = reg(new CoreFn<>(Symbols.SET_PARENT) {
+	public static final CoreFn<ACell> SET_PARENT = reg(new CoreFn<>(Symbols.SET_PARENT,99) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1276,7 +1282,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AccountKey> SET_KEY = reg(new CoreFn<>(Symbols.SET_KEY) {
+	public static final CoreFn<AccountKey> SET_KEY = reg(new CoreFn<>(Symbols.SET_KEY,100) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1305,7 +1311,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<ACell> GET = reg(new CoreFn<>(Symbols.GET) {
+	public static final CoreFn<ACell> GET = reg(new CoreFn<>(Symbols.GET,112) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1333,7 +1339,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> GET_IN = reg(new CoreFn<>(Symbols.GET_IN) {
+	public static final CoreFn<ACell> GET_IN = reg(new CoreFn<>(Symbols.GET_IN,113) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1370,7 +1376,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> CONTAINS_KEY_Q = reg(new CoreFn<>(Symbols.CONTAINS_KEY_Q) {
+	public static final CoreFn<CVMBool> CONTAINS_KEY_Q = reg(new CoreFn<>(Symbols.CONTAINS_KEY_Q,114) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1392,7 +1398,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q) {
+	public static final CoreFn<CVMBool> SUBSET_Q = reg(new CoreFn<>(Symbols.SUBSET_Q,115) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1413,7 +1419,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AMap<?, ?>> DISSOC = reg(new CoreFn<>(Symbols.DISSOC) {
+	public static final CoreFn<AMap<?, ?>> DISSOC = reg(new CoreFn<>(Symbols.DISSOC,116) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1431,7 +1437,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ADataStructure<ACell>> CONJ = reg(new CoreFn<>(Symbols.CONJ) {
+	public static final CoreFn<ADataStructure<ACell>> CONJ = reg(new CoreFn<>(Symbols.CONJ,117) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1455,7 +1461,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASet<ACell>> DISJ = reg(new CoreFn<>(Symbols.DISJ) {
+	public static final CoreFn<ASet<ACell>> DISJ = reg(new CoreFn<>(Symbols.DISJ,118) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1480,7 +1486,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AList<ACell>> CONS = reg(new CoreFn<>(Symbols.CONS) {
+	public static final CoreFn<AList<ACell>> CONS = reg(new CoreFn<>(Symbols.CONS,119) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1504,7 +1510,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> FIRST = reg(new CoreFn<>(Symbols.FIRST) {
+	public static final CoreFn<ACell> FIRST = reg(new CoreFn<>(Symbols.FIRST,120) {
 		// note we could define this as (nth coll 0) but this is more efficient
 
 		
@@ -1523,7 +1529,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> SECOND = reg(new CoreFn<>(Symbols.SECOND) {
+	public static final CoreFn<ACell> SECOND = reg(new CoreFn<>(Symbols.SECOND,121) {
 		// note we could define this as (nth coll 1) but this is more efficient
 
 		
@@ -1542,7 +1548,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> LAST = reg(new CoreFn<>(Symbols.LAST) {
+	public static final CoreFn<ACell> LAST = reg(new CoreFn<>(Symbols.LAST,122) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1561,7 +1567,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> EQUALS = reg(new CoreFn<>(Symbols.EQUALS) {
+	public static final CoreFn<CVMBool> EQUALS = reg(new CoreFn<>(Symbols.EQUALS,123) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1572,7 +1578,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> EQ = reg(new CoreFn<>(Symbols.EQ) {
+	public static final CoreFn<CVMBool> EQ = reg(new CoreFn<>(Symbols.EQ,124) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1584,7 +1590,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMBool> NE = reg(new CoreFn<>(Symbols.NE) {
+	public static final CoreFn<CVMBool> NE = reg(new CoreFn<>(Symbols.NE,125) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1596,7 +1602,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> GE = reg(new CoreFn<>(Symbols.GE) {
+	public static final CoreFn<CVMBool> GE = reg(new CoreFn<>(Symbols.GE,126) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1608,7 +1614,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> GT = reg(new CoreFn<>(Symbols.GT) {
+	public static final CoreFn<CVMBool> GT = reg(new CoreFn<>(Symbols.GT,127) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1621,7 +1627,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> LE = reg(new CoreFn<>(Symbols.LE) {
+	public static final CoreFn<CVMBool> LE = reg(new CoreFn<>(Symbols.LE,128) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1634,7 +1640,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> LT = reg(new CoreFn<>(Symbols.LT) {
+	public static final CoreFn<CVMBool> LT = reg(new CoreFn<>(Symbols.LT,129) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1647,7 +1653,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMBool> MIN = reg(new CoreFn<>(Symbols.MIN) {
+	public static final CoreFn<CVMBool> MIN = reg(new CoreFn<>(Symbols.MIN,130) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1660,7 +1666,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMBool> MAX = reg(new CoreFn<>(Symbols.MAX) {
+	public static final CoreFn<CVMBool> MAX = reg(new CoreFn<>(Symbols.MAX,131) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1673,7 +1679,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> INC = reg(new CoreFn<>(Symbols.INC) {
+	public static final CoreFn<CVMLong> INC = reg(new CoreFn<>(Symbols.INC,132) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1688,7 +1694,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> DEC = reg(new CoreFn<>(Symbols.DEC) {
+	public static final CoreFn<CVMLong> DEC = reg(new CoreFn<>(Symbols.DEC,133) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1703,7 +1709,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> BOOLEAN = reg(new CoreFn<>(Symbols.BOOLEAN) {
+	public static final CoreFn<CVMBool> BOOLEAN = reg(new CoreFn<>(Symbols.BOOLEAN,134) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1716,14 +1722,14 @@ public class Core {
 		}
 	});
 
-	public static final CorePred BOOLEAN_Q = reg(new CorePred(Symbols.BOOLEAN_Q) {
+	public static final CorePred BOOLEAN_Q = reg(new CorePred(Symbols.BOOLEAN_Q,135) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isBoolean(val);
 		}
 	});
 
-	public static final CoreFn<ABlob> ENCODING = reg(new CoreFn<>(Symbols.ENCODING) {
+	public static final CoreFn<ABlob> ENCODING = reg(new CoreFn<>(Symbols.ENCODING,136) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1739,7 +1745,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> LONG = reg(new CoreFn<>(Symbols.LONG) {
+	public static final CoreFn<CVMLong> LONG = reg(new CoreFn<>(Symbols.LONG,137) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1753,7 +1759,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<AInteger> INT = reg(new CoreFn<>(Symbols.INT) {
+	public static final CoreFn<AInteger> INT = reg(new CoreFn<>(Symbols.INT,138) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1767,7 +1773,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMDouble> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE) {
+	public static final CoreFn<CVMDouble> DOUBLE = reg(new CoreFn<>(Symbols.DOUBLE,139) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1781,7 +1787,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMChar> CHAR = reg(new CoreFn<>(Symbols.CHAR) {
+	public static final CoreFn<CVMChar> CHAR = reg(new CoreFn<>(Symbols.CHAR,140) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1804,7 +1810,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> BYTE = reg(new CoreFn<>(Symbols.BYTE) {
+	public static final CoreFn<CVMLong> BYTE = reg(new CoreFn<>(Symbols.BYTE,141) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1817,7 +1823,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<APrimitive> PLUS = reg(new CoreFn<>(Symbols.PLUS) {
+	public static final CoreFn<APrimitive> PLUS = reg(new CoreFn<>(Symbols.PLUS,160) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1835,7 +1841,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<APrimitive> MINUS = reg(new CoreFn<>(Symbols.MINUS) {
+	public static final CoreFn<APrimitive> MINUS = reg(new CoreFn<>(Symbols.MINUS,161) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1853,7 +1859,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<APrimitive> TIMES = reg(new CoreFn<>(Symbols.TIMES) {
+	public static final CoreFn<APrimitive> TIMES = reg(new CoreFn<>(Symbols.TIMES,162) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1871,7 +1877,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMDouble> DIVIDE = reg(new CoreFn<>(Symbols.DIVIDE) {
+	public static final CoreFn<CVMDouble> DIVIDE = reg(new CoreFn<>(Symbols.DIVIDE,163) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1883,7 +1889,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMDouble> FLOOR = reg(new CoreFn<>(Symbols.FLOOR) {
+	public static final CoreFn<CVMDouble> FLOOR = reg(new CoreFn<>(Symbols.FLOOR,164) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1895,7 +1901,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<CVMDouble> CEIL = reg(new CoreFn<>(Symbols.CEIL) {
+	public static final CoreFn<CVMDouble> CEIL = reg(new CoreFn<>(Symbols.CEIL,165) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1907,7 +1913,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<CVMDouble> SQRT = reg(new CoreFn<>(Symbols.SQRT) {
+	public static final CoreFn<CVMDouble> SQRT = reg(new CoreFn<>(Symbols.SQRT,166) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1918,7 +1924,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<APrimitive> ABS = reg(new CoreFn<>(Symbols.ABS) {
+	public static final CoreFn<APrimitive> ABS = reg(new CoreFn<>(Symbols.ABS,167) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1929,7 +1935,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM) {
+	public static final CoreFn<CVMLong> SIGNUM = reg(new CoreFn<>(Symbols.SIGNUM,168) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1940,7 +1946,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AInteger> MOD = reg(new CoreFn<>(Symbols.MOD) {
+	public static final CoreFn<AInteger> MOD = reg(new CoreFn<>(Symbols.MOD,169) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1957,7 +1963,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<AInteger> DIV = reg(new CoreFn<>(Symbols.DIV) {
+	public static final CoreFn<AInteger> DIV = reg(new CoreFn<>(Symbols.DIV,170) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1974,7 +1980,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AInteger> REM = reg(new CoreFn<>(Symbols.REM) {
+	public static final CoreFn<AInteger> REM = reg(new CoreFn<>(Symbols.REM,171) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -1991,7 +1997,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AInteger> QUOT = reg(new CoreFn<>(Symbols.QUOT) {
+	public static final CoreFn<AInteger> QUOT = reg(new CoreFn<>(Symbols.QUOT,172) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2007,9 +2013,27 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+	
+	/**
+	 * Expander used for expansion of `quote` forms.
+	 * 
+	 * Should work on both raw forms and syntax objects.
+	 * 
+	 * Follows the "Expansion-Passing Style" approach of Dybvig, Friedman, and Haynes
+	 */
+	public static final CoreFn<ACell> QUOTE = reg(new CoreFn<ACell>(Symbols.QUOTE,0) {
+		@Override
+		public Context invoke(Context context,ACell[] args ) {
+			if (args.length!=2) return context.withArityError(exactArityMessage(2, args.length));
+			ACell x = args[0];
+		
+			return context.withResult(Juice.EXPAND_CONSTANT,x);
+		}
+	});
 
 
-	public static final CoreFn<CVMDouble> POW = reg(new CoreFn<>(Symbols.POW) {
+	public static final CoreFn<CVMDouble> POW = reg(new CoreFn<>(Symbols.POW,173) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2022,7 +2046,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMDouble> EXP = reg(new CoreFn<>(Symbols.EXP) {
+	public static final CoreFn<CVMDouble> EXP = reg(new CoreFn<>(Symbols.EXP,174) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2035,7 +2059,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> NOT = reg(new CoreFn<>(Symbols.NOT) {
+	public static final CoreFn<CVMBool> NOT = reg(new CoreFn<>(Symbols.NOT,175) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2046,7 +2070,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMLong> BIT_AND = reg(new CoreFn<>(Symbols.BIT_AND) {
+	public static final CoreFn<CVMLong> BIT_AND = reg(new CoreFn<>(Symbols.BIT_AND,176) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2064,7 +2088,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMLong> BIT_XOR = reg(new CoreFn<>(Symbols.BIT_XOR) {
+	public static final CoreFn<CVMLong> BIT_XOR = reg(new CoreFn<>(Symbols.BIT_XOR,177) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2082,7 +2106,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMLong> BIT_OR = reg(new CoreFn<>(Symbols.BIT_OR) {
+	public static final CoreFn<CVMLong> BIT_OR = reg(new CoreFn<>(Symbols.BIT_OR,178) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2100,7 +2124,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<CVMLong> BIT_NOT = reg(new CoreFn<>(Symbols.BIT_NOT) {
+	public static final CoreFn<CVMLong> BIT_NOT = reg(new CoreFn<>(Symbols.BIT_NOT,179) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2115,7 +2139,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<Hash> HASH = reg(new CoreFn<>(Symbols.HASH) {
+	public static final CoreFn<Hash> HASH = reg(new CoreFn<>(Symbols.HASH,180) {
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -2130,7 +2154,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<Hash> KECCAK256 = reg(new CoreFn<>(Symbols.KECCAK256) {
+	public static final CoreFn<Hash> KECCAK256 = reg(new CoreFn<>(Symbols.KECCAK256,181) {
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -2145,7 +2169,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<Hash> SHA256 = reg(new CoreFn<>(Symbols.SHA256) {
+	public static final CoreFn<Hash> SHA256 = reg(new CoreFn<>(Symbols.SHA256,182) {
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -2160,7 +2184,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> COUNT = reg(new CoreFn<>(Symbols.COUNT) {	
+	public static final CoreFn<CVMLong> COUNT = reg(new CoreFn<>(Symbols.COUNT,183) {	
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -2172,7 +2196,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> EMPTY = reg(new CoreFn<>(Symbols.EMPTY) {
+	public static final CoreFn<ACell> EMPTY = reg(new CoreFn<>(Symbols.EMPTY,192) {
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
@@ -2190,7 +2214,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> NTH = reg(new CoreFn<>(Symbols.NTH) {
+	public static final CoreFn<ACell> NTH = reg(new CoreFn<>(Symbols.NTH,193) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2220,7 +2244,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ASequence<ACell>> NEXT = reg(new CoreFn<>(Symbols.NEXT) {
+	public static final CoreFn<ASequence<ACell>> NEXT = reg(new CoreFn<>(Symbols.NEXT,194) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2235,7 +2259,7 @@ public class Core {
 		}
 	});
 	
-	public static final CoreFn<ASequence<ACell>> SLICE= reg(new CoreFn<>(Symbols.SLICE) {
+	public static final CoreFn<ASequence<ACell>> SLICE= reg(new CoreFn<>(Symbols.SLICE,195) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2274,7 +2298,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<?> RECUR = reg(new CoreFn<>(Symbols.RECUR) {
+	public static final CoreFn<?> RECUR = reg(new CoreFn<>(Symbols.RECUR,196) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2286,7 +2310,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<?> TAILCALL_STAR = reg(new CoreFn<>(Symbols.TAILCALL_STAR) {
+	public static final CoreFn<?> TAILCALL_STAR = reg(new CoreFn<>(Symbols.TAILCALL_STAR,197) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2303,7 +2327,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<?> ROLLBACK = reg(new CoreFn<>(Symbols.ROLLBACK) {
+	public static final CoreFn<?> ROLLBACK = reg(new CoreFn<>(Symbols.ROLLBACK,208) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2315,7 +2339,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<?> HALT = reg(new CoreFn<>(Symbols.HALT) {
+	public static final CoreFn<?> HALT = reg(new CoreFn<>(Symbols.HALT,209) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2328,7 +2352,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<?> RETURN = reg(new CoreFn<>(Symbols.RETURN) {
+	public static final CoreFn<?> RETURN = reg(new CoreFn<>(Symbols.RETURN,210) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2339,7 +2363,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMBool> FAIL = reg(new CoreFn<>(Symbols.FAIL) {
+	public static final CoreFn<CVMBool> FAIL = reg(new CoreFn<>(Symbols.FAIL,211) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2358,7 +2382,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<?> APPLY = reg(new CoreFn<>(Symbols.APPLY) {
+	public static final CoreFn<?> APPLY = reg(new CoreFn<>(Symbols.APPLY,198) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2397,7 +2421,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ADataStructure<ACell>> INTO = reg(new CoreFn<>(Symbols.INTO) {
+	public static final CoreFn<ADataStructure<ACell>> INTO = reg(new CoreFn<>(Symbols.INTO,224) {
 
 		
 		@Override
@@ -2433,7 +2457,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<AHashMap<ACell,ACell>> MERGE = reg(new CoreFn<>(Symbols.MERGE) {
+	public static final CoreFn<AHashMap<ACell,ACell>> MERGE = reg(new CoreFn<>(Symbols.MERGE,225) {
 
 		
 		@Override
@@ -2467,7 +2491,7 @@ public class Core {
 
 	});
 
-	public static final CoreFn<ADataStructure<?>> MAP = reg(new CoreFn<>(Symbols.MAP) {
+	public static final CoreFn<ADataStructure<?>> MAP = reg(new CoreFn<>(Symbols.MAP,226) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -2519,7 +2543,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<ACell> REDUCE = reg(new CoreFn<>(Symbols.REDUCE) {
+	public static final CoreFn<ACell> REDUCE = reg(new CoreFn<>(Symbols.REDUCE,227) {
 		
 		@Override
 		public  Context invoke(Context ctx, ACell[] args) {
@@ -2580,7 +2604,7 @@ public class Core {
 	 	return ctx.consumeJuice(Juice.REDUCE); // bail out with exception
 	}
 
-	public static final CoreFn<ACell> REDUCED = reg(new CoreFn<>(Symbols.REDUCED) {
+	public static final CoreFn<ACell> REDUCED = reg(new CoreFn<>(Symbols.REDUCED,228) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {
@@ -2594,49 +2618,49 @@ public class Core {
 	// =====================================================================================================
 	// Predicates
 
-	public static final CorePred NIL_Q = reg(new CorePred(Symbols.NIL_Q) {
+	public static final CorePred NIL_Q = reg(new CorePred(Symbols.NIL_Q,240) {
 		@Override
 		public boolean test(ACell val) {
 			return val == null;
 		}
 	});
 
-	public static final CorePred VECTOR_Q = reg(new CorePred(Symbols.VECTOR_Q) {
+	public static final CorePred VECTOR_Q = reg(new CorePred(Symbols.VECTOR_Q,241) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AVector;
 		}
 	});
 
-	public static final CorePred LIST_Q = reg(new CorePred(Symbols.LIST_Q) {
+	public static final CorePred LIST_Q = reg(new CorePred(Symbols.LIST_Q,242) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AList;
 		}
 	});
 
-	public static final CorePred SET_Q = reg(new CorePred(Symbols.SET_Q) {
+	public static final CorePred SET_Q = reg(new CorePred(Symbols.SET_Q,243) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof ASet;
 		}
 	});
 
-	public static final CorePred MAP_Q = reg(new CorePred(Symbols.MAP_Q) {
+	public static final CorePred MAP_Q = reg(new CorePred(Symbols.MAP_Q,244) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AMap;
 		}
 	});
 
-	public static final CorePred COLL_Q = reg(new CorePred(Symbols.COLL_Q) {
+	public static final CorePred COLL_Q = reg(new CorePred(Symbols.COLL_Q,245) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof ADataStructure;
 		}
 	});
 
-	public static final CorePred EMPTY_Q = reg(new CorePred(Symbols.EMPTY_Q) {
+	public static final CorePred EMPTY_Q = reg(new CorePred(Symbols.EMPTY_Q,246) {
 		@Override
 		public boolean test(ACell val) {
 			// consider null as an empty object
@@ -2647,21 +2671,21 @@ public class Core {
 		}
 	});
 
-	public static final CorePred SYMBOL_Q = reg(new CorePred(Symbols.SYMBOL_Q) {
+	public static final CorePred SYMBOL_Q = reg(new CorePred(Symbols.SYMBOL_Q,247) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Symbol;
 		}
 	});
 
-	public static final CorePred KEYWORD_Q = reg(new CorePred(Symbols.KEYWORD_Q) {
+	public static final CorePred KEYWORD_Q = reg(new CorePred(Symbols.KEYWORD_Q,248) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Keyword;
 		}
 	});
 
-	public static final CorePred BLOB_Q = reg(new CorePred(Symbols.BLOB_Q) {
+	public static final CorePred BLOB_Q = reg(new CorePred(Symbols.BLOB_Q,249) {
 		@Override
 		public boolean test(ACell val) {
 			if (!(val instanceof ABlob)) return false;
@@ -2669,14 +2693,14 @@ public class Core {
 		}
 	});
 
-	public static final CorePred ADDRESS_Q = reg(new CorePred(Symbols.ADDRESS_Q) {
+	public static final CorePred ADDRESS_Q = reg(new CorePred(Symbols.ADDRESS_Q,250) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Address;
 		}
 	});
 
-	public static final CorePred LONG_Q = reg(new CorePred(Symbols.LONG_Q) {
+	public static final CorePred LONG_Q = reg(new CorePred(Symbols.LONG_Q,251) {
 		@Override
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
@@ -2686,7 +2710,7 @@ public class Core {
 		}
 	});
 	
-	public static final CorePred INT_Q = reg(new CorePred(Symbols.INT_Q) {
+	public static final CorePred INT_Q = reg(new CorePred(Symbols.INT_Q,252) {
 		@Override
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
@@ -2696,42 +2720,42 @@ public class Core {
 		}
 	});
 	
-	public static final CorePred DOUBLE_Q = reg(new CorePred(Symbols.DOUBLE_Q) {
+	public static final CorePred DOUBLE_Q = reg(new CorePred(Symbols.DOUBLE_Q,253) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof CVMDouble;
 		}
 	});
 
-	public static final CorePred STR_Q = reg(new CorePred(Symbols.STR_Q) {
+	public static final CorePred STR_Q = reg(new CorePred(Symbols.STR_Q,254) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AString;
 		}
 	});
 
-	public static final CorePred NUMBER_Q = reg(new CorePred(Symbols.NUMBER_Q) {
+	public static final CorePred NUMBER_Q = reg(new CorePred(Symbols.NUMBER_Q,255) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isNumber(val);
 		}
 	});
 
-	public static final CorePred NAN_Q = reg(new CorePred(Symbols.NAN_Q) {
+	public static final CorePred NAN_Q = reg(new CorePred(Symbols.NAN_Q,270) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isNaN(val);
 		}
 	});
 
-	public static final CorePred FN_Q = reg(new CorePred(Symbols.FN_Q) {
+	public static final CorePred FN_Q = reg(new CorePred(Symbols.FN_Q,271) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AFn;
 		}
 	});
 
-	public static final CorePred ZERO_Q = reg(new CorePred(Symbols.ZERO_Q) {
+	public static final CorePred ZERO_Q = reg(new CorePred(Symbols.ZERO_Q,272) {
 		@Override
 		public boolean test(ACell val) {
 			if (!RT.isNumber(val)) return false;
@@ -2753,8 +2777,20 @@ public class Core {
 
 	private static AHashMap<Symbol, ACell> register(AHashMap<Symbol, ACell> env, ACell o) {
 		Symbol sym = symbolFor(o);
+		if (o instanceof ICoreDef) {
+			registerCode((ICoreDef)o);
+		}
 		assert (!env.containsKey(sym)) : "Duplicate core declaration: " + sym;
 		return env.assoc(sym, o);
+	}
+	
+	public static void registerCode(ICoreDef o) {
+		int code=o.getCoreCode();
+		ACell there=CODE_MAP[code];
+		if (there!=null) {
+			throw new Error("Code duplicte ("+code+"): "+o+" clashes with "+there);
+		}
+		CODE_MAP[code]=(ACell) o;
 	}
 
 	/**
@@ -2799,13 +2835,12 @@ public class Core {
 
 		return ctx;
 	}
+	
+	private static AMap<Symbol, AHashMap<ACell, ACell>> METAS;
 
  	@SuppressWarnings("unchecked")
 	private static Context applyDocumentation(Context ctx) throws IOException {
-
- 		AMap<Symbol, AHashMap<ACell, ACell>> metas = Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
-
- 		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> entry : metas.entrySet()) {
+ 		for (Map.Entry<Symbol, AHashMap<ACell, ACell>> entry : METAS.entrySet()) {
  			try {
  				Symbol sym = entry.getKey();
  				AHashMap<ACell, ACell> meta = entry.getValue();
@@ -2850,6 +2885,28 @@ public class Core {
  
  		return ctx;
  	}
+ 	
+ 	/**
+ 	 * Read a Core definition from an encoding
+ 	 * @param b Blob containing encoding
+ 	 * @param pos Position to read
+ 	 * @return Singleton cell representing the Core value
+ 	 * @throws BadFormatException
+ 	 */
+	public static ACell read(Blob b, int pos) throws BadFormatException {
+		Symbol sym = Symbol.read(b,pos);
+		ACell o = ENVIRONMENT.get(sym);
+		if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
+		return o;
+	}
+	
+	/**
+	 * Main function to build core and print key details
+	 * @param args Command line arguments, if any
+	 */
+	public static void main(String... args) {
+		
+	}
 
 	static {
 		// Set up `convex.core` environment
@@ -2857,6 +2914,8 @@ public class Core {
 		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
 
 		try {
+			METAS=Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
+			
 			// Register all objects from registered runtime
 			for (ACell o : tempReg) {
 				coreEnv = register(coreEnv, o);
@@ -2874,4 +2933,5 @@ public class Core {
 			throw new RuntimeException("IO Error initialising core!",e);
 		}
 	}
+
 }

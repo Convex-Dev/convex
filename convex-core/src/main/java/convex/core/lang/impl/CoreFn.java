@@ -21,11 +21,13 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 
 	private Symbol symbol;
 	private int arity;
+	private int code;
 	private boolean variadic;
 
-	protected CoreFn(Symbol symbol) {
+	protected CoreFn(Symbol symbol, int code) {
 		this.symbol = symbol;
 		this.arity=0;
+		this.code=code;
 		this.variadic=true;
 	}
 
@@ -137,6 +139,11 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	public boolean equals(ACell o) {
 		// This is OK since these are guaranteed to be singleton instances!
 		return o==this;
+	}
+	
+	@Override
+	public int getCoreCode() {
+		return code;
 	}
 
 }

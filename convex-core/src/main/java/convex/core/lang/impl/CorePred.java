@@ -11,8 +11,8 @@ import convex.core.lang.Juice;
  */
 public abstract class CorePred extends CoreFn<CVMBool> {
 
-	protected CorePred(Symbol symbol) {
-		super(symbol);
+	protected CorePred(Symbol symbol, int code) {
+		super(symbol,code);
 	}
 
 	@Override
