@@ -2,6 +2,7 @@ package convex.core.lang.impl;
 
 import convex.core.data.ACell;
 import convex.core.data.BlobBuilder;
+import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
@@ -99,7 +100,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = symbol.encodeRaw(bs,pos);
+		pos = Format.writeVLCCount(bs, pos, code);
 		return pos;
 	}
 	
@@ -121,7 +122,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 20;
+		return 5;
 	}
 
 	@Override

@@ -2894,9 +2894,11 @@ public class Core {
  	 * @throws BadFormatException
  	 */
 	public static ACell read(Blob b, int pos) throws BadFormatException {
-		Symbol sym = Symbol.read(b,pos);
-		ACell o = ENVIRONMENT.get(sym);
-		if (o == null) throw new BadFormatException("Core definition not found [" + sym + "]");
+		long code=Format.readVLCCount(b, pos+1);
+		if (code <0 || code>=CODE_MAP.length) throw new BadFormatException("Core code out of range: "+code);
+		
+		ACell o = CODE_MAP[(int)code];
+		if (o == null) throw new BadFormatException("Core code definition not found: " + code);
 		return o;
 	}
 	
