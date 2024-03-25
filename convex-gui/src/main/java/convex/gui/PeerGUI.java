@@ -330,6 +330,10 @@ public class PeerGUI extends JPanel {
 	public ConvexLocal getDefaultConvex() {
 		return peerList.getElementAt(0);
 	}
+	
+	public Convex getClientConvex(Address contract) {
+		return Convex.connect(getPrimaryServer(),contract,null);
+	}
 
 	public Address getUserAddress(int i) {
 		return Init.getGenesisPeerAddress(i);
@@ -437,6 +441,8 @@ public class PeerGUI extends JPanel {
 	public void addWalletEntry(WalletEntry we) {
 		walletPanel.addWalletEntry(we);
 	}
+
+
 
 
 }
