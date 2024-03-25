@@ -20,6 +20,7 @@ import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -75,6 +76,19 @@ public class OpsTest extends ACVMTest {
 			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuiceAvailable());
 			assertNull(c2.getResult());
 			doOpTest(op);
+			
+			assertEquals(Blob.wrap(new byte[] {op.getTag(),Tag.NULL}),op.getEncoding());
+		}
+		
+		{// nested constant
+			AOp<ACell> op = Constant.of(Constant.nil());
+			Context c2 = c.fork().execute(op);
+
+			assertEquals(INITIAL_JUICE - Juice.CONSTANT, c2.getJuiceAvailable());
+			assertEquals(Constant.nil(),c2.getResult());
+			doOpTest(op);
+			
+			assertEquals(Blob.wrap(new byte[] {op.getTag(),op.getTag(),Tag.NULL}),op.getEncoding());
 		}
 	}
 
