@@ -46,6 +46,9 @@ public class MainGUI extends JPanel implements Runnable {
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.setLayout(new MigLayout("center,align center,fillx"));
 		
+		JComponent wallet=createLaunchButton("Wallet",Toolkit.WALLET_ICON,this::launchTestNet);
+		actionPanel.add(wallet);
+
 		JComponent testNet=createLaunchButton("Launch TestNet",Toolkit.TESTNET_ICON,this::launchTestNet);
 		actionPanel.add(testNet);
 		
@@ -60,8 +63,6 @@ public class MainGUI extends JPanel implements Runnable {
 
 		JComponent www=createLaunchButton("https://convex.world",Toolkit.WWW_ICON,this::launchWebsite);
 		actionPanel.add(www);
-
-
 		
 		add(actionPanel,"dock south");
 	}
