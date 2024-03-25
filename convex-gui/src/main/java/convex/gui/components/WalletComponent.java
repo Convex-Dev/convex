@@ -13,6 +13,7 @@ import javax.swing.JTextArea;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
 import convex.core.data.AccountStatus;
@@ -143,14 +144,14 @@ public class WalletComponent extends BaseListComponent {
 
 	private String getInfoString() {
 		StringBuilder sb=new StringBuilder();
-		manager.runWithLatestState(s->{
-			AccountStatus as=s.getAccount(address);
-			if (as!=null) {
-				Long bal=as.getBalance();
-				sb.append("Public Key: " + walletEntry.getAccountKey()+"\n");
-				sb.append("Balance:    " + Text.toFriendlyNumber(bal));
-			}
-		});
+		State s=manager.getLatestState();
+		AccountStatus as=s.getAccount(address);
+		if (as!=null) {
+			Long bal=as.getBalance();
+			sb.append("Public Key: " + walletEntry.getAccountKey()+"\n");
+			sb.append("Balance:    " + Text.toFriendlyNumber(bal));
+		}
+		
 		//sb.append("\n");
 		//sb.append("Key: "+walletEntry.getAccountKey()+ "   Controller: "+as.getController());
 		return sb.toString();

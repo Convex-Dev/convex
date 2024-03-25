@@ -8,9 +8,7 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import javax.swing.DefaultListModel;
@@ -25,19 +23,14 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.Order;
 import convex.core.Peer;
-import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.WalletEntry;
-import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
@@ -274,51 +267,6 @@ public class PeerGUI extends JPanel {
 		return Convex.connect(host,address, kp);
 	}
 
-	/**
-	 * Executes a transaction using the given Wallet
-	 *
-	 * @param code Code to execute
-	 * @param we Wallet to use
-	 * @return Future for Result
-	 */
-	public CompletableFuture<Result> execute(WalletEntry we, ACell code) {
-		Address address = we.getAddress();
-		AccountStatus as = getLatestState().getAccount(address);
-		long sequence = as.getSequence() + 1;
-		ATransaction trans = Invoke.create(address,sequence, code);
-		return execute(we,trans);
-	}
-
-	/**
-	 * Executes a transaction using the given Wallet
-	 *
-	 * @param we Wallet to use
-	 * @param trans Transaction to execute
-	 * @return Future for Result
-	 */
-	public CompletableFuture<Result> execute(WalletEntry we, ATransaction trans) {
-		try {
-			AKeyPair kp = we.getKeyPair();
-			Convex convex = makeConnection(we.getAddress(),kp);
-			CompletableFuture<Result> fr= convex.transact(trans);
-			log.trace("Sent transaction: {}",trans);
-			return fr;
-		} catch (IOException | TimeoutException e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
-
-	/**
-	 * Executes a transaction using the given Wallet
-	 *
-	 * @param we Wallet to use
-	 * @param trans Transaction to execute
-	 * @param receiveAction Action to invoke when result is received
-	 */
-	public void execute(WalletEntry we, ATransaction trans, Consumer<Result> receiveAction) {
-		execute(we,trans).thenAcceptAsync(receiveAction);
-	}
-
 	public State getLatestState() {
 		return latestState.getValue();
 	}
@@ -333,18 +281,6 @@ public class PeerGUI extends JPanel {
 	
 	public Convex getClientConvex(Address contract) {
 		return Convex.connect(getPrimaryServer(),contract,null);
-	}
-
-	public Address getUserAddress(int i) {
-		return Init.getGenesisPeerAddress(i);
-	}
-	
-	public AKeyPair getUserKeyPair(int i) {
-		return KEYPAIRS.get(i);
-	}
-
-	public Address getGenesisAddress() {
-		return Init.getGenesisAddress();
 	}
 
 	public Convex connectClient(Address address, AKeyPair keyPair) {
@@ -408,32 +344,6 @@ public class PeerGUI extends JPanel {
 		return null;
 	}
 
-	public void runWithLatestState(Consumer<State> f) {
-		AStore tempStore=Stores.current();
-		try {
-			Server s=getPrimaryServer();
-			Stores.setCurrent(s.getStore());
-			f.accept(s.getPeer().getConsensusState());
-		} finally {
-			Stores.setCurrent(tempStore);
-		}
-	}
-	
-	public void runOnPrimaryServer(Consumer<Server> f) {
-		Server s=getPrimaryServer();
-		runOnServer(s,f);
-	}
-
-	public void runOnServer(Server server,Consumer<Server> f) {
-		AStore tempStore=Stores.current();
-		try {
-			Stores.setCurrent(server.getStore());
-			f.accept(server);
-		} finally {
-			Stores.setCurrent(tempStore);
-		}	
-	}
-
 	public long getMaxBlockCount() {
 		return maxBlock;
 	}
@@ -441,8 +351,6 @@ public class PeerGUI extends JPanel {
 	public void addWalletEntry(WalletEntry we) {
 		walletPanel.addWalletEntry(we);
 	}
-
-
 
 
 }
