@@ -161,6 +161,8 @@ public class Samples {
 	
 	public static final CVMBigInteger MAX_BIGINT;
 	public static final CVMBigInteger MIN_BIGINT;
+
+	public static final ACell NIL = null;
 	
 	static {
 		// we should be able to actually build these, thanks to structural sharing.

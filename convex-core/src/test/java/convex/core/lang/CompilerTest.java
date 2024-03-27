@@ -478,14 +478,20 @@ public class CompilerTest extends ACVMTest {
 	
 	@Test
 	public void testQuasiquoteExpansions() {
+		// quasiquote of something with no unquotes should expand to an equivalent quote
 		assertEquals(read("(quote foo)"),expand("(quasiquote foo)"));
 		assertEquals(read("(quote false)"),expand("(quasiquote false)"));
 		assertEquals(read("(quote nil)"),expand("(quasiquote nil)"));
 		assertEquals(read("(quote 17)"),expand("(quasiquote 17)"));
-		assertEquals(read("(quote [1 2])"),expand("(quasiquote [1 2])"));
+		assertEquals(read("(quote [1 2 nil])"),expand("(quasiquote [1 2 nil])"));
+		
+		// quasiquote of an unquote should expand like whatever is in the unquote
+		assertEquals(Constant.NULL,expand("(quasiquote ~nil)")); // TODO: it this what we want?
+		assertEquals(CVMLong.ONE,expand("(quasiquote ~1)"));
+		assertEquals(read("(cond 1 2 3)"),expand("(quasiquote ~(if 1 2 3))"));
+		
 		assertEquals(read("[(quote foo) (inc 2)]"),expand("(quasiquote [foo (unquote (inc 2))])"));
 		
-		assertEquals(read("(cond 1 2 3)"),expand("(quasiquote ~(if 1 2 3))"));
 		
 		assertEquals(read("[foo 3]"),eval("(expand-1 `[foo (unquote (inc 2))])"));
 	}

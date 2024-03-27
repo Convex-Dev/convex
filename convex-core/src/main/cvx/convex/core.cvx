@@ -42,7 +42,8 @@
      (cond 
        qf qf 
        (list 'quote 
-             form)))))
+             form)
+       ))))
 
 ;; quasiquote elements of sequence, produce a sequence of generators or nil if "pure" quotation
 ;; nil production is an important optimisation to avoid regenerating static subtrees
