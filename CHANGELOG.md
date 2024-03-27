@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CNS improvements
 - More efficient encodings for CVM core definitions and ops
 
+## BREAKING CHANGES
+- Switch from `:callable?` to `:callable` for metadata on callable actor functions
+- Etch encoding changes. Will require fresh Etch database. 
+
 ### Fixed
 - Bug fixes for message decoding
 
