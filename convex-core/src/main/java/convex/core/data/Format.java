@@ -522,7 +522,7 @@ public class Format {
 		byte tag = blob.byteAt(0);
 		T result= read(tag,blob,0);
 		if (result==null) {
-			if (n!=1) throw new BadFormatException("Decode of null value but blob size = "+n);
+			if (n!=1) throw new BadFormatException("Decode of nil value but blob size = "+n);
 		} else {
 			if (result.getEncoding().count()!=n) throw new BadFormatException("Excess bytes in read from Blob");
 		}

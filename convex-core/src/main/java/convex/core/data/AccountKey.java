@@ -219,7 +219,10 @@ public class AccountKey extends AArrayBlob {
 	}
 	
 	public static AccountKey readRaw(Blob b, int pos) {
-		return AccountKey.wrap(b.getInternalArray(),b.getInternalOffset()+pos);
+		byte[] data=b.getInternalArray();
+		int off=b.getInternalOffset(); // offset of account key in source blob
+		if (pos+LENGTH>b.count()) throw new IndexOutOfBoundsException("wrapping AccountKey beyond bound");
+		return AccountKey.wrap(data,off+pos);
 	}
 
 	@Override

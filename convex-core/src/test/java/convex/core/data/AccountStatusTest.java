@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,12 @@ public class AccountStatusTest {
 	@Test public void testEmpty() {
 		AccountStatus as=AccountStatus.create();
 		doAccountStatusTest(as);
+	}
+	
+	@Test public void testEncodingRegression() throws BadFormatException {
+		// Detected with fuzz tests
+		Blob b=Blob.parse("0xc1036632b4");
+		assertThrows(BadFormatException.class,()->Format.read(b));
 	}
 	
 	@Test public void testFull() throws BadFormatException {

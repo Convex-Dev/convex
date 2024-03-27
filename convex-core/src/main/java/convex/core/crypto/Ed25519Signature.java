@@ -96,7 +96,10 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 	public static ASignature readRaw(Blob b, int pos) {
-		return wrap(b.getInternalArray(),b.getInternalOffset()+pos);
+		byte[] data=b.getInternalArray();
+		int off=b.getInternalOffset(); // offset of account key in source blob
+		if (pos+SIGNATURE_LENGTH>b.count()) throw new IndexOutOfBoundsException("wrapping Ed25519Signature beyond blob bounds");
+		return wrap(data,off+pos);
 	}
 
 	@Override

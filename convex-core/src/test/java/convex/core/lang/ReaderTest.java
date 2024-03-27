@@ -56,6 +56,8 @@ public class ReaderTest {
 		// keywords can start with more than one colon
 		assertEquals(Keyword.create(":foo"), Reader.read("::foo"));
 		
+		assertEquals(Keyword.create("nil"), Reader.read(":nil"));
+		
 		assertThrows(ParseException.class,()->Reader.read(":"));
 
 	}
@@ -90,17 +92,16 @@ public class ReaderTest {
 		assertEquals(Symbol.create("foo.bar"), Reader.read("foo.bar"));
 		assertEquals(Symbol.create(".bar"), Reader.read(".bar"));
 		
+		// TODO: What should happen here?
+		// assertEquals(Symbols.NIL, Reader.read("'nil"));
+		
 		// Interpret leading dot as symbols always. Addresses Issue #65
 		assertEquals(Symbol.create(".56"), Reader.read(".56"));
 
-		// TODO: maybe this should be possible?
-		// namespaces cannot themselves be qualified
-		//assertThrows(ParseException.class,()->Reader.read("a/b/c"));
-		
 		// Bad address parsing
 		assertThrows(ParseException.class,()->Reader.read("#-1/foo"));
 		
-		// Pipe not yet a valid symbol?
+		// Pipe not yet a valid symbol? Clojure doesn't allow but perhaps we should
 		assertThrows(ParseException.class,()->Reader.read("|"));
 		
 		// too long symbol names

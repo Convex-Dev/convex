@@ -12,6 +12,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 /**
@@ -21,8 +22,8 @@ import convex.core.util.Utils;
  */
 public class FuzzTestFormat {
 
-	private static final int NUM_FUZZ = 3000;
-	private static Random r = new Random(7855875);
+	private static final int NUM_FUZZ = 5000;
+	private static Random r = new Random(3244);
 
 	@Test
 	public void fuzzTest() {
@@ -30,24 +31,49 @@ public class FuzzTestFormat {
 
 		for (int i = 0; i < NUM_FUZZ; i++) {
 			long stime = System.currentTimeMillis();
-			r.setSeed(i * 1000);
+			r.setSeed(i * 1007);
 			Blob b = Blob.createRandom(r, 100);
 			try {
 				doFuzzTest(b);
+				doMutationTest(b);
 			} catch (BadFormatException e) {
 				/* OK */
 			} catch (MissingDataException e) {
 				/* also OK */
 			}
 
+			// This happens sometimes, e.g. if loading Core Def 
 			if (System.currentTimeMillis() > stime + 100) {
 				System.err.println("Slow fuzz test: " + b);
 			}
 		}
 	}
+	
+	@Test 
+	public void fuzzExamples()  {
+		doCellFuzzTests(Symbols.FOO);
+	}
+	
+	public static void doCellFuzzTests(ACell c)  {
+		for (int i = 0; i < 1000; i++) {
+			Blob b=Format.encodedBlob(c);
+			try {
+				doFuzzTest(b);
+			} catch (Exception e) {
+				throw new Error("Uncaught problem in fix test for encoding: "+b);
+			}
+		}
+	}
 
 	private static void doFuzzTest(Blob b) throws BadFormatException {
-		ACell v = Format.read(b);
+		ACell v;
+		try {
+			v = Format.read(b);
+		} catch (ArrayIndexOutOfBoundsException e) {
+			System.out.println("Badd fuzzed read: "+b);
+			throw e;
+		}
+		
 
 		// If we have read the object, check that we can validate as a cell, at minimum
 		try {
