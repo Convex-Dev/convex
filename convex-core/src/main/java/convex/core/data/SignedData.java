@@ -225,7 +225,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 		epos+=value.getEncodingLength();
 		
 		SignedData<T> result=create(pubKey, sig, value);
-		result.attachEncoding(b.slice(pos, epos));
+		Blob enc=b.slice(pos, epos);
+		result.attachEncoding(enc);
 		return result;
 	}
 

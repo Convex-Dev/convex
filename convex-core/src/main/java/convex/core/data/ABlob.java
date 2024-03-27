@@ -100,7 +100,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * 
 	 * @param start  Start position for the created slice (inclusive)
 	 * @param end End of the slice (exclusive)
-	 * @return A blob of the specified length, representing a slice of this blob.
+	 * @return A blob of the specified length, representing a slice of this blob, or null if the slice is invalid
 	 */
 	public abstract ABlob slice(long start, long end);
 

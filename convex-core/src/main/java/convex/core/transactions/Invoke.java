@@ -43,6 +43,7 @@ public class Invoke extends ATransaction {
 	}
 
 	public static Invoke create(Address address,long sequence, ACell command) {
+		if (sequence<0) throw new IllegalArgumentException("Illegal sequence number: "+sequence);
 		return new Invoke(address,sequence, command);
 	}
 	
@@ -92,8 +93,8 @@ public class Invoke extends ATransaction {
 		Address address=Address.create(aval);
 		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(sequence);
+		long sequence = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(sequence);
 		
 		ACell args=Format.read(b, epos);
 		epos+=Format.getEncodingLength(args);

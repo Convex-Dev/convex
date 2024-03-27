@@ -141,7 +141,7 @@ public class Blob extends AArrayBlob {
 	public boolean equals(Blob b) {
 		if (this==b) return true;
 		if (length!=b.length) return false;
-		return Arrays.equals(store, offset, offset+length, b.store, b.offset, b.offset+length);
+		return Utils.arrayEquals(store, offset, b.store, b.offset, length);
 	}
 
 	/**

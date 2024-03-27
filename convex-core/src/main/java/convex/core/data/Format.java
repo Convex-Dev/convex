@@ -291,6 +291,7 @@ public class Format {
 			result = (result << 7) | (octet & 0x7F); // shift and set next 7 lowest bits
 			bits += 7;
 		}
+		if (result<0) throw new BadFormatException("VLC Count netative overflow");
 		return result;
 	}
 	
