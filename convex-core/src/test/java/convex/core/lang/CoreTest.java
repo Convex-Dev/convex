@@ -4006,6 +4006,13 @@ public class CoreTest extends ACVMTest {
 		// def with metadata on both symbol and value should merge
 		assertEquals(FOOBARMAP, eval("(do (def ^:foo v ^{:bar true} 1) (lookup-meta 'v))"));
 
+		// def with new metadata should not change value
+		assertEquals(CVMLong.ONE, eval("(do (def ^:foo v 1) (def ^:bar v) v)"));
+		
+		// Undef should clear metadata
+		assertNull(eval("(do (def ^:foo v 1) (undef v) (lookup-meta 'v))"));
+		// assertNull(eval("(do (def ^:foo v 1) (undef ^:baz v) (lookup-meta 'v))"));  // TODO: how should this behave?
+		assertNull(eval("(lookup-meta 'v)"));
 	}
 
 	@Test

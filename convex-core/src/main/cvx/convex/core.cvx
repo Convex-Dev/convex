@@ -34,7 +34,7 @@
                 :signature   [{:params [form]}]}
 		  :expander true}	
   (fn [[_ form] e]
-    (e (qq* form 1) e)))
+    (tailcall* e (qq* form 1) e)))
 
 ;; private helper, always produces a generator for a form
 (def ^:private qq* (fn [form depth] 
@@ -170,7 +170,7 @@
           form     `(def ~(syntax name
                                   (assoc (meta (first decl))
                                          :expander true))  ;; merge in metadata on parameter plus :expander tag
-                      (let [m# ~mac]
+                      (let [m# ~mac]       ; This is an optimisation to construct the macro function only once
                         (fn [x e]
                           (tailcall* e (apply m#
                                     (next x))  ; Apply macro function to the macro arguments
@@ -186,8 +186,8 @@
 				  decl)]
 		  `(let [m# ~mfunc] ;; set up a closure containing the macro function
 		     (fn [x e]
-		       (e 
-		    	  (apply m# (next (unsyntax x)))
+		       (tailcall* e 
+		    	  (apply m# (next x))
 		          e)))))
 
 (defmacro defn
