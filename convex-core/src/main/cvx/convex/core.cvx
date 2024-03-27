@@ -148,7 +148,7 @@
 (def defexpander
   ^{:doc       {:description "Advanced feature. Defines an expander in the current environment."
                 :examples    [{:code "(defexpander expand-once [x e] (e x identity))"}]
-                :signature   [{:params [a]}]}
+                :signature   [{:params [x e]}]}
     :expander true}
   (fn [x e]
     (let [[_ name & decl] x
@@ -156,7 +156,7 @@
         		         decl)
           form     `(def ~(syntax name {:expander true})
                          ~exp)]
-      (tailcall* e form e))))    ;; Note: tailcall not yet defined
+      (tailcall* e form e))))    ;; Note: tailcall macro not yet defined, so use core runtime function directly
 
 (def defmacro
   ^{:doc       {:description ["Like `defn` but defines a macro instead of a regular function."
@@ -172,10 +172,10 @@
                                          :expander true))  ;; merge in metadata on parameter plus :expander tag
                       (let [m# ~mac]
                         (fn [x e]
-                          (e (apply m#
-                                    (next x))
+                          (tailcall* e (apply m#
+                                    (next x))  ; Apply macro function to the macro arguments
                              e))))]
-      (e form e))))
+      (tailcall* e form e))))
 
 (defmacro macro
 		  ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."

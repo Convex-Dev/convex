@@ -4097,6 +4097,7 @@ public class CoreTest extends ACVMTest {
 		// simple expander that wraps a value in a syntax object
 		Context ctx=exec(context(),"(defexpander wrapsyn [x e] (syntax x))");
 
+		assertEquals(Syntax.of(41L),eval(ctx,"(wrapsyn 41 identity)")); // TODO: Is this right?
 		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 wrapsyn)"));
 	}
 
