@@ -4095,9 +4095,9 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testDefExpander() {
 		// simple expander that wraps a value in a syntax object
-		Context ctx=step("(defexpander expand-once [x e] (expand x (fn [x e] (syntax x))))");
+		Context ctx=exec(context(),"(defexpander wrapsyn [x e] (syntax x))");
 
-		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 expand-once)"));
+		assertEquals(Syntax.of(42L),eval(ctx,"(expand 42 wrapsyn)"));
 	}
 
 	@Test

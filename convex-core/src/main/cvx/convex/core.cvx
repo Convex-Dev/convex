@@ -147,7 +147,7 @@
 
 (def defexpander
   ^{:doc       {:description "Advanced feature. Defines an expander in the current environment."
-                :examples    [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
+                :examples    [{:code "(defexpander expand-once [x e] (e x identity))"}]
                 :signature   [{:params [a]}]}
     :expander true}
   (fn [x e]
@@ -156,7 +156,7 @@
         		         decl)
           form     `(def ~(syntax name {:expander true})
                          ~exp)]
-      (e form e))))
+      (tailcall* e form e))))    ;; Note: tailcall not yet defined
 
 (def defmacro
   ^{:doc       {:description ["Like `defn` but defines a macro instead of a regular function."
@@ -177,6 +177,19 @@
                              e))))]
       (e form e))))
 
+(defmacro macro
+		  ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
+		          :examples    [{:code "(macro [x] (if x :foo :bar))"}]
+		          :signature   [{:params [params & body]}]}}
+		  [& decl]
+		  (let [mfunc  (cons 'fn 
+				  decl)]
+		  `(let [m# ~mfunc] ;; set up a closure containing the macro function
+		     (fn [x e]
+		       (e 
+		    	  (apply m# (next (unsyntax x)))
+		          e)))))
+
 (defmacro defn
   ^{:doc {:description "Defines a function in the current environment."
           :examples    [{:code "(defn my-square [x] (* x x))"}]
@@ -189,19 +202,6 @@
 		                decl)
           name   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list
     `(def ~name ~fnform)))
-
-(defmacro macro
-  ^{:doc {:description "Creates an anonymous macro function, suitable for use as an expander."
-          :examples    [{:code "(macro [x] (if x :foo :bar))"}]
-          :signature   [{:params [params & body]}]}}
-  [& decl]
-  (let [mfunc  (cons 'fn 
-		  decl)]
-  `(let [m# ~mfunc] ;; set up a closure containing the macro function
-     (fn [x e]
-       (e 
-    	  (apply m# (next (unsyntax x)))
-          e)))))
   
 (defn identity
    ^{:doc {:description "An identity function which returns its first argument unchanged."
