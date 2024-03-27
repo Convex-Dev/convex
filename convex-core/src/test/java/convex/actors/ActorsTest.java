@@ -30,7 +30,7 @@ import convex.core.util.Utils;
 public class ActorsTest extends ACVMTest {
 
 	@Test public void testDeployAndCall() {
-		Context ctx=step("(def caddr (deploy '(let [n 10] (defn getter ^{:callable? true} [] n) (defn hidden [] nil) (defn plus ^{:callable? true} [x] (+ n x)))))");
+		Context ctx=step("(def caddr (deploy '(let [n 10] (defn getter ^{:callable true} [] n) (defn hidden [] nil) (defn plus ^{:callable true} [x] (+ n x)))))");
 
 		assertEquals(Address.class,ctx.getResult().getClass());
 
@@ -61,7 +61,7 @@ public class ActorsTest extends ACVMTest {
 	}
 
 	@Test public void testUserAsActor() {
-		Context ctx=step("(do (defn foo ^{:callable? true} [] *caller*) (defn bar [] nil) (def z 1))");
+		Context ctx=step("(do (defn foo ^{:callable true} [] *caller*) (defn bar [] nil) (def z 1))");
 		assertEquals(InitTest.HERO,eval(ctx,"(call *address* (foo))"));
 		assertStateError(step(ctx,"(call *address* (non-existent-function))"));
 		assertStateError(step(ctx,"(call *address* (bar))"));

@@ -12,7 +12,7 @@
 (import convex.trust :as trust)
 
 (defn check-trusted?
-  ^:callable?
+  ^:callable
 	[subject action object]
   (or (set? *scope*) (fail :ARGUMENT "Scope must be a set"))
   (contains-key? *scope* subject))

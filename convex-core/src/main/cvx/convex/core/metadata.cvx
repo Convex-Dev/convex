@@ -14,30 +14,30 @@
 {*address*
  {:doc      {:description "Returns the address of the current account (user address in regular transaction, actor address in actor calls)."
              :examples    [{:code "(address? *address*)"}]}
-  :special? true}
+  :special true}
 
  *balance*
   {:doc      {:description ["Returns the available balance of the current account (in Convex coins)."
                             "The available balance excludes reserved balance for transaction execution, so this number may be somewhat less than the total account balance during transaction execution."]
               :examples    [{:code "*balance*"}]}
-   :special? true}
+   :special true}
 
 
  *caller*
  {:doc      {:description "During an actor call, returns the address of the account doing the call. Returns `nil` otherwise."
              :examples    [{:code "*caller*"}]}
-  :special? true}
+  :special true}
  
  *controller*
  {:doc      {:description "Returns the controller of the current account."
              :examples    [{:code "*controller*"}]}
-  :special? true}
+  :special true}
 
  *depth*
  {:doc      {:description ["Returns the CVM execution stack depth, at the point the `*depth*` operation is executed. If the depth becomes too deep, the transaction will fail with a `:DEPTH` exception."
                            "In most cases, the allowable depth should be sufficient."]
              :examples    [{:code "*depth*"}]}
-  :special? true}
+  :special true}
 
 
  *holdings*
@@ -46,7 +46,7 @@
              "Holdings should NOT be trusted if they are provided by an untrusted account."
                             "See `get-holding`, `set-holding`."]
               :examples    [{:code "*holdings*"}]}
-   :special? true}
+   :special true}
 
 
  *initial-expander*
@@ -59,67 +59,67 @@
   {:doc      {:description ["Returns the amount of execution juice consumed at this point of the current transaction."
                             "Juice is required for every CVM operation executed, and the transaction will fail immediately with a `:JUICE` error if an attempt is made to consume juice beyond this value."]
               :examples    [{:code "*juice*"}]}
-   :special? true}
+   :special true}
   
   *juice-limit*
   {:doc      {:description ["Returns the limit of execution juice available."
                             "Juice is required for every CVM operation executed, and the transaction will fail immediately with a `:JUICE` error if an attempt is made to consume juice beyond this value."]
               :examples    [{:code "*juice-limit*"}]}
-   :special? true}
+   :special true}
 
 
   *key*
   {:doc      {:description "Returns the public key for this account. Returns nil in the case of an actor since actors are accounts without keys."
               :examples    [{:code "*key*"}]}
-   :special? true}
+   :special true}
   
   *memory*
   {:doc      {:description "Returns the current memory allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
               :examples    [{:code "*memory*"}]}
-   :special? true}
+   :special true}
   
   *memory-price*
   {:doc      {:description "Returns the current memory price, as a double value"
               :examples    [{:code "*memory-price*"}]}
-   :special? true}
+   :special true}
   
   *nop*
   {:doc      {:description "Does nothing."
               :examples    [{:code "*nop*"}]}
-   :special? true}
+   :special true}
 
   *offer*
   {:doc      {:description "Returns the amount of native coin offered by `*caller*` during a call. See `call`. Will usually be zero, unless the caller has included an offer with a 'call' expression."
               :examples    [{:code "*offer*"}]}
-   :special? true}
+   :special true}
 
   *origin*
   {:doc      {:description ["Similar to `*caller*` but returns the address of the account that initially signed this transaction."
                             "In a chain of calls, this address is the very first link."
                             "Usually, should NOT be used for access control, since a rogue actor can potentially trick a user into creating a transaction that allows code to be indirectly executed. Consider using `*caller*` for access control instead."]
               :examples    [{:code "*origin*"}]}
-   :special? true}
+   :special true}
   
   *parent*
   {:doc      {:description "Returns the parent of the current account. Determines the default location for symbolic lookup."
               :examples    [{:code "*parent*"}]}
-   :special? true}
+   :special true}
 
   *result*
   {:doc      {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
               :examples    [{:code "(do 1 *result*)"}]}
-   :special? true}
+   :special true}
 
   *sequence*
   {:doc      {:description "Returns the sequence number for the current transaction. The sequence number is the number of transactions executed on this account *including* the current transaction / query. The next valid transction must increment *sequence* by one."
               :examples    [{:code "*sequence*"}]}
-   :special? true}
+   :special true}
 
   *state*
   {:doc      {:description "Returns the current CVM state record. This is a large object, and should normally only be used temporarily to look up relevant values."
               :examples    [{:code "(keys *state*)"}
                             {:code "(get-in *state* [:accounts *address* :balance])"}]}
-   :special? true}
+   :special true}
 
   *timestamp*
   {:doc      {:description ["Returns the current timestamp."
@@ -127,7 +127,7 @@
                             "A timestamp can be interpreted as the number of milliseconds since January 1, 1970, 00:00:00 GMT. The block timestamp should always be less than or equal to the Unix timestamp of peers that are in consensus."
                             "Commonly used with `schedule`."]
               :examples    [{:code "*timestamp*"}]}
-   :special? true}
+   :special true}
 
   <
   {:doc {:description "Tests if numeric arguments are in strict increasing order. Reads as 'less-than'."
@@ -390,7 +390,7 @@
                            {:params [test result]}
                            {:params [test result fallback-value]}
                            {:params [test-1 result-1 test-2 result-2 & more]}]}
-  :special? true}
+  :special true}
 
  compile
  {:doc {:description "Compiles a form, returning an Op. See `eval`."
@@ -456,7 +456,7 @@
              :errors      {:CAST "If the argument is neither a valid symbol name nor a syntax containing a symbol value."}
              :examples    [{:code "(def a 10)"}]
              :signature   [{:params [name value]}]}
-  :special? true}
+  :special true}
 
  deploy
  {:doc {:description "Deploys an actor. The code provided will be executed to initialise the actor's account. More than one code form may be provided, in which case they will be compiled and evaluated separately. Returns the Address of the deployed actor."
@@ -496,7 +496,7 @@
  {:doc      {:description "Executes multiple expressions sequentially, and returns the value of the final expression."
              :examples    [{:code "(do (count [1 2 3]) :done)"}]
              :signature   [{:params [& expressions]}]}
-  :special? true}
+  :special true}
 
  double
  {:doc {:description "Casts any numerical value to a `Double`."
@@ -586,7 +586,7 @@
  {:doc      {:description "Creates an anonymous function (closure) with the specified argument list and function body. Will close over variables in the current lexical scope."
              :examples    [{:code "(let [f (fn [x y] (* x y))] (f 10 7))"}]
              :signature   [{:params [args & body]}]}
-  :special? true}
+  :special true}
  
  fn?
  {:doc {:description "Returns `true` if and only if the argument is a function. Some values may operate as functions but are not functions themselves (eg. maps and vectors)."
@@ -731,7 +731,7 @@
  {:doc      {:description "Binds local variables according to symbol-expression pairs in a binding vectors, then execute following expressions in an implicit do block."
              :examples    [{:code "(let [x 10] (* x x))"}]
              :signature   [{:params [bindings & exps]}]}
-  :special? true}
+  :special true}
 
 
  list
@@ -777,7 +777,7 @@
                            {:code "(lookup #8 count)"}]
              :signature   [{:params [sym]}
                            {:params [address sym]}]}
-  :special? true}
+  :special true}
 
 
  lookup-meta
@@ -792,7 +792,7 @@
                            "Within the loop body, `recur` can be used to return to the start of the loop while re-binding the loop variables with new values. Does not consume stack."]
              :examples    [{:code "(loop [i 10 acc 1] (if (> i 1) (recur (dec i) (* acc i)) acc))"}]
              :signature   [{:params [bindings & body]}]}
-  :special? true}
+  :special true}
 
 
  map
@@ -911,8 +911,8 @@
                             {:code   "(quasiquote (:a :b (unquote (+ 2 3))))"
                              :return "(:a :b 5)"}]
               :signature   [{:params [form]}]}
-  :expander? true
-  :special?  true}
+  :expander true
+  :special  true}
 
 
  query
@@ -920,7 +920,7 @@
              :examples    [{:code "(query (def a 10) a)"}
                            {:code "(query (call unsafe-actor (do-something)))"}]
              :signature   [{:params [& forms]}]}
-  :special? true}
+  :special true}
  
  query-as
  {:doc {:description "Like `eval-as` but executes the code in a query context, discarding any state changes."
@@ -940,15 +940,15 @@
               :examples    [{:code "(quote foo)"}
                             {:code "(eval (quote (+ 1 2 3)))"}]
               :signature   [{:params [form]}]}
-  :expander? true
-  :special?  true}
+  :expander true
+  :special  true}
 
 
  recur
  {:doc      {:description "Escapes from the currently executing code and recurs at the level of the next loop or function body."
              :examples    [{:code "(recur acc (dec i))"}]
              :signature   [{:params [x y]}]}
-  :special? true}
+  :special true}
 
 
  reduce
@@ -978,7 +978,7 @@
  {:doc      {:description "Escapes from the currently executing code and returns the specified value from the current function. Expressions following `return` will not be executed."
              :examples    [{:code "(do (return :finished) 42)"}]
              :signature   [{:params [value]}]}
-  :special? true}
+  :special true}
 
 
  reverse
@@ -986,14 +986,14 @@
              :examples    [{:code "(reverse [1 2 3])"}]
              :signature   [{:params [value]
                             :return Sequence}]}
-  :special? true}
+  :special true}
 
 
  rollback
  {:doc      {:description "Escapes from the currently executing smart contract. Rolls back any state changes, as if nothing happened during that transaction. Returns the given value."
              :examples    [{:code "(rollback :aborted)"}]
              :signature   [{:params [value]}]}
-  :special? true}
+  :special true}
 
 
  schedule*
@@ -1025,7 +1025,7 @@
             :errors       {:ARGUMENT "If the symbol is qualified."}
             :examples     [{:code "(let [a 10] (set! a 20) a)"}]
             :signature    [{:params [sym value]}]}
- :special? true}
+ :special true}
 
 
  set-controller

@@ -13,7 +13,7 @@
 
 (def counter 0)
 
-(defn ^:callable? request [amt msg]
+(defn ^:callable request [amt msg]
   (let [id (inc counter)]
     (def requests 
       (assoc requests id 
@@ -43,7 +43,7 @@
                          (assoc rec :status :rejected)))
     :OK))
 
-(defn ^:callable? gc [id]
+(defn ^:callable gc [id]
   (let [rec (get requests id)]
     (if (:status rec) 
       (def requests (dissoc requests id))

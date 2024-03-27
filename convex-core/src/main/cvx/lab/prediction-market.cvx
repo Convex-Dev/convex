@@ -16,7 +16,7 @@
 		  
 		  ;; Bonding curve function for a given map of stakes
 		  (defn bond
-	        ^{:callable? true}
+	        ^{:callable true}
 	        [stks]
 		    (let [sxx (reduce (fn [acc [k v]] (let [x (double v)] (+ acc (* x x)))) 0.0 stks)]
 		      (sqrt sxx)))
@@ -25,7 +25,7 @@
 		  ;; must be called with a sufficient offer to fund any increase
 		  ;; returns positive cost of increased stake, or negative refund of reduced stake
 		  (defn stake
-	        ^{:callable? true}
+	        ^{:callable true}
 	        [outcome new-stake]
 		    (assert (contains-key? stakes outcome) (>= new-stake 0))
 		    
@@ -49,7 +49,7 @@
 		  
 		  ;; Get the effective price for an outcome. May be NaN if no balance at all.
 		  (defn price
-	        ^{:callable? true}
+	        ^{:callable true}
 	        [outcome]
 		    (when-not (contains-key? totals outcome) (return il))
 		    (let [tstk (double (totals outcome))
@@ -58,7 +58,7 @@
 		  
 		  ;; Get the collection of possible outcomes
 		  (defn get-outcomes
-	        ^{:callable? true}
+	        ^{:callable true}
 	        [data]
 		    outcomes)
 		  
@@ -68,7 +68,7 @@
 		  
 		  ;; Check if contract is finalised
 		  (defn finalized?
-	        ^{:callable? true}
+	        ^{:callable true}
 	        []
 		    (when final-flag (return true))
 		    (cond (call oracle (finalized? oracle-key)) :OK (return false))
@@ -88,7 +88,7 @@
 		  ;; call to claim payout
 		  ;; returns amount paid out, or null if not yet finalised
 		  (defn payout
-	        ^{:callable? true}
+	        ^{:callable true}
 	        []
 		    (if (finalized?) :OK (return nil))
 		    (when-not (contains-key? totals final-outcome) (return (refund)))

@@ -1,6 +1,6 @@
  (defn accept 
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Accepts a message and offered assets."
                 :examples    [{:code "(call messenger (accept message-id))"}]
                 :signature   [{:params [token holder]}]}}

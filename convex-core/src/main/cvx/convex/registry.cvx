@@ -22,7 +22,7 @@
 ;;;;;;;;;; Values
 
 (def trust
-  ^{:private? true}
+  ^{:private true}
   ;; Address of the `convex.trust`, it is deployed right after this account, hence it is predictable.
   (address (inc (long *address*))))
 
@@ -30,7 +30,7 @@
 
 
 (defn lookup
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Looks up registry metadata for a given address."
                 :examples    [{:code "(call *registry* (lookup somebody)"}]
                 :signature   [{:params [addr]}]}}
@@ -39,7 +39,7 @@
 
 
 (defn register
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Registers metadata for the *caller* account. Metadata can be an arbitrary value, but by convention is a map with defined fields."
                 :examples    [{:code "(call *registry* (register  {:name \"My Name\"})"}]
                 :signature   [{:params [metadata]}]}}
@@ -148,7 +148,7 @@
 
 
 (defn change-control
-	^{:callable? true
+	^{:callable true
 	  :doc {:description "Changes controller for a CNS node."
 			                :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
 			                :signature   [{:params [name addr]}]}}
@@ -162,7 +162,7 @@
 
 
 (defn cns-control
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Updates a CNS name mapping to set a new controller. May only be performed by a current controller."
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
@@ -178,7 +178,7 @@
     (set-in! cns-database [path 1] controller)))
 
 (defn cns-resolve
-  ^{:callable? true
+  ^{:callable true
     :doc {:description "Resolves a name in the Convex Name Service."
           :examples    [{:code "(call *registry* (cns-resolve 'convex.registry)"}]
           :signature   [{:params [addr]}]}}
@@ -189,7 +189,7 @@
     (if record (first record) nil)))
 
 (defn cns-update
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Updates or adds a name mapping in the Convex Name Service. Only the owner of a CNS record may update the mapping for an existing name"
                 :examples    [{:code "(call *registry* (cns-update 'my.actor addr)"}]
                 :signature   [{:params [name addr]}]}}
@@ -212,7 +212,7 @@
                 [addr monitor meta])))))
 
 (defn cns-create-node
-	^{:callable? true
+	^{:callable true
 	  :doc {:description "Creates a child CNS node."
 			:examples    [{:code "(call [cns-node cns-key] (cns-create-node \\\"child-name\\\"))"}]
 			:signature   [{:params [sym]}]}}
@@ -225,7 +225,7 @@
 	  [~*address* path]))
 
 (defn cns-read
-	^{:callable? true
+	^{:callable true
 	  :doc {:description "Reads a child CNS record from this CNS node. Assumes a record key passed in *scope*."
 			:examples    [{:code "(call [cns-node cns-key] (cns-read \\\"my-name\\\"))"}]
 			:signature   [{:params [sym]}]}}
@@ -233,7 +233,7 @@
 	(get-in cns-database [*scope* pname]))
 
 (defn cns-write
-	^{:callable? true
+	^{:callable true
 	  :doc {:description "Writes a CNS record from this Actor. Assumes a CNS node key passed in *scope*."
 	  :examples    [{:code "(call [cns-node cns-key] (cns-write \"my-name\" new-record))"}]
 						:signature   [{:params [sym]}]}}

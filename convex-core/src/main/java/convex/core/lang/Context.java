@@ -2301,7 +2301,7 @@ public class Context {
 		if (me == null) return null;
 
 		// TODO: examine syntax object for expander details?
-		ACell expBool = me.get(Keywords.EXPANDER_Q);
+		ACell expBool = me.get(Keywords.EXPANDER_META);
 		if (RT.bool(expBool)) {
 			// expand form using specified expander and continuation expander
 			ACell v = lookupValue(addr,sym);

@@ -32,12 +32,12 @@
                 :examples    [{:code "(quasiquote foo)" :return "foo"}
                         {:code "(quasiquote (:a :b (unquote (+ 2 3))))" :return "(:a :b 5)"}]
                 :signature   [{:params [form]}]}
-		  :expander? true}	
+		  :expander true}	
   (fn [[_ form] e]
     (e (qq* form 1) e)))
 
 ;; private helper, always produces a generator for a form
-(def ^:private? qq* (fn [form depth] 
+(def ^:private qq* (fn [form depth] 
   (let [qf (quasiquote* form depth)]
      (cond 
        qf qf 
@@ -46,7 +46,7 @@
 
 ;; quasiquote elements of sequence, produce a sequence of generators or nil if "pure" quotation
 ;; nil production is an important optimisation to avoid regenerating static subtrees
-(def ^:private? qq-seq (fn 
+(def ^:private qq-seq (fn 
   [ss depth] 
   (let  [n      (count ss)]  ;; size of sequence]
     (loop [i 0
@@ -149,12 +149,12 @@
   ^{:doc       {:description "Advanced feature. Defines an expander in the current environment."
                 :examples    [{:code "(defexpander expand-once [x e] (e x (fn [x e] x)))"}]
                 :signature   [{:params [a]}]}
-    :expander? true}
+    :expander true}
   (fn [x e]
     (let [[_ name & decl] x
           exp      (cons 'fn 
         		         decl)
-          form     `(def ~(syntax name {:expander? true})
+          form     `(def ~(syntax name {:expander true})
                          ~exp)]
       (e form e))))
 
@@ -162,14 +162,14 @@
   ^{:doc       {:description ["Like `defn` but defines a macro instead of a regular function."
                               "A macro is a special function that is executed at expansion, before compilation, and produces valid Convex Lisp code for subsequent execution."]
                 :signature   [{:params [name params & body]}]}
-    :expander? true}
+    :expander true}
   (fn [x e]
     (let [[_ name & decl] x
           mac      (cons 'fn 
         		         decl)
           form     `(def ~(syntax name
                                   (assoc (meta (first decl))
-                                         :expander? true))  ;; merge in metadata on parameter plus :expander? tag
+                                         :expander true))  ;; merge in metadata on parameter plus :expander tag
                       (let [m# ~mac]
                         (fn [x e]
                           (e (apply m#

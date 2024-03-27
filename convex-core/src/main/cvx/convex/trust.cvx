@@ -52,8 +52,7 @@
   ([monitor subject action object]
    (cond
      ;; General case: call into check-trusted? function if it exists
-	 (callable? monitor 'check-trusted? 
-			 ) 
+	 (callable? monitor 'check-trusted? ) 
        ;; SECURITY note: query here is protection against potential re-entrancy attacks.
        (query (call monitor
                   (check-trusted? subject
@@ -99,7 +98,7 @@
              ~root)
 
         (defn change-control
-          ^{:callable? true}
+          ^{:callable true}
           [controller]
           (or 
             (trust/trusted? upgradable-root *caller* :control *address*)
@@ -109,7 +108,7 @@
             (fail :ARGUMENT "Unexpected non-nil scope")))
         
         (defn upgrade
-          ^{:callable? true}
+          ^{:callable true}
           [code]
           (if (trust/trusted? upgradable-root *caller* :upgrade *address*)
             (eval code)

@@ -27,7 +27,7 @@
 (def counter 1)
 
 (defn 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets a DID document for a given account. Returns nil if ID is invalid or DDO does not exist."
                 :signature   [{:params [addr]}]}}
   read
@@ -36,7 +36,7 @@
     (nth rec 0)))
 
 (defn 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Creates a new DID. Controller will be *caller* unless otherwise specified."
                 :signature   [{:params []}
                               {:params [controller]}]}}
@@ -52,7 +52,7 @@
       id)))
 
 (defn 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Updates a DDO for a DID. DDO can be a String, or nil to deactivate"
                 :signature   [{:params [id ddo]}]}}
   update
@@ -71,7 +71,7 @@
      rec)))
 
 (defn 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Authorises a set of accounts for this DID. May be nil."
                 :signature   [{:params [id auth-set]}]}}
   authorise 
@@ -90,7 +90,7 @@
       rec)))
 
 (defn 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Sets the contoller for a DID."
                 :signature   [{:params [id auth-set]}]}}
   change-control 
@@ -110,7 +110,7 @@
       rec)))
 
 (defn check-trusted?
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Trust monitor for DID. Checks if subject is authorised by the DID, where the DID is provided either via a scoped call or the object parameter."
                 :signature   [{:params [subject action object]}]}}
   [subject action object]
@@ -124,7 +124,7 @@
                  (address subject))))))
 
 (defn 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Deactivates a DID."
                 :signature   [{:params [id]}]}}
   deactivate

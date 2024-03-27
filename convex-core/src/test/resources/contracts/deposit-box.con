@@ -6,7 +6,7 @@
   ;; Deposit function accepts any offer.
   ;;
   (defn deposit
-   ^{:callable? true}
+   ^{:callable true}
    [] 
    (accept *offer*))
   
@@ -14,6 +14,6 @@
   ;; Withdraw function sends the caller the complete balance.
   ;;
   (defn withdraw
-    ^{:callable? true}
+    ^{:callable true}
     []
     (transfer *caller* *balance*)))

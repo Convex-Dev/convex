@@ -18,7 +18,7 @@
 
 (def next-id 1)
 
-(defn ^:callable? list 
+(defn ^:callable list 
   [thing price]
   (or (asset/owns? *caller* thing) (error "Don't own asset for sale!"))
   (let [id next-id
@@ -32,7 +32,7 @@
      
 (call SHOP (list [COOKIE 10] [USD 299]))
 
-(defn ^:callable? buy
+(defn ^:callable buy
   [id]
   (let [buyer *caller*
         rec (or (get listings id) (error "No listing!"))

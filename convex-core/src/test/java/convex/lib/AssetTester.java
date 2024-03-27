@@ -160,7 +160,7 @@ public class AssetTester {
 
 		// Test transfers to actor: accept cases
 		ctx = step(ctx,
-				"(def sink (deploy `(defn ^:callable? receive-asset [tok qnt data] (~asset/accept *caller* tok qnt))))");
+				"(def sink (deploy `(defn ^:callable receive-asset [tok qnt data] (~asset/accept *caller* tok qnt))))");
 		{
 			Context c = step(ctx, "(asset/transfer sink token 10)");
 			assertCVMEquals(10L, c.getResult());

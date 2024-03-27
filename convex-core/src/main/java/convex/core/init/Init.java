@@ -308,7 +308,7 @@ public class Init {
 			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
 
 			return ctx.getState();
-		} catch (IOException e) { 
+		} catch (Exception e) { 
 			throw Utils.sneakyThrow(e);
 		}
 	}

@@ -14,7 +14,7 @@
 
 
 (defn init
-  ^{:callable? true}
+  ^{:callable true}
   [root-controller trust-address]
   (def root-controller
        root-controller)
@@ -128,7 +128,7 @@
 
 (defn cns-get-key
 
-  ^{:callable? true}
+  ^{:callable true}
 
   [key]
 
@@ -147,7 +147,7 @@
 
 (defn cns-set-key
 
-  ^{:callable? true}
+  ^{:callable true}
 
   [key value options]
 
@@ -182,7 +182,7 @@
 
 (defn set-controller
 
-  ^{:callable? true}
+  ^{:callable true}
 
   [key controller]
 
@@ -212,7 +212,7 @@
 
 (defn set-root-controller
   
-  ^{:callable? true}
+  ^{:callable true}
 
   [controller]
 

@@ -47,7 +47,7 @@
 
 
 (defn create
-  ^{:callable? true
+  ^{:callable true
     :doc {:description "Creates a new token and returns its id. Caller will be controller of token. Returns ID."
           :signature   [{:params []}
                         {:params [actor]}]}}
@@ -60,7 +60,7 @@
 ;;; Trust / control SPI
 
 (defn change-control
-  ^{:callable? true}
+  ^{:callable true}
   [controller]
   (or (callable? controller) (fail :ARGUMENT "controller must be a callable value"))
   (let [trec (or (get tokens *scope*) (fail :TRUST "Not allowed to update controller"))
@@ -74,7 +74,7 @@
 ;;; Asset SPI
 
 (defn direct-transfer
-   ^{:callable? true}
+   ^{:callable true}
    [addr amount]
    (let [addr   (address addr)
          amount (if amount
@@ -96,14 +96,14 @@
      (-set-balance addr id (+ tbal amount))))
 
 (defn balance
-   ^{:callable? true}
+   ^{:callable true}
    ([addr]
      (let [hs (get-holding addr) 
            rec (get hs *scope*)]
        (if rec (nth rec 0) 0))))
 
 (defn accept 
-  ^{:callable? true}
+  ^{:callable true}
   [sender quantity] 
   (let [id *scope*
         quantity (-qc quantity)
@@ -132,14 +132,14 @@
       (fail "No offers from sender"))))
 
 (defn get-offer
-  ^{:callable? true}
+  ^{:callable true}
   [sender receiver]
   (let [id *scope*
         rec (or (get (get-holding sender) id) (return 0))]
     (or (get (nth rec 1) receiver) 0)))
 
 (defn offer
-  ^{:callable? true}
+  ^{:callable true}
   [receiver quantity]
   (let [id *scope*
         quantity (-qc quantity)
@@ -159,7 +159,7 @@
     ))
 
 (defn mint
-  ^{:callable? true}
+  ^{:callable true}
   [amount]
   (let [id *scope*
         token (or (get tokens id) (fail "token does not exist"))
@@ -185,21 +185,21 @@
         new-supply))))
 
 (defn quantity-add
-  ^{:callable? true}
+  ^{:callable true}
   [a b]
   (let [a (if a (int a) 0)
         b (if b (int b) 0)]
     (+ a b)))
 
 (defn quantity-sub
-  ^{:callable? true}
+  ^{:callable true}
   [a b]
   (let [a (if a (int a) 0)
         b (if b (int b) 0)] 
     (if (>= a b) (- a b) 0)))
 
 (defn quantity-subset?
-   ^{:callable? true}
+   ^{:callable true}
    [a b]
     (let [a (if a (int a) 0)
         b (if b (int b) 0)] 

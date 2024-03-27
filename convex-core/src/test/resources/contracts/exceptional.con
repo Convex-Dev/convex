@@ -3,27 +3,27 @@
   (def fragile :ok)
   
   (defn halt-fn 
-    ^{:callable? true}
+    ^{:callable true}
     [x]
     (halt x)
     (return :foo)
     :bar)
   
   (defn rollback-fn 
-    ^{:callable? true}
+    ^{:callable true}
     [x]
     (def fragile :broken)
     (rollback x)
     :bar)
   
   (defn break-fn 
-    ^{:callable? true}
+    ^{:callable true}
     [x]
     (def fragile :broken)
     x)
   
   (defn get-fragile
-    ^{:callable? true}
+    ^{:callable true}
     []
     (return fragile))
   

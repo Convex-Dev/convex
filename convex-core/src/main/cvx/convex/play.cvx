@@ -29,7 +29,7 @@
 
 (defn -stop
 
-  ^{:private? true}
+  ^{:private true}
 
   ;; Private because unreachable:
   ;;

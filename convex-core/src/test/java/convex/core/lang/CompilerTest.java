@@ -704,7 +704,7 @@ public class CompilerTest extends ACVMTest {
 		c=c.execute(compiled);
 		assertNotError(c);
 		assertTrue(c.getEnvironment().get(Symbol.create("bex")) instanceof AFn);
-		assertTrue(c.getMetadata().get(Symbol.create("bex")).containsKey(Keywords.EXPANDER_Q));
+		assertTrue(c.getMetadata().get(Symbol.create("bex")).containsKey(Keywords.EXPANDER_META));
 
 		compiled=comp("(bex 2)",c);
 		c=c.execute(compiled);
@@ -776,7 +776,7 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testExternalCompile() {
 		// Inspired by #377, thanks @Darkneew!
 		Context ctx=context();
-		ctx=step(ctx,"(def a (deploy `(defn ^:callable? eval [code] (eval-as *address* code))))");
+		ctx=step(ctx,"(def a (deploy `(defn ^:callable eval [code] (eval-as *address* code))))");
 		assertTrue(ctx.getResult() instanceof Address);
 		
 		ctx=step(ctx,"(call a (eval '(defn foo [arg] arg)))");

@@ -14,7 +14,7 @@
 (def next-id 1)
 
 (defn create 
-  ^{:callable? true 
+  ^{:callable true 
     :doc {:description ["Creates new delegated trust monitor"]
               :examples    
           [{:code "(call delegate-actor (create initial-monitor *address*))])"}]
@@ -29,7 +29,7 @@
       id)))
   
 (defn update
-  ^{:callable? true 
+  ^{:callable true 
         :doc {:description ["Creates new delegated trust monitor"]
               :examples    
               [{:code "(call delegate-actor (create initial-monitor *address*))])"}]
@@ -44,7 +44,7 @@
     new-monitor))
 
 (defn change-control
-  ^{:callable? true}
+  ^{:callable true}
   [controller]
    (let [rec (mons *scope*)]
     (or rec (fail :ARGUMENT "Delegated trust monitor ID not valid"))
@@ -55,7 +55,7 @@
     controller))
   
 (defn check-trusted?
-  ^:callable?
+  ^:callable
 	[subject action object]
   (or *scope* (fail :ARGUMENT "Null scope ID"))
   (let [rec (mons *scope*)]

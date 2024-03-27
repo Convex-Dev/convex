@@ -403,7 +403,7 @@
                              {})
 
                         (defn check-trusted?
-                          ^{:callable? true}
+                          ^{:callable true}
                           [addr policy-key id]
                           (if (= policy-key
                                  :destroy)
@@ -415,7 +415,7 @@
                                addr)))
 
                         (defn create-token
-                          ^{:callable? true}
+                          ^{:callable true}
                           [caller id initial-data]
                           (def token-history
                                (assoc token-history
@@ -425,25 +425,25 @@
                                         :event  :create-token}])))
 
                         (defn destroy-token
-                          ^{:callable? true}
+                          ^{:callable true}
                           [caller id]
                           (def token-history
                                (dissoc token-history
                                        id)))
 
                         (defn get-token-history
-                          ^{:callable? true}
+                          ^{:callable true}
                           [id]
                           (get token-history
                                id))
 
                         (defn get-uri
-                          ^{:callable? true}
+                          ^{:callable true}
                           [id]
                           ~uri-logger)
 
                         (defn merge-token-data
-                          ^{:callable? true}
+                          ^{:callable true}
                           [caller id data]
                           (def token-history
                                (assoc token-history
@@ -455,7 +455,7 @@
                                              :event :merge-token-data}))))
 
                         (defn set-token-data
-                          ^{:callable? true}
+                          ^{:callable true}
                           [caller id data]
                           (def token-history
                             (assoc token-history
@@ -468,7 +468,7 @@
 
 
                         (defn perform-transfer
-                          ^{:callable? true}
+                          ^{:callable true}
                           [caller sender receiver id-set]
                           (def token-history
                                (reduce (fn [history id]
@@ -561,7 +561,7 @@
                            {})
 
                       (defn check-transfer
-                        ^{:callable? true}
+                        ^{:callable true}
                         [caller sender receiver id-set]
                         (reduce (fn [_ id]
                                  (when (>= (get transfer-count
@@ -572,7 +572,7 @@
                                 id-set))
 
                       (defn check-trusted?
-                        ^{:callable? true}
+                        ^{:callable true}
                         [addr policy-key id]
                         (if (contains-key? #{:destroy
                                              :transfer}
@@ -585,7 +585,7 @@
                              addr)))
 
                       (defn create-token
-                        ^{:callable? true}
+                        ^{:callable true}
                         [caller id initial-data]
                         (def transfer-count
                              (assoc transfer-count
@@ -593,14 +593,14 @@
                                     0)))
 
                       (defn destroy-token
-                        ^{:callable? true}
+                        ^{:callable true}
                         [caller id]
                         (def transfer-count
                              (dissoc transfer-count
                                      id)))
 
                       (defn perform-transfer
-                        ^{:callable? true}
+                        ^{:callable true}
                         [caller sender receiver id-set]
                         (def transfer-count
                              (reduce (fn [tc id]
@@ -880,7 +880,7 @@
   (transfer.mono 'transfer.actor
                  `(deploy
                     '(defn receive-asset
-                        ^{:callable? true}
+                        ^{:callable true}
                         [offer _data]
                         (~asset/accept *caller*
                                        offer)))))
@@ -956,7 +956,7 @@
                        (import convex.asset :as asset)
 
                        (defn receive-asset
-                         ^{:callable? true}
+                         ^{:callable true}
                          [[addr id-set] data]
                          (asset/accept *caller*
                                        [addr

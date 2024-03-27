@@ -282,8 +282,8 @@ public class StateTransitionsTest {
 		for (int i=1; i<=100; i++) { // i is sequence number
 			ATransaction trans=Invoke.create(InitTest.HERO, i, Reader.read("(def storage-example\r\n"
 					+ "  (deploy '(do (def stored-data nil)\r\n"
-					+ "                     (defn get ^{:callable? true} [] stored-data)\r\n"
-					+ "                     (defn set ^{:callable? true} [x] (def stored-data x)))))\r\n"));
+					+ "                     (defn get ^{:callable true} [] stored-data)\r\n"
+					+ "                     (defn set ^{:callable true} [x] (def stored-data x)))))\r\n"));
 			AKeyPair kp = InitTest.HERO_KEYPAIR;
 			Block b=Block.of(s.getTimestamp().longValue(),kp.signData(trans));
 			SignedData<Block> sb=KEYPAIR_PEER.signData(b);

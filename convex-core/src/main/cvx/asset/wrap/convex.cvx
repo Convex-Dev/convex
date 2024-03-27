@@ -19,7 +19,7 @@
     bal))
 
 (defn balance
-   ^{:callable? true}
+   ^{:callable true}
    ([addr]
      (let [rec (get-holding addr)]
        (or (get rec 0) 0))))
@@ -35,7 +35,7 @@
 ;; Transfer
 
 (defn direct-transfer
-   ^{:callable? true}
+   ^{:callable true}
    [addr amount]
    (let [addr   (address addr)
          amount (-qc amount)
@@ -58,7 +58,7 @@
   [amount]
   (call ~*address* amount (wrap-offer)))
 
-(defn ^:callable? wrap-offer []
+(defn ^:callable wrap-offer []
   (let [amt *offer*
         new-bal (+ (-get-balance *caller*) amt)]
     (accept amt)
@@ -71,7 +71,7 @@
   ([amount]
     (call ~*address* amount (-unwrap amount))))
 
-(defn ^:callable? -unwrap [amt]
+(defn ^:callable -unwrap [amt]
   (let [new-bal (- (-get-balance *caller*) amt)]
     (or (>= new-bal 0) (fail "Insufficient balance for unwrap"))
     (-set-balance *caller* new-bal)
@@ -82,13 +82,13 @@
 ;; Offers
 
 (defn get-offer
-  ^{:callable? true}
+  ^{:callable true}
   [sender receiver]
   (let [offs (get (get-holding sender) 1)]
     (or (get offs receiver) 0)))
 
 (defn offer
-  ^{:callable? true}
+  ^{:callable true}
   [receiver quantity]
   (let [quantity (-qc quantity) 
         receiver (address receiver)
@@ -105,7 +105,7 @@
     ))
 
 (defn accept 
-  ^{:callable? true}
+  ^{:callable true}
   [sender quantity] 
   (let [quantity (-qc quantity)
         _ (cond 
@@ -134,21 +134,21 @@
 ;; Quantity operations
 
 (defn quantity-add
-  ^{:callable? true}
+  ^{:callable true}
   [a b]
   (let [a (if a (int a) 0)
         b (if b (int b) 0)]
     (+ a b)))
 
 (defn quantity-sub
-  ^{:callable? true}
+  ^{:callable true}
   [a b]
   (let [a (if a (int a) 0)
         b (if b (int b) 0)] 
     (if (>= a b) (- a b) 0)))
 
 (defn quantity-subset?
-   ^{:callable? true}
+   ^{:callable true}
    [a b]
     (let [a (if a (int a) 0)
         b (if b (int b) 0)] 

@@ -510,7 +510,7 @@ public class AccountStatus extends ARecord {
 		ASet<Symbol> results=Sets.empty();
 		if (metadata==null) return results;
 		for (Entry<Symbol, AHashMap<ACell, ACell>> me:metadata.entrySet()) {
-			ACell callVal=me.getValue().get(Keywords.CALLABLE_Q);
+			ACell callVal=me.getValue().get(Keywords.CALLABLE_META);
 			if (RT.bool(callVal)) {
 				Symbol sym=me.getKey();
 				if (RT.ensureFunction(getEnvironmentValue(sym))==null) continue;
@@ -531,7 +531,7 @@ public class AccountStatus extends ARecord {
 		
 		if (fn==null) return null;
 		AHashMap<ACell,ACell> md=getMetadata().get(sym);
-		if (RT.bool(md.get(Keywords.CALLABLE_Q))) {
+		if (RT.bool(md.get(Keywords.CALLABLE_META))) {
 			// We have both a function and required metadata tag
 			return fn;
 		}

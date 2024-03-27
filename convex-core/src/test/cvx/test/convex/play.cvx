@@ -43,7 +43,7 @@
                              [])
 
                         (defn command
-                          ^{:callable? true}
+                          ^{:callable true}
                           [trx]
                           (when-not (= trx
                                        42)
@@ -52,7 +52,7 @@
                                        trx))))
 
                         (defn start
-                          ^{:callable? true}
+                          ^{:callable true}
                           []
                           (def *log*
                                [:join])))))

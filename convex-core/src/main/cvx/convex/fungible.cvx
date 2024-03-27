@@ -32,7 +32,7 @@
        ~(if max-supply `(def max-supply ~max-supply))
 
        (defn burn
-         ^{:callable? true}
+         ^{:callable true}
          [amount]
          (when-not (trust/trusted? minter *caller* :burn) (fail :TRUST "No rights to burn"))
          (let [amount (int amount)
@@ -46,7 +46,7 @@
                           amount))))
 
        (defn mint
-         ^{:callable? true}
+         ^{:callable true}
          [amount]
          (when-not (trust/trusted? minter *caller* :mint) (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
@@ -89,7 +89,7 @@
 
        ;; Functions of the interface described in the `convex.asset` library
        (defn accept 
-         ^{:callable? true}
+         ^{:callable true}
          [sender quantity]
          (let [sender   (address sender)
                quantity (-qc quantity)
@@ -128,19 +128,19 @@
                  quantity))))
 
        (defn balance
-         ^{:callable? true}
+         ^{:callable true}
          [addr]
          (or (get-holding addr) 0))
 
        ;; No restrictions on transfer by default.
        ;;
        (defn check-transfer
-         ^{:callable? true}
+         ^{:callable true}
          [_sender _receiver _quantity]
          nil)
 
        (defn direct-transfer
-         ^{:callable? true}
+         ^{:callable true}
          [addr amount]
          (let [addr   (address addr)
                amount (if amount
@@ -170,7 +170,7 @@
                            amount))))
 
        (defn get-offer
-         ^{:callable? true}
+         ^{:callable true}
          [sender receiver]
          (or (get-in offers
                      [sender
@@ -178,7 +178,7 @@
              0))
 
        (defn offer
-         ^{:callable? true}
+         ^{:callable true}
          [receiver quantity]
          (let [receiver (address receiver)
                quantity (-qc quantity)
@@ -206,7 +206,7 @@
 
        (defn quantity-add
 
-         ^{:callable? true}
+         ^{:callable true}
 
          [a b]
 
@@ -221,7 +221,7 @@
 
        (defn quantity-sub
 
-         ^{:callable? true}
+         ^{:callable true}
 
          [a b]
 
@@ -239,7 +239,7 @@
 
        (defn quantity-subset?
 
-         ^{:callable? true}
+         ^{:callable true}
 
          [a b]
 

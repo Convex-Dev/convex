@@ -4,7 +4,7 @@
   (def people #{})
   
   (defn greet
-    ^{:callable? true}
+    ^{:callable true}
     [name] 
     (if (people name) 
       (str "Welcome back " name)

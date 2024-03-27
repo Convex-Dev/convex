@@ -25,7 +25,7 @@
   (asset/offer ~*address* item)
   (call ~*address* (post-impl item price)))
 
-(defn post-impl ^:callable?
+(defn post-impl ^:callable
   [item price]
   (let [id (inc counter)]
     ;; accept the input
@@ -41,7 +41,7 @@
     (asset/offer ~*address* price)
     (call ~*address* (buy-impl id))))
 
-(defn buy-impl ^:callable?
+(defn buy-impl ^:callable
   ([] (recur *scope*))
   ([id]
     (let [rec (-get-rec id)
@@ -62,7 +62,7 @@
   [id]
   (call ~*address* (cancel-impl id)))
 
-(defn cancel-impl ^:callable?
+(defn cancel-impl ^:callable
   ([] (recur *scope*))
   
   ([id ]
@@ -79,7 +79,7 @@
       (asset/transfer *caller* item)
       :OK)))
 
-(defn claim ^:callable?
+(defn claim ^:callable
   ([] (recur *scope*))
   ([id]
     (let [rec (-get-rec id)

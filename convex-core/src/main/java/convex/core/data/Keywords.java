@@ -43,13 +43,12 @@ public class Keywords {
 	public static final Keyword END = Keyword.create("end");
 	public static final Keyword SOURCE = Keyword.create("source");
 	public static final Keyword TAG = Keyword.create("tag");
-	public static final Keyword DOC = Keyword.create("doc");
+
 	public static final Keyword DESCRIPTION = Keyword.create("description");
 	public static final Keyword EXAMPLES = Keyword.create("examples");
 	public static final Keyword CODE = Keyword.create("code");
 
 	public static final Keyword TYPE = Keyword.create("type");
-	public static final Keyword SPECIAL_Q = Keyword.create("special?");
 
 	public static final Keyword PEER = Keyword.create("peer");
 	public static final Keyword STAKE = Keyword.create("stake");
@@ -88,12 +87,14 @@ public class Keywords {
 	
 	public static final Keyword CVM = Keyword.create("cvm");
 
+	// Metadata keywords
+	public static final Keyword EXPANDER_META = Keyword.create("expander");
+	public static final Keyword MACRO_META = Keyword.create("macro");
+	public static final Keyword CALLABLE_META = Keyword.create("callable");
+	public static final Keyword PRIVATE_META = Keyword.create("private");
+	public static final Keyword DOC_META = Keyword.create("doc");
+	public static final Keyword SPECIAL_META = Keyword.create("special");
 
-	public static final Keyword EXPANDER_Q = Keyword.create("expander?");
-	public static final Keyword MACRO = Keyword.create("macro");
-
-	public static final Keyword CALLABLE_Q = Keyword.create("callable?");
-	public static final Keyword PRIVATE_Q = Keyword.create("private?");
 
 	public static final Keyword VALUE = Keyword.create("value");
 	public static final Keyword FUNCTION = Keyword.create("function");

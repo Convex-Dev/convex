@@ -30,7 +30,7 @@
     (call actor (data key))))
 
 (defn finalized?
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Returns a boolean indicating if a results has been provided for `key`."
                 :examples    [{:code "(finalized? :foo)"}]
                 :signature   [{:params [key]}
@@ -41,7 +41,7 @@
     (call actor(finalized? key))))
 
 (defn read
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Returns the result for `key`."
                 :examples    [{:code "(read :foo)"}]
                 :signature   [{:params [key]}
@@ -53,7 +53,7 @@
       (read key))))
 
 (defn register
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description ["Callable function for registering a new oracle key."
                               "Returns true if successful, false if key already exists."
                               "Data should be a map containg at least `:trust`, a set of addresses trusted for using `provide` on that key."
@@ -70,7 +70,7 @@
       (register key data))))
 
 (defn provide
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description ["Provides a result for a key registered using `register`."
                               "Does not change anything if a resulted has already been provided for that key."
                               "Returns the result associated with that key."]

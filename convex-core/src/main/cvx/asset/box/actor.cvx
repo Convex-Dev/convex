@@ -65,8 +65,7 @@
 ;;;;;;;;;; Implementation of `convex.asset` interface
 
 (defn accept
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   [sender quantity]
   (let [q (-qc quantity)
         sender           (address sender)
@@ -86,21 +85,18 @@
 
 
 (defn balance
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   [owner]
   (or (get ownership owner)
       #{}))
 
 (defn direct-transfer
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   [receiver quantity]
   (-direct-transfer *caller* receiver quantity))
 
 (defn offer
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   [receiver quantity]
   (let [q (-qc quantity)
         caller-offers (get offers
@@ -114,8 +110,7 @@
                        q)))))
 
 (defn receive-asset
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   [path quantity _]
   (let [box-id (int *scope*)]
     ;; NOTE: Accepting first solves the problem of putting a box into itself.
@@ -138,18 +133,15 @@
                                        [path quantity])))))
 
 (def quantity-add
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   union)
 
 (def quantity-sub
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   difference)
 
 (def quantity-subset?
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   subset?)
 
 ;;;;;;;;;; Implementation of `asset.box` interface
@@ -157,8 +149,7 @@
 
 (defn burn
 
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
 
   [set-box-ids]
 
@@ -183,8 +174,7 @@
 
 
 (defn create
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   []
   (let [id          counter
         owner       *caller*
@@ -203,8 +193,7 @@
 
 
 (defn remove
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true}
   [asset]
   (let [id *scope*
         current-asset (get boxes id)]

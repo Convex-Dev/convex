@@ -59,9 +59,9 @@ Should be replaced with:
 (query (call untrusted-actor (foo)))
 ```
 
-### Input validation on `:callable?` functions
+### Input validation on `:callable` functions
 
-Any `:callable?` function should perform input validation, since it may be called by any other user or actor on the network and hence is the point at which security checks should be performed. 
+Any `:callable` function should perform input validation, since it may be called by any other user or actor on the network and hence is the point at which security checks should be performed. 
 
 Specific recommendations are as follows:
 
@@ -84,7 +84,7 @@ If any identifiers are passed that refer to digital assets or other entities, in
 Normally, this can be done by checking whether the ID is a valid key in a map or other indexed data structure. A typical pattern is:
 
 ```clojure
-(defn ^:callable? do-something [id]
+(defn ^:callable do-something [id]
   (let [entity (get map-of-entities id)]
   	;; Check if entity was successfully found in map
   	(or entity (fail "Invalid ID"))
@@ -204,7 +204,7 @@ This also creates a positive economic incentive for users to perform transaction
 
 In some cases, cleanup operations may be expensive to compute directly, e.g. identifying records in a large data structure that are expired because of old timestamps could require `O(n)` computation. However the cleanup itself may be cheap to perform, e.g. `O(1)` cost to remove an expired entry.
 
-A simple solution to this problem is to allow any 3rd party to compute the cleanups off-chain, and execute a special cleanup `:callable?` function to dispose of the redundant data. 
+A simple solution to this problem is to allow any 3rd party to compute the cleanups off-chain, and execute a special cleanup `:callable` function to dispose of the redundant data. 
 
 Economically, the 3rd party benefits from getting the memory refund from disposed data, which is likely to be more valuable than the execution cost of the cleanup. (especially if multiple cleanups can be executed in a single transactions).
 

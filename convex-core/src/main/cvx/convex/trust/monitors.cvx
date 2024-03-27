@@ -8,7 +8,7 @@
 
 ;; Generic check
 (defn check-trusted?
-  ^:callable?
+  ^:callable
 	[subject action object]
   (or *scope* (fail :ARGUMENT "Null scope in generic trust monitor"))
   (let [[type arg] *scope*]

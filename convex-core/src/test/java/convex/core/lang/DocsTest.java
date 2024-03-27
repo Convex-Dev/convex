@@ -23,9 +23,9 @@ public class DocsTest extends ACVMTest {
 				if (PRINT_MISSING) System.err.println("Empty metadata in Core: "+sym);
 			} else {
 				@SuppressWarnings("unchecked")
-				AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) meta.get(Keywords.DOC);
+				AHashMap<ACell,ACell> doc=(AHashMap<ACell, ACell>) meta.get(Keywords.DOC_META);
 				if (doc==null) {
-					if (RT.bool(meta.get(Keywords.PRIVATE_Q))) continue;
+					if (RT.bool(meta.get(Keywords.PRIVATE_META))) continue;
 					if (PRINT_MISSING) System.err.println("No documentation in Core: "+sym);
 				} else {
 					doDocTest(sym,doc);

@@ -110,32 +110,32 @@ public class DIDTest extends ACVMTest {
 		Context ctx=context();
 		
 		// Set up DDO controlled by HERO (current *address*)
-		ctx=step(ctx,"(def id (call did (create)))");
+		ctx=exec(ctx,"(def id (call did (create)))");
 		CVMLong id=(CVMLong) ctx.getResult();
 		AString ddo=Strings.create("{}");
-		ctx=step(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
+		ctx=exec(ctx,"(call did (update "+id+" "+RT.print(ddo)+"))");
 		
 
 		// Switch to VILLAIN
 		ctx=ctx.forkWithAddress(VILLAIN);
-		ctx=step(ctx,"(import convex.did :as did)");
+		ctx=exec(ctx,"(import convex.did :as did)");
 		
 		// Attempt to change DDO
 		ctx=step(ctx,"(call did (update "+id+" \"PWND\"))");
 		Assertions.assertError(ctx);
 		
 		// Original DDO should be unchanged
-		ctx=step(ctx,"(call did (read "+id+"))");
+		ctx=exec(ctx,"(call did (read "+id+"))");
 		assertEquals(ddo,ctx.getResult()); 
 	}
 	
 	@Test public void testAuthorisedMonitor() {
 		Context ctx=context();
-		ctx=step(ctx,"(import convex.did :as did)");
-		ctx=step(ctx,"(import convex.trust :as trust)");
+		ctx=exec(ctx,"(import convex.did :as did)");
+		ctx=exec(ctx,"(import convex.trust :as trust)");
 		
 		// Set up DDO controlled by HERO
-		ctx=step(ctx,"(def id (call did (create)))");
+		ctx=exec(ctx,"(def id (call did (create)))");
 		
 		// Nobody is initially trusted
 		assertFalse(evalB(ctx,"(trust/trusted? [did id] *address*)"));
@@ -159,10 +159,10 @@ public class DIDTest extends ACVMTest {
 	
 	@Test public void testDeactivate() {
 		Context ctx=step("(import convex.did :as did)");
-		ctx=step(ctx,"(import convex.trust :as trust)");
+		ctx=exec(ctx,"(import convex.trust :as trust)");
 		
 		// Set up DDO controlled by HERO
-		ctx=step(ctx,"(def id (call did (create)))");
+		ctx=exec(ctx,"(def id (call did (create)))");
 		CVMLong id=(CVMLong) ctx.getResult();
 		AString ddo=Strings.create("{}");
 		ctx=step(ctx,"(call did (update id "+RT.print(ddo)+"))");

@@ -26,7 +26,7 @@
 
 (defn -qc
 		  ^{:doc {:description "Checks a NFT quantity."}
-		    :private? true}
+		    :private true}
 		  [q]
 		  (cond (set? q) q              ;; base case, quantity should always be a Set
 				(int? q) #{q} 
@@ -34,7 +34,7 @@
 		        (fail :ARGUMENT "Invalid NFT quantity")))
 
 (defn -direct-transfer
-  ^{:private? true}
+  ^{:private true}
   ;; Used internally by [[accept]] and [[direct-transfer]].
   [sender receiver quantity]
   (let [q (-qc quantity)
@@ -55,8 +55,8 @@
 
 
 (defn accept
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true
+    :private  true}
   [sender quantity]
   (let [q (-qc quantity)
         sender           (address sender)
@@ -81,21 +81,21 @@
 
 
 (defn balance
-  ^{:callable? true
-    :private?  true}
+  ^{:callable true
+    :private  true}
   [owner]
   (or (get-holding owner)
       #{}))
 
 (defn direct-transfer
-  ^{:callable? true}
+  ^{:callable true}
   [receiver quantity]
   (-direct-transfer *caller*
                     receiver
                     quantity))
 
 (defn offer
-  ^{:callable? true}
+  ^{:callable true}
   [receiver quantity]
   (let [q (-qc quantity)
         caller-offers (get offers *caller* {})]
@@ -106,22 +106,22 @@
 
 
 (def quantity-add
-  ^{:callable? true}
+  ^{:callable true}
   union)
 
 (def quantity-sub
-  ^{:callable? true}
+  ^{:callable true}
   difference)
 
 (def quantity-subset?
-  ^{:callable? true}
+  ^{:callable true}
   subset?)
 
 ;;;;;;;;;; Callable functions
 
 
 (defn burn
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Destroys a set of NFTs. NFTs must be owned by the caller."
                 :signature   [{:params [nft-set]}]}}
   [nft-set]
@@ -137,7 +137,7 @@
 
 
 (defn create
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Creates a new NFT with a fresh ID."
                 :signature   [{:params []}]}}
   []

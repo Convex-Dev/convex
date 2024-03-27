@@ -231,7 +231,7 @@
 
 (defn create-token
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description ["Creates token with initial data map."
                               "A policy map can provided (see `check-trusted?`) or the address of an account acting as a \"class\"."
                               "A class implements a version of `check-trusted?` and optionally any of the functions found it this account."
@@ -293,7 +293,7 @@
 
 (defn destroy-token
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Destroys token if `(check-trusted? *caller* :destroy id)` returns true."
                 :examples    [{:code "(destroy-token 1234)"}]
                 :signature   [{:params [id]}]}}
@@ -325,7 +325,7 @@
 
 (defn get-offer
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets the offer from a given sender to a given receiver."
                 :examples    [{:code "(get-offer sender receiver)"}]
                 :signature   [{:params [sender receiver]}]}}
@@ -340,7 +340,7 @@
 
 (defn get-offers
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets all the offers from a given sender."
                 :examples    [{:code "(get-offers sender)"}]
                 :signature   [{:params [sender]}]}}
@@ -353,7 +353,7 @@
 
 (defn get-token-class
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets class actor for token, returns nil if it is a singleton token with policy map.",
                 :examples    [{:code "(get-token-class 1234)"}]
                 :signature   [{:params [id]}]}}
@@ -368,7 +368,7 @@
 
 (defn get-token-creator
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets creator of token.",
                 :examples    [{:code "(get-token-creator 1234)"}]
                 :signature   [{:params [id]}]}}
@@ -383,7 +383,7 @@
 
 (defn get-token-data
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets data map associated with token."
                 :examples    [{:code "(get-token-data 1234)"}]
                 :signature   [{:params [id]}]}}
@@ -398,7 +398,7 @@
 
 (defn get-token-owner
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets owner of token.",
                 :examples    [{:code "(get-token-owner 1234)"}]
                 :signature   [{:params [id]}]}}
@@ -413,7 +413,7 @@
 
 (defn get-uri
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description ["Gets the URI associth with token."
                               "Not all NFTs have a URI pointing to data off-chain but it is common."]}}
 
@@ -435,7 +435,7 @@
 
 (defn merge-token-data
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description ["Merges data into token's data map."
                               "Caller must have the right to do so. Either:"
                               "- `(check-trusted? *caller* :update id)` returns true"
@@ -476,7 +476,7 @@
 
 (defn set-token-data
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Replaces data map if `(check-trusted? *caller* :update id)` returns true."
                 :examples    [{:code "(set-token-data 1234 {:name \"New name\", :redeemed? false})"}]
                 :signature   [{:params [id data]}]}}
@@ -510,7 +510,7 @@
 
 (defn accept
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   [sender accepted-id-set]
@@ -546,7 +546,7 @@
 
 (defn balance
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   [owner]
@@ -558,7 +558,7 @@
 
 (defn direct-transfer
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   ;; Interface for a sender to call the private perform-transfer function
@@ -575,7 +575,7 @@
 
 (defn check-transfer
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   ;; Returns string explaining restriction, or nil if no restriction on transfer.
@@ -610,7 +610,7 @@
 
 (defn offer
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   ;; Can cancel existing offer by passing in `[addr #{}]`.
@@ -633,7 +633,7 @@
 
 (def quantity-add
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   union)
@@ -642,7 +642,7 @@
 
 (def quantity-sub
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   difference)
@@ -651,7 +651,7 @@
 
 (defn quantity-subset?
 
-  ^{:callable? true
+  ^{:callable true
     :private?  true}
 
   [a b]
@@ -669,7 +669,7 @@
 
 (defn check-trusted?
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description ["Determines whether a given address as certain rights.."
                               "A `policy-key` is either:"
                               "- `:destroy`, right to destroy token"

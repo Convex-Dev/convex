@@ -13,7 +13,7 @@
 					
 	  ;;transfer function
 	  (defn transfer
-        ^{:callable? true}
+        ^{:callable true}
         [target amount] 
 	    (assert (address? target) (long? amount) (<= 0 amount (balances *caller*)))
 	    (if (not (= target *caller*))
@@ -30,13 +30,13 @@
 					
 	  ;;return total supply
 	  (defn total-supply
-        ^{:callable? true}
+        ^{:callable true}
         []
         ~supply)
 					
 	  ;; get balance, or 0 if no balance for specified address
 	  (defn balance
-        ^{:callable? true}
+        ^{:callable true}
         [acct]
         (let [b (balances acct)] (if b b 0)))
 	  ))

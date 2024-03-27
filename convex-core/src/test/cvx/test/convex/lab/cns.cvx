@@ -106,11 +106,11 @@
                    (def *records*
                         {})
                    (defn cns-get-key
-                     ^{:callable? true}
+                     ^{:callable true}
                      [k]
                      (*records* k))
                    (defn cns-set-key
-                     ^{:callable? true}
+                     ^{:callable true}
                      [k v _options]
                      (def *records*
                           (assoc *records*

@@ -58,7 +58,7 @@
     		        (fail :ARGUMENT "Invalid token quantity")))
 
       (defn add-liquidity
-    		  ^{:callable? true}
+    		  ^{:callable true}
         [amount]
         (let [;; Amount of tokens deposited.
               amount (-qc amount)
@@ -95,7 +95,7 @@
 
        (defn buy-cvx
 
-         ^{:callable? true}
+         ^{:callable true}
 
          [amount]
 
@@ -116,7 +116,7 @@
 
 
       (defn buy-cvx-quote
-        ^{:callable? true}
+        ^{:callable true}
         [amount]
         ;; Security: check pool can provide.
         (when-not (< 0 amount *balance*)
@@ -136,7 +136,7 @@
 
        (defn buy-tokens
 
-         ^{:callable? true}
+         ^{:callable true}
 
          [amount]
 
@@ -157,7 +157,7 @@
 
       (defn buy-tokens-quote
 
-        ^{:callable? true}
+        ^{:callable true}
 
         [amount]
 
@@ -189,7 +189,7 @@
 
 
       (defn price
-        ^{:callable? true}
+        ^{:callable true}
         ;; Price is CVX amount per token, or nil if there are no tokens in liquidity pool.
         []
 
@@ -201,7 +201,7 @@
 
       (defn sell-cvx
 
-        ^{:callable? true}
+        ^{:callable true}
 
         [amount]
 
@@ -222,7 +222,7 @@
 
       (defn sell-cvx-quote
 
-        ^{:callable? true}
+        ^{:callable true}
 
         [amount]
 
@@ -248,7 +248,7 @@
 
        (defn sell-tokens
 
-          ^{:callable? true}
+          ^{:callable true}
 
           [amount]
 
@@ -270,7 +270,7 @@
 
        (defn sell-tokens-quote
 
-         ^{:callable? true}
+         ^{:callable true}
 
          [amount]
 
@@ -295,7 +295,7 @@
 
 
       (defn withdraw-liquidity
-        ^{:callable? true}
+        ^{:callable true}
         [shares]
         (let [;; Amount of shares to withdraw.
               shares       (-qc shares)
@@ -340,7 +340,7 @@
 
 (defn create-market
 
-  ^{:callable? true
+  ^{:callable true
     :doc       {:description "Gets or creates the canonical market for a token."
                 :examples    [{:code "(deploy (build-market {:token token-address}))"}]
                 :signature   [{:params [config]}]}}

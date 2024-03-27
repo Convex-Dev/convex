@@ -20,13 +20,13 @@ public class ActorTest extends ACVMTest {
 	public void testScopedCall() {
 		Context c=context();
 		
-		c=exec(c,"(def a1 (deploy '(defn ^:callable? check [] [*address* :s *scope*])))");
+		c=exec(c,"(def a1 (deploy '(defn ^:callable check [] [*address* :s *scope*])))");
 		
 		assertEquals(eval(c,"[a1 :s :foo]"),eval(c,"(call [a1 :foo] (check))"));
 		assertEquals(eval(c,"[a1 :s nil]"),eval(c,"(call a1 (check))"));
 		assertNull(eval(c,"(do (call [a1 :foo] (check)) *scope*)"));
 		
-		c=step(c,"(def a2 (deploy '(defn ^:callable? nest [t] [*scope* (call t (check)) *scope*])))");
+		c=step(c,"(def a2 (deploy '(defn ^:callable nest [t] [*scope* (call t (check)) *scope*])))");
 		assertNotError(c);
 		
 		assertEquals(eval(c,"[nil [a1 :s :foo] nil]"),eval(c,"(call a2 (nest [a1 :foo]))"));
@@ -51,7 +51,7 @@ public class ActorTest extends ACVMTest {
 	public void testBadScopedCalls() {
 		Context c=context();
 		
-		c=step(c,"(def a1 (deploy '(defn ^:callable? check [] [*caller* *address* *scope*])))");
+		c=step(c,"(def a1 (deploy '(defn ^:callable check [] [*caller* *address* *scope*])))");
 		assertNotError(c);
 		
 		// scope vector too small
@@ -66,7 +66,7 @@ public class ActorTest extends ACVMTest {
 	public void testActorAccept() {
 		Context c=context();
 		
-		c=step(c,"(def a1 (deploy '(defn ^:callable? do [c] (eval c))))");
+		c=step(c,"(def a1 (deploy '(defn ^:callable do [c] (eval c))))");
 		assertNotError(c);
 		
 		assertEquals(CVMLong.ZERO,eval(c,"(call a1 (do '(accept 0)))"));

@@ -2827,7 +2827,7 @@ public class Core {
 			AOp<?> op = (AOp<?>)ctx.getResult();
 			ctx = ctx.execute(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
-			assert (!ctx.isExceptional()) : "Error executing op: "+ op+ "\n\nException : "+ ctx.getExceptional().toString();
+			assert (!ctx.isExceptional()) : "Error executing form: "+ form+ "\n\nException : "+ ctx.getExceptional().toString();
 			
 			// Testing for core output
 			// System.out.println("Core: "+ctx.getResult());
@@ -2848,13 +2848,13 @@ public class Core {
  
  				if (definedEntry == null) {
  					// No existing value, might be a special.
- 					AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>) meta.get(Keywords.DOC);
+ 					AHashMap<Keyword, ACell> doc = (AHashMap<Keyword, ACell>) meta.get(Keywords.DOC_META);
  					if (doc == null) {
  						// No docs.
  						System.err.println("CORE WARNING: Missing :doc tag in metadata for: " + sym);
  						continue;
  					} else {
- 						if (meta.get(Keywords.SPECIAL_Q) == CVMBool.TRUE) {
+ 						if (meta.get(Keywords.SPECIAL_META) == CVMBool.TRUE) {
  							ACell val=sym;
  							
  							// convert *special* symbols into Ops

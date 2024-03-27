@@ -33,7 +33,7 @@ public class SpecialTest extends ACVMTest {
 		assertEquals(InitTest.HERO, eval("*address*"));
 
 		// *address* MUST return Actor address within actor call
-		Context ctx=step("(def act (deploy `(do (defn addr ^{:callable? true} [] *address*))))");
+		Context ctx=step("(def act (deploy `(do (defn addr ^{:callable true} [] *address*))))");
 		Address act=(Address) ctx.getResult();
 		assertEquals(act, eval(ctx,"(call act (addr))"));
 		
@@ -47,7 +47,7 @@ public class SpecialTest extends ACVMTest {
 		assertEquals(InitTest.HERO, eval("*origin*"));
 		
 		// *origin* MUST return original address within actor call
-		Context ctx=step("(def act (deploy `(do (defn origin ^{:callable? true} [] *origin*))))");
+		Context ctx=step("(def act (deploy `(do (defn origin ^{:callable true} [] *origin*))))");
 		assertEquals(InitTest.HERO, eval(ctx,"(call act (origin))"));
 		
 		// *origin* MUST be original address in library call
@@ -114,7 +114,7 @@ public class SpecialTest extends ACVMTest {
 	@Test
 	public void testSpecialCaller() {
 		assertNull(eval("*caller*"));
-		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *caller*)))) (call c (f)))"));
+		assertEquals(HERO, eval("(do (def c (deploy '(do (defn f ^{:callable true} [] *caller*)))) (call c (f)))"));
 	}
 
 	@Test
@@ -132,7 +132,7 @@ public class SpecialTest extends ACVMTest {
 		assertEquals(Keywords.FOO, eval("(do ((fn [] :foo)) *result*)"));
 
 		// *result* should be cleared to nil in an Actor call.
-		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *result*)))) (call c (f)))"));
+		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable true} [] *result*)))) (call c (f)))"));
 	}
 	
 	@Test
@@ -149,7 +149,7 @@ public class SpecialTest extends ACVMTest {
 
 
 		// *result* should be cleared to nil in an Actor call.
-		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable? true} [] *nop*)))) (call c (f)))"));
+		assertNull(eval("(do (def c (deploy '(do (defn f ^{:callable true} [] *nop*)))) (call c (f)))"));
 	}
 
 	@Test

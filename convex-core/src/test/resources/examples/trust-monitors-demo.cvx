@@ -30,7 +30,7 @@
 
 (def plz-monitor (mon/permit-subjects #12))
 
-(defn ^:callable? plz []
+(defn ^:callable plz []
   (if (trust/trusted? plz-monitor *caller* :plz [USD 100])
     (asset/transfer *caller* [USD 100])
     (fail :TRUST "No dollar for you!")))
