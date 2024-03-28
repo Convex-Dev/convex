@@ -299,7 +299,7 @@ public class REPLPanel extends JPanel {
 						return;
 					}
 					Address address = getAddress();
-					ATransaction trans = Invoke.create(address,-1, code);
+					ATransaction trans = Invoke.create(address,0, code);
 					convex.setAddress(address);
 					convex.setKeyPair(getKeyPair());
 					future = convex.transact(trans);
