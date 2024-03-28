@@ -375,6 +375,23 @@ public abstract class Convex {
 	 * @throws TimeoutException 
 	 */
 	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException, TimeoutException {
+		SignedData<ATransaction> signed = prepareTransaction(transaction);
+		CompletableFuture<Result> r= transact(signed);
+		return r;
+	}
+
+	/**
+	 * Prepares a transaction for network submission
+	 * - Sets origin account if needed
+	 * - Sets sequence number (if autosequencing is enabled)
+	 * - Signs transaction with current key pair
+	 *
+	 * @param transaction Transaction to prepare
+	 * @return Signed transaction ready to submit
+	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
+	 * @throws TimeoutException 
+	 */
+	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws TimeoutException, IOException {
 		Address origin=transaction.getOrigin();
 		if (origin == null) {
 			origin=address;
@@ -420,8 +437,7 @@ public abstract class Convex {
 		}		
 		
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
-		CompletableFuture<Result> r= transact(signed);
-		return r;
+		return signed;
 	}
 
 	/**
@@ -445,7 +461,7 @@ public abstract class Convex {
 	 * @throws TimeoutException 
 	 */
 	public synchronized CompletableFuture<Result> transact(ACell code) throws IOException, TimeoutException {
-		ATransaction trans = Invoke.create(getAddress(), -1, code);
+		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
 		return transact(trans);
 	}
 
@@ -470,7 +486,7 @@ public abstract class Convex {
 	 * @throws TimeoutException If the transaction times out
 	 */
 	public synchronized Result transactSync(String code) throws IOException, TimeoutException {
-		ATransaction trans = Invoke.create(getAddress(), -1, code);
+		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
 		return transactSync(trans);
 	}
 
@@ -497,7 +513,7 @@ public abstract class Convex {
 	 * @throws TimeoutException 
 	 */
 	public CompletableFuture<Result> transfer(Address target, long amount) throws IOException, TimeoutException {
-		ATransaction trans = Transfer.create(getAddress(), 0, target, amount);
+		ATransaction trans = Transfer.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, target, amount);
 		return transact(trans);
 	}
 

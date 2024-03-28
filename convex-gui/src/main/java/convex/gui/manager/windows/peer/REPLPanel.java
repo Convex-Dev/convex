@@ -43,6 +43,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.List;
+import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -65,6 +66,7 @@ public class REPLPanel extends JPanel {
 	private JCheckBox btnResults;
 	private JCheckBox btnTiming;
 	private JCheckBox btnCompile;
+	private JCheckBox btnTX;
 	
 	private ArrayList<String> history=new ArrayList<>();
 	private int historyPosition=0;
@@ -227,6 +229,10 @@ public class REPLPanel extends JPanel {
 			JOptionPane.showMessageDialog(this, infoString);
 		});
 		
+		btnTX=new JCheckBox("Show transaction");
+		btnTX.setToolTipText("Tick to show full transaction details.");
+		panel_1.add(btnTX);
+		
 		btnResults=new JCheckBox("Full Results");
 		btnResults.setToolTipText("Tick to show full Result record returned from peer.");
 		panel_1.add(btnResults);
@@ -299,10 +305,17 @@ public class REPLPanel extends JPanel {
 						return;
 					}
 					Address address = getAddress();
-					ATransaction trans = Invoke.create(address,0, code);
 					convex.setAddress(address);
 					convex.setKeyPair(getKeyPair());
-					future = convex.transact(trans);
+					ATransaction trans = Invoke.create(address,0, code);
+					SignedData<ATransaction> strans=convex.prepareTransaction(trans);
+					
+					if (btnTX.isSelected()) {
+						addOutput(outputArea,strans.toString()+"\n");
+						addOutput(outputArea,"TX Hash: "+strans.getHash()+"\n");
+					}
+					
+					future = convex.transact(strans);
 				} else {
 					throw new Error("Unrecognosed REPL mode: " + mode);
 				}

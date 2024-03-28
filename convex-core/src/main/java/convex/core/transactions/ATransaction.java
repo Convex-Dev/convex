@@ -20,6 +20,12 @@ import convex.core.lang.Context;
  *
  */
 public abstract class ATransaction extends ARecord {
+	
+	/**
+	 * Sequence number for transactions where required sequence is currently unknown
+	 */
+	public static final long UNKNOWN_SEQUENCE = 0;
+	
 	protected final Address origin;
 	protected final long sequence;
 
