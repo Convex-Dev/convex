@@ -2,12 +2,11 @@ package convex.core.data;
 
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Abstract base class for generic records.
  * 
- * Generic records are backed by a vector of values
+ * Generic records are backed by a Vector of values
  */
 public abstract class ARecordGeneric extends ARecord {
 
@@ -55,7 +54,7 @@ public abstract class ARecordGeneric extends ARecord {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return h.equals(ha);
 		}
 		return values.equals(a.values);
 	}

@@ -250,8 +250,6 @@ public final class Result extends ARecordGeneric {
 		if (rc.totalFees>0) info=info.assoc(Keywords.FEES, CVMLong.create(rc.totalFees));
 		if (rc.juiceUsed>0) info=info.assoc(Keywords.JUICE, CVMLong.create(rc.juiceUsed));
 		
-	
-		
 		return create(id,(ACell)result,errorCode,info);
 	}
 	
