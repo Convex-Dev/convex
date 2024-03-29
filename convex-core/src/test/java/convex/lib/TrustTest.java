@@ -20,6 +20,7 @@ import convex.core.data.Vectors;
 import convex.core.init.BaseTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
+import convex.test.Samples;
 
 public class TrustTest extends ACVMTest {
 	private Address trusted;
@@ -140,7 +141,7 @@ public class TrustTest extends ACVMTest {
 	 * @param thing Entity to change control (Address or scope vector)
 	 */
 	public static void testChangeControl(Context ctx, ACell thing) {
-		ctx=ctx.createAccount(null);
+		ctx=ctx.deploy(Samples.NIL);
 		Address nca=(Address) ctx.getResult();
 		
 		// Change control should work

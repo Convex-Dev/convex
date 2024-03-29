@@ -135,7 +135,7 @@ public class Juice {
 	 * 
 	 * Pretty cheap.
 	 */
-	public static final long EQUALS = 5;
+	public static final long EQUALS = 20;
 
 	/**
 	 * Juice for numeric comparison
@@ -155,14 +155,14 @@ public class Juice {
 	/**
 	 * Base juice for a cryptographic hash
 	 * 
-	 * Expensive.
+	 * Expensive. We want to discourage lots of these.
 	 */
 	public static final long HASH = 1000;
 	
 	/**
 	 * Juice per byte of a cryptographic hash
 	 */
-	public static final long HASH_PER_BYTE = 10;
+	public static final long HASH_PER_BYTE = 20;
 
 	/**
 	 * Juice for a very cheap operation. O(1), no new cell allocations or non-trivial lookups.
@@ -531,6 +531,11 @@ public class Juice {
 		return Math.max(0, limit);
 	}
 
+	/**
+	 * Calculate price for memory size, mainly used for transaction overhead cost
+	 * @param a
+	 * @return
+	 */
 	public static long priceMemorySize(ACell a) {
 		return Juice.mul(Juice.TRANSACTION_PER_BYTE, Utils.fullMemorySize(a));
 	}

@@ -1,5 +1,6 @@
 package convex.lib;
 
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
@@ -14,7 +15,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.TestState;
-import static convex.test.Assertions.*;
 
 public class BasicNFTTest extends ACVMTest {
 	
@@ -76,9 +76,9 @@ public class BasicNFTTest extends ACVMTest {
 		assertEquals(Sets.of(v.toCellArray()),eval(ctx,"(asset/balance nft)"));
 		
 		// Create test Users
-		ctx=ctx.createAccount(KP1.getAccountKey());
+		ctx = exec(ctx,"(create-account "+KP1.getAccountKey()+")");
 		Address user1=(Address) ctx.getResult();
-		ctx=ctx.createAccount(KP2.getAccountKey());
+		ctx = exec(ctx,"(create-account "+KP2.getAccountKey()+")");
 		Address user2=(Address) ctx.getResult();
 		
 		ctx=step(ctx,"(asset/transfer "+user1+" [nft (set (next total))])");

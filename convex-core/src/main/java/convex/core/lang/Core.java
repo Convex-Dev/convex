@@ -698,7 +698,7 @@ public class Core {
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length<1) return context.withArityError(minArityMessage(1, args.length));
 
-			return context.deployActor(args);
+			return context.deploy(args);
 		}
 	});
 

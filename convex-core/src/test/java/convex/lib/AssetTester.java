@@ -143,7 +143,7 @@ public class AssetTester {
 		// Run generic asset tests, giving 1/3 the balance to a new user account
 		{
 			Context c = ctx.fork();
-			c = c.createAccount(Samples.ACCOUNT_KEY);
+			c =  step(c,"(create-account "+Samples.ACCOUNT_KEY+")");
 			Address user2 = (Address) c.getResult();
 			Long smallBal = BAL / 3;
 			c = step(c, "(asset/transfer " + user2 + " [token " + smallBal + "])");
@@ -183,7 +183,7 @@ public class AssetTester {
 	 */
 	public static void doAssetTests(Context ctx, ACell asset, Address user1, Address user2) {
 		// Set up test user
-		ctx = ctx.createAccount(TEST_KP.getAccountKey());
+		ctx = step(ctx,"(create-account "+TEST_KP.getAccountKey()+")");
 		Address tester = (Address) ctx.getResult();
 		ctx = ctx.forkWithAddress(tester);
 		ctx = step(ctx, "(import convex.asset :as asset)");

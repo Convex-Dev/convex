@@ -49,7 +49,7 @@ public class TestState {
 							+ "(defn read ^{:callable true} [] my-data)" + "(defn who-called-me ^{:callable true} [] *caller*)"
 							+ "(defn my-address ^{:callable true} [] *address*)" + "(defn my-number ^{:callable true} [] "+i+")" + "(defn foo ^{:callable true} [] :bar))");
 
-			ctx = ctx.deployActor(contractCode);
+			ctx = ctx.deploy(contractCode);
 			CONTRACTS[i] = (Address) ctx.getResult();
 		}
 
@@ -113,7 +113,7 @@ public class TestState {
 		try {
 			source = Utils.readResourceAsString(actorResource);
 			ACell contractCode=Reader.read(source);
-			ctx=ctx.deployActor(contractCode);
+			ctx=ctx.deploy(contractCode);
 		} catch (IOException e) {
 			throw new RuntimeException("IO Error setting up testing state",e);
 		}

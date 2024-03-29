@@ -1812,17 +1812,16 @@ public class Context {
 	}
 
 	/**
-	 * Deploys an Actor in this context.
+	 * Deploys an new account.
 	 *
-	 * Argument argument must be an Actor generation code, which will be evaluated in the new Actor account
-	 * to initialise the Actor.
+	 * Argument argument must be an account setup code, which will be evaluated in the new account.
 	 *
-	 * Result will contain the new Actor address if successful, an exception otherwise.
+	 * Result will contain the new address if successful, an exception otherwise.
 	 *
-	 * @param code Actor initialisation code
-	 * @return Updated Context with Actor deployed, or an exceptional result
+	 * @param code Account initialisation code
+	 * @return Updated Context with account deployed, or an exceptional result
 	 */
-	public Context deployActor(ACell... code) {
+	public Context deploy(ACell... code) {
 		int n=code.length;
 		final State initialState=getState();
 
@@ -1840,22 +1839,6 @@ public class Context {
 		if (result.isExceptional()) return result;
 
 		return result.withResult(Juice.DEPLOY_CONTRACT,address);
-	}
-
-	/**
-	 * Create a new Account with a given AccountKey (may be null for actors etc.)
-	 * @param key New Account Key
-	 * @return Updated context with new Account added
-	 */
-	public Context createAccount(AccountKey key) {
-		final State initialState=getState();
-		Address address=initialState.nextAddress();
-		AVector<AccountStatus> accounts=initialState.getAccounts();
-		AccountStatus as=AccountStatus.create(0L, key);
-		accounts=accounts.conj(as);
-		final State newState=initialState.withAccounts(accounts);
-		Context rctx=this.withState(newState);
-		return rctx.withResult(address);
 	}
 
 	public Context withError(Keyword error) {

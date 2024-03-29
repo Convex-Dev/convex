@@ -59,7 +59,7 @@ public class BoxTest extends ACVMTest {
 		assertSame(Sets.empty(),eval(ctx,"(asset/balance box.actor #0)"));
 		
 		// Create test Users
-		ctx=ctx.createAccount(Samples.KEY_PAIR.getAccountKey());
+		ctx = exec(ctx,"(create-account "+Samples.KEY_PAIR.getAccountKey()+")");
 		Address user2=(Address) ctx.getResult();
 
 		ctx=step(ctx,"(asset/transfer "+user2+" ["+BOX+" #{"+BAL.get(0)+"}])");

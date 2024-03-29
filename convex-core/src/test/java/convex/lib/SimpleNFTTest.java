@@ -54,13 +54,13 @@ public class SimpleNFTTest extends ACVMTest {
 		assertEquals(Sets.of(v.toCellArray()),eval(ctx,"(asset/balance nft)"));
 		
 		// Create test Users
-		ctx=ctx.createAccount(KP1.getAccountKey());
+		ctx=exec(ctx,"(create-account "+KP1.getAccountKey()+")");
 		Address user1=(Address) ctx.getResult();
-		ctx=ctx.createAccount(KP2.getAccountKey());
+		ctx=exec(ctx,"(create-account "+KP2.getAccountKey()+")");
 		Address user2=(Address) ctx.getResult();
 		
-		ctx=step(ctx,"(asset/transfer "+user1+" [nft (set (next total))])");
-		ctx=step(ctx,"(asset/transfer "+user2+" [nft #{"+b1+"}])");
+		ctx=exec(ctx,"(asset/transfer "+user1+" [nft (set (next total))])");
+		ctx=exec(ctx,"(asset/transfer "+user2+" [nft #{"+b1+"}])");
 		assertEquals(Sets.of(b1),ctx.getResult());
 		
 		AssetTester.doAssetTests(ctx, NFT, user1, user2);

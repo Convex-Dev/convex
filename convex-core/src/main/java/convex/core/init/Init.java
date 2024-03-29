@@ -297,7 +297,7 @@ public class Init {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
 			AList<ACell> code=forms.drop(1);
 			
-			ctx = ctx.deployActor(code.toCellArray());
+			ctx = ctx.deploy(code.toCellArray());
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
 			Address addr=ctx.getResult();
 			
