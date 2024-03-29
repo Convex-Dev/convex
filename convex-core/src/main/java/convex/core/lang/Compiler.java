@@ -572,7 +572,7 @@ public class Compiler {
 		for (int i=0; i<num; i++) {
 			ACell o=Syntax.unwrap(list.get(i));
 			if (!(o instanceof AList)) {
-				return context.withError(ErrorCodes.COMPILE,"multi-function requires instances of form: ([args] ...) but got "+list);
+				return context.withSyntaxError("multi-function requires instances of form: ([args] ...) but got "+list);
 			}
 			
 			context= compileFnInstance((AList<ACell>) o,context);
@@ -606,7 +606,7 @@ public class Compiler {
 			return compileFnInstance(paramsVector,bodyList,context);
 		}
 			
-		return context.withCompileError("fn instance requires a vector of parameters but got form: " + list);
+		return context.withSyntaxError("fn instance requires a vector of parameters but got form: " + list);
 	}
 		
 	@SuppressWarnings("unchecked")

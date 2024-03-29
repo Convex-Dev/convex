@@ -3836,10 +3836,10 @@ public class CoreTest extends ACVMTest {
 
 		// Bad fn forms
 		assertArityError(step("(fn)"));
-		assertCompileError(step("(fn 1)"));
-		assertCompileError(step("(fn foo 1)"));
-		assertCompileError(step("(fn {})"));
-		assertCompileError(step("(fn '())"));
+		assertSyntaxError(step("(fn 1)"));
+		assertSyntaxError(step("(fn foo 1)"));
+		assertSyntaxError(step("(fn {})"));
+		assertSyntaxError(step("(fn '())"));
 
 		// fn printing
 		assertCVMEquals("(fn [x y] 0)",eval("(str (fn [x y] 0))"));
@@ -4100,7 +4100,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(defn f)"));
 
 		// bad function construction
-		assertCompileError(step("(defn f b)"));
+		assertSyntaxError(step("(defn f b)"));
 
 	}
 
