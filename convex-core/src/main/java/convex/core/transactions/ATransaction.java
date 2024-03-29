@@ -79,6 +79,9 @@ public abstract class ATransaction extends ARecord {
 	/**
 	 * Gets the sequence number for this transaction. The first transaction for any account should have sequence number 1. 
 	 * The sequence number must be incremented by 1 for each subsequent transaction.
+	 * 
+	 * A sequence number of 0 stands for "unknown".
+	 * 
 	 * @return Sequence number
 	 */
 	public final long getSequence() {

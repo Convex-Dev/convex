@@ -25,7 +25,7 @@ import convex.core.exceptions.InvalidDataException;
  * understanding it." - John Conway
  * </p>
  */
-public final class Symbol extends ASymbolic implements Comparable<Symbol> {
+public final class Symbol extends ASymbolic {
 	
 	private Symbol(StringShort name) {
 		super(name);
@@ -104,6 +104,13 @@ public final class Symbol extends ASymbolic implements Comparable<Symbol> {
 	}
 	
 	@Override
+	public int compareTo(ABlobLike<?> b) {
+		if (b instanceof Symbol) {
+			return compareTo((Symbol)b);
+		}
+		return -b.compareTo(toBlob());
+	}
+	
 	public int compareTo(Symbol sym) {
 		return name.compareTo(sym.name.toBlob());
 	}
@@ -180,5 +187,11 @@ public final class Symbol extends ASymbolic implements Comparable<Symbol> {
 		return name;
 	}
 
+	@Override
+	public Symbol slice(long start, long end) {
+		if (start>=end) return null;
+		if ((start==0)&&(end==name.length)) return this;
+		return Symbol.create(name.slice(start, end));
+	}
 
 }

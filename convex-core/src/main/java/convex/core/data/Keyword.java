@@ -16,7 +16,7 @@ import convex.core.exceptions.InvalidDataException;
  * "Programs must be written for people to read, and only incidentally for
  * machines to execute." ― Harold Abelson
  */
-public final class Keyword extends ASymbolic implements Comparable<Keyword> {
+public final class Keyword extends ASymbolic {
 
 	/** Maximum size of a Keyword in UTF-8 bytes representation */
 	public static final int MAX_CHARS = Constants.MAX_NAME_LENGTH;
@@ -147,8 +147,15 @@ public final class Keyword extends ASymbolic implements Comparable<Keyword> {
 		if (other == null) return false;
 		return name.equals(other.name);
 	}
-
+	
 	@Override
+	public int compareTo(ABlobLike<?> b) {
+		if (b instanceof Keyword) {
+			return compareTo((Keyword)b);
+		}
+		return -b.compareTo(toBlob());
+	}
+	
 	public int compareTo(Keyword k) {
 		return name.compareTo(k.name.toBlob());
 	}
@@ -176,6 +183,13 @@ public final class Keyword extends ASymbolic implements Comparable<Keyword> {
 	@Override
 	public AString toCVMString(long limit) {
 		return Strings.COLON.append(name);
+	}
+	
+	@Override
+	public Keyword slice(long start, long end) {
+		if (start>=end) return null;
+		if ((start==0)&&(end==name.length)) return this;
+		return Keyword.create(name.slice(start, end));
 	}
 
 }

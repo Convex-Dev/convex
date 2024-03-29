@@ -560,12 +560,15 @@
           :examples    [{:code "(for [x [1 2 3]] (inc x))"}]
           :signature   [{:params [[sym sequence] & body]}]}}
   [[sym sequence] & body]
-  `(map ~(cons 'fn 
-               (vector sym)
-               body)
-        (vec ~sequence)))
-
-
+  `(let [s# ~sequence
+         n# (count s#)]
+	 (loop [a [] 
+			i 0]
+	   (cond (< i n#)
+		  (recur (conj a (let [~sym (nth s# i)] ~(cons 'do 
+				                                       body))) 
+				 (inc i))
+		  a))))
 
 (defmacro set-in!
 		^{:doc {:description "Sets a value within a nested associative structure, combining behaviour of set! and assoc-in."

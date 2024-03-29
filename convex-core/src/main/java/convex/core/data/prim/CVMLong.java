@@ -453,5 +453,10 @@ public final class CVMLong extends AInteger {
 		return result;
 	}
 
+	@Override
+	public boolean isLong() {
+		return true;
+	}
+
 
 }

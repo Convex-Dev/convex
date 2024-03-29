@@ -1,12 +1,13 @@
 package convex.core.data;
 
 import convex.core.Constants;
+import convex.core.data.prim.CVMChar;
 import convex.core.exceptions.InvalidDataException;
 
 /**
  * Abstract based class for symbolic objects (Keywords, Symbols)
  */
-public abstract class ASymbolic extends ACell {
+public abstract class ASymbolic extends ABlobLike<CVMChar> {
 
 	protected final StringShort name;
 
@@ -76,5 +77,61 @@ public abstract class ASymbolic extends ACell {
 	 */
 	@Override
 	public abstract void validateCell() throws InvalidDataException;
+	
+	@Override
+	public byte byteAt(long i) {
+		// TODO Auto-generated method stub
+		return toBlob().byteAt(i);
+	}
+
+	@Override
+	public long hexMatchLength(ABlob b, long start, long length) {
+		return toBlob().hexMatchLength(b, start, length);
+	}
+
+	@Override
+	public ABlobLike<CVMChar> empty() {
+		// emptying a symbolic value isn't really valid. Return null.
+		return null;
+	}
+
+	@Override
+	public int getBytes(byte[] dest, int destOffset) {
+		return toBlob().getBytes(dest, destOffset);
+	}
+
+	@Override
+	public long longValue() {
+		// TODO Auto-generated method stub
+		return toBlob().longValue();
+	}
+
+	@Override
+	public ABlob toBlob() {
+		return name.toBlob();
+	}
+
+	@Override
+	public boolean equalsBytes(ABlob b) {
+		return toBlob().equalsBytes(b);
+	}
+
+	@Override
+	public long count() {
+		return name.count();
+	}
+
+	@Override
+	public Ref<CVMChar> getElementRef(long index) {
+		return Ref.get(get(index));
+	}
+	
+	@Override
+	public CVMChar get(long index) {
+		return name.get(index);
+	}
+
+	@Override
+	public abstract ABlobLike<CVMChar> slice(long start, long end);
 
 }

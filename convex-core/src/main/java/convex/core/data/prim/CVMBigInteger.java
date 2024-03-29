@@ -409,6 +409,11 @@ public final class CVMBigInteger extends AInteger {
 		return blob();
 	}
 
+	@Override
+	public boolean isLong() {
+		return !isCanonical();
+	}
+
 
 
 }

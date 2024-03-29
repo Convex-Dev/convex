@@ -826,9 +826,6 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(ACell o, long i) {
-		if (o == null)
-			throw new IndexOutOfBoundsException("Can't get nth element from null!");
-
 		if (o instanceof ACountable)
 			return ((ACountable<T>) o).get(i); // blobs, maps, strings and collections
 
@@ -845,8 +842,8 @@ public class RT {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(Object o, long i) {
-		if (o instanceof ACell)
-			return nth((ACell) o, i);
+		if (o instanceof ACountable)
+			return ((ACountable<T>)o).get(i);
 
 		try {
 			if (o.getClass().isArray()) {
@@ -872,6 +869,23 @@ public class RT {
 			return 0L;
 		if (o instanceof ACell)
 			return count((ACell) o);
+		if (o.getClass().isArray()) {
+			return (long) Array.getLength(o);
+		}
+		return null;
+	}
+	
+	/**
+	 * Gets the count of objects in a collection for destructuring (may be data structure or Java Array)
+	 * 
+	 * @param o An Object representing a collection of items to be counted
+	 * @return The count of elements in the collection, or null if not countable
+	 */
+	public static Long argumentCount(Object o) {
+		if (o == null)
+			return 0L;
+		if (o instanceof ADataStructure)
+			return ((ADataStructure<?>) o).count();
 		if (o.getClass().isArray()) {
 			return (long) Array.getLength(o);
 		}

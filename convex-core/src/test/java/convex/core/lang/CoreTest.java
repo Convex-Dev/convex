@@ -263,6 +263,7 @@ public class CoreTest extends ACVMTest {
 		// badly formed lets - Issue #80 related
 		assertCompileError(step("(let)"));
 		assertCompileError(step("(let :foo)"));
+		assertCompileError(step("(let foo)"));
 		assertCompileError(step("(let [a])"));
 	}
 	
@@ -770,8 +771,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(eval("(blob-map 0xa2 :foo 0xb3 :bar)"),eval("(assoc (blob-map) 0xa2 :foo 0xb3 :bar)"));
 
 		// Bad key types should result in argument errors
-		assertArgumentError(step("(blob-map :foo :bar)")); // See issue #162
-		assertArgumentError(step("(assoc (blob-map) :foo 10)")); // See Issue #101
+		assertArgumentError(step("(blob-map nil :bar)")); 
+		assertArgumentError(step("(assoc (blob-map) \\f 10)")); 
 		
 		// We want to preserve Address type in keys and values
 		assertEquals(Address.create(19),eval("(first (first (blob-map #19 #21)))"));
@@ -946,6 +947,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1,2),eval("(slice #{1 2} 0)"));
 		assertEquals(Sets.empty(),eval("(slice #{1 2} 1 1)"));
 		
+		// Invalid slices of symbolic values
+		assertNull(eval("(slice :foo 3)")); 
+		assertNull(eval("(slice 'gyuigui 1 1)")); 
+
+		
 		// TODO: slicing for maps
 		//assertEquals(Maps.of(1,2),eval("(slice {1 2} 0)"));
 
@@ -955,7 +961,7 @@ public class CoreTest extends ACVMTest {
 		assertBoundsError(step("(slice 0x1234 1 3)")); 
 		assertBoundsError(step("(slice 0x1234 2 0)")); 
 		
-		assertCastError(step("(slice :foo 0)")); 
+		assertCastError(step("(slice 567 0)")); 
 		
 		assertArityError(step("(slice)"));
 		assertArityError(step("(slice nil nil nil nil)"));
@@ -1111,6 +1117,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(nth [1 2] 1)"));
 		assertEquals(2L, evalL("(nth [1 2] (byte 1))"));
 		assertCVMEquals('c', eval("(nth \"abc\" 2)"));
+		assertCVMEquals('b', eval("(nth :abc 1)"));
+		assertCVMEquals('a', eval("(nth 'abc 0)"));
 		assertEquals(CVMLong.create(10), eval("(nth 0xff0a0b 1)")); // Blob nth byte
 
 		assertArityError(step("(nth)"));
@@ -1127,8 +1135,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(nth [] :foo)"));
 		assertCastError(step("(nth [] nil)"));
 
-		// cast errors for non-sequential objects
-		assertCastError(step("(nth :foo 0)"));
+		// cast errors for non-countable objects
 		assertCastError(step("(nth 12 13)"));
 
 		// BOUNDS error because treated as empty sequence
@@ -1164,13 +1171,13 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(vec {})"));
 		assertSame(Vectors.empty(), eval("(vec (blob-map))"));
 
-		assertEquals( eval("[\\a \\b \\c]"), eval("(vec \"abc\")"));
+		assertEquals(read("[\\a \\b \\c]"), eval("(vec \"abc\")"));
+		assertEquals(read("[\\f \\o \\o]"), eval("(vec :foo)"));
 
 		assertEquals(Vectors.of(1,2,3,4), eval("(vec (list 1 2 3 4))"));
 		assertEquals(Vectors.of(MapEntry.of(1,2)), eval("(vec {1,2})"));
 
 		assertCastError(step("(vec 1)"));
-		assertCastError(step("(vec :foo)"));
 
 		assertArityError(step("(vec)"));
 		assertArityError(step("(vec 1 2)"));
@@ -1572,6 +1579,7 @@ public class CoreTest extends ACVMTest {
 	public void testFirst() {
 		assertEquals(1L, evalL("(first [1 2])"));
 		assertEquals(1L, evalL("(first '(1 2 3 4))"));
+		assertEquals(CVMChar.create('f'), eval("(first :foo)"));
 
 		assertBoundsError(step("(first [])"));
 		assertBoundsError(step("(first nil)"));
@@ -1579,7 +1587,6 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(first)"));
 		assertArityError(step("(first [1] 2)"));
 		assertCastError(step("(first 1)"));
-		assertCastError(step("(first :foo)"));
 		
 		assertEquals(17L,evalL("(first 0x11223344)"));
 		
@@ -1686,7 +1693,7 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
 		assertArgumentError(step("(conj {1 2} [1])")); // wrong size vector for a map entry
 		assertArgumentError(step("(conj {} '(1 2))")); // wrong type for a map entry
-		assertArgumentError(step("(conj (blob-map) [:foo 0xa2])")); // bad key type for blobmap
+		assertArgumentError(step("(conj (blob-map) [nil 0xa2])")); // bad key type for blobmap
 		assertArgumentError(step("(conj (blob-map #0 #0) [false #0])")); // Issue #386
 
 		assertCastError(step("(conj 1 2)"));
@@ -1898,13 +1905,15 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.empty(), eval("(for [x []] (inc x))"));
 		assertEquals(Vectors.of(2L,3L), eval("(for [x '(1 2)] (inc x))"));
 		assertEquals(Vectors.of(2L,3L), eval("(for [x [1 2]] (inc x))"));
+		
+		assertEquals(read("[\\f \\o \\o]"), eval("(for [x :foo] x)")); 
 
 		// TODO: maybe dubious error types?
-
 		assertCastError(step("(for 1 1)")); // bad binding form
 		assertArityError(step("(for [x] 1)")); // bad binding form
 		assertArityError(step("(for [x [1 2] [2 3]] 1)")); // bad binding form length
-		assertCastError(step("(for [x :foo] 1)")); // bad sequence
+		
+		assertCastError(step("(for [x 1] :foo)")); // bad sequence (not countable)
 
 		assertArityError(step("(for)"));
 		assertArityError(step("(for [] nil nil)"));
@@ -3492,6 +3501,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L, evalL("(count (list :foo :bar))"));
 		assertEquals(2L, evalL("(count #{1 2 2})"));
 		assertEquals(3L, evalL("(count [1 2 3])"));
+		assertEquals(3L, evalL("(count :foo)"));
+		assertEquals(8L, evalL("(count 'deadbeef)"));
 		assertEquals(4L, evalL("(count 0xcafebabe)"));
 		
 		// Address is blob-like when used in indexes, so this behaviour is useful
@@ -3502,7 +3513,6 @@ public class CoreTest extends ACVMTest {
 
 		// non-countable things fail with CAST
 		assertCastError(step("(count 1)"));
-		assertCastError(step("(count :foo)"));
 
 		assertArityError(step("(count)"));
 		assertArityError(step("(count 1 2)"));
@@ -3825,6 +3835,7 @@ public class CoreTest extends ACVMTest {
 		// Bad fn forms
 		assertArityError(step("(fn)"));
 		assertCompileError(step("(fn 1)"));
+		assertCompileError(step("(fn foo 1)"));
 		assertCompileError(step("(fn {})"));
 		assertCompileError(step("(fn '())"));
 

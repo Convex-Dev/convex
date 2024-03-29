@@ -1069,7 +1069,7 @@ public class Context {
 			long vcount=v.count(); // count of binding form symbols (may include & etc.)
 
 			// Count the arguments, exit with a CAST error if args are not sequential
-			Long argCount=RT.count(args);
+			Long argCount=RT.argumentCount(args);
 			if (argCount==null) return ctx.withError(ErrorCodes.CAST, "Trying to destructure an argument that is not a sequential collection");
 
 			boolean foundAmpersand=false;

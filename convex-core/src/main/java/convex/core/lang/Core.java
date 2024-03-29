@@ -2227,12 +2227,12 @@ public class Core {
 			if (n == null) return context.withCastError(arg, Types.SEQUENCE);
 
 			// Second argument should be an Integer index within long range
-			ACell iarg=RT.ensureInteger(args[1]);
-			if (!(iarg instanceof AInteger)) return context.withCastError(1,args, Types.INTEGER);
-			CVMLong ix = RT.ensureLong(iarg);
-			if (ix == null) return context.withError(ErrorCodes.BOUNDS,"Excessively large index");
+			AInteger iarg=RT.ensureInteger(args[1]);
+			if (iarg==null) return context.withCastError(1,args, Types.INTEGER);
+			
+			if (!iarg.isLong()) return context.withError(ErrorCodes.BOUNDS,"Excessively large index");
 
-			long i=ix.longValue();
+			long i=iarg.longValue();
 
 			// BOUNDS error if access is out of bounds
 			if ((i < 0) || (i >= n)) return context.withBoundsError(i);
