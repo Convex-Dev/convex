@@ -1339,10 +1339,9 @@ public class Context {
 		AccountStatus as=this.getAccountStatus(target);
 		if (as==null) return withError(Errors.nobody(target));
 
+		// TODO should probably refactor into a checkControl function or similar
 		ACell controller=as.getController();
-
 		boolean canControl=false;
-
 		Context ctx=this;
 		if (caller.equals(target)) {
 			// can always control own address
