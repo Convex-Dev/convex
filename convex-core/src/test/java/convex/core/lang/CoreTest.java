@@ -4228,7 +4228,14 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(eval-as :foo 2)"));
 		assertArityError(step("(eval-as 1)")); // arity > cast
 		assertArityError(step("(eval-as 1 2 3)"));
-		
+	}
+	
+	@Test
+	public void testEvalAsInActor() {
+		// eval-as in an actor should clear any *offer*
+		Context ctx=exec(context(),"(def ACTOR (deploy '[(defn ^:callable off [] (eval-as *address* '*offer*))]))");
+		ctx=exec(ctx,"(call ACTOR 5678 (off))");
+		assertCVMEquals(0,ctx.getResult());
 	}
 
 	@Test

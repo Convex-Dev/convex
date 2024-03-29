@@ -80,6 +80,7 @@ public class Context {
 	private static final ACell NO_RESULT = null;
 	private static final ACell NULL_SCOPE = null;
 	private static final AExceptional NO_EXCEPTION = null;
+	private static final CompilerState NO_COMPILER_STATE = null;
 	
 	// private static final Logger log=Logger.getLogger(Context.class.getName());
 
@@ -1329,27 +1330,29 @@ public class Context {
 	 * Evaluates a form as another Address.
 	 *
 	 * Causes TRUST error if the Address is not controlled by the current address.
-	 * @param address Address of Account in which to evaluate
+	 * @param target Address of Account in which to evaluate
 	 * @param form Form to evaluate
 	 * @return Updated Context
 	 */
-	public Context evalAs(Address address, ACell form) {
+	public Context evalAs(Address target, ACell form) {
 		Address caller=getAddress();
-		if (caller.equals(address)) return eval(form);
-		AccountStatus as=this.getAccountStatus(address);
-		if (as==null) return withError(Errors.nobody(address));
+		AccountStatus as=this.getAccountStatus(target);
+		if (as==null) return withError(Errors.nobody(target));
 
 		ACell controller=as.getController();
-		if (controller==null) return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+address);
 
 		boolean canControl=false;
 
-		// Run eval in a forked context
-		Context ctx=this.fork();
-		if (controller.equals(caller)) {
+		Context ctx=this;
+		if (caller.equals(target)) {
 			// can always control own address
 			canControl=true;
-		} else {
+		} else if (controller==null) {
+			return withError(ErrorCodes.TRUST,"Cannot control address with nil controller set: "+target);
+		} else if (caller.equals(controller)) {
+			// if we are the precisely specified controller, can control
+			canControl=true;
+		}  else {
 			// need to check trust monitor
 			Address actorAddress=RT.callableAddress(controller);
 			if (actorAddress==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller is not a valid address or scoped actor");
@@ -1357,17 +1360,17 @@ public class Context {
 			if (actorAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
 
 			// (call target amount (receive-coin source amount nil))
-			ctx=ctx.actorCall(controller,ZERO_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,address);
+			ctx=ctx.actorCall(controller,ZERO_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,target);
 			if (ctx.isExceptional()) {
-				return ctx.withError(ErrorCodes.TRUST,"Failed to obtain :control rights");
+				return ctx.withError(ErrorCodes.TRUST,"Failure trying to obtain :control rights");
 			}
 			canControl=RT.bool(ctx.getResult());
 		}
 
-		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+address);
+		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+target);
 
 		// SECURITY: eval with a context switch
-		final Context exContext=Context.create(getState(), juice,juiceLimit, EMPTY_BINDINGS, null, depth+1, getOrigin(),caller, address,0,log,null);
+		final Context exContext=Context.create(ctx.getState(), ctx.juice,juiceLimit, EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),caller, target,ZERO_OFFER,ctx.log,NO_COMPILER_STATE);
 
 		final Context rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
@@ -1383,9 +1386,9 @@ public class Context {
 	public Context queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		State s=getState();
-		ChainState cs=ChainState.create(s,getOrigin(),getAddress(),address,ZERO_OFFER,null);
+		ChainState cs=ChainState.create(s,getOrigin(),getAddress(),address,ZERO_OFFER,NULL_SCOPE);
 		if (cs==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
-		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, null, depth,log,null);
+		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, NO_RESULT, depth,log,NO_COMPILER_STATE);
 		ctx=ctx.eval(form);
 		return handleStateResults(ctx,true);
 	}
@@ -1739,7 +1742,7 @@ public class Context {
 	 * @return
 	 */
 	private Context forkActorCall(State state, Address target, long offer, ACell scope) {
-		Context fctx=Context.create(state, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+		Context fctx=Context.create(state, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), target,offer, log,NO_COMPILER_STATE);
 		if (scope!=null) {
 			fctx.chainState=fctx.chainState.withScope(scope);
 		}
@@ -1841,7 +1844,7 @@ public class Context {
 		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		Context ctx=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), address,ZERO_OFFER,log,null);
+		Context ctx=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), address,ZERO_OFFER,log,NO_COMPILER_STATE);
 		for (int i=0; i <n; i++) {
 			ctx=ctx.eval(code[i]);
 			if (ctx.isExceptional()) break;
