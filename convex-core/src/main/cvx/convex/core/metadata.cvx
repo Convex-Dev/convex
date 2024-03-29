@@ -437,15 +437,15 @@
                        :return stake-amount}]}}
 
  count
- {:doc {:description "Returns the number of elements in the given collection, blob, or string."
+ {:doc {:description "Returns the number of elements in the given data structure or other countable value."
         :errors      {:CAST "If the argument is not a countable object."}
         :examples    [{:code "(count [1 2 3])"}]
         :signature   [{:params [coll]
                        :return Long}]}}
 
  dec
- {:doc {:description "Decrements the given Long value by 1."
-        :errors      {:CAST "If the argument is not a Long."}
+ {:doc {:description "Decrements the given Integer by 1."
+        :errors      {:CAST "If the argument is not an Integer."}
         :examples    [{:code "(dec 10)"}]
         :signature   [{:params [long]
                        :return Long}]}}
@@ -876,9 +876,10 @@
 
 
  nth
- {:doc {:description ["Gets the nth element of a Countable data structure: a collection as defined in `collection?`, a Blob, or a String."
-                      "The index must be a valid long between 0 (inclusive) and the element count of the collection (exclusive)."]
-        :errors      {:CAST "If the first argument is not countable data structure."}
+ {:doc {:description ["Gets the nth element of a Countable data structure."
+                      "The index must be a valid integer between 0 (inclusive) and the element count of the collection (exclusive)."]
+        :errors      {:CAST "If the first argument is not countable data structure."
+	                  :BOUNDS "If the element index is out of range."}
         :examples    [{:code "(nth [1 2 3] 2)"}]
         :signature   [{:params [coll index]}]}}
 
@@ -1019,10 +1020,11 @@
 
 
  set!
- {:doc     {:description  ["Sets a local binding identified by an unqualified symbol to the given value."
-                           "This local change will be be visible until the scope leaves the current binding form (eg. `let` binding, function body or recur)."
-                           "This is probably most useful for updating a local variable in imperative style. Returns the value assigned to the local binding if successful."]
-            :errors       {:ARGUMENT "If the symbol is qualified."}
+ {:doc     {:description  ["Sets a binding to the given value."
+                           "A local change will be be visible until the scope leaves the current binding form (eg. `let` binding, function body or recur)."
+                           "Returns the value assigned to the local binding if successful."]
+            :errors       {:ARGUMENT "If the symbol is not valid."
+	                       :UNDECLARED "If the symbol is not decalred."}
             :examples     [{:code "(let [a 10] (set! a 20) a)"}]
             :signature    [{:params [sym value]}]}
  :special true}

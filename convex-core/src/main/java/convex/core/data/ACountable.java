@@ -1,7 +1,7 @@
 package convex.core.data;
 
 /**
- * Abstract base class for Countable objects.
+ * Abstract base class for Countable objects, supporting `count`, `nth`, `empty?` and `slice`
  * 
  * Countable values support a count of elements and the ability to get by an element index.
  * 
@@ -10,14 +10,14 @@ package convex.core.data;
 public abstract class ACountable<E extends ACell> extends ACell {
 	
 	/**
-	 * Returns the number of elements in this data structure
+	 * Returns the number of elements in this value
 	 * 
-	 * @return Number of elements in this collection.
+	 * @return Number of elements
 	 */
 	public abstract long count();
 
 	/**
-	 * Gets the element at the specified element index in this collection
+	 * Gets the element at the specified element index in this value
 	 * 
 	 * @param index Index of element to get
 	 * @return Element at the specified index

@@ -1126,7 +1126,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(nth [] 1 2)"));
 		assertArityError(step("(nth 1 1 2)")); // arity > cast
 
-		// nth on Blobs
+		// nth on Blobs gets n unsigned byte value
 		assertEquals(CVMLong.create(255),eval("(nth 0xFF 0)"));
 		assertTrue(evalB("(= 16 (nth 0x0010 1))"));
 		assertTrue(evalB("(== 16 (nth 0x0010 1))"));
@@ -1149,6 +1149,7 @@ public class CoreTest extends ACVMTest {
 		assertBoundsError(step("(nth nil 0)"));
 		assertBoundsError(step("(nth (str) 0)"));
 		assertBoundsError(step("(nth {} 10)"));
+		assertBoundsError(step("(nth {:foo 2} -1)"));
 
 		assertBoundsError(step("(nth [1 2] 10)"));
 		assertBoundsError(step("(nth [1 2] -1)"));
@@ -3707,6 +3708,7 @@ public class CoreTest extends ACVMTest {
 		
 		assertFalse(evalB("(empty? 0)"));
 		assertFalse(evalB("(empty? :foo)"));
+		assertFalse(evalB("(empty? 'bar)"));
 	}
 
 	@Test
@@ -4146,8 +4148,7 @@ public class CoreTest extends ACVMTest {
 		// set! cannot alter value within query
 		assertEquals(5L,evalL("(let [a 5] (query (set! a 6)) a)"));
 
-		// TODO: reconsider this
-		// set! doesn't work outside eval boundary?
+		// set! doesn't work outside eval boundary
 		assertUndeclaredError(step ("(let [a 5] (eval `(set! a 7)) a)"));
 		
 		// Set on a defined value in environment

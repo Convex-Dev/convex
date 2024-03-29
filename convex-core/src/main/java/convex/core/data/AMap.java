@@ -201,6 +201,12 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		return entryAt(index).getRef();
 	}
 	
+	/**
+	 * Gets the map entry at the specified position in this Map
+	 * 
+	 * @param i Index of entry to get
+	 * @return map entry
+	 */
 	@Override
 	public final MapEntry<K, V> get(long i) {
 		checkIndex(i);
