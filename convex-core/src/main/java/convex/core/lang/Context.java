@@ -73,21 +73,25 @@ public class Context {
 
 	// Default values
 	private static final AVector<AVector<ACell>> DEFAULT_LOG = null;
-	private static int DEFAULT_DEPTH = 0;
+	private static int ZERO_DEPTH = 0;
 	private static final AExceptional DEFAULT_EXCEPTION = null;
-	private static final long DEFAULT_OFFER = 0L;
+	private static final long ZERO_OFFER = 0L;
 	public static final AVector<ACell> EMPTY_BINDINGS=Vectors.empty();
+	private static final ACell NO_RESULT = null;
+	private static final ACell NULL_SCOPE = null;
+	private static final AExceptional NO_EXCEPTION = null;
+	
 	// private static final Logger log=Logger.getLogger(Context.class.getName());
 
 	/*
-	 *  Frequently changing fields during execution.
+	 *  Frequently changing mutable fields during execution.
 	 *
 	 *  While these are mutable, it is also very cheap to just fork() short-lived Contexts
 	 *  because the JVM generational GC will just sweep them up shortly afterwards.
 	 */
 
 	private long juice;
-	private long juiceLimit=Constants.MAX_TRANSACTION_JUICE;
+	private long juiceLimit;
 	private ACell result;
 	private AExceptional exception;
 	private int depth;
@@ -252,7 +256,7 @@ public class Context {
 	}
 
 	private static <T extends ACell> Context create(State state, long juice,long juiceLimit,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
-		ChainState chainState=ChainState.create(state,origin,caller,address,offer,null);
+		ChainState chainState=ChainState.create(state,origin,caller,address,offer,NULL_SCOPE);
 		if (chainState==null) throw new Error("Attempting to create context with invalid Address");
 		return create(chainState,juice,juiceLimit,localBindings,result,depth,log,comp);
 	}
@@ -281,7 +285,7 @@ public class Context {
 	 */
 	public static Context createFake(State state, Address origin) {
 		if (origin==null) throw new IllegalArgumentException("Null address!");
-		return create(state,0,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,null,0,origin,null,origin, 0, DEFAULT_LOG,null);
+		return create(state,0,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin, ZERO_OFFER, DEFAULT_LOG,null);
 	}
 
 	/**
@@ -302,7 +306,7 @@ public class Context {
 			return Context.createFake(state).withError(ErrorCodes.NOBODY);
 		}
 
-		return create(state,0,juiceLimit,EMPTY_BINDINGS,null,DEFAULT_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
+		return create(state,0,juiceLimit,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
 	}
 
 
@@ -1353,7 +1357,7 @@ public class Context {
 			if (actorAccount==null) return ctx.withError(ErrorCodes.TRUST,"Cannot control address because controller does not exist: "+controller);
 
 			// (call target amount (receive-coin source amount nil))
-			ctx=ctx.actorCall(controller,DEFAULT_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,address);
+			ctx=ctx.actorCall(controller,ZERO_OFFER,Symbols.CHECK_TRUSTED_Q,caller,Keywords.CONTROL,address);
 			if (ctx.isExceptional()) {
 				return ctx.withError(ErrorCodes.TRUST,"Failed to obtain :control rights");
 			}
@@ -1379,7 +1383,7 @@ public class Context {
 	public Context queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		State s=getState();
-		ChainState cs=ChainState.create(s,getOrigin(),getAddress(),address,DEFAULT_OFFER,null);
+		ChainState cs=ChainState.create(s,getOrigin(),getAddress(),address,ZERO_OFFER,null);
 		if (cs==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
 		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, null, depth,log,null);
 		ctx=ctx.eval(form);
@@ -1735,7 +1739,7 @@ public class Context {
 	 * @return
 	 */
 	private Context forkActorCall(State state, Address target, long offer, ACell scope) {
-		Context fctx=Context.create(state, juice, juiceLimit,EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), target,offer, log,null);
+		Context fctx=Context.create(state, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), target,offer, log,null);
 		if (scope!=null) {
 			fctx.chainState=fctx.chainState.withScope(scope);
 		}
@@ -1837,7 +1841,7 @@ public class Context {
 		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		Context ctx=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, null, depth+1, getOrigin(),getAddress(), address,DEFAULT_OFFER,log,null);
+		Context ctx=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), address,ZERO_OFFER,log,null);
 		for (int i=0; i <n; i++) {
 			ctx=ctx.eval(code[i]);
 			if (ctx.isExceptional()) break;
@@ -2178,11 +2182,11 @@ public class Context {
 	}
 
 	/**
-	 * Forks this context, creating a new copy of all local state
+	 * Forks this context, creating a new copy of all local state but clears any exceptional value
 	 * @return A new forked Context
 	 */
 	public Context fork() {
-		return new Context(chainState, juice, juiceLimit, localBindings,null, depth,null,log, compilerState);
+		return new Context(chainState, juice, juiceLimit, localBindings,result, depth,NO_EXCEPTION,log, compilerState);
 	}
 	
 	/**
