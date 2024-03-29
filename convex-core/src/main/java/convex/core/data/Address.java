@@ -24,6 +24,11 @@ public final class Address extends ALongBlob {
 	public static final Address ZERO = Address.create(0);
 	
 	/**
+	 * The maximum possible Address
+	 */
+	public static final Address MAX_VALUE = Address.create(Long.MAX_VALUE);
+	
+	/**
 	 * Length of an Address in bytes (considered as a Blob)
 	 */
 	static final int BYTE_LENGTH = 8;
@@ -222,6 +227,8 @@ public final class Address extends ALongBlob {
 	}
 	
 	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_COUNT_LENGTH;
+
+
 
 	@Override
 	public byte getTag() {

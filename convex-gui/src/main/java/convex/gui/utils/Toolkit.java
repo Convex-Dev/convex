@@ -16,6 +16,8 @@ import java.net.URL;
 
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
@@ -30,6 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.util.Utils;
+import convex.gui.components.AddressCombo;
 import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
 import mdlaf.themes.MaterialOceanicTheme;
@@ -184,5 +187,13 @@ public class Toolkit {
 		} catch (IOException | URISyntaxException ex) {
 			log.warn("IO Failure launching browser: "+ex);
 		}
+	}
+
+	public static void showMainFrame(JComponent comp) {
+		 JFrame frame = new JFrame("Test Frame"); 
+		 frame.getContentPane().add(comp);
+		 frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		 frame.pack();
+		 frame.setVisible(true);
 	}
 }
