@@ -326,7 +326,7 @@ public class Context {
 		rc.juiceUsed=executionJuice;
 
 		// Base fixed juice cost per transaction
-		long trxJuice=Juice.TRANSACTION;
+		long trxJuice=Juice.TRANSACTION+Juice.priceMemorySize(rc.tx);
 		
 		long totalJuice=executionJuice+trxJuice;
 		long juicePrice=rc.juicePrice;

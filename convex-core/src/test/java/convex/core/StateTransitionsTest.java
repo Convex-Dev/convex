@@ -76,11 +76,12 @@ public class StateTransitionsTest {
 		assertNull(s.getBalance(ADDRESS_C));
 
 		long JPRICE=s.getJuicePrice().longValue(); // Juice price
-		long TCOST = (Juice.TRANSACTION + Juice.TRANSFER) * JPRICE;
 		long AMT=50; // Amount for small transfers
 		
 		{ // transfer from existing to existing account A->B
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_B, AMT);
+			long TCOST = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t1)) * JPRICE;
+
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			long nowTS = Constants.INITIAL_TIMESTAMP;
 			Block b = Block.of(nowTS, st);
@@ -97,6 +98,7 @@ public class StateTransitionsTest {
 
 		{ // transfer from existing to non-existing account A -> C
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT);
+			long TCOST = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t1)) * JPRICE;
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
@@ -122,6 +124,7 @@ public class StateTransitionsTest {
 			State s0=s.putAccount(ADDRESS_C, AccountStatus.create(0L,KEYPAIR_C.getAccountKey()));
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT);
+			long TCOST = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t1)) * JPRICE;
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
@@ -137,15 +140,17 @@ public class StateTransitionsTest {
 			State s0=s.putAccount(ADDRESS_C, AccountStatus.create(0L,KEYPAIR_C.getAccountKey()));
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT*3);
+			long TCOST1 = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t1)) * JPRICE;
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(ADDRESS_A,2, ADDRESS_C, AMT*2);
+			long TCOST2 = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t2)) * JPRICE;
 			SignedData<ATransaction> st2 = KEYPAIR_A.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 
 			BlockResult br = s0.applyBlock(sb);
 			State s2 = br.getState();
-			assertEquals(ABAL - AMT*5 - TCOST * 2, s2.getBalance(ADDRESS_A));
+			assertEquals(ABAL - AMT*5 - (TCOST1+TCOST2), s2.getBalance(ADDRESS_A));
 			assertEquals(BBAL, s2.getBalance(ADDRESS_B));
 			assertEquals(AMT*5, s2.getBalance(ADDRESS_C));
 		}
@@ -155,16 +160,18 @@ public class StateTransitionsTest {
 			State s0=s.putAccount(ADDRESS_C, AccountStatus.create(0L,KEYPAIR_C.getAccountKey()));
 
 			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, AMT);
+			long TCOST1 = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t1)) * JPRICE;
 			SignedData<ATransaction> st1 = KEYPAIR_A.signData(t1);
 			Transfer t2 = Transfer.create(ADDRESS_B,1, ADDRESS_C, AMT);
+			long TCOST2 = (Juice.TRANSACTION + Juice.TRANSFER+Juice.priceMemorySize(t2)) * JPRICE;
 			SignedData<ATransaction> st2 = KEYPAIR_B.signData(t2);
 			Block b = Block.of(System.currentTimeMillis(), st1, st2);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
 
 			BlockResult br = s0.applyBlock(sb);
 			State s2 = br.getState();
-			assertEquals(ABAL - AMT - TCOST, s2.getBalance(ADDRESS_A));
-			assertEquals(BBAL - AMT - TCOST, s2.getBalance(ADDRESS_B));
+			assertEquals(ABAL - AMT - TCOST1, s2.getBalance(ADDRESS_A));
+			assertEquals(BBAL - AMT - TCOST2, s2.getBalance(ADDRESS_B));
 			assertEquals(2*AMT, s2.getBalance(ADDRESS_C));
 
 			AVector<Result> results = br.getResults();

@@ -7,6 +7,7 @@ import convex.core.data.ADataStructure;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
+import convex.core.util.Utils;
 
 /**
  * Static class defining juice costs for executable operations.
@@ -529,6 +530,12 @@ public class Juice {
 		long limit = (balance/juicePrice)-Juice.TRANSACTION;
 		return Math.max(0, limit);
 	}
+
+	public static long priceMemorySize(ACell a) {
+		return Juice.mul(Juice.TRANSACTION_PER_BYTE, Utils.fullMemorySize(a));
+	}
+	
+
 
 
 }

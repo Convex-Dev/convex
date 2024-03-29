@@ -1537,9 +1537,15 @@ public class Utils {
 		return sb.toString();
 	}
 
-
-
-
-
-
+	/**
+	 * Get the full memory size of a value, including size of an embedded encoding
+	 * @param a
+	 * @return
+	 */
+	public static long fullMemorySize(ACell a) {
+		if (a==null) return 1;
+		long memSize=a.getMemorySize();
+		if (a.isEmbedded()) memSize+=a.getEncodingLength();
+		return memSize;
+	}
 }
