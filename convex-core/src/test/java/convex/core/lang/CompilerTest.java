@@ -1,14 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertArityError;
-import static convex.test.Assertions.assertBoundsError;
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertCastError;
-import static convex.test.Assertions.assertCompileError;
-import static convex.test.Assertions.assertDepthError;
-import static convex.test.Assertions.assertJuiceError;
-import static convex.test.Assertions.assertNotError;
-import static convex.test.Assertions.assertUndeclaredError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -344,9 +336,8 @@ public class CompilerTest extends ACVMTest {
 		assertArityError(step("~(inc)"));
 		assertCastError(step("~(inc :foo)"));
 
-		// TODO: what are right error types here?
-		assertCompileError(step("(unquote)"));
-		assertCompileError(step("(unquote 1 2)"));
+		assertArityError(step("(unquote)"));
+		assertArityError(step("(unquote 1 2)"));
 	}
 
 	@Test
@@ -386,6 +377,8 @@ public class CompilerTest extends ACVMTest {
 		
 		// Macros don't expand within in regular quote
 		assertEquals(read("(if)"),eval("(quote (if))"));
+		
+		assertArityError(step("(quote a b)"));
 
 	}
 	

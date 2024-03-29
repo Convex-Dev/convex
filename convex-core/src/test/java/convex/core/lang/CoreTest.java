@@ -261,10 +261,10 @@ public class CoreTest extends ACVMTest {
 		assertCompileError(step("(let ['(a b) '(1 2)] b)"));
 
 		// badly formed lets - Issue #80 related
-		assertCompileError(step("(let)"));
-		assertCompileError(step("(let :foo)"));
-		assertCompileError(step("(let foo)"));
-		assertCompileError(step("(let [a])"));
+		assertSyntaxError(step("(let)"));
+		assertSyntaxError(step("(let :foo)"));
+		assertSyntaxError(step("(let foo)"));
+		assertSyntaxError(step("(let [a])"));
 	}
 	
 	@Test
@@ -2110,9 +2110,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Keywords.FOO,eval("(loop [] 1 2 3 :foo)"));
 		assertEquals(Keywords.FOO,eval("(loop [a :foo] :bar a)"));
 
-		assertCompileError(step("(loop [a])"));
-		assertCompileError(step("(loop)")); // Issue #80
-		assertCompileError(step("(loop :foo)")); // Not a binting vector
+		assertSyntaxError(step("(loop [a])"));
+		assertSyntaxError(step("(loop)")); // Issue #80
+		assertSyntaxError(step("(loop :foo)")); // Not a binting vector
 	}
 
 	@Test
@@ -4078,8 +4078,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.of(1L, 2L), eval("`[1 (unquote (+ 1 1))]"));
 		assertEquals(Constant.create(CVMLong.create(3L)), comp("(unquote (+ 1 2))"));
 
-		assertCompileError(step("(unquote)"));
-		assertCompileError(step("(unquote 1 2)"));
+		assertArityError(step("(unquote)"));
+		assertArityError(step("(unquote 1 2)"));
 	}
 	
 	@Test
@@ -4165,8 +4165,8 @@ public class CoreTest extends ACVMTest {
 		}
 		
 		// Bad types
-		assertCompileError(step("(set! :a 2)"));
-		assertCompileError(step("(set! 'noff 2)"));
+		assertSyntaxError(step("(set! :a 2)"));
+		assertSyntaxError(step("(set! 'noff 2)"));
 		
 		// Arity problems
 		assertArityError(step("(set! a)"));

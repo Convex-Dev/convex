@@ -1023,7 +1023,7 @@
  {:doc     {:description  ["Sets a binding to the given value."
                            "A local change will be be visible until the scope leaves the current binding form (eg. `let` binding, function body or recur)."
                            "Returns the value assigned to the local binding if successful."]
-            :errors       {:ARGUMENT "If the symbol is not valid."
+            :errors       {:SYNTAX "If the symbol is not valid."
 	                       :UNDECLARED "If the symbol is not decalred."}
             :examples     [{:code "(let [a 10] (set! a 20) a)"}]
             :signature    [{:params [sym value]}]}

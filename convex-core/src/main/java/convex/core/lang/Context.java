@@ -1888,6 +1888,10 @@ public class Context {
 		return withError(ErrorCodes.COMPILE,message);
 	}
 	
+	public Context withSyntaxError(String message) {
+		return withError(ErrorCodes.SYNTAX,message);
+	}
+	
 	public Context withUndeclaredError(Symbol sym) {
 		return withError(ErrorCodes.UNDECLARED,sym.getName());
 	}

@@ -230,7 +230,7 @@ public class Compiler {
 
 		// First position must be a Symbol in `(set! sym exp)`
 		ACell a1=list.get(1);
-		if (!(a1 instanceof Symbol)) return context.withCompileError("set! requires a symbol as first argument");
+		if (!(a1 instanceof Symbol)) return context.withError(ErrorCodes.SYNTAX,"set! requires a symbol as first argument");
 		Symbol sym=(Symbol)a1;
 		
 		// Extract Expression
@@ -401,7 +401,7 @@ public class Compiler {
 			if (sym.equals(Symbols.FN)) return compileFn(list, context);
 			
 			if (sym.equals(Symbols.QUOTE))  {
-				if (list.size() != 2) return context.withCompileError(sym + " expects one argument.");
+				if (list.size() != 2) return context.withArityError("quote requires one argument.");
 				return compileConstant(context,list.get(1));
 			}
 				
@@ -411,7 +411,7 @@ public class Compiler {
 
 			if (sym.equals(Symbols.UNQUOTE)) {
 				// execute the unquoted code directly to get a form to compile
-				if (list.size() != 2) return context.withCompileError(Symbols.UNQUOTE + " expects one argument.");
+				if (list.size() != 2) return context.withArityError("unquote requires one argument.");
 				context = context.expandCompile(list.get(1));
 				if (context.isExceptional()) return context;
 				AOp<?> quotedOp = context.getResult();
@@ -452,15 +452,15 @@ public class Compiler {
 			boolean isLoop) {
 		// list = (let [...] a b c ...)
 		int n=list.size();
-		if (n<2) return context.withCompileError(list.get(0) + " requires a binding form vector at minimum");
+		if (n<2) return context.withSyntaxError(list.get(0) + " requires a binding form vector at minimum");
 				
 		ACell bo = list.get(1);
 
 		if (!(bo instanceof AVector))
-			return context.withCompileError(list.get(0) + " requires a vector of binding forms but got: " + bo);
+			return context.withSyntaxError(list.get(0) + " requires a vector of binding forms but got: " + bo);
 		AVector<ACell> bv = (AVector<ACell>) bo;
 		int bn = bv.size();
-		if ((bn & 1) != 0) return context.withCompileError(
+		if ((bn & 1) != 0) return context.withSyntaxError(
 				list.get(0) + " requires a binding vector with an even number of forms but got: " + bn);
 
 		AVector<ACell> bindingForms = Vectors.empty();
