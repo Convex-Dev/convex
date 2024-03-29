@@ -136,8 +136,8 @@ public class TestState {
 	public void testContractCall() {
 		Context ctx0 = Context.createFake(STATE, InitTest.HERO);
 		Address TARGET = CONTRACTS[0];
-		ctx0 = ctx0.execute(compile(ctx0, "(def target (address \"" + TARGET.toHexString() + "\"))"));
-		ctx0 = ctx0.execute(compile(ctx0, "(def hero *address*)"));
+		ctx0 = ctx0.exec(compile(ctx0, "(def target (address \"" + TARGET.toHexString() + "\"))"));
+		ctx0 = ctx0.exec(compile(ctx0, "(def hero *address*)"));
 		final Context ctx = ctx0;
 
 		assertEquals(InitTest.HERO, ctx.lookup(Symbols.HERO).getResult());

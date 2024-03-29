@@ -948,7 +948,7 @@ public class Context {
 	 */
 	public Context run(AOp<?> op) {
 		// Security: run in fork
-		Context ctx=fork().execute(op);
+		Context ctx=fork().exec(op);
 
 		// must handle state results like halt, rollback etc.
 		return handleStateResults(ctx,false);
@@ -1143,13 +1143,11 @@ public class Context {
 	}
 
 	/**
-	 * Updates this Context with new local bindings. Doesn't affact result state (exceptional or otherwise)
+	 * Updates this Context with new local bindings. Doesn't affect result state (exceptional or otherwise)
 	 * @param newBindings New local bindings map to use.
 	 * @return Updated context
 	 */
 	public Context withLocalBindings(AVector<ACell> newBindings) {
-		//if (localBindings==newBindings) return (Context<R>) this;
-		//return create(chainState,juice,newBindings,(R)result,depth);
 		localBindings=newBindings;
 		return this;
 	}
@@ -1307,11 +1305,20 @@ public class Context {
 				ctx=ctx.withResult(null); // clear result for execution
 			}
 		}
-		// Execute with empty local bindings (top level form)
-		AVector<ACell> savedBindings = ctx.getLocalBindings();
-		ctx=ctx.withLocalBindings(Vectors.empty());
-		Context rctx= ctx.execute(op);
-		return rctx.withLocalBindings(savedBindings);
+		return exec(op);
+	}
+	
+	/**
+	 * Executes an op as a top level instruction (no local bindings)
+	 * @param <T>
+	 * @param op
+	 * @return
+	 */
+	public <T extends ACell> Context exec(AOp<T> op) {
+		AVector<ACell> savedBindings = getLocalBindings();
+		Context ctx=withLocalBindings(Vectors.empty());
+		ctx= ctx.execute(op);
+		return ctx.withLocalBindings(savedBindings);
 	}
 
 	/**
@@ -1812,9 +1819,9 @@ public class Context {
 	}
 
 	/**
-	 * Deploys an new account.
+	 * Deploys a new account.
 	 *
-	 * Argument argument must be an account setup code, which will be evaluated in the new account.
+	 * Arguments must be an account setup code, which will be evaluated in the new account.
 	 *
 	 * Result will contain the new address if successful, an exception otherwise.
 	 *

@@ -497,17 +497,22 @@ public class Core {
 	});
 
 	public static final CoreFn<ACell> EVAL = reg(new CoreFn<>(Symbols.EVAL,17) {
-
-		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell form = (ACell) args[0];
-			Context rctx = context.eval(form);
+			AOp<?> op;
+			if (form instanceof AOp) {
+				op=(AOp<?>)form;
+			} else {
+				context=context.expandCompile(form);
+				if (context.isExceptional()) return context;
+				op=(AOp<?>)context.getResult();
+			}
+			Context rctx = context.exec(op);
 			return rctx.consumeJuice(Juice.EVAL);
 		}
-
 	});
 
 	public static final CoreFn<ACell> EVAL_AS = reg(new CoreFn<>(Symbols.EVAL_AS,18) {	
@@ -2825,9 +2830,11 @@ public class Core {
 				throw new Error("Error compiling core code form: " + form + "\nException : " + ctx.getExceptional());
 			}
 			AOp<?> op = (AOp<?>)ctx.getResult();
-			ctx = ctx.execute(op);
+			ctx = ctx.exec(op);
 			// System.out.println("Core compilation juice: "+ctx.getJuice());
-			assert (!ctx.isExceptional()) : "Error executing form: "+ form+ "\n\nException : "+ ctx.getExceptional().toString();
+			if (ctx.isExceptional()) {
+				throw new Error("Error executing form: "+ form+ "\n\nException : "+ ctx.getExceptional().toString());
+			}
 			
 			// Testing for core output
 			// System.out.println("Core: "+ctx.getResult());

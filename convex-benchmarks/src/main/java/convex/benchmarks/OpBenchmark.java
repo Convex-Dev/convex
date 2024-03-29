@@ -17,7 +17,7 @@ public class OpBenchmark {
 	static final Context CTX=Benchmarks.context();
 	
 	private static final ACell runOp(AOp<ACell> op) {
-		return CTX.fork().execute(op).getResult();
+		return CTX.fork().exec(op).getResult();
 	}
 	
 	static final AOp<ACell> loopOp=CTX.expandCompile(Reader.read("(dotimes [i 1000])")).getResult();
