@@ -42,4 +42,12 @@ public class ResultContext {
 		return context.getResult();
 	}
 
+	public static ResultContext fromContext(Context ctx) {
+		State state=ctx.getState();
+		ResultContext rc=new ResultContext(null, state.getJuicePrice().longValue());
+		rc.context=ctx;
+		rc.juiceUsed=ctx.getJuiceUsed();
+		return rc;
+	}
+
 }

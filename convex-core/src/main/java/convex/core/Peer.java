@@ -19,10 +19,10 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
+import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 
 /**
@@ -297,9 +297,10 @@ public class Peer {
 			return  ResultContext.error(state,ErrorCodes.NOBODY,"Query for non-existant account");
 		}
 
-		long newSeq=state.getAccount(address).getSequence()+1;
-		ATransaction t=Invoke.create(address, newSeq, form);
-		ResultContext rctx=state.applyTransaction(t);
+		// Run query in a fake context
+		Context ctx=Context.createInitial(state, address, Constants.MAX_TRANSACTION_JUICE);
+		ctx=ctx.run(form);
+		ResultContext rctx=ResultContext.fromContext(ctx);
 		return rctx;
 	}
 

@@ -314,7 +314,7 @@ public class REPLPanel extends JPanel {
 			} catch (TimeoutException t) {
 				addOutput(outputArea," TIMEOUT waiting for result");
 			} catch (Throwable t) {
-				addOutput(outputArea," SEND ERROR: ");
+				addOutput(outputArea," SEND ERROR: ",Color.RED);
 				addOutput(outputArea,t.getMessage() + "\n");
 				t.printStackTrace();
 			}
