@@ -44,7 +44,7 @@ public class AddressFormat extends AFormat {
 		int i=ix;
 		for (; i<n; i++) {
 			char d=source.charAt(i);
-			if ((d>='0')&&(d<='9')) {
+			if (Text.isASCIIDigit(d)) {
 				if (v>(Long.MAX_VALUE/10)) {
 					pos.setErrorIndex(i);
 					return null;

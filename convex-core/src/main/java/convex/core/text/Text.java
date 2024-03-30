@@ -12,6 +12,15 @@ public class Text {
 	private static final int WHITESPACE_LENGTH = 32;
 	private static String WHITESPACE_32 = "                                "; // 32 spaces
 
+	/**
+	 * Return true if the character is an ASCII numeric digit
+	 * @param c Character to test
+	 * @return True if ASCII digit, false otherwise
+	 */
+	public static boolean isASCIIDigit(char c) {
+		return (c>='0')&&(c<='9');
+	}
+	
 	public static String whiteSpace(int length) {
 		if (length < 0) throw new IllegalArgumentException("Negative whitespace requested!");
 		if (length == 0) return "";

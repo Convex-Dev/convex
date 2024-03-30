@@ -6,7 +6,6 @@ import java.util.Collection;
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
-import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -34,9 +33,8 @@ public class AddressCombo extends JComboBox<Address> {
 		}
 		
 		@Override
-		protected JFormattedTextField createEditorComponent() {
-			JFormattedTextField fld= new JFormattedTextField(AddressFormat.INSTANCE);
-			fld.setFocusLostBehavior(JFormattedTextField.COMMIT_OR_REVERT);
+		protected AddressField createEditorComponent() {
+			AddressField fld= new AddressField();
 			fld.addFocusListener(new FocusAdapter() {
 				public void focusGained(java.awt.event.FocusEvent evt) {
 			        SwingUtilities.invokeLater(new Runnable() {
@@ -58,7 +56,6 @@ public class AddressCombo extends JComboBox<Address> {
 		this.addItemListener(e->{
 			Toolkit.relinquishFocus(AddressCombo.this);
 		});
-		this.setFont(Toolkit.MONO_FONT);
 	}
 
 	public AddressCombo() {
