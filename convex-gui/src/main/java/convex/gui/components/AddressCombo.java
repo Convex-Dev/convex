@@ -7,6 +7,7 @@ import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.plaf.basic.BasicComboBoxEditor;
 
 import convex.core.data.Address;
 import convex.core.data.Vectors;
@@ -16,11 +17,20 @@ import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class AddressCombo extends JComboBox<Address> {
-	private static Address PROTOTYPE=Address.create(1000000);
+	private static Address PROTOTYPE=Address.create(100000);
+	
+	private class AddressEditor extends BasicComboBoxEditor {	
+		@Override 
+		public Object getItem() {
+			return Address.parse(editor.getText());
+		}
+	}
 
 	public AddressCombo(ComboBoxModel<Address> model) {
 		super(model);
+		setEditor(new AddressEditor());
 		setEditable(true);
+		this.setFont(Toolkit.MONO_FONT);
 	}
 	
 	public AddressCombo() {

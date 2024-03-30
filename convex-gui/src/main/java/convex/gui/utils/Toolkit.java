@@ -32,7 +32,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.util.Utils;
-import convex.gui.components.AddressCombo;
 import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
 import mdlaf.themes.MaterialOceanicTheme;
@@ -48,10 +47,7 @@ public class Toolkit {
 	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 	public static Font SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 
-	
 	static {
-		
-		
 		try {
 			UIManager.installLookAndFeel("Material", "mdlaf.MaterialLookAndFeel");
 			Class.forName("mdlaf.MaterialLookAndFeel");
@@ -70,14 +66,13 @@ public class Toolkit {
 			// prefer MaterialLookAndFeel if we have it
 			AbstractMaterialTheme theme = new MaterialOceanicTheme();
 			MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
-			UIManager.setLookAndFeel(material);
+
 			DEFAULT_FONT=theme.getFontRegular().deriveFont(14.0f);
 			theme.setFontRegular(new FontUIResource(DEFAULT_FONT.deriveFont(14.0f)));
 			theme.setFontBold(new FontUIResource(theme.getFontBold().deriveFont(14.0f)));
 			theme.setFontItalic(new FontUIResource(theme.getFontItalic().deriveFont(14.0f)));
 			theme.setFontMedium(new FontUIResource(theme.getFontMedium().deriveFont(14.0f)));
 			
-
 			UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
 			
 			if (System.getProperty("os.name").toLowerCase().startsWith("mac")) {
@@ -91,6 +86,8 @@ public class Toolkit {
 			Font monoFont = Font.createFont(Font.TRUETYPE_FONT, is);
 			SMALL_MONO_FONT = monoFont.deriveFont(14f);
 			SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
+			
+			UIManager.setLookAndFeel(material);
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);

@@ -33,6 +33,8 @@ public class TorusPanel extends JPanel {
 		
 		tableModel = new TorusTableModel(manager.getLatestState());
 		table = new JTable(tableModel);
+		table.setFont(Toolkit.SMALL_MONO_FONT);
+		table.getTableHeader().setFont(Toolkit.SMALL_MONO_BOLD);
 
 		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
 		leftRenderer.setHorizontalAlignment(JLabel.LEFT);
@@ -83,8 +85,7 @@ public class TorusPanel extends JPanel {
 		scrollPane.getViewport().setBackground(null);
 		add(scrollPane, BorderLayout.CENTER);
 
-		table.setFont(Toolkit.SMALL_MONO_FONT);
-		table.getTableHeader().setFont(Toolkit.SMALL_MONO_BOLD);
+
 		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
 
 	}
