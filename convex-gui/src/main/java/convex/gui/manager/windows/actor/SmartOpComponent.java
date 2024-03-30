@@ -3,12 +3,10 @@ package convex.gui.manager.windows.actor;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
-import java.net.InetSocketAddress;
 import java.util.HashMap;
 
 import javax.swing.JButton;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 
@@ -17,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Result;
-import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
@@ -106,7 +103,6 @@ public class SmartOpComponent extends BaseListComponent {
 	}
 
 	private void execute() {
-		InetSocketAddress addr = parent.manager.getPrimaryServer().getHostAddress();
 
 		AVector<ACell> args = Vectors.empty();
 		for (int i = 0; i < paramCount; i++) {
@@ -127,23 +123,14 @@ public class SmartOpComponent extends BaseListComponent {
 			ACell message = RT.cons(Symbols.CALL, parent.contract, rest);
 
 			AccountChooserPanel execPanel = parent.execPanel;
-			WalletEntry we = execPanel.getWalletEntry();
-			Address myAddress=we.getAddress();
-
-			// connect to Peer as a client
-			Convex peerConnection = Convex.connect(addr, we.getAddress(),we.getKeyPair());
+			Convex peerConnection = execPanel.getConvex();
+			Address myAddress=peerConnection.getAddress();
 
 			String mode = execPanel.getMode();
 			Result r=null;
 			if (mode.equals("Query")) {
 				r=peerConnection.querySync(message);
 			} else if (mode.equals("Transact")) {
-				if (we.isLocked()) {
-					JOptionPane.showMessageDialog(this,
-							"Please select an unlocked wallet address to use for transactions before sending");
-					return;
-				}
-
 				ATransaction trans = Invoke.create(myAddress,-1, message);
 				r = peerConnection.transactSync(trans);
 			} else {

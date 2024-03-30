@@ -3,46 +3,42 @@ package convex.gui.components;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 
-import javax.swing.ComboBoxModel;
-import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.ListModel;
 
 import convex.api.Convex;
-import convex.core.crypto.WalletEntry;
+import convex.core.crypto.wallet.IWallet;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
-import convex.core.lang.Symbols;
+import convex.core.lang.ops.Special;
 import convex.core.text.Text;
-import convex.gui.PeerGUI;
+import convex.gui.components.account.AddressCombo;
 import net.miginfocom.swing.MigLayout;
 
 /**
- * Panel allowing the selection of account and query mode
+ * Panel allowing the selection of account and query mode for a Convex connection
  */
 @SuppressWarnings("serial")
 public class AccountChooserPanel extends JPanel {
 
 	private JComboBox<String> modeCombo;
-	public JComboBox<WalletEntry> addressCombo;
+	public final AddressCombo addressCombo;
 	private JLabel lblMode;
 	private JLabel lblNewLabel;
 
-	private DefaultComboBoxModel<WalletEntry> addressModel;
 	private JLabel balanceLabel;
 	
-	private Convex convex;
-	private PeerGUI manager;
+	protected Convex convex;
+	protected IWallet wallet;
 
-	public AccountChooserPanel(PeerGUI manager,Convex convex) {
+	public AccountChooserPanel(IWallet wallet,Convex convex) {
 		this.convex=convex;
-		this.manager=manager;
+		this.wallet=wallet;
 		
-		MigLayout flowLayout = new MigLayout();
-		setLayout(flowLayout);
+		MigLayout layout = new MigLayout();
+		setLayout(layout);
 
 
 		// Account selection
@@ -50,17 +46,14 @@ public class AccountChooserPanel extends JPanel {
 		lblNewLabel = new JLabel("Account:");
 		add(lblNewLabel);
 
-		addressCombo = new JComboBox<WalletEntry>();
-		addressCombo.setEditable(true);
-		add(addressCombo);
+		addressCombo = new AddressCombo();
+		addressCombo.setSelectedItem(convex.getAddress());
 		addressCombo.setToolTipText("Select Account for use");
+		add(addressCombo);
 		
-		updateModel();
-		addressCombo.setModel(addressModel);
 		addressCombo.addFocusListener(new FocusListener() {
 			@Override
 			public void focusGained(FocusEvent e) {
-				updateModel();
 			}
 
 			@Override
@@ -70,7 +63,7 @@ public class AccountChooserPanel extends JPanel {
 		});
 
 		addressCombo.addItemListener(e -> {
-			updateBalance(getSelectedAddress());
+			updateAddress(addressCombo.getAddress());
 		});
 		
 		// Mode selection
@@ -92,65 +85,26 @@ public class AccountChooserPanel extends JPanel {
 		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 		add(balanceLabel);
 
-		updateBalance(getSelectedAddress());
+		updateBalance(getAddress());
 	}
 
-	private void updateModel() {
-		if (addressModel==null) {
-			addressModel = new DefaultComboBoxModel<WalletEntry>();
-			addressModel.addElement(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
-			addAddressList(manager);
-		} else {
-			WalletEntry we=(WalletEntry) addressModel.getSelectedItem();
-			addressModel.removeAllElements();
-			
-			// TODO should use better wallet interface
-			addAddressList(manager);
-			if (we!=null) {
-				addressModel.setSelectedItem(we);
-			}
-		}
-		addressCombo.setModel(addressModel);
-	}
-
-	public Address getSelectedAddress() {
-		WalletEntry we = (WalletEntry) addressModel.getSelectedItem();
-		return (we == null) ? null : we.getAddress();
+	public Address getAddress() {
+		return convex.getAddress();
 	}
 	
-	public boolean selectAddress(Address a) {
-		for (int i = 0; i < addressModel.getSize(); i++) {
-			WalletEntry we = addressModel.getElementAt(i);
-			if (we.getAddress().equals(a)) {
-				addressModel.setSelectedItem(we);
-				updateBalance(a);
-				return true;
-			};
-		}
-		return false;
-	}
-
-	private ComboBoxModel<WalletEntry> addAddressList(PeerGUI mananger) {
-		if (manager==null) return addressModel;
+	public void updateAddress(Address a) {
+		convex.setAddress(a);
 		
-		ListModel<WalletEntry> m=manager.getWalletPanel().getListModel();
-		int n = m.getSize();
-		DefaultComboBoxModel<WalletEntry> cm = addressModel;
-		for (int i = 0; i < n; i++) {
-			WalletEntry we = m.getElementAt(i);
-			cm.addElement(we);
-		}
-		cm.addElement(null);
-		return cm;
+		updateBalance();
 	}
 	
 	public void updateBalance() {
-		updateBalance(getSelectedAddress());
+		updateBalance(getAddress());
 	}
 
 	private void updateBalance(Address a) {
 		try {
-			convex.query(Symbols.STAR_BALANCE).thenAccept(r-> {
+			convex.query(Special.get("*balance*"),a).thenAccept(r-> {
 				ACell bal=r.getValue();
 				String s="<unknown>";
 				if (bal instanceof AInteger) {
@@ -165,10 +119,6 @@ public class AccountChooserPanel extends JPanel {
 
 	public String getMode() {
 		return (String) modeCombo.getSelectedItem();
-	}
-
-	public WalletEntry getWalletEntry() {
-		return (WalletEntry) addressCombo.getSelectedItem();
 	}
 
 	public Convex getConvex() {

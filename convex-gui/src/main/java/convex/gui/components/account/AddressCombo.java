@@ -3,7 +3,6 @@ package convex.gui.components.account;
 import java.awt.event.FocusAdapter;
 import java.util.Collection;
 
-import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
@@ -49,11 +48,15 @@ public class AddressCombo extends JComboBox<Address> {
 		}
 	}
 
-	public AddressCombo(ComboBoxModel<Address> model) {
+	public AddressCombo(DefaultComboBoxModel<Address> model) {
 		super(model);
 		setEditor(new AddressEditor());
 		setEditable(true);
 		this.addItemListener(e->{
+			Address address=(Address) getSelectedItem();
+			if ((address!=null)&&(model.getIndexOf(address)<0)) {
+				model.addElement(address);
+			}
 			Toolkit.relinquishFocus(AddressCombo.this);
 		});
 	}
@@ -91,5 +94,11 @@ public class AddressCombo extends JComboBox<Address> {
 		});
 		
 		Toolkit.showMainFrame(p);
+	}
+
+	public Address getAddress() {
+		Object a = getSelectedItem();
+		if (a instanceof Address) return (Address)a;
+		return null;
 	}
 }

@@ -36,7 +36,6 @@ import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
@@ -53,7 +52,6 @@ import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.RightCopyMenu;
-import convex.gui.components.Toast;
 import convex.gui.utils.CVXHighlighter;
 
 @SuppressWarnings("serial")
@@ -256,15 +254,11 @@ public class REPLPanel extends JPanel {
 	}
 
 	private AKeyPair getKeyPair() {
-		WalletEntry we=execPanel.getWalletEntry();
-		if (we==null) return null;
-		if (we.isLocked()) return null;
-		return we.getKeyPair();
+		return execPanel.getConvex().getKeyPair();
 	}
 	
 	private Address getAddress() {
-		WalletEntry we=execPanel.getWalletEntry();
-		return we.getAddress();
+		return execPanel.getConvex().getAddress();
 	}
 
 	private void sendMessage(String s) {
@@ -299,11 +293,6 @@ public class REPLPanel extends JPanel {
 						future = convex.query(code, qaddr);
 					}
 				} else if (mode.equals("Transact")) {
-					WalletEntry we = execPanel.getWalletEntry();
-					if ((we == null) || (we.isLocked())) {
-						Toast.display(this, "Can't transact without an unlocked key pair", Color.RED);
-						return;
-					}
 					Address address = getAddress();
 					convex.setAddress(address);
 					convex.setKeyPair(getKeyPair());

@@ -9,6 +9,7 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -130,7 +131,9 @@ public class ConvexLocal extends Convex {
 	@Override
 	public long getSequence() {
 		if (sequence==null) {
-			sequence=getState().getAccount(address).getSequence();
+			AccountStatus as=getState().getAccount(address);
+			if (as==null) return 0;
+			sequence=as.getSequence();
 		}
 		return sequence;
 	}

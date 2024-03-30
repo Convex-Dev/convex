@@ -27,7 +27,7 @@ public class ActorInvokePanel extends JPanel {
 		this.manager = manager;
 		this.contract = contract;
 		
-		execPanel=new AccountChooserPanel(manager,manager.getClientConvex(contract));
+		execPanel=new AccountChooserPanel(null,manager.getClientConvex(contract));
 		add(execPanel, BorderLayout.NORTH);
 
 		setLayout(new BorderLayout());

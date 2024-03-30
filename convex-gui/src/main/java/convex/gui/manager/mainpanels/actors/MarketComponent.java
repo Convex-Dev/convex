@@ -13,20 +13,15 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
 import convex.core.State;
-import convex.core.crypto.WalletEntry;
 import convex.core.data.ACell;
-import convex.core.data.AList;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.data.List;
-import convex.core.data.Lists;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.utils.Toolkit;
@@ -167,9 +162,6 @@ public class MarketComponent extends BaseListComponent {
 		long newStake = Math.max(0L, stk + delta);
 		long offer = Math.max(0, delta); // covers stake increase for sure?
 
-		WalletEntry we = marketsPanel.acctChooser.getWalletEntry();
-		AList<ACell> cc = Lists.of(Symbol.create("stake"), outcome, newStake);
-		AList<ACell> cmd = List.of(Symbols.CALL, address, offer, cc);
 		//marketsPanel.execute(we, cmd).thenAcceptAsync(new DefaultReceiveAction(marketsPanel));
 	}
 
@@ -177,7 +169,7 @@ public class MarketComponent extends BaseListComponent {
 
 	private void updateStatus(State state) {
 		try {
-			Address caller = marketsPanel.acctChooser.getSelectedAddress();
+			Address caller = marketsPanel.acctChooser.getAddress();
 			Context ctx = Context.createFake(state, caller); // fake for caller
 			for (int i = 0; i < numOutcomes; i++) {
 				ACell outcome = outcomes.get(i);
@@ -204,7 +196,7 @@ public class MarketComponent extends BaseListComponent {
 	}
 
 	private Long getStake(State state, Object outcome) {
-		Address caller = marketsPanel.acctChooser.getSelectedAddress();
+		Address caller = marketsPanel.acctChooser.getAddress();
 		Context ctx = Context.createFake(state, caller);
 		@SuppressWarnings("unchecked")
 		AMap<Address, CVMLong> stks = (AMap<Address, CVMLong>) ctx.actorCall(address, 0, "stakes", RT.cvm(outcome)).getResult();
