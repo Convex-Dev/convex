@@ -35,9 +35,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.text.Text;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
-import convex.core.util.Text;
 import convex.core.util.Utils;
 
 @Execution(value = ExecutionMode.CONCURRENT)

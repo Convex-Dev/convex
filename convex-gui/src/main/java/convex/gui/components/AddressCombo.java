@@ -1,16 +1,20 @@
 package convex.gui.components;
 
+import java.awt.event.FocusAdapter;
 import java.util.Collection;
 
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
+import javax.swing.JFormattedTextField;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
 import javax.swing.plaf.basic.BasicComboBoxEditor;
 
 import convex.core.data.Address;
 import convex.core.data.Vectors;
+import convex.core.text.AddressFormat;
 import convex.core.util.Utils;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -22,7 +26,28 @@ public class AddressCombo extends JComboBox<Address> {
 	private class AddressEditor extends BasicComboBoxEditor {	
 		@Override 
 		public Object getItem() {
-			return Address.parse(editor.getText());
+			try {
+				return AddressFormat.INSTANCE.parseObject(editor.getText());
+			} catch (Exception e) {
+				return null;
+			}
+		}
+		
+		@Override
+		protected JFormattedTextField createEditorComponent() {
+			JFormattedTextField fld= new JFormattedTextField(AddressFormat.INSTANCE);
+			fld.setFocusLostBehavior(JFormattedTextField.COMMIT_OR_REVERT);
+			fld.addFocusListener(new FocusAdapter() {
+				public void focusGained(java.awt.event.FocusEvent evt) {
+			        SwingUtilities.invokeLater(new Runnable() {
+			            @Override
+			            public void run() {
+			                fld.select(1, fld.getText().length());;
+			            }
+			        });
+			    }
+			});
+			return fld;
 		}
 	}
 
@@ -30,9 +55,12 @@ public class AddressCombo extends JComboBox<Address> {
 		super(model);
 		setEditor(new AddressEditor());
 		setEditable(true);
+		this.addItemListener(e->{
+			Toolkit.relinquishFocus(AddressCombo.this);
+		});
 		this.setFont(Toolkit.MONO_FONT);
 	}
-	
+
 	public AddressCombo() {
 		this(new DefaultComboBoxModel<Address>());
 	}

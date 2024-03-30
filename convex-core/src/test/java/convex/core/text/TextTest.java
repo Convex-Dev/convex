@@ -1,10 +1,12 @@
-package convex.util;
+package convex.core.text;
 
 import static org.junit.Assert.assertEquals;
 
+import java.text.ParseException;
+
 import org.junit.Test;
 
-import convex.core.util.Text;
+import convex.core.data.Address;
 
 public class TextTest {
 
@@ -34,5 +36,17 @@ public class TextTest {
 	@Test public void testFriendlyDecimals() {
 		assertEquals("0.1",Text.toFriendlyDecimal(0.1));
 		assertEquals("1,000.51",Text.toFriendlyDecimal(1000.51));
+	}
+	
+	@Test public void testAddressFormat() throws ParseException {
+		AddressFormat af=AddressFormat.INSTANCE;
+		
+		assertEquals(Address.create(1234),af.parseObject("#1234"));
+		assertEquals(Address.create(0),af.parseObject("0"));
+		assertEquals(Address.create(Long.MAX_VALUE),af.parseObject("#"+Long.MAX_VALUE));
+		
+		assertEquals("#789",af.format(Address.create(789)));
+		assertEquals("#0",af.format(Address.ZERO));
+		assertEquals("#9223372036854775807",af.format(Address.create(Long.MAX_VALUE)));
 	}
 }

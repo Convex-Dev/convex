@@ -13,7 +13,7 @@ import javax.swing.JTextArea;
 import javax.swing.Timer;
 
 import convex.api.Convex;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.NonUpdatingCaret;
 import convex.gui.utils.Toolkit;

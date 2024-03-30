@@ -2,8 +2,8 @@ package convex.core.data;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.text.Text;
 import convex.core.util.Errors;
-import convex.core.util.Text;
 
 /**
  * String implementation class wrapping a BlobTree.

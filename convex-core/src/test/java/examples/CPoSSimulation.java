@@ -13,7 +13,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.core.util.Utils;
 
 public class CPoSSimulation {

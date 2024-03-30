@@ -14,7 +14,7 @@ import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.test.Samples;
 
 public class SymbolTest {

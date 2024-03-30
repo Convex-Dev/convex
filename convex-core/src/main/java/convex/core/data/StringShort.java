@@ -3,8 +3,8 @@ package convex.core.data;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.exceptions.InvalidDataException;
+import convex.core.text.Text;
 import convex.core.util.Errors;
-import convex.core.util.Text;
 import convex.core.util.Utils;
 
 /**

@@ -6,7 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import etch.EtchStore;
 import etch.EtchUtils.FullValidator;
 import picocli.CommandLine.Command;

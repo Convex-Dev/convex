@@ -5,7 +5,7 @@ import java.io.PrintWriter;
 import java.util.HashMap;
 import java.util.Map;
 
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.core.util.Utils;
 
 /*

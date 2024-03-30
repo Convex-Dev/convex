@@ -16,7 +16,7 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.Symbols;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.gui.PeerGUI;
 import net.miginfocom.swing.MigLayout;
 

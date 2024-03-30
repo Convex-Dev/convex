@@ -1,6 +1,6 @@
 package convex.gui.utils;
 
-import convex.core.util.Text;
+import convex.core.text.Text;
 
 public class TextFormat {
 	public String convexBalance(long bal) {

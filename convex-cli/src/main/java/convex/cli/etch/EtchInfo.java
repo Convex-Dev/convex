@@ -5,7 +5,7 @@ import java.io.IOException;
 import convex.core.data.ACell;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.core.util.Utils;
 import etch.EtchStore;
 import picocli.CommandLine.Command;

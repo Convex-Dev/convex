@@ -1,4 +1,4 @@
-package convex.core.util;
+package convex.core.text;
 
 import java.text.DecimalFormat;
 import java.time.Instant;

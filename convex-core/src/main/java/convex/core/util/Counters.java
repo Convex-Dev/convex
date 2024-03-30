@@ -1,5 +1,7 @@
 package convex.core.util;
 
+import convex.core.text.Text;
+
 /**
  * Some event counters, for debugging and general metrics
  */

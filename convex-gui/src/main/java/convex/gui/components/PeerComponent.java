@@ -21,7 +21,7 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.PeerStatus;
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.gui.PeerGUI;
 import convex.gui.client.ConvexClient;
 import convex.gui.components.models.StateModel;

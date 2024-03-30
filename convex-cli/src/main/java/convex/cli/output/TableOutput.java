@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import convex.core.util.Text;
+import convex.core.text.Text;
 import convex.core.util.Utils;
 
 /*

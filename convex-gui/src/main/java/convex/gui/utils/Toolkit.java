@@ -1,6 +1,7 @@
 package convex.gui.utils;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.Font;
 import java.awt.Graphics2D;
@@ -192,5 +193,16 @@ public class Toolkit {
 		 frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		 frame.pack();
 		 frame.setVisible(true);
+	}
+
+	/**
+	 * Relinquish focus from a component
+	 * @param c
+	 */
+	public static void relinquishFocus(Component c) {
+		if (c.isFocusable()) {
+			c.setFocusable(false);
+			c.setFocusable(true);
+		}
 	}
 }
