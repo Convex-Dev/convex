@@ -43,6 +43,7 @@ import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.List;
 import convex.core.data.SignedData;
+import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -128,8 +129,15 @@ public class REPLPanel extends JPanel {
 	}
 	
 	private void addOutput(JTextPane pane, String text) {
-		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);
-		
+		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);	
+	}
+	
+	private void addOutputWithHighlight(JTextPane pane, String text) {
+		Document d=pane.getDocument();
+		int start = d.getLength();
+		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);	
+		int end=d.getLength();
+		if (end>start) updateHighlight(pane,start,end-start);
 	}
 	
 	private void addOutput(JTextPane pane, String text, Color c) {
@@ -300,7 +308,7 @@ public class REPLPanel extends JPanel {
 					SignedData<ATransaction> strans=convex.prepareTransaction(trans);
 					
 					if (btnTX.isSelected()) {
-						addOutput(outputArea,strans.toString()+"\n");
+						addOutputWithHighlight(outputArea,strans.toString()+"\n");
 						addOutput(outputArea,"TX Hash: "+strans.getHash()+"\n");
 					}
 					
@@ -311,8 +319,10 @@ public class REPLPanel extends JPanel {
 				log.trace("Sent message");
 				
 				handleResult(start,future.get(5000, TimeUnit.MILLISECONDS));
+			} catch (ParseException e) {
+				addOutput(outputArea," PARSE ERROR: "+e.getMessage(),Color.RED);
 			} catch (TimeoutException t) {
-				addOutput(outputArea," TIMEOUT waiting for result");
+				addOutput(outputArea," TIMEOUT waiting for result",Color.RED);
 			} catch (Throwable t) {
 				addOutput(outputArea," SEND ERROR: ",Color.RED);
 				addOutput(outputArea,t.getMessage() + "\n");
@@ -345,7 +355,6 @@ public class REPLPanel extends JPanel {
 
 		@Override
 		public void insertUpdate(DocumentEvent e) {
-
 			updateHighlight();
 		}
 
