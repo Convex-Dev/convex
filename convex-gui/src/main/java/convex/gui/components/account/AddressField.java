@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.components.account;
 
 import javax.swing.JTextField;
 import javax.swing.text.AttributeSet;
@@ -6,6 +6,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import javax.swing.text.PlainDocument;
 
+import convex.core.data.Address;
 import convex.core.text.Text;
 import convex.gui.utils.Toolkit;
 
@@ -24,6 +25,10 @@ public class AddressField extends JTextField {
 		return new AddressDocument();
 	}
 	
+	public Address getAddress() {
+		return Address.parse(getText());
+	}
+	
 	public class AddressDocument extends PlainDocument {
 		@Override
 		public void insertString(int offset, String s, AttributeSet a) throws BadLocationException {
@@ -31,7 +36,12 @@ public class AddressField extends JTextField {
 
 			char[] cs = s.toCharArray();
 			int n=cs.length;
-
+			if (n==0) return;
+			
+			if ((offset>0)&&(cs[0]=='#')) {
+				super.remove(0, offset);
+				offset=0;
+			}
 
 			for (int i = 0; i < n; i++ ) {
 				char c=cs[i];

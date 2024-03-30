@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.components.account;
 
 import java.awt.event.FocusAdapter;
 import java.util.Collection;
@@ -24,9 +24,9 @@ public class AddressCombo extends JComboBox<Address> {
 	
 	private class AddressEditor extends BasicComboBoxEditor {	
 		@Override 
-		public Object getItem() {
+		public Address getItem() {
 			try {
-				return AddressFormat.INSTANCE.parseObject(editor.getText());
+				return (Address) AddressFormat.INSTANCE.parseObject(editor.getText());
 			} catch (Exception e) {
 				return null;
 			}
