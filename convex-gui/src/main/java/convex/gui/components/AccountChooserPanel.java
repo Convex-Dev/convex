@@ -25,8 +25,6 @@ public class AccountChooserPanel extends JPanel {
 
 	private JComboBox<String> modeCombo;
 	public final AddressCombo addressCombo;
-	private JLabel lblMode;
-	private JLabel lblNewLabel;
 
 	private JLabel balanceLabel;
 	
@@ -37,55 +35,62 @@ public class AccountChooserPanel extends JPanel {
 		this.convex=convex;
 		this.wallet=wallet;
 		
-		MigLayout layout = new MigLayout();
+		MigLayout layout = new MigLayout("insets 10 10 10 10,fill");
 		setLayout(layout);
 
+		{
+			JPanel mp=new JPanel();
 
-		// Account selection
+			// Account selection
+			mp.add(new JLabel("Account:"));
+	
+			addressCombo = new AddressCombo();
+			addressCombo.setSelectedItem(convex.getAddress());
+			addressCombo.setToolTipText("Select Account for use");
+			mp.add(addressCombo);
+			
+			addressCombo.addFocusListener(new FocusListener() {
+				@Override
+				public void focusGained(FocusEvent e) {
+				}
+	
+				@Override
+				public void focusLost(FocusEvent e) {
+					// Ignore		
+				}
+			});
+	
+			addressCombo.addItemListener(e -> {
+				updateAddress(addressCombo.getAddress());
+			});
+			
+			// Balance Info
+			mp.add(new JLabel("Balance: "));
+			balanceLabel = new JLabel("0");
+			balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
+			mp.add(balanceLabel);
+			updateBalance(getAddress());
+
+			add(mp,"dock west");
+		}
 		
-		lblNewLabel = new JLabel("Account:");
-		add(lblNewLabel);
-
-		addressCombo = new AddressCombo();
-		addressCombo.setSelectedItem(convex.getAddress());
-		addressCombo.setToolTipText("Select Account for use");
-		add(addressCombo);
 		
-		addressCombo.addFocusListener(new FocusListener() {
-			@Override
-			public void focusGained(FocusEvent e) {
-			}
-
-			@Override
-			public void focusLost(FocusEvent e) {
-				// Ignore		
-			}
-		});
-
-		addressCombo.addItemListener(e -> {
-			updateAddress(addressCombo.getAddress());
-		});
+		// Blank space
+		add(new JPanel(),"growx");
 		
-		// Mode selection
-		
-		lblMode = new JLabel("Mode:");
-		add(lblMode);
-
-		modeCombo = new JComboBox<String>();
-		modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
-				+ "Use Query to compute results without changing on-chain state (free).");
-		modeCombo.addItem("Transact");
-		modeCombo.addItem("Query");
-		if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
-
-		add(modeCombo);
-
-		// Balance Info
-		balanceLabel = new JLabel("Balance: ");
-		balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
-		add(balanceLabel);
-
-		updateBalance(getAddress());
+		// Mode selection	
+		{
+			JPanel mp=new JPanel();
+			mp.setBorder(null);
+			modeCombo = new JComboBox<String>();
+			modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
+					+ "Use Query to compute results without changing on-chain state (free).");
+			modeCombo.addItem("Transact");
+			modeCombo.addItem("Query");
+			if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
+			mp.add(modeCombo);
+			add(mp,"dock east");
+		}
 	}
 
 	public Address getAddress() {
@@ -109,6 +114,9 @@ public class AccountChooserPanel extends JPanel {
 				String s="<unknown>";
 				if (bal instanceof AInteger) {
 					s=Text.toFriendlyNumber(((AInteger)bal).longValue());
+				}
+				if (r.getErrorCode()!=null) {
+					s="<"+r.getErrorCode()+">";
 				}
 				balanceLabel.setText(s);
 			});

@@ -135,7 +135,7 @@ public class StressPanel extends JPanel {
 		optionPanel.add(lblSync);
 		syncCheckBox=new JCheckBox();
 		optionPanel.add(syncCheckBox);
-		syncCheckBox.setSelected(true);
+		syncCheckBox.setSelected(false);
 		
 		JLabel lblDist=new JLabel("Distribute over Peers?");
 		optionPanel.add(lblDist);
@@ -156,8 +156,8 @@ public class StressPanel extends JPanel {
 
 		JLabel lblTxType=new JLabel("Transaction Type");
 		txTypeBox=new JComboBox<String>();
-		txTypeBox.addItem("Define Data");
 		txTypeBox.addItem("Transfer");
+		txTypeBox.addItem("Define Data");
 		// txTypeBox.addItem("AMM Trade");
 		txTypeBox.addItem("Null Op");
 		optionPanel.add(lblTxType);
@@ -240,7 +240,7 @@ public class StressPanel extends JPanel {
 			}
 			cmdsb.append("]))");
 			
-			Result ccr=pc.transactSync(Invoke.create(address, -1, cmdsb.toString()));
+			Result ccr=pc.transactSync(Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, cmdsb.toString()));
 			if (ccr.isError()) throw new Error("Creating accounts failed: "+ccr);
 			AVector<Address> clientAddresses=ccr.getValue();
 
@@ -249,7 +249,7 @@ public class StressPanel extends JPanel {
 			
 			resultArea.setText("Syncing...");
 			// Make sure we are in consensus
-			pc.transactSync(Invoke.create(address, -1, Strings.create("sync")));
+			pc.transactSync(Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, Strings.create("sync")));
 			long startTime = Utils.getCurrentTimestamp();
 			
 			resultArea.setText("Sending transactions...");
@@ -362,7 +362,7 @@ public class StressPanel extends JPanel {
 			}
 			ATransaction t;
 			if (transCount!=1) {
-				t=Multi.create(origin, -1, Multi.MODE_ANY, trxs);
+				t=Multi.create(origin, ATransaction.UNKNOWN_SEQUENCE, Multi.MODE_ANY, trxs);
 			} else {
 				t=trxs[0];
 			}
@@ -372,7 +372,7 @@ public class StressPanel extends JPanel {
 		protected ATransaction buildSubTransaction(int reqNo, int txNo, Address origin) {
 			Address target=clients.get((1+reqNo+txNo*6969)%clients.size()).getAddress();
 			if (type.equals("Transfer")) {
-				ATransaction t = Transfer.create(origin,-1, target, 100);
+				ATransaction t = Transfer.create(origin,ATransaction.UNKNOWN_SEQUENCE, target, 100);
 				return t;
 			}
 			
@@ -387,7 +387,7 @@ public class StressPanel extends JPanel {
 			}
 			if (opCount>1) tsb.append(" (cond (> i "+opCount+") nil (recur (inc i)) ) )");
 			String source = tsb.toString();
-			ATransaction t = Invoke.create(origin,-1, Reader.read(source));
+			ATransaction t = Invoke.create(origin,ATransaction.UNKNOWN_SEQUENCE, Reader.read(source));
 			return t;
 		}
 
