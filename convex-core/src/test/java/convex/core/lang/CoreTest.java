@@ -1988,11 +1988,11 @@ public class CoreTest extends ACVMTest {
 
 	
 	@Test
-	public void testLang() {
+	public void testLangCompile() {
 		{
 			Context ctx=context();
-			ctx=step(ctx,"(def *lang* (fn [x] x))");
-			assertEquals(Symbols.COUNT,eval(ctx,"count"));
+			ctx=step(ctx,"(def *lang* (fn [x] (#8/compile nil)))");
+			assertNull(eval(ctx,"count"));
 		}
 	}
 

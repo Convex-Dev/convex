@@ -960,7 +960,7 @@ public class Context {
 	}
 	
 	/**
-	 * Executes a form at the top level in a new forked Context. Handles top level halt, recur and return.
+	 * Executes a form at the top level. Handles top level halt, recur and return.
 	 *
 	 * Returning an updated context containing the result or an exceptional error.
 	 *
@@ -968,7 +968,7 @@ public class Context {
 	 * @return Updated Context
 	 */
 	public Context run(ACell code) {
-		Context ctx=fork();
+		Context ctx=fork(); // for so we can handle rollback etc.
 		ctx=ctx.eval(code);
 
 		// must handle state results like halt, rollback etc.
@@ -1279,8 +1279,7 @@ public class Context {
 	 * Executes a form in the current context.
 	 * 
 	 * Ops are executed directly.
-	 * Other forms will be expanded and compiled before execution, unless *lang* is set, in which case they will
-	 * be executed via the *lang* function.
+	 * Other forms will be expanded and compiled before execution, according to `compile` as defined in the current environment
 	 *
 	 * @param form Form to evaluate
 	 * @return Context containing the result of evaluating the specified form
@@ -1292,25 +1291,19 @@ public class Context {
 		if (form instanceof AOp) {
 			op=(AOp<?>)form;
 		} else {
-			ACell maybeLang=getEnvironment().get(Symbols.STAR_LANG);
-			if (maybeLang!=null) {
-				AFn<?> lang=RT.ensureFunction(lookupValue(Symbols.STAR_LANG));
-				if (lang==null) return ctx.withError(ErrorCodes.CAST, "*lang* not a valid function");
-				
-				// Execute *lang* function, but increment depth just in case
-				int saveDepth=ctx.getDepth();
-				ctx=ctx.withDepth(saveDepth+1);
-				if (ctx.isExceptional()) return ctx;
-				Context rctx = ctx.invoke(lang,form);
-				return rctx.withDepth(saveDepth);
-			} else {
-				ctx=expandCompile(form);
-				if (ctx.isExceptional()) return ctx;
-				op=ctx.getResult();
-				ctx=ctx.withResult(null); // clear result for execution
-			}
+			ctx=ctx.lookup(Symbols.STAR_LANG);
+			if (ctx.isExceptional()) return ctx;
+			AFn<?> cfn=RT.ensureFunction(ctx.getResult());
+			if (cfn==null) cfn=Core.COMPILE;
+			ctx=ctx.invoke(cfn, form);
+			if (ctx.isExceptional()) return ctx;
+			
+			ACell cop=ctx.getResult();
+			if (!(cop instanceof AOp)) return ctx.withCompileError("*lang* did not produce CVM op");
+			op = (AOp<?>)cop;
+			ctx=ctx.withResult(null); // clear result before execution
 		}
-		return exec(op);
+		return ctx.exec(op);
 	}
 	
 	/**
