@@ -58,8 +58,8 @@ public class Transfer extends ATransaction {
 		Address origin=Address.create(aval);
 		epos+=Format.getVLCCountLength(aval);
 		
-		long sequence = Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(sequence);
+		long sequence = Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(sequence);
 		
 		long tval=Format.readVLCCount(b,epos);
 		Address target=Address.create(tval);

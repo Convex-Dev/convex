@@ -37,6 +37,52 @@ public class EncodingTest {
 
 	@Test public void testVLCLongLength() throws BadFormatException, BufferUnderflowException {
 		assertEquals(1,Format.getVLCLength(0x0f));
+		assertEquals(1,Format.getVLCLength(0x3f));
+		assertEquals(2,Format.getVLCLength(0x40));
+	}
+	
+	@Test public void testVLCCountLength() throws BadFormatException, BufferUnderflowException {
+		assertEquals(1,Format.getVLCCountLength(0x0f));
+		assertEquals(1,Format.getVLCCountLength(0x7f));
+		assertEquals(2,Format.getVLCCountLength(0x80));
+	}
+	
+	@Test public void testVLCCount() throws BadFormatException {
+		doVLCCountTest(0);
+		doVLCCountTest(1);
+		doVLCCountTest(63);
+		doVLCCountTest(64);
+		doVLCCountTest(127);
+		doVLCCountTest(128);
+		doVLCCountTest(255);
+		doVLCCountTest(256);
+		doVLCCountTest(56447567);
+		doVLCCountTest(Long.MAX_VALUE);
+		doVLCLongTest(Long.MIN_VALUE);
+	}
+	
+	byte[] buf=new byte[50];
+	private void doVLCCountTest(long x) throws BadFormatException {
+		int n=Format.getVLCCountLength(x);
+		
+		long pos=Format.writeVLCCount(buf, 2, x);
+		assertEquals(n+2,pos);
+		
+		long r=Format.readVLCCount(buf, 2);
+		assertEquals(x,r);
+		
+		doVLCLongTest(x);
+		doVLCLongTest(-x);
+	}
+	
+	private void doVLCLongTest(long x) throws BadFormatException {
+		int n=Format.getVLCLength(x);
+		
+		long pos=Format.writeVLCLong(buf, 2, x);
+		assertEquals(n+2,pos);
+		
+		long r=Format.readVLCLong(buf, 2);
+		assertEquals(x,r);
 	}
 	
 //	@Test public void testBigIntegerRegression() throws BadFormatException {

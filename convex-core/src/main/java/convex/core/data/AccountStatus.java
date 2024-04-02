@@ -149,10 +149,10 @@ public class AccountStatus extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		int included=getInclusion();
 		pos=Format.writeVLCCount(bs, pos, included);
-		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLCLong(bs, pos,sequence);
+		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLCCount(bs, pos,sequence);
 		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
-		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLCLong(bs,pos, balance);
-		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLCLong(bs,pos, memory);
+		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLCCount(bs,pos, balance);
+		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLCCount(bs,pos, memory);
 		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
 		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
 		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
@@ -174,8 +174,8 @@ public class AccountStatus extends ARecord {
 		epos+=Format.getVLCCountLength(included);
 		long sequence=0;
 		if ((included&HAS_SEQUENCE)!=0) {
-			sequence=Format.readVLCLong(b, epos);
-			epos+=Format.getVLCLength(sequence);
+			sequence=Format.readVLCCount(b, epos);
+			epos+=Format.getVLCCountLength(sequence);
 		};
 		AccountKey publicKey=null;
 		if ((included&HAS_KEY)!=0) {
@@ -184,13 +184,13 @@ public class AccountStatus extends ARecord {
 		}
 		long balance=0;
 		if ((included&HAS_BALANCE)!=0) {
-			balance=Format.readVLCLong(b, epos);
-			epos+=Format.getVLCLength(balance);
+			balance=Format.readVLCCount(b, epos);
+			epos+=Format.getVLCCountLength(balance);
 		};		
 		long allowance=0;
 		if ((included&HAS_ALLOWANCE)!=0) {
-			allowance=Format.readVLCLong(b, epos);
-			epos+=Format.getVLCLength(allowance);
+			allowance=Format.readVLCCount(b, epos);
+			epos+=Format.getVLCCountLength(allowance);
 		};		
 		BlobMap<Address,ACell> holdings = null;
 		if ((included&HAS_HOLDINGS)!=0) {

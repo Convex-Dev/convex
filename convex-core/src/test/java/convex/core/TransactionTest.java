@@ -224,6 +224,14 @@ public class TransactionTest extends ACVMTest {
 		
 		doTransactionTests(t1);
 	}
+	
+	@Test public void testBigSequence() {
+		doTransactionTests(Invoke.create(HERO, 99, "(+ 2 5)"));
+		doTransactionTests(Invoke.create(HERO, 199, "(+ 2 5)"));
+		doTransactionTests(Invoke.create(HERO, 677599, "(+ 2 5)"));
+		
+		doTransactionTests(Transfer.create(HERO, 99, VILLAIN,1000));
+	}
 
 	private void doTransactionTests(ATransaction t) {
 		assertEquals(VILLAIN,t.withOrigin(VILLAIN).getOrigin());

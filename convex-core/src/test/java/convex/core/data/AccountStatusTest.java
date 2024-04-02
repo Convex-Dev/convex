@@ -27,6 +27,11 @@ public class AccountStatusTest {
 		assertThrows(BadFormatException.class,()->Format.read(b));
 	}
 	
+	@Test public void testBigSequence() throws BadFormatException {
+		AccountStatus as=AccountStatus.create(80, 1000, Samples.ACCOUNT_KEY);
+		doAccountStatusTest(as);
+	}
+	
 	@Test public void testFull() throws BadFormatException {
 		AccountStatus as=AccountStatus.create(10, 1000, Samples.ACCOUNT_KEY);
 		as=as.withMemory(10000);
