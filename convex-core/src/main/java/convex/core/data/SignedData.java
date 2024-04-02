@@ -51,6 +51,10 @@ public final class SignedData<T extends ACell> extends ARecord {
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.PUBLIC_KEY, Keywords.SIGNATURE, Keywords.VALUE };
 
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+	
+	//Cached fields
+	private AccountKey verifiedKey=null;
+
 
 	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
 		super(FORMAT.count());
@@ -256,6 +260,9 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 * @return true if valid, false otherwise
 	 */
 	private boolean checkSignatureImpl(AccountKey publicKey) {
+		// Fast check for already verified key
+		if ((verifiedKey!=null)&&(verifiedKey.equals(publicKey))) return true;
+		
 		Ref<SignedData<T>> sigRef=getRef();
 		int flags=sigRef.getFlags();
 		if ((flags&Ref.BAD_MASK)!=0) return false;
@@ -266,6 +273,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 
 		if (check) {
 			markValidated();
+			verifiedKey=publicKey;
 		} else {
 			markBadSignature();
 		}

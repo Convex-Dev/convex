@@ -486,11 +486,8 @@ public class State extends ARecord {
 		} else {
 			AccountKey key=as.getAccountKey();
 			if (key==null) return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
-			if (!Utils.equals(key, signedTransaction.getAccountKey())) {
-				return ResultContext.error(this,ErrorCodes.SIGNATURE,"Signature not valid for Account: "+addr+", expected public key: "+key);
-			}
 			
-			boolean sigValid=signedTransaction.checkSignature();
+			boolean sigValid=signedTransaction.checkSignature(key);
 			if (!sigValid) return ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 		}
 
