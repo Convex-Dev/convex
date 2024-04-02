@@ -26,6 +26,7 @@ import convex.core.lang.impl.RecordFormat;
  * (call actor offer (function-name arg1 arg2 .....))
  */
 public class Call extends ATransaction {
+	public static final long DEFAULT_OFFER = 0;
 
 	protected final Address target;
 	protected final long offer;
@@ -49,7 +50,7 @@ public class Call extends ATransaction {
 
 	
 	public static Call create(Address address, long sequence, Address target, Symbol functionName,AVector<ACell> args) {
-		return create(address,sequence,target,0,functionName,args);
+		return create(address,sequence,target,DEFAULT_OFFER,functionName,args);
 	}
 	
 	@Override

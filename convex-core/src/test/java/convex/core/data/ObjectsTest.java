@@ -76,16 +76,20 @@ public class ObjectsTest {
 		
 		if (a.isEmbedded()) {
 			if (rc==0) {
+				// fully embedded, so memory size is zero and full memory sizing is just encoding length
 				assertEquals(0L,ms);
 				assertEquals(elen,fms);
 			} else {
+				// Full memory size is encoding length plus contained memory size
 				assertEquals(elen+ms,fms);
 			}
 
 		} else {
 			if (rc==0) {
+				// no children, so memory size is element length plus overhead
 				assertEquals(ms,elen+Constants.MEMORY_OVERHEAD);
 			}
+			// full memory size is always equal to memory size for non-embedded cells
 			assertEquals(ms,fms);
 		}
 	}

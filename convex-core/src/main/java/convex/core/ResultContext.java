@@ -50,4 +50,8 @@ public class ResultContext {
 		return rc;
 	}
 
+	public Object getErrorCode() {
+		return context.getErrorCode();
+	}
+
 }

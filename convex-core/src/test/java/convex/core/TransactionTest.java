@@ -187,15 +187,27 @@ public class TransactionTest extends ACVMTest {
 	
 	@Test 
 	public void testCall() {
+		State s=state();
 		Call t1=Call.create(HERO, 1, HERO, Symbols.FOO, Vectors.empty());
+		// should fail with no callable function
 		ResultContext rc=state().applyTransaction(t1);
-		Context ctx=rc.context;
-		assertEquals(ErrorCodes.STATE,ctx.getErrorCode());
+		assertEquals(ErrorCodes.STATE,rc.getErrorCode());
+		
+		Context ctx=context();
+		ctx=exec(ctx,"(deploy '(defn ^:callable foo [] 7))");
+		s=ctx.getState();
+		Address target=ctx.getResult();
+		
+		Call t2=Call.create(HERO, 1, target, Symbols.FOO, Vectors.empty());
+		ResultContext rc2=s.applyTransaction(t2);
+		assertCVMEquals(7,rc2.getResult());
+
 		
 		// We expect a short call to be completely encoded
 		assertTrue(t1.isCompletelyEncoded());
 		
 		doTransactionTests(t1);
+		doTransactionTests(t2);
 	}
 	
 	@Test 
@@ -232,6 +244,8 @@ public class TransactionTest extends ACVMTest {
 		
 		// 99 chosen to be outside 1-byte VLC Long range
 		doTransactionTests(Transfer.create(HERO, 99, VILLAIN,1000));
+		
+		doTransactionTests(Call.create(HERO, 99, VILLAIN, 178,Symbols.FOO,Vectors.empty()));
 	}
 
 	private void doTransactionTests(ATransaction t) {
