@@ -148,7 +148,7 @@ public class WalletComponent extends BaseListComponent {
 		AccountStatus as=s.getAccount(address);
 		if (as!=null) {
 			Long bal=as.getBalance();
-			sb.append("Public Key: " + walletEntry.getAccountKey()+"\n");
+			sb.append("Public Key: " + walletEntry.getPublicKey()+"\n");
 			sb.append("Balance:    " + Text.toFriendlyNumber(bal));
 		}
 		

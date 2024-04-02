@@ -35,7 +35,8 @@ public class BasicWalletEntry extends AWalletEntry {
 		return new BasicWalletEntry(address, Maps.empty(), kp);
 	}
 
-	public AccountKey getAccountKey() {
+	@Override
+	public AccountKey getPublicKey() {
 		if (keyPair==null) return null;
 		return keyPair.getAccountKey();
 	}
@@ -44,6 +45,7 @@ public class BasicWalletEntry extends AWalletEntry {
 		return address;
 	}
 
+	@Override
 	public AKeyPair getKeyPair() {
 		if (keyPair == null) throw new IllegalStateException("Wallet not unlocked!");
 		return keyPair;
@@ -81,7 +83,7 @@ public class BasicWalletEntry extends AWalletEntry {
 
 	@Override
 	public String toString() {
-		AccountKey pubKey=getAccountKey(); 
+		AccountKey pubKey=getPublicKey(); 
 		String ks=(pubKey==null)?"<No key>":"0x"+pubKey.toChecksumHex();
 		return getAddress() +" : "+ks;
 	}
