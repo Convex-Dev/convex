@@ -474,9 +474,9 @@ public class State extends ARecord {
 	 *
 	 * SECURITY: Checks digital signature and correctness of account key
 	 *
-	 * @return Context containing the updated chain State (may be exceptional)
+	 * @return ResultContext containing the result of the transaction
 	 */
-	private ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
 		Address addr=t.getOrigin();
@@ -484,6 +484,14 @@ public class State extends ARecord {
 		if (as==null) {
 			return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
 		} else {
+
+			// Update sequence number for target account
+			long sequence=t.getSequence();
+			long expectedSequence=as.getSequence()+1;
+			if (sequence!=expectedSequence) {
+				return ResultContext.error(this,ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+expectedSequence);
+			}
+			
 			AccountKey key=as.getAccountKey();
 			if (key==null) return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
 			
@@ -511,7 +519,7 @@ public class State extends ARecord {
 	 * <li>Completion of accounting, with completeTransaction</li>
 	 * </ol>
 	 *
-	 * SECURITY: Assumes digital signature already checked.
+	 * SECURITY: Assumes digital signature and sequence number already checked.
 	 *
 	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
@@ -551,12 +559,6 @@ public class State extends ARecord {
 			return Context.createFake(this).withError(ErrorCodes.NOBODY);
 		}
 
-		// Update sequence number for target account
-		long sequence=t.getSequence();
-		long expectedSequence=account.getSequence()+1;
-		if (sequence!=expectedSequence) {
-			return Context.createFake(this,origin).withError(ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+expectedSequence);
-		}
 
 		// Create context with juice limit
 		long balance=account.getBalance();

@@ -264,6 +264,8 @@ public class ServerTest {
 			Connection pc = Connection.connect(hostAddress, handler, Stores.current());
 			AKeyPair kp=AKeyPair.generate();
 			Address addr=network.getClient(kp).getAddress();
+			long heroSeq=network.CONVEX.getSequence();
+
 			long s=0; // Base sequence number for new client
 			long id1 = checkSent(pc,kp.signData(Invoke.create(addr, s+1, Reader.read("[1 2 3]"))));
 			long id2 = checkSent(pc,kp.signData(Invoke.create(addr, s+2, Reader.read("(return 2)"))));
@@ -271,7 +273,7 @@ public class ServerTest {
 			long id3 = checkSent(pc,kp.signData(Invoke.create(addr, s+3, Reader.read("(do (def foo :bar) (rollback 3))"))));
 			long id4 = checkSent(pc,kp.signData(Transfer.create(addr, s+4, addr, 1000)));
 			long id5 = checkSent(pc,kp.signData(Call.create(addr, s+5, Init.REGISTRY_ADDRESS, Symbols.FOO, Vectors.of(Maps.empty()))));
-			long id6bad = checkSent(pc,kp.signData(Invoke.create(network.HERO, s+6, Reader.read("(def a 1)"))));
+			long id6bad = checkSent(pc,kp.signData(Invoke.create(network.HERO, heroSeq+1, Reader.read("(def a 1)"))));
 			long id6 = checkSent(pc,kp.signData(Invoke.create(addr, s+6, Reader.read("foo"))));
 
 			long last=id6;

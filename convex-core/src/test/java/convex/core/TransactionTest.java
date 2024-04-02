@@ -12,9 +12,11 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.RecordTest;
+import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Transaction;
+import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
@@ -27,6 +29,7 @@ import convex.core.transactions.Multi;
 import convex.core.transactions.Transactions;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 import static convex.test.Assertions.*;
 
@@ -209,9 +212,10 @@ public class TransactionTest extends ACVMTest {
 	}
 	
 	@Test 
-	public void testBadSequence() {
+	public void testBadSequence() throws BadSignatureException {
 		Invoke t1=Invoke.create(HERO, 2, "(+ 2 5)");
-		ResultContext rc=state().applyTransaction(t1);
+		SignedData<Invoke> st = Samples.KEY_PAIR.signData(t1);
+		ResultContext rc=state().applyTransaction(st);
 		Context ctx=rc.context;
 		assertEquals(ErrorCodes.SEQUENCE,ctx.getError().getCode());
 		

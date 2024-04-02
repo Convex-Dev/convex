@@ -480,6 +480,7 @@ public class Peer {
 		// Return if we don't need to advance states
 		if (stateIndex>=consensusPoint) return this;
 		
+		// Kick off parallel signature validation
 		validateSignatures(s,blocks,stateIndex,consensusPoint);
 
 		// We need to compute at least one new state update

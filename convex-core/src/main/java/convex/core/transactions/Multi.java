@@ -90,7 +90,7 @@ public class Multi extends ATransaction {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = super.encodeRaw(bs,pos); // origin, sequence
-		pos = Format.writeVLCLong(bs,pos, mode);
+		pos = Format.writeVLCCount(bs,pos, mode);
 		pos = txs.encode(bs, pos);
 		return pos;
 	}
@@ -106,9 +106,9 @@ public class Multi extends ATransaction {
 		long sequence = Format.readVLCCount(b,epos);
 		epos+=Format.getVLCCountLength(sequence);
 
-		long mode = Format.readVLCLong(b,epos);
+		long mode = Format.readVLCCount(b,epos);
 		if (!isValidMode(mode)) throw new BadFormatException("Invalid Multi transaction mode: "+mode);
-		epos+=Format.getVLCLength(mode);
+		epos+=Format.getVLCCountLength(mode);
 		
 		Ref<AVector<ATransaction>> txs=Format.readRef(b, epos);
 		epos+=txs.getEncodingLength();
