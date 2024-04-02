@@ -148,7 +148,7 @@ public class MessageFormatPanel extends JPanel {
 		sb.append("\n");
 		sb.append("Encoding Size: "+(empty?"<none>":b.count()));
 		sb.append("\n");
-		sb.append("Memory Size:   "+(empty?"<none>":ACell.getMemorySize(v)));
+		sb.append("Memory Size:   "+(empty?"<none>":Utils.fullMemorySize(v)));
 		sb.append("\n");
 		sb.append("Cell Count:    "+(empty?"<none>":Refs.totalRefCount(v)));
 		hashLabel.setText(sb.toString());

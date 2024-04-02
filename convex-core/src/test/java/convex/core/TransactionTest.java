@@ -230,6 +230,7 @@ public class TransactionTest extends ACVMTest {
 		doTransactionTests(Invoke.create(HERO, 199, "(+ 2 5)"));
 		doTransactionTests(Invoke.create(HERO, 677599, "(+ 2 5)"));
 		
+		// 99 chosen to be outside 1-byte VLC Long range
 		doTransactionTests(Transfer.create(HERO, 99, VILLAIN,1000));
 	}
 

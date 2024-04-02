@@ -69,6 +69,7 @@ public class ObjectsTest {
 	
 	private static void doMemorySizeTests(ACell a) {
 		long ms=a.calcMemorySize();
+		long fms=Utils.fullMemorySize(a);
 		assertEquals(ms,a.getMemorySize());
 		int rc=a.getRefCount();
 		long elen=a.getEncodingLength();
@@ -76,11 +77,16 @@ public class ObjectsTest {
 		if (a.isEmbedded()) {
 			if (rc==0) {
 				assertEquals(0L,ms);
+				assertEquals(elen,fms);
+			} else {
+				assertEquals(elen+ms,fms);
 			}
+
 		} else {
 			if (rc==0) {
 				assertEquals(ms,elen+Constants.MEMORY_OVERHEAD);
 			}
+			assertEquals(ms,fms);
 		}
 	}
 

@@ -56,7 +56,10 @@ public class EncodingTest {
 		doVLCCountTest(128);
 		doVLCCountTest(255);
 		doVLCCountTest(256);
+		doVLCCountTest(65535);
+		doVLCCountTest(65536);
 		doVLCCountTest(56447567);
+		doVLCCountTest(Integer.MAX_VALUE);
 		doVLCCountTest(Long.MAX_VALUE);
 		doVLCLongTest(Long.MIN_VALUE);
 	}
@@ -64,11 +67,12 @@ public class EncodingTest {
 	byte[] buf=new byte[50];
 	private void doVLCCountTest(long x) throws BadFormatException {
 		int n=Format.getVLCCountLength(x);
+		int offset=(int) (x%10); // variable offset, somewhat pseudorandom
 		
-		long pos=Format.writeVLCCount(buf, 2, x);
-		assertEquals(n+2,pos);
+		long pos=Format.writeVLCCount(buf, offset, x);
+		assertEquals(n+offset,pos);
 		
-		long r=Format.readVLCCount(buf, 2);
+		long r=Format.readVLCCount(buf, offset);
 		assertEquals(x,r);
 		
 		doVLCLongTest(x);
@@ -77,11 +81,12 @@ public class EncodingTest {
 	
 	private void doVLCLongTest(long x) throws BadFormatException {
 		int n=Format.getVLCLength(x);
+		int offset=(int) ((x+n)&0x0f); // variable offset, somewhat pseudorandom
 		
-		long pos=Format.writeVLCLong(buf, 2, x);
-		assertEquals(n+2,pos);
+		long pos=Format.writeVLCLong(buf, offset, x);
+		assertEquals(n+offset,pos);
 		
-		long r=Format.readVLCLong(buf, 2);
+		long r=Format.readVLCLong(buf, offset);
 		assertEquals(x,r);
 	}
 	
