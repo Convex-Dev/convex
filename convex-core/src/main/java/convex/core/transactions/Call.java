@@ -1,5 +1,6 @@
 package convex.core.transactions;
 
+import convex.core.Coin;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -90,6 +91,8 @@ public class Call extends ATransaction {
 		
 		long offer=Format.readVLCCount(b,epos);
 		epos+=Format.getVLCCountLength(offer);
+		if (!Coin.isValidAmount(offer)) throw new BadFormatException("Invalid offer in Call");
+
 
 		Symbol functionName=Format.read(b,epos);
 		epos+=Format.getEncodingLength(functionName);
@@ -114,6 +117,7 @@ public class Call extends ATransaction {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		if (!Coin.isValidAmount(offer)) throw new InvalidDataException("Invalid offer",this);
 		target.validateCell();
 	}
 	

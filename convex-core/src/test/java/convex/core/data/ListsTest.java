@@ -17,16 +17,28 @@ public class ListsTest {
 	@Test
 	public void testEmptyList() throws BadFormatException {
 		List<ACell> e = Lists.empty();
+		
+		// size is zero
 		assertEquals(0, e.size());
+		
+		// Empty list constructor
 		assertSame(e, Lists.of());
+		
+		// Doesn't contain the null value
 		assertFalse(e.contains(null));
 		
+		// Equivalent to wrapping empty vector as a list
 		assertEquals(e,List.wrap(Vectors.empty()));
 		
+		// Not equal to empty vector
+		assertFalse(e.equals(Vectors.empty()));
+		
+		// Encoding should be list tag plus zero for VLC length count
 		Blob expectedEncoding=Blob.create(new byte[] {Tag.LIST,0});
 		assertEquals(expectedEncoding,e.getEncoding());
 		assertSame(e,Format.read(expectedEncoding));
 		
+		// Reverse gets back to empty vector
 		assertSame(Vectors.empty(),e.reverse());
 		
 		doListTests(e);
@@ -58,6 +70,16 @@ public class ListsTest {
 		
 		assertEquals(Lists.of(299),Samples.INT_LIST_300.drop(299));
 		assertNull(Samples.INT_LIST_300.drop(400));
+	}
+	
+	@Test 
+	public void testConcat() {
+		AList<ACell> l2=Lists.of(1,2);
+		assertSame(l2,l2.concat(Lists.empty()));
+		assertSame(l2,Lists.empty().concat(l2));
+		assertSame(l2,l2.concat(Vectors.empty()));
+				
+		assertEquals(Lists.of(1,2,3,4,5),l2.concat(Lists.of(3,4,5)));
 	}
 	
 	@Test

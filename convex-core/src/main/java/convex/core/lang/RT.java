@@ -908,7 +908,6 @@ public class RT {
 		if (a instanceof ACountable)
 			return ((ACountable<?>) a).count();
 		
-		
 		return null;
 	}
 

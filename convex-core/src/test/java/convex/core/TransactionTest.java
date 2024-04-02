@@ -237,13 +237,15 @@ public class TransactionTest extends ACVMTest {
 		doTransactionTests(t1);
 	}
 	
-	@Test public void testBigSequence() {
+	@Test public void testBigValues() {
+		// Checks in case there are oddities with big values / VLC encoding
 		doTransactionTests(Invoke.create(HERO, 99, "(+ 2 5)"));
 		doTransactionTests(Invoke.create(HERO, 199, "(+ 2 5)"));
 		doTransactionTests(Invoke.create(HERO, 677599, "(+ 2 5)"));
 		
 		// 99 chosen to be outside 1-byte VLC Long range
 		doTransactionTests(Transfer.create(HERO, 99, VILLAIN,1000));
+		doTransactionTests(Transfer.create(HERO, 199, VILLAIN,Coin.SUPPLY));
 		
 		doTransactionTests(Call.create(HERO, 99, VILLAIN, 178,Symbols.FOO,Vectors.empty()));
 	}

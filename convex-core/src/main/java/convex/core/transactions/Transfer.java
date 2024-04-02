@@ -1,6 +1,6 @@
 package convex.core.transactions;
 
-import convex.core.Constants;
+import convex.core.Coin;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -67,6 +67,7 @@ public class Transfer extends ATransaction {
 
 		long amount = Format.readVLCCount(b,epos);
 		epos+=Format.getVLCCountLength(amount);
+		if (!Coin.isValidAmount(amount)) throw new BadFormatException("Illegal amount in transfer: "+amount);
 		
 		Transfer result=create(origin,sequence, target, amount);
 		result.attachEncoding(b.slice(pos, epos));
@@ -86,6 +87,7 @@ public class Transfer extends ATransaction {
 		// Return unconditionally. Might be an error.
 		return ctx;
 	}
+	
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -96,7 +98,7 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if ((amount<0)||(amount>Constants.MAX_SUPPLY)) throw new InvalidDataException("Invalid amount", this);
+		if (!Coin.isValidAmount(amount)) throw new InvalidDataException("Invalid amount", this);
 		if (target == null) throw new InvalidDataException("Null Address", this);
 	}
 	

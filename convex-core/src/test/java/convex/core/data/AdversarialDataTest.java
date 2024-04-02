@@ -14,7 +14,10 @@ import convex.core.Result;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.init.Init;
 import convex.core.lang.Symbols;
+import convex.core.transactions.Call;
+import convex.core.transactions.Transfer;
 import convex.test.Samples;
 
 /**
@@ -141,6 +144,21 @@ public class AdversarialDataTest {
 	public void testBadResult() {
 		invalidTest(Result.buildFromVector(Vectors.of(Symbols.FOO,null,null,null))); // invalid ID
 		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,Keywords.BAR))); // Invalid info map
+	}
+	
+	@Test
+	public void testBadTransactions() {
+		Address HERO=Init.GENESIS_ADDRESS;
+		
+		// invalid amount in Transfer
+		invalidTest(Transfer.create(HERO, 0, HERO,Long.MAX_VALUE)); 
+		
+		// invalid offer amounts in Call
+		invalidTest(Call.create(HERO, 0, HERO,Long.MAX_VALUE,Symbols.FOO,Vectors.empty())); 
+		invalidTest(Call.create(HERO, 0, HERO,-10,Symbols.FOO,Vectors.empty())); 
+	
+		// invalid origin in Call. TODO: reconsider?
+		assertThrows(ClassCastException.class, ()->Call.create(null, 0, HERO,0,Symbols.FOO,Vectors.empty())); 
 	}
 
 	private void invalidTest(ACell b) {

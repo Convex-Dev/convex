@@ -341,26 +341,35 @@ public class List<T extends ACell> extends AList<T> {
 		return reverse(data.slice(count - end, count-start));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper) {
-		// TODO: reverse map order?
-		return new List<>(data.map(mapper));
+		AVector<R> newData=data.map(mapper);
+		if (data==newData) return (AList<R>) this;
+		return new List<>(newData);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> List<R> concat(ASequence<R> vals) {
+		long n = RT.count(vals);
+		if (n==0) return (List<R>) this;
+
 		AVector<R> rvals;
 		if (vals instanceof List) {
-			rvals = ((List<R>) vals).data;
+			List<R> vlist=(List<R>) vals;
+			if (count==0) return vlist;
+			rvals = vlist.data;
 		} else {
 			rvals = Vectors.empty();
-			long n = vals.count();
 			for (long i = 0; i < n; i++) {
 				rvals = rvals.conj(vals.get(n - i - 1));
 			}
 		}
-		return List.reverse(rvals.concat((AVector<R>)data));
+		if (count>0) {
+			rvals=rvals.concat((AVector<R>)data);
+		}
+		return List.reverse(rvals);
 	}
 
 	@Override
@@ -372,6 +381,7 @@ public class List<T extends ACell> extends AList<T> {
 	@Override
 	public AVector<T> subVector(long start, long length) {
 		checkRange(start, length);
+		if (length==0) return Vectors.empty();
 
 		// Create using an Object array. Probably fastest?
 		ACell[] arr = new ACell[Utils.checkedInt(length)];

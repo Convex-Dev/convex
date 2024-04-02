@@ -1,5 +1,6 @@
 package convex.core.lang;
 
+import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.ResultContext;
@@ -1575,7 +1576,6 @@ public class Context {
 		State state=getState();
 		AVector<AccountStatus> accounts=state.getAccounts();
 		if (allowance<0) return withError(ErrorCodes.ARGUMENT,"Can't transfer a negative allowance amount");
-		if (allowance>Constants.MAX_SUPPLY) return withError(ErrorCodes.ARGUMENT,"Can't transfer an allowance amount beyond maximum limit");
 
 		Address source=getAddress();
 		long sourceIndex=source.longValue();
@@ -2059,9 +2059,8 @@ public class Context {
 		State s=getState();
 		PeerStatus ps=s.getPeer(accountKey);
 		if (ps!=null) return withError(ErrorCodes.STATE,"Peer already exists for this account key: "+accountKey.toChecksumHex());
-		if (initialStake<0) return this.withArgumentError("Cannot set a negative stake");
 		if (initialStake == 0) return this.withArgumentError("Cannot create a peer with zero stake");
-		if (initialStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
+		if (!Coin.isValidAmount(initialStake)) return this.withArgumentError("Target stake out of valid Amount range: "+initialStake);
 
 		Address myAddress=getAddress();
 

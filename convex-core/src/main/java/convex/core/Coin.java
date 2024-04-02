@@ -43,4 +43,13 @@ public class Coin {
 	 * The total Convex Coin maximum supply limit. One billion Gold Coins
 	 */
 	public static final long SUPPLY=1000*EMERALD;
+
+	/**
+	 * Check if an amount is valid quantity of Convex Coins 
+	 * @param amount Amount to test
+	 * @return true if valid, false otherwsie
+	 */
+	public static boolean isValidAmount(long amount) {
+		return (amount >=0) &&(amount <=Coin.SUPPLY) ;
+	}
 }
