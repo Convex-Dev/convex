@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.WalletEntry;
+import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.Address;
 import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
@@ -24,12 +24,12 @@ public class WalletPanel extends JPanel {
 	
 	private static final Logger log = LoggerFactory.getLogger(WalletPanel.class.getName());
 
-	public static WalletEntry HERO;
+	public static BasicWalletEntry HERO;
 
-	private DefaultListModel<WalletEntry> listModel = new DefaultListModel<>();;
-	ScrollyList<WalletEntry> walletList;
+	private DefaultListModel<BasicWalletEntry> listModel = new DefaultListModel<>();;
+	ScrollyList<BasicWalletEntry> walletList;
 
-	public void addWalletEntry(WalletEntry we) {
+	public void addWalletEntry(BasicWalletEntry we) {
 		listModel.addElement(we);
 	}
 
@@ -50,7 +50,7 @@ public class WalletPanel extends JPanel {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				Address addr=convex.createAccountSync(newKP.getAccountKey());
-				listModel.addElement(WalletEntry.create(addr,newKP));
+				listModel.addElement(BasicWalletEntry.create(addr,newKP));
 			} catch (Throwable t) {
 				log.warn("Exception creating account: ",t);
 			}
@@ -58,11 +58,11 @@ public class WalletPanel extends JPanel {
 
 
 		// create and add ScrollyList
-		walletList = new ScrollyList<WalletEntry>(listModel, we -> new WalletComponent(manager,we));
+		walletList = new ScrollyList<BasicWalletEntry>(listModel, we -> new WalletComponent(manager,we));
 		add(walletList, BorderLayout.CENTER);
 	}
 
-	public ListModel<WalletEntry> getListModel() {
+	public ListModel<BasicWalletEntry> getListModel() {
 		return listModel;
 	}
 

@@ -25,7 +25,7 @@ import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.WalletEntry;
+import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.init.Init;
@@ -348,7 +348,7 @@ public class PeerGUI extends JPanel {
 		return maxBlock;
 	}
 
-	public void addWalletEntry(WalletEntry we) {
+	public void addWalletEntry(BasicWalletEntry we) {
 		walletPanel.addWalletEntry(we);
 	}
 

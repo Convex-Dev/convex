@@ -6,12 +6,14 @@ import java.io.File;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.wallet.PKCS12Wallet;
+
 public class WalletTest {
 	
 	@Test 
 	public void testTempStore() {
 		String password="OmarSharif";
-		File file=Wallet.createTempStore(password);
+		File file=PKCS12Wallet.createTempStore(password);
 		assertNotNull(file);
 	}
 }

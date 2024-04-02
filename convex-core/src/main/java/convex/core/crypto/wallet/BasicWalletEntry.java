@@ -1,5 +1,6 @@
-package convex.core.crypto;
+package convex.core.crypto.wallet;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
@@ -15,23 +16,23 @@ import convex.core.exceptions.TODOException;
  * 
  * May be in a locked locked or unlocked state. Unlocking requires passphrase.
  */
-public class WalletEntry {
+public class BasicWalletEntry extends AWalletEntry {
 	private final Address address;
 	private final AKeyPair keyPair;
 	private final AMap<Keyword, ACell> data;
 
-	private WalletEntry(Address address, AMap<Keyword, ACell> data, AKeyPair kp) {
+	private BasicWalletEntry(Address address, AMap<Keyword, ACell> data, AKeyPair kp) {
 		this.address=address;
 		this.data = data;
 		this.keyPair = kp;
 	}
 
-	private WalletEntry(AMap<Keyword, ACell> data) {
+	private BasicWalletEntry(AMap<Keyword, ACell> data) {
 		this(null,data, null);
 	}
 
-	public static WalletEntry create(Address address,AKeyPair kp) {
-		return new WalletEntry(address, Maps.empty(), kp);
+	public static BasicWalletEntry create(Address address,AKeyPair kp) {
+		return new BasicWalletEntry(address, Maps.empty(), kp);
 	}
 
 	public AccountKey getAccountKey() {
@@ -48,7 +49,7 @@ public class WalletEntry {
 		return keyPair;
 	}
 
-	public WalletEntry unlock(char[] password) {
+	public BasicWalletEntry unlock(char[] password) {
 		if (keyPair != null) throw new IllegalStateException("Wallet already unlocked!");
 
 		// byte[] privateKey=PBE.deriveKey(password, data);
@@ -59,20 +60,21 @@ public class WalletEntry {
 		throw new TODOException();
 	}
 
-	public WalletEntry withKeyPair(AKeyPair kp) {
-		return new WalletEntry(address,data, kp);
+	public BasicWalletEntry withKeyPair(AKeyPair kp) {
+		return new BasicWalletEntry(address,data, kp);
 	}
 	
-	public WalletEntry withAddress(Address address) {
-		return new WalletEntry(null,data, keyPair);
+	public BasicWalletEntry withAddress(Address address) {
+		return new BasicWalletEntry(null,data, keyPair);
 	}
 
-	public WalletEntry lock() {
+	public BasicWalletEntry lock() {
 		if (keyPair == null) throw new IllegalStateException("Wallet already locked!");
 		// Clear keypair
 		return this.withKeyPair(null);
 	}
 
+	@Override
 	public boolean isLocked() {
 		return (keyPair == null);
 	}

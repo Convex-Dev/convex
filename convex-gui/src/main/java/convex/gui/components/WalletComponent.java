@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.WalletEntry;
+import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.text.Text;
@@ -35,14 +35,14 @@ public class WalletComponent extends BaseListComponent {
 	JButton lockButton;
 	JButton replButton;
 
-	WalletEntry walletEntry;
+	BasicWalletEntry walletEntry;
 
 	JPanel buttons = new JPanel();
 
 	private Address address;
 	PeerGUI manager;
 
-	public WalletComponent(PeerGUI manager,WalletEntry initialWalletEntry) {
+	public WalletComponent(PeerGUI manager,BasicWalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
 		this.manager=manager;
 		address = walletEntry.getAddress();

@@ -24,7 +24,7 @@ import convex.api.ConvexRemote;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.WalletEntry;
+import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
@@ -58,7 +58,7 @@ public class PeersListPanel extends JPanel {
 				addPeer(convex);
 				
 				// initial wallet list
-		        WalletEntry we = WalletEntry.create(server.getPeerController(), server.getKeyPair());
+		        BasicWalletEntry we = BasicWalletEntry.create(server.getPeerController(), server.getKeyPair());
 				manager.addWalletEntry(we);
 			}
 		} catch (Exception e) {
@@ -80,7 +80,7 @@ public class PeersListPanel extends JPanel {
 			long amt=convex.getBalance()/10;
 			convex.transferSync(a, amt);
 			
-			manager.addWalletEntry(WalletEntry.create(a, kp));
+			manager.addWalletEntry(BasicWalletEntry.create(a, kp));
 			
 			// Set up Peer in base server
 			convex=Convex.connect(base, a, kp);

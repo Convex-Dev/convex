@@ -20,7 +20,7 @@ import javax.swing.border.EmptyBorder;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.SLIP10;
-import convex.core.crypto.WalletEntry;
+import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.util.Utils;
@@ -225,7 +225,7 @@ public class KeyGenPanel extends JPanel {
 		addWalletButton.addActionListener(e -> {
 			String pks = privateKeyArea.getText();
 			pks = Utils.stripWhiteSpace(pks);
-			WalletEntry we = WalletEntry.create(null,AKeyPair.create(Utils.hexToBytes(pks)));
+			BasicWalletEntry we = BasicWalletEntry.create(null,AKeyPair.create(Utils.hexToBytes(pks)));
 			manager.addWalletEntry(we);
 			manager.switchPanel("Wallet");
 
