@@ -261,7 +261,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 */
 	private synchronized boolean checkSignatureImpl(AccountKey publicKey) {
 		// Fast check for already verified key
-		if ((verifiedKey!=null)&&(verifiedKey.equals(publicKey))) return true;
+		if (verifiedKey!=null) return verifiedKey.equals(publicKey);
 		
 		Ref<SignedData<T>> sigRef=getRef();
 		int flags=sigRef.getFlags();

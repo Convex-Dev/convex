@@ -1,12 +1,15 @@
 package convex.core;
 
 import java.io.IOException;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -476,6 +479,8 @@ public class Peer {
 		
 		// Return if we don't need to advance states
 		if (stateIndex>=consensusPoint) return this;
+		
+		validateSignatures(s,blocks,stateIndex,consensusPoint);
 
 		// We need to compute at least one new state update
 		while (stateIndex < consensusPoint) { // add states until last state is at consensus point
@@ -487,6 +492,27 @@ public class Peer {
 			stateIndex++;
 		}
 		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
+	}
+
+	private void validateSignatures(State s, AVector<SignedData<Block>> blocks, long start, long end) {
+		Consumer<SignedData<ATransaction>> transactionValidator=st->{
+			ATransaction t=st.getValue();
+			Address origin=t.getOrigin();
+			AccountStatus as=s.getAccount(origin);
+			if (as==null) return; // ignore, will probably fail with :NOBODY
+			AccountKey pk=as.getAccountKey();
+			if (pk==null) return; // ignore, will probably fail as an actor account
+			st.checkSignature(pk);
+		};
+		
+		Consumer<SignedData<Block>> blockValidator=sb->{
+			AVector<SignedData<ATransaction>> transactions = sb.getValue().getTransactions();
+			Stream<SignedData<ATransaction>> tstream=transactions.parallelStream();
+			tstream.forEach(transactionValidator);
+		};
+		
+		Stream<SignedData<Block>> stream=blocks.parallelStream().skip(start).limit(end-start);
+		stream.forEach(blockValidator);
 	}
 
 	/**
