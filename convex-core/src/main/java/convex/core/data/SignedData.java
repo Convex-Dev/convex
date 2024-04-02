@@ -259,7 +259,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 	 *
 	 * @return true if valid, false otherwise
 	 */
-	private boolean checkSignatureImpl(AccountKey publicKey) {
+	private synchronized boolean checkSignatureImpl(AccountKey publicKey) {
 		// Fast check for already verified key
 		if ((verifiedKey!=null)&&(verifiedKey.equals(publicKey))) return true;
 		
