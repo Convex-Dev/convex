@@ -45,4 +45,8 @@ java -cp target/convex-gui-jar-with-dependencies.jar -XX:+FlightRecorder -XX:Sta
 
 Copyright 2019-2024 The Convex Foundation and Contributors
 
-Code in convex-gui is provided under the Convex Public License
+Code in convex-gui is provided under the [Convex Public License](../LICENSE.md). Alternate licenses can be granted for developers in the Convex ecosystem who have specific requirements - contact @mikera to discuss
+
+Feather Icons (https://github.com/feathericons/feather) used under MIT license 
+
+Material UI Swing (https://github.com/vincenzopalazzo/material-ui-swing) used under MIT license.
