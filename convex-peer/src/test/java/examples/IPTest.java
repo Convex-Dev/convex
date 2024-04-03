@@ -1,10 +1,15 @@
 package examples;
 
 import java.io.IOException;
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Enumeration;
+import java.util.Iterator;
 
 import convex.core.util.Utils;
 
@@ -15,6 +20,19 @@ public class IPTest {
 
 	@SuppressWarnings({ "unused", "resource" })
 	public static void main (String[] args) throws IOException {
+		final Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
+		while (e.hasMoreElements()) {
+		    final Iterator<InterfaceAddress> e2 = e.nextElement().getInterfaceAddresses().iterator();
+		    while (e2.hasNext()) {
+		    	InterfaceAddress inf = e2.next();
+		        final InetAddress ip = inf.getAddress();
+		        if (ip.isLoopbackAddress() || ip instanceof Inet4Address){
+		            continue;
+		        }
+		       System.err.println(inf+" === "+ip);
+		    }
+		}
+		
 		System.out.println("Local host: "+InetAddress.getLocalHost());
 		System.out.println("Loopback: "+InetAddress.getLoopbackAddress().getHostAddress());
 		

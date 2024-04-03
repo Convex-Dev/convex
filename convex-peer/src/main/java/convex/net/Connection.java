@@ -189,6 +189,8 @@ public class Connection {
 		// Disable Nagle, we don't want this as we want to send one-way traffic as fast as possible
 		clientChannel.socket().setTcpNoDelay(true);
 		clientChannel.connect(socketAddress);	
+		
+		// System.out.println("Connection: attempting to connect to: "+socketAddress);
 
 		long start = Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {
