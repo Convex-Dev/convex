@@ -30,6 +30,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.exceptions.TODOException;
+import convex.core.util.Utils;
 import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
@@ -149,10 +150,7 @@ public class PeersListPanel extends JPanel {
 			String input = JOptionPane.showInputDialog("Enter host address: ", "localhost:18888");
 			if (input==null) return; // no result?
 
-			String[] ss = input.split(":");
-			String host = ss[0].trim();
-			int port = (ss.length > 1) ? Integer.parseInt(ss[1].trim()) : 0;
-			InetSocketAddress hostAddress = new InetSocketAddress(host, port);
+			InetSocketAddress hostAddress = Utils.toInetSocketAddress(input);
 			ConvexRemote pc;
 			try {
 				// TODO: we want to receive anything?

@@ -86,7 +86,7 @@ public class MainGUI extends JPanel implements Runnable {
 
 
 		int result = JOptionPane.showConfirmDialog(this, pan, 
-	               "Enter Connection Details", JOptionPane.OK_CANCEL_OPTION);
+	               "Enter Testnet Details", JOptionPane.OK_CANCEL_OPTION);
 	    if (result == JOptionPane.OK_OPTION) {
 	    	try {
 	    		int numPeers=(Integer)peerCountSpinner.getValue();
@@ -145,7 +145,7 @@ public class MainGUI extends JPanel implements Runnable {
 	    		}
 	    		ConvexClient.launch(convex);
 	    	} catch (ConnectException e) {
-	    		Toast.display(this, "Connection Refused!", Color.RED);
+	    		Toast.display(this, "Connection Refused! "+e.getMessage(), Color.RED);
 	    	} catch (Exception e) {
 	    		Toast.display(this, "Connect Failed: "+e.getMessage(), Color.RED);
 	    		e.printStackTrace();

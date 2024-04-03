@@ -337,7 +337,7 @@ public class Peer {
 	}
 
 	/**
-	 * Gets the Peer Key of this Peer.
+	 * Gets the Peer Public Key of this Peer.
 	 * @return Peer Key of Peer.
 	 */
  	public AccountKey getPeerKey() {
@@ -519,7 +519,7 @@ public class Peer {
 	/**
 	 * Gets a historical State for the specified position
 	 * @param consensusMatch
-	 * @return
+	 * @return Historical state, or null if not available
 	 */
 	private State getHistoricalState(long pos) {
 		if (pos==0) return genesis;
