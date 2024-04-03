@@ -6,6 +6,7 @@ import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.awt.event.WindowEvent;
 import java.net.ConnectException;
+import java.net.InetSocketAddress;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -52,7 +53,7 @@ public class MainGUI extends JPanel implements Runnable {
 		JComponent testNet=createLaunchButton("Launch TestNet",Toolkit.TESTNET_ICON,this::launchTestNet);
 		actionPanel.add(testNet);
 		
-		JComponent terminal=createLaunchButton("Convex Terminal",Toolkit.TERMINAL_ICON,this::launchClient);
+		JComponent terminal=createLaunchButton("Convex Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient);
 		actionPanel.add(terminal);
 		
 		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools);
@@ -112,7 +113,7 @@ public class MainGUI extends JPanel implements Runnable {
 		Toolkit.launchBrowser("https://discord.com/invite/xfYGq4CT7v");
 	}
 	
-	public void launchClient() {
+	public void launchTerminalClient() {
 		JPanel pan=new JPanel();
 		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
@@ -134,8 +135,9 @@ public class MainGUI extends JPanel implements Runnable {
 	               "Enter Connection Details", JOptionPane.OK_CANCEL_OPTION);
 	    if (result == JOptionPane.OK_OPTION) {
 	    	try {
-	    		Utils.toInetSocketAddress(TOOL_TIP_TEXT_KEY);
-	    		Convex convex=Convex.connect(Utils.toInetSocketAddress(hostField.getText()));
+	    		InetSocketAddress sa=Utils.toInetSocketAddress(hostField.getText());
+	    		System.err.println("MainGUI attemptiong connect to: "+sa);
+	    		Convex convex=Convex.connect(sa);
 	    		convex.setAddress(Address.parse(addressField.getText()));
 	    		
 	    		Blob b=Blob.parse(keyField.getText());
@@ -146,6 +148,7 @@ public class MainGUI extends JPanel implements Runnable {
 	    		ConvexClient.launch(convex);
 	    	} catch (ConnectException e) {
 	    		Toast.display(this, "Connection Refused! "+e.getMessage(), Color.RED);
+	    		e.printStackTrace();
 	    	} catch (Exception e) {
 	    		Toast.display(this, "Connect Failed: "+e.getMessage(), Color.RED);
 	    		e.printStackTrace();

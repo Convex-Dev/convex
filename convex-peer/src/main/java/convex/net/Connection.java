@@ -124,9 +124,9 @@ public class Connection {
 	}
 
 	/**
-	 * Create a PeerConnection by connecting to a remote address
+	 * Create a Connection by connecting to a remote address
 	 *
-	 * @param hostAddress   Internet Address to connect to
+	 * @param socketAddress   Address to connect to
 	 * @param receiveAction A callback Consumer to be called for any received
 	 *                      messages on this connection
 	 * @param store         Store to use for this Connection
@@ -135,15 +135,15 @@ public class Connection {
 	 * @throws TimeoutException If connection cannot be established within an
 	 *                          acceptable time (~5s)
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store)
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction, AStore store)
 			throws IOException, TimeoutException {
-		return connect(hostAddress, receiveAction, store, null);
+		return connect(socketAddress, receiveAction, store, null);
 	}
 	
 	/**
 	 * Create a Connection by connecting to a remote address
 	 *
-	 * @param hostAddress    Internet Address to connect to
+	 * @param socketAddress    Address to connect to
 	 * @param receiveAction  A callback Consumer to be called for any received
 	 *                       messages on this connection
 	 * @param store          Store to use for this Connection
@@ -154,15 +154,15 @@ public class Connection {
 	 * @throws TimeoutException If the connection cannot be established within the
 	 *                          timeout period
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey) throws IOException, TimeoutException {	
-		return connect(hostAddress,receiveAction,store,trustedPeerKey,Config.SOCKET_SEND_BUFFER_SIZE,Config.SOCKET_RECEIVE_BUFFER_SIZE);
+		return connect(socketAddress,receiveAction,store,trustedPeerKey,Config.SOCKET_SEND_BUFFER_SIZE,Config.SOCKET_RECEIVE_BUFFER_SIZE);
 	}
 
 	/**
 	 * Create a Connection by connecting to a remote address
 	 *
-	 * @param hostAddress    Internet Address to connect to
+	 * @param socketAddress    Internet Address to connect to
 	 * @param receiveAction  A callback Consumer to be called for any received
 	 *                       messages on this connection
 	 * @param store          Store to use for this Connection
@@ -175,7 +175,7 @@ public class Connection {
 	 * @throws TimeoutException If the connection cannot be established within the
 	 *                          timeout period
 	 */
-	public static Connection connect(InetSocketAddress hostAddress, Consumer<Message> receiveAction, AStore store,
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize) throws IOException, TimeoutException {
 		ensureSelectorLoop();
 		
@@ -188,7 +188,7 @@ public class Connection {
 		
 		// Disable Nagle, we don't want this as we want to send one-way traffic as fast as possible
 		clientChannel.socket().setTcpNoDelay(true);
-		clientChannel.connect(hostAddress);	
+		clientChannel.connect(socketAddress);	
 
 		long start = Utils.getCurrentTimestamp();
 		while (!clientChannel.finishConnect()) {
@@ -205,7 +205,7 @@ public class Connection {
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
-		log.debug("Connect succeeded for host: {}", hostAddress);
+		log.debug("Connect succeeded for host: {}", socketAddress);
 		return pc;
 	}
 
