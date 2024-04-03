@@ -87,7 +87,6 @@ public class NIOServer implements Closeable {
 		bindAddress = (bindAddress == null) ? "::" : bindAddress;
 		InetSocketAddress address;
 		
-		
 		if (port==0) {
 			try {
 				address = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
