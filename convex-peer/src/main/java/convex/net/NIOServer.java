@@ -66,10 +66,13 @@ public class NIOServer implements Closeable {
 		return new NIOServer(server);
 	}
 
-	public void launch(Integer port) throws IOException {
-		launch(null, port);
-	}
-
+	/**
+	 * Launch NIO Server, binding to a given socket address
+	 * 
+	 * @param bindAddress Address to bind to, or null to bind to all addresses (unspecified)
+	 * @param port Port to use. If 0 or null, a default port will be used, with fallback to a random port
+	 * @throws IOException
+	 */
 	public void launch(String bindAddress, Integer port) throws IOException {
 		if (port == null) {
 			port = 0;
@@ -111,7 +114,7 @@ public class NIOServer implements Closeable {
 		// set running status now, so that loops don't terminate
 		running = true;
 
-		Thread selectorThread = new Thread(selectorLoop, "NIO Server selector loop on port: " + port);
+		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + port);
 		selectorThread.setDaemon(true);
 		selectorThread.start();
 		log.debug("NIO server started on port {}", port);
