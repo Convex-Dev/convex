@@ -50,6 +50,10 @@ public class Init {
 
 	// Base for genesis user addresses
 	public static final Address GENESIS_ADDRESS = Address.create(11);
+	
+	// Controller for genesis peer address
+	public static final Address GENESIS_PEER_ADDRESS = Address.create(12);
+
 
 	/**
 	 * Creates the base genesis state (before deployment of standard libraries and actors)
