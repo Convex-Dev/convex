@@ -545,11 +545,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs,pos, count);
+		pos = Format.writeVLCCount(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 
-		pos = Format.writeVLCLong(bs,pos, depth);
-		pos = Format.writeVLCLong(bs,pos, prefixLength);
+		pos = Format.writeVLCCount(bs,pos, depth);
+		pos = Format.writeVLCCount(bs,pos, prefixLength);
 			
 		pos = MapEntry.encodeCompressed(entry,bs,pos); // entry may be null
 		if (count == 1) return pos; // must be a single entry
@@ -585,19 +585,19 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static <K extends ABlob, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLCLong(b,pos+1);
+		long count = Format.readVLCCount(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative count!");
 		if (count == 0) return (Index<K, V>) EMPTY;
 		
-		int epos=pos+1+Format.getVLCLength(count);
+		int epos=pos+1+Format.getVLCCountLength(count);
 		
-		long depth = Format.readVLCLong(b,epos);
+		long depth = Format.readVLCCount(b,epos);
 		if (depth < 0) throw new BadFormatException("Negative depth!");
-		epos+=Format.getVLCLength(depth);
+		epos+=Format.getVLCCountLength(depth);
 		
-		long prefixLength = Format.readVLCLong(b,epos);
+		long prefixLength = Format.readVLCCount(b,epos);
 		if (prefixLength < 0) throw new BadFormatException("Negative prefix length!");
-		epos+=Format.getVLCLength(prefixLength);
+		epos+=Format.getVLCCountLength(prefixLength);
 
 		byte etype=b.byteAt(epos++);
 		MapEntry<K,V> me;
