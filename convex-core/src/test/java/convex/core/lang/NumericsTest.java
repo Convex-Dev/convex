@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,6 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.data.ObjectsTest;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -157,11 +159,7 @@ public class NumericsTest extends ACVMTest {
 		doIntegerTests(a);
 	}
 
-	public static void doIntegerTests(AInteger a) {
-		assertEquals(a.abs(),RT.multiply(a.signum(),a));
-		
-		ObjectsTest.doAnyValueTests(a);
-	}
+
 
 	@Test
 	public void testMinusDouble() {
@@ -442,6 +440,32 @@ public class NumericsTest extends ACVMTest {
 	@Test
 	public void testBadStringCast() {
 		assertCastError(step("(inc (str 1))"));
+	}
+
+	public static void doNumberTests(ANumeric a) {
+		if (a instanceof AInteger) {
+			doIntegerTests((AInteger) a);
+		} else if (a instanceof CVMDouble) {
+			doDoubleTests((CVMDouble) a);
+		} else {
+			fail("Unrecognised numeric value: "+a);
+		}
+	}
+	
+	public static void doIntegerTests(AInteger a) {
+		assertEquals(a.abs(),RT.multiply(a.signum(),a));
+		
+		doGenericNumberTests(a);
+	}
+	
+	public static void doDoubleTests(CVMDouble a) {
+		assertEquals(a.abs(),RT.multiply(a.signum(),a));
+		
+		doGenericNumberTests(a);
+	}
+	
+	public static void doGenericNumberTests(ANumeric a) {
+		ObjectsTest.doAnyValueTests(a);
 	}
 
 }

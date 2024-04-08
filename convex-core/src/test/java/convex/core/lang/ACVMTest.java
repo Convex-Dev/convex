@@ -154,6 +154,10 @@ public abstract class ACVMTest {
 	public boolean evalB(String source) {
 		return ((CVMBool) eval(source)).booleanValue();
 	}
+	
+	public boolean evalB(ACell code) {
+		return ((CVMBool) eval(code)).booleanValue();
+	}
 
 	public static boolean evalB(Context ctx, String source) {
 		return ((CVMBool) eval(ctx, source)).booleanValue();

@@ -39,11 +39,11 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 	}
 	
 	// Build an invoke using the given values
-	public static <T extends ACell> Invoke<T> build(ACell... vals) {
+	public static <T extends ACell> Invoke<T> build(Object... vals) {
 		int n=vals.length;
 		AOp<?>[] ops=new AOp[n];
 		for (int i=0; i<n; i++) {
-			ACell v=vals[i];
+			ACell v=RT.cvm(vals[i]);
 			ops[i]=(v instanceof AOp)?(AOp<?>) v:Constant.of(v);
 		}
 		return create(ops);

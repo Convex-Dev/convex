@@ -548,7 +548,7 @@ public class RT {
 		if (a instanceof CVMDouble)
 			return (CVMDouble) a;
 
-		CVMLong l = ensureLong(a);
+		AInteger l = ensureInteger(a);
 		if (l == null)
 			return null;
 		return l.toDouble();

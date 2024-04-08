@@ -1,8 +1,10 @@
 package convex.core.data;
 
+import static convex.test.Assertions.assertCastError;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -11,6 +13,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
@@ -20,14 +23,16 @@ import convex.core.exceptions.ValidationException;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.AOp;
 import convex.core.lang.Core;
+import convex.core.lang.NumericsTest;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Invoke;
 import convex.test.Samples;
 
-import static convex.test.Assertions.*;
-
+/**
+ * Parameterised tests for a representative range of valid CVM values
+ */
 @RunWith(Parameterized.class)
 public class ParamTestValues extends ACVMTest {
 	private final ACell data;
@@ -42,17 +47,39 @@ public class ParamTestValues extends ACVMTest {
 	public static Collection<Object[]> dataExamples() {
 		return Arrays.asList(new Object[][] {
 			{ "nil", Samples.NIL },
+			
 			{ "Keyword :foo", Samples.FOO },
 			{ "Symbol 'foo", Symbols.FOO },
+			
 			{ "Short String", Strings.create("bonnie") },
 			{ "Empty String", Strings.EMPTY },
+			
 			{ "Empty Vector", Vectors.empty() },
 			{ "Short Vector 16", Samples.INT_VECTOR_16 },
 			{ "Big Vector 300", Samples.INT_VECTOR_300 },
-			{ "Long", CVMLong.ONE },
-			{ "Double", CVMDouble.ONE },
-			{ "NAN", CVMDouble.NaN },
+			
+			{ "Empty List", Lists.empty() },
+			{ "Short List 16", Samples.INT_LIST_10 },
+			{ "Big List 300", Samples.INT_LIST_300 },
+			
+			{ "Long 1", CVMLong.ONE },
+			{ "Long -666", CVMLong.create(-666) },
+			{ "Big Integer", Samples.MIN_BIGINT },
+			{ "Double 0.0", CVMDouble.ZERO },
+			{ "Double 1.0", CVMDouble.ONE },
+			{ "Double -Infinity", CVMDouble.NEGATIVE_INFINITY },
+			{ "Double NaN", CVMDouble.NaN },
+			
+			{ "Empty Blob", Blobs.empty() },
+			{ "Small Blob", Blob.fromHex("0xf0013456abcd") },
+			{ "Full Blob", Samples.FULL_BLOB },
+			{ "Blob Tree", Samples.FULL_BLOB_PLUS },
+
 			{ "Single value map", Maps.of(7, 8) },
+			
+			{ "Empty Index", Index.none() },
+			{ "Keyword Index", Index.of(Keywords.FOO,1,Keywords.BAR,2) },
+			
 			{ "Account status", AccountStatus.create(1000L,Samples.ACCOUNT_KEY) },
 			{ "Peer status", PeerStatus.create(Address.create(11), 1000L, Maps.create(Keywords.URL,Strings.create("http://www.google.com:18888"))) },
 			{ "Signed value", SignedData.sign(Samples.KEY_PAIR, Strings.create("foo")) },
@@ -94,14 +121,50 @@ public class ParamTestValues extends ACVMTest {
 	public void testCountable() {
 		boolean countable=RT.bool(eval(Invoke.build(Core.COUNTABLE_Q,constOp)));
 		if (countable) {
+			// Count should work and return a natural number
 			CVMLong l=RT.ensureLong(eval(Invoke.build(Core.COUNT,constOp)));
 			assertNotNull(l);
 			long n=l.longValue();
 			assert(n>=0);
 			
 			assertEquals(n,(long)RT.count(data));
+			
+			ACountable<?> c=RT.ensureCountable(data);
+			if (c!=null) {
+				assertEquals(n,c.count());
+				assertEquals(n,c.size());
+			} else {
+				assert(n==0);
+			}
+			
+			// should be empty? iff count is zero
+			assertEquals(n==0,evalB(Invoke.build(Core.EMPTY_Q,c)));
+			
+			// empty should return the empty instance (or nil)
+			ACell empty=eval(Invoke.build(Core.EMPTY,c));
+			assertEquals(0,(long)RT.count(empty));
+			
 		} else {
 			assertCastError(step(context(),Invoke.build(Core.COUNT,constOp)));
+			assertCastError(step(context(),Invoke.build(Core.NTH,constOp,0)));
+			assertNull(RT.count(data));
+		}
+	}
+	
+	@Test
+	public void testNumber() {
+		boolean number=RT.bool(eval(Invoke.build(Core.NUMBER_Q,constOp)));
+		if (number) {
+			ANumeric a=RT.ensureNumber(data);
+			assertNotNull(a);
+			CVMDouble dv=eval(Invoke.build(Core.DOUBLE,constOp));
+			assertNotNull(dv);
+			assertEquals(dv.doubleValue(),a.doubleValue(),0.0);
+			
+			NumericsTest.doNumberTests(a);
+		
+		} else {
+			assertCastError(step(context(),Invoke.build(Core.INC,constOp)));
 		}
 	}
 }
