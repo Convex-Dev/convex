@@ -44,8 +44,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/**
 	 * Empty Index singleton
 	 */
-	public static final Index<?, ?> EMPTY = new Index<ABlob, ACell>(0, 0, null, EMPTY_CHILDREN,
-			(short) 0, 0L);
+	public static final Index<?, ?> EMPTY = new Index<ABlob, ACell>(0, null, EMPTY_CHILDREN,(short) 0, 0L);
 	
 	static {
 		// Set empty Ref flags as internal embedded constant
@@ -70,26 +69,17 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	private final short mask;
 
 	/**
-	 * Depth of radix tree in number of hex digits. Top level is 0. 
-	 * Children should have depth = parent depth + parent prefixLength + 1
+	 * Depth of radix tree entry in number of hex digits.
 	 */
 	private final long depth;
 
-	/**
-	 * Length of prefix, where the tree branches beyond depth. 0 = no prefix.
-	 */
-	private final long prefixLength;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	protected Index(long depth, long prefixLength, MapEntry<K, V> entry, Ref<Index>[] entries,
+	protected Index(long depth, MapEntry<K, V> entry, Ref<Index>[] entries,
 			short mask, long count) {
 		super(count);
 		this.depth = depth;
-		this.prefixLength = prefixLength;
 		this.entry = entry;
-		int cn = Utils.bitCount(mask);
-		if (cn != entries.length) throw new IllegalArgumentException(
-				"Illegal mask: " + Utils.toHexString(mask) + " for given number of children: " + cn);
 		this.children = (Ref[]) entries;
 		this.mask = mask;
 	}
@@ -99,18 +89,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		ACell k=me.getKey();
 		if (!(k instanceof ABlobLike)) return null; // check in case invalid key type
 		long hexLength = Math.min(MAX_DEPTH,((K)k).hexLength());
-		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
-	}
-
-	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
-		long hexLength =  Math.min(me.getKey().hexLength(),MAX_DEPTH);
-		return new Index<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new Index<K, V>(hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> create(K k, V v) {
 		MapEntry<K, V> me = MapEntry.create(k, v);
 		long hexLength = Math.min(MAX_DEPTH,k.hexLength());
-		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new Index<K, V>(hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 	
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> of(Object k, Object v) {
@@ -146,7 +131,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		MapEntry<K, V> newEntry = Ref.update(entry,func);
 		Ref<Index<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
-		Index<K,V> result= new Index<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
+		Index<K,V> result= new Index<K, V>(depth, newEntry, (Ref[])newChildren, mask, count);
 		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
 		return result;
 	}
@@ -161,7 +146,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@Override
 	public MapEntry<K, V> getEntry(K key) {
 		long kl = key.hexLength();
-		long pl = depth + prefixLength;
+		long pl = depth;
 		if (kl < pl) return null; // key is too short to start with current prefix
 
 		if (kl == pl) {
@@ -231,11 +216,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
 			if (keyMatch(k,entry.getKey())) {
-				return (depth==0)?empty():null;
+				return empty();
 			}
 			return this; // leave existing entry in place
 		}
-		long pDepth = depth + prefixLength; // hex depth of this node including prefix
+		long pDepth = depth; // hex depth of this node including prefix
 		long kl = Math.min(k.hexLength(),MAX_DEPTH); // hex length of key to dissoc
 		if (kl < pDepth) {
 			// no match for sure, so no change
@@ -248,13 +233,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			// at this point have matched entry exactly. So need to remove it safely while
 			// preserving invariants
 			if (children.length == 1) {
-				// need to promote child to the current depth
 				Index<K, V> c = (Index<K, V>) children[0].getValue();
-				return new Index(depth, (c.depth + c.prefixLength) - depth, c.entry, c.children, c.mask,
-						count - 1);
+				return c;
 			} else {
 				// Clearing current entry, keeping existing children (must be 2+)
-				return new Index(depth, prefixLength, null, children, mask, count - 1);
+				return new Index(depth, null, children, mask, count - 1);
 			}
 		}
 		// dissoc beyond current prefix length, so need to check children
@@ -266,8 +249,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V> newChild = oldChild.dissoc(k);
 		Index<K,V> r=this.withChild(digit, oldChild, newChild);
 		
-		// check if whole Index was emptied
-		if ((r==null)&&(depth==0)) r= empty();
 		return r;
 	}
 
@@ -336,16 +317,21 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
 	public Index<K, V> assocEntry(MapEntry<K, V> e) {
+		return assocEntry(e,0);
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	private Index<K, V> assocEntry(MapEntry<K, V> e, long match) {
+
 		if (count == 0L) return create(e);
 		if (count == 1L) {
 			assert (mask == (short) 0); // should be no children
 			if (entry.keyEquals(e)) {
 				if (entry == e) return this;
 				// recreate, preserving current depth
-				return createAtDepth(e, depth);
+				return create(e);
 			}
 		}
 		ACell maybeValidKey=e.getKey();
@@ -358,9 +344,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		ABlob prefix=getPrefix(); // prefix of current node (valid up to pDepth)
 		if (newKeyLength >= pDepth) {
 			// constrain relevant key length by match with current prefix
-			mkl = depth + k.hexMatchLength(prefix, depth, prefixLength);
+			mkl = match + k.hexMatchLength(prefix, match, depth-match);
 		} else {
-			mkl = depth + k.hexMatchLength(prefix, depth, newKeyLength - depth);
+			mkl = match + k.hexMatchLength(prefix, match, newKeyLength - match);
 		}
 		if (mkl < pDepth) {
 			// we collide at a point shorter than the current prefix length
@@ -368,22 +354,14 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				// new key is subset of the current prefix, so split prefix at key position mkl
 				// doesn't need to adjust child depths, since they are splitting at the same
 				// point
-				long newDepth=mkl+1; // depth for new child
-				Index<K, V> split = new Index<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
-						count);
 				int splitDigit = prefix.getHexDigit(mkl);
 				short splitMask = (short) (1 << splitDigit);
-				Index<K, V> result = new Index<K, V>(depth, mkl - depth, e, new Ref[] { split.getRef() },
-						splitMask, count + 1);
+				Index<K, V> result = new Index<K, V>(mkl, e, new Ref[] { this.getRef() }, splitMask, count + 1);
 				return result;
 			} else {
-				// we need to fork the current prefix in two at position mkl
-				long newDepth=mkl+1; // depth for new children
-				
-				Index<K, V> branch1 = new Index<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
-						count);
-				Index<K, V> branch2 = new Index<K, V>(newDepth, newKeyLength - newDepth, e, (Ref[]) EMPTY_CHILDREN,
-						(short) 0, 1L);
+				// we need to fork the current prefix in two at position mkl			
+				Index<K, V> branch1 = this;
+				Index<K, V> branch2 = create(e);
 				int d1 = prefix.getHexDigit(mkl);
 				int d2 = k.getHexDigit(mkl);
 				if (d1 > d2) {
@@ -394,7 +372,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				}
 				Ref[] newChildren = new Ref[] { branch1.getRef(), branch2.getRef() };
 				short newMask = (short) ((1 << d1) | (1 << d2));
-				Index<K, V> fork = new Index<K, V>(depth, mkl - depth, null, newChildren, newMask, count + 1L);
+				Index<K, V> fork = new Index<K, V>(mkl, null, newChildren, newMask, count + 1L);
 				return fork;
 			}
 		}
@@ -403,12 +381,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			// we must have matched the current entry exactly
 			if (entry == null) {
 				// just add entry at this position
-				return new Index<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count + 1);
+				return new Index<K, V>(depth, e, (Ref[]) children, mask, count + 1);
 			}
 			if (entry == e) return this;
 
 			// swap entry, no need to change count
-			return new Index<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count);
+			return new Index<K, V>(depth, e, (Ref[]) children, mask, count);
 		}
 		// at this point we have matched full prefix, but new key length is longer.
 		// so we need to update (or add) exactly one child
@@ -416,7 +394,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V> oldChild = getChild(childDigit);
 		Index<K, V> newChild;
 		if (oldChild == null) {
-			newChild = createAtDepth(e, pDepth+1); // Must be at least 1 beyond current prefix. Safe because pDepth < MAX_DEPTH
+			newChild = create(e); // Must be at least 1 beyond current prefix. Safe because pDepth < MAX_DEPTH
 		} else {
 			newChild = oldChild.assocEntry(e);
 		}
@@ -432,11 +410,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @param newChild
 	 * @return Index with child removed, or null if Index was deleted entirely
 	 */
-	@SuppressWarnings({ "rawtypes", "unchecked"})
+	@SuppressWarnings({ "rawtypes", "unchecked", "null"})
 	private Index<K, V> withChild(int childDigit, Index<K, V> oldChild, Index<K, V> newChild) {
 		// consider empty children as null
-		//if (oldChild == EMPTY) oldChild = null;
-		//if (newChild == EMPTY) newChild = null;
+		if (oldChild == EMPTY) oldChild = null;
+		if (newChild == EMPTY) newChild = null;
 		if (oldChild == newChild) return this;
 
 		int n = children.length;
@@ -451,7 +429,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			System.arraycopy(children, 0, newChildren, 0, newPos); // earlier entries
 			newChildren[newPos] = newChild.getRef();
 			System.arraycopy(children, newPos, newChildren, newPos + 1, n - newPos); // later entries
-			return new Index<K, V>(depth, prefixLength, entry, newChildren, newMask,
+			return new Index<K, V>(depth, entry, newChildren, newMask,
 					count + newChild.count());
 		} else {
 			// dealing with an existing child
@@ -459,26 +437,18 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				// need to delete an existing child
 				int delPos = Bits.positionForDigit(childDigit, mask);
 
-				// handle special case where we need to promote the remaining child
+				// handle special case where entry is null and we need to promote the one remaining child
 				if (entry == null) {
 					if (n == 2) {
 						Index<K, V> rm = (Index<K, V>) children[1 - delPos].getValue();
-						long newPLength = prefixLength + rm.prefixLength+1;
-						return new Index<K, V>(depth, newPLength, rm.entry, (Ref[]) rm.children, rm.mask,
-								rm.count());
-					} else if (n == 1) {
-						// deleting entire Index!
-						return null;
-					}
-				}
-				if (n==0) {
-					System.out.print("Index Bad!");
+						return rm;
+					} 
 				}
 				newChildren = new Ref[n - 1];
 				short newMask = (short) (mask & ~(1 << childDigit));
 				System.arraycopy(children, 0, newChildren, 0, delPos); // earlier entries
 				System.arraycopy(children, delPos + 1, newChildren, delPos, n - delPos - 1); // later entries
-				return new Index<K, V>(depth, prefixLength, entry, newChildren, newMask,
+				return new Index<K, V>(depth, entry, newChildren, newMask,
 						count - oldChild.count());
 			} else {
 				// need to replace a child
@@ -486,7 +456,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				newChildren = children.clone();
 				newChildren[childPos] = newChild.getRef();
 				long newCount = count + newChild.count() - oldChild.count();
-				return new Index<K, V>(depth, prefixLength, entry, newChildren, mask, newCount);
+				return new Index<K, V>(depth, entry, newChildren, mask, newCount);
 			}
 		}
 	}
@@ -530,7 +500,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		// check if whole Index was emptied
 		if (r==null) {
 			// everything deleted, but need 
-			if (depth==0) r=empty();
+			return empty();
 		}
 		return r;
 	}
@@ -547,7 +517,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 
 		pos = Format.writeVLCCount(bs,pos, depth);
-		pos = Format.writeVLCCount(bs,pos, prefixLength);
 			
 		pos = MapEntry.encodeCompressed(entry,bs,pos); // entry may be null
 		if (count == 1) return pos; // must be a single entry
@@ -592,10 +561,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		long depth = Format.readVLCCount(b,epos);
 		if (depth < 0) throw new BadFormatException("Negative depth!");
 		epos+=Format.getVLCCountLength(depth);
-		
-		long prefixLength = Format.readVLCCount(b,epos);
-		if (prefixLength < 0) throw new BadFormatException("Negative prefix length!");
-		epos+=Format.getVLCCountLength(prefixLength);
 
 		byte etype=b.byteAt(epos++);
 		MapEntry<K,V> me;
@@ -615,7 +580,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K,V> result;
 		if (count == 1) {
 			// single entry map
-			result = new Index<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+			result = new Index<K, V>(depth, me, EMPTY_CHILDREN, (short) 0, 1L);
 			result.attachEncoding(b.slice(pos, epos));
 		} else {
 			// Need to include children
@@ -628,7 +593,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				epos+=cr.getEncodingLength();
 				children[i] =cr; 
 			}
-			result= new Index<K, V>(depth, prefixLength, me, children, mask, count);
+			result= new Index<K, V>(depth, me, children, mask, count);
 		}
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
@@ -644,11 +609,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public void validate() throws InvalidDataException {
 		super.validate();
 		
-		if ((depth<0)||(depth>=MAX_DEPTH)) throw new InvalidDataException("Invalid index depth",this);
+		if ((depth<0)||(depth>MAX_DEPTH)) throw new InvalidDataException("Invalid index depth",this);
 
 		long ecount = (entry == null) ? 0 : 1;
 		int n = children.length;
-		long pDepth = prefixDepth();
 		for (int i = 0; i < n; i++) {
 			ACell o = children[i].getValue();
 			if (!(o instanceof Index))
@@ -658,11 +622,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			long ccount=c.count();
 			if (ccount==0) {
 				throw new InvalidDataException("Child "+i+" should not be empty! At depth "+depth,this);
-			}
-
-			if (c.depth != (pDepth+1)) {
-				throw new InvalidDataException("Child must have depth: " + (pDepth+1) + " but was: " + c.depth,
-						this);
 			}
 
 			if (c.prefixDepth() <= prefixDepth()) {
@@ -683,12 +642,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * @return
 	 */
 	private long prefixDepth() {
-		return depth + prefixLength;
+		return depth;
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (prefixLength < 0) throw new InvalidDataException("Negative prefix length!" + prefixLength, this);
 		if (count == 0) {
 			if (this != EMPTY) throw new InvalidDataException("Non-singleton empty Index", this);
 			return;
