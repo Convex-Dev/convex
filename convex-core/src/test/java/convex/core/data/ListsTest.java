@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -98,6 +99,18 @@ public class ListsTest {
 		doListTests(Lists.of(1, 2L, Vectors.empty()));
 		doListTests(Samples.INT_LIST_10);
 		doListTests(Samples.INT_LIST_300);
+	}
+	
+	@Test 
+	public void testToArray() {
+		CVMLong[] arr=new CVMLong[] {CVMLong.ZERO, CVMLong.ONE};
+		
+		CVMLong[] buf=new CVMLong[0];
+		
+		List<CVMLong> l=List.create(arr.clone());
+		buf=l.toArray(buf);
+		
+		assertArrayEquals(buf,arr);
 	}
 
 	/**

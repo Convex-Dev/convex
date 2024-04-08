@@ -3571,6 +3571,15 @@ public class CoreTest extends ACVMTest {
 			assertArityError(pred.invoke(C, a2));
 		}
 	}
+	
+	@Test 
+	public void testCoreSetup() {
+		assertThrows(Error.class,()->Core.symbolFor(Symbols.FOO));
+		assertSame(Symbols.INDEX,Core.symbolFor(Core.INDEX));
+		
+		// duplicate registration
+		assertThrows(Error.class,()->Core.registerCode(Core.ADDRESS));
+	}
 
 	@Test
 	public void testCoreDefSymbols() throws BadFormatException {

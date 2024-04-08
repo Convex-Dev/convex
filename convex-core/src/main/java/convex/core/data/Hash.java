@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.nio.ByteBuffer;
-
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
 import convex.core.data.type.AType;
@@ -166,19 +164,6 @@ public class Hash extends AArrayBlob {
 	public static Hash compute(ACell value) {
 		if (value == null) return NULL_HASH;
 		return value.getHash();
-	}
-
-	/**
-	 * Reads a Hash from a ByteBuffer Assumes no Tag or count, i.e. just Hash.LENGTH for the
-	 * hash is read.
-	 * 
-	 * @param bb ByteBuffer to read from
-	 * @return Hash object read from ByteBuffer
-	 */
-	public static Hash readRaw(ByteBuffer bb) {
-		byte[] bs = new byte[Hash.LENGTH];
-		bb.get(bs);
-		return Hash.wrap(bs);
 	}
 
 	@Override

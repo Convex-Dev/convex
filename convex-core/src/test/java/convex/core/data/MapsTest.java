@@ -324,16 +324,16 @@ public class MapsTest {
 
 	@Test
 	public void testAssocs() {
-		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
+		AHashMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
 		assertSame(m, m.assoc(RT.cvm(1L), RT.cvm(2L)));
 
-		CollectionsTest.doMapTests(m);
+		doHashMapTest(m);
 	}
 
 	@Test
 	public void testConj() {
-		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
-		AMap<CVMLong, CVMLong> me = Maps.of(1L, 2L, 3L, 4L);
+		AHashMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);
+		AHashMap<CVMLong, CVMLong> me = Maps.of(1L, 2L, 3L, 4L);
 		assertEquals(m, m.conj(Vectors.of(1L, 2L)));
 		assertEquals(me, m.conj(Vectors.of(3L, 4L)));
 		assertEquals(me, m.conj(MapEntry.of(3L, 4L)));
@@ -344,8 +344,7 @@ public class MapsTest {
 		assertNull(m.conj(Vectors.of(1L, 2L, 3L)));
 		assertNull(m.conj(null));
 
-		CollectionsTest.doMapTests(me);
-
+		doHashMapTest(me);
 	}
 
 	@Test
@@ -366,7 +365,26 @@ public class MapsTest {
 			return (b == null) ? a : b;
 		}));
 
+		doHashMapTest(m);
+		doHashMapTest(m2);
+	}
+	
+	protected static <K extends ACell, V extends ACell> void doHashMapTest(AHashMap<K, V> m) {
+		if (m.isEmpty()) {
+			assertSame(m,m.empty());
+		} else {
+			long n=m.count();
+			MapEntry<K, V> firstEntry = m.entryAt(0);
+			K firstKey=firstEntry.getKey();
+			assertEquals(firstEntry,m.getEntryByHash(Hash.compute(firstKey)));
+			
+			// Test a smaller version of this map
+			AHashMap<K, V> smaller = m.dissoc(firstKey);
+			assertEquals(n-1,smaller.count());
+			assertTrue(m.containsAllKeys(m));
+			assertFalse(smaller.containsAllKeys(m));
+		}
+		
 		CollectionsTest.doMapTests(m);
-		CollectionsTest.doMapTests(m2);
 	}
 }

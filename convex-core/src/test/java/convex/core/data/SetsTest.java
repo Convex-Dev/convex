@@ -179,7 +179,7 @@ public class SetsTest {
 	@Test
 	public void testBigMerging() {
 		ASet<CVMLong> s = Sets.create(Samples.INT_VECTOR_300);
-		CollectionsTest.doSetTests(s);
+		SetsTest.doSetTests(s);
 
 		ASet<CVMLong> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
 		assertEquals(s, s2);
@@ -225,8 +225,30 @@ public class SetsTest {
 		doSetTests(set);
 	}
 	
+	/**
+	 * Generic tests for any CVM set
+	 * @param <T> Type of set element
+	 * @param a Set to test
+	 */
 	public static <T extends ACell> void doSetTests(ASet<T> a) {
+		assertSame(a.empty(),a.disjAll(a));
 		
-		CollectionsTest.doSetTests(a);
+		if (a.isEmpty()) {
+			assertSame(a.empty(),a);
+		} else {
+			long n=a.count();
+			T first=a.get(0);
+			ASet<T> butfirst=a.exclude(first);
+			assertEquals(n-1,butfirst.count);
+			
+			ASet<T> onlyfirst=a.empty().conj(first);
+			assertEquals(a,butfirst.includeAll(onlyfirst));
+			assertEquals(a,onlyfirst.includeAll(butfirst));
+			
+			assertEquals(onlyfirst,a.excludeAll(butfirst));
+		}
+		
+		// Fall back to generic tests for any collection
+		CollectionsTest.doCollectionTests(a);
 	}
 }

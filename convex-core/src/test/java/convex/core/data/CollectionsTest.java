@@ -31,6 +31,10 @@ public class CollectionsTest {
 			T first = a.get(0);
 			assertEquals(n - 1, a.longLastIndexOf(last));
 			assertEquals(0L, a.longIndexOf(first));
+			
+			assertEquals(n - 1, a.lastIndexOf(last));
+			assertEquals(0L, a.indexOf(first));
+
 
 			assertSame(a, a.assoc(0, first));
 			assertSame(a, a.assoc(n - 1, last));
@@ -137,17 +141,20 @@ public class CollectionsTest {
 			assertSame(a.empty(),t);
 		}
 		
+		{ // test that keySet works properly
+			java.util.Set<K> ks=a.keySet();
+			assertEquals(ks.size(),a.size());
+			AMap<K, V> t=a;
+			for (K k: ks) {
+				t=t.dissoc(k);
+			}
+			assertSame(a.empty(),t);
+			
+		}
+		
 		assertThrows(IndexOutOfBoundsException.class, () -> a.entryAt(-1));
 		assertThrows(IndexOutOfBoundsException.class, () -> a.entryAt(n));
 
 		doDataStructureTests(a);
-	}
-
-	/**
-	 * Generic tests for any set
-	 * @param a Any Set
-	 */
-	public static <V extends ACell> void doSetTests(ASet<V> a) {
-		doCollectionTests(a);
 	}
 }

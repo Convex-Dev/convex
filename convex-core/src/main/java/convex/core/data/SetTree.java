@@ -22,7 +22,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	private final Ref<AHashSet<T>>[] children;
 
 	/**
-	 * Shift position of this @link SetTree node in number of hex digits. 0 at top level.
+	 * Shift position of this @link SetTree node in number of hex digits. 0 at top level, 1 at next level up etc
 	 */
 	final int shift;
 
