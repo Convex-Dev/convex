@@ -41,7 +41,7 @@
 
 
  *holdings*
-  {:doc      {:description ["Returns the holdings BlobMap for this account."
+  {:doc      {:description ["Returns the holdings Index for this account."
                             "Holdings are data values controlled by other accounts (usually actors). They can be used to indicate that an account may have special rights or asset holdings with respect to a specific actor, for instance."
              "Holdings should NOT be trusted if they are provided by an untrusted account."
                             "See `get-holding`, `set-holding`."]
@@ -306,14 +306,14 @@
         :signature   [{:params [address]
                        :return Blob}]}}
 
- blob-map
- {:doc {:description ["Creates a BlobMap. BlobMaps are specialised maps that support blob-like types as keys only (see `blob`)."
+ index
+ {:doc {:description ["Creates an Index. Indexes are specialised maps that support blob-like types as keys only (see `blob`)."
                       "Optional arguments must be pairs of blob-like keys and values to be included in the blob map."]
         :errors      {:ARGUMENT "If any of the keys supplied is not castable to a blob."
                       :ARITY    "If there is not an even number of arguments (key and value pairs)."}
-        :examples    [{:code "(blob-map 0x1234 :foo)"}]
+        :examples    [{:code "(index 0x1234 :foo)"}]
         :signature   [{:params [& kvs]
-                       :return BlobMap}]}}
+                       :return Index}]}}
 
  blob?
  {:doc {:description "Returns true if and only if the argument is a Blob."
@@ -479,7 +479,7 @@
         :signature   [{:params [coll key]}]}}
 
  dissoc
- {:doc {:description "Removes entries with the specified key(s) from a Map (including BlobMaps). `nil` is treated as the empty Map."
+ {:doc {:description "Removes entries with the specified key(s) from a Map (including Indexes). `nil` is treated as the empty Map."
         :errors      {:CAST "If the first argument is not a Map."}
         :examples    [{:code "(dissoc {1 2 3 4} 3)"}]
         :signature   [{:params [coll & keys]
@@ -814,7 +814,7 @@
           :signature   [{:params [& numbers]}]}}
 
  merge
- {:doc {:description "Merges zero or more Maps (not BlobMaps!), replacing existing values. Nil is considered as an empty map."
+ {:doc {:description "Merges zero or more Maps (not Indexes!), replacing existing values. Nil is considered as an empty map."
         :examples    [{:code "(merge {1 2 3 4} {3 5 7 9})"}]
         :signature   [{:params [& maps]}]}}
 

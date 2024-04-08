@@ -23,7 +23,7 @@ public class AccountStatus extends ARecord {
 	private final long memory;
 	private final AHashMap<Symbol, ACell> environment;
 	private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
-	private final BlobMap<Address, ACell> holdings;
+	private final Index<Address, ACell> holdings;
 	private final ACell controller;
 	private final AccountKey publicKey;
 	private final Address parent;
@@ -35,6 +35,9 @@ public class AccountStatus extends ARecord {
 			Keywords.ENVIRONMENT,Keywords.METADATA,
 			Keywords.PARENT
 			};
+	
+	private static final Index<Address, ACell> EMPTY_HOLDINGS = Index.none();
+
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
 	
@@ -53,7 +56,7 @@ public class AccountStatus extends ARecord {
 
 	private AccountStatus(long sequence, AccountKey publicKey, long balance,
 			long memory, 
-			BlobMap<Address, ACell> holdings, 
+			Index<Address, ACell> holdings, 
 			ACell controller,
 			AHashMap<Symbol, ACell> environment, 
 			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, Address parent) {
@@ -192,7 +195,7 @@ public class AccountStatus extends ARecord {
 			allowance=Format.readVLCCount(b, epos);
 			epos+=Format.getVLCCountLength(allowance);
 		};		
-		BlobMap<Address,ACell> holdings = null;
+		Index<Address,ACell> holdings = null;
 		if ((included&HAS_HOLDINGS)!=0) {
 			holdings=Format.read(b, epos);
 			epos+=holdings.getEncodingLength();
@@ -287,7 +290,7 @@ public class AccountStatus extends ARecord {
 		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,environment,newMeta,parent);
 	}
 	
-	private AccountStatus withHoldings(BlobMap<Address, ACell> newHoldings) {
+	private AccountStatus withHoldings(Index<Address, ACell> newHoldings) {
 		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null;
 		if (holdings==newHoldings) return this;
 		return new AccountStatus(sequence, publicKey, balance, memory,newHoldings,controller,environment,metadata,parent);
@@ -356,9 +359,9 @@ public class AccountStatus extends ARecord {
 	 * Gets the holdings for this account. Will always be a non-null map.
 	 * @return Holdings map for this account
 	 */
-	public BlobMap<Address, ACell> getHoldings() {
-		BlobMap<Address, ACell> result=holdings;
-		if (result==null) return BlobMaps.empty();
+	public Index<Address, ACell> getHoldings() {
+		Index<Address, ACell> result=holdings;
+		if (result==null) return EMPTY_HOLDINGS;
 		return result;
 	}
 	
@@ -368,11 +371,11 @@ public class AccountStatus extends ARecord {
 	}
 	
 	public AccountStatus withHolding(Address addr,ACell value) {
-		BlobMap<Address, ACell> hodls=getHoldings();
+		Index<Address, ACell> hodls=getHoldings();
 		if (value==null) { 
 			hodls=hodls.dissoc(addr);
 		} else if (hodls==null) {
-			hodls=BlobMaps.of(addr,value);
+			hodls=Index.of(addr,value);
 		} else {
 			hodls=hodls.assoc(addr, value);
 		}
@@ -433,7 +436,7 @@ public class AccountStatus extends ARecord {
 	public AccountStatus updateRefs(IRefFunction func) {
 		AHashMap<Symbol, ACell> newEnv=Ref.updateRefs(environment, func);
 		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta=Ref.updateRefs(metadata, func);
-		BlobMap<Address, ACell> newHoldings=Ref.updateRefs(holdings, func);
+		Index<Address, ACell> newHoldings=Ref.updateRefs(holdings, func);
 		
 		if ((newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)) {
 			return this;

@@ -25,7 +25,7 @@ public class Symbols {
 	public static final Symbol VEC = intern("vec");
 	public static final Symbol SET = intern("set");
 	public static final Symbol HASH_MAP = intern("hash-map");
-	public static final Symbol BLOB_MAP = intern("blob-map");
+	public static final Symbol INDEX = intern("index");
 	public static final Symbol HASH_SET = intern("hash-set");
 	public static final Symbol LIST = intern("list");
 	public static final Symbol EMPTY = intern("empty");

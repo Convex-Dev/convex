@@ -15,8 +15,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
@@ -61,7 +60,7 @@ public class PeerCluster {
 	private static State createInitialState() {
 		// setting up NUM_PEERS peers with accounts 0..NUM_PEERS-1
 		AVector<AccountStatus> accts = Vectors.empty();
-		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
+		Index<AccountKey, PeerStatus> peers = State.EMPTY_PEERS;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			AccountKey peerKey = PEER_KEYPAIRS.get(i).getAccountKey();
 			Map<Keyword, Object> config = PEER_CONFIGS.get(i);
@@ -75,7 +74,7 @@ public class PeerCluster {
 			accts = accts.conj(as);
 		}
 
-		return State.create(accts, peers, Constants.INITIAL_GLOBALS, BlobMaps.empty());
+		return State.create(accts, peers, Constants.INITIAL_GLOBALS, State.EMPTY_SCHEDULE);
 	}
 
 	public static void main(String... args) {

@@ -8,13 +8,13 @@ import convex.core.data.ABlob;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.BlobMap;
+import convex.core.data.Index;
 import convex.core.data.Format;
 import convex.core.data.Maps;
 import convex.test.Samples;
 
 /**
- * Generator for arbitrary maps, including BlobMaps
+ * Generator for arbitrary maps, including Indexess
  *
  */
 @SuppressWarnings("rawtypes")
@@ -42,11 +42,11 @@ public class AnyMapGen extends Generator<AMap> {
 			return Maps.of(o1, o2);
 		}
 		case 5:
-			return BlobMap.EMPTY;
+			return Index.EMPTY;
 		case 6: {
 			ABlob o1 = Format.encodedBlob(gen().make(PrimitiveGen.class).generate(r, status));
 			AString o2 = gen().make(StringGen.class).generate(r, status);
-			return BlobMap.create(o1, o2);
+			return Index.create(o1, o2);
 		}
 
 		default: {

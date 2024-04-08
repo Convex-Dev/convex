@@ -24,9 +24,8 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
 import convex.core.data.EncodingTest;
+import convex.core.data.Index;
 import convex.core.data.PeerStatus;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
@@ -59,7 +58,7 @@ public class BeliefMergeTest {
 		long seed = 2654733563337952L;
 		// System.out.println("Generating with seed: "+seed);
 		AVector<AccountStatus> accounts = Vectors.empty();
-		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
+		Index<AccountKey, PeerStatus> peers = State.EMPTY_PEERS;
 		for (int i = 0; i < NUM_PEERS; i++) {
 			AKeyPair kp = AKeyPair.createSeeded(seed + i * 17777);
 			AccountKey key = kp.getAccountKey();
@@ -77,7 +76,7 @@ public class BeliefMergeTest {
 
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 		globals = globals.assoc(State.GLOBAL_JUICE_PRICE, RT.cvm(1L)); // cheap juice for simplicity. USe CVM long
-		INITIAL_STATE = State.create(accounts, peers, globals, BlobMaps.empty());
+		INITIAL_STATE = State.create(accounts, peers, globals, State.EMPTY_SCHEDULE);
 		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();
 	}
 

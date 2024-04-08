@@ -15,8 +15,8 @@ import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.BlobMaps;
 import convex.core.data.Blobs;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -91,7 +91,7 @@ public class RTTest {
 		assertEquals((Long)13L,RT.json(Address.create(13)));
 		assertEquals("0xcafebabe",RT.json(Blob.fromHex("cafebabe")));
 		assertEquals("0x",RT.json(Blobs.empty()));
-		assertEquals("{}",RT.json(BlobMaps.empty()).toString());
+		assertEquals("{}",RT.json(Index.none()).toString());
 		assertEquals("{}",RT.json(Maps.empty()).toString());
 		assertEquals("[1, 2]",RT.json(Vectors.of(1,2)).toString());
 		assertEquals("[1, 2]",RT.json(Lists.of(1,2)).toString());

@@ -26,8 +26,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
+import convex.core.data.Index;
 import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
@@ -103,11 +102,11 @@ public class Samples {
 	public static final MapTree<CVMLong, CVMLong> LONG_MAP_10 = createTestLongMap(10);
 	public static final MapTree<CVMLong, CVMLong> LONG_MAP_100 = createTestLongMap(100);
 
-	public static final BlobMap<ABlobLike<?>, CVMLong> INT_BLOBMAP_7 = BlobMaps.of(Strings.EMPTY, 0, Blob.fromHex("0001"), 1,
+	public static final Index<ABlobLike<?>, CVMLong> INT_INDEX_7 = Index.of(Strings.EMPTY, 0, Blob.fromHex("0001"), 1,
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,
 			Blob.fromHex("ff0101"), 6);
 	
-	public static final BlobMap<ABlob, CVMLong> INT_BLOBMAP_256 = createTestBlobMap(256);
+	public static final Index<ABlob, CVMLong> INT_Index_256 = createTestIndex(256);
 
 	public static final ASet<CVMLong> LONG_SET_5 = Sets.of(1,2,3,4,5);
 	public static final ASet<CVMLong> LONG_SET_10 = Sets.create(INT_VECTOR_10);
@@ -192,13 +191,13 @@ public class Samples {
 	}
 
 	/**
-	 * Create a test BlobMap of the given size
+	 * Create a test Index of the given size
 	 * @param size
 	 * @return
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	static BlobMap<ABlob,CVMLong> createTestBlobMap(long size) {
-		BlobMap bm=BlobMap.EMPTY;
+	static Index<ABlob,CVMLong> createTestIndex(long size) {
+		Index bm=Index.EMPTY;
 		for (long i=0; i<size; i++) {
 			CVMLong val=CVMLong.create(i);
 			bm=bm.assoc(val.getHash(), val);

@@ -67,7 +67,7 @@ public class LocalPeerBenchmark {
 			}
 			HERO=hr.getValue();
 			CONVEX=Convex.connect(SERVER, HERO, HERO_KP);
-			CONVEX.transactSync("(def bm (blob-map))");
+			CONVEX.transactSync("(def bm (index))");
 		} catch (Throwable t) {
 			Utils.sneakyThrow(t);
 		}

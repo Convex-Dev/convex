@@ -15,7 +15,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.BlobBuilder;
-import convex.core.data.BlobMap;
+import convex.core.data.Index;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -732,7 +732,7 @@ public class Context {
 	 * Gets the holdings map for the current account.
 	 * @return Map of holdings, or null if the current account does not exist.
 	 */
-	public BlobMap<Address,ACell> getHoldings() {
+	public Index<Address,ACell> getHoldings() {
 		AccountStatus as=getAccountStatus(getAddress());
 		if (as==null) return null;
 		return as.getHoldings();
@@ -2204,7 +2204,7 @@ public class Context {
 	/**
 	 * Gets the log map for the current context.
 	 *
-	 * @return BlobMap of addresses to log entries created in the course of current execution context.
+	 * @return Index of addresses to log entries created in the course of current execution context.
 	 */
 	public AVector<AVector<ACell>> getLog() {
 		if (log==null) return Vectors.empty();

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.data.Address;
-import convex.core.data.BlobMaps;
+import convex.core.data.Index;
 import convex.core.data.Keywords;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.BaseTest;
@@ -177,11 +177,11 @@ public class SpecialTest extends ACVMTest {
 	}
 
 	@Test public void testSpecialHoldings() {
-		assertSame(BlobMaps.empty(),eval("*holdings*"));
+		assertSame(Index.none(),eval("*holdings*"));
 
 		// Test set-holding modifies *holdings* as expected
 		assertNull(eval("(get-holding *address*)"));
-		assertEquals(BlobMaps.of(HERO,1L),eval("(do (set-holding *address* 1) *holdings*)"));
+		assertEquals(Index.of(HERO,1L),eval("(do (set-holding *address* 1) *holdings*)"));
 
 		assertNull(eval("(*holdings* { :PuSg 650989 })"));
 		assertEquals(Keywords.FOO,eval("(*holdings* { :PuSg 650989 } :foo )"));

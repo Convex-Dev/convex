@@ -25,7 +25,7 @@ public class AbstractionsTest extends ACVMTest {
 		doAssocGetTest(Maps.empty(),CVMLong.ONE,CVMLong.ZERO);
 		doAssocGetTest(Maps.of(0,1),CVMLong.ONE,CVMLong.ZERO);
 		doAssocGetTest(Vectors.of(1,2,3),CVMLong.ONE,CVMBool.FALSE);
-		doAssocGetTest(BlobMaps.empty(),Blob.EMPTY,CVMLong.ZERO);
+		doAssocGetTest(Index.none(),Blob.EMPTY,CVMLong.ZERO);
 	}
 
 	private void doAssocGetTest(ADataStructure<?> a, ACell key, ACell value) {
@@ -46,7 +46,7 @@ public class AbstractionsTest extends ACVMTest {
 		doSingletonTest(Vectors.of(13));
 		doSingletonTest(Lists.of(13));
 		doSingletonTest(Sets.of(19));
-		doSingletonTest(BlobMaps.create(Blob.fromHex("cafebabe"), CVMLong.MAX_VALUE));
+		doSingletonTest(Index.create(Blob.fromHex("cafebabe"), CVMLong.MAX_VALUE));
 	}
 
 	private void doSingletonTest(ADataStructure<?> a) {

@@ -488,7 +488,7 @@ public class Format {
 
 		if (tag == Tag.LIST) return (T) List.read(b,pos);
 
-		if (tag == Tag.BLOBMAP) return (T) BlobMap.read(b,pos);
+		if (tag == Tag.INDEX) return (T) Index.read(b,pos);
 
 		throw new BadFormatException("Can't read data structure with tag byte: " + tag);
 	}

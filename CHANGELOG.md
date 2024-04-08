@@ -31,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## BREAKING CHANGES
 - Switch from `:callable?` to `:callable` for metadata on callable actor functions
 - Etch encoding changes. Will require fresh Etch database. 
+- Renamed `Index` to `Index`
 
 ### Fixed
 - Bug fixes for message decoding
@@ -73,7 +74,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Support for arbitrary sized integers (Part 1)
 - Better support for CI builds
-- Allow `merge` and `slice` to work with BlobMaps
+- Allow `merge` and `slice` to work with Indexs
 
 ### Changed
 - General update of dependencies to most recent versions as of Apr 2023

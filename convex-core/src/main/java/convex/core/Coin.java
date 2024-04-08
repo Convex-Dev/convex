@@ -45,6 +45,11 @@ public class Coin {
 	public static final long SUPPLY=1000*EMERALD;
 
 	/**
+	 * A zero quantity of coins, the minimum possible
+	 */
+	public static final long ZERO = 0;
+
+	/**
 	 * Check if an amount is valid quantity of Convex Coins 
 	 * @param amount Amount to test
 	 * @return true if valid, false otherwsie

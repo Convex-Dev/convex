@@ -15,11 +15,10 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.LongBlob;
@@ -58,6 +57,9 @@ import convex.core.util.Utils;
  *
  */
 public class State extends ARecord {
+	public static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
+	public static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
+
 	private static final Keyword[] STATE_KEYS = new Keyword[] { Keywords.ACCOUNTS, Keywords.PEERS,
 			Keywords.GLOBALS, Keywords.SCHEDULE };
 
@@ -79,8 +81,7 @@ public class State extends ARecord {
 	/**
 	 * An empty State
 	 */
-	public static final State EMPTY = create(Vectors.empty(), BlobMaps.empty(), Constants.INITIAL_GLOBALS,
-			BlobMaps.empty());
+	public static final State EMPTY = create(Vectors.empty(), EMPTY_PEERS, Constants.INITIAL_GLOBALS, EMPTY_SCHEDULE);
 
 	private static final Logger log = LoggerFactory.getLogger(State.class.getName());
 
@@ -89,12 +90,12 @@ public class State extends ARecord {
 	// TODO: check we aren't at risk of hitting max encoding size limits
 
 	private final AVector<AccountStatus> accounts;
-	private final BlobMap<AccountKey, PeerStatus> peers;
+	private final Index<AccountKey, PeerStatus> peers;
 	private final AVector<ACell> globals;
-	private final BlobMap<ABlob, AVector<ACell>> schedule;
+	private final Index<ABlob, AVector<ACell>> schedule;
 
-	private State(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
-			AVector<ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
+	private State(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
+			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
 		super(FORMAT.count());
 		this.accounts = accounts;
 		this.peers = peers;
@@ -153,9 +154,9 @@ public class State extends ARecord {
 	@Override
 	public State updateRefs(IRefFunction func) {
 		AVector<AccountStatus> newAccounts = accounts.updateRefs(func);
-		BlobMap<AccountKey, PeerStatus> newPeers = peers.updateRefs(func);
+		Index<AccountKey, PeerStatus> newPeers = peers.updateRefs(func);
 		AVector<ACell> newGlobals = globals.updateRefs(func);
-		BlobMap<ABlob, AVector<ACell>> newSchedule = schedule.updateRefs(func);
+		Index<ABlob, AVector<ACell>> newSchedule = schedule.updateRefs(func);
 		if ((accounts == newAccounts) && (peers == newPeers) && (globals == newGlobals)
 				&& (schedule == newSchedule)) {
 			return this;
@@ -171,8 +172,8 @@ public class State extends ARecord {
 	 * @param schedule Schedule (may be null)
 	 * @return New State instance
 	 */
-	public static State create(AVector<AccountStatus> accounts, BlobMap<AccountKey, PeerStatus> peers,
-			AVector<ACell> globals, BlobMap<ABlob, AVector<ACell>> schedule) {
+	public static State create(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
+			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
 		return new State(accounts, peers, globals, schedule);
 	}
 
@@ -225,7 +226,7 @@ public class State extends ARecord {
 		if (accounts==null) throw new BadFormatException("Null accounts!");
 		epos+=Format.getEncodingLength(accounts);
 
-		BlobMap<AccountKey, PeerStatus> peers = Format.read(b,epos);
+		Index<AccountKey, PeerStatus> peers = Format.read(b,epos);
 		if (peers==null) throw new BadFormatException("Null peers!");
 		epos+=Format.getEncodingLength(peers);
 
@@ -233,7 +234,7 @@ public class State extends ARecord {
 		if (globals==null) throw new BadFormatException("Null globals!");
 		epos+=Format.getEncodingLength(globals);
 
-		BlobMap<ABlob, AVector<ACell>> schedule = Format.read(b,epos);
+		Index<ABlob, AVector<ACell>> schedule = Format.read(b,epos);
 		if (schedule==null) throw new BadFormatException("Null schedule!");
 		epos+=Format.getEncodingLength(schedule);
 
@@ -255,7 +256,7 @@ public class State extends ARecord {
 	 *
 	 * @return A map of addresses to PeerStatus records
 	 */
-	public BlobMap<AccountKey, PeerStatus> getPeers() {
+	public Index<AccountKey, PeerStatus> getPeers() {
 		return peers;
 	}
 
@@ -369,7 +370,7 @@ public class State extends ARecord {
 	@SuppressWarnings("unchecked")
 	public State applyScheduledTransactions() {
 		long tcount = 0;
-		BlobMap<ABlob, AVector<ACell>> sched = this.schedule;
+		Index<ABlob, AVector<ACell>> sched = this.schedule;
 		CVMLong timestamp = this.getTimestamp();
 
 		// ArrayList to accumulate the transactions to apply. Null until we need it
@@ -427,7 +428,7 @@ public class State extends ARecord {
 		return state;
 	}
 
-	private State withSchedule(BlobMap<ABlob, AVector<ACell>> newSchedule) {
+	private State withSchedule(Index<ABlob, AVector<ACell>> newSchedule) {
 		if (schedule == newSchedule) return this;
 		return new State(accounts, peers, globals, newSchedule);
 	}
@@ -664,7 +665,7 @@ public class State extends ARecord {
 	 * @param newPeers New Peer Map
 	 * @return Updated State
 	 */
-	public State withPeers(BlobMap<AccountKey, PeerStatus> newPeers) {
+	public State withPeers(Index<AccountKey, PeerStatus> newPeers) {
 		if (peers == newPeers) return this;
 		return create(accounts, newPeers, globals, schedule);
 	}
@@ -751,7 +752,7 @@ public class State extends ARecord {
 		} else {
 			list = list.append(v);
 		}
-		BlobMap<ABlob, AVector<ACell>> newSchedule = schedule.assoc(key, list);
+		Index<ABlob, AVector<ACell>> newSchedule = schedule.assoc(key, list);
 
 		return this.withSchedule(newSchedule);
 	}
@@ -761,7 +762,7 @@ public class State extends ARecord {
 	 *
 	 * @return The schedule data structure.
 	 */
-	public BlobMap<ABlob, AVector<ACell>> getSchedule() {
+	public Index<ABlob, AVector<ACell>> getSchedule() {
 		return schedule;
 	}
 

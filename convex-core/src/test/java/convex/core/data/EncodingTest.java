@@ -396,15 +396,15 @@ public class EncodingTest {
 		doMultiEncodingTest(st);
 	}
 	
-	@Test public void testBlobMapEncoding() throws BadFormatException {
-		BlobMap<Blob, ACell> bm=BlobMaps.empty();
+	@Test public void testIndexEncoding() throws BadFormatException {
+		Index<Blob, ACell> bm=Index.none();
 		
 		bm=bm.assoc(Blobs.fromHex(""), CVMLong.create((6785759)));
 		bm=bm.assoc(Blobs.fromHex("0a"), CVMLong.create((1678575659)));
 		bm=bm.assoc(Blobs.fromHex("0a56"), CVMLong.create((346785759)));
 		bm=bm.assoc(Blobs.fromHex("0a79"), CVMLong.create((896785759)));
 		
-		BlobMap<Blob, ACell> decoded=doMultiEncodingTest(bm);
+		Index<Blob, ACell> decoded=doMultiEncodingTest(bm);
 		assertTrue(decoded.containsKey(Blob.fromHex("0a79")));
 	}
 	

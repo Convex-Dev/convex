@@ -6,14 +6,14 @@ import java.util.List;
 import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.State;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
+import convex.core.data.Index;
 import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -57,6 +57,10 @@ public class Init {
 	// First user of Protonet
 	public static final Address FIRST_USER_ADDRESS = Address.create(13);
 
+	// Constants
+	private static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
+	private static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
+
 
 	/**
 	 * Creates the base genesis state (before deployment of standard libraries and actors)
@@ -65,14 +69,14 @@ public class Init {
 	 */
 	public static State createBaseState(List<AccountKey> genesisKeys) {
 		// accumulators for initial state maps
-		BlobMap<AccountKey, PeerStatus> peers = BlobMaps.empty();
+		Index<AccountKey, PeerStatus> peers = EMPTY_PEERS;
 		AVector<AccountStatus> accts = Vectors.empty();
 
 		long supply = Constants.MAX_SUPPLY;
 		
 		// Initial accounts
-		accts = addGovernanceAccount(accts, NULL_ADDRESS, 0L); // Null account
-		accts = addGovernanceAccount(accts, INIT_ADDRESS, 0L); // Initialisation Account
+		accts = addGovernanceAccount(accts, NULL_ADDRESS, Coin.ZERO); // Null account
+		accts = addGovernanceAccount(accts, INIT_ADDRESS, Coin.ZERO); // Initialisation Account
 
 		// Foundation fund for startup
 		long foundation = 1*Coin.EMERALD;
@@ -115,7 +119,7 @@ public class Init {
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
 		// Create the initial state
-		State s = State.create(accts, peers, globals, BlobMaps.empty());
+		State s = State.create(accts, peers, globals, EMPTY_SCHEDULE);
 		supply-=s.getGlobalMemoryValue().longValue();
 		
 		// There should be at least 100,000 Convex Gold for genesis to succeed, to be distributed to genesis account(s)
@@ -365,7 +369,7 @@ public class Init {
 		return GENESIS_ADDRESS.offset(index+1);
 	}
 
-	private static BlobMap<AccountKey, PeerStatus> addPeer(BlobMap<AccountKey, PeerStatus> peers, AccountKey peerKey,
+	private static Index<AccountKey, PeerStatus> addPeer(Index<AccountKey, PeerStatus> peers, AccountKey peerKey,
 			Address owner, long initialStake) {
 		PeerStatus ps = PeerStatus.create(owner, initialStake, null);
 		if (peers.containsKey(peerKey)) throw new IllegalArgumentException("Duplicate peer key");

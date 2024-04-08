@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
+import convex.core.data.Index;
 import convex.core.data.PeerStatus;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
@@ -101,7 +101,7 @@ public class PeerTest {
 		Order o1=Order.create().append(kp.signData(b1));
 		o1=o1.withConsensusPoints(new long[] {1,1,1,1});
 		SignedData<Order> so1=kp.signData(o1);
-		b=b.withOrders(BlobMap.create(peerKey, so1));
+		b=b.withOrders(Index.create(peerKey, so1));
 		
 		p=p.updateBelief(b);
 		assertEquals(STATE,p.getConsensusState());
@@ -112,7 +112,7 @@ public class PeerTest {
 		Order o2=Order.create().append(kp.signData(b2));
 		o2=o2.withConsensusPoints(new long[] {1,1,1,1});
 		SignedData<Order> so2=kp.signData(o2);
-		b=b.withOrders(BlobMap.create(peerKey, so2));
+		b=b.withOrders(Index.create(peerKey, so2));
 
 		p=p.updateBelief(b);
 		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr).context);

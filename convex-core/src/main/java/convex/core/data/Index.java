@@ -1,7 +1,9 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -13,7 +15,9 @@ import convex.core.util.Bits;
 import convex.core.util.Utils;
 
 /**
- * BlobMap node implementation supporting: 
+ * Index node implementation, providing an efficient radix tree based immutable data structure for indexed access and sorting.
+ * 
+ * Supporting: 
  * 
  * <ul>
  * <li>An optional prefix string</li>
@@ -23,14 +27,14 @@ import convex.core.util.Utils;
  * @param <K> Type of Keys
  * @param <V> Type of values
  */
-public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlobMap<K, V> {
+public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private static final Ref<BlobMap>[] EMPTY_CHILDREN = new Ref[0];
+	private static final Ref<Index>[] EMPTY_CHILDREN = new Ref[0];
 
 	/**
-	 * Empty BlobMap singleton
+	 * Empty Index singleton
 	 */
-	public static final BlobMap<ABlob, ACell> EMPTY = new BlobMap<ABlob, ACell>(0, 0, null, EMPTY_CHILDREN,
+	public static final Index<?, ?> EMPTY = new Index<ABlob, ACell>(0, 0, null, EMPTY_CHILDREN,
 			(short) 0, 0L);
 	
 	static {
@@ -42,7 +46,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.
 	 * Child entries must have at least one entry.
 	 */
-	private final Ref<BlobMap<K, V>>[] children;
+	private final Ref<Index<K, V>>[] children;
 
 	/**
 	 * Entry for this node of the radix tree. Invariant assumption that the prefix
@@ -67,7 +71,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	private final long prefixLength;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	protected BlobMap(long depth, long prefixLength, MapEntry<K, V> entry, Ref<BlobMap>[] entries,
+	protected Index(long depth, long prefixLength, MapEntry<K, V> entry, Ref<Index>[] entries,
 			short mask, long count) {
 		super(count);
 		this.depth = depth;
@@ -81,29 +85,42 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> create(MapEntry<K, V> me) {
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> create(MapEntry<K, V> me) {
 		ACell k=me.getKey();
 		if (!(k instanceof ABlobLike)) return null;
 		long hexLength = ((K)k).hexLength();
-		return new BlobMap<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
-	private static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
+	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
 		ABlob prefix = me.getKey().toBlob();
 		long hexLength = prefix.hexLength();
 		if (depth > hexLength)
 			throw new IllegalArgumentException("Depth " + depth + " too deep for key with hexLength: " + hexLength);
-		return new BlobMap<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new Index<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
-	public static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> create(K k, V v) {
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> create(K k, V v) {
 		MapEntry<K, V> me = MapEntry.create(k, v);
 		long hexLength = k.hexLength();
-		return new BlobMap<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 	
-	public static <K extends ABlobLike<?>, V extends ACell> BlobMap<K, V> of(Object k, Object v) {
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> of(Object k, Object v) {
 		return create(RT.cvm(k),RT.cvm(v));
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <R extends AIndex<K, V>, K extends ABlobLike<?>, V extends ACell> R of(Object... kvs) {
+		int n = kvs.length;
+		if (Utils.isOdd(n)) throw new IllegalArgumentException("Even number of key + values required");
+		Index<K, V> result = (Index<K, V>) EMPTY;
+		for (int i = 0; i < n; i += 2) {
+			V value=RT.cvm(kvs[i + 1]);
+			result = result.assoc((K) kvs[i], value);
+		}
+
+		return (R) result;
 	}
 
 	@Override
@@ -112,17 +129,17 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 	
 	@Override public final boolean isCVMValue() {
-		// A BlobMap is only a first class CVM value at depth 0.
+		// A Index is only a first class CVM value at depth 0.
 		return (depth==0);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public BlobMap<K,V> updateRefs(IRefFunction func) {
+	public Index<K,V> updateRefs(IRefFunction func) {
 		MapEntry<K, V> newEntry = Ref.update(entry,func);
-		Ref<BlobMap<K, V>>[] newChildren = Ref.updateRefs(children, func);
+		Ref<Index<K, V>>[] newChildren = Ref.updateRefs(children, func);
 		if ((entry == newEntry) && (children == newChildren)) return this;
-		BlobMap<K,V> result= new BlobMap<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
+		Index<K,V> result= new Index<K, V>(depth, prefixLength, newEntry, (Ref[])newChildren, mask, count);
 		result.attachEncoding(encoding); // this is an optimisation to avoid re-encoding
 		return result;
 	}
@@ -146,7 +163,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		}
 
 		int digit = key.getHexDigit(pl);
-		BlobMap<K, V> cc = getChild(digit);
+		Index<K, V> cc = getChild(digit);
 
 		if (cc == null) return null;
 		return cc.getEntry(key);
@@ -158,10 +175,10 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	 * @param digit
 	 * @return
 	 */
-	private BlobMap<K, V> getChild(int digit) {
+	private Index<K, V> getChild(int digit) {
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return null;
-		return (BlobMap<K, V>) children[i].getValue();
+		return (Index<K, V>) children[i].getValue();
 	}
 
 	@Override
@@ -184,14 +201,14 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 	
 	@SuppressWarnings("unchecked")
-	public BlobMap<K, V> assoc(ACell key, ACell value) {
+	public Index<K, V> assoc(ACell key, ACell value) {
 		if (!(key instanceof ABlobLike)) return null;
 		return assocEntry(MapEntry.create((K)key, (V)value));
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public BlobMap<K, V> dissoc(K k) {
+	public Index<K, V> dissoc(K k) {
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
 			if (entry.getKey().equalsBytes(k.toBlob())) {
@@ -213,12 +230,12 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 			// preserving invariants
 			if (children.length == 1) {
 				// need to promote child to the current depth
-				BlobMap<K, V> c = (BlobMap<K, V>) children[0].getValue();
-				return new BlobMap(depth, (c.depth + c.prefixLength) - depth, c.entry, c.children, c.mask,
+				Index<K, V> c = (Index<K, V>) children[0].getValue();
+				return new Index(depth, (c.depth + c.prefixLength) - depth, c.entry, c.children, c.mask,
 						count - 1);
 			} else {
 				// Clearing current entry, keeping existing children (must be 2+)
-				return new BlobMap(depth, prefixLength, null, children, mask, count - 1);
+				return new Index(depth, prefixLength, null, children, mask, count - 1);
 			}
 		}
 		// dissoc beyond current prefix length, so need to check children
@@ -226,11 +243,11 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		int childIndex = Bits.indexForDigit(digit, mask);
 		if (childIndex < 0) return this; // key miss
 		// we know we need to replace a child
-		BlobMap<K, V> oldChild = (BlobMap<K, V>) children[childIndex].getValue();
-		BlobMap<K, V> newChild = oldChild.dissoc(k);
-		BlobMap<K,V> r=this.withChild(digit, oldChild, newChild);
+		Index<K, V> oldChild = (Index<K, V>) children[childIndex].getValue();
+		Index<K, V> newChild = oldChild.dissoc(k);
+		Index<K,V> r=this.withChild(digit, oldChild, newChild);
 		
-		// check if whole blobmap was emptied
+		// check if whole Index was emptied
 		if ((r==null)&&(depth==0)) r= empty();
 		return r;
 	}
@@ -286,7 +303,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public BlobMap<K, V> assocEntry(MapEntry<K, V> e) {
+	public Index<K, V> assocEntry(MapEntry<K, V> e) {
 		if (count == 0L) return create(e);
 		if (count == 1L) {
 			assert (mask == (short) 0); // should be no children
@@ -317,32 +334,32 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 				// doesn't need to adjust child depths, since they are splitting at the same
 				// point
 				long newDepth=mkl+1; // depth for new child
-				BlobMap<K, V> split = new BlobMap<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
+				Index<K, V> split = new Index<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
 						count);
 				int splitDigit = prefix.getHexDigit(mkl);
 				short splitMask = (short) (1 << splitDigit);
-				BlobMap<K, V> result = new BlobMap<K, V>(depth, mkl - depth, e, new Ref[] { split.getRef() },
+				Index<K, V> result = new Index<K, V>(depth, mkl - depth, e, new Ref[] { split.getRef() },
 						splitMask, count + 1);
 				return result;
 			} else {
 				// we need to fork the current prefix in two at position mkl
 				long newDepth=mkl+1; // depth for new children
 				
-				BlobMap<K, V> branch1 = new BlobMap<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
+				Index<K, V> branch1 = new Index<K, V>(newDepth, pDepth - newDepth, entry, (Ref[]) children, mask,
 						count);
-				BlobMap<K, V> branch2 = new BlobMap<K, V>(newDepth, newKeyLength - newDepth, e, (Ref[]) EMPTY_CHILDREN,
+				Index<K, V> branch2 = new Index<K, V>(newDepth, newKeyLength - newDepth, e, (Ref[]) EMPTY_CHILDREN,
 						(short) 0, 1L);
 				int d1 = prefix.getHexDigit(mkl);
 				int d2 = k.getHexDigit(mkl);
 				if (d1 > d2) {
 					// swap to get in right order
-					BlobMap<K, V> temp = branch1;
+					Index<K, V> temp = branch1;
 					branch1 = branch2;
 					branch2 = temp;
 				}
 				Ref[] newChildren = new Ref[] { branch1.getRef(), branch2.getRef() };
 				short newMask = (short) ((1 << d1) | (1 << d2));
-				BlobMap<K, V> fork = new BlobMap<K, V>(depth, mkl - depth, null, newChildren, newMask, count + 1L);
+				Index<K, V> fork = new Index<K, V>(depth, mkl - depth, null, newChildren, newMask, count + 1L);
 				return fork;
 			}
 		}
@@ -351,18 +368,18 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 			// we must have matched the current entry exactly
 			if (entry == null) {
 				// just add entry at this position
-				return new BlobMap<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count + 1);
+				return new Index<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count + 1);
 			}
 			if (entry == e) return this;
 
 			// swap entry, no need to change count
-			return new BlobMap<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count);
+			return new Index<K, V>(depth, prefixLength, e, (Ref[]) children, mask, count);
 		}
 		// at this point we have matched full prefix, but new key length is longer.
 		// so we need to update (or add) exactly one child
 		int childDigit = k.getHexDigit(pDepth);
-		BlobMap<K, V> oldChild = getChild(childDigit);
-		BlobMap<K, V> newChild;
+		Index<K, V> oldChild = getChild(childDigit);
+		Index<K, V> newChild;
 		if (oldChild == null) {
 			newChild = createAtDepth(e, pDepth+1); // Myst be at least 1 beyond current prefix
 		} else {
@@ -372,16 +389,16 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 
 	/**
-	 * Updates this BlobMap with a new child.
+	 * Updates this Index with a new child.
 	 * 
 	 * Either oldChild or newChild may be null. Empty maps are treated as null.
 	 * 
 	 * @param childDigit Digit for new child
 	 * @param newChild
-	 * @return BlobMap with child removed, or null if BlobMap was deleted entirely
+	 * @return Index with child removed, or null if Index was deleted entirely
 	 */
 	@SuppressWarnings({ "rawtypes", "unchecked"})
-	private BlobMap<K, V> withChild(int childDigit, BlobMap<K, V> oldChild, BlobMap<K, V> newChild) {
+	private Index<K, V> withChild(int childDigit, Index<K, V> oldChild, Index<K, V> newChild) {
 		// consider empty children as null
 		//if (oldChild == EMPTY) oldChild = null;
 		//if (newChild == EMPTY) newChild = null;
@@ -399,7 +416,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 			System.arraycopy(children, 0, newChildren, 0, newPos); // earlier entries
 			newChildren[newPos] = newChild.getRef();
 			System.arraycopy(children, newPos, newChildren, newPos + 1, n - newPos); // later entries
-			return new BlobMap<K, V>(depth, prefixLength, entry, newChildren, newMask,
+			return new Index<K, V>(depth, prefixLength, entry, newChildren, newMask,
 					count + newChild.count());
 		} else {
 			// dealing with an existing child
@@ -410,23 +427,23 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 				// handle special case where we need to promote the remaining child
 				if (entry == null) {
 					if (n == 2) {
-						BlobMap<K, V> rm = (BlobMap<K, V>) children[1 - delPos].getValue();
+						Index<K, V> rm = (Index<K, V>) children[1 - delPos].getValue();
 						long newPLength = prefixLength + rm.prefixLength+1;
-						return new BlobMap<K, V>(depth, newPLength, rm.entry, (Ref[]) rm.children, rm.mask,
+						return new Index<K, V>(depth, newPLength, rm.entry, (Ref[]) rm.children, rm.mask,
 								rm.count());
 					} else if (n == 1) {
-						// deleting entire BlobMap!
+						// deleting entire Index!
 						return null;
 					}
 				}
 				if (n==0) {
-					System.out.print("BlobMap Bad!");
+					System.out.print("Index Bad!");
 				}
 				newChildren = new Ref[n - 1];
 				short newMask = (short) (mask & ~(1 << childDigit));
 				System.arraycopy(children, 0, newChildren, 0, delPos); // earlier entries
 				System.arraycopy(children, delPos + 1, newChildren, delPos, n - delPos - 1); // later entries
-				return new BlobMap<K, V>(depth, prefixLength, entry, newChildren, newMask,
+				return new Index<K, V>(depth, prefixLength, entry, newChildren, newMask,
 						count - oldChild.count());
 			} else {
 				// need to replace a child
@@ -434,7 +451,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 				newChildren = children.clone();
 				newChildren[childPos] = newChild.getRef();
 				long newCount = count + newChild.count() - oldChild.count();
-				return new BlobMap<K, V>(depth, prefixLength, entry, newChildren, mask, newCount);
+				return new Index<K, V>(depth, prefixLength, entry, newChildren, mask, newCount);
 			}
 		}
 	}
@@ -460,13 +477,13 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 	
 	@Override
-	public BlobMap<K, V> filterValues(Predicate<V> pred) {
-		BlobMap<K, V> r=this;
+	public Index<K, V> filterValues(Predicate<V> pred) {
+		Index<K, V> r=this;
 		for (int i=0; i<16; i++) {
 			if (r==null) break; // might be null from dissoc
-			BlobMap<K,V> oldChild=r.getChild(i);
+			Index<K,V> oldChild=r.getChild(i);
 			if (oldChild==null) continue;
-			BlobMap<K,V> newChild=oldChild.filterValues(pred);
+			Index<K,V> newChild=oldChild.filterValues(pred);
 			r=r.withChild(i, oldChild, newChild);
 		}
 		
@@ -475,7 +492,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 			if ((r.entry!=null)&&!pred.test(r.entry.getValue())) r=r.dissoc(r.entry.getKey());
 		}
 		
-		// check if whole blobmap was emptied
+		// check if whole Index was emptied
 		if (r==null) {
 			// everything deleted, but need 
 			if (depth==0) r=empty();
@@ -485,7 +502,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.BLOBMAP;
+		bs[pos++]=Tag.INDEX;
 		return encodeRaw(bs,pos);
 	}
 
@@ -510,11 +527,11 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 	
 	private int encodeChild(byte[] bs, int pos, int i) {
-		Ref<BlobMap<K, V>> cref = children[i];
+		Ref<Index<K, V>> cref = children[i];
 		return cref.encode(bs, pos);
 		
 		// TODO: maybe compress single entries?
-//		ABlobMap<K, V> c=cref.getValue();
+//		AIndex<K, V> c=cref.getValue();
 //		if (c.count==1) {
 //			MapEntry<K,V> me=c.entryAt(0);
 //			pos = me.getRef().encode(bs, pos);
@@ -530,10 +547,10 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlob, V extends ACell> BlobMap<K, V> read(Blob b, int pos) throws BadFormatException {
+	public static <K extends ABlob, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
 		long count = Format.readVLCLong(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative count!");
-		if (count == 0) return (BlobMap<K, V>) EMPTY;
+		if (count == 0) return (Index<K, V>) EMPTY;
 		
 		int epos=pos+1+Format.getVLCLength(count);
 		
@@ -556,27 +573,27 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 			epos+=vr.getEncodingLength();
 			me=MapEntry.createRef(kr, vr);
 		} else {
-			throw new BadFormatException("Invalid MapEntry tag in BlobMap: "+etype);
+			throw new BadFormatException("Invalid MapEntry tag in Index: "+etype);
 		}
 
 		
-		BlobMap<K,V> result;
+		Index<K,V> result;
 		if (count == 1) {
 			// single entry map
-			result = new BlobMap<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
+			result = new Index<K, V>(depth, prefixLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 			result.attachEncoding(b.slice(pos, epos));
 		} else {
 			// Need to include children
 			short mask = b.shortAt(epos);
 			epos+=2;
 			int n = Utils.bitCount(mask);
-			Ref<BlobMap>[] children = new Ref[n];
+			Ref<Index>[] children = new Ref[n];
 			for (int i = 0; i < n; i++) {
-				Ref<BlobMap> cr=Format.readRef(b,epos);
+				Ref<Index> cr=Format.readRef(b,epos);
 				epos+=cr.getEncodingLength();
 				children[i] =cr; 
 			}
-			result= new BlobMap<K, V>(depth, prefixLength, me, children, mask, count);
+			result= new Index<K, V>(depth, prefixLength, me, children, mask, count);
 		}
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
@@ -597,9 +614,9 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		long pDepth = prefixDepth();
 		for (int i = 0; i < n; i++) {
 			ACell o = children[i].getValue();
-			if (!(o instanceof BlobMap))
-				throw new InvalidDataException("Illegal BlobMap child type: " + Utils.getClass(o), this);
-			BlobMap<K, V> c = (BlobMap<K, V>) o;
+			if (!(o instanceof Index))
+				throw new InvalidDataException("Illegal Index child type: " + Utils.getClass(o), this);
+			Index<K, V> c = (Index<K, V>) o;
 			
 			long ccount=c.count();
 			if (ccount==0) {
@@ -636,11 +653,11 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	public void validateCell() throws InvalidDataException {
 		if (prefixLength < 0) throw new InvalidDataException("Negative prefix length!" + prefixLength, this);
 		if (count == 0) {
-			if (this != EMPTY) throw new InvalidDataException("Non-singleton empty BlobMap", this);
+			if (this != EMPTY) throw new InvalidDataException("Non-singleton empty Index", this);
 			return;
 		} else if (count == 1) {
-			if (entry == null) throw new InvalidDataException("Single entry BlobMap with null entry?", this);
-			if (mask != 0) throw new InvalidDataException("Single entry BlobMap with child mask?", this);
+			if (entry == null) throw new InvalidDataException("Single entry Index with null entry?", this);
+			if (mask != 0) throw new InvalidDataException("Single entry Index with child mask?", this);
 			return;
 		}
 		
@@ -652,17 +669,22 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		if (entry != null) {
 			entry.validateCell();
 			if (cn == 0)
-				throw new InvalidDataException("BlobMap with entry and count=" + count + " must have children", this);
+				throw new InvalidDataException("Index with entry and count=" + count + " must have children", this);
 		} else {
 			if (cn <= 1) throw new InvalidDataException(
-					"BlobMap with no entry and count=" + count + " must have two or more children", this);
+					"Index with no entry and count=" + count + " must have two or more children", this);
 		}
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public BlobMap<K, V> empty() {
-		return (BlobMap<K, V>) EMPTY;
+	public Index<K, V> empty() {
+		return (Index<K, V>) EMPTY;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> none() {
+		return (Index<K, V>) EMPTY;
 	}
 
 	@Override
@@ -673,7 +695,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		}
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
-			BlobMap<K, V> c = children[i].getValue();
+			Index<K, V> c = children[i].getValue();
 			long cc = c.count();
 			if (ix < cc) return c.entryAt(ix);
 			ix -= cc;
@@ -682,27 +704,27 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	}
 
 	/**
-	 * Slices this BlobMap, starting at the specified position
+	 * Slices this Index, starting at the specified position
 	 * 
-	 * Removes n leading entries from this BlobMap, in key order.
+	 * Removes n leading entries from this Index, in key order.
 	 * 
 	 * @param start Start position of entries to keep
-	 * @return Updated BlobMap with leading entries removed, or null if invalid slice
+	 * @return Updated Index with leading entries removed, or null if invalid slice
 	 */
 	@Override
-	public BlobMap<K, V> slice(long start) {
+	public Index<K, V> slice(long start) {
 		return slice(start,count);
 	}
 	
 	/**
-	 * Returns a slice of this BlobMap
+	 * Returns a slice of this Index
 	 * 
 	 * @param start Start position of slice (inclusive)
 	 * @param end End position of slice (exclusive)
-	 * @return Slice of BlobMap, or null if invalid slice
+	 * @return Slice of Index, or null if invalid slice
 	 */
 	@Override
-	public BlobMap<K, V> slice(long start, long end) {
+	public Index<K, V> slice(long start, long end) {
 		if ((start<0)||(end>count)) return null;
 		if (end<start) return null;
 		long n=end-start;
@@ -710,7 +732,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 		if (n==count) return this;
 		
 		// TODO: optimise this
-		BlobMap<K, V> bm = this;
+		Index<K, V> bm = this;
 		for (long i=count-1; i>=end; i--) {
 			MapEntry<K, V> me = bm.entryAt(i);
 			bm = bm.dissoc(me.getKey());
@@ -727,18 +749,18 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	@Override
 	public boolean equals(ACell a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (!(a instanceof BlobMap)) return false;
-		// Must be a BlobMap
-		return equals((BlobMap<K,V>)a);
+		if (!(a instanceof Index)) return false;
+		// Must be a Index
+		return equals((Index<K,V>)a);
 	}
 	
 	/**
-	 * Checks this BlobMap for equality with another BlobMap 
+	 * Checks this Index for equality with another Index 
 	 * 
-	 * @param a BlobMap to compare with
+	 * @param a Index to compare with
 	 * @return true if maps are equal, false otherwise.
 	 */
-	public boolean equals(BlobMap<K, V> a) {
+	public boolean equals(Index<K, V> a) {
 		if (a==null) return false;
 		long n=this.count();
 		if (n != a.count()) return false;
@@ -751,7 +773,7 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 
 	@Override
 	public byte getTag() {
-		return Tag.BLOBMAP;
+		return Tag.INDEX;
 	}
 
 	@Override
@@ -762,10 +784,19 @@ public final class BlobMap<K extends ABlobLike<?>, V extends ACell> extends ABlo
 	@Override
 	public boolean containsValue(ACell value) {
 		if ((entry!=null)&&Utils.equals(value, entry.getValue())) return true;
-		for (Ref<BlobMap<K,V>> cr : children) {
+		for (Ref<Index<K,V>> cr : children) {
 			if (cr.getValue().containsValue(value)) return true;
 		}
 		return false;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static <R extends AIndex<K, V>, K extends ABlobLike<?>, V extends ACell> R create(HashMap<K, V> map) {
+		Index<K,V> result=(Index<K, V>) EMPTY;
+		for (Map.Entry<K,V> me: map.entrySet()) {
+			result=result.assoc(me.getKey(), me.getValue());
+		}
+		return (R) result;
 	}
 
 

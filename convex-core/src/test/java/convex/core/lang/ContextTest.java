@@ -20,7 +20,7 @@ import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.BlobMaps;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -184,7 +184,7 @@ public class ContextTest extends ACVMTest {
 		assertCVMEquals(Constants.INITIAL_TIMESTAMP,eval(Symbols.STAR_TIMESTAMP));
 
 		assertSame(ctx.getState(), eval(Symbols.STAR_STATE));
-		assertSame(BlobMaps.empty(),eval(Symbols.STAR_HOLDINGS));
+		assertSame(Index.none(),eval(Symbols.STAR_HOLDINGS));
 
 		assertUndeclaredError(ctx.eval(Symbol.create("*bad-special-symbol*")));
 	}

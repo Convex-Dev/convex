@@ -21,7 +21,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
+import convex.core.data.Index;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -448,7 +448,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
 		AccountKey key=server.getPeerKey();
-		BlobMap<AccountKey, SignedData<Order>> orders = belief.getOrders();
+		Index<AccountKey, SignedData<Order>> orders = belief.getOrders();
 		SignedData<Order> order=belief.getOrders().get(key);
 		if (order==null) return null;
 		

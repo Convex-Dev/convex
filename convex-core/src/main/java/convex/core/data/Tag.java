@@ -44,7 +44,7 @@ public class Tag {
 	public static final byte MAP = (byte) 0x82;
 	public static final byte SET = (byte) 0x83;
 
-	public static final byte BLOBMAP = (byte) 0x84;
+	public static final byte INDEX = (byte) 0x84;
 
 	public static final byte SYNTAX = (byte) 0x88;
 	

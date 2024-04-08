@@ -41,7 +41,7 @@ public class Status extends AClientCommand {
 			// Hash hash = Hash.wrap(stateHash.getBytes());
 
 			//AVector<AccountStatus> accountList = state.getAccounts();
-			//BlobMap<AccountKey, PeerStatus> peerList = state.getPeers();
+			//Index<AccountKey, PeerStatus> peerList = state.getPeers();
 
 			RecordOutput output=new RecordOutput();
 			output.addField("State hash", stateHash.toString());

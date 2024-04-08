@@ -16,10 +16,14 @@ import convex.core.util.Utils;
  *
  */ 
 public class PeerStatus extends ARecord {
+
 	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.CONTROLLER, Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
 			Keywords.METADATA, Keywords.TIMESTAMP};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
+	
+	private static final Index<Address, CVMLong> EMPTY_STAKES = Index.none();
+
 
     private final Address controller;
 	private final long stake;
@@ -29,14 +33,14 @@ public class PeerStatus extends ARecord {
 	/**
 	 * Map of delegated stakes. Never null internally, but empty map encoded as null.
 	 */
-	private final BlobMap<Address, CVMLong> stakes;
+	private final Index<Address, CVMLong> stakes;
 
 	/**
 	 * Metadata for the Peer. Can be null internally, which is interpreted as an empty Map.
 	 */
 	private final AHashMap<ACell,ACell> metadata;
 
-	private PeerStatus(Address controller, long stake, BlobMap<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata, long timestamp) {
+	private PeerStatus(Address controller, long stake, Index<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata, long timestamp) {
 		super(FORMAT.count());
         this.controller = controller;
 		this.stake = stake;
@@ -51,7 +55,7 @@ public class PeerStatus extends ARecord {
 	}
 
 	public static PeerStatus create(Address controller, long stake, AHashMap<ACell,ACell> metadata) {
-		return new PeerStatus(controller, stake, BlobMaps.empty(), 0L, metadata,Constants.INITIAL_PEER_TIMESTAMP);
+		return new PeerStatus(controller, stake, EMPTY_STAKES, 0L, metadata,Constants.INITIAL_PEER_TIMESTAMP);
 	}
 	/**
 	 * Gets the stake of this peer
@@ -158,10 +162,10 @@ public class PeerStatus extends ARecord {
 	    long stake = Format.readVLCLong(b,epos);
 	    epos+=Format.getVLCLength(stake);
 	    
-		BlobMap<Address, CVMLong> stakes = Format.read(b,epos);
+		Index<Address, CVMLong> stakes = Format.read(b,epos);
 		epos+=Format.getEncodingLength(stakes);
 		if (stakes==null) {
-			stakes=BlobMaps.empty();
+			stakes=EMPTY_STAKES;
 		} else if (stakes.isEmpty()) {
 			throw new BadFormatException("Empty delegated stakes should be encoded as null");
 		}
@@ -224,7 +228,7 @@ public class PeerStatus extends ARecord {
 		long newDelegatedStake = delegatedStake + newStake - oldStake;
 
 		// Cast needed for Maven Java 11 compile?
-		BlobMap<Address, CVMLong> newStakes = (BlobMap<Address,CVMLong>)((newStake == 0L) ? stakes.dissoc(delegator)
+		Index<Address, CVMLong> newStakes = (Index<Address,CVMLong>)((newStake == 0L) ? stakes.dissoc(delegator)
 				: stakes.assoc(delegator, CVMLong.create(newStake)));
 		return new PeerStatus(controller, stake, newStakes, newDelegatedStake, metadata,timestamp);
 	}
@@ -273,7 +277,7 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public PeerStatus updateRefs(IRefFunction func) {
-		BlobMap<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
+		Index<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
 		AHashMap<ACell,ACell> newMeta = Ref.updateRefs(metadata, func);
 
 		if ((this.stakes==newStakes)&&(this.metadata==newMeta)) {
@@ -282,7 +286,7 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(controller, stake, newStakes, delegatedStake, newMeta,timestamp);
 	}
 
-	protected static long computeDelegatedStake(BlobMap<Address, CVMLong> stakes) {
+	protected static long computeDelegatedStake(Index<Address, CVMLong> stakes) {
 		long ds = stakes.reduceValues((acc, e)->acc+e.longValue(), 0L);
 		return ds;
 	}

@@ -15,8 +15,8 @@ import static convex.test.Assertions.assertMemoryError;
 import static convex.test.Assertions.assertNobodyError;
 import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertStateError;
-import static convex.test.Assertions.assertTrustError;
 import static convex.test.Assertions.assertSyntaxError;
+import static convex.test.Assertions.assertTrustError;
 import static convex.test.Assertions.assertUndeclaredError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -46,10 +46,9 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
@@ -763,40 +762,40 @@ public class CoreTest extends ACVMTest {
 	}
 
 	@Test
-	public void testBlobMap() {
-		// Singleton empty BlobMap
-		assertSame(BlobMaps.empty(), eval("(blob-map)"));
+	public void testIndex() {
+		// Singleton empty Index
+		assertSame(Index.none(), eval("(index)"));
 
-		assertEquals(eval("(blob-map 0xa2 :foo)"),eval("(assoc (blob-map) 0xa2 :foo)"));
-		assertEquals(eval("(blob-map 0xa2 :foo 0xb3 :bar)"),eval("(assoc (blob-map) 0xa2 :foo 0xb3 :bar)"));
+		assertEquals(eval("(index 0xa2 :foo)"),eval("(assoc (index) 0xa2 :foo)"));
+		assertEquals(eval("(index 0xa2 :foo 0xb3 :bar)"),eval("(assoc (index) 0xa2 :foo 0xb3 :bar)"));
 
 		// Bad key types should result in argument errors
-		assertArgumentError(step("(blob-map nil :bar)")); 
-		assertArgumentError(step("(assoc (blob-map) \\f 10)")); 
+		assertArgumentError(step("(index nil :bar)")); 
+		assertArgumentError(step("(assoc (index) \\f 10)")); 
 		
 		// We want to preserve Address type in keys and values
-		assertEquals(Address.create(19),eval("(first (first (blob-map #19 #21)))"));
-		assertEquals(Address.create(21),eval("(second (first (blob-map #19 #21)))"));
+		assertEquals(Address.create(19),eval("(first (first (index #19 #21)))"));
+		assertEquals(Address.create(21),eval("(second (first (index #19 #21)))"));
 		
 		// Strings count as equivalent blobs (will overwrite each other)
-		assertSame(Strings.EMPTY,eval("(first (first (blob-map \"\" #21)))"));
-		assertEquals(Address.create(23),eval("(second (first (blob-map \"\" #21 0x #23)))"));
-		assertEquals(Address.create(23),eval("(get (blob-map \"\" #23) 0x)"));
+		assertSame(Strings.EMPTY,eval("(first (first (index \"\" #21)))"));
+		assertEquals(Address.create(23),eval("(second (first (index \"\" #21 0x #23)))"));
+		assertEquals(Address.create(23),eval("(get (index \"\" #23) 0x)"));
 		
 		// Different bloblikes are still regarded as different keys, so affect equality
-		assertNotEquals(eval("(blob-map \"\" 1)"),eval("(blob-map 0x 1)"));
-		assertNotEquals(eval("(blob-map #13 1)"),eval("(blob-map 0x0000000000000013 1)"));
-		assertEquals(eval("(blob-map #13 1)"),eval("(blob-map #13 1)"));
+		assertNotEquals(eval("(index \"\" 1)"),eval("(index 0x 1)"));
+		assertNotEquals(eval("(index #13 1)"),eval("(index 0x0000000000000013 1)"));
+		assertEquals(eval("(index #13 1)"),eval("(index #13 1)"));
 		
 		// Keys collide between blobs and equivalent addresses
-		assertEquals(CVMLong.ONE,eval("(count (blob-map #19 #21 0x0000000000000013 #22))"));
-		assertEquals(Vectors.of(Blob.fromHex("0000000000000013"),Address.create(22)),eval("(first (blob-map #19 #21 0x0000000000000013 #22))"));
+		assertEquals(CVMLong.ONE,eval("(count (index #19 #21 0x0000000000000013 #22))"));
+		assertEquals(Vectors.of(Blob.fromHex("0000000000000013"),Address.create(22)),eval("(first (index #19 #21 0x0000000000000013 #22))"));
 
-		assertArityError(step("(blob-map 0xabcd)"));
-		assertArityError(step("(blob-map 0xa2 :foo 0xb3)"));
+		assertArityError(step("(index 0xabcd)"));
+		assertArityError(step("(index 0xa2 :foo 0xb3)"));
 		
-		// Dissoc back to empty blobmap via equivalent bloblike keys
-		assertSame(BlobMaps.empty(),eval("(dissoc (blob-map 0x 1) \"\")"));
+		// Dissoc back to empty Index via equivalent bloblike keys
+		assertSame(Index.none(),eval("(dissoc (index 0x 1) \"\")"));
 	}
 
 	@Test
@@ -805,8 +804,8 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.of(1L), eval("(keys {1 2})"));
 		assertEquals(Sets.of(1L, 3L, 5L), eval("(set (keys {1 2 3 4 5 6}))"));
 
-		assertEquals(Vectors.empty(),RT.keys(BlobMaps.empty()));
-		assertEquals(Vectors.of(HERO),RT.keys(BlobMap.of(HERO, 1L)));
+		assertEquals(Vectors.empty(),RT.keys(Index.none()));
+		assertEquals(Vectors.of(HERO),RT.keys(Index.of(HERO, 1L)));
 
 		assertCastError(step("(keys 1)"));
 		assertCastError(step("(keys [])"));
@@ -1170,7 +1169,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(Vectors.empty(), eval("(vec nil)"));
 		assertSame(Vectors.empty(), eval("(vec [])"));
 		assertSame(Vectors.empty(), eval("(vec {})"));
-		assertSame(Vectors.empty(), eval("(vec (blob-map))"));
+		assertSame(Vectors.empty(), eval("(vec (index))"));
 
 		assertEquals(read("[\\a \\b \\c]"), eval("(vec \"abc\")"));
 		assertEquals(read("[\\f \\o \\o]"), eval("(vec :foo)"));
@@ -1206,10 +1205,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.of(1,2),eval("(assoc {} 1 2)"));
 		assertEquals(Vectors.of(1,2),eval("(assoc [1 3] 1 2)"));
 		assertEquals(Sets.of(1,2),eval("(assoc #{1} 2 true)"));
-		assertEquals(BlobMap.of(Blob.EMPTY,2),eval("(assoc (blob-map) 0x 2)"));
+		assertEquals(Index.of(Blob.EMPTY,2),eval("(assoc (index) 0x 2)"));
 		
 		// bad key types
-		assertArgumentError(step("(assoc (blob-map) 1 2)"));
+		assertArgumentError(step("(assoc (index) 1 2)"));
 		assertArgumentError(step("(assoc [1 2 3] :foo 7)"));
 	
 		// Definitiely Non-associative values
@@ -1302,7 +1301,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(assoc-in #{3} [3 2] :fail)")); // 'true' is not a data structure
 
 		// Cast error - wrong key types
-		assertCastError(step("(assoc-in (blob-map) :foo :bar)"));
+		assertCastError(step("(assoc-in (index) :foo :bar)"));
 
 		// Cast errors - not associative collections
 		assertCastError(step("(assoc-in 1 [2] 3)"));
@@ -1335,7 +1334,7 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(assoc [1 2 3] nil :foo)"));
 		assertArgumentError(step("(assoc [] 2 :foo)"));
 		assertArgumentError(step("(assoc (list) 2 :fail)"));
-		assertArgumentError(step("(assoc (blob-map) 2 :fail)"));
+		assertArgumentError(step("(assoc (index) 2 :fail)"));
 
 		// Arity error
 		assertArityError(step("(assoc)"));
@@ -1368,12 +1367,12 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.empty(), eval("(dissoc {1 2 3 4} 1 3)"));
 		assertEquals(Maps.of(3L, 4L), eval("(dissoc {1 2 3 4} 1 2)"));
 
-		// blob-map dissocs. Regression tests for #140 (fatal error in dissoc with non-blob keys)
-		assertSame(BlobMap.EMPTY,eval("(dissoc (blob-map) 1)"));
-		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo] [0xb3 :bar]]) 0xb3)"));
-		assertEquals(BlobMap.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (blob-map) [[0xa2 :foo]]) :foo)"));
-		assertEquals(BlobMaps.empty(), eval("(dissoc (blob-map 0x 0x1234) 0x)"));
-		assertEquals(BlobMaps.empty(), eval("(dissoc(blob-map) :foo)"));
+		// index dissocs. Regression tests for #140 (fatal error in dissoc with non-blob keys)
+		assertSame(Index.EMPTY,eval("(dissoc (index) 1)"));
+		assertEquals(Index.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (index) [[0xa2 :foo] [0xb3 :bar]]) 0xb3)"));
+		assertEquals(Index.of(Blob.fromHex("a2"), Keywords.FOO),eval("(dissoc (into (index) [[0xa2 :foo]]) :foo)"));
+		assertEquals(Index.none(), eval("(dissoc (index 0x 0x1234) 0x)"));
+		assertEquals(Index.none(), eval("(dissoc(index) :foo)"));
 
 		assertCastError(step("(dissoc 1 1 2)"));
 		assertCastError(step("(dissoc #{})"));
@@ -1401,11 +1400,11 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(contains-key? [0 1 2] :foo)"));
 		assertTrue(evalB("(contains-key? [3 4] 1)"));
 		
-		// BlobMaps test for key presence
-		assertFalse(evalB("(contains-key? (blob-map) 1)"));
-		assertFalse(evalB("(contains-key? (blob-map) 0x)"));
-		assertFalse(evalB("(contains-key? (blob-map 0x :foo) :foo)"));
-		assertTrue(evalB("(contains-key? (blob-map 0x :foo) 0x)"));
+		// Indexs test for key presence
+		assertFalse(evalB("(contains-key? (index) 1)"));
+		assertFalse(evalB("(contains-key? (index) 0x)"));
+		assertFalse(evalB("(contains-key? (index 0x :foo) :foo)"));
+		assertTrue(evalB("(contains-key? (index 0x :foo) 0x)"));
 
 		// Nil is treated as a data structure with no keys
 		assertFalse(evalB("(contains-key? nil 1)"));
@@ -1436,7 +1435,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(Sets.empty(), eval("(disj nil nil)"));
 
 		assertCastError(step("(disj [] 1)"));
-		assertCastError(step("(disj (blob-map) 0x)"));
+		assertCastError(step("(disj (index) 0x)"));
 		
 		assertArityError(step("(disj)"));
 	}
@@ -1682,8 +1681,8 @@ public class CoreTest extends ACVMTest {
 		// arity 1 OK, no change
 		assertEquals(Vectors.of(1L, 2L), eval("(conj [1 2])"));
 
-		// Blobmaps
-		assertEquals(BlobMaps.create(Blob.fromHex("a1"), Blob.fromHex("a2")),eval("(conj (blob-map) [0xa1 0xa2])"));
+		// Indexs
+		assertEquals(Index.create(Blob.fromHex("a1"), Blob.fromHex("a2")),eval("(conj (index) [0xa1 0xa2])"));
 
 		// bad data structures
 		assertCastError(step("(conj :foo)"));
@@ -1694,8 +1693,8 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(conj {} [1 2 3])")); // wrong size vector for a map entry
 		assertArgumentError(step("(conj {1 2} [1])")); // wrong size vector for a map entry
 		assertArgumentError(step("(conj {} '(1 2))")); // wrong type for a map entry
-		assertArgumentError(step("(conj (blob-map) [nil 0xa2])")); // bad key type for blobmap
-		assertArgumentError(step("(conj (blob-map #0 #0) [false #0])")); // Issue #386
+		assertArgumentError(step("(conj (index) [nil 0xa2])")); // bad key type for Index
+		assertArgumentError(step("(conj (index #0 #0) [false #0])")); // Issue #386
 
 		assertCastError(step("(conj 1 2)"));
 		assertCastError(step("(conj (str :foo) 2)")); // string is not a Data Structure
@@ -1774,7 +1773,7 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(into {} [[:foo :bar :baz]])")); // length 1 vector shouldn't convert to MapEntry
 		assertArgumentError(step("(into {1 2} [2 3])")); // longs are not map entries
 		assertArgumentError(step("(into {1 2} [[] []])")); // empty vectors are not map entries
-		assertArgumentError(step("(into (blob-map) [[1 2]])"));
+		assertArgumentError(step("(into (index) [[1 2]])"));
 
 		assertArityError(step("(into)"));
 		assertArityError(step("(into inc)"));
@@ -1794,11 +1793,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Maps.of(1L,3L),eval("(merge {1 2} {1 3})"));
 		assertEquals(Maps.of(1L,3L),eval("(merge nil {1 2} nil {1 3} nil)"));
 		
-		// Blobmap handling
-		assertEquals(BlobMaps.empty(), eval("(merge (blob-map) nil)"));
-		assertEquals(BlobMaps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge (blob-map 0x01 1) (blob-map 0x01 2))"));
-		assertEquals(Maps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge {0x01 1} (blob-map 0x01 2))"));
-		assertEquals(BlobMaps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge (blob-map 0x01 1) {0x01 2})"));
+		// Index handling
+		assertEquals(Index.none(), eval("(merge (index) nil)"));
+		assertEquals(Index.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge (index 0x01 1) (index 0x01 2))"));
+		assertEquals(Maps.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge {0x01 1} (index 0x01 2))"));
+		assertEquals(Index.of(Blob.fromHex("01"), CVMLong.create(2)), eval("(merge (index 0x01 1) {0x01 2})"));
 
 		assertCastError(step("(merge [])"));
 		assertCastError(step("(merge {} [1 2 3])"));
@@ -1943,9 +1942,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Vectors.empty(), eval("(mapv + '(1 2) nil)"));
 		assertEquals(Vectors.empty(), eval("(mapv + nil)"));
 		
-		// Check blob-map behaviour
-		assertSame(Vectors.empty(),eval("(mapv inc (blob-map))"));
-		assertEquals(Vectors.of(2),eval("(mapv count (blob-map 0x00 :foo))"));
+		// Check index behaviour
+		assertSame(Vectors.empty(),eval("(mapv inc (index))"));
+		assertEquals(Vectors.of(2),eval("(mapv count (index 0x00 :foo))"));
 
 		assertArityError(step("(mapv)"));
 		assertArityError(step("(mapv inc)"));
@@ -2009,9 +2008,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(100.0, evalD(
 				"(reduce (fn [acc [k v]] (let [x (double (v nil))] (+ acc (* x x)))) 0.0 {true {nil 10}})"));
 
-		// reduce over BlobMap should be in order
+		// reduce over Index should be in order
 		assertEquals(12.0, evalD(
-				"(reduce (fn [acc [k v]] (let [x (double v)] (+ (* acc acc) x))) 0.0 (blob-map 0x 1 0x01 2 0x02 3))"));
+				"(reduce (fn [acc [k v]] (let [x (double v)] (+ (* acc acc) x))) 0.0 (index 0x 1 0x01 2 0x02 3))"));
 		
 		
 		assertEquals(Lists.of(3,2,1), eval("(reduce conj '() '(1 2 3))"));
@@ -2523,7 +2522,7 @@ public class CoreTest extends ACVMTest {
 		assertSame(Maps.empty(), eval("(empty {1 2 3 4})"));
 		assertSame(Vectors.empty(), eval("(empty [1 2 3])"));
 		assertSame(Sets.empty(), eval("(empty #{1 2})"));
-		assertSame(BlobMaps.empty(), eval("(empty (blob-map 0x 0x))"));
+		assertSame(Index.none(), eval("(empty (index 0x 0x))"));
 		
 		assertCastError(step("(empty 0x1234abcd)"));
 		assertCastError(step("(empty 1)"));
@@ -2592,7 +2591,7 @@ public class CoreTest extends ACVMTest {
 		// Basic data structure application
 		assertSame(Maps.empty(),eval("(apply assoc [nil])"));
 		assertSame(Vectors.empty(), eval("(apply vector ())"));
-		assertSame(BlobMaps.empty(), eval("(apply blob-map ())"));
+		assertSame(Index.none(), eval("(apply index ())"));
 		assertSame(Lists.empty(), eval("(apply list [])"));
 
 		assertEquals("foo", evalS("(apply str [\\f \\o \\o])"));
@@ -3156,7 +3155,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval(ctx, "(set-peer-data peer-key nil)"));
 		
 		assertCastError(step(ctx, "(set-peer-data peer-key :fail)"));
-		assertCastError(step(ctx, "(set-peer-data peer-key (blob-map))"));
+		assertCastError(step(ctx, "(set-peer-data peer-key (index))"));
 
 		// Try to hijack with an account that isn't the first Peer
 		ctx=ctx.forkWithAddress(HERO.offset(2));
@@ -3617,7 +3616,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(get '() 10)"));
 		assertNull(eval("(get nil :boff)"));
 		assertNull(eval("(get-in nil [])"));
-		assertNull(eval("(get (blob-map 0x01 0x30) 10)"));
+		assertNull(eval("(get (index 0x01 0x30) 10)"));
 		
 		// nil is result of non-existing account lookups
 		assertNull(eval("(account #67896876)"));
@@ -3685,8 +3684,8 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(coll? [:foo :bar])"));
 		assertTrue(evalB("(coll? {1 2 3 4})"));
 		assertTrue(evalB("(coll? #{1 2})"));
-		assertTrue(evalB("(coll? (blob-map))"));
-		assertTrue(evalB("(coll? (blob-map 0x 0x))"));
+		assertTrue(evalB("(coll? (index))"));
+		assertTrue(evalB("(coll? (index 0x 0x))"));
 	}
 
 	@Test
@@ -3695,13 +3694,13 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(empty? {})"));
 		assertTrue(evalB("(empty? [])"));
 		assertTrue(evalB("(empty? ())"));
-		assertTrue(evalB("(empty? (blob-map))"));
+		assertTrue(evalB("(empty? (index))"));
 		assertTrue(evalB("(empty? \"\")"));
 		assertTrue(evalB("(empty? #{})"));
 		
 		assertFalse(evalB("(empty? 0x1234)"));
 		assertFalse(evalB("(empty? {1 2})"));
-		assertFalse(evalB("(empty? (blob-map 0x 0x1234))"));
+		assertFalse(evalB("(empty? (index 0x 0x1234))"));
 		assertFalse(evalB("(empty? [ 3])"));
 		assertFalse(evalB("(empty? '(foo))"));
 		assertFalse(evalB("(empty? #{[]})"));
@@ -4458,7 +4457,7 @@ public class CoreTest extends ACVMTest {
 		Context ctx = step("(schedule (+ *timestamp* 1000) (def a 2))");
 		assertCVMEquals(expectedTS, ctx.getResult());
 		State s = ctx.getState();
-		BlobMap<ABlob, AVector<ACell>> sched = s.getSchedule();
+		Index<ABlob, AVector<ACell>> sched = s.getSchedule();
 		assertEquals(1L, sched.count());
 		assertEquals(expectedTS, sched.entryAt(0).getKey().longValue());
 
@@ -4780,8 +4779,8 @@ public class CoreTest extends ACVMTest {
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
 		ctx=step(ctx,"(def NOONE (address 7777777))");
 
-		// Basic empty holding should match empty blobmap in account record. See #131
-		assertTrue(evalB("(= *holdings* (:holdings (account *address*)) (blob-map))"));
+		// Basic empty holding should match empty Index in account record. See #131
+		assertTrue(evalB("(= *holdings* (:holdings (account *address*)) (index))"));
 
 		// initial holding behaviour
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));

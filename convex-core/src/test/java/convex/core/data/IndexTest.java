@@ -18,11 +18,11 @@ import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.test.Samples;
 
-public class BlobMapsTest {
+public class IndexTest {
 
 	@Test
 	public void testEmpty() throws InvalidDataException {
-		BlobMap<ABlob, ACell> m = BlobMaps.empty();
+		Index<ABlob, ACell> m = Index.none();
 
 		assertFalse(m.containsKey(Blob.EMPTY));
 		assertFalse(m.containsKey(null));
@@ -37,12 +37,12 @@ public class BlobMapsTest {
 		assertFalse(m.equals(Maps.empty()));
 		assertFalse(Maps.empty().equals(m));
 		
-		doBlobMapTests(m);
+		doIndexTests(m);
 	}
 
 	@Test
 	public void testBadAssoc() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m =BlobMaps.create(InitTest.HERO, RT.cvm(1L));
+		Index<ABlob, CVMLong> m =Index.create(InitTest.HERO, RT.cvm(1L));
 		m=m.assoc(InitTest.VILLAIN, RT.cvm(2L));
 		assertEquals(2L,m.count());
 
@@ -54,9 +54,9 @@ public class BlobMapsTest {
 		Blob k1 = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
 		Blob k3 = Blob.fromHex("ccca");
-		BlobMap<ABlob, CVMLong> m = BlobMaps.create(k1, RT.cvm(17L));
+		Index<ABlob, CVMLong> m = Index.create(k1, RT.cvm(17L));
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 
 		assertTrue(m.containsKey(k1));
 		assertTrue(m.containsValue(RT.cvm(17L)));
@@ -71,7 +71,7 @@ public class BlobMapsTest {
 		assertSame(k2, e2.getKey());
 		assertEquals(RT.cvm(23L), e2.getValue());
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 
 		// add third entry
 		m = m.assoc(k3, RT.cvm(34L));
@@ -81,7 +81,7 @@ public class BlobMapsTest {
 		assertEquals(e3, m.getEntry(k3));
 		assertEquals(RT.cvm(34L), e3.getValue());
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 
 		assertEquals(Vectors.of(17L,23L,34L),m.values());
 	}
@@ -90,7 +90,7 @@ public class BlobMapsTest {
 	public void testGet() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
 		ACell v1 = CVMLong.create(17);
-		BlobMap<ABlob, CVMLong> m = BlobMaps.of(k1, v1);
+		Index<ABlob, CVMLong> m = Index.of(k1, v1);
 		assertNull(m.get(Samples.MAX_EMBEDDED_STRING)); // needs a blob. String counts as non-existent key
 		assertCVMEquals(17L,m.get(k1));
 
@@ -99,8 +99,8 @@ public class BlobMapsTest {
 
 
 	@Test
-	public void testBlobMapConstruction() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m = BlobMaps.empty();
+	public void testIndexConstruction() throws InvalidDataException {
+		Index<ABlob, CVMLong> m = Index.none();
 		for (int i = 0; i < 100; i++) {
 			Long l = (long) Integer.hashCode(i);
 			CVMLong cl = RT.cvm(l);
@@ -111,7 +111,7 @@ public class BlobMapsTest {
 		assertEquals(100L, m.count());
 		m.validate();
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 
 		for (int i = 0; i < 100; i++) {
 			Long l = (long) Integer.hashCode(i);
@@ -119,12 +119,12 @@ public class BlobMapsTest {
 			m = m.dissoc(lb);
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
-		assertSame(BlobMaps.empty(), m);
+		assertSame(Index.none(), m);
 	}
 
 	@Test
-	public void testBlobMapRandomConstruction() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m = BlobMaps.empty();
+	public void testIndexRandomConstruction() throws InvalidDataException {
+		Index<ABlob, CVMLong> m = Index.none();
 		for (int i = 0; i < 100; i++) {
 			Long l = (Long.MAX_VALUE / 91 * i * 18);
 			CVMLong cl=RT.cvm(l);
@@ -135,7 +135,7 @@ public class BlobMapsTest {
 		assertEquals(100L, m.count());
 		m.validate();
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 
 		for (int i = 0; i < 100; i++) {
 			Long l = (Long.MAX_VALUE / 91 * i * 18);
@@ -143,17 +143,17 @@ public class BlobMapsTest {
 			m = m.dissoc(lb);
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
-		assertSame(BlobMaps.empty(), m);
+		assertSame(Index.none(), m);
 	}
 	
 	@Test
 	public void testStringKeys() {
 		AString k=Samples.NON_EMBEDDED_STRING;
 		Address v=Address.ZERO;
-		BlobMap<AString,Address> bm=BlobMap.create(k,v);
-		doBlobMapTests(bm);
+		Index<AString,Address> bm=Index.create(k,v);
+		doIndexTests(bm);
 		
-		assertSame(BlobMaps.empty(),bm.dissoc(k));
+		assertSame(Index.none(),bm.dissoc(k));
 	}
 
 	@Test
@@ -161,8 +161,8 @@ public class BlobMapsTest {
 		Blob bb = Blob.fromHex("000000000000cafe");
 		LongBlob bl = LongBlob.create(0xcafe);
 		Address ba=Address.create(0xcafe);
-		assertNotEquals(BlobMap.create(bb, bl), BlobMap.create(ba,bl)); // different entry key types
-		assertEquals(BlobMap.create(bb, bl), BlobMap.create(bl,bl)); // same entry key types
+		assertNotEquals(Index.create(bb, bl), Index.create(ba,bl)); // different entry key types
+		assertEquals(Index.create(bb, bl), Index.create(bl,bl)); // same entry key types
 	}
 
 	@Test
@@ -170,7 +170,7 @@ public class BlobMapsTest {
 		Blob k = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
 		CVMLong val=RT.cvm(177777L);
-		BlobMap<ABlob, CVMLong> m = BlobMaps.create(k, val);
+		Index<ABlob, CVMLong> m = Index.create(k, val);
 		assertEquals(1L, m.count());
 
 		assertEquals(val, m.get(k));
@@ -178,7 +178,7 @@ public class BlobMapsTest {
 		assertNull(m.get(Blob.EMPTY));
 		assertNull(m.get(k2));
 
-		assertSame(BlobMaps.empty(), m.dissoc(k));
+		assertSame(Index.none(), m.dissoc(k));
 		assertSame(m, m.dissoc(k2)); // long key miss
 		assertSame(m, m.dissoc(k.slice(0, 1))); // short prefix key miss
 		assertSame(m, m.dissoc(Blob.fromHex("caef"))); // partial prefix key miss
@@ -187,29 +187,29 @@ public class BlobMapsTest {
 		assertEquals(k, me.getKey());
 		assertEquals(val, me.getValue());
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 	}
 
 	@Test
 	public void testPrefixEntryTwo() throws InvalidDataException {
 		Blob k1 = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
-		BlobMap<Blob, CVMLong> m = BlobMaps.of(k1, 17L, k2, 23L);
-		BlobMap<Blob, CVMLong> m1 = BlobMaps.of(k1, 17L);
-		BlobMap<Blob, CVMLong> m2 = BlobMaps.of(k2, 23L);
+		Index<Blob, CVMLong> m = Index.of(k1, 17L, k2, 23L);
+		Index<Blob, CVMLong> m1 = Index.of(k1, 17L);
+		Index<Blob, CVMLong> m2 = Index.of(k2, 23L);
 		assertSame(m, m.dissoc(k1.slice(0, 1)));
 		assertEquals(m1, m.dissoc(k2));
 		assertEquals(m2, m.dissoc(k1));
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 	}
 
 	@Test
-	public void testInitialPeersBlobMap() {
-		BlobMap<AccountKey, PeerStatus> bm = InitTest.STATE.getPeers();
-		doBlobMapTests(bm);
+	public void testInitialPeersIndex() {
+		Index<AccountKey, PeerStatus> bm = InitTest.STATE.getPeers();
+		doIndexTests(bm);
 
-		BlobMap<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(InitTest.FIRST_PEER_KEY));
+		Index<AccountKey, PeerStatus> fm =bm.filterValues(ps -> ps==bm.get(InitTest.FIRST_PEER_KEY));
 		assertEquals(1L,fm.count());
 		
 		bm.isCompletelyEncoded();
@@ -220,7 +220,7 @@ public class BlobMapsTest {
 		Blob k1 = Blob.fromHex("cafe");
 		Blob k2 = Blob.fromHex("cafebabe");
 		Blob k3 = Blob.fromHex("cafefeed");
-		BlobMap<Blob, CVMLong> m = BlobMaps.of(k1, 17L, k2, 23L, k3, 47L);
+		Index<Blob, CVMLong> m = Index.of(k1, 17L, k2, 23L, k3, 47L);
 		m.validate();
 		assertEquals(2L, m.dissoc(k1).count());
 
@@ -228,36 +228,36 @@ public class BlobMapsTest {
 		assertEquals(m, m.assoc(k1, RT.cvm(17L)));
 		assertNotEquals(m, m.assoc(k1,  RT.cvm(27L)));
 
-		assertEquals(m, BlobMaps.of(k2, 23L, k3, 47L).assoc(k1,  RT.cvm(17L)));
+		assertEquals(m, Index.of(k2, 23L, k3, 47L).assoc(k1,  RT.cvm(17L)));
 
 		Blob k0 = Blob.fromHex("ca");
-		BlobMap<Blob, CVMLong> m4 = m.assoc(k0,  RT.cvm(7L));
+		Index<Blob, CVMLong> m4 = m.assoc(k0,  RT.cvm(7L));
 		m4.validate();
-		BlobMap<Blob, CVMLong> m4b = BlobMaps.of(k0, 7L, k1, 17L, k2, 23L, k3, 47L);
+		Index<Blob, CVMLong> m4b = Index.of(k0, 7L, k1, 17L, k2, 23L, k3, 47L);
 		assertEquals(m4, m4b);
-		doBlobMapTests(m4);
+		doIndexTests(m4);
 
-		doBlobMapTests(m);
+		doIndexTests(m);
 	}
 
 	@Test
 	public void testDissocEntries() throws InvalidDataException {
-		BlobMap<ABlobLike<?>, CVMLong> m = Samples.INT_BLOBMAP_7;
+		Index<ABlobLike<?>, CVMLong> m = Samples.INT_INDEX_7;
 		long n=m.count();
 
 		for (int i=0; i<n; i++) {
 			MapEntry<ABlobLike<?>,CVMLong> me=m.entryAt(i);
-			BlobMap<ABlobLike<?>, CVMLong> dm= (BlobMap<ABlobLike<?>, CVMLong>)m.dissoc(me.getKey());
+			Index<ABlobLike<?>, CVMLong> dm= (Index<ABlobLike<?>, CVMLong>)m.dissoc(me.getKey());
 			dm.validate();
 			assertEquals(n-1,dm.count());
-			BlobMap<ABlobLike<?>, CVMLong> m2=dm.assocEntry(me);
+			Index<ABlobLike<?>, CVMLong> m2=dm.assocEntry(me);
 			assertEquals(m,m2);
 		}
 	}
 
 	@Test
 	public void testDissocAll() throws InvalidDataException {
-		BlobMap<ABlob, CVMLong> m=BlobMaps.empty();
+		Index<ABlob, CVMLong> m=Index.none();
 		long n=100;
 
 		for (long i=0; i<n; i++) {
@@ -270,15 +270,15 @@ public class BlobMapsTest {
 			m=m.dissoc(Address.create(Math.abs(i*546546565954464911L)));
 			m.validate();
 		}
-		assertSame(BlobMaps.empty(),m);
+		assertSame(Index.none(),m);
 	}
 	
 	@Test
-	public void testSliceSmallBlobMap() {
-		BlobMap<ABlobLike<?>, CVMLong> m=Samples.INT_BLOBMAP_7;
-		BlobMap<ABlobLike<?>, CVMLong> ms=m.slice(3,4);
+	public void testSliceSmallIndex() {
+		Index<ABlobLike<?>, CVMLong> m=Samples.INT_INDEX_7;
+		Index<ABlobLike<?>, CVMLong> ms=m.slice(3,4);
 		assertEquals(1,ms.count());
-		doBlobMapTests(ms);
+		doIndexTests(ms);
 		
 		assertEquals(ms.entryAt(0),m.entryAt(3));
 		
@@ -288,25 +288,25 @@ public class BlobMapsTest {
 
 		
 		assertSame(m, m.slice(0));
-		assertSame(BlobMaps.empty(), m.slice(7));
+		assertSame(Index.none(), m.slice(7));
 	}
 
 	@Test
-	public void testSmallIntBlobMap() {
-		BlobMap<ABlobLike<?>, CVMLong> m = Samples.INT_BLOBMAP_7;
+	public void testSmallIntIndex() {
+		Index<ABlobLike<?>, CVMLong> m = Samples.INT_INDEX_7;
 
 		for (int i = 0; i < 7; i++) {
 			MapEntry<ABlobLike<?>, CVMLong> me = m.entryAt(i);
 			assertEquals(i, me.getValue().longValue());
 			assertEquals(me, m.getEntry(me.getKey()));
 		}
-		doBlobMapTests(m);
+		doIndexTests(m);
 	}
 
-	private <K extends ABlobLike<?>, V extends ACell> void doBlobMapTests(BlobMap<K, V> m) {
+	private <K extends ABlobLike<?>, V extends ACell> void doIndexTests(Index<K, V> m) {
 		long n = m.count();
 		
-		BlobMap<K,V> secondHalf=m.slice(n/2,n);
+		Index<K,V> secondHalf=m.slice(n/2,n);
 		assertNotNull(secondHalf);
 		assertEquals(m,m.slice(0,n/2).merge(secondHalf));
 
@@ -316,7 +316,7 @@ public class BlobMapsTest {
 			assertTrue(e1.getKey().compareTo(e2.getKey().toBlob()) < 0);
 		}
 		
-		assertEquals(Types.BLOBMAP,m.getType());
+		assertEquals(Types.INDEX,m.getType());
 
 		CollectionsTest.doMapTests(m);
 	}

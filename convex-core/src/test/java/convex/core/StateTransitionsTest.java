@@ -16,7 +16,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.BlobMap;
+import convex.core.data.Index;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -367,7 +367,7 @@ public class StateTransitionsTest {
 		BlockResult br2 = s.applyBlock(sb2);
 		assertNull(br2.getErrorCode(0),br2.getResult(0).toString());
 		s = br2.getState();
-		BlobMap<ABlob, AVector<ACell>> sched2 = s.getSchedule();
+		Index<ABlob, AVector<ACell>> sched2 = s.getSchedule();
 		assertEquals(1L, sched2.count());
 		// no change to target balance yet
 		assertEquals(BAL2 + 10000000, s.getBalance(TARGET));

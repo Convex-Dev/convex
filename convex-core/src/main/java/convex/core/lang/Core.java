@@ -26,10 +26,9 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
@@ -1039,7 +1038,7 @@ public class Core {
 	});
 
 
-	public static final CoreFn<BlobMap> BLOB_MAP = reg(new CoreFn<>(Symbols.BLOB_MAP,81) {
+	public static final CoreFn<Index> INDEX = reg(new CoreFn<>(Symbols.INDEX,81) {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
@@ -1050,14 +1049,14 @@ public class Core {
 			long juice = Juice.BUILD_DATA + len * Juice.BUILD_PER_ELEMENT;
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
-			BlobMap<ABlob,ACell> r=BlobMaps.empty();
+			Index<ABlob,ACell> r=Index.none();
 			int n=len/2;
 			for (int i=0; i<n; i++) {
 				int ix=i*2;
 				ACell k=args[ix];
 				ACell v=args[ix+1];
 				r=r.assoc(k, v);
-				if (r==null) return context.withArgumentError("Cannot have a key of Type "+RT.getType(k) +" in blob-map"); // must be bad key type
+				if (r==null) return context.withArgumentError("Cannot have a key of Type "+RT.getType(k) +" in Index"); // must be bad key type
 			}
 
 			return context.withResult(juice, r);
@@ -1201,7 +1200,7 @@ public class Core {
 			AccountStatus as=context.getAccountStatus(address);
 			if (as==null) return context.withResult(Juice.LOOKUP, null);
 			
-			BlobMap<Address,ACell> holdings=as.getHoldings();
+			Index<Address,ACell> holdings=as.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account
 			ACell result=holdings.get(context.getAddress());
@@ -2470,7 +2469,7 @@ public class Core {
 			int n=args.length;
 			if (n==0) return context.withResult(Juice.BUILD_DATA,Maps.empty());
 
-			// TODO: handle blobmaps?
+			// TODO: handle indexes?
 
 			ACell arg0=args[0];
 			AMap<ACell,ACell> result=RT.ensureMap(arg0);

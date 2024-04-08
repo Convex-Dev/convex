@@ -14,7 +14,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.BlobMap;
+import convex.core.data.Index;
 import convex.core.data.MapEntry;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
@@ -39,7 +39,7 @@ public class BeliefMerge {
 	private final State state;
 	private final AKeyPair keyPair;
 	private final long timestamp;
-	private final BlobMap<AccountKey, PeerStatus> peers;
+	private final Index<AccountKey, PeerStatus> peers;
 
 	private BeliefMerge(Belief belief, AKeyPair peerKeyPair, long mergeTimestamp, State consensusState) {
 		this.initialBelief=belief;
@@ -73,10 +73,10 @@ public class BeliefMerge {
 		Counters.beliefMerge++;
 
 		// accumulate combined list of latest Orders for all peers
-		final BlobMap<AccountKey, SignedData<Order>> accOrders = accumulateOrders(beliefs);
+		final Index<AccountKey, SignedData<Order>> accOrders = accumulateOrders(beliefs);
 
 		// vote for new proposed chain
-		final BlobMap<AccountKey, SignedData<Order>> resultOrders = vote(accOrders);
+		final Index<AccountKey, SignedData<Order>> resultOrders = vote(accOrders);
 		if (resultOrders == null) return initialBelief;
 
 		// update my belief with the resulting Orders
@@ -91,8 +91,8 @@ public class BeliefMerge {
 	 * @return Belief with updated orders (or the same Belief if unchanged)
 	 */
 	public Belief mergeOrders(Belief b) {
-		BlobMap<AccountKey, SignedData<Order>> orders = initialBelief.getOrders();
-		BlobMap<AccountKey, SignedData<Order>> newOrders=accumulateOrders(orders,b);
+		Index<AccountKey, SignedData<Order>> orders = initialBelief.getOrders();
+		Index<AccountKey, SignedData<Order>> newOrders=accumulateOrders(orders,b);
 		return initialBelief.withOrders(newOrders);
 	}
 	
@@ -101,10 +101,10 @@ public class BeliefMerge {
 	 * @param belief Belief from which to merge orders
 	 * @return Updated map of orders
 	 */
-	BlobMap<AccountKey, SignedData<Order>> accumulateOrders(BlobMap<AccountKey, SignedData<Order>> orders,Belief belief) {
-		BlobMap<AccountKey, SignedData<Order>> result=orders;
+	Index<AccountKey, SignedData<Order>> accumulateOrders(Index<AccountKey, SignedData<Order>> orders,Belief belief) {
+		Index<AccountKey, SignedData<Order>> result=orders;
 		
-		BlobMap<AccountKey, SignedData<Order>> bOrders = belief.getOrders();
+		Index<AccountKey, SignedData<Order>> bOrders = belief.getOrders();
 		// Iterate over each Peer's ordering conveyed in this Belief
 		long bcount=bOrders.count();
 		for (long i=0; i<bcount; i++) {
@@ -164,7 +164,7 @@ public class BeliefMerge {
 	 * @return Updates Orders, or null if no vote result (e.g. no voting stake available)
 	 * @throws BadSignatureException @
 	 */
-	BlobMap<AccountKey, SignedData<Order>> vote( final BlobMap<AccountKey, SignedData<Order>> accOrders) {
+	Index<AccountKey, SignedData<Order>> vote( final Index<AccountKey, SignedData<Order>> accOrders) {
 		AccountKey myAddress = getAccountKey();
 
 		// get current Order for this peer.
@@ -174,7 +174,7 @@ public class BeliefMerge {
 
 		// filter Orders for compatibility with current Order for inclusion in Voting Set
 		// TODO: figure out what to do with new blocks filtered out?
-		BlobMap<AccountKey, SignedData<Order>> filteredOrders=accOrders;
+		Index<AccountKey, SignedData<Order>> filteredOrders=accOrders;
 		
 		if (!Constants.ENABLE_FORK_RECOVERY) {
 			filteredOrders= accOrders.filterValues(signedOrder -> {
@@ -212,7 +212,7 @@ public class BeliefMerge {
 
 		final Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
-		BlobMap<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
+		Index<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {
 			// We have a different Order to propose
 			// First check how consistent this is with our current Order
@@ -538,7 +538,7 @@ public class BeliefMerge {
 	 * @throws BadSignatureException 
 	 */
 	private Order getMyOrder() {
-		BlobMap<AccountKey, SignedData<Order>> orders = initialBelief.getOrders();
+		Index<AccountKey, SignedData<Order>> orders = initialBelief.getOrders();
 		SignedData<Order> signed = (SignedData<Order>) orders.get(publicKey);
 		if (signed == null) return null;
 		return signed.getValue();
@@ -584,9 +584,9 @@ public class BeliefMerge {
 	 * @param beliefs Set of Beliefs from which to merge orders
 	 * @return
 	 */
-	private BlobMap<AccountKey, SignedData<Order>> accumulateOrders(Belief[] beliefs) {
+	private Index<AccountKey, SignedData<Order>> accumulateOrders(Belief[] beliefs) {
 		// Initialise result with existing Orders from this Belief
-		BlobMap<AccountKey, SignedData<Order>> result = initialBelief.getOrders();
+		Index<AccountKey, SignedData<Order>> result = initialBelief.getOrders();
 		
 		// Iterate over each received Belief
 		for (Belief belief : beliefs) {

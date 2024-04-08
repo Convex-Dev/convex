@@ -9,11 +9,10 @@ import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.BlobMap;
-import convex.core.data.BlobMaps;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
@@ -40,16 +39,21 @@ import convex.core.util.Utils;
  * Nakamoto
  */
 public class Belief extends ARecord {
+
 	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS);
+	
+	// Constants
+	private static final Index<AccountKey, SignedData<Order>> EMPTY_ORDERS = Index.none();
+
 
 	/**
 	 * The latest view of signed Orders held by other Peers
 	 */
-	private final BlobMap<AccountKey,SignedData<Order>> orders;
+	private final Index<AccountKey,SignedData<Order>> orders;
 
 	// private final long timeStamp;
 
-	Belief(BlobMap<AccountKey,SignedData<Order>> orders) {
+	Belief(Index<AccountKey,SignedData<Order>> orders) {
 		super(BELIEF_FORMAT.count());
 		this.orders = orders;
 	}
@@ -62,7 +66,7 @@ public class Belief extends ARecord {
 
 	@Override
 	public Belief updateRefs(IRefFunction func) {
-		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.updateRefs(func);
+		Index<AccountKey, SignedData<Order>> newOrders = orders.updateRefs(func);
 		if (this.orders == newOrders) {
 			return this;
 		}
@@ -74,7 +78,7 @@ public class Belief extends ARecord {
 	 * @return Empty Belief
 	 */
 	public static Belief initial() {
-		return create(BlobMaps.empty());
+		return create(EMPTY_ORDERS);
 	}
 	
 	/**
@@ -84,18 +88,18 @@ public class Belief extends ARecord {
 	 * @return new Belief representing the isolated belief of a single Peer.
 	 */
 	public static Belief create(AKeyPair kp, Order order) {
-		BlobMap<AccountKey, SignedData<Order>> orders=BlobMap.of(kp.getAccountKey(),kp.signData(order));
+		Index<AccountKey, SignedData<Order>> orders=Index.of(kp.getAccountKey(),kp.signData(order));
 		return create(orders);
 	}
 
 
-	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders, long timestamp) {
+	private static Belief create(Index<AccountKey, SignedData<Order>> orders, long timestamp) {
 		return new Belief(orders);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static Belief create(SignedData<Order>... orders)  {
-		BlobMap<AccountKey, SignedData<Order>> newOrders=BlobMaps.empty();
+		Index<AccountKey, SignedData<Order>> newOrders=EMPTY_ORDERS;
 		for (SignedData<Order> so:orders) {
 			newOrders=newOrders.assoc(so.getAccountKey(), so);
 		}
@@ -104,11 +108,11 @@ public class Belief extends ARecord {
 	
 
 	public static Belief create(HashMap<AccountKey, SignedData<Order>> orderMap) {
-		BlobMap<AccountKey, SignedData<Order>> orders=BlobMaps.create(orderMap);
+		Index<AccountKey, SignedData<Order>> orders=Index.create(orderMap);
 		return new Belief(orders);
 	}
 
-	private static Belief create(BlobMap<AccountKey, SignedData<Order>> orders) {
+	private static Belief create(Index<AccountKey, SignedData<Order>> orders) {
 		return create(orders, Constants.INITIAL_TIMESTAMP);
 	}
 
@@ -121,7 +125,7 @@ public class Belief extends ARecord {
 	public static Belief createSingleOrder(AKeyPair kp) {
 		AccountKey address = kp.getAccountKey();
 		SignedData<Order> order = kp.signData(Order.create());
-		return create(BlobMap.of(address, order));
+		return create(Index.of(address, order));
 	}
 
 
@@ -133,7 +137,7 @@ public class Belief extends ARecord {
 	 * @param newOrders New map of peer keys to Orders
 	 * @return The updated belief, or the same Belief if no change.
 	 */
-	public Belief withOrders(BlobMap<AccountKey, SignedData<Order>> newOrders) {
+	public Belief withOrders(Index<AccountKey, SignedData<Order>> newOrders) {
 		if (newOrders == orders) return this;
 		return Belief.create(newOrders);
 	}
@@ -154,7 +158,7 @@ public class Belief extends ARecord {
 	public static Belief read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		
-		BlobMap<AccountKey, SignedData<Order>> orders = Format.read(b,epos);
+		Index<AccountKey, SignedData<Order>> orders = Format.read(b,epos);
 		if (orders == null) throw new BadFormatException("Null orders in Belief");
 		epos+=Format.getEncodingLength(orders);
 		
@@ -185,7 +189,7 @@ public class Belief extends ARecord {
 	 * Get the map of orders for this Belief
 	 * @return Orders map
 	 */
-	public BlobMap<AccountKey, SignedData<Order>> getOrders() {
+	public Index<AccountKey, SignedData<Order>> getOrders() {
 		return orders;
 	}
 
@@ -265,7 +269,7 @@ public class Belief extends ARecord {
 			}
 		} else if (payload instanceof Belief) {
 			Belief b=(Belief)payload;
-			BlobMap<AccountKey, SignedData<Order>> porders = b.getOrders();
+			Index<AccountKey, SignedData<Order>> porders = b.getOrders();
 			int n=porders.size();
 			for (int i=0; i<n; i++) {
 				result.add(porders.entryAt(i).getValue());
@@ -282,7 +286,7 @@ public class Belief extends ARecord {
 	 */
 	public Belief proposeBlock(AKeyPair kp, SignedData<Block> signedBlock) {
 		AccountKey peerKey=kp.getAccountKey();
-		BlobMap<AccountKey, SignedData<Order>> orders = getOrders();
+		Index<AccountKey, SignedData<Order>> orders = getOrders();
 
 		SignedData<Order> mySO=orders.get(peerKey);
 		Order myOrder;
@@ -296,7 +300,7 @@ public class Belief extends ARecord {
 		Order newOrder = myOrder.append(signedBlock);
 		SignedData<Order> newSignedOrder = kp.signData(newOrder);
 		
-		BlobMap<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
+		Index<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
 		Belief newBelief=this.withOrders(newOrders);
 		return newBelief;
 	}
