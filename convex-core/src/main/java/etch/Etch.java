@@ -389,7 +389,7 @@ public class Etch {
 			// recursively write this key
 			return write(key,nextLevel,ref,newIndexPosition);
 		} else if (type==PTR_START) {
-			// first check if the start pointer is the right value. if so, bail out with nothing to do
+			// first check if the start pointer is the right value. if so, just update in place
 			if (checkMatchingKey(key, slotValue)) {
 				return updateInPlace(slotValue,ref);
 			}

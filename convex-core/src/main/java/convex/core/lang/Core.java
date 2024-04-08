@@ -2210,9 +2210,10 @@ public class Core {
 			// emptying nil is still nil
 			if (o == null) return context.withResult(Juice.SIMPLE_FN, null);
 
-			ADataStructure<?> coll = RT.ensureDataStructure(o);
+			ACountable<?> coll = RT.ensureCountable(o);
 			if (coll == null) return context.withCastError(0,args, Types.DATA_STRUCTURE);
 
+			// This might be nil, if the countable type doesn't support an empty instance
 			ACell result = coll.empty();
 			return context.withResult(Juice.SIMPLE_FN, result);
 		}

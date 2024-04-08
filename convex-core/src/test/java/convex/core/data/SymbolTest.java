@@ -33,8 +33,11 @@ public class SymbolTest {
 		// max length Symbol should be embedded
 		Symbol s=Symbol.create(Text.whiteSpace(Constants.MAX_NAME_LENGTH));
 		assertTrue(s.isEmbedded());
+		
+		doSymbolTest(s);
 	}
 	
+
 	@Test 
 	public void testComparable() {
 		assertEquals(0,Symbols.FOO.compareTo(Symbols.FOO));
@@ -46,6 +49,7 @@ public class SymbolTest {
 	public void testPrint() {
 		Symbol s=Symbol.create("foobar");
 		assertEquals(s.getName(),RT.print(s));
+		doSymbolTest(s);
 	}
 	
 	@Test 
@@ -60,6 +64,7 @@ public class SymbolTest {
 	@Test
 	public void testToString() {
 		assertEquals("foo",Symbols.FOO.toString());
+		doSymbolTest(Symbols.FOO);
 	}
 
 	@Test
@@ -73,13 +78,13 @@ public class SymbolTest {
 
 	@Test
 	public void testNormalSymbol() {
-		Symbol k = Symbol.create("count");
-		assertEquals(Symbols.COUNT, k);
+		Symbol cs = Symbol.create("count");
+		assertEquals(Symbols.COUNT, cs);
 
-		assertEquals("count", k.getName().toString());
-		assertEquals("count", k.toString());
-		assertEquals(7, k.getEncoding().length); // tag(1) + length(1) + name(5)
-
+		assertEquals("count", cs.getName().toString());
+		assertEquals("count", cs.toString());
+		assertEquals(7, cs.getEncoding().length); // tag(1) + length(1) + name(5)
+		doSymbolTest(cs);
 	}
 	
 	@Test
@@ -89,4 +94,11 @@ public class SymbolTest {
 		assertTrue(hs.contains(Symbols.STAR_JUICE_PRICE));
 		
 	}
+	
+	private void doSymbolTest(Symbol s) {
+		assertTrue(Symbol.validateName(s.getName()));
+		
+		BlobsTest.doBlobLikeTests(s);
+	}
+
 }

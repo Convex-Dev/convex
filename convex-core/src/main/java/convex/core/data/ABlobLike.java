@@ -110,4 +110,12 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	@Override
 	public abstract int compareTo(ABlobLike<?> b);
 
+	/**
+	 * Returns true if this object is a regular blob (i.e. not a special blob type like Address)
+	 * @return True if a regular blob
+	 */
+	public boolean isRegularBlob() {
+		return false;
+	}
+
 }

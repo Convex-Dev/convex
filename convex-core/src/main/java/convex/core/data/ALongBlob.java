@@ -149,5 +149,17 @@ public abstract class ALongBlob extends ABlob {
 		// Always embedded
 		return true;
 	}
+	
+	@Override
+	public boolean isChunkPacked() {
+		// Never a full chunk
+		return false;
+	}
+
+	@Override
+	public boolean isFullyPacked() {
+		// Never a full packed blob
+		return false;
+	}
 
 }

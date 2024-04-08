@@ -46,6 +46,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Index;
@@ -2524,10 +2525,17 @@ public class CoreTest extends ACVMTest {
 		assertSame(Sets.empty(), eval("(empty #{1 2})"));
 		assertSame(Index.none(), eval("(empty (index 0x 0x))"));
 		
-		assertCastError(step("(empty 0x1234abcd)"));
+		// These are countable bloblikes with empty instances
+		assertSame(Strings.EMPTY, eval("(empty \"to be or not to be\")"));
+		assertSame(Blobs.empty(),eval("(empty 0x1234abcd)"));
+
+		// These are nil, because there are no empty keywords or symbols
+		assertNull(eval("(empty :foo)"));
+		assertNull(eval("(empty 'nil)"));
+
+		// can't empty a non-countable value
 		assertCastError(step("(empty 1)"));
-		assertCastError(step("(empty :foo)"));
-		
+			
 		assertArityError(step("(empty)"));
 		assertArityError(step("(empty [1] [2])"));
 	}

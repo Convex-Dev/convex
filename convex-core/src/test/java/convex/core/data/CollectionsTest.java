@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Iterator;
 import java.util.ListIterator;
@@ -66,7 +67,12 @@ public class CollectionsTest {
 		long n = a.count();
 		
 		ACountable<T> empty=a.empty();
-		assertSame(empty.empty(),empty);
+		if (empty==null) {
+			// doesn't support emptying, so must be a symbol or keyword
+			assertTrue((a instanceof Keyword)||(a instanceof Symbol));
+		} else {
+			assertEquals(0,empty.count());
+		}
 		
  		if (n == 0) {
 			assertSame(empty, a);
@@ -100,10 +106,25 @@ public class CollectionsTest {
 	 * @param a Any Collection
 	 */
 	public static <T extends ACell> void doCollectionTests(ACollection<T> a) {
-		Iterator<T> it = a.iterator();
-		assertThrows(Throwable.class, () -> it.remove());
+		doCollIteratorTests(a);
 
 		doDataStructureTests(a);
+	}
+
+	public static <T extends ACell> void doCollIteratorTests(ACollection<T> a) {
+		Iterator<T> it = a.iterator();
+		
+		// Can't remove
+		assertThrows(Throwable.class, () -> it.remove());
+		
+		long n=a.count();
+		assertEquals(n>0,it.hasNext());
+		for (int i=0; i<n; i++) {
+			ACell e = a.get(i);
+			ACell ie=it.next();
+			assertEquals(e,ie);
+		}
+		assertFalse(it.hasNext());
 	}
 
 	/**

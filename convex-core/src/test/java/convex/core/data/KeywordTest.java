@@ -85,6 +85,7 @@ public class KeywordTest {
 		AString name=k.getName();
 		assertEquals(k,Keyword.create(name));
 		
-		ObjectsTest.doAnyValueTests(k);
+		// fallback to generic bloblike tests
+		BlobsTest.doBlobLikeTests(k);
 	}
 }

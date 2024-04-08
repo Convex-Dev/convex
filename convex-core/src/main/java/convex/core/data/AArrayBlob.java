@@ -150,6 +150,16 @@ public abstract class AArrayBlob extends ABlob {
 	public final long count() {
 		return length;
 	}
+	
+	@Override
+	public boolean isChunkPacked() {
+		return (length==0)||(length==Blob.CHUNK_LENGTH);
+	}
+
+	@Override
+	public boolean isFullyPacked() {
+		return (length==Blob.CHUNK_LENGTH);
+	}
 
 	@Override
 	public final byte byteAt(long i) {

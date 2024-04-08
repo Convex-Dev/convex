@@ -320,10 +320,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return Long.hashCode(longValue());
 	}
 
-	/**
-	 * Returns true if this object is a regular blob (i.e. not a special blob type like Address)
-	 * @return True if a regular blob
-	 */
+	@Override
 	public boolean isRegularBlob() {
 		return true;
 	}
@@ -344,6 +341,18 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		byte lo=byteAt(i+1);
 		return (short)((hi<<8)|(lo&0xFF));
 	}
+
+	/**
+	 * Returns true if this is a fully packed set of chunks
+	 * @return True if fully packed, false otherwise
+	 */
+	public abstract boolean isChunkPacked();
+
+	/**
+	 * Returns true if this is a fully packed set of chunks
+	 * @return True if fully packed, false otherwise
+	 */
+	public abstract boolean isFullyPacked();
 
 
 }

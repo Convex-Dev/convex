@@ -4,7 +4,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 
 /**
- * AString subclass representing a subsequence of some Blob data
+ * AString subclass representing a view some String data. Not canonical!
  */
 public class StringSlice extends AString {
 

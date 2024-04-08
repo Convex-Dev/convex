@@ -343,6 +343,21 @@ public class BlobsTest {
 		// Bad VLC length
 		assertThrows(BadFormatException.class,()->Format.read(Blob.fromHex("318000")));
 	}
+	
+	@Test
+	public void testPacked() {
+		Blob chunk=Samples.FULL_BLOB;
+		assertEquals(Blob.CHUNK_LENGTH,chunk.size());
+		assertTrue(chunk.isChunkPacked());
+		assertTrue(chunk.isFullyPacked());
+		
+		assertTrue(Samples.FULL_BLOB.isRegularBlob());
+		
+		ABlob b=chunk.append(chunk);
+		assertEquals(2*Blob.CHUNK_LENGTH,b.size());
+		assertTrue(b.isChunkPacked());
+		assertFalse(b.isFullyPacked());
+	}
 		
 	@Test 
 	public void testEncodingSize() {
@@ -505,6 +520,8 @@ public class BlobsTest {
 			assertEquals(a,a.slice(0,n));
 		}
 		
+		doBlobSliceTests(a);
+		
 		if (n>0) {
 			assertEquals(n*2,a.commonHexPrefixLength(b));
 			
@@ -515,6 +532,15 @@ public class BlobsTest {
 			// Reconstruct first and last bytes via hex digits
 			assertEquals(a.get(0).longValue(),a.getHexDigit(0)*16+a.getHexDigit(1));
 			assertEquals(a.get(n-1).longValue(),a.getHexDigit(n*2-2)*16+a.getHexDigit(n*2-1));
+		}
+		
+		// Test interpretation as a long
+		long lv=a.longValue();
+		assertEquals(lv,b.longValue());
+		
+		if (n>=8) {
+			LongBlob lb=LongBlob.create(lv);
+			assertEquals(lb,a.slice(n-LongBlob.LENGTH,n));
 		}
 
 		// Round trip via ByteBuffer should produce a canonical Blob
@@ -529,8 +555,35 @@ public class BlobsTest {
 		assertEquals(b,r.slice(n,n*2));
 		assertEquals(b.append(b),r);
 		
-		// Should pass tests for a CVM value
-		CollectionsTest.doCountableTests(a);
+		doBlobLikeTests(a);
 		
+	}
+
+	public static void doBlobLikeTests(ABlobLike<?> a) {
+		long n=a.count();
+		ABlob b=a.toBlob();
+		
+		if (a.isRegularBlob()) {
+			assertSame(a.empty().toBlob(),b.empty());
+		}
+		
+		if (n>0) {
+			assertEquals(a.byteAt(0),b.byteAt(0));
+		}
+		
+		if (n>1) {
+			assertEquals(a.byteAt(n-1),b.byteAt(n-1));
+		}
+		
+		// Should pass tests for a CVM countable value
+		CollectionsTest.doCountableTests(a);
+	}
+
+	public static void doBlobSliceTests(ABlob a) {
+		long n=a.count();
+		// slice tests
+		assertEquals(a,a.slice(0));
+		assertEquals(a,a.slice(0,n));
+		assertSame(a.empty(),a.slice(n));
 	}
 }

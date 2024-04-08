@@ -426,6 +426,7 @@ public class BlobTree extends ABlob {
 	 * Returns true if this is a fully packed set of chunks
 	 * @return True if fully packed, false otherwise
 	 */
+	@Override
 	public boolean isFullyPacked() {
 		return count==childLength()*FANOUT;
 	}
@@ -434,6 +435,7 @@ public class BlobTree extends ABlob {
 	 * Returns true if this is a fully packed set of chunks
 	 * @return True if fully packed, false otherwise
 	 */
+	@Override
 	public boolean isChunkPacked() {
 		return (count&(Blob.CHUNK_LENGTH-1))==0;
 	}

@@ -45,7 +45,7 @@ public abstract class ACountable<E extends ACell> extends ACell {
 	/**
 	 * Returns a canonical, singleton empty instance of the same type as this Countable value.
 	 * 
-	 * @return An empty Countable value
+	 * @return An empty Countable value, or null if there is no empty instance
 	 */
 	public abstract ACountable<E> empty();
 	

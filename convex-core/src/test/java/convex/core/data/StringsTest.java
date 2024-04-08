@@ -214,6 +214,7 @@ public class StringsTest {
 		AString abs=Strings.create(bs);
 		assertEquals(a,abs);
 		
-		CollectionsTest.doCountableTests(a);
+		// fall back to bloblike tests
+		BlobsTest.doBlobLikeTests(a);
 	}
 }
