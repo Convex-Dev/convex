@@ -14,6 +14,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import convex.core.data.prim.ANumeric;
+import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
@@ -32,6 +33,8 @@ import convex.test.Samples;
 
 /**
  * Parameterised tests for a representative range of valid CVM values
+ * 
+ * Mainly focused on checking generic properties and consistency with core predicate expecations
  */
 @RunWith(Parameterized.class)
 public class ParamTestValues extends ACVMTest {
@@ -48,12 +51,16 @@ public class ParamTestValues extends ACVMTest {
 		return Arrays.asList(new Object[][] {
 			{ "nil", Samples.NIL },
 			
-			{ "Keyword :foo", Samples.FOO },
+			{ "Keyword :foo", Keywords.FOO },
 			{ "Symbol 'foo", Symbols.FOO },
 			
 			{ "Short String", Strings.create("bonnie") },
 			{ "Empty String", Strings.EMPTY },
 			
+			{ "Null Character", CVMChar.ZERO },
+			{ "Character A", CVMChar.parse("A") },
+			{ "Character Max Codepoint", CVMChar.MAX_VALUE },
+	
 			{ "Empty Vector", Vectors.empty() },
 			{ "Short Vector 16", Samples.INT_VECTOR_16 },
 			{ "Big Vector 300", Samples.INT_VECTOR_300 },
@@ -61,6 +68,9 @@ public class ParamTestValues extends ACVMTest {
 			{ "Empty List", Lists.empty() },
 			{ "Short List 16", Samples.INT_LIST_10 },
 			{ "Big List 300", Samples.INT_LIST_300 },
+			
+			{ "Address 0", Address.ZERO },
+			{ "Address MAX", Address.MAX_VALUE },
 			
 			{ "Long 1", CVMLong.ONE },
 			{ "Long -666", CVMLong.create(-666) },
@@ -75,7 +85,9 @@ public class ParamTestValues extends ACVMTest {
 			{ "Full Blob", Samples.FULL_BLOB },
 			{ "Blob Tree", Samples.FULL_BLOB_PLUS },
 
+			{ "Empty map", Maps.empty() },
 			{ "Single value map", Maps.of(7, 8) },
+			{ "Big map", Samples.LONG_MAP_100 },
 			
 			{ "Empty Index", Index.none() },
 			{ "Keyword Index", Index.of(Keywords.FOO,1,Keywords.BAR,2) },
@@ -145,6 +157,7 @@ public class ParamTestValues extends ACVMTest {
 			assertEquals(0,(long)RT.count(empty));
 			
 		} else {
+			// if not countable....
 			assertCastError(step(context(),Invoke.build(Core.COUNT,constOp)));
 			assertCastError(step(context(),Invoke.build(Core.NTH,constOp,0)));
 			assertNull(RT.count(data));
@@ -165,6 +178,8 @@ public class ParamTestValues extends ACVMTest {
 		
 		} else {
 			assertCastError(step(context(),Invoke.build(Core.INC,constOp)));
+			assertCastError(step(context(),Invoke.build(Core.TIMES,1.0,constOp)));
+			assertNull(RT.ensureNumber(data));
 		}
 	}
 }

@@ -21,7 +21,7 @@ import convex.core.util.Utils;
  * 
  * <ul>
  * <li>An optional prefix string</li>
- * <li>An optional entry with this prefix </li>
+ * <li>An optional entry with this exact prefix </li>
  * <li>Up to 16 child entries at the next level of depth</li>
  * </ul>
  * @param <K> Type of Keys
@@ -30,6 +30,16 @@ import convex.core.util.Utils;
 public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex<K, V> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private static final Ref<Index>[] EMPTY_CHILDREN = new Ref[0];
+	
+	/**
+	 *  Maximum depth of index, in hex digits
+	 */
+	private static final int MAX_DEPTH=64;
+	
+	/**
+	 *  Maximum usable size of keys, in bytes
+	 */
+	private static final int MAX_KEY_BYTES=MAX_DEPTH/2;
 
 	/**
 	 * Empty Index singleton
@@ -88,13 +98,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> create(MapEntry<K, V> me) {
 		ACell k=me.getKey();
 		if (!(k instanceof ABlobLike)) return null;
-		long hexLength = ((K)k).hexLength();
+		long hexLength = Math.min(MAX_DEPTH,((K)k).hexLength());
 		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
-		ABlob prefix = me.getKey().toBlob();
-		long hexLength = prefix.hexLength();
+		long hexLength =  Math.min(me.getKey().hexLength(),MAX_DEPTH);
 		if (depth > hexLength)
 			throw new IllegalArgumentException("Depth " + depth + " too deep for key with hexLength: " + hexLength);
 		return new Index<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
@@ -102,7 +111,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> create(K k, V v) {
 		MapEntry<K, V> me = MapEntry.create(k, v);
-		long hexLength = k.hexLength();
+		long hexLength = Math.min(MAX_DEPTH,k.hexLength());
 		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 	
@@ -158,10 +167,22 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (kl < pl) return null; // key is too short to start with current prefix
 
 		if (kl == pl) {
-			if ((entry!=null)&&(key.equalsBytes(entry.getKey().toBlob()))) return entry; // we matched this key exactly!
-			return null; // entry does not exist
+			if (entry!=null) {
+				K ekey=entry.getKey();
+				if (keyMatch(key,ekey)) return entry; // we matched this key exactly!
+			}
+			if (pl<MAX_DEPTH) return null; // entry definitely does not exist
+		}
+		
+		// key length is longer than current prefix
+		// if we are max depth, return entry iff matches up to full depth
+		if (pl==MAX_DEPTH) {
+			if (entry==null) return null;
+			if (key.hexMatchLength(entry.getKey().toBlob(),0,MAX_DEPTH)==MAX_DEPTH) return entry;
+			return null; 
 		}
 
+		// key exceeds current prefix, so need to go to next branch of tree
 		int digit = key.getHexDigit(pl);
 		Index<K, V> cc = getChild(digit);
 
@@ -211,13 +232,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public Index<K, V> dissoc(K k) {
 		if (count <= 1) {
 			if (count == 0) return this; // Must already be empty singleton
-			if (entry.getKey().equalsBytes(k.toBlob())) {
+			if (keyMatch(k,entry.getKey())) {
 				return (depth==0)?empty():null;
 			}
 			return this; // leave existing entry in place
 		}
 		long pDepth = depth + prefixLength; // hex depth of this node including prefix
-		long kl = k.hexLength(); // hex length of key to dissoc
+		long kl = Math.min(k.hexLength(),MAX_DEPTH); // hex length of key to dissoc
 		if (kl < pDepth) {
 			// no match for sure, so no change
 			return this;
@@ -225,7 +246,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (kl == pDepth) {
 			// need to check for match with current entry
 			if (entry == null) return this;
-			if (!k.equalsBytes(entry.getKey().toBlob())) return this;
+			if (!keyMatch(k,entry.getKey())) return this;
 			// at this point have matched entry exactly. So need to remove it safely while
 			// preserving invariants
 			if (children.length == 1) {
@@ -250,6 +271,22 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		// check if whole Index was emptied
 		if ((r==null)&&(depth==0)) r= empty();
 		return r;
+	}
+
+	/**
+	 * Tests if two keys match (up to the maximum index key depth)
+	 * @param a First key
+	 * @param b second key
+	 * @return
+	 */
+	public static <K extends ABlobLike<?>>boolean keyMatch(K a, K b) {
+		long n=a.count();
+		if (n<MAX_KEY_BYTES) {
+			return a.equalsBytes(b.toBlob());
+		}
+		if (b.count()<MAX_KEY_BYTES) return false;
+		return a.hexMatchLength(b.toBlob(), 0, MAX_DEPTH)==MAX_DEPTH;
+		
 	}
 
 	/**
@@ -318,9 +355,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		ABlobLike<?> k = (ABlobLike)maybeValidKey;
 		
 		long pDepth = this.prefixDepth(); // hex depth of this node including prefix
-		long newKeyLength = k.hexLength(); // hex length of new key
+		long newKeyLength = Math.min(k.hexLength(),MAX_DEPTH); // hex length of new key, up to MAX_DEPTH
 		long mkl; // matched key length
-		ABlob prefix=getPrefix();
+		ABlob prefix=getPrefix(); // prefix of current node (valid up to pDepth)
 		if (newKeyLength >= pDepth) {
 			// constrain relevant key length by match with current prefix
 			mkl = depth + k.hexMatchLength(prefix, depth, prefixLength);
@@ -381,7 +418,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K, V> oldChild = getChild(childDigit);
 		Index<K, V> newChild;
 		if (oldChild == null) {
-			newChild = createAtDepth(e, pDepth+1); // Myst be at least 1 beyond current prefix
+			newChild = createAtDepth(e, pDepth+1); // Must be at least 1 beyond current prefix. Safe because pDepth < MAX_DEPTH
 		} else {
 			newChild = oldChild.assocEntry(e);
 		}
@@ -608,6 +645,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
+		
+		if ((depth<0)||(depth>=MAX_DEPTH)) throw new InvalidDataException("Invalid index depth",this);
 
 		long ecount = (entry == null) ? 0 : 1;
 		int n = children.length;

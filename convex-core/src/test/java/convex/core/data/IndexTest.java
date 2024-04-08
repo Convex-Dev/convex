@@ -147,10 +147,11 @@ public class IndexTest {
 	}
 	
 	@Test
-	public void testStringKeys() {
+	public void testStringKeys() throws InvalidDataException {
 		AString k=Samples.NON_EMBEDDED_STRING;
 		Address v=Address.ZERO;
 		Index<AString,Address> bm=Index.create(k,v);
+		bm.validate();
 		doIndexTests(bm);
 		
 		assertSame(Index.none(),bm.dissoc(k));
@@ -254,6 +255,35 @@ public class IndexTest {
 			assertEquals(m,m2);
 		}
 	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Test 
+	public void testBigKeys() {
+		Blob k=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+		Blob k2=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef22");
+		Blob k3=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef33");
+		Blob ks=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef");
+		
+		Index m=Index.of(k, CVMLong.ONE);
+		
+		assertNull(m.get(ks)); // short fetch
+		assertEquals(CVMLong.ONE,m.get(k)); // exact full length match
+		assertEquals(CVMLong.ONE,m.get(k2)); // matching up to max depth
+		assertEquals(CVMLong.ONE,m.get(k3)); // matching up to max depth
+		
+		m=m.assoc(k2, CVMLong.ZERO);
+		
+		assertEquals(CVMLong.ZERO,m.get(k2)); // should match up to max depth
+		assertEquals(CVMLong.ZERO,m.get(k)); // should match up to max depth
+		assertEquals(k2,m.getEntry(k3).getKey()); // should match up to max depth
+		assertNull(m.get(ks)); // short fetch
+		
+		// dissoc should happen on keys equal up to max depth
+		assertSame(m,m.dissoc(ks));
+		assertSame(m.empty(),m.dissoc(k));
+		assertSame(m.empty(),m.dissoc(k2));
+		assertSame(m.empty(),m.dissoc(k3));
+	}
 
 	@Test
 	public void testDissocAll() throws InvalidDataException {
@@ -307,8 +337,9 @@ public class IndexTest {
 		long n = m.count();
 		
 		Index<K,V> secondHalf=m.slice(n/2,n);
+		Index<K,V> firstHalf=m.slice(0,n/2);
 		assertNotNull(secondHalf);
-		assertEquals(m,m.slice(0,n/2).merge(secondHalf));
+		assertEquals(m,firstHalf.merge(secondHalf));
 
 		if (n >= 2) {
 			MapEntry<K, V> e1 = m.entryAt(0);
