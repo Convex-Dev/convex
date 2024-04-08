@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
@@ -171,6 +173,30 @@ public class IndexTest {
 		assertNotEquals(Index.of(Symbols.FOO,CVMLong.ZERO),bm);
 		
 		doIndexTests(bm);
+	}
+	
+	@Test public void testCreate() {
+		Index<ABlobLike<?>,ACell> bm=Index.of(Symbols.FOO, 2,Keywords.BAR,3);
+		assertEquals(2,bm.count());
+		
+		// hashmap round trip
+		HashMap<ABlobLike<?>,ACell> hm=new HashMap<>(bm);
+		
+		Index<ABlobLike<?>,ACell> rm=Index.create(hm);
+		assertEquals(bm,rm);
+		
+		doIndexTests(rm);
+	}
+	
+	@Test public void testContains() {
+		Index<ABlob, CVMLong> bm=Samples.INT_INDEX_256;
+		long n=bm.count;
+		
+		assertTrue(bm.containsKey(bm.entryAt(n/2).getKey()));
+		assertFalse(bm.containsKey(LongBlob.create(1000)));
+		
+		assertFalse(bm.containsValue(LongBlob.create(1)));
+		assertTrue(bm.containsValue(CVMLong.ONE));
 	}
 
 	@Test

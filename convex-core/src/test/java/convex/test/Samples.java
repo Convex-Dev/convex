@@ -106,7 +106,7 @@ public class Samples {
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,
 			Blob.fromHex("ff0101"), 6);
 	
-	public static final Index<ABlob, CVMLong> INT_Index_256 = createTestIndex(256);
+	public static final Index<ABlob, CVMLong> INT_INDEX_256 = createTestIndex(256);
 
 	public static final ASet<CVMLong> LONG_SET_5 = Sets.of(1,2,3,4,5);
 	public static final ASet<CVMLong> LONG_SET_10 = Sets.create(INT_VECTOR_10);

@@ -97,15 +97,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@SuppressWarnings("unchecked")
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> create(MapEntry<K, V> me) {
 		ACell k=me.getKey();
-		if (!(k instanceof ABlobLike)) return null;
+		if (!(k instanceof ABlobLike)) return null; // check in case invalid key type
 		long hexLength = Math.min(MAX_DEPTH,((K)k).hexLength());
 		return new Index<K, V>(0, hexLength, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
 	private static <K extends ABlobLike<?>, V extends ACell> Index<K, V> createAtDepth(MapEntry<K, V> me, long depth) {
 		long hexLength =  Math.min(me.getKey().hexLength(),MAX_DEPTH);
-		if (depth > hexLength)
-			throw new IllegalArgumentException("Depth " + depth + " too deep for key with hexLength: " + hexLength);
 		return new Index<K, V>(depth, hexLength - depth, me, EMPTY_CHILDREN, (short) 0, 1L);
 	}
 
@@ -845,6 +843,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K,V> result=(Index<K, V>) EMPTY;
 		for (Map.Entry<K,V> me: map.entrySet()) {
 			result=result.assoc(me.getKey(), me.getValue());
+			if (result==null) return null;
 		}
 		return (R) result;
 	}

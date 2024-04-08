@@ -26,7 +26,7 @@ import convex.test.Samples;
 public class AdversarialDataTest {
 
 	// A value that is valid, but not a first class CVM value
-	public static final ACell NON_CVM=Samples.INT_Index_256.getRef(0).getValue();
+	public static final ACell NON_CVM=Samples.INT_INDEX_256.getRef(0).getValue();
 	
 	// A value that is non-canonical but otherwise valid CVM value
 	public static final Blob NON_CANONICAL=Blob.createRandom(new Random(), Blob.CHUNK_LENGTH+1);
