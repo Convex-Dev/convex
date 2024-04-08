@@ -97,4 +97,9 @@ public class BasicWalletEntry extends AWalletEntry {
 		if (a==null) a=Address.ZERO;
 		return a.getHash();
 	}
+
+	@Override
+	public boolean tryUnlock(char[] password) {
+		return !isLocked();
+	}
 }

@@ -68,8 +68,7 @@ public class PKCS12Wallet extends AWallet {
 	}
 
 	@Override
-	public void getKeyPair(AccountKey pubKey) {
+	public void getKeyPair(AccountKey pubKey) throws LockedWalletException {
 		// TODO Auto-generated method stub
-		
 	}
 }

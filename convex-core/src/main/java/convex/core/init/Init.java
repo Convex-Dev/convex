@@ -48,11 +48,14 @@ public class Init {
 	public static final Address REGISTRY_ADDRESS = Address.create(9);
     public static final Address TRUST_ADDRESS = Address.create(10);
 
-	// Base for genesis user addresses
+	// Base for genesis addresses
 	public static final Address GENESIS_ADDRESS = Address.create(11);
 	
 	// Controller for genesis peer address
 	public static final Address GENESIS_PEER_ADDRESS = Address.create(12);
+	
+	// First user of Protonet
+	public static final Address FIRST_USER_ADDRESS = Address.create(13);
 
 
 	/**

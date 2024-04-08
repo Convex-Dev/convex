@@ -4,5 +4,5 @@ import convex.core.data.AccountKey;
 
 public interface IWallet {
 
-	public void getKeyPair(AccountKey pubKey);
+	public void getKeyPair(AccountKey pubKey) throws LockedWalletException;
 }

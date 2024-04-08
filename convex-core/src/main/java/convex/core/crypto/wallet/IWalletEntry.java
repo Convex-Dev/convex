@@ -22,5 +22,12 @@ public interface IWalletEntry {
 	 * @return
 	 */
 	AccountKey  getPublicKey();
+	
+	/**
+	 * Try to unlock a wallet with the given password
+	 * 
+	 * @return true if unlocked, false otherwise
+	 */
+	public boolean tryUnlock(char[] password);
 
 }
