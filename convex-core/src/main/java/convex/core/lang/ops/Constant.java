@@ -75,6 +75,10 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return create(RT.cvm(value));
 	}
 	
+	public static <T extends ACell> Constant<T> of(T value) {
+		return create(value);
+	}
+	
 	public static Constant<CVMBool> forBoolean(boolean value) {
 		return value?TRUE:FALSE;
 	}

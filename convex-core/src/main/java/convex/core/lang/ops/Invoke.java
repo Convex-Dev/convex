@@ -37,6 +37,17 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 	public static <T extends ACell> Invoke<T> create(AOp<?>... ops) {
 		return create(Vectors.create(ops));
 	}
+	
+	// Build an invoke using the given values
+	public static <T extends ACell> Invoke<T> build(ACell... vals) {
+		int n=vals.length;
+		AOp<?>[] ops=new AOp[n];
+		for (int i=0; i<n; i++) {
+			ACell v=vals[i];
+			ops[i]=(v instanceof AOp)?(AOp<?>) v:Constant.of(v);
+		}
+		return create(ops);
+	}
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell, A extends AOp<ACell>, F extends AOp<ACell>> Invoke<T> create(F f, ASequence<A> args) {

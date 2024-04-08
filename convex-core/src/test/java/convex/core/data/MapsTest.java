@@ -346,6 +346,25 @@ public class MapsTest {
 
 		doHashMapTest(me);
 	}
+	
+	@Test
+	public void testDissoc() {
+		AHashMap<CVMLong, CVMLong> m=Samples.LONG_MAP_100;
+		long n=m.count();
+		assertTrue(n>0);
+		
+		// Shouldn't be in map
+		assertSame(m,m.dissoc(CVMLong.MINUS_ONE));
+		
+		ACell v=m.entryAt(n/2).getKey();
+		assertTrue(m.containsKey(v));
+		
+		AHashMap<CVMLong, CVMLong> dm=m.dissoc(v);
+		assertNotEquals(m,dm);
+		
+		assertEquals(n-1,dm.count());
+		assertFalse(dm.containsKey(v));
+	}
 
 	@Test
 	public void testMergeWith() {

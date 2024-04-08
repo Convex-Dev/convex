@@ -1401,6 +1401,10 @@ public class RT {
 			return (ACountable<E>) a;
 		return null;
 	}
+	
+	public static boolean isCountable(ACell val) {
+		return (val==null)||(val instanceof ACountable);
+	}
 
 	/**
 	 * Tests if a value is one of the canonical boolean values 'true' or 'false'
@@ -1808,6 +1812,8 @@ public class RT {
 		}
 		return addr;
 	}
+
+
 
 
 }

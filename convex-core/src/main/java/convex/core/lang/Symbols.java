@@ -242,6 +242,7 @@ public class Symbols {
 	public static final Symbol STR_Q = intern("str?");
 	public static final Symbol NUMBER_Q = intern("number?");
 	public static final Symbol HASH_Q = intern("hash?");
+	public static final Symbol COUNTABLE_Q = intern("countable?");
 
 	public static final Symbol FN_Q = intern("fn?");
 	public static final Symbol ACTOR_Q = intern("actor?");
@@ -337,6 +338,7 @@ public class Symbols {
 	public static final Symbol MEMORY = intern("memory");
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
+
 
 	
 

@@ -442,6 +442,12 @@
         :examples    [{:code "(count [1 2 3])"}]
         :signature   [{:params [coll]
                        :return Long}]}}
+ 
+ countable?
+ {:doc {:description "Returns true if the argument is countable."
+        :examples    [{:code "(countable? 0x1234)"}]
+        :signature   [{:params [a]
+                       :return Boolean}]}}
 
  dec
  {:doc {:description "Decrements the given Integer by 1."

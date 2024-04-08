@@ -2664,6 +2664,13 @@ public class Core {
 			return val instanceof ADataStructure;
 		}
 	});
+	
+	public static final CorePred COUNTABLE_Q = reg(new CorePred(Symbols.COUNTABLE_Q,256) {
+		@Override
+		public boolean test(ACell val) {
+			return RT.isCountable(val);
+		}
+	});
 
 	public static final CorePred EMPTY_Q = reg(new CorePred(Symbols.EMPTY_Q,246) {
 		@Override

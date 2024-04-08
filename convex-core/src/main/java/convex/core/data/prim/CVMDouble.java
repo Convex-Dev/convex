@@ -91,7 +91,7 @@ public final class CVMDouble extends ANumeric {
 	public void validateCell() throws InvalidDataException {
 		// Nothing to check. Always valid
 		if (Double.isNaN(value)) {
-			if (value!=Double.NaN) throw new InvalidDataException("Non-canonical NaN value",this);
+			if (Double.doubleToLongBits(value)!=RAW_NAN_BITS) throw new InvalidDataException("Non-canonical NaN value",this);
 		}
 	}
 
