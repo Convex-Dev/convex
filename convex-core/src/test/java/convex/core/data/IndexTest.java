@@ -283,6 +283,12 @@ public class IndexTest {
 		assertSame(m.empty(),m.dissoc(k));
 		assertSame(m.empty(),m.dissoc(k2));
 		assertSame(m.empty(),m.dissoc(k3));
+		
+		doIndexTests(m);
+		
+		Index m2=Index.of(ks, 0,k,1,k2,2,k3,3);
+		assertEquals(2,m2.count());
+		doIndexTests(m2);
 	}
 
 	@Test
