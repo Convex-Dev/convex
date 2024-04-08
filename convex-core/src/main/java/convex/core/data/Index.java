@@ -700,6 +700,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			return;
 		}
 		
+		long pDepth=prefixDepth();
+		if (pDepth>MAX_DEPTH) throw new InvalidDataException("Excessive Prefix Depth beyond MAX_DEPTH", this);
+		if (pDepth==MAX_DEPTH) {
+			if (count!=1) throw new InvalidDataException("Can only have a single entry at MAX_DEPTH",this);
+		}
+		
 		// at least count 2 from this point
 		int cn = Utils.bitCount(mask);
 		if (cn != children.length) throw new InvalidDataException(
@@ -707,6 +713,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 		if (entry != null) {
 			entry.validateCell();
+			long entryKeyLength=entry.getKey().hexLength();
+			if (entryKeyLength<pDepth) throw new InvalidDataException("Key too short for prefix depth",this);
+			if (entryKeyLength>MAX_DEPTH) {
+				if (pDepth!=MAX_DEPTH) throw new InvalidDataException("Key too long at this prefix depth",this);
+			}
 			if (cn == 0)
 				throw new InvalidDataException("Index with entry and count=" + count + " must have children", this);
 		} else {

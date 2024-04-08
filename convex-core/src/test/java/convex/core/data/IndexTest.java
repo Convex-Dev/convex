@@ -16,6 +16,7 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 public class IndexTest {
@@ -156,6 +157,21 @@ public class IndexTest {
 		
 		assertSame(Index.none(),bm.dissoc(k));
 	}
+	
+	@Test
+	public void testSymbolicKeys() throws InvalidDataException {
+		Index<?,?> bm=Index.none();
+		bm=bm.assoc(Symbols.FOO, CVMLong.ONE);
+		bm=bm.assoc(Keywords.FOO, CVMLong.ZERO);
+		
+		// Equal symbolic name should overwrite
+		assertEquals(Index.of(Keywords.FOO,CVMLong.ZERO),bm);
+		
+		// Should be regarded as different Index, even if keys collide and values are identical
+		assertNotEquals(Index.of(Symbols.FOO,CVMLong.ZERO),bm);
+		
+		doIndexTests(bm);
+	}
 
 	@Test
 	public void testIdentity() {
@@ -261,7 +277,7 @@ public class IndexTest {
 	public void testBigKeys() {
 		Blob k=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 		Blob k2=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef22");
-		Blob k3=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef33");
+		Blob k3=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef3333");
 		Blob ks=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef");
 		
 		Index m=Index.of(k, CVMLong.ONE);
