@@ -580,11 +580,15 @@ public class BlobsTest {
 		
 		if (n>0) {
 			assertEquals(a.byteAt(0),b.byteAt(0));
+			
+			assertEquals(a.getHexDigit(2*n-1),0xF&a.byteAt(n-1));
 		}
 		
 		if (n>1) {
 			assertEquals(a.byteAt(n-1),b.byteAt(n-1));
 		}
+		
+		assertTrue(a.hexEquals(b.toFlatBlob()));
 		
 		// Should pass tests for a CVM countable value
 		CollectionsTest.doCountableTests(a);

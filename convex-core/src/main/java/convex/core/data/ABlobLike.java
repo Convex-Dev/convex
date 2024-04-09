@@ -5,6 +5,8 @@ import convex.core.util.Utils;
 /**
  * Abstract base class for Blob-like objects, which conceptually behave as a sequence of bytes.
  * 
+ * Includes hex-related functionality for printing and usage in radix trees etc.
+ * 
  * @param <T> type of conceptual elements
  */
 public abstract class ABlobLike<T extends ACell> extends ACountable<T> implements Comparable<ABlobLike<?>> {
@@ -67,7 +69,21 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 		long limit=Math.min(count(),b.count());
 		return hexMatch(b,0,limit);
 	}
+	
+	/**
+	 * Checks for Hex equality of two BlobLikes. *ignores* type, i.e. only considers hex contents.
+	 * @param b Value to compare with
+	 * @return True if all hex digits are equal, false otherwise
+	 */
+	public boolean hexEquals(ABlobLike<?> b) {
+		long c = count();
+		if (b.count() != c) return false;
+		return hexMatch(b, 0L, c) == c;
+	}
 
+	public boolean hexEquals(ABlobLike<?> b, long start, long length) {
+		return hexMatch(b, start, length) == length;
+	}
 	
 	@Override
 	public abstract ABlobLike<T> empty();

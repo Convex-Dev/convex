@@ -247,20 +247,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 
 
-	/**
-	 * Checks for Hex equality of two ABlobs. *ignores* type, i.e. only considers hex contents.
-	 * @param b ABlob to compare with
-	 * @return True if all hex digits are equal, false otherwise
-	 */
-	public boolean hexEquals(ABlob b) {
-		long c = count();
-		if (b.count() != c) return false;
-		return hexMatch(b, 0L, c) == c;
-	}
-
-	public boolean hexEquals(ABlob b, long start, long length) {
-		return hexMatch(b, start, length) == length;
-	}
 	
 	/**
 	 * Writes this Blob's encoding to a byte array, excluding the tag byte
