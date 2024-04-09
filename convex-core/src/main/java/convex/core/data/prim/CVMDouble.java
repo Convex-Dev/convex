@@ -14,6 +14,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
 import convex.core.util.Utils;
 
 /**
@@ -38,7 +39,7 @@ public final class CVMDouble extends ANumeric {
 	
 	public static final int MAX_ENCODING_LENGTH = 9;
 	
-	public CVMDouble(double value) {
+	private CVMDouble(double value) {
 		this.value=value;
 		this.memorySize=Format.FULL_EMBEDDED_MEMORY_SIZE;
 	}
@@ -51,6 +52,10 @@ public final class CVMDouble extends ANumeric {
 	public static CVMDouble create(double value) {
 		// We must use a canonical NaN value (0x7ff8000000000000L);
 		if (Double.isNaN(value)) value=Double.NaN;
+		return new CVMDouble(value);
+	}
+	
+	public static CVMDouble unsafeCreate(double value) {
 		return new CVMDouble(value);
 	}
 	
@@ -89,9 +94,8 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// Nothing to check. Always valid
 		if (Double.isNaN(value)) {
-			if (Double.doubleToLongBits(value)!=RAW_NAN_BITS) throw new InvalidDataException("Non-canonical NaN value",this);
+			if (Double.doubleToRawLongBits(value)!=RAW_NAN_BITS) throw new InvalidDataException("Non-canonical NaN value",this);
 		}
 	}
 
@@ -103,7 +107,7 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		long doubleBits=Double.doubleToRawLongBits(value);
+		long doubleBits=Double.doubleToLongBits(value);
 		return Utils.writeLong(bs,pos,doubleBits);
 	}
 	
@@ -180,7 +184,13 @@ public final class CVMDouble extends ANumeric {
 	
 	@Override
 	public boolean equals(ACell a) {
+		if (a==this) return true;
 		return ((a instanceof CVMDouble)&&(Double.compare(((CVMDouble)a).value,value)==0));
+	}
+	
+	@Override
+	public int hashCode() {
+		return Bits.hash32(Double.doubleToLongBits(value));
 	}
 
 	@Override

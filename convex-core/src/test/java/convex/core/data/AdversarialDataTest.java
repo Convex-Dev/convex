@@ -11,6 +11,7 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -184,6 +185,12 @@ public class AdversarialDataTest {
 		}
 		
 
+	}
+	
+	@Test
+	public void testBadDouble() {
+		// Double with invalid (non-canonical) NaN
+		invalidTest(CVMDouble.unsafeCreate(Double.longBitsToDouble(0x7ff80000ff000000L)));
 	}
 	
 	@Test
