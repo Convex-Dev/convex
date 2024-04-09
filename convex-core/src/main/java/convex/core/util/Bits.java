@@ -129,7 +129,14 @@ public class Bits {
 	/**
 	 * 64-bit salted hash function for hashtables etc.
 	 */
-	public static long hash64(long x) {
-		return xorshift64(x*SALT);
+	public static final long hash64(long x) {
+		return SALT^xorshift64(x^SALT);
+	}
+	
+	/**
+	 * 32-bit salted hash function for hashtables etc.
+	 */
+	public static final int hash32(long x) {
+		return (int)(SALT^xorshift64(x^SALT));
 	}
 }

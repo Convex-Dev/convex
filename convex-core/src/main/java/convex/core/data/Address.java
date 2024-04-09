@@ -67,7 +67,7 @@ public final class Address extends ALongBlob {
 	
 	@Override
 	public int hashCode() {
-		return (int)Bits.hash64(value);
+		return Bits.hash32(value);
 	}
 	
 	@Override
