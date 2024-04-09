@@ -9,6 +9,7 @@ import java.util.function.BiFunction;
 
 import convex.core.Constants;
 import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
 import convex.core.data.ACountable;
@@ -1579,6 +1580,15 @@ public class RT {
 		}
 		return null;
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <V extends ACell> ABlobLike<V> ensureBlobLike(ACell a) {
+		if (a instanceof ABlobLike) {
+			ABlobLike<V> b= ((ABlobLike<V>) a);
+			return b;
+		}
+		return null;
+	}
 
 	/**
 	 * Ensures the argument is a CVM String
@@ -1812,6 +1822,8 @@ public class RT {
 		}
 		return addr;
 	}
+
+
 
 
 

@@ -38,13 +38,22 @@ public class EncodingTest {
 	@Test public void testVLCLongLength() throws BadFormatException, BufferUnderflowException {
 		assertEquals(1,Format.getVLCLength(0x0f));
 		assertEquals(1,Format.getVLCLength(0x3f));
-		assertEquals(2,Format.getVLCLength(0x40));
+		assertEquals(2,Format.getVLCLength(0x40)); // roll over at 64
+		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MAX_VALUE));
+		
+		assertEquals(1,Format.getVLCLength(-1)); // small negative numbers in one byte
+		assertEquals(1,Format.getVLCLength(-64)); 
+		assertEquals(2,Format.getVLCLength(-65)); // roll over at -65
+
 	}
 	
 	@Test public void testVLCCountLength() throws BadFormatException, BufferUnderflowException {
 		assertEquals(1,Format.getVLCCountLength(0x0f));
 		assertEquals(1,Format.getVLCCountLength(0x7f));
-		assertEquals(2,Format.getVLCCountLength(0x80));
+		assertEquals(2,Format.getVLCCountLength(0x80)); // roll over at 128
+		assertEquals(Format.MAX_VLC_COUNT_LENGTH,Format.getVLCCountLength(Long.MAX_VALUE));
+		
+		assertThrows(IllegalArgumentException.class, ()->Format.getVLCCountLength(-10));
 	}
 	
 	@Test public void testVLCCount() throws BadFormatException {
@@ -89,31 +98,6 @@ public class EncodingTest {
 		long r=Format.readVLCLong(buf, offset);
 		assertEquals(x,r);
 	}
-	
-//	@Test public void testBigIntegerRegression() throws BadFormatException {
-//		BigInteger expected=BigInteger.valueOf(-4223);
-//		assertEquals(expected,Format.read("0adf01"));
-//		
-//		assertThrows(BadFormatException.class,()->Format.read("0affdf01"));
-//	}
-//	
-//	@Test public void testBigIntegerRegression2() throws BadFormatException {
-//		BigInteger b=BigInteger.valueOf(1496216);
-//		Blob blob=Format.encodedBlob(b);
-//		assertEquals(b,Format.read(blob));
-//	}
-//	
-//	@Test public void testBigIntegerRegression3() throws BadFormatException {
-//		Blob blob=Blob.fromHex("0a801d");
-//		assertThrows(BadFormatException.class,()->Format.read(blob));
-//	}
-//	
-//	@Test public void testBigDecimalRegression() throws BadFormatException {
-//		Blob blob=Blob.fromHex("0e001d");
-//		BigDecimal bd=Format.read(blob);
-//		assertEquals(BigDecimal.valueOf(29),bd);
-//		assertEquals(blob,Format.encodedBlob(bd));
-//	}
 	
 	@Test public void testEmbeddedRegression() throws BadFormatException {
 		Keyword k=Keyword.create("foo");

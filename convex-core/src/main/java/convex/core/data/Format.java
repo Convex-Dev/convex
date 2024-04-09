@@ -113,6 +113,7 @@ public class Format {
 	 * @return Length of VLC encoding
 	 */
 	public static int getVLCCountLength(long x) {
+		if (x<0) throw new IllegalArgumentException("Negative Count");
 		if (x < 128) {
 			return 1;
 		}

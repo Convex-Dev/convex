@@ -147,6 +147,17 @@ public class AdversarialDataTest {
 	}
 	
 	@Test
+	public void testBadIndex() {
+		invalidTest(Index.unsafeCreate(1, null, Index.EMPTY_CHILDREN, 0, 0));
+		invalidTest(Index.unsafeCreate(0, null, Index.EMPTY_CHILDREN, 0, 0));
+
+		invalidTest(Index.unsafeCreate(0, MapEntry.of(Blobs.fromHex("1234"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 1)); // bad depth
+		invalidTest(Index.unsafeCreate(2, MapEntry.of(Blobs.fromHex("1234"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 1)); // insufficient depth
+		invalidTest(Index.unsafeCreate(4, MapEntry.of(Blobs.fromHex("1234"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 0)); // bad count
+
+	}
+	
+	@Test
 	public void testBadTransactions() {
 		Address HERO=Init.GENESIS_ADDRESS;
 		
