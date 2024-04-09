@@ -12,7 +12,7 @@ import convex.core.util.Utils;
 /**
  * General purpose immutable wrapper for byte array data.
  * 
- * Can be serialised directly if 4096 bytes or less, otherwise needs to be
+ * Can be encoded fully as a single Cell if 4096 bytes or less, otherwise needs to be
  * structures as a BlobTree.
  * 
  * Encoding format is:
@@ -35,7 +35,7 @@ public class Blob extends AArrayBlob {
 	}
 
 	/**
-	 * Creates a new data object using a copy of the specified byte range
+	 * Creates a new Blob using a copy of the specified byte range
 	 * 
 	 * @param data Byte array
 	 * @param offset Start offset in the byte array
@@ -192,18 +192,16 @@ public class Blob extends AArrayBlob {
 
 
 	/**
-	 * Fast read of a Blob from its representation inside another Blob object,
-	 * 
-	 * Main benefit is to avoid reconstructing via ByteBuffer allocation, enabling
-	 * retention of source Blob object as encoded data.
+	 * Fast read of a Blob from its encoding inside another Blob object,
 	 * 
 	 * @param source Source Blob object.
-	 * @param pos Position in source to start reading from
+	 * @param pos Position in source to start reading from (location of tag byte)
 	 * @param count Length in bytes to take from the source Blob
 	 * @return Blob read from the source
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static Blob read(Blob source, int pos, long count) throws BadFormatException {
+		if (count==0) return EMPTY; // important! Don't want to allocate new empty Blobs or mess with EMPTY encoding
 		if (count>CHUNK_LENGTH) throw new BadFormatException("Trying to read flat blob with count = " +count);
 		
 		// compute data length, excluding tag and encoded length
@@ -214,6 +212,7 @@ public class Blob extends AArrayBlob {
 		}
 
 		Blob result= source.slice(start , start+count);
+		if (result==null) throw new IllegalArgumentException("Failed to slice Blob source");
 		if (source.byteAtUnchecked(pos)==Tag.BLOB) {
 			// Only attach encoding if we were reading a genuine Blob
 			result.attachEncoding(source.slice(pos,pos+(headerLength+count)));

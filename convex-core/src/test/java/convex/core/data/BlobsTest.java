@@ -283,6 +283,13 @@ public class BlobsTest {
 		doBlobTests(e);
 	}
 	
+	@Test public void testAppend() {
+		ABlob tag=Blobs.fromHex("f00f");
+		
+		Blob b=Blobs.empty().append(tag).toFlatBlob();
+		assertEquals(tag,b);
+	}
+	
 	@Test
 	public void testBlobSlice() {
 		ABlob blob = Blob.fromHex("cafebabedeadbeef").slice(2,6);
@@ -342,6 +349,13 @@ public class BlobsTest {
 		
 		// Bad VLC length
 		assertThrows(BadFormatException.class,()->Format.read(Blob.fromHex("318000")));
+	}
+	
+	@Test
+	public void testCreate() {
+		byte[] bs=new byte[100];
+		assertThrows(IllegalArgumentException.class,()->Blob.create(bs,10,-1));
+		assertSame(Blobs.empty(),Blob.create(bs, 10, 0));
 	}
 	
 	@Test
@@ -467,13 +481,10 @@ public class BlobsTest {
 	}
 
 	@Test
-	public void testBlobFormat() throws BadFormatException {
+	public void testBlobEncoding() throws BadFormatException {
 		byte[] bf = new byte[] { Tag.BLOB, 0 };
 		Blob b = Format.read(Blob.wrap(bf));
-		assertEquals(0, b.count());
-		assertNotEquals(b.getHash(), Hash.EMPTY_HASH);
-		
-		doBlobTests(b);
+		assertSame(Blob.EMPTY,b);
 	}
 	
 	/*

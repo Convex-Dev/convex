@@ -160,6 +160,28 @@ public class IndexTest {
 		assertSame(Index.none(),bm.dissoc(k));
 	}
 	
+	@Test public void testDissocCases() {
+		// Dissocs on a split Index with no entry
+		Index <Blob,CVMLong> m=Index.none();
+		Blob k1=Blob.fromHex("65021337");
+		Blob k2=Blob.fromHex("6502c001");
+		Blob kiss=Blob.fromHex("6502");
+		
+		m=m.assoc(k1, CVMLong.ONE);
+		m=m.assoc(k2, CVMLong.ZERO);
+		
+		assertEquals(m,m.dissoc(kiss));
+		assertEquals(Index.of(k1,1),m.dissoc(k2));
+		assertEquals(Index.of(k2,0),m.dissoc(k1));
+	
+		// Remove entry at split position
+		Index<Blob, CVMLong> ms=m.assoc(kiss,CVMLong.MAX_VALUE);
+		assertEquals(m,ms.dissoc(kiss));
+		
+		// remove branches below an entry
+		assertEquals(Index.of(kiss,Long.MAX_VALUE),ms.dissoc(k1).dissoc(k2));
+	}
+	
 	@Test
 	public void testSymbolicKeys() throws InvalidDataException {
 		Index<?,?> bm=Index.none();
