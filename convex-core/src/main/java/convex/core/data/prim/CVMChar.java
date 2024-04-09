@@ -13,6 +13,7 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.reader.ReaderUtils;
+import convex.core.util.Bits;
 
 /**
  * Class for CVM Character values.
@@ -360,6 +361,11 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public boolean equals(CVMChar a) {
 		if (a==null) return false;
 		return value==a.value;
+	}
+	
+	@Override
+	public int hashCode() {
+		return Bits.hash32(value);
 	}
 
 }

@@ -9,6 +9,7 @@ import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
 
 /**
  * Class for CVM Boolean types.
@@ -23,6 +24,10 @@ public final class CVMBool extends APrimitive {
 	public static final CVMBool FALSE=new CVMBool(false);
 
 	public static final int MAX_ENCODING_LENGTH = 1;
+
+	// Salted values for hashcodes
+	private static final int TRUE_HASHCODE = (int)Bits.SALT;
+	private static final int FALSE_HASHCODE = (int)(Bits.SALT>>32);
 	
 	private CVMBool(boolean value) {
 		this.value=value;
@@ -103,6 +108,11 @@ public final class CVMBool extends APrimitive {
 	@Override
 	public AString toCVMString(long limit) {
 		return value?Strings.TRUE:Strings.FALSE;
+	}
+	
+	@Override
+	public int hashCode() {
+		return value?TRUE_HASHCODE:FALSE_HASHCODE;
 	}
 	
 	@Override public boolean equals(ACell a) {
