@@ -146,14 +146,43 @@ public class AdversarialDataTest {
 		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,Keywords.BAR))); // Invalid info map
 	}
 	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Test
 	public void testBadIndex() {
 		invalidTest(Index.unsafeCreate(1, null, Index.EMPTY_CHILDREN, 0, 0));
 		invalidTest(Index.unsafeCreate(0, null, Index.EMPTY_CHILDREN, 0, 0));
 
+		invalidTest(Index.unsafeCreate(1, MapEntry.of(Blobs.fromHex("12"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 1)); // bad depth
 		invalidTest(Index.unsafeCreate(0, MapEntry.of(Blobs.fromHex("1234"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 1)); // bad depth
 		invalidTest(Index.unsafeCreate(2, MapEntry.of(Blobs.fromHex("1234"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 1)); // insufficient depth
 		invalidTest(Index.unsafeCreate(4, MapEntry.of(Blobs.fromHex("1234"),CVMLong.ONE), Index.EMPTY_CHILDREN, 0, 0)); // bad count
+
+		{ // split at wrong depth
+			Index c1=Index.create(Blobs.fromHex("1230"),CVMLong.ONE);
+			Index c2=Index.create(Blobs.fromHex("1231"),CVMLong.ZERO);
+			invalidTest(Index.unsafeCreate(2, null, new Ref[] {c1.getRef(),c2.getRef()}, 3, 2)); 
+		}
+		
+		{ // inconsistent common prefix before depth
+			Index c1=Index.create(Blobs.fromHex("1230"),CVMLong.ONE);
+			Index c2=Index.create(Blobs.fromHex("1231"),CVMLong.ZERO);
+			Index c3=Index.create(Blobs.fromHex("1332"),CVMLong.ZERO);
+			invalidTest(Index.unsafeCreate(3, null, new Ref[] {c1.getRef(),c2.getRef(),c3.getRef()}, 3, 3));
+		}
+		
+		{ // inconsistent common prefix with entry
+			MapEntry e=MapEntry.create(Blobs.fromHex("12"), null);
+			Index c0=Index.create(Blobs.fromHex("1200"),CVMLong.ONE);
+			Index c1=Index.create(Blobs.fromHex("1311"),CVMLong.ZERO);
+			invalidTest(Index.unsafeCreate(2, e, new Ref[] {c0.getRef(),c1.getRef()}, 3, 3));
+		}
+		
+		{ // bad mask
+			Index c1=Index.create(Blobs.fromHex("1230"),CVMLong.ONE);
+			Index c2=Index.create(Blobs.fromHex("1231"),CVMLong.ZERO);
+			invalidTest(Index.unsafeCreate(3, null, new Ref[] {c1.getRef(),c2.getRef()}, 5, 2)); 
+		}
+		
 
 	}
 	

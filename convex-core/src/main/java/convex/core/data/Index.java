@@ -648,6 +648,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (ml<depth) throw new InvalidDataException("Child does not have matching common prefix", this);
 
 			c.validate();
+			
+			// check child has correct digit for mask position
+			int digit=childPrefix.getHexDigit(depth);
+			if (i!=Bits.indexForDigit(digit, mask)) throw new InvalidDataException("Child does not have correct digit", this);
 
 			ecount += ccount;
 		}
