@@ -109,7 +109,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static <R extends AIndex<K, V>, K extends ABlobLike<?>, V extends ACell> R of(Object... kvs) {
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> of(Object... kvs) {
 		int n = kvs.length;
 		if (Utils.isOdd(n)) throw new IllegalArgumentException("Even number of key + values required");
 		Index<K, V> result = (Index<K, V>) EMPTY;
@@ -118,7 +118,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			result = result.assoc((K) kvs[i], value);
 		}
 
-		return (R) result;
+		return (Index<K, V>) result;
 	}
 
 	@Override
