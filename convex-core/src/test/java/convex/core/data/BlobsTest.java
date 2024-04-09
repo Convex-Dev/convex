@@ -87,11 +87,11 @@ public class BlobsTest {
 	
 	@Test
 	public void testHexMatchLength() {
-		assertEquals(4,Blob.fromHex("0123").hexMatchLength(Blob.fromHex("0123"), 0, 4));
-		assertEquals(3,Blob.fromHex("0123").hexMatchLength(Blob.fromHex("012f"), 0, 4));
-		assertEquals(3,Blob.fromHex("ffff0123").hexMatchLength(Blob.fromHex("ffff012f"), 4, 4));
+		assertEquals(4,Blob.fromHex("0123").hexMatch(Blob.fromHex("0123"), 0, 4));
+		assertEquals(3,Blob.fromHex("0123").hexMatch(Blob.fromHex("012f"), 0, 4));
+		assertEquals(3,Blob.fromHex("ffff0123").hexMatch(Blob.fromHex("ffff012f"), 4, 4));
 
-		assertEquals(0,Blob.fromHex("ffff0123").hexMatchLength(Blob.fromHex("ffff012f"), 3, 0));
+		assertEquals(0,Blob.fromHex("ffff0123").hexMatch(Blob.fromHex("ffff012f"), 3, 0));
 	}
 	
 	@Test public void testHexDigit() {
@@ -224,9 +224,9 @@ public class BlobsTest {
 		assertTrue(bb.hexEquals(b));
 		assertTrue(b.hexEquals(bb, 3, 10));
 
-		assertEquals(16, b.commonHexPrefixLength(bb));
-		assertEquals(10, b.commonHexPrefixLength(bb.slice(0, 5)));
-		assertEquals(8, bb.commonHexPrefixLength(b.slice(0, 4)));
+		assertEquals(16, b.hexMatch(bb));
+		assertEquals(10, b.hexMatch(bb.slice(0, 5)));
+		assertEquals(8, bb.hexMatch(b.slice(0, 4)));
 
 		ObjectsTest.doEqualityTests(b, bb);
 
@@ -415,7 +415,7 @@ public class BlobsTest {
 		bbb.validate();
 		assertEquals(bb, bbb);
 		assertEquals(bb, rb.getValue());
-		assertEquals(bb.count(), bb.hexMatchLength(bbb, 0, len));
+		assertEquals(bb.count(), bb.hexMatch(bbb, 0, len));
 
 		doBlobTests(bb);
 	}
@@ -534,7 +534,7 @@ public class BlobsTest {
 		doBlobSliceTests(a);
 		
 		if (n>0) {
-			assertEquals(n*2,a.commonHexPrefixLength(b));
+			assertEquals(n*2,a.hexMatch(b));
 			
 			assertEquals(a.slice(n/2,n),b.slice(n/2, n));
 			

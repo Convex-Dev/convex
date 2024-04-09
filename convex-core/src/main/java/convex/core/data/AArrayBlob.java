@@ -283,7 +283,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
+	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		if (b == this) return length;
 		long end = start + length;
 		for (long i = start; i < end; i++) {
@@ -308,7 +308,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public long commonHexPrefixLength(ABlob b) {
+	public long hexMatch(ABlobLike<?> b) {
 		if (b == this) return count() * 2;
 
 		long max = Math.min(count(), b.count());
@@ -319,8 +319,6 @@ public abstract class AArrayBlob extends ABlob {
 		}
 		return max * 2;
 	}
-
-
 
 	@Override
 	public void validate() throws InvalidDataException {

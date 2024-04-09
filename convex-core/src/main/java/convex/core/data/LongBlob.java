@@ -46,7 +46,7 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public long commonHexPrefixLength(ABlob b) {
+	public long hexMatch(ABlobLike<?> b) {
 		if (b == this) return LENGTH * 2;
 
 		long max = Math.min(LENGTH, b.count());
@@ -89,7 +89,7 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
+	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		if (b == this) return length;
 		long end = start + length;
 		for (long i = start; i < end; i++) {

@@ -606,7 +606,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			}
 			
 			Hash childHash=child.getElementRef(0).getHash();
-			long pmatch=firstHash.commonHexPrefixLength(childHash);
+			long pmatch=firstHash.hexMatch(childHash);
 			if (pmatch<shift) throw new InvalidDataException("Mismatched child hash [" + childHash +"] with this ["+firstHash+"]",
 					this);
 			

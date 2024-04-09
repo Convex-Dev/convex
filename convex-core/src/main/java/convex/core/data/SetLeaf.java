@@ -448,7 +448,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		for (int i = 0; i < elements.length; i++) {
 			Ref<T> e = elements[i];
 			Hash h = e.getHash();
-			long match=h.commonHexPrefixLength(prefix);
+			long match=h.hexMatch(prefix);
 			if (match<(position-1)) {
 				throw new InvalidDataException("Parent prefix did not match",this);
 			}

@@ -125,13 +125,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 */
 	public abstract Blob toFlatBlob();
 
-	/**
-	 * Computes the length of the longest common hex prefix between two blobs
-	 * 
-	 * @param b Blob to compare with 
-	 * @return The length of the longest common prefix in hex digits
-	 */
-	public abstract long commonHexPrefixLength(ABlob b);
 
 	/**
 	 * Computes the hash of the byte data stored in this Blob, using the default MessageDigest.
@@ -296,11 +289,11 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	public boolean hexEquals(ABlob b) {
 		long c = count();
 		if (b.count() != c) return false;
-		return hexMatchLength(b, 0L, c) == c;
+		return hexMatch(b, 0L, c) == c;
 	}
 
 	public boolean hexEquals(ABlob b, long start, long length) {
-		return hexMatchLength(b, start, length) == length;
+		return hexMatch(b, start, length) == length;
 	}
 	
 	/**

@@ -55,7 +55,19 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 * @param b Blob to compare with
 	 * @return The number of matching hex characters
 	 */
-	public abstract long hexMatchLength(ABlobLike<?> b, long start, long length);
+	public abstract long hexMatch(ABlobLike<?> b, long start, long length);
+	
+	/**
+	 * Computes the length of the longest common hex prefix between two blobs
+	 * 
+	 * @param b Blob to compare with 
+	 * @return The length of the longest common prefix in hex digits
+	 */
+	public long hexMatch(ABlobLike<?> b) {
+		long limit=Math.min(count(),b.count());
+		return hexMatch(b,0,limit);
+	}
+
 	
 	@Override
 	public abstract ABlobLike<T> empty();

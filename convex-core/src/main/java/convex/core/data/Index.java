@@ -167,7 +167,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		// if we are max depth, return entry iff matches up to full depth
 		if (pl==MAX_DEPTH) {
 			if (entry==null) return null;
-			if (key.hexMatchLength(entry.getKey().toBlob(),0,MAX_DEPTH)==MAX_DEPTH) return entry;
+			if (key.hexMatch(entry.getKey().toBlob(),0,MAX_DEPTH)==MAX_DEPTH) return entry;
 			return null; 
 		}
 
@@ -270,7 +270,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			return a.equalsBytes(b.toBlob());
 		}
 		if (b.count()<MAX_KEY_BYTES) return false;
-		return a.hexMatchLength(b.toBlob(), 0, MAX_DEPTH)==MAX_DEPTH;
+		return a.hexMatch(b.toBlob(), 0, MAX_DEPTH)==MAX_DEPTH;
 		
 	}
 
@@ -344,17 +344,16 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (!(maybeValidKey instanceof ABlobLike)) return null; // invalid key type!
 		ABlobLike<?> k = (ABlobLike)maybeValidKey;
 		
-		long pDepth = this.getDepth(); // hex depth of this node including prefix
 		long newKeyLength = effectiveLength(k);; // hex length of new key, up to MAX_DEPTH
 		long mkl; // matched key length
 		ABlobLike prefix=getPrefix(); // prefix of current node (valid up to pDepth)
-		if (newKeyLength >= pDepth) {
+		if (newKeyLength >= depth) {
 			// constrain relevant key length by match with current prefix
-			mkl = match + k.hexMatchLength(prefix, match, depth-match);
+			mkl = match + k.hexMatch(prefix, match, depth-match);
 		} else {
-			mkl = match + k.hexMatchLength(prefix, match, newKeyLength - match);
+			mkl = match + k.hexMatch(prefix, match, newKeyLength - match);
 		}
-		if (mkl < pDepth) {
+		if (mkl < depth) {
 			// we collide at a point shorter than the current prefix length
 			if (mkl == newKeyLength) {
 				// new key is subset of the current prefix, so split prefix at key position mkl
@@ -382,8 +381,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				return fork;
 			}
 		}
-		assert (newKeyLength >= pDepth);
-		if (newKeyLength == pDepth) {
+		assert (newKeyLength >= depth);
+		if (newKeyLength == depth) {
 			// we must have matched the current entry exactly
 			if (entry == null) {
 				// just add entry at this position
@@ -396,7 +395,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 		// at this point we have matched full prefix, but new key length is longer.
 		// so we need to update (or add) exactly one child
-		int childDigit = k.getHexDigit(pDepth);
+		int childDigit = k.getHexDigit(depth);
 		Index<K, V> oldChild = getChild(childDigit);
 		Index<K, V> newChild;
 		if (oldChild == null) {
@@ -644,7 +643,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			}
 			
 			ABlobLike<?> childPrefix=c.getPrefix();
-			long ml=prefix.hexMatchLength(childPrefix, 0, depth);
+			long ml=prefix.hexMatch(childPrefix, 0, depth);
 			if (ml<depth) throw new InvalidDataException("Child does not have matching common prefix", this);
 
 			c.validate();

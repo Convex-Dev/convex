@@ -18,7 +18,12 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public final long count() {
-		return 8;
+		return LENGTH;
+	}
+	
+	@Override
+	public final long hexLength() {
+		return HEX_LENGTH;
 	}
 	
 	@Override
@@ -41,11 +46,7 @@ public abstract class ALongBlob extends ABlob {
 	
 	@Override
 	public int getHexDigit(long i) {
-		if ((i < 0) || (i >= HEX_LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
-		return getHexDigitUnchecked(i);
-	}
-	
-	public final int getHexDigitUnchecked(long i) {
+		assert ((i >= 0) && (i < HEX_LENGTH)) : "Bad Hex Digit position in LongBlob";
 		return 0x0F & (int) (value >> ((HEX_LENGTH - i - 1) * 4));
 	}
 
@@ -54,11 +55,6 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public abstract Blob toFlatBlob();
-
-	@Override
-	public long commonHexPrefixLength(ABlob b) {
-		return toFlatBlob().commonHexPrefixLength(b);
-	}
 	
 	private void checkIndex(long i) {
 		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
@@ -107,10 +103,10 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
+	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		for (int i=0; i<length; i++) {
 			int c=b.getHexDigit(start+i);
-			if (c!=getHexDigitUnchecked(i)) return i;
+			if (c!=getHexDigit(i)) return i;
 		}	
 		return length;
 	}

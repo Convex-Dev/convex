@@ -496,14 +496,19 @@ public class BlobTree extends ABlob {
 		int n = children.length;
 		if ((n < 2) | (n > FANOUT)) throw new InvalidDataException("Illegal number of BlobTree children: " + n, this);
 	}
-
+	
 	@Override
+	public long hexMatch(ABlobLike<?> b) {
+		if (b instanceof ABlob) return commonHexPrefixLength((ABlob)b);
+		return b.hexMatch(this);
+	}
+
 	public long commonHexPrefixLength(ABlob b) {
 		long cpl = 0;
 		long DIGITS_PER_CHUNK = Blob.CHUNK_LENGTH * 2;
 		long maxChunk=(Math.min(count(),b.count())-1)/Blob.CHUNK_LENGTH;
 		for (long i = 0; i<=maxChunk; i++) {
-			long cl = getChunk(i).commonHexPrefixLength(b.getChunk(i));
+			long cl = getChunk(i).hexMatch(b.getChunk(i));
 			if (cl < DIGITS_PER_CHUNK) return cpl + cl;
 			cpl += DIGITS_PER_CHUNK;
 		}
@@ -511,7 +516,7 @@ public class BlobTree extends ABlob {
 	}
 	
 	@Override
-	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
+	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		long HEX_CHUNK_LENGTH = (Blob.CHUNK_LENGTH * 2);
 		long end = start + length;
 		long endChunk = (end - 1) / HEX_CHUNK_LENGTH;
@@ -520,7 +525,7 @@ public class BlobTree extends ABlob {
 			long cs = Math.max(0, start - cpos); // start position within chunk
 			long ce = Math.min(HEX_CHUNK_LENGTH, end - cpos); // end position within chunk
 			long clen = ce - cs; // length to check within chunk
-			long match = getChunk(ci).hexMatchLength(b.toBlob().getChunk(ci), cs, clen);
+			long match = getChunk(ci).hexMatch(b.toBlob().getChunk(ci), cs, clen);
 			if (match < clen) return cpos + cs + match;
 		}
 		return length;
