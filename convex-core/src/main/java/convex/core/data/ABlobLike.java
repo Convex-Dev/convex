@@ -92,8 +92,54 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 */
 	public abstract int getBytes(byte[] dest, int destOffset);
 
+	/**
+	 * Gets the length of this value in hex digits
+	 * @return Number of hex digits
+	 */
 	public long hexLength() {
 		return count()*2;
+	}
+	
+	/**
+	 * Converts this data object to a hex string representation of the given length.
+	 * Equivalent to truncating the full String representation.
+	 * @param hexLength Length to truncate String to (in hex characters)
+	 * @return String representation of hex values in Blob
+	 */
+	public final String toHexString(int hexLength) {
+		BlobBuilder bb=new BlobBuilder();
+		long hl=((hexLength&1)==0)?hexLength:hexLength+1;
+		appendHex(bb,hl);
+		String s= bb.getCVMString().toString();
+		if (s.length()>hexLength) {
+			s=s.substring(0,hexLength);
+		}
+		return s;
+	}
+	
+	/**
+	 * Converts this data object to a lowercase hex string representation
+	 * @return Hex String representation
+	 */
+	public String toHexString() {
+		return toHexString(Utils.checkedInt(hexLength()));
+	}
+
+	/**
+	 * Append hex string up to the given length in hex digits (a multiple of two)
+	 * @param bb BlobBuilder instance to append to
+	 * @param length Length in Hex digits to append
+	 * @return true if Blob fully appended, false if more more hex digits remain
+	 */
+	protected boolean appendHex(BlobBuilder bb, long length) {
+		long len=hexLength();
+		length=Math.min(len,length);
+		for (int i=0; i<length; i++) {
+			int digit=getHexDigit(i);
+			char c=Utils.toHexChar(digit);
+			bb.append(c);
+		}
+		return length==len;
 	}
 	
 	/**

@@ -52,6 +52,11 @@ public class StringsTest {
 		doStringTest(ss);
 	}
 	
+	@Test public void testHexString() {
+		assertEquals("20",Strings.create(" ").toHexString());
+		assertEquals("2",Strings.create(" ").toHexString(1));
+	}
+	
 	@Test public void testStringTree() {
 		String src="0123456789abcdef";
 		for (int i=0; i<8; i++) {

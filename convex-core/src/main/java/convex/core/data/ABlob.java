@@ -8,7 +8,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Utils;
 
 /**
  * Abstract base class for data objects containing immutable chunks of binary
@@ -48,39 +47,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	public Blob empty() {
 		return Blob.EMPTY;
 	}
-
-	/**
-	 * Converts this data object to a lowercase hex string representation
-	 * @return Hex String representation
-	 */
-	public String toHexString() {
-		return toHexString(Utils.checkedInt(count())*2);
-	}
-
-	/**
-	 * Converts this data object to a hex string representation of the given length.
-	 * Equivalent to truncating the full String representation.
-	 * @param hexLength Length to truncate String to (in hex characters)
-	 * @return String representation of hex values in Blob
-	 */
-	public final String toHexString(int hexLength) {
-		BlobBuilder bb=new BlobBuilder();
-		long hl=((hexLength&1)==0)?hexLength:hexLength+1;
-		appendHex(bb,hl);
-		String s= bb.getCVMString().toString();
-		if (s.length()>hexLength) {
-			s=s.substring(0,hexLength);
-		}
-		return s;
-	}
-
-	/**
-	 * Append hex string up to the given length in hex digits (a multiple of two)
-	 * @param bb BlobBuilder instance to append to
-	 * @param length Length in Hex digits to append
-	 * @return true if Blob fully appended, false if more more hex digits remain
-	 */
-	protected abstract boolean appendHex(BlobBuilder bb, long length);
 
 	/**
 	 * Converts this blob to a readable byte buffer. 
