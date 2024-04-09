@@ -118,11 +118,5 @@ public class StringSlice extends AString {
 	public long longValue() {
 		return slice(0,Math.min(LongBlob.LENGTH, count())).longValue();
 	}
-	
-	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
-		return toBlob().hexMatchLength(b,start,length);
-	}
-
 
 }

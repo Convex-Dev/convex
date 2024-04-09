@@ -55,7 +55,7 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 * @param b Blob to compare with
 	 * @return The number of matching hex characters
 	 */
-	public abstract long hexMatchLength(ABlob b, long start, long length);
+	public abstract long hexMatchLength(ABlobLike<?> b, long start, long length);
 	
 	@Override
 	public abstract ABlobLike<T> empty();

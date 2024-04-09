@@ -157,11 +157,6 @@ public class StringTree extends AString {
 	}
 	
 	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
-		return data.hexMatchLength(b,start,length);
-	}
-	
-	@Override
 	public long longValue() {
 		return data.longValue();
 	}

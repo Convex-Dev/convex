@@ -509,9 +509,9 @@ public class BlobTree extends ABlob {
 		}
 		return cpl;
 	}
-
+	
 	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
+	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
 		long HEX_CHUNK_LENGTH = (Blob.CHUNK_LENGTH * 2);
 		long end = start + length;
 		long endChunk = (end - 1) / HEX_CHUNK_LENGTH;
@@ -520,7 +520,7 @@ public class BlobTree extends ABlob {
 			long cs = Math.max(0, start - cpos); // start position within chunk
 			long ce = Math.min(HEX_CHUNK_LENGTH, end - cpos); // end position within chunk
 			long clen = ce - cs; // length to check within chunk
-			long match = getChunk(ci).hexMatchLength(b.getChunk(ci), cs, clen);
+			long match = getChunk(ci).hexMatchLength(b.toBlob().getChunk(ci), cs, clen);
 			if (match < clen) return cpos + cs + match;
 		}
 		return length;

@@ -42,6 +42,10 @@ public abstract class ALongBlob extends ABlob {
 	@Override
 	public int getHexDigit(long i) {
 		if ((i < 0) || (i >= HEX_LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		return getHexDigitUnchecked(i);
+	}
+	
+	public final int getHexDigitUnchecked(long i) {
 		return 0x0F & (int) (value >> ((HEX_LENGTH - i - 1) * 4));
 	}
 
@@ -103,8 +107,12 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
-		return toFlatBlob().hexMatchLength(b,start,length);
+	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
+		for (int i=0; i<length; i++) {
+			int c=b.getHexDigit(start+i);
+			if (c!=getHexDigitUnchecked(i)) return i;
+		}	
+		return length;
 	}
 
 	@Override

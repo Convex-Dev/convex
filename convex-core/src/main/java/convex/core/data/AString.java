@@ -150,6 +150,11 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	}
 	
 	@Override
+	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
+		return toBlob().hexMatchLength(b, start, length);
+	}
+	
+	@Override
 	public AString toCVMString(long limit) {
 		if (limit<count()) return null;
 		return this;

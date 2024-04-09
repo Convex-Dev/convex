@@ -212,11 +212,6 @@ public final class StringShort extends AString {
 	public boolean equalsBytes(ABlob b) {
 		return data.equalsBytes(b);
 	}
-	
-	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
-		return data.hexMatchLength(b,start,length);
-	}
 
 	@Override
 	public long longValue() {

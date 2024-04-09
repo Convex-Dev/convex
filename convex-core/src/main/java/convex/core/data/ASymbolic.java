@@ -85,7 +85,7 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	}
 
 	@Override
-	public long hexMatchLength(ABlob b, long start, long length) {
+	public long hexMatchLength(ABlobLike<?> b, long start, long length) {
 		return toBlob().hexMatchLength(b, start, length);
 	}
 

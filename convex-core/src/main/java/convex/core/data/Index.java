@@ -283,8 +283,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * Typically we populate with the key of the first entry added to avoid
 	 * unnecessary blob instances being created.
 	 */
-	private ABlob getPrefix() {
-		if (entry!=null) return entry.getKey().toBlob();
+	private ABlobLike<?> getPrefix() {
+		if (entry!=null) return entry.getKey();
 		int n=children.length;
 		if (n==0) return Blob.EMPTY;
 		return children[0].getValue().getPrefix();
@@ -347,7 +347,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		long pDepth = this.getDepth(); // hex depth of this node including prefix
 		long newKeyLength = effectiveLength(k);; // hex length of new key, up to MAX_DEPTH
 		long mkl; // matched key length
-		ABlob prefix=getPrefix(); // prefix of current node (valid up to pDepth)
+		ABlobLike prefix=getPrefix(); // prefix of current node (valid up to pDepth)
 		if (newKeyLength >= pDepth) {
 			// constrain relevant key length by match with current prefix
 			mkl = match + k.hexMatchLength(prefix, match, depth-match);
@@ -623,7 +623,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			if (depth!=effectiveLength(k)) throw new InvalidDataException("Entry at inconsistent depth",this);
 		}
 		
-		ABlob prefix=getPrefix();
+		ABlobLike<?> prefix=getPrefix();
 		if (depth>effectiveLength(prefix)) throw new InvalidDataException("depth longer than common prefix",this);
 
 		long ecount = (entry == null) ? 0 : 1;
@@ -643,7 +643,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				throw new InvalidDataException("Child must have greater depth than parent", this);
 			}
 			
-			ABlob childPrefix=c.getPrefix();
+			ABlobLike<?> childPrefix=c.getPrefix();
 			long ml=prefix.hexMatchLength(childPrefix, 0, depth);
 			if (ml<depth) throw new InvalidDataException("Child does not have matching common prefix", this);
 
