@@ -1,5 +1,7 @@
 package convex.core.util;
 
+import java.security.SecureRandom;
+
 /**
  * Static utility function for bitwise functions
  */
@@ -106,5 +108,28 @@ public class Bits {
 	public static int leadingOnes(long value) {
 		return Long.numberOfLeadingZeros(value^(-1l));
 	}
-
+	
+	/**
+	 * A long salt value used for internal hashing 
+	 */
+	public static final long SALT=new SecureRandom().nextLong();
+	
+	/**
+	 * Compute XORShift64 PRNG for a given value
+	 * @param x
+	 * @return
+	 */
+	public static long xorshift64(long x) {
+		x ^= x << 13;
+		x ^= x >> 7;
+		x ^= x << 17;
+		return x;
+	}
+	
+	/**
+	 * 64-bit salted hash function for hashtables etc.
+	 */
+	public static long hash64(long x) {
+		return xorshift64(x*SALT);
+	}
 }

@@ -598,7 +598,7 @@ public class Utils {
 	public static boolean equals(ACell a, ACell b) {
 		if (a == b) return true;
 		if (a == null) return false; // b can't be null because of above line
-		return a.equals(b); // fall back to Object equality
+		return a.equals(b); // fall back to ACell equality
 	}
 
 	/**

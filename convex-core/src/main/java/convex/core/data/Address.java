@@ -7,6 +7,7 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.util.Bits;
 import convex.core.util.Utils;
 
 /**
@@ -63,6 +64,18 @@ public final class Address extends ALongBlob {
 	public AType getType() {
 		return Types.ADDRESS;
 	}
+	
+	@Override
+	public int hashCode() {
+		return (int)Bits.hash64(value);
+	}
+	
+	@Override
+	public boolean equals(Object a) {
+		if (a==this) return true; // Fast path, avoids cast
+		if (!(a instanceof Address)) return false; // Handles null
+		return equals((Address)a);
+	}
 
 	@Override
 	public boolean equals(ACell o) {
@@ -73,6 +86,7 @@ public final class Address extends ALongBlob {
 	
 	@Override
 	public boolean equals(ABlob o) {
+		if (o==this) return true;
 		if (!(o instanceof Address)) return false;
 		return value==((Address) o).value;
 	}

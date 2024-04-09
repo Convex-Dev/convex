@@ -8,6 +8,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
 
 /**
  * Abstract base class for data objects containing immutable chunks of binary
@@ -142,8 +143,9 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * Blobs are defined to be equal if they have the same on-chain representation,
 	 * i.e. if and only if all of the following are true:
 	 * 
-	 * - Blob is of the same general type - Blobs are of the same length - All byte
-	 * values are equal
+	 * - Blob is of the same general type 
+	 * - Blobs are of the same length 
+	 * - All byte values are equal
 	 */
 	@Override
 	public boolean equals(ACell o) {
@@ -255,9 +257,10 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 	
 	@Override
-	public final int hashCode() {
-		// note: We use the Java hashcode of the last bytes for blobs
-		return Long.hashCode(longValue());
+	public int hashCode() {
+		// note: We use a salted hash of the last bytes for blobs. 
+		// SECURITY: This is decent for small blobs, DoS risk for user generated large blobs. Be careful putting large keys in Java HashMaps.....
+		return (int) Bits.hash64(longValue());
 	}
 
 	@Override

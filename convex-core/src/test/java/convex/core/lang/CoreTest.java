@@ -947,7 +947,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1,2),eval("(slice #{1 2} 0)"));
 		assertEquals(Sets.empty(),eval("(slice #{1 2} 1 1)"));
 		
-		// Invalid slices of symbolic values
+		// Invalid slices of symbolic values (although technically legal bounds)
 		assertNull(eval("(slice :foo 3)")); 
 		assertNull(eval("(slice 'gyuigui 1 1)")); 
 
@@ -955,12 +955,16 @@ public class CoreTest extends ACVMTest {
 		// Slicing for maps
 		assertEquals(Maps.of(1,2),eval("(slice {1 2} 0)"));
 		assertEquals(Maps.empty().conj(INITIAL.getAccount(Address.ZERO).get(0)),eval("(slice (account #0) 0 1)"));
+		assertEquals(Index.none(),eval("(slice (index 0x1234 1) 1 1)"));
 
+		// Bad bounds defined by length of data structure
 		assertBoundsError(step("(slice 0x 1)")); 
 		assertBoundsError(step("(slice 0x -1 0)")); 
 		assertBoundsError(step("(slice 0x1234 -1 1)")); 
 		assertBoundsError(step("(slice 0x1234 1 3)")); 
 		assertBoundsError(step("(slice 0x1234 2 0)")); 
+		assertBoundsError(step("(slice (index) 2 4)")); 
+		assertBoundsError(step("(slice {} 2 4)")); 
 		
 		assertCastError(step("(slice 567 0)")); 
 		

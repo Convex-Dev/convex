@@ -106,7 +106,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	@Override
-	public final boolean equals(Object a) {
+	public boolean equals(Object a) {
 		if (a==this) return true; // Fast path, avoids cast
 		if (!(a instanceof ACell)) return false; // Handles null
 		return equals((ACell)a);
