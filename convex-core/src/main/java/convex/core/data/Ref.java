@@ -691,4 +691,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		R b=(R) a.updateRefs(func);
 		return b;
 	}
+
+	@SuppressWarnings("unchecked")
+	public static final <T extends ACell> Ref<T> nil() {
+		return (Ref<T>)NULL_VALUE;
+	}
 }

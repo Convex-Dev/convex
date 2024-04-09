@@ -107,7 +107,7 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		long doubleBits=Double.doubleToLongBits(value);
+		long doubleBits=Double.doubleToRawLongBits(value); // note same as doubleToLongBits assuming we are valid and canonical
 		return Utils.writeLong(bs,pos,doubleBits);
 	}
 	
@@ -185,12 +185,21 @@ public final class CVMDouble extends ANumeric {
 	@Override
 	public boolean equals(ACell a) {
 		if (a==this) return true;
-		return ((a instanceof CVMDouble)&&(Double.compare(((CVMDouble)a).value,value)==0));
+		if (!(a instanceof CVMDouble)) return false;
+		return equals((CVMDouble)a);
 	}
 	
+	public boolean equals(CVMDouble a) {
+		return longBits()==a.longBits();
+	}
+	
+	private final long longBits() {
+		return Double.doubleToRawLongBits(value);
+	}
+
 	@Override
 	public int hashCode() {
-		return Bits.hash32(Double.doubleToLongBits(value));
+		return Bits.hash32(longBits());
 	}
 
 	@Override

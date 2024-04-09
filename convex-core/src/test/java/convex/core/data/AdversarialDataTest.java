@@ -16,6 +16,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
+import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
 import convex.core.transactions.Call;
 import convex.core.transactions.Transfer;
@@ -50,6 +51,8 @@ public class AdversarialDataTest {
 		invalidTest(VectorTree.unsafeCreate(42, Samples.INT_VECTOR_16,Samples.INT_VECTOR_10,Samples.INT_VECTOR_16)); // Bad child count
 		invalidTest(VectorTree.unsafeCreate(42, Samples.INT_VECTOR_16,Samples.INT_VECTOR_16,Samples.INT_VECTOR_10)); // Non-packed final child
 		invalidTest(VectorTree.unsafeCreate(316, Samples.INT_VECTOR_16,Samples.INT_VECTOR_300)); // Bad tailing vector
+		
+		invalidEncoding(Tag.VECTOR,"01"); // no data
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -132,6 +135,13 @@ public class AdversarialDataTest {
 		invalidTest(Keyword.unsafeCreate(""));
 		invalidTest(Keyword.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
 		invalidTest(Keyword.unsafeCreate(Samples.MAX_SHORT_STRING));
+		
+		invalidEncoding(Tag.KEYWORD,"00");
+		invalidEncoding(Tag.KEYWORD,"0120ff");
+	}
+	
+	@Test public void testBadConstant() {
+		invalidEncoding(Tag.OP+Ops.CONSTANT,"");
 	}
 	
 	@Test public void testBadSymbols() {
@@ -139,6 +149,8 @@ public class AdversarialDataTest {
 		invalidTest(Symbol.unsafeCreate(""));
 		invalidTest(Symbol.unsafeCreate(Samples.TOO_BIG_SYMBOLIC));
 		invalidTest(Symbol.unsafeCreate(Samples.MAX_SHORT_STRING));
+		
+		invalidEncoding(Tag.SYMBOL,"00");
 	}
 	
 	@Test
@@ -183,16 +195,49 @@ public class AdversarialDataTest {
 			Index c2=Index.create(Blobs.fromHex("1231"),CVMLong.ZERO);
 			invalidTest(Index.unsafeCreate(3, null, new Ref[] {c1.getRef(),c2.getRef()}, 5, 2)); 
 		}
-		
-
+	
+	}
+	
+	@Test
+	public void testBadNull() {
+		invalidEncoding(Tag.NULL,"00"); // excess bytes
+	}
+	
+	@Test
+	public void testBadTags() {
+		invalidEncoding(Tag.ILLEGAL,"00"); // disallowed tag
 	}
 	
 	@Test
 	public void testBadDouble() {
 		// Double with invalid (non-canonical) NaN
 		invalidTest(CVMDouble.unsafeCreate(Double.longBitsToDouble(0x7ff80000ff000000L)));
+		
+		invalidEncoding(Tag.DOUBLE,"7ff80000ff000000"); // non-canonical NaN
+		invalidEncoding(Tag.DOUBLE,"fff8000000000000"); // signed NaN
+		invalidEncoding(Tag.DOUBLE,"00000000000000"); // short double
 	}
 	
+	@Test
+	public void testBadBoolean() {
+		invalidEncoding(Tag.TRUE,"12"); // excess byte
+		invalidEncoding(Tag.FALSE,"00"); // excess byte
+	}
+	
+	protected void invalidEncoding(int tag, String more) {
+		Blob b=Blob.forByte((byte)tag).append(Blob.fromHex(more)).toFlatBlob();
+		invalidEncoding(b);
+	}
+	
+	protected void invalidEncoding(String enc) {
+		Blob b=Blob.fromHex(enc);
+		invalidEncoding(b);
+	}
+
+	protected void invalidEncoding(Blob b) {
+		assertThrows(BadFormatException.class,()->Format.read(b));
+	}
+
 	@Test
 	public void testBadTransactions() {
 		Address HERO=Init.GENESIS_ADDRESS;
@@ -225,7 +270,7 @@ public class AdversarialDataTest {
 		ACell c=null;
 		try {
 			c=Format.read(enc);
-			c.validateCell(); // If we managed to read it, should validate
+			c.validateCell(); // If we managed to read it, should validate at cell level
 		} catch (BadFormatException e) {
 			// not a readable format, so probably not dangerous
 			return;

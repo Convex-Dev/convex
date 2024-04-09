@@ -440,7 +440,7 @@ public class Format {
 	 * @param pos Position of first UTF-8 byte
 	 * @param len Number of UTF-8 bytes to read
 	 * @return String from ByteBuffer
-	 * @throws BadFormatException If encoding is invalid
+	 * @throws BadFormatException If there are insufficient bytes in Blob to read
 	 */
 	public static AString readUTF8String(Blob blob, int pos, int len) throws BadFormatException {
 		if (len == 0) return Strings.empty();
@@ -468,12 +468,15 @@ public class Format {
 	 * @param pos Position to read Ref from (should point to tag)
 	 * @return Ref as read from ByteBuffer
 	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
-	 *                            object is found.
+	 *                            value is found where it should be a Ref.
 	 */
 	public static <T extends ACell> Ref<T> readRef(Blob b,int pos) throws BadFormatException {
 		byte tag=b.byteAt(pos);
 		if (tag==Tag.REF) return Ref.readRaw(b,pos+1);
 		
+		if (tag==Tag.NULL) return Ref.nil();
+		
+		// Looks like an embedded cell, so try to read this
 		T cell= Format.read(tag,b,pos);
 		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
 		return Ref.get(cell);

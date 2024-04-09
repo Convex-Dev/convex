@@ -175,6 +175,10 @@ public class Blob extends AArrayBlob {
 		if (bs.length==0) return EMPTY;
 		return wrap(bs);
 	}
+	
+	public static Blob forByte(byte b) {
+		return wrap(new byte[] {b});
+	}
 
 	/**
 	 * Constructs a Blob object from all remaining bytes in a ByteBuffer
@@ -283,5 +287,7 @@ public class Blob extends AArrayBlob {
 	public ABlob toBlob() {
 		return toCanonical();
 	}
+
+
 
 }
