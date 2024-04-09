@@ -340,10 +340,18 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public AMap<K,V> slice(long start) {
 		return slice(start,count);
 	}
+	
+	@Override
+	public abstract AMap<K,V> empty();
 
 	@Override
 	public AMap<K,V> slice(long start, long end) {
-		throw new TODOException();
+		AMap<K,V> r=empty();
+ 		for (long i=start; i<end; i++) {
+			r=(AMap<K, V>) r.conj(get(i));
+			if (r==null) return null;
+		}
+ 		return r;
 	}
 
 	/**

@@ -952,8 +952,9 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(slice 'gyuigui 1 1)")); 
 
 		
-		// TODO: slicing for maps
-		//assertEquals(Maps.of(1,2),eval("(slice {1 2} 0)"));
+		// Slicing for maps
+		assertEquals(Maps.of(1,2),eval("(slice {1 2} 0)"));
+		assertEquals(Maps.empty().conj(INITIAL.getAccount(Address.ZERO).get(0)),eval("(slice (account #0) 0 1)"));
 
 		assertBoundsError(step("(slice 0x 1)")); 
 		assertBoundsError(step("(slice 0x -1 0)")); 
