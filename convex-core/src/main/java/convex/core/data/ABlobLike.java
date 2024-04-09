@@ -70,17 +70,6 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 		return hexMatch(b,0,limit);
 	}
 	
-	/**
-	 * Checks for Hex equality of two BlobLikes. *ignores* type, i.e. only considers hex contents.
-	 * @param b Value to compare with
-	 * @return True if all hex digits are equal, false otherwise
-	 */
-	public boolean hexEquals(ABlobLike<?> b) {
-		long c = count();
-		if (b.count() != c) return false;
-		return hexMatch(b, 0L, c) == c;
-	}
-
 	public boolean hexEquals(ABlobLike<?> b, long start, long length) {
 		return hexMatch(b, start, length) == length;
 	}
@@ -173,6 +162,16 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 * @return
 	 */
 	public abstract ABlob toBlob();
+	
+	/**
+	 * Converts the contents of this value to a flat array-backed Blob instance.
+	 * Warning: might be O(n) in size of Blob, may not be canonical etc.
+	 * 
+	 * @return A Blob instance containing the same data as this value. Might be this is already a flat Blob.
+	 */
+	public Blob toFlatBlob() {
+		return toBlob().toFlatBlob();
+	}
 
 	/**
 	 * Compare the byte content of this BlobLike to a Blob value

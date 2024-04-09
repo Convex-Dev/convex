@@ -83,12 +83,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return slice(start, count());
 	}
 
-	/**
-	 * Converts this object to a flat array-backed Blob instance.
-	 * Warning: might be O(n) in size of Blob, may not be canonical etc.
-	 * 
-	 * @return A Blob instance containing the same data as this Blob.
-	 */
+	@Override
 	public abstract Blob toFlatBlob();
 
 

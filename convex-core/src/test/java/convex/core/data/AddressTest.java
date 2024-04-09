@@ -44,6 +44,16 @@ public class AddressTest {
 	public void testBlobBehaviour() {
 		assertEquals(0L,Address.ZERO.longValue());
 		assertEquals(Blobs.createFilled(0, 8),Address.ZERO.toFlatBlob());
+		
+		Address a1=Address.create(0x12345678);
+		Address a2=Address.create(0x1234abcd);
+		assertEquals(3,a1.hexMatch(a2, 8, 3));
+		assertEquals(1,a1.hexMatch(a2, 11, 3));
+		assertEquals(0,a1.hexMatch(a2, 13, 3));
+	
+		BlobsTest.doBlobLikeTests(Address.ZERO);
+		BlobsTest.doBlobLikeTests(a1);
+		BlobsTest.doBlobLikeTests(Address.MAX_VALUE);
 	}
 	
 	@Test

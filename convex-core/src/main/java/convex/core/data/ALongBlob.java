@@ -106,7 +106,7 @@ public abstract class ALongBlob extends ABlob {
 	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		for (int i=0; i<length; i++) {
 			int c=b.getHexDigit(start+i);
-			if (c!=getHexDigit(i)) return i;
+			if (c!=getHexDigit(start+i)) return i;
 		}	
 		return length;
 	}

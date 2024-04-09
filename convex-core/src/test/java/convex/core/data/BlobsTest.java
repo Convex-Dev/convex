@@ -221,7 +221,7 @@ public class BlobsTest {
 		
 		assertSame(b.getCanonical(),b.getChunk(0)); // Use canonical Blob as chunk
 
-		assertTrue(bb.hexEquals(b));
+		assertTrue(bb.equalsBytes(b));
 		assertTrue(b.hexEquals(bb, 3, 10));
 
 		assertEquals(16, b.hexMatch(bb));
@@ -318,7 +318,7 @@ public class BlobsTest {
 		ABlob two = b.append(b);
 		assertEquals(Blob.EMPTY, b.getChunk(1));
 		assertEquals(b, two.getChunk(1));
-		assertTrue(b.hexEquals(b));
+		assertTrue(b.equalsBytes(b));
 		assertTrue(two.isCanonical());
 
 		doBlobTests(b);
@@ -588,7 +588,7 @@ public class BlobsTest {
 			assertEquals(a.byteAt(n-1),b.byteAt(n-1));
 		}
 		
-		assertTrue(a.hexEquals(b.toFlatBlob()));
+		assertTrue(a.equalsBytes(b.toFlatBlob()));
 		
 		// Should pass tests for a CVM countable value
 		CollectionsTest.doCountableTests(a);
