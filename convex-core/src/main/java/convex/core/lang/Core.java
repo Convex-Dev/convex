@@ -1802,11 +1802,11 @@ public class Core {
 			if (a instanceof CVMChar) {
 				result= (CVMChar) a;
 			} else {
-				CVMLong l = RT.ensureLong(a);
-				if (l == null)
+				AInteger cp = RT.ensureInteger(a);
+				if (cp == null)
 					return context.withCastError(0,args, Types.CHARACTER);
-				long cp=l.longValue();
-				result=CVMChar.create(cp);
+				if (!cp.isLong()) return context.withArgumentError("Invalid Unicode code point: "+cp);
+				result=CVMChar.create(cp.longValue());
 				if (result == null) 
 					return context.withArgumentError("Invalid Unicode code point: "+cp);
 			}

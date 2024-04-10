@@ -476,6 +476,7 @@ public class CoreTest extends ACVMTest {
 		
 		// Out of Unicode range
 		assertArgumentError(step("(char 12345678)"));
+		assertArgumentError(step("(char 9999999999999999999999)"));
 		assertArgumentError(step("(char (long 0xff00000050))"));
 		
 		// Bad types
