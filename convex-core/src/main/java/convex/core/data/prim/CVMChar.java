@@ -25,10 +25,12 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	public static int MAX_CODEPOINT=0x10ffff; // 21 bits max Unicode value
 	public static CVMChar MAX_VALUE=create(MAX_CODEPOINT); // 21 bits max Unicode value
 	
-	private static final CVMChar[] cache=new CVMChar[128];
+	private static final int CACHE_SIZE=256;
+	
+	private static final CVMChar[] cache=new CVMChar[CACHE_SIZE];
 	
 	static {
-		for (int i=0; i<128; i++) {
+		for (int i=0; i<CACHE_SIZE; i++) {
 			cache[i]=new CVMChar(i);
 		}
 	}
@@ -65,7 +67,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	 */
 	public static CVMChar create(long value) {
 		if (value<0) return null; // invalid negative number
-		if (value<128) return cache[(int)value];
+		if (value<CACHE_SIZE) return cache[(int)value];
 		if (value>MAX_CODEPOINT) return null;
 		return new CVMChar((int)value);
 	}

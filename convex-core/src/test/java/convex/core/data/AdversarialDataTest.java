@@ -224,6 +224,25 @@ public class AdversarialDataTest {
 		invalidEncoding(Tag.FALSE,"00"); // excess byte
 	}
 	
+	@Test
+	public void testBadCharacter() {
+		invalidEncoding("3c2066"); // excess byte
+		invalidEncoding("3d20ff66"); // excess byte
+		invalidEncoding("3e10ffff66"); // excess byte on max codepoint
+
+		invalidEncoding("3c"); // missing byte
+		invalidEncoding("3d20"); // missing byte
+		
+		invalidEncoding("3d0020"); // excess leading zeros
+		invalidEncoding("3d00ffff"); // excess leading zeros
+		invalidEncoding("3f0000ffff"); // excess leading zeros
+		invalidEncoding("3f0010ffff"); // excess leading zeros on max code point
+		
+		invalidEncoding("3d110000"); // just beyond maximum code point
+		invalidEncoding("3f0fffffff"); // way beyond max code point
+		invalidEncoding("3fffffffff"); // way beyond max code point, also negative int
+	}
+	
 	protected void invalidEncoding(int tag, String more) {
 		Blob b=Blob.forByte((byte)tag).append(Blob.fromHex(more)).toFlatBlob();
 		invalidEncoding(b);
