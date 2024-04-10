@@ -1,6 +1,7 @@
 package convex.core.data.prim;
 
 import convex.core.Constants;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
@@ -368,6 +369,15 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	@Override
 	public int hashCode() {
 		return Bits.hash32(value);
+	}
+
+	public static CVMChar fromUTF8(ABlobLike<?> b) {
+		long n=b.count();
+		if ((n==0)||(n>4)) return null;
+		int v=(int)b.longValue()<<((4-n)*8);
+		int cp=CVMChar.codepointFromUTFInt(v);
+		if (CVMChar.utfLength(cp)!=n)return null;
+		return CVMChar.create(cp);
 	}
 
 }

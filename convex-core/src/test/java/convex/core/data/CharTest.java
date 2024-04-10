@@ -96,6 +96,7 @@ public class CharTest {
 		// Should round trip when contained in a String
 		AString s=Strings.create(c.toString());
 		assertEquals(s,Reader.read(RT.print(s).toString()));
+		assertEquals(c,CVMChar.fromUTF8(s));
 		
 		// Should round trip via UTF blob
 		assertEquals(s,Strings.create(c.toUTFBlob()));

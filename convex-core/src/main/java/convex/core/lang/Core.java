@@ -12,6 +12,7 @@ import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.crypto.Hashing;
 import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -1801,14 +1802,19 @@ public class Core {
 			CVMChar result;
 			if (a instanceof CVMChar) {
 				result= (CVMChar) a;
+			} else if (a instanceof ABlobLike) {
+				ABlobLike b=RT.ensureBlobLike(a);
+				result=CVMChar.fromUTF8(b);
+				if (result == null) 
+					return context.withArgumentError("Not a valid UTF-8 character");
 			} else {
 				AInteger cp = RT.ensureInteger(a);
 				if (cp == null)
 					return context.withCastError(0,args, Types.CHARACTER);
-				if (!cp.isLong()) return context.withArgumentError("Invalid Unicode code point: "+cp);
+				if (!cp.isLong()) return context.withArgumentError("Invalid code point: "+cp);
 				result=CVMChar.create(cp.longValue());
 				if (result == null) 
-					return context.withArgumentError("Invalid Unicode code point: "+cp);
+					return context.withArgumentError("Invalid code point: "+cp);
 			}
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

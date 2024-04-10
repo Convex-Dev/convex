@@ -366,9 +366,9 @@
                        :return Double}]}}
 
  char
- {:doc {:description "Casts a value to a Character. Discards high bits of larger integer types."
+ {:doc {:description "Casts a value to a Character. Treats integers as Unicode code points. Treats blob-like values as UTF-8 strings."
         :errors      {:CAST "If the argument type is not castable to a character."
-                      :ARGUMENT "If the character is outside valid Unicode range"}
+                      :ARGUMENT "If the argument does not precisely specify a valid Unicode code point"}
         :examples    [{:code "(char 97)"}]
         :signature   [{:params [x]
                        :return Character}]}}

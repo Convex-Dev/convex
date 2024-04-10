@@ -485,6 +485,11 @@ public class CoreTest extends ACVMTest {
 		assertCVMEquals('a', eval("(char 97)"));
 		assertCVMEquals('a', eval("(nth \"bar\" 1)"));
 		
+		// Conversion from UTF-8
+		assertCVMEquals(' ',eval("(char 0x20)")); 
+		assertCVMEquals('f',eval("(char :f)")); 
+		assertCVMEquals('Z',eval("(char \"Z\")")); 
+		
 		// Out of Unicode range
 		assertArgumentError(step("(char 12345678)"));
 		assertArgumentError(step("(char 12345678)"));
@@ -492,8 +497,9 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(char 9999999999999999999999)"));
 		assertArgumentError(step("(char (long 0xff00000050))"));
 		
+		// Not single UTF-8 characters
+		
 		// Bad types
-		assertCastError(step("(char 0x20)")); // TODO: maybe should work? Consider as UTF-8?
 		assertCastError(step("(char false)"));
 		assertCastError(step("(char nil)"));
 		assertCastError(step("(char {})"));
