@@ -2068,6 +2068,37 @@ public class Core {
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
+	
+// TODO: probably want this?
+//	
+//	public static final CoreFn<CVMDouble> EXPT = reg(new CoreFn<>(Symbols.EXPT,500) {
+//		
+//		@Override
+//		public  Context invoke(Context context, ACell[] args) {
+//			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+//
+//			ANumeric base=RT.ensureNumber(args[0]);
+//			if (base==null) return context.withCastError(0,Types.DOUBLE);
+//
+//			ANumeric power=RT.ensureNumber(args[1]);
+//			if (power==null) return context.withCastError(1,Types.DOUBLE);
+//
+//			ANumeric result;
+//			
+//			if ((base instanceof AInteger )&&(power instanceof AInteger)) {
+//				AInteger a=(AInteger)base;
+//				AInteger b=(AInteger)power;
+//				long juice=Juice.addMul(Juice.ARITHMETIC,Juice.costNumeric(a),Juice.costNumeric(b));
+//				if (!context.checkJuice(juice)) return context.withJuiceError();
+//				result = a.toPower(b);
+//				
+//				return context.withResult(juice, result);
+//			} else {
+//				result=CVMDouble.create(Math.pow(base.doubleValue(), power.doubleValue()));
+//				return context.withResult(Juice.ARITHMETIC, result);
+//			}
+//		}
+//	});
 
 	public static final CoreFn<CVMBool> NOT = reg(new CoreFn<>(Symbols.NOT,175) {
 		

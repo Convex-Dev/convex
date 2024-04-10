@@ -149,6 +149,7 @@ public class Symbols {
 	public static final Symbol MOD = intern("mod");
 	public static final Symbol QUOT = intern("quot");
 	public static final Symbol REM = intern("rem");
+	public static final Symbol EXPT = intern("expt");
 
 
 	public static final Symbol FLOOR = intern("floor");
@@ -338,6 +339,7 @@ public class Symbols {
 	public static final Symbol MEMORY = intern("memory");
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
+
 
 
 	

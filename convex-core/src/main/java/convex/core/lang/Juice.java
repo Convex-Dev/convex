@@ -510,7 +510,7 @@ public class Juice {
 	 * @param aCell
 	 * @return base cost, or negative if not numeric
 	 */
-	private static long costNumeric(ACell a) {
+	public static long costNumeric(ACell a) {
 		if (!(a instanceof ANumeric)) return -1;
 		if (a instanceof CVMBigInteger) {
 			long bl=((CVMBigInteger)a).byteLength();

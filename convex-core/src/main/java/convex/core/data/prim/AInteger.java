@@ -5,6 +5,7 @@ import java.math.BigInteger;
 import convex.core.data.ABlob;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.exceptions.TODOException;
 
 /**
  * Abstract base class for CVM Integer values
@@ -180,6 +181,13 @@ public abstract class AInteger extends ANumeric {
 	 */
 	public abstract boolean isLong();
 
-
+	/**
+	 * Raise the integer to the given power
+	 * @param power
+	 * @return Result, or null if invalid
+	 */
+	public AInteger toPower(AInteger power) {
+		throw new TODOException();
+	}
 
 }
