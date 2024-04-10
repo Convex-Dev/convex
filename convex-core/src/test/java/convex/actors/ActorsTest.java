@@ -86,15 +86,12 @@ public class ActorsTest extends ACVMTest {
 	}
 
 	@Test public void testTokenContract() throws IOException {
-		String VILLAIN=InitTest.VILLAIN.toHexString();
-		String HERO=InitTest.HERO.toHexString();
-
 		// setup address for this scene
-		Context ctx=step("(do (def HERO (address \""+HERO+"\")) (def VILLAIN (address \""+VILLAIN+"\")))");
+		Context ctx=exec(context(),"(do (def HERO "+HERO+") (def VILLAIN "+VILLAIN+"))");
 
 		// Technique of constructing a contract using a String
 		String contractString=Utils.readResourceAsString("contracts/token.con");
-		ctx=step(ctx,"(def my-token (deploy ("+contractString+" 101 1000 HERO)))"); // contract initialisation args
+		ctx=exec(ctx,"(def my-token (deploy ("+contractString+" 101 1000 HERO)))"); // contract initialisation args
 
 		assertEquals(1000L,evalL(ctx,"(call my-token (balance *address*))"));
 		assertEquals(0L,evalL(ctx,"(call my-token (balance VILLAIN))"));

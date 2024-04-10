@@ -1160,8 +1160,6 @@ public class RT {
 			return (Address) a;
 		if (a instanceof ABlob)
 			return Address.create((ABlob) a);
-		if (a instanceof AString)
-			return Address.fromHex(a.toString());
 		CVMLong value = RT.ensureLong(a);
 		if (value == null)
 			return null;

@@ -109,9 +109,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testAddress() {
 		Address a = HERO;
-		assertEquals(a, eval("(address \"" + a.toHexString() + "\")"));
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
-		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address "+a.longValue()+")"));
 		assertEquals(a, eval("(address "+a+")"));
@@ -123,15 +121,15 @@ public class CoreTest extends ACVMTest {
 		// Short blob / string addresses
 		Address ash=Address.fromHex("1234abcd");
 		assertEquals(305441741L,ash.longValue());
-		assertEquals(ash, eval("(address \"1234abcd\")"));
 		assertEquals(ash, eval("(address 0x1234abcd)"));
 
 		// invalid address values - not a cast error since argument types (in general) are valid
-		assertArgumentError(step("(address \"1234abcd1234567812345678\")"));
+		assertArgumentError(step("(address 0x1234abcd1234567812345678)"));
 		assertArgumentError(step("(address -10)"));
 
 		// invalid conversions
 		assertCastError(step("(address :foo)"));
+		assertCastError(step("(address \"1234\")"));
 		assertCastError(step("(address nil)"));
 	}
 
@@ -2878,7 +2876,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(actor? 8)"));
 
 		// Above are OK if cast to addresses explicitly
-		assertTrue(evalB(ctx,"(actor? (address \""+ctr.toHexString()+"\"))"));
+		assertTrue(evalB(ctx,"(actor? "+ctr+")"));
 		assertTrue(evalB(ctx,"(actor? (address 8))"));
 
 		assertFalse(evalB(ctx,"(actor? :foo)"));
@@ -4835,9 +4833,9 @@ public class CoreTest extends ACVMTest {
 
 
 	@Test public void testHoldings() {
-		Context ctx = step("(def VILLAIN (address \""+VILLAIN.toHexString()+"\"))");
+		Context ctx = exec(context(),"(def VILLAIN "+VILLAIN+")");
 		assertTrue(eval(ctx,"VILLAIN") instanceof Address);
-		ctx=step(ctx,"(def NOONE (address 7777777))");
+		ctx=exec(ctx,"(def NOONE (address 7777777))");
 
 		// Basic empty holding should match empty Index in account record. See #131
 		assertTrue(evalB("(= *holdings* (:holdings (account *address*)) (index))"));

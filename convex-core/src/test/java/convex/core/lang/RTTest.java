@@ -53,14 +53,6 @@ public class RTTest {
 		assertEquals(za, RT.castAddress(za.toFlatBlob()));
 		assertSame(za, RT.castAddress(za));
 
-		// reading a hex address
-		{
-			Address a18=Address.create(18);
-			assertEquals(a18, RT.castAddress(Strings.create("0000000000000012"))); // OK, hex string
-			assertEquals(a18, RT.castAddress(Strings.create("0012"))); // short but OK
-			assertNull( RT.castAddress(Strings.create("ffffff0000000000000012"))); // long hex string
-		}
-
 		// Check null return values for invalid addresses
 		assertNull(RT.castAddress(null)); // null not allowed
 		assertNull(RT.castAddress(CVMLong.create(-1))); // negative ints not allowed
