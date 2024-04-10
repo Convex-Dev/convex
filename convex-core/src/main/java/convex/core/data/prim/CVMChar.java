@@ -74,6 +74,20 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	}
 	
 	/**
+	 * Gets a {@link CVMChar} from a UTF-8 representation
+	 * @param value UTF-8 representation of a single character
+	 * @return CVMChar instance, or null if not valid
+	 */
+	public static CVMChar fromUTF8(ABlobLike<?> b) {
+		long n=b.count();
+		if ((n==0)||(n>4)) return null;
+		int v=(int)b.longValue()<<((4-n)*8);
+		int cp=CVMChar.codepointFromUTFInt(v);
+		if (CVMChar.utfLength(cp)!=n)return null;
+		return CVMChar.create(cp);
+	}
+	
+	/**
 	 * Gets the Long value of this char, equal to the Unicode code point
 	 */
 	@Override
@@ -371,13 +385,6 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 		return Bits.hash32(value);
 	}
 
-	public static CVMChar fromUTF8(ABlobLike<?> b) {
-		long n=b.count();
-		if ((n==0)||(n>4)) return null;
-		int v=(int)b.longValue()<<((4-n)*8);
-		int cp=CVMChar.codepointFromUTFInt(v);
-		if (CVMChar.utfLength(cp)!=n)return null;
-		return CVMChar.create(cp);
-	}
+
 
 }
