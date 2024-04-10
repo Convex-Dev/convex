@@ -315,11 +315,12 @@ public class NumericsTest extends ACVMTest {
 	@Test
 	public void testZero() {
 		assertTrue(evalB("(== 0 -0)"));
-		assertTrue(evalB("(== 0.0 -0.0)"));
 		assertTrue(evalB("(== 0 -0.0)"));
 		assertTrue(evalB("(<= 0 -0)"));
 		assertTrue(evalB("(>= 0 0)"));
-
+		
+		assertFalse(evalB("(= 0.0 -0.0)")); // Seriously, IEEE 754?
+		assertTrue(evalB("(== 0.0 -0.0)")); // the least this is sane
 	}
 	
 	@Test
@@ -339,6 +340,10 @@ public class NumericsTest extends ACVMTest {
 		assertEquals(0.0, evalD("(sqrt 0.0)"), 0);
 		assertEquals(Double.NaN, evalD("(sqrt -3)"), 0);
 		assertEquals(Double.NaN, evalD("(sqrt ##NaN)"), 0);
+		
+		// fun cases
+		assertEquals(Double.POSITIVE_INFINITY, evalD("(sqrt ##Inf)"), 0);
+		assertEquals(Double.NaN, evalD("(sqrt ##-Inf)"), 0);
 
 		assertArityError(step("(sqrt)"));
 		assertArityError(step("(sqrt :foo :bar)")); // arity before cast error

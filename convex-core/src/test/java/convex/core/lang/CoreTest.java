@@ -110,7 +110,7 @@ public class CoreTest extends ACVMTest {
 	public void testAddress() {
 		Address a = HERO;
 		assertEquals(a, eval("(address 0x" + a.toHexString() + ")"));
-		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
+		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))")); // can convert via hex string
 		assertEquals(a, eval("(address "+a.longValue()+")"));
 		assertEquals(a, eval("(address "+a+")"));
 
