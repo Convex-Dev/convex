@@ -126,9 +126,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(ash, eval("(address \"1234abcd\")"));
 		assertEquals(ash, eval("(address 0x1234abcd)"));
 
-		// invalid address lengths - not a cast error since argument types (in general) are valid
-		//assertArgumentError(step("(address \"1234abcd\")"));
-		//assertArgumentError(step("(address 0x1234abcd)"));
+		// invalid address values - not a cast error since argument types (in general) are valid
+		assertArgumentError(step("(address \"1234abcd1234567812345678\")"));
+		assertArgumentError(step("(address -10)"));
 
 		// invalid conversions
 		assertCastError(step("(address :foo)"));

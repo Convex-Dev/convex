@@ -843,8 +843,9 @@ public class Core {
 			ACell o = args[0];
 			Address address = RT.castAddress(o);
 			if (address == null) {
-				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address: " + o);
-				if (o instanceof ABlob) return context.withArgumentError("Blob not convertible a valid Address: " + o);
+				if (o instanceof AString) return context.withArgumentError("String not convertible to a valid Address");
+				if (o instanceof ABlob) return context.withArgumentError("Blob not convertible a valid Address");
+				if (o instanceof AInteger) return context.withArgumentError("Integer value is not a valid Address");
 				return context.withCastError(0,args, Types.ADDRESS);
 			}
 			long juice = Juice.ADDRESS;
