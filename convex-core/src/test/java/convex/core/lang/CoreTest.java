@@ -464,6 +464,17 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Long.MIN_VALUE,evalL("(int -9223372036854775808)"));
 		assertEquals(CVMBigInteger.MIN_POSITIVE,eval("(int 9223372036854775808)"));
 	}
+	
+	@Test
+	public void testIntPred() {
+		assertSame(CVMBool.TRUE,eval("(int? 0)"));
+		assertSame(CVMBool.TRUE,eval("(int? 99999999999999999999999999999999999)"));
+		assertSame(CVMBool.FALSE,eval("(int? :foo)"));
+		assertSame(CVMBool.FALSE,eval("(int? 8.0)"));
+		
+		assertArityError(step("(int?)"));
+		assertArityError(step("(int? 3 4)"));
+	}
 
 
 	@Test
@@ -476,10 +487,13 @@ public class CoreTest extends ACVMTest {
 		
 		// Out of Unicode range
 		assertArgumentError(step("(char 12345678)"));
+		assertArgumentError(step("(char 12345678)"));
+		assertArgumentError(step("(char -9223372036854775808)"));
 		assertArgumentError(step("(char 9999999999999999999999)"));
 		assertArgumentError(step("(char (long 0xff00000050))"));
 		
 		// Bad types
+		assertCastError(step("(char 0x20)")); // TODO: maybe should work? Consider as UTF-8?
 		assertCastError(step("(char false)"));
 		assertCastError(step("(char nil)"));
 		assertCastError(step("(char {})"));
