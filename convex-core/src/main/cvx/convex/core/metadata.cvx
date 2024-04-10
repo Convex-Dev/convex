@@ -334,11 +334,11 @@
                        :return Boolean}]}}
 
  byte
- {:doc {:description "Casts a value to a Byte. Discards high bits of larger integer types."
-        :errors      {:CAST "If the argument is not castable to a Byte."}
+ {:doc {:description "Casts a value to the unsigned byte range 0-255. Discards high bits of larger integer / blob types."
+        :errors      {:CAST "If the argument is not castable to an integer."}
         :examples    [{:code "(byte 1234)"}]
         :signature   [{:params [x]
-                       :return Byte}]}}
+                       :return Integer}]}}
 
  call*
  {:doc {:description ["Behaves like `call` but implemented as a function. Instead of a form, takes a symbol referring to the function, and then arguments separately."
@@ -400,7 +400,7 @@
                        :return Op}]}}
 
  concat
- {:doc {:description "Concatenates sequential data structures (Lists or Maps), returning a new sequential data structure of the same type as the first non-nil argument. `nil` is treated as an empty sequence."
+ {:doc {:description "Concatenates sequential data structures, returning a new sequential data structure of the same type as the first non-nil argument. `nil` is treated as an empty sequence."
         :errors      {:CAST "If any of the arguments is neither a sequential data structure nor nil."}
         :examples    [{:code "(concat [1 2] [3 4])"}]
         :signature   [{:params [& seqs]

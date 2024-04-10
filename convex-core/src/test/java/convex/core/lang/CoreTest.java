@@ -114,6 +114,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(a, eval("(address (address \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address (blob \"" + a.toHexString() + "\"))"));
 		assertEquals(a, eval("(address "+a.longValue()+")"));
+		assertEquals(a, eval("(address "+a+")"));
 
 		// bad arities
 		assertArityError(step("(address 1 2)"));
@@ -193,9 +194,11 @@ public class CoreTest extends ACVMTest {
 		assertSame(CVMLong.create(0xff), eval("(byte 0xff)"));
 		assertSame(CVMLong.create(0xff), eval("(byte 0xeeff)"));
 		
+		// effectively a blob with no bits set.....
+		assertSame(CVMLong.ZERO, eval("(byte 0x)"));
+		
 		assertCastError(step("(byte nil)"));
 		assertCastError(step("(byte :foo)"));
-		assertCastError(step("(byte 0x)")); // can't cast empty blob
 		
 		// Shouldn't try to convert an Address, see #431
 		assertCastError(step("(byte #13)"));
@@ -3811,10 +3814,13 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(long? 1)"));
 		assertTrue(evalB("(long? (long *balance*))")); // TODO: is this sane?
 		assertTrue(evalB("(long? (byte 1))"));
+		
 		assertFalse(evalB("(long? nil)"));
 		assertFalse(evalB("(long? 0xFF)"));
 		assertFalse(evalB("(long? [1 2])"));
+		assertFalse(evalB("(long? 7.0)"));
 		
+		// big integer boundaries
 		assertTrue(evalB("(long? 9223372036854775807)"));
 		assertFalse(evalB("(long? 9223372036854775808)"));
 		assertTrue(evalB("(long? -9223372036854775808)"));
@@ -3823,10 +3829,15 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testStrPred() {
+		// These are strings
 		assertTrue(evalB("(str? (name :foo))"));
 		assertTrue(evalB("(str? (str :foo))"));
 		assertTrue(evalB("(str? (str nil))"));
+		assertTrue(evalB("(str? \"\")"));
+		
+		// These are not strings
 		assertFalse(evalB("(str? 1)"));
+		assertFalse(evalB("(str? :foo)"));
 		assertFalse(evalB("(str? nil)"));
 	}
 

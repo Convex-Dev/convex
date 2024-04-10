@@ -60,7 +60,7 @@ public final class CVMLong extends AInteger {
 	 */
 	public static CVMLong create(long value) {
 		if ((value<CACHE_SIZE)&&(value>=0)) {
-			return forByte((byte)value);
+			return forByte((int)value);
 		}
 		return new CVMLong(value);
 	}
@@ -79,7 +79,7 @@ public final class CVMLong extends AInteger {
 	 * @param b Byte to convert to CVMLong (will be interpreted as unsigned)
 	 * @return CVMLong value
 	 */
-	public static CVMLong forByte(byte b) {
+	public static CVMLong forByte(int b) {
 		return CACHE[0xff&b];
 	}
 	
