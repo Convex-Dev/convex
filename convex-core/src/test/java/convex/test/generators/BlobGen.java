@@ -25,7 +25,7 @@ public class BlobGen extends Generator<ABlob> {
 		int type = r.nextInt();
 		switch (type % 10) {
 		case 0:
-			return LongBlob.create(r.nextLong());
+			return LongBlob.create(r.nextLong(0,len));
 		case 1:
 			return Samples.FULL_BLOB;
 		case 2:

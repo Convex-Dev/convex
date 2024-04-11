@@ -31,7 +31,7 @@ public class VectorGen extends Generator<AVector> {
 		}
 		case 1: {
 			ACell o1 = gen().make(PrimitiveGen.class).generate(r, status);
-			ACell o2 = gen().make(StringGen.class).generate(r, status);
+			ACell o2 = Gen.STRING.generate(r, status);
 			return Vectors.of(o1, o2);
 		}
 		case 2: {

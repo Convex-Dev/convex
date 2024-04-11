@@ -5,7 +5,6 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.ANumeric;
-import convex.core.data.prim.APrimitive;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -14,9 +13,9 @@ import convex.core.lang.RT;
  * Generator for arbitrary numeric values
  *
  */
-public class NumericGen extends Generator<APrimitive> {
+public class NumericGen extends Generator<ANumeric> {
 	public NumericGen() {
-		super(APrimitive.class);
+		super(ANumeric.class);
 	}
 
 	@Override
@@ -37,7 +36,7 @@ public class NumericGen extends Generator<APrimitive> {
 		case 3:
 			return CVMDouble.NaN;
 		case 4:
-			return CVMDouble.create(Math.pow(2.0*r.nextDouble(), r.nextLong(-status.size(),status.size())));
+			return Gen.DOUBLE.generate(r,status);
 			
 			
 		default:

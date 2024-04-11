@@ -149,6 +149,8 @@ public class Samples {
 	public static final String IPSUM="Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. ";
 	public static final String SPANISH="El veloz murciélago hindú comía feliz cardillo y kiwi. La cigüeña tocaba el saxofón detrás del palenque de paja.";
 	public static final String RUSSIAN="Съешь же ещё этих мягких французских булок, да выпей чаю.";
+	public static final AString RUSSIAN_STRING=Strings.create(RUSSIAN);
+
 	
 	public static final String MAX_SYMBOLIC="abcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnopabcdefghijklmnop";
 	public static final String TOO_BIG_SYMBOLIC=MAX_SYMBOLIC+"a";

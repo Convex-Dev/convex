@@ -6,13 +6,21 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.Address;
 
 public class AddressGen extends Generator<Address> {
+	
 	public AddressGen() {
 		super(Address.class);
 	}
 
 	@Override
 	public Address generate(SourceOfRandomness r, GenerationStatus status) {
-
-		return Address.create(r.nextLong(0, Long.MAX_VALUE));
+		int size=status.size();
+		int x=r.nextInt(10);
+		
+		switch (x) {
+			case 0: return Address.ZERO;
+			case 1: return Address.create(Long.MAX_VALUE>>r.nextInt(64));
+			case 2: return Address.create(10*r.nextLong(0, size));
+			default: return Address.create(r.nextLong(0, size));
+		}
 	}
 }

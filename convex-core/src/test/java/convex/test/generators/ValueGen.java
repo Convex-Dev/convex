@@ -36,11 +36,11 @@ public class ValueGen extends Generator<ACell> {
 		case 6:
 			return gen().make(SetGen.class).generate(r, status);
 		case 7:
-			return gen().make(BlobGen.class).generate(r, status);
+			return Gen.BLOB.generate(r, status);
 		case 8:
-			return gen().make(AddressGen.class).generate(r, status);
+			return Gen.ADDRESS.generate(r, status);
 		case 9:
-			return gen().make(NumericGen.class).generate(r, status);
+			return Gen.NUMERIC.generate(r, status);
 		case 10:
 			return CVMLong.create(r.nextLong());
 		case 11:

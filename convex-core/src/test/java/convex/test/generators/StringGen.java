@@ -8,6 +8,9 @@ import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.test.Samples;
 
+/**
+ * Generator for valid UTF-8 strings
+ */
 public class StringGen extends Generator<AString> {
 	public StringGen() {
 		super(AString.class);
@@ -15,17 +18,24 @@ public class StringGen extends Generator<AString> {
 
 	@Override
 	public AString generate(SourceOfRandomness r, GenerationStatus status) {
-
-	 	int type=r.nextInt();
-    	switch (type%12) {
+		int size=status.size();
+		
+    	switch (r.nextInt(10)) {
     		case 0: return Strings.empty();
     		case 1: return Samples.MAX_EMBEDDED_STRING;
     		case 2: return Samples.NON_EMBEDDED_STRING;
     		case 3: return Samples.MAX_SHORT_STRING;
        		case 4: return Samples.MIN_TREE_STRING;
+       		case 5: return Samples.RUSSIAN_STRING;
+       		case 6: return generate(r,status).append(generate(r,status));
        	    		
     		default: {
-    			return Strings.create(gen().type(String.class).generate(r, status));
+    			AString BASE=generate(r,status);
+    			long n=Math.min(size,BASE.count());
+    			long start=r.nextLong(0,n);
+    			long end=r.nextLong(start,n);
+    			if ((start==n)||(BASE.charAt(start)<0)||((BASE.charAt(end)<0))) return BASE;
+       		    return BASE.slice(start,end);
     		}
     	}
 	}
