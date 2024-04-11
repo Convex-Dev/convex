@@ -355,7 +355,7 @@ public class ObjectsTest {
 		if (!a.isCanonical()) return;
 		int rc=a.getRefCount();
 		assertTrue(rc>=0);
-		assertEquals(rc,Utils.refCount(a));
+		assertEquals(rc,Cells.refCount(a));
 		if (rc>0) {
 			long tcount = Refs.totalRefCount(a);
 			assertTrue(rc <= tcount);

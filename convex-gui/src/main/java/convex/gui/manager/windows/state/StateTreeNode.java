@@ -8,6 +8,7 @@ import javax.swing.tree.TreeNode;
 
 import convex.core.data.Ref;
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.util.Utils;
 
 public class StateTreeNode<T extends ACell> implements TreeNode {
@@ -17,7 +18,7 @@ public class StateTreeNode<T extends ACell> implements TreeNode {
 
 	public StateTreeNode(T o) {
 		this.object = o;
-		this.isContainer = Utils.refCount(o)>0;
+		this.isContainer = Cells.refCount(o)>0;
 	}
 
 	private static <R extends ACell> StateTreeNode<R> create(R value) {

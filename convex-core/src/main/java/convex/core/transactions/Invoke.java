@@ -3,6 +3,7 @@ package convex.core.transactions;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -16,7 +17,6 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Transaction class representing the Invoke of an on-chain operation.
@@ -136,12 +136,12 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public int getRefCount() {
-		return Utils.refCount(command);
+		return Cells.refCount(command);
 	}
 
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		return Utils.getRef(command, i);
+		return Cells.getRef(command, i);
 	}
 
 	@Override

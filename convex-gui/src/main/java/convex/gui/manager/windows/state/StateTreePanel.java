@@ -15,6 +15,7 @@ import javax.swing.tree.TreePath;
 
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
+import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.MapLeaf;
@@ -33,7 +34,7 @@ public class StateTreePanel extends JPanel {
 		public Node(String name, ACell val) {
 			super(val);
 			this.name = name;
-			container = Utils.refCount(val)>0;
+			container = Cells.refCount(val)>0;
 		}
 
 		public Node(ACell val) {

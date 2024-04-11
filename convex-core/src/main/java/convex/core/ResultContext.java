@@ -9,7 +9,7 @@ import convex.core.transactions.ATransaction;
 /**
  * Class for preparation of transaction results
  * 
- * Mutable so that results can be accumulated as processing proceeds
+ * Mutable so that results can be accumulated efficiently as processing proceeds
  */
 public class ResultContext {
 

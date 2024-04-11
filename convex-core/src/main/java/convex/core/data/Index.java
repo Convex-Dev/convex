@@ -194,7 +194,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@Override
 	public int getRefCount() {
 		// note entry might be null
-		return Utils.refCount(entry) + children.length;
+		return Cells.refCount(entry) + children.length;
 	}
 
 	@SuppressWarnings("unchecked")

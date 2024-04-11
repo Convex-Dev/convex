@@ -27,6 +27,7 @@ import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
@@ -173,8 +174,8 @@ public class EtchStoreTest {
 			assertEquals(Ref.UNKNOWN,rb.getStatus());
 			assertEquals(Ref.UNKNOWN,rt.getStatus());
 
-			assertEquals(3,Utils.refCount(t1));
-			assertEquals(0,Utils.refCount(t2));
+			assertEquals(3,Cells.refCount(t1));
+			assertEquals(0,Cells.refCount(t2));
 			assertEquals(14,Refs.totalRefCount(belief));
 
 

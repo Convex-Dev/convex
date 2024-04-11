@@ -40,7 +40,6 @@ import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.Blob;
-import convex.core.data.Ref;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 
@@ -1146,23 +1145,6 @@ public class Utils {
 	 */
 	public static String stripWhiteSpace(String s) {
 		return s.replaceAll("\\s+", "");
-	}
-
-	/**
-	 * Gets the number of Refs directly contained in a Cell (will be zero if the
-	 * Cell is not a Ref container)
-	 *
-	 * @param a Cell to check (may be null)
-	 * @return Number of Refs in the object.
-	 */
-	public static int refCount(ACell a) {
-		if (a==null) return 0;
-		return a.getRefCount();
-	}
-
-	public static <R extends ACell> Ref<R> getRef(ACell o, int i) {
-		if (o ==null) throw new IllegalArgumentException("Bad ref index: " + i+ " called on null");
-		return o.getRef(i);
 	}
 
 	public static int bitCount(short mask) {

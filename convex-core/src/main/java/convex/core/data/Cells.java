@@ -40,4 +40,29 @@ public class Cells {
 		return result;
 	}
 
+	/**
+	 * Gets the number of Refs directly contained in a Cell (will be zero if the
+	 * Cell is not a Ref container)
+	 *
+	 * @param a Cell to check (may be null)
+	 * @return Number of Refs in the object.
+	 */
+	public static int refCount(ACell a) {
+		if (a==null) return 0;
+		return a.getRefCount();
+	}
+
+	/**
+	 * Gets a Ref from a Cell by index
+	 * @param <R>
+	 * @param cell Cell to read Ref from
+	 * @param index Numerical index of Ref
+	 * @throws IndexOutOfBoundsException if the index is out of range for the Cell
+	 * @return
+	 */
+	public static <R extends ACell> Ref<R> getRef(ACell cell, int index) {
+		if (cell ==null) throw new IndexOutOfBoundsException("Bad ref index called on null");
+		return cell.getRef(index);
+	}
+
 }

@@ -15,7 +15,6 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Transaction Receipt record.
@@ -167,12 +166,12 @@ public class Receipt extends ARecord {
 
 	@Override
 	public int getRefCount() {
-		return Utils.refCount(result)+Utils.refCount(log);
+		return Cells.refCount(result)+Cells.refCount(log);
 	}
 	
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		int rr=Utils.refCount(result);
+		int rr=Cells.refCount(result);
 		if (i<rr) {
 			if (result==null) throw new IndexOutOfBoundsException("Negative ref index");
 			return result.getRef();

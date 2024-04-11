@@ -6,7 +6,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Class describing the on-chain state of a Peer declared on the network.
@@ -323,14 +322,14 @@ public class PeerStatus extends ARecord {
 	@Override
 	public int getRefCount() {
 		int result=0;
-		result+=Utils.refCount(stakes);
-		result+=Utils.refCount(metadata);
+		result+=Cells.refCount(stakes);
+		result+=Cells.refCount(metadata);
 		return result;
 	}
 	
 	@Override 
 	public <R extends ACell> Ref<R> getRef(int i) {
-		int sc=Utils.refCount(stakes);
+		int sc=Cells.refCount(stakes);
 		if (i<sc) {
 			return stakes.getRef(i);
 		} else {

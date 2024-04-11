@@ -225,7 +225,7 @@ public class BlockResult extends ARecord {
 	
 	@Override 
 	public <R extends ACell> Ref<R> getRef(int i) {
-		int sc=Utils.refCount(state);
+		int sc=Cells.refCount(state);
 		if (i<sc) {
 			return state.getRef(i);
 		} else {
