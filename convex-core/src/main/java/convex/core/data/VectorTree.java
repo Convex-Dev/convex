@@ -541,9 +541,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		return this;
 	}
 	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
 
 	@SuppressWarnings("unchecked")
 	@Override

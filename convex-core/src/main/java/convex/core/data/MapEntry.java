@@ -268,11 +268,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return pos;
 	}
 
-	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
-
 	@Override
 	public int estimatedEncodingSize() {
 		return 1+Format.MAX_EMBEDDED_LENGTH*2; // header plus two embedded objects

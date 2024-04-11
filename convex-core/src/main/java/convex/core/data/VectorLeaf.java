@@ -548,10 +548,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	public ACell toCanonical() {
 		return this;
 	}
-	
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
 
 	@Override
 	public int getRefCount() {

@@ -241,10 +241,6 @@ public class List<T extends ACell> extends AList<T> {
 		return true;
 	}
 	
-	@Override public final boolean isCVMValue() {
-		return data.isCVMValue(); // TODO: always true?
-	}
-	
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.append('(');
