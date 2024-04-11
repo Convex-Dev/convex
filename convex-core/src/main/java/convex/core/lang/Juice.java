@@ -215,11 +215,7 @@ public class Juice {
 	/**
 	 * Juice per byte for any signed transaction
 	 */
-	public static final long TRANSACTION_PER_BYTE = 5;
-
-
-
-	public static final long SIMPLE_MACRO = 200;
+	public static final long TRANSACTION_PER_BYTE = 20;
 
 	/**
 	 * Juice for a recur form
@@ -341,7 +337,7 @@ public class Juice {
 
 	public static final long QUERY = Juice.CHEAP_OP;
 
-	public static final long LOG = 100;
+	public static final long LOG = 1000;
 
 	public static final long SPECIAL = Juice.CHEAP_OP;
 
