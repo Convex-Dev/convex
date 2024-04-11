@@ -36,6 +36,7 @@ import convex.core.lang.impl.RecordFormat;
  * <li>Message ID</li>
  * <li>Result value</li>
  * <li>Error Code</li>
+ * <li>Log Records</li>
  * <li>Additional info</li>
  * </ol>
  * 
@@ -102,7 +103,7 @@ public final class Result extends ARecordGeneric {
 	 * @return ID from this result
 	 */
 	public ACell getID() {
-		return values.get(0);
+		return values.get(ID_POS);
 	}
 	
 	/**

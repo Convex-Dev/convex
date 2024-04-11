@@ -41,6 +41,19 @@ public abstract class ARecordGeneric extends ARecord {
 		return values.getRefCount();
 	}
 	
+	/**
+	 * Writes the raw fields of this record in declared order
+	 * @param bs Array to write to
+	 */
+	@Override
+	public int encodeRaw(byte[] bs, int pos) {
+		AVector<Keyword> keys=getKeys();
+		for (Keyword key: keys) {
+			pos=Format.write(bs,pos, get(key));
+		}
+		return pos;
+	}
+	
 	@Override 
 	public boolean equals(ACell a) {
 		if (!(a instanceof ARecordGeneric)) return false;

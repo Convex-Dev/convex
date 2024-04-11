@@ -39,7 +39,7 @@ public final class Syntax extends ACell {
 
 	/** 
 	 * Metadata map
-	 * Never null, but if empty, gets encoded as null in byte encoding
+	 * Never null logically, but if empty, gets encoded as null in byte encoding
 	 */
 	private final AHashMap<ACell, ACell> meta;
 
@@ -223,8 +223,12 @@ public final class Syntax extends ACell {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
-		if (datumRef.getValue() instanceof Syntax) {
-			throw new InvalidDataException("Cannot double-wrap a Syntax value",this);
+		ACell datum=datumRef.getValue();
+		if (datum!=null) {
+			if (datum instanceof Syntax) {
+				throw new InvalidDataException("Cannot double-wrap a Syntax value",this);
+			}
+			if (!datum.isCVMValue()) throw new InvalidDataException("Syntax can only wrap CVM values",this);
 		}
 	}
 

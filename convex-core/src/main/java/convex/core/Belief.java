@@ -166,6 +166,16 @@ public class Belief extends ARecord {
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
+	
+	/**
+	 * Encodes this Belief
+	 * @param bs Array to write to
+	 */
+	@Override
+	public int encodeRaw(byte[] bs, int pos) {
+		pos=Format.write(bs,pos, orders);
+		return pos;
+	}
 
 
 	@Override

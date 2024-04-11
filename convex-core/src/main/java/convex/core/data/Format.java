@@ -12,6 +12,7 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.BlockResult;
 import convex.core.Order;
+import convex.core.Receipt;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.data.prim.ANumeric;
@@ -30,7 +31,6 @@ import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.MultiFn;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.transactions.ATransaction;
 import convex.core.transactions.Call;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
@@ -511,6 +511,9 @@ public class Format {
 			AFn<?> fn = Fn.read(b,pos);
 			return fn;
 		}
+		
+		if (tag == Tag.PEER_STATUS) return PeerStatus.read(b,pos);
+		if (tag == Tag.ACCOUNT_STATUS) return AccountStatus.read(b,pos); 
 
 		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
 	}
@@ -583,22 +586,21 @@ public class Format {
 			if (high == 0x10) return (T) readNumeric(tag,blob,offset);
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
-			if (tag == Tag.ADDRESS) return (T) Address.readRaw(blob,offset);
+			if (tag == Tag.ADDRESS) return (T) Address.read(blob,offset);
 			
-			if ((tag & 0xF0) == 0x80) return readDataStructure(tag,blob,offset);
+			if (high == 0xE0) return (T) readOp(tag,blob,offset);
 			
-			if ((tag & 0xF0) == 0x90) return (T) readSignedData(tag,blob, offset); 
+			if (high == 0xC0) return (T) readCode(tag,blob,offset);
 
-			if ((tag & 0xF0) == 0xA0) return (T) readRecord(tag,blob,offset);
-
-			if ((tag & 0xF0) == 0xD0) return (T) readTransaction(tag, blob, offset);
-
-			if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(blob,offset);
-			if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(blob,offset); 
-
-			if ((tag & 0xF0) == 0xC0) return (T) readCode(tag,blob,offset);
+			if (high == 0x80) return readDataStructure(tag,blob,offset);
 			
-			if ((tag & 0xF0) == 0xE0) return (T) readOp(tag,blob,offset);
+			if (high == 0x90) return (T) readSignedData(tag,blob, offset); 
+			
+
+			if (high == 0xD0) return (T) readTransaction(tag, blob, offset);
+
+			if (high == 0xA0) return (T) readRecord(tag,blob,offset);
+
 
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
@@ -661,6 +663,7 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
+
 		if (tag == Tag.BLOCK) {
 			return (T) Block.read(b,pos);
 		}
@@ -685,15 +688,20 @@ public class Format {
 		throw new BadFormatException(badTagMessage(tag));
 	}
 
-	private static ATransaction readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
+	@SuppressWarnings("unchecked")
+	private static <T extends ACell> T readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
+		if ((byte)(tag & Tag.RECEIPT_MASK) == Tag.RECEIPT) {
+			return (T) Receipt.read(tag,b,pos);
+		}
+
 		if (tag == Tag.INVOKE) {
-			return Invoke.read(b,pos);
+			return (T) Invoke.read(b,pos);
 		} else if (tag == Tag.TRANSFER) {
-			return Transfer.read(b,pos);
+			return (T) Transfer.read(b,pos);
 		} else if (tag == Tag.CALL) {
-			return Call.read(b,pos);
+			return (T) Call.read(b,pos);
 		} else if (tag == Tag.MULTI) {
-			return Multi.read(b,pos);
+			return (T) Multi.read(b,pos);
 		}
 		throw new BadFormatException(badTagMessage(tag));
 	}

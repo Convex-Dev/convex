@@ -162,15 +162,14 @@ public final class Address extends ALongBlob {
 		return null;
 	}
 	
-	public static Address readRaw(Blob b, int pos) throws BadFormatException {
-		long value=Format.readVLCCount(b,pos+1); // skip tag
+	public static Address read(Blob b, int pos) throws BadFormatException {
+		long value=Format.readVLCCount(b,pos+1); // skip tag, we assume correct
 		Address a= Address.create(value);
 		if (a==null) throw new BadFormatException("Invalid Address: "+value);
 		int epos=pos+1+Format.getVLCCountLength(value);
 		a.attachEncoding(b.slice(pos, epos));
 		return a;
 	}
-
 
 	@Override
 	public int encode(byte[] bs, int pos) {

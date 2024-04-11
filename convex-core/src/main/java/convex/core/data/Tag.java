@@ -55,6 +55,7 @@ public class Tag {
 
 	// Record data structures
 	public static final byte STATE = (byte) 0xA0;
+
 	public static final byte BELIEF = (byte) 0xAA;
 	public static final byte BLOCK = (byte) 0xAB;
 	public static final byte ORDER = (byte) 0xAC;
@@ -80,6 +81,12 @@ public class Tag {
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
 	public static final byte MULTI = (byte) 0xD3;
+	
+	public static final byte RECEIPT = (byte) 0xD8;
+	public static final byte RECEIPT_MASK = (byte) 0xFC; // 11111100
+	public static final byte RECEIPT_ERROR_MASK = (byte) 0x01;
+	public static final byte RECEIPT_LOG_MASK = (byte) 0x02;
+
 	
 	// Op execution
 	

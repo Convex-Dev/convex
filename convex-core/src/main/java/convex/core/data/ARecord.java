@@ -2,7 +2,6 @@ package convex.core.data;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -54,18 +53,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		return true;
 	}
 	
-	/**
-	 * Writes the raw fields of this record in declared order
-	 * @param bs Array to write to
-	 */
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		List<Keyword> keys=getKeys();
-		for (Keyword key: keys) {
-			pos=Format.write(bs,pos, get(key));
-		}
-		return pos;
-	}
+
 
 	/**
 	 * Gets a vector of keys for this record

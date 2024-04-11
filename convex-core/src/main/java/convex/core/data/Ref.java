@@ -681,7 +681,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T update(T o, IRefFunction func) {
-		if (o==null) return o;
+		if (o==null) return null;
 		return (T) o.updateRefs(func);
 	}
 
