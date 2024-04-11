@@ -4,6 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -117,8 +118,8 @@ public class Receipt extends ARecord {
 	public boolean equals(Receipt a) {
 		if (a==this) return true;
 		if (this.isError!=a.isError) return false;
-		if (!Utils.equals(result, a.result)) return false;
-		if (!Utils.equals(log, a.log)) return false;
+		if (!Cells.equals(result, a.result)) return false;
+		if (!Cells.equals(log, a.log)) return false;
 		return true;
 	}
 

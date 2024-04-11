@@ -26,6 +26,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.BlobBuilder;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.IAssociative;
 import convex.core.data.Keyword;
@@ -72,7 +73,7 @@ public class RT {
 	 */
 	public static <T extends ACell> Boolean allEqual(T[] values) {
 		for (int i = 0; i < values.length - 1; i++) {
-			if (!Utils.equals(values[i], values[i + 1]))
+			if (!Cells.equals(values[i], values[i + 1]))
 				return false;
 		}
 		return true;
@@ -695,7 +696,7 @@ public class RT {
 			return castVector((ACell) o);
 
 		if (o.getClass().isArray()) {
-			ACell[] arr = Utils.toCellArray(o);
+			ACell[] arr = Cells.toCellArray(o);
 			return Vectors.create(arr);
 		}
 

@@ -103,7 +103,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			Ref<T> e = elements[i];
-			if (Utils.equals(k, e.getValue())) return e;
+			if (Cells.equals(k, e.getValue())) return e;
 		}
 		return null;
 	}
@@ -132,7 +132,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	private int seek(T key) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			if (Utils.equals(key, elements[i].getValue())) return i;
+			if (Cells.equals(key, elements[i].getValue())) return i;
 		}
 		return -1;
 	}

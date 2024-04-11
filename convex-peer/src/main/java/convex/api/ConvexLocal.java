@@ -11,6 +11,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -19,7 +20,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
-import convex.core.util.Utils;
 import convex.net.MessageType;
 import convex.net.message.MessageLocal;
 import convex.peer.Server;
@@ -140,7 +140,7 @@ public class ConvexLocal extends Convex {
 	
 	@Override
 	public long getSequence(Address addr) {
-		if (Utils.equals(address, addr)) return getSequence();
+		if (Cells.equals(address, addr)) return getSequence();
 		return getState().getAccount(addr).getSequence();
 	}
 

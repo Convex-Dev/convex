@@ -35,17 +35,12 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import convex.core.Constants;
-import convex.core.State;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
-import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Ref;
-import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 
@@ -141,11 +136,7 @@ public class Utils {
 		sb.append(toHexChar(((int) value) & 0xF));
 		return sb.toString();
 	}
-	
-	public static void appendHexByte(BlobBuilder bb, byte b) {
-		bb.append(toHexChar((b & 0xF0) >>> 4));
-		bb.append(toHexChar((b & 0xF)));
-	}
+
 
 	/**
 	 * Converts a long value to a 16 character hex string
@@ -302,16 +293,6 @@ public class Utils {
 		byte[] bytes = new byte[len];
 		bb.get(bytes);
 		return bytes;
-	}
-
-	/**
-	 * Reads ByteBuffer contents into a new Data object
-	 *
-	 * @param bb ByteBuffer
-	 * @return Blob extracted from ByteBuffer
-	 */
-	public static AArrayBlob toData(ByteBuffer bb) {
-		return Blob.wrap(toByteArray(bb));
 	}
 
 	/**
@@ -561,21 +542,6 @@ public class Utils {
 	}
 
 	/**
-	 * Converts any array to an ACell[] array. Elements must be Cells.
-	 *
-	 * @param anyArray Array to convert
-	 * @return ACell[] array
-	 */
-	public static ACell[] toCellArray(Object anyArray) {
-		int n = Array.getLength(anyArray);
-		ACell[] result = new ACell[n];
-		for (int i = 0; i < n; i++) {
-			result[i] = (ACell) Array.get(anyArray, i);
-		}
-		return result;
-	}
-
-	/**
 	 * Equality method allowing for nulls
 	 *
 	 * @param a First value
@@ -586,19 +552,6 @@ public class Utils {
 		if (a == b) return true;
 		if (a == null) return false; // b can't be null because of above line
 		return a.equals(b); // fall back to Object equality
-	}
-
-	/**
-	 * Equality method allowing for nulls
-	 *
-	 * @param a First value
-	 * @param b Second value
-	 * @return true if arguments are equal, false otherwise
-	 */
-	public static boolean equals(ACell a, ACell b) {
-		if (a == b) return true;
-		if (a == null) return false; // b can't be null because of above line
-		return a.equals(b); // fall back to ACell equality
 	}
 
 	/**
@@ -1382,22 +1335,6 @@ public class Utils {
 	    				.map(CompletableFuture::join)
 	    				.collect(Collectors.toList())
 	    				);
-	}
-
-	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
-		return binarySearchLeftmost(states, State::getTimestamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
-	}
-
-	public static AVector<State> statesAsOfRange(AVector<State> states, CVMLong timestamp, long interval, int count) {
-		AVector<State> v = Vectors.empty();
-
-		for (int i = 0; i < count; i++) {
-			v = v.conj(stateAsOf(states, timestamp));
-
-			timestamp = CVMLong.create(timestamp.longValue() + interval);
-		}
-
-		return v;
 	}
 
 	public static boolean bool(Object a) {

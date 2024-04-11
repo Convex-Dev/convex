@@ -8,6 +8,7 @@ import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -203,10 +204,10 @@ public final class Block extends ARecord {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return Cells.equals(h, ha);
 		}
 		
-		if (!(Utils.equals(transactions, a.transactions))) return false;
+		if (!(Cells.equals(transactions, a.transactions))) return false;
 		return true;
 	}
 

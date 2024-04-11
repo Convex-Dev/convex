@@ -8,7 +8,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Node representing a signed data object.
@@ -385,7 +384,7 @@ public final class SignedData<T extends ACell> extends ARecord {
 		@SuppressWarnings("unchecked")
 		SignedData<T> b=(SignedData<T>) o;
 		if (!signature.equals(b.signature)) return false;
-		if (!Utils.equals(pubKey,b.pubKey)) return false;
+		if (!Cells.equals(pubKey,b.pubKey)) return false;
 		
 		return valueRef.equals(b.valueRef);
 	}

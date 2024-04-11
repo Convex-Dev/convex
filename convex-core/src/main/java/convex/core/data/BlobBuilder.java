@@ -207,6 +207,11 @@ public class BlobBuilder {
 			return append(CVMChar.create(c));
 		}
 	}
+	
+	public void appendHexByte(byte b) {
+		append(Utils.toHexChar((b & 0xF0) >>> 4));
+		append(Utils.toHexChar((b & 0xF)));
+	}
 
 	/**
 	 * Append a CVM character to this Blob
@@ -271,7 +276,4 @@ public class BlobBuilder {
 		tail=null;
 		count=0;
 	}
-
-
-
 }

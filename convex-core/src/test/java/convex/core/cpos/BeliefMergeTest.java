@@ -24,6 +24,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.EncodingTest;
 import convex.core.data.Index;
 import convex.core.data.PeerStatus;
@@ -37,7 +38,6 @@ import convex.core.lang.RT;
 import convex.core.text.Text;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
-import convex.core.util.Utils;
 
 @Execution(value = ExecutionMode.CONCURRENT)
 public class BeliefMergeTest {
@@ -360,7 +360,7 @@ public class BeliefMergeTest {
 	private boolean allBeliefsEqual(Peer[] pss) {
 		int n = pss.length;
 		for (int i = 0; i < n - 1; i++) {
-			if (!Utils.equals(pss[i].getBelief(), pss[i + 1].getBelief())) return false;
+			if (!Cells.equals(pss[i].getBelief(), pss[i + 1].getBelief())) return false;
 		}
 		return true;
 	}

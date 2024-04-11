@@ -805,7 +805,7 @@ public class Format {
 	public static ACell[] decodeCells(Blob data) throws BadFormatException {
 		long ml=data.count();
 		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
-		if (ml==0) return ACell.EMPTY_ARRAY;
+		if (ml==0) return Cells.EMPTY_ARRAY;
 		
 		ArrayList<ACell> cells=new ArrayList<>();
 		ACell first=Format.read(data, 0);

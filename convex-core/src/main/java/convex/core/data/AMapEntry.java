@@ -8,7 +8,6 @@ import java.util.function.Predicate;
 
 import convex.core.exceptions.TODOException;
 import convex.core.util.Errors;
-import convex.core.util.Utils;
 
 public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVector<ACell> implements Map.Entry<K, V> {
 
@@ -89,9 +88,9 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 		if (b == this) return 2;
 		long bc = b.count();
 		if (bc == 0) return 0;
-		if (!Utils.equals(getKey(), b.get(0))) return 0;
+		if (!Cells.equals(getKey(), b.get(0))) return 0;
 		if (bc == 1) return 1;
-		if (!Utils.equals(getValue(), b.get(1))) return 1;
+		if (!Cells.equals(getValue(), b.get(1))) return 1;
 		return 2;
 	}
 

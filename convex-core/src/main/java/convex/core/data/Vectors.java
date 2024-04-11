@@ -74,7 +74,7 @@ public class Vectors {
 	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> elements) {
 		if (elements instanceof ASequence) return create((ASequence<R>) elements);
 		if (elements.size() == 0) return empty();
-		ACell[] cells=Utils.toCellArray(elements.toArray());
+		ACell[] cells=Cells.toCellArray(elements.toArray());
 		return (AVector<R>) create(cells);
 	}
 	

@@ -141,7 +141,7 @@ public abstract class AArrayBlob extends ABlob {
 		long nbytes= Math.min(hexLength/2, this.length); // Bytes to print
 		for (long i=0; i<nbytes; i++) {
 			byte b=byteAt(i);
-			Utils.appendHexByte(bb,b);
+			bb.appendHexByte(b);
 		}
 		return nbytes==this.length;
 	}

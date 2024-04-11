@@ -9,6 +9,7 @@ import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -23,7 +24,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Class representing a Peer's view of the overall network consensus state.
@@ -227,7 +227,7 @@ public class Belief extends ARecord {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return Cells.equals(h, ha);
 		}
 
 		if (!orders.equals(a.orders)) return false;

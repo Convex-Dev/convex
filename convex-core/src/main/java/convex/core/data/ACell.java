@@ -22,13 +22,6 @@ import convex.core.util.Utils;
  * to have 10 functions operate on 10 data structures." - Alan Perlis
  */
 public abstract class ACell extends AObject implements IWriteable, IValidated {
-
-	
-	/**
-	 * An empty Java array of cells
-	 */
-	public static final ACell[] EMPTY_ARRAY = new ACell[0];
-
 	/**
 	 * We cache the computed memorySize. May be 0 for embedded objects
 	 * -1 is initial value for when size is not calculated
@@ -363,10 +356,14 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract ACell toCanonical();
 	
 	/**
-	 * Returns true if this Cell represents a first class CVM Value allowable in the CVM state
+	 * Returns true if this cell instances represents a first class CVM Value allowable in the CVM state
 	 * 
 	 * Sub-structural cells that are not themselves first class values
-	 * should return false, pretty much everything else should return true.
+	 * should return false
+	 * 
+	 * Records and types that are not permissible on the CVM should return false.
+	 * 
+	 * Pretty much everything else should return true.
 	 * 
 	 * Note: CVM values might not be in a canonical format, e.g. temporary data structures
 	 * 
@@ -578,7 +575,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if completely encoded, false otherwise
 	 */
 	public boolean isCompletelyEncoded() {
-		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true; // fast path
+		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true; // fast path for fully embedded
 		if (!isCanonical()) {
 			throw new Error("Checking whether a non-canonical cell is encoded. Not a good idea, any ref assumptions may be invalid: "+this.getType());
 		}

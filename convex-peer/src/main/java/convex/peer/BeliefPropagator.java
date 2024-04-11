@@ -21,6 +21,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Index;
 import convex.core.data.Format;
 import convex.core.data.Hash;
@@ -329,7 +330,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						AccountKey key=so.getAccountKey();
 						
 						// Check if this Order could replace existing Order
-						if (Utils.equals(myKey, key)) continue; // skip own order
+						if (Cells.equals(myKey, key)) continue; // skip own order
 						if (orders.containsKey(key)) {
 							Order newOrder=so.getValue();
 							Order oldOrder=orders.get(key).getValue();

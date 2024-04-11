@@ -27,6 +27,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Index;
@@ -2612,7 +2613,7 @@ public class Core {
 				// 2 arg form of reduce must apply function directly to 0 or 1 elements
 				int initial=(int)Math.min(2,n); // number of initial arguments to consume
 				if (initial==0) {
-					return reduceResult(ctx.invoke(fn, ACell.EMPTY_ARRAY));
+					return reduceResult(ctx.invoke(fn, Cells.EMPTY_ARRAY));
 				} else if (initial==1) {
 					return reduceResult(ctx.invoke(fn, new ACell[] {seq.get(0)}));
 				}

@@ -136,7 +136,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 			return hash.equals(a.hash);
 		}
 		// compare by value
-		return Utils.equals(getValue(),a.getValue());
+		return Cells.equals(getValue(),a.getValue());
 	}
 
 	@Override

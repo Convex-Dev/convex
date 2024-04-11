@@ -96,7 +96,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			MapEntry<K, V> e = entries[i];
-			if (Utils.equals(k, e.getKey())) return e;
+			if (Cells.equals(k, e.getKey())) return e;
 		}
 		return null;
 	}
@@ -125,7 +125,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public boolean containsValue(ACell value) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			if (Utils.equals(value, entries[i].getValue())) return true;
+			if (Cells.equals(value, entries[i].getValue())) return true;
 		}
 		return false;
 	}
@@ -146,7 +146,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	private int seek(K key) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			if (Utils.equals(key, entries[i].getKey())) return i;
+			if (Cells.equals(key, entries[i].getKey())) return i;
 		}
 		return -1;
 	}
@@ -233,8 +233,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// first check for update with existing key
 		for (int i = 0; i < len; i++) {
 			MapEntry<K, V> me = entries[i];
-			if (Utils.equals(me.getKey(), key)) {
-				if (Utils.equals(me.getValue(), value)) return this;
+			if (Cells.equals(me.getKey(), key)) {
+				if (Cells.equals(me.getValue(), value)) return this;
 				MapEntry<K, V> newEntry = me.withValue(value);
 				if (me == newEntry) return this;
 
@@ -588,7 +588,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 				// keys are equal (i.e. value in both maps)
 				V av = ae.getValue();
 				V bv = be.getValue();
-				V r = (Utils.equals(av, bv)) ? av : func.merge(ae.getValue(), be.getValue());
+				V r = (Cells.equals(av, bv)) ? av : func.merge(ae.getValue(), be.getValue());
 				if (r != null) newE = ae.withValue(r);
 			}
 			if ((results == null) && (newE != ((c <= 0) ? ae : null))) {

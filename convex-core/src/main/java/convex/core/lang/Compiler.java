@@ -15,6 +15,7 @@ import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
@@ -41,7 +42,6 @@ import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
 import convex.core.lang.ops.Special;
-import convex.core.util.Utils;
 
 /**
  * Compiler class responsible for transforming forms (code as data) into an
@@ -371,7 +371,7 @@ public class Compiler {
 		AList<ACell> list = (AList<ACell>) form;
 		if (list.count() == 0) return false;
 		ACell firstElement=list.get(0);
-		return Utils.equals(element, Syntax.unwrap(firstElement));
+		return Cells.equals(element, Syntax.unwrap(firstElement));
 	}
 
 	@SuppressWarnings("unchecked")

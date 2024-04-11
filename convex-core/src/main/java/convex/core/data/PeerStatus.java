@@ -309,14 +309,14 @@ public class PeerStatus extends ARecord {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return Cells.equals(h, ha);
 		}
 		
 		if (stake!=a.stake) return false;
 		if (delegatedStake!=a.delegatedStake) return false;
-		if (!(Utils.equals(stakes, a.stakes))) return false;
-		if (!(Utils.equals(metadata, a.metadata))) return false;
-		if (!(Utils.equals(controller, a.controller))) return false;
+		if (!(Cells.equals(stakes, a.stakes))) return false;
+		if (!(Cells.equals(metadata, a.metadata))) return false;
+		if (!(Cells.equals(controller, a.controller))) return false;
 		return true;
 	}
 

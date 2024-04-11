@@ -24,6 +24,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -342,7 +343,7 @@ public class TransactionHandler extends AThreadedComponent{
 			if (address==null) break trySetHostname;
 			AccountStatus as=s.getAccount(address);
 			if (as==null) break trySetHostname;
-			if (!Utils.equals(peerKey, as.getAccountKey())) break trySetHostname;
+			if (!Cells.equals(peerKey, as.getAccountKey())) break trySetHostname;
 
 			String code;
 			if (desiredHostname==null) {

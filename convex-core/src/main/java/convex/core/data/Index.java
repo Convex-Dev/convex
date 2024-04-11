@@ -798,7 +798,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (n != a.count()) return false;
 		if (this.mask!=a.mask) return false;
 		
-		if (!Utils.equals(this.entry, a.entry)) return false;
+		if (!Cells.equals(this.entry, a.entry)) return false;
 		
 		return getHash().equals(a.getHash());
 	}
@@ -815,7 +815,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public boolean containsValue(ACell value) {
-		if ((entry!=null)&&Utils.equals(value, entry.getValue())) return true;
+		if ((entry!=null)&&Cells.equals(value, entry.getValue())) return true;
 		for (Ref<Index<K,V>> cr : children) {
 			if (cr.getValue().containsValue(value)) return true;
 		}

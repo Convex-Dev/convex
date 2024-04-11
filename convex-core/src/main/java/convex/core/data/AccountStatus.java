@@ -7,7 +7,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
 import convex.core.lang.RT;
 import convex.core.lang.impl.RecordFormat;
-import convex.core.util.Utils;
 
 /**
  * Class representing the current on-chain status of an account.
@@ -320,12 +319,12 @@ public class AccountStatus extends ARecord {
 		if (balance!=a.balance) return false;
 		if (sequence!=a.sequence) return false;
 		if (memory!=a.memory) return false;
-		if (!(Utils.equals(publicKey, a.publicKey))) return false;
-		if (!(Utils.equals(controller, a.controller))) return false;
-		if (!(Utils.equals(holdings, a.holdings))) return false;
-		if (!(Utils.equals(metadata, a.metadata))) return false;
-		if (!(Utils.equals(environment, a.environment))) return false;
-		if (!(Utils.equals(parent, a.parent))) return false;
+		if (!(Cells.equals(publicKey, a.publicKey))) return false;
+		if (!(Cells.equals(controller, a.controller))) return false;
+		if (!(Cells.equals(holdings, a.holdings))) return false;
+		if (!(Cells.equals(metadata, a.metadata))) return false;
+		if (!(Cells.equals(environment, a.environment))) return false;
+		if (!(Cells.equals(parent, a.parent))) return false;
 		return true;
 	}
 

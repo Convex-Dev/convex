@@ -25,6 +25,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -254,7 +255,7 @@ public abstract class Convex {
 	 * @throws TimeoutException If the request times out
 	 */
 	public long getSequence(Address addr) throws TimeoutException, IOException {
-		if (Utils.equals(getAddress(), addr)) return getSequence();
+		if (Cells.equals(getAddress(), addr)) return getSequence();
 		return lookupSequence(addr);
 	}
 	
@@ -283,7 +284,7 @@ public abstract class Convex {
 		try {
 			ATransaction trans=signed.getValue();
 			if (!isAutoSequence()) return;
-			if (!Utils.equals(trans.getOrigin(),address)) return;
+			if (!Cells.equals(trans.getOrigin(),address)) return;
 			Long seq=this.sequence;
 			if (seq==null) return;
 			seq++;
@@ -405,7 +406,7 @@ public abstract class Convex {
 		if (autoSequence||(originalSeq<=0)) {		
 			if (seq <= 0) {		
 				// apply sequence if using expected address
-				if (Utils.equals(origin, address)) {
+				if (Cells.equals(origin, address)) {
 					seq = getNextSequence(transaction);
 				}
 			}
@@ -432,7 +433,7 @@ public abstract class Convex {
 		}
 		
 		// Store updated sequence number, ready for next transaction
-		if (Utils.equals(origin, address)) { 
+		if (Cells.equals(origin, address)) { 
 			this.sequence=seq;
 		}		
 		

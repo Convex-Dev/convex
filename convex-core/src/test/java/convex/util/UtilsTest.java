@@ -393,7 +393,7 @@ public class UtilsTest {
 			states = states.conj(state1);
 		}
 
-		AVector<State> statesInRange = Utils.statesAsOfRange(states, STATE.getTimestamp(), 1000, 2);
+		AVector<State> statesInRange = State.statesAsOfRange(states, STATE.getTimestamp(), 1000, 2);
 
 		assertEquals(2, statesInRange.count());
 

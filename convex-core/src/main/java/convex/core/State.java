@@ -1,6 +1,7 @@
 package convex.core;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -862,13 +864,13 @@ public class State extends ARecord {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return Cells.equals(h, ha);
 		}
 		
-		if (!(Utils.equals(accounts, a.accounts))) return false;
-		if (!(Utils.equals(globals, a.globals))) return false;
-		if (!(Utils.equals(peers, a.peers))) return false;
-		if (!(Utils.equals(schedule, a.schedule))) return false;
+		if (!(Cells.equals(accounts, a.accounts))) return false;
+		if (!(Cells.equals(globals, a.globals))) return false;
+		if (!(Cells.equals(peers, a.peers))) return false;
+		if (!(Cells.equals(schedule, a.schedule))) return false;
 		return true;
 	}
 
@@ -904,6 +906,20 @@ public class State extends ARecord {
 		return (av>=0) &&(av<accounts.count());
 	}
 
+	public static AVector<State> statesAsOfRange(AVector<State> states, CVMLong timestamp, long interval, int count) {
+		AVector<State> v = Vectors.empty();
+	
+		for (int i = 0; i < count; i++) {
+			v = v.conj(stateAsOf(states, timestamp));
+	
+			timestamp = CVMLong.create(timestamp.longValue() + interval);
+		}
+	
+		return v;
+	}
 
+	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
+		return Utils.binarySearchLeftmost(states, State::getTimestamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
+	}
 
 }

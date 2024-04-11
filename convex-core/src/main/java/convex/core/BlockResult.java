@@ -5,6 +5,7 @@ import convex.core.data.ARecord;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -209,11 +210,11 @@ public class BlockResult extends ARecord {
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
-			if (ha!=null) return Utils.equals(h, ha);
+			if (ha!=null) return Cells.equals(h, ha);
 		}
 		
-		if (!(Utils.equals(results, a.results))) return false;
-		if (!(Utils.equals(state, a.state))) return false;
+		if (!(Cells.equals(results, a.results))) return false;
+		if (!(Cells.equals(state, a.state))) return false;
 		return true;
 	}
 
