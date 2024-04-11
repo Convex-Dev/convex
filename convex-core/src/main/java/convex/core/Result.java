@@ -43,9 +43,17 @@ import convex.core.lang.impl.RecordFormat;
  */
 public final class Result extends ARecordGeneric {
 
-	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.INFO);
+	private static final RecordFormat RESULT_FORMAT=RecordFormat.of(Keywords.ID,Keywords.RESULT,Keywords.ERROR,Keywords.LOG,Keywords.INFO);
 	private static final long FIELD_COUNT=RESULT_FORMAT.count();
+
+	private static final long ID_POS=RESULT_FORMAT.indexFor(Keywords.ID);
+	private static final long RESULT_POS=RESULT_FORMAT.indexFor(Keywords.RESULT);
+	private static final long ERROR_POS=RESULT_FORMAT.indexFor(Keywords.ERROR);
 	private static final long INFO_POS=RESULT_FORMAT.indexFor(Keywords.INFO);
+	private static final long LOG_POS=RESULT_FORMAT.indexFor(Keywords.LOG);
+	
+	// internal value used for empty logs
+	private static final AVector<AVector<ACell>> EMPTY_LOG = null;
 	
 	private Result(AVector<ACell> values) {
 		super(RESULT_FORMAT, values);
@@ -64,7 +72,7 @@ public final class Result extends ARecordGeneric {
 	 * @return Result instance
 	 */
 	public static Result create(CVMLong id, ACell value, ACell errorCode, AHashMap<Keyword,ACell> info) {
-		return buildFromVector(Vectors.of(id,value,errorCode,info));
+		return buildFromVector(Vectors.of(id,value,errorCode,EMPTY_LOG,info));
 	}
 	
 	/**
@@ -105,7 +113,7 @@ public final class Result extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getValue() {
-		return (T)values.get(1);
+		return (T)values.get(RESULT_POS);
 	}
 	
 	/**
@@ -130,7 +138,19 @@ public final class Result extends ARecordGeneric {
 	 */
 	@SuppressWarnings("unchecked")
 	public AMap<Keyword,ACell> getInfo() {
-		return (AMap<Keyword, ACell>) values.get(3);
+		return (AMap<Keyword, ACell>) values.get(INFO_POS);
+	}
+	
+	/**
+	 * Returns the log for this Result. May be an empty vector.
+	 * 
+	 * @return Log Vector from this Result
+	 */
+	@SuppressWarnings("unchecked")
+	public AVector<AVector<ACell>> getLog() {
+		AVector<AVector<ACell>> log=(AVector<AVector<ACell>>) values.get(LOG_POS);
+		if (log==null) log=Vectors.empty();
+		return log;
 	}
 	
 	/**
@@ -141,7 +161,7 @@ public final class Result extends ARecordGeneric {
 	 * @return ID from this result
 	 */
 	public ACell getErrorCode() {
-		return values.get(2);
+		return values.get(ERROR_POS);
 	}
 	
 	@Override
@@ -169,14 +189,19 @@ public final class Result extends ARecordGeneric {
 	private static String checkValues(AVector<ACell> values) {
 		if (values.count()!=FIELD_COUNT) return "Wrong number of fields for Result";
 
-		ACell id=values.get(0);
+		ACell id=values.get(ID_POS);
 		if ((id!=null)&&!(id instanceof CVMLong)) {
 			return "Result ID must be a CVM long value";
 		}
 		
-		ACell info=values.get(3);
+		ACell info=values.get(INFO_POS);
 		if ((info!=null)&&!(info instanceof AHashMap)) {
 			return "Result info must be a hash map";
+		}
+		
+		ACell log=values.get(LOG_POS);
+		if ((log!=null)&&!(log instanceof AVector)) {
+			return "Result log must be a Vector";
 		}
 		return null;
 	}
@@ -282,7 +307,7 @@ public final class Result extends ARecordGeneric {
 	 * @return Updated Result
 	 */
 	public Result withID(ACell id) {
-		return withValues(values.assoc(0, id));
+		return withValues(values.assoc(ID_POS, id));
 	}
 
 	@Override

@@ -50,7 +50,7 @@ public class ResultContext {
 		return rc;
 	}
 
-	public Object getErrorCode() {
+	public ACell getErrorCode() {
 		return context.getErrorCode();
 	}
 

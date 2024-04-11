@@ -84,6 +84,7 @@ public class Keywords {
 	public static final Keyword MEM = Keyword.create("mem");
 	public static final Keyword FEES = Keyword.create("fees");
 	public static final Keyword JUICE = Keyword.create("juice");
+	public static final Keyword LOG = Keyword.create("log");
 	
 	public static final Keyword CVM = Keyword.create("cvm");
 
@@ -134,6 +135,7 @@ public class Keywords {
 	
 	// Commond trust keys
 	public static final Keyword CONTROL = Keyword.create("control");
+
 
 
 

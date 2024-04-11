@@ -101,9 +101,9 @@ public class RecordTest {
 	
 	@Test
 	public void testResult() {
-		String s="{:id 4,:result #44,:error nil,:info nil}";
+		String s="{:id 4,:result #44,:error nil,:log nil,:info nil}";
 		AHashMap<Keyword,ACell> m=TestState.eval(s);
-		assertEquals(4,m.count);
+		assertEquals(5,m.count);
 	
 		Result r=Result.create(CVMLong.create(4), Address.create(44), null, null);
 		assertEquals(s,r.toString());

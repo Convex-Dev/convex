@@ -29,8 +29,7 @@ public class BlockResult extends ARecord {
 	private State state;
 	private AVector<Result> results;
 	
-	private static final Keyword[] BLOCKRESULT_KEYS = new Keyword[] { Keywords.STATE,
-			Keywords.RESULTS};
+	private static final Keyword[] BLOCKRESULT_KEYS = new Keyword[] { Keywords.STATE, Keywords.RESULTS};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCKRESULT_KEYS);
 

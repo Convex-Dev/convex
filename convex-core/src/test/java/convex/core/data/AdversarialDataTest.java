@@ -155,8 +155,9 @@ public class AdversarialDataTest {
 	
 	@Test
 	public void testBadResult() {
-		invalidTest(Result.buildFromVector(Vectors.of(Symbols.FOO,null,null,null))); // invalid ID
-		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,Keywords.BAR))); // Invalid info map
+		invalidTest(Result.buildFromVector(Vectors.of(Symbols.FOO,null,null,null,null))); // invalid ID
+		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,null,Keywords.BAR))); // Invalid info map
+		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,CVMLong.ONE,null))); // Invalid log vector
 	}
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
