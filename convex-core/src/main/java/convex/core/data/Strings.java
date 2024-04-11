@@ -94,6 +94,10 @@ public class Strings {
 		return Strings.create(utfBlob);
 	}
 	
+	public static AString create(CVMChar c) {
+		return create(c.toUTFBlob());
+	}
+	
 	private static Blob tryGetASCII(String s) {
 		int n=s.length();
 		byte[] bs=new byte[n];
@@ -194,6 +198,8 @@ public class Strings {
 		}
 		return Strings.create(bb.toBlob());
 	}
+
+
 
 
 }

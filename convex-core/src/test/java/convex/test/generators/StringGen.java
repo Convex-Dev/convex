@@ -6,6 +6,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.AString;
 import convex.core.data.Strings;
+import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 /**
@@ -28,7 +29,9 @@ public class StringGen extends Generator<AString> {
        		case 4: return Samples.MIN_TREE_STRING;
        		case 5: return Samples.RUSSIAN_STRING;
        		case 6: return generate(r,status).append(generate(r,status));
-       	    		
+       		case 7: return Symbols.FOO.getName();
+       		case 8: return Strings.create(Gen.CHAR.generate(r, status));
+     	    		
     		default: {
     			AString BASE=generate(r,status);
     			long n=Math.min(size,BASE.count());

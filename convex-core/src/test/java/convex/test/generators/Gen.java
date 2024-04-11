@@ -35,4 +35,6 @@ public class Gen {
 	public static final SymbolGen SYMBOL = new SymbolGen();
 
 	public static final SetGen SET = new SetGen();
+
+	public static final CharGen CHAR = new CharGen();
 }
