@@ -27,7 +27,7 @@ public class DataStructureGen extends Generator<ADataStructure<ACell>> {
 
 		switch (type) {
 		case 0:
-			return gen().make(MapGen.class).generate(r, status);
+			return gen().make(HashMapGen.class).generate(r, status);
 		case 1:
 			return gen().make(VectorGen.class).generate(r, status);
 		case 2:

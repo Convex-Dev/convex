@@ -26,18 +26,18 @@ public class VectorGen extends Generator<AVector> {
 		int type = r.nextInt(15);
 		switch (type) {
 		case 0: {
-			Object o = gen().make(PrimitiveGen.class).generate(r, status);
+			ACell o = gen().make(PrimitiveGen.class).generate(r, status);
 			return Vectors.of(o);
 		}
 		case 1: {
-			Object o1 = gen().make(PrimitiveGen.class).generate(r, status);
-			Object o2 = gen().make(StringGen.class).generate(r, status);
+			ACell o1 = gen().make(PrimitiveGen.class).generate(r, status);
+			ACell o2 = gen().make(StringGen.class).generate(r, status);
 			return Vectors.of(o1, o2);
 		}
 		case 2: {
-			Object o1 = gen().make(ValueGen.class).generate(r, status);
-			Object o2 = gen().make(StringGen.class).generate(r, status);
-			Object o3 = gen().make(FormGen.class).generate(r, status);
+			ACell o1 = gen().make(ValueGen.class).generate(r, status);
+			ACell o2 = gen().make(StringGen.class).generate(r, status);
+			ACell o3 = gen().make(FormGen.class).generate(r, status);
 			return Vectors.of(o1, o2, o3);
 		}
 
@@ -58,12 +58,12 @@ public class VectorGen extends Generator<AVector> {
 		}
 		default: {
 			int n = (int) (1 + (Math.sqrt(status.size())));
-			Object[] obs = new Object[n];
+			ACell[] obs = new ACell[n];
 			ValueGen g = gen().make(ValueGen.class);
 			for (int i = 0; i < n; i++) {
 				obs[i] = g.generate(r, status);
 			}
-			return Vectors.of(obs);
+			return Vectors.create(obs);
 		}
 		}
 	}

@@ -11,7 +11,7 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
-import convex.test.generators.MapGen;
+import convex.test.generators.HashMapGen;
 import convex.test.generators.PrimitiveGen;
 
 @RunWith(JUnitQuickcheck.class)
@@ -19,7 +19,7 @@ public class GenTestMap {
 
 	@SuppressWarnings({ "rawtypes" })
 	@Property
-	public void primitiveAssoc(@From(MapGen.class) AHashMap m, @From(PrimitiveGen.class) ACell prim) {
+	public void primitiveAssoc(@From(HashMapGen.class) AHashMap m, @From(PrimitiveGen.class) ACell prim) {
 		long n = m.count();
 		long expectedN = (m.containsKey(prim)) ? n : n + 1;
 
@@ -37,7 +37,7 @@ public class GenTestMap {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
-	public void mapToIdentity(@From(MapGen.class) AHashMap m) {
+	public void mapToIdentity(@From(HashMapGen.class) AHashMap m) {
 		AHashMap<ACell, ACell> m2 = m.mapEntries(e -> e);
 
 		// check that the map is unchanged
@@ -46,7 +46,7 @@ public class GenTestMap {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void merging1(@From(MapGen.class) AHashMap m) {
+	public void merging1(@From(HashMapGen.class) AHashMap m) {
 		m = m.filterValues(v -> v != null); // don't want null values, to avoid accidental entry removal
 
 		AMap<ACell, ACell> m1 = m.mergeWith(m, (a, b) -> a);
@@ -62,8 +62,8 @@ public class GenTestMap {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void merging2(@From(MapGen.class) AHashMap a,
-			@From(MapGen.class) AHashMap b) {
+	public void merging2(@From(HashMapGen.class) AHashMap a,
+			@From(HashMapGen.class) AHashMap b) {
 		long[] c = new long[] { 0L };
 		a.mergeWith(b, (va, vb) -> ((c[0]++ & 1) == 0L) ? va : vb);
 		assertTrue(c[0] >= Math.max(a.count(), b.count()));

@@ -8,6 +8,7 @@ import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Sets;
+import convex.core.data.prim.CVMLong;
 import convex.test.Samples;
 
 /**
@@ -24,7 +25,7 @@ public class SetGen extends Generator<ASet> {
 	public ASet generate(SourceOfRandomness r, GenerationStatus status) {
 
 		int type = r.nextInt();
-		switch (type % 6) {
+		switch (type % 10) {
 		case 0:
 			return Sets.empty();
 		case 1: {
@@ -37,6 +38,8 @@ public class SetGen extends Generator<ASet> {
 			return Samples.LONG_SET_10;
 		case 4:
 			return Samples.LONG_SET_100;
+		case 5:
+			return Sets.of(CVMLong.create(r.nextLong(-status.size(),status.size())));
 		default: {
 			AVector<ACell> o1 = gen().make(VectorGen.class).generate(r, status);
 			return Sets.create(o1);

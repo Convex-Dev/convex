@@ -32,7 +32,7 @@ public class ValueGen extends Generator<ACell> {
 		case 4:
 			return gen().make(ListGen.class).generate(r, status);
 		case 5:
-			return gen().make(MapGen.class).generate(r, status);
+			return gen().make(HashMapGen.class).generate(r, status);
 		case 6:
 			return gen().make(SetGen.class).generate(r, status);
 		case 7:

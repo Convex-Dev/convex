@@ -15,8 +15,8 @@ import convex.test.Samples;
  *
  */
 @SuppressWarnings("rawtypes")
-public class MapGen extends Generator<AHashMap> {
-    public MapGen() {
+public class HashMapGen extends Generator<AHashMap> {
+    public HashMapGen() {
         super(AHashMap.class);
     }
 
@@ -39,7 +39,7 @@ public class MapGen extends Generator<AHashMap> {
     		
     		default: {
     			AVector<?> vec=gen().make(VectorGen.class).generate(r, status);
-    			vec=(AVector<?>) vec.subList(0, vec.size()&(~1));
+    			vec=vec.slice(0, vec.size()&(~1));
     			Object[] os=vec.toArray();
     			return Maps.of(os);
     		}

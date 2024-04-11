@@ -14,7 +14,7 @@ import convex.core.data.Maps;
 import convex.test.Samples;
 
 /**
- * Generator for arbitrary maps, including Indexess
+ * Generator for arbitrary maps, including Indexes
  *
  */
 @SuppressWarnings("rawtypes")
