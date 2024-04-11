@@ -1,7 +1,7 @@
 package convex.test.generators;
 
+import com.pholser.junit.quickcheck.generator.ComponentizedGenerator;
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ACell;
@@ -15,7 +15,7 @@ import convex.test.Samples;
  *
  */
 @SuppressWarnings("rawtypes")
-public class VectorGen extends Generator<AVector> {
+public class VectorGen extends ComponentizedGenerator<AVector> {
 	public VectorGen() {
 		super(AVector.class);
 	}
@@ -67,4 +67,8 @@ public class VectorGen extends Generator<AVector> {
 		}
 		}
 	}
+	
+    @Override public int numberOfNeededComponents() {
+        return 1;
+    }
 }

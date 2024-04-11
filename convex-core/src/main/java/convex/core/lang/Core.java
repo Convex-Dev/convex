@@ -1414,7 +1414,7 @@ public class Core {
 			ASet<ACell> s0=RT.ensureSet(args[0]);
 			if (s0==null) return context.withCastError(args[0], Types.SET);
 
-			long juice = Juice.SET_COMPARE_PER_ELEMENT*s0.count();
+			long juice = Juice.SIMPLE_FN+Juice.SET_COMPARE_PER_ELEMENT*s0.count();
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			ASet<ACell> s1=RT.ensureSet(args[1]);

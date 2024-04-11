@@ -19,9 +19,8 @@ import convex.test.generators.ValueGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestRT {
 
-	@SuppressWarnings("rawtypes")
 	@Property
-	public void setConversion(@From(CollectionGen.class) ACollection a) {
+	public void setConversion(@From(CollectionGen.class) ACollection<@From(ValueGen.class) ACell> a) {
 		long ac = a.count();
 		ASet<ACell> set = RT.castSet(a);
 		assertTrue(set.count() <= ac);
@@ -36,9 +35,8 @@ public class GenTestRT {
 		assertNotNull(s);
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void conjTest(@From(CollectionGen.class) ACollection a, @From(ValueGen.class) ACell b) {
+	public void conjTest(@From(CollectionGen.class) ACollection<@From(ValueGen.class) ACell> a, @From(ValueGen.class) ACell b) {
 		ACollection<ACell> ac = a.conj(b);
 		assertTrue(ac.contains(b));
 	}

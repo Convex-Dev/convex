@@ -27,7 +27,7 @@ public class GenTestCode {
 			ctx=ctx.compile((Syntax) expObject);
 
 			if (!ctx.isExceptional()) {
-				Object compObject=ctx.getResult();
+				ACell compObject=ctx.getResult();
 				assertTrue(compObject instanceof AOp);
 
 				ctx=ctx.execute((AOp<?>) compObject);

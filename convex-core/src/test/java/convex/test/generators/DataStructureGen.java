@@ -27,17 +27,17 @@ public class DataStructureGen extends Generator<ADataStructure<ACell>> {
 
 		switch (type) {
 		case 0:
-			return gen().make(HashMapGen.class).generate(r, status);
+			return Gen.HASHMAP.generate(r, status);
 		case 1:
-			return gen().make(VectorGen.class).generate(r, status);
+			return Gen.VECTOR.generate(r, status);
 		case 2:
-			return gen().make(ListGen.class).generate(r, status);
+			return Gen.LIST.generate(r, status);
 		case 3:
-			return gen().make(SetGen.class).generate(r, status);
+			return Gen.SET.generate(r, status);
 
 		// generate map entries as special cases of vectors
 		case 4: {
-			Generator<ACell> vgen = gen().make(ValueGen.class);
+			Generator<ACell> vgen = Gen.VALUE;
 			return MapEntry.create(vgen.generate(r, status), vgen.generate(r, status));
 		}
 		}

@@ -1,7 +1,7 @@
 package convex.test.generators;
 
+import com.pholser.junit.quickcheck.generator.ComponentizedGenerator;
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ACell;
@@ -10,7 +10,7 @@ import convex.core.data.ACollection;
 /**
  * Generator for arbitrary collections
  */
-public class CollectionGen extends Generator<ACollection<ACell>> {
+public class CollectionGen extends ComponentizedGenerator<ACollection<ACell>> {
 	@SuppressWarnings("rawtypes")
 	private static final Class cls = (Class) ACollection.class;
 
@@ -25,14 +25,18 @@ public class CollectionGen extends Generator<ACollection<ACell>> {
 		int type = r.nextInt(3);
 		switch (type) {
 		case 0:
-			return gen().make(VectorGen.class).generate(r, status);
+			return Gen.VECTOR.generate(r, status);
 		case 1:
-			return gen().make(ListGen.class).generate(r, status);
+			return Gen.LIST.generate(r, status);
 		case 2:
-			return gen().make(SetGen.class).generate(r, status);
+			return Gen.SET.generate(r, status);
 
 		default:
 			throw new Error("Unexpected type: " + type);
 		}
 	}
+	
+    @Override public int numberOfNeededComponents() {
+        return 1;
+    }
 }

@@ -14,14 +14,13 @@ import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.core.lang.RT;
-import convex.test.generators.DataStructureGen;
+import convex.test.generators.*;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestDataStructures {
 
-	@SuppressWarnings("rawtypes")
 	@Property
-	public void empty(@From(DataStructureGen.class) ADataStructure a) {
+	public void empty(@From(DataStructureGen.class) ADataStructure<@From(ValueGen.class) ACell> a) {
 		long c = a.count();
 
 		ADataStructure<?> e = a.empty();
@@ -32,18 +31,18 @@ public class GenTestDataStructures {
 		assertEquals(0, e.count());
 		assertTrue(e.isEmpty());
 		assertEquals(0, e.size());
+		
+		CollectionsTest.doDataStructureTests(a);
 	}
 
-	@SuppressWarnings("rawtypes")
 	@Property
-	public void testSequence(@From(DataStructureGen.class) ADataStructure a) {
+	public void testSequence(@From(DataStructureGen.class) ADataStructure<@From(ValueGen.class) ACell> a) {
 		ASequence<?> seq = RT.sequence(a);
 		assertEquals(seq.count(), a.count());
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
-	public void testJavaInterface(@From(DataStructureGen.class) ADataStructure a) {
+	public void testJavaInterface(@From(DataStructureGen.class) ADataStructure<@From(ValueGen.class) ACell> a) {
 		if (a instanceof Collection) {
 			ACollection<ACell> coll = (ACollection<ACell>) a;
 

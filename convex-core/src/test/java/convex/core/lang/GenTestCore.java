@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+import java.util.Map.Entry;
+
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -29,13 +32,16 @@ import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.impl.CoreFn;
 import convex.core.util.Utils;
 import convex.test.generators.AddressGen;
 import convex.test.generators.ListGen;
 import convex.test.generators.SetGen;
+import convex.test.generators.ValueGen;
 import convex.test.generators.VectorGen;
 
 /**
@@ -187,6 +193,27 @@ public class GenTestCore {
 		
 		assertNull(RT.count(a));
 		assertNull(RT.vec(a));
+	}
+	
+	@Property 
+	public void testCoreArgs(@From(VectorGen.class) AVector<@From(ValueGen.class) ACell> a) throws IOException {
+		Context ctx=new CoreTest().context();
+		long initialJuice=ctx.getJuiceUsed();
+		
+		for (Entry<Symbol, ACell> e: Core.CORE_FORMS.entrySet()) {
+			Symbol sym=e.getKey();
+			ACell val=e.getValue();
+			CoreFn<?> f=(CoreFn<?>)val;
+			
+			Context c=ctx.fork();
+			c=f.invoke(c, a.toCellArray());
+			
+			if (c.isExceptional()) {
+				
+			} else {
+				assertTrue(c.getJuiceUsed()>initialJuice,()->"Juice for core function: "+sym);
+			}
+		}
 	}
 	
 	@Property 
