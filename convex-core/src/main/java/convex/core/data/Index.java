@@ -127,8 +127,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	@Override public final boolean isCVMValue() {
-		// A Index is only a first class CVM value at depth 0.
-		return (depth==0);
+		return true;
+	}
+	
+	@Override
+	public boolean isDataValue() {
+		return true;
 	}
 
 	@SuppressWarnings("unchecked")

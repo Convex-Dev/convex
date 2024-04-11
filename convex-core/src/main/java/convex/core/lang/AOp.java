@@ -54,6 +54,11 @@ public abstract class AOp<T extends ACell> extends ACell {
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
+	
+	@Override public final boolean isDataValue() {
+		return true;
+	}
+
 
 	/**
 	 * Returns the opcode for this op

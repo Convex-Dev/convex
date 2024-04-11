@@ -26,6 +26,10 @@ public abstract  class APrimitive extends ACell {
 		return true;
 	}
 	
+	@Override public final boolean isDataValue() {
+		return true;
+	}
+	
 	@Override
 	protected long calcMemorySize() {	
 		// Usually embedded and no child Refs, so memory size = 0

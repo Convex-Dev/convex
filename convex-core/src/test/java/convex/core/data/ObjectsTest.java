@@ -232,7 +232,7 @@ public class ObjectsTest {
 		Hash h=a.getHash();
 		assertNotNull(h);
 		assertSame(h,a.getHash());
-		assertSame(h,a.getEncoding().getContentHash());
+		assertSame(h,a.getEncoding().getContentHash(),()->"Inconsistent Hash on "+a);
 	}
 
 	/**

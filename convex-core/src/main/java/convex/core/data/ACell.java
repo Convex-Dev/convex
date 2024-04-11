@@ -153,7 +153,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	protected static boolean genericEquals(ACell a, ACell b) {
 		if (a==b) return true; // important optimisation for e.g. hashmap equality
 		if ((b==null)||(a==null)) return false; // no non-null Cell is equal to null
-		if (!(a.getTag()==b.getTag())) return false; // Different types never equal
+		if (!(a.getTag()==b.getTag())) return false; // Different tags never equal
 		
 		// Check hashes for equality if they exist
 		Hash ha=a.cachedHash();
@@ -370,6 +370,17 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if the object is a CVM Value, false otherwise
 	 */
 	public abstract boolean isCVMValue();
+	
+	/**
+	 * Returns true if this cell instance is a first class value, i.e. not a component of a larger data structure
+	 * 
+	 * Sub-structural cells that are not themselves first class values should return false
+	 * 
+	 * Everything else should return true.
+	 * 
+	 * @return true if the object is a Value, false otherwise
+	 */
+	public abstract boolean isDataValue();
 
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
@@ -415,6 +426,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param <R> Type of referenced Cell
 	 * @param i Index of ref to get
 	 * @return The Ref at the specified index
+	 * @throws IndexOutOfBoundsException if the Ref index is invalid
 	 */
 	public <R extends ACell> Ref<R> getRef(int i) {
 		// This will always throw an error if not overridden. Provided for warning purposes if accidentally used.

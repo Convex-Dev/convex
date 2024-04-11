@@ -51,6 +51,11 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	public final boolean isEmpty() {
 		return count==0L;
 	}
+	
+	@Override public boolean isDataValue() {
+		return isCVMValue();
+	}
+
 
 	/**
 	 * Adds an element to this data structure, in the natural manner defined by the

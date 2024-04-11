@@ -61,7 +61,8 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	@Override
 	public Hash getHash() {
 		if (hash!=null) return hash;
-		Hash newHash=(value==null)?Hash.NULL_HASH:value.getHash();
+		if (value==null) return Hash.NULL_HASH;
+		Hash newHash=value.getHash();
 		hash=newHash;
 		return newHash;
 	}

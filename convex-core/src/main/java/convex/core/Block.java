@@ -148,6 +148,10 @@ public final class Block extends ARecord {
 		return 10+transactions.estimatedEncodingSize()+AccountKey.LENGTH;
 	}
 	
+	/**
+	 * Read a Block from a Blob encoding
+	 * @throws BadFormatException
+	 */
 	public static Block read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		long timestamp = b.longAt(epos);
@@ -209,6 +213,11 @@ public final class Block extends ARecord {
 		
 		if (!(Cells.equals(transactions, a.transactions))) return false;
 		return true;
+	}
+	
+	@Override
+	public boolean isCVMValue() {
+		return false;
 	}
 
 	@Override

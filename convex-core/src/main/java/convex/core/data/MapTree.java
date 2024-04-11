@@ -484,6 +484,11 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// A MapTree is only a valid CVM value at the top level (shift == 0)
 		return (shift==0);
 	}
+	
+	@Override public final boolean isDataValue() {
+		// A MapTree is only a valid data value at the top level (shift == 0)
+		return (shift==0);
+	}
 
 	@Override
 	public int getRefCount() {

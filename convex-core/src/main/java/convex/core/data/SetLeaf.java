@@ -7,7 +7,6 @@ import java.util.function.BiFunction;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
-import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
@@ -259,6 +258,10 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
+	
+	@Override public final boolean isDataValue() {
+		return true;
+	}
 
 	private static <V extends ACell> boolean isValidOrder(Ref<V>[] entries) {
 		long count = entries.length;
@@ -461,7 +464,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 			e.validate();
 			
 			T value=e.getValue();
-			if(!RT.isCVM(value)) throw new InvalidDataException("Non-CVM value in Set",this);
+			if(!Cells.isCVM(value)) throw new InvalidDataException("Non-CVM value in Set",this);
 		}
 	}
 

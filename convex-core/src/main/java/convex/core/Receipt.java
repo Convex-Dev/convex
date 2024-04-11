@@ -174,7 +174,7 @@ public class Receipt extends ARecord {
 		int rr=Cells.refCount(result);
 		if (i<rr) {
 			if (result==null) throw new IndexOutOfBoundsException("Negative ref index");
-			return result.getRef();
+			return result.getRef(i);
 		} else {
 			if (log==null) throw new IndexOutOfBoundsException("Excessive ref index");
 			return log.getRef(i-rr);

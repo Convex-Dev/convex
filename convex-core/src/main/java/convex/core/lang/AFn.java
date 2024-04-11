@@ -52,6 +52,11 @@ public abstract class AFn<T extends ACell> extends ACell implements IFn<T> {
 		return true;
 	}
 	
+	@Override public final boolean isDataValue() {
+		return true;
+	}
+
+	
 	@Override
 	public byte getTag() {
 		return Tag.FN;

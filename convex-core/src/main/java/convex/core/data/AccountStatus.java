@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -338,6 +339,8 @@ public class AccountStatus extends ARecord {
 			if (holdings.isEmpty()) throw new InvalidDataException("Account should not have empty map as holdings",this);
 			holdings.validateCell();
 		}
+		
+		if (!Coin.isValidAmount(balance)) throw new InvalidDataException("Illegal balance: "+balance,this);
 	}
 
 	/**

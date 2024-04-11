@@ -190,5 +190,10 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	public boolean isRegularBlob() {
 		return false;
 	}
+	
+	@Override public boolean isDataValue() {
+		return true;
+	}
+
 
 }

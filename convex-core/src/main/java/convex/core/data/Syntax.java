@@ -151,6 +151,11 @@ public final class Syntax extends ACell {
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
+	
+	@Override public final boolean isDataValue() {
+		return true;
+	}
+
 
 	/**
 	 * Decodes a Syntax object from a Blob encoding
@@ -194,7 +199,7 @@ public final class Syntax extends ACell {
 		if (meta.isEmpty()) {
 			bs[pos++]=Tag.NULL;
 		} else {
-			pos=meta.encode(bs,pos);
+			pos=Format.write(bs,pos,meta);
 		}
 		return pos;
 	}

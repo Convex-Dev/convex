@@ -65,4 +65,24 @@ public class Cells {
 		return cell.getRef(index);
 	}
 
+	/**
+	 * Checks if a Cell is a valid CVM value
+	 * @param a Cell to check
+	 * @return True if CVM VAlue, false otherwise
+	 */
+	public static boolean isCVM(ACell a) {
+		if (a==null) return true;
+		return a.isCVMValue();
+	}
+	
+	/**
+	 * Checks if a Cell is a first class value
+	 * @param a Cell to check
+	 * @return True if CVM VAlue, false otherwise
+	 */
+	public static boolean isValue(ACell a) {
+		if (a==null) return true;
+		return a.isDataValue();
+	}
+
 }

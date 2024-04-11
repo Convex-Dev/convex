@@ -296,8 +296,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		super.validate();
 		keyRef.validate();
 		valueRef.validate();
-		if (!RT.isCVM(getKey())) throw new InvalidDataException("MapEntry key not a CVM value: " +getKey(),this);
-		if (!RT.isCVM(getValue())) throw new InvalidDataException("MapEntry value not a CVM value: " +getValue(),this);
+		if (!Cells.isCVM(getKey())) throw new InvalidDataException("MapEntry key not a CVM value: " +getKey(),this);
+		if (!Cells.isCVM(getValue())) throw new InvalidDataException("MapEntry value not a CVM value: " +getValue(),this);
 	}
 
 

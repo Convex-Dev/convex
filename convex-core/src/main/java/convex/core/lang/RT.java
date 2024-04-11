@@ -1775,16 +1775,6 @@ public class RT {
 	}
 
 	/**
-	 * Checks if a Cell is a valid CVM value
-	 * @param a Cell to check
-	 * @return True if CVM VAlue, false otherwise
-	 */
-	public static boolean isCVM(ACell a) {
-		if (a==null) return true;
-		return a.isCVMValue();
-	}
-
-	/**
 	 * Implicitly casts argument to a CVM Character
 	 * @param a Value to cast
 	 * @return CVMChar instance, or null if not implicitly castable

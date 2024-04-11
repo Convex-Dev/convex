@@ -4,15 +4,14 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
-import convex.core.Belief;
-import convex.core.Block;
-import convex.core.Constants;
+import convex.core.State;
 import convex.core.data.ARecord;
-import convex.core.init.InitTest;
+import convex.core.data.AccountStatus;
+import convex.core.data.PeerStatus;
 import convex.core.lang.TestState;
 
 /**
- * Generator for binary Blobs
+ * Generator for records, will be CVM Values
  *
  */
 public class RecordGen extends Generator<ARecord> {
@@ -24,13 +23,21 @@ public class RecordGen extends Generator<ARecord> {
 	public ARecord generate(SourceOfRandomness r, GenerationStatus status) {
 
 		int type = r.nextInt();
-		switch (type % 8) {
-		case 0:
-			return Belief.createSingleOrder(InitTest.HERO_KEYPAIR);
-		case 1:
+		switch (type % 5) {
+		case 0: {
+			AccountStatus as=AccountStatus.create(r.nextLong(0, 1000000000000000000L),null);
+			return as;
+			}
+		case 1: {
+			PeerStatus ps=PeerStatus.create(null, r.nextLong(0, 1000000000000000000L));
+			return ps;
+			}
+		case 2: {
 			return TestState.STATE;
-		default:
-			return Block.of(Constants.INITIAL_TIMESTAMP);
+			}
+		default:{
+			return State.EMPTY;
+			}
 		}
 	}
 }

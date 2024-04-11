@@ -46,7 +46,7 @@ public class GenTestAnyValue {
 			ACell rc=(ACell) o;
 			int n=rc.getRefCount();
 			assertThrows(IndexOutOfBoundsException.class,()->rc.getRef(n));
-			assertThrows(IndexOutOfBoundsException.class,()->rc.getRef(-1));
+			assertThrows(IndexOutOfBoundsException.class,()->rc.getRef(-1),()->"Invalid ref worked on "+Utils.getClassName(o));
 			if (n>0 ) {
 				assertNotNull(rc.getRef(0));
 				assertSame(rc,rc.updateRefs(r->r));

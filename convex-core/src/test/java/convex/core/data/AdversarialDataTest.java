@@ -10,6 +10,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Receipt;
 import convex.core.Result;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
@@ -28,7 +29,7 @@ import convex.test.Samples;
 public class AdversarialDataTest {
 
 	// A value that is valid, but not a first class CVM value
-	public static final ACell NON_CVM=Samples.INT_INDEX_256.getRef(0).getValue();
+	public static final ACell NON_CVM=Receipt.create(null);
 	
 	// A value that is non-canonical but otherwise valid CVM value
 	public static final Blob NON_CANONICAL=Blob.createRandom(new Random(), Blob.CHUNK_LENGTH+1);
@@ -81,7 +82,6 @@ public class AdversarialDataTest {
 	@Test public void testBadSetTree() {
 		SetTree<CVMLong> a = Samples.INT_SET_300;
 		
-		invalidTest(a.include(NON_CVM));
 		invalidTest(a.include(NON_VALID));
 		
 		// Get a SetTree child, must be at least one by PigeonHole Principle
@@ -123,7 +123,6 @@ public class AdversarialDataTest {
 		
 		// Basic sets for invalid set values
 		invalidTest(Sets.of(NON_VALID));
-		invalidTest(Sets.of(NON_CVM));
 		
 		// Inserting non-CVM values into existing valid sets
 		invalidTest(Sets.of(1,2,3,4).include(NON_CVM));
@@ -232,6 +231,19 @@ public class AdversarialDataTest {
 	public void testBadBoolean() {
 		invalidEncoding(Tag.TRUE,"12"); // excess byte
 		invalidEncoding(Tag.FALSE,"00"); // excess byte
+	}
+	
+	@Test
+	public void testBadBlock() {
+		invalidEncoding(Tag.BLOCK,""); // no data!
+		invalidEncoding(Tag.BLOCK,"1234567812345678"); // timestamp only
+		invalidEncoding(Tag.BLOCK,"12345678123456788100"); // list instead of vector
+
+	}
+	
+	@Test
+	public void testBadAccountStatus() {
+		invalidTest(AccountStatus.create(-100, null));
 	}
 	
 	@Test
