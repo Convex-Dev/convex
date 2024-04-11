@@ -154,6 +154,15 @@ public class AdversarialDataTest {
 	}
 	
 	@Test
+	public void testBadReceipt() {
+		invalidEncoding(Tag.RECEIPT,"00ff"); // too many bytes
+		invalidEncoding(Tag.RECEIPT,""); // too few bytes
+		invalidEncoding(Tag.RECEIPT+Tag.RECEIPT_LOG_MASK,"0000"); // null log when should be present
+		invalidEncoding(Tag.RECEIPT+Tag.RECEIPT_LOG_MASK,"00b0"); // log is not a vector
+
+	}
+	
+	@Test
 	public void testBadResult() {
 		invalidTest(Result.buildFromVector(Vectors.of(Symbols.FOO,null,null,null,null))); // invalid ID
 		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,null,Keywords.BAR))); // Invalid info map
