@@ -13,4 +13,26 @@ public class Gen {
 	public static final DoubleGen DOUBLE = new DoubleGen();
 
 	public static final LongGen LONG = new LongGen();
+
+	public static final IntegerGen INTEGER = new IntegerGen();
+
+	public static final PrimitiveGen PRIMITIVE = new PrimitiveGen();
+
+	public static final ValueGen VALUE = new ValueGen();
+
+	public static final HashMapGen HASHMAP = new HashMapGen();
+
+	public static final VectorGen VECTOR = new VectorGen();
+
+	public static final FormGen FORM = new FormGen();
+
+	public static final KeywordGen KEYWORD = new KeywordGen();
+
+	public static final ListGen LIST = new ListGen();
+
+	public static final RecordGen RECORD = new RecordGen();
+
+	public static final SymbolGen SYMBOL = new SymbolGen();
+
+	public static final SetGen SET = new SetGen();
 }

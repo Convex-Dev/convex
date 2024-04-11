@@ -24,11 +24,11 @@ public class LongGen extends Generator<CVMLong> {
 		case 1: 
 			return CVMLong.ONE;
 		case 2: 
-			return CVMLong.create(Long.MAX_VALUE);
+			return CVMLong.MAX_VALUE;
 		case 3: 
-			return CVMLong.create(Long.MIN_VALUE);
+			return CVMLong.MIN_VALUE;
 		case 4: 
-			return CVMLong.create(1<<r.nextInt(Math.min(size, 64)));
+			return CVMLong.create(1<<r.nextInt(0,Math.min(size, 63)));
 		default:
 			return CVMLong.create(r.nextLong(-size, size));
 

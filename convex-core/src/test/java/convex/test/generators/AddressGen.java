@@ -5,6 +5,9 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.Address;
 
+/**
+ * Generator for arbitrary Addresses
+ */
 public class AddressGen extends Generator<Address> {
 	
 	public AddressGen() {

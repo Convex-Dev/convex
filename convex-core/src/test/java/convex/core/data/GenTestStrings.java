@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.runner.RunWith;
 
@@ -21,5 +22,11 @@ public class GenTestStrings {
 		
 		String printed=RT.print(a, 1000000).toString();
 		assertEquals(a,Reader.read(printed));
+	}
+	
+	@Property
+	public void testJabaStringProperties(String a) {
+		AString cvm=Strings.create(a);
+		assertNotNull(cvm);
 	}
 }

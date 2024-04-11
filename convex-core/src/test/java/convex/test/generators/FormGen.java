@@ -9,7 +9,6 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Lists;
-import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
@@ -35,12 +34,12 @@ public class FormGen extends Generator<ACell> {
 			return Syntax.create(generate(r, status));
 
 		case 2:
-			return gen().make(PrimitiveGen.class).generate(r, status);
+			return Gen.PRIMITIVE.generate(r, status);
 		case 3:
-			return Strings.create(gen().type(String.class).generate(r, status));
+			return Gen.STRING.generate(r, status);
 
 		case 4:
-			return gen().make(NumericGen.class).generate(r, status);
+			return Gen.NUMERIC.generate(r, status);
 
 		case 5: {
 			// random form containing core symbol at head

@@ -29,7 +29,7 @@ public class SetGen extends Generator<ASet> {
 		case 0:
 			return Sets.empty();
 		case 1: {
-			Object o1 = gen().make(ValueGen.class).generate(r, status);
+			ACell o1 = Gen.PRIMITIVE.generate(r, status);
 			return Sets.of(o1);
 		}
 		case 2:
@@ -41,7 +41,7 @@ public class SetGen extends Generator<ASet> {
 		case 5:
 			return Sets.of(CVMLong.create(r.nextLong(-status.size(),status.size())));
 		default: {
-			AVector<ACell> o1 = gen().make(VectorGen.class).generate(r, status);
+			AVector<ACell> o1 = Gen.VECTOR.generate(r, status);
 			return Sets.create(o1);
 		}
 		}

@@ -21,6 +21,6 @@ public class ListGen extends Generator<AList> {
 	@Override
 	public AList generate(SourceOfRandomness r, GenerationStatus status) {
 
-		return List.reverse(gen().make(VectorGen.class).generate(r, status));
+		return List.reverse(Gen.VECTOR.generate(r, status));
 	}
 }

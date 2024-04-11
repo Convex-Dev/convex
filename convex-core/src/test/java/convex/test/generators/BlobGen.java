@@ -5,7 +5,9 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ABlob;
+import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Format;
 import convex.core.data.LongBlob;
 import convex.test.Samples;
 
@@ -25,16 +27,20 @@ public class BlobGen extends Generator<ABlob> {
 		int type = r.nextInt();
 		switch (type % 10) {
 		case 0:
-			return LongBlob.create(r.nextLong(0,len));
+			return Blob.EMPTY;
 		case 1:
-			return Samples.FULL_BLOB;
+			return LongBlob.create(r.nextLong(0,len));
 		case 2:
-			return Samples.BIG_BLOB_TREE;
+			return Samples.FULL_BLOB;
 		case 3:
-			return Samples.MAX_EMBEDDED_BLOB;
+			return Samples.BIG_BLOB_TREE;
 		case 4:
+			return Samples.MAX_EMBEDDED_BLOB;
+		case 5:
 			return Samples.NON_EMBEDDED_BLOB;
-		case 5: {
+		case 6:
+			return Format.encodedBlob(Gen.PRIMITIVE.generate(r, status));
+		case 7: {
 			// use a slice from a big blob
 			long length=Math.min(len, Samples.BIG_BLOB_LENGTH);
 			length=r.nextLong(0, length);

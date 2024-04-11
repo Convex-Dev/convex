@@ -32,13 +32,13 @@ public class HashMapGen extends Generator<AHashMap> {
     		case 2: return Samples.LONG_MAP_10;
     		case 3: return Samples.LONG_MAP_100;
     		case 4: {
-    			ACell o1=gen().make(PrimitiveGen.class).generate(r, status);
-    			ACell o2=gen().make(StringGen.class).generate(r, status);
+    			ACell o1=Gen.PRIMITIVE.generate(r, status);
+    			ACell o2=Gen.STRING.generate(r, status);
     			return Maps.create(o1,o2);
     		}
     		
     		default: {
-    			AVector<?> vec=gen().make(VectorGen.class).generate(r, status);
+    			AVector<?> vec=Gen.VECTOR.generate(r, status);
     			vec=vec.slice(0, vec.size()&(~1));
     			Object[] os=vec.toArray();
     			return Maps.of(os);
