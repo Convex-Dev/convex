@@ -170,15 +170,12 @@ public class Main extends ACommand {
 				return ExitCodes.SUCCESS;
 			}
 
-			ch.qos.logback.classic.Logger parentLogger = (ch.qos.logback.classic.Logger) LoggerFactory
-					.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
-
 			Level[] verboseLevels = { Level.OFF, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL };
 
 			if (verbose == null)
 				verbose = 0;
 			if (verbose >= 0 && verbose < verboseLevels.length) {
-				parentLogger.setLevel(verboseLevels[verbose]);
+				// OK
 			} else {
 				commandLine.getErr().println("ERROR: Invalid verbosity level: " + verbose);
 				return ExitCodes.ERROR;
