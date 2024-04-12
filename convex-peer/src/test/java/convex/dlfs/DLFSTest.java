@@ -2,6 +2,7 @@ package convex.dlfs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
@@ -31,6 +32,10 @@ public class DLFSTest {
 		Path p2=p1.getFileName();
 		assertFalse(p2.isAbsolute());
 		assertEquals("hello",p2.toString());
+		
+		Path p3=provider.getPath(new URI("dlfs:/hello"));
+		assertTrue(p3.isAbsolute());
+		assertEquals("hello",p3.getFileName().toString());
 	}
 
 }

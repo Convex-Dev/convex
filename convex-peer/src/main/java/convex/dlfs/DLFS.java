@@ -17,14 +17,17 @@ public class DLFS extends FileSystem {
 
 	static final String SEP = "/";
 
-	protected DLFSProvider provider;
+	protected final DLFSProvider provider;
 	
 	// Singleton root / empty paths
-	protected DLPath root=new DLPath(this,Utils.EMPTY_STRINGS,true);
-	protected DLPath emptyPath=new DLPath(this);
+	protected final DLPath root=new DLPath(this,Utils.EMPTY_STRINGS,true);
+	protected final DLPath emptyPath=new DLPath(this);
+
+	protected final String uriPath;
 	
-	public DLFS(DLFSProvider dlfsProvider) {
+	public DLFS(DLFSProvider dlfsProvider, String uriPath) {
 		this.provider=dlfsProvider;
+		this.uriPath=uriPath;
 	}
 
 	@Override
@@ -59,8 +62,8 @@ public class DLFS extends FileSystem {
 
 	@Override
 	public Iterable<FileStore> getFileStores() {
-		// TODO Auto-generated method stub
-		return null;
+		// TODO should we have special stores?
+		return Collections.emptyList();
 	}
 
 	@Override
@@ -86,14 +89,12 @@ public class DLFS extends FileSystem {
 
 	@Override
 	public UserPrincipalLookupService getUserPrincipalLookupService() {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
 	public WatchService newWatchService() throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	/**

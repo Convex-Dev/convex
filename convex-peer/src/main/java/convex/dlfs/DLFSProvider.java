@@ -19,36 +19,40 @@ import java.nio.file.spi.FileSystemProvider;
 import java.util.Map;
 import java.util.Set;
 
+import convex.core.util.SoftCache;
+
 public class DLFSProvider extends FileSystemProvider {
 
+	SoftCache<String,DLFS> fileSystems=new SoftCache<>();
+	
 	@Override
 	public String getScheme() {
 		return "dlfs";
 	}
 
 	@Override
-	public FileSystem newFileSystem(URI uri, Map<String, ?> env) throws IOException {
-		String schemePart=uri.getSchemeSpecificPart();
-		int maybeSlash = schemePart.indexOf("!/");
-        if (maybeSlash >= 0) {
-        	schemePart = schemePart.substring(0, maybeSlash);
-        }
-        
-        
-        
-        return new DLFS(this);
+	public FileSystem newFileSystem(URI uri, Map<String, ?> env) {
+		String path = uri.getPath();
+       
+        DLFS fs= new DLFS(this,path); 
+        fileSystems.put(path, fs);
+        return fs;
 	}
+
+
 
 	@Override
 	public FileSystem getFileSystem(URI uri) {
-		// TODO Auto-generated method stub
-		return null;
+		String pathPart = uri.getPath();
+		if (pathPart==null) throw new IllegalArgumentException("URI contains no path");
+		FileSystem fs= fileSystems.get(pathPart);
+		if (fs==null) fs=newFileSystem(uri,null);
+		return fs;
 	}
 
 	@Override
 	public Path getPath(URI uri) {
-		// TODO Auto-generated method stub
-		return null;
+		return getFileSystem(uri).getPath(uri.getPath());
 	}
 
 	@Override
