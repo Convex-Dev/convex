@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.util.Utils;
+import convex.gui.dlfs.DLFSPanel;
 import convex.gui.manager.mainpanels.KeyGenPanel;
 import convex.gui.manager.mainpanels.MessageFormatPanel;
 import convex.gui.utils.Toolkit;
@@ -56,6 +57,8 @@ public class HackerTools extends JPanel {
 	private KeyGenPanel keyGenPanel;
 
 	private MessageFormatPanel messagePanel;
+	
+	private DLFSPanel dataPanel=new DLFSPanel();
 
 	/**
 	 * Create the application.
@@ -69,6 +72,7 @@ public class HackerTools extends JPanel {
 
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("Encoding", messagePanel);
+		tabs.add("Data Lattice", dataPanel);
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		
