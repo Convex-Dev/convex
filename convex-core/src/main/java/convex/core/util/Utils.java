@@ -1203,6 +1203,7 @@ public class Utils {
 	public static final Object[] EMPTY_OBJECTS = new Object[0];
 	
 	public static final char[] EMPTY_CHARS = new char[0];
+	public static final String[] EMPTY_STRINGS = new String[0];
 
 	/**
 	 * Gets a millisecond accurate time suitable for use in timing.
@@ -1329,6 +1330,21 @@ public class Utils {
 	@SafeVarargs
 	public static <T> List<T> listOf(T... values) {
 		return Arrays.asList(values);
+	}
+	
+	/**
+	 * Concatenate two arrays. May return same array if the other is empty
+	 * @param <T> Type of array elements
+	 * @param a First array
+	 * @param b Second array
+	 * @return Concatenated array
+	 */
+	public static <T> T[] concat(T[] a, T[] b) {
+		if (a.length==0) return b;
+		if (b.length==0) return a;
+		T[] result = Arrays.copyOf(a, a.length + b.length);
+		System.arraycopy(b, 0, result, a.length, b.length);
+		return result;
 	}
 
 	private static ExecutorService virtualExecutor = null;
