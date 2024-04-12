@@ -32,6 +32,7 @@ import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.gui.components.AbstractGUI;
 import convex.gui.components.models.StateModel;
 import convex.gui.manager.mainpanels.AboutPanel;
 import convex.gui.manager.mainpanels.AccountsPanel;
@@ -45,7 +46,7 @@ import convex.peer.Server;
 import convex.restapi.RESTServer;
 
 @SuppressWarnings("serial")
-public class PeerGUI extends JPanel {
+public class PeerGUI extends AbstractGUI {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerGUI.class.getName());
 

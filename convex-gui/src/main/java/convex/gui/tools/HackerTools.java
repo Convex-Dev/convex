@@ -1,7 +1,6 @@
 package convex.gui.tools;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
 import java.io.IOException;
@@ -15,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.util.Utils;
+import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.manager.mainpanels.KeyGenPanel;
 import convex.gui.manager.mainpanels.MessageFormatPanel;
@@ -26,11 +26,9 @@ import convex.gui.utils.Toolkit;
  * Doesn't run a Peer. Connects to convex.world.
  */
 @SuppressWarnings("serial")
-public class HackerTools extends JPanel {
+public class HackerTools extends AbstractGUI {
 
 	private static final Logger log = LoggerFactory.getLogger(HackerTools.class.getName());
-
-	private static JFrame frame;
 	
 	static boolean clientMode=false;
 
@@ -91,15 +89,10 @@ public class HackerTools extends JPanel {
 		}
 		System.err.println("Missing tab: " + title);
 	}
-
-
-	public static Component getFrame() {
-		return frame;
-	}
 	
 	public static HackerTools launch() {
 		try {
-			HackerTools.frame = new JFrame();
+			JFrame frame = new JFrame();
 			frame.setTitle("Hacker Tools");
 			frame.setIconImage(Toolkit.getImage(HackerTools.class.getResource("/images/Convex.png")));
 			frame.setBounds(200, 200, 1024, 768);
@@ -107,6 +100,7 @@ public class HackerTools extends JPanel {
 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 			}
 			HackerTools window = new HackerTools();
+			window.frame=frame;
 			frame.getContentPane().add(window, BorderLayout.CENTER);
 			frame.pack();
 			frame.setVisible(true);
@@ -116,4 +110,6 @@ public class HackerTools extends JPanel {
 		}
 	}
 
+	
+	
 }
