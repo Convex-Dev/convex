@@ -159,7 +159,37 @@ final class DLPath implements Path {
 
 	@Override
 	public Path normalize() {
-		return this;
+		if (count==0) return this;  // nothing to normalize
+		
+		int j=0; // new names
+		String[] dest=names;
+		for (int i=0; i<count; i++) {
+			String c=names[i];
+			int strategy; // -1 = delete previous, 0 = skip, 1 = keep 
+			if (DOT.equals(c)) {
+				// skip over this (don't increment j)
+				strategy=0;
+			} else if (DOTDOT.equals(c)){
+				if (absolute) {
+					// we always back up in absolute paths, delete previous iff it exists
+					strategy=(j>0)?-1:0; 
+				} else {
+					// we delete previous if it wasn't .. itself, otherwise keep
+					strategy=((j>0)&&(!DOTDOT.equals(dest[j-1])))?-1:1;
+				}
+			} else {
+				// copy element across iff we have dest, increment j always
+				strategy=1;
+			}
+			switch (strategy) {
+				case -1: if (dest==names) dest=names.clone(); if (j>0) j--; break;
+				case 0: if (dest==names) dest=names.clone(); break; // skip by not incrementing j
+				case 1: if (dest!=names) dest[j]=c; j++; break; // copy across
+			}
+		}
+		if (j==count) return this; // nothing changed
+		if (dest.length>j) dest=Arrays.copyOfRange(dest,0,j); // trim to length j if needed
+		return new DLPath(fileSystem,dest,absolute);
 	}
 
 	@Override
@@ -249,10 +279,14 @@ final class DLPath implements Path {
 	@Override
 	public String toString() {
 		if (pathString!=null) return pathString;
-		String result=String.join("/", names);
-		if (absolute) result="/"+result;
-		pathString=result;
-		return pathString;
+		String joined=String.join("/", names);
+		if (absolute) joined="/"+joined;
+		
+		// special case for empty path
+		if (joined.isEmpty()) joined=DOT;
+
+		pathString=joined;
+		return joined;
 	}
 	
 	@Override
