@@ -37,7 +37,8 @@ public class DLFSRenderer extends DefaultTreeCellRenderer {
 			//this.setForeground(this.getTextNonSelectionColor());
 			setBackground(this.getBackgroundNonSelectionColor());
 		}
-		setText(path.getFileName().toString());
+		Path name=path.getFileName();
+		setText((name==null)?"root":name.toString());
 		
 		Icon icon = UIManager.getIcon(Files.isDirectory(path) ? "FileView.directoryIcon" : "FileView.fileIcon");
 		setIcon(icon);

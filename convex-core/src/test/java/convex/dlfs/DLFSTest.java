@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
+import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 
@@ -53,10 +54,18 @@ public class DLFSTest {
 		assertEquals(root,fs.getPath("/"));
 		assertEquals(root,fs.getPath("/////")); // POSIX 4.11, multiple slashes at start == single slash
 		
+		assertTrue(Files.isDirectory(root));
+		assertFalse(Files.isRegularFile(root));
+		
 		Path foo=fs.getPath("foo");
 		Path foobar=fs.getPath("foo/bar");
 		Path baz=fs.getPath("baz");
 		assertEquals("foo",foo.toString());
+		
+		// Neither a directory nor a regular file (because path doesn't exist....)
+		assertFalse(Files.isDirectory(foo));
+		assertFalse(Files.isRegularFile(root));
+
 
 		Path rootFoo=fs.getPath("/foo");
 		assertEquals("/foo",rootFoo.toString());

@@ -21,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 import convex.core.util.SoftCache;
+import convex.dlfs.impl.DLFSLocal;
 
 public class DLFSProvider extends FileSystemProvider {
 
@@ -28,19 +29,17 @@ public class DLFSProvider extends FileSystemProvider {
 	
 	@Override
 	public String getScheme() {
-		return "dlfs";
+		return DLFS.SCHEME;
 	}
 
 	@Override
 	public DLFileSystem newFileSystem(URI uri, Map<String, ?> env) {
 		String path = uri.getPath();
        
-        DLFileSystem fs= new DLFileSystem(this,path); 
+        DLFileSystem fs= new DLFSLocal(this,path); 
         fileSystems.put(path, fs);
         return fs;
 	}
-
-
 
 	@Override
 	public DLFileSystem getFileSystem(URI uri) {
@@ -129,11 +128,12 @@ public class DLFSProvider extends FileSystemProvider {
 		return null;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> type, LinkOption... options)
 			throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		DLPath dlp=DLFS.checkPath(path);
+        return (A) dlp.getFileSystem().getFileAttributes(dlp);
 	}
 
 	@Override

@@ -20,8 +20,23 @@ public class DLFSNode {
 	// node structure contents
 	private static final int POS_DIR = 0;
 	
-	public static boolean isDirector(AVector<ACell> node) {
+	public static boolean isDirectory(AVector<ACell> node) {
+		if (node==null) return false;
 		return node.get(POS_DIR)!=null;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static AVector<ACell> navigate(AVector<ACell> node, DLPath path) {
+		int n=path.getNameCount();
+		for (int i=0; i<n; i++) {
+			AString compName=path.getCVMName(i);
+			AHashMap<AString,AVector<ACell>> dir=(AHashMap<AString, AVector<ACell>>) node.get(POS_DIR);
+			if (dir==null) return null;
+			AVector<ACell> child=dir.get(compName);
+			if (child==null) return null;
+			node=child;
+		}
+		return node;
 	}
 
 }

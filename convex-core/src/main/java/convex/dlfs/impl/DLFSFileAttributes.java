@@ -7,7 +7,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.dlfs.DLFSNode;
 
-class DLFSFileAttributes implements BasicFileAttributes {
+public class DLFSFileAttributes implements BasicFileAttributes {
 
 	private AVector<ACell> node;
 
@@ -15,7 +15,7 @@ class DLFSFileAttributes implements BasicFileAttributes {
 		this.node=node;
 	}
 
-	public DLFSFileAttributes create(AVector<ACell> node) {
+	public static DLFSFileAttributes create(AVector<ACell> node) {
 		return new DLFSFileAttributes(node);
 	}
 	
@@ -46,7 +46,7 @@ class DLFSFileAttributes implements BasicFileAttributes {
 	@Override
 	public boolean isDirectory() {
 		// TODO Auto-generated method stub
-		return DLFSNode.isDirector(node);
+		return DLFSNode.isDirectory(node);
 	}
 
 	@Override

@@ -3,7 +3,6 @@ package convex.dlfs;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.FileSystem;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -15,6 +14,8 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import convex.core.data.AString;
+import convex.core.data.StringShort;
 import convex.core.util.Utils;
 
 /**
@@ -22,24 +23,26 @@ import convex.core.util.Utils;
  * 
  * Path components are Strings, separated by "/"
  */
-final class DLPath implements Path {
+public final class DLPath implements Path {
 
 	protected final DLFileSystem fileSystem;
-	protected final String[] names;
+	protected final AString[] names;
 	protected final boolean absolute;
 	protected final int count;
 	
 	private String pathString=null;
 	
-	static final String DOT=".";
-	static final String SLASHDOT="/.";
-	static final String DOTDOT="..";
+	static final StringShort DOT=StringShort.create(".");
+	static final StringShort SLASHDOT=StringShort.create("/.");
+	static final StringShort DOTDOT=StringShort.create("..");
+	
+	static final AString[] EMPTY_STRINGS = new AString[0];
 
 	protected DLPath(DLFileSystem fs) {
-		this(fs,Utils.EMPTY_STRINGS,false);
+		this(fs,EMPTY_STRINGS,false);
 	}
 	
-	protected DLPath(DLFileSystem fs,String[] names, boolean absolute) {
+	protected DLPath(DLFileSystem fs,AString[] names, boolean absolute) {
 		this.fileSystem=fs;
 		this.names=names;
 		this.absolute=absolute;
@@ -47,7 +50,7 @@ final class DLPath implements Path {
 	}
 
 	static Path createRoot(DLFileSystem fileSystem) {
-		return new DLPath(fileSystem,Utils.EMPTY_STRINGS,true);
+		return new DLPath(fileSystem,EMPTY_STRINGS,true);
 	}
 	
 	static final Pattern endSlashes = Pattern.compile("/+$");
@@ -75,15 +78,19 @@ final class DLPath implements Path {
 		}
 
 		String[] names=path.isEmpty()?Utils.EMPTY_STRINGS:path.split(sep);
-		for (int i=0; i<names.length; i++) {
-			if (names[i].isEmpty()) throw new InvalidPathException(fullPath,"Empty path component");
+		int n=names.length;
+		AString[] ns=new AString[n];
+		for (int i=0; i<n; i++) {
+			String name=names[i];
+			AString cname=DLFS.checkName(name);
+			if (cname==null) throw new InvalidPathException(fullPath,"Invalid path name at position "+i);
+			ns[i]=cname;
 		}
-		
-		return new DLPath(fs,names,absolute);
+		return new DLPath(fs,ns,absolute);
 	}
 	
 	@Override
-	public FileSystem getFileSystem() {
+	public DLFileSystem getFileSystem() {
 		return fileSystem;
 	}
 
@@ -102,7 +109,7 @@ final class DLPath implements Path {
 	public Path getFileName() {
 		if (count==0) return null;
 		if (!absolute&(count==1)) return this;
-		return new DLPath(fileSystem,new String[] {names[count-1]},false);
+		return new DLPath(fileSystem,new AString[] {names[count-1]},false);
 	}
 
 	@Override
@@ -122,7 +129,7 @@ final class DLPath implements Path {
 		int n=getNameCount();
 		if ((index<0)||(index>=n)) throw new IllegalArgumentException("index out of range");
 		if (!absolute&(count==1)) return this;
-		return new DLPath(fileSystem,new String[] {names[index]},false);
+		return new DLPath(fileSystem,new AString[] {names[index]},false);
 	}
 
 	@Override
@@ -167,9 +174,9 @@ final class DLPath implements Path {
 		if (count==0) return this;  // nothing to normalize
 		
 		int j=0; // new names
-		String[] dest=names;
+		AString[] dest=names;
 		for (int i=0; i<count; i++) {
-			String c=names[i];
+			AString c=names[i];
 			int strategy; // -1 = delete previous, 0 = skip, 1 = keep 
 			if (DOT.equals(c)) {
 				// skip over this (don't increment j)
@@ -201,11 +208,11 @@ final class DLPath implements Path {
 	public Path resolve(Path other) {
 		if (other.isAbsolute()) return other;
 		if (other.getNameCount()==0) return this;
-		String[] newNames=Utils.concat(names, extractNames(other));
+		AString[] newNames=Utils.concat(names, extractNames(other));
 		return new DLPath(fileSystem,newNames,absolute);
 	}
 
-	private static String[] extractNames(Path other) {
+	private static AString[] extractNames(Path other) {
 		if (other instanceof DLPath) {
 			return ((DLPath)other).names;
 		}
@@ -233,7 +240,7 @@ final class DLPath implements Path {
 			if (Objects.equals(names[i], other.names[i])) return null;
 		}
 		
-		String[] newNames=Arrays.copyOfRange(other.names, count, count+extra);
+		AString[] newNames=Arrays.copyOfRange(other.names, count, count+extra);
 		return new DLPath(fileSystem,newNames,false);
 	}
 
@@ -284,16 +291,26 @@ final class DLPath implements Path {
 	@Override
 	public String toString() {
 		if (pathString!=null) return pathString;
-		String joined=String.join("/", names);
+		
+		String[] ns=getJavaNames();
+		String joined=String.join("/", ns);
 		if (absolute) joined="/"+joined;
 		
 		// special case for empty path
-		if (joined.isEmpty()) joined=DOT;
+		if (joined.isEmpty()) joined=".";
 
 		pathString=joined;
 		return joined;
 	}
 	
+	protected String[] getJavaNames() {
+		String[] ns=new String[count];
+		for (int i=0; i<count; i++) {
+			ns[i]=names[i].toString();
+		}
+		return ns;
+	}
+
 	@Override
 	public boolean equals(Object other) {
 		if (!(other instanceof DLPath)) return false;
@@ -305,5 +322,9 @@ final class DLPath implements Path {
 		if (!other.fileSystem.equals(this.fileSystem)) return false;
 		if (count!=other.count) return false;
 		return Arrays.equals(names,other.names);
+	}
+
+	public AString getCVMName(int i) {
+		return names[i];
 	}
 }

@@ -2,7 +2,6 @@ package convex.gui.dlfs;
 
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.io.File;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,14 +18,15 @@ import javax.swing.tree.TreePath;
 
 import net.miginfocom.swing.MigLayout;
 
+/**
+ * A file browser panel for DLFS
+ */
 @SuppressWarnings("serial")
 public class DLFSPanel extends JPanel {
-
-	
-	public DLFSPanel() {
+	public DLFSPanel(Path root) {
 		setLayout(new MigLayout());
 		
-		DLFileTreeModel model=new DLFileTreeModel(new File(".").toPath());
+		DLFileTreeModel model=new DLFileTreeModel(root);
 		JTree treeView = new JTree(model);
 		// treeView.setBackground(Color.BLACK);
 		DLFSRenderer renderer=new DLFSRenderer();
@@ -127,7 +127,8 @@ public class DLFSPanel extends JPanel {
 		
 		@Override
 		public String toString() {
-			return getFilePath().getFileName().toString();
+			Path name=getFilePath().getFileName();
+			return (name==null)?"DLFS Root":name.toString();
 		}
 		
 	}

@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.util.Utils;
+import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.manager.mainpanels.KeyGenPanel;
@@ -56,7 +57,7 @@ public class HackerTools extends AbstractGUI {
 
 	private MessageFormatPanel messagePanel;
 	
-	private DLFSPanel dataPanel=new DLFSPanel();
+	private DLFSPanel dataPanel=new DLFSPanel(DLFS.createLocal().getRoot());
 
 	/**
 	 * Create the application.

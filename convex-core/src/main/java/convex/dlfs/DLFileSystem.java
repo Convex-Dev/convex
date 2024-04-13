@@ -16,7 +16,9 @@ import java.nio.file.spi.FileSystemProvider;
 import java.util.Collections;
 import java.util.Set;
 
-import convex.core.util.Utils;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.dlfs.impl.DLFSFileAttributes;
 
 /**
  * Base class for Data Lattice FileSystems.
@@ -25,14 +27,14 @@ import convex.core.util.Utils;
  * - A single root directory
  * - A method of snapshotting any path on the tree
  */
-public class DLFileSystem extends FileSystem {
+public abstract class DLFileSystem extends FileSystem {
 
 	static final String SEP = "/";
 
 	protected final DLFSProvider provider;
 	
 	// Singleton root / empty paths
-	protected final DLPath root=new DLPath(this,Utils.EMPTY_STRINGS,true);
+	protected final DLPath root=new DLPath(this,DLPath.EMPTY_STRINGS,true);
 	protected final DLPath emptyPath=new DLPath(this);
 
 	protected final String uriPath;
@@ -145,5 +147,12 @@ public class DLFileSystem extends FileSystem {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
+	public DLFSFileAttributes getFileAttributes(DLPath path) {
+		AVector<ACell> node=getNode(path);
+		return DLFSFileAttributes.create(node);
+	}
+
+	protected abstract AVector<ACell> getNode(DLPath path);
 
 }
