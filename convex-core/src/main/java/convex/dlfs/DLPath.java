@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
+import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.WatchEvent.Kind;
@@ -12,9 +13,15 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 import convex.core.util.Utils;
 
+/**
+ * A DLFS Path
+ * 
+ * Path components are Strings, separated by "/"
+ */
 final class DLPath implements Path {
 
 	protected final DLFileSystem fileSystem;
@@ -23,38 +30,51 @@ final class DLPath implements Path {
 	protected final int count;
 	
 	private String pathString=null;
+	
+	static final String DOT=".";
+	static final String SLASHDOT="/.";
+	static final String DOTDOT="..";
 
 	protected DLPath(DLFileSystem fs) {
 		this(fs,Utils.EMPTY_STRINGS,false);
 	}
 	
 	protected DLPath(DLFileSystem fs,String[] names, boolean absolute) {
-		this(fs,names,absolute,null);
-	}
-	
-	protected DLPath(DLFileSystem fs,String[] names, boolean absolute, String fullPath) {
 		this.fileSystem=fs;
 		this.names=names;
 		this.absolute=absolute;
 		this.count=names.length;
-		this.pathString=fullPath;
 	}
 
 	static Path createRoot(DLFileSystem fileSystem) {
 		return new DLPath(fileSystem,Utils.EMPTY_STRINGS,true);
 	}
 	
-	static Path create(DLFileSystem fs, String fullPath) {
-		String sep=fs.getSeparator();
-		boolean absolute=fullPath.startsWith(sep);
-		String comps;
-		if (absolute) {
-			comps=fullPath.substring(sep.length());
-		} else {
-			comps=fullPath;
+	static final Pattern endSlashes = Pattern.compile("/+$");
+	
+	static Path create(DLFileSystem fs, String path) {
+		String sep=DLFileSystem.SEP;
+		if (path.isEmpty()) throw new InvalidPathException(path,"Empty path name");
+		
+		boolean absolute=false;
+		{
+			int ix=0;
+			while ((ix<path.length())&&(path.charAt(ix)=='/')) {
+				ix++;
+			}
+			if (ix>0) {
+				absolute=true;
+				path=path.substring(ix);
+			}
 		}
-		String[] names=comps.split(sep);
-		return new DLPath(fs,names,absolute,fullPath);
+		
+		// From POSIX 4.11 A pathname that contains at least one non-slash character and that ends with one or more trailing slashes shall be resolved as if a single dot character ( '.' ) were appended to the pathname.
+		if (path.endsWith(sep)) {
+			path=endSlashes.matcher(path).replaceAll("/.");
+		}
+
+		String[] names=path.isEmpty()?Utils.EMPTY_STRINGS:path.split(sep);
+		return new DLPath(fs,names,absolute);
 	}
 	
 	@Override
@@ -112,7 +132,6 @@ final class DLPath implements Path {
 	@Override
 	public boolean startsWith(Path other) {
 		if (!(other instanceof DLPath)) return false;
-		
 		return startsWith((DLPath)other);
 	}
 	
@@ -120,15 +139,22 @@ final class DLPath implements Path {
 		if (absolute!=other.absolute) return false;
 		int n=other.getNameCount();
 		if (n>count) return false; // can't start with a longer path!
-		if (!fileSystem.equals(other.fileSystem)) return false;
-		 
+		if (!fileSystem.equals(other.fileSystem)) return false; 
 		return Utils.arrayEquals(names,other.names,n);
 	}
 
 	@Override
 	public boolean endsWith(Path other) {
-		// TODO Auto-generated method stub
-		return false;
+		if (!(other instanceof DLPath)) return false;
+		return endsWith((DLPath)other);
+	}
+	
+	public boolean endWith(DLPath other) {
+		if (absolute!=other.absolute) return false;
+		int n=other.getNameCount();
+		if (n>count) return false; // can't start with a longer path!
+		if (!fileSystem.equals(other.fileSystem)) return false; 
+		return Utils.arrayEquals(names,other.names,n);
 	}
 
 	@Override

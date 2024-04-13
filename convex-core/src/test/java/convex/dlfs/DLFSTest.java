@@ -42,8 +42,12 @@ public class DLFSTest {
 		DLFSProvider provider=DLFS.provider();
 		DLFileSystem fs=provider.newFileSystem(new URI("dlfs"),null);
 		
+		// Root path
 		Path root=fs.getRootDirectories().iterator().next();
 		assertEquals("/",root.toString());
+		assertEquals(0,root.getNameCount());
+		assertEquals(root,fs.getPath("/"));
+		assertEquals(root,fs.getPath("/////")); // POSIX 4.11, multiple slashes at start == single slash
 		
 		Path foo=fs.getPath("foo");
 		Path foobar=fs.getPath("foo/bar");
