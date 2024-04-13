@@ -12,6 +12,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.LinkOption;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
+import java.nio.file.ProviderMismatchException;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
@@ -23,7 +24,7 @@ import convex.core.util.SoftCache;
 
 public class DLFSProvider extends FileSystemProvider {
 
-	SoftCache<String,DLFS> fileSystems=new SoftCache<>();
+	SoftCache<String,DLFileSystem> fileSystems=new SoftCache<>();
 	
 	@Override
 	public String getScheme() {
@@ -31,10 +32,10 @@ public class DLFSProvider extends FileSystemProvider {
 	}
 
 	@Override
-	public FileSystem newFileSystem(URI uri, Map<String, ?> env) {
+	public DLFileSystem newFileSystem(URI uri, Map<String, ?> env) {
 		String path = uri.getPath();
        
-        DLFS fs= new DLFS(this,path); 
+        DLFileSystem fs= new DLFileSystem(this,path); 
         fileSystems.put(path, fs);
         return fs;
 	}
@@ -42,10 +43,10 @@ public class DLFSProvider extends FileSystemProvider {
 
 
 	@Override
-	public FileSystem getFileSystem(URI uri) {
+	public DLFileSystem getFileSystem(URI uri) {
 		String pathPart = uri.getPath();
 		if (pathPart==null) throw new IllegalArgumentException("URI contains no path");
-		FileSystem fs= fileSystems.get(pathPart);
+		DLFileSystem fs= fileSystems.get(pathPart);
 		if (fs==null) fs=newFileSystem(uri,null);
 		return fs;
 	}
@@ -58,14 +59,20 @@ public class DLFSProvider extends FileSystemProvider {
 	@Override
 	public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs)
 			throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		FileSystem fs=path.getFileSystem();
+		if (!(fs instanceof DLFileSystem)) {
+            throw new ProviderMismatchException("Not DLFS");
+        }
+        return ((DLFileSystem) fs).newByteChannel(path, options, attrs);
 	}
 
 	@Override
 	public DirectoryStream<Path> newDirectoryStream(Path dir, Filter<? super Path> filter) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		FileSystem fs=dir.getFileSystem();
+		if (!(fs instanceof DLFileSystem)) {
+            throw new ProviderMismatchException("Not DLFS");
+        }
+        return ((DLFileSystem) fs).newDirectoryStream(dir, filter);
 	}
 
 	@Override

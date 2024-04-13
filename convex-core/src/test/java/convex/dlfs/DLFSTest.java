@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 public class DLFSTest {
 	
 	@Test public void testProvider() throws URISyntaxException, IOException {
-		DLFSProvider provider=new DLFSProvider();
+		DLFSProvider provider=DLFS.provider();
 		
 		FileSystem fs=provider.newFileSystem(new URI("dlfs"),null);
 		
@@ -36,6 +36,35 @@ public class DLFSTest {
 		Path p3=provider.getPath(new URI("dlfs:/hello"));
 		assertTrue(p3.isAbsolute());
 		assertEquals("hello",p3.getFileName().toString());
+	}
+	
+	@Test public void testPath() throws URISyntaxException {
+		DLFSProvider provider=DLFS.provider();
+		DLFileSystem fs=provider.newFileSystem(new URI("dlfs"),null);
+		
+		Path root=fs.getRootDirectories().iterator().next();
+		assertEquals("/",root.toString());
+		
+		Path foo=fs.getPath("foo");
+		Path foobar=fs.getPath("foo/bar");
+		Path baz=fs.getPath("baz");
+		assertEquals("foo",foo.toString());
+
+		Path rootFoo=fs.getPath("/foo");
+		assertEquals("/foo",rootFoo.toString());
+		assertEquals(1,rootFoo.getNameCount());
+
+		assertEquals(rootFoo,root.resolve(foo));
+		assertEquals(foo,root.relativize(rootFoo));
+		
+		assertTrue(foobar.startsWith(foobar));
+		assertTrue(foobar.startsWith(foo));
+		assertFalse(foobar.startsWith(baz));
+		assertFalse(foo.startsWith(foobar));
+		
+		assertTrue(rootFoo.startsWith(root));
+		assertFalse(foo.startsWith(root));
+
 	}
 
 }

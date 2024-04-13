@@ -432,6 +432,21 @@ public class Utils {
 		if ((a==b)&&(aOffset==bOffset)) return true;
 		return Arrays.equals(a, aOffset, aOffset+length, b, bOffset, bOffset+length);
 	}
+	
+	/**
+	 * Tests if two arrays are equal up to the specified position
+	 * @param <T> Type of array elements
+	 * @param a First array
+	 * @param b Second array
+	 * @param n Number of elements to check
+	 * @return
+	 */
+	public static <T> boolean arrayEquals(T[] a, T[] b, int n) {
+		for (int i=0 ; i<n; i++) {
+			if (!equals(a[i],b[i])) return false;
+		}
+		return true;
+	}
 
 	/**
 	 * Compares two byte arrays on an unsigned basis. Shorter arrays will be
@@ -1483,4 +1498,6 @@ public class Utils {
 		if (a.isEmbedded()) memSize+=a.getEncodingLength();
 		return memSize;
 	}
+
+
 }

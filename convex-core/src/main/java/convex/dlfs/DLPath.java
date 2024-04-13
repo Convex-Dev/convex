@@ -11,27 +11,28 @@ import java.nio.file.WatchEvent.Modifier;
 import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.Arrays;
+import java.util.Objects;
 
 import convex.core.util.Utils;
 
-class DLPath implements Path {
+final class DLPath implements Path {
 
-	protected final DLFS fileSystem;
+	protected final DLFileSystem fileSystem;
 	protected final String[] names;
 	protected final boolean absolute;
 	protected final int count;
 	
 	private String pathString=null;
 
-	protected DLPath(DLFS fs) {
+	protected DLPath(DLFileSystem fs) {
 		this(fs,Utils.EMPTY_STRINGS,false);
 	}
 	
-	protected DLPath(DLFS fs,String[] names, boolean absolute) {
+	protected DLPath(DLFileSystem fs,String[] names, boolean absolute) {
 		this(fs,names,absolute,null);
 	}
 	
-	protected DLPath(DLFS fs,String[] names, boolean absolute, String fullPath) {
+	protected DLPath(DLFileSystem fs,String[] names, boolean absolute, String fullPath) {
 		this.fileSystem=fs;
 		this.names=names;
 		this.absolute=absolute;
@@ -39,11 +40,11 @@ class DLPath implements Path {
 		this.pathString=fullPath;
 	}
 
-	static Path createRoot(DLFS fileSystem) {
+	static Path createRoot(DLFileSystem fileSystem) {
 		return new DLPath(fileSystem,Utils.EMPTY_STRINGS,true);
 	}
 	
-	static Path create(DLFS fs, String fullPath) {
+	static Path create(DLFileSystem fs, String fullPath) {
 		String sep=fs.getSeparator();
 		boolean absolute=fullPath.startsWith(sep);
 		String comps;
@@ -68,8 +69,7 @@ class DLPath implements Path {
 
 	@Override
 	public Path getRoot() {
-		if (isAbsolute()&&(getNameCount()==0)) return this;
-		if (!absolute) return null; // TODO: is this right?
+		if (!absolute) return null; 
 		return fileSystem.getRoot();
 	}
 
@@ -117,11 +117,12 @@ class DLPath implements Path {
 	}
 	
 	public boolean startsWith(DLPath other) {
+		if (absolute!=other.absolute) return false;
 		int n=other.getNameCount();
 		if (n>count) return false; // can't start with a longer path!
 		if (!fileSystem.equals(other.fileSystem)) return false;
-		
-		return startsWith((DLPath)other);
+		 
+		return Utils.arrayEquals(names,other.names,n);
 	}
 
 	@Override
@@ -152,8 +153,27 @@ class DLPath implements Path {
 
 	@Override
 	public Path relativize(Path other) {
+		if (!(other instanceof DLPath)) throw new IllegalArgumentException("Not a DLFS path");
+		return relativize((DLPath) other);
+	}
+	
+	public DLPath relativize(DLPath other) {
+		// same path implies relative path is the empty path
 		if (this.equals(other)) return fileSystem.getEmptyPath();
-		return null;
+		
+		// if only one is absolute, can't construct relative path
+		if (absolute!=other.isAbsolute()) return null;
+		
+		// can't produce relative path backwards
+		int extra = other.count-count;
+		if (extra<0) return null;
+		
+		for (int i=0; i<count; i++) {
+			if (Objects.equals(names[i], other.names[i])) return null;
+		}
+		
+		String[] newNames=Arrays.copyOfRange(other.names, count, count+extra);
+		return new DLPath(fileSystem,newNames,false);
 	}
 
 	@Override
@@ -173,8 +193,8 @@ class DLPath implements Path {
 
 	@Override
 	public Path toRealPath(LinkOption... options) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		if (absolute) return this;
+		return toAbsolutePath();
 	}
 
 	@Override
