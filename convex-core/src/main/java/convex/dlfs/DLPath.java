@@ -52,9 +52,10 @@ final class DLPath implements Path {
 	
 	static final Pattern endSlashes = Pattern.compile("/+$");
 	
-	static Path create(DLFileSystem fs, String path) {
+	static Path create(DLFileSystem fs, String fullPath) {
+		String path=fullPath;
 		String sep=DLFileSystem.SEP;
-		if (path.isEmpty()) throw new InvalidPathException(path,"Empty path name");
+		if (path.isEmpty()) throw new InvalidPathException(fullPath,"Empty path name");
 		
 		boolean absolute=false;
 		{
@@ -74,6 +75,10 @@ final class DLPath implements Path {
 		}
 
 		String[] names=path.isEmpty()?Utils.EMPTY_STRINGS:path.split(sep);
+		for (int i=0; i<names.length; i++) {
+			if (names[i].isEmpty()) throw new InvalidPathException(fullPath,"Empty path component");
+		}
+		
 		return new DLPath(fs,names,absolute);
 	}
 	

@@ -2,13 +2,16 @@ package convex.dlfs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.FileSystem;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 
 import org.junit.jupiter.api.Test;
@@ -72,20 +75,30 @@ public class DLFSTest {
 
 	}
 	
-	@Test public void testRelativePath() throws URISyntaxException {
+	@Test public void testBadPath() throws URISyntaxException {
+		DLFileSystem fs=DLFS.provider().getFileSystem(new URI("dlfs"));
+		
+		assertThrows(InvalidPathException.class,()->fs.getPath("foo//bar"));
+		assertThrows(InvalidPathException.class,()->fs.getPath(".//.."));
+	}
+	
+	@Test public void testNormalize() throws URISyntaxException {
 		DLFSProvider provider=DLFS.provider();
 		DLFileSystem fs=provider.newFileSystem(new URI("dlfs"),null);
 
 		Path root=fs.getRoot();
+		assertSame(root,root.normalize());
 		
 		Path empty=fs.getEmptyPath();
 		assertEquals(0,empty.getNameCount());
 		assertFalse(empty.isAbsolute());
 		assertEquals(".",empty.toString());
+		assertSame(empty,empty.normalize());
 		
 		Path d=fs.getPath(".");
 		assertEquals(1,d.getNameCount());
 		assertFalse(d.isAbsolute());
+		assertNotEquals(empty,d);
 		assertEquals(empty,d.normalize());
 		
 		Path dd=fs.getPath("..");
