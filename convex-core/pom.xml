@@ -10,6 +10,7 @@
 	<properties>
 	  <antlr.version>4.13.1</antlr.version>
 	  <bc.version>1.78</bc.version>
+	  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>

@@ -7,8 +7,7 @@
   </parent>
   <artifactId>convex-sodium</artifactId>
   <name>Sodium integration for Convex</name>
-  <description>This project makes the Sodium crypto library available for use in Conex via native dependencies.</description>
-
+  <description>This module makes the Sodium crypto library available for use in Convex via native dependencies.</description>
 
 	<dependencies>
 		<dependency>
@@ -35,14 +34,11 @@
 			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
-		
-		
 		<dependency>
 			<groupId>com.goterl</groupId>
 			<artifactId>lazysodium-java</artifactId>
 			<version>5.1.4</version>
 		</dependency>
-
 		<dependency>
 			<groupId>net.java.dev.jna</groupId>
 			<artifactId>jna</artifactId>

@@ -10,23 +10,18 @@
 		<artifactId>convex</artifactId>
 		<version>0.7.13-SNAPSHOT</version>
 	</parent>
-	
+
 	<name>Convex Observer</name>
 	<description>Observability tools for Convex peer operations</description>
-		<url>https://convex.world</url>
+	<url>https://convex.world</url>
 
-	<properties>
-		<maven.compiler.target>17</maven.compiler.target>
-		<maven.compiler.source>17</maven.compiler.source>
-		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-	</properties>
-	
-		<dependencies>
-		<!-- https://mvnrepository.com/artifact/org.apache.httpcomponents/httpclient -->
+	<dependencies>
+		<!--
+		https://mvnrepository.com/artifact/org.apache.httpcomponents/httpclient -->
 		<dependency>
 			<groupId>org.apache.httpcomponents.client5</groupId>
-  			<artifactId>httpclient5</artifactId>
-    		<version>${hc.version}</version>
+			<artifactId>httpclient5</artifactId>
+			<version>${hc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>world.convex</groupId>
@@ -56,5 +51,5 @@
 			<artifactId>convex-java</artifactId>
 			<version>0.7.13-SNAPSHOT</version>
 		</dependency>
-		</dependencies>
+	</dependencies>
 </project>
