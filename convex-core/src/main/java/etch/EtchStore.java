@@ -126,7 +126,7 @@ public class EtchStore extends AStore {
 	@Override
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
-			Ref<ACell> existing = (Ref<ACell>) blobCache.getCell(hash);
+			Ref<ACell> existing = (Ref<ACell>) refCache.getCell(hash);
 			if (existing!=null) return (Ref<T>) existing;
 			
 			existing= readStoreRef(hash);
@@ -138,7 +138,7 @@ public class EtchStore extends AStore {
 
 	public <T extends ACell> Ref<T> readStoreRef(Hash hash) throws IOException {
 		Ref<T> ref=etch.read(hash);
-		if (ref!=null) blobCache.putCell(ref);
+		if (ref!=null) refCache.putCell(ref);
 		return ref;
 	}
 
@@ -185,7 +185,7 @@ public class EtchStore extends AStore {
 		
 		if (requiredStatus<Ref.STORED) {
 			if (topLevel || !embedded) {
-				blobCache.putCell(ref);
+				refCache.putCell(ref);
 			}
 			return ref;
 		}
@@ -232,7 +232,7 @@ public class EtchStore extends AStore {
 				}
 
 				cell.attachRef(result);
-				blobCache.putCell(result); // cache for subsequent writes
+				refCache.putCell(result); // cache for subsequent writes
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -309,6 +309,6 @@ public class EtchStore extends AStore {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> Ref<T> checkCache(Hash h) {
-		return (Ref<T>) blobCache.getCell(h);
+		return (Ref<T>) refCache.getCell(h);
 	}
 }

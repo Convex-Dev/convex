@@ -8,18 +8,18 @@ import convex.core.data.RefSoft;
 /**
  * In-memory cache for Blob decoding. Should be used in the context of a specific Store
  */
-public final class BlobCache {
+public final class RefCache {
 
 	private Ref<?>[] cache;
 	private int size;
 	
-	private BlobCache(int size) {
+	private RefCache(int size) {
 		this.size=size;
 		this.cache=new Ref[size];
 	};
 	
-	public static BlobCache create(int size) {
-		return new BlobCache(size);
+	public static RefCache create(int size) {
+		return new RefCache(size);
 	}
 	
 	int getSize() {

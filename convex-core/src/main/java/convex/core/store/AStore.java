@@ -117,7 +117,7 @@ public abstract class AStore {
 	 */
 	public abstract void close();
 	
-	protected final BlobCache blobCache=BlobCache.create(10000);
+	protected final RefCache refCache=RefCache.create(10000);
 	
 	/**
 	 * Decodes a Cell from an Encoding. Looks up Cell in cache if available. Otherwise
@@ -130,22 +130,27 @@ public abstract class AStore {
 	@SuppressWarnings("unchecked")
 	public final <T extends ACell> T decode(Blob encoding) throws BadFormatException {
 		Hash hash=encoding.getContentHash();
-		Ref<?> cached= blobCache.getCell(hash);
+		Ref<?> cached= refCache.getCell(hash);
 		if (cached!=null) return (T) cached.getValue();
 		
 		// Need to ensure we are reading with the current store set
 		AStore tempStore=Stores.current();
 		ACell decoded;
 		if (tempStore==this) {
-			decoded=Format.read(encoding);
+			decoded = decodeImpl(encoding);
 		} else try {
 			Stores.setCurrent(this);
-			decoded=Format.read(encoding);
+			decoded = decodeImpl(encoding);
 		} finally {
 			Stores.setCurrent(tempStore);
 		}
-		blobCache.putCell(decoded);
+		refCache.putCell(decoded);
 		return (T)decoded;
+	}
+
+	public ACell decodeImpl(Blob encoding) throws BadFormatException {
+		ACell decoded=Format.read(encoding);
+		return decoded;
 	}
 
 	/**
