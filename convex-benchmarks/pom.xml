@@ -23,7 +23,6 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.10.1</version>
 				<configuration>
-					<release>11</release>
 					<annotationProcessorPaths>
 						<path>
 							<groupId>org.openjdk.jmh</groupId>
@@ -36,7 +35,7 @@
 			
 			<plugin>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.3.0</version>
+				<version>3.7.1</version>
 				<configuration>
 					<outputDirectory>${project.directory}</outputDirectory>
 					<archive>
