@@ -256,7 +256,7 @@ public class StressPanel extends JPanel {
 			resultArea.setText("Sending transactions...");
 			
 			ExecutorService ex=ThreadUtils.getVirtualExecutor();
-			ArrayList<CompletableFuture<Object>> cfutures=ThreadUtils.futureMap (ex,cc->{
+			ArrayList<CompletableFuture<Object>> cfutures=ThreadUtils.futureMap(ex,cc->{
 				try {
 					for (int i = 0; i < requestCount; i++) {
 						Address origin=cc.getAddress();

@@ -461,7 +461,7 @@ public class Server implements Closeable {
 		// payload for a missing data request should be a valid Hash
 		Hash h = RT.ensureHash(m.getPayload());
 		if (h == null) {
-			log.warn("Bad missing data request, not a Hash, terminating client");
+			log.trace("Bad missing data request, not a Hash, terminating client");
 			m.getConnection().close();
 			return;
 		};

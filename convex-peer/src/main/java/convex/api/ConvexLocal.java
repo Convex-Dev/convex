@@ -20,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
+import convex.core.util.ThreadUtils;
 import convex.net.MessageType;
 import convex.net.message.MessageLocal;
 import convex.peer.Server;
@@ -45,24 +46,20 @@ public class ConvexLocal extends Convex {
 		return server.isLive();
 	}
 
-
+	@SuppressWarnings("unchecked")
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
-		new Thread(new Runnable() {
-			@SuppressWarnings("unchecked")
-			@Override
-			public void run() {
-				AStore peerStore=server.getStore();
-				Ref<ACell> ref=peerStore.refForHash(hash);
-				if (ref==null) {
-					f.completeExceptionally(new MissingDataException(peerStore,hash));
-				} else {
-					ref=store.storeTopRef(ref, Ref.PERSISTED, null);
-					f.complete((T) ref.getValue());
-				}
+		ThreadUtils.runVirtual(()-> {
+			AStore peerStore=server.getStore();
+			Ref<ACell> ref=peerStore.refForHash(hash);
+			if (ref==null) {
+				f.completeExceptionally(new MissingDataException(peerStore,hash));
+			} else {
+				ref=store.storeTopRef(ref, Ref.PERSISTED, null);
+				f.complete((T) ref.getValue());
 			}
-		}).run();
+		});
 		return f;
 	}
 

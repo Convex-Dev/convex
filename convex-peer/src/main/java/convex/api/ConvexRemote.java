@@ -221,68 +221,68 @@ public class ConvexRemote extends Convex {
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
 		ThreadUtils.runVirtual(()-> {
-				Stores.setCurrent(store); // use store for calling thread
-				try {
-					Ref<T> ref = store.refForHash(hash);
-					HashSet<Hash> missingSet = new HashSet<>();
+			Stores.setCurrent(store); // use store for calling thread
+			try {
+				Ref<T> ref = store.refForHash(hash);
+				HashSet<Hash> missingSet = new HashSet<>();
 
-					// Loop until future is complete or cancelled
-					long LIMIT=100; // limit of missing data elements to query at any time
-					while (!f.isDone()) {
-						missingSet.clear();
+				// Loop until future is complete or cancelled
+				long LIMIT=100; // limit of missing data elements to query at any time
+				while (!f.isDone()) {
+					missingSet.clear();
 
-						if (ref == null) {
-							missingSet.add(hash);
+					if (ref == null) {
+						missingSet.add(hash);
+					} else {
+						if (ref.getStatus() >= Ref.PERSISTED) {
+							// we have everything!
+							f.complete(ref.getValue());
+							return;
+						}
+						ref.findMissing(missingSet,LIMIT);
+					}
+					
+					long requestsSent=0;
+					for (Hash h : missingSet) {
+						// send missing data requests until we fill pipeline
+						log.debug("Request missing data: {}", h);
+						boolean sent = connection.sendMissingData(h);
+						if (sent) {
+							requestsSent++;
 						} else {
-							if (ref.getStatus() >= Ref.PERSISTED) {
-								// we have everything!
-								f.complete(ref.getValue());
-								return;
-							}
-							ref.findMissing(missingSet,LIMIT);
-						}
-						
-						long requestsSent=0;
-						for (Hash h : missingSet) {
-							// send missing data requests until we fill pipeline
-							log.debug("Request missing data: {}", h);
-							boolean sent = connection.sendMissingData(h);
-							if (sent) {
-								requestsSent++;
-							} else {
-								log.debug("Send Queue full! Reducing limit");
-								LIMIT=Math.max(requestsSent, 10);
-								break;
-							}
-						}
-						
-						// increase limit if connection can handle it and we need to
-						if (requestsSent==LIMIT) LIMIT=Math.min(LIMIT*2, 1000);
-						
-						// if too low, can send multiple requests, and then block the peer
-						Thread.sleep(10);
-						ref = store.refForHash(hash);
-						if (ref != null) {
-							if (ref.getStatus() >= Ref.PERSISTED) {
-								// we have everything!
-								f.complete(ref.getValue());
-								return;
-							}
-							// maybe complete, but not sure
-							try {
-								ref = ref.persist();
-								f.complete(ref.getValue());
-							} catch (MissingDataException e) {
-								Hash missing = e.getMissingHash();
-								log.debug("Still missing: {}", missing);
-								connection.sendMissingData(missing);
-							}
+							log.debug("Send Queue full! Reducing limit");
+							LIMIT=Math.max(requestsSent, 10);
+							break;
 						}
 					}
-				} catch (Throwable t) {
-					// catch any errors, probably IO?
-					f.completeExceptionally(t);
+					
+					// increase limit if connection can handle it and we need to
+					if (requestsSent==LIMIT) LIMIT=Math.min(LIMIT*2, 1000);
+					
+					// if too low, can send multiple requests, and then block the peer
+					Thread.sleep(10);
+					ref = store.refForHash(hash);
+					if (ref != null) {
+						if (ref.getStatus() >= Ref.PERSISTED) {
+							// we have everything!
+							f.complete(ref.getValue());
+							return;
+						}
+						// maybe complete, but not sure
+						try {
+							ref = ref.persist();
+							f.complete(ref.getValue());
+						} catch (MissingDataException e) {
+							Hash missing = e.getMissingHash();
+							log.debug("Still missing: {}", missing);
+							connection.sendMissingData(missing);
+						}
+					}
 				}
+			} catch (Throwable t) {
+				// catch any errors, probably IO?
+				f.completeExceptionally(t);
+			}
 		});
 		
 		return f;
