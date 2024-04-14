@@ -12,7 +12,7 @@ import convex.net.MessageType;
 import convex.peer.Server;
 
 /**
- * Class representing a message to a local Server instance
+ * Class representing a message to a local Server instance. This avoids going via a Connection
  */
 public class MessageLocal extends Message {
 

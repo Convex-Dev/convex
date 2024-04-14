@@ -12,7 +12,7 @@ import convex.core.store.AStore;
  *
  */
 @SuppressWarnings("serial")
-public class MissingDataException extends RuntimeException {
+public class MissingDataException extends FastRuntimeException {
 
 	private Hash hash;
 	private AStore store;
