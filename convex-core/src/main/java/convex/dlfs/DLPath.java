@@ -142,8 +142,13 @@ public final class DLPath implements Path {
 		return new DLPath(fileSystem,Arrays.copyOfRange(names, beginIndex, endIndex),false);
 	}
 	
-	public DLPath subpath(int i) {
-		return subpath(1,count);
+	/**
+	 * Return a subpath starting from the given index
+	 * @param beginIndex Starting index
+	 * @return Relative subpath in smae manner as {@link #subpath(int, int)}
+	 */
+	public DLPath subpath(int beginIndex) {
+		return subpath(beginIndex,count);
 	}
 
 	@Override
@@ -225,6 +230,11 @@ public final class DLPath implements Path {
 		return new DLPath(fileSystem,newNames,absolute);
 	}
 
+	/**
+	 * Get CVM names from another path as an array
+	 * @param other Other path (should be a {@link DLPath})
+	 * @return CVM name array
+	 */
 	private static AString[] extractNames(Path other) {
 		if (other instanceof DLPath) {
 			return ((DLPath)other).names;
@@ -280,8 +290,7 @@ public final class DLPath implements Path {
 
 	@Override
 	public WatchKey register(WatchService watcher, Kind<?>[] events, Modifier... modifiers) throws IOException {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override
