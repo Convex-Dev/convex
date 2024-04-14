@@ -2,7 +2,6 @@ package etch;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.Collection;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -95,18 +94,6 @@ public class EtchStore extends AStore {
 			throw Utils.sneakyThrow(e);
 		}
 	}
-	
-	/**
-	 * Mark GC roots for retention during garbage collection
-	 * @param roots Cell roots to maintain
-	 * @param handler Handler to call for each Cell marked
-	 */
-	public void mark(Collection<ACell>  roots, Consumer<Ref<ACell>> handler) {
-		for (ACell cell: roots) {
-			if (cell==null) continue;
-			cell.mark(handler);
-		}
-	}
 
 	/**
 	 * Create an Etch store using a new temporary file with a generated prefix
@@ -129,6 +116,7 @@ public class EtchStore extends AStore {
 			Ref<ACell> existing = (Ref<ACell>) refCache.getCell(hash);
 			if (existing!=null) return (Ref<T>) existing;
 			
+			if (hash==Hash.NULL_HASH) return (Ref<T>) Ref.NULL_VALUE;
 			existing= readStoreRef(hash);
 			return (Ref<T>) existing;
 		} catch (IOException e) {

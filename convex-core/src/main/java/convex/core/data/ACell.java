@@ -1,15 +1,11 @@
 package convex.core.data;
 
-import java.util.function.Consumer;
-
 import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
-import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 
 /**
@@ -509,22 +505,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	@SuppressWarnings("unchecked")
 	public void attachRef(Ref<?> ref) {
 		this.cachedRef=(Ref<ACell>) ref;
-	}
-	
-	public <T extends ACell> T announce(Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = getRef();
-		AStore store=Stores.current();
-		ref= store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
-		return ref.getValue();
-	}
-	
-	@SuppressWarnings("unchecked")
-	public <T extends ACell> T mark(Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<ACell> ref = getRef();
-		AStore store=Stores.current();
-		ref= store.storeTopRef(ref, Ref.MARKED,noveltyHandler);
-		cachedRef=ref;
-		return (T) this;
 	}
 
 	/**

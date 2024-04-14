@@ -206,13 +206,13 @@ public class EtchStoreTest {
 
 			// Announce belief
 			counter.set(0L);
-			Ref<Belief> arb=belief.announce(noveltyHandler).getRef();
+			Ref<Belief> arb=Cells.announce(belief,noveltyHandler).getRef();
 			assertEquals(srb,arb);
 			assertEquals(4L,counter.get());
 
 			// Announce again. Should be no new novelty
 			counter.set(0L);
-			Ref<Belief> arb2=belief.announce(noveltyHandler).getRef();
+			Ref<Belief> arb2=Cells.announce(belief,noveltyHandler).getRef();
 			assertEquals(srb,arb2);
 			assertEquals(0L,counter.get()); // Nothing new announced
 

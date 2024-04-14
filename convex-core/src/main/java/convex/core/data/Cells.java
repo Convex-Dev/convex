@@ -107,15 +107,34 @@ public class Cells {
 	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) {
-		if (a==null) return a;
-		Ref<T> ref=store.storeTopRef(a.getRef(), Ref.PERSISTED, null);
+		Ref<T> ref=Ref.get(a);
+		Ref<T> sref=store.storeTopRef(ref, Ref.PERSISTED, null);
+		return sref.getValue();
+	}
+
+	/**
+	 * Announces a Cell, reporting as novelty any cells that have not been previously announced
+	 * @param a Cell to announce
+	 * @param noveltyHandler Handler for novelty values
+	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
+	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
+	 */
+	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler) {
+		if (a==null) {
+			return null; // null is never "novelty"
+		};
+		Ref<T> ref=Stores.current().storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
 		return ref.getValue();
 	}
 
-	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler) {
-		if (a==null) return a;
-		Ref<T> ref=Stores.current().storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
-		return ref.getValue();
+	/**
+	 * Gets the Hash (Value ID of a cell)
+	 * @param a Cell to get hash from
+	 * @return Hash value
+	 */
+	public static Hash getHash(ACell a) {
+		if (a==null) return Hash.NULL_HASH;
+		return a.getHash();
 	}
 
 }

@@ -34,7 +34,9 @@ public class MemoryStore extends AStore {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		Ref<T> ref = (Ref<T>) hashRefs.get(hash);
-		return ref;
+		if (ref!=null) return ref;
+		if (hash==Hash.NULL_HASH) return (Ref<T>) Ref.NULL_VALUE;
+		return null;
 	}
 	
 	@Override
