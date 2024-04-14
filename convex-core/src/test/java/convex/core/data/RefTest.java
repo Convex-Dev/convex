@@ -101,7 +101,7 @@ public class RefTest {
 		assertEquals(Ref.PERSISTED, vr.getStatus());	
 		
 		// Now try announcing vv
-		vv=vv.announce();
+		vv=Cells.announce(vv,null);
 		vvr=vv.getRef();
 		assertEquals(Ref.ANNOUNCED, vvr.getStatus());
 		assertEquals(Ref.ANNOUNCED, vvr.getValue().getRef(0).getStatus());

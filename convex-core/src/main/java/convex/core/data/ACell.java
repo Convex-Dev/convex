@@ -510,36 +510,12 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public void attachRef(Ref<?> ref) {
 		this.cachedRef=(Ref<ACell>) ref;
 	}
-
-	/**
-	 * Creates an ANNOUNCED Ref with the given value in the current store.
-	 * 
-	 * Novelty handler is called for all new Refs that are persisted (recursively),
-	 * starting from lowest levels.
-	 * 
-	 * @param <T> Type of Value
-	 * @param value Value to announce
-	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
-	 * @return Persisted Ref
-	 */
-	public static <T extends ACell> T createAnnounced(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		if (value==null) return null;
-		return value.announce(noveltyHandler);
-	}
-	
-	public <T extends ACell> T announce() {
-		return announce(null);
-	}
 	
 	public <T extends ACell> T announce(Consumer<Ref<ACell>> noveltyHandler) {
 		Ref<T> ref = getRef();
 		AStore store=Stores.current();
 		ref= store.storeTopRef(ref, Ref.ANNOUNCED,noveltyHandler);
 		return ref.getValue();
-	}
-	
-	public <T extends ACell> T mark() {
-		return mark(null);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -549,25 +525,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		ref= store.storeTopRef(ref, Ref.MARKED,noveltyHandler);
 		cachedRef=ref;
 		return (T) this;
-	}
-
-	/**
-	 * Creates a persisted Ref with the given value in the current store.
-	 * 
-	 * Novelty handler is called for all new Refs that are persisted (recursively),
-	 * starting from lowest levels (depth first order)
-	 * 
-	 * @param <T> Type of Value
-	 * @param value Any CVM value to persist
-	 * @param noveltyHandler Novelty handler to call for any Novelty (may be null)
-	 * @return Persisted Ref
-	 */
-	public static <T extends ACell> Ref<T> createPersisted(T value, Consumer<Ref<ACell>> noveltyHandler) {
-		Ref<T> ref = Ref.get(value);
-		if (ref.isPersisted()) return ref;
-		AStore store=Stores.current();
-		ref = (Ref<T>) store.storeTopRef(ref, Ref.PERSISTED,noveltyHandler);
-		return ref;
 	}
 
 	/**

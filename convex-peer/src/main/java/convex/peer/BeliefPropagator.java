@@ -430,7 +430,7 @@ public class BeliefPropagator extends AThreadedComponent {
 
 		// persist the state of the Peer, announcing the new Belief
 		// (ensure we can handle missing data requests etc.)
-		belief=ACell.createAnnounced(belief, noveltyHandler);
+		belief=Cells.announce(belief, noveltyHandler);
 		lastFullBroadcastBelief=belief;
 
 		Message msg = createBelief(belief, novelty);
@@ -459,7 +459,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		SignedData<Order> order=belief.getOrders().get(key);
 		if (order==null) return null;
 		
-		order=ACell.createAnnounced(order, noveltyHandler);
+		order=Cells.announce(order, noveltyHandler);
 		
 		// Update belief orders with persisted version
 		orders=orders.assoc(key, order);

@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.lang.reflect.Array;
+import java.util.function.Consumer;
 
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -108,6 +109,12 @@ public class Cells {
 	public static <T extends ACell> T persist(T a, AStore store) {
 		if (a==null) return a;
 		Ref<T> ref=store.storeTopRef(a.getRef(), Ref.PERSISTED, null);
+		return ref.getValue();
+	}
+
+	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler) {
+		if (a==null) return a;
+		Ref<T> ref=Stores.current().storeTopRef(a.getRef(), Ref.ANNOUNCED, noveltyHandler);
 		return ref.getValue();
 	}
 
