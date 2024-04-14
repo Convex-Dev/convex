@@ -5,8 +5,8 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 
-import convex.core.data.BlobBuilder;
 import convex.core.data.prim.CVMDouble;
+import convex.core.data.util.BlobBuilder;
 
 public class Text {
 	private static final int WHITESPACE_LENGTH = 32;

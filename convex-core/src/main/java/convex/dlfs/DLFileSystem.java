@@ -2,7 +2,6 @@ package convex.dlfs;
 
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
-import java.nio.file.DirectoryStream;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
@@ -18,6 +17,7 @@ import java.util.Set;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.dlfs.impl.DLDirectoryStream;
 import convex.dlfs.impl.DLFSFileAttributes;
 
 /**
@@ -115,7 +115,7 @@ public abstract class DLFileSystem extends FileSystem {
 	 * Gets the unique root path for this FileSystem
 	 * @return
 	 */
-	public Path getRoot() {
+	public DLPath getRoot() {
 		return root;
 	}
 	
@@ -134,19 +134,13 @@ public abstract class DLFileSystem extends FileSystem {
 	 * @param attrs
 	 * @return
 	 */
-	public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+	public abstract SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs);
 
 	/**
 	 * Implementation for delegation by DLFSProvider
 	 * @return
 	 */
-	public DirectoryStream<Path> newDirectoryStream(Path dir, Filter<? super Path> filter) {
-		// TODO Auto-generated method stub
-		return null;
-	}
+	public abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter);
 
 	public DLFSFileAttributes getFileAttributes(DLPath path) {
 		AVector<ACell> node=getNode(path);
@@ -154,5 +148,12 @@ public abstract class DLFileSystem extends FileSystem {
 	}
 
 	protected abstract AVector<ACell> getNode(DLPath path);
+
+	/**
+	 * Implementation for delegation by DLFSProvider, create a directory
+	 * @return
+	 * @throws IOException 
+	 */
+	protected abstract DLPath createDirectory(DLPath dir, FileAttribute<?>[] attrs) throws IOException;
 
 }

@@ -1,7 +1,10 @@
-package convex.core.data;
+package convex.core.data.util;
 
 import java.util.Spliterator;
 import java.util.function.Consumer;
+
+import convex.core.data.ACell;
+import convex.core.data.ASequence;
 
 public class SequenceSpliterator<T extends ACell> implements Spliterator<T> {
 	long start;

@@ -6,6 +6,7 @@ import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 

@@ -3,6 +3,7 @@ package convex.core.data;
 import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 

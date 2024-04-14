@@ -3,11 +3,11 @@ package convex.core.data.prim;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
 

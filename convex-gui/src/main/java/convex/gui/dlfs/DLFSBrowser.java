@@ -1,5 +1,6 @@
 package convex.gui.dlfs;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import convex.dlfs.DLFS;
@@ -8,12 +9,18 @@ import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class DLFSGUI extends AbstractGUI {
+public class DLFSBrowser extends AbstractGUI {
 	
-	public DLFSGUI() {
+	public DLFSBrowser() {
 		setLayout(new MigLayout());
 		Path p=DLFS.createLocal().getRoot();
 		// Path p=new File(".").toPath();
+		try {
+			Files.createFile(p.resolve("bob"));
+			
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		add(new DLFSPanel(p),"dock center");
 	}
 	
@@ -25,7 +32,7 @@ public class DLFSGUI extends AbstractGUI {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		DLFSGUI gui=new DLFSGUI();
+		DLFSBrowser gui=new DLFSBrowser();
 		gui.run();
 	}
 	

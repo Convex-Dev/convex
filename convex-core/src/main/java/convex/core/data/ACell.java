@@ -5,6 +5,7 @@ import java.util.function.Consumer;
 import convex.core.Constants;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
 import convex.core.store.AStore;

@@ -5,6 +5,7 @@ import java.util.ListIterator;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;

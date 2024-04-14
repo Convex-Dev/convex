@@ -4,6 +4,7 @@ import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;

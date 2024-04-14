@@ -100,20 +100,20 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path getRoot() {
+	public DLPath getRoot() {
 		if (!absolute) return null; 
 		return fileSystem.getRoot();
 	}
 
 	@Override
-	public Path getFileName() {
+	public DLPath getFileName() {
 		if (count==0) return null;
 		if (!absolute&(count==1)) return this;
 		return new DLPath(fileSystem,new AString[] {names[count-1]},false);
 	}
 
 	@Override
-	public Path getParent() {
+	public DLPath getParent() {
 		int n=getNameCount();
 		if (n==0) return null;
 		return new DLPath(fileSystem,Arrays.copyOf(names, n-1),absolute);
@@ -125,7 +125,7 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path getName(int index) {
+	public DLPath getName(int index) {
 		int n=getNameCount();
 		if ((index<0)||(index>=n)) throw new IllegalArgumentException("index out of range");
 		if (!absolute&(count==1)) return this;
@@ -133,12 +133,17 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path subpath(int beginIndex, int endIndex) {
+	public DLPath subpath(int beginIndex, int endIndex) {
 		int n=getNameCount();
-		if ((beginIndex<0)||(endIndex>=n)) throw new IllegalArgumentException("index out of range");
+		if ((beginIndex<0)||(endIndex>n)) throw new IllegalArgumentException("index out of range");
 		if (beginIndex>endIndex) throw new IllegalArgumentException("negative length");
+		if (beginIndex==endIndex) return fileSystem.getEmptyPath();
 		if (!absolute&&(beginIndex==0)&&(endIndex==n)) return this;
 		return new DLPath(fileSystem,Arrays.copyOfRange(names, beginIndex, endIndex),false);
+	}
+	
+	public DLPath subpath(int i) {
+		return subpath(1,count);
 	}
 
 	@Override
@@ -209,6 +214,14 @@ public final class DLPath implements Path {
 		if (other.isAbsolute()) return other;
 		if (other.getNameCount()==0) return this;
 		AString[] newNames=Utils.concat(names, extractNames(other));
+		return new DLPath(fileSystem,newNames,absolute);
+	}
+	
+	public DLPath resolve(AString nameToAppend) {
+		AString name=DLFS.checkName(nameToAppend);
+		if (name==null) throw new InvalidPathException(nameToAppend.toString(),"Invalid path name: ");
+		AString[] newNames=Arrays.copyOf(names, count+1);
+		newNames[count]=name;
 		return new DLPath(fileSystem,newNames,absolute);
 	}
 
@@ -327,4 +340,12 @@ public final class DLPath implements Path {
 	public AString getCVMName(int i) {
 		return names[i];
 	}
+
+	public AString getCVMFileName() {
+		if (count==0) return null;
+		return names[count-1];
+	}
+
+
+
 }

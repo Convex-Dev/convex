@@ -2,12 +2,12 @@ package convex.core.lang.ops;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;

@@ -14,8 +14,11 @@ import convex.core.util.Utils;
 public class Vectors {
 
 	protected static final int BITS_PER_LEVEL = 4;
-	protected static final int CHUNK_SIZE = 1 << BITS_PER_LEVEL; // 16
+	
+	public static final int CHUNK_SIZE = 1 << BITS_PER_LEVEL; // 16
+	
 	protected static final int BITMASK = CHUNK_SIZE - 1; // 15
+	
 	public static final int MAX_ENCODING_LENGTH = Math.max(VectorLeaf.MAX_ENCODING_LENGTH,VectorTree.MAX_ENCODING_LENGTH);
 
 	/**

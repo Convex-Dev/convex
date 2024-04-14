@@ -10,10 +10,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.util.Iterator;
 
 import org.junit.jupiter.api.Test;
 
@@ -92,8 +94,7 @@ public class DLFSTest {
 	}
 	
 	@Test public void testNormalize() throws URISyntaxException {
-		DLFSProvider provider=DLFS.provider();
-		DLFileSystem fs=provider.newFileSystem(new URI("dlfs"),null);
+		DLFileSystem fs=DLFS.createLocal();
 
 		Path root=fs.getRoot();
 		assertSame(root,root.normalize());
@@ -149,6 +150,21 @@ public class DLFSTest {
 		assertEquals("../..",fs.getPath("./.././../.").normalize().toString());
 		assertEquals("../../bar",fs.getPath("../../foo/../bar").normalize().toString());
 		assertEquals("/bar/baz",fs.getPath("/../../foo/./../bar/./baz").normalize().toString());
+	}
+	
+	@Test 
+	public void testFilesAPI() throws IOException {
+		DLFileSystem fs=DLFS.createLocal();
+		
+		Path root=fs.getRoot();
+		Path dir=Files.createDirectory(root.resolve("foo"));
+		
+		try (DirectoryStream<Path> ds=Files.newDirectoryStream(root)) {
+			Iterator<Path> it=ds.iterator();
+			assertEquals(dir,it.next());
+			assertFalse(it.hasNext());
+		};
+		
 	}
 
 }

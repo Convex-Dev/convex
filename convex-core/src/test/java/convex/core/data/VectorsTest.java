@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.data.util.VectorBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;

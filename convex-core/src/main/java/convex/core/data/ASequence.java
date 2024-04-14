@@ -9,6 +9,7 @@ import java.util.function.Function;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.util.SequenceSpliterator;
 import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;

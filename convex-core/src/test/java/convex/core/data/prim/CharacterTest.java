@@ -11,10 +11,10 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Blob;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Strings;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 
 public class CharacterTest {

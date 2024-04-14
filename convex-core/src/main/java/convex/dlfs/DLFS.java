@@ -18,6 +18,8 @@ public class DLFS {
 	 * URI scheme for DLFS
 	 */
 	public static final String SCHEME = "dlfs";
+
+	public static final String ROOT_STRING = "/";
 	
 	public static DLFSProvider provider() {
 		return PROVIDER;
@@ -36,6 +38,12 @@ public class DLFS {
 		if (name==null) return null;
 		if (name.isEmpty()) return null;
 		return Strings.create(name);
+	}
+
+	public static AString checkName(AString name) {
+		if (name==null) return null;
+		if (name.isEmpty()) return null;
+		return name;
 	}
 
 }

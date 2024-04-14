@@ -2,9 +2,9 @@ package convex.core.lang.impl;
 
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Keyword;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 

@@ -10,6 +10,7 @@ import java.util.function.Predicate;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Errors;

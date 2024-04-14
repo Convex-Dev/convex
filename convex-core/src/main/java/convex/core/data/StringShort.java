@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.charset.StandardCharsets;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
 import convex.core.util.Errors;

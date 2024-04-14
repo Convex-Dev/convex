@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 import convex.core.Constants;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 
 public class Strings {

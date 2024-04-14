@@ -1,5 +1,10 @@
-package convex.core.data;
+package convex.core.data.util;
 
+import convex.core.data.ACell;
+import convex.core.data.ASequence;
+import convex.core.data.AVector;
+import convex.core.data.VectorLeaf;
+import convex.core.data.Vectors;
 import convex.core.util.Utils;
 
 /**

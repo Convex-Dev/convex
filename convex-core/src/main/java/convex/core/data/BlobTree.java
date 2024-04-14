@@ -3,6 +3,7 @@ package convex.core.data;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;

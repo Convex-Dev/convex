@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.util.Utils;
 
 /**

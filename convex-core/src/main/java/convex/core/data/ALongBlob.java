@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.util.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 

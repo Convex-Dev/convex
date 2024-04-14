@@ -6,8 +6,8 @@ import java.security.SecureRandom;
 import java.util.HashMap;
 
 import convex.core.data.Blob;
-import convex.core.data.BlobBuilder;
 import convex.core.data.Hash;
+import convex.core.data.util.BlobBuilder;
 import convex.core.util.Utils;
 
 /**

@@ -7,6 +7,7 @@ import convex.core.crypto.Hashing;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
 

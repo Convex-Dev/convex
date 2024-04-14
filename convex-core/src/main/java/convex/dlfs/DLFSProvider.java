@@ -10,6 +10,7 @@ import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileStore;
 import java.nio.file.FileSystem;
 import java.nio.file.LinkOption;
+import java.nio.file.NotDirectoryException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.ProviderMismatchException;
@@ -21,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 import convex.core.util.SoftCache;
+import convex.dlfs.impl.DLDirectoryStream;
 import convex.dlfs.impl.DLFSLocal;
 
 public class DLFSProvider extends FileSystemProvider {
@@ -58,11 +60,12 @@ public class DLFSProvider extends FileSystemProvider {
 	@Override
 	public SeekableByteChannel newByteChannel(Path path, Set<? extends OpenOption> options, FileAttribute<?>... attrs)
 			throws IOException {
+		// Note this either opens or creates a file
 		FileSystem fs=path.getFileSystem();
 		if (!(fs instanceof DLFileSystem)) {
             throw new ProviderMismatchException("Not DLFS");
         }
-        return ((DLFileSystem) fs).newByteChannel(path, options, attrs);
+        return ((DLFileSystem) fs).newByteChannel((DLPath)path, options, attrs);
 	}
 
 	@Override
@@ -71,13 +74,18 @@ public class DLFSProvider extends FileSystemProvider {
 		if (!(fs instanceof DLFileSystem)) {
             throw new ProviderMismatchException("Not DLFS");
         }
-        return ((DLFileSystem) fs).newDirectoryStream(dir, filter);
+        DLDirectoryStream stream = ((DLFileSystem) fs).newDirectoryStream((DLPath)dir, filter);
+        if (stream==null) throw new NotDirectoryException("Not a directory: "+dir);
+        return stream;
 	}
 
 	@Override
 	public void createDirectory(Path dir, FileAttribute<?>... attrs) throws IOException {
-		// TODO Auto-generated method stub
-		
+		FileSystem fs=dir.getFileSystem();
+		if (!(fs instanceof DLFileSystem)) {
+            throw new ProviderMismatchException("Not DLFS");
+        }
+        ((DLFileSystem) fs).createDirectory((DLPath)dir, attrs);
 	}
 
 	@Override
@@ -100,8 +108,7 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public boolean isSameFile(Path path, Path path2) throws IOException {
-		// TODO Auto-generated method stub
-		return false;
+		return path.toAbsolutePath().equals(path2.toAbsolutePath());
 	}
 
 	@Override

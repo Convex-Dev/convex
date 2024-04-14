@@ -8,6 +8,7 @@ import java.nio.charset.CoderResult;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 import convex.core.util.Utils;
 
 /**
