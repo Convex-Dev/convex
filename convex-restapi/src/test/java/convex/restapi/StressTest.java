@@ -9,6 +9,7 @@ import java.util.concurrent.TimeoutException;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.java.Convex;
 import convex.java.JSON;
@@ -49,9 +50,9 @@ public class StressTest {
 			long genTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT+ " REST clients connected in "+compTime(startTime,genTime));
 			
-			ExecutorService ex=Utils.getVirtualExecutor();
+			ExecutorService ex=ThreadUtils.getVirtualExecutor();
 			
-			ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (ex,cc->{
+			ArrayList<CompletableFuture<Object>> cfutures=ThreadUtils.futureMap (ex,cc->{
 				for (int i = 0; i < TRANSCOUNT; i++) {
 					String source = "*timestamp*";
 					cc.query(source);
@@ -59,28 +60,28 @@ public class StressTest {
 				return null;
 			},clients);
 			// wait for everything to be sent
-			Utils.awaitAll(cfutures);
+			ThreadUtils.awaitAll(cfutures);
 			
 			long queryTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT * TRANSCOUNT+ " REST queries in "+compTime(queryTime,genTime));
 		
-			cfutures=Utils.futureMap (ex,cc->{
+			cfutures=ThreadUtils.futureMap (ex,cc->{
 				return cc.faucet(cc.getAddress(), 1000000);
 			},clients);
 			// wait for everything to be sent
-			Utils.awaitAll(cfutures);
+			ThreadUtils.awaitAll(cfutures);
 	
 			long faucetTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT+ " Faucet transactions completed in "+compTime(faucetTime,queryTime));
 	
-			cfutures=Utils.futureMap (ex,cc->{
+			cfutures=ThreadUtils.futureMap (ex,cc->{
 				// System.out.println(cc.queryAccount());
 				Map<String,Object> res = cc.transact("(def a 1)");
 				if (res.get("errorCode")!=null) throw new Error(JSON.toPrettyString(res));
 				return res;
 			},clients);
 			// wait for everything to be sent
-			Utils.awaitAll(cfutures);
+			ThreadUtils.awaitAll(cfutures);
 	
 			long transTime=Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT+ " transactions executed in "+compTime(faucetTime,transTime));

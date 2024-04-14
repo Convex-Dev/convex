@@ -26,6 +26,7 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.peer.Server;
@@ -219,9 +220,7 @@ public class ConvexRemote extends Convex {
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
 		CompletableFuture<T> f = new CompletableFuture<T>();
-		Thread acquireThread=new Thread(new Runnable() {
-			@Override
-			public void run() {
+		ThreadUtils.runVirtual(()-> {
 				Stores.setCurrent(store); // use store for calling thread
 				try {
 					Ref<T> ref = store.refForHash(hash);
@@ -284,10 +283,7 @@ public class ConvexRemote extends Convex {
 					// catch any errors, probably IO?
 					f.completeExceptionally(t);
 				}
-			}
 		});
-		acquireThread.setDaemon(true);
-		acquireThread.start();
 		
 		return f;
 	}

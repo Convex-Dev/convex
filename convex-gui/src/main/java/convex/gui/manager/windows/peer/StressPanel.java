@@ -41,6 +41,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
 import convex.core.transactions.Transfer;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.PeerGUI;
 import convex.gui.components.ActionPanel;
@@ -254,8 +255,8 @@ public class StressPanel extends JPanel {
 			
 			resultArea.setText("Sending transactions...");
 			
-			ExecutorService ex=Utils.getVirtualExecutor();
-			ArrayList<CompletableFuture<Object>> cfutures=Utils.futureMap (ex,cc->{
+			ExecutorService ex=ThreadUtils.getVirtualExecutor();
+			ArrayList<CompletableFuture<Object>> cfutures=ThreadUtils.futureMap (ex,cc->{
 				try {
 					for (int i = 0; i < requestCount; i++) {
 						Address origin=cc.getAddress();
@@ -289,7 +290,7 @@ public class StressPanel extends JPanel {
 			resultArea.setText("Awaiting "+futureCount+" results...");
 			
 
-			List<Result> results = Utils.completeAll(frs).get();
+			List<Result> results = ThreadUtils.completeAll(frs).get();
 			long endTime = Utils.getCurrentTimestamp();
 
 			HashMap<ACell, Integer> errorMap=new HashMap<>();
