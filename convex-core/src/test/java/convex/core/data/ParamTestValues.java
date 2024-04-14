@@ -116,7 +116,7 @@ public class ParamTestValues extends ACVMTest {
 
 	@Test
 	public void testHexRoundTrip() throws InvalidDataException, ValidationException {
-		ACell.createPersisted(data);
+		Cells.persist(data);
 		String hex = Format.encodedBlob(data).toHexString();
 		Blob d2 = Blob.fromHex(hex);
 		ACell rec = Format.read(d2);

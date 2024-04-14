@@ -10,8 +10,8 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.bc.BCProvider;
 import convex.core.crypto.sodium.SodiumProvider;
 import convex.core.data.ABlob;
-import convex.core.data.ACell;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 
@@ -25,7 +25,7 @@ public class SignatureBenchmark {
 
 	private static SignedData<ABlob> makeSigned() {
 		SignedData<ABlob> signed= KEYPAIR.signData(Blobs.fromHex("cafebabe"));
-		ACell.createPersisted(signed);
+		Cells.persist(signed);
 		return signed;
 	}
 	

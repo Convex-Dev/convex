@@ -411,7 +411,7 @@ public class BlobsTest {
 
 		bb.validate();
 
-		Ref<BlobTree> rb = ACell.createPersisted(bb);
+		Ref<BlobTree> rb = Cells.persist(bb).getRef();
 		BlobTree bbb = Format.read(bb.getEncoding());
 		bbb.validate();
 		assertEquals(bb, bbb);
@@ -493,9 +493,10 @@ public class BlobsTest {
 	 */
 	@Test
 	public void testLongBlobBroken() throws BadFormatException {
-	   Blob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
+	   ABlob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
 	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
-	   Ref<ACell> pref = ACell.createPersisted(value); // ensure persisted
+	   
+	   Ref<ACell> pref = Cells.persist(value).getRef(); // ensure persisted
 	   assertEquals(BlobTree.class,pref.getValue().getClass());
 	   Blob b = value.getEncoding();
 	   ACell o = Format.read(b);

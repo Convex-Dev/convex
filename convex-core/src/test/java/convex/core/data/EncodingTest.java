@@ -413,7 +413,7 @@ public class EncodingTest {
 		
 		Belief b=Belief.create(kp, o);
 		
-		b=ACell.createPersisted(b).getValue();
+		b=Cells.persist(b);
 		assertTrue(b.getRef().getStatus()==Ref.PERSISTED);
 		
 		ArrayList<ACell> novelty=new ArrayList<>();

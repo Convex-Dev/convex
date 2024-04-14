@@ -3,7 +3,7 @@ package convex.store;
 import org.junit.jupiter.api.Test;
 
 import convex.core.State;
-import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
@@ -21,7 +21,7 @@ public class EtchInitTest {
 
 			// Use fresh State
 			State s=InitTest.createState();
-			Ref<State> sr=ACell.createPersisted(s);
+			Ref<State> sr=Cells.persist(s).getRef();
 
 			Hash hash=sr.getHash();
 

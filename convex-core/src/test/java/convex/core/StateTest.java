@@ -12,6 +12,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Lists;
 import convex.core.data.RecordTest;
@@ -57,7 +58,7 @@ public class StateTest {
 
 		assertEquals(0,s.getRef().getStatus());
 
-		Ref<State> rs = ACell.createPersisted(s);
+		Ref<State> rs = Cells.persist(s).getRef();
 		assertEquals(Ref.PERSISTED, rs.getStatus());
 
 		// TODO: consider if cached ref in state should now have persisted status?
@@ -100,7 +101,7 @@ public class StateTest {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
 		State s=Init.createState(Lists.of(kp.getAccountKey()));
 		
-		Ref<State> r1=ACell.createPersisted(s);
+		Ref<State> r1=Cells.persist(s).getRef();
 		RefTreeStats rs1=Refs.getRefTreeStats(r1);
 		
 		assertTrue(r1.isPersisted());

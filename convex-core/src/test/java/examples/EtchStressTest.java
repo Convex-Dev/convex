@@ -3,8 +3,8 @@ package examples;
 import java.util.Random;
 
 import convex.core.data.ABlob;
-import convex.core.data.ACell;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.store.Stores;
@@ -27,7 +27,7 @@ public class EtchStressTest {
 			ABlob b=Blobs.createRandom(r,10000);
 			Hash h=b.getHash();
 			
-			b=ACell.createPersisted(b).getValue();
+			b=Cells.persist(b);
 			
 			Ref<ABlob> rb=store.refForHash(h);
 			if (rb==null) {

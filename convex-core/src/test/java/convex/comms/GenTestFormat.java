@@ -11,6 +11,7 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
 import convex.core.data.Ref;
@@ -38,7 +39,7 @@ public class GenTestFormat {
 		Blob b = Format.encodedBlob(prim);
 		if (!Format.isEmbedded(prim)) {
 			// persist in case large
-			ACell.createPersisted(prim);
+			Cells.persist(prim);
 		}
 		ACell o = Format.read(b);
 		assertEquals(prim, o);
@@ -49,7 +50,7 @@ public class GenTestFormat {
 
 	@Property
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException {
-		Ref<ACell> pref = ACell.createPersisted(value); // ensure persisted
+		Ref<ACell> pref = Ref.get(Cells.persist(value)); // ensure persisted
 		Blob b = Format.encodedBlob(value);
 		ACell o = Format.read(b);
 

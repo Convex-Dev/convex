@@ -571,18 +571,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Creates a persisted Ref with the given value in the current store. Returns
-	 * the current Ref if already persisted
-	 * 
-	 * @param <T> Type of Value
-	 * @param value Any CVM value to persist
-	 * @return Ref to the given value
-	 */
-	public static <T extends ACell> Ref<T> createPersisted(T value) {
-		return createPersisted(value, null);
-	}
-
-	/**
 	 * Tests if this Cell is completely encoded, i.e. has no external Refs. This implies that the 
 	 * complete Cell can be represented in a single encoding.
 	 * @return true if completely encoded, false otherwise

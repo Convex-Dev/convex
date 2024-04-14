@@ -6,9 +6,9 @@ import convex.core.Belief;
 import convex.core.Block;
 import convex.core.Order;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.EncodingTest;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
@@ -46,7 +46,7 @@ public class BeliefTest {
 		
 		RecordTest.doRecordTests(b);
 		
-		b=ACell.createPersisted(b).getValue();
+		b=Cells.persist(b);
 		
 		RecordTest.doRecordTests(b);
 		

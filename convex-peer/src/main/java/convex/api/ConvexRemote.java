@@ -18,6 +18,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -270,8 +271,9 @@ public class ConvexRemote extends Convex {
 						}
 						// maybe complete, but not sure
 						try {
-							ref = ref.persist();
-							f.complete(ref.getValue());
+							T a=ref.getValue();
+							a=Cells.persist(a);
+							f.complete(a);
 						} catch (MissingDataException e) {
 							Hash missing = e.getMissingHash();
 							log.debug("Still missing: {}", missing);

@@ -20,6 +20,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Lists;
@@ -310,7 +311,7 @@ public class ChainAPI extends ABaseAPI {
 			long sequence=convex.getSequence(addr);
 			long nextSeq=sequence+1;
 			ATransaction trans=Invoke.create(addr, nextSeq, code);
-			Ref<ATransaction> ref=ACell.createPersisted(trans);
+			Ref<ATransaction> ref=Cells.persist(trans).getRef();
 			
 			HashMap<String,Object> rmap=new HashMap<>();
 			rmap.put("source",srcValue);

@@ -135,7 +135,7 @@ public class TransactionHandler extends AThreadedComponent{
 			
 			// Persist the signed transaction. Might throw MissingDataException?
 			// If we already have the transaction persisted, will obtain signature status
-			sd=ACell.createPersisted(sd).getValue();
+			sd=Cells.persist(sd);
 	
 			// Put on Server's transaction queue. We are OK to block here
 			LoadMonitor.down();

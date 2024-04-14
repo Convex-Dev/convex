@@ -34,13 +34,12 @@ public class ObjectsTest {
 	public static void doAnyValueTests(ACell a) {
 		Hash h=Hash.compute(a);
 				
-
-		Ref<ACell> r = Ref.get(a).persist();
+		a=Cells.persist(a);
+		Ref<ACell> r = Ref.get(a);
 		assertEquals(h,r.getHash());
-		assertEquals(a, r.getValue());
+		assertSame(a, r.getValue()); // shouldn't get GC'd because we have a strong reference
 
 		doAnyEncodingTests(a);
-		
 		doCellTests(a);
 	}
 
@@ -331,8 +330,8 @@ public class ObjectsTest {
 			
 			assertNull(ms.refForHash(hash));
 			
-			// persist the Ref
-			ACell.createPersisted(a);
+			// persist the cell
+			Cells.persist(a);
 			
 			// retrieve from store
 			Ref<ACell> rr=ms.refForHash(hash);

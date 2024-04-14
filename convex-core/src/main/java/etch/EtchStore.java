@@ -185,11 +185,11 @@ public class EtchStore extends AStore {
 		
 		if (requiredStatus<Ref.STORED) {
 			if (topLevel || !embedded) {
-				refCache.putCell(ref);
+				addToCache(ref);
 			}
 			return ref;
 		}
-
+		
 		// beyond STORED level, need to recursively persist child refs if they exist
 		if ((requiredStatus > Ref.STORED)&&(cell.getRefCount()>0)) {
 			// TODO: probably slow to rebuild these all the time!
@@ -210,6 +210,7 @@ public class EtchStore extends AStore {
 			}
 		}
 
+		// Actually write top level an non-embedded cells only
 		if (topLevel || !embedded) {
 			
 			// Do actual write to store
@@ -232,7 +233,7 @@ public class EtchStore extends AStore {
 				}
 
 				cell.attachRef(result);
-				refCache.putCell(result); // cache for subsequent writes
+				addToCache(result); // cache for subsequent writes
 			} catch (IOException e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -248,6 +249,10 @@ public class EtchStore extends AStore {
 			cell.attachRef(ref);
 			return ref;
 		}
+	}
+
+	protected <T extends ACell> void addToCache(Ref<T> ref) {
+		refCache.putCell(ref);
 	}
 
 	@Override

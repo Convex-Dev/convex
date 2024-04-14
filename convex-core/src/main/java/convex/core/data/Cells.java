@@ -2,6 +2,9 @@ package convex.core.data;
 
 import java.lang.reflect.Array;
 
+import convex.core.store.AStore;
+import convex.core.store.Stores;
+
 /**
  * Static utility class for dealing with cells
  */
@@ -83,6 +86,29 @@ public class Cells {
 	public static boolean isValue(ACell a) {
 		if (a==null) return true;
 		return a.isDataValue();
+	}
+	
+	/**
+	 * Persist a cell in the current store
+	 * @param a Cell to persist
+	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
+	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
+	 */
+	public static <T extends ACell> T persist(T a) {
+		return persist(a,Stores.current());
+	}
+
+	/**
+	 * Persist a cell in the given store
+	 * @param a Cell to persist
+	 * @param store Store instance to persist in
+	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
+	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
+	 */
+	public static <T extends ACell> T persist(T a, AStore store) {
+		if (a==null) return a;
+		Ref<T> ref=store.storeTopRef(a.getRef(), Ref.PERSISTED, null);
+		return ref.getValue();
 	}
 
 }

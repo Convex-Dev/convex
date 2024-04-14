@@ -41,7 +41,7 @@ public class SignedDataTest {
 
 		assertThrows(BadSignatureException.class, () -> sd.validateSignature());
 		
-		ACell.createPersisted(sd);
+		Cells.persist(sd);
 		
 		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
 		// should have cached checked signature
@@ -86,7 +86,7 @@ public class SignedDataTest {
 		CVMLong cl=RT.cvm(1585856457);
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);
-		ACell.createPersisted(sd);
+		Cells.persist(sd);
 		
 		SignedData<CVMLong> sd1 = (SignedData<CVMLong>) Ref.forHash(sd.getHash()).getValue();
 		// should have cached checked signature

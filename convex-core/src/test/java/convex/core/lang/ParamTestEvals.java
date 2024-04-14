@@ -13,6 +13,7 @@ import org.junit.runners.Parameterized;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.exceptions.BadFormatException;
@@ -102,7 +103,7 @@ public class ParamTestEvals {
 	public void testOpRoundTrip() throws BadFormatException {
 		AOp<?> op = compile(source);
 		Blob b = Format.encodedBlob(op);
-		ACell.createPersisted(op); // persist to allow re-creation
+		Cells.persist(op); // persist to allow re-creation
 
 		AOp<?> op2 = Format.read(b);
 		Blob b2 = Format.encodedBlob(op2);

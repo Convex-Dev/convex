@@ -271,7 +271,7 @@ public class EtchStoreTest {
 			assertNotSame(cell,a1);
 			assertEquals(cell,a1);
 			
-			Ref<?> r=ACell.createPersisted(cell);
+			Ref<?> r=Cells.persist(cell).getRef();
 			assertTrue(r.isPersisted());
 			cell=r.getValue();
 			

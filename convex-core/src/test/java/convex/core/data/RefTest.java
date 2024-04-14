@@ -92,7 +92,7 @@ public class RefTest {
 		assertEquals(v, Ref.forHash(vh).getValue());
 		
 		// Now do full persistence of vv
-		vvr=ACell.createPersisted(vv);
+		vvr=Cells.persist(vv).getRef();
 		assertEquals(Ref.PERSISTED, vvr.getStatus());
 		
 		// Persistence should extend to child v
@@ -177,7 +177,7 @@ public class RefTest {
 		assertEquals(0,rs.persisted);
 		assertEquals(1,rs.embedded); // top level only is embedded with 2 children
 		
-		Ref<ABlob> rb=ACell.createPersisted(bigBlob);
+		Ref<ABlob> rb=Cells.persist(bigBlob).getRef();
 		
 		// TODO: Check Soft Refs
 		
@@ -208,7 +208,7 @@ public class RefTest {
 
 	@Test
 	public void testCompare() {
-		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(ACell.createPersisted(RT.cvm(1L))));
+		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Cells.persist(RT.cvm(1L)).getRef()));
 		assertEquals(1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));
 		assertEquals(-1, Ref.get(RT.cvm(1L)).compareTo(

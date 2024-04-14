@@ -174,7 +174,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		// Persist Belief in all cases, just without announcing
 		// This is mainly in case we get missing data / sync requests for the Belief
 		// This is super cheap if already persisted, so no problem
-		belief=ACell.createPersisted(belief).getValue();
+		belief=Cells.persist(belief);
 		
 		/* Update Belief again after persistence. We want to be using
 		 * Latest persisted version as much as possible
@@ -349,7 +349,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						};
 						
 						// Ensure we can persist newly received Order
-						so=ACell.createPersisted(so).getValue();
+						so=Cells.persist(so);
 						observeOrderUpdate(so);
 						orders.put(key, so);
 						changed=true;
