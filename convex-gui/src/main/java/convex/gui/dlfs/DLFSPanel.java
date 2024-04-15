@@ -19,7 +19,7 @@ import javax.swing.tree.TreePath;
 import net.miginfocom.swing.MigLayout;
 
 /**
- * A file browser panel for DLFS
+ * A file browser panel for DLFS directories
  */
 @SuppressWarnings("serial")
 public class DLFSPanel extends JPanel {
@@ -112,7 +112,9 @@ public class DLFSPanel extends JPanel {
 			Path p=getFilePath();
 			try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
 		        for (Path path : stream) {
-		        	this.add(new Node(path));
+		        	if (Files.isDirectory(path)) {
+		        		this.add(new Node(path));
+		        	}
 		        }
 		    } catch (Exception e) {
 		    	System.err.println(e.getMessage());

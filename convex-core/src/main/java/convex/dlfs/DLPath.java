@@ -260,7 +260,7 @@ public final class DLPath implements Path {
 		if (extra<0) return null;
 		
 		for (int i=0; i<count; i++) {
-			if (Objects.equals(names[i], other.names[i])) return null;
+			if (!Objects.equals(names[i], other.names[i])) return null;
 		}
 		
 		AString[] newNames=Arrays.copyOfRange(other.names, count, count+extra);

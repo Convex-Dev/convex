@@ -156,4 +156,11 @@ public abstract class DLFileSystem extends FileSystem {
 	 */
 	protected abstract DLPath createDirectory(DLPath dir, FileAttribute<?>[] attrs) throws IOException;
 
+	/**
+	 * Implementation for DLFSProvider delegation
+	 * @param path
+	 * @throws IOException 
+	 */
+	protected abstract void checkAccess(DLPath path) throws IOException;
+
 }

@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.OpenOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileAttribute;
@@ -56,12 +57,22 @@ public class DLFSLocal extends DLFileSystem {
 		DLPath parent=dir.getParent();
 		if (parent==null) throw new FileAlreadyExistsException(dir.toString());
 		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
-		if (parentNode==null) throw new FileNotFoundException(parent.toString());
+		if (parentNode==null) {
+			throw new FileNotFoundException(parent.toString());
+		}
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(dir.toString());
 		}
 		rootNode=DLFSNode.updateNode(rootNode,dir,DLFSNode.EMPTY_DIRECTORY);
 		return dir;
+	}
+
+	@Override
+	protected void checkAccess(DLPath path) throws IOException {
+		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
+		if (node==null) {
+			throw new NoSuchFileException(path.toString());
+		}
 	}
 
 }

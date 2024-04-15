@@ -16,7 +16,9 @@ public class DLFSBrowser extends AbstractGUI {
 		Path p=DLFS.createLocal().getRoot();
 		// Path p=new File(".").toPath();
 		try {
-			Files.createFile(p.resolve("bob"));
+			// Files.createFile(p.resolve("bob"));
+			Files.createDirectory(p.resolve("subdir"));
+			Files.createDirectories(p.resolve("foo/bar/baz"));
 			
 		} catch (Exception e) {
 			e.printStackTrace();

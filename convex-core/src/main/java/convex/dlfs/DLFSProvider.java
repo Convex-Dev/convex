@@ -125,8 +125,8 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public void checkAccess(Path path, AccessMode... modes) throws IOException {
-		// TODO Auto-generated method stub
-		
+		DLPath dlp=DLFS.checkPath(path);
+        dlp.getFileSystem().checkAccess(dlp);
 	}
 
 	@Override
