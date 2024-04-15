@@ -8,6 +8,7 @@ import convex.core.data.Blob;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 
 /**
  * Static utility class for working with DLFS Node structures
@@ -18,14 +19,18 @@ public class DLFSNode {
 	static final AHashMap<AString,AVector<ACell>> NIL_CONTENTS = null;
 	static final Blob NIL_DATA = null;
 	static final Blob EMPTY_DATA = Blob.EMPTY;
+	static final ACell EMPTY_METADATA = null;
+	static final CVMLong EMPTY_TIME = CVMLong.ZERO;
 	
-	public static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA);
-	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA);
+	public static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
+	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
 	
 	// node structure contents
-	private static final long NODE_LENGTH = 2;
+	private static final long NODE_LENGTH = 4;
 	private static final int POS_DIR = 0;
 	private static final int POS_DATA = 1;
+	private static final int POS_METADATA = 2;
+	private static final int POS_UTIME = 3;
 	
 	public static boolean isDirectory(AVector<ACell> node) {
 		if (node==null) return false;
@@ -101,6 +106,20 @@ public class DLFSNode {
 	 */
 	public static Blob getData(AVector<ACell> node) {
 		return (Blob) node.get(POS_DATA);
+	}
+	
+	/**
+	 * Gets the metadata from a DLFS node
+	 */
+	public static Blob getMetaData(AVector<ACell> node) {
+		return (Blob) node.get(POS_METADATA);
+	}
+	
+	/**
+	 * Gets the metadata from a DLFS node
+	 */
+	public static CVMLong getUTime(AVector<ACell> node) {
+		return (CVMLong) node.get(POS_UTIME);
 	}
 
 	/**
