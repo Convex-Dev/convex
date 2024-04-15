@@ -81,4 +81,8 @@ public class ResultContext {
 		return totalFees-getJuiceFees();
 	}
 
+	public boolean isError() {
+		return context.isError();
+	}
+
 }

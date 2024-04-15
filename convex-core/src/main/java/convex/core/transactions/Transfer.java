@@ -19,8 +19,6 @@ import convex.core.lang.impl.RecordFormat;
  * Transaction class representing a coin Transfer from one account to another
  */
 public class Transfer extends ATransaction {
-	public static final long TRANSFER_JUICE = Juice.TRANSFER;
-
 	protected final Address target;
 	protected final long amount;
 
