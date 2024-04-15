@@ -89,6 +89,16 @@ public class DLFSLocal extends DLFileSystem {
 		updateNode(path,newNode);
 		return newNode;
 	}
+	
+
+	@Override
+	public void delete(DLPath path) throws IOException {
+		path=path.toAbsolutePath();
+		if (path.getNameCount()==0) {
+			throw new IOException("Can't delete DLFS Root node");
+		}
+		updateNode(path,null);
+	}
 
 	AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
 		rootNode=DLFSNode.updateNode(rootNode,dir,newNode);
@@ -102,6 +112,7 @@ public class DLFSLocal extends DLFileSystem {
 			throw new NoSuchFileException(path.toString());
 		}
 	}
+
 
 
 }

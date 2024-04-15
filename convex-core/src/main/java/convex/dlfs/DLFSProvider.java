@@ -90,8 +90,8 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public void delete(Path path) throws IOException {
-		// TODO Auto-generated method stub
-		
+		DLPath dlp=DLFS.checkPath(path);
+        dlp.getFileSystem().delete(dlp);
 	}
 
 	@Override

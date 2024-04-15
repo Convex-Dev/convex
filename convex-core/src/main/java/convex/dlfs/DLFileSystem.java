@@ -164,4 +164,6 @@ public abstract class DLFileSystem extends FileSystem {
 	 */
 	protected abstract void checkAccess(DLPath path) throws IOException;
 
+	public abstract void delete(DLPath dlp) throws IOException;
+
 }

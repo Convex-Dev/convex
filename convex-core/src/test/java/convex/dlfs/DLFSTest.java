@@ -12,11 +12,16 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.ByteBuffer;
+import java.nio.channels.NonWritableChannelException;
+import java.nio.channels.SeekableByteChannel;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
 
 import org.junit.jupiter.api.Test;
@@ -171,14 +176,16 @@ public class DLFSTest {
 		Path dir2=Files.createDirectories(root.resolve("foo/bar/buzz/../baz"));
 		assertTrue(Files.exists(dir2));
 		assertTrue(Files.isDirectory(dir2.subpath(0, 2)));
+		
+		assertThrows(IOException.class,()->Files.delete(fs.getRoot()));
 	}
 	
 	@Test 
 	public void testDataFiles() throws IOException {
 		DLFileSystem fs=DLFS.createLocal();
 		Path root=fs.getRoot();
-		Path file=root.resolve("data");
-		file=Files.createFile(file);
+		final Path fileName=root.resolve("data");
+		Path file=Files.createFile(fileName);
 		
 		assertTrue(Files.exists(file));
 		
@@ -197,6 +204,41 @@ public class DLFSTest {
 			assertEquals(42,is.read());
 			assertEquals(-1,is.read());
 		}
+		
+		// read only file channel
+		try (SeekableByteChannel fc = Files.newByteChannel(file)) {
+			assertTrue(fc.isOpen());
+			assertThrows(NonWritableChannelException.class,()->fc.truncate(0));
+		}
+		
+		// append two more bytes
+		try (SeekableByteChannel fc = Files.newByteChannel(file,StandardOpenOption.WRITE,StandardOpenOption.APPEND)) {
+			assertTrue(fc.isOpen());
+			assertEquals(1,fc.position());
+			assertEquals(1,fc.size());
+			fc.write(ByteBuffer.wrap(new byte[] {43,44}));
+			assertEquals(3,fc.size());
+		}
+		
+		// writable file channel, use to truncate
+		try (SeekableByteChannel fc = Files.newByteChannel(file,StandardOpenOption.WRITE)) {
+			assertTrue(fc.isOpen());
+			fc.truncate(0);
+			assertEquals(0,fc.size());
+			assertEquals(0,fc.position());
+		}
+
+		Files.delete(file);
+		assertFalse(Files.exists(file));
+		
+		assertThrows(NoSuchFileException.class,()->{
+			try (InputStream is = Files.newInputStream(fileName)) {
+				assertEquals(42,is.read());
+				assertEquals(-1,is.read());
+			}
+		});
+		
+		assertFalse(Files.exists(file));
 	}
 
 

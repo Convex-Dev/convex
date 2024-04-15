@@ -3,6 +3,7 @@ package convex.dlfs.impl;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
+import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
@@ -54,6 +55,7 @@ public class DLFileChannel implements SeekableByteChannel {
 		}
 		
 		if (node==null) {
+			if (fc.readOnly) throw new NoSuchFileException(path.toString());
 			node=fs.createFile(path);
 		}
 		if (truncate) fc.truncate(0);
@@ -78,7 +80,9 @@ public class DLFileChannel implements SeekableByteChannel {
 			checkOpen();
 			ABlob data=getData();
 			
-			// TODO: is -1 possible?
+			// position beyond end legal, but reads register end of file
+			if (position>=data.count()) return -1;
+			
 			int read=data.read(position,dst);
 			position+=read;
 			return read;
@@ -108,7 +112,7 @@ public class DLFileChannel implements SeekableByteChannel {
 
 	protected AVector<ACell> updateNode(AVector<ACell> newNode) throws IOException {
 		if (readOnly) {
-			throw new IOException("Read only file");
+			throw new NonWritableChannelException();
 		}
 		return fileSystem.updateNode(path, newNode);
 	}
@@ -123,7 +127,8 @@ public class DLFileChannel implements SeekableByteChannel {
 	public SeekableByteChannel position(long newPosition) throws IOException {
 		checkOpen();
 		if (newPosition<0) throw new IllegalArgumentException("Negative position");
-		return null;
+		position=newPosition;
+		return this;
 	}
 
 	@Override
@@ -177,6 +182,7 @@ public class DLFileChannel implements SeekableByteChannel {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData);
 				updateNode(newNode);
 			}
+			position=0;
 		}
 		return this;
 	}
