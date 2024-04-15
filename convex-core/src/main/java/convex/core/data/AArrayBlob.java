@@ -357,5 +357,13 @@ public abstract class AArrayBlob extends ABlob {
 		return 0;
 	}
 	
+	@Override
+	public int read(long offset, long count, ByteBuffer dest) {
+		if (count<0) throw new IllegalArgumentException("Negative count");
+		if ((offset<0)||(offset+count>length)) throw new IndexOutOfBoundsException();
+		int n=(int)count;
+		dest.put(store, (int) (this.offset+offset), n);
+		return n;
+	}
 
 }

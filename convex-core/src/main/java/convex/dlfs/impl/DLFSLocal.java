@@ -45,9 +45,9 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	public SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) {
-		// TODO Auto-generated method stub
-		return null;
+	public SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException {
+		path=path.normalize();
+		return DLFileChannel.create(this,path);
 	}
 
 	@Override
@@ -63,8 +63,28 @@ public class DLFSLocal extends DLFileSystem {
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(dir.toString());
 		}
-		rootNode=DLFSNode.updateNode(rootNode,dir,DLFSNode.EMPTY_DIRECTORY);
+		updateNode(dir,DLFSNode.EMPTY_DIRECTORY);
 		return dir;
+	}
+	
+	public synchronized void createFile(DLPath path) throws IOException {
+		AString name=path.getCVMFileName();
+		path=path.toAbsolutePath();
+		DLPath parent=path.getParent();
+		if (parent==null) throw new FileAlreadyExistsException(path.toString()); // trying to create root
+		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
+		if (parentNode==null) {
+			throw new FileNotFoundException(parent.toString());
+		}
+		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
+			throw new FileAlreadyExistsException(name.toString());
+		}
+		updateNode(path,DLFSNode.EMPTY_FILE);
+	}
+
+	AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
+		rootNode=DLFSNode.updateNode(rootNode,dir,newNode);
+		return rootNode;
 	}
 
 	@Override
@@ -74,5 +94,6 @@ public class DLFSLocal extends DLFileSystem {
 			throw new NoSuchFileException(path.toString());
 		}
 	}
+
 
 }

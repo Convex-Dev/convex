@@ -1,5 +1,6 @@
 package convex.dlfs;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
@@ -26,15 +27,20 @@ public class DLFSNode {
 	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
 	
 	// node structure contents
-	private static final long NODE_LENGTH = 4;
-	private static final int POS_DIR = 0;
-	private static final int POS_DATA = 1;
-	private static final int POS_METADATA = 2;
-	private static final int POS_UTIME = 3;
+	public static final long NODE_LENGTH = 4;
+	public static final int POS_DIR = 0;
+	public static final int POS_DATA = 1;
+	public static final int POS_METADATA = 2;
+	public static final int POS_UTIME = 3;
 	
 	public static boolean isDirectory(AVector<ACell> node) {
 		if (node==null) return false;
 		return node.get(POS_DIR)!=null;
+	}
+	
+	public static boolean isRegularFile(AVector<ACell> node) {
+		if (node==null) return false;
+		return node.get(POS_DATA) instanceof ABlob;
 	}
 
 	/**
@@ -104,8 +110,8 @@ public class DLFSNode {
 	/**
 	 * Gets the data from a DLFS file node, or nil if not a regular File
 	 */
-	public static Blob getData(AVector<ACell> node) {
-		return (Blob) node.get(POS_DATA);
+	public static ABlob getData(AVector<ACell> node) {
+		return (ABlob) node.get(POS_DATA);
 	}
 	
 	/**
@@ -134,5 +140,7 @@ public class DLFSNode {
 		MapEntry<AString, AVector<ACell>> entry = entries.getEntry(name);
 		return entry;
 	}
+
+
 
 }

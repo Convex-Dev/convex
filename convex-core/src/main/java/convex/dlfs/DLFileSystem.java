@@ -133,8 +133,9 @@ public abstract class DLFileSystem extends FileSystem {
 	 * @param options
 	 * @param attrs
 	 * @return
+	 * @throws IOException 
 	 */
-	public abstract SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs);
+	public abstract SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException;
 
 	/**
 	 * Implementation for delegation by DLFSProvider

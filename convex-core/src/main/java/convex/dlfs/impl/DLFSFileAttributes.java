@@ -3,6 +3,7 @@ package convex.dlfs.impl;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
 
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.dlfs.DLFSNode;
@@ -40,12 +41,11 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 	@Override
 	public boolean isRegularFile() {
 		// TODO Auto-generated method stub
-		return false;
+		return DLFSNode.isRegularFile(node);
 	}
 
 	@Override
 	public boolean isDirectory() {
-		// TODO Auto-generated method stub
 		return DLFSNode.isDirectory(node);
 	}
 
@@ -63,7 +63,8 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 
 	@Override
 	public long size() {
-		// TODO Auto-generated method stub
+		ABlob blob=DLFSNode.getData(node);
+		if (blob!=null) return blob.count();
 		return 0;
 	}
 

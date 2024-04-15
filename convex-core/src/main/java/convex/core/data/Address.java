@@ -268,6 +268,4 @@ public final class Address extends ALongBlob {
 	public ABlob toBlob() {
 		return this;
 	}
-
-
 }

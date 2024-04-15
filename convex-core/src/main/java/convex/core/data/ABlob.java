@@ -298,5 +298,38 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 */
 	public abstract boolean isFullyPacked();
 
+	/**
+	 * Gets bytes from this Blob into a ByteBuffer
+	 * @param offset Offset into this Blob to read from
+	 * @param dest Destination byte buffer
+	 * @return Number of bytes read
+	 */
+	public int read(long offset, ByteBuffer dest) {
+		long n=Math.min(count()-offset, dest.remaining());
+		return read(offset,n,dest);
+	}
+	
+	/**
+	 * Gets bytes from this Blob into a ByteBuffer
+	 * @param offset Offset into this Blob to read from
+	 * @param count Number of bytes to read. Must be in bounds
+	 * @param dest Destination byte buffer
+	 * @return Number of bytes read
+	 * @throws BufferOverflowException if there is insufficient space in destination buffer
+	 */
+	public abstract int read(long offset, long count, ByteBuffer dest);
+
+	/**
+	 * Replaces a slice of this Blob, returning a new Blob
+	 * @param position Position at which to replace
+	 * @param b Blob to replace
+	 * @return Updated Blob
+	 */
+	public ABlob replaceSlice(long position, Blob b) {
+		long end=Math.min(position+b.count(),count());
+		ABlob rest=slice(end,count());
+		return slice(0,position).append(b).append(rest);
+	}
+
 
 }

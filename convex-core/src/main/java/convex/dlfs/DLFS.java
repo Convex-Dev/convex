@@ -29,6 +29,12 @@ public class DLFS {
 		return DLFSLocal.create(provider());
 	}
 
+	/**
+	 * Converts to a DLFS path
+	 * @param path Path to check
+	 * @return DLFS compatible Path instance
+	 * @throws ProviderMismatchException if not a DLFS file
+	 */
 	public static DLPath checkPath(Path path) {
 		if (path instanceof DLPath) return (DLPath) path;
 		throw new ProviderMismatchException("Not a DLFS path");

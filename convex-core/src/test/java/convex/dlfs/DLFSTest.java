@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.DirectoryStream;
@@ -164,7 +166,38 @@ public class DLFSTest {
 			assertEquals(dir,it.next());
 			assertFalse(it.hasNext());
 		};
-		
+
+		assertFalse(Files.exists(root.resolve("noob")));
+		Path dir2=Files.createDirectories(root.resolve("foo/bar/buzz/../baz"));
+		assertTrue(Files.exists(dir2));
+		assertTrue(Files.isDirectory(dir2.subpath(0, 2)));
 	}
+	
+	@Test 
+	public void testDataFiles() throws IOException {
+		DLFileSystem fs=DLFS.createLocal();
+		Path root=fs.getRoot();
+		Path file=root.resolve("data");
+		file=Files.createFile(file);
+		
+		assertTrue(Files.exists(file));
+		
+		try (InputStream is = Files.newInputStream(file)) {
+			assertEquals(-1,is.read());
+		}
+		
+		try (OutputStream os = Files.newOutputStream(file)) {
+			os.write(42);
+		}
+		
+		// should be one byte in file
+		assertEquals(1,Files.size(file));
+		
+		try (InputStream is = Files.newInputStream(file)) {
+			assertEquals(42,is.read());
+			assertEquals(-1,is.read());
+		}
+	}
+
 
 }

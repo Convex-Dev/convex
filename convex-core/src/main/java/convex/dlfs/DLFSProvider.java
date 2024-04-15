@@ -131,7 +131,7 @@ public class DLFSProvider extends FileSystemProvider {
 
 	@Override
 	public <V extends FileAttributeView> V getFileAttributeView(Path path, Class<V> type, LinkOption... options) {
-		// TODO Auto-generated method stub
+		// We don't currently have an updatable file attribute view. OK for now?
 		return null;
 	}
 
@@ -139,8 +139,12 @@ public class DLFSProvider extends FileSystemProvider {
 	@Override
 	public <A extends BasicFileAttributes> A readAttributes(Path path, Class<A> type, LinkOption... options)
 			throws IOException {
-		DLPath dlp=DLFS.checkPath(path);
-        return (A) dlp.getFileSystem().getFileAttributes(dlp);
+		if (type==BasicFileAttributes.class) {
+			DLPath dlp=DLFS.checkPath(path);
+			return (A) dlp.getFileSystem().getFileAttributes(dlp);
+		} else {
+			throw new UnsupportedOperationException("No support of attributes type: "+type);
+		}
 	}
 
 	@Override

@@ -166,5 +166,15 @@ public abstract class ALongBlob extends ABlob {
 		// Never a full packed blob
 		return false;
 	}
+	
+	@Override
+	public int read(long offset, long count, ByteBuffer dest) {
+		if ((offset==0)&&(count==LENGTH)) {
+			dest.putLong(longValue());
+			return LENGTH;
+		}
+		return toFlatBlob().read(offset,count,dest);
+	}
+
 
 }

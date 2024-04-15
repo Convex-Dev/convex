@@ -180,7 +180,7 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path normalize() {
+	public DLPath normalize() {
 		if (count==0) return this;  // nothing to normalize
 		
 		int j=0; // new names
@@ -277,7 +277,7 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path toAbsolutePath() {
+	public DLPath toAbsolutePath() {
 		if (absolute) return this;
 		return new DLPath(fileSystem,names,true);
 	}
