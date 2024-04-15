@@ -26,17 +26,19 @@ public class EconomicsTest {
 	public void testPoolPrice() {
 
 		assertEquals(101, Economics.swapPrice(50, 100, 100));
-		assertEquals(1, Economics.swapPrice(0, 100, 100));
 		assertEquals(-33, Economics.swapPrice(-50, 100, 100));
+		assertEquals(1000000, Economics.swapPrice(999999, 1000000, 1));
+		
+		// buying zero costs one because of strict pool increase
 		assertEquals(1, Economics.swapPrice(0, 1675, 117));
 		assertEquals(1, Economics.swapPrice(0, 12, 1454517));
-		assertEquals(1000000, Economics.swapPrice(999999, 1000000, 1));
+		assertEquals(1, Economics.swapPrice(0, 100, 100));
 		
 		// TODO: seem to be some instability issues doing things like this?
 		// assertEquals(Long.MAX_VALUE-1000000, Economics.swapPrice(Long.MAX_VALUE-1000000, Long.MAX_VALUE, 1000000));
 		
 		// Fails because (double)(Long.MAX_VALUE-1) == (double)(Long.MAX_VALUE)
-		assertThrows(IllegalArgumentException.class, ()->Economics.swapPrice(Long.MAX_VALUE-1, Long.MAX_VALUE, 10));
+		assertThrows(ArithmeticException.class, () -> Economics.swapPrice(Long.MAX_VALUE-1, Long.MAX_VALUE, 10));
 
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 100, 100));
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 0, 100));

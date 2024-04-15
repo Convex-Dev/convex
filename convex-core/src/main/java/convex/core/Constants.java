@@ -189,5 +189,10 @@ public class Constants {
 
 	public static final int MAX_BIG_INTEGER_LENGTH = 4096;
 
+	/**
+	 * Flag to omit filling in stack traces on validation exceptions. This helps performance against DoS attacks
+	 */
+	public static final boolean OMIT_VALIDATION_STACKTRACES = true;
+
 
 }

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Refs;
+import convex.core.data.prim.ANumeric;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 
@@ -116,5 +117,35 @@ public class Assertions {
 	public static void assertAssertError(Context ctx) {
 		ACell cet = ctx.getErrorCode();
 		assertEquals(ErrorCodes.ASSERT, cet, "Expected ASSERT error but got: " + ctx.getValue());
+	}
+	
+	public static void assertLess(long a, long b) {
+		if (a<b) return; //OK
+		fail("Expected "+a+" to be less than "+b);
+	}
+	
+	public static void assertLess(double a, double b) {
+		if (a<b) return; //OK
+		fail("Expected "+a+" to be less than "+b);
+	}
+	
+	public static void assertLess(ANumeric  a, ANumeric b) {
+		if (RT.compare(a, b, 1L)<0) return; //OK
+		fail("Expected "+a+" to be less than "+b);
+	}
+	
+	public static void assertGreater(long a, long b) {
+		if (a>b) return; //OK
+		fail("Expected "+a+" to be greater than "+b);
+	}
+	
+	public static void assertGreater(double a, double b) {
+		if (a>b) return; //OK
+		fail("Expected "+a+" to be greater than "+b);
+	}
+	
+	public static void assertGreater(ANumeric  a, ANumeric b) {
+		if (RT.compare(a, b, -1L)>0) return; //OK
+		fail("Expected "+a+" to be greater than "+b);
 	}
 }

@@ -4,6 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.lang.Context;
+import convex.core.lang.Juice;
 import convex.core.transactions.ATransaction;
 
 /**
@@ -54,6 +55,30 @@ public class ResultContext {
 
 	public ACell getErrorCode() {
 		return context.getErrorCode();
+	}
+
+	/**
+	 * Get overall Juice fees, including the cost of the transaction
+	 * @return Total juice fees
+	 */
+	public long getJuiceFees() {
+		return Juice.mul(juiceUsed, juicePrice)+Juice.mul(Juice.priceTransaction(tx), juicePrice);
+	}
+	
+	/**
+	 * Get fees for execution juice only , excluding the cost of the transaction
+	 * @return CVM Execution fees
+	 */
+	public long getExecutionFees() {
+		return Juice.mul(juiceUsed, juicePrice);
+	}
+
+	public State getState() {
+		return context.getState();
+	}
+
+	public long getMemoryFees() {
+		return totalFees-getJuiceFees();
 	}
 
 }

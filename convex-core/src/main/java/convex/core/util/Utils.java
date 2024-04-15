@@ -595,6 +595,18 @@ public class Utils {
 		if (a != i) throw new IllegalArgumentException(Errors.sizeOutOfRange(a));
 		return i;
 	}
+	
+
+	public static long checkedLong(double d) {
+		long l=(long)d;
+		if (l!=d) throw new IllegalArgumentException("Double is not an exact long value");
+		return l;
+	}
+	
+
+	public static long checkedLong(BigInteger p) {
+		return p.longValueExact();
+	}
 
 	/**
 	 * Converts a long to a short, throws error if out of allowable range.
@@ -1423,6 +1435,22 @@ public class Utils {
 		if (a.isEmbedded()) memSize+=a.getEncodingLength();
 		return memSize;
 	}
+
+	/**
+	 * Long computation of (a*b)/c. Arguments and result must be in range 0..Long.MAX_VALUE
+	 * @param a First multiplicand
+	 * @param b Second multiplicand
+	 * @param c Divisor
+	 * @return Result of (a*b)/c
+	 */
+	public static long mulDiv(long a, long b, long c) {
+		// TODO: we want a faster version of this
+
+		BigInteger result=BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)).divide(BigInteger.valueOf(c));
+		return checkedLong(result);
+	}
+
+
 
 
 }

@@ -7,6 +7,7 @@ import convex.core.data.ADataStructure;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
+import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 
 /**
@@ -535,8 +536,8 @@ public class Juice {
 	public static long priceMemorySize(ACell a) {
 		return Juice.mul(Juice.TRANSACTION_PER_BYTE, Utils.fullMemorySize(a));
 	}
-	
 
-
-
+	public static long priceTransaction(ATransaction tx) {
+		return Juice.TRANSACTION+Juice.priceMemorySize(tx);
+	}
 }

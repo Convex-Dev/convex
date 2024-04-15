@@ -1,0 +1,156 @@
+package convex.core;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import org.junit.jupiter.api.Test;
+
+import convex.core.lang.ACVMTest;
+import convex.core.lang.Context;
+import convex.core.lang.Juice;
+import convex.core.lang.Reader;
+import convex.core.transactions.Invoke;
+import static convex.test.Assertions.*;
+
+/**
+ * Tests for tokenomics operations
+ */
+public class TokenomicsTest extends ACVMTest {
+	// starting balance
+	long BALANCE=context().getBalance(HERO);
+	long ALLOWANCE=context().getAccountStatus(HERO).getMemory();
+	double MEMPRICE=context().getState().getMemoryPrice();
+	double TOTAL_MEMORY=context().getState().computeTotalMemory();
+
+	@Test public void testJuiceOnly() {
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(+ 2 3)"));
+		ResultContext rc=runTransaction(t);
+		
+		assertEquals(0,rc.memUsed); 
+		assertTrue(rc.juiceUsed>0);
+		assertTrue(rc.juicePrice>0);
+		
+		// total fees should be for execution only, as we didn't make any memory changes
+		long txJuice=Juice.priceTransaction(t);
+		assertEquals(rc.totalFees,rc.juicePrice*(rc.juiceUsed+txJuice));
+		
+		// HERO should pay juice fees for transaction, nothing else
+		assertEquals(rc.getJuiceFees(),BALANCE-rc.context.getBalance(HERO));
+		
+		checkFinalState(rc);
+
+	}
+	
+	@Test public void testSmallMemorySell() {
+		// sell one byte of allowance
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (set-memory (dec *memory*)))"));
+		ResultContext rc=runTransaction(t);
+
+		// we should have slightly decreased pool memory price
+		assertLess(rc.getState().getMemoryPrice(),MEMPRICE);
+		
+		assertEquals(0,rc.memUsed); 
+		assertEquals(ALLOWANCE-1,rc.context.getAccountStatus(HERO).getMemory()); 
+		
+		checkFinalState(rc);
+
+
+	}
+	
+	@Test public void testSmallMemoryBuy() {
+		// sell one byte of allowance
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (set-memory (inc *memory*)))"));
+		ResultContext rc=runTransaction(t);
+	
+		// we should have slightly increased pool memory price
+		assertGreater(rc.getState().getMemoryPrice(),MEMPRICE);
+
+		assertEquals(0,rc.memUsed); 
+		assertEquals(ALLOWANCE+1,rc.context.getAccountStatus(HERO).getMemory()); 
+		
+		checkFinalState(rc);
+
+	}
+	
+	@Test public void testMemoryUsed() {
+		// sell all memory, then make an allocation of 16 bytes
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (set-memory 0) (def a 0x12345678123456781234567812345678))"));
+		ResultContext rc=runTransaction(t);
+		
+		// memory of more than 16 bytes should be used, but not more than 100
+		assertGreater(rc.memUsed,16);
+		assertLess(rc.memUsed,100);
+		
+		assertEquals(rc.totalFees,rc.getJuiceFees()+rc.getMemoryFees());
+		
+		checkFinalState(rc);
+
+		
+	}
+	
+	@Test public void testMemoryFail() {
+		// This transaction fails by transferring most coins and all allowance away, then allocating more data
+		long COINS_LEFT=100000;
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (set-memory 0) (transfer "+VILLAIN+" (- *balance* "+COINS_LEFT+")) (def a 0x12345678123456781234567812345678))"));
+		ResultContext rc=runTransaction(t);
+
+		// juice fees shouldn't blow up transaction alone, but memory cost does
+		assertLess(rc.getJuiceFees(),COINS_LEFT); 
+
+		// We failed because of memory allocation
+		assertEquals(ErrorCodes.MEMORY,rc.getErrorCode());
+		
+		// shouldn't move memory price, since transaction was rolled back
+		assertEquals(MEMPRICE,rc.getState().getMemoryPrice()); 
+		
+		checkFinalState(rc);
+
+	}
+	
+	@Test public void testMemoryOverbuy() {
+		long initialBal=context().getBalance(HERO);
+		long COINS_LEFT=100000;
+		
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (set-memory 0) (transfer "+VILLAIN+" (- *balance* "+COINS_LEFT+")) (set-memory 10000))"));
+		ResultContext rc=runTransaction(t);
+		
+		// juice fees shouldn't blow up transaction alone, but memory cost does
+		assertLess(rc.getJuiceFees(),COINS_LEFT); 
+		
+		// We failed due to insufficient coin funds for memory purchase
+		assertEquals(ErrorCodes.FUNDS,rc.getErrorCode());
+		
+		// should have paid full juice fees
+		assertEquals(rc.getJuiceFees(),initialBal-rc.context.getBalance(HERO));
+
+		checkFinalState(rc);
+
+	}
+	
+	@Test public void testJuiceExceeded() {
+		// Transfer away almost all coins, so we definitely don't have enough to complete transaction
+		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (transfer "+VILLAIN+" (- *balance* 5)))"));
+		ResultContext rc=runTransaction(t);
+		
+		// juice fees shouldn't blow up transaction alone, but memory cost does
+		assertEquals(ErrorCodes.JUICE,rc.getErrorCode());
+		
+		// transaction is rolled back so our transfer is refunded, but juice fees still applied which affects account balance
+		long newBalance=rc.context.getBalance(HERO);
+		assertGreater(newBalance,0);
+		assertEquals(rc.getJuiceFees(),BALANCE-newBalance);
+		
+		checkFinalState(rc);
+	}
+
+	protected void checkFinalState(ResultContext rc) {
+		// Nothing should have gone wrong with total coin supply
+		assertEquals(Coin.SUPPLY,rc.getState().computeTotalFunds());
+	}
+
+	private ResultContext runTransaction(Invoke t) {
+		Context c=context();
+		State s=c.getState();
+		return s.applyTransaction(t);
+	}
+}

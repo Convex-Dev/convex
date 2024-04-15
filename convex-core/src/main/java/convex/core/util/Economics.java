@@ -1,7 +1,5 @@
 package convex.core.util;
 
-import java.math.BigInteger;
-
 /**
  * Utility function for Convex Cryptoeconomics
  */
@@ -20,9 +18,6 @@ public class Economics {
 		return (double)b/(double)a;
 	}
 	
-	static final BigInteger MAX_POOL_SIZE=BigInteger.valueOf(Long.MAX_VALUE);
-	
-	
 	/**
 	 * Computes the smallest price for d units of Asset A in terms of units of Asset B
 	 * such that a constant liquidity pool c = a * b is increased
@@ -34,20 +29,12 @@ public class Economics {
 	 */
 	public static long swapPrice(long delta,long a, long b) {
 		if ((a<=0)||(b<=0)) throw new IllegalArgumentException("Pool quantities must be positive");
+		if (delta>=a) throw new IllegalArgumentException("Trying to buy entire pool!");
 		
-		BigInteger c = BigInteger.valueOf(a).multiply(BigInteger.valueOf(b));
-		long newA = a-delta;
-		if (newA<=0) throw new IllegalArgumentException("Cannot buy entire Pool");
+		long newB=Utils.mulDiv(a, b, a-delta);
 		
-		BigInteger newBigA=BigInteger.valueOf(newA);
-		if (newBigA.compareTo(MAX_POOL_SIZE)>=0) throw new IllegalArgumentException("Can't exceed Long pool size for A");
-
-		BigInteger newBigB = c.divide(newBigA);
-		if (newBigB.compareTo(MAX_POOL_SIZE)>=0) throw new IllegalArgumentException("Can't exceed Long pool size for B");
+		long result=(newB-b)+1; // strict increase
 		
-		// Convert back to long, add one so pool size must strictly increase
-		long finalB=newBigB.longValueExact()+1;
-		
-		return finalB-b;
+		return result;
 	}
 }

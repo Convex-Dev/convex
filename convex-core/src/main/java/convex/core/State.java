@@ -537,8 +537,11 @@ public class State extends ARecord {
 
 			// apply transaction. This may result in an error / exceptional result!
 			ctx = t.apply(ctx);
+			
+			// Set context, might be needed by completeTransaction
+			rc.context=ctx;
 
-			// complete transaction
+			// complete transaction including handling of fees
 			// NOTE: completeTransaction handles error cases as well
 			ctx = ctx.completeTransaction(preparedState,rc);	
 		} else {
@@ -701,6 +704,17 @@ public class State extends ARecord {
 		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getTotalStake(), 0L);
 		total += getGlobalFees().longValue();
 		total += getGlobalMemoryValue().longValue();
+		return total;
+	}
+	
+	/**
+	 * Compute the total memory allowance, including the memory pool.
+	 *
+	 * @return The total amount of CVM memory available
+	 */
+	public double computeTotalMemory() {
+		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getMemory(), (Long)0L);
+		total+=getGlobalMemoryPool().longValue();
 		return total;
 	}
 
@@ -921,5 +935,7 @@ public class State extends ARecord {
 	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
 		return Utils.binarySearchLeftmost(states, State::getTimestamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
 	}
+
+
 
 }

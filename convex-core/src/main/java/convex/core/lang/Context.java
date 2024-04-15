@@ -332,53 +332,62 @@ public class Context {
 		rc.juiceUsed=executionJuice;
 
 		// Base fixed juice cost per transaction
-		long trxJuice=Juice.TRANSACTION+Juice.priceMemorySize(rc.tx);
+		long trxJuice=Juice.priceTransaction(rc.tx);
 		
 		long totalJuice=executionJuice+trxJuice;
 		long juicePrice=rc.juicePrice;
 		long juiceFees=Juice.addMul(0,totalJuice,juicePrice);
-
-		// compute memory delta (memUsed) and store in ResultContext
+		
 		Address address=getAddress();
 		AccountStatus account=state.getAccount(address);
-		long memUsed=state.getMemorySize()-initialState.getMemorySize();
-		rc.memUsed=memUsed;
-		
-		long allowance=account.getMemory();
 		long balance=account.getBalance();
+		boolean juiceFailure=juiceFees>balance;
+
+		
 		boolean memoryFailure=false;
-
 		long memorySpend=0L; // usually zero
-		if (memUsed>0) {
-			long allowanceUsed=Math.min(allowance, memUsed);
-			if (allowanceUsed>0) {
-				account=account.withMemory(allowance-allowanceUsed);
-			}
 
-			// compute additional memory purchase requirement beyond allowance
-			long purchaseNeeded=memUsed-allowanceUsed;
-			if (purchaseNeeded>0) {
-				long poolBalance=state.getGlobalMemoryValue().longValue();
-				long poolAllowance=state.getGlobalMemoryPool().longValue();
-				memorySpend=Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
-
-				if ((balance-juiceFees)>=memorySpend) {
-					// enough to cover memory price, so automatically buy from pool
-					// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
-					state=state.updateMemoryPool(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
-				} else {
-					// Insufficient memory, so need to roll back state to before transaction
-					// origin should still pay transaction fees, but no memory costs
-					memorySpend=0L;
-					state=initialState;
-					account=state.getAccount(address);
-					memoryFailure=true;
+		if (juiceFailure) {
+			// consume whole balance
+			juiceFees=balance;
+		} else if (!rc.context.isExceptional()) {
+			// do memory accounting as long as we didn't fail for any other reason
+			// compute memory delta (memUsed) and store in ResultContext
+			long memUsed=state.getMemorySize()-initialState.getMemorySize();
+			rc.memUsed=memUsed;
+			
+			long allowance=account.getMemory();
+			if (memUsed>0) {
+				long allowanceUsed=Math.min(allowance, memUsed);
+				if (allowanceUsed>0) {
+					account=account.withMemory(allowance-allowanceUsed);
 				}
+	
+				// compute additional memory purchase requirement beyond allowance
+				long purchaseNeeded=memUsed-allowanceUsed;
+				if (purchaseNeeded>0) {
+					long poolBalance=state.getGlobalMemoryValue().longValue();
+					long poolAllowance=state.getGlobalMemoryPool().longValue();
+					memorySpend=(long)Economics.swapPrice(purchaseNeeded, poolAllowance, poolBalance);
+	
+					if ((balance-juiceFees)>=memorySpend) {
+						// enough to cover memory price, so automatically buy from pool
+						// System.out.println("Buying "+purchaseNeeded+" memory for: "+price);
+						state=state.updateMemoryPool(poolBalance+memorySpend, poolAllowance-purchaseNeeded);
+					} else {
+						// Insufficient memory, so need to roll back state to before transaction
+						// origin should still pay transaction fees, but no memory costs
+						memorySpend=0L;
+						state=initialState;
+						account=state.getAccount(address);
+						memoryFailure=true;
+					}
+				}
+			} else {
+				// credit any unused memory back to allowance (may be zero)
+				long allowanceCredit=-memUsed;
+				account=account.withMemory(allowance+allowanceCredit);
 			}
-		} else {
-			// credit any unused memory back to allowance (may be zero)
-			long allowanceCredit=-memUsed;
-			account=account.withMemory(allowance+allowanceCredit);
 		}
 
 		// Compute total fees
@@ -392,7 +401,7 @@ public class Context {
 		// update Account
 		state=state.putAccount(address,account);
 
-		// maybe add used juice to miner fees
+		// maybe add used juice to peer fees
 		if (juiceFees>0L) {
 			long oldFees=state.getGlobalFees().longValue();
 			long newFees=oldFees+juiceFees;
@@ -401,8 +410,10 @@ public class Context {
 
 		// final state update and result reporting
 		Context rctx=this.withState(state);
-		if (memoryFailure) {
-			rctx=rctx.withError(ErrorCodes.MEMORY, "Unable to allocate additional memory required for transaction ("+memUsed+" bytes)");
+		if (juiceFailure) {
+			rctx=rctx.withError(ErrorCodes.JUICE, "Insuffienct balance to cover juice fees of "+rc.getJuiceFees());
+		} else if (memoryFailure) {
+			rctx=rctx.withError(ErrorCodes.MEMORY, "Unable to allocate additional memory required for transaction ("+rc.memUsed+" bytes)");
 		}
 		return rctx;
 	}
@@ -1589,7 +1600,7 @@ public class Context {
 		try {
 			long poolAllowance=state.getGlobalMemoryPool().longValue();
 			long poolBalance=state.getGlobalMemoryValue().longValue();
-			long price = Economics.swapPrice(delta, poolAllowance,poolBalance);
+			long price = (long)Economics.swapPrice(delta, poolAllowance,poolBalance);
 			if (price>balance) {
 				return withError(ErrorCodes.FUNDS,"Cannot afford allowance, would cost: "+price);
 			}
