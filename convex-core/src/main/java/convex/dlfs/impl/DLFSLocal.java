@@ -47,7 +47,7 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	public SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException {
 		path=path.normalize();
-		return DLFileChannel.create(this,path);
+		return DLFileChannel.create(this,options,path);
 	}
 
 	@Override
@@ -67,7 +67,13 @@ public class DLFSLocal extends DLFileSystem {
 		return dir;
 	}
 	
-	public synchronized void createFile(DLPath path) throws IOException {
+	/**
+	 * Creates a file, returning the new node
+	 * @param path
+	 * @return
+	 * @throws IOException
+	 */
+	public synchronized AVector<ACell> createFile(DLPath path) throws IOException {
 		AString name=path.getCVMFileName();
 		path=path.toAbsolutePath();
 		DLPath parent=path.getParent();
@@ -79,7 +85,9 @@ public class DLFSLocal extends DLFileSystem {
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(name.toString());
 		}
-		updateNode(path,DLFSNode.EMPTY_FILE);
+		AVector<ACell> newNode=DLFSNode.EMPTY_FILE;
+		updateNode(path,newNode);
+		return newNode;
 	}
 
 	AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {

@@ -4,7 +4,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.OpenOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Set;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -16,6 +20,7 @@ import convex.dlfs.DLPath;
 public class DLFileChannel implements SeekableByteChannel {
 
 	private boolean isOpen=true;
+	private boolean readOnly=true;
 	private long position=0;
 	private DLPath path;
 	private DLFSLocal fileSystem;
@@ -25,12 +30,35 @@ public class DLFileChannel implements SeekableByteChannel {
 		this.path=path;
 	}
 	
-	public static DLFileChannel create(DLFSLocal fs, DLPath path) throws IOException {
+	public static DLFileChannel create(DLFSLocal fs, Set<? extends OpenOption> options, DLPath path) throws IOException {
 		DLFileChannel fc=new DLFileChannel(fs,path);
 		AVector<ACell> node= fs.getNode(path);
-		if (node==null) {
-			fs.createFile(path);
+		
+		boolean append=false;
+		boolean truncate=false;
+		if (options!=null) {
+			if (options.contains(StandardOpenOption.WRITE)) {
+				fc.readOnly=false;
+			}
+			if (options.contains(StandardOpenOption.CREATE_NEW)) {
+				if (node!=null) {
+					throw new FileAlreadyExistsException(path.toString());
+				}
+			}
+			if (options.contains(StandardOpenOption.APPEND)) {
+				append=true;
+			}
+			if (options.contains(StandardOpenOption.TRUNCATE_EXISTING)) {
+				truncate=true;
+			}
 		}
+		
+		if (node==null) {
+			node=fs.createFile(path);
+		}
+		if (truncate) fc.truncate(0);
+		if (append) fc.position=DLFSNode.getData(node).count();
+		
 		return fc;
 	}
 
@@ -71,11 +99,18 @@ public class DLFileChannel implements SeekableByteChannel {
 			
 			if (newData!=data) {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData);
-				fileSystem.updateNode(path, newNode);
+				updateNode(newNode);
 			}
 			
 			return (int)n;
 		}
+	}
+
+	protected AVector<ACell> updateNode(AVector<ACell> newNode) throws IOException {
+		if (readOnly) {
+			throw new IOException("Read only file");
+		}
+		return fileSystem.updateNode(path, newNode);
 	}
 
 	@Override
@@ -140,7 +175,7 @@ public class DLFileChannel implements SeekableByteChannel {
 			ABlob newData=data.slice(0, newSize);
 			if (newData!=data) {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData);
-				fileSystem.updateNode(path, newNode);
+				updateNode(newNode);
 			}
 		}
 		return this;
