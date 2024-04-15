@@ -16,16 +16,18 @@ import static convex.test.Assertions.*;
  * Tests for tokenomics operations
  */
 public class TokenomicsTest extends ACVMTest {
-	// starting balance
+	// starting balances etc.
 	long BALANCE=context().getBalance(HERO);
 	long ALLOWANCE=context().getAccountStatus(HERO).getMemory();
 	double MEMPRICE=context().getState().getMemoryPrice();
 	double TOTAL_MEMORY=context().getState().computeTotalMemory();
 
 	@Test public void testJuiceOnly() {
+		// A transaction that burns some juice, but not much else
 		Invoke t=Invoke.create(HERO, 0, Reader.read("(+ 2 3)"));
 		ResultContext rc=runTransaction(t);
 		
+		// we should have used some juice, but no memory
 		assertEquals(0,rc.memUsed); 
 		assertTrue(rc.juiceUsed>0);
 		assertTrue(rc.juicePrice>0);
@@ -37,8 +39,7 @@ public class TokenomicsTest extends ACVMTest {
 		// HERO should pay juice fees for transaction, nothing else
 		assertEquals(rc.getJuiceFees(),BALANCE-rc.context.getBalance(HERO));
 		
-		checkFinalState(rc);
-
+		checkFinalState(rc,false);
 	}
 	
 	@Test public void testSmallMemorySell() {
@@ -52,7 +53,7 @@ public class TokenomicsTest extends ACVMTest {
 		assertEquals(0,rc.memUsed); 
 		assertEquals(ALLOWANCE-1,rc.context.getAccountStatus(HERO).getMemory()); 
 		
-		checkFinalState(rc);
+		checkFinalState(rc,false);
 
 
 	}
@@ -68,7 +69,7 @@ public class TokenomicsTest extends ACVMTest {
 		assertEquals(0,rc.memUsed); 
 		assertEquals(ALLOWANCE+1,rc.context.getAccountStatus(HERO).getMemory()); 
 		
-		checkFinalState(rc);
+		checkFinalState(rc,false);
 
 	}
 	
@@ -83,7 +84,7 @@ public class TokenomicsTest extends ACVMTest {
 		
 		assertEquals(rc.totalFees,rc.getJuiceFees()+rc.getMemoryFees());
 		
-		checkFinalState(rc);
+		checkFinalState(rc,true);
 
 		
 	}
@@ -103,7 +104,7 @@ public class TokenomicsTest extends ACVMTest {
 		// shouldn't move memory price, since transaction was rolled back
 		assertEquals(MEMPRICE,rc.getState().getMemoryPrice()); 
 		
-		checkFinalState(rc);
+		checkFinalState(rc,false);
 
 	}
 	
@@ -111,6 +112,7 @@ public class TokenomicsTest extends ACVMTest {
 		long initialBal=context().getBalance(HERO);
 		long COINS_LEFT=100000;
 		
+		// A transaction that sells all memory, then transfers away most coins, then tries to buy memory back
 		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (set-memory 0) (transfer "+VILLAIN+" (- *balance* "+COINS_LEFT+")) (set-memory 10000))"));
 		ResultContext rc=runTransaction(t);
 		
@@ -123,7 +125,7 @@ public class TokenomicsTest extends ACVMTest {
 		// should have paid full juice fees
 		assertEquals(rc.getJuiceFees(),initialBal-rc.context.getBalance(HERO));
 
-		checkFinalState(rc);
+		checkFinalState(rc,false);
 
 	}
 	
@@ -132,7 +134,7 @@ public class TokenomicsTest extends ACVMTest {
 		Invoke t=Invoke.create(HERO, 0, Reader.read("(do (transfer "+VILLAIN+" (- *balance* 5)))"));
 		ResultContext rc=runTransaction(t);
 		
-		// juice fees shouldn't blow up transaction alone, but memory cost does
+		// Transaction should fail due to juice fees
 		assertEquals(ErrorCodes.JUICE,rc.getErrorCode());
 		
 		// transaction is rolled back so our transfer is refunded, but juice fees still applied which affects account balance
@@ -140,12 +142,23 @@ public class TokenomicsTest extends ACVMTest {
 		assertGreater(newBalance,0);
 		assertEquals(rc.getJuiceFees(),BALANCE-newBalance);
 		
-		checkFinalState(rc);
+		checkFinalState(rc,false);
 	}
 
-	protected void checkFinalState(ResultContext rc) {
+	protected void checkFinalState(ResultContext rc, boolean memUsed) {
 		// Nothing should have gone wrong with total coin supply
 		assertEquals(Coin.SUPPLY,rc.getState().computeTotalFunds());
+		
+		if (memUsed) {
+			// we expect total memory to have fallen because of memory used
+			long NEW_TOTAL_MEMORY=rc.getState().computeTotalMemory();
+			assertTrue(rc.memUsed>0);
+			assertLess(NEW_TOTAL_MEMORY,TOTAL_MEMORY);
+			assertEquals(rc.memUsed,TOTAL_MEMORY-NEW_TOTAL_MEMORY);
+		} else {
+			// memory should not be created or destroyed
+			assertEquals(TOTAL_MEMORY,rc.getState().computeTotalMemory());
+		}
 	}
 
 	private ResultContext runTransaction(Invoke t) {

@@ -712,7 +712,7 @@ public class State extends ARecord {
 	 *
 	 * @return The total amount of CVM memory available
 	 */
-	public double computeTotalMemory() {
+	public long computeTotalMemory() {
 		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getMemory(), (Long)0L);
 		total+=getGlobalMemoryPool().longValue();
 		return total;
