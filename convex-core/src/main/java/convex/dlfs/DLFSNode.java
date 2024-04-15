@@ -4,6 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Blob;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
@@ -15,12 +16,16 @@ public class DLFSNode {
 
 	static final AHashMap<AString,AVector<ACell>> EMPTY_CONTENTS = Maps.empty();
 	static final AHashMap<AString,AVector<ACell>> NIL_CONTENTS = null;
-	public static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS);
-	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS);
+	static final Blob NIL_DATA = null;
+	static final Blob EMPTY_DATA = Blob.EMPTY;
+	
+	public static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA);
+	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA);
 	
 	// node structure contents
-	private static final long NODE_LENGTH = 1;
+	private static final long NODE_LENGTH = 2;
 	private static final int POS_DIR = 0;
+	private static final int POS_DATA = 1;
 	
 	public static boolean isDirectory(AVector<ACell> node) {
 		if (node==null) return false;
@@ -89,6 +94,13 @@ public class DLFSNode {
 			entries=entries.assoc(name, childNode);
 		}
 		return rootNode.assoc(POS_DIR, entries);
+	}
+	
+	/**
+	 * Gets the data from a DLFS file node, or nil if not a regular File
+	 */
+	public static Blob getData(AVector<ACell> node) {
+		return (Blob) node.get(POS_DATA);
 	}
 
 	/**
