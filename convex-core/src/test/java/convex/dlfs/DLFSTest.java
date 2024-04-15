@@ -15,6 +15,7 @@ import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.channels.NonWritableChannelException;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -164,11 +165,11 @@ public class DLFSTest {
 		DLFileSystem fs=DLFS.createLocal();
 		
 		Path root=fs.getRoot();
-		Path dir=Files.createDirectory(root.resolve("foo"));
+		Path fooDir=Files.createDirectory(root.resolve("foo"));
 		
 		try (DirectoryStream<Path> ds=Files.newDirectoryStream(root)) {
 			Iterator<Path> it=ds.iterator();
-			assertEquals(dir,it.next());
+			assertEquals(fooDir,it.next());
 			assertFalse(it.hasNext());
 		};
 
@@ -176,8 +177,11 @@ public class DLFSTest {
 		Path dir2=Files.createDirectories(root.resolve("foo/bar/buzz/../baz"));
 		assertTrue(Files.exists(dir2));
 		assertTrue(Files.isDirectory(dir2.subpath(0, 2)));
-		
+
+		assertThrows(DirectoryNotEmptyException.class,()->Files.delete(fooDir));
+
 		assertThrows(IOException.class,()->Files.delete(fs.getRoot()));
+		assertThrows(NoSuchFileException.class,()->Files.delete(fs.getRoot().resolve("not-found")));
 	}
 	
 	@Test 

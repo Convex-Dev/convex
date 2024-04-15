@@ -66,7 +66,7 @@ public class DLFSNode {
 	/**
 	 * Gets the directory entries for a node
 	 * @param dirNode
-	 * @return
+	 * @return Map of directory entries, or null if not a directory
 	 */
 	@SuppressWarnings("unchecked")
 	public static AHashMap<AString,AVector<ACell>> getDirectoryEntries(AVector<ACell> dirNode) {

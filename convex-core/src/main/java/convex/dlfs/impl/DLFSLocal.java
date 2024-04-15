@@ -3,6 +3,7 @@ package convex.dlfs.impl;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.DirectoryStream.Filter;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.NoSuchFileException;
@@ -12,6 +13,7 @@ import java.nio.file.attribute.FileAttribute;
 import java.util.Set;
 
 import convex.core.data.ACell;
+import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.dlfs.DLFS;
@@ -80,7 +82,7 @@ public class DLFSLocal extends DLFileSystem {
 		if (parent==null) throw new FileAlreadyExistsException(path.toString()); // trying to create root
 		AVector<ACell> parentNode=DLFSNode.navigate(rootNode, parent);
 		if (parentNode==null) {
-			throw new FileNotFoundException(parent.toString());
+			throw new FileNotFoundException("Parent directory does not exist: "+parent.toString());
 		}
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(name.toString());
@@ -92,11 +94,20 @@ public class DLFSLocal extends DLFileSystem {
 	
 
 	@Override
-	public void delete(DLPath path) throws IOException {
+	public synchronized void delete(DLPath path) throws IOException {
 		path=path.toAbsolutePath();
 		if (path.getNameCount()==0) {
 			throw new IOException("Can't delete DLFS Root node");
 		}
+		
+		// Check file actually exists
+		AVector<ACell> node=getNode(path);
+		if (node==null) throw new NoSuchFileException(path.toString());
+		
+		// Check it it empty, if a directory
+		AHashMap<AString, AVector<ACell>> entries = DLFSNode.getDirectoryEntries(node);
+		if ((entries!=null)&&(!entries.isEmpty())) throw new DirectoryNotEmptyException(path.toString());
+		
 		updateNode(path,null);
 	}
 
