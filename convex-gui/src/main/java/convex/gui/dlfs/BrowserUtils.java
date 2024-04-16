@@ -6,8 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import javax.swing.Icon;
 import javax.swing.JComponent;
 import javax.swing.JOptionPane;
+import javax.swing.UIManager;
+import javax.swing.filechooser.FileSystemView;
 
 public class BrowserUtils {
 
@@ -24,6 +27,24 @@ public class BrowserUtils {
 			 
 			 System.out.println("Copied "+Files.size(p)+" bytes to: "+p.toString());
 		 }
+	}
+
+	protected static Icon getFileIcon(Path path) {
+		String iconName= "FileView.fileIcon";
+		Icon icon =null;
+		if (Files.isDirectory(path)) {
+			iconName="FileView.directoryIcon";
+		}
+		
+		if (path.getNameCount()==0) {
+			icon = UIManager.getIcon("FileView.hardDriveIcon"); // root icon
+		} else try {
+			icon= FileSystemView.getFileSystemView().getSystemIcon( path.toFile() );
+		} catch (Exception e) {
+			// ignore
+		}
+		if (icon==null) icon = UIManager.getIcon(iconName);
+		return icon;
 	}
 
 }

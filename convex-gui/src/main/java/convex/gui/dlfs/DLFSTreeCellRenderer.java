@@ -2,13 +2,11 @@ package convex.gui.dlfs;
 
 import java.awt.Color;
 import java.awt.Component;
-import java.nio.file.Files;
 import java.nio.file.Path;
 
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
 import javax.swing.JTree;
-import javax.swing.UIManager;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
@@ -40,19 +38,7 @@ public class DLFSTreeCellRenderer extends DefaultTreeCellRenderer {
 		Path name=path.getFileName();
 		setText((name==null)?"DLFS Root":name.toString());
 		
-		String iconName= "FileView.fileIcon";
-		if (Files.isDirectory(path)) {
-			iconName=expanded?"FileView.directoryIcon": "FileView.directoryIcon";
-		}
-		
-		Icon icon;
-		if (name==null) {
-			icon = UIManager.getIcon("FileView.hardDriveIcon"); // root icon
-		} else try {
-			icon= FileSystemView.getFileSystemView().getSystemIcon( name.toFile() );
-		} catch (Exception e) {
-			icon = UIManager.getIcon(iconName);
-		}
+		Icon icon = BrowserUtils.getFileIcon(path);
 		
 		setIcon(icon);
 		return this;
