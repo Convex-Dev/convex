@@ -26,6 +26,8 @@ public class DLFSBrowser extends AbstractGUI {
 			Files.createFile(p.resolve("models/ace2.tensor"));
 			Files.createDirectories(p.resolve("models/old"));
 			Files.createDirectories(p.resolve("models/experimental"));
+			Files.createFile(p.resolve("tombstone"));
+			Files.delete(p.resolve("tombstone"));
 			
 		} catch (Exception e) {
 			e.printStackTrace();

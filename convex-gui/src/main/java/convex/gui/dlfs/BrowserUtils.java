@@ -14,7 +14,8 @@ import javax.swing.filechooser.FileSystemView;
 
 public class BrowserUtils {
 
-	protected static void copyFiles(JComponent parent, List<File> files, Path targetDir) throws IOException {
+	protected static boolean copyFiles(JComponent parent, List<File> files, Path targetDir) throws IOException {
+		boolean copied=false;
 		fileLoop: for (File f:files) {
 			 String fname=f.getName();
 			 Path targetPath=targetDir.resolve(fname);
@@ -24,9 +25,11 @@ public class BrowserUtils {
 				 targetPath=targetDir.resolve(fname);
 			 }
 			 Path p=Files.copy(f.toPath(),targetPath);
-			 
 			 System.out.println("Copied "+Files.size(p)+" bytes to: "+p.toString());
+			 copied=true;
+			 
 		 }
+		return copied;
 	}
 
 	protected static Icon getFileIcon(Path path) {

@@ -32,14 +32,14 @@ public class DLFileChannel implements SeekableByteChannel {
 	}
 	
 	public static DLFileChannel create(DLFSLocal fs, Set<? extends OpenOption> options, DLPath path) throws IOException {
-		DLFileChannel fc=new DLFileChannel(fs,path);
 		AVector<ACell> node= fs.getNode(path);
 		
 		boolean append=false;
 		boolean truncate=false;
+		boolean readOnly=true;
 		if (options!=null) {
 			if (options.contains(StandardOpenOption.WRITE)) {
-				fc.readOnly=false;
+				readOnly=false;
 			}
 			if (options.contains(StandardOpenOption.CREATE_NEW)) {
 				if (node!=null) {
@@ -55,9 +55,13 @@ public class DLFileChannel implements SeekableByteChannel {
 		}
 		
 		if (node==null) {
-			if (fc.readOnly) throw new NoSuchFileException(path.toString());
+			if (readOnly) throw new NoSuchFileException(path.toString());
 			node=fs.createFile(path);
+		} else {
+			if (DLFSNode.getData(node)==null) throw new NoSuchFileException(path.toString());
 		}
+		DLFileChannel fc=new DLFileChannel(fs,path);
+		fc.readOnly=readOnly;
 		if (truncate) fc.truncate(0);
 		if (append) fc.position=DLFSNode.getData(node).count();
 		

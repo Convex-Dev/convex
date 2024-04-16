@@ -110,7 +110,7 @@ public class DLFSLocal extends DLFileSystem {
 		AHashMap<AString, AVector<ACell>> entries = DLFSNode.getDirectoryEntries(node);
 		if ((entries!=null)&&(!entries.isEmpty())) throw new DirectoryNotEmptyException(path.toString());
 		
-		updateNode(path,null);
+		updateNode(path,DLFSNode.createTombstone(getTimestamp()));
 	}
 
 	AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
@@ -121,7 +121,7 @@ public class DLFSLocal extends DLFileSystem {
 	@Override
 	protected void checkAccess(DLPath path) throws IOException {
 		AVector<ACell> node=DLFSNode.navigate(rootNode,path);
-		if (node==null) {
+		if ((node==null)||(DLFSNode.isTombstone(node))) {
 			throw new NoSuchFileException(path.toString());
 		}
 	}

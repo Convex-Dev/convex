@@ -40,7 +40,6 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 
 	@Override
 	public boolean isRegularFile() {
-		// TODO Auto-generated method stub
 		return DLFSNode.isRegularFile(node);
 	}
 
@@ -51,14 +50,12 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 
 	@Override
 	public boolean isSymbolicLink() {
-		// TODO Auto-generated method stub
 		return false;
 	}
 
 	@Override
 	public boolean isOther() {
-		// TODO Auto-generated method stub
-		return false;
+		return DLFSNode.isTombstone(node);
 	}
 
 	@Override

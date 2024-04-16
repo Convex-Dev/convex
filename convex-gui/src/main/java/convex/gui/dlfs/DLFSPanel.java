@@ -6,7 +6,6 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTree;
 
 import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
@@ -23,7 +22,7 @@ public class DLFSPanel extends JPanel {
 	
 	JLabel pathLabel;
 	
-	JTree directoryTree;
+	DirectoryTree directoryTree;
 	FileList fileList;
 	
 	CodeLabel infoLabel=new CodeLabel("READY");
@@ -55,7 +54,7 @@ public class DLFSPanel extends JPanel {
 			}
 		});
 		
-		fileList=new FileList(selectedPath);
+		fileList=new FileList(selectedPath,p->setSelectedPath(p));
 		fileList.setTransferHandler(new DnDTransferHandler(this) {
 			@Override
 			protected Path getTargetPath() {
@@ -83,6 +82,7 @@ public class DLFSPanel extends JPanel {
 		}		
 		selectedPath=(DLPath) newPath;
 		fileList.setDirectory(newPath);
+		// Some way to update directory tree selection?
 		
 		infoLabel.setText("ROOT HASH: " +fileSystem.getRootHash()+"\n"+
 				"NODE HASH: " +fileSystem.getNodeHash(selectedPath)+"\n");

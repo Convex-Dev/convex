@@ -19,6 +19,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.prim.CVMLong;
 import convex.dlfs.impl.DLDirectoryStream;
 import convex.dlfs.impl.DLFSFileAttributes;
 
@@ -33,7 +34,10 @@ public abstract class DLFileSystem extends FileSystem {
 
 	static final String SEP = "/";
 
+	private static final Set<String> SUPPORTED_FILE_ATTRIBUTE_SET = Collections.singleton("basic");
+
 	protected final DLFSProvider provider;
+	private CVMLong timestamp; 
 	
 	// Singleton root / empty paths
 	protected final DLPath root=new DLPath(this,DLPath.EMPTY_STRINGS,true);
@@ -54,6 +58,25 @@ public abstract class DLFileSystem extends FileSystem {
 	@Override
 	public void close() throws IOException {
 		
+	}
+	
+	/**
+	 * Gets the timestamp of this DLFS drive
+	 * @return
+	 */
+	public final CVMLong getTimestamp() {
+		return timestamp;
+	}
+	
+	/**
+	 * Updates the timestamp of this DLFS drive to the maximum of the given timestamp or it's current time stamp
+	 * @return The new timestamp value, or the original one if unchanged
+	 */
+	public synchronized CVMLong updateTimestamp(long newTimestamp) {
+		if (newTimestamp>timestamp.longValue()) {
+			timestamp=CVMLong.create(newTimestamp);
+		}
+		return timestamp;
 	}
 
 	@Override
@@ -84,8 +107,7 @@ public abstract class DLFileSystem extends FileSystem {
 
 	@Override
 	public Set<String> supportedFileAttributeViews() {
-		// TODO Auto-generated method stub
-		return null;
+		return SUPPORTED_FILE_ATTRIBUTE_SET;
 	}
 
 	@Override

@@ -25,6 +25,7 @@ public class DLFSNode {
 	
 	public static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
 	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
+	public static final AVector<ACell> TOMBSTONE=Vectors.of(NIL_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
 	
 	// node structure contents
 	public static final long NODE_LENGTH = 4;
@@ -142,6 +143,22 @@ public class DLFSNode {
 		return entry;
 	}
 
+	/**
+	 * Returns true iff the node is a DLFS tombstone
+	 * @param node Node to test
+	 * @return True if a tombstone, false if anything else (including null)
+	 */
+	public static boolean isTombstone(AVector<ACell> node) {
+		if (node==null) return false;
+		return (!isDirectory(node)&&!isRegularFile(node));
+	}
 
+	private static AVector<ACell> lastTombstone=TOMBSTONE;
+	public static AVector<ACell> createTombstone(CVMLong timestamp) {
+		AVector<ACell> last=lastTombstone;
+		last= TOMBSTONE.assoc(POS_UTIME,timestamp);
+		lastTombstone=last;
+		return last;
+	}
 
 }
