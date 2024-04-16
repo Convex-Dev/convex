@@ -97,6 +97,11 @@ public class DLFileChannel implements SeekableByteChannel {
 			ABlob data = DLFSNode.getData(node);
 			if (data==null) throw new NoSuchFileException(path.toString());
 			
+			if (data.count()<position) {
+				// TODO: is this sane?
+				position=data.count();
+			}
+			
 			Blob b=Blob.fromByteBuffer(src);
 			long n=b.count();
 			ABlob newData=data.replaceSlice(position,b);
@@ -105,6 +110,8 @@ public class DLFileChannel implements SeekableByteChannel {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData);
 				updateNode(newNode);
 			}
+			// position after replaced slice
+			position=position+n;
 			
 			return (int)n;
 		}

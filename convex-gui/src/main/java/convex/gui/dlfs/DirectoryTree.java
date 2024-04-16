@@ -38,13 +38,11 @@ public class DirectoryTree extends JTree {
 
 		addMouseListener(new MouseAdapter() {
 		     public void mousePressed(MouseEvent e) {
-		         // int selRow = treeView.getRowForLocation(e.getX(), e.getY());
 		         TreePath selPath = getPathForLocation(e.getX(), e.getY());
 		         setSelectionPath(selPath);
-		         // System.out.println("Selected: "+selPath);
 		         validate();
 		     }
-		 });
+		});
 		
 		addTreeWillExpandListener(new TreeWillExpandListener() {
 

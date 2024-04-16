@@ -21,8 +21,8 @@ public class BrowserUtils {
 				 targetPath=targetDir.resolve(fname);
 			 }
 			 Path p=Files.copy(f.toPath(),targetPath);
-			 System.out.println("Copied to: "+p.toString());
-			 System.out.println(Files.size(p));
+			 
+			 System.out.println("Copied "+Files.size(p)+" bytes to: "+p.toString());
 		 }
 	}
 

@@ -3,16 +3,11 @@ package convex.gui.dlfs;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import javax.swing.DefaultListModel;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -36,7 +31,7 @@ public class DLFSPanel extends JPanel {
 	JLabel pathLabel;
 	
 	JTree directoryTree;
-	JList<Path> fileList;
+	FileList fileList;
 	
 	CodeLabel infoLabel=new CodeLabel("READY");
 
@@ -62,7 +57,7 @@ public class DLFSPanel extends JPanel {
 			}
 		});
 		
-		fileList=new JList<>(new DefaultListModel<Path>());
+		fileList=new FileList(selectedPath);
 		fileList.setTransferHandler(new DropTransferHandler());
 		JScrollPane listScrollPane=new JScrollPane(fileList);
 		
@@ -77,31 +72,20 @@ public class DLFSPanel extends JPanel {
 		directoryTree.setSelectionPath(directoryTree.getPathForRow(0));
 	}
 	
-	
 	private void setSelectedPath(Path newPath) {
-		DefaultListModel<Path> model = ((DefaultListModel<Path>)fileList.getModel());
-
-		infoLabel.setText("ROOT HASH: " +fileSystem.getRootHash()+"\n"+
-				"NODE HASH: " +fileSystem.getNodeHash((DLPath)newPath)+"\n");
-		
-		model.removeAllElements();
 		if (!(newPath instanceof DLPath)) {
 			pathLabel.setText("No path selected");
+			selectedPath=null;
 			return;
-		}
-		DLPath p=(DLPath)newPath;
+		}		
+		selectedPath=(DLPath) newPath;
+		fileList.setDirectory(newPath);
 		
-		pathLabel.setText(p.toString());
+		infoLabel.setText("ROOT HASH: " +fileSystem.getRootHash()+"\n"+
+				"NODE HASH: " +fileSystem.getNodeHash(selectedPath)+"\n");
+		
 
-		
-		try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
-	        for (Path path : stream) {
-	        	model.addElement(path.getFileName());
-	        }
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		pathLabel.setText(newPath.toUri().toString());
 	}
 
 
@@ -132,6 +116,7 @@ public class DLFSPanel extends JPanel {
 			 Transferable tf =support.getTransferable();
 			 List<File> files;
 			 Path targetDir=getSelectedPath();
+			 System.out.println("Dropping to: "+targetDir);
 			 
 			 DropLocation dropLocation = support.getDropLocation();
 			 if (dropLocation instanceof JTree.DropLocation) {
