@@ -45,9 +45,15 @@ public class DLFSRenderer extends DefaultTreeCellRenderer {
 			iconName=expanded?"FileView.directoryIcon": "FileView.directoryIcon";
 		}
 		
-		if (path.getNameCount()==0) iconName="FileView.hardDriveIcon";
+		Icon icon;
+		if (name==null) {
+			icon = UIManager.getIcon("FileView.hardDriveIcon"); // root icon
+		} else try {
+			icon= FileSystemView.getFileSystemView().getSystemIcon( name.toFile() );
+		} catch (Exception e) {
+			icon = UIManager.getIcon(iconName);
+		}
 		
-		Icon icon = UIManager.getIcon(iconName);
 		setIcon(icon);
 		return this;
 	}
