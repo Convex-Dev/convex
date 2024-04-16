@@ -304,32 +304,33 @@ public class DLFSTest {
 		DLFileSystem driveA=DLFS.createLocal();
 		DLFileSystem driveB=DLFS.createLocal();
 		
+		long TS=1000;
 		{ // create two files, check timestamp
-			setDriveTimes(1000,driveA,driveB);
+			setDriveTimes(TS,driveA,driveB);
 			AVector<ACell> nodeA=driveA.createFile(driveA.getPath("foo"));
 			AVector<ACell> nodeB=driveB.createFile(driveB.getPath("bar"));
 			assertEquals(nodeA, nodeB); // should be identical nodes
-			assertEquals(1000,DLFSNode.getUTime(nodeA).longValue());
+			assertEquals(TS,DLFSNode.getUTime(nodeA).longValue());
 			
-			assertEquals(1000,driveB.getFileAttributes(driveB.getPath("bar")).lastModifiedTime().toMillis());
+			assertEquals(TS,driveB.getFileAttributes(driveB.getPath("bar")).lastModifiedTime().toMillis());
 		}
 		
 		{ // create two directory trees
-			setDriveTimes(1001,driveA,driveB);
+			setDriveTimes(TS+1,driveA,driveB);
 			Files.createDirectories(driveA.getPath("tree/a"));
 			Files.createDirectories(driveB.getPath("tree/b"));
 		}
 		
 		{ // create conflict at same time
-			setDriveTimes(1002,driveA,driveB);
+			setDriveTimes(TS+2,driveA,driveB);
 			Files.createDirectories(driveA.getPath("conflict"));
 			Files.createFile(driveB.getPath("conflict"));
 		}
 		
 		{ // create conflict at same time
-			setDriveTimes(1003,driveA);
+			setDriveTimes(TS+3,driveA);
 			Files.createDirectories(driveA.getPath("conflict2"));
-			setDriveTimes(1004,driveB);
+			setDriveTimes(TS+4,driveB);
 			Files.createFile(driveB.getPath("conflict2"));
 		}
 		
@@ -344,13 +345,13 @@ public class DLFSTest {
 		assertTrue(Files.isRegularFile(driveA.getPath("conflict2"))); // should prefer newer timestamp from b
 		
 		// root timestamp for drive A should be time of merge. Some files may be past that
-		assertEquals(1003,driveA.getFileAttributes(driveA.getPath("/")).lastModifiedTime().toMillis());
-		assertEquals(1004,driveA.getFileAttributes(driveA.getPath("/conflict2")).lastModifiedTime().toMillis());
+		assertEquals(TS+3,driveA.getFileAttributes(driveA.getPath("/")).lastModifiedTime().toMillis());
+		assertEquals(TS+4,driveA.getFileAttributes(driveA.getPath("/conflict2")).lastModifiedTime().toMillis());
 		
-		setDriveTimes(1005,driveA,driveB);
+		setDriveTimes(TS+5,driveA,driveB);
 		driveB.replicate(driveA);
 		assertTrue(Files.isRegularFile(driveB.getPath("conflict"))); // should prefer current value at same timestamp
-		assertEquals(1005,Files.getLastModifiedTime(driveB.getPath("/")).toMillis()); // something got updated
+		assertEquals(TS+5,Files.getLastModifiedTime(driveB.getPath("/")).toMillis()); // something got updated
 
 		// Delete conflicting file, should make a tombstone!
 		Files.delete(driveA.getPath("conflict"));
@@ -358,7 +359,7 @@ public class DLFSTest {
 		// Replicate both ways, should get same root hash with no conflicts
 		driveA.replicate(driveB);
 		driveB.replicate(driveA);
-		assertEquals(1005,Files.getLastModifiedTime(driveA.getPath("/")).toMillis()); // something got updated
+		assertEquals(TS+5,Files.getLastModifiedTime(driveA.getPath("/")).toMillis()); // something got updated
 		assertEquals(driveA.getRootHash(),driveB.getRootHash());
 	}
 
