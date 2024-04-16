@@ -51,6 +51,7 @@ public class DLFSNode {
 	 */
 	@SuppressWarnings("unchecked")
 	public static AVector<ACell> navigate(AVector<ACell> node, DLPath path) {
+		if (path==null) return null;
 		int n=path.getNameCount();
 		for (int i=0; i<n; i++) {
 			AString compName=path.getCVMName(i);

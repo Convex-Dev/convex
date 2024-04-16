@@ -2,8 +2,6 @@ package convex.gui.dlfs;
 
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -11,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -21,12 +18,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTree;
 import javax.swing.TransferHandler;
-import javax.swing.border.BevelBorder;
-import javax.swing.event.TreeExpansionEvent;
-import javax.swing.event.TreeWillExpandListener;
-import javax.swing.tree.DefaultMutableTreeNode;
-import javax.swing.tree.DefaultTreeModel;
-import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreePath;
 
 import convex.dlfs.DLFileSystem;
@@ -44,7 +35,7 @@ public class DLFSPanel extends JPanel {
 	
 	JLabel pathLabel;
 	
-	JTree treeView;
+	JTree directoryTree;
 	JList<Path> fileList;
 	
 	CodeLabel infoLabel=new CodeLabel("READY");
@@ -57,62 +48,25 @@ public class DLFSPanel extends JPanel {
 		selectedPath=dlfs.getRoot();
 		setLayout(new MigLayout());
 		
-		DLFileTreeModel model=new DLFileTreeModel(dlfs);
-		treeView = new JTree(model);
+		directoryTree = new DirectoryTree(dlfs);
 		// treeView.setBackground(Color.BLACK);
-		DLFSRenderer renderer=new DLFSRenderer();
-		renderer.setBackgroundNonSelectionColor(getBackground());
-		treeView.setCellRenderer(renderer);
-		treeView.setShowsRootHandles(true);
-		treeView.setTransferHandler(new DropTransferHandler());
-		treeView.setExpandsSelectedPaths(true);
-		treeView.setEnabled(true);
+		directoryTree.setTransferHandler(new DropTransferHandler());
 		
-		treeView.addMouseListener(new MouseAdapter() {
-		     public void mousePressed(MouseEvent e) {
-		         // int selRow = treeView.getRowForLocation(e.getX(), e.getY());
-		         TreePath selPath = treeView.getPathForLocation(e.getX(), e.getY());
-		         treeView.setSelectionPath(selPath);
-		         // System.out.println("Selected: "+selPath);
-		         treeView.validate();
-		     }
-		 });
-		
-		treeView.addTreeSelectionListener(e->{
-			Node node=(Node)treeView.getLastSelectedPathComponent();
-					
+		directoryTree.addTreeSelectionListener(e->{
+			DirectoryTree.Node node=(DirectoryTree.Node)directoryTree.getLastSelectedPathComponent();
 			if (node==null) {
-				updateTreeSelection(null);
+				setSelectedPath(null);
 			} else {
 				Path p=node.getFilePath();
-				updateTreeSelection(p);
+				setSelectedPath(p);
 			}
 		});
-		
-		treeView.addTreeWillExpandListener(new TreeWillExpandListener() {
-
-            @Override
-            public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException {
-                TreePath treePath = event.getPath();
-                if (treePath.getLastPathComponent() instanceof Node) {
-                    Node node = (Node) treePath.getLastPathComponent();
-                    node.loadChildren();
-                }
-            }
-
-            @Override
-            public void treeWillCollapse(TreeExpansionEvent event) throws ExpandVetoException {
-
-            }
-        });
-		treeView.setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
-
 		
 		fileList=new JList<>(new DefaultListModel<Path>());
 		fileList.setTransferHandler(new DropTransferHandler());
 		JScrollPane listScrollPane=new JScrollPane(fileList);
 		
-		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(treeView), listScrollPane);
+		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(directoryTree), listScrollPane);
 		add(splitPane,"dock center");
 		
 		pathLabel=new JLabel("/");
@@ -120,20 +74,24 @@ public class DLFSPanel extends JPanel {
 
 		add(infoLabel,"dock south");
 		
-		treeView.setSelectionPath(treeView.getPathForRow(0));
+		directoryTree.setSelectionPath(directoryTree.getPathForRow(0));
 	}
 	
 	
-	private void updateTreeSelection(Path newPath) {
+	private void setSelectedPath(Path newPath) {
 		DefaultListModel<Path> model = ((DefaultListModel<Path>)fileList.getModel());
 
+		infoLabel.setText("ROOT HASH: " +fileSystem.getRootHash()+"\n"+
+				"NODE HASH: " +fileSystem.getNodeHash((DLPath)newPath)+"\n");
+		
 		model.removeAllElements();
-		if (!(newPath instanceof DLPath)) return;
+		if (!(newPath instanceof DLPath)) {
+			pathLabel.setText("No path selected");
+			return;
+		}
 		DLPath p=(DLPath)newPath;
 		
 		pathLabel.setText(p.toString());
-		infoLabel.setText("ROOT HASH: " +((DLPath)p).getFileSystem().getRootHash()+"\n"+
-				"NODE HASH: " +((DLPath)p).getFileSystem().getNodeHash(p)+"\n");
 
 		
 		try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
@@ -147,27 +105,10 @@ public class DLFSPanel extends JPanel {
 	}
 
 
-	public static class DLFileTreeModel extends DefaultTreeModel {
-		protected Path root;
-
-		public DLFileTreeModel(DLFileSystem filesystem) {
-			super(getNode(filesystem.getRoot()));
-		}
-
-		static Node getNode(Path path) {
-			Node node= new Node(path);
-			
-			node.loadChildren();
-			return node;
-		}
-
-
-	}
-	
 	public class DropTransferHandler extends TransferHandler {
 
 		public DropTransferHandler() {
-			
+
 		}
 		@Override
 		public boolean canImport(TransferSupport support) {
@@ -197,7 +138,7 @@ public class DLFSPanel extends JPanel {
 				 JTree.DropLocation dl =(JTree.DropLocation)dropLocation;
 			     TreePath treePath = dl.getPath();
 			     if (treePath!=null) {
-				     Node parent =(Node)treePath.getLastPathComponent();
+				     DirectoryTree.Node parent =(DirectoryTree.Node)treePath.getLastPathComponent();
 					 System.out.println("Parent: "+parent);
 					 targetDir=parent.getFilePath();
 			     }
@@ -207,7 +148,7 @@ public class DLFSPanel extends JPanel {
 				 files=(List<File>)(tf.getTransferData(DataFlavor.javaFileListFlavor));
 				 if ((files==null)||(files.isEmpty())) return false;		 
 				 BrowserUtils.copyFiles(DLFSPanel.this, files, targetDir);	 
-				 updateTreeSelection(getSelectedPath());		 
+				 setSelectedPath(getSelectedPath());		 
 			 } catch (Exception e) {
 				 e.printStackTrace();
 				 return false;
@@ -215,62 +156,10 @@ public class DLFSPanel extends JPanel {
 			 return true;
 		 }
 	}
-	
-	Path getNodePath(Object node) {
-		return ((Node)node).getFilePath();
-	}
+
 	
 	public DLPath getSelectedPath() {
 		return selectedPath;
-	}
-
-
-	public static class Node extends DefaultMutableTreeNode {
-		private boolean childrenLoaded = false;
-		private boolean isDirectory = false;
-		
-		public Node(Path path) {
-			super(path);
-			isDirectory=Files.isDirectory(path);
-			if (isDirectory) {
-				setAllowsChildren(true);
-			}
-		}
-
-		public Path getFilePath() {
-			return (Path)this.getUserObject();
-		}
-
-		public void loadChildren() {
-			if (childrenLoaded) {
-				this.removeAllChildren();
-			}
-			if (!isDirectory) return;
-			
-			Path p=getFilePath();
-			try (DirectoryStream<Path> stream = Files.newDirectoryStream(p)) {
-		        for (Path path : stream) {
-		        	if (Files.isDirectory(path)) {
-		        		this.add(new Node(path));
-		        	}
-		        }
-		    } catch (Exception e) {
-		    	System.err.println(e.getMessage());
-		    } 
-	        childrenLoaded=true;
-		}
-		
-		@Override
-		public boolean isLeaf() {
-			return !isDirectory;
-		}
-		
-		@Override
-		public String toString() {
-			Path name=getFilePath().getFileName();
-			return (name==null)?"DLFS Root":name.toString();
-		}
-		
 	}
 
 }

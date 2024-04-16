@@ -14,10 +14,10 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
 @SuppressWarnings("serial")
-public class DLFSRenderer extends DefaultTreeCellRenderer {
+public class DLFSTreeCellRenderer extends DefaultTreeCellRenderer {
 	private static final Color SELCOLOUR=new Color(30,70, 100);
 	
-	public DLFSRenderer() {
+	public DLFSTreeCellRenderer() {
 		setBorder(BorderFactory.createEmptyBorder(3, 3, 3, 3));
 		setOpaque(false);
 		setBackgroundSelectionColor(SELCOLOUR);
