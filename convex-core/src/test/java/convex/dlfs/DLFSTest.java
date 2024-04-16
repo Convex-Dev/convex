@@ -279,10 +279,13 @@ public class DLFSTest {
 		try (SeekableByteChannel fc = Files.newByteChannel(file,StandardOpenOption.WRITE)) {
 			fc.position(OFF);
 			fc.write(ByteBuffer.wrap(data.getBytes()));
+			fc.write(ByteBuffer.wrap(data.getBytes()));
 		}
 		
-		assertEquals(2*SIZE,Files.size(file));
+		// should have written 2 copies at position OFF, extending file size
+		assertEquals(2*SIZE+OFF,Files.size(file));
 
+		// Check we can read a consistent copy from position in input stream
 		try (InputStream is = Files.newInputStream(fileName)) {
 			is.skip(OFF);
 			byte[] bs=is.readNBytes(SIZE);
