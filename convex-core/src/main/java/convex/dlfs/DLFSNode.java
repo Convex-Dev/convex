@@ -23,9 +23,9 @@ public class DLFSNode {
 	static final ACell EMPTY_METADATA = null;
 	static final CVMLong EMPTY_TIME = CVMLong.ZERO;
 	
-	public static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
-	public static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
-	public static final AVector<ACell> TOMBSTONE=Vectors.of(NIL_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
+	private static final AVector<ACell> EMPTY_DIRECTORY=Vectors.of(EMPTY_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
+	private static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
+	private static final AVector<ACell> TOMBSTONE=Vectors.of(NIL_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
 	
 	// node structure contents
 	public static final long NODE_LENGTH = 4;
@@ -158,6 +158,22 @@ public class DLFSNode {
 		AVector<ACell> last=lastTombstone;
 		last= TOMBSTONE.assoc(POS_UTIME,timestamp);
 		lastTombstone=last;
+		return last;
+	}
+
+	private static AVector<ACell> lastDirectory=EMPTY_DIRECTORY;
+	public static AVector<ACell> createDirectory(CVMLong timestamp) {
+		AVector<ACell> last=lastDirectory;
+		last= EMPTY_DIRECTORY.assoc(POS_UTIME,timestamp);
+		lastDirectory=last;
+		return last;
+	}
+	
+	private static AVector<ACell> lastEmptyFile=EMPTY_FILE;
+	public static AVector<ACell> createEmptyFile(CVMLong timestamp) {
+		AVector<ACell> last=lastEmptyFile;
+		last= EMPTY_FILE.assoc(POS_UTIME,timestamp);
+		lastEmptyFile=last;
 		return last;
 	}
 

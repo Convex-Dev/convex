@@ -31,7 +31,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
-import convex.core.lang.RT;
 
 public class DLFSTest {
 	
@@ -291,8 +290,8 @@ public class DLFSTest {
 			byte[] bs=is.readNBytes(SIZE);
 			assertEquals(SIZE,bs.length);
 			Blob data2=Blob.wrap(bs);
-			System.out.println(RT.print(data, SIZE*3));
-			System.out.println(RT.print(data2, SIZE*3));
+			//System.out.println(RT.print(data, SIZE*3));
+			//System.out.println(RT.print(data2, SIZE*3));
 			assertEquals(data,data2);
 		}
 

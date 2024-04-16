@@ -172,7 +172,12 @@ public abstract class DLFileSystem extends FileSystem {
 		return DLFSFileAttributes.create(node);
 	}
 
-	protected abstract AVector<ACell> getNode(DLPath path);
+	/**
+	 * Gets DLFS node for the given path
+	 * @param path
+	 * @return
+	 */
+	public abstract AVector<ACell> getNode(DLPath path);
 
 	/**
 	 * Implementation for delegation by DLFSProvider, create a directory
@@ -197,5 +202,15 @@ public abstract class DLFileSystem extends FileSystem {
 		if (node==null) return null;
 		return Cells.getHash(node);
 	}
+
+	/**
+	 * Creates a file, returning the new node
+	 * @param path
+	 * @return
+	 * @throws IOException
+	 */
+	public abstract AVector<ACell> createFile(DLPath path) throws IOException;
+
+	public abstract AVector<ACell> updateNode(DLPath path, AVector<ACell> newNode);
 
 }

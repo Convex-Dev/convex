@@ -26,7 +26,7 @@ import convex.dlfs.DLPath;
 
 public class DLFSLocal extends DLFileSystem {
 	
-	AVector<ACell> rootNode=DLFSNode.EMPTY_DIRECTORY;
+	AVector<ACell> rootNode=DLFSNode.createDirectory(getTimestamp());
 	
 	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath) {
 		super(dlfsProvider,uriPath);
@@ -37,7 +37,7 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	protected AVector<ACell> getNode(DLPath path) {
+	public AVector<ACell> getNode(DLPath path) {
 		AVector<ACell> result=DLFSNode.navigate(rootNode,path);
 		return result;
 	}
@@ -67,16 +67,11 @@ public class DLFSLocal extends DLFileSystem {
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(dir.toString());
 		}
-		updateNode(dir,DLFSNode.EMPTY_DIRECTORY);
+		updateNode(dir,DLFSNode.createDirectory(getTimestamp()));
 		return dir;
 	}
 	
-	/**
-	 * Creates a file, returning the new node
-	 * @param path
-	 * @return
-	 * @throws IOException
-	 */
+	@Override
 	public synchronized AVector<ACell> createFile(DLPath path) throws IOException {
 		AString name=path.getCVMFileName();
 		path=path.toAbsolutePath();
@@ -89,7 +84,7 @@ public class DLFSLocal extends DLFileSystem {
 		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
 			throw new FileAlreadyExistsException(name.toString());
 		}
-		AVector<ACell> newNode=DLFSNode.EMPTY_FILE;
+		AVector<ACell> newNode=DLFSNode.createEmptyFile(getTimestamp());
 		updateNode(path,newNode);
 		return newNode;
 	}
@@ -113,7 +108,8 @@ public class DLFSLocal extends DLFileSystem {
 		updateNode(path,DLFSNode.createTombstone(getTimestamp()));
 	}
 
-	AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
+	@Override
+	public AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
 		rootNode=DLFSNode.updateNode(rootNode,dir,newNode);
 		return rootNode;
 	}

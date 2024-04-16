@@ -16,6 +16,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.dlfs.DLFSNode;
+import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
 
 public class DLFileChannel implements SeekableByteChannel {
@@ -24,14 +25,14 @@ public class DLFileChannel implements SeekableByteChannel {
 	private boolean readOnly=true;
 	private long position=0;
 	private DLPath path;
-	private DLFSLocal fileSystem;
+	private DLFileSystem fileSystem;
 	
-	private DLFileChannel(DLFSLocal fs, DLPath path) {
+	private DLFileChannel(DLFileSystem fs, DLPath path) {
 		this.fileSystem=fs;
 		this.path=path;
 	}
 	
-	public static DLFileChannel create(DLFSLocal fs, Set<? extends OpenOption> options, DLPath path) throws IOException {
+	public static DLFileChannel create(DLFileSystem fs, Set<? extends OpenOption> options, DLPath path) throws IOException {
 		AVector<ACell> node= fs.getNode(path);
 		
 		boolean append=false;
