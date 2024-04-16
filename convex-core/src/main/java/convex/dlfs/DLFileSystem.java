@@ -11,7 +11,6 @@ import java.nio.file.PathMatcher;
 import java.nio.file.WatchService;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.UserPrincipalLookupService;
-import java.nio.file.spi.FileSystemProvider;
 import java.util.Collections;
 import java.util.Set;
 
@@ -45,13 +44,14 @@ public abstract class DLFileSystem extends FileSystem {
 
 	protected final String uriPath;
 	
-	protected DLFileSystem(DLFSProvider dlfsProvider, String uriPath) {
+	protected DLFileSystem(DLFSProvider dlfsProvider, String uriPath, CVMLong timestamp) {
 		this.provider=dlfsProvider;
 		this.uriPath=uriPath;
+		this.timestamp=timestamp;
 	}
 
 	@Override
-	public FileSystemProvider provider() {
+	public DLFSProvider provider() {
 		return provider;
 	}
 
@@ -66,6 +66,14 @@ public abstract class DLFileSystem extends FileSystem {
 	 */
 	public final CVMLong getTimestamp() {
 		return timestamp;
+	}
+	
+	/**
+	 * Sets the timestamp of this DLFS drive
+	 * @return
+	 */
+	public final void setTimestamp(CVMLong newTimestamp) {
+		timestamp=newTimestamp;
 	}
 	
 	/**
@@ -111,7 +119,7 @@ public abstract class DLFileSystem extends FileSystem {
 	}
 
 	@Override
-	public Path getPath(String first, String... more) {
+	public DLPath getPath(String first, String... more) {
 		String fullPath=first;
 		if ((more!=null)&&(more.length>0)) {
 			fullPath=fullPath+SEP+String.join(SEP,more);
@@ -211,6 +219,23 @@ public abstract class DLFileSystem extends FileSystem {
 	 */
 	public abstract AVector<ACell> createFile(DLPath path) throws IOException;
 
+	/**
+	 * Updates a node, returning the new node 
+	 * @param path
+	 * @param newNode
+	 * @return The new node
+	 */
 	public abstract AVector<ACell> updateNode(DLPath path, AVector<ACell> newNode);
+	
 
+	/**
+	 * Merges another DLFS drive into this one
+	 * @param other Root node of other DLFS drive
+	 */
+	public abstract void merge(AVector<ACell> other);
+
+	public void replicate(DLFileSystem other) {
+		merge(other.getNode(other.getRoot()));
+	}
+	
 }

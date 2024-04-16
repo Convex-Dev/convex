@@ -18,22 +18,27 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.prim.CVMLong;
 import convex.dlfs.DLFS;
 import convex.dlfs.DLFSNode;
 import convex.dlfs.DLFSProvider;
 import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
 
-public class DLFSLocal extends DLFileSystem {
+/**
+ * Local DLFS Drive implementation
+ */
+public class DLFSLocal extends DLFileSystem implements Cloneable {
 	
-	AVector<ACell> rootNode=DLFSNode.createDirectory(getTimestamp());
+	AVector<ACell> rootNode;
 	
-	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath) {
-		super(dlfsProvider,uriPath);
+	public DLFSLocal(DLFSProvider dlfsProvider, String uriPath, AVector<ACell> rootNode) {
+		super(dlfsProvider,uriPath,DLFSNode.getUTime(rootNode));
+		this.rootNode=rootNode;
 	}
 
 	public static DLFileSystem create(DLFSProvider provider) {
-		return new DLFSLocal(provider,null);
+		return new DLFSLocal(provider,null,DLFSNode.createDirectory(CVMLong.ZERO));
 	}
 
 	@Override
@@ -109,9 +114,9 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	public AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
-		rootNode=DLFSNode.updateNode(rootNode,dir,newNode);
-		return rootNode;
+	public synchronized AVector<ACell> updateNode(DLPath dir, AVector<ACell> newNode) {
+		rootNode=DLFSNode.updateNode(rootNode,dir,newNode,getTimestamp());
+		return newNode;
 	}
 
 	@Override
@@ -127,6 +132,16 @@ public class DLFSLocal extends DLFileSystem {
 		return Cells.getHash(rootNode);
 	}
 
+	@Override
+	public void merge(AVector<ACell> other) {
+		AVector<ACell> merged=DLFSNode.merge(rootNode,other,getTimestamp());
+		rootNode=merged;
+	}
 
 
+	@Override 
+	public DLFSLocal clone() {
+		DLFSLocal result=new DLFSLocal(provider(),uriPath,rootNode);
+		return result;
+	}
 }

@@ -49,13 +49,13 @@ public final class DLPath implements Path {
 		this.count=names.length;
 	}
 
-	static Path createRoot(DLFileSystem fileSystem) {
+	static DLPath createRoot(DLFileSystem fileSystem) {
 		return new DLPath(fileSystem,EMPTY_STRINGS,true);
 	}
 	
 	static final Pattern endSlashes = Pattern.compile("/+$");
 	
-	static Path create(DLFileSystem fs, String fullPath) {
+	static DLPath create(DLFileSystem fs, String fullPath) {
 		String path=fullPath;
 		String sep=DLFileSystem.SEP;
 		if (path.isEmpty()) throw new InvalidPathException(fullPath,"Empty path name");
@@ -243,7 +243,7 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path relativize(Path other) {
+	public DLPath relativize(Path other) {
 		if (!(other instanceof DLPath)) throw new IllegalArgumentException("Not a DLFS path");
 		return relativize((DLPath) other);
 	}
@@ -283,7 +283,7 @@ public final class DLPath implements Path {
 	}
 
 	@Override
-	public Path toRealPath(LinkOption... options) throws IOException {
+	public DLPath toRealPath(LinkOption... options) throws IOException {
 		if (absolute) return this;
 		return toAbsolutePath();
 	}

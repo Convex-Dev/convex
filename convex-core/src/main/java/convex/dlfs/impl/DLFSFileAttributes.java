@@ -22,8 +22,11 @@ public class DLFSFileAttributes implements BasicFileAttributes {
 	
 	@Override
 	public FileTime lastModifiedTime() {
-		// TODO Auto-generated method stub
-		return null;
+		return getFileTime();
+	}
+
+	protected FileTime getFileTime() {
+		return FileTime.fromMillis(DLFSNode.getUTime(node).longValue());
 	}
 
 	@Override

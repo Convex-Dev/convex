@@ -38,7 +38,7 @@ public class DLFSProvider extends FileSystemProvider {
 	public DLFileSystem newFileSystem(URI uri, Map<String, ?> env) {
 		String path = uri.getPath();
        
-        DLFileSystem fs= new DLFSLocal(this,path); 
+        DLFileSystem fs= DLFSLocal.create(this); 
         fileSystems.put(path, fs);
         return fs;
 	}

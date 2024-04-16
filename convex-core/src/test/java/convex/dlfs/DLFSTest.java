@@ -29,8 +29,11 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ABlob;
+import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.prim.CVMLong;
 
 public class DLFSTest {
 	
@@ -257,7 +260,7 @@ public class DLFSTest {
 		final Path fileName=root.resolve("data");
 		Path file=Files.createFile(fileName);
 		
-		int SIZE=10000;
+		int SIZE=10000; // Big enough we need multiple Blob chunks
 		ABlob data=Blobs.createRandom(new Random(5465), SIZE);
 		
 		try (OutputStream os = Files.newOutputStream(file)) {
@@ -295,6 +298,75 @@ public class DLFSTest {
 			assertEquals(data,data2);
 		}
 
+	}
+	
+	@Test public void testReplication() throws IOException {
+		DLFileSystem driveA=DLFS.createLocal();
+		DLFileSystem driveB=DLFS.createLocal();
+		
+		{ // create two files, check timestamp
+			setDriveTimes(1000,driveA,driveB);
+			AVector<ACell> nodeA=driveA.createFile(driveA.getPath("foo"));
+			AVector<ACell> nodeB=driveB.createFile(driveB.getPath("bar"));
+			assertEquals(nodeA, nodeB); // should be identical nodes
+			assertEquals(1000,DLFSNode.getUTime(nodeA).longValue());
+			
+			assertEquals(1000,driveB.getFileAttributes(driveB.getPath("bar")).lastModifiedTime().toMillis());
+		}
+		
+		{ // create two directory trees
+			setDriveTimes(1001,driveA,driveB);
+			Files.createDirectories(driveA.getPath("tree/a"));
+			Files.createDirectories(driveB.getPath("tree/b"));
+		}
+		
+		{ // create conflict at same time
+			setDriveTimes(1002,driveA,driveB);
+			Files.createDirectories(driveA.getPath("conflict"));
+			Files.createFile(driveB.getPath("conflict"));
+		}
+		
+		{ // create conflict at same time
+			setDriveTimes(1003,driveA);
+			Files.createDirectories(driveA.getPath("conflict2"));
+			setDriveTimes(1004,driveB);
+			Files.createFile(driveB.getPath("conflict2"));
+		}
+		
+		driveA.replicate(driveB);
+		
+		assertTrue(Files.isRegularFile(driveA.getPath("foo")));
+		assertTrue(Files.isRegularFile(driveA.getPath("bar")));
+		assertTrue(Files.isDirectory(driveA.getPath("tree")));
+		assertTrue(Files.isDirectory(driveA.getPath("tree/b")));
+		assertTrue(Files.isDirectory(driveA.getPath("tree/a")));
+		assertTrue(Files.isDirectory(driveA.getPath("conflict"))); // should prefer current value at same timestamp
+		assertTrue(Files.isRegularFile(driveA.getPath("conflict2"))); // should prefer newer timestamp from b
+		
+		// root timestamp for drive A should be time of merge. Some files may be past that
+		assertEquals(1003,driveA.getFileAttributes(driveA.getPath("/")).lastModifiedTime().toMillis());
+		assertEquals(1004,driveA.getFileAttributes(driveA.getPath("/conflict2")).lastModifiedTime().toMillis());
+		
+		setDriveTimes(1005,driveA,driveB);
+		driveB.replicate(driveA);
+		assertTrue(Files.isRegularFile(driveB.getPath("conflict"))); // should prefer current value at same timestamp
+		assertEquals(1005,Files.getLastModifiedTime(driveB.getPath("/")).toMillis()); // something got updated
+
+		// Delete conflicting file, should make a tombstone!
+		Files.delete(driveA.getPath("conflict"));
+		
+		// Replicate both ways, should get same root hash with no conflicts
+		driveA.replicate(driveB);
+		driveB.replicate(driveA);
+		assertEquals(1005,Files.getLastModifiedTime(driveA.getPath("/")).toMillis()); // something got updated
+		assertEquals(driveA.getRootHash(),driveB.getRootHash());
+	}
+
+	private void setDriveTimes(long time, DLFileSystem... drives) {
+		CVMLong utime=CVMLong.create(time);
+		for (DLFileSystem d: drives) {
+			d.setTimestamp(utime);
+		}
 	}
 
 

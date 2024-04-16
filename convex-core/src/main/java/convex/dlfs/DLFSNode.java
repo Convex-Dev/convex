@@ -10,6 +10,7 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.MergeFunction;
 
 /**
  * Static utility class for working with DLFS Node structures
@@ -81,9 +82,10 @@ public class DLFSNode {
 	 * @param rootNode
 	 * @param path Path relative to root
 	 * @param newNode New node, or null to delete a node
-	 * @return Updated root node, or null if update failed (parent(s) not a directory)
+	 * @param utime Timestamp to set on any directories changed
+ 	 * @return Updated root node, or null if update failed (parent(s) not a directory)
 	 */
-	public static AVector<ACell> updateNode(AVector<ACell> rootNode, DLPath path,AVector<ACell> newNode) {
+	public static AVector<ACell> updateNode(AVector<ACell> rootNode, DLPath path,AVector<ACell> newNode, CVMLong utime) {
 		int n=path.getNameCount();
 		if (n==0) return newNode;
 		
@@ -93,7 +95,7 @@ public class DLFSNode {
 		AHashMap<AString, AVector<ACell>> entries = getDirectoryEntries(rootNode);
 		AVector<ACell> childNode=entries.get(name);
 		
-		childNode=updateNode(childNode,path.subpath(1),newNode);
+		childNode=updateNode(childNode,path.subpath(1),newNode,utime);
 		if (childNode==null) {
 			if (n==1) {
 				// deleting an entry at this position
@@ -106,7 +108,10 @@ public class DLFSNode {
 			// we have an updated child
 			entries=entries.assoc(name, childNode);
 		}
-		return rootNode.assoc(POS_DIR, entries);
+		AVector<ACell> result=rootNode;
+		result=result.assoc(POS_DIR, entries);
+		result=result.assoc(POS_UTIME, utime);
+		return result;
 	}
 	
 	/**
@@ -175,6 +180,48 @@ public class DLFSNode {
 		last= EMPTY_FILE.assoc(POS_UTIME,timestamp);
 		lastEmptyFile=last;
 		return last;
+	}
+
+	/**
+	 * Merges two DLFS nodes recursively. Favours newer (utime) entries in case of conflicts.
+	 * @param a First node (non-null). Favoured in result if all else equal.
+	 * @param b Second node (non-null)
+	 * @param time Update time for changes
+	 * @return Merged node
+	 */
+	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b, CVMLong time) {
+		if (a.equals(b)) return a;
+		CVMLong timeA=getUTime(a);
+		CVMLong timeB=getUTime(b);
+		
+		AHashMap<AString, AVector<ACell>> contA = getDirectoryEntries(a);
+		AHashMap<AString, AVector<ACell>> contB = getDirectoryEntries(b);
+		if ((contA!=null)&&(contB!=null)) {
+			// we have two directories, so need to merge by entry name
+			AHashMap<AString, AVector<ACell>> mergedEntries=contA.mergeDifferences(contB, new MergeFunction<AVector<ACell>>() {
+				@Override
+				public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
+					// We know values are different at this point
+					
+					// nulls mean other map has a missing value
+					if (cb==null) return ca;
+					if (ca==null) return cb;
+					
+					return DLFSNode.merge(ca,cb,time);
+				}
+			});
+			
+			// Helps performance a lot if we can return a directly with no changes
+			if ((contA==mergedEntries)&&(timeA.longValue()>=time.longValue())) return a; 
+			
+			AVector<ACell> result=createDirectory(time);
+			result=result.assoc(POS_DIR, mergedEntries);
+			return result;
+		} else {
+			// at least one in not a directory, so select based on more recent timestamp, or choose a if equal
+			AVector<ACell> result= timeA.longValue()>=timeB.longValue()?a:b;
+			return result;
+		}
 	}
 
 }
