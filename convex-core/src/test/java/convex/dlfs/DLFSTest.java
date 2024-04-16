@@ -24,8 +24,14 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Iterator;
+import java.util.Random;
 
 import org.junit.jupiter.api.Test;
+
+import convex.core.data.ABlob;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.lang.RT;
 
 public class DLFSTest {
 	
@@ -243,6 +249,50 @@ public class DLFSTest {
 		});
 		
 		assertFalse(Files.exists(file));
+	}
+	
+	@Test 
+	public void testBigFile() throws IOException {
+		DLFileSystem fs=DLFS.createLocal();
+		Path root=fs.getRoot();
+		final Path fileName=root.resolve("data");
+		Path file=Files.createFile(fileName);
+		
+		int SIZE=10000;
+		ABlob data=Blobs.createRandom(new Random(5465), SIZE);
+		
+		try (OutputStream os = Files.newOutputStream(file)) {
+			os.write(data.getBytes());
+		}
+		
+		assertEquals(SIZE,Files.size(file));
+		
+		try (OutputStream os = Files.newOutputStream(file,StandardOpenOption.APPEND)) {
+			os.write(data.getBytes());
+		}
+		
+		assertEquals(2*SIZE,Files.size(file));
+		
+		// random offset into file
+		int OFF=SIZE/2;
+		
+		try (SeekableByteChannel fc = Files.newByteChannel(file,StandardOpenOption.WRITE)) {
+			fc.position(OFF);
+			fc.write(ByteBuffer.wrap(data.getBytes()));
+		}
+		
+		assertEquals(2*SIZE,Files.size(file));
+
+		try (InputStream is = Files.newInputStream(fileName)) {
+			is.skip(OFF);
+			byte[] bs=is.readNBytes(SIZE);
+			assertEquals(SIZE,bs.length);
+			Blob data2=Blob.wrap(bs);
+			System.out.println(RT.print(data, SIZE*3));
+			System.out.println(RT.print(data2, SIZE*3));
+			assertEquals(data,data2);
+		}
+
 	}
 
 

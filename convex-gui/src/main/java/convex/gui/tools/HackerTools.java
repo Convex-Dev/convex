@@ -57,7 +57,7 @@ public class HackerTools extends AbstractGUI {
 
 	private MessageFormatPanel messagePanel;
 	
-	private DLFSPanel dataPanel=new DLFSPanel(DLFS.createLocal().getRoot());
+	private DLFSPanel dataPanel=new DLFSPanel(DLFS.createLocal());
 
 	/**
 	 * Create the application.

@@ -420,6 +420,19 @@ public class BlobsTest {
 
 		doBlobTests(bb);
 	}
+	
+	@Test
+	public void testBigBlobReplace() {
+		int SIZE=10000;
+		ABlob data=Blob.createRandom(new Random(5465), SIZE);
+
+		ABlob dd=data.append(data);
+		assertEquals(data,dd.slice(SIZE));
+		
+		ABlob cc=dd.replaceSlice(SIZE/2, data);
+		ABlob data2=cc.slice(SIZE/2, SIZE/2+SIZE);
+		assertEquals(data,data2);
+	}
 
 	@Test
 	public void testBlobTreeOutOfRange() {

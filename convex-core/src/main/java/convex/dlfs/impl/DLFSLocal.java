@@ -16,6 +16,8 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.dlfs.DLFS;
 import convex.dlfs.DLFSNode;
 import convex.dlfs.DLFSProvider;
@@ -122,6 +124,11 @@ public class DLFSLocal extends DLFileSystem {
 		if (node==null) {
 			throw new NoSuchFileException(path.toString());
 		}
+	}
+
+	@Override
+	public Hash getRootHash() {
+		return Cells.getHash(rootNode);
 	}
 
 

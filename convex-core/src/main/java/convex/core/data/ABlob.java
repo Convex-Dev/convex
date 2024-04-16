@@ -325,7 +325,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param b Blob to replace
 	 * @return Updated Blob
 	 */
-	public ABlob replaceSlice(long position, Blob b) {
+	public ABlob replaceSlice(long position, ABlob b) {
 		long end=Math.min(position+b.count(),count());
 		ABlob rest=slice(end,count());
 		return slice(0,position).append(b).append(rest);

@@ -17,6 +17,8 @@ import java.util.Set;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
+import convex.core.data.Hash;
 import convex.dlfs.impl.DLDirectoryStream;
 import convex.dlfs.impl.DLFSFileAttributes;
 
@@ -165,5 +167,13 @@ public abstract class DLFileSystem extends FileSystem {
 	protected abstract void checkAccess(DLPath path) throws IOException;
 
 	public abstract void delete(DLPath dlp) throws IOException;
+
+	public abstract Hash getRootHash();
+
+	public Hash getNodeHash(DLPath p) {
+		AVector<ACell> node=getNode(p);
+		if (node==null) return null;
+		return Cells.getHash(node);
+	}
 
 }

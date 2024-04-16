@@ -641,6 +641,7 @@ public class BlobTree extends ABlob {
 					result+=getChild(i).read(offset,n, dest);
 				}
 				count-=n;
+				offset=0; // offset is now the start of the next child 
 			} else {
 				offset-=csize;
 			}
