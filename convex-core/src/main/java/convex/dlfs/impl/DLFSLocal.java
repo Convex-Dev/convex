@@ -37,7 +37,7 @@ public class DLFSLocal extends DLFileSystem implements Cloneable {
 		this.rootNode=rootNode;
 	}
 
-	public static DLFileSystem create(DLFSProvider provider) {
+	public static DLFSLocal create(DLFSProvider provider) {
 		return new DLFSLocal(provider,null,DLFSNode.createDirectory(CVMLong.ZERO));
 	}
 

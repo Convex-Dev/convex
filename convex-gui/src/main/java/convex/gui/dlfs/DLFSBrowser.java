@@ -4,6 +4,7 @@ import java.nio.file.Files;
 
 import convex.dlfs.DLFS;
 import convex.dlfs.DLPath;
+import convex.dlfs.impl.DLFSLocal;
 import convex.gui.components.AbstractGUI;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -11,9 +12,22 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class DLFSBrowser extends AbstractGUI {
 	
-	public DLFSBrowser() {
+	protected DLFSLocal drive;
+
+	public DLFSBrowser(DLFSLocal drive) {
 		setLayout(new MigLayout());
-		DLPath p=DLFS.createLocal().getRoot();
+		this.drive=drive;
+		add(new DLFSPanel(drive),"dock center");
+	}
+	
+	
+	
+	
+	public static DLFSLocal createDemoDrive() {
+		DLFSLocal drive=DLFS.createLocal();
+		drive.updateTimestamp();
+		
+		DLPath p=drive.getRoot();
 		// Path p=new File(".").toPath();
 		try {
 			Files.createDirectory(p.resolve("training"));
@@ -32,7 +46,7 @@ public class DLFSBrowser extends AbstractGUI {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-		add(new DLFSPanel(p.getFileSystem()),"dock center");
+		return drive;
 	}
 	
 	/**
@@ -43,7 +57,8 @@ public class DLFSBrowser extends AbstractGUI {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		DLFSBrowser gui=new DLFSBrowser();
+		DLFSLocal demoDrive=createDemoDrive();
+		DLFSBrowser gui=new DLFSBrowser(demoDrive);
 		gui.run();
 	}
 	

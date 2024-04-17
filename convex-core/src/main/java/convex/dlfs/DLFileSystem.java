@@ -19,6 +19,7 @@ import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.Utils;
 import convex.dlfs.impl.DLDirectoryStream;
 import convex.dlfs.impl.DLFSFileAttributes;
 
@@ -85,6 +86,13 @@ public abstract class DLFileSystem extends FileSystem {
 			timestamp=CVMLong.create(newTimestamp);
 		}
 		return timestamp;
+	}
+	
+	/**
+	 * Updates the timestamp of the drive to the current system timestamp
+	 */
+	public synchronized CVMLong updateTimestamp() {
+		return updateTimestamp(Utils.getCurrentTimestamp());
 	}
 
 	@Override

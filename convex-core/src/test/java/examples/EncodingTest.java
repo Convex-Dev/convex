@@ -1,6 +1,7 @@
 package examples;
 
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 
@@ -14,7 +15,7 @@ public class EncodingTest {
 		}
 		
 		System.out.println(v.toString());
-		System.out.println("Complete encoded: "+v.isCompletelyEncoded());
+		System.out.println("Complete encoded: "+Cells.isCompletelyEncoded(v));
 		System.out.println("Embedded: "+v.isEmbedded());
 		System.out.println("Encoding Length: "+v.getEncodingLength());
 	}

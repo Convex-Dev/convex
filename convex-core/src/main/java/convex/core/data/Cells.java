@@ -80,6 +80,16 @@ public class Cells {
 	}
 	
 	/**
+	 * Checks if a Cell is completely encoded, i.e. has not external Refs
+	 * @param a Cell to check
+	 * @return True if completely encoded, false otherwise
+	 */
+	public static boolean isCompletelyEncoded(ACell a) {
+		if (a==null) return true;
+		return a.isCompletelyEncoded();
+	}
+	
+	/**
 	 * Checks if a Cell is a first class value
 	 * @param a Cell to check
 	 * @return True if CVM VAlue, false otherwise

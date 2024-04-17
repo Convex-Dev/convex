@@ -60,12 +60,12 @@ public class StoresTest {
 		// non-emebdded single Cell
 		AString nv=Samples.NON_EMBEDDED_STRING; 
 		assertFalse(nv.isEmbedded());
-		assertTrue(nv.isCompletelyEncoded());
+		assertTrue(Cells.isCompletelyEncoded(nv));
 		
 		// small fully embedded cell
 		CVMLong ev=CVMLong.ONE;
 		assertTrue(ev.isEmbedded());
-		assertTrue(ev.isCompletelyEncoded());
+		assertTrue(Cells.isCompletelyEncoded(ev));
 		
 		AVector<?> v=Vectors.of(Vectors.of(nv,ev),nv,ev);
 		

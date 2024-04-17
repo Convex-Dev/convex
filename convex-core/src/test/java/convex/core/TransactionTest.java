@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Cells;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -70,7 +71,7 @@ public class TransactionTest extends ACVMTest {
 		assertEquals(AMT+expectedFees,balanceDrop);
 		
 		// We expect a Transfer to be completely encoded
-		assertTrue(t1.isCompletelyEncoded());
+		assertTrue(Cells.isCompletelyEncoded(t1));
 		
 		doTransactionTests(t1);
 	}
@@ -203,8 +204,8 @@ public class TransactionTest extends ACVMTest {
 		assertCVMEquals(7,rc2.getResult());
 
 		
-		// We expect a short call to be completely encoded
-		assertTrue(t1.isCompletelyEncoded());
+		// We expect a short call transaction to be completely encoded
+		assertTrue(Cells.isCompletelyEncoded(t1));
 		
 		doTransactionTests(t1);
 		doTransactionTests(t2);
@@ -218,7 +219,7 @@ public class TransactionTest extends ACVMTest {
 		assertEquals(CVMLong.create(7),ctx.getResult());
 		
 		// We expect a short Invoke to be completely encoded
-		assertTrue(t1.isCompletelyEncoded());
+		assertTrue(Cells.isCompletelyEncoded(t1));
 		
 		doTransactionTests(t1);
 	}

@@ -493,7 +493,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			this.memorySize=memorySize;
 			assert (this.memorySize>0) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this);
 		} else {
-			assert (this.memorySize==memorySize) : "Attempting to attach memory size "+memorySize+" to object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize;
+			assert (this.memorySize==memorySize) : "Trying to change memory size to "+memorySize+" with object of class "+Utils.getClassName(this)+" which already has memorySize "+this.memorySize;
 		}
 	}
 	
@@ -512,10 +512,10 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * complete Cell can be represented in a single encoding.
 	 * @return true if completely encoded, false otherwise
 	 */
-	public boolean isCompletelyEncoded() {
+	boolean isCompletelyEncoded() {
 		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true; // fast path for fully embedded
 		if (!isCanonical()) {
-			throw new Error("Checking whether a non-canonical cell is encoded. Not a good idea, any ref assumptions may be invalid: "+this.getType());
+			throw new Error("Checking whether a non-canonical cell is encoded. Not a good idea: any Ref assumptions may be invalid for "+this.getType());
 		}
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {

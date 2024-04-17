@@ -33,7 +33,7 @@ public class EtchStore extends AStore {
 	 * Etch file instance for the current store
 	 */
 	private Etch etch;
-	
+
 	/**
 	 * Etch file instance for GC destination
 	 */
@@ -41,28 +41,32 @@ public class EtchStore extends AStore {
 
 	public EtchStore(Etch etch) {
 		this.etch = etch;
-		this.target=null;
+		this.target = null;
 		etch.setStore(this);
 	}
-	
+
 	/**
-	 * Starts a GC cycle. Creates a new Etch file for collection, and directs all new writes to
-	 * the new store
+	 * Starts a GC cycle. Creates a new Etch file for collection, and directs all
+	 * new writes to the new store
+	 * 
 	 * @throws IOException If an IO exception occurs
 	 */
 	public synchronized void startGC() throws IOException {
-		if (target!=null) throw new Error("Already collecting!");
-		File temp=new File(etch.getFile().getCanonicalPath()+"~");
-		target=Etch.create(temp);
-		
+		if (target != null)
+			throw new Error("Already collecting!");
+		File temp = new File(etch.getFile().getCanonicalPath() + "~");
+		target = Etch.create(temp);
+
 		// copy across current root hash
 		target.setRootHash(etch.getRootHash());
 	}
-	
+
 	private Etch getWriteEtch() {
-		if (target!=null) synchronized(this) {
-			if (target!=null) return target;
-		}
+		if (target != null)
+			synchronized (this) {
+				if (target != null)
+					return target;
+			}
 		return etch;
 	}
 
@@ -75,7 +79,7 @@ public class EtchStore extends AStore {
 	 * @throws IOException If an IO error occurs
 	 */
 	public static EtchStore create(File file) throws IOException {
-		file=Utils.ensurePath(file);
+		file = Utils.ensurePath(file);
 		Etch etch = Etch.create(file);
 		return new EtchStore(etch);
 	}
@@ -114,10 +118,12 @@ public class EtchStore extends AStore {
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
 			Ref<ACell> existing = (Ref<ACell>) refCache.getCell(hash);
-			if (existing!=null) return (Ref<T>) existing;
-			
-			if (hash==Hash.NULL_HASH) return (Ref<T>) Ref.NULL_VALUE;
-			existing= readStoreRef(hash);
+			if (existing != null)
+				return (Ref<T>) existing;
+
+			if (hash == Hash.NULL_HASH)
+				return (Ref<T>) Ref.NULL_VALUE;
+			existing = readStoreRef(hash);
 			return (Ref<T>) existing;
 		} catch (IOException e) {
 			throw Utils.sneakyThrow(e);
@@ -125,8 +131,9 @@ public class EtchStore extends AStore {
 	}
 
 	public <T extends ACell> Ref<T> readStoreRef(Hash hash) throws IOException {
-		Ref<T> ref=etch.read(hash);
-		if (ref!=null) refCache.putCell(ref);
+		Ref<T> ref = etch.read(hash);
+		if (ref != null)
+			refCache.putCell(ref);
 		return ref;
 	}
 
@@ -145,17 +152,18 @@ public class EtchStore extends AStore {
 			boolean topLevel) {
 		// TODO: remove this?, probably dangerous if in different store
 		// first check if the Ref is already persisted to required level
-		//if (ref.getStatus() >= requiredStatus) {
-		//	// we are done as long as not top level
-		//	if (!topLevel) return ref;
-		//}
+		// if (ref.getStatus() >= requiredStatus) {
+		// // we are done as long as not top level
+		// if (!topLevel) return ref;
+		// }
 
 		// Get the value. If we are persisting, should be there!
 		ACell cell = ref.getValue();
-		
+
 		// Quick handling for null
-		if (cell == null) return (Ref<T>) Ref.NULL_VALUE;
-		
+		if (cell == null)
+			return (Ref<T>) Ref.NULL_VALUE;
+
 		// check store for existing ref first.
 		boolean embedded = cell.isEmbedded();
 		Hash hash = null;
@@ -170,16 +178,16 @@ public class EtchStore extends AStore {
 				}
 			}
 		}
-		
-		if (requiredStatus<Ref.STORED) {
+
+		if (requiredStatus < Ref.STORED) {
 			if (topLevel || !embedded) {
 				addToCache(ref);
 			}
 			return ref;
 		}
-		
+
 		// beyond STORED level, need to recursively persist child refs if they exist
-		if ((requiredStatus > Ref.STORED)&&(cell.getRefCount()>0)) {
+		if ((requiredStatus > Ref.STORED) && (cell.getRefCount() > 0)) {
 			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
 				return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false);
@@ -191,21 +199,21 @@ public class EtchStore extends AStore {
 
 			// perhaps need to update Ref
 			if (cell != newObject) {
-				
+
 				ref = ref.withValue((T) newObject);
-				cell=newObject;
+				cell = newObject;
 				cell.attachRef(ref); // make sure we are using current ref within new cell
 			}
 		}
 
 		// Actually write top level an non-embedded cells only
 		if (topLevel || !embedded) {
-			
+
 			// Do actual write to store
 			final Hash fHash = (hash != null) ? hash : ref.getHash();
 			if (log.isTraceEnabled()) {
-				log.trace( "Etch persisting at status=" + requiredStatus + " hash = 0x"
-						+ fHash.toHexString() + " ref of class " + Utils.getClassName(cell) + " with store " + this);
+				log.trace("Etch persisting at status=" + requiredStatus + " hash = 0x" + fHash.toHexString()
+						+ " ref of class " + Utils.getClassName(cell) + " with store " + this);
 			}
 
 			Ref<ACell> result;
@@ -214,10 +222,10 @@ public class EtchStore extends AStore {
 				ref = ref.withMinimumStatus(requiredStatus);
 				cell.attachRef(ref); // make sure we are using current ref within cell
 				result = etch.write(fHash, (Ref<ACell>) ref);
-				
+
 				if (!embedded) {
 					// Ensure we have soft Refpointing to this store
-					result=result.toSoft(this);
+					result = result.toSoft(this);
 				}
 
 				cell.attachRef(result);
@@ -228,12 +236,13 @@ public class EtchStore extends AStore {
 
 			// call novelty handler if newly persisted non-embedded
 			if (noveltyHandler != null) {
-				if (!embedded) noveltyHandler.accept(result);
+				if (!embedded)
+					noveltyHandler.accept(result);
 			}
 			return (Ref<T>) result;
 		} else {
 			// no need to write, just tag updated status
-			ref= ref.withMinimumStatus(requiredStatus);
+			ref = ref.withMinimumStatus(requiredStatus);
 			cell.attachRef(ref);
 			return ref;
 		}
@@ -263,12 +272,14 @@ public class EtchStore extends AStore {
 
 	/**
 	 * Ensure the store is fully persisted to disk
+	 * 
 	 * @throws IOException If an IO error occurs
 	 */
-	public void flush() throws IOException  {
+	public void flush() throws IOException {
 		etch.flush();
-		Etch target=this.target;
-		if (target!=null) target.flush();
+		Etch target = this.target;
+		if (target != null)
+			target.flush();
 	}
 
 	public File getFile() {
@@ -283,9 +294,9 @@ public class EtchStore extends AStore {
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) throws IOException {
 		// Ensure data if persisted at sufficient level
-		Ref<T> ref=storeTopRef(data.getRef(), Ref.PERSISTED,null);
-		Hash h=ref.getHash();
-		Etch etch=getWriteEtch();
+		Ref<T> ref = storeTopRef(data.getRef(), Ref.PERSISTED, null);
+		Hash h = ref.getHash();
+		Etch etch = getWriteEtch();
 		etch.setRootHash(h);
 		etch.writeDataLength(); // ensure data length updated for root data addition
 		return ref;
@@ -293,6 +304,7 @@ public class EtchStore extends AStore {
 
 	/**
 	 * Gets the underlying Etch instance
+	 * 
 	 * @return Etch instance
 	 */
 	public Etch getEtch() {
