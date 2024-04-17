@@ -9,12 +9,14 @@ import org.slf4j.LoggerFactory;
 
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
+import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
 /**
- * Class implementing caching and storage of hashed node data
+ * Class implementing direct in-memory caching and storage of hashed node data
  * 
  * Persists refs as direct refs, i.e. retains fully in memory
  */
@@ -47,6 +49,27 @@ public class MemoryStore extends AStore {
 	@Override
 	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) {
 		return persistRef(ref,noveltyHandler,status,true); 
+	}
+	
+	@Override
+	@SuppressWarnings("unchecked")
+	public final <T extends ACell> T decode(Blob encoding) throws BadFormatException {
+		Hash hash=encoding.getContentHash();
+		Ref<?> cached= hashRefs.get(hash);
+		if (cached!=null) return (T) cached.getValue();
+		
+		// Need to ensure we are reading with the current store set
+		AStore tempStore=Stores.current();
+		ACell decoded;
+		if (tempStore==this) {
+			decoded = decodeImpl(encoding);
+		} else try {
+			Stores.setCurrent(this);
+			decoded = decodeImpl(encoding);
+		} finally {
+			Stores.setCurrent(tempStore);
+		}
+		return (T)decoded;
 	}
 	
 	@SuppressWarnings("unchecked")

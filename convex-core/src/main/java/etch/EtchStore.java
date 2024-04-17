@@ -11,7 +11,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
-import convex.core.store.AStore;
+import convex.core.store.ACachedStore;
 import convex.core.util.Utils;
 
 /**
@@ -26,7 +26,7 @@ import convex.core.util.Utils;
  *
  * Garbage collection is left as an exercise for the reader.
  */
-public class EtchStore extends AStore {
+public class EtchStore extends ACachedStore {
 	private static final Logger log = LoggerFactory.getLogger(EtchStore.class.getName());
 
 	/**
@@ -311,9 +311,4 @@ public class EtchStore extends AStore {
 		return etch;
 	}
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public <T extends ACell> Ref<T> checkCache(Hash h) {
-		return (Ref<T>) refCache.getCell(h);
-	}
 }
