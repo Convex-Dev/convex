@@ -1,9 +1,8 @@
 package convex.core.data;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Predicate;
@@ -295,7 +294,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	@Override
-	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
+	protected void accumulateEntrySet(Set<Entry<K, V>> h) {
 		for (int i = 0; i < children.length; i++) {
 			children[i].getValue().accumulateEntrySet(h);
 		}
@@ -303,7 +302,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	@Override
-	protected void accumulateKeySet(HashSet<K> h) {
+	protected void accumulateKeySet(Set<K> h) {
 		for (int i = 0; i < children.length; i++) {
 			children[i].getValue().accumulateKeySet(h);
 		}
@@ -311,7 +310,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	@Override
-	protected void accumulateValues(ArrayList<V> al) {
+	protected void accumulateValues(java.util.List<V> al) {
 		// add this entry first, since we want lexicographic order
 		if (entry != null) al.add(entry.getValue());
 		for (int i = 0; i < children.length; i++) {

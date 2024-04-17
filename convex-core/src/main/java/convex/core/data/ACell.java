@@ -118,13 +118,14 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * O(1) if canonical representation is already generated, may be O(n) otherwise.
 	 * 
-	 * @return A Blob representing this cell in encoded form
+	 * @return Canonical version of this cell in encoded form
 	 */
-	public final ACell getCanonical() {
-		if (isCanonical()) return this;
+	@SuppressWarnings("unchecked")
+	public final <T extends ACell> T getCanonical() {
+		if (isCanonical()) return (T) this;
 		Ref<ACell> ref=getRef().ensureCanonical();
 		if (cachedRef!=ref) cachedRef=ref;
-		ACell c= ref.getValue();
+		T c= (T) ref.getValue();
 		return c;
 	}
 	

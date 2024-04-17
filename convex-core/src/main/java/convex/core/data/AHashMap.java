@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.util.HashSet;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -174,11 +176,23 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	}
 	
 	@Override
+	public HashSet<Entry<K, V>> entrySet() {
+		int len = size();
+		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
+		accumulateEntrySet(h);
+		return h;
+	}
+	
+	@Override
 	public AHashMap<K,V> slice(long start) {
 		return slice(start,count);
 	}
 
 	@Override
 	public abstract AHashMap<K,V> slice(long start, long end);
+
+	// TODO: better conversion to Sets
+	// public abstract AHashSet<MapEntry<K,V>> buildEntrySet();
+	// public abstract AHashSet<K> buildKeySet();
 
 }

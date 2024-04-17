@@ -1,9 +1,7 @@
 package convex.core.data;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -378,29 +376,21 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void accumulateKeySet(HashSet<K> h) {
+	protected void accumulateKeySet(Set<K> h) {
 		for (Ref<AHashMap<K, V>> mr : children) {
 			mr.getValue().accumulateKeySet(h);
 		}
 	}
 
 	@Override
-	protected void accumulateValues(ArrayList<V> al) {
+	protected void accumulateValues(java.util.List<V> al) {
 		for (Ref<AHashMap<K, V>> mr : children) {
 			mr.getValue().accumulateValues(al);
 		}
 	}
 
 	@Override
-	public HashSet<Entry<K, V>> entrySet() {
-		int len = size();
-		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
-		accumulateEntrySet(h);
-		return h;
-	}
-
-	@Override
-	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
+	protected void accumulateEntrySet(Set<Entry<K, V>> h) {
 		for (Ref<AHashMap<K, V>> mr : children) {
 			mr.getValue().accumulateEntrySet(h);
 		}

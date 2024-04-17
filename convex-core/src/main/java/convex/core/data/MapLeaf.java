@@ -3,7 +3,6 @@ package convex.core.data;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -283,7 +282,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void accumulateKeySet(HashSet<K> h) {
+	protected void accumulateKeySet(Set<K> h) {
 		for (int i = 0; i < entries.length; i++) {
 			MapEntry<K, V> me = entries[i];
 			h.add(me.getKey());
@@ -291,7 +290,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void accumulateValues(ArrayList<V> al) {
+	protected void accumulateValues(java.util.List<V> al) {
 		for (int i = 0; i < entries.length; i++) {
 			MapEntry<K, V> me = entries[i];
 			al.add(me.getValue());
@@ -299,16 +298,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public Set<Entry<K, V>> entrySet() {
-		int len = size();
-		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
-		;
-		accumulateEntrySet(h);
-		return h;
-	}
-
-	@Override
-	protected void accumulateEntrySet(HashSet<Entry<K, V>> h) {
+	protected void accumulateEntrySet(Set<Entry<K, V>> h) {
 		for (int i = 0; i < entries.length; i++) {
 			MapEntry<K, V> me = entries[i];
 			h.add(me);

@@ -190,6 +190,16 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 		return a;
 	}
 	
+	@Override
+	public Object[] toArray() {
+		int n=size();
+		Object[] os=new Object[n];
+		for (int i=0; i<n; i++) {
+			os[i]=this.get(i);
+		}
+		return os;
+	}
+	
 	/**
 	 * Adds an element to this collection, according to the natural semantics of the collection
 	 * @param x Value to add, should be the element type of the data structure
