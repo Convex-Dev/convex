@@ -38,7 +38,7 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ASet<K> exclude(K a) {
+	public ASet<K> exclude(ACell a) {
 		return (ASet<K>) getCanonicalSet().exclude(a);
 	}
 

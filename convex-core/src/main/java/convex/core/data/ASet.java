@@ -49,7 +49,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param a Value to exclude
 	 * @return Updated set
 	 */
-	public abstract ASet<T> exclude(T a) ;
+	public abstract ASet<T> exclude(ACell a) ;
 	
 	/**
 	 * Updates the set to include all the given elements.

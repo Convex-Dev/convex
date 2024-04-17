@@ -204,7 +204,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	public AHashSet<T> excludeRef(Ref<T> keyRef) {
+	public AHashSet<T> excludeRef(Ref<?> keyRef) {
 		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return this; // not present

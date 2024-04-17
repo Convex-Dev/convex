@@ -142,7 +142,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	 * @param key
 	 * @return
 	 */
-	private int seekKeyRef(Ref<T> key) {
+	private int seekKeyRef(Ref<?> key) {
 		Hash h=key.getHash();
 		int len = size();
 		for (int i = 0; i < len; i++) {
@@ -160,7 +160,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	public SetLeaf<T> excludeRef(Ref<T> key) {
+	public SetLeaf<T> excludeRef(Ref<?> key) {
 		int i = seekKeyRef(key);
 		if (i < 0) return this; // not found
 		return excludeAt(i);

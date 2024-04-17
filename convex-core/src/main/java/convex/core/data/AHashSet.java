@@ -85,7 +85,7 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		return result;
 	}
 	
-	public abstract AHashSet<T> excludeRef(Ref<T> valueRef);
+	public abstract AHashSet<T> excludeRef(Ref<?> valueRef);
 	
 	public abstract AHashSet<T> includeRef(Ref<T> ref) ;
 
@@ -96,8 +96,8 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	}
 	
 	@Override
-	public ASet<T> exclude(T a) {
-		return excludeRef((Ref<T>) Ref.get(a));
+	public ASet<T> exclude(ACell a) {
+		return excludeRef(Ref.get(a));
 	}
 	
 	@SuppressWarnings("unchecked")
