@@ -42,20 +42,19 @@ public class MessageRemote extends Message {
 	 * @return True if reported successfully, false otherwise
 	 */
 	public boolean reportResult(Result res) {
-		ACell id=getID();
-		if (id!=null) res=res.withID(id);
-		
-		Connection pc = getConnection();
-		if ((pc == null) || pc.isClosed()) return false;
-
 		try {
+			ACell id=getID();
+			if (id!=null) res=res.withID(id);
+			
+			Connection pc = getConnection();
+			if ((pc == null) || pc.isClosed()) return false;
 			Message msg=Message.createResult(res);
 			return pc.sendMessage(msg);
 		} catch (IOException t) {
 			// Ignore, probably IO error
 			log.warn("Error reporting result: {}",t.getMessage());
 			return false;
-		}
+		} 
 	}
 
 	public boolean reportResult(CVMLong id, ACell reply) {

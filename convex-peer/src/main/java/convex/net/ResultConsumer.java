@@ -10,6 +10,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
@@ -59,21 +60,23 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			r.persistShallow();
 			Hash h=r.getHash();
 			log.trace("Recieved DATA for hash {}",h);
-		} catch (MissingDataException e) {
+		} catch (MissingDataException | BadFormatException e) {
 			// ignore?
 		}
 	}
 
 	private void handleMissingDataRequest(Message m) {
-		// try to be helpful by returning sent data
-		Hash h = RT.ensureHash(m.getPayload());
-		if (h==null) return; // not a valid payload so ignore
-		
-		Ref<?> r = Stores.current().refForHash(h);
-		if (r != null) try {
-			boolean sent=m.sendData(r.getValue());
-			if (!sent) {
-				log.warn("Unable to satisfy missing data request");
+		try {
+			// try to be helpful by returning sent data
+			Hash h = RT.ensureHash(m.getPayload());
+			if (h==null) return; // not a valid payload so ignore
+			
+			Ref<?> r = Stores.current().refForHash(h);
+			if (r != null) {
+				boolean sent=m.sendData(r.getValue());
+				if (!sent) {
+					log.warn("Unable to satisfy missing data request");
+				}
 			}
 		} catch (Exception e) {
 			log.warn("Error replying to MISSING DATA request",e);

@@ -459,27 +459,29 @@ public class Server implements Closeable {
 	 */
 	protected void handleMissingData(Message m)  {
 		// payload for a missing data request should be a valid Hash
-		Hash h = RT.ensureHash(m.getPayload());
-		if (h == null) {
-			log.trace("Bad missing data request, not a Hash, terminating client");
-			m.getConnection().close();
-			return;
-		};
-
-		Ref<?> r = store.refForHash(h);
-		if (r != null) {
-			try {
-				ACell data = r.getValue();
-				boolean sent = m.sendData(data);
-				// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
-				if (!sent) {
-					log.trace("Can't send missing data for hash {} due to full buffer",h);
-				}
-			} catch (Exception e) {
-				log.trace("Unable to deliver missing data for {} due to exception: {}", h, e);
+		try {
+			Hash h = RT.ensureHash(m.getPayload());
+			if (h == null) {
+				log.trace("Bad missing data request, not a Hash, terminating client");
+				m.getConnection().close();
+				return;
+			};
+	
+			Ref<?> r = store.refForHash(h);
+			if (r != null) {
+	
+					ACell data = r.getValue();
+					boolean sent = m.sendData(data);
+					// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
+					if (!sent) {
+						log.trace("Can't send missing data for hash {} due to full buffer",h);
+					}
+	
+			} else {
+				// log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
 			}
-		} else {
-			// log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
+		} catch (Exception e) {
+			log.trace("Unable to deliver missing data due to exception:", e);
 		}
 	}
 
@@ -621,9 +623,14 @@ public class Server implements Closeable {
 	}
 	
 
-
 	private void processData(Message m) {
-		ACell payload = m.getPayload();
+		ACell payload;
+		try {
+			payload = m.getPayload();
+		} catch (BadFormatException e) {
+			m.closeConnection();
+			return;
+		}
 		Counters.peerDataReceived++;
 		
 		// Note: partial messages are handled in Connection now
@@ -633,12 +640,6 @@ public class Server implements Closeable {
 			return;
 		}
 		r = r.persistShallow();
-
-		if (log.isTraceEnabled()) {
-			Hash payloadHash = r.getHash();
-			log.trace( "Processing DATA of type: " + Utils.getClassName(payload) + " with hash: "
-					+ payloadHash.toHexString());
-		}
 	}
 
 	/**

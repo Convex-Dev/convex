@@ -410,10 +410,14 @@ public class Connection {
 	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
-		if (msg.hasData()) {
-			return sendBuffer(msg.getType(),msg.getMessageData());
+		try {
+			if (msg.hasData()) {
+				return sendBuffer(msg.getType(),msg.getMessageData());
+			}
+			return sendObject(msg.getType(), msg.getPayload());
+		} catch (BadFormatException e) {
+			throw new Error("Unexpected bad format in payload",e);
 		}
-		return sendObject(msg.getType(), msg.getPayload());
 	}
 
 	/**

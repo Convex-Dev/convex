@@ -16,7 +16,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.MessageType;
 
@@ -93,17 +92,11 @@ public abstract class Message {
 	}
 
 	@SuppressWarnings("unchecked")
-	public <T extends ACell> T getPayload() {
+	public <T extends ACell> T getPayload() throws BadFormatException {
 		if (payload==null) {
 			if (messageData==null) throw new IllegalStateException("Null payload and data in Message?!? Type = "+type);
 			if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
-			try {
-				// TODO: should probably expose checked exception here?
-				payload=Format.decodeMultiCell(messageData);
-			} catch (BadFormatException e) {
-				log.warn("Bad format in Message payload",e);
-				throw Utils.sneakyThrow(e);
-			}
+			payload=Format.decodeMultiCell(messageData);
 		}
 		return (T) payload;
 	}
@@ -125,27 +118,46 @@ public abstract class Message {
 
 	@Override
 	public String toString() {
-		return "#message {:type " + getType() + " :payload " + RT.print(getPayload(),1000) + "}";
+		try {
+			return "#message {:type " + getType() + " :payload " + RT.print(getPayload(),1000) + "}";
+		} catch (BadFormatException e) {
+			log.trace("Bad format in message decoding",e);
+			return "Corrupted message type "+getType()+": "+RT.toString(messageData);
+		}
 	}
 
 	/**
 	 * Gets the message ID for correlation, assuming this message type supports IDs.
 	 *
-	 * @return Message ID, or null if the message type does not use message IDs
+	 * @return Message ID, or null if the message does not have a message ID
 	 */
-	public CVMLong getID() {
-		switch (type) {
-			// Query and transact use a vector [ID ...]
-			case QUERY:
-			case TRANSACT: return (CVMLong) ((AVector<?>)getPayload()).get(0);
-
-			// Result is a special record type
-			case RESULT: return (CVMLong)((Result)getPayload()).getID();
-
-			// Status ID is the single value
-			case STATUS: return (CVMLong)(getPayload());
-
-			default: return null;
+	public CVMLong getID()  {
+		try {
+			switch (type) {
+				// Query and transact use a vector [ID ...]
+				case QUERY:
+				case TRANSACT: return (CVMLong) ((AVector<?>)getPayload()).get(0);
+	
+				// Result is a special record type
+				case RESULT: return (CVMLong)((Result)getPayload()).getID();
+	
+				// Status ID is the single value
+				case STATUS: return (CVMLong)(getPayload());
+				
+				case DATA: {
+					ACell o=getPayload();
+					if (o instanceof AVector) {
+						AVector<?> v = (AVector<?>)o; 
+						if (v.count()==0) return null;
+						// first element might be ID, otherwise null
+						return RT.ensureLong(v.get(0));
+					}
+				}
+	
+				default: return null;
+			}
+		} catch (BadFormatException e) {
+			return null;
 		}
 	}
 

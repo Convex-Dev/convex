@@ -22,8 +22,12 @@ public enum MessageType {
 
 	/**
 	 * A message relaying data.
+	 * 
+	 * Payload is a vector:
+	 * - [id content]
 	 *
-	 * Data is presented "as-is", and may be: - the result of a missing data request
+	 * Data is presented "as-is", and may be: 
+	 * - the result of a missing data request
 	 * - data sent ahead of another message requiring composite data
 	 */
 	DATA(3),
@@ -44,10 +48,12 @@ public enum MessageType {
 	 * Excessive invalid missing data requests may be considered a DoS attack by
 	 * peers. Peers under load may need to ignore missing data requests.
 	 *
-	 * Payload is the missing data hash.
-	 *
+	 * Payload is either:
+	 * - The missing data hash. 
+	 * - A Vector containing ID plus one or more hashes i.e [id hash1 hash2 ......]
+	 * 
 	 * Receiver should respond with a DATA message if the specified data is
-	 * available in their store.
+	 * available in their store, and they are willing to fulfill the request
 	 */
 	MISSING_DATA(5),
 
@@ -63,7 +69,7 @@ public enum MessageType {
 	QUERY(6),
 
 	/**
-	 * A message requesting a transaction be performed by the receiving peer and
+	 * A message requesting a transaction be accepted by the receiving peer and
 	 * included in the next available block.
 	 *
 	 * Payload is: [id signed-data]
@@ -71,33 +77,39 @@ public enum MessageType {
 	TRANSACT(7),
 
 	/**
-	 * Message containing the result for a corresponding COMMAND, QUERY or TRANSACT
+	 * Message containing the Result for a corresponding COMMAND, QUERY or TRANSACT
 	 * message.
 	 *
-	 * Payload is: [id result error-flag]
+	 * Payload is: [id result error-code]
 	 *
 	 * Where:
 	 * - Result is the result of the request, or the message if an error occurred
-	 * - error-flag is nil if the transaction succeeded, or error code if it failed
+	 * - error-code is nil if the transaction succeeded, or error code if it failed
 	 */
 	RESULT(8),
 
 	/**
 	 * Communication of a latest Belief by a Peer.
 	 *
-	 * Payload is a Belief or a Signed Order
+	 * Payload is a Belief or a Signed Order, which is expected to be a Partial update
 	 */
 	BELIEF(9),
 	
 	/**
-	 * Request the latest broadcast Belief from a Peer.
+	 * Request the latest Belief from a Peer.
 	 *
-	 * Payload is ignored, nil recommended
+	 * Payload is:
+	 * - nil for the latest Belief or Order
+	 * - Long value for a specific Block in the Peer's Order.
 	 */
 	REQUEST_BELIEF(10),
 
 	/**
-	 * Communication of an intention to shutdown.
+	 * Communication of an intention to shutdown the connection. This is optional
+	 * 
+	 * Payload can be:
+	 * - nil for no reason
+	 * - A human readable string as a reason
 	 */
 	GOODBYE(11),
 

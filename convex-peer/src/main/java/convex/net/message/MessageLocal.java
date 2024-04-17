@@ -40,9 +40,8 @@ public class MessageLocal extends Message {
 
 	@Override
 	public boolean reportResult(Result res) {
-		ACell id=getID();
+		ACell id = getID();
 		if (id!=null) res=res.withID(id);
-		
 		resultHandler.accept(res);
 		return true;
 	}

@@ -377,7 +377,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		} catch (ClassCastException e) {
 			// Bad message from Peer
 			log.warn("Class cast exception in Belief!",e);
-			m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
+			// m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
 		}  catch (Exception e) {
 			log.warn("Unexpected exception getting Belief",e);
 		}
