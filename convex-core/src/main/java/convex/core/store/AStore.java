@@ -127,7 +127,7 @@ public abstract class AStore {
 	 */
 	public abstract  <T extends ACell> T decode(Blob encoding) throws BadFormatException;
 
-	public ACell decodeImpl(Blob encoding) throws BadFormatException {
+	protected ACell decodeImpl(Blob encoding) throws BadFormatException {
 		ACell decoded=Format.read(encoding);
 		return decoded;
 	}

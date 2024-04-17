@@ -16,7 +16,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
 /**
- * Class implementing direct in-memory caching and storage of hashed node data
+ * Class implementing direct in-memory caching and storage of hashed node data. 
+ * 
+ * Does not release storage unless closed or entire store is GC'd: mainly useful for testing
  * 
  * Persists refs as direct refs, i.e. retains fully in memory
  */
