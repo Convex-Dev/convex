@@ -12,36 +12,46 @@ import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
 import convex.test.generators.HashMapGen;
-import convex.test.generators.PrimitiveGen;
+import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestMap {
 
-	@SuppressWarnings({ "rawtypes" })
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void primitiveAssoc(@From(HashMapGen.class) AHashMap m, @From(PrimitiveGen.class) ACell prim) {
+	public void assocDissoc(@From(HashMapGen.class) AHashMap baseMap, @From(ValueGen.class) ACell prim) {
+		AHashMap m=baseMap;
+		AHashMap singletonMap=Maps.of(prim,prim);
 		long n = m.count();
 		long expectedN = (m.containsKey(prim)) ? n : n + 1;
 
 		// add the key
 		m = m.assoc(prim, prim);
+		AHashMap fullMap=m;
 		assertEquals(prim, m.get(prim));
 		assertEquals(expectedN, m.size());
+		
+		// merging without change
+		assertSame(m,m.merge(singletonMap));
 
 		// remove the key
 		m = m.dissoc(prim);
 		assertNull(m.get(prim));
 		assertEquals(expectedN - 1, m.size());
 
+		// recreate full map
+		assertEquals(fullMap,singletonMap.merge(m));
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Property
-	public void mapToIdentity(@From(HashMapGen.class) AHashMap m) {
-		AHashMap<ACell, ACell> m2 = m.mapEntries(e -> e);
-
-		// check that the map is unchanged
-		assertTrue(m2 == m);
+	public void mapPRoperties(@From(HashMapGen.class) AHashMap m) {
+		long n=m.count();
+		// check that the map is unchanged by an identity mapping
+		assertSame(m,m.mapEntries(e->e));
+		
+		//check that a map can be recreated from overlapping slices
+		assertEquals(m,m.slice(0,n/2).merge(m.slice(n/3,n)));
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })

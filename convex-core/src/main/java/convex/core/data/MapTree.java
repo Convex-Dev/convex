@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -30,6 +31,8 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Child maps, one for each present bit in the mask, max 16
 	 */
 	private final Ref<AHashMap<K, V>>[] children;
+	
+	private static final int FANOUT=16;
 
 	/**
 	 * Shift position of this treemap node in number of hex digits
@@ -76,7 +79,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 
 		// construct full child array
-		Ref<AHashMap<K, V>>[] children = new Ref[16];
+		Ref<AHashMap<K, V>>[] children = new Ref[FANOUT];
 		for (int i = 0; i < n; i++) {
 			MapEntry<K, V> e = newEntries[i];
 			int ix = e.getKeyHash().getHexDigit(shift);
@@ -99,7 +102,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @return
 	 */
 	private static <K extends ACell, V extends ACell> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] children, int shift, long count) {
-		if (children.length != 16) throw new IllegalArgumentException("16 children required!");
+		if (children.length != FANOUT) throw new IllegalArgumentException("16 children required!");
 		Ref<AHashMap<K, V>>[] newChildren = Utils.filterArray(children, a -> {
 			if (a == null) return false;
 			AMap<K, V> m = a.getValue();
@@ -301,7 +304,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public static int digitForIndex(int index, short mask) {
 		// scan mask for specified index
 		int found = 0;
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < FANOUT; i++) {
 			if ((mask & (1 << i)) != 0) {
 				if (found++ == index) return i;
 			}
@@ -433,7 +436,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**
 	 * Max length is tag, shift byte, 2 byte mask, max count plus embedded Refs
 	 */
-	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * 16;
+	public static int MAX_ENCODING_LENGTH = 4 + Format.MAX_EMBEDDED_LENGTH * FANOUT;
 
 	/**
 	 * Reads a ListMap from the provided Blob 
@@ -547,7 +550,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int fullMask = mask | b.mask;
 		// We are going to build full child list only if needed
 		Ref<AHashMap<K, V>>[] newChildren = null;
-		for (int digit = 0; digit < 16; digit++) {
+		for (int digit = 0; digit < FANOUT; digit++) {
 			int bitMask = 1 << digit;
 			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
 			AHashMap<K, V> ac = childForDigit(digit).getValue();
@@ -555,7 +558,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			AHashMap<K, V> rc = ac.mergeWith(bc, func, shift + 1);
 			if (ac != rc) {
 				if (newChildren == null) {
-					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[16];
+					newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[FANOUT];
 					for (int ii = 0; ii < digit; ii++) { // copy existing children up to this point
 						int chi = Bits.indexForDigit(ii, mask);
 						if (chi >= 0) newChildren[ii] = children[chi];
@@ -572,7 +575,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	private AHashMap<K, V> mergeWith(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		Ref<AHashMap<K, V>>[] newChildren = null;
 		int ix = 0;
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < FANOUT; i++) {
 			int imask = (1 << i); // mask for this digit
 			if ((mask & imask) == 0) continue;
 			Ref<AHashMap<K, V>> cref = children[ix++];
@@ -634,7 +637,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (this.equals(b)) return this; // no differences to merge
 		int fullMask = mask | b.mask;
 		Ref<AHashMap<K, V>>[] newChildren = null; // going to build new full child list if needed
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < FANOUT; i++) {
 			int bitMask = 1 << i;
 			if ((fullMask & bitMask) == 0) continue; // nothing to merge at this index
 			Ref<AHashMap<K, V>> aref = childForDigit(i);
@@ -662,7 +665,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	private AHashMap<K, V> mergeDifferences(MapLeaf<K, V> b, MergeFunction<V> func, int shift) {
 		Ref<AHashMap<K, V>>[] newChildren = null;
 		int ix = 0;
-		for (int i = 0; i < 16; i++) {
+		for (int i = 0; i < FANOUT; i++) {
 			int imask = (1 << i); // mask for this digit
 			if ((mask & imask) == 0) continue;
 			Ref<AHashMap<K, V>> cref = children[ix++];
@@ -848,7 +851,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		// fist check this mask contains all of target mask
 		if ((this.mask|map.mask)!=this.mask) return false;
 		
-		for (int i=0; i<16; i++) {
+		for (int i=0; i<FANOUT; i++) {
 			Ref<AHashMap<K,V>> child=this.childForDigit(i);
 			if (child==null) continue;
 			
@@ -874,7 +877,56 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> slice(long start, long end) {
-		throw new TODOException();
+		if ((start<0)||(end>count)||(end<start)) throw new IndexOutOfBoundsException();
+		if (start==end) return Maps.empty();
+		if ((start==0) && (end==count)) return this;
+		if (end-start<=MapLeaf.MAX_ENTRIES) {
+			return smallSlice(start,end);
+		}
+		
+		long pos=0L;
+		int cc=children.length;
+		short m=0;
+		int istart=0;
+		int iend=0;
+		Ref<AHashMap<K,V>>[] newChildren=children; 
+		for (int i=0; i<cc; i++ ) {
+			AHashMap<K,V> child=children[i].getValue();
+			long csize=child.size();
+			long cend=pos+csize;
+			if (cend<=start) {
+				// haven't reached range yet
+				istart++; iend++;
+				pos+=csize;
+				continue;
+			} else if (end<=cend) {
+				// we reached the end of the range at this child
+				if (i==istart) return child.slice(start-pos,end-pos); // slice within single child! important optimisation
+				if (end<=pos) break; //nothing to include from this child, we are done
+			} 
+			// defensive copy if needed
+			if (children==newChildren) newChildren=children.clone();
+			AHashMap<K,V> newChild=child.slice(Math.max(0, start-pos), Math.min(csize, end-pos));
+			newChildren[i]=newChild.getRef();
+			
+			// mark mash and and extent index range for new child
+			m|=(short)(1<<digitForIndex(i,mask));
+			iend++;
+			pos+=csize; // advance position
+		}
+		
+		newChildren= Arrays.copyOfRange(newChildren, istart, iend);
+		return new MapTree<K,V>(newChildren,shift,m,end-start);
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private AHashMap<K, V> smallSlice(long start, long end) {
+		int n=(int)(end-start);
+		MapEntry[] items=new MapEntry[n];
+		for (int i=0; i<n; i++) {
+			items[i]=entryAt(start+i);
+		}
+		return MapLeaf.unsafeCreate(items);
 	}
 
 

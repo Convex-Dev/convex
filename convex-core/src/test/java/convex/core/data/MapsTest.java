@@ -275,6 +275,26 @@ public class MapsTest {
 		assertNull(m.slice(12));
 		assertNull(m.slice(4,3));
 	}
+	
+	@Test 
+	public void testBigMapSlice() {
+
+		
+		AHashMap<CVMLong,CVMLong> bm=Samples.LONG_MAP_100;
+		AHashMap<CVMLong,CVMLong> bm1=bm.slice(0,18);
+		assertEquals(18,bm1.count());
+		doHashMapTest(bm1);
+		AHashMap<CVMLong,CVMLong> bm2=bm.slice(18,67);
+		assertEquals(67-18,bm2.count());
+		doHashMapTest(bm2);
+		AHashMap<CVMLong,CVMLong> bm3=bm.slice(67);
+		assertEquals(100-67,bm3.count());
+		doHashMapTest(bm3);
+		
+		AHashMap<CVMLong,CVMLong> merged=bm2.merge(bm3.merge(bm1));
+		assertEquals(bm,merged);
+		doHashMapTest(merged);
+	}
 
 	@Test
 	public void testEquals() {
