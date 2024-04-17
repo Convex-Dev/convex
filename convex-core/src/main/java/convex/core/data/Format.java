@@ -576,42 +576,40 @@ public class Format {
 	 */
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
-		switch (tag) {
-		// Fast paths for one-byte instances
-		case Tag.NULL: return null;
-		case Tag.TRUE: return (T) CVMBool.TRUE;
-		case Tag.FALSE: return (T) CVMBool.FALSE;
-		case Tag.INTEGER: return (T) CVMLong.ZERO; 
 
-		default:
-			try {
-				int high=(tag & 0xF0);
-				if (high == 0x10) return (T) readNumeric(tag,blob,offset);
-				
-				if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
-				
-				if (tag == Tag.ADDRESS) return (T) Address.read(blob,offset);
-				
-				if (high == 0xE0) return (T) readOp(tag,blob,offset);
-				
-				if (high == 0xC0) return (T) readCode(tag,blob,offset);
-	
-				if (high == 0x80) return readDataStructure(tag,blob,offset);
-				
-				if (high == 0x90) return (T) readSignedData(tag,blob, offset); 
-	
-				if (high == 0xD0) return (T) readTransaction(tag, blob, offset);
-	
-				if (high == 0xA0) return (T) readRecord(tag,blob,offset);
-			} catch (BadFormatException e) {
-				throw e;
-			} catch (IndexOutOfBoundsException e) {
-				throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
-			} catch (Exception e) {
-				throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
-			}
-			throw new BadFormatException(badTagMessage(tag));
+		// Fast paths for common one-byte instances. TODO: might switch have better performance if compiled correctly into a table?
+		if (tag==Tag.NULL) return null;
+		if (tag==Tag.TRUE) return (T) CVMBool.TRUE;
+		if (tag==Tag.FALSE) return (T) CVMBool.FALSE;
+		if (tag==Tag.INTEGER) return (T) CVMLong.ZERO; 
+
+		try {
+			int high=(tag & 0xF0);
+			if (high == 0x10) return (T) readNumeric(tag,blob,offset);
+			
+			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
+			
+			if (tag == Tag.ADDRESS) return (T) Address.read(blob,offset);
+			
+			if (high == 0xE0) return (T) readOp(tag,blob,offset);
+			
+			if (high == 0xC0) return (T) readCode(tag,blob,offset);
+
+			if (high == 0x80) return readDataStructure(tag,blob,offset);
+			
+			if (high == 0x90) return (T) readSignedData(tag,blob, offset); 
+
+			if (high == 0xD0) return (T) readTransaction(tag, blob, offset);
+
+			if (high == 0xA0) return (T) readRecord(tag,blob,offset);
+		} catch (BadFormatException e) {
+			throw e;
+		} catch (IndexOutOfBoundsException e) {
+			throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
+		} catch (Exception e) {
+			throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
 		}
+		throw new BadFormatException(badTagMessage(tag));
 	}
 
 	private static <T extends ACell> AOp<T> readOp(byte tag, Blob blob, int offset) throws BadFormatException {
