@@ -181,14 +181,14 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param b Set to compare with
 	 * @return True if other set is completely contained within this set, false otherwise
 	 */
-	public abstract boolean containsAll(ASet<T> b);
+	public abstract boolean containsAll(ASet<?> b);
 	
 	/**
 	 * Tests if this set is a (non-strict) subset of another Set
 	 * @param b Set to test against
 	 * @return True if this is a subset of the other set, false otherwise.
 	 */
-	public boolean isSubset(ASet<T> b) {
+	public boolean isSubset(ASet<? super T> b) {
 		return b.containsAll(this);
 	}
 	

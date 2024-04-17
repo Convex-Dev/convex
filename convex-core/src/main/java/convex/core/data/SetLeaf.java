@@ -484,24 +484,24 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	public boolean containsAll(ASet<T> b) {
+	public boolean containsAll(ASet<?> b) {
 		if (this==b) return true;
 		
 		// if set is too big, can't possibly contain all keys
 		if (b.count()>count) return false;
 		
 		// must be a setleaf if this size or smaller
-		return containsAll((SetLeaf<T>)b);
+		return containsAll((SetLeaf<?>)b);
 	}
 	
 	@Override
-	public boolean isSubset(ASet<T> b) {
+	public boolean isSubset(ASet<? super T> b) {
 		return b.containsAll(this);
 	}
 	
-	protected boolean containsAll(SetLeaf<T> b) {
+	protected boolean containsAll(SetLeaf<?> b) {
 		int ix=0;
-		for (Ref<T> meb:b.elements) {
+		for (Ref<?> meb:b.elements) {
 			Hash bh=meb.getHash();
 			
 			if (ix>=count) return false; // no remaining entries in this

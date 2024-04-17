@@ -2335,7 +2335,7 @@ public class Core {
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
 			// TODO: this might not be canonical? Should be careful...
-			ACountable<ACell> result = counted.slice(start,end);
+			ACountable<?> result = counted.slice(start,end);
 			// TODO: probably needs to cost a lot more?
 			return context.withResult(juice, result);
 		}

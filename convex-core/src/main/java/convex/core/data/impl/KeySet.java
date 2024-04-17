@@ -100,7 +100,7 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public boolean containsAll(ASet<K> b) {
+	public boolean containsAll(ASet<?> b) {
 		return getCanonicalSet().containsAll(b);
 	}
 

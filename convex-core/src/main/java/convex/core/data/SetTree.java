@@ -636,31 +636,31 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	public boolean containsAll(ASet<T> b) {
+	public boolean containsAll(ASet<?> b) {
 		if (b instanceof SetTree) {
-			return containsAll((SetTree<T>)b);
+			return containsAll((SetTree<?>)b);
 		}
 		// must be a SetLeaf
 		long n=b.count;
 		for (long i=0; i<n; i++) {
-			Ref<T> me=b.getElementRef(i);
+			Ref<?> me=b.getElementRef(i);
 			if (!this.containsHash(me.getHash())) return false;
 		}
 		return true;
 	}
 	
-	protected boolean containsAll(SetTree<T> map) {
+	protected boolean containsAll(SetTree<?> other) {
 		// fist check this mask contains all of target mask
-		if ((this.mask|map.mask)!=this.mask) return false;
+		if ((this.mask|other.mask)!=this.mask) return false;
 		
 		for (int i=0; i<16; i++) {
 			Ref<AHashSet<T>> child=this.childForDigit(i);
 			if (child==null) continue;
 			
-			Ref<AHashSet<T>> mchild=map.childForDigit(i);
+			Ref<?> mchild = other.childForDigit(i);
 			if (mchild==null) continue;
 			
-			if (!(child.getValue().containsAll(mchild.getValue()))) return false; 
+			if (!(child.getValue().containsAll((ASet<?>) mchild.getValue()))) return false; 
 		}
 		return true;
 	}
