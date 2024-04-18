@@ -67,7 +67,7 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 * @return The length of the longest common prefix in hex digits
 	 */
 	public long hexMatch(ABlobLike<?> b) {
-		long limit=Math.min(count(),b.count());
+		long limit=Math.min(hexLength(),b.hexLength());
 		return hexMatch(b,0,limit);
 	}
 	

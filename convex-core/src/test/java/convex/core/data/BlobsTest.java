@@ -14,6 +14,7 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.ASignature;
+import convex.core.data.impl.ZeroBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -476,6 +477,22 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testZeroBlobs() {
+		ZeroBlob z0=ZeroBlob.create(0);
+		ZeroBlob z1=ZeroBlob.create(10);
+		ZeroBlob z2=ZeroBlob.create(100);
+		ZeroBlob z3=ZeroBlob.create(10000);
+		ZeroBlob z4=ZeroBlob.create(100000);
+		
+		assertSame(Blob.EMPTY,z0.toFlatBlob());
+		
+		doBlobTests(z0);
+		doBlobTests(z1);
+		doBlobTests(z2);
+		doBlobTests(z3);
+		doBlobTests(z4);
+	}
+	@Test
 	public void testBlobParse() {
 		assertNull(Blobs.parse(null));
 		assertNull(Blobs.parse("iugiubouib"));
@@ -615,5 +632,9 @@ public class BlobsTest {
 		assertEquals(a,a.slice(0));
 		assertEquals(a,a.slice(0,n));
 		assertSame(a.empty(),a.slice(n));
+		
+		assertNull(a.slice(0,Long.MAX_VALUE));
+		assertNull(a.slice(-1,0));
+		assertNull(a.slice(0,Integer.MAX_VALUE+2)); // 0x0100000001
 	}
 }

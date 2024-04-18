@@ -28,4 +28,10 @@ public abstract class ACountedBlob extends ABlob {
 	public final long count() {
 		return count;
 	}
+	
+	@Override
+	public ACountedBlob empty() {
+		// Note this is the default but specific implementations may define other empty instances
+		return Blob.EMPTY;
+	}
 }

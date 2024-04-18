@@ -48,8 +48,9 @@ public abstract class AArrayBlob extends ACountedBlob {
 		if (end > this.count) return null;
 		long length=end-start;
 		if (length<0) return null;
-		if ((start==0)&&(end==this.count())) return toFlatBlob();
-		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
+		int size=(int)length;
+		if (length==count) return toFlatBlob();
+		return Blob.wrap(store, Utils.checkedInt(start + offset), size);
 	}
 
 	@Override

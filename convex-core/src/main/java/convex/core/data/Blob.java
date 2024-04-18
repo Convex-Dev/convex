@@ -113,10 +113,12 @@ public class Blob extends AArrayBlob {
 		if (start < 0) return null;
 		if (end > this.count) return null;
 		long length=end-start;
+		int size=(int)length;
+		if (size!=length) return null;
 		if (length < 0) return null;
 		if (length == 0) return EMPTY;
 		if (length==this.count) return this;
-		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
+		return Blob.wrap(store, Utils.checkedInt(start + offset), size);
 	}
 	
 	@Override

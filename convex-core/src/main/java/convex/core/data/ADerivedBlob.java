@@ -6,11 +6,9 @@ import java.security.MessageDigest;
 import convex.core.util.Utils;
 
 public abstract class ADerivedBlob extends ACountedBlob {
-	protected final long offset;
 	
-	protected ADerivedBlob(long offset,long count) {
+	protected ADerivedBlob(long count) {
 		super(count);
-		this.offset=offset;
 	}
 	
 	@Override
@@ -19,11 +17,29 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	}
 
 	@Override
-	public abstract ACountedBlob slice(long start, long end);
+	public final ACountedBlob slice(long start, long end) {
+		if (start < 0) return null;
+		if (end > this.count) return null;
+		long length=end-start;
+		if (length<0) return null;
+		if (length==0) return empty();
+		if (length==count) return this;
+		return sliceImpl(start,end);
+	}
 
+	/**
+	 * Constructs a slice of this Blob as the same type. Assumes a new slice must be constructed
+	 * and that bounds have already been checked. 
+	 * @param start Start of slice
+	 * @param end End of slice
+	 * @return New slice instance
+	 */
+	protected abstract ACountedBlob sliceImpl(long start, long end);
+	
 	@Override
 	public Blob toFlatBlob() {
-		int n=Utils.checkedInt(count());
+		if (count==0) return Blob.EMPTY;
+		int n=Utils.checkedInt(count);
 		byte[] bs=new byte[n];
 		getBytes(bs,0);
 		return Blob.wrap(bs);
@@ -98,10 +114,7 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	}
 
 	@Override
-	public int getBytes(byte[] dest, int destOffset) {
-		ABlob can=getCanonical();
-		return can.getBytes(dest, destOffset);
-	}
+	public abstract int getBytes(byte[] dest, int destOffset);
 
 	@Override
 	public long longValue() {
@@ -134,5 +147,6 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	public int getRefCount() {
 		throw new UnsupportedOperationException();
 	}
+
 
 }

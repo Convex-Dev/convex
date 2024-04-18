@@ -46,7 +46,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	}
 	
 	@Override
-	public Blob empty() {
+	public ABlob empty() {
 		return Blob.EMPTY;
 	}
 
