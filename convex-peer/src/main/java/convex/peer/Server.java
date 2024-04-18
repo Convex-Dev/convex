@@ -185,8 +185,8 @@ public class Server implements Closeable {
 		}
 		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
 		if (as==null) {
-			log.warn("Peer Controller Account does not exist: "+controlAddress);	
-		} else if (!as.getAccountKey().equals(getKeyPair().getAccountKey())) {
+			log.warn("Peer Controller Account does not currently exist (perhaps pending sync?): "+controlAddress);	
+		} else if (!Utils.equals(as.getAccountKey(),getKeyPair().getAccountKey())) {
 			// TODO: not a problem?
 			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
 		}

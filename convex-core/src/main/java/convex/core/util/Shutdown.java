@@ -25,7 +25,7 @@ public class Shutdown {
 				public void run() {
 					Shutdown.runHooks();
 				}
-			}));
+			},"Convex Shutdown"));
 		} catch(IllegalStateException e) {
 			// Ignore, already shutting down
 		}

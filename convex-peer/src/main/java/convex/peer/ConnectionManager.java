@@ -534,7 +534,10 @@ public class ConnectionManager extends AThreadedComponent {
 		long start=Utils.getCurrentTimestamp();
 		while ((!hm.isEmpty())&&(start+BROADCAST_TIMEOUT>Utils.getCurrentTimestamp())) {
 			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
+			
+			// Shuffle order for sending
 			Utils.shuffle(left);
+			
 			for (Map.Entry<AccountKey,Connection> me: left) {
 				Connection pc=me.getValue();
 				try {
@@ -545,10 +548,11 @@ public class ConnectionManager extends AThreadedComponent {
 						// log.warn("Delayed sending to peer because of full Buffer");
 					}
 				} catch (ClosedChannelException e) {
-					log.debug("Closed channel during broadcast");
+					log.trace("Closed channel during broadcast");
 					pc.close();
 				} catch (IOException e) {
-					log.warn("IO Error in broadcast: ", e);
+					// probably the connection was forcibly closed
+					log.debug("Closed channel during broadcast",e);
 					pc.close();
 				}
 			}
@@ -608,6 +612,7 @@ public class ConnectionManager extends AThreadedComponent {
 			}
 		} catch (IOException | TimeoutException e) {
 			// ignore any errors from the peer connections
+			return null;
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);
 		}
@@ -668,8 +673,10 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param key
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey key) {
-		String message= "Missing data "+e.getMissingHash()+" from "+m.getOriginString();
-		log.warn(message);
+		if (log.isDebugEnabled()) {
+			String message= "Missing data "+e.getMissingHash()+" from "+m.getOriginString();
+			log.debug(message);
+		}
 		
 		// TODO: possibly fire off request to specific Peer? Unclear if this improves things generally, but might avoid polling
 		
