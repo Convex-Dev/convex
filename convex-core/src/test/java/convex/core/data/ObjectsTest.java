@@ -189,17 +189,17 @@ public class ObjectsTest {
 		
 		assertEquals(a.getTag(),encoding.byteAt(0)); // Correct Tag
 		assertSame(encoding,a.getEncoding()); // should be same cached encoding
-		assertEquals(encoding.length,a.getEncodingLength());
+		assertEquals(encoding.count,a.getEncodingLength());
 			
 		if (a.isCVMValue()) {
 			assertNotNull(a.getType());
 		}
 
 		// Any encoding should be less than or equal to the limit
-		assertTrue(encoding.length <= Format.LIMIT_ENCODING_LENGTH);
+		assertTrue(encoding.count <= Format.LIMIT_ENCODING_LENGTH);
 		
 		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
-		if (encoding.length > Format.MAX_EMBEDDED_LENGTH) {
+		if (encoding.count > Format.MAX_EMBEDDED_LENGTH) {
 			assertFalse(Format.isEmbedded(a),()->"Should not be embedded: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
 		}
 

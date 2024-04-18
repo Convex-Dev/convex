@@ -70,7 +70,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param end End of the slice (exclusive)
 	 * @return A blob of the specified length, representing a slice of this blob, or null if the slice is invalid
 	 */
-	public abstract ABlob slice(long start, long end);
+	public abstract ACountedBlob slice(long start, long end);
 
 	/**
 	 * Gets a slice of this blob, as a new blob, starting from the given offset and
@@ -81,7 +81,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param start Start position to slice from
 	 * @return Slice of Blob
 	 */
-	public ABlob slice(long start) {
+	public ACountedBlob slice(long start) {
 		return slice(start, count());
 	}
 
@@ -136,7 +136,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param d Blob to append
 	 * @return A new Blob, containing the additional data appended to this blob.
 	 */
-	public abstract ABlob append(ABlob d);
+	public abstract ACountedBlob append(ABlob d);
 
 	/**
 	 * Determines if this Blob is equal to another Object.

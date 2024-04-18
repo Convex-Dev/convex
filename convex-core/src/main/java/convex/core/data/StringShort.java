@@ -37,7 +37,7 @@ public final class StringShort extends AString {
 	public static final StringShort EMPTY = new StringShort(Blob.EMPTY);
 
 	protected StringShort(Blob data) {
-		super(data.length);
+		super(data.count);
 		this.data = data;
 	}
 
@@ -101,7 +101,7 @@ public final class StringShort extends AString {
 	public void validateCell() throws InvalidDataException {
 		if (length > MAX_LENGTH)
 			throw new InvalidDataException("StringShort too long: " + length, this);
-		if (length != data.length)
+		if (length != data.count)
 			throw new InvalidDataException("Wrong String length!", this);
 	}
 

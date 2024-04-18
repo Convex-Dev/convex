@@ -31,8 +31,8 @@ public final class LongBlob extends ALongBlob {
 	}
 	
 	@Override
-	public ABlob slice(long start, long end) {
-		if ((start == 0) && (end == LENGTH)) return this;
+	public ACountedBlob slice(long start, long end) {
+		if ((start == 0) && (end == LENGTH)) return toFlatBlob();
 
 		if (start < 0) return null;
 		return getEncoding().slice(start + 2, end+2);

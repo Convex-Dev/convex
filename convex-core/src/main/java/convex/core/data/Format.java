@@ -816,7 +816,7 @@ public class Format {
 			Blob enc=data.slice(pos, pos+encLength);
 			ACell result=store.decode(enc);
 			// ACell result=Format.read(enc);
-			pos+=enc.length;
+			pos+=enc.count;
 			cells.add(result);
 		}
 		return cells.toArray(ACell[]::new);
@@ -985,11 +985,11 @@ public class Format {
 		
 		// Write top encoding, then ensure we add each unique child
 		topCellEncoding.getBytes(msg, 0);
-		int ix=topCellEncoding.length;
+		int ix=topCellEncoding.size();
 		for (Ref<?> r: refs) {
 			ACell c=r.getValue();
 			Blob enc=Format.encodedBlob(c);
-			int encLength=enc.length;
+			int encLength=enc.size();
 			
 			// Write count then Blob encoding
 			ix=Format.writeVLCCount(msg, ix, encLength);
@@ -1011,7 +1011,7 @@ public class Format {
 		int ml=0;
 		for (ACell a:cells) {
 			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data
-			int elen=enc.length;
+			int elen=enc.size();
 			if (ml>0) ml+=Format.getVLCCountLength(elen);
 			ml+=elen;
 		}
@@ -1020,7 +1020,7 @@ public class Format {
 		int ix=0;
 		for (ACell a:cells) {
 			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data;
-			int elen=enc.length;
+			int elen=enc.size();
 			if (ix>0) ix=Format.writeVLCCount(msg,ix,elen);
 			ix=enc.getBytes(msg, ix);
 		}

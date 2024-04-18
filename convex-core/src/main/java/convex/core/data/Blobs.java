@@ -108,7 +108,7 @@ public class Blobs {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ABlob> T read(Blob source, int pos) throws BadFormatException {
-		int sLen = source.length-pos;
+		int sLen = source.size()-pos;
 		if (sLen < 2) throw new BadFormatException("Trying to read Blob from insufficient source of size " + sLen);
 		// read length at position 1 (skipping tag)
 		long count = Format.readVLCCount(source.store, source.offset + pos+ 1); // skip pos and tag

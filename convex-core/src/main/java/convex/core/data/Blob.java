@@ -111,11 +111,11 @@ public class Blob extends AArrayBlob {
 	@Override
 	public Blob slice(long start, long end) {
 		if (start < 0) return null;
-		if (end > this.length) return null;
+		if (end > this.count) return null;
 		long length=end-start;
 		if (length < 0) return null;
 		if (length == 0) return EMPTY;
-		if (length==this.length) return this;
+		if (length==this.count) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), Utils.checkedInt(length));
 	}
 	
@@ -140,8 +140,8 @@ public class Blob extends AArrayBlob {
 
 	public boolean equals(Blob b) {
 		if (this==b) return true;
-		if (length!=b.length) return false;
-		return Utils.arrayEquals(store, offset, b.store, b.offset, length);
+		if (count!=b.count) return false;
+		return Utils.arrayEquals(store, offset, b.store, b.offset, size());
 	}
 
 	/**
@@ -149,18 +149,18 @@ public class Blob extends AArrayBlob {
 	 * 
 	 * Implemented by testing equality of byte data
 	 * 
-	 * @param other Blob to comapre with
+	 * @param other Blob to compare with
 	 * @return true if blobs are equal, false otherwise.
 	 */
 	public boolean equals(AArrayBlob other) {
 		if (other == this) return true;
-		if (this.length != other.length) return false;
+		if (this.count != other.count) return false;
 
 		// avoid false positives with other Blob types, especially Hash and Address
 		if (this.getType() != other.getType()) return false;
 
 		if ((contentHash != null) && (other.contentHash != null) && contentHash.equals(other.contentHash)) return true;
-		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, this.length);
+		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, size());
 	}
 
 	/**
@@ -226,7 +226,7 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		if (length > CHUNK_LENGTH) {
+		if (count > CHUNK_LENGTH) {
 			return getCanonical().encode(bs, pos);
 		} else {
 			// we have a Blob of canonical size
@@ -239,7 +239,7 @@ public class Blob extends AArrayBlob {
 	@Override
 	public int estimatedEncodingSize() {
 		// space for tag, generous VLC length, plus raw data
-		return 1 + Format.MAX_VLC_LONG_LENGTH + length;
+		return 1 + Format.MAX_VLC_LONG_LENGTH + size();
 	}
 	
 	/**
@@ -249,7 +249,7 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public boolean isCanonical() {
-		return length <= Blob.CHUNK_LENGTH;
+		return count <= Blob.CHUNK_LENGTH;
 	}
 
 	/**
@@ -267,9 +267,9 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public Blob getChunk(long i) {
-		if ((i == 0) && (length <= CHUNK_LENGTH)) return this;
+		if ((i == 0) && (count <= CHUNK_LENGTH)) return this;
 		long start = i * CHUNK_LENGTH;
-		long take=Math.min(CHUNK_LENGTH, length - start);
+		long take=Math.min(CHUNK_LENGTH, count - start);
 		return slice(start, start+take);
 	}
 

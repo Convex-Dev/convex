@@ -231,7 +231,7 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
-	protected void updateDigest(MessageDigest digest) {
+	public void updateDigest(MessageDigest digest) {
 		toFlatBlob().updateDigest(digest);
 	}
 	

@@ -22,27 +22,22 @@ import convex.core.util.Utils;
  * One smart reference is maintained for each child node at each level
  * 
  */
-public class BlobTree extends ABlob {
+public class BlobTree extends ACountedBlob {
 
 	public static final int BIT_SHIFT_PER_LEVEL = 4;
 	public static final int FANOUT = 1 << BIT_SHIFT_PER_LEVEL;
 
-	private final Ref<ABlob>[] children;
+	private final Ref<ACountedBlob>[] children;
 	
 	/**
 	 * Shift level for the BlobTree. 0 for minimum size BlobTree, increase by 4 for each level
 	 */
 	private final int shift;
-	
-	/**
-	 * Total number of bytes in this BlobTree
-	 */
-	private final long count;
 
-	private BlobTree(Ref<ABlob>[] children, int shift, long count) {
+	private BlobTree(Ref<ACountedBlob>[] children, int shift, long count) {
+		super(count);
 		this.children = children;
 		this.shift = shift;
-		this.count = count;
 	}
 
 	/**
@@ -79,7 +74,7 @@ public class BlobTree extends ABlob {
 	public static BlobTree createWithChildren(ABlob[] children) {
 		int n=children.length;
 		long count=0;
-		Ref<ABlob>[] cs = new Ref[n];
+		Ref<ACountedBlob>[] cs = new Ref[n];
 		for (int i=0; i<n; i++) {
 			ABlob child=children[i];
 			cs[i]=child.getRef();
@@ -129,7 +124,7 @@ public class BlobTree extends ABlob {
 		long length = 0;
 		if (chunkCount < 2) throw new IllegalArgumentException("Cannot create BlobTree without at least 2 Blobs");
 		@SuppressWarnings("unchecked")
-		Ref<ABlob>[] children = new Ref[chunkCount];
+		Ref<ACountedBlob>[] children = new Ref[chunkCount];
 		for (int i = 0; i < chunkCount; i++) {
 			Blob blob = blobs[offset + i];
 			long childLength = blob.count();
@@ -139,7 +134,7 @@ public class BlobTree extends ABlob {
 			if ((i < chunkCount - 1) && (childLength != Blob.CHUNK_LENGTH))
 				throw new IllegalArgumentException("Illegal internediate chunk size: " + childLength);
 
-			Ref<ABlob> child = blob.getRef();
+			Ref<ACountedBlob> child = blob.getRef();
 			children[i] = child;
 			length += childLength;
 		}
@@ -154,13 +149,13 @@ public class BlobTree extends ABlob {
 			int childChunks = 1 << shift; // number of chunks in children
 			int numChildren = ((chunkCount - 1) >> shift) + 1;
 			@SuppressWarnings("unchecked")
-			Ref<ABlob>[] children = new Ref[numChildren];
+			Ref<ACountedBlob>[] children = new Ref[numChildren];
 
 			long length = 0;
 			for (int i = 0; i < numChildren; i++) {
 				int childOffset = i * childChunks;
 				int chunks= Math.min(childChunks, chunkCount - childOffset);
-				ABlob child;
+				ACountedBlob child;
 				if (chunks==1) {
 					child=blobs[offset+childOffset];
 				} else {
@@ -198,12 +193,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public long count() {
-		return count;
-	}
-
-	@Override
-	public ABlob slice(long start, long end) {
+	public ACountedBlob slice(long start, long end) {
 		if (start < 0L) return null;
 		if (end >count) return null;
 		long length=end-start;;
@@ -233,11 +223,11 @@ public class BlobTree extends ABlob {
 		return bb.toBlob();
 	}
 
-	private ABlob getChild(int childIndex) {
+	private ACountedBlob getChild(int childIndex) {
 		return children[childIndex].getValue();
 	}
 	
-	private ABlob lastChild() {
+	private ACountedBlob lastChild() {
 		return children[children.length-1].getValue();
 	}
 
@@ -352,11 +342,11 @@ public class BlobTree extends ABlob {
 		int numChildren = Utils.checkedInt(((chunks - 1) >> shift) + 1);
 
 		@SuppressWarnings("unchecked")
-		Ref<ABlob>[] children = (Ref<ABlob>[]) new Ref<?>[numChildren];
+		Ref<ACountedBlob>[] children = (Ref<ACountedBlob>[]) new Ref<?>[numChildren];
 		
 		int rpos=pos+headerLength; // ref position
 		for (int i = 0; i < numChildren; i++) {
-			Ref<ABlob> ref = Format.readRef(src,rpos);
+			Ref<ACountedBlob> ref = Format.readRef(src,rpos);
 			children[i] = ref;
 			rpos+=ref.getEncodingLength();
 		}
@@ -378,7 +368,7 @@ public class BlobTree extends ABlob {
 	 * We are careful to slice from (0...n) on the appended array, to minimise reconstruction of BlobTrees
 	 */
 	@Override
-	public ABlob append(ABlob d) {
+	public ACountedBlob append(ABlob d) {
 		BlobTree acc=this;
 		long off=0; // offset into d
 		long dlen=d.count();
@@ -387,7 +377,7 @@ public class BlobTree extends ABlob {
 		while (off<dlen) {
 		
 			long csize=acc.childLength();
-			ABlob lastChild=acc.lastChild();
+			ACountedBlob lastChild=acc.lastChild();
 			long clen=lastChild.count();
 			if (clen!=csize) {
 				// Need to fill last child
@@ -404,7 +394,7 @@ public class BlobTree extends ABlob {
 				// Need to add more children
 				for (int i=acc.childCount(); i<FANOUT; i++) {
 					long take=Math.min(csize, dlen-off);
-					ABlob newChild=d.slice(off,off+take);
+					ACountedBlob newChild=d.slice(off,off+take);
 					acc=acc.appendChild(newChild);
 					off+=take;
 					if (off>=dlen) return acc; // Finished!
@@ -433,14 +423,7 @@ public class BlobTree extends ABlob {
 		return count==childLength()*FANOUT;
 	}
 	
-	/**
-	 * Returns true if this is a fully packed set of chunks
-	 * @return True if fully packed, false otherwise
-	 */
-	@Override
-	public boolean isChunkPacked() {
-		return (count&(Blob.CHUNK_LENGTH-1))==0;
-	}
+
 
 	@Override
 	public Blob getChunk(long chunkIndex) {
@@ -551,11 +534,11 @@ public class BlobTree extends ABlob {
 
 	@Override
 	public BlobTree updateRefs(IRefFunction func) {
-		Ref<ABlob>[] newChildren = Ref.updateRefs(children, func);
+		Ref<ACountedBlob>[] newChildren = Ref.updateRefs(children, func);
 		return withChildren(newChildren);
 	}
 
-	private BlobTree withChildren(Ref<ABlob>[] newChildren) {
+	private BlobTree withChildren(Ref<ACountedBlob>[] newChildren) {
 		if (children == newChildren) return this;
 		return new BlobTree(newChildren, shift, count);
 	}
@@ -563,7 +546,7 @@ public class BlobTree extends ABlob {
 	private BlobTree withChild(int i,ABlob newChild) {
 		ABlob oldChild=children[i].getValue();
 		if (oldChild == newChild) return this;
-		Ref<ABlob>[] newChildren=children.clone();
+		Ref<ACountedBlob>[] newChildren=children.clone();
 		newChildren[i]=newChild.getRef();
 		long newCount=count;
 		if (i==(children.length-1)) {
@@ -578,10 +561,10 @@ public class BlobTree extends ABlob {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	private BlobTree appendChild(ABlob newChild) {
+	private BlobTree appendChild(ACountedBlob newChild) {
 		int ch=children.length;
 		if (ch>=FANOUT) throw new Error("Trying to add a child beyond allowable fanout!");
-		Ref<ABlob>[] newChildren=new Ref[ch+1];
+		Ref<ACountedBlob>[] newChildren=new Ref[ch+1];
 		System.arraycopy(children, 0, newChildren, 0, ch);
 		newChildren[ch]=newChild.getRef();
 		long newCount=ch*childLength()+newChild.count();

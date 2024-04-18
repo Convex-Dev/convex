@@ -69,7 +69,7 @@ public class KeywordTest {
 
 		assertEquals("foo", k.getName().toString());
 		assertEquals(":foo", k.toString());
-		assertEquals(5, k.getEncoding().length); // tag+length+3 name
+		assertEquals(5, k.getEncoding().count); // tag+length+3 name
 		
 		assertNull(RT.print(k, 3));
 		assertEquals(k.print(),RT.print(k, 4));

@@ -204,7 +204,7 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length != LENGTH) throw new InvalidDataException("Hash length must be 32 bytes = 256 bits", this);
+		if (count != LENGTH) throw new InvalidDataException("Hash length must be 32 bytes = 256 bits", this);
 	}
 
 	@Override

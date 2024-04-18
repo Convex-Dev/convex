@@ -251,7 +251,7 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length != LENGTH)
+		if (count != LENGTH)
 			throw new InvalidDataException("Address length must be " + LENGTH + "  bytes = " + LENGTH_BITS + " bits",
 					this);
 	}

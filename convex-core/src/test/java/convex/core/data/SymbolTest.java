@@ -83,7 +83,7 @@ public class SymbolTest {
 
 		assertEquals("count", cs.getName().toString());
 		assertEquals("count", cs.toString());
-		assertEquals(7, cs.getEncoding().length); // tag(1) + length(1) + name(5)
+		assertEquals(7, cs.getEncoding().count); // tag(1) + length(1) + name(5)
 		doSymbolTest(cs);
 	}
 	

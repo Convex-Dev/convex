@@ -13,14 +13,13 @@ import convex.core.util.Utils;
  * Abstract base class for binary data stored in Java arrays.
  *
  */
-public abstract class AArrayBlob extends ABlob {
+public abstract class AArrayBlob extends ACountedBlob {
 	protected final byte[] store;
 	protected final int offset;
-	protected final int length;
 
 	protected AArrayBlob(byte[] bytes, int offset, int length) {
+		super((long)length);
 		this.store = bytes;
-		this.length = length;
 		this.offset = offset;
 	}
 
@@ -40,13 +39,13 @@ public abstract class AArrayBlob extends ABlob {
 	
 	@Override
 	public void updateDigest(MessageDigest digest) {
-		digest.update(store, offset, length);
+		digest.update(store, offset, (int)count);
 	}
 
 	@Override
 	public Blob slice(long start, long end) {
 		if (start < 0) return null;
-		if (end > this.length) return null;
+		if (end > this.count) return null;
 		long length=end-start;
 		if (length<0) return null;
 		if ((start==0)&&(end==this.count())) return toFlatBlob();
@@ -54,11 +53,11 @@ public abstract class AArrayBlob extends ABlob {
 	}
 
 	@Override
-	public ABlob append(ABlob d) {
+	public ACountedBlob append(ABlob d) {
 		long dlength = d.count();
-		if (dlength == 0) return (ABlob) this.getCanonical();
-		long length = this.length;
-		if (length == 0) return (ABlob) d.getCanonical();
+		if (dlength == 0) return (ACountedBlob) this.getCanonical();
+		long length = this.count;
+		if (length == 0) return (ACountedBlob) d.getCanonical();
 		
 		if (length>Blob.CHUNK_LENGTH) {
 			// Need to normalise to a BlobTree first
@@ -83,18 +82,18 @@ public abstract class AArrayBlob extends ABlob {
 		return bb.toBlob();
 	}
 		
-	protected ABlob appendSmall(ABlob d) {
+	protected ACountedBlob appendSmall(ABlob d) {
 		int n=Utils.checkedInt(count() + d.count());
 		if (n>Blob.CHUNK_LENGTH) throw new Error("Illegal Blob appendSmall size: "+n);
 		byte[] newData = new byte[n];
 		getBytes(newData, 0);
-		d.getBytes(newData, length);
+		d.getBytes(newData, (int) count);
 		return Blob.wrap(newData);
 	}
 
 	@Override
 	public Blob toFlatBlob() {
-		return Blob.wrap(store, offset, length);
+		return Blob.wrap(store, offset, (int) count);
 	}
 
 	@Override
@@ -108,8 +107,8 @@ public abstract class AArrayBlob extends ABlob {
 
 	public final int compareTo(AArrayBlob b) {
 		if (this == b) return 0;
-		int alength = this.length;
-		int blength = b.length;
+		int alength = (int) this.count;
+		int blength = (int) b.count;
 		
 		// Check common bytes first
 		int compareLength = Math.min(alength, blength);
@@ -123,8 +122,8 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public final int getBytes(byte[] dest, int pos) {
-		System.arraycopy(store, offset, dest, pos, length);
-		return pos + length;
+		System.arraycopy(store, offset, dest, pos, (int) count);
+		return (int) (pos + count);
 	}
 
 	/**
@@ -132,40 +131,35 @@ public abstract class AArrayBlob extends ABlob {
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.writeVLCCount(bs, pos, length);
+		pos=Format.writeVLCCount(bs, pos, count);
 		return getBytes(bs,pos);
 	}
 
 	@Override
 	public final boolean appendHex(BlobBuilder bb, long hexLength) {
 		if (hexLength<0) return false;
-		long nbytes= Math.min(hexLength/2, this.length); // Bytes to print
+		long nbytes= Math.min(hexLength/2, this.count); // Bytes to print
 		for (long i=0; i<nbytes; i++) {
 			byte b=byteAt(i);
 			bb.appendHexByte(b);
 		}
-		return nbytes==this.length;
+		return nbytes==this.count;
 	}
 
 	@Override
-	public final long count() {
-		return length;
-	}
-	
-	@Override
 	public boolean isChunkPacked() {
-		return (length==0)||(length==Blob.CHUNK_LENGTH);
+		return (count==0)||(count==Blob.CHUNK_LENGTH);
 	}
 
 	@Override
 	public boolean isFullyPacked() {
-		return (length==Blob.CHUNK_LENGTH);
+		return (count==Blob.CHUNK_LENGTH);
 	}
 
 	@Override
 	public final byte byteAt(long i) {
 		int ix = (int) i;
-		if ((ix != i) || (ix < 0) || (ix >= length)) {
+		if ((ix != i) || (ix < 0) || (ix >= count)) {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
 		return store[offset + ix];
@@ -174,7 +168,7 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public final short shortAt(long i) {
 		int ix=(int)i;
-		if ((ix != i) || (ix < 0) || (ix+1 >= length)) {
+		if ((ix != i) || (ix < 0) || (ix+1 >= count)) {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
 		ix+=offset;
@@ -184,7 +178,7 @@ public abstract class AArrayBlob extends ABlob {
 
 	public long longAt(long i) {
 		int ix=(int)i;
-		if ((ix != i) || (ix < 0) || (ix+7 >= length)) {
+		if ((ix != i) || (ix < 0) || (ix+7 >= count)) {
 			throw new IndexOutOfBoundsException("Index: " + i);
 		}
 		
@@ -231,7 +225,7 @@ public abstract class AArrayBlob extends ABlob {
 		// We need to force the ByteBuffer offset in the array to be zero
 		// Otherwise position won't be 0 at start....
 		if (offset == 0) {
-			return ByteBuffer.wrap(store, offset, length);
+			return ByteBuffer.wrap(store, offset, (int) count);
 		} else {
 			return ByteBuffer.wrap(this.getBytes());
 		}
@@ -242,13 +236,13 @@ public abstract class AArrayBlob extends ABlob {
 		if (o==this) return true;
 		if (o==null) return false;
 		if (!o.isRegularBlob()) return false; // exclude irregular Blob types
-		if (o.count()!=length) return false;
+		if (o.count()!=count) return false;
 		return o.equalsBytes(this.store, this.offset);
 	}
 	
 	@Override
 	public boolean equalsBytes(byte[] bytes, long byteOffset) {
-		return Utils.arrayEquals(store, offset, bytes, Utils.checkedInt(byteOffset), length);
+		return Utils.arrayEquals(store, offset, bytes, Utils.checkedInt(byteOffset), (int) count);
 	}
 	
 	public boolean equalsBytes(ABlob k) {
@@ -328,21 +322,21 @@ public abstract class AArrayBlob extends ABlob {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (length < 0) throw new InvalidDataException("Negative length: " + length, this);
+		if (count < 0) throw new InvalidDataException("Negative length: " + count, this);
 		if (offset < 0) throw new InvalidDataException("Negative data offset: " + offset, this);
-		if ((offset + length) > store.length) {
+		if ((offset + count) > store.length) {
 			throw new InvalidDataException(
-					"End out of range: " + (offset + length) + " with array size=" + store.length, this);
+					"End out of range: " + (offset + count) + " with array size=" + store.length, this);
 		}
 	}
 
 	@Override
 	public long longValue() {
-		if (length==0) return 0;
-		if (length >= 8) {
-			return Utils.readLong(store, offset + length - 8,8);
+		if (count==0) return 0;
+		if (count >= 8) {
+			return Utils.readLong(store, (int) (offset + count - 8),8);
 		} else {
-			return Utils.readLong(store,offset,length);
+			return Utils.readLong(store,offset,(int) count);
 		}
 	}
 	
@@ -360,7 +354,7 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public int read(long offset, long count, ByteBuffer dest) {
 		if (count<0) throw new IllegalArgumentException("Negative count");
-		if ((offset<0)||(offset+count>length)) throw new IndexOutOfBoundsException();
+		if ((offset<0)||(offset+count>this.count)) throw new IllegalArgumentException();
 		int n=(int)count;
 		dest.put(store, (int) (this.offset+offset), n);
 		return n;

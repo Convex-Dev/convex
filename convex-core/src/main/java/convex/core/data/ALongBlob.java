@@ -52,7 +52,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public abstract ABlob slice(long start, long end);
+	public abstract ACountedBlob slice(long start, long end);
 
 	@Override
 	public abstract Blob toFlatBlob();
@@ -73,7 +73,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public final ABlob append(ABlob d) {
+	public final ACountedBlob append(ABlob d) {
 		return toFlatBlob().append(d);
 	}
 
