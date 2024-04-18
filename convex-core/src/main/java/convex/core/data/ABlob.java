@@ -180,7 +180,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param offset Offset into byte array from which to start comparison
 	 * @return true if exactly equal, false otherwise
 	 */
-	public abstract boolean equalsBytes(byte[] bytes, int offset);
+	public abstract boolean equalsBytes(byte[] bytes, long offset);
 	
 	/**
 	 * Compares this Blob to another Blob, in lexicographic order sorting by first
@@ -327,8 +327,17 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 */
 	public ABlob replaceSlice(long position, ABlob b) {
 		long end=Math.min(position+b.count(),count());
-		ABlob rest=slice(end,count());
-		return slice(0,position).append(b).append(rest);
+		ABlob head=slice(0,position);
+		if (head==null)throw new IllegalArgumentException("Invalid "+position+ " in blob of size "+count());
+		ABlob tail=slice(end,count());
+		ABlob firstPart= head.append(b);
+		ABlob result= firstPart.append(tail);
+		
+		if (result.count()<0) {
+			head.append(b);
+			throw new Error("This is bad!!");
+		}
+		return result;
 	}
 
 

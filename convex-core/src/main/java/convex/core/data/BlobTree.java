@@ -208,6 +208,7 @@ public class BlobTree extends ABlob {
 		if (end >count) return null;
 		long length=end-start;;
 		if (length<0) return null;
+		if (start==end) return Blob.EMPTY;
 		
 		if ((start == 0L) && (length == this.count)) return this;
 
@@ -258,7 +259,7 @@ public class BlobTree extends ABlob {
 	
 	@Override
 	public byte byteAtUnchecked(long i) {
-		int childLength = childLength();
+		long childLength = childLength();
 		int ci = (int) (i >> (shift + Blobs.CHUNK_SHIFT));
 		return getChild(ci).byteAtUnchecked(i - ci * childLength);
 	}
@@ -267,8 +268,8 @@ public class BlobTree extends ABlob {
 	 * Gets the length in bytes of each full child of this BlobTree
 	 * @return
 	 */
-	private int childLength() {
-		return 1 << (shift + Blobs.CHUNK_SHIFT);
+	private long childLength() {
+		return 1L << (shift + Blobs.CHUNK_SHIFT);
 	}
 
 	@Override
@@ -288,8 +289,8 @@ public class BlobTree extends ABlob {
 	}
 	
 	@Override
-	public boolean equalsBytes(byte[] bytes, int byteOffset) {
-		int clen=childLength();
+	public boolean equalsBytes(byte[] bytes, long byteOffset) {
+		long clen=childLength();
 		for (int i=0; i<children.length; i++) {
 			if (!(getChild(i).equalsBytes(bytes, byteOffset+i*clen))) return false;
 		}
@@ -453,7 +454,7 @@ public class BlobTree extends ABlob {
 		super.validate();
 		int n = children.length;
 		if ((n < 2) | (n > FANOUT)) throw new InvalidDataException("Illegal number of BlobTree children: " + n, this);
-		int clen = childLength();
+		long clen = childLength();
 		long total = 0;
 		
 		// We need to validate and check the lengths of all child notes. Note that only the last child can

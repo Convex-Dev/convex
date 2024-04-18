@@ -65,12 +65,12 @@ public class PreviewPanel extends JPanel {
 							sb.append("DLFS Directory accessible\n");
 						}
 						sb.append("Entries:     "+DLFSNode.getDirectoryEntries(node).count()+"\n");
-						sb.append("Node Hash:   "+node.getHash()+"\n");
 					} else {
 						ABlob data=DLFSNode.getData(node);
 						sb.append("File Size:   "+data.count()+"\n");
 						sb.append("Data Hash:   "+data.getHash()+"\n");
 					}
+					sb.append("Node Hash:   "+node.getHash()+"\n");
 				} else {
 					sb.append("Not a DLFS file: "+Utils.getClassName(path));
 				}

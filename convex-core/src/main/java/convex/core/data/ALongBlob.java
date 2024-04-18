@@ -135,6 +135,11 @@ public abstract class ALongBlob extends ABlob {
 		if (b.count()!=LENGTH) return false;
 		return value==b.longValue();
 	}
+	
+	@Override
+	public boolean equalsBytes(byte[] bytes, long byteOffset) {
+		return value==Utils.readLong(bytes, Utils.checkedInt(byteOffset),8);
+	}
 
 	@Override
 	public abstract byte getTag();

@@ -235,10 +235,7 @@ public final class Address extends ALongBlob {
 		toFlatBlob().updateDigest(digest);
 	}
 	
-	@Override
-	public boolean equalsBytes(byte[] bytes, int byteOffset) {
-		return value==Utils.readLong(bytes, byteOffset,8);
-	}
+
 	
 	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_COUNT_LENGTH;
 

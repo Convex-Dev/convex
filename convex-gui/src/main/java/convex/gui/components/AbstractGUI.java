@@ -27,7 +27,7 @@ public class AbstractGUI extends JPanel implements Runnable {
 					frame.setTitle(getTitle());
 					frame.setIconImage(Toolkit.getDefaultToolkit()
 							.getImage(MainGUI.class.getResource("/images/Convex.png")));
-					frame.setBounds(50, 50, 1000, 800);
+					frame.setBounds(50, 50, 1200, 920);
 					
 					Toolkit.closeIfFirstFrame(frame);
 

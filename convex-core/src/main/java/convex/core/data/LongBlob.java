@@ -104,11 +104,6 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public boolean equalsBytes(byte[] bytes, int byteOffset) {
-		return value==Utils.readLong(bytes, byteOffset,8);
-	}
-	
-	@Override
 	public boolean isCanonical() {
 		return false;
 	}

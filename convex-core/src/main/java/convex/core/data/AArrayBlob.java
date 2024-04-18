@@ -247,8 +247,8 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	public boolean equalsBytes(byte[] bytes, int byteOffset) {
-		return Utils.arrayEquals(store, offset, bytes, byteOffset, length);
+	public boolean equalsBytes(byte[] bytes, long byteOffset) {
+		return Utils.arrayEquals(store, offset, bytes, Utils.checkedInt(byteOffset), length);
 	}
 	
 	public boolean equalsBytes(ABlob k) {

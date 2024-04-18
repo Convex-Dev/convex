@@ -114,12 +114,13 @@ public class DLFileChannel implements SeekableByteChannel {
 			long n=b.count();
 			ABlob newData=data.replaceSlice(position,b);
 			
+			// position after replaced slice
+			position=position+n;
+			
 			if (newData!=data) {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData);
 				updateNode(newNode);
 			}
-			// position after replaced slice
-			position=position+n;
 			
 			return (int)n;
 		}
