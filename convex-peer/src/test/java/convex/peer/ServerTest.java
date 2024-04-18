@@ -162,25 +162,20 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testMissingData() throws IOException, InterruptedException, TimeoutException {
+	public void testAcquireMissing() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+		Hash BAD_HASH=Hash.fromHex("BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0BAD0");
+		
+		synchronized(network.SERVER) {
 
-		InetSocketAddress hostAddress=network.SERVER.getHostAddress();
-
-		// Connect to Peer Server using the current store for the client
-		AStore store=Stores.current();
-		Connection pc = Connection.connect(hostAddress, handler, store);
-		State s=network.SERVER.getPeer().getConsensusState();
-		Hash h=s.getHash();
-
-		boolean sent=pc.sendMissingData(h);
-		assertTrue(sent);
-
-		Thread.sleep(200);
-		Ref<State> ref=Ref.forHash(h);
-		assertNotNull(ref);
+			Convex convex=Convex.connect(network.SERVER.getHostAddress());
+			assertThrows(ExecutionException.class,()->{
+				ACell c = convex.acquire(BAD_HASH).get();
+				System.out.println("Didn't expect to acquire: "+c);
+			}
+			);
+		}
 	}
-
-
+	
 	@Test
 	public void testAcquireBeliefLocal() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
 		synchronized(network.SERVER) {

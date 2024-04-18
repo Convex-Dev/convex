@@ -116,7 +116,7 @@ public class TransactionHandler extends AThreadedComponent{
 			// System.out.println("transact: "+v);
 			if (!(sd.getValue() instanceof ATransaction)) {
 				Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
-				m.reportResult(r);
+				m.returnResult(r);
 				return;
 			}
 			
@@ -125,7 +125,7 @@ public class TransactionHandler extends AThreadedComponent{
 				try {
 					// TODO: throttle?
 					Result r=Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE);
-					m.reportResult(r);
+					m.returnResult(r);
 				} catch (Exception e) {
 					// Ignore?? Connection probably gone anyway
 				}
@@ -206,7 +206,7 @@ public class TransactionHandler extends AThreadedComponent{
 					
 					res=res.withExtraInfo(extInfo);
 
-					boolean reported = m.reportResult(res);
+					boolean reported = m.returnResult(res);
 					if (!reported) {
 						// ignore?
 					}

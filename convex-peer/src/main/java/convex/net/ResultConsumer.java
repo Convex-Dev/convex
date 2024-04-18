@@ -7,20 +7,12 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
 import convex.core.data.ACell;
-import convex.core.data.Hash;
-import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.MissingDataException;
-import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.net.message.Message;
 
 /**
- * Consumer<Message> abstract base class for awaiting results.
- *
- * Provides basic buffering of:
- * - Missing data until all data is available.
+ * Consumer<Message> abstract base class for default behaviour when awaiting results.
  */
 public abstract class ResultConsumer implements Consumer<Message> {
 
@@ -35,8 +27,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					handleDataProvided(m);
 					break;
 				}
-				case MISSING_DATA: {
-					handleMissingDataRequest(m);
+				case REQUEST_DATA: {
+					handleDataRequest(m);
 					break;
 				}
 				case RESULT: {
@@ -53,31 +45,13 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	}
 
 	private void handleDataProvided(Message m) {
-		// Just store the data, can't guarantee full persistence yet
-		try {
-			ACell o = m.getPayload();
-			Ref<?> r = Ref.get(o);
-			r.persistShallow();
-			Hash h=r.getHash();
-			log.trace("Recieved DATA for hash {}",h);
-		} catch (MissingDataException | BadFormatException e) {
-			// ignore?
-		}
+		// Ignore
 	}
 
-	private void handleMissingDataRequest(Message m) {
+	private void handleDataRequest(Message m) {
 		try {
-			// try to be helpful by returning sent data
-			Hash h = RT.ensureHash(m.getPayload());
-			if (h==null) return; // not a valid payload so ignore
-			
-			Ref<?> r = Stores.current().refForHash(h);
-			if (r != null) {
-				boolean sent=m.sendData(r.getValue());
-				if (!sent) {
-					log.warn("Unable to satisfy missing data request");
-				}
-			}
+			Message response=m.makeDataResponse(Stores.current());
+			m.returnMessage(response);
 		} catch (Exception e) {
 			log.warn("Error replying to MISSING DATA request",e);
 		}
@@ -128,7 +102,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param errorMessage The error message associated with the result (may be null)
 	 */
 	protected void handleError(long id, ACell code, ACell errorMessage) {
-		log.debug("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
+		log.warn("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
 	}
 	
 	/**

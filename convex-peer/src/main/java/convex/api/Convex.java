@@ -91,48 +91,45 @@ public abstract class Convex {
 	/**
 	 * Map of results awaiting completion.
 	 */
-	protected HashMap<Long, CompletableFuture<Result>> awaiting = new HashMap<>();
+	protected HashMap<Long, CompletableFuture<Message>> awaiting = new HashMap<>();
 
 	/**
 	 * Result Consumer for messages received back from a client connection
 	 */
-	protected final Consumer<Message> internalHandler = new ResultConsumer() {
+	protected final Consumer<Message> messageHandler = new ResultConsumer() {
 		@Override
 		protected synchronized void handleResult(long id, Result v) {
 			ACell ec=v.getErrorCode();
 			
 			if (ec!=null) {
-					// We probably have a wrong sequence number now. Kill the stored value.
-					sequence = null;
-			}
-
-			// Check if we are waiting for a Result with this ID for this connection
-			synchronized (awaiting) {
-				CompletableFuture<Result> cf = awaiting.remove(id);
-				if (cf != null) {
-					cf.complete(v);
-					log.trace("Result received for message ID: {}", id);
-				} else {
-					log.warn("Ignored Result received for unexpected message ID: {}", id);
-				}
+				// We probably have a wrong sequence number now. Kill the stored value.
+				sequence = null;
 			}
 		}
 
 		@Override
 		public void accept(Message m) {
-			super.accept(m);
-
-			if (delegatedHandler != null) {
-				try {
-					delegatedHandler.accept(m);
-				} catch (Throwable t) {
-					log.warn("Exception thrown in user-supplied handler function: {}", t);
-				}
+			// Check if we are waiting for a Result with this ID for this connection
+			synchronized (awaiting) {
+				CVMLong id=m.getID();
+				CompletableFuture<Message> cf = (id==null)?null:awaiting.remove((Long)id.longValue());
+				if (cf != null) {
+					// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
+					if (cf.complete(m)) return;
+				} 
+			}
+			
+			if (delegatedHandler!=null) {
+				delegatedHandler.accept(m);
+			} else {
+				// default handling
+				super.accept(m);
 			}
 		}
 	};
+	
+	private Consumer<Message> delegatedHandler=null;
 
-	private Consumer<Message> delegatedHandler = null;
 
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
@@ -721,17 +718,18 @@ public abstract class Convex {
 	 */
 	protected CompletableFuture<Result> awaitResult(long id, long timeout) {
 		// TODO: timeout parameter, maybe allow 0 timeout for never fail?
-		CompletableFuture<Result> cf = new CompletableFuture<Result>();
+		CompletableFuture<Message> cf = new CompletableFuture<Message>();
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
-		cf=cf.whenComplete((r,e)->{
+		cf=cf.whenComplete((m,e)->{
 			synchronized(awaiting) {
 				awaiting.remove(id);
 			}
 		});
 		awaiting.put(id, cf);
-		return cf;
+		CompletableFuture<Result> cr=cf.thenApply(m->m.toResult());
+		return cr;
 	}
 
 	/**

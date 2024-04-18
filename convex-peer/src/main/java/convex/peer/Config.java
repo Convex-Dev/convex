@@ -42,7 +42,6 @@ public class Config {
 	 */
 	public static final long PEER_SYNC_TIMEOUT = 60000;
 	
-
 	/**
 	 * Number of milliseconds average time to drop low-staked Peers
 	 */
@@ -59,14 +58,16 @@ public class Config {
 	 */
 	public static final long STATUS_COUNT = 9;
 
-
-	
 	/**
 	 * Default size for incoming client transaction queue
 	 * Note: this limits TPS for client transactions, will send failures if overloaded
 	 */
 	public static final int TRANSACTION_QUEUE_SIZE = 10000;
 
+	/**
+	 * Default size for incoming client query queue
+	 * Note: this limits TPS for client queries, will send failures if overloaded
+	 */
 	public static final int QUERY_QUEUE_SIZE = 10000;
 	
 	/**

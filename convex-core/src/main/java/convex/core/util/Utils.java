@@ -34,6 +34,7 @@ import convex.core.data.ACell;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 
@@ -1225,6 +1226,7 @@ public class Utils {
 	
 	public static final char[] EMPTY_CHARS = new char[0];
 	public static final String[] EMPTY_STRINGS = new String[0];
+	public static final Hash[] EMPTY_HASHES = new Hash[0];
 
 	/**
 	 * Gets a millisecond accurate time suitable for use in timing.

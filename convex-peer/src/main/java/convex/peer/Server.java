@@ -417,8 +417,8 @@ public class Server implements Closeable {
 			case DATA:
 				processData(m);
 				break;
-			case MISSING_DATA:
-				processQuery(m);
+			case REQUEST_DATA:
+				processQuery(m); // goes on Query handler
 				break;
 			case QUERY:
 				processQuery(m);
@@ -436,7 +436,7 @@ public class Server implements Closeable {
 				break;
 			default:
 				Result r=Result.create(m.getID(), Strings.create("Bad Message Type: "+type), ErrorCodes.ARGUMENT);
-				m.reportResult(r);
+				m.returnResult(r);
 				break;
 			}
 
@@ -457,31 +457,18 @@ public class Server implements Closeable {
 	 * @param m
 	 * @throws BadFormatException
 	 */
-	protected void handleMissingData(Message m)  {
+	protected void handleDataRequest(Message m)  {
 		// payload for a missing data request should be a valid Hash
 		try {
-			Hash h = RT.ensureHash(m.getPayload());
-			if (h == null) {
-				log.trace("Bad missing data request, not a Hash, terminating client");
-				m.getConnection().close();
-				return;
-			};
-	
-			Ref<?> r = store.refForHash(h);
-			if (r != null) {
-	
-					ACell data = r.getValue();
-					boolean sent = m.sendData(data);
-					// log.trace( "Sent missing data for hash: {} with type {}",Utils.getClassName(data));
-					if (!sent) {
-						log.trace("Can't send missing data for hash {} due to full buffer",h);
-					}
-	
-			} else {
-				// log.warn("Unable to provide missing data for {} from store: {}", h,Stores.current());
+			Message response=m.makeDataResponse(store);
+			boolean sent = m.returnMessage(response);
+			if (!sent) {
+				log.trace("Can't send data request response due to full buffer");
 			}
+		} catch (BadFormatException e) {
+			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
 		} catch (Exception e) {
-			log.trace("Unable to deliver missing data due to exception:", e);
+			log.warn("Unable to deliver missing data due to exception:", e);
 		}
 	}
 
@@ -493,7 +480,7 @@ public class Server implements Closeable {
 		} else {
 			// Failed to queue transaction
 			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
-			m.reportResult(r);
+			m.returnResult(r);
 		} 
 	}
 
@@ -504,10 +491,6 @@ public class Server implements Closeable {
 	protected void processClose(Message m) {
 		m.closeConnection();
 	}
-
-
-
-
 
 	/**
 	 * Gets the number of belief broadcasts made by this Peer
@@ -564,7 +547,7 @@ public class Server implements Closeable {
 			AVector<ACell> reply = getStatusVector();
 			Result r=Result.create(m.getID(), reply);
 
-			m.reportResult(r);
+			m.returnResult(r);
 		} catch (Throwable t) {
 			log.warn("Status Request Error:", t);
 		}
@@ -618,11 +601,10 @@ public class Server implements Closeable {
 		boolean queued= queryHandler.offerQuery(m);
 		if (!queued) {
 			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
-			m.reportResult(r);
+			m.returnResult(r);
 		} 
 	}
 	
-
 	private void processData(Message m) {
 		ACell payload;
 		try {

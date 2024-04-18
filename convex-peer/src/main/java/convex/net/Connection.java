@@ -281,18 +281,6 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a MISSING_DATA Message on this connection.
-	 *
-	 * @param hash Any data object
-	 * @return true if buffered successfully, false otherwise (not sent)
-	 * @throws IOException If IO error occurs
-	 */
-	public boolean sendMissingData(Hash hash) throws IOException {
-		log.trace("Requested missing data for hash {} with store {}", hash.toHexString(), Stores.current());
-		return sendObject(MessageType.MISSING_DATA, hash);
-	}
-
-	/**
 	 * Sends a QUERY Message on this connection with a null Address
 	 *
 	 * @param form A data object representing the query form
@@ -391,7 +379,7 @@ public class Connection {
 		AStore temp = Stores.current();
 		try {
 			Stores.setCurrent(store);
-			long id = ++idCounter;
+			long id = getNextID();
 			AVector<ACell> v = Vectors.of(id, signed);
 			boolean sent = sendObject(MessageType.TRANSACT, v);
 			return (sent) ? id : -1;
@@ -410,14 +398,7 @@ public class Connection {
 	 * @throws IOException If IO error occurs
 	 */
 	public boolean sendMessage(Message msg) throws IOException {
-		try {
-			if (msg.hasData()) {
-				return sendBuffer(msg.getType(),msg.getMessageData());
-			}
-			return sendObject(msg.getType(), msg.getPayload());
-		} catch (BadFormatException e) {
-			throw new Error("Unexpected bad format in payload",e);
-		}
+		return sendBuffer(msg.getType(),msg.getMessageData());
 	}
 
 	/**
@@ -429,10 +410,10 @@ public class Connection {
 	 * @return true if message queued successfully, false otherwise
 	 * @throws IOException If IO error occurs
 	 */
-	public boolean sendObject(MessageType type, ACell payload) throws IOException {
+	private boolean sendObject(MessageType type, ACell payload) throws IOException {
 		Counters.sendCount++;
 
-		Blob enc = Format.encodeMultiCell(payload);
+		Blob enc = Format.encodeMultiCell(payload,true);
 		if (log.isTraceEnabled()) {
 			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
 					+ Format.encodedBlob(payload).toHexString());
@@ -722,5 +703,9 @@ public class Connection {
 
 	public long getLastActivity() {
 		return lastActivity;
+	}
+
+	public long getNextID() {
+		return ++idCounter;
 	}
 }

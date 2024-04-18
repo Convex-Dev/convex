@@ -21,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
+import convex.core.util.Utils;
 import convex.peer.Config;
 import convex.peer.Server;
 
@@ -277,10 +278,10 @@ public class NIOServer implements Closeable {
 				log.trace("No bytes received for key: {}", key);
 			}
 		} catch (ClosedChannelException | SocketException e) {
-			log.info("Channel closed from: {}", conn.getRemoteAddress());
+			log.trace("Channel closed ("+Utils.getClassName(e)+") from: {}", conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.warn("Cancelled connection: Bad data format from: {} message: {}", conn.getRemoteAddress(),
+			log.info("Cancelled connection: Bad data format from: {} message: {}", conn.getRemoteAddress(),
 					e.getMessage());
 			// TODO: blacklist peer?
 			key.cancel();

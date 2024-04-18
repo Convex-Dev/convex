@@ -41,21 +41,20 @@ public enum MessageType {
 	COMMAND(4),
 
 	/**
-	 * A request to provide missing data. Peers should not send this message unless
+	 * A request to provide data. Peers should not send this message unless
 	 * both: a) they are unable to locate the given data in their local store b)
 	 * They have reason to believe the targeted peer may be able to provide it
 	 *
-	 * Excessive invalid missing data requests may be considered a DoS attack by
-	 * peers. Peers under load may need to ignore missing data requests.
+	 * Excessive invalid data requests may be considered a DoS attack by
+	 * peers. Peers under load may ignore data requests.
 	 *
-	 * Payload is either:
-	 * - The missing data hash. 
-	 * - A Vector containing ID plus one or more hashes i.e [id hash1 hash2 ......]
+	 * Payload is a Vector containing ID plus one or more hashes 
+	 * i.e [id hash1 hash2 ......]
 	 * 
 	 * Receiver should respond with a DATA message if the specified data is
-	 * available in their store, and they are willing to fulfill the request
+	 * available in their store, and they are willing to fulfil the request
 	 */
-	MISSING_DATA(5),
+	REQUEST_DATA(5),
 
 	/**
 	 * A request to perform the specified query and return results.
@@ -139,7 +138,7 @@ public enum MessageType {
 		case 4:
 			return COMMAND;
 		case 5:
-			return MISSING_DATA;
+			return REQUEST_DATA;
 		case 6:
 			return QUERY;
 		case 7:

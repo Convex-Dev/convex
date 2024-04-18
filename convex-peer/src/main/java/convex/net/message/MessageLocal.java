@@ -2,10 +2,7 @@ package convex.net.message;
 
 import java.util.function.Consumer;
 
-import convex.core.Result;
 import convex.core.data.ACell;
-import convex.core.data.Hash;
-import convex.core.data.Ref;
 import convex.core.store.AStore;
 import convex.net.Connection;
 import convex.net.MessageType;
@@ -18,12 +15,12 @@ public class MessageLocal extends Message {
 
 	protected Server server;
 	protected AStore store;
-	protected Consumer<Result> resultHandler;
+	protected Consumer<Message> returnHandler;
 	
-	protected MessageLocal(MessageType type, ACell payload, Server server, Consumer<Result> handler) {
+	protected MessageLocal(MessageType type, ACell payload, Server server, Consumer<Message> handler) {
 		super(type, payload,null);
 		this.server=server;
-		this.resultHandler=handler;
+		this.returnHandler=handler;
 	}
 	
 	/**
@@ -34,38 +31,22 @@ public class MessageLocal extends Message {
 	 * @param handler Handler for Results
 	 * @return New MessageLocal instance
 	 */
-	public static MessageLocal create(MessageType type, ACell payload, Server server, Consumer<Result> handler) {
+	public static MessageLocal create(MessageType type, ACell payload, Server server, Consumer<Message> handler) {
 		return new MessageLocal(type,payload,server,handler);
 	}
-
+	
 	@Override
-	public boolean reportResult(Result res) {
-		ACell id = getID();
-		if (id!=null) res=res.withID(id);
-		resultHandler.accept(res);
+	public boolean returnMessage(Message m) {
+		if (m.getID()==null) {
+			throw new IllegalArgumentException("Return message must have correlation ID");
+		}
+		returnHandler.accept(m);
 		return true;
 	}
 
 	@Override
 	public String getOriginString() {
 		return "Local Peer";
-	}
-
-	@Override
-	public boolean sendData(ACell data) {
-		if (data!=null) {
-			store.storeRef(data.getRef(), Ref.STORED, null);
-		}
-		return true;
-	}
-
-	@Override
-	public boolean sendMissingData(Hash hash) {
-		Ref<ACell> ref=server.getStore().refForHash(hash);
-		if (ref!=null) {
-			store.storeRef(ref, Ref.STORED, null);
-		} 
-		return true;
 	}
 
 	@Override
@@ -77,5 +58,7 @@ public class MessageLocal extends Message {
 	public void closeConnection() {
 		// Nothing to close
 	}
+
+
 
 }

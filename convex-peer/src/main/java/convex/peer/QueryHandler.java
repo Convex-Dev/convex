@@ -48,8 +48,8 @@ public class QueryHandler extends AThreadedComponent {
 		case QUERY:
 			handleQuery(m);
 			break;
-		case MISSING_DATA:
-			server.handleMissingData(m);
+		case REQUEST_DATA:
+			server.handleDataRequest(m);
 			break;
 		default:
 			log.warn("Unexpected Message type on query queue: "+type);
@@ -72,7 +72,7 @@ public class QueryHandler extends AThreadedComponent {
 			ResultContext resultContext = server.getPeer().executeQuery(form, address);
 			
 			// Report result back to message sender
-			boolean resultReturned= m.reportResult(Result.fromContext(id, resultContext));
+			boolean resultReturned= m.returnResult(Result.fromContext(id, resultContext));
 
 			if (!resultReturned) {
 				log.warn("Failed to send query result back to client with ID: {}", id);

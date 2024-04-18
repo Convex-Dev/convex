@@ -329,7 +329,4 @@ public final class Result extends ARecordGeneric {
 		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
-
-
-
 }

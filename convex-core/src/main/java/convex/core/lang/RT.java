@@ -814,6 +814,22 @@ public class RT {
 			return (ASequence<T>) o;
 		return null;
 	}
+	
+	/**
+	 * Ensures argument is a Vector data structure.
+	 * 
+	 * Returns null if not a vector is not possible.
+	 * 
+	 * @param <T> Type of Vector elements
+	 * @param o   Value to cast to Vector
+	 * @return An AVector instance, or null if the argument is not a Vector
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AVector<T> ensureVector(ACell o) {
+		if (o instanceof AVector)
+			return (AVector<T>) o;
+		return null;
+	}
 
 	/**
 	 * Gets the nth element from a sequential collection.

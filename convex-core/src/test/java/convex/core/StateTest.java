@@ -86,7 +86,7 @@ public class StateTest {
 		//	}
 		//});
 		
-		Blob b=Format.encodeMultiCell(s);
+		Blob b=Format.encodeMultiCell(s,true);
 		
 		State s2=Format.decodeMultiCell(b);
 		// System.err.println(Refs.printMissingTree(s2));

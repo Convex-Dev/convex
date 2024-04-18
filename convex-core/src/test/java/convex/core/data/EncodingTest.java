@@ -308,7 +308,7 @@ public class EncodingTest {
 		assertFalse(strans.isEmbedded());
 		AVector<?> v=Vectors.of(strans);
 		
-		Blob enc=Format.encodeMultiCell(v);
+		Blob enc=Format.encodeMultiCell(v,true);
 		
 		AVector<?> v2=Format.decodeMultiCell(enc);
 		assertEquals(v,v2);
@@ -395,7 +395,7 @@ public class EncodingTest {
 	@SuppressWarnings("unchecked")
 	private <T extends ACell> T doMultiEncodingTest(ACell a) throws BadFormatException {
 		long rc=Refs.totalRefCount(a);
-		Blob enc=Format.encodeMultiCell(a);
+		Blob enc=Format.encodeMultiCell(a,true);
 		ACell decoded=Format.decodeMultiCell(enc);
 		assertEquals(a,decoded);
 		
@@ -476,7 +476,7 @@ public class EncodingTest {
 
 	public static void testFullencoding(ACell s) throws BadFormatException {
 		RefTreeStats rstats  = Refs.getRefTreeStats(s.getRef());
-		Blob b=Format.encodeMultiCell(s);
+		Blob b=Format.encodeMultiCell(s,true);
 		
 		ACell s2=Format.decodeMultiCell(b);
 		// System.err.println(Refs.printMissingTree(s2));

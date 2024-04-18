@@ -2,12 +2,8 @@ package convex.net.message;
 
 import java.io.IOException;
 
-import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Format;
-import convex.core.data.Hash;
-import convex.core.data.prim.CVMLong;
 import convex.net.Connection;
 import convex.net.MessageType;
 
@@ -33,41 +29,19 @@ public class MessageRemote extends Message {
 		return new MessageRemote(peerConnection, type, payload, messageData);
 	}
 	
-	/**
-	 * Reports a result back to the originator of the message.
-	 * 
-	 * Will set a Result ID if necessary.
-	 * 
-	 * @param res Result record
-	 * @return True if reported successfully, false otherwise
-	 */
-	public boolean reportResult(Result res) {
+
+	
+	@Override
+	public boolean returnMessage(Message m) {
 		try {
-			ACell id=getID();
-			if (id!=null) res=res.withID(id);
-			
 			Connection pc = getConnection();
 			if ((pc == null) || pc.isClosed()) return false;
-			Message msg=Message.createResult(res);
-			return pc.sendMessage(msg);
+			return pc.sendMessage(m);
 		} catch (IOException t) {
 			// Ignore, probably IO error
-			log.warn("Error reporting result: {}",t.getMessage());
+			log.warn("Error returning message: {}",t.getMessage());
 			return false;
 		} 
-	}
-
-	public boolean reportResult(CVMLong id, ACell reply) {
-		Connection pc = getConnection();
-		if ((pc == null) || pc.isClosed()) return false;
-		try {
-			Message msg=Message.createResult(id,reply,null);
-			return pc.sendMessage(msg);
-		} catch (IOException t) {
-			// Ignore, probably IO error
-			log.debug("Error reporting result: {}",t.getMessage());
-			return false;
-		}
 	}
 	
 	/**
@@ -80,30 +54,6 @@ public class MessageRemote extends Message {
 		return pc.getRemoteAddress().toString();
 	}
 
-	@Override
-	public boolean sendData(ACell data) {
-		Connection pc=getConnection();
-		if (pc==null) return false;
-		try {
-			Blob enc=Format.encodedBlob(data);
-			return pc.sendData(enc);
-		} catch (IOException e) {
-			return false;
-		}
-	}
-
-	@Override
-	public boolean sendMissingData(Hash hash) {
-		Connection pc=getConnection();
-		if (pc==null) return false;
-		try {
-			
-			pc.sendMissingData(hash);
-		} catch (IOException e) {
-			return false;
-		}
-		return true;
-	}
 
 	@Override
 	public void closeConnection() {
@@ -112,6 +62,7 @@ public class MessageRemote extends Message {
 			pc.close();
 		}
 	}
+
 
 
 }

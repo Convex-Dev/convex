@@ -4,18 +4,24 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Belief;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
+import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
+import convex.core.store.AStore;
 import convex.net.Connection;
 import convex.net.MessageType;
 
@@ -43,32 +49,36 @@ public abstract class Message {
 		this.payload = payload;
 	}
 
-	public static MessageRemote create(Connection peerConnection, MessageType type, ACell payload, Blob data) {
-		return new MessageRemote(peerConnection, type, payload,data);
+	public static MessageRemote create(Connection peerConnection, MessageType type, Blob data) {
+		return new MessageRemote(peerConnection, type, null,data);
+	}
+	
+	public static MessageRemote create(MessageType type,ACell payload) {
+		return new MessageRemote(null, type, payload,null);
 	}
 
-	public static Message createData(ACell o) {
-		return create(null,MessageType.DATA,o,null);
-	}
-	
-	public static Message createMissingData(Hash missingHash) {
-		return create(null,MessageType.DATA,missingHash,null);
-	}
-	
-	public static Message createMissingData(CVMLong id, Hash... missingHashes) {
-		int n=Hash.LENGTH;
-		if (n==1) return create(null,MessageType.DATA,missingHashes[0],null);
-		
+	public static MessageRemote createDataResponse(CVMLong id, ACell... cells) {
+		int n=cells.length;
 		ACell[] cs=new ACell[n+1];
 		cs[0]=id;
 		for (int i=0; i<n; i++) {
-			cs[i+1]=missingHashes[i];
+			cs[i+1]=cells[i];
 		}
-		return create(null,MessageType.DATA,Vectors.create(cs),null);
+		return create(MessageType.DATA,Vectors.create(cs));
+	}
+	
+	public static Message createDataRequest(CVMLong id, Hash... hashes) {
+		int n=hashes.length;
+		ACell[] cs=new ACell[n+1];
+		cs[0]=id;
+		for (int i=0; i<n; i++) {
+			cs[i+1]=hashes[i];
+		}
+		return create(MessageType.REQUEST_DATA,Vectors.create(cs));
 	}
 
 	public static Message createBelief(Belief belief) {
-		return create(null,MessageType.BELIEF,belief,null);
+		return create(MessageType.BELIEF,belief);
 	}
 	
 	/**
@@ -76,28 +86,38 @@ public abstract class Message {
 	 * @return Message instance
 	 */
 	public static Message createBeliefRequest() {
-		return create(null,MessageType.REQUEST_BELIEF,null,null);
+		return create(MessageType.REQUEST_BELIEF,null);
 	}
 
 	public static Message createChallenge(SignedData<ACell> challenge) {
-		return create(null,MessageType.CHALLENGE, challenge,null);
+		return create(MessageType.CHALLENGE, challenge);
 	}
 
 	public static Message createResponse(SignedData<ACell> response) {
-		return create(null,MessageType.RESPONSE, response,null);
+		return create(MessageType.RESPONSE, response);
 	}
 
 	public static Message createGoodBye() {
-		return create(null,MessageType.GOODBYE, null,Blob.NULL_ENCODING);
+		return create(MessageType.GOODBYE, null);
 	}
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() throws BadFormatException {
-		if (payload==null) {
-			if (messageData==null) throw new IllegalStateException("Null payload and data in Message?!? Type = "+type);
-			if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
+		if (payload!=null) return (T) payload;
+		if (messageData==null) return null;
+		
+		// actual null payload :-)
+		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
+		
+		switch(type) {
+		case MessageType.DATA:
+			ACell[] cells=Format.decodeCells(messageData);
+			payload=Vectors.create(cells);
+			break;
+		default:
 			payload=Format.decodeMultiCell(messageData);
 		}
+		
 		return (T) payload;
 	}
 	
@@ -106,9 +126,28 @@ public abstract class Message {
 	 * @return Blob containing message data
 	 */
 	public Blob getMessageData() {
-		if (messageData==null) {
+		if (messageData!=null) return messageData;
+		
+		// default to single cell encoding
+		// TODO: alternative depths for different types
+		switch (type) {
+		case MessageType.RESULT:
+		case MessageType.QUERY:
+		case MessageType.TRANSACT:
+		case MessageType.REQUEST_DATA:
+		   messageData=Format.encodeMultiCell(payload,true);
+		   break;
+		   
+		case MessageType.DATA:
+			@SuppressWarnings("unchecked") 
+			AVector<ACell> v=(AVector<ACell>) payload;
+			messageData=Format.encodeCells(v);		 
+			break;
+			
+		default:
 			messageData=Format.encodedBlob(payload);
 		}
+		
 		return messageData;
 	}
 
@@ -119,11 +158,23 @@ public abstract class Message {
 	@Override
 	public String toString() {
 		try {
-			return "#message {:type " + getType() + " :payload " + RT.print(getPayload(),1000) + "}";
-		} catch (BadFormatException e) {
-			log.trace("Bad format in message decoding",e);
-			return "Corrupted message type "+getType()+": "+RT.toString(messageData);
+			ACell payload=getPayload();
+			AString ps=RT.print(getPayload(),10000);
+			if (ps==null) ps=Strings.create("<"+RT.count(messageData)+" bytes as "+RT.getType(payload)+">");
+			return "#message {:type " + getType() + " :payload " + ps + "}";
+		} catch (MissingDataException e) {
+			return "#message {:type " + getType() + " :payload <partial, some still missing>}";
+		} catch (Exception e) {
+			return "#message <CORRUPED "+getType()+": "+e.getMessage();
 		}
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (!(o instanceof Message)) return false;
+		Message other=(Message) o;
+		if (getType()!=other.getType()) return false;
+		return this.getMessageData().equals(other.getMessageData());
 	}
 
 	/**
@@ -161,6 +212,7 @@ public abstract class Message {
 		}
 	}
 
+
 	/**
 	 * Reports a result back to the originator of the message.
 	 * 
@@ -169,27 +221,29 @@ public abstract class Message {
 	 * @param res Result record
 	 * @return True if reported successfully, false otherwise
 	 */
-	public abstract boolean reportResult(Result res);
+	public boolean returnResult(Result res) {
+		ACell id=getID();
+		if (id!=null) res=res.withID(id);
+	
+		Message msg=Message.createResult(res);
+		return returnMessage(msg);
+	}
+	
+	/**
+	 * Returns a message back to the originator of the message.
+	 * 
+	 * Will set response ID if necessary.
+	 * 
+	 * @param m Message
+	 * @return True if sent successfully, false otherwise
+	 */
+	public abstract boolean returnMessage(Message m);
 	
 	/**
 	 * Gets a String identifying the origin of the message. Used for logging.
 	 * @return String representing message origin
 	 */
 	public abstract String getOriginString();
-
-	/**
-	 * Sends a cell of data to the connected Peer
-	 * @param value Cell value to send
-	 * @return true if data sent, false otherwise
-	 */
-	public abstract boolean sendData(ACell value);
-
-	/**
-	 * Returns a missing data request to the connected Peer
-	 * @param hash Hash of missing data
-	 * @return True if request sent, false otherwise
-	 */
-	public abstract boolean sendMissingData(Hash hash);
 
 	/**
 	 * Gets the Connection instance associated with this message, or null if no
@@ -203,8 +257,7 @@ public abstract class Message {
 	}
 
 	public static Message createResult(Result res) {
-		Blob enc=Format.encodeMultiCell(res);
-		return create(null,MessageType.RESULT,res,enc);
+		return create(MessageType.RESULT,res);
 	}
 
 	public static Message createResult(CVMLong id, ACell value, ACell error) {
@@ -213,5 +266,53 @@ public abstract class Message {
 	}
 
 	public abstract void closeConnection();
+
+	public void closeConnection(String message) {
+		log.debug(message);
+		closeConnection();
+	}
+
+	public Message makeDataResponse(AStore store) throws BadFormatException {
+		AVector<ACell> v = RT.ensureVector(getPayload());
+		if ((v == null)||(v.isEmpty())) {
+			throw new BadFormatException("Invalid data request payload");
+		};
+		//System.out.println("DATA REQ:"+ v);
+		long n=v.count();
+		for (int i=1; i<n; i++) {
+			Hash h=RT.ensureHash(v.get(i));
+			if (h==null) {
+				throw new BadFormatException("Invalid data request hash");
+			}
+			
+			Ref<?> r = store.refForHash(h);
+			if (r != null) {
+				ACell data = r.getValue();
+				v=v.assoc(i, data);
+			} else {
+				// signal we don't have this data
+				v=v.assoc(i, null);
+			}
+		}
+		//System.out.println("DATA RESP:"+ v);
+		// Create response. Will have null return connection
+		Message resp=create(MessageType.DATA,v);
+		return resp;
+	}
+
+	public Result toResult() {
+		try {
+			MessageType type=getType();
+			switch (type) {
+			case MessageType.RESULT: 
+				Result result=getPayload();
+				return result;
+			default:
+				return Result.create(getID(), Strings.create("Unexpected message type for Result: "+type), ErrorCodes.UNEXPECTED);
+			}
+		} catch (Exception e) {
+			return Result.create(null, Strings.create("Error building Result: "+e.getMessage()), ErrorCodes.FATAL);
+		}
+	}
 
 }

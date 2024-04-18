@@ -22,6 +22,7 @@ import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
 import convex.core.util.ThreadUtils;
 import convex.net.MessageType;
+import convex.net.message.Message;
 import convex.net.message.MessageLocal;
 import convex.peer.Server;
 
@@ -94,15 +95,15 @@ public class ConvexLocal extends Convex {
 
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
 		CompletableFuture<Result> cf=new CompletableFuture<>();
-		Consumer<Result> resultHandler=makeResultHandler(cf);
+		Consumer<Message> resultHandler=makeResultHandler(cf);
 		MessageLocal ml=MessageLocal.create(type,payload, server, resultHandler);
 		server.getReceiveAction().accept(ml);
 		return cf;
 	}
 
-	private Consumer<Result> makeResultHandler(CompletableFuture<Result> cf) {
-		return r->{
-			cf.complete(r);
+	private Consumer<Message> makeResultHandler(CompletableFuture<Result> cf) {
+		return m->{
+			cf.complete(m.toResult());
 		};
 	}
 

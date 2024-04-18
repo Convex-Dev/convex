@@ -121,6 +121,19 @@ public class Cells {
 		Ref<T> sref=store.storeTopRef(ref, Ref.PERSISTED, null);
 		return sref.getValue();
 	}
+	
+	/**
+	 * Persist a cell in the given store
+	 * @param a Cell to persist
+	 * @param store Store instance to persist in
+	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
+	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
+	 */
+	public static <T extends ACell> T store(T a, AStore store) {
+		Ref<T> ref=Ref.get(a);
+		Ref<T> sref=store.storeTopRef(ref, Ref.STORED, null);
+		return sref.getValue();
+	}
 
 	/**
 	 * Announces a Cell, reporting as novelty any cells that have not been previously announced

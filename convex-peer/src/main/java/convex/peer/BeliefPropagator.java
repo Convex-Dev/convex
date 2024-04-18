@@ -22,14 +22,12 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Index;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Ref;
-import convex.core.data.Refs;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.util.LoadMonitor;
@@ -78,10 +76,6 @@ public class BeliefPropagator extends AThreadedComponent {
 
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
-
-
-	private static final boolean ANALYSE_MISSING = false;
-	
 
 	long beliefReceivedCount=0L;
 
@@ -308,8 +302,12 @@ public class BeliefPropagator extends AThreadedComponent {
 			Belief newBelief= Belief.create(newOrders);
 			return newBelief;
 			
+		} catch (InterruptedException e) {
+			// This is expected sometimes, e.g. peer shutdown
+			throw e;
 		} catch (Exception e) {
-			log.warn("Error awaiting Belief: "+e.getMessage());
+			// we didn't expect this!
+			log.warn("UNEXPECTED error awaiting Belief",e);
 			return null;
 		}
 	}
@@ -343,7 +341,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						// Check signature before we accept Order
 						if (!so.checkSignature()) {
 							log.warn("Bad Order signature");
-							m.reportResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
+							m.returnResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
 							// TODO: close connection?
 							continue;
 						};
@@ -356,23 +354,12 @@ public class BeliefPropagator extends AThreadedComponent {
 					} catch (MissingDataException e) {
 						Hash h=e.getMissingHash();
 						log.warn("Missing data in Order! {}",h);
-						analyseMissing(h,m,so);
-						// System.exit(0);
-						if (!m.sendMissingData(e.getMissingHash())) {
-							log.warn("Unable to request Missing data in Belief!");
-						}
-						
 					}
 				}
 			} catch (MissingDataException e) {
 				// Missing data somewhere in Belief / Order received
 				Hash h=e.getMissingHash();
-				log.warn("Missing data in Belief! {}",e.getMessage());
-				//System.out.print(Refs.printMissingTree(a));
-				// System.exit(0);
-				if (!m.sendMissingData(h)) {
-					log.warn("Unable to request Missing data in Belief!");
-				}
+				log.warn("Missing data in Belief! {}",h);
 			}
 		} catch (ClassCastException e) {
 			// Bad message from Peer
@@ -390,27 +377,6 @@ public class BeliefPropagator extends AThreadedComponent {
 			obs.accept(so);
 		}
 	}
-
-
-	private void analyseMissing(Hash h, Message m, SignedData<Order> so) throws BadFormatException {
-		if (!ANALYSE_MISSING) return;
-		
-		StringBuilder sb=new StringBuilder();
-		ACell[] cs=Format.decodeCells(m.getMessageData());
-		
-		int n=cs.length;
-		sb.append("Delta cell count = " +n+"\n");
-		for (int i=0; i<n; i++) {
-			ACell c=cs[i];
-			sb.append(cs[i].getHash()+" = "+c.getClass()+"\n");
-		}
-		sb.append("\n");
-		
-		String s=Refs.printMissingTree(so);
-		sb.append(s);
-		System.out.println(sb.toString());
-	}
-
 
 	private void doBroadcast(Message msg) throws InterruptedException {
 		server.manager.broadcast(msg);
@@ -489,7 +455,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			novelty.add(n, payload);
 		}
 		Blob data=Format.encodeDelta(novelty);
-		return Message.create(null,MessageType.BELIEF,payload,data);
+		return Message.create(null,MessageType.BELIEF,data);
 	}
 
 	private Belief lastFullBroadcastBelief;

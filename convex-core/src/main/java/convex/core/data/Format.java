@@ -947,9 +947,10 @@ public class Format {
 	 * cell first, following cells in arbitrary order.
 	 * 
 	 * @param a Cell to Encode
+	 * @param everything If true, traverse the entire Cell tree
 	 * @return Blob encoding
 	 */
-	public static Blob encodeMultiCell(ACell a) {
+	public static Blob encodeMultiCell(ACell a, boolean everything) {
 		Blob topCellEncoding=Format.encodedBlob(a);
 		if (a.getRefCount()==0) return topCellEncoding;
 
@@ -976,7 +977,7 @@ public class Format {
 				if (newLength>Format.MAX_MESSAGE_LENGTH) return;
 				ml[0]=newLength;
 				refs.add(cr);
-				Refs.visitNonEmbedded(c, addToStackFunc);
+				if (everything) Refs.visitNonEmbedded(c, addToStackFunc);
 			}
 		});
 		int messageLength=ml[0];
@@ -999,8 +1000,9 @@ public class Format {
 		return Blob.wrap(msg);
 	}
 	
+	
 	/**
-	 * Encodes a list of cells in order specified in multi-cell format
+	 * Encodes a flat list of cells in order specified in multi-cell format
 	 * 
 	 * @param cells Cells to Encode
 	 * @return Blob containing multi-cell encoding
@@ -1008,7 +1010,7 @@ public class Format {
 	public static Blob encodeCells(java.util.List<ACell> cells) {
 		int ml=0;
 		for (ACell a:cells) {
-			Blob enc=a.getEncoding();
+			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data
 			int elen=enc.length;
 			if (ml>0) ml+=Format.getVLCCountLength(elen);
 			ml+=elen;
@@ -1017,7 +1019,7 @@ public class Format {
 		byte[] msg=new byte[ml];
 		int ix=0;
 		for (ACell a:cells) {
-			Blob enc=a.getEncoding();
+			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data;
 			int elen=enc.length;
 			if (ix>0) ix=Format.writeVLCCount(msg,ix,elen);
 			ix=enc.getBytes(msg, ix);
