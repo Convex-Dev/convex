@@ -548,7 +548,7 @@ public class ConnectionManager extends AThreadedComponent {
 					log.debug("Closed channel during broadcast");
 					pc.close();
 				} catch (IOException e) {
-					log.debug("IO Error in broadcast: ", e);
+					log.warn("IO Error in broadcast: ", e);
 					pc.close();
 				}
 			}
@@ -656,7 +656,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param message 
 	 */
 	public void alertBadMessage(Message m, String message) {
-		// TODO Possibly dump Peer?
+		// TODO Possibly dump Peer? Send a result indicating bad message?
 		message=message+" from "+m.getOriginString();
 		log.warn(message);
 	}
