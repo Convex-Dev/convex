@@ -14,20 +14,17 @@ import org.slf4j.LoggerFactory;
 import convex.core.Belief;
 import convex.core.BeliefMerge;
 import convex.core.Block;
-import convex.core.ErrorCodes;
 import convex.core.Order;
-import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.util.LoadMonitor;
@@ -324,8 +321,8 @@ public class BeliefPropagator extends AThreadedComponent {
 				ACell payload=m.getPayload();
 				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
 				for (SignedData<Order> so:a ) {
+					AccountKey key=so.getAccountKey();
 					try {
-						AccountKey key=so.getAccountKey();
 						
 						// Check if this Order could replace existing Order
 						if (Cells.equals(myKey, key)) continue; // skip own order
@@ -341,9 +338,8 @@ public class BeliefPropagator extends AThreadedComponent {
 						// Check signature before we accept Order
 						if (!so.checkSignature()) {
 							log.warn("Bad Order signature");
-							m.returnResult(Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE));
-							// TODO: close connection?
-							continue;
+							server.getConnectionManager().alertBadMessage(m,"Bad Order Signature!!");
+							break;
 						};
 						
 						// Ensure we can persist newly received Order
@@ -352,21 +348,18 @@ public class BeliefPropagator extends AThreadedComponent {
 						orders.put(key, so);
 						changed=true;
 					} catch (MissingDataException e) {
-						Hash h=e.getMissingHash();
-						log.warn("Missing data in Order! {}",h);
+						server.getConnectionManager().alertMissing(m,e,key);
 					}
 				}
 			} catch (MissingDataException e) {
-				// Missing data somewhere in Belief / Order received
-				Hash h=e.getMissingHash();
-				log.warn("Missing data in Belief! {}",h);
+				server.getConnectionManager().alertMissing(m,e,null);
 			}
-		} catch (ClassCastException e) {
+		} catch (ClassCastException | BadFormatException e) {
 			// Bad message from Peer
-			log.warn("Class cast exception in Belief!",e);
-			// m.reportResult(Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT));
+			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
 		}  catch (Exception e) {
 			log.warn("Unexpected exception getting Belief",e);
+			server.getConnectionManager().alertBadMessage(m,"Unexpected exception getting Belief: "+e.getMessage());
 		}
 		return changed;
 	}

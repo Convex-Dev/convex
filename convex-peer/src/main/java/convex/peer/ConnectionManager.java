@@ -30,6 +30,7 @@ import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
@@ -649,7 +650,29 @@ public class ConnectionManager extends AThreadedComponent {
 		return "Connection Manager thread at "+server.getPort();
 	}
 
+	/**
+	 * Called to signal a bad / corrupt message from a Peer.
+	 * @param m
+	 * @param message 
+	 */
+	public void alertBadMessage(Message m, String message) {
+		// TODO Possibly dump Peer?
+		message=message+" from "+m.getOriginString();
+		log.warn(message);
+	}
 
-
+	/**
+	 * Called to signal missing data in a Belief / Order
+	 * @param m
+	 * @param e
+	 * @param key
+	 */
+	public void alertMissing(Message m, MissingDataException e, AccountKey key) {
+		String message= "Missing data "+e.getMissingHash()+" from "+m.getOriginString();
+		log.warn(message);
+		
+		// TODO: possibly fire off request to specific Peer? Unclear if this improves things generally, but might avoid polling
+		
+	}
 
 }
