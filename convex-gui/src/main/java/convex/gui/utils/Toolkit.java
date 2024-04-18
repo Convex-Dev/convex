@@ -205,4 +205,12 @@ public class Toolkit {
 			c.setFocusable(true);
 		}
 	}
+
+	private static JFrame firstFrame=null;
+	public static synchronized void closeIfFirstFrame(JFrame frame) {
+		if (firstFrame==null) {
+			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+			firstFrame=frame;
+		}
+	}
 }

@@ -1,5 +1,6 @@
 package convex.gui.dlfs;
 
+import java.awt.Dimension;
 import java.nio.file.Path;
 
 import javax.swing.JLabel;
@@ -7,6 +8,7 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 
+import convex.core.util.ThreadUtils;
 import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
 import convex.gui.components.CodeLabel;
@@ -28,6 +30,8 @@ public class DLFSPanel extends JPanel {
 	CodeLabel infoLabel=new CodeLabel("READY");
 
 	private DLPath selectedPath;
+
+	private PreviewPanel previewPanel;
 
 	
 	public DLFSPanel(DLFileSystem dlfs) {
@@ -53,6 +57,7 @@ public class DLFSPanel extends JPanel {
 				setSelectedPath(p);
 			}
 		});
+		directoryTree.setPreferredSize(new Dimension(250,500));
 		
 		fileList=new FileList(selectedPath,p->setSelectedPath(p));
 		fileList.setTransferHandler(new DnDTransferHandler(this) {
@@ -61,9 +66,19 @@ public class DLFSPanel extends JPanel {
 				return getSelectedPath();
 			}
 		});
+		fileList.addListSelectionListener(e->{
+			Path p=fileList.getSelectedPath();
+			previewPanel.setPath(p);
+		});
+		fileList.setPreferredSize(new Dimension(250,500));
+
 		JScrollPane listScrollPane=new JScrollPane(fileList);
 		
-		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(directoryTree), listScrollPane);
+		JSplitPane filesSplitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(directoryTree), listScrollPane);
+		
+		previewPanel=new PreviewPanel();
+		
+		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,filesSplitPane,previewPanel);
 		add(splitPane,"dock center");
 		
 		pathLabel=new JLabel("/");
@@ -72,6 +87,17 @@ public class DLFSPanel extends JPanel {
 		add(infoLabel,"dock south");
 		
 		directoryTree.setSelectionPath(directoryTree.getPathForRow(0));
+		
+		ThreadUtils.runVirtual(()->{
+			try {
+				while (fileSystem.isOpen()) {
+					fileSystem.updateTimestamp();
+					Thread.sleep(100);
+				}
+			} catch (InterruptedException e) {
+				// finished
+			}
+		});
 	}
 	
 	void setSelectedPath(Path newPath) {
@@ -93,6 +119,10 @@ public class DLFSPanel extends JPanel {
 
 	public DLPath getSelectedPath() {
 		return selectedPath;
+	}
+
+	public void refreshView() {
+		setSelectedPath(selectedPath);
 	}
 
 }

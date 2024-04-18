@@ -93,8 +93,8 @@ public class ThreadUtils {
 	}
 
 	/**
-	 * Runs a (probably IO-bound) task in a virtual thrwead if available, 
-	 * @param task
+	 * Runs a (probably IO-bound) task in a virtual thread if available, 
+	 * @param task Task to run
 	 */
 	public static void runVirtual(Runnable task) {
 		getVirtualExecutor().execute(task);

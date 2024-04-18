@@ -31,9 +31,10 @@ public class DirectoryTree extends JTree {
 		setEnabled(true);
 		
 		DLFSTreeCellRenderer renderer=new DLFSTreeCellRenderer();
-		renderer.setBackgroundNonSelectionColor(getBackground());
+
 		setCellRenderer(renderer);
-		setShowsRootHandles(true);
+		setShowsRootHandles(false);
+		setRootVisible(true);
 		setBorder(BorderFactory.createBevelBorder(BevelBorder.LOWERED));
 
 		addMouseListener(new MouseAdapter() {

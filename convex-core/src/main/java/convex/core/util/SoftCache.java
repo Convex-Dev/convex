@@ -2,6 +2,7 @@ package convex.core.util;
 
 import java.lang.ref.SoftReference;
 import java.util.AbstractMap;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -34,6 +35,14 @@ public class SoftCache<K,V> extends AbstractMap<K,V> {
 
 	@Override
 	public Set<Entry<K, V>> entrySet() {
-		throw new UnsupportedOperationException();
+		HashSet<Entry<K, V>> result=new HashSet<Entry<K, V>>();
+		
+		for (Entry<K, SoftReference<V>> e: cache.entrySet()) {
+			V val=e.getValue().get();
+			if (val!=null) {
+				result.add(new AbstractMap.SimpleEntry<>(e.getKey(),val));
+			}
+		}
+		return result;
 	}
 }

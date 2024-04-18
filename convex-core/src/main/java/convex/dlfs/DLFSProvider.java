@@ -18,7 +18,9 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileAttribute;
 import java.nio.file.attribute.FileAttributeView;
 import java.nio.file.spi.FileSystemProvider;
+import java.util.ArrayList;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import convex.core.util.SoftCache;
@@ -52,6 +54,15 @@ public class DLFSProvider extends FileSystemProvider {
 		return fs;
 	}
 
+	public Iterable<DLFileSystem> getFileSystems() {
+		ArrayList<DLFileSystem> systems=new ArrayList<>();
+		for (Entry<String, DLFileSystem> e: fileSystems.entrySet()) {
+			DLFileSystem fs=e.getValue();
+			if (fs!=null) systems.add(fs); 
+		}
+		return systems;
+	}
+	
 	@Override
 	public Path getPath(URI uri) {
 		return getFileSystem(uri).getPath(uri.getPath());

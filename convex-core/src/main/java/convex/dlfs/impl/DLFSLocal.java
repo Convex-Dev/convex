@@ -86,8 +86,11 @@ public class DLFSLocal extends DLFileSystem implements Cloneable {
 		if (parentNode==null) {
 			throw new FileNotFoundException("Parent directory does not exist: "+parent.toString());
 		}
-		if (DLFSNode.getDirectoryEntries(parentNode).containsKey(name)) {
-			throw new FileAlreadyExistsException(name.toString());
+		AVector<ACell> oldNode=DLFSNode.getDirectoryEntries(parentNode).get(name);
+		if (oldNode!=null) {
+			if (!DLFSNode.isTombstone(oldNode)) {
+				throw new FileAlreadyExistsException(name.toString());
+			}
 		}
 		AVector<ACell> newNode=DLFSNode.createEmptyFile(getTimestamp());
 		updateNode(path,newNode);

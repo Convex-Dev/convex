@@ -87,7 +87,7 @@ public class PeerGUI extends AbstractGUI {
 				frame.setIconImage(Toolkit.getDefaultToolkit()
 						.getImage(PeerGUI.class.getResource("/images/Convex.png")));
 				frame.setBounds(200, 150, 1000, 800);
-				if (topLevel) frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+				Toolkit.closeIfFirstFrame(frame);
 
 				frame.getContentPane().add(manager, BorderLayout.CENTER);
 				frame.setVisible(true);

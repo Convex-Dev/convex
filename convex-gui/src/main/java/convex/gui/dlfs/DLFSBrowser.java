@@ -1,6 +1,15 @@
 package convex.gui.dlfs;
 
+import java.awt.event.ActionEvent;
+import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+
+import javax.swing.AbstractAction;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
 
 import convex.dlfs.DLFS;
 import convex.dlfs.DLPath;
@@ -13,11 +22,70 @@ import net.miginfocom.swing.MigLayout;
 public class DLFSBrowser extends AbstractGUI {
 	
 	protected DLFSLocal drive;
+	
+	protected static ArrayList<DLFSLocal> allDrives=new ArrayList<>(); 
 
+	public JMenuBar menuBar=new JMenuBar();
+	public JMenu fileMenu=new JMenu("File");
+	public JMenu driveMenu=new JMenu("Drive");
+	public JMenu helpMenu=new JMenu("Help");
+	protected DLFSPanel panel;
+	
 	public DLFSBrowser(DLFSLocal drive) {
+		allDrives.add(drive);
 		setLayout(new MigLayout());
 		this.drive=drive;
-		add(new DLFSPanel(drive),"dock center");
+		panel=new DLFSPanel(drive);
+		add(panel,"dock center");
+		
+		fileMenu.add(makeMenu("Delete",()->{
+			Path p=panel.fileList.getSelectedPath();
+			try {
+				Files.deleteIfExists(p);
+			} catch (IOException e) {
+				System.out.println("Can't delete "+p+ " : "+e.getMessage());
+			}
+			panel.refreshView();
+		}));		
+		menuBar.add(fileMenu);
+		
+		driveMenu.add(makeMenu("Clone",()->new DLFSBrowser(drive.clone()).run()));
+		driveMenu.add(makeMenu("Sync",()->{
+			for (DLFSLocal other: allDrives) {
+				if (other!=drive) {
+					System.out.println("Replicating!!");
+					drive.replicate(other);
+				}
+			}
+			panel.refreshView();
+		}));
+		menuBar.add(driveMenu);
+		
+		menuBar.add(makeMenu("Sync!",()->{
+			for (DLFSLocal other: allDrives) {
+				if (other!=drive) {
+					System.out.println("Replicating!!");
+					drive.replicate(other);
+				}
+			}
+			panel.refreshView();
+		}));
+		
+		getFrame().setJMenuBar(menuBar);
+		
+	}
+
+	protected JMenuItem makeMenu(String name,Runnable op) {
+		JMenuItem mi= new JMenuItem(name);
+		mi.setAction(new AbstractAction(name) {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				op.run();
+			}
+			
+		} );
+		return mi;
 	}
 	
 	

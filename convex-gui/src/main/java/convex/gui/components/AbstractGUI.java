@@ -2,7 +2,6 @@ package convex.gui.components;
 
 
 import java.awt.EventQueue;
-import java.awt.event.WindowEvent;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -17,7 +16,7 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class AbstractGUI extends JPanel implements Runnable {
 
-	protected JFrame frame=null;
+	protected JFrame frame=new JFrame();
 	
 	@Override
 	public void run() {
@@ -25,22 +24,18 @@ public class AbstractGUI extends JPanel implements Runnable {
 			@Override
 			public void run() {
 				try {
-					frame = new JFrame();
 					frame.setTitle(getTitle());
 					frame.setIconImage(Toolkit.getDefaultToolkit()
 							.getImage(MainGUI.class.getResource("/images/Convex.png")));
 					frame.setBounds(50, 50, 1000, 800);
-					frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+					
+					Toolkit.closeIfFirstFrame(frame);
+
 
 					frame.getContentPane().setLayout(new MigLayout());
 					frame.getContentPane().add(AbstractGUI.this, "dock center");
 					frame.setVisible(true);
 
-					frame.addWindowListener(new java.awt.event.WindowAdapter() {
-				        public void windowClosing(WindowEvent winEvt) {
-				        	// shut down peers gracefully
-				        }
-				    });
 
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -55,6 +50,10 @@ public class AbstractGUI extends JPanel implements Runnable {
 	 */
 	public String getTitle() {
 		return "Convex Desktop";
+	}
+	
+	public JFrame getFrame() {
+		return frame;
 	}
 
 }
