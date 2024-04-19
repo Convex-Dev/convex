@@ -13,7 +13,7 @@ import convex.core.util.Utils;
  * Abstract base class for binary data stored in Java arrays.
  *
  */
-public abstract class AArrayBlob extends ACountedBlob {
+public abstract class AArrayBlob extends ABlob {
 	protected final byte[] store;
 	protected final int offset;
 
@@ -54,11 +54,11 @@ public abstract class AArrayBlob extends ACountedBlob {
 	}
 
 	@Override
-	public ACountedBlob append(ABlob d) {
+	public ABlob append(ABlob d) {
 		long dlength = d.count();
-		if (dlength == 0) return (ACountedBlob) this.getCanonical();
+		if (dlength == 0) return this.getCanonical();
 		long length = this.count;
-		if (length == 0) return (ACountedBlob) d.getCanonical();
+		if (length == 0) return d.getCanonical();
 		
 		if (length>Blob.CHUNK_LENGTH) {
 			// Need to normalise to a BlobTree first
@@ -83,7 +83,7 @@ public abstract class AArrayBlob extends ACountedBlob {
 		return bb.toBlob();
 	}
 		
-	protected ACountedBlob appendSmall(ABlob d) {
+	protected ABlob appendSmall(ABlob d) {
 		int n=Utils.checkedInt(count() + d.count());
 		if (n>Blob.CHUNK_LENGTH) throw new Error("Illegal Blob appendSmall size: "+n);
 		byte[] newData = new byte[n];

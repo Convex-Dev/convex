@@ -32,7 +32,7 @@ public final class LongBlob extends ALongBlob {
 	}
 	
 	@Override
-	public ACountedBlob slice(long start, long end) {
+	public ABlob slice(long start, long end) {
 		if ((start == 0) && (end == LENGTH)) return toFlatBlob();
 
 		if (start < 0) return null;

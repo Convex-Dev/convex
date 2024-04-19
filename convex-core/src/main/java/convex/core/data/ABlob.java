@@ -10,6 +10,7 @@ import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for data objects containing immutable chunks of binary
@@ -22,6 +23,31 @@ import convex.core.util.Bits;
  */
 public abstract class ABlob extends ABlobLike<CVMLong>  {
 
+	protected final long count;
+
+	protected ABlob(long count) {
+		this.count=count;
+	}
+	
+	/**
+	 * Returns true if this Blob is a fully packed set of chunks
+	 * @return True if fully packed, false otherwise
+	 */
+	public boolean isChunkPacked() {
+		return (count&(Blob.CHUNK_LENGTH-1))==0;
+	}
+
+	/**
+	 * Returns true if this is a fully packed set of chunks
+	 * @return True if fully packed, false otherwise
+	 */
+	public abstract boolean isFullyPacked();
+	
+	@Override
+	public final int size() {
+		return Utils.checkedInt(count);
+	}
+	
 	@Override
 	public final AType getType() {
 		return Types.BLOB;
@@ -33,7 +59,10 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @return The length in bytes of this data object
 	 */
 	@Override
-	public abstract long count();
+	public final long count() {
+		return count;
+	}
+	
 	
 	@Override
 	public CVMLong get(long ix) {
@@ -70,7 +99,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param end End of the slice (exclusive)
 	 * @return A blob of the specified length, representing a slice of this blob, or null if the slice is invalid
 	 */
-	public abstract ACountedBlob slice(long start, long end);
+	public abstract ABlob slice(long start, long end);
 
 	/**
 	 * Gets a slice of this blob, as a new blob, starting from the given offset and
@@ -81,7 +110,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param start Start position to slice from
 	 * @return Slice of Blob
 	 */
-	public ACountedBlob slice(long start) {
+	public ABlob slice(long start) {
 		return slice(start, count());
 	}
 
@@ -141,7 +170,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param d Blob to append
 	 * @return A new Blob, containing the additional data appended to this blob.
 	 */
-	public abstract ACountedBlob append(ABlob d);
+	public abstract ABlob append(ABlob d);
 
 	/**
 	 * Determines if this Blob is equal to another Object.
@@ -164,10 +193,9 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	/**
 	 * Determines if this Blob is equal to another Blob.
 	 * 
-	 * Blobs are defined to be equal if they have the same on-chain representation,
+	 * Blobs are defined to be equal if they have the same encoded representation,
 	 * i.e. if and only if all of the following are true:
 	 * 
-	 * - Blob is of the same general type 
 	 * - Blobs are of the same length 
 	 * - All byte values are equal
 	 * 
@@ -292,17 +320,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return (short)((hi<<8)|(lo&0xFF));
 	}
 
-	/**
-	 * Returns true if this is a fully packed set of chunks
-	 * @return True if fully packed, false otherwise
-	 */
-	public abstract boolean isChunkPacked();
 
-	/**
-	 * Returns true if this is a fully packed set of chunks
-	 * @return True if fully packed, false otherwise
-	 */
-	public abstract boolean isFullyPacked();
 
 	/**
 	 * Gets bytes from this Blob into a ByteBuffer

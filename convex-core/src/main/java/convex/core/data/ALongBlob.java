@@ -14,12 +14,8 @@ public abstract class ALongBlob extends ABlob {
 	protected final long value;
 
 	protected ALongBlob(long value) {
+		super(LENGTH);
 		this.value=value;
-	}
-
-	@Override
-	public final long count() {
-		return LENGTH;
 	}
 	
 	@Override
@@ -52,7 +48,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public abstract ACountedBlob slice(long start, long end);
+	public abstract ABlob slice(long start, long end);
 
 	@Override
 	public abstract Blob toFlatBlob();
@@ -73,7 +69,7 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public final ACountedBlob append(ABlob d) {
+	public final ABlob append(ABlob d) {
 		return toFlatBlob().append(d);
 	}
 

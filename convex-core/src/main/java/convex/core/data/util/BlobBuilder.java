@@ -3,7 +3,6 @@ package convex.core.data.util;
 import java.nio.ByteBuffer;
 
 import convex.core.data.ABlob;
-import convex.core.data.ACountedBlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Strings;
@@ -19,7 +18,7 @@ public class BlobBuilder {
 	/**
 	 * Accumulator Blob, always a canonical Blob with filled chunks
 	 */
-	protected ACountedBlob acc=Blob.EMPTY; 
+	protected ABlob acc=Blob.EMPTY; 
 	
 	/**
 	 * Accumulator array for up to a single chunk worth of bytes
@@ -125,8 +124,8 @@ public class BlobBuilder {
 	 * 
 	 * @return Blob contents of this BlobBuilder
 	 */
-	public ACountedBlob toBlob() {
-		ACountedBlob result=acc;
+	public ABlob toBlob() {
+		ABlob result=acc;
 		if (tail==null) return acc;
 		
 		result=result.append(Blob.wrap(tail,0,arrayPos()));	

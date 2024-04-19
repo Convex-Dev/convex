@@ -5,7 +5,7 @@ import java.security.MessageDigest;
 
 import convex.core.util.Utils;
 
-public abstract class ADerivedBlob extends ACountedBlob {
+public abstract class ADerivedBlob extends ABlob {
 	
 	protected ADerivedBlob(long count) {
 		super(count);
@@ -17,7 +17,7 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	}
 
 	@Override
-	public final ACountedBlob slice(long start, long end) {
+	public final ABlob slice(long start, long end) {
 		if (start < 0) return null;
 		if (end > this.count) return null;
 		long length=end-start;
@@ -34,7 +34,7 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	 * @param end End of slice
 	 * @return New slice instance
 	 */
-	protected abstract ACountedBlob sliceImpl(long start, long end);
+	protected abstract ABlob sliceImpl(long start, long end);
 	
 	@Override
 	public Blob toFlatBlob() {
@@ -52,8 +52,8 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	}
 
 	@Override
-	public ACountedBlob append(ABlob d) {
-		return ((ACountedBlob)getCanonical()).append(d);
+	public ABlob append(ABlob d) {
+		return ((ABlob)getCanonical()).append(d);
 	}
 
 	@Override
