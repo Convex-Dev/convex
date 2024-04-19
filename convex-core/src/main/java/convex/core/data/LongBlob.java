@@ -12,7 +12,8 @@ import convex.core.util.Utils;
  */
 public final class LongBlob extends ALongBlob {
 
-	public static final int MAX_ENCODING_LENGTH = 1+1+8; // Tag plus length plus 8 bytes
+	private static final int HEADER_LENGTH=2; // tag plus length byte
+	public static final int MAX_ENCODING_LENGTH = HEADER_LENGTH+8; // Tag plus length plus 8 bytes
 	
 	public static final LongBlob ZERO = create(0);
 
@@ -83,7 +84,7 @@ public final class LongBlob extends ALongBlob {
 
 	@Override
 	public int estimatedEncodingSize() {
-		return (int) (2 + LENGTH);
+		return HEADER_LENGTH + LENGTH;
 	}
 
 	@Override
@@ -102,31 +103,7 @@ public final class LongBlob extends ALongBlob {
 	}
 
 	@Override
-	public boolean isCanonical() {
-		return false;
-	}
-
-	@Override
-	public Blob toCanonical() {
-		return toFlatBlob();
-	}
-	
-	@Override
 	public Blob toFlatBlob() {
-		// Trick to use cached encoding if available
-		if (encoding!=null) {
-			return encoding.slice(2,2+LENGTH);
-		}
-		byte[] bs=new byte[LENGTH];
-		Utils.writeLong(bs, 0, value);
-		return Blob.wrap(bs);
+		return getEncoding().slice(HEADER_LENGTH,HEADER_LENGTH+LENGTH);
 	}
-
-
-	@Override
-	public ABlob toBlob() {
-		// Already a Blob
-		return this;
-	}
-
 }

@@ -159,7 +159,9 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	public abstract long longValue();
 
 	/**
-	 * Convert this BlobLike object to a blob, in the most efficient way. May return `this`
+	 * Convert this BlobLike object to an ABlob instance, in the most efficient way. 
+	 * 
+	 * May return `this`. Result might not be a regular Blob (e.g. Address)
 	 * @return
 	 */
 	public abstract ABlob toBlob();
@@ -168,7 +170,7 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 * Converts the contents of this value to a flat array-backed Blob instance.
 	 * Warning: might be O(n) in size of Blob, may not be canonical etc.
 	 * 
-	 * @return A Blob instance containing the same data as this value. Might be this is already a flat Blob.
+	 * @return A Blob instance containing the same data as this value. Might be `this` if already a flat Blob.
 	 */
 	public Blob toFlatBlob() {
 		return toBlob().toFlatBlob();

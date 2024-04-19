@@ -87,7 +87,12 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 	@Override
 	public abstract Blob toFlatBlob();
-
+	
+	@Override
+	public final ABlob toBlob() {
+		// already an ABlob, so no change
+		return this;
+	}
 
 	/**
 	 * Computes the hash of the byte data stored in this Blob, using the default MessageDigest.
@@ -206,7 +211,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	}
 	
 	/**
-	 * Gets a chunk of this Blob, as a canonical Blob up to the maximum chunk size.
+	 * Gets a chunk of this Blob, as a canonical flat Blob up to the maximum Blob chunk size.
 	 * Returns empty Blob if and only if referencing the end of a Blob with fully packed chunks
 	 * 
 	 * @param i Index of chunk

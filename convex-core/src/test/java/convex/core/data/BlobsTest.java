@@ -221,7 +221,7 @@ public class BlobsTest {
 			assertEquals(b.getHexDigit(i), bb.getHexDigit(i));
 		}
 		
-		assertSame(b.getCanonical(),b.getChunk(0)); // Use canonical Blob as chunk
+		// assertSame(b.getCanonical(),b.getChunk(0)); // Use canonical Blob as chunk
 
 		assertTrue(bb.equalsBytes(b));
 		assertTrue(b.hexEquals(bb, 3, 10));

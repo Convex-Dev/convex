@@ -197,12 +197,6 @@ public final class Address extends ALongBlob {
 	}
 
 	@Override
-	public boolean isCanonical() {
-		// always canonical, since class invariants are maintained
-		return true;
-	}
-
-	@Override
 	public int estimatedEncodingSize() {
 		// tag plus LENGTH bytes
 		return 1 + Format.MAX_VLC_LONG_LENGTH;
@@ -259,10 +253,5 @@ public final class Address extends ALongBlob {
 	 */
 	public Address offset(long offset) {
 		return create(value+offset);
-	}
-
-	@Override
-	public ABlob toBlob() {
-		return this;
 	}
 }

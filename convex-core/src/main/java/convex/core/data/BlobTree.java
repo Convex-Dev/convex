@@ -606,11 +606,6 @@ public class BlobTree extends ACountedBlob {
 	}
 
 	@Override
-	public ABlob toBlob() {
-		return this;
-	}
-
-	@Override
 	public int read(long offset, long count, ByteBuffer dest) {
 		if (count<0) throw new IllegalArgumentException("Negative count");
 		if ((offset<0)||(offset+count>this.count)) throw new IndexOutOfBoundsException();

@@ -123,11 +123,6 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	}
 
 	@Override
-	public ABlob toBlob() {
-		return this;
-	}
-
-	@Override
 	public byte getTag() {
 		return Tag.BLOB;
 	}

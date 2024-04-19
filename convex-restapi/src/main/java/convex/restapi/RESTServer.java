@@ -3,12 +3,14 @@ package convex.restapi;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.core.data.Keyword;
 import convex.core.util.Utils;
 import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
@@ -32,24 +34,7 @@ public class RESTServer {
 		this.server = server;
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
 
-		boolean useSSL=true;
-		SslPlugin sslPlugin=null;
-		if (useSSL) try {
-			Path certFile=Utils.getHomePath().resolve("ssl/certificate.pem");
-			Path privateFile=Utils.getHomePath().resolve("ssl/certificate.pem");
-			if (Files.exists(certFile)&&Files.exists(privateFile)) {
-				InputStream certS=Files.newInputStream(certFile);
-				InputStream privateS=Files.newInputStream(privateFile);
-				sslPlugin = new SslPlugin(conf -> {
-					conf.pemFromInputStream(certS, privateS);
-				});
-			} else {
-				log.warn("Failed to find SSL cerificates, defaulting back to HTTP");
-			}
-		} catch (Exception e) {
-			log.warn("Failed to create SSL plugin, will use insecure HTTP only", e);
-		}
-		SslPlugin finalSSLPlugin=sslPlugin; // final version of plugin
+		SslPlugin sslPlugin = getSSLPlugin(server.getConfig());
 		
 		app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
@@ -60,8 +45,8 @@ public class RESTServer {
 				});
 			});
 			
-			if (finalSSLPlugin!=null) {
-				config.registerPlugin(finalSSLPlugin);
+			if (sslPlugin!=null) {
+				config.registerPlugin(sslPlugin);
 			}
 			
 			addOpenApiPlugins(config);
@@ -87,6 +72,28 @@ public class RESTServer {
 		});
 
 		addAPIRoutes(app);	
+	}
+
+	// Get an SSL plugin, or null if SSL cannot be configured
+	protected SslPlugin getSSLPlugin(HashMap<Keyword, Object> config) {
+		boolean useSSL=true;
+		SslPlugin sslPlugin=null;
+		if (useSSL) try {
+			Path certFile=Utils.getHomePath().resolve(".convex/ssl/certificate.pem");
+			Path privateFile=Utils.getHomePath().resolve(".convex/ssl/private.pem");
+			if (Files.exists(certFile)&&Files.exists(privateFile)) {
+				InputStream certS=Files.newInputStream(certFile);
+				InputStream privateS=Files.newInputStream(privateFile);
+				sslPlugin = new SslPlugin(conf -> {
+					conf.pemFromInputStream(certS, privateS);
+				});
+			} else {
+				log.warn("Failed to find SSL cerificates, defaulting back to HTTP");
+			}
+		} catch (Exception e) {
+			log.warn("Failed to create SSL plugin, will use insecure HTTP only", e);
+		}
+		return sslPlugin;
 	}
 
 	protected void addOpenApiPlugins(JavalinConfig config) {

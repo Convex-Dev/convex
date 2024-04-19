@@ -88,7 +88,7 @@ public abstract class ALongBlob extends ABlob {
 
 	@Override
 	public final Blob getChunk(long i) {
-		if (i == 0L) return (Blob) getCanonical();
+		if (i == 0L) return toFlatBlob();
 		throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
@@ -147,6 +147,11 @@ public abstract class ALongBlob extends ABlob {
 	@Override
 	public boolean isCanonical() {
 		return true;
+	}
+
+	@Override
+	public ABlob toCanonical() {
+		return this;
 	}
 
 	@Override
