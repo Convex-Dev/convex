@@ -338,7 +338,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Returns true if this Cell is in a canonical representation for message writing.
+	 * Returns true if this Cell is in a canonical representation for encoding.
+	 * 
 	 * Non-canonical objects may be used on a temporary internal basis, they must always
 	 * be converted to canonical representations for external use (e.g. Encoding).
 	 * 

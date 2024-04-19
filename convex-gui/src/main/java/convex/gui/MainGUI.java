@@ -47,7 +47,7 @@ public class MainGUI extends AbstractGUI {
 		JComponent wallet=createLaunchButton("Wallet",Toolkit.WALLET_ICON,this::launchTestNet);
 		actionPanel.add(wallet);
 
-		JComponent testNet=createLaunchButton("Launch TestNet",Toolkit.TESTNET_ICON,this::launchTestNet);
+		JComponent testNet=createLaunchButton("Peer Manager",Toolkit.TESTNET_ICON,this::launchTestNet);
 		actionPanel.add(testNet);
 		
 		JComponent latticeFS=createLaunchButton("Lattice Filesystem",Toolkit.DLFS_ICON,this::launchDLFS);

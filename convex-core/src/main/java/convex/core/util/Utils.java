@@ -1452,6 +1452,16 @@ public class Utils {
 		return checkedLong(result);
 	}
 
+	private static Path homePath=null;
+	public static Path getHomePath() {
+		if (homePath!=null) return homePath;
+		String homeDir=System.getProperty("user.home");
+		Path p=new File(homeDir).toPath();
+		
+		homePath=p;
+		return p;
+	}
+
 
 
 

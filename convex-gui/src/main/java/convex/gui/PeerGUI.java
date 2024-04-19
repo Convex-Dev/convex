@@ -221,12 +221,11 @@ public class PeerGUI extends AbstractGUI {
 
 				} catch (InterruptedException e) {
 					//
-					log.warn("Update thread interrupted abnormally: "+e.getMessage());
-					e.printStackTrace();
-					Thread.currentThread().interrupt();
+					log.trace("Update thread interrupted, presumably shutting down");
+					updateRunning=false;
 				}
 			}
-			log.debug("GUI Peer Manager update thread ended");
+			log.debug("GUI Peer Manager update thread ending");
 		}
 	};
 
@@ -238,7 +237,7 @@ public class PeerGUI extends AbstractGUI {
 
 	@Override
 	public void finalize() {
-		// terminate the update thread
+		// terminate the update thread if needed
 		updateRunning = false;
 	}
 
