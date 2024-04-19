@@ -134,7 +134,6 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 
 	@Override
 	public boolean equals(ACell a) {
-		// TODO Auto-generated method stub
 		return getCanonicalSet().equals(a);
 	}
 
@@ -144,7 +143,7 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public AHashSet<K> toCanonical() {
+	protected AHashSet<K> toCanonical() {
 		throw new TODOException();
 		// return map.buildKeySet();
 	}

@@ -350,9 +350,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Converts this Cell to its canonical version. Must return this Cell if already canonical, may be O(n) in size of value otherwise.
 	 * 
+	 * Callers should usually use getCanonical(), which caches canonical instances. 
+	 * 
 	 * @return Canonical version of Cell
 	 */
-	public abstract ACell toCanonical();
+	protected abstract ACell toCanonical();
 	
 	/**
 	 * Returns true if this cell instances represents a first class CVM Value allowable in the CVM state

@@ -76,6 +76,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	
 	@Override
 	public final Blob empty() {
+		// Enforce singleton empty Blob
 		return Blob.EMPTY;
 	}
 
@@ -205,7 +206,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	public abstract boolean equals(ABlob o);
 	
 	@Override
-	public abstract ABlob toCanonical();
+	protected abstract ABlob toCanonical();
 
 	/**
 	 * Tests if the byte contents of this instance are equal to a subset of a byte array
@@ -298,7 +299,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return Bits.hash32(longValue());
 	}
 
-	@Override public boolean isCVMValue() {
+	@Override public final boolean isCVMValue() {
 		return true;
 	}
 	

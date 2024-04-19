@@ -64,11 +64,6 @@ public class Ed25519Signature extends ASignature {
 		return this;
 	}
 	
-	@Override public final boolean isCVMValue() {
-		// We allow signatures to exist as CVM values (i.e. Blobs)
-		return true;
-	}
-	
 	/**
 	 * Read a signature from a ByteBuffer. Assumes tag already read.
 	 * @param bb ByteBuffer to read from

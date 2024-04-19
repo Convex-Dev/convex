@@ -5,6 +5,11 @@ import java.security.MessageDigest;
 
 import convex.core.util.Utils;
 
+/**
+ * Abstract Blob base base for Blobs that derive their functionality from other sources.
+ * 
+ * Allows extension of ABlob interface to various backing stores.
+ */
 public abstract class ADerivedBlob extends ABlob {
 	
 	protected ADerivedBlob(long count) {
@@ -63,7 +68,8 @@ public abstract class ADerivedBlob extends ABlob {
 
 	@Override
 	public ABlob toCanonical() {
-		return toFlatBlob();
+		// Not great, but probably best we can do in general?
+		return toFlatBlob().getCanonical();
 	}
 
 	@Override
@@ -124,6 +130,7 @@ public abstract class ADerivedBlob extends ABlob {
 
 	@Override
 	public boolean isCanonical() {
+		// We probably aren't canonical if we are a derived Blob, though it is possible
 		return false;
 	}
 

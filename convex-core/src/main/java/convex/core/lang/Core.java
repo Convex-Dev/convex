@@ -1746,7 +1746,7 @@ public class Core {
 			long juice=Juice.buildBlobCost(encoding.count());
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			
-			ABlob result=encoding.toCanonical();
+			ABlob result=encoding.getCanonical();
 			return context.withResult(juice, result);
 		}
 	});

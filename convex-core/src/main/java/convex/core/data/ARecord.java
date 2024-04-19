@@ -42,7 +42,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 	
 	@Override
-	public ARecord toCanonical() {
+	protected ARecord toCanonical() {
 		// Should already be canonical
 		return this;
 	}

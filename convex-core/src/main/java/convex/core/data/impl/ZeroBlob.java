@@ -4,6 +4,9 @@ import org.bouncycastle.util.Arrays;
 
 import convex.core.data.ADerivedBlob;
 
+/**
+ * Blob filled with all zeros. Useful to avoid allocating lots of empty arrays, potentially.
+ */
 public class ZeroBlob extends ADerivedBlob {
 
 	public static final ZeroBlob EMPTY = new ZeroBlob(0);

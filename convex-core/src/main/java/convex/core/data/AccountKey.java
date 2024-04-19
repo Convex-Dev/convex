@@ -267,7 +267,7 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	@Override
-	public Blob toCanonical() {
+	protected Blob toCanonical() {
 		return toFlatBlob();
 	}
 
