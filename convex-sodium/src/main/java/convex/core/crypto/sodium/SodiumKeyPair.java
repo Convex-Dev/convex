@@ -64,7 +64,7 @@ public class SodiumKeyPair extends AKeyPair {
 		byte[] signature=new byte[Ed25519Signature.SIGNATURE_LENGTH];
 		if (SodiumProvider.SODIUM_SIGN.cryptoSignDetached(
 				signature,
-				Blobs.zeroBasedArray(hash),
+				Blobs.ensureZeroBasedArray(hash),
 				mlength,
 				secretKeyBytes)) {;
 				return Ed25519Signature.wrap(signature);

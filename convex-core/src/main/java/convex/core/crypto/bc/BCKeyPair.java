@@ -38,7 +38,7 @@ public class BCKeyPair extends AKeyPair {
 		long n=seed.count();
 		if (seed.count() != SEED_LENGTH) throw new IllegalArgumentException("32 bytes private key material expected as seed but got: "+n);
 
-		Ed25519PrivateKeyParameters priv=new Ed25519PrivateKeyParameters(Blobs.zeroBasedArray(seed), 0);
+		Ed25519PrivateKeyParameters priv=new Ed25519PrivateKeyParameters(Blobs.ensureZeroBasedArray(seed), 0);
 		byte[] publicBytes=priv.generatePublicKey().getEncoded();
 		AccountKey publicKey=AccountKey.wrap(publicBytes);
 		

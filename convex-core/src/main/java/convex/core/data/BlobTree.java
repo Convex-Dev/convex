@@ -363,7 +363,7 @@ public class BlobTree extends ABlob {
 	 */
 	@Override
 	public ABlob append(ABlob d) {
-		BlobTree acc=this;
+		BlobTree acc=this; // accumulator for appended BlobTree
 		long off=0; // offset into d
 		long dlen=d.count();
 		
@@ -395,7 +395,7 @@ public class BlobTree extends ABlob {
 				}
 			}
 			
-			// Next level takes a following child with up to as memy bytes as acc
+			// Next level takes a following child with up to as many bytes as acc
 			long take=Math.min(acc.count(), dlen-off);
 			BlobTree nextLevel=BlobTree.createWithChildren(new ABlob[] {acc,d.slice(off,off+take)});
 			acc=nextLevel;

@@ -28,7 +28,8 @@ public class Blob extends AArrayBlob {
 	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] {Tag.NULL});
 	
 	public static final int CHUNK_LENGTH = 4096;
-
+	
+	public static final Blob EMPTY_CHUNK = wrap(new byte[CHUNK_LENGTH]);
 
 	private Blob(byte[] bytes, int offset, int length) {
 		super(bytes, offset, length);

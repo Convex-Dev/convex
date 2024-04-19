@@ -49,7 +49,13 @@ public class BlobsTest {
 	
 	@Test
 	public void testEqualsCases() {
+		// LongBlob is a Blob, but a similar Address isn't
+		assertEquals(Blob.fromHex("0000000000000001"),LongBlob.create(1));
 		assertNotEquals(Blob.fromHex("0000000000000001"),Address.create(1));
+		
+		// Two empty Bloblikes are different
+		assertNotEquals(Strings.EMPTY,Blob.EMPTY);
+		
 		assertNotEquals(Address.create(1),Blob.fromHex("0000000000000001"));
 	}
 	
@@ -483,6 +489,8 @@ public class BlobsTest {
 		ZeroBlob z4=ZeroBlob.create(100000);
 		
 		assertSame(Blob.EMPTY,z0.toFlatBlob());
+		
+		assertTrue(z3.append(z4) instanceof ZeroBlob);
 		
 		doBlobTests(z0);
 		doBlobTests(z1);

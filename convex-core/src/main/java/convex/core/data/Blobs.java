@@ -4,6 +4,7 @@ import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
 
+import convex.core.data.impl.ZeroBlob;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -126,7 +127,7 @@ public class Blobs {
 	 * Create a Blob entirely filled with a given value
 	 * @param value Byte value to fill with (low 8 bits used)
 	 * @param length Length of Blob to create
-	 * @return BlobTree filled with given value
+	 * @return Blob filled with given value
 	 */
 	public static ABlob createFilled(int value, long length) {
 		byte fillByte=(byte)value;
@@ -146,6 +147,16 @@ public class Blobs {
 		children[n-1]=lastSize==subSize?fullChild:Blobs.createFilled(fillByte, lastSize);
 		return BlobTree.createWithChildren(children);
 	}
+	
+	/**
+	 * Create a Blob entirely filled with zeros
+	 * @param length Length of Blob to create
+	 * @return Blob filled with zeros
+	 */
+	public static ABlob createZero(long length) {
+		if (length<=Blob.CHUNK_LENGTH) return Blob.EMPTY_CHUNK.slice(0,length);
+		return ZeroBlob.create(length);
+	}
 
 	public static Blob empty() {
 		return Blob.EMPTY;
@@ -154,11 +165,12 @@ public class Blobs {
 	/** 
 	 * Gets a zero-based array containing the contents of the given Blob.
 	 * MAY use current internal array if possible.
+	 * WARNING: may return underlying array, should never be mutated
 	 * 
 	 * @param b Blob to get array for
 	 * @return byte array containing the blob contents starting at offset zero
 	 */
-	public static byte[] zeroBasedArray(AArrayBlob b) {
+	public static byte[] ensureZeroBasedArray(AArrayBlob b) {
 		if (b.getInternalOffset()==0) {
 			return b.getInternalArray();
 		} else {

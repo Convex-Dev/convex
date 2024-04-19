@@ -15,6 +15,7 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.dlfs.DLFSNode;
 import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
@@ -101,21 +102,23 @@ public class DLFileChannel implements SeekableByteChannel {
 	public int write(ByteBuffer src) throws IOException {
 		synchronized(this) {
 			checkOpen();
+			long pos=position;
 			AVector<ACell> node=getNode();
 			ABlob data = DLFSNode.getData(node);
 			if (data==null) throw new NoSuchFileException(path.toString());
 			
-			if (data.count()<position) {
-				// TODO: is this sane?
-				position=data.count();
+			if (data.count()<pos) {
+				// extend file with zeros to start at new position
+				// ZeroBlob implementation makes this relatively cheap
+				data=data.append(Blobs.createZero(pos-data.count()));
 			}
 			
 			Blob b=Blob.fromByteBuffer(src);
 			long n=b.count();
-			ABlob newData=data.replaceSlice(position,b);
+			ABlob newData=data.replaceSlice(pos,b);
 			
 			// position after replaced slice
-			position=position+n;
+			position=pos+n;
 			
 			if (newData!=data) {
 				AVector<ACell> newNode=node.assoc(DLFSNode.POS_DATA, newData);
