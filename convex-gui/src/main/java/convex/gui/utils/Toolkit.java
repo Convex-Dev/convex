@@ -114,6 +114,7 @@ public class Toolkit {
 	public static final ImageIcon TERMINAL_ICON = scaledIcon(128, "/images/terminal.png");
 	public static final ImageIcon ECOSYSTEM_ICON = scaledIcon(128, "/images/ecosystem.png");
 	public static final ImageIcon WALLET_ICON = scaledIcon(128, "/images/wallet.png");
+	public static final ImageIcon DLFS_ICON = scaledIcon(128, "/images/filesystem.png");
 
 	public static ImageIcon scaledIcon(int size, String resourcePath) {
 		java.net.URL imgURL = Toolkit.class.getResource(resourcePath);

@@ -31,6 +31,7 @@ import convex.core.data.Address;
 import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.models.StateModel;
@@ -176,7 +177,7 @@ public class PeerGUI extends AbstractGUI {
 
 		});
 
-		updateThread.start();
+		ThreadUtils.runVirtual(updateThread);
 	}
 
 	private boolean updateRunning = true;
@@ -184,9 +185,10 @@ public class PeerGUI extends AbstractGUI {
 	private long cp = 0;
 	private long maxBlock=0;
 
-	private Thread updateThread = new Thread(new Runnable() {
+	private Runnable updateThread = new Runnable() {
 		@Override
 		public void run() {
+			Thread.currentThread().setName("PeerGUI update thread");
 			while (updateRunning) {
 				try {
 					Thread.sleep(100);
@@ -226,7 +228,7 @@ public class PeerGUI extends AbstractGUI {
 			}
 			log.debug("GUI Peer Manager update thread ended");
 		}
-	}, "GUI Manager state update thread");
+	};
 
 	public DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
 

@@ -74,6 +74,12 @@ public class DLFSBrowser extends AbstractGUI {
 		getFrame().setJMenuBar(menuBar);
 		
 	}
+	
+
+	public DLFSBrowser() {
+		this(createDemoDrive());
+	}
+
 
 	protected JMenuItem makeMenu(String name,Runnable op) {
 		JMenuItem mi= new JMenuItem(name);
@@ -125,8 +131,7 @@ public class DLFSBrowser extends AbstractGUI {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		DLFSLocal demoDrive=createDemoDrive();
-		DLFSBrowser gui=new DLFSBrowser(demoDrive);
+		DLFSBrowser gui=new DLFSBrowser();
 		gui.run();
 	}
 	

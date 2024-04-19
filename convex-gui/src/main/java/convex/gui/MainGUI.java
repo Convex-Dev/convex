@@ -27,6 +27,7 @@ import convex.gui.client.ConvexClient;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.Toast;
+import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.manager.mainpanels.HomePanel;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
@@ -49,6 +50,9 @@ public class MainGUI extends AbstractGUI {
 		JComponent testNet=createLaunchButton("Launch TestNet",Toolkit.TESTNET_ICON,this::launchTestNet);
 		actionPanel.add(testNet);
 		
+		JComponent latticeFS=createLaunchButton("Lattice Filesystem",Toolkit.DLFS_ICON,this::launchDLFS);
+		actionPanel.add(latticeFS);
+
 		JComponent terminal=createLaunchButton("Convex Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient);
 		actionPanel.add(terminal);
 		
@@ -62,6 +66,10 @@ public class MainGUI extends AbstractGUI {
 		actionPanel.add(www);
 		
 		add(actionPanel,"dock south");
+	}
+	
+	public void launchDLFS() {
+		new DLFSBrowser().run();
 	}
 	
 	public void launchTestNet() {
@@ -182,7 +190,6 @@ public class MainGUI extends AbstractGUI {
 	 * @param args Command line args
 	 */
 	public static void main(String[] args) {
-		// call to set up Look and Feel
 		Toolkit.init();
 		new MainGUI().run();
 	}

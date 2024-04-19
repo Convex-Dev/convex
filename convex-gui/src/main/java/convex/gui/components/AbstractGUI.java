@@ -20,6 +20,9 @@ public class AbstractGUI extends JPanel implements Runnable {
 	
 	@Override
 	public void run() {
+		// call to set up Look and Feel
+		Toolkit.init();
+		
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
