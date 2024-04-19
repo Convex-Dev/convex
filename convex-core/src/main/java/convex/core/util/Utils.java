@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 import convex.core.Constants;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
+import convex.core.data.ALongBlob;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.Blob;
@@ -1460,6 +1461,10 @@ public class Utils {
 		
 		homePath=p;
 		return p;
+	}
+
+	public static long longByteAt(long value,long i) {
+		return 0xFF&(value >> ((ALongBlob.LENGTH - i - 1) * 8));
 	}
 
 

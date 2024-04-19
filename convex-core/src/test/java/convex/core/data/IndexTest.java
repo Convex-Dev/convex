@@ -45,7 +45,7 @@ public class IndexTest {
 
 	@Test
 	public void testBadAssoc() throws InvalidDataException {
-		Index<ABlob, CVMLong> m =Index.create(InitTest.HERO, RT.cvm(1L));
+		Index<Address, CVMLong> m =Index.create(InitTest.HERO, RT.cvm(1L));
 		m=m.assoc(InitTest.VILLAIN, RT.cvm(2L));
 		assertEquals(2L,m.count());
 
@@ -357,7 +357,7 @@ public class IndexTest {
 
 	@Test
 	public void testDissocAll() throws InvalidDataException {
-		Index<ABlob, CVMLong> m=Index.none();
+		Index<Address, CVMLong> m=Index.none();
 		long n=100;
 
 		for (long i=0; i<n; i++) {

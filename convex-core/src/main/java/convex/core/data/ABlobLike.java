@@ -89,6 +89,11 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 		return result;
 	}
 	
+	@Override
+	public Ref<T> getElementRef(long index) {
+		return Ref.get(get(index));
+	}
+	
 	/**
 	 * Copies the bytes from this instance to a given destination array
 	 * 

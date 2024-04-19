@@ -8,7 +8,7 @@ import convex.core.util.Utils;
 
 public abstract class ALongBlob extends ABlob {
 
-	protected static final int LENGTH = 8;
+	public static final int LENGTH = 8;
 	protected static final int HEX_LENGTH = LENGTH*2;
 	
 	protected final long value;
@@ -57,19 +57,19 @@ public abstract class ALongBlob extends ABlob {
 	@Override
 	public abstract Blob toFlatBlob();
 	
-	private void checkIndex(long i) {
+	private static void checkIndex(long i) {
 		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
 	}
 
 	@Override
 	public final byte byteAt(long i) {
 		checkIndex(i);
-		return (byte) (value >> ((LENGTH - i - 1) * 8));
+		return (byte) Utils.longByteAt(value,i);
 	}
 	
 	@Override
 	public final byte byteAtUnchecked(long i) {
-		return (byte) (value >> ((LENGTH - i - 1) * 8));
+		return (byte) Utils.longByteAt(value,i);
 	}
 
 	@Override

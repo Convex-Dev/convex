@@ -153,6 +153,10 @@ public class CoreTest extends ACVMTest {
 		// Blob from a bigint
 		assertEquals(eval("0x00ffffffffffffffff"),eval("(blob 18446744073709551615)")); 
 		assertEquals(eval("0xff0000000000000000"),eval("(blob -18446744073709551616)")); 
+
+		// Blobs from Symbols and Kewyords
+		assertEquals(eval("(blob 'foo)"),eval("(blob :foo)")); 
+		assertEquals(eval("(blob \\A)"),eval("(blob :A)")); 
 		
 		// Address converts to regular Blob
 		assertEquals(eval("0x0000000000000013"),eval("(blob #19)")); 
@@ -175,7 +179,7 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(blob)"));
 
 		assertCastError(step("(blob \"f\")")); // odd length hex string bug #54 special case
-		assertCastError(step("(blob :foo)"));
+		// assertCastError(step("(blob :foo)")); // now works
 		assertCastError(step("(blob nil)"));
 	}
 

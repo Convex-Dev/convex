@@ -588,6 +588,11 @@ public class RT {
 		if (a instanceof APrimitive) {
 			return CVMLong.create(((APrimitive) a).longValue());
 		}
+		
+		if (a instanceof Address) {
+			long lv = ((Address) a).longValue();
+			return CVMLong.create(lv);
+		}
 
 		if (a instanceof ABlob) {
 			long lv = ((ABlob) a).longValue();
@@ -1250,14 +1255,18 @@ public class RT {
 	 * @return Blob value, or null if not convertible to a blob
 	 */
 	public static ABlob castBlob(ACell a) {
-		// handle address, hash, blob instances
-		if (a instanceof ABlob)
-			return Blobs.toCanonical((ABlob) a);
-		// TODO: big integer support?
-		if (a instanceof AInteger)
-			return ((AInteger)a).toBlob();
 		if (a instanceof AString)
 			return Blobs.fromHex((AString)a);
+
+		// handle address, hash, blob instances
+		if (a instanceof ABlobLike)
+			return ((ABlobLike<?>)a).toBlob();
+		
+		if (a instanceof AInteger)
+			return ((AInteger)a).toBlob();
+		if (a instanceof CVMChar)
+			return ((CVMChar)a).toUTFBlob();
+		
 		if (a instanceof CVMBool)
 			return ((CVMBool)a).toBlob();
 		return null;

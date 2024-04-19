@@ -68,8 +68,8 @@ public class CollectionsTest {
 		
 		ACountable<T> empty=a.empty();
 		if (empty==null) {
-			// doesn't support emptying, so must be a symbol or keyword
-			assertTrue((a instanceof Keyword)||(a instanceof Symbol));
+			// doesn't support emptying, so must be a symbol, Address  or keyword
+			assertTrue((a instanceof Keyword)||(a instanceof Symbol)||(a instanceof Address));
 		} else {
 			assertEquals(0,empty.count());
 		}

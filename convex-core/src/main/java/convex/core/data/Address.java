@@ -1,7 +1,6 @@
 package convex.core.data;
 
-import java.security.MessageDigest;
-
+import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -9,6 +8,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Bits;
+import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
@@ -18,8 +18,10 @@ import convex.core.util.Utils;
  * serves as an index into the vector of accounts for the current state.
  * 
  */
-public final class Address extends ALongBlob {
+public final class Address extends ABlobLike<CVMLong> {
 
+	public static final int LENGTH=8;
+	
 	/**
 	 * The Zero Address
 	 */
@@ -35,9 +37,14 @@ public final class Address extends ALongBlob {
 	 */
 	static final int BYTE_LENGTH = 8;
 
+	/**
+	 * 64-bit address value
+	 */
+	private long value;
+
 
 	private Address(long value) {
-		super(value);
+		this.value=value;
 	}
 	
 	/**
@@ -56,7 +63,7 @@ public final class Address extends ALongBlob {
 	 * @param b Blob to convert to an Address
 	 * @return Address instance, or null if not valid
 	 */
-	public static Address create(ABlob b) {
+	public static Address create(ABlobLike<?> b) {
 		if (b.count()>BYTE_LENGTH) return null;
 		return create(b.longValue());
 	}
@@ -80,13 +87,6 @@ public final class Address extends ALongBlob {
 
 	@Override
 	public boolean equals(ACell o) {
-		if (o==this) return true;
-		if (!(o instanceof Address)) return false;
-		return value==((Address) o).value;
-	}
-	
-	@Override
-	public boolean equals(ABlob o) {
 		if (o==this) return true;
 		if (!(o instanceof Address)) return false;
 		return value==((Address) o).value;
@@ -223,21 +223,11 @@ public final class Address extends ALongBlob {
 		Utils.writeLong(bs, 0, value);
 		return Blob.wrap(bs);
 	}
-
-	@Override
-	public void updateDigest(MessageDigest digest) {
-		toFlatBlob().updateDigest(digest);
-	}
-	
-
 	
 	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_COUNT_LENGTH;
 
-
-
 	@Override
 	public byte getTag() {
-		// Note this is NOT a regular Blob
 		return Tag.ADDRESS;
 	}
 
@@ -253,5 +243,98 @@ public final class Address extends ALongBlob {
 	 */
 	public Address offset(long offset) {
 		return create(value+offset);
+	}
+
+	@Override
+	public final byte byteAt(long i) {
+		checkIndex(i);
+		return (byte) Utils.longByteAt(value,i);
+	}
+	
+	@Override
+	public final byte byteAtUnchecked(long i) {
+		return (byte) Utils.longByteAt(value,i);
+	}
+	
+	private static void checkIndex(long i) {
+		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+	}
+	
+	@Override
+	public long hexMatch(ABlobLike<?> b, long start, long length) {
+		for (int i=0; i<length; i++) {
+			int c=b.getHexDigit(start+i);
+			if (c!=getHexDigit(start+i)) return i;
+		}	
+		return length;
+	}
+
+	@Override
+	public Address empty() {
+		// There is no empty Address
+		return null;
+	}
+
+	@Override
+	public final int getBytes(byte[] bs, int pos) {
+		pos=Utils.writeLong(bs, pos, value);
+		return pos;
+	}
+
+	@Override
+	public long longValue() {
+		// TODO Auto-generated method stub
+		return value;
+	}
+
+	@Override
+	public ABlob toBlob() {
+		return LongBlob.create(value);
+	}
+
+	@Override
+	public boolean equalsBytes(ABlob b) {
+		if (b.count()!=LENGTH) return false;
+		return b.longValue()==(value);
+	}
+
+	@Override
+	public int compareTo(ABlobLike<?> b) {
+		if (b.count()==LENGTH) {
+			return compareTo(b.longValue());
+		} else {
+			// safe because must be a different type
+			return -b.compareTo(this);
+		}
+	}
+	
+	protected int compareTo(long bvalue) {
+		return Long.compareUnsigned(value, bvalue);
+	}
+
+	@Override
+	public long count() {
+		return LENGTH;
+	}
+
+	@Override
+	public CVMLong get(long i) {
+		checkIndex(i);
+		return CVMLong.create(Utils.longByteAt(value,i));
+	}
+
+	@Override
+	public boolean isCanonical() {
+		return true;
+	}
+
+	@Override
+	public boolean isCVMValue() {
+		return true;
+	}
+
+	@Override
+	public int getRefCount() {
+		return 0;
 	}
 }
