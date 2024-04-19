@@ -123,17 +123,6 @@ public abstract class ADerivedBlob extends ACountedBlob {
 	}
 
 	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		ABlob can=getCanonical();
-		return can.encode(bs, pos);
-	}
-
-	@Override
 	public boolean isCanonical() {
 		return false;
 	}

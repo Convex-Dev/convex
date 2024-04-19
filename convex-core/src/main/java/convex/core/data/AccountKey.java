@@ -226,12 +226,6 @@ public class AccountKey extends AArrayBlob {
 	}
 
 	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.BLOB;
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
 	public int estimatedEncodingSize() {
 		// tag plus LENGTH bytes
 		return 3 + LENGTH;

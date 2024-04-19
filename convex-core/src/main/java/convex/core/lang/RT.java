@@ -670,7 +670,6 @@ public class RT {
 	public static CVMLong castByte(ACell a) {
 		if (a instanceof ABlob) {
 			ABlob b=(ABlob) a;
-			if (!b.isRegularBlob()) return null; // bail on Address etc.
 			long n=b.count();
 			if (n==0) return CVMLong.ZERO;
 			return b.get(n-1);

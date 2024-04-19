@@ -367,8 +367,6 @@ public class BlobsTest {
 		assertTrue(chunk.isChunkPacked());
 		assertTrue(chunk.isFullyPacked());
 		
-		assertTrue(Samples.FULL_BLOB.isRegularBlob());
-		
 		ABlob b=chunk.append(chunk);
 		assertEquals(2*Blob.CHUNK_LENGTH,b.size());
 		assertTrue(b.isChunkPacked());
@@ -554,14 +552,8 @@ public class BlobsTest {
 		
 		BlobBuilder bb=new BlobBuilder(a);
 
-		if (a.isRegularBlob()) {
-			assertEquals(canonical,b);
-			
-			assertEquals(a,bb.toBlob());
-			
-			// Slice should not change type
-			assertEquals(a,a.slice(0,n));
-		}
+		assertEquals(canonical,b);
+		assertEquals(a,bb.toBlob());
 		
 		doBlobSliceTests(a);
 		
@@ -605,14 +597,9 @@ public class BlobsTest {
 	public static void doBlobLikeTests(ABlobLike<?> a) {
 		long n=a.count();
 		ABlob b=a.toBlob();
-		
-		if (a.isRegularBlob()) {
-			assertSame(a.empty().toBlob(),b.empty());
-		}
-		
+
 		if (n>0) {
 			assertEquals(a.byteAt(0),b.byteAt(0));
-			
 			assertEquals(a.getHexDigit(2*n-1),0xF&a.byteAt(n-1));
 		}
 		

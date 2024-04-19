@@ -2739,7 +2739,7 @@ public class Core {
 		@Override
 		public boolean test(ACell val) {
 			if (!(val instanceof ABlob)) return false;
-			return ((ABlob)val).isRegularBlob();
+			return true;
 		}
 	});
 

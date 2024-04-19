@@ -75,9 +75,7 @@ public class Blobs {
 	 */
 	public static ABlob parse(Object o) {
 		if (o instanceof ABlob) {
-			ABlob b= (ABlob)o;
-			if (b.isRegularBlob()) return b;
-			return null;
+			return (ABlob)o;
 		}
 		if (o instanceof ACell) o=RT.jvm((ACell)o);
 		if (!(o instanceof String)) return null;;

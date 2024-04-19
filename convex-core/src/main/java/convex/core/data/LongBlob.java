@@ -62,17 +62,7 @@ public final class LongBlob extends ALongBlob {
 	@Override
 	public boolean equals(ABlob a) {
 		if (a instanceof LongBlob) return (((LongBlob) a).value == value);
-		if (a.isRegularBlob()) {
-			// must be regular Blob containing exactly this Long value
-			return ((a.count()==LENGTH)&& (a.longValue()== value));
-		}
-		return false;
-	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.BLOB;
-		return encodeRaw(bs,pos);
+		return ((a.count()==LENGTH)&& (a.longValue()== value));
 	}
 	
 	@Override
@@ -97,11 +87,6 @@ public final class LongBlob extends ALongBlob {
 		return length;
 	}
 	
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
-
 	@Override
 	public Blob toFlatBlob() {
 		return getEncoding().slice(HEADER_LENGTH,HEADER_LENGTH+LENGTH);

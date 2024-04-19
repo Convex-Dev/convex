@@ -142,9 +142,6 @@ public abstract class ALongBlob extends ABlob {
 	}
 
 	@Override
-	public abstract byte getTag();
-
-	@Override
 	public boolean isCanonical() {
 		return true;
 	}

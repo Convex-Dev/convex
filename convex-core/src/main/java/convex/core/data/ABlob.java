@@ -23,7 +23,7 @@ import convex.core.util.Bits;
 public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 	@Override
-	public AType getType() {
+	public final AType getType() {
 		return Types.BLOB;
 	}
 	
@@ -46,7 +46,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	}
 	
 	@Override
-	public ABlob empty() {
+	public final Blob empty() {
 		return Blob.EMPTY;
 	}
 
@@ -248,8 +248,11 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		if (count() < 0) throw new InvalidDataException("Negative blob length", this);
 	}
 
-
-
+	@Override
+	public final int encode(byte[] bs, int pos) {
+		bs[pos++]=Tag.BLOB;
+		return encodeRaw(bs,pos);
+	}
 	
 	/**
 	 * Writes this Blob's encoding to a byte array, excluding the tag byte
@@ -260,8 +263,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 */
 	public abstract int encodeRaw(byte[] bs, int pos);
 	
-
-	
 	@Override
 	public int hashCode() {
 		// note: We use a salted hash of the last bytes for blobs. 
@@ -269,13 +270,13 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return Bits.hash32(longValue());
 	}
 
-	@Override
-	public boolean isRegularBlob() {
-		return true;
-	}
-
 	@Override public boolean isCVMValue() {
 		return true;
+	}
+	
+	@Override
+	public final byte getTag() {
+		return Tag.BLOB;
 	}
 
 	/**

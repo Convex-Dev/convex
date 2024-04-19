@@ -208,11 +208,6 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 
 	@Override
-	public boolean isRegularBlob() {
-		return false;
-	}
-
-	@Override
 	public Blob slice(long start, long end) {
 		return toFlatBlob().slice(start,end);
 	}

@@ -75,7 +75,7 @@ public class CollectionsTest {
 		}
 		
  		if (n == 0) {
-			assertSame(empty, a);
+			assertEquals(empty, a);
 		} else {
 			assertFalse(a.isEmpty());
 			T first =a.get(0);

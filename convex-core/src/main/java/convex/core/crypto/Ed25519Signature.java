@@ -7,7 +7,6 @@ import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Strings;
-import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
@@ -99,12 +98,6 @@ public class Ed25519Signature extends ASignature {
 		int off=b.getInternalOffset(); // offset of account key in source blob
 		if (pos+SIGNATURE_LENGTH>b.count()) throw new IndexOutOfBoundsException("wrapping Ed25519Signature beyond blob bounds");
 		return wrap(data,off+pos);
-	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.BLOB;
-		return encodeRaw(bs,pos);
 	}
 
 	@Override

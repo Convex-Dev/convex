@@ -303,12 +303,6 @@ public class BlobTree extends ACountedBlob {
 		}
 		throw new UnsupportedOperationException("Shouldn't be possible?");
 	}
-	
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.BLOB;
-		return encodeRaw(bs,pos);
-	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
@@ -570,13 +564,6 @@ public class BlobTree extends ACountedBlob {
 		long newCount=ch*childLength()+newChild.count();
 		return new BlobTree(newChildren, shift, newCount);
 	}
-
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
-
-
 
 	/**
 	 * Gets the size of a BlobTree child for a blob of given total length.

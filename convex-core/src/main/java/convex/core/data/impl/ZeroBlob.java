@@ -30,12 +30,6 @@ public class ZeroBlob extends ADerivedBlob {
 		return end;
 	}
 	
-	
-	@Override
-	public ZeroBlob empty() {
-		return ZeroBlob.EMPTY;
-	}
-	
 	@Override
 	public byte byteAtUnchecked(long i) {
 		return 0;

@@ -144,16 +144,13 @@ public class StringsTest {
 	@Test public void testEmbeddedString() {
 		StringShort s=Samples.MAX_EMBEDDED_STRING;
 		assertTrue(s.isEmbedded());
-		assertFalse(s.isRegularBlob());
 		assertTrue(s.getRef().isDirect());
 		
 		Blob b=s.toBlob();
-		assertTrue(b.isRegularBlob());
 		
 		assertEquals(b.toHexString(),s.toHexString());
 		
 		Blob enc=s.getEncoding();
-		assertTrue(enc.isRegularBlob());
 		assertEquals(s.getTag(),enc.byteAt(0));
 	}
 	

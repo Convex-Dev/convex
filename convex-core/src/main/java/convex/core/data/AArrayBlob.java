@@ -236,7 +236,6 @@ public abstract class AArrayBlob extends ACountedBlob {
 	public boolean equals(ABlob o) {
 		if (o==this) return true;
 		if (o==null) return false;
-		if (!o.isRegularBlob()) return false; // exclude irregular Blob types
 		if (o.count()!=count) return false;
 		return o.equalsBytes(this.store, this.offset);
 	}
@@ -341,10 +340,7 @@ public abstract class AArrayBlob extends ACountedBlob {
 		}
 	}
 	
-	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
+
 
 	@Override
 	public final int getRefCount() {

@@ -167,13 +167,6 @@ public class Hash extends AArrayBlob {
 	}
 
 	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.BLOB;
-		bs[pos++]=LENGTH;
-		return getBytes(bs,pos);
-	}
-
-	@Override
 	public boolean isCanonical() {
 		// never canonical, since the canonical version is a Blob
 		return false;

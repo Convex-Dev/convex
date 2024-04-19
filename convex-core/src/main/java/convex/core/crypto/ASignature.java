@@ -5,7 +5,6 @@ import java.nio.ByteBuffer;
 import convex.core.data.AArrayBlob;
 import convex.core.data.ABlob;
 import convex.core.data.AccountKey;
-import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
@@ -71,13 +70,7 @@ public abstract class ASignature extends AArrayBlob {
 	}
 	
 	@Override
-	public byte getTag() {
-		return Tag.BLOB;
-	}
-	
-	@Override
 	public boolean equals(ABlob b) {
-		if (!b.isRegularBlob()) return false;
 		return b.equalsBytes(this);
 	}
 
