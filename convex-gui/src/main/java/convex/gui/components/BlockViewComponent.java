@@ -16,7 +16,7 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.gui.PeerGUI;
+import convex.gui.peer.PeerGUI;
 import convex.peer.Server;
 
 /**

@@ -2,8 +2,10 @@ package convex.gui.components;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Point;
+import java.awt.Toolkit;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.awt.geom.RoundRectangle2D;
@@ -30,15 +32,25 @@ public class Toast extends JWindow {
 		this.getContentPane().setBackground(color);
 		add(component);
 		
-		Point pp=parent.getLocationOnScreen();
-		
-		int px=(int) pp.getX();
-		int py=(int) pp.getY();
-		int pw=parent.getWidth();
-		int ph=parent.getHeight();
-		int h=50;
-		this.setLocation(px, py+ph-h);
-		setSize(pw,h);
+		if (parent!=null) {
+			Point pp=parent.getLocationOnScreen();
+			
+			int px=(int) pp.getX();
+			int py=(int) pp.getY();
+			int pw=parent.getWidth();
+			int ph=parent.getHeight();
+			int h=50;
+			setLocation(px, py+ph-h);
+			setSize(pw,h);
+		} else {
+			Dimension dims=Toolkit.getDefaultToolkit().getScreenSize();
+			int cx=dims.width/2;
+			int cy=dims.height/2;
+			int w=600;
+			int h=100;
+			setLocation(cx-w/2, cy+w/2);
+			setSize(w,h);
+		}
 		
 		addComponentListener(new ComponentAdapter() {
 			@Override

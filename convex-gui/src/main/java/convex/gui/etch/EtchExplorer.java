@@ -1,26 +1,27 @@
 package convex.gui.etch;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.EventQueue;
 import java.awt.Toolkit;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.core.store.Stores;
+import convex.gui.components.AbstractGUI;
 import convex.gui.components.models.StateModel;
 import convex.gui.etch.panels.DatabasePanel;
 import etch.EtchStore;
 
 /**
- * A Client application for the Convex Network
+ * A Client application for exploring an Etch store
  */
 @SuppressWarnings("serial")
-public class EtchExplorer extends JPanel {
+public class EtchExplorer extends AbstractGUI {
 
 	public static final Logger log = LoggerFactory.getLogger(EtchExplorer.class.getName());
 
@@ -92,10 +93,6 @@ public class EtchExplorer extends JPanel {
 		System.err.println("Missing tab: " + title);
 	}
 
-	public static Component getFrame() {
-		return frame;
-	}
-	
 	public StateModel<EtchStore> getEtchState() {
 		return etchState;
 	}

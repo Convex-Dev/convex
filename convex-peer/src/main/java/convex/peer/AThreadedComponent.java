@@ -28,14 +28,15 @@ public abstract class AThreadedComponent {
 				try {
 					loop();		
 				} catch (InterruptedException e) {
-					log.debug("Component thread interrupted: {}",thread);
+					log.trace("Component thread interrupted: {}",thread);
 					break;
-				} catch (Throwable e) {
-					log.warn("Unexpected exception in "+this.getClass().getSimpleName(),e);
+				} catch (Exception e) {
+					log.warn("Unexpected exception in "+AThreadedComponent.this.getClass().getSimpleName(),e);
 				} 
 			}
 			
 			// Finally close the component properly
+			log.debug("Component thread stopping: {}",thread);
 			close();
 		}
 	}

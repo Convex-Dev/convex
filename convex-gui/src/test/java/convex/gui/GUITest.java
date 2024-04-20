@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.InvalidDataException;
+import convex.gui.peer.PeerGUI;
 
 /**
  * We can't test much of the GUI easily in unit tests, but we can at least test

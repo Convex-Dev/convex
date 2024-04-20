@@ -932,7 +932,8 @@ public class Utils {
 		try {
 			// Try URL parsing first
 			URL url=new URI(s).toURL();
-			return toInetSocketAddress(url);
+			InetSocketAddress sa= toInetSocketAddress(url);
+			return sa;
 		} catch (Exception ex) {
 			// Try to parse as host:port
 			int colon = s.lastIndexOf(':');

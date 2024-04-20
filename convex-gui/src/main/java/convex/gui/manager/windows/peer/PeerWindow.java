@@ -12,9 +12,9 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
-import convex.gui.PeerGUI;
 import convex.gui.components.PeerComponent;
-import convex.gui.manager.windows.BaseWindow;
+import convex.gui.peer.PeerGUI;
+import convex.gui.peer.windows.BaseWindow;
 import convex.peer.Server;
 
 @SuppressWarnings("serial")

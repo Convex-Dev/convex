@@ -28,7 +28,7 @@ public class LocalGUI implements Runnable {
 	public void run() {
 		// sub command to launch peer manager
 		try {
-			Applications.launchApp(convex.gui.PeerGUI.class);
+			Applications.launchApp(convex.gui.peer.PeerGUI.class);
 		} catch (Throwable t) {
 			throw new CLIError("Error launching GUI: ",t);
 		}

@@ -3,8 +3,6 @@ package convex.gui;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.EventQueue;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -20,17 +18,18 @@ import javax.swing.SwingConstants;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.util.Utils;
 import convex.gui.client.ConvexClient;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.ConnectPanel;
 import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSBrowser;
-import convex.gui.manager.mainpanels.HomePanel;
+import convex.gui.peer.PeerGUI;
+import convex.gui.peer.mainpanels.HomePanel;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
+import convex.gui.wallet.WalletApp;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -44,7 +43,7 @@ public class MainGUI extends AbstractGUI {
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.setLayout(new MigLayout("center,align center,fillx"));
 		
-		JComponent wallet=createLaunchButton("Wallet",Toolkit.WALLET_ICON,this::launchTestNet);
+		JComponent wallet=createLaunchButton("Wallet",Toolkit.WALLET_ICON,this::launchWallet);
 		actionPanel.add(wallet);
 
 		JComponent testNet=createLaunchButton("Peer Manager",Toolkit.TESTNET_ICON,this::launchTestNet);
@@ -53,7 +52,7 @@ public class MainGUI extends AbstractGUI {
 		JComponent latticeFS=createLaunchButton("Lattice Filesystem",Toolkit.DLFS_ICON,this::launchDLFS);
 		actionPanel.add(latticeFS);
 
-		JComponent terminal=createLaunchButton("Convex Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient);
+		JComponent terminal=createLaunchButton("Client Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient);
 		actionPanel.add(terminal);
 		
 		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools);
@@ -71,6 +70,14 @@ public class MainGUI extends AbstractGUI {
 	public void launchDLFS() {
 		new DLFSBrowser().run();
 	}
+	
+	public void launchWallet() {
+	    Convex convex=ConnectPanel.tryConnect(this);
+	    if (convex!=null) {
+	    	new WalletApp(convex).run();
+	    }
+	}
+	
 	
 	public void launchTestNet() {
 		JPanel pan=new JPanel();
@@ -118,47 +125,10 @@ public class MainGUI extends AbstractGUI {
 	}
 	
 	public void launchTerminalClient() {
-		JPanel pan=new JPanel();
-		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
-		pan.add(new JLabel("Host:"));
-		JTextField hostField=new JTextField("localhost:18888");
-		pan.add(hostField);
-		
-		pan.add(new JLabel("Address:"));
-		JTextField addressField=new JTextField("#12");
-		pan.add(addressField);
-
-		pan.add(new JLabel("Private Key:   "));
-		JTextField keyField=new JTextField("");
-		keyField.setMinimumSize(new Dimension(200,25));
-		pan.add(keyField);
-
-
-		int result = JOptionPane.showConfirmDialog(this, pan, 
-	               "Enter Connection Details", JOptionPane.OK_CANCEL_OPTION);
-	    if (result == JOptionPane.OK_OPTION) {
-	    	try {
-	    		InetSocketAddress sa=Utils.toInetSocketAddress(hostField.getText());
-	    		System.err.println("MainGUI attemptiong connect to: "+sa);
-	    		Convex convex=Convex.connect(sa);
-	    		convex.setAddress(Address.parse(addressField.getText()));
-	    		
-	    		Blob b=Blob.parse(keyField.getText());
-	    		if ((b!=null)&&(!b.isEmpty())) {
-	    			AKeyPair kp=AKeyPair.create(b);
-	    			convex.setKeyPair(kp);
-	    		}
-	    		ConvexClient.launch(convex);
-	    	} catch (ConnectException e) {
-	    		Toast.display(this, "Connection Refused! "+e.getMessage(), Color.RED);
-	    		e.printStackTrace();
-	    	} catch (Exception e) {
-	    		Toast.display(this, "Connect Failed: "+e.getMessage(), Color.RED);
-	    		e.printStackTrace();
-	    	}
+	    Convex convex=ConnectPanel.tryConnect(this);
+	    if (convex!=null) {
+	    	ConvexClient.launch(convex);
 	    }
-		
 	}
 	
 	public void launchTools() {

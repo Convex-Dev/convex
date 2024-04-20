@@ -1,0 +1,48 @@
+package convex.gui.etch;
+
+import java.awt.BorderLayout;
+
+import javax.swing.JTabbedPane;
+
+import convex.api.Convex;
+import convex.api.ConvexLocal;
+import convex.gui.components.PeerComponent;
+import convex.gui.peer.PeerGUI;
+import convex.gui.peer.windows.BaseWindow;
+import etch.EtchStore;
+
+@SuppressWarnings("serial")
+public class EtchWindow extends BaseWindow {
+	EtchStore store;
+	Convex peer;
+	
+
+	
+	public EtchStore getEtchStore() {
+		return store;
+	}
+	
+	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
+
+	public EtchWindow(PeerGUI manager, ConvexLocal peer) {
+		super(manager);
+		this.peer=peer;
+		this.store=(EtchStore) peer.getLocalServer().getStore();
+		
+		PeerComponent pcom=new PeerComponent(manager,peer);
+		add(pcom, BorderLayout.NORTH);
+		
+		add(tabbedPane, BorderLayout.CENTER);
+	}
+
+	@Override
+	public String getTitle() {
+		try {
+			 return "Storage view - "+peer.getHostAddress();
+		}
+		catch (Exception e) {
+			return "Storage view - Unknown";
+		}
+	}
+
+}
