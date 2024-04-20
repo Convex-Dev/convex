@@ -9,6 +9,7 @@ import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.peer.mainpanels.HomePanel;
+import convex.gui.peer.mainpanels.KeyListPanel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -32,6 +33,7 @@ public class WalletApp extends AbstractGUI {
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Home", homePanel);
+		tabs.add("Keys", new KeyListPanel(convex));
 	}
 
 	// private static final Logger log = LoggerFactory.getLogger(Wallet.class.getName());

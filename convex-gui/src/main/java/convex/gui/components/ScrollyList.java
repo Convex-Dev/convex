@@ -2,6 +2,7 @@ package convex.gui.components;
 
 import java.awt.Component;
 import java.awt.Dimension;
+import java.awt.EventQueue;
 import java.awt.GridLayout;
 import java.awt.Rectangle;
 import java.util.function.Function;
@@ -25,14 +26,16 @@ public class ScrollyList<E> extends JScrollPane {
 	private final ListModel<E> model;
 	private final ScrollablePanel listPanel = new ScrollablePanel();
 
-	private void refreshList() {
-		listPanel.removeAll();
-		int n = model.getSize();
-		for (int i = 0; i < n; i++) {
-			E we = model.getElementAt(i);
-			listPanel.add(builder.apply(we));
-		}
-		this.revalidate();
+	public void refreshList() {
+		EventQueue.invokeLater(()->{;
+			listPanel.removeAll();
+			int n = model.getSize();
+			for (int i = 0; i < n; i++) {
+				E we = model.getElementAt(i);
+				listPanel.add(builder.apply(we));
+			}
+			this.revalidate();
+		});
 	}
 
 	private static class ScrollablePanel extends JPanel implements Scrollable {

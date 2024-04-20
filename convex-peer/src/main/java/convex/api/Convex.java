@@ -907,6 +907,16 @@ public abstract class Convex {
 	public static ConvexLocal connect(Server server, Address address, AKeyPair keyPair) {
 		return ConvexLocal.create(server, address, keyPair);
 	}
+	
+	/**
+	 * Connect to a local Server, with no address and keypair set
+	 * 
+	 * @param server  Server to connect to
+	 * @return New Client Connection
+	 */
+	public static ConvexLocal connect(Server server) {
+		return ConvexLocal.create(server, null, null);
+	}
 
 	/**
 	 * Gets the consensus state from the remote Peer

@@ -13,14 +13,12 @@ import javax.swing.JTextArea;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.State;
+import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.BasicWalletEntry;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.text.Text;
 import convex.gui.client.ConvexClient;
-import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -40,11 +38,11 @@ public class WalletComponent extends BaseListComponent {
 	JPanel buttons = new JPanel();
 
 	private Address address;
-	PeerGUI manager;
+	protected Convex convex;
 
-	public WalletComponent(PeerGUI manager,BasicWalletEntry initialWalletEntry) {
+	public WalletComponent(Convex convex,BasicWalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
-		this.manager=manager;
+		this.convex=convex;
 		address = walletEntry.getAddress();
 
 		setLayout(new MigLayout("fillx"));
@@ -65,17 +63,13 @@ public class WalletComponent extends BaseListComponent {
 		cPanel.add(infoLabel,"span,growx");
 		add(cPanel,"grow,shrink"); // add to MigLayout
 
-		manager.getStateModel().addPropertyChangeListener(e -> {
-			infoLabel.setText(getInfoString());
-		});
-		
 		///// Buttons
 		// REPL button
 		replButton = new JButton("");
 		buttons.add(replButton);
 		replButton.setIcon(Toolkit.REPL_ICON);
 		replButton.addActionListener(e -> {
-			ConvexClient c= ConvexClient.launch(manager.connectClient(walletEntry.getAddress(),walletEntry.getKeyPair()));
+			ConvexClient c= ConvexClient.launch(convex);
 			c.tabs.setSelectedComponent(c.replPanel);
 		});
 		replButton.setToolTipText("Launch a client REPL for this account");
@@ -134,6 +128,7 @@ public class WalletComponent extends BaseListComponent {
 		add(buttons,"east"); // add to MigLayout
 	}
 
+
 	private void resetTooltipTExt(JComponent b) {
 		if (walletEntry.isLocked()) {
 			b.setToolTipText("Unlock");
@@ -144,12 +139,12 @@ public class WalletComponent extends BaseListComponent {
 
 	private String getInfoString() {
 		StringBuilder sb=new StringBuilder();
-		State s=manager.getLatestState();
-		AccountStatus as=s.getAccount(address);
-		if (as!=null) {
-			Long bal=as.getBalance();
-			sb.append("Public Key: " + walletEntry.getPublicKey()+"\n");
-			sb.append("Balance:    " + Text.toFriendlyNumber(bal));
+		sb.append("Public Key: " + walletEntry.getPublicKey()+"\n");
+		try {
+			sb.append("Balance:    " + Text.toFriendlyNumber(convex.getBalance(address)));
+		} catch (Exception e) {
+			e.printStackTrace();
+			sb.append("Balance:    <not available>");
 		}
 		
 		//sb.append("\n");

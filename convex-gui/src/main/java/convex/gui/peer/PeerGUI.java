@@ -41,7 +41,7 @@ import convex.gui.peer.mainpanels.KeyGenPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.peer.mainpanels.PeersListPanel;
 import convex.gui.peer.mainpanels.TorusPanel;
-import convex.gui.peer.mainpanels.WalletPanel;
+import convex.gui.peer.mainpanels.KeyListPanel;
 import convex.gui.utils.Toolkit;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
@@ -111,7 +111,7 @@ public class PeerGUI extends AbstractGUI {
 	 * Main component panel
 	 */
 	PeersListPanel peerPanel;
-	WalletPanel walletPanel;
+	KeyListPanel walletPanel;
 	KeyGenPanel keyGenPanel;
 	MessageFormatPanel messagePanel;
 	JPanel accountsPanel;
@@ -139,7 +139,7 @@ public class PeerGUI extends AbstractGUI {
 		tickState = StateModel.create(0L);
 		
 		peerPanel= new PeersListPanel(this);
-		walletPanel = new WalletPanel(this);
+		walletPanel = new KeyListPanel(null);
 		keyGenPanel = new KeyGenPanel(this);
 		messagePanel = new MessageFormatPanel(this);
 		accountsPanel = new AccountsPanel(this);
@@ -150,8 +150,8 @@ public class PeerGUI extends AbstractGUI {
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Peers", peerPanel);
-		tabs.add("Wallet", getWalletPanel());
 		tabs.add("Accounts", accountsPanel);
+		tabs.add("Keys", walletPanel);
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("Message", messagePanel);
 		// tabs.add("Actors", new ActorsPanel(this));
@@ -160,22 +160,21 @@ public class PeerGUI extends AbstractGUI {
 		
 		tabs.setSelectedComponent(peerPanel);
 		
-		// launch local peers for testing
-		EventQueue.invokeLater(() -> {
-			peerPanel.launchAllPeers(this);
-			
-			Server first=peerList.firstElement().getLocalServer();
-			
-			// Set up observability
-			
-			try {
-				restServer=RESTServer.create(first);
-				restServer.start();
-			} catch (Exception t) {
-				log.warn("Unable to start REST Server: ",t);
-			}
+		// launch local peers 
+		peerPanel.launchAllPeers(this);
+		
+		Server first=peerList.firstElement().getLocalServer();
+		walletPanel.setConvex(Convex.connect(first));
+		
+		// Set up observability
+		
+		try {
+			restServer=RESTServer.create(first);
+			restServer.start();
+		} catch (Exception t) {
+			log.warn("Unable to start REST Server: ",t);
+		}
 
-		});
 
 		ThreadUtils.runVirtual(updateThread);
 	}
@@ -229,7 +228,7 @@ public class PeerGUI extends AbstractGUI {
 		}
 	};
 
-	public DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
+	protected DefaultListModel<ConvexLocal> peerList = new DefaultListModel<ConvexLocal>();
 
 	public DefaultListModel<ConvexLocal> getPeerList() {
 		return peerList;
@@ -252,7 +251,7 @@ public class PeerGUI extends AbstractGUI {
 		System.err.println("Missing tab: " + title);
 	}
 
-	public WalletPanel getWalletPanel() {
+	public KeyListPanel getWalletPanel() {
 		return walletPanel;
 	}
 
