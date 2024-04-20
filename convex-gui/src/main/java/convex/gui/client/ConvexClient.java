@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.util.Utils;
-import convex.gui.manager.windows.peer.REPLPanel;
+import convex.gui.peer.windoes.REPLPanel;
 import convex.gui.utils.Toolkit;
 
 /**

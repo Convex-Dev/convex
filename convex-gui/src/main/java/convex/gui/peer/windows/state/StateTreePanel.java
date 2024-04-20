@@ -14,11 +14,16 @@ import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
 import convex.core.data.ACell;
+import convex.core.data.ACountable;
+import convex.core.data.ADataStructure;
+import convex.core.data.AMap;
 import convex.core.data.ARecord;
-import convex.core.data.Cells;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
-import convex.core.data.MapLeaf;
+import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")
@@ -27,14 +32,20 @@ public class StateTreePanel extends JPanel {
 	private final ACell state;
 
 	private static class Node extends DefaultMutableTreeNode {
-		private final boolean container;
+		private boolean container;
 		private boolean loaded = false;
-		private final String name;
+		private String name;
 
 		public Node(String name, ACell val) {
 			super(val);
+			if (val instanceof ADataStructure) {
+				if (RT.count(val)>0) {
+					container=true;
+				} else {
+					name = name+ " (empty)";
+				}
+			}
 			this.name = name;
-			container = Cells.refCount(val)>0;
 		}
 
 		public Node(ACell val) {
@@ -46,51 +57,64 @@ public class StateTreePanel extends JPanel {
 			return !container;
 		}
 
-		private static String getString(Object val) {
-			if (val instanceof ACell) {
-				ACell r = (ACell) val;
-				return r.getClass().getSimpleName() + " [" + r.getHash().toHexString(6) + "...]";
+		private static String getString(ACell a) {
+			if (a instanceof AString) {
+				return "\""+a.toString()+"\"";
+			} else if (a instanceof Address) {
+				return a.toString();
+			} else if (a instanceof ACountable) {
+				return Utils.getClass(a).getSimpleName();
+			} else {
+				return RT.print(a).toString();
 			}
-
-			return Utils.getClassName(val);
 		}
 
 		@Override
 		public String toString() {
 			if (name != null) return name;
-			return getString(this.userObject);
+			name = getString((ACell)this.userObject);
+			return name;
 		}
 
 		@SuppressWarnings("rawtypes")
 		public void loadChildren() {
 			if (loaded) return;
 			loaded = true;
+			ACell a=(ACell)userObject;
 
-			if (userObject instanceof ARecord) {
-				ARecord r = (ARecord) userObject;
+			if (a instanceof ARecord) {
+				ARecord r = (ARecord) a;
 				for (Keyword k : r.getKeys()) {
 					ACell c = r.get(k);
 					add(new Node(k + " = " + getString(c), c));
 				}
 				return;
-			} else if (userObject instanceof MapLeaf) {
-				MapLeaf m = (MapLeaf) userObject;
-				for (Object oe : m.entrySet()) {
-					MapEntry e = (MapEntry) oe;
+			} else if (a instanceof AMap) {
+				AMap m = (AMap) a;
+				long n=m.count();
+				for (long i=0; i<n; i++) {
+					MapEntry e = m.entryAt(i);
 					ACell c = e.getValue();
-					add(new Node(getString(e.getKey()) + " = " + getString(c), c));
+					add(new Node(RT.toString(e.getKey()) + " = " + getString(c), c));
 				}
 				return;
+			} else if (a instanceof AVector) {
+				AVector v = (AVector) a;
+				long n=v.count();
+				for (long i=0; i<n; i++) {
+					ACell c = v.get(i);
+					add(new Node("["+i + "] = " + getString(c), c));
+				}
+				return;
+			} else {
+				if (!container) return;
+				ACell rc = (ACell) a;
+				int n = rc.getRefCount();
+				for (int i = 0; i < n; i++) {
+					ACell child = rc.getRef(i).getValue();
+					add(new Node(child));
+				}
 			}
-
-			if (!container) return;
-			ACell rc = (ACell) userObject;
-			int n = rc.getRefCount();
-			for (int i = 0; i < n; i++) {
-				ACell child = rc.getRef(i).getValue();
-				add(new Node(child));
-			}
-
 		}
 
 	}

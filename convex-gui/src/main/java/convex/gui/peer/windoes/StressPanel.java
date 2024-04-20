@@ -1,4 +1,4 @@
-package convex.gui.manager.windows.peer;
+package convex.gui.peer.windoes;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;

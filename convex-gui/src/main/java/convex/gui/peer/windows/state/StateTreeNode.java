@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
 
+import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.TreeNode;
 
 import convex.core.data.Ref;
@@ -11,7 +12,8 @@ import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.util.Utils;
 
-public class StateTreeNode<T extends ACell> implements TreeNode {
+@SuppressWarnings("serial")
+public class StateTreeNode<T extends ACell> extends DefaultMutableTreeNode {
 
 	private final T object;
 	private final boolean isContainer;
@@ -62,10 +64,10 @@ public class StateTreeNode<T extends ACell> implements TreeNode {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public Enumeration<? extends TreeNode> children() {
+	public Enumeration<TreeNode> children() {
 
-		Ref<ACell>[] childRefs = (isContainer ? ((ACell) object).getChildRefs() : new Ref[0]);
-		ArrayList<StateTreeNode<ACell>> tns = new ArrayList<>();
+		Ref<ACell>[] childRefs = (isContainer ? object.getChildRefs() : new Ref[0]);
+		ArrayList<TreeNode> tns = new ArrayList<>();
 		for (Ref<ACell> r : childRefs) {
 			tns.add(StateTreeNode.create(r.getValue()));
 		}
