@@ -10,6 +10,7 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 
 import convex.core.Constants;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -20,8 +21,8 @@ public class Strings {
 	public static final Ref<StringShort> EMPTY_REF = EMPTY.getRef();
 	
 	public static final StringShort NIL = StringShort.create("nil");
-	public static final StringShort TRUE = StringShort.create("true");
-	public static final StringShort FALSE = StringShort.create("false");
+	public static final StringShort TRUE = StringShort.create(CVMBool.TRUE_STRING);
+	public static final StringShort FALSE = StringShort.create(CVMBool.FALSE_STRING);
 	
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
 	public static final StringShort BAD_FORMAT = StringShort.create("Bad Message Format!");

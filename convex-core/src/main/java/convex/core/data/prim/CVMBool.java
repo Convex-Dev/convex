@@ -28,7 +28,11 @@ public final class CVMBool extends APrimitive {
 	// Salted values for hashcodes
 	private static final int TRUE_HASHCODE = (int)Bits.SALT;
 	private static final int FALSE_HASHCODE = (int)(Bits.SALT>>32);
-	
+
+	// Java String values
+	public static final String TRUE_STRING = "true";
+	public static final String FALSE_STRING = "false";
+
 	private CVMBool(boolean value) {
 		this.value=value;
 	}
@@ -126,6 +130,11 @@ public final class CVMBool extends APrimitive {
 
 	public ACell not() {
 		return value?FALSE:TRUE;
+	}
+	
+	@Override
+	public String toString() {
+		return value?TRUE_STRING:FALSE_STRING;
 	}
 
 }

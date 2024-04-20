@@ -248,11 +248,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 */
 	public abstract Blob getChunk(long i);
 	
-	/**
-	 * Prints this Blob in a readable Hex representation, typically in the format "0x01abcd...."
-	 * 
-	 * Subclasses may override this if they require a different representation.
-	 */
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.append(Strings.HEX_PREFIX);

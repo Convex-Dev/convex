@@ -126,7 +126,7 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	}
 	
 	@Override 
-	public final String toString() {
+	public String toString() {
 		int n=Utils.checkedInt(count());
 		ByteBuffer bb=toBlob().toByteBuffer();
 		

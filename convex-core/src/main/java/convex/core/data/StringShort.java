@@ -218,5 +218,12 @@ public final class StringShort extends AString {
 	public long longValue() {
 		return data.longValue();
 	}
+	
+	@Override
+	public String toString() {
+		byte [] bytes=data.getInternalArray();
+		if (bytes.length!=data.count()) bytes=data.getBytes(); // need a copy if not fully packed
+		return new String(bytes,StandardCharsets.UTF_8);
+	}
 
 }

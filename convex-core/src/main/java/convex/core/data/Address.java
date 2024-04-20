@@ -193,7 +193,12 @@ public final class Address extends ABlobLike<CVMLong> {
 	@Override
 	public AString toCVMString(long limit) {
 		if (limit<2) return null;
-		return Strings.create("#"+value);
+		return Strings.create(toString());
+	}
+	
+	@Override
+	public String toString() {
+		return "#"+value;
 	}
 
 	@Override
