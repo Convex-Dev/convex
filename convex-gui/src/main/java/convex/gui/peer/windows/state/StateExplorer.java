@@ -1,5 +1,6 @@
 package convex.gui.peer.windows.state;
 
+import java.awt.EventQueue;
 import java.util.List;
 
 import javax.swing.JComponent;
@@ -12,25 +13,32 @@ import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.CodeLabel;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class StateWindow extends AbstractGUI {
+public class StateExplorer extends AbstractGUI {
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
-	private final ACell state;
+	protected ACell state;
 
-	public StateWindow(ACell state) {
+	public StateExplorer(ACell state) {
 		this.state=state;
 		this.setLayout(new MigLayout());
-		add(tabbedPane, "dock center");
 
+		StringBuilder sb=new StringBuilder();
+		sb.append("HASH: "+Cells.getHash(state)+"\n");
+		sb.append("TYPE: "+Utils.getClass(state).getSimpleName()+"\n");
+		add(new CodeLabel(sb.toString()),"dock north");
+		
 		tabbedPane.addTab("Tree", null, new StateTreePanel(state), null);
 		tabbedPane.addTab("Text", null, createTextPanel(state), null);
-
+		tabbedPane.addTab("Encoding", null, new CodeLabel(Cells.getEncoding(state).toHexString()), null);
+		add(tabbedPane, "dock center");
+		
 	}
 
 	protected JComponent createTextPanel(ACell state) {
@@ -42,13 +50,19 @@ public class StateWindow extends AbstractGUI {
 
 	@Override
 	public String getTitle() {
-		return "State explorer: "+Cells.getHash(state);
+		return "State explorer";
+	}
+	
+	public static void explore (ACell a) {
+		EventQueue.invokeLater(()->{
+			new StateExplorer(a).run();
+		});
 	}
 
 	public static void main(String[] args) {
 		Toolkit.init();
 		AKeyPair kp=AKeyPair.createSeeded(564646);
 		ACell state=Init.createBaseState(List.of(kp.getAccountKey()));
-		new StateWindow(state).run();
+		new StateExplorer(state).run();
 	}
 }

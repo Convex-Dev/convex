@@ -27,7 +27,7 @@ import convex.gui.components.models.StateModel;
 import convex.gui.etch.EtchWindow;
 import convex.gui.peer.PeerGUI;
 import convex.gui.peer.windoes.PeerWindow;
-import convex.gui.peer.windows.state.StateWindow;
+import convex.gui.peer.windows.state.StateExplorer;
 import convex.gui.utils.Toolkit;
 import convex.peer.ConnectionManager;
 import convex.peer.Server;
@@ -57,7 +57,7 @@ public class PeerComponent extends BaseListComponent {
 	public void launchExploreWindow(Convex peer) {
 		Server s = peer.getLocalServer();
 		ACell p = s.getPeer().getConsensusState();
-		StateWindow pw = new StateWindow(p);
+		StateExplorer pw = new StateExplorer(p);
 		pw.run();
 	}
 

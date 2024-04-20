@@ -11,10 +11,13 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 
+import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.dlfs.DLFS;
 import convex.dlfs.DLPath;
 import convex.dlfs.impl.DLFSLocal;
 import convex.gui.components.AbstractGUI;
+import convex.gui.peer.windows.state.StateExplorer;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -38,6 +41,18 @@ public class DLFSBrowser extends AbstractGUI {
 		panel=new DLFSPanel(drive);
 		add(panel,"dock center");
 		
+		fileMenu.add(makeMenu("Explore Node...",()->{
+			Path p=panel.fileList.getSelectedPath();
+			if (p instanceof DLPath) {
+				AVector<ACell> node=drive.getNode((DLPath) p);
+				if (node!=null) {
+					StateExplorer.explore(node);
+				} else {
+					StateExplorer.explore(drive.getNode(drive.getRoot()));
+				}
+			}
+			panel.refreshView();
+		}));		
 		fileMenu.add(makeMenu("Delete",()->{
 			Path p=panel.fileList.getSelectedPath();
 			try {

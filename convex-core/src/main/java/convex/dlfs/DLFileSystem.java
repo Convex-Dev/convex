@@ -191,7 +191,7 @@ public abstract class DLFileSystem extends FileSystem {
 	/**
 	 * Gets DLFS node for the given path
 	 * @param path
-	 * @return
+	 * @return DLFS node, or null if does not exist
 	 */
 	public abstract AVector<ACell> getNode(DLPath path);
 

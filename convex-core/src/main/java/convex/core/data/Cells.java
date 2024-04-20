@@ -3,6 +3,7 @@ package convex.core.data;
 import java.lang.reflect.Array;
 import java.util.function.Consumer;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 
@@ -158,6 +159,11 @@ public class Cells {
 	public static Hash getHash(ACell a) {
 		if (a==null) return Hash.NULL_HASH;
 		return a.getHash();
+	}
+
+	public static ABlobLike<CVMLong> getEncoding(ACell a) {
+		if (a==null) return Blob.NULL_ENCODING;
+		return a.getEncoding();
 	}
 
 }
