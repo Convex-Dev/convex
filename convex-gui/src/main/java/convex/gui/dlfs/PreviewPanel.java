@@ -46,8 +46,10 @@ public class PreviewPanel extends JPanel {
 			if ((path!=null)&&Files.exists(path)) {
 				
 				boolean isDir=Files.isDirectory(path);
+				Path fname=(path.getFileName());
 				
-				sb.append("Name:        "+path.getFileName().toString()+"\n");
+				sb.append("Name:        "+((fname==null)?"<root>":fname.toString())+"\n");
+				sb.append("Path:        "+path.toString()+"\n");
 				sb.append("Type:        "+(isDir?"Directory":"File")+"\n");
 				sb.append("\n");
 				

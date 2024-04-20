@@ -42,7 +42,7 @@ public class DLFSBrowser extends AbstractGUI {
 		add(panel,"dock center");
 		
 		fileMenu.add(makeMenu("Explore Node...",()->{
-			Path p=panel.fileList.getSelectedPath();
+			Path p=panel.getSelectedPath();
 			if (p instanceof DLPath) {
 				AVector<ACell> node=drive.getNode((DLPath) p);
 				if (node!=null) {
@@ -52,9 +52,10 @@ public class DLFSBrowser extends AbstractGUI {
 				}
 			}
 			panel.refreshView();
-		}));		
+		}));	
+		// fileMenu.addSeparator();
 		fileMenu.add(makeMenu("Delete",()->{
-			Path p=panel.fileList.getSelectedPath();
+			Path p=panel.getSelectedPath();
 			try {
 				Files.deleteIfExists(p);
 			} catch (IOException e) {

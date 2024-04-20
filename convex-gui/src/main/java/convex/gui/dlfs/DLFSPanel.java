@@ -115,6 +115,8 @@ public class DLFSPanel extends JPanel {
 		
 
 		pathLabel.setText(newPath.toUri().toString());
+		
+		previewPanel.setPath(newPath);
 	}
 
 	public DLPath getSelectedPath() {
