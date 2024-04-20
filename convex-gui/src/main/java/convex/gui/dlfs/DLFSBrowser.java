@@ -14,6 +14,7 @@ import javax.swing.JMenuItem;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.dlfs.DLFS;
+import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
 import convex.dlfs.impl.DLFSLocal;
 import convex.gui.components.AbstractGUI;
@@ -24,9 +25,9 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class DLFSBrowser extends AbstractGUI {
 	
-	protected DLFSLocal drive;
+	protected DLFileSystem drive;
 	
-	protected static ArrayList<DLFSLocal> allDrives=new ArrayList<>(); 
+	protected static ArrayList<DLFileSystem> allDrives=new ArrayList<>(); 
 
 	public JMenuBar menuBar=new JMenuBar();
 	public JMenu fileMenu=new JMenu("File");
@@ -34,7 +35,7 @@ public class DLFSBrowser extends AbstractGUI {
 	public JMenu helpMenu=new JMenu("Help");
 	protected DLFSPanel panel;
 	
-	public DLFSBrowser(DLFSLocal drive) {
+	public DLFSBrowser(DLFileSystem drive) {
 		allDrives.add(drive);
 		setLayout(new MigLayout());
 		this.drive=drive;
@@ -67,7 +68,7 @@ public class DLFSBrowser extends AbstractGUI {
 		
 		driveMenu.add(makeMenu("Clone",()->new DLFSBrowser(drive.clone()).run()));
 		driveMenu.add(makeMenu("Sync",()->{
-			for (DLFSLocal other: allDrives) {
+			for (DLFileSystem other: allDrives) {
 				if (other!=drive) {
 					System.out.println("Replicating!!");
 					drive.replicate(other);
@@ -78,7 +79,7 @@ public class DLFSBrowser extends AbstractGUI {
 		menuBar.add(driveMenu);
 		
 		menuBar.add(makeMenu("Sync!",()->{
-			for (DLFSLocal other: allDrives) {
+			for (DLFileSystem other: allDrives) {
 				if (other!=drive) {
 					System.out.println("Replicating!!");
 					drive.replicate(other);
@@ -91,6 +92,9 @@ public class DLFSBrowser extends AbstractGUI {
 		
 	}
 	
+	public DLFileSystem getDrive() {
+		return drive;
+	}
 
 	public DLFSBrowser() {
 		this(createDemoDrive());

@@ -29,8 +29,9 @@ import convex.dlfs.impl.DLFSFileAttributes;
  * A Data Lattice FileSystem has:
  * - A single root directory
  * - A method of snapshotting any path on the tree
+ * - An efficient method of cloning the Drive with an immutable snapshot
  */
-public abstract class DLFileSystem extends FileSystem {
+public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	static final String SEP = "/";
 
@@ -245,5 +246,8 @@ public abstract class DLFileSystem extends FileSystem {
 	public void replicate(DLFileSystem other) {
 		merge(other.getNode(other.getRoot()));
 	}
+	
+	@Override 
+	public abstract DLFileSystem clone();
 	
 }

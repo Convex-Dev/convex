@@ -28,7 +28,7 @@ import convex.dlfs.DLPath;
 /**
  * Local DLFS Drive implementation
  */
-public class DLFSLocal extends DLFileSystem implements Cloneable {
+public class DLFSLocal extends DLFileSystem {
 	
 	AVector<ACell> rootNode;
 	

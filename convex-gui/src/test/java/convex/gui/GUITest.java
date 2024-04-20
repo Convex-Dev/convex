@@ -1,10 +1,14 @@
 package convex.gui;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.InvalidDataException;
+import convex.dlfs.DLFileSystem;
+import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
 
 /**
@@ -22,5 +26,12 @@ public class GUITest {
 	public void testState() throws InvalidDataException {
 		State s = manager.getLatestState();
 		s.validate();
+	}
+	
+	@Test
+	public void testDLFSBrowser() {
+		DLFSBrowser browser=new DLFSBrowser();
+		DLFileSystem drive=browser.getDrive();
+		assertEquals(0,drive.getRoot().getNameCount());
 	}
 }
