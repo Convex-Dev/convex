@@ -1,5 +1,6 @@
 package convex.gui.dlfs;
 
+import java.awt.Color;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.IOException;
@@ -11,8 +12,11 @@ import java.util.function.Consumer;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JList;
+import javax.swing.JPopupMenu;
 
 import convex.dlfs.DLPath;
+import convex.gui.components.Toast;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class FileList extends JList<Path> {
@@ -20,24 +24,66 @@ public class FileList extends JList<Path> {
 	private Path directory;
 	DefaultListModel<Path> model;
 
-	public FileList(Path initialDir,Consumer<Path> onSelect) {
+	public class FileContextMenu extends JPopupMenu {
+		public FileContextMenu(Path p) {
+			add(Toolkit.makeMenu("Delete",()->{
+				try {
+			    	System.out.println("Deleting:"+ p);
+			    	Files.delete(p);
+			    	refreshList();
+				} catch (IOException e) {
+					Toast.display(null, "Can't delete file!", Color.ORANGE);
+					e.printStackTrace();
+				}
+			}));
+		}
+	};
+	
+	public FileList(Path initialDir,Consumer<Path> obDoubleClick) {
 		this.directory=initialDir;
 		model=new DefaultListModel<Path>();
 		setCellRenderer(new Renderer());
 		this.setDragEnabled(true);
 		setModel(model);
 		this.addMouseListener(new MouseAdapter() {
+			@Override
 		    public void mouseClicked(MouseEvent e) {
 		    	if (e.getClickCount()==2) {
 		    		Path p=getSelectedPath();
 		    		if ((p!=null)&&Files.isDirectory(p)) {
-		    			onSelect.accept(p);
+		    			obDoubleClick.accept(p);
 		    		}
 		    	}
+		    }
+		    
+		    @Override
+		    public void mousePressed(MouseEvent e) {
+		    	if (e.isPopupTrigger()) {
+		    		maybePopup(e);
+		    	}
+		    }
+		    
+		    @Override
+		    public void mouseReleased(MouseEvent e) {
+		    	if (e.isPopupTrigger()) {
+		    		maybePopup(e);
+		    	}
+		    }
+		    
+		    public void maybePopup(MouseEvent e) {
+	    		Object o=getSelectedValue();
+	    		if (o instanceof DLPath) {
+	    			FileContextMenu menu=new FileContextMenu((Path)o);
+	    			menu.show(e.getComponent(), e.getX(), e.getY());
+	    		};
 		    }
 		});
 	}
 	
+	public void refreshList() {
+		setDirectory(directory);
+	}
+
 	protected Path getSelectedPath() {
 		Object o=this.getSelectedValue();
 		if (o instanceof Path) return (Path)o;

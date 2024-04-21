@@ -1,15 +1,12 @@
 package convex.gui.dlfs;
 
-import java.awt.event.ActionEvent;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
-import javax.swing.AbstractAction;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
-import javax.swing.JMenuItem;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -42,7 +39,7 @@ public class DLFSBrowser extends AbstractGUI {
 		panel=new DLFSPanel(drive);
 		add(panel,"dock center");
 		
-		fileMenu.add(makeMenu("Explore Node...",()->{
+		fileMenu.add(Toolkit.makeMenu("Explore Node...",()->{
 			Path p=panel.getSelectedPath();
 			if (p instanceof DLPath) {
 				AVector<ACell> node=drive.getNode((DLPath) p);
@@ -55,7 +52,7 @@ public class DLFSBrowser extends AbstractGUI {
 			panel.refreshView();
 		}));	
 		// fileMenu.addSeparator();
-		fileMenu.add(makeMenu("Delete",()->{
+		fileMenu.add(Toolkit.makeMenu("Delete",()->{
 			Path p=panel.getSelectedPath();
 			try {
 				Files.deleteIfExists(p);
@@ -66,8 +63,8 @@ public class DLFSBrowser extends AbstractGUI {
 		}));		
 		menuBar.add(fileMenu);
 		
-		driveMenu.add(makeMenu("Clone",()->new DLFSBrowser(drive.clone()).run()));
-		driveMenu.add(makeMenu("Sync",()->{
+		driveMenu.add(Toolkit.makeMenu("Clone",()->new DLFSBrowser(drive.clone()).run()));
+		driveMenu.add(Toolkit.makeMenu("Sync",()->{
 			for (DLFileSystem other: allDrives) {
 				if (other!=drive) {
 					System.out.println("Replicating!!");
@@ -78,7 +75,7 @@ public class DLFSBrowser extends AbstractGUI {
 		}));
 		menuBar.add(driveMenu);
 		
-		menuBar.add(makeMenu("Sync!",()->{
+		menuBar.add(Toolkit.makeMenu("Sync!",()->{
 			for (DLFileSystem other: allDrives) {
 				if (other!=drive) {
 					System.out.println("Replicating!!");
@@ -101,22 +98,6 @@ public class DLFSBrowser extends AbstractGUI {
 	}
 
 
-	protected JMenuItem makeMenu(String name,Runnable op) {
-		JMenuItem mi= new JMenuItem(name);
-		mi.setAction(new AbstractAction(name) {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				op.run();
-			}
-			
-		} );
-		return mi;
-	}
-	
-	
-	
-	
 	public static DLFSLocal createDemoDrive() {
 		DLFSLocal drive=DLFS.createLocal();
 		drive.updateTimestamp();

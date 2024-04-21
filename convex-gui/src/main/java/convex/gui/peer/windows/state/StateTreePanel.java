@@ -95,7 +95,7 @@ public class StateTreePanel extends JPanel {
 				for (long i=0; i<n; i++) {
 					MapEntry e = m.entryAt(i);
 					ACell c = e.getValue();
-					add(new Node(RT.toString(e.getKey()) + " = " + getString(c), c));
+					add(new Node(RT.toString(e.getKey()) + " -> " + getString(c), c));
 				}
 				return;
 			} else if (a instanceof AVector) {
@@ -103,7 +103,7 @@ public class StateTreePanel extends JPanel {
 				long n=v.count();
 				for (long i=0; i<n; i++) {
 					ACell c = v.get(i);
-					add(new Node("["+i + "] = " + getString(c), c));
+					add(new Node("["+i + "] -> " + getString(c), c));
 				}
 				return;
 			} else {

@@ -7,6 +7,7 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -15,11 +16,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 
+import javax.swing.AbstractAction;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
@@ -37,6 +40,7 @@ import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
 import mdlaf.themes.MaterialOceanicTheme;
 
+@SuppressWarnings("serial")
 public class Toolkit {
 
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
@@ -213,5 +217,20 @@ public class Toolkit {
 			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 			firstFrame=frame;
 		}
+	}
+
+	public static JMenuItem makeMenu(String name,Runnable op) {
+		AbstractAction action=makeAction(name,op);
+		JMenuItem mi= new JMenuItem(action);
+		return mi;
+	}
+	
+	public static AbstractAction makeAction(String name,Runnable op) {
+		return new AbstractAction(name) {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				op.run();
+			}
+		};
 	}
 }

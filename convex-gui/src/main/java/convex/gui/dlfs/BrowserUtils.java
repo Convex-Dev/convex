@@ -32,19 +32,26 @@ public class BrowserUtils {
 		return copied;
 	}
 
+	@SuppressWarnings("null")
 	protected static Icon getFileIcon(Path path) {
-		String iconName= "FileView.fileIcon";
+		String iconName= null;
 		Icon icon =null;
 		if (Files.isDirectory(path)) {
 			iconName="FileView.directoryIcon";
+		} else if (Files.isRegularFile(path)) {
+			iconName= "FileView.fileIcon";
+		} else {
+			iconName= "FileView.hardDriveIcon";
 		}
 		
-		if (path.getNameCount()==0) {
-			icon = UIManager.getIcon("FileView.hardDriveIcon"); // root icon
-		} else try {
-			icon= FileSystemView.getFileSystemView().getSystemIcon( path.toFile() );
-		} catch (Exception e) {
-			// ignore
+		if (iconName!=null) {
+			if (path.getNameCount()==0) {
+				icon = UIManager.getIcon("FileView.hardDriveIcon"); // root icon
+			} else try {
+				icon= FileSystemView.getFileSystemView().getSystemIcon( path.toFile() );
+			} catch (Exception e) {
+				// ignore
+			}
 		}
 		if (icon==null) icon = UIManager.getIcon(iconName);
 		return icon;
