@@ -1,4 +1,6 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
@@ -11,6 +13,10 @@
 	<name>Convex GUI</name>
 	<description>Convex desktop GUI and test applications</description>
 	<url>https://convex.world</url>
+	
+	<properties>
+		<zxing.version>3.5.3</zxing.version>
+	</properties>
 
 	<build>
 		<finalName>convex-gui</finalName>
@@ -30,7 +36,8 @@
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
 					<appendAssemblyId>false</appendAssemblyId>
-					<!-- We want differentiated outputs <appendAssemblyId>false</appendAssemblyId> -->
+					<!-- We want differentiated outputs
+					<appendAssemblyId>false</appendAssemblyId> -->
 				</configuration>
 				<executions>
 					<execution>
@@ -51,7 +58,7 @@
 			<artifactId>convex-peer</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
-		
+
 		<dependency>
 			<groupId>world.convex</groupId>
 			<artifactId>convex-observer</artifactId>
@@ -97,6 +104,18 @@
 		</dependency>
 
 		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>core</artifactId>
+			<version>${zxing.version}</version>
+		</dependency>
+		
+		<dependency>
+			<groupId>com.google.zxing</groupId>
+			<artifactId>javase</artifactId>
+			<version>${zxing.version}</version>
+		</dependency>
+
+		<dependency>
 			<groupId>io.github.vincenzopalazzo</groupId>
 			<artifactId>material-ui-swing</artifactId>
 			<version>1.1.4</version>
@@ -119,6 +138,6 @@
 			<scope>test</scope>
 		</dependency>
 
-	
+
 	</dependencies>
 </project>
