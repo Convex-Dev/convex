@@ -1,6 +1,7 @@
 package convex.gui.components;
 
 
+import java.awt.BorderLayout;
 import java.awt.EventQueue;
 
 import javax.swing.JFrame;
@@ -8,7 +9,6 @@ import javax.swing.JPanel;
 
 import convex.gui.MainGUI;
 import convex.gui.utils.Toolkit;
-import net.miginfocom.swing.MigLayout;
 
 /**
  * Base class for Convex GUI apps
@@ -35,8 +35,8 @@ public class AbstractGUI extends JPanel implements Runnable {
 					Toolkit.closeIfFirstFrame(frame);
 
 
-					frame.getContentPane().setLayout(new MigLayout());
-					frame.getContentPane().add(AbstractGUI.this, "dock center");
+					frame.getContentPane().setLayout(new BorderLayout());
+					frame.getContentPane().add(AbstractGUI.this, BorderLayout.CENTER);
 					frame.setVisible(true);
 
 

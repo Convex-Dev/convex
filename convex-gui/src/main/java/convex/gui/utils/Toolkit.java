@@ -150,6 +150,14 @@ public class Toolkit {
 		graphics.drawImage(src, 0, 0, w, h, null);
 		return newImage;
 	}
+	
+	public static BufferedImage pixelResize(BufferedImage src, int w, int h) {
+		BufferedImage newImage = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+		Graphics2D graphics = (Graphics2D) newImage.getGraphics();
+
+		graphics.drawImage(src, 0, 0, w, h, null);
+		return newImage;
+	}
 
 	public static DocumentListener createDocumentListener(final Runnable a) {
 		return new DocumentListener() {
@@ -233,4 +241,6 @@ public class Toolkit {
 			}
 		};
 	}
+
+
 }

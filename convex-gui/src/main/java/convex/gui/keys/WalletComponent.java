@@ -52,7 +52,7 @@ public class WalletComponent extends BaseListComponent {
 		setLayout(new MigLayout("fillx"));
 
 		// identicon
-		JLabel identicon = new Identicon(walletEntry.getIdenticonHash());
+		JLabel identicon = new Identicon(walletEntry.getPublicKey());
 		JPanel idPanel=new JPanel();
 		idPanel.add(identicon);
 		add(idPanel,"west"); // add to MigLayout
