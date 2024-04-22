@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.keys;
 
 import javax.swing.Icon;
 import javax.swing.JButton;
@@ -19,6 +19,10 @@ import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.Address;
 import convex.core.text.Text;
 import convex.gui.client.ConvexClient;
+import convex.gui.components.BaseListComponent;
+import convex.gui.components.CodeLabel;
+import convex.gui.components.DropdownMenu;
+import convex.gui.components.Identicon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 

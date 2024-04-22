@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.keys;
 
 import java.awt.BorderLayout;
 import java.awt.Color;

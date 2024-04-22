@@ -34,14 +34,15 @@ import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
+
 import convex.gui.components.models.StateModel;
+import convex.gui.keys.KeyGenPanel;
+import convex.gui.keys.KeyListPanel;
 import convex.gui.peer.mainpanels.AboutPanel;
 import convex.gui.peer.mainpanels.AccountsPanel;
-import convex.gui.peer.mainpanels.KeyGenPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.peer.mainpanels.PeersListPanel;
 import convex.gui.peer.mainpanels.TorusPanel;
-import convex.gui.peer.mainpanels.KeyListPanel;
 import convex.gui.utils.Toolkit;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
@@ -111,7 +112,8 @@ public class PeerGUI extends AbstractGUI {
 	 * Main component panel
 	 */
 	PeersListPanel peerPanel;
-	KeyListPanel walletPanel;
+	KeyListPanel keyRingPanel;
+	
 	KeyGenPanel keyGenPanel;
 	MessageFormatPanel messagePanel;
 	JPanel accountsPanel;
@@ -139,7 +141,7 @@ public class PeerGUI extends AbstractGUI {
 		tickState = StateModel.create(0L);
 		
 		peerPanel= new PeersListPanel(this);
-		walletPanel = new KeyListPanel(null);
+		keyRingPanel = new KeyListPanel(null);
 		keyGenPanel = new KeyGenPanel(this);
 		messagePanel = new MessageFormatPanel(this);
 		accountsPanel = new AccountsPanel(this);
@@ -151,7 +153,7 @@ public class PeerGUI extends AbstractGUI {
 
 		tabs.add("Peers", peerPanel);
 		tabs.add("Accounts", accountsPanel);
-		tabs.add("Keys", walletPanel);
+		tabs.add("Keyring", keyRingPanel);
 		tabs.add("KeyGen", keyGenPanel);
 		tabs.add("Message", messagePanel);
 		// tabs.add("Actors", new ActorsPanel(this));
@@ -164,7 +166,7 @@ public class PeerGUI extends AbstractGUI {
 		peerPanel.launchAllPeers(this);
 		
 		Server first=peerList.firstElement().getLocalServer();
-		walletPanel.setConvex(Convex.connect(first));
+		keyRingPanel.setConvex(Convex.connect(first));
 		
 		// Set up observability
 		
@@ -252,7 +254,7 @@ public class PeerGUI extends AbstractGUI {
 	}
 
 	public KeyListPanel getWalletPanel() {
-		return walletPanel;
+		return keyRingPanel;
 	}
 
 	/**
@@ -350,7 +352,7 @@ public class PeerGUI extends AbstractGUI {
 	}
 
 	public void addWalletEntry(BasicWalletEntry we) {
-		walletPanel.addWalletEntry(we);
+		keyRingPanel.addWalletEntry(we);
 	}
 
 

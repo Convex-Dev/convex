@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.keys;
 
 import java.awt.BorderLayout;
 import java.awt.Font;
@@ -30,7 +30,7 @@ public class UnlockWalletDialog extends JDialog {
 		return dialog;
 	}
 
-	char[] getPassPhrase() {
+	public char[] getPassPhrase() {
 		return passPhrase;
 	}
 

@@ -9,8 +9,8 @@ import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.QRPanel;
+import convex.gui.keys.KeyListPanel;
 import convex.gui.peer.mainpanels.HomePanel;
-import convex.gui.peer.mainpanels.KeyListPanel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

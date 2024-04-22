@@ -17,7 +17,7 @@ import convex.core.util.Utils;
 import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
-import convex.gui.peer.mainpanels.KeyGenPanel;
+import convex.gui.keys.KeyGenPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.utils.Toolkit;
 

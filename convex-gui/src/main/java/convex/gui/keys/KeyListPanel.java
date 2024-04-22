@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.keys;
 
 import java.awt.BorderLayout;
 
@@ -17,7 +17,6 @@ import convex.core.data.Address;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.ScrollyList;
-import convex.gui.components.WalletComponent;
 
 @SuppressWarnings("serial")
 public class KeyListPanel extends JPanel {
