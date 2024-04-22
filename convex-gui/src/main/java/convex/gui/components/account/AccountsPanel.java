@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.components.account;
 
 
 import java.awt.BorderLayout;
@@ -19,13 +19,14 @@ import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 
+import convex.api.Convex;
 import convex.core.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.gui.actor.ActorWindow;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.AccountsTableModel;
-import convex.gui.peer.PeerGUI;
+import convex.gui.components.models.StateModel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings({ "serial"})
@@ -43,11 +44,11 @@ public class AccountsPanel extends JPanel {
 		}
 	}
 
-	public AccountsPanel(PeerGUI manager) {
+	public AccountsPanel(Convex convex,StateModel<State> model) {
 		setLayout(new BorderLayout());
 
 		
-		tableModel = new AccountsTableModel(manager.getLatestState());
+		tableModel = new AccountsTableModel(model.getValue());
 		table = new JTable(tableModel);
 		
 		table.setCellSelectionEnabled(true);
@@ -56,7 +57,7 @@ public class AccountsPanel extends JPanel {
 		table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
 		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
 		
-		manager.getStateModel().addPropertyChangeListener(pc -> {
+		model.addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});
@@ -141,8 +142,8 @@ public class AccountsPanel extends JPanel {
 			if (as == null) return;
 			Address addr = Address.create(ix);
 			if (!as.isActor()) return;
-			ActorWindow pw = new ActorWindow(manager, addr);
-			pw.launch();
+			ActorWindow pw = new ActorWindow(convex, model, addr);
+			pw.run();
 		});
 
 		// Turn off auto-resize, since we want a scrollable table

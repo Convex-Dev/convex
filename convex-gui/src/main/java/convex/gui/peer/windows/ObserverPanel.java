@@ -1,4 +1,4 @@
-package convex.gui.peer.windoes;
+package convex.gui.peer.windows;
 
 import java.util.HashMap;
 

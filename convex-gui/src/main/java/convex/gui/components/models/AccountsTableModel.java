@@ -10,6 +10,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.init.Init;
+import convex.core.text.Text;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")
@@ -59,7 +60,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 			return (seq>=0)?seq:"";
 		}
 		case 3:
-			return as.getBalance();
+			return Text.toFriendlyNumber(as.getBalance());
 		case 4: {
 			ACell o = as.getHoldings().get(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";

@@ -1,6 +1,5 @@
-package convex.gui.peer.windoes;
+package convex.gui.peer.windows;
 
-import java.awt.BorderLayout;
 import java.awt.Dimension;
 
 import javax.swing.JLabel;
@@ -12,13 +11,13 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.gui.components.AbstractGUI;
 import convex.gui.components.PeerComponent;
-import convex.gui.peer.PeerGUI;
-import convex.gui.peer.windows.BaseWindow;
 import convex.peer.Server;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class PeerWindow extends BaseWindow {
+public class PeerWindow extends AbstractGUI {
 	ConvexLocal peer;
 
 	public Convex getPeerView() {
@@ -29,12 +28,13 @@ public class PeerWindow extends BaseWindow {
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public PeerWindow(PeerGUI manager, ConvexLocal peer) {
-		super(manager);
+	public PeerWindow(ConvexLocal peer) {
+		super("Peer Control Panel - " + peer.toString());
 		this.peer = peer;
-
-		add(tabbedPane, BorderLayout.CENTER);
 		this.setPreferredSize(new Dimension(1200,1000));
+
+		setLayout(new MigLayout());
+		add(tabbedPane, "dock center");
 		
 		Server server=peer.getLocalServer();
 		if (server!=null) {
@@ -49,16 +49,10 @@ public class PeerWindow extends BaseWindow {
 			}
 			tabbedPane.addTab("Observation", null, new JScrollPane(new ObserverPanel(server)), null);
 		}
-		tabbedPane.addTab("Stress", null, new StressPanel(manager,peer), null);
+		tabbedPane.addTab("Stress", null, new StressPanel(peer), null);
 		tabbedPane.addTab("Info", null, new PeerInfoPanel(peer), null);
 
-		PeerComponent pcom = new PeerComponent(manager, peer);
-		add(pcom, BorderLayout.NORTH);
+		PeerComponent pcom = new PeerComponent(peer);
+		add(pcom, "dock north");
 	}
-
-	@Override
-	public String getTitle() {
-		return "Peer Control - " + peer.toString();
-	}
-
 }

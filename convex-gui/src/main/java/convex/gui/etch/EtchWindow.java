@@ -1,22 +1,18 @@
 package convex.gui.etch;
 
-import java.awt.BorderLayout;
-
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.gui.components.AbstractGUI;
 import convex.gui.components.PeerComponent;
-import convex.gui.peer.PeerGUI;
-import convex.gui.peer.windows.BaseWindow;
 import etch.EtchStore;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class EtchWindow extends BaseWindow {
+public class EtchWindow extends AbstractGUI {
 	EtchStore store;
 	Convex peer;
-	
-
 	
 	public EtchStore getEtchStore() {
 		return store;
@@ -24,25 +20,15 @@ public class EtchWindow extends BaseWindow {
 	
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public EtchWindow(PeerGUI manager, ConvexLocal peer) {
-		super(manager);
-		this.peer=peer;
+	public EtchWindow(ConvexLocal peer) {
+		super ("Etch Storage View - "+peer.getLocalServer().getStore());
 		this.store=(EtchStore) peer.getLocalServer().getStore();
+		setLayout(new MigLayout());
 		
-		PeerComponent pcom=new PeerComponent(manager,peer);
-		add(pcom, BorderLayout.NORTH);
+		PeerComponent pcom=new PeerComponent(peer);
+		add(pcom, "dock north");
 		
-		add(tabbedPane, BorderLayout.CENTER);
-	}
-
-	@Override
-	public String getTitle() {
-		try {
-			 return "Storage view - "+peer.getHostAddress();
-		}
-		catch (Exception e) {
-			return "Storage view - Unknown";
-		}
+		add(tabbedPane, "dock center");
 	}
 
 }

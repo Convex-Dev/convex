@@ -74,7 +74,7 @@ public class EtchExplorer extends AbstractGUI {
 	 * Create the application.
 	 */
 	public EtchExplorer() {
-		
+		super ("Etch Explorer");
 		
 		setLayout(new BorderLayout());
 		this.add(tabs, BorderLayout.CENTER);

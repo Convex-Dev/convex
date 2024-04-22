@@ -9,18 +9,16 @@ import javax.swing.JTextArea;
 import convex.core.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.gui.peer.PeerGUI;
+import convex.gui.components.models.StateModel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class ActorInfoPanel extends JPanel {
 
-	protected PeerGUI manager;
 	protected Address actor;
 	protected JTextArea infoArea;
 
-	public ActorInfoPanel(PeerGUI manager, Address contract) {
-		this.manager = manager;
+	public ActorInfoPanel(StateModel<State> manager, Address contract) {
 		this.actor = contract;
 		setLayout(new BorderLayout(0, 0));
 
@@ -31,10 +29,10 @@ public class ActorInfoPanel extends JPanel {
 		infoArea.setBackground(null);
 		infoArea.setFont(Toolkit.SMALL_MONO_FONT);
 
-		manager.getStateModel().addPropertyChangeListener(e -> {
+		manager.addPropertyChangeListener(e -> {
 			updateInfo((State) e.getNewValue());
 		});
-		updateInfo(manager.getLatestState());
+		updateInfo(manager.getValue());
 	}
 
 	private void updateInfo(State latestState) {

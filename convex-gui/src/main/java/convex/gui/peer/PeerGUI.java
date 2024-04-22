@@ -34,12 +34,11 @@ import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
-
+import convex.gui.components.account.AccountsPanel;
 import convex.gui.components.models.StateModel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyListPanel;
 import convex.gui.peer.mainpanels.AboutPanel;
-import convex.gui.peer.mainpanels.AccountsPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.peer.mainpanels.PeersListPanel;
 import convex.gui.peer.mainpanels.TorusPanel;
@@ -128,6 +127,7 @@ public class PeerGUI extends AbstractGUI {
 	 * @param peerNum Numer of peers to initialise in geneis
 	 */
 	public PeerGUI(int peerCount, AKeyPair genesis) {
+		super ("Peer Manager");
 		// Create key pairs for peers, use genesis key as first keypair
 		genesisKey=genesis;
 		for (int i=0; i<peerCount; i++) {
@@ -140,11 +140,28 @@ public class PeerGUI extends AbstractGUI {
 		latestState = StateModel.create(genesisState);
 		tickState = StateModel.create(0L);
 		
+		// launch local peers 
 		peerPanel= new PeersListPanel(this);
 		keyRingPanel = new KeyListPanel(null);
+
+		peerPanel.launchAllPeers(this);
+		
+		Server first=peerList.firstElement().getLocalServer();
+		ConvexLocal convex=Convex.connect(first);
+		
+		// Set up observability
+		
+		try {
+			restServer=RESTServer.create(first);
+			restServer.start();
+		} catch (Exception t) {
+			log.warn("Unable to start REST Server: ",t);
+		}
+		
 		keyGenPanel = new KeyGenPanel(this);
 		messagePanel = new MessageFormatPanel(this);
-		accountsPanel = new AccountsPanel(this);
+		accountsPanel = new AccountsPanel(convex,latestState);
+		keyRingPanel.setConvex(convex);
 
 		setLayout(new BorderLayout());
 
@@ -158,24 +175,11 @@ public class PeerGUI extends AbstractGUI {
 		tabs.add("Message", messagePanel);
 		// tabs.add("Actors", new ActorsPanel(this));
 		tabs.add("Torus", new TorusPanel(this));
-		tabs.add("About", new AboutPanel(this));
+		tabs.add("About", new AboutPanel(convex));
 		
 		tabs.setSelectedComponent(peerPanel);
 		
-		// launch local peers 
-		peerPanel.launchAllPeers(this);
-		
-		Server first=peerList.firstElement().getLocalServer();
-		keyRingPanel.setConvex(Convex.connect(first));
-		
-		// Set up observability
-		
-		try {
-			restServer=RESTServer.create(first);
-			restServer.start();
-		} catch (Exception t) {
-			log.warn("Unable to start REST Server: ",t);
-		}
+
 
 
 		ThreadUtils.runVirtual(updateThread);
@@ -184,7 +188,7 @@ public class PeerGUI extends AbstractGUI {
 	private boolean updateRunning = true;
 
 	private long cp = 0;
-	private long maxBlock=0;
+
 
 	private Runnable updateThread = new Runnable() {
 		@Override
@@ -294,9 +298,9 @@ public class PeerGUI extends AbstractGUI {
 		}
 	}
 	
-	private HashMap<Server,StateModel<Peer>> models=new HashMap<>();
+	private static HashMap<Server,StateModel<Peer>> models=new HashMap<>();
 
-	public StateModel<Peer> getStateModel(Convex peer) {
+	public static StateModel<Peer> getStateModel(Convex peer) {
 		Server s=peer.getLocalServer();
 		if (s!=null) {
 			StateModel<Peer> model=models.get(s);
@@ -316,6 +320,11 @@ public class PeerGUI extends AbstractGUI {
 			return newModel;
 		}
 		return null;
+	}
+	
+	private static long maxBlock=0;
+	public static long getMaxBlockCount() {
+		return maxBlock;
 	}
 
 	public Server getRandomServer() {
@@ -347,9 +356,6 @@ public class PeerGUI extends AbstractGUI {
 		return null;
 	}
 
-	public long getMaxBlockCount() {
-		return maxBlock;
-	}
 
 	public void addWalletEntry(BasicWalletEntry we) {
 		keyRingPanel.addWalletEntry(we);

@@ -33,6 +33,8 @@ public class DLFSBrowser extends AbstractGUI {
 	protected DLFSPanel panel;
 	
 	public DLFSBrowser(DLFileSystem drive) {
+		super (	"Data Lattice");
+
 		allDrives.add(drive);
 		setLayout(new MigLayout());
 		this.drive=drive;
@@ -136,8 +138,5 @@ public class DLFSBrowser extends AbstractGUI {
 		gui.run();
 	}
 	
-	@Override public String getTitle() {
-		return "Data Lattice";
-	}
 
 }

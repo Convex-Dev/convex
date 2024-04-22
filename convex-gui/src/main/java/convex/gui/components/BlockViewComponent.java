@@ -27,11 +27,9 @@ import convex.peer.Server;
 public class BlockViewComponent extends JPanel {
 
 	private ConvexLocal peerView;
-	private PeerGUI manager;
 
-	public BlockViewComponent(PeerGUI manager,ConvexLocal peer) {
+	public BlockViewComponent(ConvexLocal peer) {
 		this.peerView = peer;
-		this.manager=manager;
 
 		setBackground(null);
 		setPreferredSize(new Dimension(1000, 10));
@@ -59,7 +57,7 @@ public class BlockViewComponent extends JPanel {
 	
 	
 			int W = 10;
-			long tw = W * manager.getMaxBlockCount();
+			long tw = W * PeerGUI.getMaxBlockCount();
 			long offset = Math.max(0, tw - pw);
 	
 			for (int i = (int) (offset / W); i < n; i++) {

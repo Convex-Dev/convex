@@ -147,7 +147,6 @@ public class WalletComponent extends BaseListComponent {
 		try {
 			sb.append("Balance:    " + Text.toFriendlyNumber(convex.getBalance(address)));
 		} catch (Exception e) {
-			e.printStackTrace();
 			sb.append("Balance:    <not available>");
 		}
 		

@@ -7,6 +7,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
+import convex.api.ConvexLocal;
 import convex.core.State;
 import convex.core.crypto.bc.BCKeyPair;
 import convex.core.crypto.bc.BCProvider;
@@ -17,14 +18,17 @@ import convex.gui.components.ActionPanel;
 import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 
+/**
+ * Panel for diagnostic information about a Local Peer
+ */
 @SuppressWarnings("serial")
 public class AboutPanel extends JPanel {
 
 	private final JTextArea textArea;
-	private PeerGUI manager;
+	protected ConvexLocal convex;
 
-	public AboutPanel(PeerGUI manager) {
-		this.manager=manager;
+	public AboutPanel(ConvexLocal convex) {
+		this.convex=convex;
 		setLayout(new BorderLayout(0, 0));
 
 		JPanel panel = new ActionPanel();
@@ -42,8 +46,8 @@ public class AboutPanel extends JPanel {
 		textArea.setBackground(null);
 		textArea.setFont(Toolkit.SMALL_MONO_FONT);
 
-		manager.getStateModel().addPropertyChangeListener(e -> {
-			updateState((State) e.getNewValue());
+		PeerGUI.getStateModel(convex).addPropertyChangeListener(e -> {
+			updateState(convex);
 		});
 
 		panel_1.add(textArea);
@@ -53,14 +57,15 @@ public class AboutPanel extends JPanel {
 					"Credits", JOptionPane.PLAIN_MESSAGE);
 		});
 
-		updateState(manager.getLatestState());
+		updateState(convex);
 	}
 
 	private String lpad(Object s) {
 		return Text.leftPad(s.toString(), 30);
 	}
 
-	private void updateState(State s) {
+	private void updateState(ConvexLocal peer) {
+		State s=peer.getLocalServer().getPeer().getConsensusState();
 		StringBuilder sb = new StringBuilder();
 		CVMLong timestamp = s.getTimestamp();
 		
@@ -69,7 +74,7 @@ public class AboutPanel extends JPanel {
 		sb.append("Consensus state hash: " + s.getHash().toHexString() + "\n");
 		sb.append("Timestamp:            " + Text.dateFormat(timestamp.longValue()) + "   (" + timestamp + ")\n");
 		sb.append("\n");
-		sb.append("Block Count:          " + lpad(manager.getMaxBlockCount()) + "\n");
+		sb.append("Block Count:          " + lpad(PeerGUI.getMaxBlockCount()) + "\n");
 		sb.append("\n");
 		sb.append("Account statistics\n");
 		sb.append("  # Accounts:         " + lpad(s.getAccounts().count()) + "\n");

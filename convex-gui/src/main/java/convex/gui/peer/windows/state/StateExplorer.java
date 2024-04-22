@@ -26,6 +26,7 @@ public class StateExplorer extends AbstractGUI {
 	protected ACell state;
 
 	public StateExplorer(ACell state) {
+		super ("State Explorer");
 		this.state=state;
 		this.setLayout(new MigLayout());
 
@@ -46,11 +47,6 @@ public class StateExplorer extends AbstractGUI {
 		panel.setLayout(new MigLayout());
 		panel.add(new JScrollPane(new CodeLabel(RT.toString(state,10000))),"dock center");
 		return panel;
-	}
-
-	@Override
-	public String getTitle() {
-		return "State explorer";
 	}
 	
 	public static void explore (ACell a) {

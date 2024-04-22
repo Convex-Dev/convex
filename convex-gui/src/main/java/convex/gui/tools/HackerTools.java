@@ -64,6 +64,7 @@ public class HackerTools extends AbstractGUI {
 	 * @param convex Convex client instance
 	 */
 	public HackerTools() {
+		super ("Hacker Tools");
 		setLayout(new BorderLayout());
 		keyGenPanel = new KeyGenPanel(null);
 		messagePanel = new MessageFormatPanel(null);

@@ -29,6 +29,7 @@ public class WalletApp extends AbstractGUI {
 	 * Create the application.
 	 */
 	public WalletApp(Convex convex) {
+		super ("Desktop Wallet");
 		this.convex=convex;
 		setLayout(new BorderLayout());
 		this.add(tabs, BorderLayout.CENTER);

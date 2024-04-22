@@ -17,7 +17,13 @@ import convex.gui.utils.Toolkit;
 public class AbstractGUI extends JPanel implements Runnable {
 
 	protected JFrame frame=new JFrame();
+	private String title;
 	
+	public AbstractGUI(String title) {
+		this.title=title;
+	}
+	
+
 	@Override
 	public void run() {
 		// call to set up Look and Feel
@@ -27,7 +33,7 @@ public class AbstractGUI extends JPanel implements Runnable {
 			@Override
 			public void run() {
 				try {
-					frame.setTitle(getTitle());
+					frame.setTitle(title);
 					frame.setIconImage(Toolkit.getDefaultToolkit()
 							.getImage(MainGUI.class.getResource("/images/Convex.png")));
 					frame.setBounds(50, 50, 1200, 920);
@@ -45,14 +51,6 @@ public class AbstractGUI extends JPanel implements Runnable {
 				}
 			}
 		});
-	}
-
-	/**
-	 * Get the title to be used for this GUI
-	 * @return
-	 */
-	public String getTitle() {
-		return "Convex Desktop";
 	}
 	
 	public JFrame getFrame() {

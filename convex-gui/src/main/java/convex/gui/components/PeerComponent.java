@@ -26,7 +26,7 @@ import convex.gui.client.ConvexClient;
 import convex.gui.components.models.StateModel;
 import convex.gui.etch.EtchWindow;
 import convex.gui.peer.PeerGUI;
-import convex.gui.peer.windoes.PeerWindow;
+import convex.gui.peer.windows.PeerWindow;
 import convex.gui.peer.windows.state.StateExplorer;
 import convex.gui.utils.Toolkit;
 import convex.peer.ConnectionManager;
@@ -38,20 +38,19 @@ public class PeerComponent extends BaseListComponent {
 
 	public ConvexLocal convex;
 	JTextArea description;
-	private PeerGUI manager;
 
 	public void launchPeerWindow(ConvexLocal peer) {
 		try {
-			PeerWindow pw = new PeerWindow(manager, peer);
-			pw.launch();
+			PeerWindow pw = new PeerWindow(peer);
+			pw.run();
 		} catch (Exception e) {
 			// Ignore
 		}
 	}
 
 	public void launchEtchWindow(ConvexLocal peer) {
-		EtchWindow ew = new EtchWindow(manager, peer);
-		ew.launch();
+		EtchWindow ew = new EtchWindow(peer);
+		ew.run();
 	}
 
 	public void launchExploreWindow(Convex peer) {
@@ -61,8 +60,7 @@ public class PeerComponent extends BaseListComponent {
 		pw.run();
 	}
 
-	public PeerComponent(PeerGUI manager, ConvexLocal value) {
-		this.manager = manager;
+	public PeerComponent(ConvexLocal value) {
 		this.convex = value;
 
 		setLayout(new BorderLayout(0, 0));
@@ -141,28 +139,32 @@ public class PeerComponent extends BaseListComponent {
 		clientButton.addActionListener(e -> launchClientWindow(convex));
 		popupMenu.add(clientButton);
 
-		JPanel blockView = new BlockViewComponent(manager,convex);
+		JPanel blockView = new BlockViewComponent(convex);
 		add(blockView, BorderLayout.SOUTH);
 
 		DropdownMenu dm = new DropdownMenu(popupMenu);
 		add(dm, BorderLayout.EAST);
 		
-		StateModel<Peer> model=manager.getStateModel(convex);
+		StateModel<Peer> model=PeerGUI.getStateModel(convex);
 		if (model!=null) {
 			model.addPropertyChangeListener(e->{
 				blockView.repaint();
 				description.setText(getPeerDescription());
 			});
+			
+			model.addPropertyChangeListener(e->{
+				updateDescription();
+			});
 		}
-		
-		manager.tickState.addPropertyChangeListener(e->{
-			// Set text while maintaining selection
-			int ss=description.getSelectionStart();
-			int se=description.getSelectionEnd();
-			description.setText(getPeerDescription());
-			description.select(ss, se);
-		});
+		updateDescription();
+	}
 
+	protected void updateDescription() {
+		// Set text while maintaining selection
+		int ss=description.getSelectionStart();
+		int se=description.getSelectionEnd();
+		description.setText(getPeerDescription());
+		description.select(ss, se);
 	}
 
 	private void launchClientWindow(Convex peer) {

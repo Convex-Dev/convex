@@ -164,7 +164,7 @@ public class PeersListPanel extends JPanel {
 		});
 
 		ScrollyList<ConvexLocal> scrollyList = new ScrollyList<>(manager.getPeerList(),
-				peer -> new PeerComponent(manager, peer));
+				peer -> new PeerComponent(peer));
 		add(scrollyList, BorderLayout.CENTER);
 	}
 

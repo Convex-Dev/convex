@@ -85,14 +85,13 @@ public class Identicon extends JLabel {
 	public Identicon(AArrayBlob a) {
 		super();
 		size=7;
-		ImageIcon icon=createIcon(a, 36);
-		setIcon(icon);
-		this.setToolTipText(icon.getDescription());
+		setKey(a);
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
 	}
 
 	public static class IdenticApp extends AbstractGUI{
 		public IdenticApp() {
+			super ("Convex Identicons");
 			setLayout(new FlowLayout());
 			
 			// Identicons for Strings
@@ -122,5 +121,12 @@ public class Identicon extends JLabel {
 		Toolkit.init();
 		IdenticApp app=new IdenticApp();
 		app.run();
+	}
+
+	public void setKey(AArrayBlob a) {
+		ImageIcon icon=createIcon(a, 36);
+		this.setToolTipText(icon.getDescription());
+
+		setIcon(icon);
 	}
 }

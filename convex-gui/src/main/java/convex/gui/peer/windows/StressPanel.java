@@ -1,4 +1,4 @@
-package convex.gui.peer.windoes;
+package convex.gui.peer.windows;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -74,9 +74,8 @@ public class StressPanel extends JPanel {
 
 	private PeerGUI manager;
 
-	public StressPanel(PeerGUI manager, Convex peerView) {
+	public StressPanel(Convex peerView) {
 		this.peerConvex = peerView;
-		this.manager=manager;
 		this.setLayout(new BorderLayout());
 
 		actionPanel = new ActionPanel();

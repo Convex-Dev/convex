@@ -35,6 +35,7 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class MainGUI extends AbstractGUI {
 	public MainGUI() {
+		super ("Convex Desktop");
 		MigLayout layout=new MigLayout("center");
 		setLayout(layout);
 		

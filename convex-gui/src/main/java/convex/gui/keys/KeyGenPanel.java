@@ -21,10 +21,12 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.SLIP10;
 import convex.core.crypto.wallet.BasicWalletEntry;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.Identicon;
 import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -127,6 +129,7 @@ public class KeyGenPanel extends JPanel {
 	}
 	
 	int[] derivationPath=null;
+	private Identicon identicon;
 	
 	private void updatePath() {
 		try {
@@ -174,9 +177,13 @@ public class KeyGenPanel extends JPanel {
 			if (s.startsWith("0x")) s=s.substring(2);
 			Blob b = Blob.fromHex(Utils.stripWhiteSpace(s));
 			AKeyPair kp = AKeyPair.create(b.getBytes());
+			
+			AccountKey publicKey=kp.getAccountKey();
 			// String pk=Utils.toHexString(kp.getPrivateKey(),64);
-			publicKeyArea.setText("0x"+kp.getAccountKey().toChecksumHex());
+			publicKeyArea.setText("0x"+publicKey.toChecksumHex());
 			addWalletButton.setEnabled(true);
+			
+			identicon.setKey(publicKey);
 		} catch (Exception ex) {
 			publicKeyArea.setText("<enter valid private key>");
 			addWalletButton.setEnabled(false);
@@ -353,6 +360,11 @@ public class KeyGenPanel extends JPanel {
 			publicKeyArea.setFont(HEX_FONT);
 			formPanel.add(publicKeyArea,TEXTAREA_CONSTRAINT);
 		}
+		
+		identicon=new Identicon(null);
+		// identicon.setBorder(null);
+		addLabel("Identicon:");
+		formPanel.add(identicon,"grow 0");
 
 	}
 
