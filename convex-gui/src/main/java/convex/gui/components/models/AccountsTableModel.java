@@ -60,7 +60,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 			return (seq>=0)?seq:"";
 		}
 		case 3:
-			return Text.toFriendlyNumber(as.getBalance());
+			return Text.toFriendlyBalance(as.getBalance());
 		case 4: {
 			ACell o = as.getHoldings().get(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";
@@ -69,9 +69,9 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 			return a.get(Keyword.create("name"));
 		}
 		case 5:
-			return as.getMemorySize();
+			return Text.toFriendlyNumber(as.getMemorySize());
 		case 6:
-			return as.getMemory();
+			return Text.toFriendlyNumber(as.getMemory());
 		case 7:
 			return as.getAccountKey();
 		default:

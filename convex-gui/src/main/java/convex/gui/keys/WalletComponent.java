@@ -67,17 +67,17 @@ public class WalletComponent extends BaseListComponent {
 		resetTooltipTExt(lockButton);
 		lockButton.addActionListener(e -> {
 			if (walletEntry.isLocked()) {
-				UnlockWalletDialog dialog = UnlockWalletDialog.show(this);
+				UnlockWalletDialog dialog = UnlockWalletDialog.show(WalletComponent.this);
 				char[] passPhrase = dialog.getPassPhrase();
 				try {
 					walletEntry.unlock(passPhrase);
 					icon = Toolkit.UNLOCKED_ICON;
 				} catch (Exception e1) {
-					JOptionPane.showMessageDialog(this, "Unable to unlock keypair: " + e1.getMessage(),"Unlock Failed",JOptionPane.WARNING_MESSAGE);
+					JOptionPane.showMessageDialog(WalletComponent.this, "Unable to unlock keypair: " + e1.getMessage(),"Unlock Failed",JOptionPane.WARNING_MESSAGE);
 				}
 			} else {
 				try {
-					String s=JOptionPane.showInputDialog("Enter lock password");
+					String s=JOptionPane.showInputDialog(WalletComponent.this,"Enter lock password");
 					if (s!=null) {
 						walletEntry.lock(s.toCharArray());
 					}	

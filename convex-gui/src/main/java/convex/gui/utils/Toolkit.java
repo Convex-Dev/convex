@@ -9,6 +9,8 @@ import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
@@ -240,6 +242,29 @@ public class Toolkit {
 				op.run();
 			}
 		};
+	}
+
+	/**
+	 * Adds a popup menu to a component, including necessary mouse listeners
+	 * @param jPopupMenu
+	 */
+	public static void addPopupMenu(JComponent comp,javax.swing.JPopupMenu popupMenu) {
+		comp.addMouseListener(new MouseAdapter () {
+		    public void mousePressed(MouseEvent e) {
+		        maybeDisplayPopupMenu(e);
+		    }
+
+		    public void mouseReleased(MouseEvent e) {
+		        maybeDisplayPopupMenu(e);
+		    }
+
+		    private void maybeDisplayPopupMenu(MouseEvent e) {
+		    	// This is because different platforms have different mouse events for popup triggers. Ugly.....
+		        if (e.isPopupTrigger()) {
+		            popupMenu.show(e.getComponent(),e.getX(), e.getY());
+		        }
+		    }
+		});
 	}
 
 

@@ -90,6 +90,7 @@ public class AccountsPanel extends JPanel {
 		table.getColumnModel().getColumn(6).setPreferredWidth(100);
 		table.getColumnModel().getColumn(6).setCellRenderer(rightRenderer);
 
+		// Key
 		table.getColumnModel().getColumn(7).setPreferredWidth(200);
 		table.getColumnModel().getColumn(7).setCellRenderer(rightRenderer);
 
@@ -103,6 +104,7 @@ public class AccountsPanel extends JPanel {
 			}
 		});
 		popupMenu.add(copyItem);
+		Toolkit.addPopupMenu(table, popupMenu);
  
 		table.addMouseListener(new MouseAdapter() {
 			@Override
@@ -115,18 +117,6 @@ public class AccountsPanel extends JPanel {
 					table.setColumnSelectionInterval(c, c);
 				} else {
 					table.clearSelection();
-				}
-				maybePopup(e);
-			}
-			
-			@Override
-			public void mouseReleased(MouseEvent e) {
-				maybePopup(e);
-			}
-
-			private void maybePopup(MouseEvent e) {
-				if (e.isPopupTrigger()) {
-					popupMenu.show(e.getComponent(), e.getX(), e.getY());
 				}
 			}
 		});

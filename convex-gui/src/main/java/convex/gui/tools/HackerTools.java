@@ -18,6 +18,7 @@ import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyGenPanel;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.utils.Toolkit;
 
@@ -71,6 +72,7 @@ public class HackerTools extends AbstractGUI {
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("KeyGen", keyGenPanel);
+		tabs.add("KeyRing", new KeyRingPanel());
 		tabs.add("Encoding", messagePanel);
 		tabs.add("Data Lattice", dataPanel);
 		

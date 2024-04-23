@@ -5,11 +5,13 @@ import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 
+import convex.core.Coin;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.util.BlobBuilder;
 
 public class Text {
 	private static final int WHITESPACE_LENGTH = 32;
+	private static final String ZEROS_9 = "000000000";
 	private static String WHITESPACE_32 = "                                "; // 32 spaces
 
 	/**
@@ -79,6 +81,25 @@ public class Text {
 	public static String toFriendlyIntString(double value) {
 		return toFriendlyNumber((long) value);
 	}
+	
+
+	/**
+	 * Format function for Convex Coin balances
+	 * @param balance
+	 * @return
+	 */
+	public static String toFriendlyBalance(long balance) {
+		if (!Coin.isValidAmount(balance)) throw new IllegalArgumentException("Invalid balance)");
+		long gold=balance/Coin.GOLD;
+		long copper = balance%Coin.GOLD;
+		String copperString=Long.toString(copper);
+		int cn=copperString.length();
+		if (cn<9) {
+			copperString=ZEROS_9.substring(cn,9)+copperString;
+		}
+		return toFriendlyNumber(gold)+"."+copperString;
+	}
+
 
 	static final DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendInstant(3).toFormatter();
 

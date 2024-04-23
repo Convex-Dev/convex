@@ -25,10 +25,11 @@ public class FileList extends JList<Path> {
 	DefaultListModel<Path> model;
 
 	public class FileContextMenu extends JPopupMenu {
-		public FileContextMenu(Path p) {
-			add(Toolkit.makeMenu("Delete",()->{
+		public FileContextMenu() {
+		add(Toolkit.makeMenu("Delete",()->{
 				try {
-			    	System.out.println("Deleting:"+ p);
+					Path p=getSelectedPath();
+					System.out.println("Deleting:"+ p);
 			    	Files.delete(p);
 			    	refreshList();
 				} catch (IOException e) {
@@ -55,29 +56,8 @@ public class FileList extends JList<Path> {
 		    		}
 		    	}
 		    }
-		    
-		    @Override
-		    public void mousePressed(MouseEvent e) {
-		    	if (e.isPopupTrigger()) {
-		    		maybePopup(e);
-		    	}
-		    }
-		    
-		    @Override
-		    public void mouseReleased(MouseEvent e) {
-		    	if (e.isPopupTrigger()) {
-		    		maybePopup(e);
-		    	}
-		    }
-		    
-		    public void maybePopup(MouseEvent e) {
-	    		Object o=getSelectedValue();
-	    		if (o instanceof DLPath) {
-	    			FileContextMenu menu=new FileContextMenu((Path)o);
-	    			menu.show(e.getComponent(), e.getX(), e.getY());
-	    		};
-		    }
 		});
+		Toolkit.addPopupMenu(this,new FileContextMenu());
 	}
 	
 	public void refreshList() {

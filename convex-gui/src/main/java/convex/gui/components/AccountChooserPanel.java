@@ -113,7 +113,7 @@ public class AccountChooserPanel extends JPanel {
 				ACell bal=r.getValue();
 				String s="<unknown>";
 				if (bal instanceof AInteger) {
-					s=Text.toFriendlyNumber(((AInteger)bal).longValue());
+					s=Text.toFriendlyBalance(((AInteger)bal).longValue());
 				}
 				if (r.getErrorCode()!=null) {
 					s="<"+r.getErrorCode()+">";

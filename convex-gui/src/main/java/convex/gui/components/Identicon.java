@@ -6,6 +6,7 @@ import java.util.WeakHashMap;
 
 import javax.swing.ImageIcon;
 import javax.swing.JLabel;
+import javax.swing.JPopupMenu;
 import javax.swing.border.BevelBorder;
 
 import convex.core.data.AArrayBlob;
@@ -87,6 +88,10 @@ public class Identicon extends JLabel {
 		size=7;
 		setKey(a);
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
+		
+		Toolkit.addPopupMenu(this,new JPopupMenu() {
+			
+		});
 	}
 
 	public static class IdenticApp extends AbstractGUI{
