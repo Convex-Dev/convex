@@ -18,17 +18,17 @@ public class PKCS12Wallet extends AWallet {
 	
 	private static final Logger log = LoggerFactory.getLogger(PKCS12Wallet.class.getName());
 
-	private HashMap<Address, BasicWalletEntry> data;
+	private HashMap<Address, HotWalletEntry> data;
 
-	private PKCS12Wallet(HashMap<Address, BasicWalletEntry> data) {
+	private PKCS12Wallet(HashMap<Address, HotWalletEntry> data) {
 		this.data = data;
 	}
 
 	public static PKCS12Wallet create() {
-		return new PKCS12Wallet(new HashMap<Address, BasicWalletEntry>());
+		return new PKCS12Wallet(new HashMap<Address, HotWalletEntry>());
 	}
 
-	public BasicWalletEntry get(Address a) {
+	public HotWalletEntry get(Address a) {
 		return data.get(a);
 	}
 

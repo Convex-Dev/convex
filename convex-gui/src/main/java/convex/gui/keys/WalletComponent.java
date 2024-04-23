@@ -13,12 +13,8 @@ import javax.swing.JTextArea;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.BasicWalletEntry;
-import convex.core.data.Address;
-import convex.core.text.Text;
-import convex.gui.client.ConvexClient;
+import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DropdownMenu;
@@ -37,17 +33,12 @@ public class WalletComponent extends BaseListComponent {
 	JButton lockButton;
 	JButton replButton;
 
-	BasicWalletEntry walletEntry;
+	AWalletEntry walletEntry;
 
 	JPanel buttons = new JPanel();
 
-	private Address address;
-	protected Convex convex;
-
-	public WalletComponent(Convex convex,BasicWalletEntry initialWalletEntry) {
+	public WalletComponent(AWalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
-		this.convex=convex;
-		address = walletEntry.getAddress();
 
 		setLayout(new MigLayout("fillx"));
 
@@ -60,23 +51,14 @@ public class WalletComponent extends BaseListComponent {
 		// Wallet Address and info fields
 		JPanel cPanel = new JPanel();
 		cPanel.setLayout(new MigLayout("fillx"));
-		CodeLabel addressLabel = new CodeLabel(address.toString());
-		addressLabel.setFont(Toolkit.MONO_FONT);
-		cPanel.add(addressLabel,"span");
+		//CodeLabel addressLabel = new CodeLabel(address.toString());
+		//addressLabel.setFont(Toolkit.MONO_FONT);
+		// cPanel.add(addressLabel,"span");
 		CodeLabel infoLabel = new CodeLabel(getInfoString());
 		cPanel.add(infoLabel,"span,growx");
 		add(cPanel,"grow,shrink"); // add to MigLayout
 
 		///// Buttons
-		// REPL button
-		replButton = new JButton("");
-		buttons.add(replButton);
-		replButton.setIcon(Toolkit.REPL_ICON);
-		replButton.addActionListener(e -> {
-			ConvexClient c= ConvexClient.launch(convex);
-			c.tabs.setSelectedComponent(c.replPanel);
-		});
-		replButton.setToolTipText("Launch a client REPL for this account");
 
 		// lock button
 		lockButton = new JButton("");
@@ -88,16 +70,19 @@ public class WalletComponent extends BaseListComponent {
 				UnlockWalletDialog dialog = UnlockWalletDialog.show(this);
 				char[] passPhrase = dialog.getPassPhrase();
 				try {
-					walletEntry = walletEntry.unlock(passPhrase);
+					walletEntry.unlock(passPhrase);
 					icon = Toolkit.UNLOCKED_ICON;
-				} catch (Throwable e1) {
-					JOptionPane.showMessageDialog(this, "Unable to unlock wallet: " + e1.getMessage());
+				} catch (Exception e1) {
+					JOptionPane.showMessageDialog(this, "Unable to unlock keypair: " + e1.getMessage(),"Unlock Failed",JOptionPane.WARNING_MESSAGE);
 				}
 			} else {
 				try {
-					walletEntry = walletEntry.lock();
+					String s=JOptionPane.showInputDialog("Enter lock password");
+					if (s!=null) {
+						walletEntry.lock(s.toCharArray());
+					}	
 				} catch (IllegalStateException e1) {
-					// OK, must be already locked.
+					e1.printStackTrace();
 				}
 				icon = Toolkit.LOCKED_ICON;
 			}
@@ -120,10 +105,19 @@ public class WalletComponent extends BaseListComponent {
 				JTextArea text = new JTextArea(sb.toString());
 				JOptionPane.showMessageDialog(WalletComponent.this, text,"Private Seed",JOptionPane.INFORMATION_MESSAGE);
 			} else {
-				JOptionPane.showMessageDialog(WalletComponent.this, "Seed not available","Warning",JOptionPane.WARNING_MESSAGE);
+				JOptionPane.showMessageDialog(WalletComponent.this, "Keypair is locked, cannot access seed","Warning",JOptionPane.WARNING_MESSAGE);
 			}
 		});
 		menu.add(m2);
+		JMenuItem m3=new JMenuItem("Delete");
+		m3.addActionListener(e-> {
+			int confirm =JOptionPane.showConfirmDialog(WalletComponent.this, "Are you sure you want to delete this keypair from your keyring?","Confirm Delete",JOptionPane.WARNING_MESSAGE);
+			if (confirm==JOptionPane.OK_OPTION) {
+				KeyRingPanel.getListModel().removeElement(walletEntry);
+			}
+		});
+		menu.add(m3);
+
 
 		DropdownMenu menuButton=new DropdownMenu(menu);
 		buttons.add(menuButton);
@@ -144,11 +138,7 @@ public class WalletComponent extends BaseListComponent {
 	private String getInfoString() {
 		StringBuilder sb=new StringBuilder();
 		sb.append("Public Key: " + walletEntry.getPublicKey()+"\n");
-		try {
-			sb.append("Balance:    " + Text.toFriendlyNumber(convex.getBalance(address)));
-		} catch (Exception e) {
-			sb.append("Balance:    <not available>");
-		}
+		sb.append("Status:     " + (walletEntry.isLocked()?"Locked":"Unlocked"));
 		
 		//sb.append("\n");
 		//sb.append("Key: "+walletEntry.getAccountKey()+ "   Controller: "+as.getController());

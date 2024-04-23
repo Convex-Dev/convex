@@ -24,7 +24,7 @@ import convex.api.ConvexRemote;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.BasicWalletEntry;
+import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
@@ -34,6 +34,7 @@ import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.PeerComponent;
 import convex.gui.components.ScrollyList;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.PeerGUI;
 import convex.peer.API;
 import convex.peer.Server;
@@ -59,8 +60,8 @@ public class PeersListPanel extends JPanel {
 				addPeer(convex);
 				
 				// initial wallet list
-		        BasicWalletEntry we = BasicWalletEntry.create(server.getPeerController(), server.getKeyPair());
-				manager.addWalletEntry(we);
+		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair());
+				KeyRingPanel.addWalletEntry(we);
 			}
 		} catch (Exception e) {
 			if (e instanceof ClosedChannelException) {
@@ -81,7 +82,7 @@ public class PeersListPanel extends JPanel {
 			long amt=convex.getBalance()/10;
 			convex.transferSync(a, amt);
 			
-			manager.addWalletEntry(BasicWalletEntry.create(a, kp));
+			KeyRingPanel.addWalletEntry(HotWalletEntry.create(kp));
 			
 			// Set up Peer in base server
 			convex=Convex.connect(base, a, kp);

@@ -61,7 +61,7 @@ public class UnlockWalletDialog extends JDialog {
 		JPanel panel = new JPanel();
 		panel_2.add(panel);
 
-		JLabel lblPassphrase = new JLabel("Passphrase: ");
+		JLabel lblPassphrase = new JLabel("Password: ");
 		panel.add(lblPassphrase);
 
 		passwordField = new JPasswordField();

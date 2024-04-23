@@ -9,7 +9,7 @@ import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.QRPanel;
-import convex.gui.keys.KeyListPanel;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.HomePanel;
 import convex.gui.utils.Toolkit;
 
@@ -35,7 +35,7 @@ public class WalletApp extends AbstractGUI {
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Home", homePanel);
-		tabs.add("Keys", new KeyListPanel(convex));
+		tabs.add("Keys", new KeyRingPanel());
 		tabs.add("QR Links", new QRPanel("Test QR code with a reasonable length string to see what happens",300));
 	}
 

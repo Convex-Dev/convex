@@ -25,7 +25,6 @@ import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.BasicWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.init.Init;
@@ -37,7 +36,7 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.components.account.AccountsPanel;
 import convex.gui.components.models.StateModel;
 import convex.gui.keys.KeyGenPanel;
-import convex.gui.keys.KeyListPanel;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.AboutPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.peer.mainpanels.PeersListPanel;
@@ -111,7 +110,7 @@ public class PeerGUI extends AbstractGUI {
 	 * Main component panel
 	 */
 	PeersListPanel peerPanel;
-	KeyListPanel keyRingPanel;
+	KeyRingPanel keyRingPanel;
 	
 	KeyGenPanel keyGenPanel;
 	MessageFormatPanel messagePanel;
@@ -142,7 +141,7 @@ public class PeerGUI extends AbstractGUI {
 		
 		// launch local peers 
 		peerPanel= new PeersListPanel(this);
-		keyRingPanel = new KeyListPanel(null);
+		keyRingPanel = new KeyRingPanel();
 
 		peerPanel.launchAllPeers(this);
 		
@@ -161,7 +160,6 @@ public class PeerGUI extends AbstractGUI {
 		keyGenPanel = new KeyGenPanel(this);
 		messagePanel = new MessageFormatPanel(this);
 		accountsPanel = new AccountsPanel(convex,latestState);
-		keyRingPanel.setConvex(convex);
 
 		setLayout(new BorderLayout());
 
@@ -254,10 +252,10 @@ public class PeerGUI extends AbstractGUI {
 				return;
 			}
 		}
-		System.err.println("Missing tab: " + title);
+		log.info("Missing tab: " + title);
 	}
 
-	public KeyListPanel getWalletPanel() {
+	public KeyRingPanel getWalletPanel() {
 		return keyRingPanel;
 	}
 
@@ -355,11 +353,5 @@ public class PeerGUI extends AbstractGUI {
 		}
 		return null;
 	}
-
-
-	public void addWalletEntry(BasicWalletEntry we) {
-		keyRingPanel.addWalletEntry(we);
-	}
-
 
 }

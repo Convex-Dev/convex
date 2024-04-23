@@ -20,7 +20,7 @@ import javax.swing.border.EmptyBorder;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.SLIP10;
-import convex.core.crypto.wallet.BasicWalletEntry;
+import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
@@ -47,7 +47,7 @@ public class KeyGenPanel extends JPanel {
 	
 	JSpinner numSpinner;
 
-	JButton addWalletButton = new JButton("Add to wallet");
+	JButton addWalletButton = new JButton("Add to keyring");
 	
 	JPanel formPanel;
 
@@ -198,45 +198,7 @@ public class KeyGenPanel extends JPanel {
 	public KeyGenPanel(PeerGUI manager) {
 		setLayout(new BorderLayout());
 
-		// Action panel with buttons 
-		
-		JPanel actionPanel = new ActionPanel();
-		add(actionPanel, BorderLayout.SOUTH);
 
-		JButton btnRecreate = new JButton("Generate");
-		actionPanel.add(btnRecreate);
-		btnRecreate.addActionListener(e -> {
-			Integer wc=(Integer) numSpinner.getValue();
-			mnemonicArea.setText(BIP39.createSecureMnemonic(wc));
-			updateMnemonic();
-		});
-		
-		numSpinner = new JSpinner();
-		numSpinner.setModel(new SpinnerNumberModel(12, 3, 30, 1));
-		actionPanel.add(numSpinner);
-
-		JButton btnNewButton = new JButton("Export...");
-		actionPanel.add(btnNewButton);
-		
-		{ // Button to Normalise Mnemonic string
-			JButton btnNormalise = new JButton("Normalise Mnemonic");
-			actionPanel.add(btnNormalise);
-			btnNormalise.addActionListener(e -> { 
-				String s=mnemonicArea.getText();
-				mnemonicArea.setText(BIP39.normalise(s));
-				updateMnemonic();
-			});
-		}
-
-		actionPanel.add(addWalletButton);
-		addWalletButton.addActionListener(e -> {
-			String pks = privateKeyArea.getText();
-			pks = Utils.stripWhiteSpace(pks);
-			BasicWalletEntry we = BasicWalletEntry.create(null,AKeyPair.create(Utils.hexToBytes(pks)));
-			manager.addWalletEntry(we);
-			manager.switchPanel("Wallet");
-
-		});
 
 		// Main Key generation form
 		
@@ -366,6 +328,46 @@ public class KeyGenPanel extends JPanel {
 		addLabel("Identicon:");
 		formPanel.add(identicon,"grow 0");
 
+		////////////////////////////////////////////////////////////////
+		// Action panel with buttons 
+		
+		JPanel actionPanel = new ActionPanel();
+		add(actionPanel, BorderLayout.SOUTH);
+
+		JButton btnRecreate = new JButton("Generate");
+		actionPanel.add(btnRecreate);
+		btnRecreate.addActionListener(e -> {
+			Integer wc=(Integer) numSpinner.getValue();
+			mnemonicArea.setText(BIP39.createSecureMnemonic(wc));
+			updateMnemonic();
+		});
+		
+		numSpinner = new JSpinner();
+		numSpinner.setModel(new SpinnerNumberModel(12, 3, 30, 1));
+		actionPanel.add(numSpinner);
+
+		JButton btnNewButton = new JButton("Export...");
+		actionPanel.add(btnNewButton);
+		
+		{ // Button to Normalise Mnemonic string
+			JButton btnNormalise = new JButton("Normalise Mnemonic");
+			actionPanel.add(btnNormalise);
+			btnNormalise.addActionListener(e -> { 
+				String s=mnemonicArea.getText();
+				mnemonicArea.setText(BIP39.normalise(s));
+				updateMnemonic();
+			});
+		}
+
+		actionPanel.add(addWalletButton);
+		addWalletButton.setEnabled(false);
+		addWalletButton.addActionListener(e -> {
+			String pks = privateKeyArea.getText();
+			pks = Utils.stripWhiteSpace(pks);
+			HotWalletEntry we = HotWalletEntry.create(AKeyPair.create(Utils.hexToBytes(pks)));
+			KeyRingPanel.addWalletEntry(we);
+			manager.switchPanel("Keyring");
+		});
 	}
 
 	private void addNote(String s) {
