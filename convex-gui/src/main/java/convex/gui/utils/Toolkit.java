@@ -70,15 +70,21 @@ public class Toolkit {
 				}
 			}
 			
+			InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
+			MONO_FONT = Font.createFont(Font.TRUETYPE_FONT, is);
+			SMALL_MONO_FONT = MONO_FONT.deriveFont(14f);
+			SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
+			
 			// prefer MaterialLookAndFeel if we have it
 			AbstractMaterialTheme theme = new MaterialOceanicTheme();
 			MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
 
-			DEFAULT_FONT=theme.getFontRegular().deriveFont(14.0f);
-			theme.setFontRegular(new FontUIResource(DEFAULT_FONT.deriveFont(14.0f)));
-			theme.setFontBold(new FontUIResource(theme.getFontBold().deriveFont(14.0f)));
-			theme.setFontItalic(new FontUIResource(theme.getFontItalic().deriveFont(14.0f)));
-			theme.setFontMedium(new FontUIResource(theme.getFontMedium().deriveFont(14.0f)));
+			DEFAULT_FONT=DEFAULT_FONT.deriveFont(14.0f).deriveFont(Font.PLAIN);
+			// DEFAULT_FONT=SMALL_MONO_FONT;
+			theme.setFontRegular(new FontUIResource(DEFAULT_FONT));
+			theme.setFontBold(new FontUIResource(DEFAULT_FONT.deriveFont(Font.BOLD)));
+			theme.setFontItalic(new FontUIResource(DEFAULT_FONT.deriveFont(Font.ITALIC)));
+			theme.setFontMedium(new FontUIResource(DEFAULT_FONT.deriveFont(Font.PLAIN)));
 			
 			UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
 			
@@ -89,10 +95,6 @@ public class Toolkit {
 				im.put(KeyStroke.getKeyStroke(KeyEvent.VK_X, KeyEvent.META_DOWN_MASK), DefaultEditorKit.cutAction);
 			}
 			
-			InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
-			Font monoFont = Font.createFont(Font.TRUETYPE_FONT, is);
-			SMALL_MONO_FONT = monoFont.deriveFont(14f);
-			SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 			
 			UIManager.setLookAndFeel(material);
 		} catch (Exception e) {

@@ -53,8 +53,8 @@ public class AccountsPanel extends JPanel {
 		
 		table.setCellSelectionEnabled(true);
 		
-		table.setFont(Toolkit.SMALL_MONO_FONT);
-		table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
+		//table.setFont(Toolkit.SMALL_MONO_FONT);
+		//table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
 		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
 		
 		model.addPropertyChangeListener(pc -> {
@@ -94,7 +94,6 @@ public class AccountsPanel extends JPanel {
 		table.getColumnModel().getColumn(7).setPreferredWidth(200);
 		table.getColumnModel().getColumn(7).setCellRenderer(rightRenderer);
 
-		// popup menu, not sure why this doesn't work....
 		final JPopupMenu popupMenu = new JPopupMenu();
 		JMenuItem copyItem = new JMenuItem("Copy Value");
 		copyItem.addActionListener(new ActionListener() {

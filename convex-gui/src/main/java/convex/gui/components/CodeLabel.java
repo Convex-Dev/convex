@@ -4,6 +4,9 @@ import javax.swing.JTextArea;
 
 import convex.gui.utils.Toolkit;
 
+/**
+ * A simple label for multi-line text / code components
+ */
 @SuppressWarnings("serial")
 public class CodeLabel extends JTextArea {
 
