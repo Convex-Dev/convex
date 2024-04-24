@@ -227,7 +227,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Returns the CVM String representation of this Cell. Normally, this is as printed, but may be different for some types.
 	 * 
-	 * MUST return null in O(1) time if the length of the CVM String would exceed limit.
+	 * SHOULD return null in O(1) time if the length of the CVM String can be proved to exceed the limit.
+	 * MUST complete in O(limit) time and space otherwise
 	 * 
 	 * The String representation is intended to be a easy-to-read textual representation of the Cell's data content.
 	 * @param limit Limit of CVM String length in UTF-8 bytes
@@ -243,7 +244,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	/**
 	 * Gets the cached blob representing this Cell's Encoding in binary format, if it exists.
 	 * 
-	 * @return The cached blob for this cell, or null if not available. 
+	 * @return The cached blob for this cell, or null if not yet available. 
 	 */
 	public Blob cachedEncoding() {
 		return encoding;
@@ -290,7 +291,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Gets the Memory Size of this Cell, computing it if required.
 	 * 
 	 * The memory size is the total storage requirement for this cell. Embedded cells do not require storage for
-	 * their own encoding, but may require storage for nested non-embedded Refs.
+	 * their own encoding, but may require storage for nested branches.
 	 * 
 	 * @return Memory Size of this Cell
 	 */
@@ -306,7 +307,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * Gets the Memory Size of a Cell, computing it if required.
 	 * 
 	 * The memory size is the total storage requirement for this cell. Embedded cells do not require storage for
-	 * their own encoding, but may require storage for nested non-embedded Refs.
+	 * their own encoding, but may require storage for nested branches.
 	 * 
 	 * @return Memory Size of this Cell
 	 */

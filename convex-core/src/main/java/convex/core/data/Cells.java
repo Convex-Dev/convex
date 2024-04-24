@@ -174,7 +174,9 @@ public class Cells {
 	public static long storageSize(ACell a) {
 		if (a==null) return 1;
 		long memSize=a.getMemorySize();
-		if (a.isEmbedded()) memSize+=a.getEncodingLength();
+		if (a.isEmbedded()) {
+			memSize+=a.getEncodingLength();
+		} 
 		return memSize;
 	}
 

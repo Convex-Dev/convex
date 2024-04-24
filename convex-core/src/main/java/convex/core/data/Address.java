@@ -327,6 +327,12 @@ public final class Address extends ABlobLike<CVMLong> {
 	public boolean isCanonical() {
 		return true;
 	}
+	
+	@Override
+	protected long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
+	}
 
 	@Override
 	public boolean isCVMValue() {

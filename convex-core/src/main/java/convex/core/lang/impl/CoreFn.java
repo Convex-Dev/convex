@@ -132,8 +132,14 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	
 	@Override
 	public boolean isEmbedded() {
-		// embed core functions, since they are the same size as small symbols
+		// core functions are always small embedded values
 		return true;
+	}
+	
+	@Override
+	protected final long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
 	}
 	
 	@Override 

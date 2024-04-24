@@ -179,8 +179,8 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// tag plus raw data
-		return 1 + LENGTH;
+		// tag plus length plis raw data
+		return 2 + LENGTH;
 	}
 	
 	@Override

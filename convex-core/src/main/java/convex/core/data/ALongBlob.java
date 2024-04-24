@@ -94,12 +94,6 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	protected final long calcMemorySize() {	
-		// always embedded and no child Refs, so memory size == 0
-		return 0;
-	}
-	
-	@Override
 	public long hexMatch(ABlobLike<?> b, long start, long length) {
 		for (int i=0; i<length; i++) {
 			int c=b.getHexDigit(start+i);
@@ -156,6 +150,12 @@ public abstract class ALongBlob extends ABlob {
 	public final boolean isEmbedded() {
 		// Always embedded
 		return true;
+	}
+
+	@Override
+	protected final long calcMemorySize() {	
+		// always embedded and no child Refs, so memory size == 0
+		return 0;
 	}
 	
 	@Override

@@ -156,6 +156,13 @@ public abstract class AArrayBlob extends ABlob {
 	public boolean isFullyPacked() {
 		return (count==Blob.CHUNK_LENGTH);
 	}
+	
+	@Override
+	protected long calcMemorySize() {	
+		// fast path for small Blobs, never have child cells
+		if (isEmbedded()) return 0;
+		return super.calcMemorySize();
+	}
 
 	@Override
 	public final byte byteAt(long i) {
