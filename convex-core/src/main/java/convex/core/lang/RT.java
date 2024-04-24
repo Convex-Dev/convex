@@ -1036,7 +1036,9 @@ public class RT {
 	 * @return Java String representation. May be "nil". May include message if print limit exceeded
 	 */
 	public static String toString(ACell a, long limit) {
-		return RT.print(a,limit).toString();
+		AString s=RT.print(a,limit);
+		if (s==null) return Constants.PRINT_EXCEEDED_STRING;
+		return s.toString();
 	}
 
 	/**

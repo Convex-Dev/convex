@@ -29,7 +29,6 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Multi;
 import convex.core.transactions.Transactions;
 import convex.core.transactions.Transfer;
-import convex.core.util.Utils;
 import convex.test.Samples;
 
 import static convex.test.Assertions.*;
@@ -60,7 +59,7 @@ public class TransactionTest extends ACVMTest {
 		long IBAL=state().getAccount(HERO).getBalance();
 		Transfer t1=Transfer.create(HERO, 1, VILLAIN, AMT);
 		
-		long memSize=Utils.fullMemorySize(t1);
+		long memSize=Cells.storageSize(t1);
 		
 		State s=apply(t1);
 		long expectedFees=(Juice.TRANSACTION+Juice.TRANSFER+Juice.TRANSACTION_PER_BYTE*memSize)*JP;

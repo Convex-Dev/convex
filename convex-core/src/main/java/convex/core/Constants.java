@@ -162,7 +162,8 @@ public class Constants {
 	 */
 	public static final long PRINT_LIMIT = 4096;
 
-	public static final AString PRINT_EXCEEDED_MESSAGE = Strings.create("<<Print limit exceeded>>");
+	public static final String PRINT_EXCEEDED_STRING = "<<Print limit exceeded>>";
+	public static final AString PRINT_EXCEEDED_MESSAGE = Strings.create(PRINT_EXCEEDED_STRING);
 
 	/**
 	 * Default port for Convex Peers

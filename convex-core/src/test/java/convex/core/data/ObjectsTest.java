@@ -69,7 +69,7 @@ public class ObjectsTest {
 	
 	private static void doMemorySizeTests(ACell a) {
 		long ms=a.calcMemorySize();
-		long fms=Utils.fullMemorySize(a);
+		long fms=Cells.storageSize(a);
 		assertEquals(ms,a.getMemorySize());
 		int rc=a.getRefCount();
 		long elen=a.getEncodingLength();

@@ -166,4 +166,16 @@ public class Cells {
 		return a.getEncoding();
 	}
 
+	/**
+	 * Get the full storage size of a value, including size of an embedded encoding
+	 * @param a
+	 * @return
+	 */
+	public static long storageSize(ACell a) {
+		if (a==null) return 1;
+		long memSize=a.getMemorySize();
+		if (a.isEmbedded()) memSize+=a.getEncodingLength();
+		return memSize;
+	}
+
 }

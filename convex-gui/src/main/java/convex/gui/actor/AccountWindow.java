@@ -12,16 +12,16 @@ import convex.gui.peer.windows.state.StateTreePanel;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class ActorWindow extends AbstractGUI {
-	Address contract;
+public class AccountWindow extends AbstractGUI {
+	Address account;
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public ActorWindow(Convex convex,StateModel<State> manager, Address contract) {
-		super ("Contract view - " + contract);
-		this.contract = contract;
+	public AccountWindow(Convex convex,StateModel<State> manager, Address account) {
+		super ("Account view - " + account);
+		this.account = account;
 		setLayout(new MigLayout());
-		AccountStatus as = manager.getValue().getAccount(contract);
+		AccountStatus as = manager.getValue().getAccount(account);
 
 		manager.addPropertyChangeListener(e -> {
 
@@ -29,9 +29,9 @@ public class ActorWindow extends AbstractGUI {
 
 		add(tabbedPane, "dock center");
 
-		tabbedPane.add("Overview", new ActorInfoPanel(manager, contract));
-		tabbedPane.add("Environment", new StateTreePanel(as.getEnvironment()));
-		tabbedPane.add("Operations", new ActorInvokePanel(convex,manager, contract));
+		tabbedPane.add("Overview", new AccountInfoPanel(manager, account));
+		tabbedPane.add("Environment", new StateTreePanel((as==null)?null:as.getEnvironment()));
+		tabbedPane.add("Operations", new ActorInvokePanel(convex,manager, account));
 	}
 
 }

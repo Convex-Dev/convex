@@ -4,11 +4,11 @@ import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
+import convex.core.data.Cells;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
 import convex.core.transactions.ATransaction;
-import convex.core.util.Utils;
 
 /**
  * Static class defining juice costs for executable operations.
@@ -534,7 +534,7 @@ public class Juice {
 	 * @return
 	 */
 	public static long priceMemorySize(ACell a) {
-		return Juice.mul(Juice.TRANSACTION_PER_BYTE, Utils.fullMemorySize(a));
+		return Juice.mul(Juice.TRANSACTION_PER_BYTE, Cells.storageSize(a));
 	}
 
 	public static long priceTransaction(ATransaction tx) {

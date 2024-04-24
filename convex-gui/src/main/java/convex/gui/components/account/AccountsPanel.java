@@ -10,6 +10,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
+import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
@@ -17,14 +18,18 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.border.BevelBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import convex.api.Convex;
 import convex.core.State;
+import convex.core.data.AArrayBlob;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.gui.actor.ActorWindow;
+import convex.core.util.Utils;
+import convex.gui.actor.AccountWindow;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.Identicon;
 import convex.gui.components.models.AccountsTableModel;
 import convex.gui.components.models.StateModel;
 import convex.gui.utils.Toolkit;
@@ -34,13 +39,25 @@ public class AccountsPanel extends JPanel {
 	AccountsTableModel tableModel;
 	JTable table;
 
-	static class ActorRenderer extends DefaultTableCellRenderer {
-		public ActorRenderer() {
+	static class AccountsTableRenderer extends DefaultTableCellRenderer {
+		public AccountsTableRenderer() {
 			super();
 		}
 
 		public void setValue(Object value) {
-			setText(value.toString());
+			setText(Utils.toString(value));
+		}
+	}
+	
+	static class AccountKeyRenderer extends DefaultTableCellRenderer {
+		public AccountKeyRenderer() {
+			super();
+			this.setBorder(BorderFactory.createBevelBorder(BevelBorder.RAISED));
+		}
+
+		public void setValue(Object value) {
+			setText((value==null)?"":value.toString());
+			setIcon(Identicon.createIcon((AArrayBlob) value,24));
 		}
 	}
 
@@ -52,7 +69,6 @@ public class AccountsPanel extends JPanel {
 		table = new JTable(tableModel);
 		
 		table.setCellSelectionEnabled(true);
-		
 		//table.setFont(Toolkit.SMALL_MONO_FONT);
 		//table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
 		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
@@ -62,15 +78,15 @@ public class AccountsPanel extends JPanel {
 			tableModel.setState(newState);
 		});
 
-		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
+		DefaultTableCellRenderer leftRenderer = new AccountsTableRenderer();
 		leftRenderer.setHorizontalAlignment(JLabel.LEFT);
-		DefaultTableCellRenderer rightRenderer = new DefaultTableCellRenderer();
+		DefaultTableCellRenderer rightRenderer = new AccountsTableRenderer();
 		rightRenderer.setHorizontalAlignment(JLabel.RIGHT);
 		
 		table.getColumnModel().getColumn(0).setCellRenderer(leftRenderer);
 		table.getColumnModel().getColumn(0).setPreferredWidth(80);
 		
-		ActorRenderer actorRenderer = new ActorRenderer();
+		AccountsTableRenderer actorRenderer = new AccountsTableRenderer();
 		actorRenderer.setHorizontalAlignment(JLabel.CENTER);
 		table.getColumnModel().getColumn(1).setPreferredWidth(70);
 		table.getColumnModel().getColumn(1).setCellRenderer(actorRenderer);
@@ -92,7 +108,7 @@ public class AccountsPanel extends JPanel {
 
 		// Key
 		table.getColumnModel().getColumn(7).setPreferredWidth(200);
-		table.getColumnModel().getColumn(7).setCellRenderer(rightRenderer);
+		table.getColumnModel().getColumn(7).setCellRenderer(new AccountKeyRenderer());
 
 		final JPopupMenu popupMenu = new JPopupMenu();
 		JMenuItem copyItem = new JMenuItem("Copy Value");
@@ -123,7 +139,7 @@ public class AccountsPanel extends JPanel {
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
-		JButton btnActor = new JButton("Examine Actor...");
+		JButton btnActor = new JButton("Examine Account...");
 		actionPanel.add(btnActor);
 		btnActor.addActionListener(e -> {
 			long ix=table.getSelectedRow();
@@ -131,7 +147,7 @@ public class AccountsPanel extends JPanel {
 			if (as == null) return;
 			Address addr = Address.create(ix);
 			if (!as.isActor()) return;
-			ActorWindow pw = new ActorWindow(convex, model, addr);
+			AccountWindow pw = new AccountWindow(convex, model, addr);
 			pw.run();
 		});
 

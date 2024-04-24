@@ -1429,18 +1429,6 @@ public class Utils {
 	}
 
 	/**
-	 * Get the full memory size of a value, including size of an embedded encoding
-	 * @param a
-	 * @return
-	 */
-	public static long fullMemorySize(ACell a) {
-		if (a==null) return 1;
-		long memSize=a.getMemorySize();
-		if (a.isEmbedded()) memSize+=a.getEncodingLength();
-		return memSize;
-	}
-
-	/**
 	 * Long computation of (a*b)/c. Arguments and result must be in range 0..Long.MAX_VALUE
 	 * @param a First multiplicand
 	 * @param b Second multiplicand

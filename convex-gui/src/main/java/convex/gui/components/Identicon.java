@@ -23,10 +23,9 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class Identicon extends JLabel {
 
-	protected final int size;
+	protected static final int SIZE=7;
 	
-	public BufferedImage createImage(AArrayBlob data, int renderSize) {
-		int SIZE = size;
+	public static BufferedImage createImage(AArrayBlob data, int renderSize) {
 		if ((data==null)||(data.isEmpty())) return  new BufferedImage(renderSize, renderSize, BufferedImage.TYPE_INT_RGB);
 		long n=data.count(); // must be one byte at least
 		
@@ -71,9 +70,9 @@ public class Identicon extends JLabel {
 	/**
 	 * A weak cache for Icons
 	 */
-	private WeakHashMap<AArrayBlob,ImageIcon> wm=new WeakHashMap<>();
+	private static WeakHashMap<AArrayBlob,ImageIcon> wm=new WeakHashMap<>();
 	
-	private ImageIcon createIcon(AArrayBlob hash, int size) {
+	public static ImageIcon createIcon(AArrayBlob hash, int size) {
 		ImageIcon cached=wm.get(hash);
 		if ((cached!=null)&&(cached.getImage().getWidth(null)==size)) return cached;
 		
@@ -85,7 +84,6 @@ public class Identicon extends JLabel {
 
 	public Identicon(AArrayBlob a) {
 		super();
-		size=7;
 		setKey(a);
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
 		

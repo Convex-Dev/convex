@@ -11,6 +11,7 @@ import javax.swing.JTextArea;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Refs;
 import convex.core.exceptions.ParseException;
@@ -148,7 +149,7 @@ public class MessageFormatPanel extends JPanel {
 		sb.append("\n");
 		sb.append("Encoding Size: "+(empty?"<none>":b.count()));
 		sb.append("\n");
-		sb.append("Memory Size:   "+(empty?"<none>":Utils.fullMemorySize(v)));
+		sb.append("Memory Size:   "+(empty?"<none>":Cells.storageSize(v)));
 		sb.append("\n");
 		sb.append("Cell Count:    "+(empty?"<none>":Refs.totalRefCount(v)));
 		hashLabel.setText(sb.toString());
