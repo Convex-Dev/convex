@@ -36,7 +36,6 @@ The repository also contains core "on-chain" libraries providing key full-stack 
 
 - `convex.fungible` - Fungible Tokens
 - `asset.nft.simple` - Basic lightweight Non-fungible tokens
-- `asset.nft.tokens` - More advanced NFTs with customisable functionality
 - `convex.asset` - library for managing arbitrary digital assets using a common abstraction
 - `convex.trust` - library for access control and trusted operations
 - `torus.exchange` - decentralised exchange for trading fungible tokens and currencies
@@ -55,7 +54,7 @@ For making use of Convex data structures, CVM execution etc. locally you probabl
 
 ## Key features
 
-* *Virtual Machine* - The Convex Virtual Machine provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.
+* *Convex Virtual Machine (CVM)* - The CVM provides a secure execution environment based on the Lambda Calculus and capable of acting as the execution layer for smart contracts and autonomous agents.
 * *Decentralised Consensus* - Similar to Blockchain technology, Convex incorporates a consensus mechanism that ensures all nodes ultimately agree on true values in the system without the control of any single entity. This property means that it is inherently tamper-proof and censorship-resistant.
 * *Performance and Scalability* - Convex is capable of executing large volumes of transactions (tens of thousands of transactions per second) with low latency (sub-second global consensus)
 * *100% Green* - No wasteful consumption of energy or computing resources
@@ -71,6 +70,14 @@ To get a local development build of Convex you need [git](https://git-scm.com/) 
 
 This should download all necessary dependencies and perform a standard build.
 
+### Convex Desktop
+
+Convex Desktop is a GUI application for power users and developers providing full access to the capabilities of Convex. To run, you will need a modern version of Java installed (21+) and the `convex-desktop.jar` executable file (which can be found in the outputs of the Maven build above, or downloaded from trusted sources).
+
+```bash
+java -jar convex-desktop.jar
+```
+
 ### Command Line Interface (CLI)
 
 If you have an already built version of the Convex CLI `convex-cli.jar` file and installed a recent version of Java you can run it as follows:
@@ -84,17 +91,11 @@ For convenience, there are shell scripts to automate this for common platforms i
 ```bash
 ./convex --help
 ```
-
-### Local GUI Peers
-
-The convex GUI can be used to run a local test network. This is often the simplest way to get a temporary Convex network running for experimental / development pruposes and provides a number of useful tools.
-
-Using the CLI, you can start the GUI  by using the `local gui` command:
+Using the CLI, you can start the Convex Desktop GUI for a local peer test network by using the `local gui` command:
 
 ```
 ./convex local gui
 ```
-
 
 ## Contributing
 

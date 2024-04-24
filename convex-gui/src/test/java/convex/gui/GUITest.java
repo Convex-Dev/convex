@@ -10,12 +10,18 @@ import convex.core.exceptions.InvalidDataException;
 import convex.dlfs.DLFileSystem;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
+import convex.gui.utils.Toolkit;
 
 /**
  * We can't test much of the GUI easily in unit tests, but we can at least test
  * that the GUI component tree is initialised correctly and consistently.
  */
 public class GUITest {
+	
+	static {
+		Toolkit.init();
+	}
+	
 	/**
 	 * Manager is the root panel of the GUI. Everything else is built in its
 	 * constructor.
