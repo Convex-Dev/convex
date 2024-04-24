@@ -44,7 +44,6 @@ import convex.core.transactions.Transfer;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
-import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -71,8 +70,6 @@ public class StressPanel extends JPanel {
 	private JTextArea resultArea;
 	
 	private JComboBox<String> txTypeBox;
-
-	private PeerGUI manager;
 
 	public StressPanel(Convex peerView) {
 		this.peerConvex = peerView;
@@ -137,10 +134,10 @@ public class StressPanel extends JPanel {
 		optionPanel.add(syncCheckBox);
 		syncCheckBox.setSelected(false);
 		
-		JLabel lblDist=new JLabel("Distribute over Peers?");
-		optionPanel.add(lblDist);
+		//JLabel lblDist=new JLabel("Distribute over Peers?");
+		//optionPanel.add(lblDist);
 		distCheckBox=new JCheckBox();
-		optionPanel.add(distCheckBox);
+		//optionPanel.add(distCheckBox);
 		distCheckBox.setSelected(false);
 		
 		optionPanel.add(new JLabel("Repeat requests?"));
@@ -345,12 +342,12 @@ public class StressPanel extends JPanel {
 				AKeyPair kp=kps.get(i);
 				Address clientAddr = clientAddresses.get(i);
 				Convex cc;
-				if (distCheckBox.isSelected()) {
-					InetSocketAddress pa=manager.getRandomServer().getHostAddress();
-					cc=Convex.connect(pa,clientAddr,kp);
-				} else {
+				//if (distCheckBox.isSelected()) {
+				//	InetSocketAddress pa=manager.getRandomServer().getHostAddress();
+				//	cc=Convex.connect(pa,clientAddr,kp);
+				//} else {
 					cc=Convex.connect(sa,clientAddr,kp);
-				}
+				//}
 				clients.add(cc);
 			}
 		}

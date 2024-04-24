@@ -123,7 +123,7 @@ public class PeerGUI extends AbstractGUI {
 	/**
 	 * Create the application.
 	 * @param genesis Genesis key pair
-	 * @param peerNum Numer of peers to initialise in geneis
+	 * @param peerNum Number of peers to initialise in genesis
 	 */
 	public PeerGUI(int peerCount, AKeyPair genesis) {
 		super ("Peer Manager");

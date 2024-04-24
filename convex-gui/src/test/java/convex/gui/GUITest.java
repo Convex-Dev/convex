@@ -23,7 +23,7 @@ public class GUITest {
 	}
 	
 	/**
-	 * Manager is the root panel of the GUI. Everything else is built in its
+	 * Manager is the root panel of the GUI. A lot of other stuff is built in its
 	 * constructor.
 	 */
 	static final PeerGUI manager = new PeerGUI(3,AKeyPair.generate());
@@ -34,6 +34,9 @@ public class GUITest {
 		s.validate();
 	}
 	
+	/**
+	 * Simple test that DLFSBrowser can be constructed and functionality is working
+	 */
 	@Test
 	public void testDLFSBrowser() {
 		DLFSBrowser browser=new DLFSBrowser();
