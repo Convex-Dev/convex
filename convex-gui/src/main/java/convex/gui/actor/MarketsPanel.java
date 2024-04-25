@@ -34,7 +34,7 @@ public class MarketsPanel extends JPanel {
 
 		// ===========================================
 		// Top panel
-		acctChooser = new AccountChooserPanel(null,peer);
+		acctChooser = new AccountChooserPanel(peer);
 		this.add(acctChooser, BorderLayout.NORTH);
 
 		// ===========================================

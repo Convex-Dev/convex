@@ -23,6 +23,7 @@ public class AccountWindow extends AbstractGUI {
 		setLayout(new MigLayout());
 		AccountStatus as = manager.getValue().getAccount(account);
 
+
 		manager.addPropertyChangeListener(e -> {
 
 		});

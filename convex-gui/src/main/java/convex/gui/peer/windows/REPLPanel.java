@@ -164,7 +164,7 @@ public class REPLPanel extends JPanel {
 	 */
 	public REPLPanel(Convex convex) {
 		this.convex=convex;
-		execPanel=new AccountChooserPanel(null,convex);
+		execPanel=new AccountChooserPanel(convex);
 		
 		setLayout(new BorderLayout(0, 0));
 		

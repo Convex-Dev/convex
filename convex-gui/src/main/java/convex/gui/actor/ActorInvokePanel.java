@@ -1,7 +1,5 @@
 package convex.gui.actor;
 
-import java.awt.BorderLayout;
-
 import javax.swing.DefaultListModel;
 import javax.swing.JPanel;
 
@@ -14,6 +12,7 @@ import convex.core.data.Symbol;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.models.StateModel;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class ActorInvokePanel extends JPanel {
@@ -24,14 +23,15 @@ public class ActorInvokePanel extends JPanel {
 	DefaultListModel<Symbol> exportList = new DefaultListModel<Symbol>();
 	private StateModel<State> model;
 
-	public ActorInvokePanel(Convex manager,StateModel<State> model, Address contract) {
+	public ActorInvokePanel(Convex convex,StateModel<State> model, Address contract) {
 		this.contract = contract;
 		this.model=model;
 		
-		execPanel=new AccountChooserPanel(null,manager);
-		add(execPanel, BorderLayout.NORTH);
 
-		setLayout(new BorderLayout());
+		setLayout(new MigLayout());
+
+		execPanel=new AccountChooserPanel(convex);
+		add(execPanel, "dock north");
 
 		AccountStatus as = model.getValue().getAccount(contract);
 		ASet<Symbol> exports = as.getCallableFunctions();
@@ -41,7 +41,7 @@ public class ActorInvokePanel extends JPanel {
 
 		ScrollyList<Symbol> scrollyList = new ScrollyList<Symbol>(exportList,
 				sym -> new SmartOpComponent(this, contract, sym));
-		add(scrollyList, BorderLayout.CENTER);
+		add(scrollyList, "dock center");
 
 	}
 

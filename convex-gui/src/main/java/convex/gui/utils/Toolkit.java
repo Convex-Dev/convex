@@ -78,7 +78,7 @@ public class Toolkit {
 			}
 			
 			InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
-			MONO_FONT = Font.createFont(Font.TRUETYPE_FONT, is);
+			MONO_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(24f);
 			SMALL_MONO_FONT = MONO_FONT.deriveFont(14f);
 			SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 			
@@ -294,7 +294,11 @@ public class Toolkit {
 	}
 
 	public static Border createDialogBorder() {
-		return BorderFactory.createEmptyBorder(20, 20, 20, 20);
+		return createEmptyBorder(20);
+	}
+
+	public static Border createEmptyBorder(int x) {
+		return BorderFactory.createEmptyBorder(x, x, x, x);
 	}
 
 

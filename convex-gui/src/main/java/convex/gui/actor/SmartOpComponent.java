@@ -2,7 +2,6 @@ package convex.gui.actor;
 
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.GridLayout;
 import java.util.HashMap;
 
 import javax.swing.JButton;
@@ -35,6 +34,7 @@ import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 
 @SuppressWarnings("serial")
@@ -60,12 +60,14 @@ public class SmartOpComponent extends BaseListComponent {
 		setFont(Toolkit.SMALL_MONO_FONT);
 		setLayout(new BorderLayout(0, 0));
 
+		// Name and description
 		CodeLabel opName = new CodeLabel(sym.toString());
 		opName.setFont(Toolkit.MONO_FONT);
 		add(opName, BorderLayout.NORTH);
-
+		
+		// Parameters
 		JPanel paramPanel = new JPanel();
-		paramPanel.setLayout(new GridLayout(0, 3, 4, 4)); // 3 columns, small hgap and vgap
+		paramPanel.setLayout(new MigLayout("wrap 3","[200][300,fill][400]","")); // 3 columns, small hgap and vgap
 
 		AccountStatus as = parent.getLatestState().getAccount(contract);
 
@@ -84,21 +86,22 @@ public class SmartOpComponent extends BaseListComponent {
 			paramFields.put(i, argBox);
 			paramPanel.add(new JLabel("")); // TODO: descriptions?
 		}
-		paramPanel.add(new ParamLabel("<offer funds>"));
+		paramPanel.add(new ParamLabel("*offer*"));
 		JTextField offerBox = new ArgBox();
 		paramFields.put(null, offerBox);
 		paramPanel.add(offerBox);
-		paramPanel.add(new JLabel("Offer funds (0 or blank for no offer)"));
+		paramPanel.add(new JLabel("Offer amount (0 or blank for no offer)"));
 
 		add(paramPanel, BorderLayout.CENTER);
 
-		JPanel aPanel = new JPanel();
-		aPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
-		JButton execButton = new JButton("Execute");
-		aPanel.add(execButton);
+		// Actions for each operation
+		JPanel actionPanel = new JPanel();
+		actionPanel.setLayout(new FlowLayout(FlowLayout.LEFT));
+		JButton execButton = new JButton("Execute...");
+		actionPanel.add(execButton);
 		execButton.addActionListener(e -> execute());
 
-		add(aPanel, BorderLayout.SOUTH);
+		add(actionPanel, BorderLayout.SOUTH);
 
 	}
 

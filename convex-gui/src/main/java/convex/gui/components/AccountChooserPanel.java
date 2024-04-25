@@ -12,7 +12,6 @@ import javax.swing.JPanel;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
-import convex.core.crypto.wallet.IWallet;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
@@ -35,11 +34,9 @@ public class AccountChooserPanel extends JPanel {
 	private JLabel balanceLabel;
 	
 	protected Convex convex;
-	protected IWallet wallet;
 
-	public AccountChooserPanel(IWallet wallet,Convex convex) {
+	public AccountChooserPanel(Convex convex) {
 		this.convex=convex;
-		this.wallet=wallet;
 		
 		MigLayout layout = new MigLayout("insets 10 10 10 10,fill");
 		setLayout(layout);

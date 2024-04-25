@@ -945,6 +945,10 @@ public abstract class Convex {
 	@Override 
 	public abstract String toString();
 
+	/**
+	 * Get the keypair for this Convex connection. 
+	 * @return Keypair or null if not set
+	 */
 	public AKeyPair getKeyPair() {
 		return keyPair;
 	}

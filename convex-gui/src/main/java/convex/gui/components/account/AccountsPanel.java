@@ -2,6 +2,7 @@ package convex.gui.components.account;
 
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -18,7 +19,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.border.BevelBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 
 import convex.api.Convex;
@@ -52,7 +52,7 @@ public class AccountsPanel extends JPanel {
 	static class AccountKeyRenderer extends DefaultTableCellRenderer {
 		public AccountKeyRenderer() {
 			super();
-			this.setBorder(BorderFactory.createBevelBorder(BevelBorder.RAISED));
+			this.setBorder(BorderFactory.createEmptyBorder(0, 3, 0, 3));
 		}
 
 		public void setValue(Object value) {
@@ -69,6 +69,7 @@ public class AccountsPanel extends JPanel {
 		table = new JTable(tableModel);
 		
 		table.setCellSelectionEnabled(true);
+		table.setIntercellSpacing(new Dimension(1,1));
 		//table.setFont(Toolkit.SMALL_MONO_FONT);
 		//table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
 		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
@@ -143,10 +144,10 @@ public class AccountsPanel extends JPanel {
 		actionPanel.add(btnActor);
 		btnActor.addActionListener(e -> {
 			long ix=table.getSelectedRow();
+			if (ix<0) return;
 			AccountStatus as = tableModel.getEntry(ix);
 			if (as == null) return;
 			Address addr = Address.create(ix);
-			if (!as.isActor()) return;
 			AccountWindow pw = new AccountWindow(convex, model, addr);
 			pw.run();
 		});

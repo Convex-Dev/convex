@@ -17,6 +17,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
+import convex.core.data.Blobs;
 import convex.core.util.Utils;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Identicon;
@@ -91,8 +92,14 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		public Component getListCellRendererComponent(JList<? extends AWalletEntry> list, AWalletEntry value, int index,
 				boolean isSelected, boolean cellHasFocus) {
 			AWalletEntry entry= (AWalletEntry)value;
-			setText("0x"+entry.getPublicKey().toHexString(12)+"...");
-			setIcon(Identicon.createIcon(entry.getIdenticonData(),21));
+			if (entry!=null) {
+				AccountKey pubKey=entry.getPublicKey();
+				setText(pubKey.toHexString(12)+"...");
+				setIcon(Identicon.createIcon(entry.getIdenticonData(),21));				
+			} else {
+				setText("<none>");
+				setIcon(Identicon.createIcon(Blobs.empty(),21));
+			}
 			return this;
 		}
 	}
@@ -137,12 +144,14 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	public static KeyPairCombo forConvex(Convex convex) {
 		KeyPairModel model=new KeyPairModel();
 		AKeyPair kp=convex.getKeyPair();
-		AccountKey publicKey=(kp==null)?null:kp.getAccountKey();
-		AWalletEntry we=Toolkit.getKeyRingEntry(publicKey);
-		if (we==null) {
-			we=new HotWalletEntry(kp);
+		if (kp!=null) {
+			AccountKey publicKey=kp.getAccountKey();
+			AWalletEntry we=Toolkit.getKeyRingEntry(publicKey);
+			if (we==null) {
+				we=new HotWalletEntry(kp);
+			}
+			model.setSelectedItem(we);
 		}
-		model.setSelectedItem(we);
 
  		return new KeyPairCombo(model);
 	}
