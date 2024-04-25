@@ -34,8 +34,8 @@ public class HotWalletEntry extends AWalletEntry {
 	}
 
 	@Override
-	public AKeyPair getKeyPair() {
-		if (keyPair == null) throw new IllegalStateException("Wallet not unlocked!");
+	public synchronized AKeyPair getKeyPair() {
+		if (isLocked()) throw new IllegalStateException("Wallet not unlocked!");
 		return keyPair;
 	}
 

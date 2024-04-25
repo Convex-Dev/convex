@@ -28,14 +28,14 @@ public class WalletComponent extends BaseListComponent {
 	@SuppressWarnings("unused")
 	private static final Logger log = LoggerFactory.getLogger(WalletComponent.class.getName());
 
-	Icon icon = Toolkit.LOCKED_ICON;
-
 	JButton lockButton;
 	JButton replButton;
 
 	AWalletEntry walletEntry;
 
 	JPanel buttons = new JPanel();
+
+	private CodeLabel infoLabel;
 
 	public WalletComponent(AWalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
@@ -54,7 +54,8 @@ public class WalletComponent extends BaseListComponent {
 		//CodeLabel addressLabel = new CodeLabel(address.toString());
 		//addressLabel.setFont(Toolkit.MONO_FONT);
 		// cPanel.add(addressLabel,"span");
-		CodeLabel infoLabel = new CodeLabel(getInfoString());
+		
+		infoLabel = new CodeLabel(getInfoString());
 		cPanel.add(infoLabel,"span,growx");
 		add(cPanel,"grow,shrink"); // add to MigLayout
 
@@ -63,18 +64,9 @@ public class WalletComponent extends BaseListComponent {
 		// lock button
 		lockButton = new JButton("");
 		buttons.add(lockButton);
-		lockButton.setIcon(walletEntry.isLocked() ? Toolkit.LOCKED_ICON : Toolkit.UNLOCKED_ICON);
-		resetTooltipTExt(lockButton);
 		lockButton.addActionListener(e -> {
 			if (walletEntry.isLocked()) {
-				UnlockWalletDialog dialog = UnlockWalletDialog.show(WalletComponent.this);
-				char[] passPhrase = dialog.getPassPhrase();
-				try {
-					walletEntry.unlock(passPhrase);
-					icon = Toolkit.UNLOCKED_ICON;
-				} catch (Exception e1) {
-					JOptionPane.showMessageDialog(WalletComponent.this, "Unable to unlock keypair: " + e1.getMessage(),"Unlock Failed",JOptionPane.WARNING_MESSAGE);
-				}
+				UnlockWalletDialog.offerUnlock(this,walletEntry);
 			} else {
 				try {
 					String s=JOptionPane.showInputDialog(WalletComponent.this,"Enter lock password");
@@ -83,11 +75,9 @@ public class WalletComponent extends BaseListComponent {
 					}	
 				} catch (IllegalStateException e1) {
 					e1.printStackTrace();
-				}
-				icon = Toolkit.LOCKED_ICON;
+				}	
 			}
-			resetTooltipTExt(lockButton);
-			lockButton.setIcon(icon);
+			doUpdate();
 		});
 		
 		// Menu Button
@@ -124,10 +114,21 @@ public class WalletComponent extends BaseListComponent {
 		
 		// panel of buttons on right
 		add(buttons,"east"); // add to MigLayout
+		
+		doUpdate();
 	}
 
 
-	private void resetTooltipTExt(JComponent b) {
+	private void doUpdate() {
+		// TODO Auto-generated method stub
+		resetTooltipText(lockButton);
+		infoLabel.setText(getInfoString());
+		Icon icon=walletEntry.isLocked()? Toolkit.LOCKED_ICON:Toolkit.UNLOCKED_ICON;
+		this.lockButton.setIcon(icon);
+	}
+
+
+	private void resetTooltipText(JComponent b) {
 		if (walletEntry.isLocked()) {
 			b.setToolTipText("Unlock");
 		} else {

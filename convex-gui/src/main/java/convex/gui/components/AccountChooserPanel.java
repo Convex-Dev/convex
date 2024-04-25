@@ -2,12 +2,15 @@ package convex.gui.components;
 
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.event.ItemEvent;
 
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.IWallet;
 import convex.core.data.ACell;
@@ -65,8 +68,25 @@ public class AccountChooserPanel extends JPanel {
 			
 			keyCombo=KeyPairCombo.forConvex(convex);
 			keyCombo.addItemListener(e->{
+				if (e.getStateChange()==ItemEvent.DESELECTED) return;
 				AWalletEntry we=(AWalletEntry)e.getItem();
-				convex.setKeyPair(we.getKeyPair());
+				AKeyPair kp;
+				if (we.isLocked()) {
+					String s=JOptionPane.showInputDialog(AccountChooserPanel.this,"Enter password to unlock wallet:\n"+we.getPublicKey());
+					if (s==null) {
+						return;
+					}
+					char[] pass=s.toCharArray();
+					boolean unlock=we.tryUnlock(s.toCharArray());
+					if (!unlock) {
+						return;
+					}
+					kp=we.getKeyPair();
+					we.lock(pass);
+				} else {
+					kp=we.getKeyPair();
+				}
+				convex.setKeyPair(kp);
 			});
 			mp.add(keyCombo);
 

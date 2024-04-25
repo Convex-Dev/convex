@@ -1,6 +1,7 @@
 package convex.gui.keys;
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Font;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
@@ -11,11 +12,15 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.KeyStroke;
 
+import convex.core.crypto.wallet.AWalletEntry;
+import convex.gui.components.Identicon;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class UnlockWalletDialog extends JDialog {
@@ -23,8 +28,8 @@ public class UnlockWalletDialog extends JDialog {
 
 	private char[] passPhrase = null;
 
-	public static UnlockWalletDialog show(WalletComponent parent) {
-		UnlockWalletDialog dialog = new UnlockWalletDialog(parent);
+	public static UnlockWalletDialog show(Component parent, AWalletEntry walletEntry) {
+		UnlockWalletDialog dialog = new UnlockWalletDialog(walletEntry);
 		dialog.setLocationRelativeTo(parent);
 		dialog.setVisible(true);
 		return dialog;
@@ -34,7 +39,7 @@ public class UnlockWalletDialog extends JDialog {
 		return passPhrase;
 	}
 
-	public UnlockWalletDialog(WalletComponent walletComponent) {
+	public UnlockWalletDialog(AWalletEntry walletEntry) {
 		this.setIconImage(Toolkit.WARNING.getImage());
 		setAlwaysOnTop(true);
 
@@ -42,33 +47,40 @@ public class UnlockWalletDialog extends JDialog {
 		setTitle("Unlock Wallet");
 		setModal(true);
 
-		JPanel panel_2 = new JPanel();
-		getContentPane().add(panel_2, BorderLayout.NORTH);
-		panel_2.setLayout(new BorderLayout(0, 0));
+		JPanel mainPanel = new JPanel();
+		mainPanel.setLayout(new MigLayout("","","[fill]"));
+		mainPanel.setBorder(Toolkit.createDialogBorder());
+		getContentPane().add(mainPanel, BorderLayout.NORTH);
 
-		JPanel panel_1 = new JPanel();
-		panel_2.add(panel_1, BorderLayout.SOUTH);
+		Identicon a = new Identicon(walletEntry.getIdenticonData());
+		a.setText("0x"+walletEntry.getPublicKey().toChecksumHex());
+		mainPanel.add(a,"span");
 
+		// Unlock prompt and password
+		JPanel passPanel = new JPanel();
+		JLabel lblPassphrase = new JLabel("Unlock Password: ");
+		passPanel.add(lblPassphrase);
+
+		passwordField = new JPasswordField();
+		passwordField.setFont(new Font("Monospaced", Font.BOLD, 13));
+		passwordField.setColumns(20);
+		passPanel.add(passwordField);
+		mainPanel.add(passPanel);
+
+
+		// Dialog buttons
+		JPanel buttonPanel = new JPanel();
 		JButton btnUnlock = new JButton("Unlock");
-		panel_1.add(btnUnlock);
+		buttonPanel.add(btnUnlock);
 		btnUnlock.addActionListener(e -> {
 			this.passPhrase = passwordField.getPassword();
 			close();
 		});
 		JButton btnCancel = new JButton("Cancel");
-		panel_1.add(btnCancel);
-
-		JPanel panel = new JPanel();
-		panel_2.add(panel);
-
-		JLabel lblPassphrase = new JLabel("Password: ");
-		panel.add(lblPassphrase);
-
-		passwordField = new JPasswordField();
-		passwordField.setFont(new Font("Monospaced", Font.BOLD, 13));
-		passwordField.setColumns(20);
-		panel.add(passwordField);
+		buttonPanel.add(btnCancel);
 		btnCancel.addActionListener(e -> close());
+		mainPanel.add(buttonPanel, "dock south");
+
 
 		Action closeAction = new AbstractAction() {
 			@Override
@@ -82,12 +94,31 @@ public class UnlockWalletDialog extends JDialog {
 		getRootPane().getActionMap().put("close", closeAction);
 
 		pack(); // set dialog to correct size given contents
-
+		passwordField.requestFocus();
 	}
 
 	public void close() {
 		passwordField = null;
 		setVisible(false);
+	}
+
+	/**
+	 * Shows a dialog to ask the user to unlock a wallet
+	 * @param parent Parent component
+	 * @param walletEntry Wallet Entry to consider
+	 * @return True if unlocked, false otherwise
+	 */
+	public static boolean offerUnlock(Component parent, AWalletEntry walletEntry) {
+		UnlockWalletDialog dialog = UnlockWalletDialog.show(parent,walletEntry);
+		char[] passPhrase = dialog.getPassPhrase();
+		if (passPhrase!=null) {
+			try {
+				walletEntry.unlock(passPhrase);
+			} catch (Exception e1) {
+				JOptionPane.showMessageDialog(parent, "Unable to unlock keypair: " + e1.getMessage(),"Unlock Failed",JOptionPane.WARNING_MESSAGE);
+			}
+		}
+		return !walletEntry.isLocked();
 	}
 
 }

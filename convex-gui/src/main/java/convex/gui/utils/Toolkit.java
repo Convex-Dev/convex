@@ -20,6 +20,7 @@ import java.net.URL;
 import java.util.Iterator;
 
 import javax.swing.AbstractAction;
+import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
@@ -31,6 +32,7 @@ import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
+import javax.swing.border.Border;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.plaf.FontUIResource;
@@ -289,6 +291,10 @@ public class Toolkit {
 			}
 		}
 		return null;
+	}
+
+	public static Border createDialogBorder() {
+		return BorderFactory.createEmptyBorder(20, 20, 20, 20);
 	}
 
 
