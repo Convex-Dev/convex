@@ -18,6 +18,7 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
@@ -844,7 +845,7 @@ public abstract class Convex {
 	}
 
 	/**
-	 * Returns the current AcountKey for the client using the API.
+	 * Returns the current AccountKey for the client using the API.
 	 *
 	 * @return AcountKey instance, or null if no keypair is set
 	 */
@@ -852,6 +853,26 @@ public abstract class Convex {
 		if (keyPair==null) return null;
 		return keyPair.getAccountKey();
 	}
+
+	/**
+	 * Returns the current AccountKey for the specified address. Performs a sync query
+	 *
+	 * @return AcountKey instance, or null if unavailable
+	 */
+	public AccountKey getAccountKey(Address a) {
+		if (a==null) return null;
+		
+		try {
+			Result r=querySync(Reader.read("(:key (account "+a+"))"));
+			if (r.isError()) return null;
+			ABlob b=RT.ensureBlob(r.getValue());
+			return AccountKey.create(b);
+		} catch (Exception e) {
+			return null;
+		}
+		
+	}
+
 
 	/**
 	 * Returns the current Address for the client using the API.
@@ -968,5 +989,6 @@ public abstract class Convex {
 	public Long getBalance() throws IOException {
 		return getBalance(getAddress());
 	}
+
 
 }

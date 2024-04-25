@@ -28,11 +28,13 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
 import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.plaf.FontUIResource;
@@ -282,6 +284,7 @@ public class Toolkit {
 	 * @return Wallet Entry, or null if not found
 	 */
 	public static AWalletEntry getKeyRingEntry(AccountKey publicKey) {
+		if (publicKey==null) return null;
 		DefaultListModel<AWalletEntry> list = KeyRingPanel.getListModel();
 		Iterator<AWalletEntry> it=list.elements().asIterator();
 		while (it.hasNext()) {
@@ -299,6 +302,14 @@ public class Toolkit {
 
 	public static Border createEmptyBorder(int x) {
 		return BorderFactory.createEmptyBorder(x, x, x, x);
+	}
+
+	public static JTextArea makeNote(String s) {
+		JTextArea ta = new JTextArea(s);
+		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createRaisedBevelBorder(), BorderFactory.createEmptyBorder(10, 10, 10, 10));
+		ta.setBorder(b);
+		ta.setFont(Toolkit.DEFAULT_FONT);
+		return ta;
 	}
 
 

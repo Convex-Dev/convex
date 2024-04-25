@@ -39,9 +39,10 @@ public class AccountsPanel extends JPanel {
 	AccountsTableModel tableModel;
 	JTable table;
 
-	static class AccountsTableRenderer extends DefaultTableCellRenderer {
-		public AccountsTableRenderer() {
+	static class CellRenderer extends DefaultTableCellRenderer {
+		public CellRenderer(int alignment) {
 			super();
+			this.setHorizontalAlignment(alignment);
 		}
 
 		public void setValue(Object value) {
@@ -78,38 +79,62 @@ public class AccountsPanel extends JPanel {
 			State newState = (State) pc.getNewValue();
 			tableModel.setState(newState);
 		});
-
-		DefaultTableCellRenderer leftRenderer = new AccountsTableRenderer();
-		leftRenderer.setHorizontalAlignment(JLabel.LEFT);
-		DefaultTableCellRenderer rightRenderer = new AccountsTableRenderer();
-		rightRenderer.setHorizontalAlignment(JLabel.RIGHT);
 		
-		table.getColumnModel().getColumn(0).setCellRenderer(leftRenderer);
-		table.getColumnModel().getColumn(0).setPreferredWidth(80);
+		{	
+			CellRenderer cr=new CellRenderer(JLabel.LEFT);
+			cr.setToolTipText("Address of the Convex account. This is the unique ID for the account");
+			table.getColumnModel().getColumn(0).setCellRenderer(cr);
+			table.getColumnModel().getColumn(0).setPreferredWidth(80);
+		}
 		
-		AccountsTableRenderer actorRenderer = new AccountsTableRenderer();
-		actorRenderer.setHorizontalAlignment(JLabel.CENTER);
-		table.getColumnModel().getColumn(1).setPreferredWidth(70);
-		table.getColumnModel().getColumn(1).setCellRenderer(actorRenderer);
+		{	
+			CellRenderer actorRenderer = new CellRenderer(JLabel.CENTER);
+			actorRenderer.setToolTipText("An Actor account is an autonomous agent or code library on the CVM. A User account can be controlled by a user with the correct key pair.");
+			table.getColumnModel().getColumn(1).setPreferredWidth(70);
+			table.getColumnModel().getColumn(1).setCellRenderer(actorRenderer);
+		}
 
-		table.getColumnModel().getColumn(2).setCellRenderer(rightRenderer);
-		table.getColumnModel().getColumn(2).setPreferredWidth(70);
+		{	
+			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			cr.setToolTipText("Sequence number of the account. This is the total number of user transactions executed.");
+			table.getColumnModel().getColumn(2).setCellRenderer(cr);
+			table.getColumnModel().getColumn(2).setPreferredWidth(70);
+		}
+		
+		{
+			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			cr.setToolTipText("Balance of the account in Convex Coins");
+			table.getColumnModel().getColumn(3).setCellRenderer(cr);
+			table.getColumnModel().getColumn(3).setPreferredWidth(180);
+		}
+		
+		{	
+			CellRenderer cr=new CellRenderer(JLabel.LEFT); 
+			cr.setToolTipText("Name of the account in the Convex Registry");
+			table.getColumnModel().getColumn(4).setPreferredWidth(200);
+			table.getColumnModel().getColumn(4).setCellRenderer(cr);
+		}
+		{	
+			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			cr.setToolTipText("Size of the account environment");
+			table.getColumnModel().getColumn(5).setPreferredWidth(100);
+			table.getColumnModel().getColumn(5).setCellRenderer(cr);
+		}
+		
+		{	// Memory allowance
+			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			cr.setToolTipText("Unused memory allowance of the account");
+			table.getColumnModel().getColumn(6).setPreferredWidth(100);
+			table.getColumnModel().getColumn(6).setCellRenderer(cr);
+		}
 
-		table.getColumnModel().getColumn(3).setCellRenderer(rightRenderer);
-		table.getColumnModel().getColumn(3).setPreferredWidth(180);
-
-		table.getColumnModel().getColumn(4).setPreferredWidth(200);
-		table.getColumnModel().getColumn(4).setCellRenderer(leftRenderer);
-
-		table.getColumnModel().getColumn(5).setPreferredWidth(100);
-		table.getColumnModel().getColumn(5).setCellRenderer(rightRenderer);
-
-		table.getColumnModel().getColumn(6).setPreferredWidth(100);
-		table.getColumnModel().getColumn(6).setCellRenderer(rightRenderer);
-
-		// Key
-		table.getColumnModel().getColumn(7).setPreferredWidth(200);
-		table.getColumnModel().getColumn(7).setCellRenderer(new AccountKeyRenderer());
+		
+		{	// Account public key
+			AccountKeyRenderer cr=new AccountKeyRenderer(); 
+			cr.setToolTipText("Public key of the account. Used to validate transactions from users.");
+			table.getColumnModel().getColumn(7).setPreferredWidth(200);
+			table.getColumnModel().getColumn(7).setCellRenderer(cr);
+		}
 
 		final JPopupMenu popupMenu = new JPopupMenu();
 		JMenuItem copyItem = new JMenuItem("Copy Value");
@@ -158,8 +183,6 @@ public class AccountsPanel extends JPanel {
 		JScrollPane scrollPane = new JScrollPane(table);
 		scrollPane.getViewport().setBackground(null);
 		add(scrollPane, BorderLayout.CENTER);
-
-
 	}
 
 	private void copyValue() {

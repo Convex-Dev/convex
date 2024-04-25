@@ -8,7 +8,6 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JTextArea;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,26 +39,27 @@ public class WalletComponent extends BaseListComponent {
 	public WalletComponent(AWalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
 
-		setLayout(new MigLayout("fillx"));
+		setLayout(new MigLayout());
 
-		// identicon
+		//////////  identicon
 		JLabel identicon = new Identicon(walletEntry.getPublicKey());
 		JPanel idPanel=new JPanel();
 		idPanel.add(identicon);
-		add(idPanel,"west"); // add to MigLayout
+		add(idPanel,"dock west"); // add to MigLayout
 
-		// Wallet Address and info fields
+		
+		/////////// Wallet Address and info fields
 		JPanel cPanel = new JPanel();
-		cPanel.setLayout(new MigLayout("fillx"));
+		cPanel.setLayout(new MigLayout());
 		//CodeLabel addressLabel = new CodeLabel(address.toString());
 		//addressLabel.setFont(Toolkit.MONO_FONT);
 		// cPanel.add(addressLabel,"span");
 		
 		infoLabel = new CodeLabel(getInfoString());
-		cPanel.add(infoLabel,"span,growx");
-		add(cPanel,"grow,shrink"); // add to MigLayout
+		cPanel.add(infoLabel,"dock center");
+		add(cPanel,"dock center"); // add to MigLayout
 
-		///// Buttons
+		//////////// Buttons
 
 		// lock button
 		lockButton = new JButton("");
@@ -88,12 +88,13 @@ public class WalletComponent extends BaseListComponent {
 		m2.addActionListener(e-> {
 			AKeyPair kp=walletEntry.getKeyPair();
 			if (kp!=null) {
-				StringBuilder sb=new StringBuilder();
-				sb.append("\nEd25519 private seed:\n");
-				sb.append("\n"+kp.getSeed()+"\n\n");
-				sb.append("\nWarning: keep this private, it can be used to control your accounts\n");
-				JTextArea text = new JTextArea(sb.toString());
-				JOptionPane.showMessageDialog(WalletComponent.this, text,"Private Seed",JOptionPane.INFORMATION_MESSAGE);
+				JPanel panel=new JPanel();
+				panel.setLayout(new MigLayout("wrap 1","[200]"));
+				panel.add(new Identicon(kp.getAccountKey()),"align center");
+				panel.add(new CodeLabel(kp.getSeed().toString()),"span,grow");
+				panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"span,grow");
+				panel.setBorder(Toolkit.createDialogBorder());
+				JOptionPane.showMessageDialog(WalletComponent.this, panel,"Ed25519 Private Seed",JOptionPane.INFORMATION_MESSAGE);
 			} else {
 				JOptionPane.showMessageDialog(WalletComponent.this, "Keypair is locked, cannot access seed","Warning",JOptionPane.WARNING_MESSAGE);
 			}
@@ -113,7 +114,7 @@ public class WalletComponent extends BaseListComponent {
 		buttons.add(menuButton);
 		
 		// panel of buttons on right
-		add(buttons,"east"); // add to MigLayout
+		add(buttons,"dock east"); // add to MigLayout
 		
 		doUpdate();
 	}

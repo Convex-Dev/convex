@@ -1,7 +1,6 @@
 package convex.gui.components;
 
 import java.awt.Color;
-import java.awt.Dimension;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
 
@@ -10,21 +9,20 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JTextField;
 
 import convex.api.Convex;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
-import convex.core.data.Blob;
+import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.init.Init;
 import convex.core.util.Utils;
+import convex.gui.components.account.AddressCombo;
+import convex.gui.keys.KeyRingPanel;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class ConnectPanel extends JPanel {
 
 	private HostCombo hostField;
-	private JTextField addressField;
-	private JTextField keyField;
+	private AddressCombo addressField;
 
 	public ConnectPanel() {
 		ConnectPanel pan=this;
@@ -35,13 +33,9 @@ public class ConnectPanel extends JPanel {
 		pan.add(hostField);
 		
 		pan.add(new JLabel("Address:"));
-		addressField=new JTextField("#12");
+		addressField=new AddressCombo(Init.GENESIS_ADDRESS);
 		pan.add(addressField);
 
-		pan.add(new JLabel("Private Key:   "));
-		keyField=new JTextField("");
-		keyField.setMinimumSize(new Dimension(200,25));
-		pan.add(keyField);
 	}
 
 
@@ -61,14 +55,13 @@ public class ConnectPanel extends JPanel {
 	    		InetSocketAddress sa=Utils.toInetSocketAddress(target);
 	    		System.err.println("MainGUI attemptiong connect to: "+sa);
 	    		Convex convex=Convex.connect(sa);
-	    		convex.setAddress(Address.parse(pan.addressField.getText()));
+	    		convex.setAddress(pan.addressField.getAddress());
 	    		
 	    		HostCombo.registerGoodConnection(target);
 	    		
-	    		Blob b=Blob.parse(pan.keyField.getText());
-	    		if ((b!=null)&&(!b.isEmpty())) {
-	    			AKeyPair kp=AKeyPair.create(b);
-	    			convex.setKeyPair(kp);
+	    		AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
+	    		if (!we.isLocked()) {
+	    			convex.setKeyPair(we.getKeyPair());
 	    		}
 	    		return convex;
 	    	} catch (ConnectException e) {

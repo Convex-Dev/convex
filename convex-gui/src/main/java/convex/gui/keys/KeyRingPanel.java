@@ -1,6 +1,5 @@
 package convex.gui.keys;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 
 import javax.swing.DefaultListModel;
@@ -10,12 +9,17 @@ import javax.swing.JPanel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.Toast;
+import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * A GUI panel displaying the user's current keypairs
@@ -37,15 +41,14 @@ public class KeyRingPanel extends JPanel {
 	 * Create the panel.
 	 */
 	public KeyRingPanel() {
-		setLayout(new BorderLayout(0, 0));
+		setLayout(new MigLayout());
 
-		JPanel toolBar = new ActionPanel();
-		add(toolBar, BorderLayout.SOUTH);
-		
-		// create and add ScrollyList
+		// Scrollable list of wallet entrues
 		walletList = new ScrollyList<AWalletEntry>(listModel, we -> new WalletComponent(we));
-		add(walletList, BorderLayout.CENTER);
+		add(walletList, "dock center");
 
+		// Action toolbar
+		JPanel toolBar = new ActionPanel();
 
 		// new wallet button
 		JButton btnNew = new JButton("New Keypair");
@@ -59,10 +62,25 @@ public class KeyRingPanel extends JPanel {
 				t.printStackTrace();
 			}
 		});
+		
+		add(toolBar, "dock south");
+
 	}
 
 	public static DefaultListModel<AWalletEntry> getListModel() {
 		return listModel;
 	}
 
+	/**
+	 * Gets the correct keypair for a convex connection
+	 * @param convex Convex instance (assumes address is set)
+	 * @return KeyPair resolved, or null if not available
+	 */
+	public static AWalletEntry findWalletEntry(Convex convex) {
+		Address a=convex.getAddress();
+		if (a==null) return null;
+		AccountKey key=convex.getAccountKey(a);
+		AWalletEntry we=Toolkit.getKeyRingEntry(key);
+		return we;
+	}
 }

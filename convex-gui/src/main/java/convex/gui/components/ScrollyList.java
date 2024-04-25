@@ -3,7 +3,6 @@ package convex.gui.components;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.EventQueue;
-import java.awt.GridLayout;
 import java.awt.Rectangle;
 import java.util.function.Function;
 
@@ -13,6 +12,8 @@ import javax.swing.ListModel;
 import javax.swing.Scrollable;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
+
+import net.miginfocom.swing.MigLayout;
 
 /**
  * Component that represents a convenient Scrollable list of child components,
@@ -32,7 +33,7 @@ public class ScrollyList<E> extends JScrollPane {
 			int n = model.getSize();
 			for (int i = 0; i < n; i++) {
 				E we = model.getElementAt(i);
-				listPanel.add(builder.apply(we));
+				listPanel.add(builder.apply(we),"span");
 			}
 			this.revalidate();
 		});
@@ -73,7 +74,7 @@ public class ScrollyList<E> extends JScrollPane {
 		this.model = model;
 		this.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
-		listPanel.setLayout(new GridLayout(0, 1));
+		listPanel.setLayout(new MigLayout("wrap 1","[fill,grow]"));
 		setViewportView(listPanel);
 		getViewport().setBackground(null);
 
