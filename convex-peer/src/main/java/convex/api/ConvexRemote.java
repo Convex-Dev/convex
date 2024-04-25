@@ -136,8 +136,8 @@ public class ConvexRemote extends Convex {
 				id = connection.sendTransaction(signed);
 				if (id>=0) {
 					// Store future for completion by result message
-					cf = awaitResult(id,timeout);
 					maybeUpdateSequence(signed);
+					cf = awaitResult(id,timeout);
 					break;
 				} 
 			}

@@ -17,8 +17,10 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.Iterator;
 
 import javax.swing.AbstractAction;
+import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
 import javax.swing.JComponent;
@@ -37,7 +39,10 @@ import javax.swing.text.DefaultEditorKit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.data.AccountKey;
 import convex.core.util.Utils;
+import convex.gui.keys.KeyRingPanel;
 import mdlaf.MaterialLookAndFeel;
 import mdlaf.themes.AbstractMaterialTheme;
 import mdlaf.themes.MaterialOceanicTheme;
@@ -267,6 +272,23 @@ public class Toolkit {
 		        }
 		    }
 		});
+	}
+
+	/**
+	 * Gets an entry for the current keyring
+	 * @param address
+	 * @return Wallet Entry, or null if not found
+	 */
+	public static AWalletEntry getKeyRingEntry(AccountKey publicKey) {
+		DefaultListModel<AWalletEntry> list = KeyRingPanel.getListModel();
+		Iterator<AWalletEntry> it=list.elements().asIterator();
+		while (it.hasNext()) {
+			AWalletEntry we=it.next();
+			if (Utils.equals(we.getPublicKey(), publicKey)) {
+				return we;
+			}
+		}
+		return null;
 	}
 
 

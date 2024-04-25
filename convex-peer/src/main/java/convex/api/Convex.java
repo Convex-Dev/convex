@@ -728,7 +728,15 @@ public abstract class Convex {
 			}
 		});
 		awaiting.put(id, cf);
-		CompletableFuture<Result> cr=cf.thenApply(m->m.toResult());
+		CompletableFuture<Result> cr=cf.thenApply(m->{
+			Result r=m.toResult();
+			
+			if (r.getErrorCode()!=null) {
+				// clear sequence if something went wrong. It is probably invalid now....
+				sequence=null;
+			}
+			return r;
+		});
 		return cr;
 	}
 

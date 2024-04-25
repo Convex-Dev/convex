@@ -19,7 +19,7 @@ public class HotWalletEntry extends AWalletEntry {
 	private Hash passHash=null;
 	boolean locked=false;
 
-	private HotWalletEntry(AKeyPair kp) {
+	public HotWalletEntry(AKeyPair kp) {
 		this.keyPair = kp;
 	}
 

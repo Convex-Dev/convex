@@ -8,6 +8,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
+import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.IWallet;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -15,6 +16,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.lang.ops.Special;
 import convex.core.text.Text;
 import convex.gui.components.account.AddressCombo;
+import convex.gui.components.account.KeyPairCombo;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -25,6 +27,7 @@ public class AccountChooserPanel extends JPanel {
 
 	private JComboBox<String> modeCombo;
 	public final AddressCombo addressCombo;
+	public final KeyPairCombo keyCombo;
 
 	private JLabel balanceLabel;
 	
@@ -44,11 +47,10 @@ public class AccountChooserPanel extends JPanel {
 			// Account selection
 			mp.add(new JLabel("Account:"));
 	
+			Address address=convex.getAddress();
 			addressCombo = new AddressCombo();
-			addressCombo.setSelectedItem(convex.getAddress());
+			addressCombo.setSelectedItem(address);
 			addressCombo.setToolTipText("Select Account for use");
-			mp.add(addressCombo);
-			
 			addressCombo.addFocusListener(new FocusListener() {
 				@Override
 				public void focusGained(FocusEvent e) {
@@ -59,6 +61,15 @@ public class AccountChooserPanel extends JPanel {
 					// Ignore		
 				}
 			});
+			mp.add(addressCombo);
+			
+			keyCombo=KeyPairCombo.forConvex(convex);
+			keyCombo.addItemListener(e->{
+				AWalletEntry we=(AWalletEntry)e.getItem();
+				convex.setKeyPair(we.getKeyPair());
+			});
+			mp.add(keyCombo);
+
 	
 			addressCombo.addItemListener(e -> {
 				updateAddress(addressCombo.getAddress());

@@ -71,8 +71,8 @@ public class ConvexLocal extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
-		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
 		maybeUpdateSequence(signed);
+		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
 		return r;
 	}
 
@@ -103,7 +103,11 @@ public class ConvexLocal extends Convex {
 
 	private Consumer<Message> makeResultHandler(CompletableFuture<Result> cf) {
 		return m->{
-			cf.complete(m.toResult());
+			Result r=m.toResult();
+			if (r.getErrorCode()!=null) {
+				sequence=null;
+			}
+			cf.complete(r);
 		};
 	}
 

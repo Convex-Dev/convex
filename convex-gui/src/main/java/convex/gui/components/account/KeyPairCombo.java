@@ -3,26 +3,81 @@ package convex.gui.components.account;
 import java.awt.Component;
 
 import javax.swing.ComboBoxModel;
-import javax.swing.DefaultComboBoxModel;
+import javax.swing.DefaultListModel;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.ListCellRenderer;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 
+import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
+import convex.core.data.AccountKey;
 import convex.core.util.Utils;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Identicon;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class KeyPairCombo extends JComboBox<AWalletEntry> {
 
-	public static class KeyPairModel extends DefaultComboBoxModel<AWalletEntry> {
+	public static class KeyPairModel implements ComboBoxModel<AWalletEntry> {
+
+		private DefaultListModel<AWalletEntry> underlying;
+		private AWalletEntry selected;
+		
+		public KeyPairModel(DefaultListModel<AWalletEntry> underlying) {
+			this.underlying=underlying;
+		}
+		
+		public KeyPairModel() {
+			this(KeyRingPanel.getListModel());
+		}
+
+		@Override
+		public int getSize() {
+			return underlying.getSize();
+		}
+
+		@Override
+		public AWalletEntry getElementAt(int index) {
+			return underlying.getElementAt(index);
+		}
+
+		@Override
+		public void addListDataListener(ListDataListener l) {
+			underlying.addListDataListener(l);
+		}
+
+		@Override
+		public void removeListDataListener(ListDataListener l) {
+			underlying.removeListDataListener(l);
+		}
+
+		@Override
+		public void setSelectedItem(Object anItem) {
+			this.selected=(AWalletEntry)anItem;
+			ListDataListener[] listeners = underlying.getListDataListeners();
+			ListDataEvent e=new ListDataEvent(this,ListDataEvent.CONTENTS_CHANGED,0,0);
+			for (ListDataListener l: listeners) {
+				l.contentsChanged(e);
+			}
+		}
+
+		@Override
+		public Object getSelectedItem() {
+			return this.selected;
+		}
+
+		public void addElement(AWalletEntry entry) {
+			underlying.addElement(entry);
+		}
 
 	}
 	
@@ -37,7 +92,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 				boolean isSelected, boolean cellHasFocus) {
 			AWalletEntry entry= (AWalletEntry)value;
 			setText("0x"+entry.getPublicKey().toHexString(12)+"...");
-			setIcon(Identicon.createIcon(entry.getIdenticonData(),24));
+			setIcon(Identicon.createIcon(entry.getIdenticonData(),21));
 			return this;
 		}
 	}
@@ -59,9 +114,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		JPanel p=new JPanel();
 		p.setLayout(new MigLayout("insets 20 20 20 20, wrap 1"));
 		
-		
 		KeyPairModel model=new KeyPairModel();
-		model.addElement(PROTOTYPE);
 		KeyPairCombo kpCombo=new KeyPairCombo(model);
 		p.add(kpCombo);
 		
@@ -79,5 +132,18 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	public AWalletEntry getWalletEntry() {
 		Object a = getSelectedItem();
 		return (AWalletEntry)a;
+	}
+
+	public static KeyPairCombo forConvex(Convex convex) {
+		KeyPairModel model=new KeyPairModel();
+		AKeyPair kp=convex.getKeyPair();
+		AccountKey publicKey=(kp==null)?null:kp.getAccountKey();
+		AWalletEntry we=Toolkit.getKeyRingEntry(publicKey);
+		if (we==null) {
+			we=new HotWalletEntry(kp);
+		}
+		model.setSelectedItem(we);
+
+ 		return new KeyPairCombo(model);
 	}
 }
