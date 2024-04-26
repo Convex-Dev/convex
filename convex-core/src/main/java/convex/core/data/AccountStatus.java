@@ -73,7 +73,7 @@ public class AccountStatus extends ARecord {
 	}
 	
 	/**
-	 * Create a regular account, with the specified balance and zero allowance
+	 * Create a regular account, with the specified balance and zero memory allowance
 	 * 
 	 * @param sequence Sequence number
 	 * @param balance Convex Coin balance of Account
@@ -82,16 +82,6 @@ public class AccountStatus extends ARecord {
 	 */
 	public static AccountStatus create(long sequence, long balance, AccountKey key) {
 		return new AccountStatus(sequence, key, balance, 0L,null,null,null,null,null);
-	}
-
-	/**
-	 * Create a governance account.
-	 * 
-	 * @param balance Balance for governance account
-	 * @return New governance AccountStatus
-	 */
-	public static AccountStatus createGovernance(long balance) {
-		return new AccountStatus(Constants.INITIAL_SEQUENCE, null, balance, 0L,null,null,null,null,null);
 	}
 
 	public static AccountStatus createActor() {

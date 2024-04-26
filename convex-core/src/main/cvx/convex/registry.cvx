@@ -23,7 +23,7 @@
 
 (def trust
   ^{:private true}
-  ;; Address of the `convex.trust`, it is deployed right after this account, hence it is predictable.
+  ;; Address of `convex.trust`, it is deployed right after this account, hence it is predictable.
   (address (inc (long *address*))))
 
 ;;;;;;;;;; Address metadata registry
@@ -52,14 +52,20 @@
 ;; CNS root reference, i.e. this registry with an empty vector key
 (def root [~*address* []])
 
-;; Map of `node key` -> `segment symbol` -> `[path trust-monitor meta]`
+;; Map of `node key` -> `segment symbol` -> `[value trust-monitor meta child]`
+;; Where:
+;;    value = Target value for CNS resolution, usually an address or scoped address
+;;	  trust-monitor = controller for this CNS entry
+;;    meta = metadata field		
+;;    child = child CNS node, may be nil. Usually a scoped address defining an actor and a path key e.g. [#5675 "bob"] 
+;;		
 ;; Node key is implementation defined in general, but for main registry uses:
 ;;    Empty vector for CNS root
 ;;    vector of segment strings for child paths
 (def cns-database
 		  ^{:private? true}
 		  
-  {[] {"init" [#1 #1 nil]}})
+  {[] {"init" [#1 #1 nil nil]}})
 
 ;; Controllers for each CNS node managed under this actor
 ;; Default root is controlled by INIT account
@@ -71,7 +77,7 @@
   {[] #1})
 
 (defn read ^{
-	:doc       {:description "Reads a CNS record as a [addr controller metadata] vector, or nil if record does not exist."
+	:doc       {:description "Reads a CNS record as a [value controller metadata child] vector, or nil if record does not exist."
     :examples    [{:code "(*registry*/resolve 'my.actor.name)"}]
     :signature   [{:params [sym]}]}}
   ([sym]

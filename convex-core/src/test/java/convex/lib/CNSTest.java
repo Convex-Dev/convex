@@ -35,7 +35,7 @@ public class CNSTest extends ACVMTest {
 			Address init=eval("(*registry*/resolve 'init)");
 			assertEquals(Init.INIT_ADDRESS,init);
 			
-			assertEquals(eval("[#1 #1 nil]"), eval("(*registry*/read 'init)"));
+			assertEquals(eval("[#1 #1 nil nil]"), eval("(*registry*/read 'init)"));
 		}
 		
 		@Test public void testCreateNestedFromTop() {

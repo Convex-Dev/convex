@@ -54,7 +54,7 @@ public class Init {
 	// Controller for genesis peer address
 	public static final Address GENESIS_PEER_ADDRESS = Address.create(12);
 	
-	// First user of Protonet
+	// First user of Protonet, i.e. @mikera
 	public static final Address FIRST_USER_ADDRESS = Address.create(13);
 
 	// Constants
@@ -68,68 +68,107 @@ public class Init {
 	 * @return Base genesis state
 	 */
 	public static State createBaseState(List<AccountKey> genesisKeys) {
+		AccountKey genesisKey=genesisKeys.get(0);
+		
 		// accumulators for initial state maps
 		Index<AccountKey, PeerStatus> peers = EMPTY_PEERS;
 		AVector<AccountStatus> accts = Vectors.empty();
 
 		long supply = Constants.MAX_SUPPLY;
 		
-		// Initial accounts
-		accts = addGovernanceAccount(accts, NULL_ADDRESS, Coin.ZERO); // Null account
-		accts = addGovernanceAccount(accts, INIT_ADDRESS, Coin.ZERO); // Initialisation Account
-
-		// Foundation fund for startup
-		long foundation = 1*Coin.EMERALD;
-		accts = addGovernanceAccount(accts, FOUNDATION_ADDRESS, foundation); // 75% for investors
-		supply-=foundation;
+		// Null account, cannot ever be used by anyone
+		{
+			AccountStatus nullAccount=AccountStatus.create(Coin.ZERO,AccountKey.NULL);
+			accts=accts.conj(nullAccount);
+		}
 		
-		// Foundation reserve fund (rest of foundation 25%)
-		long reserve = 248*Coin.EMERALD;
-		accts = addGovernanceAccount(accts, RESERVE_ADDRESS, reserve); // 24% Foundation
-		supply -= reserve;
+		// "init" Account, used only for network setup and update. Doesn't need coins because we run state updates directly
+		{
+			AccountStatus initAccount=AccountStatus.create(Coin.ZERO,AccountKey.NULL);
+			accts = addAccount(accts, INIT_ADDRESS, initAccount); 
+		}
 
-		// Reserve for distribution via release curve
-		long rootFund = 740 * Coin.EMERALD; 
-		accts = addGovernanceAccount(accts, UNRELEASED_ADDRESS, rootFund); 
-		supply -= rootFund;
+		// Foundation fund for initial operations and fallback governance
+		{
+			long foundationFund = 1*Coin.EMERALD;
+			AccountStatus foundationAccount=AccountStatus.create(foundationFund,genesisKey);
+			accts = addAccount(accts, FOUNDATION_ADDRESS, foundationAccount); 
+			supply-=foundationFund;
+		}
 		
-		// Initial account for release curve distribution
-		long mainPool = 10 * Coin.EMERALD; 
-		accts = addGovernanceAccount(accts, DISTRIBUTION_ADDRESS, mainPool); 	
-		supply -= mainPool;
+		// Foundation reserve fund (rest of foundation 25%, controlled by foundation account)
+		{
+			long reserve = 248*Coin.EMERALD;
+			AccountStatus reserveAccount=AccountStatus.create(reserve,AccountKey.NULL);
+			reserveAccount=reserveAccount.withController(FOUNDATION_ADDRESS);
+			accts = addAccount(accts, RESERVE_ADDRESS, reserveAccount); // 24% Foundation
+			supply -= reserve;
+		}
+
+		// Reserve for distribution via release curve - 74% for coin purchasers
+		{
+			long releaseCurveFund = 740 * Coin.EMERALD; 
+			AccountStatus releaseCurveAccount=AccountStatus.create(releaseCurveFund,AccountKey.NULL);
+			releaseCurveAccount=releaseCurveAccount.withController(FOUNDATION_ADDRESS);
+			accts = addAccount(accts, UNRELEASED_ADDRESS, releaseCurveAccount); 
+			supply -= releaseCurveFund;
+		}
 		
-		long govern = 1 * Coin.DIAMOND; 
-		accts = addGovernanceAccount(accts, GOVERNANCE_ADDRESS, govern); 
-		supply -= govern;
+		// Initial account for release curve distribution - 1% for initial coin purchasers
+		{
+			long distributionFund = 10 * Coin.EMERALD; 
+			AccountStatus releaseCurveAccount=AccountStatus.create(distributionFund,AccountKey.NULL);
+			releaseCurveAccount=releaseCurveAccount.withController(FOUNDATION_ADDRESS);
+			accts = addAccount(accts, DISTRIBUTION_ADDRESS, releaseCurveAccount); 	
+			supply -= distributionFund;
+		}
+		
+		// Governance Address, used to manage key network operations e.g. CNS root changes
+		{
+			long governFund = 1 * Coin.DIAMOND; 
+			AccountStatus governanceAccount=AccountStatus.create(governFund,AccountKey.NULL);
+			governanceAccount=governanceAccount.withController(FOUNDATION_ADDRESS);
+			accts = addAccount(accts, GOVERNANCE_ADDRESS, governanceAccount); 	
+			supply -= governFund;
+		}
 
-		long admin = 1 * Coin.DIAMOND; 
-		accts = addGovernanceAccount(accts, ADMIN_ADDRESS, admin ); 
-		supply -= admin;
+		// Admin address, used for non-critical operations
+		{ 
+			long admin = 1 * Coin.DIAMOND; 
+			AccountStatus governanceAccount=AccountStatus.create(admin,genesisKey);
+			governanceAccount=governanceAccount.withController(FOUNDATION_ADDRESS);
+			accts = addAccount(accts, ADMIN_ADDRESS, governanceAccount); 	
+			supply -= admin;
+		}
+		
+		// Core library at static address: CORE_ADDRESS
+		accts = addCoreLibrary(accts);
+		// Core Account should now be fully initialised
+		// BASE_USER_ADDRESS = accts.size();
 
+		
 		// Always have at least one user and one peer setup
 		int keyCount = genesisKeys.size();
 		assert(keyCount > 0);
 
-		// Core library at static address: CORE_ADDRESS
-		accts = addCoreLibrary(accts, CORE_ADDRESS);
-		// Core Account should now be fully initialised
-		// BASE_USER_ADDRESS = accts.size();
 
 		// Build globals
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
-		// Create the initial state
+		// Create the initial state with static libraries and memory allowances
 		State s = State.create(accts, peers, globals, EMPTY_SCHEDULE);
-		supply-=s.getGlobalMemoryValue().longValue();
-		
-		// There should be at least 100,000 Convex Gold for genesis to succeed, to be distributed to genesis account(s)
-		assert(supply>100000*Coin.GOLD);
-
-		// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
-		s = addStaticLibraries(s);
-
-		// Reload accounts with the libraries
-		accts = s.getAccounts();
+		{
+			supply-=s.getGlobalMemoryValue().longValue();
+			
+			// There should be at least 100,000 Convex Gold for genesis to succeed, to be distributed to genesis account(s)
+			assert(supply>100000*Coin.GOLD);
+	
+			// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
+			s = addStaticLibraries(s);
+	
+			// Reload accounts with the libraries
+			accts = s.getAccounts();
+		}
 
 		// Set up initial user accounts, one for each genesis key. 
 		assert(accts.count() == GENESIS_ADDRESS.longValue());
@@ -175,7 +214,6 @@ public class Init {
 			assert(peerFunds == 0L);
 		}
 		
-
 		// Add the new accounts to the State
 		s = s.withAccounts(accts);
 		// Add peers to the State
@@ -266,25 +304,24 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust/whitelist.cvx");
 		s = doActorDeploy(s, "convex/trust/monitors.cvx");
 		s = doActorDeploy(s, "convex/governance.cvx");
+		// s = doActorDeploy(s, "convex/user.cvx");
 		return s;
 	}
 	
 	private static State addCNSTree(State s) {
 		Context ctx=Context.createFake(s, INIT_ADDRESS);
-		ctx=ctx.eval(Reader.read("(do (*registry*/create 'user.init))"));
-		ctx.getResult();
+		//ctx=ctx.eval(Reader.read("(do (*registry*/create 'user.init))"));
+		//ctx.getResult();
 
+		// check we can get access to general trust monitors
+		//ctx=ctx.eval(Reader.read("(import convex.trust.monitors :as mon)"));
+		//ctx.getResult();
 		
-		ctx=ctx.eval(Reader.read("(import convex.trust.monitors :as mon)"));
-		ctx.getResult();
-		
-		ctx=ctx.eval(Reader.read("(def tmon (mon/permit-actions :create))"));
-		ctx.getResult();
+		//ctx=ctx.eval(Reader.read("(def tmon (mon/permit-actions :create))"));
+		//ctx.getResult();
 
-
-		ctx=ctx.eval(Reader.read("(do ("+TRUST_ADDRESS+"/change-control [*registry* [\"user\"]] tmon))"));
-		ctx.getResult();
-
+		//ctx=ctx.eval(Reader.read("(do ("+TRUST_ADDRESS+"/change-control [*registry* [\"user\"]] tmon))"));
+		//ctx.getResult();
 		
 		s=ctx.getState();
 		return s;
@@ -375,17 +412,16 @@ public class Init {
 		if (peers.containsKey(peerKey)) throw new IllegalArgumentException("Duplicate peer key");
 		return peers.assoc(peerKey, ps);
 	}
-
-	private static AVector<AccountStatus> addGovernanceAccount(AVector<AccountStatus> accts, Address a, long balance) {
-		long num=a.longValue();
-		if (accts.count() != num) throw new Error("Incorrect initialisation address: " + a);
-		AccountStatus as = AccountStatus.createGovernance(balance);
-		accts = accts.conj(as);
+	
+	private static AVector<AccountStatus> addAccount(AVector<AccountStatus> accts, Address address, AccountStatus account) {
+		long num=address.longValue();
+		if (accts.count() != num) throw new Error("Incorrect initialisation address: " + address);
+		accts = accts.conj(account);
 		return accts;
 	}
 
-	private static AVector<AccountStatus> addCoreLibrary(AVector<AccountStatus> accts, Address a) {
-		if (accts.count() != a.longValue()) throw new Error("Incorrect core library address: " + a);
+	private static AVector<AccountStatus> addCoreLibrary(AVector<AccountStatus> accts) {
+		if (accts.count() != CORE_ADDRESS.longValue()) throw new Error("Incorrect core library address: " + accts.count());
 
 		AccountStatus as = AccountStatus.createActor();
 		as=as.withEnvironment(Core.ENVIRONMENT);

@@ -24,6 +24,11 @@ public class AccountKey extends AArrayBlob {
 
 	public static final int LENGTH_BITS = LENGTH * 8;
 
+	/**
+	 * A null Account Key
+	 */
+	public static final AccountKey NULL = null;
+
 	private AccountKey(byte[] data, int offset, int length) {
 		super(data, offset, length);
 		this.memorySize=0;

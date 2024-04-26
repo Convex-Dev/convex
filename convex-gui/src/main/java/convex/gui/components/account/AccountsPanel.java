@@ -98,7 +98,7 @@ public class AccountsPanel extends JPanel {
 			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
 			cr.setToolTipText("Sequence number of the account. This is the total number of user transactions executed.");
 			table.getColumnModel().getColumn(2).setCellRenderer(cr);
-			table.getColumnModel().getColumn(2).setPreferredWidth(70);
+			table.getColumnModel().getColumn(2).setPreferredWidth(60);
 		}
 		
 		{
@@ -132,7 +132,7 @@ public class AccountsPanel extends JPanel {
 		{	// Account public key
 			AccountKeyRenderer cr=new AccountKeyRenderer(); 
 			cr.setToolTipText("Public key of the account. Used to validate transactions from users.");
-			table.getColumnModel().getColumn(7).setPreferredWidth(200);
+			table.getColumnModel().getColumn(7).setPreferredWidth(150);
 			table.getColumnModel().getColumn(7).setCellRenderer(cr);
 		}
 

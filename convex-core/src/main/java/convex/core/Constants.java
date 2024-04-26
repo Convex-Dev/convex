@@ -47,17 +47,18 @@ public class Constants {
 	public static final long INITIAL_MEMORY_POOL = 1000000L;
 
 	/**
-	 * Initial memory price per byte
+	 * Initial memory price per byte 0.001 Convex Gold
 	 */
 	public static final long INITIAL_MEMORY_PRICE = 1000000L;
 	
 	/**
-	 * Memory Pool of growth increment 1mn
+	 * Memory Pool of growth increment 1mb
 	 */
 	public static final long MEMORY_POOL_GROWTH = 1000000L;
 
 	/**
-	 * Memory Pool of growth interval (once per day)
+	 * Memory Pool of growth interval (once per day).
+	 * This means regular price drops in memory pool
 	 */
 	public static final long MEMORY_POOL_GROWTH_INTERVAL = 1000L*24*3600;
 
