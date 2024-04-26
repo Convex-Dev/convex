@@ -11,6 +11,7 @@ import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.MergeFunction;
+import convex.core.util.Utils;
 
 /**
  * Static utility class for working with DLFS Node structures
@@ -186,7 +187,7 @@ public class DLFSNode {
 	 * Merges two DLFS nodes recursively. Favours newer (utime) entries in case of conflicts.
 	 * @param a First node (non-null). Favoured in result if all else equal.
 	 * @param b Second node (non-null)
-	 * @param time Update time for changes
+	 * @param time Update time for merged changes
 	 * @return Merged node
 	 */
 	public static AVector<ACell> merge(AVector<ACell> a, AVector<ACell> b, CVMLong time) {
@@ -196,6 +197,14 @@ public class DLFSNode {
 		
 		AHashMap<AString, AVector<ACell>> contA = getDirectoryEntries(a);
 		AHashMap<AString, AVector<ACell>> contB = getDirectoryEntries(b);
+		
+		// might be equal in everything except timestamp, if so take the most recent value.
+		if (Utils.equals(contA, contB)) {
+			if (Utils.equals(getData(a), getData(b))) {
+				return timeA.compareTo(timeB)>=0?a:b;
+			}
+		}
+		
 		if ((contA!=null)&&(contB!=null)) {
 			// we have two directories, so need to merge by entry name
 			AHashMap<AString, AVector<ACell>> mergedEntries=contA.mergeDifferences(contB, new MergeFunction<AVector<ACell>>() {
