@@ -4,6 +4,7 @@ import java.awt.Color;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import org.slf4j.Logger;
@@ -15,6 +16,7 @@ import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.Toast;
@@ -52,13 +54,33 @@ public class KeyRingPanel extends JPanel {
 
 		// new wallet button
 		JButton btnNew = new JButton("New Keypair");
+		btnNew.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				listModel.addElement(HotWalletEntry.create(newKP));
 			} catch (Exception  t) {
-				Toast.display(this,"Exception creating account: ",Color.RED);
+				Toast.display(this,"Error creating key pair: "+t.getMessage(),Color.RED);
+				t.printStackTrace();
+			}
+		});
+		
+		// new wallet button
+		JButton btnImportSeed = new JButton("Import Seed....");
+		btnImportSeed.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
+		toolBar.add(btnImportSeed);
+		btnImportSeed.addActionListener(e -> {
+			String sd=JOptionPane.showInputDialog("Enter Ed25519 Seed");
+			if (sd==null) return;
+			Blob seed=Blob.parse(sd);
+			if (seed==null) return;
+			
+			try {
+				AKeyPair newKP=AKeyPair.create(seed);
+				listModel.addElement(HotWalletEntry.create(newKP));
+			} catch (Exception  t) {
+				Toast.display(this,"Exception importing seedt: "+t.getMessage(),Color.RED);
 				t.printStackTrace();
 			}
 		});

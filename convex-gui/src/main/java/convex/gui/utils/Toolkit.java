@@ -59,11 +59,19 @@ public class Toolkit {
 	public static Font DEFAULT_FONT = new JLabel().getFont();
 
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 20);
-
 	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
 	public static Font SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
+	
+	
+	public static final int SCREEN_RES=Toolkit.getDefaultToolkit().getScreenResolution();
+	public static final int SYMBOL_SIZE = 32;
+	public static final float SYMBOL_FONT_SIZE= 72.0f * SYMBOL_SIZE / SCREEN_RES;
+	
+	public static Font SYMBOL_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)SYMBOL_FONT_SIZE);
+
 
 	static {
+		loadFonts();
 		try {
 			UIManager.installLookAndFeel("Material", "mdlaf.MaterialLookAndFeel");
 			Class.forName("mdlaf.MaterialLookAndFeel");
@@ -79,10 +87,6 @@ public class Toolkit {
 				}
 			}
 			
-			InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
-			MONO_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(24f);
-			SMALL_MONO_FONT = MONO_FONT.deriveFont(14f);
-			SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 			
 			// prefer MaterialLookAndFeel if we have it
 			AbstractMaterialTheme theme = new MaterialOceanicTheme();
@@ -141,6 +145,27 @@ public class Toolkit {
 		image = image.getScaledInstance(size, size, Image.SCALE_SMOOTH);
 
 		return new ImageIcon(image);
+	}
+
+	private static void loadFonts() {
+		try {
+			{ // Source Code Pro
+				InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
+				MONO_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(24f);
+				SMALL_MONO_FONT = MONO_FONT.deriveFont(14f);
+				SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
+			}
+			
+			{ // Material Symbols
+				InputStream is = Utils.getResourceAsStream("fonts/MaterialSymbolsSharp.ttf");
+				SYMBOL_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(SYMBOL_FONT_SIZE);
+			}
+
+		} catch (Exception e) {
+			System.err.println("PROBLEM LOADING FONTS:");
+			e.printStackTrace();
+		}
+
 	}
 
 	/**

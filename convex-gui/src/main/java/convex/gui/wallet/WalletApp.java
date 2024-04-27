@@ -34,7 +34,7 @@ public class WalletApp extends AbstractGUI {
 		setLayout(new BorderLayout());
 		this.add(tabs, BorderLayout.CENTER);
 
-		tabs.add("Home", homePanel);
+		tabs.add("Wallet", new WalletPanel(convex));
 		tabs.add("Keys", new KeyRingPanel());
 		tabs.add("QR Links", new QRPanel("Test QR code with a reasonable length string to see what happens",300));
 	}

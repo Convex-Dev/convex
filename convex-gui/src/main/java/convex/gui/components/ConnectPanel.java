@@ -60,7 +60,7 @@ public class ConnectPanel extends JPanel {
 	    		HostCombo.registerGoodConnection(target);
 	    		
 	    		AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
-	    		if (!we.isLocked()) {
+	    		if ((we!=null)&&!we.isLocked()) {
 	    			convex.setKeyPair(we.getKeyPair());
 	    		}
 	    		return convex;
