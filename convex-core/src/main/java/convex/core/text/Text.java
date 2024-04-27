@@ -129,6 +129,32 @@ public class Text {
 		}
 	}
 
+	public static int lineCount(String text) {
+		if (text==null) return 0;
+		
+		int n=1;
+		for (int i=0; i<text.length(); i++) {
+			if (text.charAt(i)=='\n') n++;
+		}
+		return n;
+	}
+
+	public static int columnCount(String text) {
+		if (text==null) return 0;
+		
+		int result=0;
+		int n=0;
+		for (int i=0; i<text.length(); i++) {
+			if (text.charAt(i)=='\n') {
+				n=0;
+			} else {
+				n++;
+				if (n>result) result=n;
+			}
+		}
+		return result;
+	}
+
 
 
 }

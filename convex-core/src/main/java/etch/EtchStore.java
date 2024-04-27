@@ -311,4 +311,10 @@ public class EtchStore extends ACachedStore {
 		return etch;
 	}
 
+	@Override
+	public String shortName() {
+		// TODO Auto-generated method stub
+		return "Etch: "+etch.getFileName();
+	}
+
 }

@@ -139,4 +139,6 @@ public abstract class AStore {
 	 * @return Stored Ref, or null if not found (may still be in persistent store)
 	 */
 	public abstract <T extends ACell> Ref<T> checkCache(Hash h);
+
+	public abstract String shortName();
 }

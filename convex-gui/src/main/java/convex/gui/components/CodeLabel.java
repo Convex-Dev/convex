@@ -2,6 +2,7 @@ package convex.gui.components;
 
 import javax.swing.JTextArea;
 
+import convex.core.text.Text;
 import convex.gui.utils.Toolkit;
 
 /**
@@ -11,8 +12,10 @@ import convex.gui.utils.Toolkit;
 public class CodeLabel extends JTextArea {
 
 	public CodeLabel(String text) {
+		super(Text.lineCount(text),Text.columnCount(text)+1);
 		this.setText(text);
 		this.setEditable(false);
 		this.setFont(Toolkit.SMALL_MONO_FONT);
+		
 	}
 }

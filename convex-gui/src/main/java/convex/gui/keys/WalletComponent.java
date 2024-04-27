@@ -32,7 +32,7 @@ public class WalletComponent extends BaseListComponent {
 
 	AWalletEntry walletEntry;
 
-	JPanel buttons = new JPanel();
+	JPanel buttons;
 
 	private CodeLabel infoLabel;
 
@@ -60,7 +60,9 @@ public class WalletComponent extends BaseListComponent {
 		add(cPanel,"dock center"); // add to MigLayout
 
 		//////////// Buttons
-
+		buttons = new JPanel();
+		buttons.setLayout(new MigLayout());
+		
 		// lock button
 		lockButton = new JButton("");
 		buttons.add(lockButton);
@@ -109,8 +111,7 @@ public class WalletComponent extends BaseListComponent {
 		});
 		menu.add(m3);
 
-
-		DropdownMenu menuButton=new DropdownMenu(menu);
+		DropdownMenu menuButton=new DropdownMenu(menu); 
 		buttons.add(menuButton);
 		
 		// panel of buttons on right

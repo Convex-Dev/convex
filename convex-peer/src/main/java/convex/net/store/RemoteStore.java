@@ -65,4 +65,10 @@ public class RemoteStore extends ACachedStore {
 		return null;
 	}
 
+	@Override
+	public String shortName() {
+		// TODO Auto-generated method stub
+		return "Remote Store: "+convex.getHostAddress();
+	}
+
 }

@@ -153,7 +153,7 @@ public class Etch {
 		if (!dataFile.exists()) dataFile.createNewFile();
 		this.data=new RandomAccessFile(dataFile,"rw");
 
-		this.fileName = dataFile.getCanonicalPath();
+		this.fileName = dataFile.getName();
 
 		// Try to exclusively lock the Etch database file
 		FileChannel fileChannel=this.data.getChannel();

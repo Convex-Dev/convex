@@ -1,6 +1,5 @@
 package convex.gui.components;
 
-import java.awt.BorderLayout;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
@@ -9,7 +8,6 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JTextArea;
-import javax.swing.border.EmptyBorder;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -32,6 +30,7 @@ import convex.gui.utils.Toolkit;
 import convex.peer.ConnectionManager;
 import convex.peer.Server;
 import etch.EtchStore;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class PeerComponent extends BaseListComponent {
@@ -63,73 +62,69 @@ public class PeerComponent extends BaseListComponent {
 	public PeerComponent(ConvexLocal value) {
 		this.convex = value;
 
-		setLayout(new BorderLayout(0, 0));
+		setLayout(new MigLayout());
 
 		// setPreferredSize(new Dimension(1000, 90));
 
-		JButton button = new JButton("");
-		button.setBorder(null);
-		add(button, BorderLayout.WEST);
-		button.setIcon(Toolkit.CONVEX);
+		// Convex Button
+		JButton button = new BaseImageButton(Toolkit.CONVEX);
 		button.addActionListener(e -> {
 			launchPeerWindow(this.convex);
 		});
 		button.setToolTipText("Launch Peer management window");
+		add(button, "dock west");
+		
+		// Central area
 
-		JPanel panel = new JPanel();
-		panel.setBorder(new EmptyBorder(5, 5, 5, 5));
-		add(panel);
-		panel.setLayout(new BorderLayout(0, 0));
-
-		description = new JTextArea((convex == null) ? "No peer" : convex.toString());
+		JPanel centralPanel = new JPanel();
+		centralPanel.setLayout(new MigLayout("fill, wrap 2","[][grow]")); 
+		
+		Server server=convex.getLocalServer();
+		AccountKey peerKey=server.getPeerKey();
+		Identicon identicon=new Identicon(peerKey);
+		centralPanel.add(identicon);
+		centralPanel.add(new CodeLabel("0x"+peerKey.toChecksumHex()),"span");
+		
+		description = new CodeLabel(getPeerDescription());
 		description.setFont(Toolkit.SMALL_MONO_FONT);
 		description.setEditable(false);
 		description.setBorder(null);
 		description.setBackground(null);
-		panel.add(description, BorderLayout.CENTER);
+		centralPanel.add(description, "span 2");
+		add(centralPanel,"dock center");
 
 		// Setup popup menu for peer
 		JPopupMenu popupMenu = new JPopupMenu();
-		Server server=convex.getLocalServer();
-		if (server!=null) {
-			JMenuItem closeButton = new JMenuItem("Shutdown Peer");
-			closeButton.addActionListener(e -> {
-				try {
-					server.shutdown();
-				} catch (Exception e1) {
-					// ignore
-				}
-			});
-			popupMenu.add(closeButton);
 
-			JMenuItem exploreButton = new JMenuItem("Explore state");
-			exploreButton.addActionListener(e -> {
-				launchExploreWindow(convex);
-			});
-			popupMenu.add(exploreButton);
-
-			if (server.getStore() instanceof EtchStore) {
-				JMenuItem storeButton = new JMenuItem("Explore Etch store");
-				storeButton.addActionListener(e -> {
-					launchEtchWindow(convex);
-				});
-				popupMenu.add(storeButton);
+		JMenuItem closeButton = new JMenuItem("Shutdown Peer");
+		closeButton.addActionListener(e -> {
+			try {
+				server.shutdown();
+			} catch (Exception e1) {
+				// ignore
 			}
-			
-			
-			JMenuItem killConn = new JMenuItem("Kill Connections");
-			killConn.addActionListener(e -> {
-				server.getConnectionManager().closeAllConnections();
+		});
+		popupMenu.add(closeButton);
+
+		JMenuItem exploreButton = new JMenuItem("Explore state");
+		exploreButton.addActionListener(e -> {
+			launchExploreWindow(convex);
+		});
+		popupMenu.add(exploreButton);
+
+		if (server.getStore() instanceof EtchStore) {
+			JMenuItem storeButton = new JMenuItem("Explore Etch store");
+			storeButton.addActionListener(e -> {
+				launchEtchWindow(convex);
 			});
-			popupMenu.add(killConn);
-			
-		} else {
-			JMenuItem closeButton = new JMenuItem("Close connection");
-			closeButton.addActionListener(e -> {
-				convex.close();
-			});
-			popupMenu.add(closeButton);
+			popupMenu.add(storeButton);
 		}
+		
+		JMenuItem killConn = new JMenuItem("Kill Connections");
+		killConn.addActionListener(e -> {
+			server.getConnectionManager().closeAllConnections();
+		});
+		popupMenu.add(killConn);
 
 		JMenuItem replButton = new JMenuItem("Launch REPL");
 		replButton.addActionListener(e -> launchPeerWindow(this.convex));
@@ -139,12 +134,13 @@ public class PeerComponent extends BaseListComponent {
 		clientButton.addActionListener(e -> launchClientWindow(convex));
 		popupMenu.add(clientButton);
 
-		JPanel blockView = new BlockViewComponent(convex);
-		add(blockView, BorderLayout.SOUTH);
 
 		DropdownMenu dm = new DropdownMenu(popupMenu);
-		add(dm, BorderLayout.EAST);
+		add(dm, "dock east");
+
+		// Block view at bottom
 		
+		JPanel blockView = new BlockViewComponent(convex);
 		StateModel<Peer> model=PeerGUI.getStateModel(convex);
 		if (model!=null) {
 			model.addPropertyChangeListener(e->{
@@ -156,6 +152,10 @@ public class PeerComponent extends BaseListComponent {
 				updateDescription();
 			});
 		}
+		add(blockView, "dock south");
+
+		
+
 		updateDescription();
 	}
 
@@ -187,17 +187,19 @@ public class PeerComponent extends BaseListComponent {
 		if (server != null) {
 			State state=server.getPeer().getConsensusState();
 			AccountKey paddr=server.getPeerKey();
-			sb.append("0x"+paddr.toChecksumHex()+"\n");
-			sb.append("Local peer on: " + server.getHostAddress() + " with store "+server.getStore()+"\n");
+			// sb.append("0x"+paddr.toChecksumHex()+"\n");
+			sb.append("Local peer on: " + server.getHostAddress() + " with store "+server.getStore().shortName()+"\n");
 			
 			PeerStatus ps=state.getPeer(paddr);
 			if (ps!=null) {
 				sb.append("Peer Stake:  "+Text.toFriendlyBalance(ps.getPeerStake()));
 				sb.append("    ");
 				sb.append("Delegated Stake:  "+Text.toFriendlyBalance(ps.getDelegatedStake()));
+				sb.append("    ");
+			} else {
+				sb.append("Not currently a rgistered peer    ");
 			}
 			ConnectionManager cm=server.getConnectionManager();
-			sb.append("\n");
 			sb.append("Connections: "+cm.getConnectionCount());				
 		} else if (convex != null) {
 			sb.append(convex.toString());

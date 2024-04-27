@@ -2,6 +2,7 @@ package convex.core.store;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -143,5 +144,10 @@ public class MemoryStore extends AStore {
 	@Override
 	public <T extends ACell> Ref<T> checkCache(Hash h) {
 		return refForHash(h);
+	}
+
+	@Override
+	public String shortName() {
+		return "Memory Store "+Objects.toIdentityString(this);
 	}
 }

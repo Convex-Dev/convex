@@ -54,6 +54,8 @@ import mdlaf.themes.MaterialOceanicTheme;
 @SuppressWarnings("serial")
 public class Toolkit {
 
+	private static final int ICON_SIZE = 48;
+
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
 	public static Font DEFAULT_FONT = new JLabel().getFont();
@@ -64,7 +66,7 @@ public class Toolkit {
 	
 	
 	public static final int SCREEN_RES=Toolkit.getDefaultToolkit().getScreenResolution();
-	public static final int SYMBOL_SIZE = 32;
+	public static final int SYMBOL_SIZE = ICON_SIZE;
 	public static final float SYMBOL_FONT_SIZE= 72.0f * SYMBOL_SIZE / SCREEN_RES;
 	
 	public static Font SYMBOL_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)SYMBOL_FONT_SIZE);
@@ -120,14 +122,16 @@ public class Toolkit {
 	// scaledIcon(36,"/images/ic_lock_outline_black_36dp.png");
 	// public static final ImageIcon UNLOCKED_ICON =
 	// scaledIcon(36,"/images/ic_lock_open_black_36dp.png");
-
-	public static final ImageIcon LOCKED_ICON = scaledIcon(36, "/images/padlock.png");
-	public static final ImageIcon UNLOCKED_ICON = scaledIcon(36, "/images/padlock-open.png");
-	public static final ImageIcon WARNING = scaledIcon(36, "/images/ic_priority_high_black_36dp.png");
-	public static final ImageIcon CAKE = scaledIcon(36, "/images/ic_cake_black_36dp.png");
-	public static final ImageIcon CONVEX = scaledIcon(36, "/images/Convex.png");
-	public static final ImageIcon COG = scaledIcon(36, "/images/cog.png");
-	public static final ImageIcon REPL_ICON = scaledIcon(36, "/images/terminal-icon.png");
+	//public static final ImageIcon LOCKED_ICON = scaledIcon(ICON_SIZE, "/images/padlock.png");
+	//public static final ImageIcon UNLOCKED_ICON = scaledIcon(ICON_SIZE, "/images/padlock-open.png");
+	
+	public static final ImageIcon LOCKED_ICON = SymbolIcon.get(0xe897,ICON_SIZE);
+	public static final ImageIcon UNLOCKED_ICON = SymbolIcon.get(0xe898,ICON_SIZE);
+	public static final ImageIcon WARNING = scaledIcon(ICON_SIZE, "/images/ic_priority_high_black_36dp.png");
+	public static final ImageIcon CAKE = scaledIcon(ICON_SIZE, "/images/ic_cake_black_36dp.png");
+	public static final ImageIcon CONVEX = scaledIcon(ICON_SIZE, "/images/Convex.png");
+	public static final ImageIcon COG = scaledIcon(ICON_SIZE, "/images/cog.png");
+	public static final ImageIcon REPL_ICON = scaledIcon(ICON_SIZE, "/images/terminal-icon.png");
 
 	public static final ImageIcon TESTNET_ICON = scaledIcon(128, "/images/testnet.png");
 	public static final ImageIcon WWW_ICON = scaledIcon(128, "/images/www.png");

@@ -975,7 +975,7 @@ public abstract class Convex {
 	}
 
 	/**
-	 * Gets the local Server instance, or null is not a local connection
+	 * Gets the local Server instance, or null if not a local connection
 	 * @return Server instance (or null)
 	 */
 	public abstract Server getLocalServer();
