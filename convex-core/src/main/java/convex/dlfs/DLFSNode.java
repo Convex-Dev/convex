@@ -198,7 +198,7 @@ public class DLFSNode {
 		AHashMap<AString, AVector<ACell>> contA = getDirectoryEntries(a);
 		AHashMap<AString, AVector<ACell>> contB = getDirectoryEntries(b);
 		
-		// might be equal in everything except timestamp, if so take the most recent value.
+		// might be equal in all content except timestamp, if so take the most recent value.
 		if (Utils.equals(contA, contB)) {
 			if (Utils.equals(getData(a), getData(b))) {
 				return timeA.compareTo(timeB)>=0?a:b;

@@ -356,10 +356,17 @@ public class DLFSTest {
 		// Delete conflicting file, should make a tombstone!
 		Files.delete(driveA.getPath("conflict"));
 		
-		// Replicate both ways, should get same root hash with no conflicts
+		// Replicate back to A, should get same root hash with no conflicts
+		setDriveTimes(TS+6,driveA,driveB);
 		driveA.replicate(driveB);
 		driveB.replicate(driveA);
-		assertEquals(TS+5,Files.getLastModifiedTime(driveA.getPath("/")).toMillis()); // something got updated
+		assertEquals(driveA.getNode(driveA.getRoot()).get(0),driveB.getNode(driveB.getRoot()).get(0));
+		
+		//  Replicate again both wats everything should by in sync
+		setDriveTimes(TS+7,driveA,driveB);
+		driveA.replicate(driveB);
+		driveB.replicate(driveA);
+		assertEquals(TS+6,Files.getLastModifiedTime(driveA.getPath("/")).toMillis()); // something got updated
 		assertEquals(driveA.getRootHash(),driveB.getRootHash());
 	}
 
