@@ -26,13 +26,14 @@ import javax.swing.ImageIcon;
 import javax.swing.InputMap;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
+import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UIManager.LookAndFeelInfo;
+import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.event.DocumentEvent;
@@ -42,6 +43,9 @@ import javax.swing.text.DefaultEditorKit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.formdev.flatlaf.FlatDarculaLaf;
+import com.formdev.flatlaf.intellijthemes.materialthemeuilite.FlatMaterialOceanicIJTheme;
 
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.data.AccountKey;
@@ -58,7 +62,7 @@ public class Toolkit {
 
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
-	public static Font DEFAULT_FONT = new JLabel().getFont();
+	public static Font DEFAULT_FONT = new Font(null,Font.PLAIN,14);
 
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 20);
 	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
@@ -74,33 +78,11 @@ public class Toolkit {
 
 	static {
 		loadFonts();
+		UIManager.getLookAndFeelDefaults().put("defaultFont", DEFAULT_FONT);
 		try {
-			UIManager.installLookAndFeel("Material", "mdlaf.MaterialLookAndFeel");
-			Class.forName("mdlaf.MaterialLookAndFeel");
-			// search for Nimbus look and feel if it is available
-			for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-				String name = info.getName();
-				// log.info("Found L&F: " + name);
-				if (name.equals("Nimbus")) { // Nimbus
-					UIManager.setLookAndFeel(info.getClassName());
-					// UIManager.put("nimbusBase", new Color(130,89,171));
-					// UIManager.put("menu", new Color(61,89,171));
-					// UIManager.put("control", new Color(200,180,160));
-				}
-			}
+			//LookAndFeel laf = installMDLaf();
+			LookAndFeel laf=installFlatLaf();
 			
-			// prefer MaterialLookAndFeel if we have it
-			AbstractMaterialTheme theme = new MaterialOceanicTheme();
-			MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
-
-			DEFAULT_FONT=DEFAULT_FONT.deriveFont(14.0f).deriveFont(Font.PLAIN);
-			// DEFAULT_FONT=SMALL_MONO_FONT;
-			theme.setFontRegular(new FontUIResource(DEFAULT_FONT));
-			theme.setFontBold(new FontUIResource(DEFAULT_FONT.deriveFont(Font.BOLD)));
-			theme.setFontItalic(new FontUIResource(DEFAULT_FONT.deriveFont(Font.ITALIC)));
-			theme.setFontMedium(new FontUIResource(DEFAULT_FONT.deriveFont(Font.PLAIN)));
-			
-			UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
 			
 			if (System.getProperty("os.name").toLowerCase().startsWith("mac")) {
 				InputMap im = (InputMap) UIManager.get("TextField.focusInputMap");
@@ -110,11 +92,49 @@ public class Toolkit {
 			}
 			
 			
-			UIManager.setLookAndFeel(material);
+			UIManager.setLookAndFeel(laf);
+			FlatMaterialOceanicIJTheme.setup();
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
 		}
+	}
+
+	protected static LookAndFeel installFlatLaf() {
+		System.setProperty("flatlaf.uiScale", "1.5");
+		FlatDarculaLaf laf=new FlatDarculaLaf();
+		return laf;
+	}
+
+	protected static MaterialLookAndFeel installMDLaf() throws ClassNotFoundException, InstantiationException,
+			IllegalAccessException, UnsupportedLookAndFeelException {
+		UIManager.installLookAndFeel("Material", "mdlaf.MaterialLookAndFeel");
+		Class.forName("mdlaf.MaterialLookAndFeel");
+		// search for Nimbus look and feel if it is available
+		for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+			String name = info.getName();
+			// log.info("Found L&F: " + name);
+			if (name.equals("Nimbus")) { // Nimbus
+				UIManager.setLookAndFeel(info.getClassName());
+				// UIManager.put("nimbusBase", new Color(130,89,171));
+				// UIManager.put("menu", new Color(61,89,171));
+				// UIManager.put("control", new Color(200,180,160));
+			}
+		}
+		
+		// prefer MaterialLookAndFeel if we have it
+		AbstractMaterialTheme theme = new MaterialOceanicTheme();
+		MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
+
+		// DEFAULT_FONT=SMALL_MONO_FONT;
+		theme.setFontRegular(new FontUIResource(DEFAULT_FONT));
+		theme.setFontBold(new FontUIResource(DEFAULT_FONT.deriveFont(Font.BOLD)));
+		theme.setFontItalic(new FontUIResource(DEFAULT_FONT.deriveFont(Font.ITALIC)));
+		theme.setFontMedium(new FontUIResource(DEFAULT_FONT.deriveFont(Font.PLAIN)));
+		
+		UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
+
+		return material;
 	}
 
 	// public static final ImageIcon LOCKED_ICON =
@@ -163,6 +183,7 @@ public class Toolkit {
 				InputStream is = Utils.getResourceAsStream("fonts/MaterialSymbolsSharp.ttf");
 				SYMBOL_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(SYMBOL_FONT_SIZE);
 			}
+			DEFAULT_FONT=DEFAULT_FONT.deriveFont(14.0f).deriveFont(Font.PLAIN);
 
 		} catch (Exception e) {
 			System.err.println("PROBLEM LOADING FONTS:");

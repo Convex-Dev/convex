@@ -49,10 +49,10 @@ public class MainGUI extends AbstractGUI {
 		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools);
 		actionPanel.add(hacker);
 
-		JComponent discord=createLaunchButton("Community Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord);
+		JComponent discord=createLaunchButton("Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord);
 		actionPanel.add(discord);
 
-		JComponent www=createLaunchButton("https://convex.world",Toolkit.WWW_ICON,this::launchWebsite);
+		JComponent www=createLaunchButton("convex.world",Toolkit.WWW_ICON,this::launchWebsite);
 		actionPanel.add(www);
 		
 		add(actionPanel,"dock south");
