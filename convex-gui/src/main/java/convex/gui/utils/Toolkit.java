@@ -1,6 +1,5 @@
 package convex.gui.utils;
 
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.Font;
@@ -32,13 +31,10 @@ import javax.swing.KeyStroke;
 import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
-import javax.swing.UIManager.LookAndFeelInfo;
-import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.border.Border;
 import javax.swing.border.CompoundBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.plaf.FontUIResource;
 import javax.swing.text.DefaultEditorKit;
 
 import org.slf4j.Logger;
@@ -51,9 +47,6 @@ import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.util.Utils;
 import convex.gui.keys.KeyRingPanel;
-import mdlaf.MaterialLookAndFeel;
-import mdlaf.themes.AbstractMaterialTheme;
-import mdlaf.themes.MaterialOceanicTheme;
 
 @SuppressWarnings("serial")
 public class Toolkit {
@@ -104,37 +97,6 @@ public class Toolkit {
 		System.setProperty("flatlaf.uiScale", "1.5");
 		FlatDarculaLaf laf=new FlatDarculaLaf();
 		return laf;
-	}
-
-	protected static MaterialLookAndFeel installMDLaf() throws ClassNotFoundException, InstantiationException,
-			IllegalAccessException, UnsupportedLookAndFeelException {
-		UIManager.installLookAndFeel("Material", "mdlaf.MaterialLookAndFeel");
-		Class.forName("mdlaf.MaterialLookAndFeel");
-		// search for Nimbus look and feel if it is available
-		for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-			String name = info.getName();
-			// log.info("Found L&F: " + name);
-			if (name.equals("Nimbus")) { // Nimbus
-				UIManager.setLookAndFeel(info.getClassName());
-				// UIManager.put("nimbusBase", new Color(130,89,171));
-				// UIManager.put("menu", new Color(61,89,171));
-				// UIManager.put("control", new Color(200,180,160));
-			}
-		}
-		
-		// prefer MaterialLookAndFeel if we have it
-		AbstractMaterialTheme theme = new MaterialOceanicTheme();
-		MaterialLookAndFeel material = new MaterialLookAndFeel(theme);
-
-		// DEFAULT_FONT=SMALL_MONO_FONT;
-		theme.setFontRegular(new FontUIResource(DEFAULT_FONT));
-		theme.setFontBold(new FontUIResource(DEFAULT_FONT.deriveFont(Font.BOLD)));
-		theme.setFontItalic(new FontUIResource(DEFAULT_FONT.deriveFont(Font.ITALIC)));
-		theme.setFontMedium(new FontUIResource(DEFAULT_FONT.deriveFont(Font.PLAIN)));
-		
-		UIManager.getLookAndFeelDefaults().put("TextField.caretForeground", Color.white);
-
-		return material;
 	}
 
 	// public static final ImageIcon LOCKED_ICON =
