@@ -89,7 +89,6 @@ public class Toolkit {
 				}
 			}
 			
-			
 			// prefer MaterialLookAndFeel if we have it
 			AbstractMaterialTheme theme = new MaterialOceanicTheme();
 			MaterialLookAndFeel material = new MaterialLookAndFeel(theme);

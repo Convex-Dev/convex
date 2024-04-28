@@ -1,7 +1,5 @@
 package convex.gui.components;
 
-import java.awt.event.FocusEvent;
-import java.awt.event.FocusListener;
 import java.awt.event.ItemEvent;
 
 import javax.swing.JComboBox;
@@ -48,19 +46,8 @@ public class AccountChooserPanel extends JPanel {
 			mp.add(new JLabel("Account:"));
 	
 			Address address=convex.getAddress();
-			addressCombo = new AddressCombo();
-			addressCombo.setSelectedItem(address);
+			addressCombo = new AddressCombo(address);
 			addressCombo.setToolTipText("Select Account for use");
-			addressCombo.addFocusListener(new FocusListener() {
-				@Override
-				public void focusGained(FocusEvent e) {
-				}
-	
-				@Override
-				public void focusLost(FocusEvent e) {
-					// Ignore		
-				}
-			});
 			mp.add(addressCombo);
 			
 			keyCombo=KeyPairCombo.forConvex(convex);

@@ -1,6 +1,7 @@
 package convex.gui.peer;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.EventQueue;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
@@ -11,10 +12,16 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
+import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JSpinner;
 import javax.swing.JTabbedPane;
+import javax.swing.SpinnerNumberModel;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +32,7 @@ import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.init.Init;
@@ -33,7 +41,9 @@ import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
+import convex.gui.components.Toast;
 import convex.gui.components.account.AccountsPanel;
+import convex.gui.components.account.KeyPairCombo;
 import convex.gui.components.models.StateModel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
@@ -41,9 +51,11 @@ import convex.gui.peer.mainpanels.AboutPanel;
 import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.peer.mainpanels.PeersListPanel;
 import convex.gui.peer.mainpanels.TorusPanel;
+import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class PeerGUI extends AbstractGUI {
@@ -352,6 +364,52 @@ public class PeerGUI extends AbstractGUI {
 			}
 		}
 		return null;
+	}
+
+	public static void runLaunchDialog(JComponent parent) {
+		JPanel pan=new JPanel();
+		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
+		
+		pan.add(Toolkit.makeNote("Select a number of peers to include in the genesis state and launch initially. More can be added later. 3-5 recommended for local devnet testing"),
+				"grow,span 2");
+		pan.add(new JLabel("Number of Peers:"));
+		JSpinner peerCountSpinner = new JSpinner();
+		// Note: about 300 max number of clients before hitting juice limits for account creation
+		peerCountSpinner.setModel(new SpinnerNumberModel(PeerGUI.DEFAULT_NUM_PEERS, 1, 100, 1));
+		pan.add(peerCountSpinner);
+
+		
+		pan.add(Toolkit.makeNote("Select genesis key for the network. The genesis key will be the key used for the first peer and initial governance accounts."),
+				"grow,span 2");
+		pan.add(new JLabel("Genesis Key:   "));
+		AKeyPair kp=AKeyPair.generate();
+		KeyPairCombo keyField=KeyPairCombo.create(kp);
+
+		pan.add(keyField);
+
+
+		int result = JOptionPane.showConfirmDialog(parent, pan, 
+	               "Enter Launch Details", 
+	               JOptionPane.OK_CANCEL_OPTION, 
+	               JOptionPane.QUESTION_MESSAGE,
+	               SymbolIcon.get(0xeb9b,72));
+	    if (result == JOptionPane.OK_OPTION) {
+	    	try {
+	    		int numPeers=(Integer)peerCountSpinner.getValue();
+	    		AWalletEntry we=keyField.getWalletEntry();
+	    		if (we==null) throw new Exception("No key pair selected");
+	    		
+	       		kp=we.getKeyPair();
+	    		if (kp==null) throw new Exception("Invalid Genesis Key!");
+	    		PeerGUI.launchPeerGUI(numPeers, kp,false);
+	    	} catch (Exception e) {
+	    		Toast.display(parent, "Launch Failed: "+e.getMessage(), Color.RED);
+	    		e.printStackTrace();
+	    	}
+	    }
+		
+		
 	}
 
 }

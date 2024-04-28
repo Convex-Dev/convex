@@ -142,8 +142,12 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	}
 
 	public static KeyPairCombo forConvex(Convex convex) {
-		KeyPairModel model=new KeyPairModel();
 		AKeyPair kp=convex.getKeyPair();
+		return create(kp);
+	}
+
+	public static KeyPairCombo create(AKeyPair kp) {
+		KeyPairModel model=new KeyPairModel();
 		if (kp!=null) {
 			AccountKey publicKey=kp.getAccountKey();
 			AWalletEntry we=Toolkit.getKeyRingEntry(publicKey);
@@ -152,7 +156,6 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 			}
 			model.setSelectedItem(we);
 		}
-
  		return new KeyPairCombo(model);
 	}
 }

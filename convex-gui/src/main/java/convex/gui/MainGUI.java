@@ -1,29 +1,19 @@
 package convex.gui;
 
-import java.awt.Color;
-import java.awt.Dimension;
 import java.awt.EventQueue;
 
-import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JSpinner;
-import javax.swing.JTextField;
-import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 
 import convex.api.Convex;
-import convex.core.crypto.AKeyPair;
-import convex.core.data.Blob;
 import convex.gui.client.ConvexClient;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ConnectPanel;
-import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
 import convex.gui.peer.mainpanels.HomePanel;
@@ -81,44 +71,7 @@ public class MainGUI extends AbstractGUI {
 	
 	
 	public void launchTestNet() {
-		JPanel pan=new JPanel();
-		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
-		
-		pan.add(new JLabel("Number of Peers:"));
-		JSpinner peerCountSpinner = new JSpinner();
-		// Note: about 300 max number of clients before hitting juice limits for account creation
-		peerCountSpinner.setModel(new SpinnerNumberModel(PeerGUI.DEFAULT_NUM_PEERS, 1, 100, 1));
-		pan.add(peerCountSpinner);
-
-		pan.add(new JLabel("Genesis Key:   "));
-		AKeyPair kp=AKeyPair.generate();
-		JTextField keyField=new JTextField("0x"+kp.getSeed().toHexString());
-		keyField.setMinimumSize(new Dimension(200,25));
-		pan.add(keyField);
-
-
-		int result = JOptionPane.showConfirmDialog(this, pan, 
-	               "Enter Testnet Details", JOptionPane.OK_CANCEL_OPTION);
-	    if (result == JOptionPane.OK_OPTION) {
-	    	try {
-	    		int numPeers=(Integer)peerCountSpinner.getValue();
-	    		
-	       		Blob b=Blob.parse(keyField.getText());
-	    		if ((b!=null)&&(!b.isEmpty())) {
-	    			kp=AKeyPair.create(b);
-	    		} else {
-	    			kp=null;
-	    		}
-	    		if (kp==null) throw new Exception("Invalid Genesis Key!");
-	    		PeerGUI.launchPeerGUI(numPeers, kp,false);
-	    	} catch (Exception e) {
-	    		Toast.display(this, "Launch Failed: "+e.getMessage(), Color.RED);
-	    		e.printStackTrace();
-	    	}
-	    }
-		
-		
+		PeerGUI.runLaunchDialog(this);
 	}
 	
 	public void launchDiscord() {
