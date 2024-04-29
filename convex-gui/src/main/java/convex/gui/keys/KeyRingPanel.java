@@ -68,7 +68,7 @@ public class KeyRingPanel extends JPanel {
 		
 		// new wallet button
 		JButton btnImportSeed = new JButton("Import Seed....");
-		btnImportSeed.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
+		btnImportSeed.setToolTipText("Import a key pair using an Ed25519 seed");
 		toolBar.add(btnImportSeed);
 		btnImportSeed.addActionListener(e -> {
 			String sd=JOptionPane.showInputDialog("Enter Ed25519 Seed");

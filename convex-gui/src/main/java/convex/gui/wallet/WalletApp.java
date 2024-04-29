@@ -6,9 +6,9 @@ import javax.swing.JTabbedPane;
 import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
-import convex.gui.components.QRCodePanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.HomePanel;
+import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -33,9 +33,9 @@ public class WalletApp extends AbstractGUI {
 		setLayout(new MigLayout());
 		this.add(tabs, "dock center");
 
-		tabs.add("Wallet", new WalletPanel(convex));
-		tabs.add("Keys", new KeyRingPanel());
-		tabs.add("QR Links", new QRCodePanel("Test QR code with a reasonable length string to see what happens",300));
+		tabs.addTab("Wallet", SymbolIcon.get(0xe850), new WalletPanel(convex));
+		tabs.addTab("Keys", SymbolIcon.get(0xe73c), new KeyRingPanel());
+		tabs.addTab("QR Code", SymbolIcon.get(0xf206), new QRPanel(convex));
 	}
 
 	// private static final Logger log = LoggerFactory.getLogger(Wallet.class.getName());

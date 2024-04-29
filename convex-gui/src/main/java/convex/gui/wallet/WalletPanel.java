@@ -12,7 +12,7 @@ import net.miginfocom.swing.MigLayout;
 public class WalletPanel extends JPanel {
 
 	public WalletPanel(Convex convex) {
-		setLayout(new MigLayout());
+		setLayout(new MigLayout("fill"));
 		
 		add(new JLabel(SymbolIcon.get(0xe14a)));
 
