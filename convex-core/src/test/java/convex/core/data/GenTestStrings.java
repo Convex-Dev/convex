@@ -20,7 +20,11 @@ public class GenTestStrings {
 	@Property
 	public void testStringProperties(@From(StringGen.class) AString a) {
 		AString cvm=Strings.create(a.toString());
-		if (cvm!=null) assertEquals(a,cvm);
+		
+		// TODO: this might fail for some invalid UTF-8?
+		if (cvm!=null) {
+			assertEquals(a,cvm);
+		}
 		
 		String printed=RT.print(a, 1000000).toString();
 		assertEquals(a,Reader.read(printed));
@@ -28,6 +32,7 @@ public class GenTestStrings {
 	
 	@Property
 	public void testJavaStringProperties(String a) {
+		// Any valid Java string should become a CVM String
 		AString cvm=Strings.create(a);
 		assertNotNull(cvm);
 	}

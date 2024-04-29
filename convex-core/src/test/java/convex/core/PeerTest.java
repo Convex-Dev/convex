@@ -89,10 +89,11 @@ public class PeerTest {
 	
 	@Test
 	public void testForkRecovery() {
+		State ST=STATE.withTimestamp(0);
 		AKeyPair kp=InitTest.FIRST_PEER_KEYPAIR;
 		Address addr=InitTest.FIRST_PEER_ADDRESS;
 		AccountKey peerKey=kp.getAccountKey();
-		Peer p=Peer.create(kp, STATE);
+		Peer p=Peer.create(kp, ST);
 		
 		Belief b=p.getBelief();
 		assertEquals(0,b.getOrder(peerKey).getBlockCount());
@@ -104,7 +105,7 @@ public class PeerTest {
 		b=b.withOrders(Index.create(peerKey, so1));
 		
 		p=p.updateBelief(b);
-		assertEquals(STATE,p.getConsensusState());
+		assertEquals(ST,p.getConsensusState());
 		p=p.updateState();
 		assertEquals(CVMLong.create(13),p.executeQuery(Reader.read("foo"), addr).getResult());
 

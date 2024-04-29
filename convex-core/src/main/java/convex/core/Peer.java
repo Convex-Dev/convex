@@ -377,7 +377,7 @@ public class Peer {
 	 * @return Signed data value
 	 */
 	public <T extends ACell> SignedData<T> sign(T value) {
-		return SignedData.sign(keyPair, value);
+		return keyPair.signData(value);
 	}
 
 	/**
@@ -488,8 +488,16 @@ public class Peer {
 			SignedData<Block> block = blocks.get(stateIndex);
 			
 			BlockResult br = s.applyBlock(block);
-			s=br.getState();
+			State newState=br.getState();
 			newResults = newResults.append(br);
+			
+			if (newState.equals(s)) {
+				// Nothing changes in CVM state, so the Block must have been invalid!
+				if (peerKey.equals(block.getAccountKey())) {
+					// We messed up, or someone was messing with us in a serious way.....
+				}
+			} 
+			s=newState;
 			stateIndex++;
 		}
 		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
