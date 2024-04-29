@@ -1,4 +1,4 @@
-package convex.gui.client.panels;
+package convex.gui.client;
 
 import javax.swing.JPanel;
 import java.awt.BorderLayout;

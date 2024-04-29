@@ -14,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import convex.core.store.Stores;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.models.StateModel;
-import convex.gui.etch.panels.DatabasePanel;
 import etch.EtchStore;
 
 /**

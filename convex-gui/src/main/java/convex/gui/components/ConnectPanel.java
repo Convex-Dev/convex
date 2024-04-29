@@ -41,6 +41,7 @@ public class ConnectPanel extends JPanel {
 		{	// Address selection
 			pan.add(new JLabel("Address"));
 			addressField=new AddressCombo(Init.GENESIS_ADDRESS);
+			addressField.setToolTipText("Set the initial account address to use");
 			pan.add(addressField,"width 50:250:");
 		}
 

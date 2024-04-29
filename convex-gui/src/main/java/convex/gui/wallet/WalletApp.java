@@ -1,17 +1,16 @@
 package convex.gui.wallet;
 
-import java.awt.BorderLayout;
-
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
-import convex.gui.components.QRPanel;
+import convex.gui.components.QRCodePanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.HomePanel;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class WalletApp extends AbstractGUI {
@@ -31,12 +30,12 @@ public class WalletApp extends AbstractGUI {
 	public WalletApp(Convex convex) {
 		super ("Desktop Wallet");
 		this.convex=convex;
-		setLayout(new BorderLayout());
-		this.add(tabs, BorderLayout.CENTER);
+		setLayout(new MigLayout());
+		this.add(tabs, "dock center");
 
 		tabs.add("Wallet", new WalletPanel(convex));
 		tabs.add("Keys", new KeyRingPanel());
-		tabs.add("QR Links", new QRPanel("Test QR code with a reasonable length string to see what happens",300));
+		tabs.add("QR Links", new QRCodePanel("Test QR code with a reasonable length string to see what happens",300));
 	}
 
 	// private static final Logger log = LoggerFactory.getLogger(Wallet.class.getName());
@@ -52,7 +51,7 @@ public class WalletApp extends AbstractGUI {
 	public static void main(String[] args) {
 		// call to set up Look and Feel
 		Toolkit.init();
-		Convex convex=ConnectPanel.tryConnect(null,"Connect Wallet");
+		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		if (convex!=null) {
 			new WalletApp(convex).run();
 		}

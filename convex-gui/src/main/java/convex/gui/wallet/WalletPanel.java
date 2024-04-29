@@ -14,8 +14,9 @@ public class WalletPanel extends JPanel {
 	public WalletPanel(Convex convex) {
 		setLayout(new MigLayout());
 		
-		add(new AccountChooserPanel(convex),"dock north");
-		
 		add(new JLabel(SymbolIcon.get(0xe14a)));
+
+		add(new AccountChooserPanel(convex),"dock south");
+		
 	}
 }

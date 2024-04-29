@@ -1,4 +1,4 @@
-package convex.gui.etch.panels;
+package convex.gui.etch;
 
 import javax.swing.JPanel;
 import java.awt.BorderLayout;
@@ -19,7 +19,6 @@ import javax.swing.border.EtchedBorder;
 import javax.swing.border.TitledBorder;
 
 import convex.gui.components.ActionPanel;
-import convex.gui.etch.EtchExplorer;
 import etch.EtchStore;
 
 import javax.swing.JButton;
