@@ -707,7 +707,7 @@ public class State extends ARecord {
 	 */
 	public long computeTotalFunds() {
 		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
-		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getTotalStake(), 0L);
+		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
 		total += getGlobalFees().longValue();
 		total += getGlobalMemoryValue().longValue();
 		return total;

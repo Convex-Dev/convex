@@ -241,12 +241,13 @@ public class PeerStatus extends ARecord {
 		if (oldStake == newStake) return this;
 
 		// compute adjustment to total delegated stake
-		long newDelegatedStake = delegatedStake + newStake - oldStake;
+		long stakeChange=newStake-oldStake;
+		long newDelegatedStake = delegatedStake + stakeChange;
 
 		// Cast needed for Maven Java 11 compile?
 		Index<Address, CVMLong> newStakes = (Index<Address,CVMLong>)((newStake == 0L) ? stakes.dissoc(delegator)
 				: stakes.assoc(delegator, CVMLong.create(newStake)));
-		return new PeerStatus(controller, peerStake, newStakes, newDelegatedStake, metadata,timestamp,balance);
+		return new PeerStatus(controller, peerStake, newStakes, newDelegatedStake, metadata,timestamp,balance+stakeChange);
 	}
 	
 	/**
@@ -259,8 +260,9 @@ public class PeerStatus extends ARecord {
 	 */
 	public PeerStatus withPeerStake(long newStake) {
 		if (peerStake == newStake) return this;
+		long stakeChange=newStake-peerStake;
 
-		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata,timestamp,balance);
+		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata,timestamp,balance+stakeChange);
 	}
 
 	public PeerStatus withPeerData(AHashMap<ACell,ACell> newMeta) {
@@ -282,6 +284,8 @@ public class PeerStatus extends ARecord {
 		if (Keywords.STAKES.equals(key)) return stakes;
 		if (Keywords.DELEGATED_STAKE.equals(key)) return CVMLong.create(delegatedStake);
 		if (Keywords.METADATA.equals(key)) return metadata;
+		if (Keywords.TIMESTAMP.equals(key)) return CVMLong.create(timestamp);
+		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 
 		return null;
 	}
@@ -330,6 +334,7 @@ public class PeerStatus extends ARecord {
 		
 		if (peerStake!=a.peerStake) return false;
 		if (delegatedStake!=a.delegatedStake) return false;
+		if (balance!=a.balance) return false;
 		if (!(Cells.equals(stakes, a.stakes))) return false;
 		if (!(Cells.equals(metadata, a.metadata))) return false;
 		if (!(Cells.equals(controller, a.controller))) return false;
