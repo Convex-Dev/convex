@@ -43,7 +43,7 @@ public class ScrollyList<E> extends JScrollPane {
 
 		@Override
 		public Dimension getPreferredScrollableViewportSize() {
-			return new Dimension(800, 600);
+			return getPreferredSize();
 		}
 
 		@Override
@@ -74,7 +74,7 @@ public class ScrollyList<E> extends JScrollPane {
 		this.model = model;
 		this.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
-		listPanel.setLayout(new MigLayout("wrap 1","[fill,grow]"));
+		listPanel.setLayout(new MigLayout("wrap 1"));
 		setViewportView(listPanel);
 		getViewport().setBackground(null);
 

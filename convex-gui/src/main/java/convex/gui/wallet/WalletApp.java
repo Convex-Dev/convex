@@ -1,13 +1,17 @@
 package convex.gui.wallet;
 
+import javax.swing.JComponent;
+import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
+import javax.swing.SwingConstants;
 
 import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.HomePanel;
+import convex.gui.peer.windows.REPLPanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -20,9 +24,11 @@ public class WalletApp extends AbstractGUI {
 	JPanel panel = new JPanel();
 
 	HomePanel homePanel = new HomePanel();
-	JTabbedPane tabs = new JTabbedPane();
+	JTabbedPane tabs = new JTabbedPane(JTabbedPane.LEFT);
 
 	protected Convex convex;
+	
+	protected static final int TAB_ICON_SIZE=72;
 	
 	/**
 	 * Create the application.
@@ -30,12 +36,36 @@ public class WalletApp extends AbstractGUI {
 	public WalletApp(Convex convex) {
 		super ("Desktop Wallet");
 		this.convex=convex;
-		setLayout(new MigLayout());
-		this.add(tabs, "dock center");
+		setLayout(new MigLayout("fill"));
 
-		tabs.addTab("Wallet", SymbolIcon.get(0xe850), new WalletPanel(convex));
-		tabs.addTab("Keys", SymbolIcon.get(0xe73c), new KeyRingPanel());
-		tabs.addTab("QR Code", SymbolIcon.get(0xf206), new QRPanel(convex));
+		addTab("Wallet", SymbolIcon.get(0xe850,TAB_ICON_SIZE), new WalletPanel(convex));
+		addTab("Keys", SymbolIcon.get(0xe73c,TAB_ICON_SIZE), new KeyRingPanel());
+		addTab("QR Code", SymbolIcon.get(0xf206,TAB_ICON_SIZE), new QRPanel(convex));
+		addTab("Terminal", SymbolIcon.get(0xeb8e,TAB_ICON_SIZE), new REPLPanel(convex));
+		
+		this.add(tabs, "dock center");
+	}
+
+	private void addTab(String name, SymbolIcon icon, JComponent panel) {
+		tabs.addTab("", icon, panel);
+		
+		int i=tabs.getTabCount()-1;
+		tabs.setToolTipTextAt(i, name);
+		
+		//JPanel p=new JPanel();
+		//p.setBorder(null);
+		//p.setOpaque(false);
+		//p.setEnabled(false);
+		JLabel label=new JLabel(); 
+		label.setHorizontalTextPosition(JLabel.CENTER);
+		label.setIconTextGap(0);
+		label.setAlignmentX(JLabel.CENTER);
+		label.setVerticalTextPosition(JLabel.BOTTOM);
+		label.setToolTipText(name);
+		label.setIcon(icon);
+		label.setHorizontalAlignment(SwingConstants.LEFT);
+		//p.add(label);
+		// tabs.setTabComponentAt(tabs.getTabCount()-1, label);
 	}
 
 	// private static final Logger log = LoggerFactory.getLogger(Wallet.class.getName());

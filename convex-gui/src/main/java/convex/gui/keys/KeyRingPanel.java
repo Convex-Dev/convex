@@ -45,7 +45,7 @@ public class KeyRingPanel extends JPanel {
 	public KeyRingPanel() {
 		setLayout(new MigLayout());
 
-		// Scrollable list of wallet entrues
+		// Scrollable list of wallet entries
 		walletList = new ScrollyList<AWalletEntry>(listModel, we -> new WalletComponent(we));
 		add(walletList, "dock center");
 
@@ -80,7 +80,7 @@ public class KeyRingPanel extends JPanel {
 				AKeyPair newKP=AKeyPair.create(seed);
 				listModel.addElement(HotWalletEntry.create(newKP));
 			} catch (Exception  t) {
-				Toast.display(this,"Exception importing seedt: "+t.getMessage(),Color.RED);
+				Toast.display(this,"Exception importing seed: "+t.getMessage(),Color.RED);
 				t.printStackTrace();
 			}
 		});

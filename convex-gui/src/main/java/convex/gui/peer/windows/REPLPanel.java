@@ -1,7 +1,7 @@
 package convex.gui.peer.windows;
 		
-import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -25,6 +25,7 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
+import javax.swing.text.JTextComponent;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
@@ -52,14 +53,15 @@ import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
-import convex.gui.components.RightCopyMenu;
+import convex.gui.components.CodePane;
 import convex.gui.utils.CVXHighlighter;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
 
-	JTextPane inputArea;
-	JTextPane outputArea;
+	CodePane inputArea;
+	CodePane outputArea;
 	private JButton btnClear;
 	private JButton btnInfo;
 	private JCheckBox btnResults;
@@ -76,11 +78,12 @@ public class REPLPanel extends JPanel {
 	private Font INPUT_FONT=new Font("Monospaced", Font.PLAIN, 30);
 	private Color DEFAULT_OUTPUT_COLOR=Color.LIGHT_GRAY;
 	
-	private JPanel panel_1;
+	private JPanel actionPanel;
 
 	private AccountChooserPanel execPanel;
 
 	private final Convex convex;
+	private JSplitPane splitPane;
 
 	private static final Logger log = LoggerFactory.getLogger(REPLPanel.class.getName());
 
@@ -128,7 +131,7 @@ public class REPLPanel extends JPanel {
 		}
 	}
 	
-	private void addOutput(JTextPane pane, String text) {
+	private void addOutput(JTextComponent pane, String text) {
 		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);	
 	}
 	
@@ -140,7 +143,7 @@ public class REPLPanel extends JPanel {
 		if (end>start) updateHighlight(pane,start,end-start);
 	}
 	
-	private void addOutput(JTextPane pane, String text, Color c) {
+	private void addOutput(JTextComponent pane, String text, Color c) {
 		StyleContext sc = StyleContext.getDefaultStyleContext();
 		AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
 
@@ -166,57 +169,54 @@ public class REPLPanel extends JPanel {
 		this.convex=convex;
 		execPanel=new AccountChooserPanel(convex);
 		
-		setLayout(new BorderLayout(0, 0));
+		setLayout(new MigLayout());
 		
+		// TOP Account Chooser
 		// Set up account chooser panel
-		add(execPanel, BorderLayout.NORTH);
+		add(execPanel, "dock north");
 
-		// Split pane for main GUI elements
+		// MAIN SPLIT PANE for main GUI elements
 
-		JSplitPane splitPane = new JSplitPane();
-		splitPane.setResizeWeight(0.8);
+		splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+		splitPane.setResizeWeight(0.7);
 		splitPane.setOneTouchExpandable(true);
-		splitPane.setOrientation(JSplitPane.VERTICAL_SPLIT);
-		add(splitPane, BorderLayout.CENTER);
+		add(splitPane, "dock center");
 
-		outputArea = new JTextPane();
-		//outputArea.setRows(15);
+		outputArea = new CodePane();
 		outputArea.setEditable(false);
-		//outputArea.setLineWrap(true);
 		outputArea.setFont(OUTPUT_FONT);
-		RightCopyMenu.addTo(outputArea);
 		//outputArea.setForeground(Color.GREEN);
 		outputArea.setBackground(new Color(10,10,10));
-		outputArea.setToolTipText("This area shows a log of output from transaction execution");
+		outputArea.setToolTipText("Output from transaction execution");
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-		splitPane.setLeftComponent(new JScrollPane(outputArea));
+		splitPane.setLeftComponent(wrapScrollPane(outputArea));
 
-		inputArea = new JTextPane();
+		inputArea = new CodePane();
 		inputArea.setFont(INPUT_FONT);
 		inputArea.getDocument().addDocumentListener(inputListener);
 		inputArea.addKeyListener(inputListener);
-		inputArea.setBackground(Color.BLACK);
-		inputArea.setToolTipText("Input commands here. Press Enter at the end of input to send.");
-		RightCopyMenu.addTo(inputArea);
+		inputArea.setToolTipText("Input commands here (Press Enter at the end of input to send)");
 		//inputArea.setForeground(Color.GREEN);
 
-		splitPane.setRightComponent(new JScrollPane(inputArea));
+		splitPane.setRightComponent(wrapScrollPane(inputArea));
 		
 		// stop ctrl+arrow losing focus
 		setFocusTraversalKeysEnabled(false);
-		inputArea.setFocusTraversalKeysEnabled(false);
 		
-
-		panel_1 = new ActionPanel();
-		add(panel_1, BorderLayout.SOUTH);
+		// BOTTOM ACTION PANEL
+		
+		actionPanel = new ActionPanel();
+		add(actionPanel, "dock south");
 
 		btnClear = new JButton("Clear");
-		panel_1.add(btnClear);
-		btnClear.addActionListener(e -> outputArea.setText(""));
+		actionPanel.add(btnClear);
+		btnClear.addActionListener(e -> {
+			outputArea.setText("");
+		});
 
 		btnInfo = new JButton("Connection Info");
-		panel_1.add(btnInfo);
+		actionPanel.add(btnInfo);
 		btnInfo.addActionListener(e -> {
 			StringBuilder sb=new StringBuilder();
 			if (convex instanceof ConvexRemote) {
@@ -237,20 +237,20 @@ public class REPLPanel extends JPanel {
 		
 		btnTX=new JCheckBox("Show transaction");
 		btnTX.setToolTipText("Tick to show full transaction details.");
-		panel_1.add(btnTX);
+		actionPanel.add(btnTX);
 		
 		btnResults=new JCheckBox("Full Results");
 		btnResults.setToolTipText("Tick to show full Result record returned from peer.");
-		panel_1.add(btnResults);
+		actionPanel.add(btnResults);
 		
 		btnTiming=new JCheckBox("Show Timing");
 		btnTiming.setToolTipText("Tick to receive execution time report after each transaction.");
-		panel_1.add(btnTiming);
+		actionPanel.add(btnTiming);
 		
 		btnCompile=new JCheckBox("Precompile");
 		btnCompile.setToolTipText("Tick to compile code before sending transaction. Usually reduces juice costs.");
 		btnCompile.setSelected(convex.getLocalServer()!=null); // default: only do this if local
-		panel_1.add(btnCompile);
+		actionPanel.add(btnCompile);
 
 		
 		// Get initial focus in REPL input area
@@ -259,6 +259,11 @@ public class REPLPanel extends JPanel {
 				inputArea.requestFocusInWindow();
 			}
 		});
+	}
+
+	private Component wrapScrollPane(CodePane codePane) {
+		JScrollPane scrollPane=new JScrollPane(codePane);
+		return scrollPane;
 	}
 
 	private AKeyPair getKeyPair() {
@@ -283,7 +288,6 @@ public class REPLPanel extends JPanel {
 				AList<ACell> forms = Reader.readAll(s);
 				ACell code = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
 				Future<Result> future;
-				String mode = execPanel.getMode();
 				
 				if (btnCompile.isSelected()) {
 					ACell compileStep=List.of(Symbols.COMPILE,List.of(Symbols.QUOTE,code));
@@ -291,8 +295,9 @@ public class REPLPanel extends JPanel {
 					code=cr.getValue();
 				}
 
-				long start=Utils.getCurrentTimestamp();
+				String mode = execPanel.getMode();
 
+				long start=Utils.getCurrentTimestamp();
 				if (mode.equals("Query")) {
 					Address qaddr=getAddress();
 					if (qaddr == null) {
@@ -303,7 +308,9 @@ public class REPLPanel extends JPanel {
 				} else if (mode.equals("Transact")) {
 					Address address = getAddress();
 					convex.setAddress(address);
-					convex.setKeyPair(getKeyPair());
+					AKeyPair kp=getKeyPair();
+					if (kp==null) throw new IllegalStateException("Can't transact without a valid key pair");
+					convex.setKeyPair(kp);
 					ATransaction trans = Invoke.create(address,0, code);
 					SignedData<ATransaction> strans=convex.prepareTransaction(trans);
 					
@@ -314,7 +321,7 @@ public class REPLPanel extends JPanel {
 					
 					future = convex.transact(strans);
 				} else {
-					throw new Error("Unrecognosed REPL mode: " + mode);
+					throw new Exception("Unrecognosed REPL mode: " + mode);
 				}
 				log.trace("Sent message");
 				
@@ -323,8 +330,8 @@ public class REPLPanel extends JPanel {
 				addOutput(outputArea," PARSE ERROR: "+e.getMessage(),Color.RED);
 			} catch (TimeoutException t) {
 				addOutput(outputArea," TIMEOUT waiting for result",Color.RED);
-			} catch (Throwable t) {
-				addOutput(outputArea," SEND ERROR: ",Color.RED);
+			} catch (Exception t) {
+				addOutput(outputArea," ERROR: ",Color.RED);
 				addOutput(outputArea,t.getMessage() + "\n");
 				t.printStackTrace();
 			}

@@ -36,11 +36,12 @@ public class AccountChooserPanel extends JPanel {
 	public AccountChooserPanel(Convex convex) {
 		this.convex=convex;
 		
-		MigLayout layout = new MigLayout("insets 10 10 10 10,fill");
+		MigLayout layout = new MigLayout("insets 10 10 10 10");
 		setLayout(layout);
 
 		{
 			JPanel mp=new JPanel();
+			mp.setLayout(new MigLayout());
 
 			// Account selection
 			mp.add(new JLabel("Account:"));
@@ -89,19 +90,19 @@ public class AccountChooserPanel extends JPanel {
 			add(mp,"dock west");
 		}
 		
-		
-		// Blank space
-		add(new JPanel(),"growx");
-		
 		// Mode selection	
 		{
 			JPanel mp=new JPanel();
+			mp.setLayout(new MigLayout());
 			mp.setBorder(null);
 			modeCombo = new JComboBox<String>();
 			modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
-					+ "Use Query to compute results without changing on-chain state (free).");
+					+ "Use Query to compute results without changing on-chain state (free).\n\n"
+					//+ "Use Prepare to run transaction with advanced options."
+					);
 			modeCombo.addItem("Transact");
 			modeCombo.addItem("Query");
+			// modeCombo.addItem("Prepare...");
 			if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
 			mp.add(modeCombo);
 			add(mp,"dock east");

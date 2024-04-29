@@ -68,6 +68,7 @@ public class PeerComponent extends BaseListComponent {
 
 		// Convex Button
 		JButton button = new BaseImageButton(Toolkit.CONVEX);
+		button.setFocusable(false);
 		button.addActionListener(e -> {
 			launchPeerWindow(this.convex);
 		});

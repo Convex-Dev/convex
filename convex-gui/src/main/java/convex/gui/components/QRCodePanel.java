@@ -27,7 +27,7 @@ public class QRCodePanel extends JPanel {
 		image=createQR(data,scale);
 		
 		this.setLayout(new MigLayout());
-		this.setPreferredSize(new Dimension(image.getWidth(),image.getHeight()));
+		this.setMinimumSize(new Dimension(image.getWidth(),image.getHeight()));
 	}
 
 	public static  BufferedImage createQR(String data,int scale) {

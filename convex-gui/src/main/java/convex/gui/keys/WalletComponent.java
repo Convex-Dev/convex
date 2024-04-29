@@ -57,7 +57,8 @@ public class WalletComponent extends BaseListComponent {
 		
 		infoLabel = new CodeLabel(getInfoString());
 		cPanel.add(infoLabel,"dock center");
-		add(cPanel,"dock center"); // add to MigLayout
+		//add(cPanel,"dock center"); // add to MigLayout
+		add(cPanel); // add to MigLayout
 
 		//////////// Buttons
 		buttons = new JPanel();

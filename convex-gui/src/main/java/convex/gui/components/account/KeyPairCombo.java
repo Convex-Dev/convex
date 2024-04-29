@@ -94,10 +94,10 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 			AWalletEntry entry= (AWalletEntry)value;
 			if (entry!=null) {
 				AccountKey pubKey=entry.getPublicKey();
-				setText(pubKey.toHexString(12)+"...");
+				setText(pubKey.toHexString(16)+"...");
 				setIcon(Identicon.createIcon(entry.getIdenticonData(),21));				
 			} else {
-				setText("<none>");
+				setText("<no key pair set>");
 				setIcon(Identicon.createIcon(Blobs.empty(),21));
 			}
 			return this;
