@@ -445,7 +445,10 @@ public class BeliefMerge {
 		}
 		newBlocksOrdered.removeIf(sb -> {
 			// We ignore blocks that don't look valid for current state
-			if (state.checkBlock(sb)!=null) return true;
+			BlockResult br=state.checkBlock(sb);
+			if (br!=null) {
+				return true;
+			}
 			return !newBlocks.contains(sb);
 		});
 

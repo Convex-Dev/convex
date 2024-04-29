@@ -319,11 +319,26 @@ public class State extends ARecord {
 		Block block=signedBlock.getValue();
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=peers.get(peerKey);
+		
+		// If no current peer for this block, dump it
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
+		
+		// If peer stake is insufficient, dump it
 		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) {
 			return BlockResult.createInvalidBlock(this,block,Strings.INSUFFICIENT_STAKE);
-		}		
+		}	
 		
+		// if block is out of order for the peer, dump it
+		if (block.getTimeStamp()<ps.getTimestamp()) {
+			return BlockResult.createInvalidBlock(this,block,Strings.MISORDERED_BLOCK);
+		}
+		
+		// if block is too old, dump it
+		if (block.getTimeStamp()<(this.getTimestamp().longValue()-Constants.MAX_BLOCK_BACKDATE)) {
+			return BlockResult.createInvalidBlock(this,block,Strings.BACKDATED_BLOCK);
+		}
+		
+		// if block looks like having too many transactions, dump it
 		if (block.getTransactions().count()>Constants.MAX_TRANSACTIONS_PER_BLOCK) {
 			return BlockResult.createInvalidBlock(this,block,Strings.ILLEGAL_BLOCK_SIZE);
 		}

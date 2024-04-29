@@ -46,6 +46,10 @@ public class Strings {
 
 	public static final StringShort ILLEGAL_BLOCK_SIZE = StringShort.create("Illegal Block Size!");
 
+	public static final StringShort BACKDATED_BLOCK = StringShort.create("Block too old");
+
+	public static final StringShort MISORDERED_BLOCK = StringShort.create("Block out of order");
+
 
 
 	/**

@@ -41,9 +41,9 @@ public class BeliefVotingTest {
 	
 	AccountKey[] keys=Stream.of(kps).map(kp->kp.getAccountKey()).toArray(AccountKey[]::new);
 	
-	final State s=Init.createState(List.of(keys));
 	
 	static final long TS=0;
+	final State initialState=Init.createState(List.of(keys)).withTimestamp(TS);
 	
 	@Test
 	public void testComputeVote() {
@@ -55,7 +55,7 @@ public class BeliefVotingTest {
 	public void testEmptyMerge() throws BadSignatureException, InvalidDataException {
 		Belief b=Belief.create(kps[0],Order.create());
 		
-		BeliefMerge mc=BeliefMerge.create(b, kps[0], TS+5, s);
+		BeliefMerge mc=BeliefMerge.create(b, kps[0], TS+5, initialState);
 		Belief b2=mc.merge(b);
 		assertSame(b,b2);
 	}
@@ -70,10 +70,10 @@ public class BeliefVotingTest {
 		Belief b0=Belief.create(kps[0],o0.getValue());
 		Belief b1=Belief.create(kps[1],o1.getValue());
 		
-		BeliefMerge mc0=BeliefMerge.create(b0, kps[0], TS+5, s);
+		BeliefMerge mc0=BeliefMerge.create(b0, kps[0], TS+5, initialState);
 		Belief b0m=mc0.merge(b1);
 		
-		BeliefMerge mc1=BeliefMerge.create(b1, kps[1], TS+5, s);
+		BeliefMerge mc1=BeliefMerge.create(b1, kps[1], TS+5, initialState);
 		Belief b1m=mc1.merge(b0);
 		
 		Order o0m = b0m.getOrder(kps[0].getAccountKey());
@@ -91,13 +91,13 @@ public class BeliefVotingTest {
 		SignedData<Block> A=bl(1);
 		
 		
-		assertTrue(s.getPeers().get(keys[0]).getTotalStake()>0);
+		assertTrue(initialState.getPeers().get(keys[0]).getTotalStake()>0);
 		
 		Order o0=Order.create().withTimestamp(TS);
 		Belief b0=Belief.create(kps[0], o0);
 
 		// check trivial merges are idempotent
-		BeliefMerge baseMC=BeliefMerge.create(b0, kps[0], TS, s);
+		BeliefMerge baseMC=BeliefMerge.create(b0, kps[0], TS, initialState);
 		assertSame(b0,baseMC.mergeOrders(b0));
 		Belief b00=baseMC.merge(b0);
 		assertSame(b0,b00);
@@ -112,7 +112,7 @@ public class BeliefVotingTest {
 		assertSame(b0,b0present);
 		
 		// Updated merge context should allow Belief merge with new Block
-		BeliefMerge mc=BeliefMerge.create(b0, kps[0], TS+1, s);
+		BeliefMerge mc=BeliefMerge.create(b0, kps[0], TS+1, initialState);
 		Belief b2=mc.merge(b1);
 		Order o2=b2.getOrder(keys[0]);
 		assertEquals(p1o.getBlocks(),o2.getBlocks());
@@ -133,10 +133,10 @@ public class BeliefVotingTest {
 		assertEquals(1,o3.getConsensusPoint(1));
 		assertEquals(0,o3.getConsensusPoint(2));
 		
-		mc=BeliefMerge.create(b3, kps[0], TS+1, s);
+		mc=BeliefMerge.create(b3, kps[0], TS+1, initialState);
 		// Future merges should be idempotent
 		assertSame(b3,mc.merge(br2,br3,br4,br5));
-		BeliefMerge mc3=BeliefMerge.create(b3, kps[0], TS+10, s);
+		BeliefMerge mc3=BeliefMerge.create(b3, kps[0], TS+10, initialState);
 		assertSame(b3,mc3.merge(br2,br3,br4,br5));
 	}
 	
@@ -149,7 +149,7 @@ public class BeliefVotingTest {
 		SignedData<Block> E=bl(5);
 		SignedData<Block> F=bl(6);
 		SignedData<Block> G=bl(7);
-		State s=Init.createState(List.of(keys));
+		State s=this.initialState;
 
 		{
 			SignedData<Order> o0=or(0, TS, 0,0,A);

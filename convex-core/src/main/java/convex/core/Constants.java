@@ -215,4 +215,9 @@ public class Constants {
 	 */
 	public static final double PEER_DECAY_TIME = 5*60*1000;
 
+	/**
+	 * Maximum time a block can be resurrected from the past (1 min)
+	 */
+	public static final long MAX_BLOCK_BACKDATE = 60*1000;
+
 }
