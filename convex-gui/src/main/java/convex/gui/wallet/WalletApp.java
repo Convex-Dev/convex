@@ -42,6 +42,7 @@ public class WalletApp extends AbstractGUI {
 		addTab("Keys", SymbolIcon.get(0xe73c,TAB_ICON_SIZE), new KeyRingPanel());
 		addTab("QR Code", SymbolIcon.get(0xf206,TAB_ICON_SIZE), new QRPanel(convex));
 		addTab("Terminal", SymbolIcon.get(0xeb8e,TAB_ICON_SIZE), new REPLPanel(convex));
+		addTab("Settings", SymbolIcon.get(0xe8b8,TAB_ICON_SIZE), new JPanel());
 		
 		this.add(tabs, "dock center");
 	}

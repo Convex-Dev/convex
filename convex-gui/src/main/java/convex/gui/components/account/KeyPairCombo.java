@@ -25,6 +25,9 @@ import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
+/**
+ * Combo box for choosing a key pair from a list of wallet entries.
+ */
 @SuppressWarnings("serial")
 public class KeyPairCombo extends JComboBox<AWalletEntry> {
 

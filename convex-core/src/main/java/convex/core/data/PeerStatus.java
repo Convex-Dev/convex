@@ -17,17 +17,17 @@ import convex.core.lang.impl.RecordFormat;
 public class PeerStatus extends ARecord {
 
 	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.CONTROLLER, Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
-			Keywords.METADATA, Keywords.TIMESTAMP};
+			Keywords.METADATA, Keywords.TIMESTAMP,Keywords.BALANCE};
 
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
 	
 	private static final Index<Address, CVMLong> EMPTY_STAKES = Index.none();
 
-
     private final Address controller;
-	private final long stake;
+	private final long peerStake;
 	private final long delegatedStake;
 	private final long timestamp;
+	private final long balance;
 
 	/**
 	 * Map of delegated stakes. Never null internally, but empty map encoded as null.
@@ -39,14 +39,15 @@ public class PeerStatus extends ARecord {
 	 */
 	private final AHashMap<ACell,ACell> metadata;
 
-	private PeerStatus(Address controller, long stake, Index<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata, long timestamp) {
+	private PeerStatus(Address controller, long stake, Index<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata, long timestamp, long balance) {
 		super(FORMAT.count());
         this.controller = controller;
-		this.stake = stake;
+		this.peerStake = stake;
 		this.delegatedStake = delegatedStake;
 		this.metadata = metadata;
 		this.stakes = stakes;
 		this.timestamp=timestamp;
+		this.balance=balance;
 	}
 
 	public static PeerStatus create(Address controller, long stake) {
@@ -54,16 +55,35 @@ public class PeerStatus extends ARecord {
 	}
 
 	public static PeerStatus create(Address controller, long stake, AHashMap<ACell,ACell> metadata) {
-		return new PeerStatus(controller, stake, EMPTY_STAKES, 0L, metadata,Constants.INITIAL_PEER_TIMESTAMP);
+		return new PeerStatus(controller, stake, EMPTY_STAKES, 0L, metadata,Constants.INITIAL_PEER_TIMESTAMP,stake);
 	}
+	
 	/**
-	 * Gets the stake of this peer
+	 * Gets the total stake shares for this peer
 	 *
 	 * @return Total stake, including own stake + delegated stake
 	 */
 	public long getTotalStake() {
 		// TODO: include rewards?
-		return stake + delegatedStake;
+		return peerStake + delegatedStake;
+	}
+	
+    /**
+	 * Gets the Convex Coin balance for this Peer. Owned jointly by peer and delegators
+	 *
+	 * @return The total Convex Coin balance of this peer
+	 */
+	public long getBalance() {
+		return balance;
+	}
+
+	/**
+	 * Gets the delegated stake of this peer
+	 *
+	 * @return Total of delegated stake
+	 */
+	public long getDelegatedStake() {
+		return delegatedStake;
 	}
 
 	/**
@@ -73,13 +93,13 @@ public class PeerStatus extends ARecord {
 	 */
 	public long getPeerStake() {
 		// TODO: include rewards?
-		return stake;
+		return peerStake;
 	}
 	
 	/**
 	 * Gets the timestamp of the last Block issued by this Peer in consensus
 	 *
-	 * @return Timestamp of last block
+	 * @return Timestamp of last block, or -1 if no block yet issued.
 	 */
 	public long getTimestamp() {
 		return timestamp;
@@ -93,15 +113,8 @@ public class PeerStatus extends ARecord {
 	public Address getController() {
 		return controller;
 	}
+	
 
-	/**
-	 * Gets the delegated stake of this peer
-	 *
-	 * @return Total of delegated stake
-	 */
-	public long getDelegatedStake() {
-		return delegatedStake;
-	}
 
 	/**
 	 * Gets the String representation of the hostname set for the current Peer status, 
@@ -133,7 +146,7 @@ public class PeerStatus extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, controller);
-		pos = Format.writeVLCLong(bs,pos, stake);
+		pos = Format.writeVLCLong(bs,pos, peerStake);
 		if (stakes.isEmpty()) {
 			bs[pos++]=Tag.NULL;
 		} else {
@@ -142,6 +155,7 @@ public class PeerStatus extends ARecord {
 		pos = Format.writeVLCLong(bs,pos, delegatedStake);
 		pos = Format.write(bs,pos, metadata);
 		pos = Format.writeVLCLong(bs,pos, timestamp);
+		pos = Format.writeVLCCount(bs,pos, balance);
 		return pos;
 	}
 
@@ -177,8 +191,11 @@ public class PeerStatus extends ARecord {
 		
 		long timestamp=Format.readVLCLong(b,epos);
 		epos+=Format.getVLCLength(timestamp);
+		
+		long balance=Format.readVLCCount(b,epos);
+		epos+=Format.getVLCCountLength(balance);
 		 
-		PeerStatus result= new PeerStatus(owner, stake,stakes,delegatedStake,metadata,timestamp);
+		PeerStatus result= new PeerStatus(owner, stake,stakes,delegatedStake,metadata,timestamp,balance);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
@@ -229,7 +246,7 @@ public class PeerStatus extends ARecord {
 		// Cast needed for Maven Java 11 compile?
 		Index<Address, CVMLong> newStakes = (Index<Address,CVMLong>)((newStake == 0L) ? stakes.dissoc(delegator)
 				: stakes.assoc(delegator, CVMLong.create(newStake)));
-		return new PeerStatus(controller, stake, newStakes, newDelegatedStake, metadata,timestamp);
+		return new PeerStatus(controller, peerStake, newStakes, newDelegatedStake, metadata,timestamp,balance);
 	}
 	
 	/**
@@ -237,18 +254,18 @@ public class PeerStatus extends ARecord {
 	 *
 	 * A value of 0 will remove the Peer stake entirely
 	 *
-	 * @param newStake New Delegated stake for the given Address
-	 * @return Value of delegated stake
+	 * @param newStake New Peer stake 
+	 * @return Updates PeerStatus
 	 */
 	public PeerStatus withPeerStake(long newStake) {
-		if (stake == newStake) return this;
+		if (peerStake == newStake) return this;
 
-		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata,timestamp);
+		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata,timestamp,balance);
 	}
 
 	public PeerStatus withPeerData(AHashMap<ACell,ACell> newMeta) {
 		if (metadata==newMeta) return this;	
-		return new PeerStatus(controller, stake, stakes, delegatedStake, newMeta,timestamp);
+		return new PeerStatus(controller, peerStake, stakes, delegatedStake, newMeta,timestamp,balance);
     }
 
 	@Override
@@ -261,7 +278,7 @@ public class PeerStatus extends ARecord {
 	@Override
 	public ACell get(Keyword key) {
 		if (Keywords.CONTROLLER.equals(key)) return controller;
-		if (Keywords.STAKE.equals(key)) return CVMLong.create(stake);
+		if (Keywords.STAKE.equals(key)) return CVMLong.create(peerStake);
 		if (Keywords.STAKES.equals(key)) return stakes;
 		if (Keywords.DELEGATED_STAKE.equals(key)) return CVMLong.create(delegatedStake);
 		if (Keywords.METADATA.equals(key)) return metadata;
@@ -282,7 +299,7 @@ public class PeerStatus extends ARecord {
 		if ((this.stakes==newStakes)&&(this.metadata==newMeta)) {
 			return this;
 		}
-		return new PeerStatus(controller, stake, newStakes, delegatedStake, newMeta,timestamp);
+		return new PeerStatus(controller, peerStake, newStakes, delegatedStake, newMeta,timestamp,balance);
 	}
 
 	protected static long computeDelegatedStake(Index<Address, CVMLong> stakes) {
@@ -311,7 +328,7 @@ public class PeerStatus extends ARecord {
 			if (ha!=null) return Cells.equals(h, ha);
 		}
 		
-		if (stake!=a.stake) return false;
+		if (peerStake!=a.peerStake) return false;
 		if (delegatedStake!=a.delegatedStake) return false;
 		if (!(Cells.equals(stakes, a.stakes))) return false;
 		if (!(Cells.equals(metadata, a.metadata))) return false;

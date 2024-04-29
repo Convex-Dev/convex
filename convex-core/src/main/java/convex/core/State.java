@@ -70,7 +70,13 @@ public class State extends ARecord {
 	/**
 	 * Symbols for global values in :globals Vector
 	 */
-	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(Symbols.TIMESTAMP, Symbols.FEES, Symbols.JUICE_PRICE, Symbols.MEMORY, Symbols.MEMORY_VALUE,Symbols.PROTOCOL);
+	public static final AVector<Symbol> GLOBAL_SYMBOLS=Vectors.of(
+			Symbols.TIMESTAMP,
+			Symbols.FEES, 
+			Symbols.JUICE_PRICE, 
+			Symbols.MEMORY, 
+			Symbols.MEMORY_VALUE,
+			Symbols.PROTOCOL);
 
 	// Indexes for globals in :globals Vector
 	public static final int GLOBAL_TIMESTAMP=0;
@@ -460,7 +466,7 @@ public class State extends ARecord {
 				
 				// state update
 				state = rc.context.getState();
-			} catch (Throwable t) {
+			} catch (Exception t) {
 				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
 				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED);
 				log.error(msg,t);

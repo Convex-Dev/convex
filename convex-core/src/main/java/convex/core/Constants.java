@@ -50,30 +50,31 @@ public class Constants {
 	 * Initial memory price per byte 0.001 Convex Gold
 	 */
 	public static final long INITIAL_MEMORY_PRICE = 1000000L;
-	
+
 	/**
 	 * Memory Pool of growth increment 1mb
 	 */
 	public static final long MEMORY_POOL_GROWTH = 1000000L;
 
 	/**
-	 * Memory Pool of growth interval (once per day).
-	 * This means regular price drops in memory pool
+	 * Memory Pool of growth interval (once per day). This means regular price drops
+	 * in memory pool
 	 */
-	public static final long MEMORY_POOL_GROWTH_INTERVAL = 1000L*24*3600;
+	public static final long MEMORY_POOL_GROWTH_INTERVAL = 1000L * 24 * 3600;
 
 	/**
 	 * Max juice allowable during execution of a single transaction.
 	 */
 	public static final long MAX_TRANSACTION_JUICE = 10000000;
-	
+
 	/**
 	 * Max transactions in a legal Block.
 	 */
 	public static final int MAX_TRANSACTIONS_PER_BLOCK = 1024;
 
 	/**
-	 * Constant to set deletion of Etch temporary files on exit. Probably should be true, unless you want to dubug temp files.
+	 * Constant to set deletion of Etch temporary files on exit. Probably should be
+	 * true, unless you want to dubug temp files.
 	 */
 	public static final boolean ETCH_DELETE_TEMP_ON_EXIT = true;
 
@@ -83,7 +84,14 @@ public class Constants {
 	public static final long INITIAL_SEQUENCE = 0;
 
 	/**
-	 * Size in bytes of constant overhead applied per non-embedded Cell in memory accounting
+	 * Initial fees in global state
+	 * 
+	 */
+	public static final long INITIAL_FEES = 0;
+
+	/**
+	 * Size in bytes of constant overhead applied per non-embedded Cell in memory
+	 * accounting
 	 */
 	public static final long MEMORY_OVERHEAD = 64;
 
@@ -106,7 +114,9 @@ public class Constants {
 	 * Initial global values for a new State
 	 */
 	public static final AVector<ACell> INITIAL_GLOBALS = Vectors.of(
-			Constants.INITIAL_TIMESTAMP, 0L, Constants.INITIAL_JUICE_PRICE,Constants.INITIAL_MEMORY_POOL,Constants.INITIAL_MEMORY_POOL*Constants.INITIAL_MEMORY_PRICE);
+			Constants.INITIAL_TIMESTAMP, Constants.INITIAL_FEES,
+			Constants.INITIAL_JUICE_PRICE, Constants.INITIAL_MEMORY_POOL,
+			Constants.INITIAL_MEMORY_POOL * Constants.INITIAL_MEMORY_PRICE);
 
 	/**
 	 * Maximum length of a symbolic name in bytes (keywords and symbols)
@@ -116,12 +126,14 @@ public class Constants {
 	public static final int MAX_NAME_LENGTH = 128;
 
 	/**
-	 * Value used to indicate inclusion of a key in a Set. Must be a singleton instance
+	 * Value used to indicate inclusion of a key in a Set. Must be a singleton
+	 * instance
 	 */
 	public static final CVMBool SET_INCLUDED = CVMBool.TRUE;
 
 	/**
-	 * Value used to indicate exclusion of a key from a Set. Must be a singleton instance
+	 * Value used to indicate exclusion of a key from a Set. Must be a singleton
+	 * instance
 	 */
 	public static final CVMBool SET_EXCLUDED = CVMBool.FALSE;
 
@@ -135,14 +147,10 @@ public class Constants {
 	 */
 	public static final int HASH_LENGTH = 32;
 
-
 	/**
 	 * Minimum stake for a Peer to be considered by other Peers in consensus
 	 */
-	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD*1;
-
-
-
+	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1;
 
 	/**
 	 * Option for static compilation support. Set to true for static inlines on core
@@ -154,7 +162,7 @@ public class Constants {
 	 * Char to represent bad Unicode characters in printing
 	 */
 	public static final char BAD_CHARACTER = '\uFFFD';
-	public static final byte[] BAD_CHARACTER_BYTES = new byte[] {(byte) 0xff, (byte) 0xfd };
+	public static final byte[] BAD_CHARACTER_BYTES = new byte[] { (byte) 0xff, (byte) 0xfd };
 	public static final String BAD_CHARACTER_STRING = new String(BAD_CHARACTER_BYTES, StandardCharsets.UTF_8);
 	public static final byte[] BAD_CHARACTER_UTF = BAD_CHARACTER_STRING.getBytes(StandardCharsets.UTF_8);
 
@@ -181,9 +189,9 @@ public class Constants {
 	 */
 	public static final int CONSENSUS_LEVELS = 4;
 
-	public static final int CONSENSUS_LEVEL_PROPOSAL = CONSENSUS_LEVELS-3;
-	public static final int CONSENSUS_LEVEL_CONSENSUS = CONSENSUS_LEVELS-2;
-	public static final int CONSENSUS_LEVEL_FINALITY = CONSENSUS_LEVELS-1;
+	public static final int CONSENSUS_LEVEL_PROPOSAL = CONSENSUS_LEVELS - 3;
+	public static final int CONSENSUS_LEVEL_CONSENSUS = CONSENSUS_LEVELS - 2;
+	public static final int CONSENSUS_LEVEL_FINALITY = CONSENSUS_LEVELS - 1;
 
 	public static final boolean ENABLE_FORK_RECOVERY = false;
 
@@ -192,9 +200,9 @@ public class Constants {
 	public static final int MAX_BIG_INTEGER_LENGTH = 4096;
 
 	/**
-	 * Flag to omit filling in stack traces on validation exceptions. This helps performance against DoS attacks
+	 * Flag to omit filling in stack traces on validation exceptions. This helps
+	 * performance against DoS attacks
 	 */
 	public static final boolean OMIT_VALIDATION_STACKTRACES = true;
-
 
 }

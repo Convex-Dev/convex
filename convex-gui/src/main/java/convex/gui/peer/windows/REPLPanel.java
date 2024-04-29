@@ -57,6 +57,9 @@ import convex.gui.components.CodePane;
 import convex.gui.utils.CVXHighlighter;
 import net.miginfocom.swing.MigLayout;
 
+/**
+ * Panel presenting a general purpose REPL terminal
+ */
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
 

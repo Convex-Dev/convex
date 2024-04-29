@@ -17,6 +17,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.MapEntry;
+import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
 import convex.core.data.prim.CVMLong;
@@ -96,6 +98,12 @@ public class InitTest extends ACVMTest {
 		assertNull(context().getResult());
 
 		assertEquals(Constants.MAX_SUPPLY, STATE.computeTotalFunds());
+		assertEquals(Constants.INITIAL_FEES,STATE.getGlobalFees().longValue());
+		assertEquals(Constants.INITIAL_MEMORY_POOL,STATE.getGlobalMemoryPool().longValue());
+		
+		MapEntry<AccountKey, PeerStatus> psEntry=STATE.getPeers().get(0);
+		PeerStatus ps=psEntry.getValue();
+		assertEquals(Constants.INITIAL_PEER_TIMESTAMP,ps.getTimestamp());
 	}
 
 	@Test
