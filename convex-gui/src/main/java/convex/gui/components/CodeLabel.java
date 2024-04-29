@@ -12,7 +12,7 @@ import convex.gui.utils.Toolkit;
 public class CodeLabel extends JTextArea {
 
 	public CodeLabel(String text) {
-		super(Text.lineCount(text),Text.columnCount(text)+1);
+		super(Text.lineCount(text),0);
 		this.setText(text);
 		this.setEditable(false);
 		this.setFont(Toolkit.SMALL_MONO_FONT);

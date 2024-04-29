@@ -11,7 +11,6 @@ import convex.core.Belief;
 import convex.core.Peer;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
-import convex.core.util.Utils;
 
 /**
  * Component handling CVM execution loop with a Peer Server
@@ -46,7 +45,12 @@ public class CVMExecutor extends AThreadedComponent {
 			Peer updatedPeer=peer.updateState();
 			if (updatedPeer!=peer) {
 				peer=updatedPeer;
-				persistPeerData();
+				try {
+					persistPeerData();
+				} catch (IOException e) {
+					log.debug("IO Exception ("+e.getMessage()+") while persisting peer data",e);
+					throw new InterruptedException("IO Exception while persisting peer data");
+				}
 				maybeCallHook(peer);
 			}
 		}
@@ -54,13 +58,9 @@ public class CVMExecutor extends AThreadedComponent {
 		server.transactionHandler.maybeReportTransactions(peer);
 	}
 	
-	public synchronized void persistPeerData() {
-		try {
-			peer = server.persistPeerData();
-		} catch (IOException e) {
-			log.warn("Exception while attempting to persist Peer data",e);
-			throw Utils.sneakyThrow(e);
-		}
+	public synchronized void persistPeerData() throws IOException {
+		peer = server.persistPeerData();
+
 	}
 
 	private void maybeCallHook(Peer p) {

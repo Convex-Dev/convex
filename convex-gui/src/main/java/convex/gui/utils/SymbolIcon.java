@@ -12,16 +12,13 @@ import javax.swing.JLabel;
 @SuppressWarnings("serial")
 public class SymbolIcon extends ImageIcon {
 
-	private static final Color SYMBOL_COLOUR = new Color(150,200,255);
-	
-	
 	private static WeakHashMap<Long,SymbolIcon> cache= new WeakHashMap<>();
 	
 	public SymbolIcon(BufferedImage image) {
 		super(image);
 	}
 	
-	private static SymbolIcon create(int codePoint, int size) {
+	private static SymbolIcon create(int codePoint, int size, int colour) {
 		 BufferedImage image =new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
 		 
 		 char[] c=Character.toChars(codePoint);
@@ -29,7 +26,7 @@ public class SymbolIcon extends ImageIcon {
 		 
 		 
 		 JLabel label = new JLabel(s);
-		 label.setForeground(SYMBOL_COLOUR);
+		 label.setForeground(new Color(colour&0xffffff));
 		 
 		 // set font size so we get the correct pixel size
 		 float fontSize= 72.0f * size / Toolkit.SCREEN_RES;
@@ -49,16 +46,21 @@ public class SymbolIcon extends ImageIcon {
 	}
 	
 	public static SymbolIcon get(int codePoint) {
-		return get(codePoint,Toolkit.SYMBOL_SIZE);
+		return get(codePoint,Toolkit.SYMBOL_SIZE,Toolkit.SYMBOL_COLOUR.getRGB());
+	}
+	
+	public static SymbolIcon get(int codePoint, int size) {
+		return get(codePoint,size,Toolkit.SYMBOL_COLOUR.getRGB());
 	}
 
-	public static SymbolIcon get(int codePoint, int size) {
-		long id=codePoint+size*0x100000000L;
+
+	public static SymbolIcon get(int codePoint, int size, int colour) {
+		long id=codePoint+(size*0x100000000L)+(colour*100000000000L);
 		SymbolIcon result=cache.get(id);
 		
 		if (result!=null) return result;
 		
-		result = create(codePoint,size);
+		result = create(codePoint,size,colour);
 		cache.put(id,result);
 		
 		return result;

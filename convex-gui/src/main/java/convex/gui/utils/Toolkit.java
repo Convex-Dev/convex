@@ -1,5 +1,6 @@
 package convex.gui.utils;
 
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Desktop;
 import java.awt.Font;
@@ -67,6 +68,10 @@ public class Toolkit {
 	public static final float SYMBOL_FONT_SIZE= 72.0f * SYMBOL_SIZE / SCREEN_RES;
 	
 	public static Font SYMBOL_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)SYMBOL_FONT_SIZE);
+	
+	public static final Color SYMBOL_COLOUR = new Color(150,200,255);
+
+
 
 
 	static {
@@ -320,6 +325,8 @@ public class Toolkit {
 		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createRaisedBevelBorder(), BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		ta.setBorder(b);
 		ta.setFont(Toolkit.DEFAULT_FONT);
+		ta.setWrapStyleWord(true);
+		ta.setLineWrap(true);
 		return ta;
 	}
 

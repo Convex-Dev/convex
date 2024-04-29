@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
-import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -368,7 +367,6 @@ public class PeerGUI extends AbstractGUI {
 
 	public static void runLaunchDialog(JComponent parent) {
 		JPanel pan=new JPanel();
-		pan.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
 		
 		pan.add(Toolkit.makeNote("Select a number of peers to include in the genesis state and launch initially. More can be added later. 3-5 recommended for local devnet testing"),

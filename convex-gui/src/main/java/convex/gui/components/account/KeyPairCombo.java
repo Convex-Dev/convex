@@ -122,6 +122,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		p.setLayout(new MigLayout("insets 20 20 20 20, wrap 1"));
 		
 		KeyPairModel model=new KeyPairModel();
+		model.addElement(HotWalletEntry.create(AKeyPair.generate()));
 		KeyPairCombo kpCombo=new KeyPairCombo(model);
 		p.add(kpCombo);
 		

@@ -1,6 +1,5 @@
 package convex.gui.dlfs;
 
-import java.awt.Dimension;
 import java.nio.file.Path;
 
 import javax.swing.JLabel;
@@ -57,7 +56,7 @@ public class DLFSPanel extends JPanel {
 				setSelectedPath(p);
 			}
 		});
-		directoryTree.setPreferredSize(new Dimension(250,500));
+		//directoryTree.setPreferredSize(new Dimension(250,500));
 		
 		fileList=new FileList(selectedPath,p->setSelectedPath(p));
 		fileList.setTransferHandler(new DnDTransferHandler(this) {
@@ -70,15 +69,17 @@ public class DLFSPanel extends JPanel {
 			Path p=fileList.getSelectedPath();
 			previewPanel.setPath(p);
 		});
-		fileList.setPreferredSize(new Dimension(250,500));
+		//fileList.setPreferredSize(new Dimension(250,500));
 
 		JScrollPane listScrollPane=new JScrollPane(fileList);
 		
 		JSplitPane filesSplitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,new JScrollPane(directoryTree), listScrollPane);
+		filesSplitPane.setResizeWeight(0.5);
 		
 		previewPanel=new PreviewPanel();
 		
 		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,filesSplitPane,previewPanel);
+		splitPane.setResizeWeight(0.5);
 		add(splitPane,"dock center");
 		
 		pathLabel=new JLabel("/");

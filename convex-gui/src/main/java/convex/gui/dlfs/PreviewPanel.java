@@ -1,6 +1,5 @@
 package convex.gui.dlfs;
 
-import java.awt.Dimension;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +29,8 @@ public class PreviewPanel extends JPanel {
 		setLayout(new MigLayout("wrap 1"));
 		header=new CodeLabel("Ready");
 		header.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-		header.setPreferredSize(new Dimension(400,50));
+		//
+		// header.setPreferredSize(new Dimension(400,50));
 		add(header,"span");
 		
 		setPath(null);
