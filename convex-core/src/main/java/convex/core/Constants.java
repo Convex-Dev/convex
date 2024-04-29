@@ -205,4 +205,14 @@ public class Constants {
 	 */
 	public static final boolean OMIT_VALIDATION_STACKTRACES = true;
 
+	/**
+	 * Milliseconds before peer stake influence starts to decay (3 mins default)
+	 */
+	public static final double PEER_DECAY_DELAY = 3*60*1000;
+
+	/**
+	 * Time for peer stake to decay by factor 1/e (5 mins default)
+	 */
+	public static final double PEER_DECAY_TIME = 5*60*1000;
+
 }

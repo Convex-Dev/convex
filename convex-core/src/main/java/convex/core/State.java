@@ -44,6 +44,7 @@ import convex.core.lang.Symbols;
 import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
+import convex.core.util.Economics;
 import convex.core.util.Utils;
 
 /**
@@ -600,10 +601,15 @@ public class State extends ARecord {
 	 */
 	public HashMap<AccountKey, Double> computeStakes() {
 		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
+		long timeStamp=this.getTimestamp().longValue();
 		Double totalStake = peers.reduceEntries((acc, e) -> {
-			double stake = (double) (e.getValue().getTotalStake());
+			PeerStatus ps=e.getValue();
+			double stake = (double) (ps.getTotalStake());
 			
-			// TODO: potential performance bottleneck from hashing?
+			long peerTimestamp=ps.getTimestamp();
+			double decay=Economics.stakeDecay(timeStamp,peerTimestamp);
+			stake*=decay;
+			
 			hm.put(RT.ensureAccountKey(e.getKey()), stake);
 			return stake + acc;
 		}, 0.0);

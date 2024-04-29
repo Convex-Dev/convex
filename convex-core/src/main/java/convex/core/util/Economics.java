@@ -1,5 +1,7 @@
 package convex.core.util;
 
+import convex.core.Constants;
+
 /**
  * Utility function for Convex Cryptoeconomics
  */
@@ -36,5 +38,14 @@ public class Economics {
 		long result=(newB-b)+1; // strict increase
 		
 		return result;
+	}
+
+	public static double stakeDecay(long time, long peerTime) {
+		if (peerTime>=time) return 1.0;
+		double delay=time-peerTime;
+		delay-=Constants.PEER_DECAY_DELAY;
+		if (delay<0) return 1.0;
+		
+		return Math.max(0.001, Math.exp(-delay/Constants.PEER_DECAY_TIME));
 	}
 }
