@@ -56,6 +56,28 @@ public class Cells {
 		if (a==null) return 0;
 		return a.getRefCount();
 	}
+	
+	/**
+	 * Gets the number of Branches directly contained in a Cell (will be zero if the
+	 * Cell is not a Ref container)
+	 *
+	 * @param a Cell to check (may be null)
+	 * @return Number of Refs in the object.
+	 */
+	public static int branchCount(ACell a) {
+		if (a==null) return 0;
+		int n=a.getRefCount();
+		int bc=0;
+		for (int i=0; i<n; i++) {
+			Ref<?> ref=a.getRef(i);
+			if (ref.isEmbedded()) {
+				bc+=branchCount(ref.getValue());
+			} else {
+				bc++;
+			}
+		}
+		return bc;
+	}
 
 	/**
 	 * Gets a Ref from a Cell by index

@@ -272,6 +272,16 @@ public class RefTest {
 		//a.findMissing(hs,100);
 		//assertTrue(hs.isEmpty());
 	}
+	
+	@Test 
+	public void testBranches() {
+		assertEquals(0,Cells.branchCount(null));
+		assertEquals(0,Cells.branchCount(Vectors.empty()));
+		assertEquals(0,Cells.branchCount(Blob.EMPTY_CHUNK));
+		assertEquals(0,Cells.branchCount(Samples.LONG_SET_10));
+		
+		assertEquals(1,Cells.branchCount(Vectors.of(Blob.EMPTY_CHUNK,1,2)));
+	}
 
 	@SuppressWarnings("unchecked")
 	@Test
