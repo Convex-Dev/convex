@@ -202,4 +202,48 @@ public class Cells {
 		return memSize;
 	}
 
+	/**
+	 * Visit all non-embedded branches from a Cell. Recursively checks embedded children.
+	 * @param a Cell within which to visit children.
+	 * @param visitor Visitor instance
+	 */
+	public static void visitBranchRefs(ACell a, Consumer<Ref<?>> visitor) {
+		if (a==null) return;
+		int n=a.getRefCount();
+		for (int i=0; i<n; i++) {
+			Ref<?> ref=a.getRef(i);
+			if (ref.isEmbedded()) {
+				ACell child=ref.getValue();
+				if (child!=null) {
+					visitBranchRefs(ref.getValue(),visitor);
+				}
+			} else {
+				visitor.accept(ref);
+			}
+		}
+		return;
+	}
+	
+	/**
+	 * Visit all non-embedded branches from a Cell. Recursively checks embedded children. May cause store reads.
+	 * @param a Cell within which to visit children.
+	 * @param visitor Visitor instance
+	 */
+	public static void visitBranches(ACell a, Consumer<ACell> visitor) {
+		if (a==null) return;
+		int n=a.getRefCount();
+		for (int i=0; i<n; i++) {
+			Ref<?> ref=a.getRef(i);
+			if (ref.isEmbedded()) {
+				ACell child=ref.getValue();
+				if (child!=null) {
+					visitBranches(ref.getValue(),visitor);
+				}
+			} else {
+				visitor.accept(ref.getValue());
+			}
+		}
+		return;
+	}
+
 }

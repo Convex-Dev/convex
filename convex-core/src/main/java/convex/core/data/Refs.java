@@ -33,27 +33,6 @@ public class Refs {
 	}
 	
 	/**
-	 * Visit all non-embedded children of a Cell. Recursively checks embedded children.
-	 * @param a Cell within which to visit children.
-	 * @param visitor Visitor instance
-	 */
-	public static void visitNonEmbedded(ACell a, Consumer<Ref<?>> visitor) {
-		int n=a.getRefCount();
-		for (int i=0; i<n; i++) {
-			Ref<?> ref=a.getRef(i);
-			if (ref.isEmbedded()) {
-				ACell child=ref.getValue();
-				if (child!=null) {
-					visitNonEmbedded(ref.getValue(),visitor);
-				}
-			} else {
-				visitor.accept(ref);
-			}
-		}
-		return;
-	}
-	
-	/**
 	 * Checks the complete tree of Refs is consistent with the given store
 	 * @param root Root of Ref tree to visit
 	 * @param store Store to check consistency with

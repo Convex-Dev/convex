@@ -957,7 +957,7 @@ public class Format {
 		// Add any non-embedded child cells to stack
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
 		Consumer<Ref<?>> addToStackFunc=r->{cells.add(r);};
-		Refs.visitNonEmbedded(a, addToStackFunc);
+		Cells.visitBranchRefs(a, addToStackFunc);
 		if (cells.isEmpty()) {
 			// single cell only
 			return topCellEncoding;
@@ -977,7 +977,7 @@ public class Format {
 				if (newLength>Format.MAX_MESSAGE_LENGTH) return;
 				ml[0]=newLength;
 				refs.add(cr);
-				if (everything) Refs.visitNonEmbedded(c, addToStackFunc);
+				if (everything) Cells.visitBranchRefs(c, addToStackFunc);
 			}
 		});
 		int messageLength=ml[0];

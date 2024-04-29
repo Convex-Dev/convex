@@ -230,12 +230,13 @@ public class RefTest {
 	}
 	
 	@Test 
-	public void testVisitNonEmbedded() {
+	public void testVisitBranches() {
 		AVector<?> v=Vectors.of(1,Samples.NON_EMBEDDED_BLOB);
 		ArrayList<ACell> al=new ArrayList<ACell>();
 		
-		Refs.visitNonEmbedded(v, r->al.add(r.getValue()));
+		Cells.visitBranchRefs(v, r->al.add(r.getValue()));
 		assertEquals(1,al.size());
+		assertEquals(Cells.branchCount(v),al.size());
 		assertSame(v.get(1), al.get(0));
 	}
 	
