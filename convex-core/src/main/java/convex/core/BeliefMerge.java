@@ -285,7 +285,7 @@ public class BeliefMerge {
 	 * partial order based on when a block is first observed. This is an important
 	 * heuristic (to avoid re-ordering new blocks from the same peer).
 	 */
-	private static ArrayList<SignedData<Block>> collectNewBlocks(Collection<AVector<SignedData<Block>>> orders, long consensusPoint) {
+	private ArrayList<SignedData<Block>> collectNewBlocks(Collection<AVector<SignedData<Block>>> orders, long consensusPoint) {
 		// We want to preserve order, remove duplicates
 		HashSet<SignedData<Block>> newBlocks = new HashSet<>();
 		ArrayList<SignedData<Block>> newBlocksOrdered = new ArrayList<>();
@@ -312,7 +312,7 @@ public class BeliefMerge {
 	 * @param initialTotalStake Total stake under consideration
 	 * @return Vector of Blocks in winning Order
 	 */
-	public static AVector<SignedData<Block>> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
+	public AVector<SignedData<Block>> computeWinningOrder(HashMap<Order, Double> stakedOrders, long consensusPoint,
 			double initialTotalStake) {
 		assert (!stakedOrders.isEmpty());
 		// Get the Voting Set. Will be updated each round to winners of previous round.
@@ -430,7 +430,7 @@ public class BeliefMerge {
 		return result;
 	}
 
-	private static final AVector<SignedData<Block>> appendNewBlocks(AVector<SignedData<Block>> blocks, ArrayList<SignedData<Block>> newBlocksOrdered,
+	private final AVector<SignedData<Block>> appendNewBlocks(AVector<SignedData<Block>> blocks, ArrayList<SignedData<Block>> newBlocksOrdered,
 			long consensusPoint) {
 		HashSet<SignedData<Block>> newBlocks = new HashSet<>();
 		newBlocks.addAll(newBlocksOrdered);
@@ -443,7 +443,11 @@ public class BeliefMerge {
 		while (it.hasNext()) {
 			newBlocks.remove(it.next());
 		}
-		newBlocksOrdered.removeIf(b -> !newBlocks.contains(b));
+		newBlocksOrdered.removeIf(sb -> {
+			// We ignore blocks that don't look valid for current state
+			if (state.checkBlock(sb)!=null) return true;
+			return !newBlocks.contains(sb);
+		});
 
 		// sort new blocks by timestamp and append to winning Order
 		// must be a stable sort to maintain order from equal timestamps

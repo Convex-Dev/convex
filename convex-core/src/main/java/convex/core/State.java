@@ -310,7 +310,12 @@ public class State extends ARecord {
 		return state.applyTransactions(block);
 	}
 
-	private BlockResult checkBlock(SignedData<Block> signedBlock) {
+	/**
+	 * Checks if a block is valid for application to the current state
+	 * @param signedBlock
+	 * @return
+	 */
+	public BlockResult checkBlock(SignedData<Block> signedBlock) {
 		Block block=signedBlock.getValue();
 		AccountKey peerKey=signedBlock.getAccountKey();
 		PeerStatus ps=peers.get(peerKey);
