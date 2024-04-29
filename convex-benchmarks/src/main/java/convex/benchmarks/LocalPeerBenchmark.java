@@ -60,7 +60,7 @@ public class LocalPeerBenchmark {
 
 			SERVER=servers.get(0);
 			PEER_CLIENT=Convex.connect(SERVER, Init.GENESIS_ADDRESS, PEER_KP);
-			String cmd="(let [ha (create-account "+HERO_KEY+")] (transfer ha 1000000000000000) ha)";
+			String cmd="(let [ha (create-account "+HERO_KEY+")] (transfer ha 1000000) ha)";
 			Result hr=PEER_CLIENT.transactSync(cmd);
 			if (hr.isError()) {
 				throw new Error("Transaction Failed: "+hr.toString());

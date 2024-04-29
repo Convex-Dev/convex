@@ -45,13 +45,13 @@ public class CVMBenchmark {
 		
 		// Move some USD to Hero
 		Context ctx=Context.createFake(STATE, Init.INIT_ADDRESS);
-		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) (fun/transfer usd "+HERO+" 100000000))"));
+		ctx=ctx.eval(Reader.read("(do (import convex.fungible :as fun) (import currency.CFUSD :as usd) (fun/transfer usd "+HERO+" 0))"));
 		if (ctx.isError()) throw new Error("Problem moving USD: "+ctx.getError().toString());
 		STATE=ctx.getState();
 
 		// Get a USD MARKET
 		ctx=Context.createFake(STATE, HERO);
-		ctx=ctx.eval(Reader.read("(do (import currency.USD :as usd) "
+		ctx=ctx.eval(Reader.read("(do (import currency.CFUSD :as usd) "
 				+ "(import torus.exchange :as torus) "
 				+ "(def market (torus/create-market usd)))"));
 		if (ctx.isError()) throw new Error("Problem getting market: "+ctx.getError().toString());
@@ -66,7 +66,7 @@ public class CVMBenchmark {
 		Address addr=HERO;
 		ATransaction trans=Transfer.create(addr,1, Benchmarks.VILLAIN, 1000);
 		ResultContext ctx=s.applyTransaction(trans);
-		ctx.context.getValue();
+		ctx.context.getResult();
 	}
 
 	@Benchmark
@@ -75,7 +75,7 @@ public class CVMBenchmark {
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
 		ResultContext ctx=s.applyTransaction(trans);
-		ctx.context.getValue();
+		ctx.context.getResult();
 	}
 
 	@Benchmark
@@ -84,7 +84,7 @@ public class CVMBenchmark {
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
 		ResultContext ctx=s.applyTransaction(trans);
-		ctx.context.getValue();
+		ctx.context.getResult();
 	}
 	
 	@Benchmark
@@ -111,7 +111,7 @@ public class CVMBenchmark {
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
 		ResultContext ctx=s.applyTransaction(trans);
-		ctx.context.getValue();
+		ctx.context.getResult();
 	}
 	
 	@Benchmark
@@ -129,7 +129,7 @@ public class CVMBenchmark {
 		Address addr=HERO;
 		ATransaction trans=Invoke.create(addr,1, Reader.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply 1000000})))"));
 		ResultContext ctx=s.applyTransaction(trans);
-		ctx.context.getValue();
+		ctx.context.getResult();
 	}
 	
 	static final ATransaction buyTrade=Invoke.create(HERO,1, Reader.read("(torus/buy-tokens usd 10)"));
@@ -148,7 +148,7 @@ public class CVMBenchmark {
 		Address addr=HERO;
 		ATransaction trans=Call.create(addr,1L, Init.REGISTRY_ADDRESS, Symbols.REGISTER, Vectors.of(Maps.of(Keywords.NAME,Strings.create("Bob"))));
 		ResultContext ctx=s.applyTransaction(trans);
-		ctx.context.getValue();
+		ctx.context.getResult();
 	}
 
 	public static void main(String[] args) throws Exception {
