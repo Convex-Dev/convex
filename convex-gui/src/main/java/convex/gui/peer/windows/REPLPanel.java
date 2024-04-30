@@ -18,7 +18,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -53,6 +52,7 @@ import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.BaseTextPane;
 import convex.gui.components.CodePane;
 import convex.gui.utils.CVXHighlighter;
 import net.miginfocom.swing.MigLayout;
@@ -128,20 +128,20 @@ public class REPLPanel extends JPanel {
 	}
 	
 	protected void handleError(ACell code, ACell msg, AVector<AString> trace) {
-		addOutput(outputArea," Exception: " + code + " "+ msg+"\n",Color.ORANGE);
+		outputArea.append(" Exception: " + code + " "+ msg+"\n",Color.ORANGE);
 		if (trace!=null) for (AString s: trace) {
-			addOutput(outputArea," - "+s.toString()+"\n",Color.PINK);
+			outputArea.append(" - "+s.toString()+"\n",Color.PINK);
 		}
 	}
 	
-	private void addOutput(JTextComponent pane, String text) {
+	private void addOutput(BaseTextPane pane, String text) {
 		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);	
 	}
 	
-	private void addOutputWithHighlight(JTextPane pane, String text) {
+	private void addOutputWithHighlight(BaseTextPane pane, String text) {
 		Document d=pane.getDocument();
 		int start = d.getLength();
-		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);	
+		pane.append(text,DEFAULT_OUTPUT_COLOR);	
 		int end=d.getLength();
 		if (end>start) updateHighlight(pane,start,end-start);
 	}
@@ -330,12 +330,12 @@ public class REPLPanel extends JPanel {
 				
 				handleResult(start,future.get(5000, TimeUnit.MILLISECONDS));
 			} catch (ParseException e) {
-				addOutput(outputArea," PARSE ERROR: "+e.getMessage(),Color.RED);
+				outputArea.append(" PARSE ERROR: "+e.getMessage(),Color.RED);
 			} catch (TimeoutException t) {
-				addOutput(outputArea," TIMEOUT waiting for result",Color.RED);
+				outputArea.append(" TIMEOUT waiting for result",Color.RED);
 			} catch (Exception t) {
-				addOutput(outputArea," ERROR: ",Color.RED);
-				addOutput(outputArea,t.getMessage() + "\n");
+				outputArea.append(" ERROR: ",Color.RED);
+				outputArea.append(t.getMessage() + "\n");
 				t.printStackTrace();
 			}
 		});
@@ -351,7 +351,7 @@ public class REPLPanel extends JPanel {
 		}
 	}
 	
-	protected void updateHighlight(JTextPane pane,int start, int len) {
+	protected void updateHighlight(BaseTextPane pane,int start, int len) {
 		SwingUtilities.invokeLater(()->{
 			CVXHighlighter.highlight(pane,start,start+len);
 			highlighting=false;
