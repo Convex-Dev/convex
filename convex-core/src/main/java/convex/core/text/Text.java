@@ -1,5 +1,6 @@
 package convex.core.text;
 
+import java.math.BigInteger;
 import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -153,6 +154,23 @@ public class Text {
 			}
 		}
 		return result;
+	}
+
+	/**
+	 * Zero pads a positive integer out to the specified number of digits
+	 * @param change
+	 * @param digits
+	 * @return
+	 */
+	public static String zeroPad(BigInteger b, int digits) {
+		if (digits>9) throw new IllegalArgumentException("Too many digits!!");
+		if (b.signum()<0) throw new IllegalArgumentException("Negative number!");
+		String s=b.toString();
+		int n=s.length();
+		if (n<digits) {
+			s=ZEROS_9.substring(0,digits-n)+s;
+		}
+		return s;
 	}
 
 

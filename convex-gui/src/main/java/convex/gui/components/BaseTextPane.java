@@ -18,10 +18,13 @@ public class BaseTextPane extends JTextPane {
 	private static final StyleContext sc = StyleContext.getDefaultStyleContext();
 
 	
-	public void append(String text, Color c) {
-		AttributeSet aset = sc.getEmptySet();
+	public void append(String text, Color c, Integer size) {
+		AttributeSet aset = SimpleAttributeSet.EMPTY;
 		if (c!=null) {
-			aset=sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
+			aset=sc.addAttribute(aset, StyleConstants.Foreground, c);
+		}
+		if (size!=null) {
+			aset=sc.addAttribute(aset, StyleConstants.FontSize, size);
 		}
 
 		StyledDocument d=getStyledDocument();
@@ -38,7 +41,11 @@ public class BaseTextPane extends JTextPane {
 		repaint();
 	}
 	
+	public void append(String text, Color c) {
+		append(text,c,null);
+	}
+	
 	public void append(String text) {
-		append(text,null);
+		append(text,null,null);
 	}
 }

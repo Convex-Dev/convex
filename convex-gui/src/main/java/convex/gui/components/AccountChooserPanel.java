@@ -14,7 +14,6 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.ops.Special;
-import convex.core.text.Text;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.components.account.KeyPairCombo;
 import net.miginfocom.swing.MigLayout;
@@ -29,7 +28,7 @@ public class AccountChooserPanel extends JPanel {
 	public final AddressCombo addressCombo;
 	public final KeyPairCombo keyCombo;
 
-	private JLabel balanceLabel;
+	private BalanceLabel balanceLabel;
 	
 	protected Convex convex;
 
@@ -82,7 +81,7 @@ public class AccountChooserPanel extends JPanel {
 			
 			// Balance Info
 			mp.add(new JLabel("Balance: "));
-			balanceLabel = new JLabel("0");
+			balanceLabel = new BalanceLabel();
 			balanceLabel.setToolTipText("Convex Coin balance of the currently selected Account");
 			mp.add(balanceLabel);
 			updateBalance(getAddress());
@@ -129,12 +128,14 @@ public class AccountChooserPanel extends JPanel {
 				ACell bal=r.getValue();
 				String s="<unknown>";
 				if (bal instanceof AInteger) {
-					s=Text.toFriendlyBalance(((AInteger)bal).longValue());
+					balanceLabel.setBalance((AInteger)bal);
+				} else {
+					balanceLabel.setBalance(null);
 				}
 				if (r.getErrorCode()!=null) {
-					s="<"+r.getErrorCode()+">";
+
+					balanceLabel.setText(s);
 				}
-				balanceLabel.setText(s);
 			});
 		} catch (Throwable t) {
 			balanceLabel.setText(t.getClass().getName());

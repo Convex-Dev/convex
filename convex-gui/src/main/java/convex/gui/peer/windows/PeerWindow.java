@@ -43,6 +43,7 @@ public class PeerWindow extends AbstractGUI {
 				tabbedPane.addTab("REPL", null, new REPLPanel(peer), null);
 			} catch (Throwable t) {
 				String msg=("Failed to connect to Peer: "+t);
+				t.printStackTrace();
 				log.warn(msg);
 				tabbedPane.addTab("REPL Error", null, new JLabel(msg), null);
 				return;
