@@ -11,6 +11,10 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class CodeLabel extends JTextArea {
 
+	public CodeLabel() {
+		this("");
+	}
+	
 	public CodeLabel(String text) {
 		super(Text.lineCount(text),0);
 		this.setText(text);

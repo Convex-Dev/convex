@@ -19,14 +19,15 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.CodePane;
 import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
 public class MessageFormatPanel extends JPanel {
 
-	final JTextArea dataArea;
-	final JTextArea messageArea;
+	final CodePane dataArea;
+	final CodePane messageArea;
 	private JPanel buttonPanel;
 	protected PeerGUI manager;
 	private JButton clearButton;
@@ -55,18 +56,18 @@ public class MessageFormatPanel extends JPanel {
 		// Top panel component
 		upperPanel = new JPanel();
 		upperPanel.setLayout(new BorderLayout(0, 0));
-		dataArea = new JTextArea();
+		dataArea = new CodePane();
 		dataArea.setToolTipText("Enter data objects here");
 		upperPanel.add(dataArea, BorderLayout.CENTER);
 		dataArea.setFont(Toolkit.MONO_FONT);
-		dataArea.setLineWrap(true);
+		// dataArea.setLineWrap(true);
 		dataArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> updateData()));
 
 		// Bottom panel component
 		JPanel lowerPanel = new JPanel();
 		lowerPanel.setLayout(new BorderLayout(0, 0));
 
-		messageArea = new JTextArea();
+		messageArea = new CodePane();
 		messageArea.setToolTipText("Enter binary hex representation here");
 		messageArea.setFont(Toolkit.MONO_FONT);
 		lowerPanel.add(messageArea, BorderLayout.CENTER);

@@ -2,6 +2,9 @@ package convex.gui.components;
 
 import java.awt.Color;
 
+/**
+ * A pane for code editing supporting syntax highlighting etc. Editable by default
+ */
 @SuppressWarnings("serial")
 public class CodePane extends BaseTextPane {
 	

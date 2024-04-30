@@ -11,34 +11,40 @@ import javax.swing.JPopupMenu;
 import javax.swing.text.JTextComponent;
 
 import convex.gui.utils.SymbolIcon;
+import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial") 
 public class RightCopyMenu extends JPopupMenu implements ActionListener {
 
-	JMenuItem copyMenuItem = new JMenuItem("Copy",SymbolIcon.get(0xe14d));
-	JMenuItem cutMenuItem = new JMenuItem("Cut",SymbolIcon.get(0xf08b));
-    JMenuItem pasteMenuItem = new JMenuItem("Paste",SymbolIcon.get(0xe14f));
+	JMenuItem copyMenuItem = new JMenuItem("Copy",SymbolIcon.get(0xe14d,Toolkit.SMALL_ICON_SIZE));
+	JMenuItem cutMenuItem = new JMenuItem("Cut",SymbolIcon.get(0xf08b,Toolkit.SMALL_ICON_SIZE));
+    JMenuItem pasteMenuItem = new JMenuItem("Paste",SymbolIcon.get(0xe14f,Toolkit.SMALL_ICON_SIZE));
     
-	public RightCopyMenu(Component invoker) {
+    JTextComponent comp;
+    
+	public RightCopyMenu(JTextComponent invoker) {
+		this.comp=invoker;
 		copyMenuItem.addActionListener(this);
 		cutMenuItem.addActionListener(this);
 		pasteMenuItem.addActionListener(this);
 	        
 		add(copyMenuItem);
-		add(cutMenuItem);
-		add(pasteMenuItem);
+		if (invoker.isEditable()) {	
+			add(cutMenuItem);
+			add(pasteMenuItem);
+		}
 		
 		setInvoker(invoker);
 	}
 	
 	public static void addTo(JTextComponent tf) {
+		RightCopyMenu menu=new RightCopyMenu(tf);
+		
 		tf.addMouseListener(new MouseAdapter() {
 			public void mousePressed(MouseEvent e) {
                 switch(e.getButton()) {
-                    case MouseEvent.BUTTON3: {
-                    	Component comp=e.getComponent();
-                    	RightCopyMenu menu=new RightCopyMenu(comp);
-                        menu.show(comp, e.getX(), e.getY());
+                    case MouseEvent.BUTTON3: {                    	
+                        menu.show(tf, e.getX(), e.getY());
                         break;
                     }
                 }

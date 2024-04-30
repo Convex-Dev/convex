@@ -57,6 +57,7 @@ public class Toolkit {
 	public static final double SCALE=1.5;
 	
 	public static final int ICON_SIZE = (int) (32*SCALE);
+	public static final int SMALL_ICON_SIZE = (int) (18*SCALE);
 
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
@@ -132,6 +133,8 @@ public class Toolkit {
 	public static final ImageIcon ECOSYSTEM_ICON = scaledIcon(128, "/images/ecosystem.png");
 	public static final ImageIcon WALLET_ICON = scaledIcon(128, "/images/wallet.png");
 	public static final ImageIcon DLFS_ICON = scaledIcon(128, "/images/filesystem.png");
+
+
 
 	public static ImageIcon scaledIcon(int size, String resourcePath) {
 		java.net.URL imgURL = Toolkit.class.getResource(resourcePath);
@@ -330,7 +333,9 @@ public class Toolkit {
 		JTextArea ta = new JTextArea(s);
 		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createRaisedBevelBorder(), BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		ta.setBorder(b);
-		ta.setFont(Toolkit.DEFAULT_FONT);
+		ta.setEditable(false);
+		ta.setFocusable(false);
+		// ta.setFont(Toolkit.DEFAULT_FONT);
 		ta.setWrapStyleWord(true);
 		ta.setLineWrap(true);
 		return ta;

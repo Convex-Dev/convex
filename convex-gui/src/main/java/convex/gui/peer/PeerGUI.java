@@ -13,6 +13,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import javax.swing.DefaultListModel;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -32,6 +33,7 @@ import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.init.Init;
@@ -385,6 +387,13 @@ public class PeerGUI extends AbstractGUI {
 		KeyPairCombo keyField=KeyPairCombo.create(kp);
 
 		pan.add(keyField);
+		pan.add(new JPanel());
+		
+		JButton randomise=new JButton("Randomise",SymbolIcon.get(0xe863,Toolkit.SMALL_ICON_SIZE)); 
+		randomise.addActionListener(e->{
+			keyField.setSelectedItem(HotWalletEntry.create(AKeyPair.generate()));
+		});
+		pan.add(randomise);
 
 
 		int result = JOptionPane.showConfirmDialog(parent, pan, 

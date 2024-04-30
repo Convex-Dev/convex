@@ -27,7 +27,7 @@ public class BalanceLabel extends BaseTextPane {
 	
 	public class BalanceMenu extends JPopupMenu {
 		
-		JMenuItem copyMenuItem = new JMenuItem("Copy Value",SymbolIcon.get(0xe14d));
+		JMenuItem copyMenuItem = new JMenuItem("Copy Value",SymbolIcon.get(0xe14d,Toolkit.SMALL_ICON_SIZE));
 		
 		public BalanceMenu() {
 			add(copyMenuItem);
