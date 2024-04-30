@@ -17,4 +17,12 @@ public class CodePane extends BaseTextPane {
 	@Override public boolean getScrollableTracksViewportWidth() {
 		return true;
 	}
+
+	/**
+	 * Gets the length of this document
+	 * @return
+	 */
+	public int docLength() {
+		return getDocument().getLength();
+	}
 }

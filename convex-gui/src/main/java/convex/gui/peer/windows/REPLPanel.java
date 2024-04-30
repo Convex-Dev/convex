@@ -21,13 +21,9 @@ import javax.swing.JSplitPane;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
-import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
-import javax.swing.text.JTextComponent;
 import javax.swing.text.SimpleAttributeSet;
-import javax.swing.text.StyleConstants;
-import javax.swing.text.StyleContext;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -63,16 +59,16 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
 
-	CodePane inputArea;
-	CodePane outputArea;
-	private JButton btnClear;
-	private JButton btnInfo;
-	private JCheckBox btnResults;
-	private JCheckBox btnTiming;
-	private JCheckBox btnCompile;
-	private JCheckBox btnTX;
+	protected final  CodePane input;
+	protected final CodePane output;
+	private final JButton btnClear;
+	private final JButton btnInfo;
+	private final JCheckBox btnResults;
+	private final JCheckBox btnTiming;
+	private final JCheckBox btnCompile;
+	private final JCheckBox btnTX;
 	
-	private ArrayList<String> history=new ArrayList<>();
+	private final ArrayList<String> history=new ArrayList<>();
 	private int historyPosition=0;
 
 	private InputListener inputListener=new InputListener();
@@ -91,19 +87,19 @@ public class REPLPanel extends JPanel {
 	private static final Logger log = LoggerFactory.getLogger(REPLPanel.class.getName());
 
 	public void setInput(String s) {
-		inputArea.setText(s);
+		input.setText(s);
 		updateHighlight();
 	}
 
 	@Override
 	public void setVisible(boolean value) {
 		super.setVisible(value);
-		if (value) inputArea.requestFocusInWindow();
+		if (value) input.requestFocusInWindow();
 	}
 
 	protected void handleResult(long start,Result r) {
 		if (btnTiming.isSelected()) {
-			addOutput(outputArea,"Completion time: " + (Utils.getCurrentTimestamp()-start) + " ms\n");
+			output.append("Completion time: " + (Utils.getCurrentTimestamp()-start) + " ms\n");
 		}
 		if (btnResults.isSelected()) {
 			handleResult((ACell)r);
@@ -119,23 +115,19 @@ public class REPLPanel extends JPanel {
 		AString s=RT.print(m);
 		String resultString=(s==null)?"Print limit exceeded!":s.toString();
 		
-		int start=outputArea.getDocument().getLength();
-		addOutput(outputArea," => " + resultString + "\n");
-		int end=outputArea.getDocument().getLength();
-		updateHighlight(outputArea,start,end-start);
+		int start=output.docLength();
+		output.append(" => " + resultString + "\n");
+		int end=output.docLength();
+		updateHighlight(output,start,end);
 		
-		outputArea.setCaretPosition(end);
+		output.setCaretPosition(end);
 	}
 	
 	protected void handleError(ACell code, ACell msg, AVector<AString> trace) {
-		outputArea.append(" Exception: " + code + " "+ msg+"\n",Color.ORANGE);
+		output.append(" Exception: " + code + " "+ msg+"\n",Color.ORANGE);
 		if (trace!=null) for (AString s: trace) {
-			outputArea.append(" - "+s.toString()+"\n",Color.PINK);
+			output.append(" - "+s.toString()+"\n",Color.PINK);
 		}
-	}
-	
-	private void addOutput(BaseTextPane pane, String text) {
-		addOutput(pane,text,DEFAULT_OUTPUT_COLOR);	
 	}
 	
 	private void addOutputWithHighlight(BaseTextPane pane, String text) {
@@ -143,25 +135,7 @@ public class REPLPanel extends JPanel {
 		int start = d.getLength();
 		pane.append(text,DEFAULT_OUTPUT_COLOR);	
 		int end=d.getLength();
-		if (end>start) updateHighlight(pane,start,end-start);
-	}
-	
-	private void addOutput(JTextComponent pane, String text, Color c) {
-		StyleContext sc = StyleContext.getDefaultStyleContext();
-		AttributeSet aset = sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
-
-		Document d=pane.getDocument();
-		int len = d.getLength();
-		try {
-			d.insertString(len, text, aset);
-		} catch (BadLocationException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		//pane.setCaretPosition(len);
-		//pane.setCharacterAttributes(aset, false);
-		//pane.replaceSelection(text);
-		pane.repaint();
+		if (end>start) updateHighlight(pane,start,end);
 	}
 
 	/**
@@ -185,24 +159,24 @@ public class REPLPanel extends JPanel {
 		splitPane.setOneTouchExpandable(true);
 		add(splitPane, "dock center");
 
-		outputArea = new CodePane();
-		outputArea.setEditable(false);
-		outputArea.setFont(OUTPUT_FONT);
+		output = new CodePane();
+		output.setEditable(false);
+		output.setFont(OUTPUT_FONT);
 		//outputArea.setForeground(Color.GREEN);
-		outputArea.setBackground(new Color(10,10,10));
-		outputArea.setToolTipText("Output from transaction execution");
+		output.setBackground(new Color(10,10,10));
+		output.setToolTipText("Output from transaction execution");
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-		splitPane.setLeftComponent(wrapScrollPane(outputArea));
+		splitPane.setLeftComponent(wrapScrollPane(output));
 
-		inputArea = new CodePane();
-		inputArea.setFont(INPUT_FONT);
-		inputArea.getDocument().addDocumentListener(inputListener);
-		inputArea.addKeyListener(inputListener);
-		inputArea.setToolTipText("Input commands here (Press Enter at the end of input to send)");
+		input = new CodePane();
+		input.setFont(INPUT_FONT);
+		input.getDocument().addDocumentListener(inputListener);
+		input.addKeyListener(inputListener);
+		input.setToolTipText("Input commands here (Press Enter at the end of input to send)");
 		//inputArea.setForeground(Color.GREEN);
 
-		splitPane.setRightComponent(wrapScrollPane(inputArea));
+		splitPane.setRightComponent(wrapScrollPane(input));
 		
 		// stop ctrl+arrow losing focus
 		setFocusTraversalKeysEnabled(false);
@@ -215,7 +189,7 @@ public class REPLPanel extends JPanel {
 		btnClear = new JButton("Clear");
 		actionPanel.add(btnClear);
 		btnClear.addActionListener(e -> {
-			outputArea.setText("");
+			output.setText("");
 		});
 
 		btnInfo = new JButton("Connection Info");
@@ -259,7 +233,7 @@ public class REPLPanel extends JPanel {
 		// Get initial focus in REPL input area
 		addComponentListener(new ComponentAdapter() {
 			public void componentShown(ComponentEvent ce) {
-				inputArea.requestFocusInWindow();
+				input.requestFocusInWindow();
 			}
 		});
 	}
@@ -284,9 +258,9 @@ public class REPLPanel extends JPanel {
 		historyPosition=history.size();
 
 		SwingUtilities.invokeLater(() -> {
-			inputArea.setText("");
-			addOutput(outputArea,s);
-			addOutput(outputArea,"\n");
+			input.setText("");
+			output.append(s);
+			output.append("\n");
 			try {
 				AList<ACell> forms = Reader.readAll(s);
 				ACell code = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
@@ -318,8 +292,8 @@ public class REPLPanel extends JPanel {
 					SignedData<ATransaction> strans=convex.prepareTransaction(trans);
 					
 					if (btnTX.isSelected()) {
-						addOutputWithHighlight(outputArea,strans.toString()+"\n");
-						addOutput(outputArea,"TX Hash: "+strans.getHash()+"\n");
+						addOutputWithHighlight(output,strans.toString()+"\n");
+						output.append("TX Hash: "+strans.getHash()+"\n");
 					}
 					
 					future = convex.transact(strans);
@@ -330,12 +304,12 @@ public class REPLPanel extends JPanel {
 				
 				handleResult(start,future.get(5000, TimeUnit.MILLISECONDS));
 			} catch (ParseException e) {
-				outputArea.append(" PARSE ERROR: "+e.getMessage(),Color.RED);
+				output.append(" PARSE ERROR: "+e.getMessage(),Color.RED);
 			} catch (TimeoutException t) {
-				outputArea.append(" TIMEOUT waiting for result",Color.RED);
+				output.append(" TIMEOUT waiting for result",Color.RED);
 			} catch (Exception t) {
-				outputArea.append(" ERROR: ",Color.RED);
-				outputArea.append(t.getMessage() + "\n");
+				output.append(" ERROR: ",Color.RED);
+				output.append(t.getMessage() + "\n"); 
 				t.printStackTrace();
 			}
 		});
@@ -344,16 +318,16 @@ public class REPLPanel extends JPanel {
 	
 	boolean highlighting=false;
 	protected void updateHighlight() {
-		int len=inputArea.getDocument().getLength();
+		int len=input.getDocument().getLength();
 		if (!highlighting) {
 			highlighting=true;
-			updateHighlight(inputArea,0,len);
+			updateHighlight(input,0,len);
 		}
 	}
 	
-	protected void updateHighlight(BaseTextPane pane,int start, int len) {
+	protected void updateHighlight(BaseTextPane pane,int start, int end) {
 		SwingUtilities.invokeLater(()->{
-			CVXHighlighter.highlight(pane,start,start+len);
+			CVXHighlighter.highlight(pane,start,end);
 			highlighting=false;
 		});
 	}
@@ -393,7 +367,7 @@ public class REPLPanel extends JPanel {
 					if (historyPosition>0) {
 						if (historyPosition==hSize) {
 							// store current in history
-							String s=inputArea.getText();
+							String s=input.getText();
 							history.add(s);
 						}
 						historyPosition--;
@@ -412,12 +386,12 @@ public class REPLPanel extends JPanel {
 			// Enter sends unless a meta key held down
 			if (code==KeyEvent.VK_ENTER) {
 				try {
-					Document doc=inputArea.getDocument();
+					Document doc=input.getDocument();
 					int docLen=doc.getLength();
 					if (e.isControlDown()||e.isShiftDown()) {
 						doc.insertString(docLen, "\n",SimpleAttributeSet.EMPTY);
 					} else {
-						int off = inputArea.getCaretPosition();
+						int off = input.getCaretPosition();
 							
 						// Detect Enter at end of form
 						if ((off==docLen)) {

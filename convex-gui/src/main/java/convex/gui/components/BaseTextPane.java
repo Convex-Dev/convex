@@ -5,10 +5,10 @@ import java.awt.Color;
 import javax.swing.JTextPane;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
-import javax.swing.text.Document;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyleContext;
+import javax.swing.text.StyledDocument;
 
 /**
  * Base class for formatted text components
@@ -24,7 +24,7 @@ public class BaseTextPane extends JTextPane {
 			aset=sc.addAttribute(SimpleAttributeSet.EMPTY, StyleConstants.Foreground, c);
 		}
 
-		Document d=getDocument();
+		StyledDocument d=getStyledDocument();
 		int len = d.getLength();
 		try {
 			d.insertString(len, text, aset);
