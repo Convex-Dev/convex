@@ -537,8 +537,4 @@ public class AccountStatus extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
-
-
-
-
 }

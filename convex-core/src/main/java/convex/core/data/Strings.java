@@ -50,6 +50,13 @@ public class Strings {
 
 	public static final StringShort MISORDERED_BLOCK = StringShort.create("Block out of order");
 
+	public static final StringShort NO_SUCH_ACCOUNT = StringShort.create("Account does not exist");
+
+	public static final StringShort NO_TX_FOR_ACTOR = StringShort.create("Cannot run external transaction for actor account");
+
+	public static final StringShort WRONG_KEY = StringShort.create("Wrong key for account");
+
+	public static final StringShort OLD_SEQUENCE = StringShort.create("Old sequence number");
 
 
 	/**

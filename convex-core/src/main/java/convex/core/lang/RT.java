@@ -52,6 +52,7 @@ import convex.core.lang.impl.KeywordFn;
 import convex.core.lang.impl.MapFn;
 import convex.core.lang.impl.SeqFn;
 import convex.core.lang.impl.SetFn;
+import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 
 /**
@@ -1835,6 +1836,16 @@ public class RT {
 			} 
 		}
 		return addr;
+	}
+
+	/**
+	 * Casts to a transaction record, or null if not castable
+	 * @param maybeTx Cell which should be a transaction
+	 * @return Transaction value, or null if not a transaction
+	 */
+	public static ATransaction ensureTransaction(ACell maybeTx) {
+		if (maybeTx instanceof ATransaction) return (ATransaction)maybeTx;
+		return null;
 	}
 
 

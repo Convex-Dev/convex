@@ -33,6 +33,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -112,27 +113,14 @@ public class TransactionHandler extends AThreadedComponent{
 			AVector<ACell> v = m.getPayload();
 			@SuppressWarnings("unchecked")
 			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
-	
-			// System.out.println("transact: "+v);
-			if (!(sd.getValue() instanceof ATransaction)) {
-				Result r=Result.create(m.getID(), Strings.BAD_FORMAT, ErrorCodes.FORMAT);
-				m.returnResult(r);
+			
+			// Check our transaction is valid and we want to process it
+			Result error=checkTransaction(sd);
+			if (error!=null) {
+				m.returnResult(error);
 				return;
 			}
-			
-			if (!sd.checkSignature()) {
-				// SECURITY: Client tried to send a badly signed transaction!
-				try {
-					// TODO: throttle?
-					Result r=Result.create(m.getID(), Strings.BAD_SIGNATURE, ErrorCodes.SIGNATURE);
-					m.returnResult(r);
-				} catch (Exception e) {
-					// Ignore?? Connection probably gone anyway
-				}
-				log.debug("Bad signature from Client! {}" , sd);
-				return;
-			}
-			
+
 			// Persist the signed transaction. Might throw MissingDataException?
 			// If we already have the transaction persisted, will obtain signature status
 			sd=Cells.persist(sd);
@@ -148,6 +136,48 @@ public class TransactionHandler extends AThreadedComponent{
 		} catch (Throwable e) {
 			log.warn("Unandled exception in transaction handler",e);
 		}
+	}
+	
+	private Result checkTransaction(SignedData<ATransaction> sd) {
+		try {
+			// TODO: throttle?
+			ATransaction tx=RT.ensureTransaction(sd.getValue());
+			
+			// System.out.println("transact: "+v);
+			if (tx==null) {
+				return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
+			}
+			
+			State s=server.getPeer().getConsensusState();
+			AccountStatus as=s.getAccount(tx.getOrigin());
+			if (as==null) {
+				return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
+			}
+			
+			if (tx.getSequence()<=as.getSequence()) {
+				return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
+			}
+			
+			AccountKey expectedKey=as.getAccountKey();
+			if (expectedKey==null) {
+				return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
+			}
+			
+			AccountKey pubKey=sd.getAccountKey();
+			if (!expectedKey.equals(pubKey)) {
+				return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
+			}
+			
+			if (!sd.checkSignature()) {
+				// SECURITY: Client tried to send a badly signed transaction!
+				return Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
+			}
+		} catch (Exception e) {
+			log.warn("Unexpected exception while checking transaction",e);
+			return Result.error(ErrorCodes.UNEXPECTED, Strings.BAD_SIGNATURE);
+		}
+		// All checks passed OK!
+		return null;
 	}
 	
 	/**

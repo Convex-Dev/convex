@@ -96,6 +96,14 @@ public final class Result extends ARecordGeneric {
 	public static Result create(CVMLong id, ACell value) {
 		return create(id,value,null,null);
 	}
+	
+	public static Result error(Keyword errorCode, AString message) {
+		return error(errorCode,message,null);
+	}
+
+	private static Result error(Keyword errorCode, AString message, AHashMap<Keyword,ACell> info) {
+		return create(CVMLong.ZERO,message,errorCode,info);
+	}
 
 	/**
 	 * Returns the message ID for this result. Message ID is an arbitrary ID assigned by a client requesting a transaction.
