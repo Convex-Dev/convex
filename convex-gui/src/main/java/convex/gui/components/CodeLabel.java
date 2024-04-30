@@ -17,5 +17,6 @@ public class CodeLabel extends JTextArea {
 		this.setEditable(false);
 		this.setFont(Toolkit.SMALL_MONO_FONT);
 		
+		RightCopyMenu.addTo(this);
 	}
 }

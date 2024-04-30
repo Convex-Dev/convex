@@ -7,6 +7,8 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.Image;
 import java.awt.RenderingHints;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -52,14 +54,18 @@ import convex.gui.keys.KeyRingPanel;
 @SuppressWarnings("serial")
 public class Toolkit {
 
-	private static final int ICON_SIZE = 48;
+	public static final double SCALE=1.5;
+	
+	public static final int ICON_SIZE = (int) (32*SCALE);
 
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
-	public static Font DEFAULT_FONT = new Font(null,Font.PLAIN,14);
+	private static final int DEFAULT_FONT_SIZE=(int) (14*SCALE);
+	
+	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,DEFAULT_FONT_SIZE);
 
-	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, 20);
-	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, 14);
+	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, DEFAULT_FONT_SIZE*3/2);
+	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, DEFAULT_FONT_SIZE);
 	public static Font SMALL_MONO_BOLD = SMALL_MONO_FONT.deriveFont(Font.BOLD);
 	
 	
@@ -99,7 +105,7 @@ public class Toolkit {
 	}
 
 	protected static LookAndFeel installFlatLaf() {
-		System.setProperty("flatlaf.uiScale", "1.5");
+		System.setProperty("flatlaf.uiScale", Double.toString(SCALE));
 		FlatDarculaLaf laf=new FlatDarculaLaf();
 		return laf;
 	}
@@ -328,6 +334,13 @@ public class Toolkit {
 		ta.setWrapStyleWord(true);
 		ta.setLineWrap(true);
 		return ta;
+	}
+
+	public static void copyToClipboard(String string) {
+		if (string==null) return;
+		 Clipboard c = Toolkit.getDefaultToolkit().getSystemClipboard();
+		 StringSelection text = new StringSelection(string);
+		 c.setContents(text,text);
 	}
 
 

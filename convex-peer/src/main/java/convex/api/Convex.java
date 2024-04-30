@@ -914,10 +914,17 @@ public abstract class Convex {
 
 	public Long getBalance(Address address) throws IOException {
 		try {
-			Future<Result> future = query(Lists.of(Symbols.BALANCE, address));
+			ACell code;
+			if (Utils.equals(this.address, address)) {
+				code=Special.forSymbol(Symbols.STAR_BALANCE);
+			} else {
+				code=Lists.of(Symbols.BALANCE, address);
+			}
+			Future<Result> future = query(code);
 			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
-			if (result.isError())
-				throw new Error(result.toString());
+			if (result.isError()) {
+				return null;
+			}
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
 		} catch (ExecutionException | InterruptedException | TimeoutException ex) {

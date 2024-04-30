@@ -10,9 +10,7 @@ import javax.swing.JPanel;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
-import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.data.prim.AInteger;
 import convex.core.lang.ops.Special;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.components.account.KeyPairCombo;
@@ -125,17 +123,7 @@ public class AccountChooserPanel extends JPanel {
 	private void updateBalance(Address a) {
 		try {
 			convex.query(Special.get("*balance*"),a).thenAccept(r-> {
-				ACell bal=r.getValue();
-				String s="<unknown>";
-				if (bal instanceof AInteger) {
-					balanceLabel.setBalance((AInteger)bal);
-				} else {
-					balanceLabel.setBalance(null);
-				}
-				if (r.getErrorCode()!=null) {
-
-					balanceLabel.setText(s);
-				}
+				balanceLabel.setBalance(r);
 			});
 		} catch (Throwable t) {
 			balanceLabel.setText(t.getClass().getName());
