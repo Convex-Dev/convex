@@ -11,7 +11,7 @@ import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.account.AccountChooserPanel;
-import convex.gui.components.models.StateModel;
+import convex.gui.models.StateModel;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")

@@ -12,7 +12,7 @@ import convex.core.data.Address;
 import convex.core.data.Cells;
 import convex.core.lang.RT;
 import convex.core.text.Text;
-import convex.gui.components.models.StateModel;
+import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

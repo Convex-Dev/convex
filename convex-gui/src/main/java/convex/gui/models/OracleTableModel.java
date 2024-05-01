@@ -1,6 +1,5 @@
-package convex.gui.components.models;
+package convex.gui.models;
 
-import javax.swing.table.AbstractTableModel;
 import javax.swing.table.TableModel;
 
 import convex.core.State;
@@ -17,7 +16,7 @@ import convex.core.util.Utils;
  * Model for the Oracle table
  */
 @SuppressWarnings("serial")
-public class OracleTableModel extends AbstractTableModel implements TableModel {
+public class OracleTableModel extends BaseTableModel implements TableModel {
 
 	private State state;
 	private Address oracle;

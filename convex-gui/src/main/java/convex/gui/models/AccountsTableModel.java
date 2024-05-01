@@ -1,7 +1,4 @@
-package convex.gui.components.models;
-
-import javax.swing.table.AbstractTableModel;
-import javax.swing.table.TableModel;
+package convex.gui.models;
 
 import convex.core.State;
 import convex.core.data.ACell;
@@ -14,7 +11,7 @@ import convex.core.text.Text;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")
-public class AccountsTableModel extends AbstractTableModel implements TableModel {
+public class AccountsTableModel extends BaseTableModel {
 
 	private State state;
 
@@ -48,6 +45,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object getValueAt(int rowIndex, int columnIndex) {
+		// TODO: should probably be flexible columns rather than hardcoded
 		Address address = Address.create(rowIndex);
 		AccountStatus as = getEntry(rowIndex);
 		switch (columnIndex) {

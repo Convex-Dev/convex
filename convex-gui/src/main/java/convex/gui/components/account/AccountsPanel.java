@@ -2,6 +2,7 @@ package convex.gui.components.account;
 
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
@@ -34,10 +35,13 @@ import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.Identicon;
-import convex.gui.components.models.AccountsTableModel;
-import convex.gui.components.models.StateModel;
+import convex.gui.models.AccountsTableModel;
+import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
 
+/**
+ * Panel showing account information
+ */
 @SuppressWarnings({ "serial"})
 public class AccountsPanel extends JPanel {
 	AccountsTableModel tableModel;
@@ -103,12 +107,13 @@ public class AccountsPanel extends JPanel {
 		{	
 			CellRenderer cr=new CellRenderer(JLabel.LEFT);
 			cr.setToolTipText("Address of the Convex account. This is the unique ID for the account");
+			cr.setForeground(Color.WHITE);
 			table.getColumnModel().getColumn(0).setCellRenderer(cr);
 			table.getColumnModel().getColumn(0).setPreferredWidth(80);
 		}
 		
 		{	
-			CellRenderer actorRenderer = new CellRenderer(JLabel.CENTER);
+			CellRenderer actorRenderer = new CellRenderer(JLabel.LEFT);
 			actorRenderer.setToolTipText("An Actor account is an autonomous agent or code library on the CVM. A User account can be controlled by a user with the correct key pair.");
 			table.getColumnModel().getColumn(1).setPreferredWidth(70);
 			table.getColumnModel().getColumn(1).setCellRenderer(actorRenderer);
@@ -125,7 +130,7 @@ public class AccountsPanel extends JPanel {
 			BalanceRenderer cr=new BalanceRenderer(); 
 			cr.setToolTipText("Balance of the account in Convex Coins");
 			table.getColumnModel().getColumn(3).setCellRenderer(cr);
-			table.getColumnModel().getColumn(3).setPreferredWidth(200);
+			table.getColumnModel().getColumn(3).setPreferredWidth(180);
 		}
 		
 		{	

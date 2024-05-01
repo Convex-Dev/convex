@@ -15,7 +15,7 @@ import javax.swing.table.TableColumnModel;
 import convex.core.State;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
-import convex.gui.components.models.TorusTableModel;
+import convex.gui.models.TorusTableModel;
 import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 

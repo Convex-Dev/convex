@@ -26,7 +26,7 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
-import convex.gui.components.models.OracleTableModel;
+import convex.gui.models.OracleTableModel;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

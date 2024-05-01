@@ -1,9 +1,7 @@
-package convex.gui.components.models;
+package convex.gui.models;
 
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
-
-import javax.swing.table.AbstractTableModel;
 
 import convex.core.State;
 import convex.core.data.ACell;
@@ -17,7 +15,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Reader;
 
 @SuppressWarnings("serial")
-public class TorusTableModel extends AbstractTableModel{
+public class TorusTableModel extends BaseTableModel {
 
 	protected State state;
 	protected Address torus;
