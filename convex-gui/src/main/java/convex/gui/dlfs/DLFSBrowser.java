@@ -15,7 +15,7 @@ import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
 import convex.dlfs.impl.DLFSLocal;
 import convex.gui.components.AbstractGUI;
-import convex.gui.peer.windows.state.StateExplorer;
+import convex.gui.state.StateExplorer;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 

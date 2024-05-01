@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.peer;
 
 import java.awt.BorderLayout;
 
@@ -15,7 +15,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.text.Text;
 import convex.core.util.Counters;
 import convex.gui.components.ActionPanel;
-import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 /**

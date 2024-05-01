@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.tools;
 
 import java.awt.BorderLayout;
 
@@ -20,7 +20,6 @@ import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodePane;
-import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
@@ -29,15 +28,13 @@ public class MessageFormatPanel extends JPanel {
 	final CodePane dataArea;
 	final CodePane messageArea;
 	private JPanel buttonPanel;
-	protected PeerGUI manager;
 	private JButton clearButton;
 	private JPanel upperPanel;
 	private JPanel instructionsPanel;
 	private JLabel lblNewLabel;
 	private JTextArea hashLabel;
 
-	public MessageFormatPanel(PeerGUI manager) {
-		this.manager = manager;
+	public MessageFormatPanel() {
 		setLayout(new BorderLayout(0, 0));
 		
 		instructionsPanel = new JPanel();

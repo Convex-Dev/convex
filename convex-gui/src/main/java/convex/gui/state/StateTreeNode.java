@@ -1,4 +1,4 @@
-package convex.gui.peer.windows.state;
+package convex.gui.state;
 
 import java.util.ArrayList;
 import java.util.Collections;

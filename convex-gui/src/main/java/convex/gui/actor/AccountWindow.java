@@ -8,7 +8,7 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.gui.components.AbstractGUI;
 import convex.gui.models.StateModel;
-import convex.gui.peer.windows.state.StateTreePanel;
+import convex.gui.state.StateTreePanel;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")

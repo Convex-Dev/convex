@@ -48,10 +48,9 @@ import convex.gui.components.account.KeyPairCombo;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.models.StateModel;
-import convex.gui.peer.mainpanels.AboutPanel;
-import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.peer.mainpanels.PeersListPanel;
 import convex.gui.peer.mainpanels.TorusPanel;
+import convex.gui.tools.MessageFormatPanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.peer.Server;
@@ -171,7 +170,7 @@ public class PeerGUI extends AbstractGUI {
 		}
 		
 		keyGenPanel = new KeyGenPanel(this);
-		messagePanel = new MessageFormatPanel(this);
+		messagePanel = new MessageFormatPanel();
 		accountsPanel = new AccountsPanel(convex,latestState);
 
 		setLayout(new BorderLayout());

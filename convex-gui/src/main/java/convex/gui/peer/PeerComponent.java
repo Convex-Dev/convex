@@ -29,7 +29,7 @@ import convex.gui.components.Identicon;
 import convex.gui.etch.EtchWindow;
 import convex.gui.models.StateModel;
 import convex.gui.peer.windows.PeerWindow;
-import convex.gui.peer.windows.state.StateExplorer;
+import convex.gui.state.StateExplorer;
 import convex.gui.utils.Toolkit;
 import convex.gui.wallet.WalletApp;
 import convex.peer.ConnectionManager;

@@ -1,4 +1,4 @@
-package convex.gui.peer.windows.state;
+package convex.gui.state;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;

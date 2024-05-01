@@ -19,7 +19,6 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.peer.mainpanels.MessageFormatPanel;
 import convex.gui.utils.Toolkit;
 
 /**
@@ -68,7 +67,7 @@ public class HackerTools extends AbstractGUI {
 		super ("Hacker Tools");
 		setLayout(new BorderLayout());
 		keyGenPanel = new KeyGenPanel(null);
-		messagePanel = new MessageFormatPanel(null);
+		messagePanel = new MessageFormatPanel();
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("KeyGen", keyGenPanel);
