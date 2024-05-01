@@ -64,6 +64,7 @@ public class StressPanel extends JPanel {
 	private JCheckBox syncCheckBox;
 	private JCheckBox distCheckBox;
 	private JCheckBox repeatCheckBox;
+	private JCheckBox queryCheckBox;
 	
 	private JSplitPane splitPane;
 	private JPanel resultPanel;
@@ -144,6 +145,11 @@ public class StressPanel extends JPanel {
 		repeatCheckBox=new JCheckBox();
 		optionPanel.add(repeatCheckBox);
 		repeatCheckBox.setSelected(false);
+		
+		optionPanel.add(new JLabel("Query"));
+		queryCheckBox=new JCheckBox();
+		optionPanel.add(queryCheckBox);
+		queryCheckBox.setSelected(false);
 		
 		optionPanel.add(new JLabel("Repeat timeout"));
 		repeatTimeSpinner = new JSpinner();
@@ -259,11 +265,20 @@ public class StressPanel extends JPanel {
 						ATransaction t = buildTransaction(origin, i);
 						
 						CompletableFuture<Result> fr;
-						if (syncCheckBox.isSelected()) {
-							Result r=cc.transactSync(t);
-							fr=CompletableFuture.completedFuture(r);
-						} else {	
-							fr = cc.transact(t);
+						if (queryCheckBox.isSelected()) {
+							if (syncCheckBox.isSelected()) {
+								Result r=cc.querySync(t);
+								fr=CompletableFuture.completedFuture(r);
+							} else {	
+								fr = cc.query(t);
+							}
+						} else {
+							if (syncCheckBox.isSelected()) {
+								Result r=cc.transactSync(t);
+								fr=CompletableFuture.completedFuture(r);
+							} else {	
+								fr = cc.transact(t);
+							}
 						}
 						synchronized(frs) {
 							// synchronised so we don't collide with other threads
