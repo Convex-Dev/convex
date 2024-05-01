@@ -5,7 +5,7 @@ import javax.swing.JTabbedPane;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.gui.components.AbstractGUI;
-import convex.gui.components.PeerComponent;
+import convex.gui.peer.PeerComponent;
 import etch.EtchStore;
 import net.miginfocom.swing.MigLayout;
 

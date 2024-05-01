@@ -24,6 +24,7 @@ import java.util.Iterator;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
 import javax.swing.JComponent;
@@ -54,7 +55,7 @@ import convex.gui.keys.KeyRingPanel;
 @SuppressWarnings("serial")
 public class Toolkit {
 
-	public static final double SCALE=1.5;
+	public static final double SCALE=1.4;
 	
 	public static final int ICON_SIZE = (int) (32*SCALE);
 	public static final int SMALL_ICON_SIZE = (int) (18*SCALE);
@@ -76,7 +77,7 @@ public class Toolkit {
 	
 	public static Font SYMBOL_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)SYMBOL_FONT_SIZE);
 	
-	public static final Color SYMBOL_COLOUR = new Color(150,200,255);
+	public static final Color SYMBOL_COLOUR = new Color(100,180,230);
 
 
 
@@ -329,9 +330,9 @@ public class Toolkit {
 		return BorderFactory.createEmptyBorder(x, x, x, x);
 	}
 
-	public static JTextArea makeNote(String s) {
-		JTextArea ta = new JTextArea(s);
-		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createRaisedBevelBorder(), BorderFactory.createEmptyBorder(10, 10, 10, 10));
+	public static JTextArea makeNote(String title, String note) {
+		JTextArea ta = new JTextArea(note);
+		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder(title), createEmptyBorder(10));
 		ta.setBorder(b);
 		ta.setEditable(false);
 		ta.setFocusable(false);
@@ -339,6 +340,10 @@ public class Toolkit {
 		ta.setWrapStyleWord(true);
 		ta.setLineWrap(true);
 		return ta;
+	}
+	
+	public static JTextArea makeNote(String note) {
+		return makeNote("NOTE",note);
 	}
 
 	public static void copyToClipboard(String string) {
@@ -348,5 +353,17 @@ public class Toolkit {
 		 c.setContents(text,text);
 	}
 
+	public static JComponent withTitledBorder(String title, JComponent comp) {
+		Border existingBorder=comp.getBorder();
+		Border border=BorderFactory.createTitledBorder(title);
+		if (existingBorder!=null) {
+			border=BorderFactory.createCompoundBorder(border, existingBorder);
+		}
+		comp.setBorder(border);
+		return comp;
+	}
 
+	public static Icon menuIcon(int codePoint) {
+		return SymbolIcon.get(codePoint,Toolkit.SMALL_ICON_SIZE);
+	}
 }

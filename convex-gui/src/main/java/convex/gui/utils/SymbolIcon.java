@@ -18,6 +18,8 @@ public class SymbolIcon extends ImageIcon {
 		super(image);
 	}
 	
+	private static final float SCALE_FACTOR=1.3f;
+	
 	private static SymbolIcon create(int codePoint, int size, int colour) {
 		 BufferedImage image =new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
 		 
@@ -29,11 +31,11 @@ public class SymbolIcon extends ImageIcon {
 		 label.setForeground(new Color(colour&0xffffff));
 		 
 		 // set font size so we get the correct pixel size
-		 float fontSize= 72.0f * size / Toolkit.SCREEN_RES;
+		 float fontSize= SCALE_FACTOR* 72.0f * size / Toolkit.SCREEN_RES;
 	     label.setFont(Toolkit.SYMBOL_FONT.deriveFont(fontSize));
 	     
-	     label.setHorizontalTextPosition(JLabel.CENTER);
-		 label.setVerticalTextPosition(JLabel.CENTER);
+	     label.setHorizontalAlignment(JLabel.CENTER);
+		 label.setVerticalAlignment(JLabel.CENTER);
 		
 		 label.setSize(size, size);
 	     

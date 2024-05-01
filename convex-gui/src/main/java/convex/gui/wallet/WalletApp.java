@@ -11,7 +11,6 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.peer.mainpanels.HomePanel;
-import convex.gui.peer.windows.REPLPanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -28,21 +27,27 @@ public class WalletApp extends AbstractGUI {
 
 	protected Convex convex;
 	
-	protected static final int TAB_ICON_SIZE=72;
+	protected static final int TAB_ICON_SIZE=60;
 	
 	/**
 	 * Create the application.
 	 */
 	public WalletApp(Convex convex) {
-		super ("Desktop Wallet");
+		super ("Convex Wallet");
 		this.convex=convex;
 		setLayout(new MigLayout("fill"));
+		
+		add(new AccountOverview(convex),"dock north");
 
 		addTab("Wallet", SymbolIcon.get(0xe850,TAB_ICON_SIZE), new WalletPanel(convex));
-		addTab("Keys", SymbolIcon.get(0xe73c,TAB_ICON_SIZE), new KeyRingPanel());
+		
+		KeyRingPanel keyPanel=new KeyRingPanel();
+		keyPanel.setBorder(Toolkit.createDialogBorder());
+		addTab("Keys", SymbolIcon.get(0xe73c,TAB_ICON_SIZE), keyPanel);
+		
 		addTab("QR Code", SymbolIcon.get(0xf206,TAB_ICON_SIZE), new QRPanel(convex));
-		addTab("Terminal", SymbolIcon.get(0xeb8e,TAB_ICON_SIZE), new REPLPanel(convex));
-		addTab("Settings", SymbolIcon.get(0xe8b8,TAB_ICON_SIZE), new JPanel());
+		// addTab("Terminal", SymbolIcon.get(0xeb8e,TAB_ICON_SIZE), new REPLPanel(convex));
+		addTab("Settings", SymbolIcon.get(0xe8b8,TAB_ICON_SIZE), new SettingsPanel(convex));
 		
 		this.add(tabs, "dock center");
 	}

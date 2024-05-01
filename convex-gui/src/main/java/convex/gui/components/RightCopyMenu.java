@@ -10,15 +10,14 @@ import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.text.JTextComponent;
 
-import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial") 
 public class RightCopyMenu extends JPopupMenu implements ActionListener {
 
-	JMenuItem copyMenuItem = new JMenuItem("Copy",SymbolIcon.get(0xe14d,Toolkit.SMALL_ICON_SIZE));
-	JMenuItem cutMenuItem = new JMenuItem("Cut",SymbolIcon.get(0xf08b,Toolkit.SMALL_ICON_SIZE));
-    JMenuItem pasteMenuItem = new JMenuItem("Paste",SymbolIcon.get(0xe14f,Toolkit.SMALL_ICON_SIZE));
+	JMenuItem copyMenuItem = new JMenuItem("Copy",Toolkit.menuIcon(0xe14d));
+	JMenuItem cutMenuItem = new JMenuItem("Cut",Toolkit.menuIcon(0xf08bE));
+    JMenuItem pasteMenuItem = new JMenuItem("Paste",Toolkit.menuIcon(0xe14f));
     
     JTextComponent comp;
     

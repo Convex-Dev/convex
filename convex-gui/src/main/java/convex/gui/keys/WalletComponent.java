@@ -94,8 +94,9 @@ public class WalletComponent extends BaseListComponent {
 				JPanel panel=new JPanel();
 				panel.setLayout(new MigLayout("wrap 1","[200]"));
 				panel.add(new Identicon(kp.getAccountKey()),"align center");
-				panel.add(new CodeLabel(kp.getSeed().toString()),"span,grow");
-				panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"span,grow");
+				
+				panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString()))); 
+				panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
 				panel.setBorder(Toolkit.createDialogBorder());
 				JOptionPane.showMessageDialog(WalletComponent.this, panel,"Ed25519 Private Seed",JOptionPane.INFORMATION_MESSAGE);
 			} else {

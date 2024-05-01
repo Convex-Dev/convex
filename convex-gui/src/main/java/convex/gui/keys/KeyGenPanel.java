@@ -31,7 +31,7 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class KeyGenPanel extends JPanel {
 
-	private static final String NOTE_CONSTRAINT = "align 50%,span 2,width 100:500:700";
+	private static final String NOTE_CONSTRAINT = "align 50%,span 2,width 100:600:1000";
 	private static final String TEXTAREA_CONSTRAINT = "grow,width 10:500:800";
 	JTextArea mnemonicArea;
 	JPasswordField passArea;
@@ -245,7 +245,7 @@ public class KeyGenPanel extends JPanel {
 			}));
 		}
 		
-		addNote("NOTE: Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. Instead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
+		addNote("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. Instead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
 		
 		{
 			addLabel("SLIP-10 Master Key");
@@ -284,7 +284,7 @@ public class KeyGenPanel extends JPanel {
 			derivedKeyArea.setText("(not ready)");
 		}
 		
-		addNote("NOTE: The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed. This is all you strictly need to sign transactions in Convex. Any 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
+		addNote("The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed. This is all you strictly need to sign transactions in Convex. Any 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
 
 
 		{
@@ -358,7 +358,7 @@ public class KeyGenPanel extends JPanel {
 	}
 
 	private void addNote(String s) {
-		JTextArea ta = Toolkit.makeNote(s);
+		JTextArea ta = Toolkit.makeNote("NOTE",s);
 		formPanel.add(ta,NOTE_CONSTRAINT);
 	}
 

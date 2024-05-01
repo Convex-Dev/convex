@@ -29,10 +29,10 @@ import convex.core.lang.Symbols;
 import convex.core.lang.impl.Fn;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
 import convex.gui.components.Toast;
+import convex.gui.components.account.AccountChooserPanel;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 

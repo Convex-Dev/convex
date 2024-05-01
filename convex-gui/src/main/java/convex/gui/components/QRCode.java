@@ -16,18 +16,19 @@ import convex.core.util.Utils;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class QRCodePanel extends JPanel {
+public class QRCode extends JPanel {
 
 	protected final String data;
 	protected  BufferedImage image;
 
-	public QRCodePanel(String data, int scale) {
+	public QRCode(String data, int scale) {
 		this.data=data;
 	
 		image=createQR(data,scale);
 		
 		this.setLayout(new MigLayout());
 		this.setMinimumSize(new Dimension(image.getWidth(),image.getHeight()));
+		this.setToolTipText(data);
 	}
 
 	public static  BufferedImage createQR(String data,int scale) {

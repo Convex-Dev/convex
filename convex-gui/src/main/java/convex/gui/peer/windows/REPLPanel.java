@@ -46,10 +46,10 @@ import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
-import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.BaseTextPane;
 import convex.gui.components.CodePane;
+import convex.gui.components.account.AccountChooserPanel;
 import convex.gui.utils.CVXHighlighter;
 import net.miginfocom.swing.MigLayout;
 

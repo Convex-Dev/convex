@@ -6,8 +6,8 @@ import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
-import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.account.AccountChooserPanel;
 
 @SuppressWarnings("serial")
 public class DeployPanel extends JPanel {

@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.components.account;
 
 import java.awt.event.ItemEvent;
 
@@ -12,8 +12,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.data.Address;
 import convex.core.lang.ops.Special;
-import convex.gui.components.account.AddressCombo;
-import convex.gui.components.account.KeyPairCombo;
+import convex.gui.components.BalanceLabel;
 import net.miginfocom.swing.MigLayout;
 
 /**

@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JFrame;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -17,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.util.Utils;
+import convex.gui.components.ConnectPanel;
 import convex.gui.peer.windows.REPLPanel;
 import convex.gui.utils.Toolkit;
 
@@ -51,10 +51,7 @@ public class ConvexClient extends JPanel {
 		// call to set up Look and Feel
 		Toolkit.init();
 
-		String DEFAULT="localhost:18888";
-		String hostAddress=JOptionPane.showInputDialog("Enter Peer Address (default to "+DEFAULT+")");
-		if (hostAddress.isBlank()) hostAddress=DEFAULT;
-		Convex convex=Convex.connect(Utils.toInetSocketAddress(hostAddress));
+		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		EventQueue.invokeLater(()->launch(convex));
 	}
 

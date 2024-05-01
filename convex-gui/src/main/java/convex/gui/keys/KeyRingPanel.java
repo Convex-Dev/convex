@@ -6,6 +6,7 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JTextArea;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,6 +45,9 @@ public class KeyRingPanel extends JPanel {
 	 */
 	public KeyRingPanel() {
 		setLayout(new MigLayout());
+		
+		JTextArea note=Toolkit.makeNote("This is a list of currentltly loaded crytographic keys. Locked keys cannot be used until unlocked.");
+		add(note,"dock north");
 
 		// Scrollable list of wallet entries
 		walletList = new ScrollyList<AWalletEntry>(listModel, we -> new WalletComponent(we));

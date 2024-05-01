@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.peer;
 
 import java.awt.Color;
 import java.awt.Dimension;
@@ -16,7 +16,6 @@ import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.gui.peer.PeerGUI;
 import convex.peer.Server;
 
 /**

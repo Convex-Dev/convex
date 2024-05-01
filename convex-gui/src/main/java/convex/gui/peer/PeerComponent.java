@@ -1,4 +1,4 @@
-package convex.gui.components;
+package convex.gui.peer;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -21,12 +21,17 @@ import convex.core.data.Address;
 import convex.core.data.PeerStatus;
 import convex.core.text.Text;
 import convex.gui.client.ConvexClient;
+import convex.gui.components.BaseImageButton;
+import convex.gui.components.BaseListComponent;
+import convex.gui.components.CodeLabel;
+import convex.gui.components.DropdownMenu;
+import convex.gui.components.Identicon;
 import convex.gui.components.models.StateModel;
 import convex.gui.etch.EtchWindow;
-import convex.gui.peer.PeerGUI;
 import convex.gui.peer.windows.PeerWindow;
 import convex.gui.peer.windows.state.StateExplorer;
 import convex.gui.utils.Toolkit;
+import convex.gui.wallet.WalletApp;
 import convex.peer.ConnectionManager;
 import convex.peer.Server;
 import etch.EtchStore;
@@ -97,7 +102,7 @@ public class PeerComponent extends BaseListComponent {
 		// Setup popup menu for peer
 		JPopupMenu popupMenu = new JPopupMenu();
 
-		JMenuItem closeButton = new JMenuItem("Shutdown Peer");
+		JMenuItem closeButton = new JMenuItem("Shutdown Peer",Toolkit.menuIcon(0xe8ac));
 		closeButton.addActionListener(e -> {
 			try {
 				server.shutdown();
@@ -107,33 +112,36 @@ public class PeerComponent extends BaseListComponent {
 		});
 		popupMenu.add(closeButton);
 
-		JMenuItem exploreButton = new JMenuItem("Explore state");
+		JMenuItem exploreButton = new JMenuItem("Explore state",Toolkit.menuIcon(0xe97a));
 		exploreButton.addActionListener(e -> {
 			launchExploreWindow(convex);
 		});
 		popupMenu.add(exploreButton);
 
 		if (server.getStore() instanceof EtchStore) {
-			JMenuItem storeButton = new JMenuItem("Explore Etch store");
+			JMenuItem storeButton = new JMenuItem("Explore Etch store",Toolkit.menuIcon(0xf80e));
 			storeButton.addActionListener(e -> {
 				launchEtchWindow(convex);
 			});
 			popupMenu.add(storeButton);
 		}
 		
-		JMenuItem killConn = new JMenuItem("Kill Connections");
+		JMenuItem killConn = new JMenuItem("Kill Connections",Toolkit.menuIcon(0xe16f));
 		killConn.addActionListener(e -> {
 			server.getConnectionManager().closeAllConnections();
 		});
 		popupMenu.add(killConn);
 
-		JMenuItem replButton = new JMenuItem("Launch REPL");
+		JMenuItem replButton = new JMenuItem("Launch REPL",Toolkit.menuIcon(0xeb8e));
 		replButton.addActionListener(e -> launchPeerWindow(this.convex));
 		popupMenu.add(replButton);
 		
-		JMenuItem clientButton = new JMenuItem("Connect Client");
-		clientButton.addActionListener(e -> launchClientWindow(convex));
-		popupMenu.add(clientButton);
+		JMenuItem walletButton = new JMenuItem("Open Wallet",Toolkit.menuIcon(0xe850));
+		walletButton.addActionListener(e -> {
+			new WalletApp(convex).run();
+		});
+		popupMenu.add(walletButton);
+
 
 
 		DropdownMenu dm = new DropdownMenu(popupMenu);
@@ -168,7 +176,7 @@ public class PeerComponent extends BaseListComponent {
 		description.select(ss, se);
 	}
 
-	private void launchClientWindow(Convex peer) {
+	protected void launchClientWindow(Convex peer) {
 		try {
 			Convex convex = ConvexRemote.connect(peer.getHostAddress());
 			Address addr=peer.getAddress();

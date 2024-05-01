@@ -12,9 +12,9 @@ import org.slf4j.LoggerFactory;
 import convex.api.ConvexLocal;
 import convex.core.State;
 import convex.core.data.Address;
-import convex.gui.components.AccountChooserPanel;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
+import convex.gui.components.account.AccountChooserPanel;
 
 /**
  * Panel displaying current prediction markets
