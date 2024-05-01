@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.peer;
 
 import java.awt.BorderLayout;
 import java.io.IOException;
@@ -34,8 +34,6 @@ import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.peer.PeerComponent;
-import convex.gui.peer.PeerGUI;
 import convex.peer.API;
 import convex.peer.Server;
 

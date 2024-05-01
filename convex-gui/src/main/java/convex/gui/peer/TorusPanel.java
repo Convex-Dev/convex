@@ -1,4 +1,4 @@
-package convex.gui.peer.mainpanels;
+package convex.gui.peer;
 
 import java.awt.BorderLayout;
 import java.awt.event.MouseAdapter;
@@ -16,7 +16,6 @@ import convex.core.State;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.models.TorusTableModel;
-import convex.gui.peer.PeerGUI;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")

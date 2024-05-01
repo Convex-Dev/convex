@@ -48,8 +48,6 @@ import convex.gui.components.account.KeyPairCombo;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.models.StateModel;
-import convex.gui.peer.mainpanels.PeersListPanel;
-import convex.gui.peer.mainpanels.TorusPanel;
 import convex.gui.tools.MessageFormatPanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
@@ -95,7 +93,7 @@ public class PeerGUI extends AbstractGUI {
 				PeerGUI manager = new PeerGUI(peerNum,genesis);
 				JFrame frame = new JFrame();
 				manager.frame=frame;
-				frame.setTitle("Testnet Peer Manager");
+				frame.setTitle("Peer Manager");
 				frame.setIconImage(Toolkit.getDefaultToolkit()
 						.getImage(PeerGUI.class.getResource("/images/Convex.png")));
 				frame.setBounds(200, 150, 1000, 800);
@@ -178,7 +176,7 @@ public class PeerGUI extends AbstractGUI {
 		tabs = new JTabbedPane();
 		this.add(tabs, BorderLayout.CENTER);
 
-		tabs.add("Peers", peerPanel);
+		tabs.add("Servers", peerPanel);
 		tabs.add("Accounts", accountsPanel);
 		tabs.add("Keyring", keyRingPanel);
 		tabs.add("KeyGen", keyGenPanel);

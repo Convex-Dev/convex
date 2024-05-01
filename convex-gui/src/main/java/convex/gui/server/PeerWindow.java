@@ -1,4 +1,4 @@
-package convex.gui.peer.windows;
+package convex.gui.server;
 
 import java.awt.Dimension;
 
@@ -12,10 +12,14 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.gui.components.AbstractGUI;
+import convex.gui.panels.REPLPanel;
 import convex.gui.peer.PeerComponent;
 import convex.peer.Server;
 import net.miginfocom.swing.MigLayout;
 
+/**
+ * GUI representing a view of a single local peer Server
+ */
 @SuppressWarnings("serial")
 public class PeerWindow extends AbstractGUI {
 	ConvexLocal peer;

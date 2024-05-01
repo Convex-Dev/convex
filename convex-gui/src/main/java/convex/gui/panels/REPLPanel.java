@@ -1,4 +1,4 @@
-package convex.gui.peer.windows;
+package convex.gui.panels;
 		
 import java.awt.Color;
 import java.awt.Component;

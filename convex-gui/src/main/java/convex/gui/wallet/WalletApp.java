@@ -10,7 +10,7 @@ import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.peer.mainpanels.HomePanel;
+import convex.gui.panels.HomePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;

@@ -1,4 +1,4 @@
-package convex.gui.peer.windows;
+package convex.gui.server;
 
 import java.awt.BorderLayout;
 import java.awt.event.ActionEvent;
