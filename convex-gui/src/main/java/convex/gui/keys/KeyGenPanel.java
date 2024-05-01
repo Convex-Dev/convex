@@ -21,6 +21,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.util.Utils;
+import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.Identicon;
 import convex.gui.components.RightCopyMenu;
@@ -321,29 +322,27 @@ public class KeyGenPanel extends JPanel {
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
-		JButton btnRecreate = new JButton("Generate");
-		actionPanel.add(btnRecreate);
-		btnRecreate.addActionListener(e -> {
+		JButton btnRecreate = new ActionButton("Generate",0xe5d5,e -> {
 			Integer wc=(Integer) numSpinner.getValue();
 			mnemonicArea.setText(BIP39.createSecureMnemonic(wc));
 			updateMnemonic();
 		});
+		actionPanel.add(btnRecreate);
 		
 		numSpinner = new JSpinner();
 		numSpinner.setModel(new SpinnerNumberModel(12, 3, 30, 1));
 		actionPanel.add(numSpinner);
 
-		JButton btnNewButton = new JButton("Export...");
+		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{});
 		actionPanel.add(btnNewButton);
 		
 		{ // Button to Normalise Mnemonic string
-			JButton btnNormalise = new JButton("Normalise Mnemonic");
-			actionPanel.add(btnNormalise);
-			btnNormalise.addActionListener(e -> { 
+			JButton btnNormalise = new ActionButton("Normalise Mnemonic",0xf0ff,e -> { 
 				String s=mnemonicArea.getText();
 				mnemonicArea.setText(BIP39.normalise(s));
 				updateMnemonic();
 			});
+			actionPanel.add(btnNormalise);
 		}
 
 		actionPanel.add(addWalletButton);

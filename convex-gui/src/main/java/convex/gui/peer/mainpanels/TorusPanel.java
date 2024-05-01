@@ -13,6 +13,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumnModel;
 
 import convex.core.State;
+import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.models.TorusTableModel;
 import convex.gui.peer.PeerGUI;
@@ -72,11 +73,10 @@ public class TorusPanel extends JPanel {
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
-		JButton btnCopy = new JButton("New Token");
-		actionPanel.add(btnCopy);
-		btnCopy.addActionListener(e -> {
+		JButton btnCopy = new ActionButton("New Token",0xe145,e -> {
 			// TODO:;
 		});
+		actionPanel.add(btnCopy);
 
 		// Turn off auto-resize, since we want a scrollable table
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);

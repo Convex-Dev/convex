@@ -65,7 +65,8 @@ public class StateTreePanel extends JPanel {
 			} else if (a instanceof ACountable) {
 				return Utils.getClass(a).getSimpleName();
 			} else {
-				return RT.print(a).toString();
+				AString s=RT.print(a);
+				return (s==null)?"<too big>":s.toString();
 			}
 		}
 

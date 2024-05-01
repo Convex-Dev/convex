@@ -60,7 +60,7 @@ public class AccountsTableModel extends AbstractTableModel implements TableModel
 			return (seq>=0)?seq:"";
 		}
 		case 3:
-			return Text.toFriendlyBalance(as.getBalance());
+			return as.getBalance();
 		case 4: {
 			ACell o = as.getHoldings().get(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";

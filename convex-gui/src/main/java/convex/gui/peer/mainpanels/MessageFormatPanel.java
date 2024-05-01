@@ -88,7 +88,7 @@ public class MessageFormatPanel extends JPanel {
 		buttonPanel = new ActionPanel();
 		add(buttonPanel, BorderLayout.SOUTH);
 
-		clearButton = new JButton("Clear");
+		clearButton = new JButton("Clear",Toolkit.menuIcon(0xe835));
 		clearButton.setToolTipText("Press to clear the input areas");
 		clearButton.addActionListener(e -> {
 			dataArea.setText("");

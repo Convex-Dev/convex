@@ -15,16 +15,16 @@ import javax.swing.text.StyledDocument;
  */
 @SuppressWarnings("serial")
 public class BaseTextPane extends JTextPane {
-	private static final StyleContext sc = StyleContext.getDefaultStyleContext();
+	protected static final StyleContext styleContext = StyleContext.getDefaultStyleContext();
 
 	
 	public void append(String text, Color c, Integer size) {
 		AttributeSet aset = SimpleAttributeSet.EMPTY;
 		if (c!=null) {
-			aset=sc.addAttribute(aset, StyleConstants.Foreground, c);
+			aset=styleContext.addAttribute(aset, StyleConstants.Foreground, c);
 		}
 		if (size!=null) {
-			aset=sc.addAttribute(aset, StyleConstants.FontSize, size);
+			aset=styleContext.addAttribute(aset, StyleConstants.FontSize, size);
 		}
 
 		StyledDocument d=getStyledDocument();

@@ -2,6 +2,7 @@ package convex.gui.components.account;
 
 
 import java.awt.BorderLayout;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.datatransfer.Clipboard;
@@ -20,6 +21,7 @@ import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
+import javax.swing.table.TableCellRenderer;
 
 import convex.api.Convex;
 import convex.core.State;
@@ -28,7 +30,9 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.util.Utils;
 import convex.gui.actor.AccountWindow;
+import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.BalanceLabel;
 import convex.gui.components.Identicon;
 import convex.gui.components.models.AccountsTableModel;
 import convex.gui.components.models.StateModel;
@@ -59,6 +63,22 @@ public class AccountsPanel extends JPanel {
 		public void setValue(Object value) {
 			setText((value==null)?"":value.toString());
 			setIcon(Identicon.createIcon((AArrayBlob) value,24));
+		}
+	}
+	
+	static class BalanceRenderer extends BalanceLabel implements TableCellRenderer {
+
+		@Override
+		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
+				int row, int column) {
+			this.setAlignmentX(RIGHT_ALIGNMENT);
+			this.setSize(table.getColumnModel().getColumn(column).getWidth(), getHeight());
+			if (value==null) {
+				setBalance(0);
+			} else {
+				this.setBalance((Long)value);
+			}
+			return this;
 		}
 	}
 
@@ -102,10 +122,10 @@ public class AccountsPanel extends JPanel {
 		}
 		
 		{
-			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			BalanceRenderer cr=new BalanceRenderer(); 
 			cr.setToolTipText("Balance of the account in Convex Coins");
 			table.getColumnModel().getColumn(3).setCellRenderer(cr);
-			table.getColumnModel().getColumn(3).setPreferredWidth(180);
+			table.getColumnModel().getColumn(3).setPreferredWidth(200);
 		}
 		
 		{	
@@ -165,9 +185,7 @@ public class AccountsPanel extends JPanel {
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
-		JButton btnActor = new JButton("Examine Account...");
-		actionPanel.add(btnActor);
-		btnActor.addActionListener(e -> {
+		JButton btnActor = new ActionButton("Examine Account...",0xf5e1,e -> {
 			long ix=table.getSelectedRow();
 			if (ix<0) return;
 			AccountStatus as = tableModel.getEntry(ix);
@@ -176,6 +194,7 @@ public class AccountsPanel extends JPanel {
 			AccountWindow pw = new AccountWindow(convex, model, addr);
 			pw.run();
 		});
+		actionPanel.add(btnActor);
 
 		// Turn off auto-resize, since we want a scrollable table
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);

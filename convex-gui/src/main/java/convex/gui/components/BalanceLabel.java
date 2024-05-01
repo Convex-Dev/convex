@@ -5,6 +5,9 @@ import java.math.BigInteger;
 
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.SimpleAttributeSet;
+import javax.swing.text.StyleConstants;
 
 import convex.api.Convex;
 import convex.core.ErrorCodes;
@@ -46,6 +49,13 @@ public class BalanceLabel extends BaseTextPane {
 	
 	public BalanceLabel() {
 		this.setEditable(false);
+		
+		AttributeSet attribs = new SimpleAttributeSet();
+		attribs=styleContext.addAttribute(attribs, StyleConstants.Alignment, StyleConstants.ALIGN_RIGHT);
+		attribs=styleContext.addAttribute(attribs, StyleConstants.FontFamily, getFont().getFamily());
+		//StyleConstants.setAlignment(attribs, StyleConstants.ALIGN_RIGHT);
+		//StyleConstants.setFontFamily(attribs, Font.PLAIN);
+		this.setParagraphAttributes(attribs, true);
 	}
 	
 	public void setBalance(long a) {

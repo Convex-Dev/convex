@@ -46,7 +46,7 @@ public class KeyRingPanel extends JPanel {
 	public KeyRingPanel() {
 		setLayout(new MigLayout());
 		
-		JTextArea note=Toolkit.makeNote("This is a list of currentltly loaded crytographic keys. Locked keys cannot be used until unlocked.");
+		JTextArea note=Toolkit.makeNote("These are currently loaded keys. Locked keys cannot be used until unlocked. Keys that are unlocked are accessible to users with control over the local machine - DO NOT unlock high value keys unless you are confident that your machine is secure.");
 		add(note,"dock north");
 
 		// Scrollable list of wallet entries
@@ -57,7 +57,7 @@ public class KeyRingPanel extends JPanel {
 		JPanel toolBar = new ActionPanel();
 
 		// new wallet button
-		JButton btnNew = new JButton("New Keypair");
+		JButton btnNew = new JButton("New Keypair",Toolkit.menuIcon(0xe145));
 		btnNew.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
 		toolBar.add(btnNew);
 		btnNew.addActionListener(e -> {
@@ -71,11 +71,11 @@ public class KeyRingPanel extends JPanel {
 		});
 		
 		// new wallet button
-		JButton btnImportSeed = new JButton("Import Seed....");
+		JButton btnImportSeed = new JButton("Import Seed....",Toolkit.menuIcon(0xe890));
 		btnImportSeed.setToolTipText("Import a key pair using an Ed25519 seed");
 		toolBar.add(btnImportSeed);
 		btnImportSeed.addActionListener(e -> {
-			String sd=JOptionPane.showInputDialog("Enter Ed25519 Seed");
+			String sd=(String) JOptionPane.showInputDialog(this,"Enter Ed25519 Seed","Import private key",JOptionPane.QUESTION_MESSAGE,Toolkit.menuIcon(0xe890),null,"");
 			if (sd==null) return;
 			Blob seed=Blob.parse(sd);
 			if (seed==null) return;
