@@ -111,10 +111,9 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		return create(things, 0, things.length);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public final <R extends ACell> AVector<R> toVector() {
-		return (AVector<R>) this;
+	public final AVector<T> toVector() {
+		return this;
 	}
 
 	@SuppressWarnings("unchecked")

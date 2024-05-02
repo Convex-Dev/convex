@@ -184,7 +184,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 
 		AVector<ACell> syms = Format.read(b,epos);
 		epos+=Format.getEncodingLength(syms);
-		AVector<AOp<?>> ops = Format.read(b,epos);
+		AVector<AOp<ACell>> ops = Format.read(b,epos);
 		epos+=Format.getEncodingLength(ops);
 		
 		Let<T> result= create(syms, ops.toVector(),isLoop);

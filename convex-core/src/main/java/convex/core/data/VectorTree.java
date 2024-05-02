@@ -541,12 +541,10 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		return this;
 	}
 	
-
-	@SuppressWarnings("unchecked")
 	@Override
-	public final <R extends ACell> AVector<R> toVector() {
+	public final AVector<T> toVector() {
 		assert (isCanonical());
-		return (AVector<R>) this;
+		return this;
 	}
 
 	@Override

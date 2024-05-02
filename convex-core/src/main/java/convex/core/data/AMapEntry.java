@@ -55,7 +55,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 
 	@Override
 	public AVector<ACell> append(ACell value) {
-		return toVector().append(value);
+		return (AVector<ACell>) toVector().append(value);
 	}
 
 	@Override

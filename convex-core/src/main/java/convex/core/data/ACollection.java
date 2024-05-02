@@ -152,7 +152,7 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	 * Converts this collection to a canonical vector of elements
 	 * @return This collection coerced to a vector
 	 */
-	public abstract <R extends ACell> AVector<R> toVector();
+	public abstract AVector<T> toVector();
 
 	/**
 	 * Copies the elements of this collection in order to an array at the specified offset

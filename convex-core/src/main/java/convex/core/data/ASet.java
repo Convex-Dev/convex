@@ -79,7 +79,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	public abstract ASet<T> disjAll(ACollection<T> xs);
 
 	@Override
-	public <R extends ACell> AVector<R> toVector() {
+	public AVector<T> toVector() {
 		int n=Utils.checkedInt(count);
 		ACell[] elements=new ACell[n];
 		copyToArray(elements,0);

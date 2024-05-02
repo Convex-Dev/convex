@@ -197,8 +197,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> AVector<R> toVector() {
-		return new VectorLeaf<R>(new Ref[] { keyRef, valueRef });
+	public AVector<ACell> toVector() {
+		return new VectorLeaf<ACell>(new Ref[] { keyRef, valueRef });
 	}
 
 	@Override
@@ -285,9 +285,10 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return toVector().concat(b);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> AVector<R> subVector(long start, long length) {
-		AVector<R> vec=toVector();
+		AVector<R> vec=(AVector<R>) toVector();
 		return vec.subVector(start, length);
 	}
 

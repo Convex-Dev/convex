@@ -42,7 +42,7 @@ public class List<T extends ACell> extends AList<T> {
 
 	private List(AVector<T> data) {
 		super(data.count);
-		this.data = data.toVector(); // ensure canonical, not a mapentry etc.
+		this.data = (AVector<T>) data.toVector(); // ensure canonical, not a mapentry etc.
 	}
 	
 	/**
