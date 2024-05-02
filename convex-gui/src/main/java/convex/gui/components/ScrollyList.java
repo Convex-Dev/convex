@@ -27,7 +27,7 @@ public class ScrollyList<E> extends JScrollPane {
 	private final ListModel<E> model;
 	private final ScrollablePanel listPanel = new ScrollablePanel();
 
-	public void refreshList() {
+	private void refreshList() {
 		EventQueue.invokeLater(()->{;
 			listPanel.removeAll();
 			int n = model.getSize();
@@ -81,12 +81,20 @@ public class ScrollyList<E> extends JScrollPane {
 		model.addListDataListener(new ListDataListener() {
 			@Override
 			public void intervalAdded(ListDataEvent e) {
-				refreshList();
+				int start=e.getIndex0();
+				int last=e.getIndex1();
+				for (int i=start; i<=last; i++) {
+					listPanel.add(builder.apply(model.getElementAt(i)),"span");
+				}
 			}
 
 			@Override
 			public void intervalRemoved(ListDataEvent e) {
-				refreshList();
+				int start=e.getIndex0();
+				int last=e.getIndex1();
+				for (int i=start; i<=last; i++) {
+					listPanel.remove(start);;
+				}
 			}
 
 			@Override

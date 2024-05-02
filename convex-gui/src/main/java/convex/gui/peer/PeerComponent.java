@@ -197,8 +197,11 @@ public class PeerComponent extends BaseListComponent {
 			State state=server.getPeer().getConsensusState();
 			AccountKey paddr=server.getPeerKey();
 			// sb.append("0x"+paddr.toChecksumHex()+"\n");
-			sb.append("Local peer on: " + server.getHostAddress() + " with store "+server.getStore().shortName()+"\n");
-			
+			if (server.isLive()) {
+				sb.append("Local peer on: " + server.getHostAddress() + " with store "+server.getStore().shortName()+"\n");
+			} else {
+				sb.append("Inactive Peer\n");
+			}
 			PeerStatus ps=state.getPeer(paddr);
 			if (ps!=null) {
 				sb.append("Peer Stake:  "+Text.toFriendlyBalance(ps.getPeerStake()));
@@ -206,7 +209,7 @@ public class PeerComponent extends BaseListComponent {
 				sb.append("Delegated Stake:  "+Text.toFriendlyBalance(ps.getDelegatedStake()));
 				sb.append("    ");
 			} else {
-				sb.append("Not currently a rgistered peer    ");
+				sb.append("Not currently a registered peer    ");
 			}
 			ConnectionManager cm=server.getConnectionManager();
 			sb.append("Connections: "+cm.getConnectionCount());				

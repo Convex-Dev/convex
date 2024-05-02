@@ -1918,6 +1918,10 @@ public class CoreTest extends ACVMTest {
 
 		// Map with sets works like conj'ing in each result in turn
 		assertEquals(Sets.of(4,5,6),eval("(map (fn [a b] b) #{1 2 3} [4 5 6])"));
+		
+		// Map over an index
+		assertEquals(Vectors.of(4,5,6),eval("(map second (into (index) {0x 4 0x01 5 0x0001 6}))"));
+		
 
 		// CAST error if any following arguments are not a data structure
 		assertCastError(step("(map inc 1)"));

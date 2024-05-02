@@ -43,6 +43,7 @@ public class BlockViewComponent extends JPanel {
 		
 		Server server=peerView.getLocalServer();
 		if (server==null) return; // not a local server
+		if (!server.isLive()) return;
 		
 		AStore tempStore=Stores.current(); // just in case, since we are reading from a specific peer
 		try {

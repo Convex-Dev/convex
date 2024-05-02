@@ -296,7 +296,12 @@ public class PeerGUI extends AbstractGUI {
 	}
 
 	public ConvexLocal getDefaultConvex() {
-		return peerList.getElementAt(0);
+		int n=peerList.size();
+		for (int i=0; i<n; i++) {
+			ConvexLocal c= peerList.get(i);
+			if (c.getLocalServer().isLive()) return c;
+		}
+		throw new IllegalStateException("No live peers!");
 	}
 	
 	public Convex getClientConvex(Address contract) {
@@ -347,7 +352,7 @@ public class PeerGUI extends AbstractGUI {
 		for (int i=0; i<n; i++) {
 			ConvexLocal c=peerList.elementAt(i);
 			Server s=c.getLocalServer();
-			if (s!=null) {
+			if ((s!=null)&&(s.isLive())) {
 				found+=1;
 				if (Math.random()*found<=1.0) {
 					result=s;
@@ -362,7 +367,7 @@ public class PeerGUI extends AbstractGUI {
 		for (int i=0; i<n; i++) {
 			ConvexLocal c=peerList.elementAt(i);
 			Server s=c.getLocalServer();
-			if (s!=null) {
+			if ((s!=null)&&s.isLive()) {
 				return s;
 			}
 		}
@@ -394,7 +399,7 @@ public class PeerGUI extends AbstractGUI {
 		
 		try {
 			Server base=getPrimaryServer();
-			ConvexLocal convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
+			ConvexLocal convex=getDefaultConvex();
 			Address a= convex.createAccountSync(kp.getAccountKey());
 			long amt=convex.getBalance()/10;
 			convex.transferSync(a, amt);

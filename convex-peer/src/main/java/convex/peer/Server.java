@@ -131,16 +131,16 @@ public class Server implements Closeable {
 	 * Flag for a running server. Setting to false will terminate server threads.
 	 */
 	private volatile boolean isRunning = false;
+	
+	/**
+	 * Flag for a live server. Live Server has synced with at least one other peer
+	 */
+	private volatile boolean isLive = false;
 
 	/**
 	 * NIO Server instance
 	 */
 	private NIOServer nio = NIOServer.create(this);
-
-	/**
-	 * The Peer Controller Address
-	 */
-	private Address controller;
 
 	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
 		this.config = config;
@@ -190,7 +190,6 @@ public class Server implements Closeable {
 			// TODO: not a problem?
 			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
 		}
-		this.setPeerController(controlAddress);
 	}
 
 	private Peer establishPeer() throws TimeoutException, IOException {
@@ -376,6 +375,7 @@ public class Server implements Closeable {
 				}
 			}
 
+			goLive();
 			log.info( "Peer Server started at "+nio.getHostAddress()+" with Peer Address: {}",getPeerKey());
 		} catch (Exception e) {
 			close();
@@ -383,6 +383,10 @@ public class Server implements Closeable {
 		} finally {
 			Stores.setCurrent(savedStore);
 		}
+	}
+
+	private void goLive() {
+		isLive=true;
 	}
 
 	/**
@@ -515,15 +519,7 @@ public class Server implements Closeable {
 	 * @return Peer controller Address
 	 */
 	public Address getPeerController() {
-		return controller;
-	}
-
-	/**
-	 * Sets the Peer controller Address
-	 * @param a Peer Controller Address to set
-	 */
-	public void setPeerController(Address a) {
-		controller=a;
+		return getPeer().getController();
 	}
 
 	/**
@@ -679,7 +675,8 @@ public class Server implements Closeable {
 
 	@Override
 	public void close() {
-		if (!isRunning) return;
+		if (!isRunning) return; // already shut down
+		isLive=false;
 		isRunning = false;
 		
 		// Shut down propagator first, no point sending any more Beliefs
@@ -770,6 +767,10 @@ public class Server implements Closeable {
 	}
 
 	public boolean isLive() {
+		return isLive;
+	}
+	
+	public boolean isRunning() {
 		return isRunning;
 	}
 
@@ -806,12 +807,13 @@ public class Server implements Closeable {
 		try {
 			AKeyPair kp= getKeyPair();
 			AccountKey key=kp.getAccountKey();
-			Convex convex=Convex.connect(this, controller,kp);
+			Convex convex=Convex.connect(this, getPeerController(),kp);
 			Result r=convex.transactSync("(set-peer-stake "+key+" 0)");
 			if (r.isError()) {
 				log.warn("Unable to remove Peer stake: "+r);
 			}
 		} finally {
+			isLive=false;
 			close();
 		}
 	}

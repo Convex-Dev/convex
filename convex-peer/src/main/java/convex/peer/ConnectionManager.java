@@ -192,47 +192,50 @@ public class ConnectionManager extends AThreadedComponent {
 
 		// refresh peers list
 		currentPeerCount=connections.size();
-		peers = connections.keySet().toArray(new AccountKey[currentPeerCount]);
-		if (peers.length<targetPeerCount) {
-			// Connect to a random peer with host address by stake
-			// SECURITY: stake weighted connection is important to avoid bad peers
-			// influencing the connection pool
-
-			Set<AccountKey> potentialPeers=s.getPeers().keySet();
-			InetSocketAddress target=null;
-			double accStake=0.0;
-			for (ACell c:potentialPeers) {
-				AccountKey peerKey=RT.ensureAccountKey(c);
-				if (connections.containsKey(peerKey)) continue; // skip if already connected
-
-				if (server.getPeerKey().equals(peerKey)) continue; // don't connect to self!!
-
-				PeerStatus ps=s.getPeers().get(peerKey);
-				if (ps==null) continue; // skip
-				AString hostName=ps.getHostname();
-				if (hostName==null) continue;
-				InetSocketAddress maybeAddress=Utils.toInetSocketAddress(hostName.toString());
-				if (maybeAddress==null) continue;
-				long peerStake=ps.getTotalStake();
-				if (peerStake>0) {
-					double t=random.nextDouble()*(accStake+peerStake);
-					if (t>=accStake) {
-						target=maybeAddress;
-					}
-					accStake+=peerStake;
-				}
-			}
-
-			if (target!=null) {
-				// Try to connect to Peer. If it fails, no worry, will retry another peer next time
-				boolean success=connectToPeer(target) != null;
-				if (!success) {
-					log.warn("Failed to connect to Peer at "+target);
-				}
-			}
+		if (currentPeerCount<targetPeerCount) {
+			tryRandomConnect(s);
 		}
 		
 		lastConnectionUpdate=Utils.getCurrentTimestamp();
+	}
+
+	private void tryRandomConnect(State s) {
+		// Connect to a random peer with host address by stake
+		// SECURITY: stake weighted connection is important to avoid bad peers
+		// influencing the connection pool
+
+		Set<AccountKey> potentialPeers=s.getPeers().keySet();
+		InetSocketAddress target=null;
+		double accStake=0.0;
+		for (ACell c:potentialPeers) {
+			AccountKey peerKey=RT.ensureAccountKey(c);
+			if (connections.containsKey(peerKey)) continue; // skip if already connected
+
+			if (server.getPeerKey().equals(peerKey)) continue; // don't connect to self!!
+
+			PeerStatus ps=s.getPeers().get(peerKey);
+			if (ps==null) continue; // skip
+			AString hostName=ps.getHostname();
+			if (hostName==null) continue;
+			InetSocketAddress maybeAddress=Utils.toInetSocketAddress(hostName.toString());
+			if (maybeAddress==null) continue;
+			long peerStake=ps.getPeerStake();
+			if (peerStake>Constants.MINIMUM_EFFECTIVE_STAKE) {
+				double t=random.nextDouble()*(accStake+peerStake);
+				if (t>=accStake) {
+					target=maybeAddress;
+				}
+				accStake+=peerStake;
+			}
+		}
+
+		if (target!=null) {
+			// Try to connect to Peer. If it fails, no worry, will retry another peer next time
+			boolean success=connectToPeer(target) != null;
+			if (!success) {
+				log.warn("Failed to connect to Peer at "+target);
+			}
+		}
 	}
 
 	/**
