@@ -6,6 +6,7 @@ import java.awt.EventQueue;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,12 +31,15 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.Order;
 import convex.core.Peer;
+import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -51,6 +55,7 @@ import convex.gui.models.StateModel;
 import convex.gui.tools.MessageFormatPanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
+import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import net.miginfocom.swing.MigLayout;
@@ -105,7 +110,7 @@ public class PeerGUI extends AbstractGUI {
 				frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			        public void windowClosing(WindowEvent winEvt) {
 			        	// shut down peers gracefully
-			    		manager.peerPanel.closePeers();
+			    		manager.peerPanel.manager.closePeers();
 			    		manager.restServer.stop();
 			        }
 			    });
@@ -153,7 +158,7 @@ public class PeerGUI extends AbstractGUI {
 		peerPanel= new PeersListPanel(this);
 		keyRingPanel = new KeyRingPanel();
 
-		peerPanel.launchAllPeers(this);
+		peerPanel.manager.launchAllPeers(peerPanel, this);
 		
 		Server first=peerList.firstElement().getLocalServer();
 		ConvexLocal convex=Convex.connect(first);
@@ -362,6 +367,76 @@ public class PeerGUI extends AbstractGUI {
 			}
 		}
 		return null;
+	}
+
+	public void launchAllPeers(PeersListPanel peersListPanel, PeerGUI manager) {
+		try {
+			List<Server> serverList = API.launchLocalPeers(manager.KEYPAIRS,manager.genesisState);
+			for (Server server: serverList) {
+				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
+				peerList.addElement(convex);
+				
+				// initial wallet list
+		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair());
+				KeyRingPanel.addWalletEntry(we);
+			}
+		} catch (Exception e) {
+			if (e instanceof ClosedChannelException) {
+				// Ignore
+			} else {
+				throw(e);
+			}		
+		}
+	}
+
+	public void launchExtraPeer() {
+		AKeyPair kp=AKeyPair.generate();
+		
+		try {
+			Server base=getPrimaryServer();
+			ConvexLocal convex=Convex.connect(base, base.getPeerController(), base.getKeyPair());
+			Address a= convex.createAccountSync(kp.getAccountKey());
+			long amt=convex.getBalance()/10;
+			convex.transferSync(a, amt);
+			
+			KeyRingPanel.addWalletEntry(HotWalletEntry.create(kp));
+			
+			// Set up Peer in base server
+			convex=Convex.connect(base, a, kp);
+			AccountKey key=kp.getAccountKey();
+			Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
+			if (rcr.isError()) {
+				throw new Exception(rcr.toString());
+			}
+			
+			HashMap<Keyword, Object> config=new HashMap<>();
+			config.put(Keywords.KEYPAIR, kp);
+			config.put(Keywords.CONTROLLER, a);
+			config.put(Keywords.STATE, genesisState);
+			Server server=API.launchPeer(config);
+			server.getConnectionManager().connectToPeer(base.getHostAddress());
+			server.setHostname("localhost:"+server.getPort());
+			base.getConnectionManager().connectToPeer(server.getHostAddress());
+			
+			convex=Convex.connect(server, a, kp);
+			peerList.addElement(convex);
+		} catch (Exception e) {
+			Toast.display(this, "Error launching extra peer: "+e.getMessage(),Color.RED);
+			e.printStackTrace();
+		}
+	}
+
+	public void closePeers() {
+		DefaultListModel<ConvexLocal> peerList = getPeerList();
+		int n = peerList.getSize();
+		for (int i = 0; i < n; i++) {
+			Convex p = peerList.getElementAt(i);
+			try {
+				p.getLocalServer().close();
+			} catch (Exception e) {
+				// ignore
+			}
+		}
 	}
 
 	public static void runLaunchDialog(JComponent parent) {
