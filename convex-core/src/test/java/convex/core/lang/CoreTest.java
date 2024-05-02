@@ -1920,7 +1920,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(4,5,6),eval("(map (fn [a b] b) #{1 2 3} [4 5 6])"));
 		
 		// Map over an index
-		assertEquals(Vectors.of(4,5,6),eval("(map second (into (index) {0x 4 0x01 5 0x0001 6}))"));
+		assertEquals(Vectors.of(4,5,6),eval("(mapv second (into (index) {0x 4 0x01 5 0x0101 6}))"));
 		
 
 		// CAST error if any following arguments are not a data structure

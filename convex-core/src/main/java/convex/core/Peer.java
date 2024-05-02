@@ -169,12 +169,12 @@ public class Peer {
 	/**
 	 * Create a Peer instance from a remotely acquired Belief
 	 * @param peerKP Peer KeyPair
-	 * @param initialState Initial genesis State of the Network
+	 * @param genesisState Initial genesis State of the Network
 	 * @param remoteBelief Remote belief to sync with
 	 * @return New Peer instance
 	 */
-	public static Peer create(AKeyPair peerKP, State initialState, Belief remoteBelief) {
-		Peer peer=create(peerKP,initialState);
+	public static Peer create(AKeyPair peerKP, State genesisState, Belief remoteBelief) {
+		Peer peer=create(peerKP,genesisState);
 		peer=peer.updateTimestamp(Utils.getCurrentTimestamp());
 		try {
 			peer=peer.mergeBeliefs(remoteBelief);
@@ -183,6 +183,26 @@ public class Peer {
 			throw Utils.sneakyThrow(e);
 		}
 	}
+	
+	/**
+	 * Create a Peer instance from a remotely acquired State and Order
+	 * @param peerKP Peer KeyPair
+	 * @param genesisState Initial genesis State of the Network
+	 * @param remoteBelief Remote belief to sync with
+	 * @return New Peer instance
+	 */
+//	public static Peer create(AKeyPair peerKP, State genesisState, State consensusState, SignedData<Order> order) {
+//		SignedData<Order> myOrder=peerKP.signData(order.getValue());
+//		Belief b=Belief.create(order,myOrder); // two orders in Belief at least....
+//		Peer peer=create(peerKP,genesisState,consensusState,b);
+//		peer=peer.updateTimestamp(Utils.getCurrentTimestamp());
+//		try {
+//			peer=peer.mergeBeliefs(remoteBelief);
+//			return peer;
+//		} catch (Throwable  e) {
+//			throw Utils.sneakyThrow(e);
+//		}
+//	}
 
 	/**
 	 * Like {@link #restorePeer(AStore, AKeyPair, ACell)} but uses a null root key.
