@@ -103,6 +103,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 				// Update soft reference to the fresh version. No point keeping old one....
 				this.softRef = ((RefSoft<T>) storeRef).softRef;
 			} else {
+				// Create a new soft reference
 				this.softRef = new SoftReference<T>(result);
 			}
 		}
