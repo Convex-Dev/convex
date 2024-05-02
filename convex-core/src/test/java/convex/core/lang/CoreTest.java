@@ -1919,9 +1919,8 @@ public class CoreTest extends ACVMTest {
 		// Map with sets works like conj'ing in each result in turn
 		assertEquals(Sets.of(4,5,6),eval("(map (fn [a b] b) #{1 2 3} [4 5 6])"));
 		
-		// Map over an index
-		assertEquals(Vectors.of(4,5,6),eval("(mapv second (into (index) {0x 4 0x01 5 0x0101 6}))"));
-		
+		// Map over an index. Note results must be map entries
+		assertTrue(evalB("(let [ix (into (index) {0x 4 0x01 5 0x0101 6})] (= ix (map (fn [[k v]] [k v]) ix)))"));
 
 		// CAST error if any following arguments are not a data structure
 		assertCastError(step("(map inc 1)"));
@@ -1983,6 +1982,9 @@ public class CoreTest extends ACVMTest {
 		// nil treated as empty collection
 		assertEquals(Vectors.empty(), eval("(mapv + '(1 2) nil)"));
 		assertEquals(Vectors.empty(), eval("(mapv + nil)"));
+		
+		// Map over an index. Note mapv required here (otherwise must produce map entries)
+		assertEquals(Vectors.of(4,5,6),eval("(mapv second (into (index) {0x 4 0x01 5 0x0101 6}))"));
 		
 		// Check index behaviour
 		assertSame(Vectors.empty(),eval("(mapv inc (index))"));
