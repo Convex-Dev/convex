@@ -710,16 +710,16 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public boolean equals(ACell o) {
+	public boolean equals(AVector<? super T>  o) {
 		if (this==o) return true;
 		if (!(o instanceof VectorTree)) {
 			if (o==null) return false;
-			ACell c=o.toCanonical();
+			ACell c=o.getCanonical();
 			if (c==o) return false;
 			return equals(c);
 		}
-		@SuppressWarnings("unchecked")
-		VectorTree<T> b=(VectorTree<T>) o;
+
+		VectorTree<?> b=(VectorTree<?>) o;
 		if (count!=b.count) return false;
 		
 		Hash ha=cachedHash();
@@ -734,7 +734,5 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		}
 		return true;
 	}
-
-
 
 }

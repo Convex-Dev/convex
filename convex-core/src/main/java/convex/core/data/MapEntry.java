@@ -171,9 +171,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public boolean equals(ACell o) {
+	public boolean equals(AVector<? super ACell> o) {
 		if (o==null) return false;
-		if (o.getTag()!=Tag.VECTOR) return false;
+		if (o==this) return true;
 		AVector<?> v=(AVector<?>) o;
 		if (v.count()!=2) return false;
 		return getEncoding().equals(o.getEncoding());

@@ -265,6 +265,16 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		throw new UnsupportedOperationException();
 	}
 	
+	@SuppressWarnings("unchecked")
+	@Override
+	public final boolean equals(ACell a) {
+		if (!(a instanceof AVector)) return false;
+		
+		return equals((AVector<? super T>)a); 
+	}
+	
+	public abstract boolean equals(AVector<? super T> a);
+	
 	@Override
 	public byte getTag() {
 		return Tag.VECTOR;
