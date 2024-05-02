@@ -38,8 +38,6 @@ public abstract class AKeyPair {
 	
 	private KeyPair keyPair=null;
 
-
-
 	/**
 	 * Gets a new byte array representation of the public key
 	 * @return Bytes of public key
@@ -150,7 +148,7 @@ public abstract class AKeyPair {
 	
 	@Override
 	public String toString() {
-		return getAccountKey()+":"+getSeed();
+		return "Keypair for: "+getAccountKey();
 	}
 
 	/**
