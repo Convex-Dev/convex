@@ -79,7 +79,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param vals A sequence of values to concatenate.
 	 * @return The concatenated sequence, of the same type as this sequence.
 	 */
-	public abstract <R extends ACell> ASequence<R> concat(ASequence<R> vals);
+	public abstract ASequence<T> concat(ASequence<? extends T> vals);
 
 	@Override
 	public final boolean addAll(int index, Collection<? extends T> c) {

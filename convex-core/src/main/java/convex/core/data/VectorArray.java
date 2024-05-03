@@ -151,7 +151,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public <R extends ACell> AVector<R> concat(ASequence<R> b) {
+	public AVector<T> concat(ASequence<? extends T> b) {
 		return toVector().concat(b);
 	}
 

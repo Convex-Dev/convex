@@ -364,15 +364,15 @@ public class EncodingTest {
 		doMultiEncodingTest(Vectors.of(1,2,3));
 		
 		// Two non-embedded identical children
-		AVector<?> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING,Samples.INT_VECTOR_23);
+		AVector<ACell> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING,Samples.INT_VECTOR_23);
 		doMultiEncodingTest(v1);
 		
 		// Moar layers
-		AVector<?> v2=Vectors.of(7,Samples.NON_EMBEDDED_STRING,v1.concat(Samples.INT_VECTOR_23));
+		AVector<ACell> v2=Vectors.of(7,Samples.NON_EMBEDDED_STRING,v1.concat(Samples.INT_VECTOR_23));
 		doMultiEncodingTest(v2);
 		
 		// Mooooar layers
-		AVector<?> v3=Vectors.of(13,v2,v1,Samples.KEY_PAIR.signData(v2));
+		AVector<ACell> v3=Vectors.of(13,v2,v1,Samples.KEY_PAIR.signData(v2));
 		doMultiEncodingTest(v3);
 		
 		// Wrap in transaction

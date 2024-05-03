@@ -293,21 +293,21 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> concat(ASequence<R> b) {
+	public AVector<T> concat(ASequence<? extends T> b) {
 		long bLen = b.count();
-		VectorTree<R> result = (VectorTree<R>) this;
+		VectorTree<T> result = this;
 		long bi = 0;
 		while (bi < bLen) {
 			if ((bi + Vectors.CHUNK_SIZE) <= bLen) {
 				// can append a whole chunk
-				AVector<R> chunk = b.subVector(bi, Vectors.CHUNK_SIZE);
+				AVector<T> chunk = (AVector<T>) b.subVector(bi, Vectors.CHUNK_SIZE);
 				result = result.appendChunk(chunk);
 				bi += Vectors.CHUNK_SIZE;
 			} else {
 				// we have less than a chunk left, so final result must be a VectorLeaf with the
 				// current result as tail
 				VectorLeaf<T> head = (VectorLeaf<T>) b.subVector(bi, bLen - bi).toVector();
-				return ((VectorLeaf<R>)head).withPrefix(result);
+				return ((VectorLeaf<T>)head).withPrefix(result);
 			}
 		}
 		return result;

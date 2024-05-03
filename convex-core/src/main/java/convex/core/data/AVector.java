@@ -140,7 +140,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	}
 
 	@Override
-	public abstract <R extends ACell> AVector<R> concat(ASequence<R> b);
+	public abstract AVector<T> concat(ASequence<? extends T> b);
 
 	public abstract <R> R reduce(BiFunction<? super R, ? super T, ? extends R> func, R value);
 
@@ -212,11 +212,12 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		return (AVector<R>) append((T) value);
 	}
 	
+	@SuppressWarnings("unchecked")
 	public <R extends ACell> AVector<R> conjAll(ACollection<R> xs) {
 		if (xs instanceof ASequence) {
-			return concat((ASequence<R>)xs);
+			return (AVector<R>) concat((ASequence<T>)xs);
 		}
-		return concat(Vectors.create(xs));
+		return (AVector<R>) concat(Vectors.create(xs));
 	}
 
 	@Override

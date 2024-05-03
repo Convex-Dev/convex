@@ -74,7 +74,7 @@ public class EncodingSizeTest {
 	}
 	
 	@Test public void testVectorTree() {
-		AVector<?> a=Samples.MAX_EMBEDDED_VECTOR;
+		AVector<ACell> a=Samples.MAX_EMBEDDED_VECTOR;
 		for (int i=0; i<15; i++) {
 			a=a.concat(Samples.MAX_EMBEDDED_VECTOR);
 		}

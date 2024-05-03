@@ -59,7 +59,7 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	public abstract <R extends ACell> AList<R> map(Function<? super T, ? extends R> mapper);
 
 	@Override
-	public abstract <R extends ACell> AList<R> concat(ASequence<R> vals);
+	public abstract AList<T> concat(ASequence<? extends T> vals);
 
 	@Override
 	public abstract AList<T> assoc(long i, T value);

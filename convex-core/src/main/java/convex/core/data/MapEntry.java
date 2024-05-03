@@ -290,10 +290,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		f.accept((Ref<ACell>) valueRef);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R  extends ACell> AVector<R> concat(ASequence<R> b) {
-		if (b.isEmpty()) return (AVector<R>) this;
+	public AVector<ACell> concat(ASequence<?> b) {
+		if (b.isEmpty()) return this;
 		return toVector().concat(b);
 	}
 

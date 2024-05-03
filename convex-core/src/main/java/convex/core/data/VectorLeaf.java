@@ -145,11 +145,11 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> concat(ASequence<R> b) {
+	public AVector<T> concat(ASequence<? extends T> b) {
 		// Maybe can optimise?
 		long aLen = count();
 		long bLen = b.count();
-		AVector<R> result = (AVector<R>) this;
+		AVector<T> result = this;
 		long i = aLen;
 		long end = aLen + bLen;
 		while (i < end) {
@@ -157,7 +157,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 				int rn = Utils.checkedInt(Math.min(Vectors.CHUNK_SIZE, end - i));
 				if (rn == Vectors.CHUNK_SIZE) {
 					// we can append a whole chunk. Not toVector in case of VectorArrays
-					result = result.appendChunk((VectorLeaf<R>) b.subVector(i - aLen, rn).toVector());
+					result = result.appendChunk((AVector<T>) b.subVector(i - aLen, rn));
 					i += Vectors.CHUNK_SIZE;
 					continue;
 				}

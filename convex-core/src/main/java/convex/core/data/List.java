@@ -347,13 +347,13 @@ public class List<T extends ACell> extends AList<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> List<R> concat(ASequence<R> vals) {
+	public List<T> concat(ASequence<? extends T> vals) {
 		long n = RT.count(vals);
-		if (n==0) return (List<R>) this;
+		if (n==0) return this;
 
-		AVector<R> rvals;
+		AVector<T> rvals;
 		if (vals instanceof List) {
-			List<R> vlist=(List<R>) vals;
+			List<T> vlist=(List<T>) vals;
 			if (count==0) return vlist;
 			rvals = vlist.data;
 		} else {
@@ -363,7 +363,7 @@ public class List<T extends ACell> extends AList<T> {
 			}
 		}
 		if (count>0) {
-			rvals=rvals.concat((AVector<R>)data);
+			rvals=rvals.concat(data);
 		}
 		return List.reverse(rvals);
 	}
