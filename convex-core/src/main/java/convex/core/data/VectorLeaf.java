@@ -650,32 +650,26 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<T> subVector(long start, long length) {
-		checkRange(start, length);
-		if (length == count) return this;
+	public AVector<T> slice(long start, long end) {
+		if (!checkRange(start, end)) return null;
+		if (start == end) return  (AVector<T>) EMPTY;
+		if ((start == 0)&&(end==count)) return this;
 
-		if (prefix == null) {
-			int len = Utils.checkedInt(length);
+		long tc = prefixLength();
+		if (start >= tc) {
+			// range is in last part
+			int len = (int)(end-start);
 			Ref<T>[] newItems= new Ref[len];
-			System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
-			return new VectorLeaf<T>(newItems, null, length);
-		} else {
-			long tc = prefixLength();
-			if (start >= tc) {
-				int len = Utils.checkedInt(length);
-				Ref<T>[] newItems= new Ref[len];
-				System.arraycopy(items, Utils.checkedInt(start-tc), newItems, 0, len);
-				return new VectorLeaf<T>(newItems, null, length);
-			}
+			System.arraycopy(items, Utils.checkedInt(start-tc), newItems, 0, len);
+			return new VectorLeaf<T>(newItems, null, len);
+		}
 
-			AVector<T> tv = prefix.getValue();
-			if ((start + length) <= tc) {
-				// Range is entirely in prefix
-				return tv.subVector(start, length);
-			} else {
-				long split = tc - start;
-				return tv.subVector(start, split).concat(this.withPrefix(null).subVector(0, length - split));
-			}
+		AVector<T> tv = prefix.getValue();
+		if (end <= tc) {
+			// Range is entirely in prefix
+			return tv.slice(start, end);
+		} else {
+			return tv.slice(start, tc).concat(slice(tc, end));
 		}
 	}
 

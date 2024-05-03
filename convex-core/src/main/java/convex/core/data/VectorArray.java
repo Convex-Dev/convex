@@ -240,13 +240,10 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public AVector<T> subVector(long start, long length) {
-		long end=start+length;
-		if (length<=0) {
-			if (length==0) return Vectors.empty();
-			return null;
-		}
-		if ((start<0)||(end>count)) return null; 
+	public AVector<T> slice(long start, long end) {
+		if (!checkRange(start,end)) return null;
+		long length=end-start;
+		if (length==0) return Vectors.empty();
 		if (length==count) return this;
 		return new VectorArray<T>(data,this.start+start,length);
 	}

@@ -639,8 +639,9 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public AVector<T> subVector(long start, long length) {
-		checkRange(start, length);
+	public AVector<T> slice(long start, long end) {
+		if (!checkRange(start, end)) return null;
+		long length=end-start;
 		if ((start & Vectors.BITMASK) == 0) {
 			// Starting at a chunk boundary, so this can be fast by re-using existing chunks
 			int chunks=Utils.checkedInt((length+15)/Vectors.CHUNK_SIZE);

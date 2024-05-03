@@ -197,11 +197,11 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param start
 	 * @param length
 	 */
-	protected void checkRange(long start, long length) {
-		if (start < 0) throw Utils.sneakyThrow(new IndexOutOfBoundsException("Negative start: " + start));
-		if (length < 0L) throw Utils.sneakyThrow(new IndexOutOfBoundsException("Negative length: " + length));
-		if ((start + length) > count())
-			throw Utils.sneakyThrow(new IndexOutOfBoundsException("End out of bounds: " + start + length));
+	protected boolean checkRange(long start, long end) {
+		if (start < 0) return false;
+		if (start > end) return false;
+		if (end > count()) return false;
+		return true;
 	}
 
 	@Override

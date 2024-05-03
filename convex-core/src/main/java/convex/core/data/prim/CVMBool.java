@@ -27,9 +27,9 @@ public final class CVMBool extends APrimitive {
 
 	public static final int MAX_ENCODING_LENGTH = 1;
 
-	// Salted values for hashcodes
-	private static final int TRUE_HASHCODE = (int)Bits.SALT;
-	private static final int FALSE_HASHCODE = (int)(Bits.SALT>>32);
+	// Salted values for boolean hashcodes
+	private static final int TRUE_HASHCODE = Bits.hash32(0xB001C0DE);
+	private static final int FALSE_HASHCODE = ~TRUE_HASHCODE;
 
 	// Java String values
 	public static final String TRUE_STRING = "true";

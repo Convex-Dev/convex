@@ -110,9 +110,12 @@ public class Bits {
 	}
 	
 	/**
-	 * A long salt value used for internal hashing 
+	 * A long salt value used for internal hashing. 
+	 * 
+	 * We use a local, secure random number to minimise chance of attacker engineering hash collisions
+	 * also minimise risk of multiple peers suffering such attacks at the same time
 	 */
-	public static final long SALT=new SecureRandom().nextLong();
+	private static final long SALT=new SecureRandom().nextLong();
 	
 	/**
 	 * Compute XORShift64 PRNG for a given value

@@ -365,7 +365,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		for (int i=0; i<n; i++) {
 			keys[i]=entryAt(i).getKey();
 		}
-		return Vectors.create(keys);
+		return Vectors.wrap(keys);
 	}
 
 }

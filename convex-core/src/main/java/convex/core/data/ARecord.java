@@ -76,7 +76,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		for (int i=0; i<n; i++) {
 			os[i]=get(format.getKey(i));
 		}
-		return Vectors.create(os);
+		return Vectors.wrap(os);
 	}
 	
 	/**

@@ -117,7 +117,7 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 
 	@Override
 	public boolean equalsBytes(ABlob b) {
-		return toBlob().equalsBytes(b);
+		return name.equalsBytes(b);
 	}
 
 	@Override

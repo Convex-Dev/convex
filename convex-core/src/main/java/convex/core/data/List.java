@@ -373,10 +373,9 @@ public class List<T extends ACell> extends AList<T> {
 		data.visitElementRefs(f);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public AVector<T> subVector(long start, long length) {
-		checkRange(start, length);
+		if (!checkRange(start, start+length)) return null;
 		if (length==0) return Vectors.empty();
 
 		// Create using an Object array. Probably fastest?
@@ -384,7 +383,7 @@ public class List<T extends ACell> extends AList<T> {
 		for (int i = 0; i < length; i++) {
 			arr[i] = get(start + i);
 		}
-		return (AVector<T>) Vectors.create(arr);
+		return Vectors.wrap(arr);
 	}
 
 	@Override

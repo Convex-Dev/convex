@@ -125,7 +125,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	public abstract AHashMap<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func);
 
 	/**
-	 * Validates the map with a given hex prefix. This is necessary to ensure that
+	 * Validates the map with a given hex prefix for the Hash. This is necessary to ensure that
 	 * child maps are valid, in particular have the correct shift level and that all
 	 * key hashes start with the correct prefix of hex characters.
 	 * 
@@ -172,7 +172,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		for (int i=0; i<n; i++) {
 			keys[i]=entryAt(i).getKey();
 		}
-		return Vectors.create(keys);
+		return Vectors.wrap(keys);
 	}
 	
 	@Override

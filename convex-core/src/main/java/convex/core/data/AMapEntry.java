@@ -88,12 +88,11 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpeci
 	}
 	
 	@Override
-	public AVector<ACell> subVector(long start, long length) {
-		if ((start<0)||(start>2)) return null;
-		if (length<0) return null;
-		if (length==0) return Vectors.empty();
-		if ((start+length)>2) return null;
-		if (length==2) return this;
+	public AVector<ACell> slice(long start, long end) {
+		if ((start<0)||(end>2)) return null;
+		if (start>end) return null;
+		if (start==end) return Vectors.empty();
+		if ((start==0)&&(end==2)) return this;
 		return Vectors.of(start==0?getKey():getValue());
 	}
 

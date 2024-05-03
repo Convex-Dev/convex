@@ -25,36 +25,46 @@ public class VectorGen extends ComponentizedGenerator<AVector> {
 
 		int type = r.nextInt(15);
 		switch (type) {
-		case 0: {
+		case 0:
+			return Vectors.empty();
+		case 1: {
 			ACell o = Gen.PRIMITIVE.generate(r, status);
 			return Vectors.of(o);
 		}
-		case 1: {
+		case 2: {
 			ACell o1 = Gen.PRIMITIVE.generate(r, status);
 			ACell o2 = Gen.STRING.generate(r, status);
 			return Vectors.of(o1, o2);
 		}
-		case 2: {
+		case 3: {
 			ACell o1 = Gen.VALUE.generate(r, status);
 			ACell o2 = Gen.STRING.generate(r, status);
 			ACell o3 = Gen.FORM.generate(r, status);
 			return Vectors.of(o1, o2, o3);
 		}
-
-		case 3:
-			return Samples.INT_VECTOR_10;
 		case 4:
-			return Samples.INT_VECTOR_300;
+			return Samples.INT_VECTOR_10;
 		case 5:
-			return Samples.INT_VECTOR_16;
+			return Samples.INT_VECTOR_300;
 		case 6:
-			return Samples.INT_VECTOR_256;
+			return Samples.INT_VECTOR_16;
 		case 7:
-			return Vectors.empty();
+			return Samples.INT_VECTOR_256;
 		case 8: {
+			// A MapEntry
 			ACell o1 = Gen.VALUE.generate(r, status);
 			ACell o2 = Gen.VALUE.generate(r, status);
 			return MapEntry.create(o1, o2);
+		}
+		case 9: {
+			// Canonical vector version
+			return generate(r,status).toVector();
+		}
+		case 10: {
+			// Slice of some other vector
+			AVector v=generate(r,status);
+			long n=v.count();
+			return v.slice(n/3, (2*n/3));
 		}
 		default: {
 			int n = (int) (1 + (Math.sqrt(status.size())));

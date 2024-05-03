@@ -28,8 +28,8 @@ public class GenTestBlobs {
 	public void testBlobSlicing(Long size, Long off, Long len) {
 		size=Math.floorMod(size, 100000L);
 		
-		off=Math.floorMod(off, size);
-		len=Math.floorMod(len, size-off);
+		off=(size>0)?Math.floorMod(off, size):0;
+		len=((size-off)>0)?Math.floorMod(len, size-off):0;
 		
 		ABlob full=Blobs.createRandom(size).toCanonical();
 		
