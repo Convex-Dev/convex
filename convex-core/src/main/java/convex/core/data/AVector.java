@@ -69,7 +69,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 * @param listVector A chunk to append. Must be a ListVector of maximum size
 	 * @return The updated vector, of the same type as this vector @
 	 */
-	public abstract AVector<T> appendChunk(VectorLeaf<T> listVector);
+	public abstract AVector<T> appendChunk(AVector<T> chunk);
 
 	/**
 	 * Gets the VectorLeaf chunk at a given offset

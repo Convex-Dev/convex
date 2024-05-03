@@ -702,9 +702,9 @@ public class RT {
 
 		if (o instanceof ACell[]) {
 			ACell[] arr = (ACell[])o;
-			return Vectors.create(arr);
+			//return Vectors.create(arr);
 			// TODO: this should be faster?
-			// return VectorArray.wrap(arr); 
+			return Vectors.wrap(arr); 
 		}
 
 		if (o instanceof java.util.List)

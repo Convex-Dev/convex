@@ -347,7 +347,6 @@ public class BlobsTest {
 		doBlobTests(b);
 		
 		Blob flat=b.toFlatBlob();
-		assertThrows(Error.class,()->flat.isCompletelyEncoded());
 		doBlobTests(flat);
 	}
 	

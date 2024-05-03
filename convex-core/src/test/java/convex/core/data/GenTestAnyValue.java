@@ -2,7 +2,6 @@ package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,7 +48,7 @@ public class GenTestAnyValue {
 			assertThrows(IndexOutOfBoundsException.class,()->rc.getRef(-1),()->"Invalid ref worked on "+Utils.getClassName(o));
 			if (n>0 ) {
 				assertNotNull(rc.getRef(0));
-				assertSame(rc,rc.updateRefs(r->r));
+				assertEquals(rc,rc.updateRefs(r->r));
 			}
 		}
 	}

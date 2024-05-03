@@ -83,7 +83,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 		int n=Utils.checkedInt(count);
 		ACell[] elements=new ACell[n];
 		copyToArray(elements,0);
-		return Vectors.create(elements);
+		return Vectors.wrap(elements);
 	}
 	
 	

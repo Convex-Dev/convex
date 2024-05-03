@@ -198,7 +198,7 @@
                         {:params [name & fn-decls]}]}}
   [name & decl]
   (cond 
-    (empty? decl) (fail :ARITY "`defn` requires at lest one function definition"))
+    (empty? decl) (fail :ARITY "`defn` requires at least one function definition"))
     (let [fnform (cons 'fn 
 		                decl)
           name   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list

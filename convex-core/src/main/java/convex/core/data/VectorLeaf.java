@@ -156,8 +156,8 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			if ((i & Vectors.BITMASK) == 0) {
 				int rn = Utils.checkedInt(Math.min(Vectors.CHUNK_SIZE, end - i));
 				if (rn == Vectors.CHUNK_SIZE) {
-					// we can append a whole chunk
-					result = result.appendChunk((VectorLeaf<R>) b.subVector(i - aLen, rn));
+					// we can append a whole chunk. Not toVector in case of VectorArrays
+					result = result.appendChunk((VectorLeaf<R>) b.subVector(i - aLen, rn).toVector());
 					i += Vectors.CHUNK_SIZE;
 					continue;
 				}
@@ -170,7 +170,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public AVector<T> appendChunk(VectorLeaf<T> chunk) {
+	public AVector<T> appendChunk(AVector<T> chunk) {
 		if (chunk.count != Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Can't append a chunk of size: " + chunk.count());
 
@@ -181,7 +181,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 		if (this.count != Vectors.CHUNK_SIZE)
 			throw new IllegalArgumentException("Can't append chunk to a VectorLeaf of size: " + this.count);
-		return VectorTree.wrap2(chunk, this);
+		return VectorTree.wrap2((VectorLeaf<T>)(chunk.toVector()), this);
 	}
 
 	@Override

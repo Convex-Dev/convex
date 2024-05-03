@@ -63,6 +63,18 @@ public class Vectors {
 	public static <T extends ACell> AVector<T> create(ACell[] elements) {
 		return create(elements, 0, elements.length);
 	}
+	
+	/**
+	 * Create a vector directly wrapping an array of cells. Do not mutate array after creation!
+	 * 
+	 * @param <T> Type of elements
+	 * @param elements Elements to include
+	 * @return New vector wrapping the specified elements
+	 */
+	public static <T extends ACell> AVector<T> wrap(ACell[] elements) {
+		if (elements.length==0) return empty();
+		return VectorArray.wrap(elements);
+	}
 
 	/**
 	 * Coerces a collection to a vector. Not necessarily the most efficient.
@@ -115,7 +127,7 @@ public class Vectors {
 			Object v=elements[i];
 			es[i]=(T)RT.cvm(v);
 		}
-		return create(es, 0, n);
+		return wrap(es);
 	}
 
 	@SuppressWarnings("unchecked")

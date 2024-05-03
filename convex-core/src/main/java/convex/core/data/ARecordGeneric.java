@@ -79,7 +79,7 @@ public abstract class ARecordGeneric extends ARecord {
 
 	@Override
 	public ARecord updateRefs(IRefFunction func) {
-		AVector<ACell> newValues=values.updateRefs(func);
+		AVector<ACell> newValues=values.toVector().updateRefs(func); // ensure values are canonical via toVector
 		return withValues(newValues);
 	}
 	

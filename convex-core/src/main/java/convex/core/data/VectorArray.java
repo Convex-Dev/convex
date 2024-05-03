@@ -109,7 +109,7 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public AVector<T> appendChunk(VectorLeaf<T> listVector) {
+	public AVector<T> appendChunk(AVector<T> listVector) {
 		return toVector().appendChunk(listVector);
 	}
 
@@ -166,7 +166,7 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 
 	@Override
 	public AVector<T> updateRefs(IRefFunction func) {
-		throw new UnsupportedOperationException();
+		return toVector().updateRefs(func);
 	}
 
 	@Override
@@ -176,7 +176,7 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 
 	@Override
 	public AVector<T> next() {
-		if (count==0) return null;
+		if (count <= 1) return null;
 		return new VectorArray<T>(data,start+1,count-1);
 	}
 
@@ -232,11 +232,17 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 		return Ref.get(get(index));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> AVector<R> subVector(long start, long length) {
 		long end=start+length;
+		if (length<=0) {
+			if (length==0) return Vectors.empty();
+			return null;
+		}
 		if ((start<0)||(end>count)) return null; 
-		return null;
+		if (length==count) return (AVector<R>) this;
+		return new VectorArray<R>(data,this.start+start,length);
 	}
 
 	@Override
@@ -278,7 +284,12 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 
 	@Override
 	public int getRefCount() {
-		throw new UnsupportedOperationException();
+		return getCanonical().getRefCount();
+	}
+	
+	@Override
+	public Ref<ACell> getRef(int i) {
+		return getCanonical().getRef(i);
 	}
 
 

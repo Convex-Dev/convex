@@ -19,7 +19,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	public abstract ACell get(long i);
 
 	@Override
-	public final AVector<ACell> appendChunk(VectorLeaf<ACell> listVector) {
+	public final AVector<ACell> appendChunk(AVector<ACell> chunk) {
 		throw new IllegalArgumentException("Can't append chunk to a MapEntry of size: 2");
 	}
 

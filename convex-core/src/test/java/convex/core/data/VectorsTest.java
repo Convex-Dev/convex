@@ -36,6 +36,8 @@ public class VectorsTest {
 		assertArrayEquals(new byte[] { Tag.VECTOR, 0 }, d.getBytes());
 		
 		assertSame(lv,Vectors.empty());
+		
+		assertSame(lv,Vectors.wrap(Cells.EMPTY_ARRAY));
 	}
 
 	@Test
@@ -242,6 +244,11 @@ public class VectorsTest {
 		doVectorTests(VectorArray.of());
 		
 		doVectorTests(VectorArray.of(1,2,3));
+		
+		AVector<CVMLong> vc=Vectors.of(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15);
+	
+		AVector<CVMLong> v2=vc.appendChunk(vc);
+		assertEquals(vc, v2.slice(16));
 	}
 	
 	@Test

@@ -29,7 +29,6 @@ import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.BlobsTest;
 import convex.core.data.Lists;
-import convex.core.data.MapEntry;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -109,7 +108,7 @@ public class GenTestCore {
 	public void testVectorFunctions(@From(VectorGen.class) AVector a) {
 		doSequenceTests(a);
 		
-		if (!(a instanceof MapEntry)) {
+		if (a.isCanonical()) {
 			// only true for regular vectors
 			assertSame(a,RT.vec(a)); 
 		}

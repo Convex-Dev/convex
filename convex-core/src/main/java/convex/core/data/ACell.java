@@ -519,9 +519,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	boolean isCompletelyEncoded() {
 		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true; // fast path for fully embedded
-		if (!isCanonical()) {
-			throw new Error("Checking whether a non-canonical cell is encoded. Not a good idea: any Ref assumptions may be invalid for "+this.getType());
-		}
 		int n=getRefCount();
 		for (int i=0; i<n; i++) {
 			Ref<ACell> r=getRef(i);

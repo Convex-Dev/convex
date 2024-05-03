@@ -232,8 +232,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public VectorTree<T> appendChunk(VectorLeaf<T> b) {
-		if (b.hasPrefix()) throw new IllegalArgumentException("Can't append a block with a tail");
+	public VectorTree<T> appendChunk(AVector<T> b) {
 		if (b.count() != VectorLeaf.MAX_SIZE)
 			throw new IllegalArgumentException("Invalid block size for append: " + b.count());
 		if (isFullyPacked()) {
@@ -301,13 +300,13 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		while (bi < bLen) {
 			if ((bi + Vectors.CHUNK_SIZE) <= bLen) {
 				// can append a whole chunk
-				VectorLeaf<R> chunk = (VectorLeaf<R>) b.subVector(bi, Vectors.CHUNK_SIZE);
+				AVector<R> chunk = b.subVector(bi, Vectors.CHUNK_SIZE);
 				result = result.appendChunk(chunk);
 				bi += Vectors.CHUNK_SIZE;
 			} else {
 				// we have less than a chunk left, so final result must be a VectorLeaf with the
 				// current result as tail
-				VectorLeaf<T> head = (VectorLeaf<T>) b.subVector(bi, bLen - bi);
+				VectorLeaf<T> head = (VectorLeaf<T>) b.subVector(bi, bLen - bi).toVector();
 				return ((VectorLeaf<R>)head).withPrefix(result);
 			}
 		}

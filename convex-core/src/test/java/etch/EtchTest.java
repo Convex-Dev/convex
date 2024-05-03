@@ -236,7 +236,7 @@ public class EtchTest {
 		
 		Ref<ACell> r=store.storeRef(v.getRef(), Ref.PERSISTED, null,true); // note top level
 		assertTrue(r.isPersisted());
-		assertSame(h,r.getHash()); // TODO: should be identical?
+		assertEquals(h,r.getHash()); // TODO: should be identical?
 		
 		Refs.checkConsistentStores(r, store);
 		

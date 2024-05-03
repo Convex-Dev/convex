@@ -155,7 +155,7 @@ public class Core {
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 
 			// Build and return requested vector
-			AVector<ACell> result = Vectors.create(args);
+			AVector<ACell> result = Vectors.wrap(args);
 			return context.withResult(juice, result);
 		}
 	});
@@ -2547,7 +2547,6 @@ public class Core {
 
 			// remaining arguments determine function arity to use
 			int fnArity = args.length - 1;
-			ACell[] xs = new ACell[fnArity];
 			ADataStructure<?>[] seqs = new ADataStructure[fnArity];
 
 			int length = Integer.MAX_VALUE;
@@ -2571,6 +2570,7 @@ public class Core {
 			ADataStructure<?> result = seqs[0].empty();
 			boolean reverse=result instanceof AList;
 			for (int i = 0; i < length; i++) {
+				ACell[] xs = new ACell[fnArity]; // note we need unique instances, because should be effectively immutable. VectorArray needs this...
 				long srcIndex=reverse?(length-1-i):i;
 				for (int j = 0; j < fnArity; j++) {
 					xs[j] = seqs[j].get(srcIndex);
