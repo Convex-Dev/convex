@@ -290,8 +290,10 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		f.accept((Ref<ACell>) valueRef);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public <R  extends ACell> AVector<R> concat(ASequence<R> b) {
+		if (b.isEmpty()) return (AVector<R>) this;
 		return toVector().concat(b);
 	}
 
@@ -317,12 +319,13 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@Override
 	public boolean isCanonical() {
+		// TODO: probably should be canonical?
 		return false;
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public ACell toCanonical() {
+	public VectorLeaf<ACell> toCanonical() {
 		return new VectorLeaf<ACell>(new Ref[] { keyRef, valueRef });
 	}
 

@@ -83,6 +83,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	@Override
 	public final boolean addAll(int index, Collection<? extends T> c) {
+		// Convex sequences are never mutable
 		throw new UnsupportedOperationException(Errors.immutable(this));
 	}
 
@@ -94,6 +95,9 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 */
 	public abstract ASequence<T> next();
 
+	@Override
+	public abstract ASequence<T> empty();
+	
 	/**
 	 * Gets the element at the specified index in this sequence.
 	 * 

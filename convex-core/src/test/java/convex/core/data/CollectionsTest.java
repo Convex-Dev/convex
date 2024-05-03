@@ -27,6 +27,10 @@ public class CollectionsTest {
 	public static <T extends ACell> void doSequenceTests(ASequence<T> a) {
 		long n = a.count();
 
+		ACell[] cells=a.toCellArray();
+		assertEquals(n,cells.length);
+		assertEquals(a.toVector(),RT.vec(cells));
+
 		if (n > 0) {
 			T last = a.get(n - 1);
 			T first = a.get(0);
@@ -36,9 +40,20 @@ public class CollectionsTest {
 			assertEquals(n - 1, a.lastIndexOf(last));
 			assertEquals(0L, a.indexOf(first));
 
-
 			assertEquals(a, a.assoc(0, first));
 			assertEquals(a, a.assoc(n - 1, last));
+			
+			assertSame(first,cells[0]);
+			assertSame(last,cells[(int) (n-1)]);
+			
+			assertEquals(Ref.get(last),a.getElementRef(n-1));
+		}
+		
+		ASequence<T> empty=a.empty();
+		if (a.isCanonical()) {
+			assertSame(a,a.concat(empty));
+		} else {
+			assertEquals(a,a.concat(empty));		
 		}
 		
 		// Out of range assocs should return null
