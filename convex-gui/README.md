@@ -27,9 +27,11 @@ Download the Convex GUI today.
 
 ### Building
 
-You can build Convex Desktop as follows:
+You will need a recent version of Java (21+) and Maven installed
 
-- Download the convex repository via git `https://github.com/Convex-Dev/convex.git`
+You can then build the latest version of Convex Desktop as follows:
+
+- Download the convex repository via git `https://github.com/Convex-Dev/convex.git` or using the zip download `https://github.com/Convex-Dev/convex/archive/refs/heads/develop.zip`
 - Run `mvn install` in the root directory (this will build all Convex modules)
 - The Convex Desktop `.jar` file should be created at `convex-gui/target/convex-desktop.jar` 
 
