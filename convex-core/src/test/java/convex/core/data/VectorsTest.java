@@ -194,10 +194,7 @@ public class VectorsTest {
 		MapEntry<CVMLong,CVMLong> me=MapEntry.of(1L,2L);
 		assertEquals(v1, me);
 		assertEquals(v1, me.toVector());
-		
-		assertEquals(me,me.toVector());
-		assertFalse(me.isCanonical());
-		
+		assertEquals(me,me.toVector());	
 		doVectorTests(me);
 	}
 

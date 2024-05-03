@@ -6,10 +6,10 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import convex.core.exceptions.TODOException;
 import convex.core.util.Errors;
+import convex.core.util.Utils;
 
-public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVector<ACell> implements Map.Entry<K, V> {
+public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpecialVector<ACell> implements Map.Entry<K, V> {
 
 	public AMapEntry(long count) {
 		super(2);
@@ -75,12 +75,26 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 
 	@Override
 	public long longIndexOf(Object o) {
-		return toVector().longIndexOf(o);
+		if (Utils.equals(o,get(0))) return 0;
+		if (Utils.equals(o,get(1))) return 1;
+		return -1;
 	}
 
 	@Override
 	public long longLastIndexOf(Object o) {
-		return toVector().longLastIndexOf(o);
+		if (Utils.equals(o,get(1))) return 1;
+		if (Utils.equals(o,get(0))) return 0;
+		return -1;
+	}
+	
+	@Override
+	public AVector<ACell> subVector(long start, long length) {
+		if ((start<0)||(start>2)) return null;
+		if (length<0) return null;
+		if (length==0) return Vectors.empty();
+		if ((start+length)>2) return null;
+		if (length==2) return this;
+		return Vectors.of(start==0?getKey():getValue());
 	}
 
 	@Override
@@ -121,11 +135,6 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 	public abstract int encode(byte[] bs, int pos);
 
 	@Override
-	public final ACell set(int index, ACell element) {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
 	public boolean anyMatch(Predicate<? super ACell> pred) {
 		return toVector().anyMatch(pred);
 	}
@@ -140,10 +149,4 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends AVecto
 		action.accept(getKey());
 		action.accept(getValue());
 	}
-
-	@Override
-	public <T> T[] toArray(T[] a) {
-		throw new TODOException();
-	}
-
 }

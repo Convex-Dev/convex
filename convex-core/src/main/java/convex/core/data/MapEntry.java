@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * From a CVM perspective, a MapEntry is just a regular 2 element Vector. As such, MapEntry is *not* canonical
  * and getting the canonical form of a MapEntry requires converting to a Vector
  * 
- * Contains exactly 2 Refs, one for key and one for value
+ * Contains exactly 2 elements, one for key and one for value
  * 
  * Implements Comparable using the Hash value of keys.
  *
@@ -70,6 +70,12 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	 */
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> of(Object key, Object value) {
 		return create(RT.cvm(key),RT.cvm(value));
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static MapEntry convertOrNull(AVector v) {
+		if (v.count()!=2) return null;
+		return createRef(v.getElementRef(0),v.getElementRef(1));
 	}
 
 	@Override
@@ -195,8 +201,8 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return keyRef.equals(b.keyRef);
 	}
 
-	@Override
 	@SuppressWarnings("unchecked")
+	@Override
 	public AVector<ACell> toVector() {
 		return new VectorLeaf<ACell>(new Ref[] { keyRef, valueRef });
 	}
@@ -231,7 +237,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;
-		pos = Format.writeVLCCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
 		return encodeRaw(bs,pos);
 	}
 	
@@ -244,6 +249,11 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
+		pos = Format.writeVLCCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
+		return encodeRefs(bs,pos);
+	}
+	
+	int encodeRefs(byte[] bs, int pos) {
 		pos = keyRef.encode(bs,pos);
 		pos = valueRef.encode(bs,pos);
 		return pos;
@@ -263,14 +273,14 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 			bs[pos++]=Tag.NULL;
 		} else {
 			bs[pos++]=Tag.VECTOR;
-			pos = me.encodeRaw(bs,pos);
+			pos = me.encodeRefs(bs,pos);
 		}
 		return pos;
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+Format.MAX_EMBEDDED_LENGTH*2; // header plus two embedded objects
+		return 2+Format.MAX_EMBEDDED_LENGTH*2; // header plus count two embedded objects
 	}
 
 	@SuppressWarnings("unchecked")
@@ -283,12 +293,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@Override
 	public <R  extends ACell> AVector<R> concat(ASequence<R> b) {
 		return toVector().concat(b);
-	}
-
-	@Override
-	public AVector<ACell> subVector(long start, long length) {
-		AVector<ACell> vec= toVector();
-		return vec.subVector(start, length);
 	}
 
 	@Override
@@ -311,21 +315,15 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return Tag.VECTOR;
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static MapEntry convertOrNull(AVector v) {
-		if (v.count()!=2) return null;
-		return createRef(v.getElementRef(0),v.getElementRef(1));
-	}
-	
 	@Override
 	public boolean isCanonical() {
 		return false;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public ACell toCanonical() {
-		// Vector is the canonical form of a MapEntry
-		return toVector();
+		return new VectorLeaf<ACell>(new Ref[] { keyRef, valueRef });
 	}
 
 }

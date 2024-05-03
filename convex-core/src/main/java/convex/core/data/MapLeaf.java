@@ -316,7 +316,8 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		pos = Format.writeVLCLong(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {
-			pos = entries[i].encodeRaw(bs,pos);
+			// Note we encode the Map Entry refs only, skipping the general vector encoding
+			pos = entries[i].encodeRefs(bs,pos);
 		}
 		return pos;
 	}

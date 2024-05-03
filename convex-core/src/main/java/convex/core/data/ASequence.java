@@ -251,7 +251,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public abstract AList<T> cons(T x);
 
 	/**
-	 * Gets a vector containing the specified subset of this sequence.
+	 * Gets a vector containing the specified subset of this sequence, or null if range is invalid
 	 * 
 	 * @param start Start index of sub vector
 	 * @param length Length of sub vector to produce

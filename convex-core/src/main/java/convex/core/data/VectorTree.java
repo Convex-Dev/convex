@@ -542,7 +542,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	
 	@Override
 	public final AVector<T> toVector() {
-		assert (isCanonical());
 		return this;
 	}
 

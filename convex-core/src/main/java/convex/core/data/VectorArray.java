@@ -19,7 +19,7 @@ import convex.core.util.Utils;
  * 
  * @param <T>
  */
-public class VectorArray<T extends ACell> extends AVector<T> {
+public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 
 	private ACell[] data;
 	private int start;
