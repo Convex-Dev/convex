@@ -1,6 +1,15 @@
 # Convex Desktop GUI
 
-A desktop interface for interacting with Convex.
+Convex Desktop is a full featured desktop application for working with Convex. It is intended for developers who wish to build solutions on Convex as well as power users who wish to work directly with assets and smart contracts on the Convex Network.
+
+Key features:
+- Execute transactions on Convex networks
+- Secure key generation and wallet management
+- Run a local network of Convex Peers
+- Visualisation of CPoS consensus and network messaging
+- Simulations and stress test code
+
+![Screenshot](docs/images/convex-desktop.png)
 
 ```
 Unleash the power of the Convex decentralized network directly from your desktop. The Convex GUI 
@@ -14,31 +23,32 @@ Download the Convex GUI today.
 - Google Gemini
 ```
 
-![Screenshot](docs/images/convex-desktop.png)
-
-## Overview
-
-Convex Desktop is a full features desktop application for working with Convex. It is intended for developers who wish to build solutions on Convex as well as power users who wish to work directly with assets and smart contracts on the Convex Network.
-
-Key features:
-- Execute transactions on Convex networks
-- Secure key generation and wallet management
-- Run a local network of Convex Peers
-- Visualisation of CPoS consensus and network messaging
-- Simulations and stress test code
-
 ## Usage
 
-### Local peer operation
+### Building
 
-Run the main class `convex.gui.manager.PeerGUI`.
+You can build Convex Desktop as follows:
 
-This launches the GUI application, which defaults to running a small local network of Peers.
+- Download the convex repository via git `https://github.com/Convex-Dev/convex.git`
+- Run `mvn install` in the root directory (this will build all Convex modules)
+- The Convex Desktop `.jar` file should be created at `convex-gui/target/convex-desktop.jar` 
+
+### Running Convex Desktop
+
+If Java is properly installed on your machine, you should be able to run the `convex-desktop.jar` file directly as a Java application (double click on Windows).
+
+Alternatively, from the command line you can run the main class `convex.gui.MainGUI`, with a Java command such as:
+
+```bash
+java -jar convex-desktop.jar
+```
+
+This launches the Convex Desktop application main screen.
 
 ### Flight recorder
 
 ```
-java -cp target/convex-gui-jar-with-dependencies.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.gui.manager.PeerGUI
+java -cp target/convex-gui-jar-with-dependencies.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.gui.MainGUI
 ```
 
 ## License
