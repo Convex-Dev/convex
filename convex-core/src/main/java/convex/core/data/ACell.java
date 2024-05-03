@@ -5,7 +5,6 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 
 /**
@@ -385,17 +384,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isDataValue();
 
 	/**
-	 * Gets the number of Refs contained within this Cell. This number is
-	 * final / immutable for any given instance and is defined by the Cell encoding rules.
-	 * WARNING: may not be valid id Cell is not canonical
-	 * 
-	 * Contained Refs may be either external or embedded.
-	 * 
-	 * @return The number of Refs in this Cell
-	 */
-	public abstract int getRefCount();
-
-	/**
 	 * Gets the Ref for this Cell, creating a new direct reference if necessary
 	 * 
 	 * @param <R> Type of Cell
@@ -422,6 +410,20 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
+	 * Gets the number of Refs contained within this Cell. This number is
+	 * final / immutable for any given instance and is defined by the Cell encoding rules.
+	 * 
+	 * Contained Refs may be either external or embedded.
+	 * 
+	 * @return The number of Refs in this Cell
+	 */
+	public int getRefCount() {
+		ACell canonical=getCanonical();
+		assert (canonical!=this) : "Canonical getRefCount not implemented: " + this.getClass();
+		return canonical.getRefCount();
+	}
+	
+	/**
 	 * Gets a numbered child Ref from within this Cell.
 	 * WARNING: May be unreliable is cell is not canonical
 	 * 
@@ -431,11 +433,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @throws IndexOutOfBoundsException if the Ref index is invalid
 	 */
 	public <R extends ACell> Ref<R> getRef(int i) {
-		// This will always throw an error if not overridden. Provided for warning purposes if accidentally used.
-		if (getRefCount()==0) {
-			throw new IndexOutOfBoundsException("No Refs to get in "+Utils.getClassName(this));
-		} 
-		throw new TODOException(Utils.getClassName(this) +" does not yet implement getRef(i) for i = "+i);
+		ACell canonical=getCanonical();
+		assert (canonical!=this) : "Canonical getRef not implemented: " + this.getClass();
+		return getCanonical().getRef(i);
 	}
 	
 	/**
@@ -455,8 +455,9 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return Cell with updated Refs
 	 */
 	public ACell updateRefs(IRefFunction func) {
-		if (getRefCount()==0) return this;
-		throw new TODOException(Utils.getClassName(this) +" does not yet implement updateRefs(...)");
+		ACell canonical=getCanonical();
+		assert (canonical!=this) : "Canonical updateRefs not implemented: " + this.getClass();
+		return canonical.updateRefs(func);
 	}
 
 	/**

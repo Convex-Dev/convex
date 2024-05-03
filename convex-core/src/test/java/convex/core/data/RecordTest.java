@@ -94,7 +94,7 @@ public class RecordTest {
 		for (int i=0; i<rc; i++) {
 			r.getRef(i);
 		}
-		assertThrows(Exception.class,()->r.getRef(rc));
+		assertThrows(IndexOutOfBoundsException.class,()->r.getRef(rc));
 
 		CollectionsTest.doDataStructureTests(r);
 	}

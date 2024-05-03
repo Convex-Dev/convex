@@ -3,6 +3,8 @@ package convex.core.data.prim;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
@@ -56,6 +58,21 @@ public final class CVMBool extends APrimitive {
 		return b?TRUE:FALSE;
 	}
 	
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
+	}
+
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		return this;
+	}
+	
+	@Override
+	public int getRefCount() {
+		// Never any refs
+		return 0;
+	}
 	
 	@Override
 	public long longValue() {

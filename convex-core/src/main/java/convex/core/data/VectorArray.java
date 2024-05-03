@@ -12,6 +12,13 @@ import convex.core.lang.RT;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
 
+/**
+ * Non-canonical vector implementation designed to make operations on small temporary vectors more efficient.
+ * 
+ * Directly wraps an array of cells, considered effectively immutable
+ * 
+ * @param <T>
+ */
 public class VectorArray<T extends ACell> extends AVector<T> {
 
 	private ACell[] data;

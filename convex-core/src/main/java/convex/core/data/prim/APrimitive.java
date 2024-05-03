@@ -1,6 +1,8 @@
 package convex.core.data.prim;
 
 import convex.core.data.ACell;
+import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
 
 /**
  * Abstract base class for CVM primitive values.
@@ -10,11 +12,6 @@ public abstract  class APrimitive extends ACell {
 	@Override
 	public boolean isCanonical() {
 		return true;
-	}
-
-	@Override
-	public int getRefCount() {
-		return 0;
 	}
 	
 	@Override
@@ -53,6 +50,23 @@ public abstract  class APrimitive extends ACell {
 		return this;
 	}
 
+	
+	// Default primitives have no Refs, must override these if different....
+	
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
+	}
 
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		return this;
+	}
+	
+	@Override
+	public int getRefCount() {
+		// No Refs by default
+		return 0;
+	}
 
 }

@@ -136,7 +136,20 @@ public final class StringShort extends AString {
 	}
 
 	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		if (!isCanonical()) return super.getRef(i);
+		throw new IndexOutOfBoundsException(i);
+	}
+
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		if (!isCanonical()) return super.updateRefs(func);
+		return this;
+	}
+	
+	@Override
 	public int getRefCount() {
+		if (!isCanonical()) return super.getRefCount();
 		return 0;
 	}
 	

@@ -340,7 +340,18 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 
 	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
+	}
+
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		return this;
+	}
+	
+	@Override
 	public int getRefCount() {
+		// No Refs
 		return 0;
 	}
 }

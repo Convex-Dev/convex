@@ -9,6 +9,7 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
+import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
@@ -242,7 +243,11 @@ public final class CVMBigInteger extends AInteger {
 	public int getRefCount() {
 		return blob().getRefCount();
 	}
-
+	
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		return blob().getRef(i);
+	}
 	
 	@Override
 	public AInteger toCanonical() {

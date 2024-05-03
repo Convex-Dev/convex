@@ -137,5 +137,20 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 
 	@Override
 	public abstract ABlobLike<CVMChar> slice(long start, long end);
+	
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
+	}
 
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		return this;
+	}
+	
+	@Override
+	public int getRefCount() {
+		// Never any refs
+		return 0;
+	}
 }

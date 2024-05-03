@@ -347,11 +347,21 @@ public abstract class AArrayBlob extends ABlob {
 		}
 	}
 	
-
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		if (count>Blob.CHUNK_LENGTH) return super.getRef(i);
+		throw new IndexOutOfBoundsException(i);
+	}
 
 	@Override
-	public final int getRefCount() {
-		// if (length>Blob.CHUNK_LENGTH) throw new IllegalStateException("Can't get ref count of non-canonical array blob");
+	public ACell updateRefs(IRefFunction func) {
+		if (count>Blob.CHUNK_LENGTH) return super.updateRefs(func);
+		return this;
+	}
+	
+	@Override
+	public int getRefCount() {
+		if (count>Blob.CHUNK_LENGTH) return super.getRefCount();
 		return 0;
 	}
 	

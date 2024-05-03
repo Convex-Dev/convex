@@ -5,8 +5,10 @@ import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -115,9 +117,20 @@ public class Transfer extends ATransaction {
 	public long getAmount() {
 		return amount;
 	}
+
+	@Override
+	public <R extends ACell> Ref<R> getRef(int i) {
+		throw new IndexOutOfBoundsException(i);
+	}
+
+	@Override
+	public ACell updateRefs(IRefFunction func) {
+		return this;
+	}
 	
 	@Override
 	public int getRefCount() {
+		// No Refs
 		return 0;
 	}
 	
