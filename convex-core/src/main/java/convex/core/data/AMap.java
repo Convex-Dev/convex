@@ -301,11 +301,10 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @return Updated map with the specified entry added, or null if the argument
 	 *         is not a valid map entry
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> ADataStructure<R> conj(R x) {
+	public AMap<K,V> conj(ACell x) {
 		MapEntry<K, V> me = RT.ensureMapEntry(x);
 		if (me == null) return null;
-		return (ADataStructure<R>) assocEntry(me);
+		return assocEntry(me);
 	}
 
 	/**

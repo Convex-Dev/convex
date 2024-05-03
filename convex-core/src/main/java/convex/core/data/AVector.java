@@ -208,16 +208,16 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public final <R extends ACell> AVector<R> conj(R value) {
-		return (AVector<R>) append((T) value);
+	public final AVector<T> conj(ACell value) {
+		return append((T) value);
 	}
 	
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> AVector<R> conjAll(ACollection<R> xs) {
+	public AVector<T> conjAll(ACollection<? extends T> xs) {
 		if (xs instanceof ASequence) {
-			return (AVector<R>) concat((ASequence<T>)xs);
+			return concat((ASequence<T>)xs);
 		}
-		return (AVector<R>) concat(Vectors.create(xs));
+		return concat(Vectors.create(xs));
 	}
 
 	@Override

@@ -28,22 +28,21 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public <R extends ACell> ASet<R> include(R a) {
+	public ASet<K> include(K a) {
 		return getCanonicalSet().include(a);
 	}
 
-	protected ASet<? super K> getCanonicalSet() {
+	protected ASet<K> getCanonicalSet() {
 		return getCanonical();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public ASet<K> exclude(ACell a) {
 		return (ASet<K>) getCanonicalSet().exclude(a);
 	}
 
 	@Override
-	public <R extends ACell> ASet<R> includeAll(ASet<R> elements) {
+	public ASet<K> includeAll(ASet<? extends K> elements) {
 		return getCanonicalSet().includeAll(elements);
 	}
 
@@ -54,7 +53,7 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public <R extends ACell> ASet<R> conjAll(ACollection<R> xs) {
+	public ASet<K> conjAll(ACollection<? extends K> xs) {
 		return getCanonicalSet().conjAll(xs);
 	}
 
@@ -82,7 +81,7 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public <R extends ACell> ASet<R> conj(R a) {
+	public ASet<K> conj(ACell a) {
 		return getCanonicalSet().conj(a);
 	}
 
@@ -104,7 +103,6 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 		return getCanonicalSet().containsAll(b);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public ASet<K> slice(long start, long end) {
 		return (ASet<K>) getCanonicalSet().slice(start,end);

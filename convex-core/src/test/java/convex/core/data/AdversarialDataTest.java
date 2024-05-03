@@ -126,7 +126,7 @@ public class AdversarialDataTest {
 		
 		// Inserting non-CVM values into existing valid sets
 		invalidTest(Sets.of(1,2,3,4).include(NON_CVM));
-		invalidTest(Samples.LONG_SET_100.include(NON_CVM));
+		invalidTest(Samples.LONG_SET_100.conj(NON_CVM));
 	}
 	
 	@Test public void testBadKeywords() {

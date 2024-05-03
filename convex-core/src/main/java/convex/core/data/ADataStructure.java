@@ -56,7 +56,6 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 		return isCVMValue();
 	}
 
-
 	/**
 	 * Adds an element to this data structure, in the natural manner defined by the
 	 * general data structure type. e.g. append at the end of a vector.
@@ -65,7 +64,7 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @param x New element to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid element type
 	 */
-	public abstract <R extends ACell> ADataStructure<R> conj(R x);
+	public abstract ADataStructure<E> conj(ACell x);
 	
 	/**
 	 * Adds multiple elements to this data structure, in the natural manner defined by the
@@ -77,10 +76,9 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * @param xs New elements to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid element types
 	 */
-	@SuppressWarnings("unchecked")
-	public <R extends ACell> ADataStructure<R> conjAll(ACollection<R> xs) {
-		ADataStructure<R> result=(ADataStructure<R>) this;
-		for (R x: xs) {
+	public ADataStructure<E> conjAll(ACollection<? extends E> xs) {
+		ADataStructure<E> result=this;
+		for (E x: xs) {
 			result=result.conj(x);
 			if (result==null) return null;
 		}

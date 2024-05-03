@@ -206,7 +206,7 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 	 * @return The updated collection
 	 */
 	@Override
-	public abstract <R extends ACell> ACollection<R> conj(R x);
+	public abstract ACollection<T> conj(ACell x);
 	
 	/**
 	 * Maps a function over a collection, applying it to each element in turn.

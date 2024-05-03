@@ -231,10 +231,10 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * Adds an element to the sequence in the natural position
 	 * 
 	 * @param value Value to add
-	 * @return Updated sequence
+	 * @return Updated sequence, or null if value is invalid
 	 */
 	@Override
-	public abstract <R extends ACell> ASequence<R> conj(R value);
+	public abstract ASequence<T> conj(ACell value);
 
 	/**
 	 * Produces a slice of this sequence, beginning with the specified start index and of the given length.

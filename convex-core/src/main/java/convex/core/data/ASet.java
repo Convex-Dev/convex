@@ -42,7 +42,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param a Value to include
 	 * @return Updated set
 	 */
-	public abstract <R extends ACell> ASet<R> include(R a);
+	public abstract ASet<T> include(T a);
 	
 	/**
 	 * Updates the set to exclude the given element
@@ -58,7 +58,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	 * @param elements Elements to include
 	 * @return Updated set
 	 */
-	public abstract <R extends ACell> ASet<R> includeAll(ASet<R> elements) ;
+	public abstract ASet<T> includeAll(ASet<? extends T> elements) ;
 	
 	/**
 	 * Updates the set to exclude all the given elements.
@@ -69,7 +69,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	public abstract ASet<T> excludeAll(ASet<T> elements) ;
 
 	@Override
-	public abstract <R extends ACell> ASet<R> conjAll(ACollection<R> xs);
+	public abstract ASet<T> conjAll(ACollection<? extends T> xs);
 
 	/**
 	 * Removes all elements from this set, returning a new set.
@@ -142,12 +142,12 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	public abstract ASet<T> includeRef(Ref<T> ref) ;
 
 	@Override
-	public abstract <R extends ACell> ASet<R> conj(R a);
+	public abstract ASet<T> conj(ACell a);
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public ASet<T> assoc(ACell key, ACell value) {
-		if (value==CVMBool.TRUE) return (ASet<T>) include(key);
+		if (value==CVMBool.TRUE) return include((T) key);
 		if (value==CVMBool.FALSE) return exclude((T) key);
 		return null;
 	}

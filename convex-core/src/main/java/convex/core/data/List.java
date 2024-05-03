@@ -305,8 +305,8 @@ public class List<T extends ACell> extends AList<T> {
 	 * @return Updated list
 	 */
 	@Override
-	public <R extends ACell> List<R> conj(R value) {
-		return new List<R>((AVector<R>) data.conj(value));
+	public List<T> conj(ACell value) {
+		return new List<T>(data.conj(value));
 	}
 	
 	@Override
@@ -314,7 +314,7 @@ public class List<T extends ACell> extends AList<T> {
 		return new List<T>((AVector<T>) data.conj(x));
 	}
 	
-	public <R extends ACell> List<R> conjAll(ACollection<R> xs) {
+	public List<T> conjAll(ACollection<? extends T> xs) {
 		return reverse(data.conjAll(xs));
 	}
 

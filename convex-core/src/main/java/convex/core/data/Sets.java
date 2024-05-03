@@ -32,7 +32,6 @@ public class Sets {
 		return (Ref)EMPTY_REF;
 	}
 
-	@SuppressWarnings("unchecked")
 	@SafeVarargs
 	public static <T extends ACell> ASet<T> of(Object... elements) {
 		int n=elements.length;
@@ -49,7 +48,7 @@ public class Sets {
 		int n=elements.length;
 		ASet<T> result=empty();
 		for (int i=0; i<n; i++) {
-			result=(ASet<T>) result.conj(elements[i]);
+			result=(ASet<T>) result.conj((T) elements[i]);
 		}
 		return result;
  	}
@@ -95,7 +94,7 @@ public class Sets {
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> ASet<T> fromCollection(ACountable<T> source) {
 		long n=source.count();
-		ASet<?> set=EMPTY;
+		ASet<T> set=EMPTY;
 		for (long i=0; i<n; i++) {
 			set=set.include(source.get(i));
 		}

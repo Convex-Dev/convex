@@ -21,8 +21,8 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	protected abstract AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int shift);
 
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> ASet<R> includeAll(ASet<R> elements) {
-		return (ASet<R>) mergeWith((AHashSet<T>) elements,OP_UNION);
+	public AHashSet<T> includeAll(ASet<? extends T> elements) {
+		return mergeWith((AHashSet<T>) elements,OP_UNION);
 	};
 	
 	protected final int reverseOp(int setOp) {
@@ -62,10 +62,10 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	
 	public abstract AHashSet<T> toCanonical();
 	
-	public <R extends ACell> ASet<R> conjAll(ACollection<R> elements) {
-		if (elements instanceof AHashSet) return includeAll((AHashSet<R>) elements);
-		@SuppressWarnings("unchecked")
-		AHashSet<R> result=(AHashSet<R>) this;
+	@SuppressWarnings("unchecked")
+	public AHashSet<T> conjAll(ACollection<? extends T> elements) {
+		if (elements instanceof AHashSet) return includeAll((AHashSet<T>)elements);
+		AHashSet<T> result=this;
 		long n=elements.count();
 		for (long i=0; i<n; i++) {
 			result=result.conj(elements.get(i));
@@ -91,8 +91,8 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AHashSet<R> conj(R a) {
-		return (AHashSet<R>) includeRef((Ref<T>) Ref.get(a));
+	public AHashSet<T> conj(ACell a) {
+		return includeRef(Ref.get((T)a));
 	}
 	
 	@Override
@@ -100,10 +100,9 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		return excludeRef(Ref.get(a));
 	}
 	
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AHashSet<R> include(R a) {
-		return (AHashSet<R>) includeRef((Ref<T>) Ref.get(a));
+	public AHashSet<T> include(T a) {
+		return includeRef((Ref<T>) Ref.get(a));
 	}
 
 	/**

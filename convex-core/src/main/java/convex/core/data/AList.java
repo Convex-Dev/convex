@@ -45,7 +45,7 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	 * Returns a new list.
 	 */
 	@Override
-	public abstract <R extends ACell> AList<R> conj(R x);
+	public abstract AList<T> conj(ACell x);
 
 	@Override
 	public AList<T> empty() {
