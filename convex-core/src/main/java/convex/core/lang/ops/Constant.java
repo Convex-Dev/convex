@@ -22,11 +22,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
-import convex.core.lang.Core;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.impl.CoreFn;
 import convex.core.util.Errors;
 
 /**
@@ -55,9 +53,6 @@ public class Constant<T extends ACell> extends AOp<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Constant<ASet<?>> EMPTY_SET = new Constant(Sets.EMPTY_REF);
-	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static final Constant<CoreFn<ACell>> EVAL = new Constant(Core.EVAL.getRef());
 
 	private final Ref<T> valueRef;
 

@@ -37,8 +37,8 @@ public class CollectionsTest {
 			assertEquals(0L, a.indexOf(first));
 
 
-			assertSame(a, a.assoc(0, first));
-			assertSame(a, a.assoc(n - 1, last));
+			assertEquals(a, a.assoc(0, first));
+			assertEquals(a, a.assoc(n - 1, last));
 		}
 		
 		// Out of range assocs should return null

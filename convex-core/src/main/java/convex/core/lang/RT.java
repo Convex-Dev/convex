@@ -690,7 +690,7 @@ public class RT {
 	/**
 	 * Converts any data structure to a vector
 	 * 
-	 * @param o Object to attempt to convert to a Vector
+	 * @param o Object to attempt to convert to a Vector. May wrap a Java array in VectorArray 
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
@@ -700,9 +700,11 @@ public class RT {
 		if (o instanceof ACell)
 			return castVector((ACell) o);
 
-		if (o.getClass().isArray()) {
-			ACell[] arr = Cells.toCellArray(o);
+		if (o instanceof ACell[]) {
+			ACell[] arr = (ACell[])o;
 			return Vectors.create(arr);
+			// TODO: this should be faster?
+			// return VectorArray.wrap(arr); 
 		}
 
 		if (o instanceof java.util.List)

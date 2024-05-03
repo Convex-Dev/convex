@@ -236,6 +236,14 @@ public class VectorsTest {
 		assertEquals(Vectors.of(2, 3, 4, 5), vec2);
 	}
 	
+	@Test 
+	public void testVectorArray() {
+		
+		doVectorTests(VectorArray.of());
+		
+		doVectorTests(VectorArray.of(1,2,3));
+	}
+	
 	@Test
 	public void testVectorBuilder() {
 		VectorBuilder<CVMLong> vb=new VectorBuilder<CVMLong>();
@@ -371,7 +379,7 @@ public class VectorsTest {
 		long n = v.count();
 
 		if (n == 0) {
-			assertSame(Vectors.empty(), v);
+			assertSame(Vectors.empty(), v.getCanonical());
 		} else {
 			T last = v.get(n - 1);
 			T first = v.get(0);
