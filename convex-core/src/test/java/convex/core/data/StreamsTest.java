@@ -25,7 +25,6 @@ public class StreamsTest {
 
 		AVector<CVMLong> v2 = Vectors.create(list);
 		v2.validate();
-		assertEquals(v.getClass(), v2.getClass());
 		assertEquals(v, v2);
 
 	}

@@ -87,10 +87,10 @@ public class Vectors {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> elements) {
-		if (elements instanceof ASequence) return create((ASequence<R>) elements);
+		if (elements instanceof ASequence) return ((ASequence<R>) elements).toVector();
 		if (elements.size() == 0) return empty();
 		ACell[] cells=Cells.toCellArray(elements.toArray());
-		return (AVector<R>) create(cells);
+		return wrap(cells);
 	}
 	
 	/**
@@ -102,10 +102,8 @@ public class Vectors {
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> AVector<R> create(ASequence<R> list) {
 		if (list instanceof AVector) return (AVector<R>) list.getCanonical();
-		if (list.size() == 0) return empty();
-		return create(list.toCellArray());
+		return wrap(list.toCellArray());
 	}
-
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> empty() {
