@@ -150,12 +150,6 @@ public class EtchStore extends ACachedStore {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
 			boolean topLevel) {
-		// TODO: remove this?, probably dangerous if in different store
-		// first check if the Ref is already persisted to required level
-		// if (ref.getStatus() >= requiredStatus) {
-		// // we are done as long as not top level
-		// if (!topLevel) return ref;
-		// }
 
 		// Get the value. If we are persisting, should be there!
 		ACell cell = ref.getValue();
@@ -313,7 +307,6 @@ public class EtchStore extends ACachedStore {
 
 	@Override
 	public String shortName() {
-		// TODO Auto-generated method stub
 		return "Etch: "+etch.getFileName();
 	}
 

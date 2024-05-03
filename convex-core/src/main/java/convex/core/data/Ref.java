@@ -240,7 +240,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	@Override
 	public String toString() {
-		// TODO. Why protected by a try-catch? Looks like it will never throw.
 		BlobBuilder sb = new BlobBuilder();
 		print(sb,Constants.PRINT_LIMIT);
 		return Strings.create(sb.toBlob()).toString();
@@ -351,7 +350,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 
 	public void validate() throws InvalidDataException {
 		if (hash != null) hash.validate();
-		// TODO is this sane?
+		// TODO should be using a stack for validation
 		if (getStatus() < VALIDATED) {
 			T o = getValue();
 			if (o!=null) {

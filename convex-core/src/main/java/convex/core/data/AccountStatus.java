@@ -215,7 +215,7 @@ public class AccountStatus extends ARecord {
 		int shouldBeIncluded=result.getInclusion();
 		if (included!=shouldBeIncluded) {
 			// TODO: double check this catches all encoding violations
-			throw new BadFormatException("Bad includion: "+included+ " should be: "+shouldBeIncluded);
+			throw new BadFormatException("Bad inclusion: "+included+ " should be: "+shouldBeIncluded);
 		}
 		result.attachEncoding(b.slice(pos,epos));
 		return result;

@@ -36,7 +36,6 @@ import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
-import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 
 public class Utils {
@@ -911,7 +910,7 @@ public class Utils {
 		} else if (v instanceof Character) {
 			sb.append(((Character)v).toString());
 		} else {
-			throw new TODOException("Can't print: " + Utils.getClass(v));
+			throw new Error("Can't print: " + Utils.getClass(v));
 		}
 	}
 
@@ -986,7 +985,7 @@ public class Utils {
 	 */
 	public static <T> T[] filterArray(T[] arr, Predicate<T> predicate) {
 		if (arr.length <= 32) return filterSmallArray(arr, predicate);
-		throw new TODOException("Filter large arrays");
+		throw new Error("Can't Filter large arrays");
 	}
 
 	/**

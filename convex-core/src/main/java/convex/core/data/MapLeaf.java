@@ -10,7 +10,6 @@ import java.util.function.Function;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.TODOException;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
@@ -492,7 +491,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
 		if (b instanceof MapLeaf) return mergeWith((MapLeaf<K, V>) b, func, shift);
 		if (b instanceof MapTree) return ((MapTree<K, V>) b).mergeWith(this, func.reverse());
-		throw new TODOException("Unhandled map type: " + b.getClass());
+		throw new Error("Unhandled map type: " + b.getClass());
 	}
 
 	@SuppressWarnings("null")
@@ -551,7 +550,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
 		if (b instanceof MapLeaf) return mergeDifferences((MapLeaf<K, V>) b, func,shift);
 		if (b instanceof MapTree) return b.mergeWith(this, func.reverse());
-		throw new TODOException("Unhandled map type: " + b.getClass());
+		throw new Error("Unhandled map type: " + b.getClass());
 	}
 
 	@SuppressWarnings("null")

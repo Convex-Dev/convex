@@ -57,7 +57,7 @@ import convex.core.util.Utils;
  * - 32 bytes key
  * - X bytes monotonic label of which
  *    - 1 byte status
- *    - 8 bytes Memory Size (TODO: might be negative for unknown?)
+ *    - 8 bytes Memory Size 
  * - 2 bytes data length N (a short)
  * - N byes actual data
  */
