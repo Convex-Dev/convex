@@ -650,22 +650,22 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R  extends ACell> AVector<R> subVector(long start, long length) {
+	public AVector<T> subVector(long start, long length) {
 		checkRange(start, length);
-		if (length == count) return (AVector<R>) this;
+		if (length == count) return this;
 
 		if (prefix == null) {
 			int len = Utils.checkedInt(length);
-			Ref<R>[] newItems= new Ref[len];
+			Ref<T>[] newItems= new Ref[len];
 			System.arraycopy(items, Utils.checkedInt(start), newItems, 0, len);
-			return new VectorLeaf<R>(newItems, null, length);
+			return new VectorLeaf<T>(newItems, null, length);
 		} else {
 			long tc = prefixLength();
 			if (start >= tc) {
 				int len = Utils.checkedInt(length);
-				Ref<R>[] newItems= new Ref[len];
+				Ref<T>[] newItems= new Ref[len];
 				System.arraycopy(items, Utils.checkedInt(start-tc), newItems, 0, len);
-				return new VectorLeaf<R>(newItems, null, length);
+				return new VectorLeaf<T>(newItems, null, length);
 			}
 
 			AVector<T> tv = prefix.getValue();

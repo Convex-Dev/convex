@@ -239,17 +239,16 @@ public class VectorArray<T extends ACell> extends AVector<T> {
 		return Ref.get(get(index));
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> subVector(long start, long length) {
+	public AVector<T> subVector(long start, long length) {
 		long end=start+length;
 		if (length<=0) {
 			if (length==0) return Vectors.empty();
 			return null;
 		}
 		if ((start<0)||(end>count)) return null; 
-		if (length==count) return (AVector<R>) this;
-		return new VectorArray<R>(data,this.start+start,length);
+		if (length==count) return this;
+		return new VectorArray<T>(data,this.start+start,length);
 	}
 
 	@Override

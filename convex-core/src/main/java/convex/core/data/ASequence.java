@@ -257,7 +257,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param length Length of sub vector to produce
 	 * @return Sub-vector of this sequence
 	 */
-	public abstract <R extends ACell> AVector<R> subVector(long start, long length);
+	public abstract AVector<T> subVector(long start, long length);
 
 	@Override
 	public final java.util.List<T> subList(int fromIndex, int toIndex) {

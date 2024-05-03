@@ -285,10 +285,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return toVector().concat(b);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> subVector(long start, long length) {
-		AVector<R> vec=(AVector<R>) toVector();
+	public AVector<ACell> subVector(long start, long length) {
+		AVector<ACell> vec= toVector();
 		return vec.subVector(start, length);
 	}
 
