@@ -84,6 +84,7 @@ public class StringSlice extends AString {
 
 	@Override
 	public int compareTo(ABlobLike<?> o) {
+		if (o==this) return 0;
 		return ((AString)getCanonical()).compareTo(o);
 	}
 

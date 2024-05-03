@@ -496,7 +496,12 @@ public class BlobsTest {
 		doBlobTests(z2);
 		doBlobTests(z3);
 		doBlobTests(z4);
+		
+		// non-canonical so should convert to blob tree
+		ABlob cz4=z4.getCanonical();
+		assertTrue(cz4 instanceof BlobTree);
 	}
+	
 	@Test
 	public void testBlobParse() {
 		assertNull(Blobs.parse(null));

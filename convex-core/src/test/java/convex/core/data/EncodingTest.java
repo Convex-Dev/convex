@@ -22,11 +22,13 @@ import convex.core.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.prim.CVMBigInteger;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.lang.Symbols;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -404,6 +406,36 @@ public class EncodingTest {
 		return (T) decoded;
 	}
 	
+	@Test public void testEncodingSizeAssumptions() {
+		// These should be exact
+		checkExactCodingSize(Hash.EMPTY_HASH);
+		checkExactCodingSize(CVMBool.TRUE);
+		checkExactCodingSize(CVMDouble.NaN);
+		
+		// These should have sufficient size
+		checkSufficientCodingSize(Strings.EMPTY);
+		checkSufficientCodingSize(Symbols.FOO);
+		checkSufficientCodingSize(CVMLong.ZERO);
+	}
+	
+	public static void checkExactCodingSize(ACell c) {
+		assertEquals(c.getEncodingLength(),c.estimatedEncodingSize());
+		checkCodingSize(c);
+	}
+
+	public static void checkSufficientCodingSize(ACell c) {
+		assertTrue(c.getEncodingLength()<=c.estimatedEncodingSize());
+		checkCodingSize(c);
+	}
+	
+	public static void checkCodingSize(ACell c) {
+		int n=c.getEncoding().size();
+		assertEquals(n,c.getEncodingLength());		
+		assertTrue(Cells.storageSize(c)>=n);
+		assertTrue(n<=Format.LIMIT_ENCODING_LENGTH);
+	}
+
+
 	@Test public void testDeltaBeliefEncoding() throws BadFormatException {
 		AKeyPair kp=AKeyPair.createSeeded(101);
 		Order o=Order.create();

@@ -415,7 +415,7 @@ public class MapsTest {
 			long n=m.count();
 			MapEntry<K, V> firstEntry = m.entryAt(0);
 			K firstKey=firstEntry.getKey();
-			assertEquals(firstEntry,m.getEntryByHash(Hash.compute(firstKey)));
+			assertEquals(firstEntry,m.getEntryByHash(Hash.get(firstKey)));
 			
 			// Test a smaller version of this map
 			AHashMap<K, V> smaller = m.dissoc(firstKey);

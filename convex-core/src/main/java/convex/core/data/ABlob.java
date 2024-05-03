@@ -166,7 +166,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 
 
 	/**
-	 * Append an additional Blob to this, creating a new Blob as needed. New Blob will be canonical.
+	 * Append an additional Blob to this, creating a new Blob as needed.
 	 * 
 	 * @param d Blob to append
 	 * @return A new Blob, containing the additional data appended to this blob.

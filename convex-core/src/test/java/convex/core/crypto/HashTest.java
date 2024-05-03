@@ -81,7 +81,7 @@ public class HashTest {
 		assertEquals("5d53469f20fef4f8eab52b88044ede69c77a6a68a60728609fc4a65ff531e7d0", Hash.NULL_HASH.toHexString());
 		
 		// different ways of getting the same result, should all correspond
-		assertSame(Hash.NULL_HASH, Hash.compute(null));
+		assertSame(Hash.NULL_HASH, Hash.get(null));
 		assertSame(Hash.NULL_HASH, Ref.get(null).getHash());
 	}
 
@@ -92,7 +92,7 @@ public class HashTest {
 
 	@Test
 	void testExtractHash() {
-		Hash h = Hash.compute(Strings.create("foo"));
+		Hash h = Hash.get(Strings.create("foo"));
 		Blob b = h.getEncoding();
 		byte[] bs = b.getBytes();
 		Hash h2 = Hash.wrap(bs, 2); // all bytes except the initial tag byte and count

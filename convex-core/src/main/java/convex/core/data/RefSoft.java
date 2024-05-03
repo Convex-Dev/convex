@@ -70,7 +70,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	}
 
 	public static <T extends ACell> RefSoft<T> create(AStore store,T value, int flags) {
-		Hash hash=Hash.compute(value);
+		Hash hash=Hash.get(value);
 		return new RefSoft<T>(store,value, hash, flags);
 	}
 
@@ -133,7 +133,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	@Override
 	public boolean equals(Ref<T> a) {
 		if (a.hash!=null) {
-			// prefer hash comparison
+			// prefer hash comparison, this avoid potential store lookups
 			return hash.equals(a.hash);
 		}
 		// compare by value

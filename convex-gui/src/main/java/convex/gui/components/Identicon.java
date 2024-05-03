@@ -115,7 +115,7 @@ public class Identicon extends JLabel {
 
 			// Identicons for Hashes / random data
 			for (int i=0; i<64; i++) {
-				add(new Identicon(Hash.compute(CVMLong.create(i).getHash())));
+				add(new Identicon(Hash.get(CVMLong.create(i).getHash())));
 			}
 			add(new Identicon(null));
 		}

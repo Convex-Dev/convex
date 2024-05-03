@@ -338,26 +338,26 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Returns true if this Cell is in a canonical representation for encoding.
+	 * Returns true if this Cell is in a canonical representation.
 	 * 
-	 * Non-canonical objects may be used on a temporary internal basis, they must always
-	 * be converted to canonical representations for external use (e.g. Encoding).
+	 * Non-canonical objects may be used on a temporary internal basis, they should
+	 * be converted to canonical representations for general purpose use.
 	 * 
 	 * @return true if the object is in canonical format, false otherwise
 	 */
 	public abstract boolean isCanonical();
 	
 	/**
-	 * Converts this Cell to its canonical version. Must return this Cell if already canonical, may be O(n) in size of value otherwise.
+	 * Converts this Cell to a canonical version. Must return this Cell if already canonical, may be O(n) in size of value otherwise.
 	 * 
-	 * Callers should usually use getCanonical(), which caches canonical instances. 
+	 * Callers should usually use getCanonical(), which caches canonical instances once created 
 	 * 
 	 * @return Canonical version of Cell
 	 */
 	protected abstract ACell toCanonical();
 	
 	/**
-	 * Returns true if this cell instances represents a first class CVM Value allowable in the CVM state
+	 * Returns true if this cell is a first class CVM Value allowable in the CVM state
 	 * 
 	 * Sub-structural cells that are not themselves first class values
 	 * should return false
@@ -425,7 +425,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Gets a numbered child Ref from within this Cell.
-	 * WARNING: May be unreliable is cell is not canonical
+	 * WARNING: May need to convert to a canonical instance
 	 * 
 	 * @param <R> Type of referenced Cell
 	 * @param i Index of ref to get
@@ -526,7 +526,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			if (!r.isEmbedded()) return false;
 			ACell child=r.getValue();
 			if (child!=null) {
-				child=child.getCanonical();
 				if (!child.isCompletelyEncoded()) return false; // Should be safe from missing?
 			}
 		}

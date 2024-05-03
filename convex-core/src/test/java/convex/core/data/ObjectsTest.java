@@ -32,7 +32,7 @@ public class ObjectsTest {
 	 * @param a Value to test
 	 */
 	public static void doAnyValueTests(ACell a) {
-		Hash h=Hash.compute(a);
+		Hash h=Hash.get(a);
 				
 		a=Cells.persist(a);
 		Ref<ACell> r = Ref.get(a);
@@ -94,9 +94,6 @@ public class ObjectsTest {
 		}
 	}
 
-
-
-
 	private static void doPrintTests(ACell a) {
 		BlobBuilder bb=new BlobBuilder();
 		assertFalse(a.print(bb,0)); // should always fail to print with limit of 0
@@ -152,9 +149,7 @@ public class ObjectsTest {
 
 	private static void doCellEncodingTest(ACell a) {
 		Blob enc=a.getEncoding();
-		long len=enc.count();
-		assertEquals(a.getEncodingLength(),enc.count());
-		assertTrue(len<=Format.LIMIT_ENCODING_LENGTH);
+		EncodingTest.checkCodingSize(a);
 		
 		// Re=read on encoding
 		ACell b;
@@ -233,6 +228,8 @@ public class ObjectsTest {
 		assertNotNull(h);
 		assertSame(h,a.getHash());
 		assertSame(h,a.getEncoding().getContentHash(),()->"Inconsistent Hash on "+a);
+		assertEquals(h,a.getRef().getHash());
+
 	}
 
 	/**
@@ -255,7 +252,7 @@ public class ObjectsTest {
 			assertSame(a,a.getCanonical());
 			assertSame(a,a.toCanonical());
 			
-			// tests for memory size
+			// tests for memory size and ref usage
 			long memorySize=a.getMemorySize();
 			long encodingSize=a.getEncodingLength();
 			int rc=a.getRefCount();
@@ -273,12 +270,14 @@ public class ObjectsTest {
 			}
 		} else {
 			// non-canonical objects should convert to a canonical object
-			ACell canon=a.toCanonical();
+			ACell canon=a.getCanonical();
 			assertNotSame(canon,a);
 			assertTrue(canon.isCanonical());
 			assertEquals(a,canon);
 			assertEquals(enc,canon.getEncoding());
 			assertTrue(a.getRef().getValue().isCanonical());
+			
+			doCanonicalTests(canon);
 		}
 		
 		// Encoding of canonical object should be equal to initial value

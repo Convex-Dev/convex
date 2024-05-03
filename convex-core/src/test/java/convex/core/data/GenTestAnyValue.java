@@ -106,7 +106,7 @@ public class GenTestAnyValue {
 		// check persistence
 		o=Cells.persist(o);
 		Ref<ACell> dataRef=Ref.get(o); // ensure in store
-		Hash hash=Hash.compute(o);
+		Hash hash=Hash.get(o);
 		assertEquals(dataRef.getHash(),hash);
 		
 		// re-read data, should be canonical
@@ -116,7 +116,7 @@ public class GenTestAnyValue {
 		// equality checks
 		assertEquals(o,o2);
 		if (o!=null) assertEquals(o.hashCode(),o2.hashCode());
-		assertEquals(hash,Hash.compute(o2));
+		assertEquals(hash,Hash.get(o2));
 
 		// re-encoding
 		AArrayBlob data2=Format.encodedBlob(o2);

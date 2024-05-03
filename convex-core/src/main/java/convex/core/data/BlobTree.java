@@ -265,7 +265,10 @@ public class BlobTree extends ABlob {
 	@Override
 	public boolean equals(ABlob a) {
 		if (a.count()!=count) return false;
-		return equals((BlobTree) (a.getCanonical())); // Canonical form must be a BlobTree for this count
+		
+		// Canonical form of other Blob must be a BlobTree for this count
+		BlobTree other=(BlobTree) (a.getCanonical());
+		return equals(other); 
 	}
 
 	public boolean equals(BlobTree b) {
@@ -292,16 +295,18 @@ public class BlobTree extends ABlob {
 		if (b.count()!=count) return false;
 		if (b instanceof BlobTree) {
 			BlobTree bb=(BlobTree) b;
-			for (int i=0; i<children.length; i++) {
-				if (!(getChild(i).equalsBytes(bb.getChild(i)))) return false;
-			}		
-			return true;
+			return equals(bb);
 		}
+		
+		assert (!b.isCanonical()) : "Canonical Blob of this size should be a BlobTree?";
+		
+		// Might be a non-canonical array blob?
 		if (b instanceof AArrayBlob) {
 			AArrayBlob ab=(AArrayBlob) b;
 			return equalsBytes(ab.getInternalArray(),ab.getInternalOffset());
 		}
-		throw new UnsupportedOperationException("Shouldn't be possible?");
+	
+		return equalsBytes(b.getCanonical());
 	}
 
 	@Override

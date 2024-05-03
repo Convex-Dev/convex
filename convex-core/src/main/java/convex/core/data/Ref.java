@@ -492,7 +492,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Check if the Ref's value is embedded. 
 	 * 
-	 * If false, the value must be an ACell instance.
+	 * If false, the value must be a branch.
 	 * 
 	 * @return true if embedded, false otherwise
 	 */

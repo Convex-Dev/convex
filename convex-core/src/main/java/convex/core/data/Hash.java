@@ -161,7 +161,7 @@ public class Hash extends AArrayBlob {
 	 * @param value Any Cell
 	 * @return Hash of the encoded data for the given value
 	 */
-	public static Hash compute(ACell value) {
+	public static Hash get(ACell value) {
 		if (value == null) return NULL_HASH;
 		return value.getHash();
 	}

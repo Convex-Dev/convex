@@ -667,7 +667,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public Ref<T> getValueRef(ACell k) {
-		Hash h=Hash.compute(k);
+		Hash h=Hash.get(k);
 		return getRefByHash(h);
 	}
 
