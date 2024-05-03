@@ -7,8 +7,10 @@ import javax.swing.JTabbedPane;
 import javax.swing.SwingConstants;
 
 import convex.api.Convex;
+import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
+import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.panels.HomePanel;
 import convex.gui.utils.SymbolIcon;
@@ -40,7 +42,12 @@ public class WalletApp extends AbstractGUI {
 		add(new AccountOverview(convex),"dock north");
 
 		addTab("Wallet", SymbolIcon.get(0xe850,TAB_ICON_SIZE), new WalletPanel(convex));
+
+		addTab("Friends", SymbolIcon.get(0xf233,TAB_ICON_SIZE), new FriendPanel(convex));
 		
+		addTab("Drive", SymbolIcon.get(0xe1db,TAB_ICON_SIZE), new DLFSPanel(DLFS.createLocal()));
+
+
 		KeyRingPanel keyPanel=new KeyRingPanel();
 		keyPanel.setBorder(Toolkit.createDialogBorder());
 		addTab("Keys", SymbolIcon.get(0xe73c,TAB_ICON_SIZE), keyPanel);
