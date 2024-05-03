@@ -147,20 +147,20 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> assoc(long i, R value) {
+	public AVector<T> assoc(long i, T value) {
 		if ((i < 0) || (i >= count)) return null;
 		
-		Ref<AVector<R>>[] rchildren=(Ref[])children;
+		Ref<AVector<T>>[] rchildren=(Ref[])children;
 
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
-		AVector<R> oc = rchildren[b].getValue();
-		AVector<R> nc = oc.assoc(i - (b * bSize), value);
-		if (oc == nc) return (AVector<R>) this;
+		AVector<T> oc = rchildren[b].getValue();
+		AVector<T> nc = oc.assoc(i - (b * bSize), value);
+		if (oc == nc) return (AVector<T>) this;
 
-		Ref<AVector<R>>[] newChildren = rchildren.clone();
+		Ref<AVector<T>>[] newChildren = rchildren.clone();
 		newChildren[b] = nc.getRef();
-		return new VectorTree<R>(newChildren, count);
+		return new VectorTree<T>(newChildren, count);
 	}
 
 	@Override

@@ -86,9 +86,9 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> assoc(long i, R a) {
-		if (i == 0) return (AVector<R>) withKey((K) a);
-		if (i == 1) return (AVector<R>) withValue((V) a);
+	public MapEntry<K,V> assoc(long i, ACell a) {
+		if (i == 0) return withKey((K) a);
+		if (i == 1) return withValue((V) a);
 		return null;
 	}
 

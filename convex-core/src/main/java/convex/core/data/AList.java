@@ -62,7 +62,7 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	public abstract <R extends ACell> AList<R> concat(ASequence<R> vals);
 
 	@Override
-	public abstract <R extends ACell> AList<R> assoc(long i, R value);
+	public abstract AList<T> assoc(long i, T value);
 
 	/**
 	 * Drops elements from the front of the list.

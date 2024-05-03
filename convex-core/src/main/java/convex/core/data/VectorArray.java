@@ -188,7 +188,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public <R extends ACell> AVector<R> assoc(long i, R value) {
+	public AVector<T> assoc(long i, T value) {
 		return toVector().assoc(i,value);
 	}
 

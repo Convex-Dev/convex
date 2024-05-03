@@ -189,7 +189,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param value New element value
 	 * @return Updated sequence, or null if index is out of range
 	 */
-	public abstract <R extends ACell> ASequence<R> assoc(long i, R value);
+	public abstract ASequence<T> assoc(long i, T value);
 
 	/**
 	 * Checks if an index range is valid for this sequence

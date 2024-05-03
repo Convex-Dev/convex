@@ -208,21 +208,21 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	@Override
-	public <R  extends ACell> AVector<R> assoc(long i, R value) {
+	public AVector<T> assoc(long i, T value) {
 		if ((i < 0) || (i >= count)) return null;
 		
 		long ix = i - prefixLength();
 		if (ix >= 0) {
-			R old = (R) items[(int) ix].getValue();
-			if (old == value) return (AVector<R>) this;
-			Ref<R>[] newItems = (Ref<R>[]) items.clone();
+			T old = items[(int) ix].getValue();
+			if (old == value) return this;
+			Ref<T>[] newItems = (Ref<T>[]) items.clone();
 			newItems[(int) ix] = Ref.get(value);
-			return new VectorLeaf<R>(newItems, (Ref)prefix, count);
+			return new VectorLeaf<T>(newItems, (Ref)prefix, count);
 		} else {
 			AVector<T> tl = prefix.getValue();
-			AVector<R> newTail = tl.assoc(i, value);
-			if (tl == newTail) return (AVector<R>) this;
-			return new VectorLeaf<R>((Ref[])items, newTail.getRef(), count);
+			AVector<T> newTail = tl.assoc(i, value);
+			if (tl == newTail) return (AVector<T>) this;
+			return new VectorLeaf<T>((Ref[])items, newTail.getRef(), count);
 		}
 	}
 

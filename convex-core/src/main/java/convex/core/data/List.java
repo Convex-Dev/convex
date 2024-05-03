@@ -113,14 +113,13 @@ public class List<T extends ACell> extends AList<T> {
 		return data.getElementRef(count - 1 - i);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AList<R> assoc(long i, R value) {
-		AVector<R> newData;
+	public AList<T> assoc(long i, T value) {
+		AVector<T> newData;
 		newData = data.assoc(count - 1 - i, value);
-		if (data == newData) return (AList<R>) this;
+		if (data == newData) return this;
 		if (newData==null) return null;
-		return new List<>(newData);
+		return new List<T>(newData);
 	}
 
 	@Override

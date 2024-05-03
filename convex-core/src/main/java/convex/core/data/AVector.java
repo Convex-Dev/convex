@@ -233,7 +233,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	}
 
 	@Override
-	public abstract <R extends ACell> AVector<R> assoc(long i, R value);
+	public abstract AVector<T> assoc(long i, T value);
 
 	@SuppressWarnings("unchecked")
 	@Override
