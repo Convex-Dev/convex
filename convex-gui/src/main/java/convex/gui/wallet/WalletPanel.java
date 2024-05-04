@@ -1,6 +1,7 @@
 package convex.gui.wallet;
 
 import java.awt.Color;
+import java.awt.Component;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JOptionPane;
@@ -8,8 +9,8 @@ import javax.swing.JPanel;
 
 import convex.api.Convex;
 import convex.core.data.ACell;
-import convex.core.data.Cells;
 import convex.core.lang.Reader;
+import convex.core.util.ThreadUtils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
@@ -18,40 +19,6 @@ import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class WalletPanel extends JPanel {
-	public static class TokenInfo {
-		private ACell id;
-
-		public TokenInfo(ACell tokenID) {
-			this.id=tokenID;
-		}
-
-		public ACell getID() {
-			return id;
-		}
-		
-		public String symbol() {
-			return (id==null)?"CVM":"???";
-		}
-		
-		public int decimals() {
-			return (id==null)?9:2;
-		}
-
-		public static TokenInfo forID(ACell tokenID) {
-			TokenInfo tokenInfo=new TokenInfo(tokenID);
-			return tokenInfo;
-		}
-		
-		@Override
-		public boolean equals(Object a) {
-			if (a instanceof TokenInfo) {
-				return Cells.equals(id, ((TokenInfo)a).id);
-			} else {
-				return false;
-			}
-		}
-	}
-
 	protected ScrollyList<TokenInfo> list;
 	
 	protected Convex convex;
@@ -93,5 +60,27 @@ public class WalletPanel extends JPanel {
 			list.refreshList(); 
 		}));
 		add(ap,"dock south");
+		
+		ThreadUtils.runVirtual(this::updateLoop);
+	}
+	
+	public void updateLoop() {
+		while (true) {
+			try {
+				if (isShowing()) {
+					Component[] comps=list.getListComponents();
+					for (Component c: comps) {
+						if ((c instanceof TokenComponent)&&c.isShowing()) {
+							((TokenComponent)c).refresh(convex);
+						}
+					}
+				}
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				return;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }

@@ -122,7 +122,7 @@ public class AccountChooserPanel extends JPanel {
 	private void updateBalance(Address a) {
 		try {
 			convex.query(Special.get("*balance*"),a).thenAccept(r-> {
-				balanceLabel.setBalance(r);
+				balanceLabel.setFromResult(r);
 			});
 		} catch (Throwable t) {
 			balanceLabel.setText(t.getClass().getName());

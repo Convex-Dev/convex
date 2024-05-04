@@ -57,10 +57,13 @@ public class AccountOverview extends JPanel {
 		add(al);
 		}
 
-		{ // Coin Balance
+		 try { // Coin Balance
 			//add(new JLabel(Toolkit.CONVEX)); // convex icon
 			balance.setFont(bigfont);
-			balance.setBalance(convex); 
+			balance.setBalance(convex.getBalance()); 
+		} catch (Exception e) {
+			// nothing
+		} finally {
 			add(balance);
 		}
 		//add(KeyPairCombo.forConvex(convex));

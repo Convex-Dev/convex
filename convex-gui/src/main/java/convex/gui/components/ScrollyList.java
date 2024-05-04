@@ -103,4 +103,8 @@ public class ScrollyList<E> extends JScrollPane {
 			}
 		});
 	}
+
+	public Component[] getListComponents() {
+		return listPanel.getComponents();
+	}
 }

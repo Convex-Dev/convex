@@ -9,7 +9,6 @@ import javax.swing.text.AttributeSet;
 import javax.swing.text.SimpleAttributeSet;
 import javax.swing.text.StyleConstants;
 
-import convex.api.Convex;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -91,9 +90,9 @@ public class BalanceLabel extends BaseTextPane {
 			setText("");
 			String cs=Text.toFriendlyNumber(coins.longValue());
 			append(cs,balanceColour,size);
-			append(".",SILVER,size);
 			String ch=Text.zeroPad(change,decimals);
 			int decimalSize=size*2/3;
+			append(decimals>0?".":" ",SILVER,decimalSize);
 			for (int i=0; i<decimals; i+=3) {
 				Color c=changeColour(i);
 				String chs=ch.substring(i,Math.min(decimals,i+3));
@@ -121,17 +120,6 @@ public class BalanceLabel extends BaseTextPane {
 	private static BigInteger getUnit(int decimals) {
 		return BigInteger.TEN.pow(decimals);
 	}
-
-	public void setBalance(Convex convex) {
-		try {
-			Long bal=convex.getBalance();
-			if (bal!=null) {
-				setBalance(bal);
-			}
-		} catch (Exception e) {
-			setText("<Can't get balance>");
-		}
-	}
 	
 	@Override
 	public void setText(String s) {
@@ -139,7 +127,7 @@ public class BalanceLabel extends BaseTextPane {
 		append(s,Color.ORANGE,getFont().getSize());
 	}
 
-	public void setBalance(Result r) {
+	public void setFromResult(Result r) {
 		ACell bal=r.getValue();
 		ACell error=r.getErrorCode();
 		if (error!=null) {
