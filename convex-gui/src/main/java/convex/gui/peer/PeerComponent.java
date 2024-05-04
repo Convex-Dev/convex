@@ -182,7 +182,7 @@ public class PeerComponent extends BaseListComponent {
 			Address addr=peer.getAddress();
 			AKeyPair kp=peer.getKeyPair();;
 			convex.setAddress(addr,kp);
-			ConvexClient.launch(convex);
+			new ConvexClient(convex).run();
 		} catch (IOException | TimeoutException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

@@ -1,13 +1,10 @@
 package convex.gui.client;
 
 import java.awt.BorderLayout;
-import java.awt.Component;
 import java.awt.Dimension;
-import java.awt.EventQueue;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -15,7 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.core.util.Utils;
+import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.panels.REPLPanel;
 import convex.gui.utils.Toolkit;
@@ -26,11 +23,9 @@ import convex.gui.utils.Toolkit;
  * Doesn't run a Peer. Connects to convex.world.
  */
 @SuppressWarnings("serial")
-public class ConvexClient extends JPanel {
+public class ConvexClient extends AbstractGUI {
 
 	private static final Logger log = LoggerFactory.getLogger(ConvexClient.class.getName());
-
-	private static JFrame frame;
 
 	public static long maxBlock = 0;
 	
@@ -45,14 +40,17 @@ public class ConvexClient extends JPanel {
 	 * @throws IOException 
 	 */
 	public static void main(String[] args) throws IOException, TimeoutException {
-		log.info("Running Convex Client");
+		log.info("Starting Convex Client");
 		clientMode=true;
 		
 		// call to set up Look and Feel
 		Toolkit.init();
 
 		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
-		EventQueue.invokeLater(()->launch(convex));
+		if (convex==null) {
+			System.exit(1);
+		}
+		new ConvexClient(convex).run();
 	}
 
 	public JTabbedPane tabs = new JTabbedPane();
@@ -64,6 +62,7 @@ public class ConvexClient extends JPanel {
 	 * @param convex Convex client instance
 	 */
 	public ConvexClient(Convex convex) {
+		super ("Convex Client");
 		setLayout(new BorderLayout());
 		replPanel=new REPLPanel(convex);
 		this.add(tabs, BorderLayout.CENTER);
@@ -89,28 +88,5 @@ public class ConvexClient extends JPanel {
 		System.err.println("Missing tab: " + title);
 	}
 
-
-	public static Component getFrame() {
-		return frame;
-	}
-	
-	public static ConvexClient launch(Convex convex) {
-		try {
-			ConvexClient.frame = new JFrame();
-			frame.setTitle("Convex Client - "+convex);
-			frame.setIconImage(Toolkit.getImage(ConvexClient.class.getResource("/images/Convex.png")));
-			frame.setBounds(100, 100, 1024, 768);
-			if (clientMode) {
-				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-			}
-			ConvexClient window = new ConvexClient(convex);
-			frame.getContentPane().add(window, BorderLayout.CENTER);
-			frame.pack();
-			frame.setVisible(true);
-			return window;
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
 
 }

@@ -81,7 +81,7 @@ public class MainGUI extends AbstractGUI {
 	public void launchTerminalClient() {
 	    Convex convex=ConnectPanel.tryConnect(this);
 	    if (convex!=null) {
-	    	ConvexClient.launch(convex);
+	    	new ConvexClient(convex).run();
 	    }
 	}
 	

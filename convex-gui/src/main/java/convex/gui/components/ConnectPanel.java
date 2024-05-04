@@ -9,6 +9,9 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.init.Init;
@@ -23,6 +26,9 @@ import net.miginfocom.swing.MigLayout;
  */
 @SuppressWarnings("serial")
 public class ConnectPanel extends JPanel {
+	
+	private static final Logger log = LoggerFactory.getLogger(ConnectPanel.class.getName());
+
 
 	private HostCombo hostField;
 	private AddressCombo addressField;
@@ -73,11 +79,14 @@ public class ConnectPanel extends JPanel {
 	    		}
 	    		return convex;
 	    	} catch (ConnectException e) {
+				log.info("Failed to connect");
 	    		Toast.display(parent, e.getMessage(), Color.RED);
 	    	} catch (Exception e) {
 	    		Toast.display(parent, e.getMessage(), Color.RED);
 	    		e.printStackTrace();
 	    	}
+	    } else {
+	    	log.info("Connect cancelled by user");
 	    }
 		return null;
 	}

@@ -7,6 +7,9 @@ import java.awt.EventQueue;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.gui.MainGUI;
 import convex.gui.utils.Toolkit;
 
@@ -16,6 +19,8 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class AbstractGUI extends JPanel implements Runnable {
 
+	private static final Logger log = LoggerFactory.getLogger(AbstractGUI.class.getName());
+	
 	protected JFrame frame=new JFrame();
 	private String title;
 	
@@ -40,14 +45,15 @@ public class AbstractGUI extends JPanel implements Runnable {
 					
 					Toolkit.closeIfFirstFrame(frame);
 
-
 					frame.getContentPane().setLayout(new BorderLayout());
 					frame.getContentPane().add(AbstractGUI.this, BorderLayout.CENTER);
 					frame.setVisible(true);
 
-
 				} catch (Exception e) {
+					log.warn("GUI launch failed");
 					e.printStackTrace();
+					// General exit code with error
+					System.exit(1);
 				}
 			}
 		});
