@@ -27,7 +27,7 @@ public class ScrollyList<E> extends JScrollPane {
 	private final ListModel<E> model;
 	private final ScrollablePanel listPanel = new ScrollablePanel();
 
-	private void refreshList() {
+	public void refreshList() {
 		EventQueue.invokeLater(()->{;
 			listPanel.removeAll();
 			int n = model.getSize();
@@ -72,7 +72,7 @@ public class ScrollyList<E> extends JScrollPane {
 		super();
 		this.builder = builder;
 		this.model = model;
-		this.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		// this.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
 		listPanel.setLayout(new MigLayout("wrap 1"));
 		setViewportView(listPanel);
@@ -102,7 +102,5 @@ public class ScrollyList<E> extends JScrollPane {
 				refreshList();
 			}
 		});
-
-		refreshList();
 	}
 }

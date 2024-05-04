@@ -12,13 +12,16 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class ActionButton extends JButton {
 
-	public ActionButton(String text, int iconCode, ActionListener al) {
+	public ActionButton(String text, int iconCode, ActionListener action) {
 		super(text,(iconCode>0)?Toolkit.menuIcon(iconCode):null);
-		this.addActionListener(al);
+		this.addActionListener(action);
 	}
 	
-	public ActionButton(String text, ActionListener al) {
-		super(text);
-		this.addActionListener(al);
+	public ActionButton(String text, ActionListener action) {
+		this(text,0,action);
+	}
+	
+	public ActionButton(int icon, ActionListener action) {
+		this(null,icon,action);
 	}
 }

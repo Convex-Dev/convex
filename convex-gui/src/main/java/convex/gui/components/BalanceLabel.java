@@ -46,6 +46,7 @@ public class BalanceLabel extends BaseTextPane {
 	public static final Color COPPER=new Color(150,80,30);
 	
 	protected int decimals=9;
+	private Color balanceColour=GOLD;
 	
 	public BalanceLabel() {
 		this.setEditable(false);
@@ -60,6 +61,14 @@ public class BalanceLabel extends BaseTextPane {
 	
 	public void setBalance(long a) {
 		setBalance(CVMLong.create(a));
+	}
+	
+	public void setDecimals(int decimals) {
+		this.decimals=decimals;
+	}
+	
+	public void setBalanceColour(Color c) {
+		this.balanceColour=c;
 	}
 
 	public void setBalance(AInteger a) {
@@ -81,13 +90,17 @@ public class BalanceLabel extends BaseTextPane {
 	
 			setText("");
 			String cs=Text.toFriendlyNumber(coins.longValue());
-			append(cs,GOLD,size);
+			append(cs,balanceColour,size);
 			append(".",SILVER,size);
 			String ch=Text.zeroPad(change,decimals);
+			int decimalSize=size*2/3;
 			for (int i=0; i<decimals; i+=3) {
 				Color c=changeColour(i);
 				String chs=ch.substring(i,Math.min(decimals,i+3));
-				append(chs,c,size*2/3);
+				append(chs,c,decimalSize);
+			}
+			for (int i=decimals; i<9; i++) {
+				append(" ",balanceColour,decimalSize);
 			}
 			
 			Toolkit.addPopupMenu(this, new BalanceMenu());
