@@ -10,6 +10,7 @@ import convex.api.Convex;
 import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
+import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.panels.HomePanel;
@@ -90,13 +91,18 @@ public class WalletApp extends AbstractGUI {
 	/**
 	 * Launch the application.
 	 * @param args Command line args
+	 * @throws InterruptedException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
 		// call to set up Look and Feel
 		Toolkit.init();
 		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		if (convex!=null) {
 			new WalletApp(convex).run();
+		} else {
+			// Quit after waiting long enough to see error message
+			Thread.sleep(Toast.DEFAULT_TIME);
+			System.exit(0);
 		}
 	}
 

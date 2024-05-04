@@ -158,7 +158,7 @@ public class PeerGUI extends AbstractGUI {
 		peerPanel= new PeersListPanel(this);
 		keyRingPanel = new KeyRingPanel();
 
-		peerPanel.manager.launchAllPeers(peerPanel, this);
+		launchAllPeers();
 		
 		Server first=peerList.firstElement().getLocalServer();
 		ConvexLocal convex=Convex.connect(first);
@@ -191,9 +191,6 @@ public class PeerGUI extends AbstractGUI {
 		tabs.add("About", new AboutPanel(convex));
 		
 		tabs.setSelectedComponent(peerPanel);
-		
-
-
 
 		ThreadUtils.runVirtual(updateThread);
 	}
@@ -374,9 +371,9 @@ public class PeerGUI extends AbstractGUI {
 		return null;
 	}
 
-	public void launchAllPeers(PeersListPanel peersListPanel, PeerGUI manager) {
+	public void launchAllPeers() {
 		try {
-			List<Server> serverList = API.launchLocalPeers(manager.KEYPAIRS,manager.genesisState);
+			List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
 			for (Server server: serverList) {
 				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
 				peerList.addElement(convex);

@@ -586,7 +586,7 @@ public class Connection {
 							log.debug("Cancelled key");
 						}
 					}
-				} catch (Throwable t) {
+				} catch (Exception t) {
 					log.warn("Uncaught error in PeerConnection client selector loop: ", t);
 				}
 			}

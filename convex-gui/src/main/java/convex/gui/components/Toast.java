@@ -23,7 +23,7 @@ public class Toast extends JWindow {
 	public static final Color SUCCESS = new Color(100,150,0);
 	public static final Color FAIL = new Color(150,50,50);
 	public static final Color INFO = new Color(50,100,150);
-	private static final long DEFAULT_TIME = 4000;
+	public static final long DEFAULT_TIME = 4000;
 
 	public Toast(JComponent parent, JComponent component, Color color) {
 		super();

@@ -77,8 +77,9 @@ public class DLFSPanel extends JPanel {
 		filesSplitPane.setResizeWeight(0.5);
 		
 		previewPanel=new PreviewPanel();
+		JScrollPane scrollPreview=new JScrollPane(previewPanel);
 		
-		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,filesSplitPane,previewPanel);
+		JSplitPane splitPane=new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,filesSplitPane,scrollPreview);
 		splitPane.setResizeWeight(0.5);
 		add(splitPane,"dock center");
 		

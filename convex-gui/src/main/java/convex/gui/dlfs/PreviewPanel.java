@@ -16,22 +16,23 @@ import convex.core.data.AVector;
 import convex.core.util.Utils;
 import convex.dlfs.DLFSNode;
 import convex.dlfs.DLPath;
-import convex.gui.components.CodeLabel;
+import convex.gui.components.CodePane;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class PreviewPanel extends JPanel {
 
 	protected Path path;
-	private CodeLabel header;
+	private CodePane information;
 
 	public PreviewPanel() {
 		setLayout(new MigLayout("wrap 1"));
-		header=new CodeLabel("Ready");
-		header.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+		information=new CodePane();
+		information.setBackground(null);
+		information.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 		//
 		// header.setPreferredSize(new Dimension(400,50));
-		add(header,"span");
+		add(information,"span");
 		
 		setPath(null);
 	}
@@ -83,7 +84,7 @@ public class PreviewPanel extends JPanel {
 			e.printStackTrace();
 			sb.append("\n\nERROR: "+e.getMessage());
 		}
-		header.setText(sb.toString());
+		information.setText(sb.toString());
 		
 	}
 }

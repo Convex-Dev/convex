@@ -73,9 +73,9 @@ public class ConnectPanel extends JPanel {
 	    		}
 	    		return convex;
 	    	} catch (ConnectException e) {
-	    		Toast.display(parent, "Connection Refused! "+e.getMessage(), Color.RED);
+	    		Toast.display(parent, e.getMessage(), Color.RED);
 	    	} catch (Exception e) {
-	    		Toast.display(parent, "Connect Failed: "+e.getMessage(), Color.RED);
+	    		Toast.display(parent, e.getMessage(), Color.RED);
 	    		e.printStackTrace();
 	    	}
 	    }

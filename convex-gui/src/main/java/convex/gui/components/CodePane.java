@@ -2,6 +2,8 @@ package convex.gui.components;
 
 import java.awt.Color;
 
+import convex.gui.utils.Toolkit;
+
 /**
  * A pane for code editing supporting syntax highlighting etc. Editable by default
  */
@@ -11,6 +13,7 @@ public class CodePane extends BaseTextPane {
 	public CodePane() {
 		RightCopyMenu.addTo(this);
 
+		setFont(Toolkit.SMALL_MONO_FONT);
 		// stop catching focus movement keys, useful for Ctrl+up and down etc
 		setFocusTraversalKeysEnabled(false);
 
