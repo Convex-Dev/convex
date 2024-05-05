@@ -78,6 +78,11 @@ public class AdversarialDataTest {
 		invalidTest(MapLeaf.unsafeCreate(new MapEntry[0]));
 	}
 	
+	@Test public void testBadAddress() {
+		invalidTest(Address.unsafeCreate(-1));
+		invalidTest(Address.unsafeCreate(Long.MIN_VALUE));
+	}
+	
 	@SuppressWarnings({ "unchecked", "null" })
 	@Test public void testBadSetTree() {
 		SetTree<CVMLong> a = Samples.INT_SET_300;
@@ -204,6 +209,19 @@ public class AdversarialDataTest {
 			Index c2=Index.create(Blobs.fromHex("1231"),CVMLong.ZERO);
 			invalidTest(Index.unsafeCreate(3, null, new Ref[] {c1.getRef(),c2.getRef()}, 5, 2)); 
 		}
+		
+		{ // Two colliding children
+			Index c1=Index.create(Blobs.fromHex("1230"),CVMLong.ONE);
+			Index c2=Index.create(Blobs.fromHex("1230"),CVMLong.ZERO);
+			invalidTest(Index.unsafeCreate(3, null, new Ref[] {c1.getRef(),c2.getRef()}, 1, 2)); 
+			invalidTest(Index.unsafeCreate(3, null, new Ref[] {c1.getRef(),c2.getRef()}, 3, 2)); 
+		}
+		
+		{ // Two colliding children at max depth
+			Index c1=Index.create(Blobs.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef00"),CVMLong.ONE);
+			Index c2=Index.create(Blobs.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef11"),CVMLong.ONE);
+			invalidTest(Index.unsafeCreate(64, null, new Ref[] {c1.getRef(),c2.getRef()}, 3, 2)); 
+		}
 	
 	}
 	
@@ -303,7 +321,7 @@ public class AdversarialDataTest {
 		Blob enc=null;
 		try {
 			enc= b.getEncoding();
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			// probably no valid encoding, so skip this test
 			return;
 		}
@@ -316,7 +334,7 @@ public class AdversarialDataTest {
 			// not a readable format, so probably not dangerous
 			return;
 		} catch (InvalidDataException e) {
-			fail("Failed to validate after re-reading?");
+			fail("Failed to validate after re-reading?",e);
 		}
 		
 		if (c.isCompletelyEncoded()) {

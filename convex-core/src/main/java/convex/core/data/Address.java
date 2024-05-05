@@ -41,7 +41,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	public static final Address MAX_VALUE = Address.create(Long.MAX_VALUE);
 	
 	/**
-	 * Length of an Address in bytes (considered as a Blob)
+	 * Length of an Address in bytes (when considered as a Blob)
 	 */
 	static final int BYTE_LENGTH = 8;
 
@@ -65,6 +65,16 @@ public final class Address extends ABlobLike<CVMLong> {
 			if (number<0) return null;
 			return CACHE[(int)number];
 		}
+		return new Address(number);
+	}
+	
+	/**
+	 * Creates an Address without checking.
+	 * 
+	 * @param number Account number
+	 * @return Address instance, may be invalid
+	 */
+	public static Address unsafeCreate(long number) {
 		return new Address(number);
 	}
 

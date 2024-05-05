@@ -593,6 +593,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		Index<K,V> result;
 		long depth = Format.readVLCCount(b,epos);
 		if (depth < 0) throw new BadFormatException("Negative depth!");
+		if (depth >=MAX_DEPTH) {
+			if (depth==MAX_DEPTH) throw new BadFormatException("More than one entry and MAX_DEPTH");
+			throw new BadFormatException("Excessive depth!");
+		}
 		epos+=Format.getVLCCountLength(depth);
 
 		// Need to include children
