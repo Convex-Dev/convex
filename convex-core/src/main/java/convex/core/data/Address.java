@@ -22,6 +22,14 @@ public final class Address extends ABlobLike<CVMLong> {
 
 	public static final int LENGTH=8;
 	
+	private static final int CACHE_SIZE=256;
+	private static Address[] CACHE=new Address[CACHE_SIZE];
+	static {
+		for (int i=0; i<CACHE_SIZE; i++) {
+			CACHE[i]=new Address(i);
+		}
+	}
+	
 	/**
 	 * The Zero Address
 	 */
@@ -54,7 +62,10 @@ public final class Address extends ABlobLike<CVMLong> {
 	 * @return Address instance, or null if not valid
 	 */
 	public static Address create(long number) {
-		if (number<0) return null;
+		if (number<CACHE_SIZE) {
+			if (number<0) return null;
+			return CACHE[(int)number];
+		}
 		return new Address(number);
 	}
 
