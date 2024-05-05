@@ -50,13 +50,12 @@ public final class Address extends ABlobLike<CVMLong> {
 	 */
 	private long value;
 
-
 	private Address(long value) {
 		this.value=value;
 	}
 	
 	/**
-	 * Creates an Address from a blob. Number be a valid non-negative long value.
+	 * Obtains an Address. Number must be a valid non-negative long value.
 	 * 
 	 * @param number Account number
 	 * @return Address instance, or null if not valid
@@ -70,7 +69,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 
 	/**
-	 * Creates an Address from a blob. Must be a valid long value
+	 * Obtains an Address from a blob. Must be a valid long value
 	 * @param b Blob to convert to an Address
 	 * @return Address instance, or null if not valid
 	 */
@@ -108,7 +107,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 
 	/**
-	 * Constructs an Address object from a hex string
+	 * Obtains an Address from a hex string
 	 * 
 	 * @param hexString String to read Address from
 	 * @return An Address constructed from the hex string, or null if not a valid
@@ -128,7 +127,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 	
 	/**
-	 * Constructs an Address from an arbitrary String, attempting to parse different possible formats '123' '0xc3' or '#123'
+	 * Obtains an Address from an arbitrary String, attempting to parse possible formats '123' '0xc3' or '#123'
 	 * @param s String to parse
 	 * @return Address parsed, or null if not valid
 	 */
@@ -148,9 +147,8 @@ public final class Address extends ABlobLike<CVMLong> {
 			return Address.create(l);
 		} catch (NumberFormatException e) {
 			// fall through
+			return null;
 		}
-		
-		return null;
 	}
 	
 	/**
