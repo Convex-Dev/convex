@@ -673,7 +673,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * 
 	 * @return
 	 */
-	private long getDepth() {
+	long getDepth() {
 		return depth;
 	}
 

@@ -13,6 +13,7 @@ import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
@@ -320,15 +321,19 @@ public class IndexTest {
 		}
 	}
 	
+	/**
+	 * Test for some keys that exceed max effective key length
+	 */
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Test 
 	public void testBigKeys() {
+		Blob ks=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef");
 		Blob k=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 		Blob k2=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef22");
 		Blob k3=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef3333");
-		Blob ks=Blob.fromHex("0123456789abcdef0123456789abcdef0123456789abcdef");
 		
 		Index m=Index.of(k, CVMLong.ONE);
+		assertEquals(k.hexLength(),m.getDepth());
 		
 		assertNull(m.get(ks)); // short fetch
 		assertEquals(CVMLong.ONE,m.get(k)); // exact full length match
@@ -336,11 +341,18 @@ public class IndexTest {
 		assertEquals(CVMLong.ONE,m.get(k3)); // matching up to max depth
 		
 		m=m.assoc(k2, CVMLong.ZERO);
+		assertEquals(k.hexLength(),m.getDepth());
 		
 		assertEquals(CVMLong.ZERO,m.get(k2)); // should match up to max depth
 		assertEquals(CVMLong.ZERO,m.get(k)); // should match up to max depth
 		assertEquals(k2,m.getEntry(k3).getKey()); // should match up to max depth
+		
+		// Add and remove a short key
 		assertNull(m.get(ks)); // short fetch
+		m=m.assoc(ks, CVMDouble.ZERO);
+		assertEquals(ks.hexLength(),m.getDepth());
+		assertEquals(CVMDouble.ZERO,m.get(ks)); // short fetch now works		
+		m=m.dissoc(ks);
 		
 		// dissoc should happen on keys equal up to max depth
 		assertSame(m,m.dissoc(ks));
@@ -352,6 +364,11 @@ public class IndexTest {
 		
 		Index m2=Index.of(ks, 0,k,1,k2,2,k3,3);
 		assertEquals(2,m2.count());
+		assertEquals(ks.hexLength(),m2.getDepth());
+		
+		// Last colliding slice should be there
+		assertEquals(m2.slice(1,2),Index.of(k3,3));
+		
 		doIndexTests(m2);
 	}
 
