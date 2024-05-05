@@ -34,6 +34,7 @@ public class IndexTest {
 		assertFalse(m.containsValue(null));
 
 		assertEquals(0L, m.count());
+		assertEquals(0L, m.getDepth());
 		assertSame(m, m.dissoc(Blob.fromHex("cafe")));
 		assertSame(m, m.dissoc(Blob.fromHex("")));
 
@@ -98,7 +99,9 @@ public class IndexTest {
 		assertNull(m.get(Samples.MAX_EMBEDDED_STRING)); // needs a blob. String counts as non-existent key
 		assertCVMEquals(17L,m.get(k1));
 
-		assertNull(m.get((Object)null)); // Null counts as non-existent key when used as an Object arg
+		// Null counts as non-existent key when used as an Object arg
+		assertNull(m.get((Object)null)); 
+		assertNull(m.get((ACell)null)); 
 	}
 
 
@@ -238,6 +241,7 @@ public class IndexTest {
 		CVMLong val=RT.cvm(177777L);
 		Index<ABlob, CVMLong> m = Index.create(k, val);
 		assertEquals(1L, m.count());
+		assertEquals(4, m.getDepth());
 
 		assertEquals(val, m.get(k));
 

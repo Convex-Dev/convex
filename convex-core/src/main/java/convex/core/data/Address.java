@@ -33,7 +33,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	/**
 	 * The Zero Address
 	 */
-	public static final Address ZERO = Address.create(0);
+	public static final Address ZERO = CACHE[0];
 	
 	/**
 	 * The maximum possible Address
