@@ -11,7 +11,7 @@
 
 ;;;;;;;;;; State
 
-;; Token metadata is stored here
+;; Internal Token metadata is stored here
 ;; Map of { id -> [controller supply] ]
 (def tokens {})
 
@@ -101,6 +101,11 @@
      (let [hs (get-holding addr) 
            rec (get hs *scope*)]
        (if rec (nth rec 0) 0))))
+
+(defn decimals
+  ^{:callable true}
+  ([]
+    (get (get tokens *scope*) 2 0)))
 
 (defn accept 
   ^{:callable true}

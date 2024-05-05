@@ -12,6 +12,7 @@ import static convex.test.Assertions.*;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.prim.AInteger;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
@@ -51,6 +52,12 @@ public class AssetTester {
 		assertTrue(BAL > 0, "Should provide a user account with positive balance!");
 		assertNull(eval(ctx, "(asset/check-transfer *address* *address* [token " + BAL + "])"));
 
+		// Fungibles have a non-negative decimals
+		{
+			AInteger decimals=eval(ctx,"(fungible/decimals token)");
+			assertTrue(decimals.signum().longValue()>=0);
+		}
+		
 		// New Address gets zero offers
 		{
 			assertEquals(0L, evalL(ctx, "(asset/balance token (deploy nil))"));

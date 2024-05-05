@@ -116,6 +116,10 @@
            rec (get hs *scope*)]
        (if rec (nth rec 0) 0))))
 
+(defn decimals
+  ^:callable
+  [] 0)
+
 (defn claim
    ^{:callable true}
    ([amt]

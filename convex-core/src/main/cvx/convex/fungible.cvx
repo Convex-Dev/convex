@@ -70,6 +70,7 @@
           :signature   [{:params [config]}]}}
   [config]
   (let [supply         (int (or (:supply config) 0))
+        decimals (int (or (:decimals config) 0))
         initial-holder (address (or (:initial-holder config) *address*))]
     `(do
     	(defn -qc [q]
@@ -138,6 +139,11 @@
          ^{:callable true}
          [_sender _receiver _quantity]
          nil)
+       
+       (defn decimals 
+    	  ^{:callable true}
+         []
+         ~decimals)
 
        (defn direct-transfer
          ^{:callable true}
@@ -250,7 +256,15 @@
                (int b)
                0))))))
 
-;;;;;;;;;; API for handling fungible actors
+;;;;;;;;;; API for handling fungible tokens
+
+(defn decimals 
+  ^{:doc {:description "Gets the number of decimal digits for a token."
+    :examples    [{:code "(decimals my-token)"}]
+    :signature   [{:params [token amount]}]}}
+  [token]
+  (call token
+    (decimals)))
 
 (defn balance
   ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."

@@ -78,6 +78,11 @@
     (transfer *caller* amt) 
     amt))
 
+;; Decimals info
+
+(defn decimals
+  ^:callable
+  [] 9)
 
 ;; Offers
 
