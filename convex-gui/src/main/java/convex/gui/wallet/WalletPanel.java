@@ -37,6 +37,8 @@ public class WalletPanel extends JPanel {
 		// add(new AccountOverview(convex),"dock north");
 		
 		model.addElement(TokenInfo.get(convex,null));
+		model.addElement(TokenInfo.getFungible(convex,"currency.USDF"));
+		model.addElement(TokenInfo.getFungible(convex,"currency.GBPF"));
 
 
 		// add(new AccountChooserPanel(convex),"dock south");

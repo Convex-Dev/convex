@@ -367,6 +367,7 @@ public class Init {
 		long decimals = RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
 		long usdValue=(Long) RT.jvm(row.get(4)); // USD value of liquidity in currency
 		
+		// number of sub-units in currency
 		long subDivisions=Math.round(Math.pow(10, decimals));
 		
 		// Currency liquidity (in lowest currency subdivision)
@@ -374,7 +375,7 @@ public class Init {
 		long supply = Math.round(liquidity);
 		
 		// CVX price for currency
-		double cvxPrice = usdPrice * 10000000; // One CVX Gold = 100 USD
+		double cvxPrice = usdPrice * 1000000000; // One CVX Gold = 1 USD in genesis
 		double cvx = cvxPrice * supply / subDivisions;
 
 		

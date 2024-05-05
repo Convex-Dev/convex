@@ -2,6 +2,7 @@ package convex.gui.components;
 
 
 import java.awt.EventQueue;
+import java.awt.event.WindowEvent;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -48,7 +49,7 @@ public class AbstractGUI extends JPanel implements Runnable {
 					Toolkit.closeIfFirstFrame(frame);
 
 					frame.getContentPane().setLayout(new MigLayout());
-					frame.getContentPane().add(AbstractGUI.this);
+					frame.getContentPane().add(AbstractGUI.this,"dock center");
 					frame.pack();
 					frame.setVisible(true);
 
@@ -64,6 +65,11 @@ public class AbstractGUI extends JPanel implements Runnable {
 	
 	public JFrame getFrame() {
 		return frame;
+	}
+
+
+	public void closeGUI() {
+		frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
 	}
 
 }

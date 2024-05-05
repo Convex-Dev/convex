@@ -652,6 +652,21 @@ public abstract class Convex {
 		ACell form = buildCodeForm(query);
 		return query(form, getAddress());
 	}
+	
+	/**
+	 * Attempts to resolve a CNS name
+	 *
+	 * @param cnsName CNS name to resolve
+	 * @return A Future for the resolved CNS value
+	 * @throws IOException In case of IO failure
+	 */
+	public CompletableFuture<ACell> resolve(String cnsName) throws IOException {
+		ACell form = buildCodeForm("(import "+cnsName+")");
+		return query(form).thenApply(r->{
+			if (r.isError()) throw new RuntimeException("Resolve failed "+r);
+			return r.getValue();
+		});
+	}
 
 	/**
 	 * Attempts to asynchronously acquire a complete persistent data structure for the given hash

@@ -8,6 +8,8 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Cells;
+import convex.core.data.Keyword;
+import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
@@ -16,6 +18,7 @@ import convex.core.util.Utils;
 public class TokenInfo {
 	private ACell id;
 	private int decimals;
+	private String symbol="???";
 
 	private TokenInfo(ACell tokenID) {
 		this.id=tokenID;
@@ -26,8 +29,8 @@ public class TokenInfo {
 		return id;
 	}
 	
-	public String symbol() {
-		return (id==null)?"CVM":"???";
+	public String getSymbol() {
+		return (id==null)?"CVM":symbol;
 	}
 	
 	public int decimals() {
@@ -69,10 +72,25 @@ public class TokenInfo {
 	}
 
 	static Address fungibleAddress=null;
-	private static Address getFungibleAddress(Convex convex) throws TimeoutException, IOException {
+	public static Address getFungibleAddress(Convex convex) throws TimeoutException, IOException {
 		if (fungibleAddress!=null) return fungibleAddress;
-		fungibleAddress=convex.querySync("(import convex.fungible)").getValue();
+		try {
+			fungibleAddress=(Address) convex.resolve("convex.fungible").get();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
 		return fungibleAddress;
+	}
+	
+	static Address multiAddress=null;
+	public static Address getMultiAddress(Convex convex) throws TimeoutException, IOException {
+		if (multiAddress!=null) return multiAddress;
+		try {
+			multiAddress=(Address) convex.resolve("asset.multi-token").get();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return multiAddress;
 	}
 
 	public static TokenInfo get(Convex convex, ACell tokenID) {
@@ -81,6 +99,50 @@ public class TokenInfo {
 		
 		// We need to get token info
 		try {
+			Result r=convex.querySync("("+getFungibleAddress(convex)+"/decimals "+tokenID+")");
+			if (r.isError()) {
+				System.err.println("Dubious Token: "+r.toString());
+				return null;
+			}
+			CVMLong decimals=RT.ensureLong(r.getValue());
+			if (decimals==null) return null;
+			tokenInfo.decimals=Utils.checkedInt(decimals.longValue());
+			return tokenInfo;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	public static TokenInfo getFungible(Convex convex, String cnsName) {
+		try {
+			ACell tokenID=convex.resolve(cnsName).get();
+			TokenInfo tokenInfo=new TokenInfo(tokenID);
+			tokenInfo.symbol=cnsName.substring(cnsName.lastIndexOf(".")+1);
+		
+			// We need to get token info
+			Result r=convex.querySync("("+getFungibleAddress(convex)+"/decimals "+tokenID+")");
+			if (r.isError()) {
+				System.err.println("Dubious Token: "+r.toString());
+				return null;
+			}
+			CVMLong decimals=RT.ensureLong(r.getValue());
+			if (decimals==null) return null;
+			tokenInfo.decimals=Utils.checkedInt(decimals.longValue());
+			return tokenInfo;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+	
+	public static TokenInfo getMulti(Convex convex, String key) {
+		try {
+			ACell tokenID=Vectors.of(getMultiAddress(convex),Keyword.create(key));
+			TokenInfo tokenInfo=new TokenInfo(tokenID);
+			tokenInfo.symbol=key;
+		
+			// We need to get token info
 			Result r=convex.querySync("("+getFungibleAddress(convex)+"/decimals "+tokenID+")");
 			if (r.isError()) {
 				System.err.println("Dubious Token: "+r.toString());

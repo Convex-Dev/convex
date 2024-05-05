@@ -1,4 +1,4 @@
 [
-["CFUSD" "Foundation US Dollar" "Convex Foundation USD Pre-payment" "£" 100000000 2 1.0]
-["CFGBP" "Foundation Pound Sterling" "Convex Foundation GBP Pre-payment" "£" 100000000 2 1.27]
+["USDF" "Foundation US Dollar" "Convex Foundation USD" "£" 10000 2 1.0]
+["GBPF" "Foundation Pound Sterling" "Convex Foundation GBP" "£" 10000 2 1.27]
 ]

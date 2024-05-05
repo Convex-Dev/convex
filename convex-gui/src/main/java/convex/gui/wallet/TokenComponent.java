@@ -34,10 +34,10 @@ public class TokenComponent extends JPanel {
 		this.setBorder(Toolkit.createEmptyBorder(20));
 		
 		ACell tokenID=token.getID();
-		Icon icon=(tokenID==null)?Toolkit.CONVEX:DEFAULT_ICON;
+		Icon icon=getIcon(token);
 		add(new JButton(icon));
 		
-		String symbolName=token.symbol();
+		String symbolName=token.getSymbol();
 		CodeLabel symLabel=new CodeLabel(symbolName);
 		symLabel.setFont(Toolkit.MONO_FONT.deriveFont(Font.BOLD));
 		symLabel.setToolTipText(symbolName+" has Token ID: "+tokenID);
@@ -49,20 +49,32 @@ public class TokenComponent extends JPanel {
 		balanceLabel.setToolTipText("Account balance for "+symbolName);
 		add(balanceLabel,"align right");
 		
+		// Action buttons
 		JPanel actions=new JPanel();
-		actions.add(new ActionButton(0xe5d5,e->{
-			refresh(convex);
-		}));
-		actions.add(new ActionButton(0xe872,e->{
-			WalletPanel.model.removeElement(token);
-		}));
-		actions.add(new ActionButton(0xe933,e->{
+		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
-			new SwapPanel(convex).run();
-		}));
+			new SwapPanel(convex,token).run();
+		},"Open token swap window for this token"));
+		actions.add(ActionButton.build(0xe5d5,e->{
+			refresh(convex);
+		},"Refresh token info")); 
+		actions.add(ActionButton.build(0xe872,e->{
+			WalletPanel.model.removeElement(token);
+		},"Remove token from tracked list"));
 
+		
 		add(actions,"dock east");
 		SwingUtilities.invokeLater(()->refresh(convex));
+	}
+
+	protected Icon getIcon(TokenInfo token) {
+		switch (token.getSymbol()) {
+		   case "USDF": return  SymbolIcon.get(0xe227, Toolkit.ICON_SIZE);
+		   case "GBPF": return  SymbolIcon.get(0xeaf1, Toolkit.ICON_SIZE);
+		}
+		
+		ACell tokenID=token.getID();
+		return (tokenID==null)?Toolkit.CONVEX:DEFAULT_ICON;
 	}
 
 	public void refresh(Convex convex) {

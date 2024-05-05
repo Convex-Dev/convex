@@ -24,4 +24,16 @@ public class ActionButton extends JButton {
 	public ActionButton(int icon, ActionListener action) {
 		this(null,icon,action);
 	}
+	
+	public static ActionButton build(String text, int iconCode, ActionListener action, String toolTip) {
+		ActionButton b=new ActionButton(text,iconCode,action);
+		b.setToolTipText(toolTip);
+		return b;
+	}
+	
+	public static ActionButton build(int iconCode, ActionListener action, String toolTip) {
+		ActionButton b=new ActionButton(iconCode,action);
+		b.setToolTipText(toolTip);
+		return b;
+	}
 }

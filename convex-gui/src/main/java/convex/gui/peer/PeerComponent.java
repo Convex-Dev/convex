@@ -1,6 +1,7 @@
 package convex.gui.peer;
 
 import java.io.IOException;
+import java.util.Objects;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
@@ -163,16 +164,18 @@ public class PeerComponent extends BaseListComponent {
 		}
 		add(blockView, "dock south");
 
-		
-
 		updateDescription();
 	}
 
 	protected void updateDescription() {
+		String current=description.getText();
+		String updated=getPeerDescription();
+		if (Objects.equals(updated, current)) return;
+		
 		// Set text while maintaining selection
 		int ss=description.getSelectionStart();
 		int se=description.getSelectionEnd();
-		description.setText(getPeerDescription());
+		description.setText(updated);
 		description.select(ss, se);
 	}
 
@@ -204,9 +207,11 @@ public class PeerComponent extends BaseListComponent {
 			}
 			PeerStatus ps=state.getPeer(paddr);
 			if (ps!=null) {
-				sb.append("Peer Stake:  "+Text.toFriendlyBalance(ps.getPeerStake()));
+				sb.append("Controller: "+ps.getController());
 				sb.append("    ");
-				sb.append("Delegated Stake:  "+Text.toFriendlyBalance(ps.getDelegatedStake()));
+				sb.append("Peer Stake: "+Text.toFriendlyBalance(ps.getPeerStake()));
+				sb.append("    ");
+				sb.append("Delegated Stake: "+Text.toFriendlyBalance(ps.getDelegatedStake()));
 				sb.append("    ");
 			} else {
 				sb.append("Not currently a registered peer    ");

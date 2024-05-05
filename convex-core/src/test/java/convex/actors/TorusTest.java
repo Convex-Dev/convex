@@ -66,8 +66,8 @@ public class TorusTest extends ACVMTest {
 
 	@Test public void testDeployedCurrencies() {
 		Context ctx=context(); // Initial test context
-		ctx= step(ctx,"(def CFGBP (import currency.CFGBP :as GBP))");
-		ctx= step(ctx,"(def CFUSD (import currency.CFUSD :as USD))");
+		ctx= step(ctx,"(def CFGBP (import currency.GBPF :as GBP))");
+		ctx= step(ctx,"(def CFUSD (import currency.USDF :as USD))");
 		assertNotNull(ctx.getResult());
 		ctx= step(ctx,"(torus/price GBP USD)");
 		assertTrue(ctx.getResult() instanceof CVMDouble);
