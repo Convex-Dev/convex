@@ -378,14 +378,18 @@ public class IndexTest {
 		Index<ABlobLike<?>, CVMLong> m=Samples.INT_INDEX_7;
 		Index<ABlobLike<?>, CVMLong> ms=m.slice(3,4);
 		assertEquals(1,ms.count());
+		
+		// Slice should be equal to a 1-entry Index with same key / value 
+		MapEntry<ABlobLike<?>, CVMLong> me=m.entryAt(3);
+		assertEquals(Index.create(me.getKey(), me.getValue()),ms);
+		
 		doIndexTests(ms);
 		
-		assertEquals(ms.entryAt(0),m.entryAt(3));
+		assertEquals(me,ms.entryAt(0));
 		
 		// Invalid slices
 		assertNull(m.slice(-1));
 		assertNull(m.slice(0,9));
-
 		
 		assertSame(m, m.slice(0));
 		assertSame(Index.none(), m.slice(7));

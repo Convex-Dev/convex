@@ -524,10 +524,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		pos = Format.writeVLCCount(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 
-		pos = Format.writeVLCCount(bs,pos, depth);
-			
 		pos = MapEntry.encodeCompressed(entry,bs,pos); // entry may be null
 		if (count == 1) return pos; // must be a single entry
+
+		// We only have a meaningful depth if more than one entry
+		pos = Format.writeVLCCount(bs,pos, depth);
 
 		// finally write children
 		pos = Utils.writeShort(bs,pos,mask);
@@ -559,16 +560,13 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlob, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
+	public static <K extends ABlobLike, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
 		long count = Format.readVLCCount(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative count!");
 		if (count == 0) return (Index<K, V>) EMPTY;
 		
 		int epos=pos+1+Format.getVLCCountLength(count);
 		
-		long depth = Format.readVLCCount(b,epos);
-		if (depth < 0) throw new BadFormatException("Negative depth!");
-		epos+=Format.getVLCCountLength(depth);
 
 		byte etype=b.byteAt(epos++);
 		MapEntry<K,V> me;
@@ -580,29 +578,34 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			Ref<V> vr=Format.readRef(b,epos);
 			epos+=vr.getEncodingLength();
 			me=MapEntry.createRef(kr, vr);
+			
+			if (count == 1) {
+				// single entry map, doesn't need separate depth encoding
+				long depth=kr.isEmbedded()?kr.getValue().hexLength():MAX_DEPTH;
+				Index<K,V> result = new Index<K, V>(depth, me, EMPTY_CHILDREN, (short) 0, 1L);
+				result.attachEncoding(b.slice(pos, epos));
+				return result;
+			} 
 		} else {
 			throw new BadFormatException("Invalid MapEntry tag in Index: "+etype);
 		}
 
-		
 		Index<K,V> result;
-		if (count == 1) {
-			// single entry map
-			result = new Index<K, V>(depth, me, EMPTY_CHILDREN, (short) 0, 1L);
-			result.attachEncoding(b.slice(pos, epos));
-		} else {
-			// Need to include children
-			short mask = b.shortAt(epos);
-			epos+=2;
-			int n = Utils.bitCount(mask);
-			Ref<Index>[] children = new Ref[n];
-			for (int i = 0; i < n; i++) {
-				Ref<Index> cr=Format.readRef(b,epos);
-				epos+=cr.getEncodingLength();
-				children[i] =cr; 
-			}
-			result= new Index<K, V>(depth, me, children, mask, count);
+		long depth = Format.readVLCCount(b,epos);
+		if (depth < 0) throw new BadFormatException("Negative depth!");
+		epos+=Format.getVLCCountLength(depth);
+
+		// Need to include children
+		short mask = b.shortAt(epos);
+		epos+=2;
+		int n = Utils.bitCount(mask);
+		Ref<Index>[] children = new Ref[n];
+		for (int i = 0; i < n; i++) {
+			Ref<Index> cr=Format.readRef(b,epos);
+			epos+=cr.getEncodingLength();
+			children[i] =cr; 
 		}
+		result= new Index<K, V>(depth, me, children, mask, count);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
@@ -666,7 +669,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	/**
-	 * Gets the depth of this Index node, i.e. the hex length of the common prefix
+	 * Gets the depth of this Index node, i.e. the hex length of the common prefix (up to MAX_DEPTH)
 	 * 
 	 * @return
 	 */

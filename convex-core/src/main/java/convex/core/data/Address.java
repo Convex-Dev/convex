@@ -212,8 +212,8 @@ public final class Address extends ABlobLike<CVMLong> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		// tag plus LENGTH bytes
-		return 1 + Format.MAX_VLC_LONG_LENGTH;
+		// tag VLC bytes
+		return 1 + Format.MAX_VLC_COUNT_LENGTH;
 	}
 
 	@Override
@@ -248,7 +248,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	/**
 	 * Creates a new Address at an offset to this Address
 	 * @param offset Offset to add to this Address (may be negative)
-	 * @return New Address
+	 * @return New Address, or null if would be invalid
 	 */
 	public Address offset(long offset) {
 		return create(value+offset);
