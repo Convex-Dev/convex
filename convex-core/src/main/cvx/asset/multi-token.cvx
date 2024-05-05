@@ -107,6 +107,11 @@
   ([]
     (get (get tokens *scope*) 2 0)))
 
+(defn total-supply
+  ^{:callable true}
+  ([]
+    (get-in tokens [*scope* 1])))
+
 (defn accept 
   ^{:callable true}
   [sender quantity] 

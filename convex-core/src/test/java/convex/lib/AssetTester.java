@@ -58,6 +58,13 @@ public class AssetTester {
 			assertTrue(decimals.signum().longValue()>=0);
 		}
 		
+		// Fungibles have a non-negative total supply
+		{
+			AInteger supply=eval(ctx,"(fungible/total-supply token)");
+			assertTrue(supply.signum().longValue()>=0);
+			assertTrue(BAL<=supply.longValue());
+		}
+		
 		// New Address gets zero offers
 		{
 			assertEquals(0L, evalL(ctx, "(asset/balance token (deploy nil))"));

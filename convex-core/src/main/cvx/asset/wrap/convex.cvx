@@ -18,6 +18,9 @@
         bal (get h 0 0)] ;; default to 0
     bal))
 
+;; Initial supply is zero. Only changed by wrapping / unwrapping
+(def supply 0)
+
 (defn balance
    ^{:callable true}
    ([addr]
@@ -63,6 +66,7 @@
         new-bal (+ (-get-balance *caller*) amt)]
     (accept amt)
     (-set-balance *caller* new-bal)
+    (set! supply (+ supply amt))
     amt))
 
 (defn unwrap
@@ -75,14 +79,19 @@
   (let [new-bal (- (-get-balance *caller*) amt)]
     (or (>= new-bal 0) (fail "Insufficient balance for unwrap"))
     (-set-balance *caller* new-bal)
+    (set! supply (- supply amt))
     (transfer *caller* amt) 
     amt))
 
-;; Decimals info
+;; Token info
 
 (defn decimals
   ^:callable
   [] 9)
+
+(defn total-supply
+  ^:callable
+  [] supply)
 
 ;; Offers
 

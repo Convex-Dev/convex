@@ -50,7 +50,7 @@
          [amount]
          (when-not (trust/trusted? minter *caller* :mint) (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
-               new-supply (+ supply amount)
+               new-supply (+ supply amount) ;; note: might overflow, important check
                bal        (balance *caller*)
                new-bal    (+ bal amount)]
            ;; New supply must be in valid range.
@@ -90,7 +90,7 @@
 
        ;; Functions of the interface described in the `convex.asset` library
        (defn accept 
-         ^{:callable true}
+         ^:callable
          [sender quantity]
          (let [sender   (address sender)
                quantity (-qc quantity)
@@ -136,14 +136,19 @@
        ;; No restrictions on transfer by default.
        ;;
        (defn check-transfer
-         ^{:callable true}
+         ^:callable
          [_sender _receiver _quantity]
          nil)
        
        (defn decimals 
-    	  ^{:callable true}
+    	  ^:callable
          []
          ~decimals)
+       
+       (defn total-supply 
+    	  ^:callable
+         []
+         supply)
 
        (defn direct-transfer
          ^{:callable true}
@@ -265,6 +270,14 @@
   [token]
   (call token
     (decimals)))
+
+(defn total-supply 
+  ^{:doc {:description "Gets the total supply of a fungible token. i.e. the sum of al;l balances."
+		   :examples    [{:code "(total-supply my-token)"}]
+		    :signature   [{:params [token amount]}]}}
+  [token]
+  (call token
+    (total-supply)))
 
 (defn balance
   ^{:doc {:description "Gets the balance from a fungible token. Checks the balance for the specified holder, or the current *address* if not specified."

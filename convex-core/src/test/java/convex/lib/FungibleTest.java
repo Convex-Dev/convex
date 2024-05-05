@@ -139,6 +139,8 @@ public class FungibleTest extends ACVMTest {
 		ctx=exec(ctx,"(def token (deploy [(fungible/build-token {:supply 100}) (fungible/add-mint {:max-supply 1000})]))");
 		Address token = (Address) ctx.getResult();
 		assertTrue(ctx.getAccountStatus(token)!=null);
+		
+		assertEquals(100,evalL(ctx,"(fungible/total-supply token)"));
 
 		// do Generic Tests
 		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());

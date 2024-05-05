@@ -34,12 +34,12 @@
 ;;;;;;;;; Private functions
 
 (defn -qc
-		  ^{:doc {:description "Quantity check."}
-		    :private? true}
-		  [q]
-		  (cond (int? q) q              ;; base case, quantity should always be an integer
-				(nil? q) 0 
-		        (fail :ARGUMENT "Invalid token quantity")))
+  ^{:doc {:description "Quantity check."}
+    :private? true}
+  [q]
+    (cond (int? q) q              ;; base case, quantity should always be an integer
+      (nil? q) 0 
+      (fail :ARGUMENT "Invalid token quantity")))
 
 (defn -set-balance 
   [addr id bal]
@@ -119,6 +119,11 @@
 (defn decimals
   ^:callable
   [] 0)
+
+(defn total-supply
+  ^:callable
+  [] 
+  (get-in tokens [*scope* 1]))
 
 (defn claim
    ^{:callable true}
