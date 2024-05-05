@@ -380,7 +380,7 @@ public class Init {
 		
 		Context ctx = Context.createFake(s, DISTRIBUTION_ADDRESS);
 		ctx = ctx.eval(Reader
-				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + "})))"));
+				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + " :decimals "+decimals+"})))"));
 		Address addr = ctx.getResult();
 		ctx = ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity " + addr + " "
 				+ (supply / 2) + " " + (cvx / 2) + "))"));

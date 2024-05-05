@@ -7,6 +7,7 @@ import javax.swing.JPanel;
 
 import convex.api.Convex;
 import convex.core.lang.RT;
+import convex.core.util.ThreadUtils;
 import convex.gui.components.BalanceLabel;
 import convex.gui.utils.SymbolIcon;
 import net.miginfocom.swing.MigLayout;
@@ -15,9 +16,11 @@ import net.miginfocom.swing.MigLayout;
 public class AccountOverview extends JPanel {
 
 	final BalanceLabel balance=new BalanceLabel();
+	private Convex convex;
 	
 
 	public AccountOverview(Convex convex) {
+		this.convex=convex;
 		setLayout(new MigLayout("fill","","push[][]"));
 		Font font=this.getFont();
 		
@@ -67,5 +70,22 @@ public class AccountOverview extends JPanel {
 			add(balance);
 		}
 		//add(KeyPairCombo.forConvex(convex));
+		 
+		 ThreadUtils.runVirtual(this::updateLoop);
+	}
+	
+	private void updateLoop() {
+		while (true) {
+			try {
+				if (isShowing()) {
+					balance.setBalance(convex.getBalance()); 
+				}
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				return;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
 	}
 }

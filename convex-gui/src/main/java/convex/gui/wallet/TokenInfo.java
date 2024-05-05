@@ -10,12 +10,16 @@ import convex.core.data.Address;
 import convex.core.data.Cells;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 public class TokenInfo {
 	private ACell id;
+	private int decimals;
 
-	public TokenInfo(ACell tokenID) {
+	private TokenInfo(ACell tokenID) {
 		this.id=tokenID;
+		this.decimals=(id==null)?9:2;
 	}
 
 	public ACell getID() {
@@ -27,7 +31,7 @@ public class TokenInfo {
 	}
 	
 	public int decimals() {
-		return (id==null)?9:2;
+		return decimals;
 	}
 
 	public static TokenInfo forID(ACell tokenID) {
@@ -69,5 +73,26 @@ public class TokenInfo {
 		if (fungibleAddress!=null) return fungibleAddress;
 		fungibleAddress=convex.querySync("(import convex.fungible)").getValue();
 		return fungibleAddress;
+	}
+
+	public static TokenInfo get(Convex convex, ACell tokenID) {
+		TokenInfo tokenInfo=new TokenInfo(tokenID);
+		if (tokenID==null) return tokenInfo; // Convex coins
+		
+		// We need to get token info
+		try {
+			Result r=convex.querySync("("+getFungibleAddress(convex)+"/decimals "+tokenID+")");
+			if (r.isError()) {
+				System.err.println("Dubious Token: "+r.toString());
+				return null;
+			}
+			CVMLong decimals=RT.ensureLong(r.getValue());
+			if (decimals==null) return null;
+			tokenInfo.decimals=Utils.checkedInt(decimals.longValue());
+			return tokenInfo;
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return null;
 	}
 }

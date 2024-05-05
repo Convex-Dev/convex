@@ -36,7 +36,7 @@ public class WalletPanel extends JPanel {
 		add(list,"dock center");
 		// add(new AccountOverview(convex),"dock north");
 		
-		model.addElement(new TokenInfo(null));
+		model.addElement(TokenInfo.get(convex,null));
 
 
 		// add(new AccountChooserPanel(convex),"dock south");
@@ -46,8 +46,10 @@ public class WalletPanel extends JPanel {
 			if (newID==null) return;
 			try {
 				ACell tokenID=newID.isBlank()?null:Reader.read(newID);
-				TokenInfo token=TokenInfo.forID(tokenID);
-				if (model.contains(token)) {
+				TokenInfo token=TokenInfo.get(convex,tokenID);
+				if (token==null) {
+					Toast.display(WalletPanel.this, "Token does not exist: "+tokenID,Color.ORANGE);
+				} else if (model.contains(token)) {
 					Toast.display(WalletPanel.this, "Token already added",Color.ORANGE);
 				} else {
 					model.addElement(token);
@@ -64,10 +66,11 @@ public class WalletPanel extends JPanel {
 		ThreadUtils.runVirtual(this::updateLoop);
 	}
 	
-	public void updateLoop() {
+	private void updateLoop() {
 		while (true) {
 			try {
 				if (isShowing()) {
+		
 					Component[] comps=list.getListComponents();
 					for (Component c: comps) {
 						if ((c instanceof TokenComponent)&&c.isShowing()) {
