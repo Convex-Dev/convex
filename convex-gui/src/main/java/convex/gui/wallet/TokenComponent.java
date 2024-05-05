@@ -56,6 +56,11 @@ public class TokenComponent extends JPanel {
 		actions.add(new ActionButton(0xe872,e->{
 			WalletPanel.model.removeElement(token);
 		}));
+		actions.add(new ActionButton(0xe933,e->{
+			// Token swap
+			new SwapPanel(convex).run();
+		}));
+
 		add(actions,"dock east");
 		SwingUtilities.invokeLater(()->refresh(convex));
 	}

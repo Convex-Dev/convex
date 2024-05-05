@@ -1,15 +1,13 @@
 package convex.gui.panels;
 
-import javax.swing.JPanel;
-import java.awt.BorderLayout;
-import java.awt.Dimension;
+import java.awt.Font;
 
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
 import convex.gui.components.WorldPanel;
-
-import java.awt.Font;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class HomePanel extends JPanel {
@@ -18,19 +16,15 @@ public class HomePanel extends JPanel {
 	 * Create the panel.
 	 */
 	public HomePanel() {
-		setPreferredSize(new Dimension(800,600));
-		setLayout(new BorderLayout(0, 0));
-
-		JPanel panel = new JPanel();
-		add(panel);
-		panel.setLayout(new BorderLayout(0, 0));
+		// setPreferredSize(new Dimension(800,600));
+		setLayout(new MigLayout());
 
 		JLabel lblWelome = new JLabel("Welcome to Convex");
 		lblWelome.setFont(new Font("Monospaced", Font.PLAIN, 24));
 		lblWelome.setHorizontalAlignment(SwingConstants.CENTER);
-		panel.add(lblWelome, BorderLayout.NORTH);
+		add(lblWelome,"dock north");
 
-		panel.add(new WorldPanel(), BorderLayout.CENTER);
+		add(new WorldPanel(),"align center");
 	}
 
 }

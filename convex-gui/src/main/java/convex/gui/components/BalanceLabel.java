@@ -16,6 +16,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.text.Text;
+import convex.core.util.Utils;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 
@@ -56,6 +57,7 @@ public class BalanceLabel extends BaseTextPane {
 		//StyleConstants.setAlignment(attribs, StyleConstants.ALIGN_RIGHT);
 		//StyleConstants.setFontFamily(attribs, Font.PLAIN);
 		this.setParagraphAttributes(attribs, true);
+		this.setFocusable(false);
 	}
 	
 	public void setBalance(long a) {
@@ -71,6 +73,7 @@ public class BalanceLabel extends BaseTextPane {
 	}
 
 	public void setBalance(AInteger a) {
+		if (Utils.equals(a, balance)) return;
 		try {
 			if (a==null) {
 				setText("<No balance>");

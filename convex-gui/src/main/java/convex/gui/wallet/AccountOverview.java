@@ -77,10 +77,10 @@ public class AccountOverview extends JPanel {
 	private void updateLoop() {
 		while (true) {
 			try {
+				Thread.sleep(1000);
 				if (isShowing()) {
 					balance.setBalance(convex.getBalance()); 
 				}
-				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				return;
 			} catch (Exception e) {

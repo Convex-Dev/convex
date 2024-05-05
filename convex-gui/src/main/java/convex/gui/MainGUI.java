@@ -26,10 +26,10 @@ import net.miginfocom.swing.MigLayout;
 public class MainGUI extends AbstractGUI {
 	public MainGUI() {
 		super ("Convex Desktop");
-		MigLayout layout=new MigLayout("center");
+		MigLayout layout=new MigLayout("wrap 1","[fill]");
 		setLayout(layout);
 		
-		add(new HomePanel(),"dock center");
+		add(new HomePanel());
 		
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.setLayout(new MigLayout("center,align center,fillx"));
@@ -55,7 +55,7 @@ public class MainGUI extends AbstractGUI {
 		JComponent www=createLaunchButton("convex.world",Toolkit.WWW_ICON,this::launchWebsite);
 		actionPanel.add(www);
 		
-		add(actionPanel,"dock south");
+		add(actionPanel);
 	}
 	
 	public void launchDLFS() {
@@ -103,9 +103,9 @@ public class MainGUI extends AbstractGUI {
 		lab.setHorizontalAlignment(SwingConstants.CENTER);
 		
 		JPanel panel=new JPanel();
-		panel.setLayout(new MigLayout());
-		panel.add(butt,"dock center");
-		panel.add(lab,"dock south");
+		panel.setLayout(new MigLayout("center, wrap 1","[align center]"));
+		panel.add(butt);
+		panel.add(lab);
 		return panel;
 	}
 

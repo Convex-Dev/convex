@@ -1,6 +1,7 @@
 package convex.gui.components;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
@@ -16,6 +17,9 @@ import javax.swing.JPanel;
 
 import convex.gui.utils.RobinsonProjection;
 
+/**
+ * Panel displaying world image an optional locations
+ */
 @SuppressWarnings("serial")
 public class WorldPanel extends JPanel {
 	static BufferedImage image;
@@ -42,6 +46,7 @@ public class WorldPanel extends JPanel {
 
 	public WorldPanel() {
 		setBackground(Color.BLACK);
+		setPreferredSize(new Dimension(image.getWidth(),image.getHeight()));
 	}
 
 	@Override
@@ -57,13 +62,14 @@ public class WorldPanel extends JPanel {
 		int dh = Math.min(h, w * sh / sw);
 
 		int y = (h - dh) / 2;
+		int x = (w - dw) / 2;
 
-		g.drawImage(image, 0, y, dw, y + dh, 0, 0, sw, sh, null);
+		g.drawImage(image, x, y, x+dw, y + dh, 0, 0, sw, sh, null);
 
-		paintDot(g, 51.5073219, -0.1276474, 0, y, dw, dh); // London
-		paintDot(g, -33.928992, 18.417396, 0, y, dw, dh); // Cape Town
-		paintDot(g, 35.6828387, 139.7594549, 0, y, dw, dh); // Tokyo
-		paintDot(g, 23.135305, -82.3589631, 0, y, dw, dh); // Havana
+		paintDot(g, 51.5073219, -0.1276474, x, y, dw, dh); // London
+		paintDot(g, -33.928992, 18.417396, x, y, dw, dh); // Cape Town
+		paintDot(g, 35.6828387, 139.7594549, x, y, dw, dh); // Tokyo
+		paintDot(g, 23.135305, -82.3589631, x, y, dw, dh); // Havana
 	}
 
 	private void paintDot(Graphics g, double latitude, double longitude, int x, int y, int dw, int dh) {
