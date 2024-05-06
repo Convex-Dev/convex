@@ -23,6 +23,7 @@ public class WalletPanel extends JPanel {
 	
 	protected Convex convex;
 
+	// Static so different lists can use same model
 	static DefaultListModel<TokenInfo> model= new DefaultListModel<TokenInfo>();
 
 	public WalletPanel(Convex convex) {
@@ -36,10 +37,12 @@ public class WalletPanel extends JPanel {
 		add(list,"dock center");
 		// add(new AccountOverview(convex),"dock north");
 		
-		model.addElement(TokenInfo.get(convex,null));
-		model.addElement(TokenInfo.getFungible(convex,"currency.USDF"));
-		model.addElement(TokenInfo.getFungible(convex,"currency.GBPF"));
-
+		// Separate thread to get tokens, in case stuff fails
+		ThreadUtils.runVirtual(()->{
+			addTokenTracking(TokenInfo.get(convex,null));
+			addTokenTracking(TokenInfo.getFungible(convex,"currency.USDF"));
+			addTokenTracking(TokenInfo.getFungible(convex,"currency.GBPF"));
+		});
 
 		// add(new AccountChooserPanel(convex),"dock south");
 		ActionPanel ap=new ActionPanel();
@@ -54,7 +57,7 @@ public class WalletPanel extends JPanel {
 				} else if (model.contains(token)) {
 					Toast.display(WalletPanel.this, "Token already added",Color.ORANGE);
 				} else {
-					model.addElement(token);
+					addTokenTracking(token);
 				}
 			} catch (Exception ex) {
 				Toast.display(WalletPanel.this, "Error adding token: "+ex.getMessage(),Color.ORANGE);
@@ -68,6 +71,13 @@ public class WalletPanel extends JPanel {
 		ThreadUtils.runVirtual(this::updateLoop);
 	}
 	
+	private static boolean addTokenTracking(TokenInfo tokenInfo) {
+		if (tokenInfo==null) return false;
+		if (model.contains(tokenInfo)) return false; // already tracked!
+		model.addElement(tokenInfo);
+		return true;
+	}
+
 	private void updateLoop() {
 		while (true) {
 			try {
