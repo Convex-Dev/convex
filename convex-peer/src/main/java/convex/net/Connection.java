@@ -388,8 +388,6 @@ public class Connection {
 		}
 	}
 
-
-
 	/**
 	 * Sends a message over this connection
 	 *

@@ -23,6 +23,7 @@ import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
+import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.peer.Server;
@@ -131,6 +132,9 @@ public class ConvexRemote extends Convex {
 		long wait=1;
 		
 		// loop until request is queued
+		ThreadUtils.runVirtual(()->{
+			
+		});
 		while (true) {
 			synchronized (awaiting) {
 				id = connection.sendTransaction(signed);
@@ -146,11 +150,11 @@ public class ConvexRemote extends Convex {
 				Thread.sleep(wait);
 				wait+=1; // linear backoff
 			} catch (InterruptedException e) {
-				throw new IOException("Transaction sending interrupted",e);
+				throw Utils.sneakyThrow(e);
 			}
 		}
 
-		log.debug("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
+		log.trace("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
 		return cf;
 	}
 	

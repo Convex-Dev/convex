@@ -102,6 +102,7 @@ public class BalanceLabel extends BaseTextPane {
 				append(chs,c,decimalSize);
 			}
 			for (int i=decimals; i<9; i++) {
+				// Should be a unicode "tabular space" i.e. the width of a regular digit
 				append("\u2007",balanceColour,decimalSize);
 			}
 			
@@ -110,8 +111,7 @@ public class BalanceLabel extends BaseTextPane {
 			e.printStackTrace();
 			setText(e.getMessage());
 			balance=null;
-		}
-		
+		}	
 	}
 
 	private static Color[] CCOLS=new Color[] {SILVER, BRONZE, COPPER};

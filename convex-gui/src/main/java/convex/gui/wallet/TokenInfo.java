@@ -68,7 +68,7 @@ public class TokenInfo {
 	}
 
 	static Address fungibleAddress=null;
-	public static Address getFungibleAddress(Convex convex) throws TimeoutException, IOException {
+	public static Address getFungibleAddress(Convex convex) {
 		if (fungibleAddress!=null) return fungibleAddress;
 		try {
 			fungibleAddress=(Address) convex.resolve("convex.fungible").get();
@@ -79,7 +79,7 @@ public class TokenInfo {
 	}
 	
 	static Address multiAddress=null;
-	public static Address getMultiAddress(Convex convex) throws TimeoutException, IOException {
+	public static Address getMultiAddress(Convex convex) {
 		if (multiAddress!=null) return multiAddress;
 		try {
 			multiAddress=(Address) convex.resolve("asset.multi-token").get();

@@ -247,7 +247,7 @@ public abstract class Message {
 
 	/**
 	 * Gets the Connection instance associated with this message, or null if no
-	 * connection exists (presumably a local Message) 
+	 * connection exists (e.g. a local Message) 
 	 * @return Connection instance
 	 */
 	public abstract Connection getConnection();
@@ -265,12 +265,10 @@ public abstract class Message {
 		return createResult(r);
 	}
 
+	/**
+	 * Closes any connection associated with this message, probably because of bad behaviour
+	 */
 	public abstract void closeConnection();
-
-	public void closeConnection(String message) {
-		log.debug(message);
-		closeConnection();
-	}
 
 	public Message makeDataResponse(AStore store) throws BadFormatException {
 		AVector<ACell> v = RT.ensureVector(getPayload());

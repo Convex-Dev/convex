@@ -560,7 +560,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <K extends ABlobLike, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
 		long count = Format.readVLCCount(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative count!");
 		if (count == 0) return (Index<K, V>) EMPTY;
