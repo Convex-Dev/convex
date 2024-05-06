@@ -1,17 +1,10 @@
 package convex.gui.wallet;
 
-import java.awt.Font;
-
-import javax.swing.Icon;
-import javax.swing.JButton;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
-import convex.core.data.ACell;
 import convex.gui.components.ActionButton;
 import convex.gui.components.BalanceLabel;
-import convex.gui.components.CodeLabel;
-import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -21,9 +14,7 @@ public class TokenComponent extends JPanel {
 	protected Convex convex;
 	protected BalanceLabel balanceLabel;
 	private TokenInfo token;
-	JButton tokenButton;
-	
-	private static SymbolIcon DEFAULT_ICON=SymbolIcon.get(0xf041, Toolkit.ICON_SIZE);
+	TokenButton tokenButton;
 
 	public TokenComponent(Convex convex, TokenInfo token) {
 		this.convex=convex;
@@ -32,22 +23,16 @@ public class TokenComponent extends JPanel {
 		this.setLayout(new MigLayout("","["+(Toolkit.ICON_SIZE+10)+"][200][300][300]push"));
 		this.setBorder(Toolkit.createEmptyBorder(20));
 		
-		ACell tokenID=token.getID();
-		Icon icon=getIcon(token);
-		tokenButton=new JButton(icon);
+		tokenButton=new TokenButton(token);
 		add(tokenButton);
 		
-		String symbolName=token.getSymbol();
-		CodeLabel symLabel=new CodeLabel(symbolName);
-		symLabel.setFont(Toolkit.MONO_FONT.deriveFont(Font.BOLD));
-		symLabel.setToolTipText(symbolName+" has Token ID: "+tokenID);
+		SymbolLabel symLabel=new SymbolLabel(token);
 		add(symLabel);
 		
 		balanceLabel = new BalanceLabel();
 		balanceLabel.setDecimals(token.getDecimals());
-				balanceLabel.setFont(Toolkit.MONO_FONT);
-		balanceLabel.setBalance(0);
-		balanceLabel.setToolTipText("Account balance for "+symbolName);
+		balanceLabel.setFont(Toolkit.MONO_FONT);
+		balanceLabel.setToolTipText("Account balance for "+symLabel.getSymbolName());
 		add(balanceLabel,"align right");
 		
 		// Action buttons
@@ -66,23 +51,6 @@ public class TokenComponent extends JPanel {
 		
 		add(actions,"dock east");
 		refresh(convex);
-	}
-	
-	public void setToken(TokenInfo token) {
-		this.token=token;
-		tokenButton.setIcon(getIcon(token));
-		balanceLabel.setDecimals(token.getDecimals());
-		refresh(convex);
-	}
-
-	protected Icon getIcon(TokenInfo token) {
-		switch (token.getSymbol()) {
-		   case "USDF": return  SymbolIcon.get(0xe227, Toolkit.ICON_SIZE);
-		   case "GBPF": return  SymbolIcon.get(0xeaf1, Toolkit.ICON_SIZE);
-		}
-		
-		ACell tokenID=token.getID();
-		return (tokenID==null)?Toolkit.CONVEX:DEFAULT_ICON;
 	}
 
 	public void refresh(Convex convex) {
