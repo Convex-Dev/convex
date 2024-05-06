@@ -157,4 +157,8 @@ public class TokenInfo {
 		}
 		return null;
 	}
+
+	public int getDecimals() {
+		return decimals;
+	}
 }

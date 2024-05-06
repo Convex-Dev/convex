@@ -379,7 +379,7 @@ public class Init {
 		double cvx = cvxPrice * supply / subDivisions;
 
 		
-		Context ctx = Context.createFake(s, DISTRIBUTION_ADDRESS);
+		Context ctx = Context.createFake(s, GENESIS_ADDRESS);
 		ctx = ctx.eval(Reader
 				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + " :decimals "+decimals+"})))"));
 		Address addr = ctx.getResult();

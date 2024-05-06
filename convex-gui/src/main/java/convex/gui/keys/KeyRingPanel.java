@@ -1,6 +1,7 @@
 package convex.gui.keys;
 
 import java.awt.Color;
+import java.util.concurrent.CompletableFuture;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -15,9 +16,13 @@ import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
+import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.lang.RT;
+import convex.core.lang.Symbols;
+import convex.core.lang.ops.Special;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.Toast;
@@ -105,8 +110,15 @@ public class KeyRingPanel extends JPanel {
 	public static AWalletEntry findWalletEntry(Convex convex) {
 		Address a=convex.getAddress();
 		if (a==null) return null;
-		AccountKey key=convex.getAccountKey(a);
-		AWalletEntry we=Toolkit.getKeyRingEntry(key);
-		return we;
+		AccountKey key;
+		try {
+			CompletableFuture<ACell> cf=convex.query(Special.forSymbol(Symbols.STAR_KEY)).thenApply(r->r.getValue());
+			key = RT.ensureAccountKey(cf.get());
+			AWalletEntry we=Toolkit.getKeyRingEntry(key);
+			return we;
+		} catch (Exception e) {
+			e.printStackTrace();
+			return null;
+		}
 	}
 }

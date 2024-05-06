@@ -102,7 +102,7 @@ public class BalanceLabel extends BaseTextPane {
 				append(chs,c,decimalSize);
 			}
 			for (int i=decimals; i<9; i++) {
-				append(" ",balanceColour,decimalSize);
+				append("\u2007",balanceColour,decimalSize);
 			}
 			
 			Toolkit.addPopupMenu(this, new BalanceMenu());

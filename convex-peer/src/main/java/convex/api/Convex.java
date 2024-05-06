@@ -851,8 +851,8 @@ public abstract class Convex {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
 			throw Utils.sneakyThrow(e);
-		} catch (Exception e) {
-			return Result.fromException(e);
+		} catch (ExecutionException e) {
+			return Result.fromException(e.getCause());
 		} finally {
 			cf.cancel(true);
 		}

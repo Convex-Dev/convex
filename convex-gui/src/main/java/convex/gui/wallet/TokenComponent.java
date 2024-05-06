@@ -44,7 +44,8 @@ public class TokenComponent extends JPanel {
 		add(symLabel);
 		
 		balanceLabel = new BalanceLabel();
-		balanceLabel.setFont(Toolkit.MONO_FONT);
+		balanceLabel.setDecimals(token.getDecimals());
+				balanceLabel.setFont(Toolkit.MONO_FONT);
 		balanceLabel.setBalance(0);
 		balanceLabel.setToolTipText("Account balance for "+symbolName);
 		add(balanceLabel,"align right");

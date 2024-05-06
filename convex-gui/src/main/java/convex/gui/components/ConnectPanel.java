@@ -67,7 +67,7 @@ public class ConnectPanel extends JPanel {
 	    	try {
 	    		String target=pan.hostField.getText();
 	    		InetSocketAddress sa=Utils.toInetSocketAddress(target);
-	    		System.err.println("Attempting connect to: "+sa);
+	    		log.info("Attempting connect to: "+sa);
 	    		Convex convex=Convex.connect(sa);
 	    		convex.setAddress(pan.addressField.getAddress());
 	    		

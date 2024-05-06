@@ -43,7 +43,7 @@ public class WalletPanel extends JPanel {
 
 		// add(new AccountChooserPanel(convex),"dock south");
 		ActionPanel ap=new ActionPanel();
-		ap.add(new ActionButton("Track Token",0xe145,e->{
+		ap.add(ActionButton.build("Track Token",0xe145,e->{
 			String newID=JOptionPane.showInputDialog(WalletPanel.this, "Enter Token ID");
 			if (newID==null) return;
 			try {
@@ -59,10 +59,10 @@ public class WalletPanel extends JPanel {
 			} catch (Exception ex) {
 				Toast.display(WalletPanel.this, "Error adding token: "+ex.getMessage(),Color.ORANGE);
 			}
-		}));
-		ap.add(new ActionButton("Refresh",0xe5d5,e->{
+		},"Add a token to the tracked token list"));
+		ap.add(ActionButton.build("Refresh",0xe5d5,e->{
 			list.refreshList(); 
-		}));
+		},"Refresh token details and balances"));
 		add(ap,"dock south");
 		
 		ThreadUtils.runVirtual(this::updateLoop);
