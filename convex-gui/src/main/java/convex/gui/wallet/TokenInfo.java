@@ -1,6 +1,7 @@
 package convex.gui.wallet;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
@@ -51,24 +52,19 @@ public class TokenInfo {
 		}
 	}
 	
-	public AInteger getBalance(Convex convex) {
-		try {
-			if (id==null) {
-				long convexBalance=convex.getBalance();
-				return CVMLong.create(convexBalance);
-			} else {
-				Result r=convex.querySync("("+getFungibleAddress(convex)+"/balance "+id+")");
-				if (!r.isError()) {
-					ACell val=r.getValue();
-					if (val instanceof AInteger) {
-						return (AInteger) val;
-					}
+	public CompletableFuture<AInteger> getBalance(Convex convex) throws TimeoutException, IOException {
+		String query=(id==null)?"*balance*":"("+getFungibleAddress(convex)+"/balance "+id+")";
+		
+		CompletableFuture<AInteger> cf=convex.query(query).thenApply(r->{
+			if (!r.isError()) {
+				ACell val=r.getValue();
+				if (val instanceof AInteger) {
+					return (AInteger) val;
 				}
 			}
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return null;
+			throw new RuntimeException("Error querying token balance: "+r);
+		});
+		return cf;
 	}
 
 	static Address fungibleAddress=null;

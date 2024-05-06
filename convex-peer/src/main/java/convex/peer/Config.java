@@ -73,7 +73,7 @@ public class Config {
 	/**
 	 * Default timeout in milliseconds for client transactions
 	 */
-	public static final long DEFAULT_CLIENT_TIMEOUT = 20000;
+	public static final long DEFAULT_CLIENT_TIMEOUT = 8000;
 
 	/**
 	 * Size of incoming Belief queue

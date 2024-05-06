@@ -34,6 +34,7 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.AOp;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -219,6 +220,11 @@ public abstract class Convex {
 		this.sequence = nextSequence - 1L;
 	}
 
+	/**
+	 * Sets a handler for messages that are received but not otherwise processed (transaction/query results will
+	 * be relayed instead to the appropriate handler )
+	 * @param handler
+	 */
 	public void setHandler(Consumer<Message> handler) {
 		this.delegatedHandler = handler;
 	}
@@ -265,7 +271,7 @@ public abstract class Convex {
 	 * @throws IOException 
 	 */
 	public long lookupSequence(Address origin) throws IOException, TimeoutException {
-		ACell code= Symbols.STAR_SEQUENCE;
+		AOp<ACell> code= Special.forSymbol(Symbols.STAR_SEQUENCE);
 		Result r= querySync(code,origin);
 		if (r.isError()) throw new RuntimeException("Error trying to get sequence number: "+r);
 		ACell rv=r.getValue();
@@ -927,6 +933,17 @@ public abstract class Convex {
 		this.autoSequence = autoSequence;
 	}
 
+	/**
+	 * Query the balance for the current account
+	 * @return Long balance in Convex coins, 
+	 * @throws IOException If balance query fails due to IO
+	 */
+	public Long getBalance() throws IOException {
+		Address a = getAddress();
+		if (a==null) throw new IllegalStateException("No address set for balance query");
+		return getBalance(a);
+	}
+	
 	public Long getBalance(Address address) throws IOException {
 		try {
 			ACell code;
@@ -978,7 +995,7 @@ public abstract class Convex {
 	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
 	
 	/**
-	 * Sets the timeout for this Convex client instance.
+	 * Sets the default timeout for this Convex client instance.
 	 * @param timeout timeout in milliseconds
 	 */
 	public void setTimeout(long timeout) {
@@ -1008,9 +1025,7 @@ public abstract class Convex {
 	 */
 	public abstract InetSocketAddress getHostAddress();
 
-	public Long getBalance() throws IOException {
-		return getBalance(getAddress());
-	}
+
 
 
 }

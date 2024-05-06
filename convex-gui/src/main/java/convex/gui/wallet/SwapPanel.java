@@ -22,6 +22,7 @@ public class SwapPanel extends AbstractGUI {
 		setLayout(new MigLayout("wrap 1"));
 		
 		add(new TokenComponent(convex,token));
+		add(new TokenComponent(convex,token));
 		
 		ActionPanel actionPanel=new ActionPanel();
 		

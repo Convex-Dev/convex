@@ -5,11 +5,9 @@ import java.awt.Font;
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 
 import convex.api.Convex;
 import convex.core.data.ACell;
-import convex.core.data.prim.AInteger;
 import convex.gui.components.ActionButton;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.CodeLabel;
@@ -23,6 +21,7 @@ public class TokenComponent extends JPanel {
 	protected Convex convex;
 	protected BalanceLabel balanceLabel;
 	private TokenInfo token;
+	JButton tokenButton;
 	
 	private static SymbolIcon DEFAULT_ICON=SymbolIcon.get(0xf041, Toolkit.ICON_SIZE);
 
@@ -35,7 +34,8 @@ public class TokenComponent extends JPanel {
 		
 		ACell tokenID=token.getID();
 		Icon icon=getIcon(token);
-		add(new JButton(icon));
+		tokenButton=new JButton(icon);
+		add(tokenButton);
 		
 		String symbolName=token.getSymbol();
 		CodeLabel symLabel=new CodeLabel(symbolName);
@@ -65,7 +65,14 @@ public class TokenComponent extends JPanel {
 
 		
 		add(actions,"dock east");
-		SwingUtilities.invokeLater(()->refresh(convex));
+		refresh(convex);
+	}
+	
+	public void setToken(TokenInfo token) {
+		this.token=token;
+		tokenButton.setIcon(getIcon(token));
+		balanceLabel.setDecimals(token.getDecimals());
+		refresh(convex);
 	}
 
 	protected Icon getIcon(TokenInfo token) {
@@ -79,11 +86,20 @@ public class TokenComponent extends JPanel {
 	}
 
 	public void refresh(Convex convex) {
-		AInteger bal=token.getBalance(convex);
-		if (bal!=null) {
-			balanceLabel.setBalance(bal);
-		} else {
-			balanceLabel.setBalance(null); 
+		try {
+			token.getBalance(convex).thenAccept(bal->{
+				if (bal!=null) {
+					balanceLabel.setBalance(bal);
+				} else {
+					balanceLabel.setBalance(null); 
+				}
+			}).exceptionally(e->{
+				e.printStackTrace();
+				balanceLabel.setBalance(null);
+				return null;
+			});
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 }
