@@ -92,6 +92,17 @@ public class TokenInfo {
 		}
 		return multiAddress;
 	}
+	
+	static Address torusAddress=null;
+	public static Address getTorusAddress(Convex convex) {
+		if (torusAddress!=null) return torusAddress;
+		try {
+			torusAddress=(Address) convex.resolve("torus.exchange").get();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+		return torusAddress;
+	}
 
 	public static TokenInfo get(Convex convex, ACell tokenID) {
 		TokenInfo tokenInfo=new TokenInfo(tokenID);
@@ -160,6 +171,10 @@ public class TokenInfo {
 
 	public int getDecimals() {
 		return decimals;
+	}
+
+	public boolean isConvex() {
+		return id==null;
 	}
 
 
