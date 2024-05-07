@@ -25,6 +25,8 @@ public class WalletPanel extends JPanel {
 
 	// Static so different lists can use same model
 	static DefaultListModel<TokenInfo> model= new DefaultListModel<TokenInfo>();
+	
+	static TokenInfo defaultToken=TokenInfo.convexCoin();
 
 	public WalletPanel(Convex convex) {
 		this.convex=convex;
@@ -97,5 +99,9 @@ public class WalletPanel extends JPanel {
 				e.printStackTrace();
 			}
 		}
+	}
+
+	public static TokenInfo getDefaultToken() {
+		return defaultToken;
 	}
 }

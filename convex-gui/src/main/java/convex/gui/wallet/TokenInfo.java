@@ -38,6 +38,10 @@ public class TokenInfo {
 		return decimals;
 	}
 
+	public static TokenInfo convexCoin() {
+		return forID(null);
+	}
+	
 	public static TokenInfo forID(ACell tokenID) {
 		TokenInfo tokenInfo=new TokenInfo(tokenID);
 		return tokenInfo;
@@ -157,4 +161,6 @@ public class TokenInfo {
 	public int getDecimals() {
 		return decimals;
 	}
+
+
 }

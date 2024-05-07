@@ -5,6 +5,7 @@ import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.util.Arrays;
 
 import convex.core.Coin;
 import convex.core.data.prim.CVMDouble;
@@ -171,6 +172,12 @@ public class Text {
 			s=ZEROS_9.substring(0,digits-n)+s;
 		}
 		return s;
+	}
+
+	public static String repeat(char c, int count) {
+		char[] cs=new char[count];
+		Arrays.fill(cs,c);
+		return new String(cs);
 	}
 
 
