@@ -176,8 +176,9 @@ public abstract class AInteger extends ANumeric {
 	public abstract ABlob toBlob();
 
 	/**
-	 * Return true if this value is a precisely equal to a valid 64-bit long integer
-	 * @return
+	 * Return true if this value is a valid 64-bit long integer
+	 * 
+	 * @return true if this integer fits in a 64-bit long
 	 */
 	public abstract boolean isLong();
 

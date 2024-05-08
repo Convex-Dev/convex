@@ -251,7 +251,7 @@ public class BIP39 {
 	 * Note: longer term users may want hierarchical deterministic wallet generation
 	 * 
 	 * @param seed BIP39 seed
-	 * @return
+	 * @return Ed25519 seed as a Blob
 	 */
 	public static Blob seedToEd25519Seed(Blob seed) {
 		long n=seed.count();
@@ -317,9 +317,9 @@ public class BIP39 {
 
 	/**
 	 * Create a list of random mnemonic words given a random number generator
-	 * @param r
-	 * @param n
-	 * @return
+	 * @param r Random number generator instance
+	 * @param n Number of words to generate
+	 * @return List of words
 	 */
 	public static List<String> createWords(SecureRandom r, int n) {
 		ArrayList<String> al=new ArrayList<>(n);
@@ -360,8 +360,8 @@ public class BIP39 {
 
 	/**
 	 * Create a mnemonic String from a list of words, separated by spaces
-	 * @param words
-	 * @return
+	 * @param words  List of words for mnemonic
+	 * @return Combined mnemonic string
 	 */
 	public static String mnemonic(List<String> words) {
 		StringBuilder sb=new StringBuilder();

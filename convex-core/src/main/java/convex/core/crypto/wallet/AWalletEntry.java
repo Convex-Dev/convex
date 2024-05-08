@@ -13,7 +13,7 @@ public abstract class AWalletEntry implements IWalletEntry {
 
 	/**
 	 * Returns the data to be used for a wallet identicon. Should be the public account key
-	 * @return
+	 * @return Data to be used for an identicon
 	 */
 	public abstract AArrayBlob getIdenticonData();
 

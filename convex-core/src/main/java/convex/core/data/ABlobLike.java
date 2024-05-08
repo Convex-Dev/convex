@@ -166,8 +166,8 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	/**
 	 * Convert this BlobLike object to an ABlob instance, in the most efficient way. 
 	 * 
-	 * May return `this`. Result might not be a regular Blob (e.g. Address)
-	 * @return
+	 * May return `this`. 
+	 * @return Blob instance
 	 */
 	public abstract ABlob toBlob();
 	
