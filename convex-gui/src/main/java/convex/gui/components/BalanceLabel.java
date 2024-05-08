@@ -76,7 +76,7 @@ public class BalanceLabel extends BaseTextPane {
 		if (Utils.equals(a, balance)) return;
 		try {
 			if (a==null) {
-				setText("<No balance>");
+				setText("-         ");
 				balance=null;
 				return;
 			} else {

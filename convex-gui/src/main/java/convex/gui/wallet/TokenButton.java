@@ -1,20 +1,25 @@
 package convex.gui.wallet;
 
+import java.awt.Font;
+
 import javax.swing.Icon;
-import javax.swing.JButton;
+import javax.swing.JLabel;
 
 import convex.core.data.ACell;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 
 @SuppressWarnings("serial")
-public class TokenButton extends JButton {
+public class TokenButton extends JLabel {
 
 	private static SymbolIcon DEFAULT_ICON=SymbolIcon.get(0xf041, Toolkit.ICON_SIZE);
 
 	public TokenButton(TokenInfo token) {
 		Icon icon=getIcon(token);
 		this.setFocusable(false);
+		setFont(Toolkit.MONO_FONT.deriveFont(Font.BOLD));
+		setIconTextGap(10);
+		setText(token.getSymbol());
 		setIcon(icon);
 	}
 

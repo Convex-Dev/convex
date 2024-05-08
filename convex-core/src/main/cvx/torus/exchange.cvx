@@ -518,8 +518,6 @@
        (call market
              (sell-cvx-quote cvx-amount))))))
 
-
-
 (defn sell-tokens
   ^{:doc {:description "Sell an amount of tokens at current CVX price"
           :signature   [{:params [token amount]}]}}

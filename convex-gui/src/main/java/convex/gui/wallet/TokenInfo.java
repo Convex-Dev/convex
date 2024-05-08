@@ -1,6 +1,7 @@
 package convex.gui.wallet;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
@@ -175,6 +176,11 @@ public class TokenInfo {
 
 	public boolean isConvex() {
 		return id==null;
+	}
+
+	public BigDecimal decimalAmount(AInteger val) {
+		BigDecimal d=new BigDecimal(val.big()).divide(BigDecimal.TEN.pow(decimals));
+		return d;
 	}
 
 
