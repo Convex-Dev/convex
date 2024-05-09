@@ -36,6 +36,7 @@ public class ActorInvokePanel extends JPanel {
 		AccountStatus as = model.getValue().getAccount(contract);
 		ASet<Symbol> exports = as.getCallableFunctions();
 		for (Symbol s : exports) {
+			System.err.println(s);
 			exportList.addElement(s);
 		}
 
