@@ -782,7 +782,7 @@ public abstract class Convex {
 	 * @param query   Query to execute, as a Form or Op
 	 * @param address Address to use for the query
 	 * @return A Future for the result of the query
-	 * @throws IOException If the connection is broken, or the send buffer is full
+	 * @throws IOException In case of IO problem (connection is broken, send buffer full)
 	 */
 	public abstract CompletableFuture<Result> query(ACell query, Address address) throws IOException;
 

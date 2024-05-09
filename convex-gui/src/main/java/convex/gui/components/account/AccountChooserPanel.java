@@ -48,6 +48,7 @@ public class AccountChooserPanel extends JPanel {
 			mp.add(addressCombo);
 			
 			keyCombo=KeyPairCombo.forConvex(convex);
+			keyCombo.setToolTipText("Select a key pair from your Keyring. This will be used to sign transactions.");
 			keyCombo.addItemListener(e->{
 				if (e.getStateChange()==ItemEvent.DESELECTED) return;
 				AWalletEntry we=(AWalletEntry)e.getItem();

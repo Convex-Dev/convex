@@ -96,6 +96,7 @@ public class RESTServer {
 		return sslPlugin;
 	}
 
+	@SuppressWarnings("deprecation")
 	protected void addOpenApiPlugins(JavalinConfig config) {
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
 			
