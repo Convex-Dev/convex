@@ -66,7 +66,7 @@ public class AccountsPanel extends JPanel {
 
 		public void setValue(Object value) {
 			setText((value==null)?"":value.toString());
-			setIcon(Identicon.createIcon((AArrayBlob) value,24));
+			setIcon(Identicon.createIcon((AArrayBlob) value,21));
 		}
 	}
 	
@@ -163,6 +163,7 @@ public class AccountsPanel extends JPanel {
 
 		final JPopupMenu popupMenu = new JPopupMenu();
 		JMenuItem copyItem = new JMenuItem("Copy Value");
+		copyItem.setIcon(Toolkit.menuIcon(0xe14d));
 		copyItem.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {

@@ -70,13 +70,14 @@ public class Toolkit {
 	
 	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,(int)DEFAULT_FONT_SIZE);
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE));
-	public static Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.BOLD, (int)(DEFAULT_FONT_SIZE*1.6));
+	public static Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, (int)(DEFAULT_FONT_SIZE*1.6));
 	
 	public static final float SYMBOL_FONT_SIZE= DEFAULT_FONT_SIZE;
 	
 	public static Font SYMBOL_FONT = new Font(Font.MONOSPACED, Font.PLAIN, (int)SYMBOL_FONT_SIZE);
 	
-	public static final Color SYMBOL_COLOUR = new Color(100,180,230);
+	public static final Color SYMBOL_COLOUR = new Color(100,170,200);
+	public static final Color BUTTON_FG = new Color(176,190,197);
 
 
 
@@ -99,6 +100,8 @@ public class Toolkit {
 			
 			UIManager.setLookAndFeel(laf);
 			FlatMaterialOceanicIJTheme.setup();
+			UIManager.put( "Button.foreground", BUTTON_FG );
+			System.out.println(UIManager.get("Label.foreground"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
