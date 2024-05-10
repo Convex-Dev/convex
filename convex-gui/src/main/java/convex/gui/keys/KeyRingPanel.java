@@ -23,6 +23,7 @@ import convex.core.data.Blob;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Special;
+import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.Toast;
@@ -62,10 +63,7 @@ public class KeyRingPanel extends JPanel {
 		JPanel toolBar = new ActionPanel();
 
 		// new wallet button
-		JButton btnNew = new JButton("New Keypair",Toolkit.menuIcon(0xe145));
-		btnNew.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
-		toolBar.add(btnNew);
-		btnNew.addActionListener(e -> {
+		JButton btnNew = new ActionButton("New Keypair",0xe145,e -> {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				listModel.addElement(HotWalletEntry.create(newKP));
@@ -74,12 +72,11 @@ public class KeyRingPanel extends JPanel {
 				t.printStackTrace();
 			}
 		});
+		btnNew.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
+		toolBar.add(btnNew);
 		
 		// new wallet button
-		JButton btnImportSeed = new JButton("Import Seed....",Toolkit.menuIcon(0xe890));
-		btnImportSeed.setToolTipText("Import a key pair using an Ed25519 seed");
-		toolBar.add(btnImportSeed);
-		btnImportSeed.addActionListener(e -> {
+		JButton btnImportSeed = new ActionButton("Import Seed....",0xe890,e -> {
 			String sd=(String) JOptionPane.showInputDialog(this,"Enter Ed25519 Seed","Import private key",JOptionPane.QUESTION_MESSAGE,Toolkit.menuIcon(0xe890),null,"");
 			if (sd==null) return;
 			Blob seed=Blob.parse(sd);
@@ -93,6 +90,9 @@ public class KeyRingPanel extends JPanel {
 				t.printStackTrace();
 			}
 		});
+		btnImportSeed.setToolTipText("Import a key pair using an Ed25519 seed");
+		toolBar.add(btnImportSeed);
+		
 		
 		add(toolBar, "dock south");
 

@@ -67,9 +67,7 @@ public class PeersListPanel extends JPanel {
 		btnLaunch.setToolTipText("Launch an extra peer for the network. Allocates some stake from genesis account");
 		toolBar.add(btnLaunch);
 
-		JButton btnConnect = new JButton("Connect...");
-		toolBar.add(btnConnect);
-		btnConnect.addActionListener(e -> {
+		JButton btnConnect = new ActionButton("Connect...",0xe157,e -> {
 			String input = JOptionPane.showInputDialog("Enter host address: ", "localhost:18888");
 			if (input==null) return; // no result?
 
@@ -85,6 +83,7 @@ public class PeersListPanel extends JPanel {
 			}
 
 		});
+		toolBar.add(btnConnect);
 
 		ScrollyList<ConvexLocal> scrollyList = new ScrollyList<>(manager.getPeerList(),
 				peer -> new PeerComponent(peer));

@@ -85,7 +85,7 @@ public class Identicon extends JLabel {
 	public Identicon(AArrayBlob a) {
 		super();
 		setKey(a);
-		setFont(Toolkit.SMALL_MONO_FONT);
+		setFont(Toolkit.MONO_FONT);
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
 		
 		Toolkit.addPopupMenu(this,new JPopupMenu() {
@@ -128,7 +128,7 @@ public class Identicon extends JLabel {
 	}
 
 	public void setKey(AArrayBlob a) {
-		ImageIcon icon=createIcon(a, 36);
+		ImageIcon icon=createIcon(a, Toolkit.IDENTICON_SIZE); 
 		this.setToolTipText(icon.getDescription());
 
 		setIcon(icon);

@@ -12,9 +12,9 @@ import convex.gui.utils.Toolkit;
 public class DropdownMenu extends BaseImageButton {
 
 	private JPopupMenu popupMenu;
-	
+	 
 	public DropdownMenu(JPopupMenu popupMenu) {
-		super(SymbolIcon.get(0xe8b8, Toolkit.SYMBOL_SIZE));
+		super(SymbolIcon.get(0xe8b8,Toolkit.ICON_SIZE));
 		this.popupMenu = popupMenu;
 		// setIconTextGap(0);
 		this.addActionListener(e->{

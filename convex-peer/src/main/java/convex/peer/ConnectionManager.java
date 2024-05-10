@@ -660,13 +660,13 @@ public class ConnectionManager extends AThreadedComponent {
 
 	/**
 	 * Called to signal a bad / corrupt message from a Peer.
-	 * @param m
-	 * @param message 
+	 * @param m Message of concern 
+	 * @param reason Reason message considered bad
 	 */
-	public void alertBadMessage(Message m, String message) {
+	public void alertBadMessage(Message m, String reason) {
 		// TODO Possibly dump Peer? Send a result indicating bad message?
-		message=message+" from "+m.getOriginString();
-		log.warn(message);
+		reason=reason+" from "+m.getOriginString();
+		log.warn(reason);
 	}
 
 	/**

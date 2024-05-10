@@ -39,7 +39,7 @@ public class PeerInfoPanel extends JPanel {
 		textArea.setBackground(null);
 		textArea.setCaret(new NonUpdatingCaret());
 		textArea.setColumns(100);
-		textArea.setFont(Toolkit.SMALL_MONO_FONT);
+		textArea.setFont(Toolkit.MONO_FONT);
 		
 		JPanel panel1=new JPanel();
 		panel1.add(textArea);

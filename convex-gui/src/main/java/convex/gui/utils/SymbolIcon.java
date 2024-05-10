@@ -1,6 +1,7 @@
 package convex.gui.utils;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
@@ -18,9 +19,8 @@ public class SymbolIcon extends ImageIcon {
 		super(image);
 	}
 	
-	private static final float SCALE_FACTOR=1.3f;
-	
-	private static SymbolIcon create(int codePoint, int size, int colour) {
+	private static SymbolIcon create(int codePoint, double dsize, int colour) {
+		 int size=(int)dsize;
 		 BufferedImage image =new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
 		 
 		 char[] c=Character.toChars(codePoint);
@@ -31,8 +31,8 @@ public class SymbolIcon extends ImageIcon {
 		 label.setForeground(new Color(colour&0xffffff));
 		 
 		 // set font size so we get the correct pixel size
-		 float fontSize= SCALE_FACTOR* 72.0f * size / Toolkit.SCREEN_RES;
-	     label.setFont(Toolkit.SYMBOL_FONT.deriveFont(fontSize));
+	     Font font=Toolkit.SYMBOL_FONT.deriveFont((float)(size));
+		 label.setFont(font);
 	     
 	     label.setHorizontalAlignment(JLabel.CENTER);
 		 label.setVerticalAlignment(JLabel.CENTER);
@@ -48,16 +48,17 @@ public class SymbolIcon extends ImageIcon {
 	}
 	
 	public static SymbolIcon get(int codePoint) {
-		return get(codePoint,Toolkit.SYMBOL_SIZE,Toolkit.SYMBOL_COLOUR.getRGB());
+		return get(codePoint,Toolkit.SMALL_ICON_SIZE,Toolkit.SYMBOL_COLOUR.getRGB());
 	}
 	
-	public static SymbolIcon get(int codePoint, int size) {
+	public static SymbolIcon get(int codePoint, double size) {
 		return get(codePoint,size,Toolkit.SYMBOL_COLOUR.getRGB());
 	}
 
 
-	public static SymbolIcon get(int codePoint, int size, int colour) {
-		long id=codePoint+(size*0x100000000L)+(colour*100000000000L);
+	public static SymbolIcon get(int codePoint, double size, int colour) {
+		int sz=(int)size;
+		long id=codePoint+(sz*0x100000000L)+(colour*100000000000L);
 		SymbolIcon result=cache.get(id);
 		
 		if (result!=null) return result;

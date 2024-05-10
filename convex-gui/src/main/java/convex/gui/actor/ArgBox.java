@@ -10,7 +10,7 @@ import convex.gui.utils.Toolkit;
 public class ArgBox extends JTextField {
 
 	public ArgBox() {
-		setFont(Toolkit.SMALL_MONO_FONT);
+		setFont(Toolkit.MONO_FONT);
 		this.setPreferredSize(new Dimension(300,30));
 	}
 }

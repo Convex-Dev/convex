@@ -13,7 +13,7 @@ public class CodePane extends BaseTextPane {
 	public CodePane() {
 		RightCopyMenu.addTo(this);
 
-		setFont(Toolkit.SMALL_MONO_FONT);
+		setFont(Toolkit.MONO_FONT);
 		// stop catching focus movement keys, useful for Ctrl+up and down etc
 		setFocusTraversalKeysEnabled(false);
 

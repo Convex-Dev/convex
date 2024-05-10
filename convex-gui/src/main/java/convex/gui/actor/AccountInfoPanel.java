@@ -30,7 +30,7 @@ public class AccountInfoPanel extends JPanel {
 		infoArea = new JTextArea();
 		add(infoArea, BorderLayout.CENTER);
 		infoArea.setBackground(null);
-		infoArea.setFont(Toolkit.SMALL_MONO_FONT);
+		infoArea.setFont(Toolkit.MONO_FONT);
 
 		manager.addPropertyChangeListener(e -> {
 			updateInfo((State) e.getNewValue());

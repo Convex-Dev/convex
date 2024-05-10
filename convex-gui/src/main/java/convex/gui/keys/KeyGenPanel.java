@@ -45,13 +45,11 @@ public class KeyGenPanel extends JPanel {
 	
 	JSpinner numSpinner;
 
-	JButton addWalletButton = new JButton("Add to keyring");
+	ActionButton addWalletButton;
 	
 	JPanel formPanel;
-
 	
-	static int FONT_SIZE=(int)Toolkit.SCALE*15;
-	static Font HEX_FONT=Toolkit.SMALL_MONO_FONT.deriveFont((float)FONT_SIZE);
+	static Font HEX_FONT=Toolkit.MONO_FONT;
 
 	/** 
 	 * Format a hex string in blocks for digits
@@ -345,15 +343,16 @@ public class KeyGenPanel extends JPanel {
 			actionPanel.add(btnNormalise);
 		}
 
-		actionPanel.add(addWalletButton);
-		addWalletButton.setEnabled(false);
-		addWalletButton.addActionListener(e -> {
+		addWalletButton=new ActionButton("Add to keyring",e -> {
 			String pks = privateKeyArea.getText();
 			pks = Utils.stripWhiteSpace(pks);
 			HotWalletEntry we = HotWalletEntry.create(AKeyPair.create(Utils.hexToBytes(pks)));
 			KeyRingPanel.addWalletEntry(we);
 			if (manager!=null) manager.switchPanel("Keyring");
-		});
+		});		
+		actionPanel.add(addWalletButton);
+		addWalletButton.setEnabled(false);
+	
 	}
 
 	private void addNote(String s) {

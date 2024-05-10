@@ -335,7 +335,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param count Number of bytes to read. Must be in bounds
 	 * @param dest Destination byte buffer
 	 * @return Number of bytes read
-	 * @throws BufferOverflowException if there is insufficient space in destination buffer
 	 */
 	public abstract int read(long offset, long count, ByteBuffer dest);
 

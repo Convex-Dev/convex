@@ -1,6 +1,7 @@
 package convex.gui.peer;
 
 import java.awt.BorderLayout;
+import java.awt.Font;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
@@ -33,8 +34,8 @@ public class TorusPanel extends JPanel {
 		
 		tableModel = new TorusTableModel(manager.getLatestState());
 		table = new JTable(tableModel);
-		table.setFont(Toolkit.SMALL_MONO_FONT);
-		table.getTableHeader().setFont(Toolkit.SMALL_MONO_BOLD);
+		table.setFont(Toolkit.MONO_FONT);
+		table.getTableHeader().setFont(Toolkit.MONO_FONT.deriveFont(Font.BOLD));
 
 		DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
 		leftRenderer.setHorizontalAlignment(JLabel.LEFT);

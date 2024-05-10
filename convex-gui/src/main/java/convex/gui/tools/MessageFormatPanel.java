@@ -76,7 +76,7 @@ public class MessageFormatPanel extends JPanel {
 		hashLabel.setToolTipText("Hash code of the data object's serilaised representation = Data Object ID");
 		hashLabel.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createEmptyBorder(10,10,10,10), BorderFactory.createRaisedBevelBorder()));
 		hashLabel.setBackground(null);
-		hashLabel.setFont(Toolkit.SMALL_MONO_FONT);
+		hashLabel.setFont(Toolkit.MONO_FONT);
 		lowerPanel.add(hashLabel, BorderLayout.SOUTH);
 		messageArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> updateMessage()));
 
@@ -137,7 +137,6 @@ public class MessageFormatPanel extends JPanel {
 		messageArea.setText(msg);
 	}
 	
-	@SuppressWarnings("null")
 	private void updateHashLabel(ACell v, Blob b) {
 		StringBuilder sb=new StringBuilder();
 		boolean empty=(b==null);

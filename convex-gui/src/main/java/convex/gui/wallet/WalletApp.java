@@ -30,7 +30,7 @@ public class WalletApp extends AbstractGUI {
 
 	protected Convex convex;
 	
-	protected static final int TAB_ICON_SIZE=60;
+	protected static final int TAB_ICON_SIZE=Toolkit.ICON_SIZE;
 	
 	/**
 	 * Create the application.

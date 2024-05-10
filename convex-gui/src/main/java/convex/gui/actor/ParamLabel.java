@@ -14,7 +14,7 @@ public class ParamLabel extends JLabel {
 	public ParamLabel(String text) {
 		super("   " + text + "   ");
 		this.setHorizontalAlignment(SwingConstants.RIGHT);
-		this.setFont(Toolkit.SMALL_MONO_FONT);
+		this.setFont(Toolkit.MONO_FONT);
 	}
 
 }

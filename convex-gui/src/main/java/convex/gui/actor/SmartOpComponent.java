@@ -57,7 +57,7 @@ public class SmartOpComponent extends BaseListComponent {
 		this.parent = parent;
 		this.sym = sym;
 
-		setFont(Toolkit.SMALL_MONO_FONT);
+		setFont(Toolkit.MONO_FONT);
 		setLayout(new BorderLayout(0, 0));
 
 		// Name and description

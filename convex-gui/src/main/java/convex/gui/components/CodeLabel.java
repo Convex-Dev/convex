@@ -19,7 +19,7 @@ public class CodeLabel extends JTextArea {
 		super(Text.lineCount(text),0);
 		this.setText(text);
 		this.setEditable(false);
-		this.setFont(Toolkit.SMALL_MONO_FONT);
+		this.setFont(Toolkit.MONO_FONT);
 		
 		RightCopyMenu.addTo(this);
 	}

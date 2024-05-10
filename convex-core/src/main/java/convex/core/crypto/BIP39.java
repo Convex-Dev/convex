@@ -334,7 +334,7 @@ public class BIP39 {
 	/**
 	 * Gets the individual words from a mnemonic String. Will trim and normalise whitespace, convert to lowercase
 	 * @param mnemonic Mnemonic String
-	 * @return
+	 * @return List of words
 	 */
 	public static List<String> getWords(String mnemonic) {
 		mnemonic=mnemonic.trim();

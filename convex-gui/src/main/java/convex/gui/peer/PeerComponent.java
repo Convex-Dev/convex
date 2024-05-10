@@ -93,7 +93,7 @@ public class PeerComponent extends BaseListComponent {
 		centralPanel.add(new CodeLabel("0x"+peerKey.toChecksumHex()),"span");
 		
 		description = new CodeLabel(getPeerDescription());
-		description.setFont(Toolkit.SMALL_MONO_FONT);
+		description.setFont(Toolkit.MONO_FONT);
 		description.setEditable(false);
 		description.setBorder(null);
 		description.setBackground(null);

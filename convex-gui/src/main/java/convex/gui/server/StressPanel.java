@@ -179,7 +179,7 @@ public class StressPanel extends JPanel {
 		resultArea.setLineWrap(true);
 		resultArea.setEditable(false);
 		resultPanel.add(resultArea);
-		resultArea.setFont(Toolkit.SMALL_MONO_FONT);
+		resultArea.setFont(Toolkit.MONO_FONT);
 	}
 
 	NumberFormat formatter = new DecimalFormat("#0.000");

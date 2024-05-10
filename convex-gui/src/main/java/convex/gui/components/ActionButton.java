@@ -14,6 +14,7 @@ public class ActionButton extends JButton {
 
 	public ActionButton(String text, int iconCode, ActionListener action) {
 		super(text,(iconCode>0)?Toolkit.menuIcon(iconCode):null);
+		this.setFont(Toolkit.BUTTON_FONT);
 		this.addActionListener(action);
 	}
 	

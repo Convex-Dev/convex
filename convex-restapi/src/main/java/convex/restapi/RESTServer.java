@@ -96,12 +96,11 @@ public class RESTServer {
 		return sslPlugin;
 	}
 
-	@SuppressWarnings("deprecation")
 	protected void addOpenApiPlugins(JavalinConfig config) {
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
 			
             pluginConfig.withDefinitionConfiguration((version, definition) -> {
-                definition.withOpenApiInfo(info -> {
+                definition.withInfo(info -> {
 					info.setTitle("Convex REST API");
 					info.setVersion("0.1.1");
                 });

@@ -1,6 +1,7 @@
 package convex.gui.actor;
 
 import java.awt.BorderLayout;
+import java.awt.Font;
 import java.util.function.Consumer;
 
 import javax.swing.JButton;
@@ -75,8 +76,8 @@ public class OraclePanel extends JPanel {
 		table.getColumnModel().getColumn(3).setPreferredWidth(300);
 
 		// fonts
-		table.setFont(Toolkit.SMALL_MONO_FONT);
-		table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
+		table.setFont(Toolkit.MONO_FONT);
+		table.getTableHeader().setFont(Toolkit.MONO_FONT.deriveFont(Font.BOLD));
 
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF); // useful in scroll pane
 		scrollPane.getViewport().setBackground(null);

@@ -119,8 +119,8 @@ public class Bits {
 	
 	/**
 	 * Compute XORShift64 PRNG for a given value
-	 * @param x
-	 * @return
+	 * @param x Input value (state)
+	 * @return PRNG value for x
 	 */
 	public static long xorshift64(long x) {
 		x ^= x << 13;
@@ -131,6 +131,7 @@ public class Bits {
 	
 	/**
 	 * 64-bit salted hash function for hashtables etc.
+	 * @return Hash value using salted hash
 	 */
 	public static final long hash64(long x) {
 		return SALT^xorshift64(x^SALT);
@@ -138,6 +139,7 @@ public class Bits {
 	
 	/**
 	 * 32-bit salted hash function for hashtables etc.
+	 * @return Hash value using salted hash
 	 */
 	public static final int hash32(long x) {
 		return (int)(SALT^xorshift64(x^SALT));

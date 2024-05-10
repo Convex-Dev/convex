@@ -43,7 +43,7 @@ public class AboutPanel extends JPanel {
 		textArea = new JTextArea();
 		textArea.setEditable(false);
 		textArea.setBackground(null);
-		textArea.setFont(Toolkit.SMALL_MONO_FONT);
+		textArea.setFont(Toolkit.MONO_FONT);
 
 		PeerGUI.getStateModel(convex).addPropertyChangeListener(e -> {
 			updateState(convex);

@@ -18,7 +18,7 @@ public class IPTest {
 	public static final int PORT=6666;
 	private static boolean running=true;
 
-	@SuppressWarnings({ "unused", "resource" })
+	@SuppressWarnings({ "resource" })
 	public static void main (String[] args) throws IOException {
 		final Enumeration<NetworkInterface> e = NetworkInterface.getNetworkInterfaces();
 		while (e.hasMoreElements()) {
