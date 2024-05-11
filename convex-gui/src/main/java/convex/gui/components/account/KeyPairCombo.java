@@ -97,7 +97,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 			AWalletEntry entry= (AWalletEntry)value;
 			if (entry!=null) {
 				AccountKey pubKey=entry.getPublicKey();
-				setText(pubKey.toHexString(16)+"...");
+				setText("0x"+pubKey.toChecksumHex().substring(0,16)+"...");
 				setIcon(Identicon.createIcon(entry.getIdenticonData(),21));				
 			} else {
 				setText("<no key pair set>");
@@ -154,7 +154,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		KeyPairModel model=new KeyPairModel();
 		if (kp!=null) {
 			AccountKey publicKey=kp.getAccountKey();
-			AWalletEntry we=Toolkit.getKeyRingEntry(publicKey);
+			AWalletEntry we=KeyRingPanel.getKeyRingEntry(publicKey);
 			if (we==null) {
 				we=new HotWalletEntry(kp);
 			}

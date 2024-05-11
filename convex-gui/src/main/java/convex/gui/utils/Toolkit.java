@@ -21,11 +21,9 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.util.Iterator;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
-import javax.swing.DefaultListModel;
 import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.InputMap;
@@ -49,13 +47,12 @@ import org.slf4j.LoggerFactory;
 import com.formdev.flatlaf.FlatDarculaLaf;
 import com.formdev.flatlaf.intellijthemes.materialthemeuilite.FlatMaterialOceanicIJTheme;
 
-import convex.core.crypto.wallet.AWalletEntry;
-import convex.core.data.AccountKey;
 import convex.core.util.Utils;
-import convex.gui.keys.KeyRingPanel;
 
 @SuppressWarnings("serial")
 public class Toolkit {
+	
+	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
 	public static final float SCALE=getUIScale();
 	
@@ -64,7 +61,6 @@ public class Toolkit {
 	public static final int SMALL_ICON_SIZE = (int) (16*SCALE);
 	public static final int MAIN_ICON_SIZE = (int) (64*SCALE);
 
-	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
 	public static final float DEFAULT_FONT_SIZE=14;
 	
@@ -100,8 +96,10 @@ public class Toolkit {
 			
 			UIManager.setLookAndFeel(laf);
 			FlatMaterialOceanicIJTheme.setup();
-			UIManager.put( "Button.foreground", BUTTON_FG );
-			System.out.println(UIManager.get("Label.foreground"));
+			
+			// Override button foreground, too dark by default
+			UIManager.put( "Button.foreground", UIManager.get("Label.foreground") );
+			// System.out.println(UIManager.get("Label.foreground"));
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
@@ -119,7 +117,7 @@ public class Toolkit {
 			    .getLocalGraphicsEnvironment()
 			    .getDefaultScreenDevice();
 		Double scale=screen.getDefaultConfiguration().getDefaultTransform().getScaleX();
-		System.err.println("UI Scale: "+scale);
+		log.debug("UI Scale: "+scale);
 		return (float)(scale.doubleValue());
 	}
 
@@ -311,24 +309,6 @@ public class Toolkit {
 		        }
 		    }
 		});
-	}
-
-	/**
-	 * Gets an entry for the current keyring
-	 * @param address
-	 * @return Wallet Entry, or null if not found
-	 */
-	public static AWalletEntry getKeyRingEntry(AccountKey publicKey) {
-		if (publicKey==null) return null;
-		DefaultListModel<AWalletEntry> list = KeyRingPanel.getListModel();
-		Iterator<AWalletEntry> it=list.elements().asIterator();
-		while (it.hasNext()) {
-			AWalletEntry we=it.next();
-			if (Utils.equals(we.getPublicKey(), publicKey)) {
-				return we;
-			}
-		}
-		return null;
 	}
 
 	public static Border createDialogBorder() {

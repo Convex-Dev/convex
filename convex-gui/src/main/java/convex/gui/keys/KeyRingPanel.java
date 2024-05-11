@@ -1,6 +1,7 @@
 package convex.gui.keys;
 
 import java.awt.Color;
+import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
 import javax.swing.DefaultListModel;
@@ -23,6 +24,7 @@ import convex.core.data.Blob;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Special;
+import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
@@ -114,11 +116,29 @@ public class KeyRingPanel extends JPanel {
 		try {
 			CompletableFuture<ACell> cf=convex.query(Special.forSymbol(Symbols.STAR_KEY)).thenApply(r->r.getValue());
 			key = RT.ensureAccountKey(cf.get());
-			AWalletEntry we=Toolkit.getKeyRingEntry(key);
+			AWalletEntry we=KeyRingPanel.getKeyRingEntry(key);
 			return we;
 		} catch (Exception e) {
 			e.printStackTrace();
 			return null;
 		}
+	}
+
+	/**
+	 * Gets an entry for the current keyring
+	 * @param address
+	 * @return Wallet Entry, or null if not found
+	 */
+	public static AWalletEntry getKeyRingEntry(AccountKey publicKey) {
+		if (publicKey==null) return null;
+		DefaultListModel<AWalletEntry> list = getListModel();
+		Iterator<AWalletEntry> it=list.elements().asIterator();
+		while (it.hasNext()) {
+			AWalletEntry we=it.next();
+			if (Utils.equals(we.getPublicKey(), publicKey)) {
+				return we;
+			}
+		}
+		return null;
 	}
 }

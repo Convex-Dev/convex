@@ -331,7 +331,9 @@ public class KeyGenPanel extends JPanel {
 		numSpinner.setModel(new SpinnerNumberModel(12, 3, 30, 1));
 		actionPanel.add(numSpinner);
 
-		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{});
+		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{
+			
+		});
 		actionPanel.add(btnNewButton);
 		
 		{ // Button to Normalise Mnemonic string
@@ -343,7 +345,7 @@ public class KeyGenPanel extends JPanel {
 			actionPanel.add(btnNormalise);
 		}
 
-		addWalletButton=new ActionButton("Add to keyring",e -> {
+		addWalletButton=new ActionButton("Add to keyring",0xe145,e -> {
 			String pks = privateKeyArea.getText();
 			pks = Utils.stripWhiteSpace(pks);
 			HotWalletEntry we = HotWalletEntry.create(AKeyPair.create(Utils.hexToBytes(pks)));
