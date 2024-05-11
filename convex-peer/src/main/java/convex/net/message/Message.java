@@ -238,19 +238,6 @@ public abstract class Message {
 	 * @return True if sent successfully, false otherwise
 	 */
 	public abstract boolean returnMessage(Message m);
-	
-	/**
-	 * Gets a String identifying the origin of the message. Used for logging.
-	 * @return String representing message origin
-	 */
-	public abstract String getOriginString();
-
-	/**
-	 * Gets the Connection instance associated with this message, or null if no
-	 * connection exists (e.g. a local Message) 
-	 * @return Connection instance
-	 */
-	public abstract Connection getConnection();
 
 	public boolean hasData() {
 		return messageData!=null;

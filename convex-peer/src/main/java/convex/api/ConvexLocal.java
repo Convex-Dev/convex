@@ -96,7 +96,7 @@ public class ConvexLocal extends Convex {
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
 		CompletableFuture<Result> cf=new CompletableFuture<>();
 		Consumer<Message> resultHandler=makeResultHandler(cf);
-		MessageLocal ml=MessageLocal.create(type,payload, server, resultHandler);
+		MessageLocal ml=MessageLocal.create(type,payload, resultHandler);
 		server.getReceiveAction().accept(ml);
 		return cf;
 	}

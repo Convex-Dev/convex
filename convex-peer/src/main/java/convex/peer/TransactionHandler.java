@@ -228,7 +228,7 @@ public class TransactionHandler extends AThreadedComponent{
 				Message m = interests.get(h);
 				if (m != null) {
 					ACell id = m.getID();
-					log.trace("Returning transaction result ID {} to {}", id,m.getOriginString());
+					log.trace("Returning transaction result ID {}", id);
 					Result res = br.getResults().get(j);
 					
 					extInfo.put(Keywords.LOC,Vectors.of(blockNum,j));

@@ -37,7 +37,6 @@ import convex.core.util.Utils;
 import convex.net.ChallengeRequest;
 import convex.net.Connection;
 import convex.net.message.Message;
-import convex.net.message.MessageRemote;
 
 /**
  * Class for managing the outbound Peer connections from a Peer Server.
@@ -352,11 +351,7 @@ public class ConnectionManager extends AThreadedComponent {
 				log.debug("challenge data incorrect number of items should be 3 not ",RT.count(challengeValues));
 				return;
 			}
-			Connection pc = ((MessageRemote)m).getConnection();
-			if ( pc == null) {
-				log.warn( "No remote peer connection from challenge");
-				return;
-			}
+			
 			// log.log(LEVEL_CHALLENGE_RESPONSE, "Processing challenge request from: " + pc.getRemoteAddress());
 
 			// get the token to respond with
@@ -395,10 +390,8 @@ public class ConnectionManager extends AThreadedComponent {
 
 			SignedData<ACell> response = thisPeer.sign(responseValues);
 			// log.log(LEVEL_CHALLENGE_RESPONSE, "Sending response to "+ pc.getRemoteAddress());
-			if (pc.sendResponse(response) == -1 ){
-				log.warn("Failed sending response from challenge to ", pc.getRemoteAddress());
-			}
-
+			Message resp=Message.createResponse(response);
+			m.returnMessage(resp);
 		} catch (Throwable t) {
 			log.error("Challenge Error: {}" ,t);
 			// t.printStackTrace();
@@ -409,7 +402,7 @@ public class ConnectionManager extends AThreadedComponent {
 		try {
 			SignedData<ACell> signedData = m.getPayload();
 
-			log.debug( "Processing response request from: {}",m.getOriginString());
+			log.debug( "Processing response request");
 
 			@SuppressWarnings("unchecked")
 			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
@@ -486,8 +479,8 @@ public class ConnectionManager extends AThreadedComponent {
 				return fromPeer;
 			}
 
-		} catch (Throwable t) {
-			log.error("Response Error: {}",t);
+		} catch (Exception e) {
+			log.error("Response Error: {}",e);
 		}
 		return null;
 	}
@@ -665,7 +658,6 @@ public class ConnectionManager extends AThreadedComponent {
 	 */
 	public void alertBadMessage(Message m, String reason) {
 		// TODO Possibly dump Peer? Send a result indicating bad message?
-		reason=reason+" from "+m.getOriginString();
 		log.warn(reason);
 	}
 
@@ -677,7 +669,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey key) {
 		if (log.isDebugEnabled()) {
-			String message= "Missing data "+e.getMissingHash()+" from "+m.getOriginString();
+			String message= "Missing data "+e.getMissingHash();
 			log.debug(message);
 		}
 		

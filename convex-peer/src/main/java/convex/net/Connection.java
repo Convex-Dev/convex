@@ -46,7 +46,7 @@ import convex.peer.Config;
 
 /**
  * <p>
- * Class representing the low-level network Connection between network participants.
+ * Class representing the low-level NIO network Connection between network participants.
  * </p>
  *
  * <p>

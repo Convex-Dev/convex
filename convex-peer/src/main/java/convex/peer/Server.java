@@ -541,10 +541,6 @@ public class Server implements Closeable {
 		try {
 			// We can ignore payload
 
-			log.trace( "Processing status request from: {}" ,m.getOriginString());
-			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
-			// address);
-
 			AVector<ACell> reply = getStatusVector();
 			Result r=Result.create(m.getID(), reply);
 
@@ -791,7 +787,7 @@ public class Server implements Closeable {
 	}
 	
 	/**
-	 * Checks is the Server threads are running
+	 * Checks if the Server threads are running
 	 * @return
 	 */
 	public boolean isRunning() {
