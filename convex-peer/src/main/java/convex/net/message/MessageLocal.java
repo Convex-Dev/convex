@@ -1,6 +1,6 @@
 package convex.net.message;
 
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import convex.core.data.ACell;
 import convex.net.MessageType;
@@ -10,11 +10,8 @@ import convex.net.MessageType;
  */
 public class MessageLocal extends Message {
 
-	protected Consumer<Message> returnHandler;
-	
-	protected MessageLocal(MessageType type, ACell payload, Consumer<Message> handler) {
-		super(type, payload,null);
-		this.returnHandler=handler;
+	protected MessageLocal(MessageType type, ACell payload, Predicate<Message> handler) {
+		super(type, payload,null,handler);
 	}
 	
 	/**
@@ -24,14 +21,8 @@ public class MessageLocal extends Message {
 	 * @param handler Handler for Results
 	 * @return New MessageLocal instance
 	 */
-	public static MessageLocal create(MessageType type, ACell payload, Consumer<Message> handler) {
+	public static MessageLocal create(MessageType type, ACell payload, Predicate<Message> handler) {
 		return new MessageLocal(type,payload,handler);
-	}
-	
-	@Override
-	public boolean returnMessage(Message m) {
-		returnHandler.accept(m);
-		return true;
 	}
 
 	@Override

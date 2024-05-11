@@ -1,5 +1,7 @@
 package convex.net.message;
 
+import java.util.function.Predicate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,11 +44,13 @@ public abstract class Message {
 	protected ACell payload;
 	protected Blob messageData; // encoding of payload (possibly multi-cell)
 	protected MessageType type;
+	protected Predicate<Message> returnHandler;
 
-	protected Message(MessageType type, ACell payload, Blob data) {
+	protected Message(MessageType type, ACell payload, Blob data, Predicate<Message> handler) {
 		this.type = type;
 		this.messageData=data;
 		this.payload = payload;
+		this.returnHandler=handler;
 	}
 
 	public static MessageRemote create(Connection peerConnection, MessageType type, Blob data) {
@@ -237,7 +241,9 @@ public abstract class Message {
 	 * @param m Message
 	 * @return True if sent successfully, false otherwise
 	 */
-	public abstract boolean returnMessage(Message m);
+	public boolean returnMessage(Message m) {
+		return returnHandler.test(m);
+	}
 
 	public boolean hasData() {
 		return messageData!=null;

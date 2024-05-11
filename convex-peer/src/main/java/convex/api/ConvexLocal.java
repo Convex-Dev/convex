@@ -3,7 +3,7 @@ package convex.api;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import convex.core.Result;
 import convex.core.State;
@@ -95,19 +95,20 @@ public class ConvexLocal extends Convex {
 
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
 		CompletableFuture<Result> cf=new CompletableFuture<>();
-		Consumer<Message> resultHandler=makeResultHandler(cf);
+		Predicate<Message> resultHandler=makeResultHandler(cf);
 		MessageLocal ml=MessageLocal.create(type,payload, resultHandler);
 		server.getReceiveAction().accept(ml);
 		return cf;
 	}
 
-	private Consumer<Message> makeResultHandler(CompletableFuture<Result> cf) {
+	private Predicate<Message> makeResultHandler(CompletableFuture<Result> cf) {
 		return m->{
 			Result r=m.toResult();
 			if (r.getErrorCode()!=null) {
 				sequence=null;
 			}
 			cf.complete(r);
+			return true;
 		};
 	}
 

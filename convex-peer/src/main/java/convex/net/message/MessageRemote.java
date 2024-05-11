@@ -14,26 +14,19 @@ public class MessageRemote extends Message {
 	
 	private final Connection connection;
 
-
 	protected MessageRemote(Connection conn, MessageType type, ACell payload, Blob data) {
-		super(type, payload,data);
+		super(type, payload,data,m->{
+			try {
+				return conn.sendMessage(m);
+			} catch (IOException e) {
+				return false;
+			}
+		});
 		this.connection=conn;
 	}
 
 	public MessageRemote withConnection(Connection peerConnection) {
 		return new MessageRemote(peerConnection, type, payload, messageData);
-	}
-	
-	@Override
-	public boolean returnMessage(Message m) {
-		try {
-			if (connection.isClosed()) return false;
-			return connection.sendMessage(m);
-		} catch (IOException t) {
-			// Ignore, probably IO error
-			log.warn("Error returning message: {}",t.getMessage());
-			return false;
-		} 
 	}
 
 	@Override
