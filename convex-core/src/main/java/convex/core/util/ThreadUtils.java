@@ -49,7 +49,7 @@ public class ThreadUtils {
 		    Method method = Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
 		    ex = (ExecutorService) method.invoke(null);
 		} catch (Exception e) {
-		    ex = Executors.newFixedThreadPool(8);
+		    ex = Executors.newCachedThreadPool();
 		}
 		return ex;
 	}

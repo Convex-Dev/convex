@@ -268,7 +268,7 @@ public class NIOServer implements Closeable {
 		// log.info("Connection read from: "+sc.getRemoteAddress()+" with key:"+key);
 		Connection conn = ensureConnection(key);
 		if (conn == null)
-			throw new Error("No PeerConnection specified");
+			throw new IOException("No Connection in selecion key");
 		try {
 			int n = conn.handleChannelRecieve();
 			if (n < 0) {
