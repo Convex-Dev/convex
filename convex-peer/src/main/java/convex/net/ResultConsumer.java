@@ -9,7 +9,6 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
 import convex.core.store.Stores;
-import convex.net.message.Message;
 
 /**
  * Consumer<Message> abstract base class for default behaviour when awaiting results.

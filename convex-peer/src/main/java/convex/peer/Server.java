@@ -46,9 +46,9 @@ import convex.core.store.Stores;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
+import convex.net.Message;
 import convex.net.MessageType;
 import convex.net.NIOServer;
-import convex.net.message.Message;
 
 
 /**

@@ -51,8 +51,8 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.net.Connection;
+import convex.net.Message;
 import convex.net.ResultConsumer;
-import convex.net.message.Message;
 
 /**
  * Tests for a fresh standalone server cluster instance

@@ -29,8 +29,8 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.Message;
 import convex.net.MessageType;
-import convex.net.message.Message;
 
 /**
  * Component class to handle propagation of new Beliefs from a Peer

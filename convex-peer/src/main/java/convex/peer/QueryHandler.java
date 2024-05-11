@@ -11,8 +11,8 @@ import convex.core.data.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
+import convex.net.Message;
 import convex.net.MessageType;
-import convex.net.message.Message;
 
 public class QueryHandler extends AThreadedComponent {
 

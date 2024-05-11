@@ -15,8 +15,8 @@ import convex.core.data.Cells;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
+import convex.net.Message;
 import convex.net.MessageType;
-import convex.net.message.Message;
 
 public class MessageTest {
 

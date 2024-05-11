@@ -21,9 +21,8 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
 import convex.core.util.ThreadUtils;
+import convex.net.Message;
 import convex.net.MessageType;
-import convex.net.message.Message;
-import convex.net.message.MessageLocal;
 import convex.peer.Server;
 
 /**
@@ -96,7 +95,7 @@ public class ConvexLocal extends Convex {
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
 		CompletableFuture<Result> cf=new CompletableFuture<>();
 		Predicate<Message> resultHandler=makeResultHandler(cf);
-		MessageLocal ml=MessageLocal.create(type,payload, resultHandler);
+		Message ml=Message.create(type,payload, resultHandler);
 		server.getReceiveAction().accept(ml);
 		return cf;
 	}

@@ -36,7 +36,7 @@ import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.ChallengeRequest;
 import convex.net.Connection;
-import convex.net.message.Message;
+import convex.net.Message;
 
 /**
  * Class for managing the outbound Peer connections from a Peer Server.

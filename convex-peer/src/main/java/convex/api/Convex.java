@@ -47,8 +47,8 @@ import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
 import convex.core.State;
+import convex.net.Message;
 import convex.net.ResultConsumer;
-import convex.net.message.Message;
 import convex.peer.Config;
 import convex.peer.Server;
 

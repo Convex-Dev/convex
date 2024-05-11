@@ -20,9 +20,9 @@ import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.net.Connection;
 import convex.net.MemoryByteChannel;
+import convex.net.Message;
 import convex.net.MessageReceiver;
 import convex.net.MessageType;
-import convex.net.message.Message;
 
 public class MessageReceiverTest {
 

@@ -1,5 +1,6 @@
-package convex.net.message;
+package convex.net;
 
+import java.io.IOException;
 import java.util.function.Predicate;
 
 import org.slf4j.Logger;
@@ -24,8 +25,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.net.Connection;
-import convex.net.MessageType;
 
 /**
  * <p>Class representing a message to / from a specific connection</p>
@@ -37,7 +36,7 @@ import convex.net.MessageType;
  *
  * <p>Messages may contain a Payload, which can be any Data Object.</p>
  */
-public abstract class Message {
+public class Message {
 	
 	protected static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
@@ -53,15 +52,22 @@ public abstract class Message {
 		this.returnHandler=handler;
 	}
 
-	public static MessageRemote create(Connection peerConnection, MessageType type, Blob data) {
-		return new MessageRemote(peerConnection, type, null,data);
+	public static Message create(Connection conn, MessageType type, Blob data) {
+		Predicate<Message> handler=m->{
+			try {
+				return conn.sendMessage(m);
+			} catch (IOException e) {
+				return false;
+			}
+		};
+		return new Message(type, null,data,handler);
 	}
 	
-	public static MessageRemote create(MessageType type,ACell payload) {
-		return new MessageRemote(null, type, payload,null);
+	public static Message create(MessageType type,ACell payload) {
+		return new Message(type, payload,null,null);
 	}
 
-	public static MessageRemote createDataResponse(CVMLong id, ACell... cells) {
+	public static Message createDataResponse(CVMLong id, ACell... cells) {
 		int n=cells.length;
 		ACell[] cs=new ACell[n+1];
 		cs[0]=id;
@@ -242,7 +248,9 @@ public abstract class Message {
 	 * @return True if sent successfully, false otherwise
 	 */
 	public boolean returnMessage(Message m) {
-		return returnHandler.test(m);
+		Predicate<Message> handler=returnHandler;
+		if (handler==null) return false;
+		return handler.test(m);
 	}
 
 	public boolean hasData() {
@@ -261,7 +269,9 @@ public abstract class Message {
 	/**
 	 * Closes any connection associated with this message, probably because of bad behaviour
 	 */
-	public abstract void closeConnection();
+	public void closeConnection() {
+		returnHandler=null;
+	}
 
 	public Message makeDataResponse(AStore store) throws BadFormatException {
 		AVector<ACell> v = RT.ensureVector(getPayload());
@@ -304,6 +314,17 @@ public abstract class Message {
 		} catch (Exception e) {
 			return Result.create(null, Strings.create("Error building Result: "+e.getMessage()), ErrorCodes.FATAL);
 		}
+	}
+
+	/**
+	 * Create an instance with the given message data
+	 * @param type Message type
+	 * @param payload Message payload
+	 * @param handler Handler for Results
+	 * @return New MessageLocal instance
+	 */
+	public static Message create(MessageType type, ACell payload, Predicate<Message> handler) {
+		return new Message(type,payload,null,handler);
 	}
 
 }

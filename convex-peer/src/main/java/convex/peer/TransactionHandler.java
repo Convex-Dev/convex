@@ -39,7 +39,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.message.Message;
+import convex.net.Message;
 
 /**
  * Server component for handling client transactions and producing Blocks

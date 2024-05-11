@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
-import convex.net.message.Message;
 import convex.peer.Config;
 
 /**
