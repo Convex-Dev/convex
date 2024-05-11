@@ -448,7 +448,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			novelty.add(n, payload);
 		}
 		Blob data=Format.encodeDelta(novelty);
-		return Message.create(null,MessageType.BELIEF,data);
+		return Message.create(MessageType.BELIEF,null,data);
 	}
 
 	private Belief lastFullBroadcastBelief;

@@ -2,7 +2,6 @@ package convex.peer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.UnresolvedAddressException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -536,20 +535,11 @@ public class ConnectionManager extends AThreadedComponent {
 			
 			for (Map.Entry<AccountKey,Connection> me: left) {
 				Connection pc=me.getValue();
-				try {
-					boolean sent = pc.sendMessage(msg);
-					if (sent) {
-						hm.remove(me.getKey());	
-					} else {
-						// log.warn("Delayed sending to peer because of full Buffer");
-					}
-				} catch (ClosedChannelException e) {
-					log.trace("Closed channel during broadcast");
-					pc.close();
-				} catch (IOException e) {
-					// probably the connection was forcibly closed
-					log.debug("Closed channel during broadcast",e);
-					pc.close();
+				boolean sent = pc.sendMessage(msg);
+				if (sent) {
+					hm.remove(me.getKey());	
+				} else {
+					// log.warn("Broadcast failed!");
 				}
 			}
 			

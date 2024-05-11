@@ -392,10 +392,13 @@ public class Connection {
 	 *
 	 * @param msg Message to send
 	 * @return true if message buffered successfully, false if failed
-	 * @throws IOException If IO error occurs
 	 */
-	public boolean sendMessage(Message msg) throws IOException {
-		return sendBuffer(msg.getType(),msg.getMessageData());
+	public boolean sendMessage(Message msg)  {
+		try {
+			return sendBuffer(msg.getType(),msg.getMessageData());
+		} catch (IOException e) {
+			return false;
+		}
 	}
 
 	/**

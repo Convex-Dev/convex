@@ -1,6 +1,5 @@
 package convex.net;
 
-import java.io.IOException;
 import java.util.function.Predicate;
 
 import org.slf4j.Logger;
@@ -53,18 +52,16 @@ public class Message {
 	}
 
 	public static Message create(Connection conn, MessageType type, Blob data) {
-		Predicate<Message> handler=m->{
-			try {
-				return conn.sendMessage(m);
-			} catch (IOException e) {
-				return false;
-			}
-		};
+		Predicate<Message> handler=conn::sendMessage;
 		return new Message(type, null,data,handler);
 	}
 	
 	public static Message create(MessageType type,ACell payload) {
 		return new Message(type, payload,null,null);
+	}
+	
+	public static Message create(MessageType type,ACell payload, Blob data) {
+		return new Message(type, payload,data,null);
 	}
 
 	public static Message createDataResponse(CVMLong id, ACell... cells) {
