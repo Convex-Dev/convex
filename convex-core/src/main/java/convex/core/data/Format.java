@@ -995,7 +995,7 @@ public class Format {
 			ix=Format.writeVLCCount(msg, ix, encLength);
 			ix=enc.getBytes(msg, ix);
 		}
-		if (ix!=messageLength) throw new Error("Bad message length expected "+ml[0]+" but was: "+ix);
+		if (ix!=messageLength) throw new IllegalArgumentException("Bad message length expected "+ml[0]+" but was: "+ix);
 		
 		return Blob.wrap(msg);
 	}

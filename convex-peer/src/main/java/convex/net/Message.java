@@ -33,7 +33,7 @@ import convex.core.store.AStore;
  * <p>This class is an immutable data structure, but NOT a representable on-chain
  * data structure, as it is part of the peer protocol layer.</p>
  *
- * <p>Messages may contain a Payload, which can be any Data Object.</p>
+ * <p>Messages may contain a Payload, which can be any Data Value.</p>
  */
 public class Message {
 	

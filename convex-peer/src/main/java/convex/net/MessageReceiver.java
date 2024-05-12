@@ -53,11 +53,7 @@ public class MessageReceiver {
 		this.action = receiveAction;
 		this.connection = pc;
 	}
-
-	public Consumer<Message> getReceiceAction() {
-		return action;
-	}
-
+	
 	/**
 	 * Get the number of messages received in total by this Receiver
 	 * @return Count of messages received
@@ -158,7 +154,7 @@ public class MessageReceiver {
 			} else {
 				log.warn("Ignored message because no receive action set: " + message);
 			}
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			// TODO: handle Throwable vs Exception differently? Close connection?
 			log.warn("Exception in receive action from: " + connection.getRemoteAddress(),e);
 		}

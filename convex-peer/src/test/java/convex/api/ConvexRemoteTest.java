@@ -125,7 +125,7 @@ public class ConvexRemoteTest {
 	public void testReceivedCount() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (network.SERVER) {
 			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			Connection conn=convex.getConnection();
+			Connection conn=convex.connection;
 
 			long seq=convex.getSequence();
 			assertEquals(1,conn.getReceivedCount());

@@ -72,16 +72,6 @@ public class ConvexRemote extends Convex {
 	}
 	
 	/**
-	 * Gets the underlying Connection instance for this Client. May be null if not
-	 * connected.
-	 *
-	 * @return Connection instance or null
-	 */
-	public Connection getConnection() {
-		return connection;
-	}
-	
-	/**
 	 * Checks if this Convex client instance has an open remote connection.
 	 *
 	 * @return true if connected, false otherwise
@@ -196,8 +186,8 @@ public class ConvexRemote extends Convex {
 	
 				return cf;
 			}
-		} catch (Throwable t) {
-			return CompletableFuture.failedFuture(t);
+		} catch (Exception e) {
+			return CompletableFuture.failedFuture(e);
 		}
 	}
 	
@@ -236,18 +226,6 @@ public class ConvexRemote extends Convex {
 		awaiting.clear();
 	}
 
-	/**
-	 * Wraps a connection as a Convex client instance
-	 * 
-	 * @param c Connection to wrap
-	 * @return New Convex client instance using underlying connection
-	 */
-	public static ConvexRemote wrap(Connection c) {
-		ConvexRemote convex = new ConvexRemote(null, null);
-		convex.setConnection(c);
-		return convex;
-	}
-	
 	@Override
 	public String toString() {
 		return "Remote Convex instance at "+getHostAddress();
