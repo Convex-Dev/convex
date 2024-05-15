@@ -61,12 +61,11 @@ public class Toolkit {
 	public static final int SMALL_ICON_SIZE = (int) (16*SCALE);
 	public static final int MAIN_ICON_SIZE = (int) (64*SCALE);
 
-
-	public static final float DEFAULT_FONT_SIZE=14;
+	public static final float DEFAULT_FONT_SIZE=16;
 	
 	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,(int)DEFAULT_FONT_SIZE);
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE));
-	public static Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, (int)(DEFAULT_FONT_SIZE*1.6));
+	public static Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, (int)(DEFAULT_FONT_SIZE*1.2));
 	
 	public static final float SYMBOL_FONT_SIZE= DEFAULT_FONT_SIZE;
 	
@@ -107,6 +106,7 @@ public class Toolkit {
 	}
 
 	protected static LookAndFeel installFlatLaf() {
+		System.setProperty("flatlaf.uiScale", "1.5");
 		// System.setProperty("flatlaf.uiScale", Double.toString(SCALE));
 		FlatDarculaLaf laf=new FlatDarculaLaf();
 		return laf;

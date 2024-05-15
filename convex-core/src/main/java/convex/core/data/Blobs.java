@@ -34,7 +34,7 @@ public class Blobs {
 	}
 
 	/**
-	 * Converts any blob to a the correct canonical Blob format
+	 * Converts any blob to a correct canonical Blob format
 	 * @param a Any Blob
 	 * @return Canonical version s a Blob or BlobTree
 	 */

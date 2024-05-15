@@ -465,7 +465,11 @@ public class PeerGUI extends AbstractGUI {
 		
 		JButton randomise=new JButton("Randomise",SymbolIcon.get(0xe863,Toolkit.SMALL_ICON_SIZE)); 
 		randomise.addActionListener(e->{
-			keyField.setSelectedItem(HotWalletEntry.create(AKeyPair.generate()));
+			AKeyPair newKP=AKeyPair.generate();
+			// System.err.println("Generated key "+newKP.getAccountKey());
+			// Note we go to the model directly, JComboBox doeesn't like
+			// setting a selected item to something not in the list when not editable
+			keyField.getModel().setSelectedItem(HotWalletEntry.create(newKP));
 		});
 		pan.add(randomise);
 
