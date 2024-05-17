@@ -1,0 +1,9 @@
+'asset.spatial
+
+;; Spatial tokens
+
+(defn build [options]
+  (let [end (blob (or (:end options) 0x010000000000000000))]     
+     [
+       `(def supply (index ~start ~end))
+     ]))

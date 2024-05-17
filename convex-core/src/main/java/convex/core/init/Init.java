@@ -304,6 +304,7 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust/whitelist.cvx");
 		s = doActorDeploy(s, "convex/trust/monitors.cvx");
 		s = doActorDeploy(s, "convex/governance.cvx");
+		s = doActorDeploy(s, "asset/spatial.cvx");
 		// s = doActorDeploy(s, "convex/user.cvx");
 		return s;
 	}
