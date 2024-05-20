@@ -1,12 +1,12 @@
 grammar Convex;
  
 form
-	: atom
-	| pathSymbol
+	: pathSymbol
 	| dataStructure
 	| syntax
 	| quoted
 	| resolve
+	| atom
 	;
 
 singleForm: form EOF;
@@ -51,8 +51,11 @@ longValue:
    
 doubleValue:
    DOUBLE;
-   
-symbol: SYMBOL;
+
+// Note slash is a special case that is a Symbol on its own
+symbol
+   : SLASH 
+   | SYMBOL;
    
 implicitSymbol: HASH SYMBOL;
    
@@ -72,7 +75,9 @@ keyword: KEYWORD;
 
 resolve: AT symbol;
 
-pathSymbol: SYMBOL_PATH;
+pathSymbol
+   : (SYMBOL | HASH DIGITS) ('/' (SLASH | SYMBOL))+
+   ;
 
 syntax: META form form;
 
@@ -87,9 +92,6 @@ commented: COMMENTED form;
  *  =========================================
  */ 
  
-SYMBOL_PATH:
-	(NAME | HASH DIGITS) ('/' NAME)+;
- 
 COMMENTED: '#_';
 
 HASH: '#';
@@ -97,6 +99,8 @@ HASH: '#';
 AT: '@';
 
 META: '^';
+
+SLASH: '/';
 
 NIL: 'nil';
 
@@ -162,7 +166,7 @@ QUOTING: '\'' | '`' | '~' | '~@';
 
 
 KEYWORD:
-   ':'+ NAME;
+   ':'+ (SLASH | NAME);
 
 SYMBOL
     : NAME
@@ -170,8 +174,7 @@ SYMBOL
     
 fragment    
 NAME
-	: '/'
-	| SYMBOL_FIRST SYMBOL_FOLLOWING*;
+	: SYMBOL_FIRST SYMBOL_FOLLOWING*;
 
 CHARACTER
   : '\\u' HEX_BYTE HEX_BYTE
