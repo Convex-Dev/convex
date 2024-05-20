@@ -12,11 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - BIP39 key generation support
 - Observability support initial version
+- Support for `@` and `resolve` for CNS resolution
 - Extra special ops: `*nop*`, `*parent*`, `*controller*`, `*memory-price*` and `*env*`
 - `query-as` function (query mode equivalent to `eval-as`)
 - Convex Lisp `quasiquote` implementation
 - Observability support
 - Extra example code and tests
+- Data Lattice File System (Prototype)
 
 ### Changed
 - Updated CLI
@@ -34,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed `Index` to `Index`
 
 ### Fixed
+- Miscellaneous edge cases and error handling
 - Bug fixes for message decoding
 
 ## [0.7.12] - 2023-07-12
