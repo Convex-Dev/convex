@@ -18,6 +18,7 @@ import convex.core.data.AList;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
+import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
@@ -54,6 +55,7 @@ import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
 import convex.core.lang.reader.antlr.ConvexParser.PathSymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
+import convex.core.lang.reader.antlr.ConvexParser.ResolveContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
 import convex.core.lang.reader.antlr.ConvexParser.SingleFormContext;
 import convex.core.lang.reader.antlr.ConvexParser.SpecialLiteralContext;
@@ -78,13 +80,14 @@ public class AntlrReader {
 			top.add(a);
 		}
 		
-		public ACell pop() {
+		@SuppressWarnings("unchecked")
+		public <R extends ACell> R pop() {
 			int n=stack.size()-1;
 			ArrayList<ACell> top=stack.get(n);
 			int c=top.size()-1;
 			ACell cell=top.get(c);
 			top.remove(c);
-			return cell;
+			return (R) cell;
 		}
 
 		
@@ -360,6 +363,17 @@ public class AntlrReader {
 			if (qsym==null) throw new ParseException("Invalid quoting reader macro: "+qs);
 			push(Lists.of(qsym,form));	
 		}
+		
+		@Override
+		public void enterResolve(ResolveContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitResolve(ResolveContext ctx) {
+			Symbol sym=pop();
+			push(List.of(Symbols.RESOLVE,sym));
+		}
 
 		@Override
 		public void enterString(StringContext ctx) {
@@ -451,6 +465,8 @@ public class AntlrReader {
 		public void exitAllForms(AllFormsContext ctx) {
 			// Nothing	
 		}
+
+
 
 	}
 

@@ -42,6 +42,7 @@ public class Symbols {
 	public static final Symbol KEYWORD = intern("keyword");
 	public static final Symbol SYMBOL = intern("symbol");
 	public static final Symbol NAME = intern("name");
+	public static final Symbol RESOLVE = intern("resolve");
 
 	public static final Symbol EQUALS = intern("=");
 

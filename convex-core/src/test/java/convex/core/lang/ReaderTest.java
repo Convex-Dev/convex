@@ -1,6 +1,6 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -64,8 +64,8 @@ public class ReaderTest {
 
 	@Test
 	public void testBadKeywords() {
-		assertThrows(ParseException.class, () -> Reader.read(":"));
-		assertThrows(ParseException.class, () -> Reader.read(" : "));
+		assertParseException( () -> Reader.read(":"));
+		assertParseException( () -> Reader.read(" : "));
 		
 		// TODO: fix Case spotted in #441
 		// ACell a=Reader.readAll("() : ()"); // Getting a null here?
@@ -99,15 +99,15 @@ public class ReaderTest {
 		assertEquals(Symbol.create(".56"), Reader.read(".56"));
 
 		// Bad address parsing
-		assertThrows(ParseException.class,()->Reader.read("#-1/foo"));
+		assertParseException(()->Reader.read("#-1/foo"));
 		
 		// Pipe not yet a valid symbol? Clojure doesn't allow but perhaps we should
-		assertThrows(ParseException.class,()->Reader.read("|"));
+		assertParseException(()->Reader.read("|"));
 		
 		// too long symbol names
-		assertThrows(ParseException.class,()->Reader.read(Samples.TOO_BIG_SYMBOLIC));
-		assertThrows(ParseException.class,()->Reader.read(Samples.TOO_BIG_SYMBOLIC+"/a"));
-		assertThrows(ParseException.class,()->Reader.read("a/"+Samples.TOO_BIG_SYMBOLIC));
+		assertParseException(()->Reader.read(Samples.TOO_BIG_SYMBOLIC));
+		assertParseException(()->Reader.read(Samples.TOO_BIG_SYMBOLIC+"/a"));
+		assertParseException(()->Reader.read("a/"+Samples.TOO_BIG_SYMBOLIC));
 
 	}
 	
@@ -120,13 +120,13 @@ public class ReaderTest {
 	@Test 
 	public void testColonIssue462() {
 		String s462="() : ()";
-		assertThrows(ParseException.class,()->Reader.readAll(s462));
+		assertParseException(()->Reader.readAll(s462));
 		
 	}
 	
 	@Test
 	public void testExtraInputRegression244() {
-		assertThrows(ParseException.class,()->Reader.readAll("'(42))))"));
+		assertParseException(()->Reader.readAll("'(42))))"));
 	}
 
 	@Test
@@ -163,7 +163,7 @@ public class ReaderTest {
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
 		assertCVMEquals(12.0, Reader.read("12e0"));
 		
-		assertThrows(ParseException.class, () -> {
+		assertParseException(() -> {
 			Reader.read("2.0e0.1234");
 		});
 		// assertNull( Reader.read("[2.0e0.1234]"));
@@ -197,10 +197,10 @@ public class ReaderTest {
 		assertEquals(Blob.EMPTY, Reader.read("0x"));
 	
 		// TODO: figure out the edge case
-		assertThrows(ParseException.class, () -> Reader.read("0x1"));
-		//assertThrows(Error.class, () -> Reader.read("[0x1]")); // odd number of hex digits
+		assertParseException(() -> Reader.read("0x1"));
+		assertParseException( () -> Reader.read("[0x1]")); // odd number of hex digits
 
-		assertThrows(ParseException.class, () -> Reader.read("0x123")); // odd number of hex digits
+		assertParseException(() -> Reader.read("0x123")); // odd number of hex digits
 	}
 
 	@Test
@@ -260,22 +260,27 @@ public class ReaderTest {
 
 	}
 	
-
+	@Test 
+	public void testResolve() {
+		assertEquals(Lists.of(Symbols.RESOLVE, Symbols.FOO), Reader.read("@foo"));
+		assertParseException(() -> Reader.read("@(foo)"));
+	}
+	
 	@Test
 	public void testTooManyClosingParens() {
 		// See #244
-		assertThrows(ParseException.class, () -> Reader.read("(42))))"));
+		assertParseException( () -> Reader.read("(42))))"));
 	}
 
 
 	@Test
 	public void testWrongSizeMaps() {
-		assertThrows(ParseException.class, () -> Reader.read("{:foobar}"));
+		assertParseException(() -> Reader.read("{:foobar}"));
 	}
 
 	@Test
 	public void testParsingNothing() {
-		assertThrows(ParseException.class, () -> Reader.read("  "));
+		assertParseException(() -> Reader.read("  "));
 	}
 
 	@Test

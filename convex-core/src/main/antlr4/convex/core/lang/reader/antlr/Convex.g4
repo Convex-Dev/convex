@@ -8,6 +8,7 @@ form
 	| dataStructure
 	| syntax
 	| quoted
+	| resolve
 	;
 
 singleForm: form EOF;
@@ -65,7 +66,7 @@ character: CHARACTER;
 
 keyword: KEYWORD;
 
-
+resolve: AT symbol;
 
 pathSymbol: SYMBOL_PATH;
 
@@ -88,6 +89,8 @@ SYMBOL_PATH:
 COMMENTED: '#_';
 
 HASH: '#';
+
+AT: '@';
 
 META: '^';
 

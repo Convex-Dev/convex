@@ -2,12 +2,16 @@ package convex.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
+
+import org.junit.jupiter.api.function.Executable;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Refs;
 import convex.core.data.prim.ANumeric;
+import convex.core.exceptions.ParseException;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 
@@ -147,5 +151,9 @@ public class Assertions {
 	public static void assertGreater(ANumeric  a, ANumeric b) {
 		if (RT.compare(a, b, -1L)>0) return; //OK
 		fail("Expected "+a+" to be greater than "+b);
+	}
+
+	public static void assertParseException(Executable a) {
+		assertThrows(ParseException.class,a);
 	}
 }
