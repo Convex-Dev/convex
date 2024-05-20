@@ -76,7 +76,7 @@ keyword: KEYWORD;
 resolve: AT symbol;
 
 pathSymbol
-   : (SYMBOL | HASH DIGITS) ('/' (SLASH | SYMBOL))+
+   : (symbol | address) ('/' symbol)+
    ;
 
 syntax: META form form;

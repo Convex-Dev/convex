@@ -417,29 +417,22 @@ public class AntlrReader {
 
 		@Override
 		public void enterPathSymbol(PathSymbolContext ctx) {
-			// Nothing	
+			// Add a list to accumulate values
+			pushList();
 		}
 
 		@Override
 		public void exitPathSymbol(PathSymbolContext ctx) {
-			String matchString=ctx.getText();
-			String[] ss=matchString.split("/",-1); // negative limit keeps empty values in cases like `#0//`
-			int n=ss.length;
-			if (n<2) {
-				throw new ParseException("Expected followed by symbol but got: ["+ matchString+"]");
-			}
+			ArrayList<ACell> elements=popList();
+			int n=elements.size();
 			
-			ACell lookup=(ss[0].startsWith("#"))?Address.parse(ss[0]):Symbol.create(ss[0]);;
+			ACell lookup=elements.get(0);
 			if (lookup==null) throw new ParseException("Path must start with Address or Symbol");
 			
 			for (int i=1; i<n; i++) {
-				String s=ss[i];
-				if ((s.length()==0)&&(i<(n-1))) {
-					// Must be a `/` starting symbol
-					s="/"+ss[++i]; // append and advance
-				}
-				Symbol sym=Symbol.create(s);
-				if (sym==null) throw new ParseException("Expected path element to be a symbol but got: "+ RT.getType(sym));
+				ACell sym=elements.get(i);
+				
+				if (!(sym instanceof Symbol)) throw new ParseException("Expected path element to be a symbol but got: "+ RT.getType(sym));
 				// System.out.println(elements);
 				lookup=Lists.of(Symbols.LOOKUP,lookup,sym);
 			}
