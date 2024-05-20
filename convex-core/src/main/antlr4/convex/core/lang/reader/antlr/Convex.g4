@@ -1,10 +1,8 @@
 grammar Convex;
  
 form
-	: literal
-	| symbol
+	: atom
 	| pathSymbol
-	| implicitSymbol
 	| dataStructure
 	| syntax
 	| quoted
@@ -28,6 +26,12 @@ set : HASH '{' forms '}';
 
 map : '{' forms '}';
 
+atom
+  : symbol 
+  | literal
+  | implicitSymbol
+  ;
+  
 literal 
 	: nil
 	| bool

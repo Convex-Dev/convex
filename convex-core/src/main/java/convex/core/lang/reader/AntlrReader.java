@@ -38,6 +38,7 @@ import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
 import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
 import convex.core.lang.reader.antlr.ConvexParser.AllFormsContext;
+import convex.core.lang.reader.antlr.ConvexParser.AtomContext;
 import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
@@ -466,8 +467,15 @@ public class AntlrReader {
 			// Nothing	
 		}
 
+		@Override
+		public void enterAtom(AtomContext ctx) {
+			// Nothing	
+		}
 
-
+		@Override
+		public void exitAtom(AtomContext ctx) {
+			// Nothing	
+		}
 	}
 
 	public static ACell read(String s) {
