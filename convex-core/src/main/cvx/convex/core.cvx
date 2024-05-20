@@ -577,6 +577,16 @@
   [sym path val]
   `(set! ~sym (assoc-in ~sym ~path ~val)))
 
+(defmacro resolve
+  ^{:doc {:description ["Resolves a value in CNS."]
+          :examples    [{:code "(resolve convex.asset)"}]
+          :signature   [{:params [& args]}]}}
+  [sym]
+  `(call* *registry*
+           0
+           'cns-resolve
+           (quote ~sym)))
+
 (defmacro import
   ^{:doc {:description ["Imports a library for use in the current environment."
                         "Creates an alias to the library so that symbols defined in the library can be addressed directly in the form 'alias/symbol-name'."
@@ -589,13 +599,10 @@
     (cond (symbol? sym) nil (fail :SYNTAX "import: alias must be a Symbol"))
     (cond (= :as as) nil (fail :SYNTAX "import expects :as keyword"))
     (let [code (cond (symbol? addr)
-                 `(or (call* *registry*
-                        0
-                        'cns-resolve
-                        (quote ~addr))
-                    (fail :NOBODY
-                      (str "Could not resolve library name for import: "
-                        (quote ~addr))))
+                 `(or (resolve ~addr)
+                      (fail :NOBODY
+                        (str "Could not resolve library name for import: "
+                          (quote ~addr))))
                  `(address ~addr))]
       `(def ~(syntax sym {:static true})
          ~code))))

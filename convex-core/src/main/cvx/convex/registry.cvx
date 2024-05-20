@@ -76,12 +76,15 @@
 (def cns-owners 
   {[] #1})
 
+(defn -check [sym]
+  (or (symbol? sym) (fail :ARGUMENT "CNS name must be a Symbol")))
+
 (defn read ^{
 	:doc       {:description "Reads a CNS record as a [value controller metadata child] vector, or nil if record does not exist."
     :examples    [{:code "(*registry*/resolve 'my.actor.name)"}]
     :signature   [{:params [sym]}]}}
   ([sym]
-	(when-not (symbol? sym) (fail :ARGUMENT "CNS name must be a valid symbol"))
+	(-check sym)
 	(let [path (split (name sym) \.)
 	      n (count path)]
 	  (when (zero? n) (fail :ARGUMENT "CNS path must have at least one segment"))
@@ -173,8 +176,7 @@
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
   [sym controller]
-  (when-not (symbol? sym)
-			  (fail :ARGUMENT "CNS names must be a valid symbol"))
+  (-check sym)
   (let [path (split (name sym) \.)
         record (get cns-database path)]
     (when (nil? record)
@@ -189,7 +191,7 @@
           :examples    [{:code "(call *registry* (cns-resolve 'convex.registry)"}]
           :signature   [{:params [addr]}]}}
   [sym]
-  (assert (symbol? sym))
+  (-check sym)
   (let [path (split (name sym) \.)
         record (get cns-database path)]
     (if record (first record) nil)))

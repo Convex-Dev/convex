@@ -2433,6 +2433,16 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(symbol)"));
 		assertArityError(step("(symbol 1 2 3)"));
 	}
+	
+	@Test
+	public void testResolve() {
+		assertNull(eval("(resolve this.does.not.exist)"));
+		assertEquals(Core.CORE_ADDRESS,eval("(resolve convex.core)"));
+		
+		assertError(step("(resolve :this.is.not.a.symbol)"));
+		assertError(step("(resolve [])"));
+
+	}
 
 	@Test
 	public void testImport() {
