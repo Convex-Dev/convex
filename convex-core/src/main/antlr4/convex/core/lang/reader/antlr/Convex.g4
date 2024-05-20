@@ -1,10 +1,14 @@
 grammar Convex;
  
 form
-	: pathSymbol
-	| dataStructure
+	: quoted
+	| pathSymbol
+	| primary
+	;
+	
+primary
+	: dataStructure
 	| syntax
-	| quoted
 	| resolve
 	| atom
 	;
@@ -76,7 +80,7 @@ keyword: KEYWORD;
 resolve: AT symbol;
 
 pathSymbol
-   : (symbol | address) ('/' symbol)+
+   : primary ('/' symbol)+
    ;
 
 syntax: META form form;

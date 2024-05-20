@@ -2438,6 +2438,8 @@ public class CoreTest extends ACVMTest {
 	public void testResolve() {
 		assertNull(eval("(resolve this.does.not.exist)"));
 		assertEquals(Core.CORE_ADDRESS,eval("(resolve convex.core)"));
+		assertEquals(Core.CORE_ADDRESS,eval("@convex.core"));
+		assertEquals(Core.COUNT,eval("@convex.core/count"));
 		
 		assertError(step("(resolve :this.is.not.a.symbol)"));
 		assertError(step("(resolve [])"));

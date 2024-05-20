@@ -55,6 +55,7 @@ import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
 import convex.core.lang.reader.antlr.ConvexParser.PathSymbolContext;
+import convex.core.lang.reader.antlr.ConvexParser.PrimaryContext;
 import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
 import convex.core.lang.reader.antlr.ConvexParser.ResolveContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
@@ -257,8 +258,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterCharacter(CharacterContext ctx) {
-			// TODO Auto-generated method stub
-			
+			// Nothing
 		}
 
 		@Override
@@ -468,6 +468,17 @@ public class AntlrReader {
 		@Override
 		public void exitAtom(AtomContext ctx) {
 			// Nothing	
+		}
+
+		@Override
+		public void enterPrimary(PrimaryContext ctx) {
+			// Nothing
+			
+		}
+
+		@Override
+		public void exitPrimary(PrimaryContext ctx) {
+			// Nothing
 		}
 	}
 

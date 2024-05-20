@@ -151,6 +151,13 @@ public class ReaderTest {
 		
 		assertCVMEquals('|', Reader.read("\\|"));
 	}
+	
+	@Test
+	public void testAddress() {
+		assertEquals(Address.ZERO, Reader.read("#0"));
+		// TODO: too generous with whitespace?
+		assertEquals(Address.ZERO, Reader.read(" # 0 "));
+	}
 
 	@Test
 	public void testNumbers() {
@@ -253,6 +260,8 @@ public class ReaderTest {
 
 	@Test
 	public void testQuote() {
+		assertEquals(Reader.read("(quote (lookup foo bar))"),Reader.read("'foo/bar"));
+		
 		assertEquals(Lists.of(Symbols.QUOTE, 1L), Reader.read("'1"));
 		assertEquals(Lists.of(Symbols.QUOTE, Lists.of(Symbols.QUOTE, Vectors.empty())), Reader.read("''[]"));
 		
