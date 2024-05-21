@@ -36,8 +36,6 @@ public class BIP39Test {
 	
 	/**
 	 * Test vector from https://iancoleman.io/bip39/
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeySpecException
 	 */
 	@Test
 	public void testExample15() throws NoSuchAlgorithmException, InvalidKeySpecException {

@@ -24,7 +24,7 @@ public interface ICoreDef {
 
 	/**
 	 * Gets the core definition code for this value
-	 * @return
+	 * @return Code definition code
 	 */
 	public int getCoreCode();
 

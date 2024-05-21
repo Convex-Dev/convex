@@ -312,8 +312,8 @@ public class State extends ARecord {
 
 	/**
 	 * Checks if a block is valid for application to the current state
-	 * @param signedBlock
-	 * @return
+	 * @param signedBlock Signed Block
+	 * @return BlockResult instance if an error occurred, or nil if checks pass
 	 */
 	public BlockResult checkBlock(SignedData<Block> signedBlock) {
 		Block block=signedBlock.getValue();
@@ -544,7 +544,7 @@ public class State extends ARecord {
 	 *
 	 * There are three phases in application of a transaction:
 	 * <ol>
-	 * <li>Preparation for accounting, with {@link #prepareTransaction(ATransaction) prepareTransaction}</li>
+	 * <li>Preparation for accounting, with {@link #prepareTransaction(ResultContext) prepareTransaction}</li>
 	 * <li>Functional application of the transaction with ATransaction.apply(....)</li>
 	 * <li>Completion of accounting, with completeTransaction</li>
 	 * </ol>

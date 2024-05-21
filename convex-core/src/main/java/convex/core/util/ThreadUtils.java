@@ -20,7 +20,7 @@ public class ThreadUtils {
 
 	/**
 	 * Get the current virtual thread ExecutorService, intended for IO-bound blocking operations 
-	 * @return
+	 * @return Executor service
 	 */
 	public synchronized static ExecutorService getVirtualExecutor() {
 		if (virtualExecutor==null) {
@@ -75,8 +75,6 @@ public class ThreadUtils {
 	 * Awaits the result of all of a collection of futures
 	 * @param <R> Type of futures
 	 * @param futures A collection of futures
-	 * @throws InterruptedException
-	 * @throws ExecutionException
 	 */
 	public static <R> void awaitAll(Collection<CompletableFuture<R>> futures) throws InterruptedException, ExecutionException {
 		CompletableFuture.allOf(futures.toArray(new CompletableFuture[futures.size()])).get();

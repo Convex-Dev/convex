@@ -150,7 +150,7 @@ public final class Block extends ARecord {
 	
 	/**
 	 * Read a Block from a Blob encoding
-	 * @throws BadFormatException
+	 * @throws BadFormatException In event of encoding error
 	 */
 	public static Block read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag

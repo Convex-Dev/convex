@@ -319,7 +319,6 @@ public class Context {
 	 * <li>Accumulates used juice fees in globals</li>
 	 * <li>Increments sequence number</li>
 	 * </ul>
-	 * @param t 
 	 *
 	 * @param initialState State before transaction execution (after prepare)
 	 * @param rc Juice price of current execution
@@ -634,7 +633,7 @@ public class Context {
 
 	/**
 	 * Looks up value for the given symbol in this context
-	 * @param sym Symbol name to look up, as a Java String for convenience
+	 * @param symName Symbol name to look up, as a Java String for convenience
 	 * @return Value for the given symbol or null if undeclared
 	 */
 	@SuppressWarnings("unchecked")
@@ -1320,9 +1319,9 @@ public class Context {
 	
 	/**
 	 * Executes an op as a top level instruction (no local bindings)
-	 * @param <T>
-	 * @param op
-	 * @return
+	 * @param <T> Type of Op result
+	 * @param op Op to execute
+	 * @return Updated Context
 	 */
 	public <T extends ACell> Context exec(AOp<T> op) {
 		AVector<ACell> savedBindings = getLocalBindings();

@@ -27,7 +27,7 @@ public class PFXTools {
 	/**
 	 * Creates a new PKCS12 key store.
 	 * @param keyFile File to use for creating the key store
-	 * @param passPhrase Passphrase used to protect the key store, may be null
+	 * @param storePassword Passphrase used to protect the key store, may be null
 	 * @return New KeyStore instance
 	 */
 	public static KeyStore createStore(File keyFile, char[] storePassword) throws GeneralSecurityException, IOException {
@@ -85,7 +85,7 @@ public class PFXTools {
 	 * Retrieves a key pair from a key store.
 	 * @param ks Key store
 	 * @param alias Alias used for finding the key pair in the store
-	 * @param passphrase Passphrase used for decrypting the key pair. Mandatory.
+	 * @param keyPassword Passphrase used for decrypting the key pair. Mandatory.
 	 * @return Found key pair
 	 * @throws UnrecoverableKeyException If key cannot be recovered
 	 * @throws KeyStoreException If a general key store exception occurs
@@ -116,7 +116,7 @@ public class PFXTools {
 	 * @param ks Key store
 	 * @param alias Alias entry for keystore
 	 * @param kp Key pair
-	 * @param passPhrase Passphrase for encrypting the key pair. Mandatory.
+	 * @param keyPassword Password for encrypting the key pair. Mandatory.
 	 * @return Updated key store.
 	 * @throws IOException If an IO error occurs accessing the key store
 	 * @throws GeneralSecurityException if a security exception occurs

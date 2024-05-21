@@ -7,7 +7,7 @@ public interface IWalletEntry {
 	
 	/**
 	 * Check if this wallet entry is locked.
-	 * @return
+	 * @return True if wallet is locked
 	 */
 	public boolean isLocked();
 
@@ -19,12 +19,13 @@ public interface IWalletEntry {
 	
 	/**
 	 * Get the public key associated with this wallet entry
-	 * @return
+	 * @return Public Key
 	 */
 	AccountKey getPublicKey();
 	
 	/**
 	 * Try to unlock a wallet with the given password
+	 * @param password Password to unlock
 	 * 
 	 * @return true if unlocked, false otherwise
 	 */
@@ -32,14 +33,13 @@ public interface IWalletEntry {
 
 	/**
 	 * Unlock the wallet entry. Unlocking makes the entry usable for signing
-	 * @param passPhrase
-	 * @return 
+	 * @param password Unlock password
 	 */
-	public void unlock(char[] passPhrase);
+	public void unlock(char[] password);
 
 	/**
 	 * Lock the wallet entry. Locking makes the wallet entry unusable until unlocked.
-	 * @param password
+	 * @param password Password with which to lock wallet
 	 */
 	public void lock(char[] password);
 

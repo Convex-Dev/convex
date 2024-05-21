@@ -26,7 +26,7 @@ public class CodePane extends BaseTextPane {
 
 	/**
 	 * Gets the length of this document
-	 * @return
+	 * @return Document length
 	 */
 	public int docLength() {
 		return getDocument().getLength();

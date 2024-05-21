@@ -126,7 +126,7 @@ public class KeyRingPanel extends JPanel {
 
 	/**
 	 * Gets an entry for the current keyring
-	 * @param address
+	 * @param publicKey Public key to search for
 	 * @return Wallet Entry, or null if not found
 	 */
 	public static AWalletEntry getKeyRingEntry(AccountKey publicKey) {

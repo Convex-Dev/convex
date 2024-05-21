@@ -60,7 +60,6 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * Adds an element to this data structure, in the natural manner defined by the
 	 * general data structure type. e.g. append at the end of a vector.
 	 * 
-	 * @param <R> Type of Value added
 	 * @param x New element to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid element type
 	 */
@@ -72,7 +71,6 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 	 * 
 	 * This may be more efficient than using 'conj' for individual items.
 	 * 
-	 * @param <R> Type of Value added
 	 * @param xs New elements to add
 	 * @return The updated data structure, or null if a failure occurred due to invalid element types
 	 */

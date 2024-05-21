@@ -71,7 +71,7 @@ public class Utils {
 	 *
 	 * @param file File object to see if the path part of the filename exists, if not then create it.
 	 * @return target File, as an absolute path, with parent directories created recursively if needed
-	 * @throws IOException 
+	 * @throws IOException In case of IO Error
 	 */
 	public static File ensurePath(File file) throws IOException {
 		// Get path of parent directory, using absolute path (may be current working directory user.dir)
@@ -83,8 +83,8 @@ public class Utils {
 	
 	/**
 	 * Gets the absolute path File for a given file name. Interprets leading "~" as user home directory.
-	 * @param filename
-	 * @return
+	 * @param path Path as a string
+	 * @return File representing the given path
 	 */
 	public static File getPath(String path) {
 		if (path!=null && path.startsWith("~")) {
@@ -434,7 +434,7 @@ public class Utils {
 	 * @param a First array
 	 * @param b Second array
 	 * @param n Number of elements to check
-	 * @return
+	 * @return True iff arrays are equal up to the specified element
 	 */
 	public static <T> boolean arrayEquals(T[] a, T[] b, int n) {
 		for (int i=0 ; i<n; i++) {

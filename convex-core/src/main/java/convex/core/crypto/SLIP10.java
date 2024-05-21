@@ -2,8 +2,6 @@ package convex.core.crypto;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -30,8 +28,6 @@ public class SLIP10 {
 	 * Gets the the master key for a given seed according to SLIP10
 	 * @param seed BIP39 seed value (or other source of good entropy!)
 	 * @return Blob containing the seed (bip39 seed, or some other good entropy source)
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeyException
 	 */
 	public static Blob getMaster(Blob seed) {
 		try {

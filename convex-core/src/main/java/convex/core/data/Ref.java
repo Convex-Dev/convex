@@ -619,7 +619,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Finds all instances of missing data in this Ref, and adds them to the missing set
 	 * @param missingSet Set to add missing instances to
-	 * @param limit 
+	 * @param limit Maximum number of missing branches to identity
 	 */
 	public void findMissing(HashSet<Hash> missingSet, long limit) {
 		if (getStatus()>=Ref.PERSISTED) return;

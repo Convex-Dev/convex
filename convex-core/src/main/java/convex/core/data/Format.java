@@ -798,7 +798,7 @@ public class Format {
 	 * Decodes an array of Cells packed in a Blob. Cells may be partial.
 	 * @param data Data containing cell encodings in multi-cell format
 	 * @return Array of decoded cells
-	 * @throws BadFormatException
+	 * @throws BadFormatException In event of any encoding error detected
 	 */
 	public static ACell[] decodeCells(Blob data) throws BadFormatException {
 		long ml=data.count();

@@ -17,7 +17,7 @@ import convex.core.util.Utils;
  * 
  * Directly wraps an array of cells, considered effectively immutable
  * 
- * @param <T>
+ * @param <T> Type of vector elements
  */
 public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 

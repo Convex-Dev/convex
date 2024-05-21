@@ -81,7 +81,7 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 	/**
 	 * Decodes a Do op from a Blob encoding
 	 * 
-	 * @param <T>
+	 * @param <T> Return type of Do
 	 * @param b Blob to read from
 	 * @param pos Start position in Blob (location of tag byte)
 	 * @return New decoded instance

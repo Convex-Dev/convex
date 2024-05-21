@@ -21,7 +21,7 @@ public class Reader {
 	/**
 	 * Parses an expression and returns a Syntax object
 	 * 
-	 * @param source
+	 * @param source Source to read as a Syntax object
 	 * @return Parsed form
 	 */
 	public static Syntax readSyntax(String source) {
@@ -44,10 +44,10 @@ public class Reader {
 	}
 
 	/**
-	 * Parses an expression list and returns a list of raw forms
+	 * Parses an String to returns a list of raw forms
 	 * 
-	 * @param source
-	 * @return List of Syntax Objects
+	 * @param source Convex data to read
+	 * @return List of forms read
 	 */
 	public static AList<ACell> readAll(String source) {
 		return AntlrReader.readAll(source);

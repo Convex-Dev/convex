@@ -258,7 +258,7 @@ public final class Result extends ARecordGeneric {
 	/**
 	 * Constructs a Result from a Context
 	 * @param id Id for Result
-	 * @param ctx Context
+	 * @param rc ResultContext instance from which to extract Result
 	 * @return New Result instance
 	 */
 

@@ -2940,9 +2940,9 @@ public class Core {
  	/**
  	 * Read a Core definition from an encoding
  	 * @param b Blob containing encoding
- 	 * @param pos Position to read
+ 	 * @param pos Position to read Core code function
  	 * @return Singleton cell representing the Core value
- 	 * @throws BadFormatException
+ 	 * @throws BadFormatException In case of encoding error
  	 */
 	public static ACell read(Blob b, int pos) throws BadFormatException {
 		long code=Format.readVLCCount(b, pos+1);

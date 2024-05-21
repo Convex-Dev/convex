@@ -87,8 +87,8 @@ public class Text {
 
 	/**
 	 * Format function for Convex Coin balances
-	 * @param balance
-	 * @return
+	 * @param balance Balance in Convex Coins
+	 * @return Formatted String like "12.000567123"
 	 */
 	public static String toFriendlyBalance(long balance) {
 		if (!Coin.isValidAmount(balance)) throw new IllegalArgumentException("Invalid balance)");
@@ -159,9 +159,9 @@ public class Text {
 
 	/**
 	 * Zero pads a positive integer out to the specified number of digits
-	 * @param change
-	 * @param digits
-	 * @return
+	 * @param b Integer to pad
+	 * @param digits Number of digits desired
+	 * @return String representation of Integer
 	 */
 	public static String zeroPad(BigInteger b, int digits) {
 		if (digits>9) throw new IllegalArgumentException("Too many digits!!");

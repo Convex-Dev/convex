@@ -66,7 +66,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 * Appends a ListVector chunk to this vector. This vector must contain a whole
 	 * number of chunks
 	 * 
-	 * @param listVector A chunk to append. Must be a ListVector of maximum size
+	 * @param chunk A chunk to append. Must be a ListVector of maximum size
 	 * @return The updated vector, of the same type as this vector @
 	 */
 	public abstract AVector<T> appendChunk(AVector<T> chunk);

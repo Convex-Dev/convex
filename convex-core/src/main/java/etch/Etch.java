@@ -631,6 +631,7 @@ public class Etch {
 	
 	/**
 	 * Gets the Etch version associated with this file
+	 * @return Return Etch version number
 	 */
 	public short getVersion() {
 		// TODO: Override when we have more versions
@@ -639,8 +640,8 @@ public class Etch {
 
 	/**
 	 * Gets the raw pointer for, given the slot value (clears high bits)
-	 * @param slotValue
-	 * @return
+	 * @param slotValue Value in slot
+	 * @return Pointer extracted from slot value
 	 */
 	public long rawPointer(long slotValue) {
 		return slotValue&~TYPE_MASK;
@@ -717,7 +718,7 @@ public class Etch {
 	 * @param <T> Type of Cell expected
 	 * @param ptr Pointer offset into Etch file. Type flags are ignored.
 	 * @return Cell value (may be null)
-	 * @throws IOException 
+	 * @throws IOException In event of IO Error
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T readCell(long ptr) throws IOException {

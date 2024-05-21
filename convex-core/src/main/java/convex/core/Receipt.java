@@ -68,7 +68,7 @@ public class Receipt extends ARecord {
 
 	/**
 	 * Gets the error code of this Receipt, or null if not an error
-	 * @return
+	 * @return Error code (probably a Keyword or nil)
 	 */
 	public ACell getErrorCode() {
 		if (!isError) return null;
@@ -77,7 +77,7 @@ public class Receipt extends ARecord {
 
 	/**
 	 * Gets the result value of this Receipt, or null if an error
-	 * @return
+	 * @return Result from this Receipt
 	 */
 	public ACell getResult() {
 		if (isError) return null;

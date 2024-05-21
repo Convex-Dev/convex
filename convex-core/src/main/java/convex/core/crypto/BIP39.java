@@ -226,8 +226,6 @@ public class BIP39 {
 	 * @param words Mnemonic words
 	 * @param passphrase Optional BIP39 passphrase
 	 * @return Blob containing BIP39 seed (64 bytes)
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeySpecException
 	 */
 	public static Blob getSeed(List<String> words, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
 		if (passphrase==null) passphrase="";
@@ -264,7 +262,7 @@ public class BIP39 {
 	
 	/**
 	 * Return true if the string is a valid mnemonic phrase
-	 * @param menemonic
+	 * @param s String to be tested as a mnemonic phrase
 	 * @return String containing reason that mnemonic is not valid, or null if OK
 	 */
 	public static String checkMnemonic(String s) {
@@ -278,8 +276,6 @@ public class BIP39 {
 	 * @param mnemonic Mnemonic words
 	 * @param passphrase Optional BIP39 passphrase
 	 * @return Blob containing BIP39 seed (64 bytes)
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeySpecException
 	 */
 	public static Blob getSeed(String mnemonic, String passphrase) {
 			mnemonic=normalise(mnemonic);

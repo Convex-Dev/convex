@@ -504,7 +504,7 @@ public class Juice {
 
 	/**
 	 * Gets the base cost for a numeric argument, basically the length in bytes (min 8)
-	 * @param aCell
+	 * @param a Cell, presumably a number
 	 * @return base cost, or negative if not numeric
 	 */
 	public static long costNumeric(ACell a) {
@@ -530,8 +530,8 @@ public class Juice {
 
 	/**
 	 * Calculate price for memory size, mainly used for transaction overhead cost
-	 * @param a
-	 * @return
+	 * @param a Cell to price
+	 * @return Juice price for memory size
 	 */
 	public static long priceMemorySize(ACell a) {
 		return Juice.mul(Juice.TRANSACTION_PER_BYTE, Cells.storageSize(a));

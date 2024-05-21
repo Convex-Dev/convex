@@ -265,7 +265,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * Tests if two keys match (up to the maximum index key depth)
 	 * @param a First key
 	 * @param b second key
-	 * @return
+	 * @return True if keys match
 	 */
 	public static <K extends ABlobLike<?>>boolean keyMatch(K a, K b) {
 		long n=a.count();

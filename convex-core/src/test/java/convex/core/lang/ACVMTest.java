@@ -194,7 +194,6 @@ public abstract class ACVMTest {
 
 	/**
 	 * Executes code in the given context and converts to a String
-	 * @param ctx Context in which to execute
 	 * @param source Code to execute
 	 * @return Result of execution
 	 */
@@ -214,7 +213,6 @@ public abstract class ACVMTest {
 
 	/**
 	 * Executes code in the given context, asserting no errors
-	 * @param ctx Context in which to execute
 	 * @param source Code to execute
 	 * @return Result of execution
 	 */

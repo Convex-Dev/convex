@@ -7,7 +7,7 @@ public abstract class ACommand implements Runnable {
 
 	/**
 	 * Gets the current CLI main command instance
-	 * @return
+	 * @return CLI instance
 	 */
 	public abstract Main cli();
 }

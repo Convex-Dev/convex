@@ -47,7 +47,7 @@ public class Ed25519Signature extends ASignature {
 	
 	/**
 	 * Creates a Signature instance with specific bytes
-	 * @param signature Bytes for signature
+	 * @param data Bytes for signature
 	 * @return Signature instance
 	 */
 	public static Ed25519Signature wrap(byte[] data, int pos) {

@@ -81,11 +81,11 @@ public class Cells {
 
 	/**
 	 * Gets a Ref from a Cell by index
-	 * @param <R>
+	 * @param <R> Type of cell
 	 * @param cell Cell to read Ref from
 	 * @param index Numerical index of Ref
 	 * @throws IndexOutOfBoundsException if the index is out of range for the Cell
-	 * @return
+	 * @return Ref for cell
 	 */
 	public static <R extends ACell> Ref<R> getRef(ACell cell, int index) {
 		if (cell ==null) throw new IndexOutOfBoundsException("Bad ref index called on null");
@@ -126,7 +126,6 @@ public class Cells {
 	 * Persist a cell in the current store
 	 * @param a Cell to persist
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
 	 */
 	public static <T extends ACell> T persist(T a) {
 		return persist(a,Stores.current());
@@ -137,7 +136,6 @@ public class Cells {
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) {
 		Ref<T> ref=Ref.get(a);
@@ -150,7 +148,6 @@ public class Cells {
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
 	 */
 	public static <T extends ACell> T store(T a, AStore store) {
 		Ref<T> ref=Ref.get(a);
@@ -163,7 +160,6 @@ public class Cells {
 	 * @param a Cell to announce
 	 * @param noveltyHandler Handler for novelty values
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
-	 * @throws MissingDataException if the cell cannot be fully persisted due to missing data
 	 */
 	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler) {
 		if (a==null) {
@@ -190,8 +186,8 @@ public class Cells {
 
 	/**
 	 * Get the full storage size of a value, including size of an embedded encoding
-	 * @param a
-	 * @return
+	 * @param a Cell to get size for (may be null)
+	 * @return Storage size
 	 */
 	public static long storageSize(ACell a) {
 		if (a==null) return 1;

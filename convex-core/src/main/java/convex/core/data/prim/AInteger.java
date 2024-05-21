@@ -184,7 +184,7 @@ public abstract class AInteger extends ANumeric {
 
 	/**
 	 * Raise the integer to the given power
-	 * @param power
+	 * @param power Power to raise integer to
 	 * @return Result, or null if invalid
 	 */
 	public AInteger toPower(AInteger power) {

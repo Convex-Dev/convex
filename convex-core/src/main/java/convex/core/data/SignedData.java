@@ -245,7 +245,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 	
 	/**
 	 * Validates the signature in this SignedData instance. Caches result
-	 *
+	 * 
+	 * @param publicKey Public key to check against this signature
 	 * @return true if valid, false otherwise
 	 */
 	public boolean checkSignature(AccountKey publicKey) {

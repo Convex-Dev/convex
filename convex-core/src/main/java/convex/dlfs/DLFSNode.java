@@ -48,8 +48,8 @@ public class DLFSNode {
 
 	/**
 	 * Navigate down a path relative to a DLFS Node.
-	 * @param node
-	 * @param path
+	 * @param node Node from which to navigate
+	 * @param path Path to navigate from (assumed to be relative)
 	 * @return Found node, or null if doesn't exist
 	 */
 	@SuppressWarnings("unchecked")
@@ -69,7 +69,7 @@ public class DLFSNode {
 
 	/**
 	 * Gets the directory entries for a node
-	 * @param dirNode
+	 * @param dirNode Node which is assumed to be a directory
 	 * @return Map of directory entries, or null if not a directory
 	 */
 	@SuppressWarnings("unchecked")
@@ -80,7 +80,7 @@ public class DLFSNode {
 
 	/**
 	 * Update a node at a path relative to a root node
-	 * @param rootNode
+	 * @param rootNode Root node of file system
 	 * @param path Path relative to root
 	 * @param newNode New node, or null to delete a node
 	 * @param utime Timestamp to set on any directories changed

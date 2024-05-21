@@ -75,7 +75,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	
 	/**
 	 * Gets a {@link CVMChar} from a UTF-8 representation
-	 * @param value UTF-8 representation of a single character
+	 * @param b Representation of a single character (UTF-8)
 	 * @return CVMChar instance, or null if not valid
 	 */
 	public static CVMChar fromUTF8(ABlobLike<?> b) {

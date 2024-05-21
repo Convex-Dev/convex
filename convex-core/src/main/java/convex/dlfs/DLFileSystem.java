@@ -64,7 +64,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	
 	/**
 	 * Gets the timestamp of this DLFS drive
-	 * @return
+	 * @return Current timestamp as a CVM integer
 	 */
 	public final CVMLong getTimestamp() {
 		return timestamp;
@@ -72,7 +72,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	
 	/**
 	 * Sets the timestamp of this DLFS drive
-	 * @return
+	 * @param newTimestamp New timestamp
 	 */
 	public final void setTimestamp(CVMLong newTimestamp) {
 		timestamp=newTimestamp;
@@ -80,6 +80,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	
 	/**
 	 * Updates the timestamp of this DLFS drive to the maximum of the given timestamp or it's current time stamp
+	 * @param newTimestamp Potential new timestamp
 	 * @return The new timestamp value, or the original one if unchanged
 	 */
 	public synchronized CVMLong updateTimestamp(long newTimestamp) {
@@ -154,15 +155,15 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	/**
 	 * Gets the unique root path for this FileSystem
-	 * @return
+	 * @return Path instance to root
 	 */
 	public DLPath getRoot() {
 		return root;
 	}
 	
 	/**
-	 * Gets the unique root path for this FileSystem
-	 * @return
+	 * Gets an empty path for this FileSystem
+	 * @return empty path instance
 	 */
 	public DLPath getEmptyPath() {
 		return emptyPath;
@@ -170,17 +171,17 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	/**
 	 * Implementation for delegation by DLFSProvider
-	 * @param path
-	 * @param options
-	 * @param attrs
-	 * @return
-	 * @throws IOException 
+	 * @param path Path for new file
+	 * @param options Options for file creation
+	 * @param attrs File attributes
+	 * @return ByteChannel instance
+	 * @throws IOException In case of IO Error
 	 */
 	public abstract SeekableByteChannel newByteChannel(DLPath path, Set<? extends OpenOption> options, FileAttribute<?>[] attrs) throws IOException;
 
 	/**
 	 * Implementation for delegation by DLFSProvider
-	 * @return
+	 * @return Directory stream
 	 */
 	public abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter);
 
@@ -191,7 +192,7 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	/**
 	 * Gets DLFS node for the given path
-	 * @param path
+	 * @param path Path for which to obtain DLFSNode
 	 * @return DLFS node, or null if does not exist
 	 */
 	public abstract AVector<ACell> getNode(DLPath path);
@@ -222,16 +223,16 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 
 	/**
 	 * Creates a file, returning the new node
-	 * @param path
-	 * @return
-	 * @throws IOException
+	 * @param path Path for which to create DLFSNode
+	 * @return New file node
+	 * @throws IOException In event of IOError
 	 */
 	public abstract AVector<ACell> createFile(DLPath path) throws IOException;
 
 	/**
 	 * Updates a node, returning the new node 
-	 * @param path
-	 * @param newNode
+	 * @param path Path for which to update DLFSNode
+	 * @param newNode NEw node to put in place
 	 * @return The new node
 	 */
 	public abstract AVector<ACell> updateNode(DLPath path, AVector<ACell> newNode);
