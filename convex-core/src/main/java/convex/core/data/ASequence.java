@@ -89,7 +89,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	/**
 	 * Gets the sequence of all elements after the first, or null if no elements
-	 * remain after the first (i.e. count <= 1)
+	 * remain after the first (i.e. count of 0 or 1)
 	 * 
 	 * @return Sequence following the first element
 	 */
