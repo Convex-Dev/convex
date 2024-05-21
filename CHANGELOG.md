@@ -10,20 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.13] - Unreleased
 
 ### Added
+- New Convex Deskup GUI interface ("MainGUI")
 - BIP39 key generation support
 - Observability support initial version
 - Support for `@` and `resolve` for CNS resolution
 - Extra special ops: `*nop*`, `*parent*`, `*controller*`, `*memory-price*` and `*env*`
 - `query-as` function (query mode equivalent to `eval-as`)
 - Convex Lisp `quasiquote` implementation
-- Observability support
 - Extra example code and tests
 - Data Lattice File System (Prototype)
 
 ### Changed
-- Updated CLI
-- Updated GUI functionality
-- Significant refactoring
+- Updated CLI and GUI functionality
+- Significant internal refactoring
 - Encoding changes for better memory efficiency
 - Upgrades to default REST API
 - More efficient signing protocol / SignedData compressed format
@@ -33,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## BREAKING CHANGES
 - Switch from `:callable?` to `:callable` for metadata on callable actor functions
 - Etch encoding changes. Will require fresh Etch database. 
-- Renamed `Index` to `Index`
+- Renamed `BlobMap` to `Index`
 
 ### Fixed
 - Miscellaneous edge cases and error handling
