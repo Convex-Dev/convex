@@ -256,7 +256,7 @@ public class Toolkit {
 
 	/**
 	 * Relinquish focus from a component
-	 * @param c
+	 * @param c Component to remove focus from
 	 */
 	public static void relinquishFocus(Component c) {
 		if (c.isFocusable()) {
