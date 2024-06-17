@@ -3,7 +3,6 @@ package convex.gui.tools;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.EventQueue;
-import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JFrame;
@@ -37,10 +36,9 @@ public class HackerTools extends AbstractGUI {
 	/**
 	 * Launch the application.
 	 * @param args Command line argument
-	 * @throws TimeoutException 
-	 * @throws IOException 
+	 * @throws TimeoutException In case of timeout
 	 */
-	public static void main(String[] args) throws IOException, TimeoutException {
+	public static void main(String[] args) throws TimeoutException {
 		log.info("Running Convex HackerTools");
 		clientMode=true;
 		
@@ -61,7 +59,6 @@ public class HackerTools extends AbstractGUI {
 
 	/**
 	 * Create the application.
-	 * @param convex Convex client instance
 	 */
 	public HackerTools() {
 		super ("Hacker Tools");

@@ -290,7 +290,7 @@ public class Toolkit {
 
 	/**
 	 * Adds a popup menu to a component, including necessary mouse listeners
-	 * @param jPopupMenu
+	 * @param popupMenu Op up menu component
 	 */
 	public static void addPopupMenu(JComponent comp,javax.swing.JPopupMenu popupMenu) {
 		comp.addMouseListener(new MouseAdapter () {

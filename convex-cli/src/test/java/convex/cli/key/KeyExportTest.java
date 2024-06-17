@@ -69,6 +69,7 @@ public class KeyExportTest {
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		String s=tester.getOutput();
+		assertEquals("",tester.getError());
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		AKeyPair kp=AKeyPair.create(PEMTools.decryptPrivateKeyFromPEM(s, EXPORT_PASSWORD));
 		assertEquals(ak,kp.getAccountKey());

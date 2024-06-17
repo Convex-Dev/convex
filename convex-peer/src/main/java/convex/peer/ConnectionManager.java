@@ -653,11 +653,11 @@ public class ConnectionManager extends AThreadedComponent {
 
 	/**
 	 * Called to signal missing data in a Belief / Order
-	 * @param m
-	 * @param e
-	 * @param key
+	 * @param m Message which caused alert
+	 * @param e Missing data exception encountered
+	 * @param peerKey Peer key which triggered missing data
 	 */
-	public void alertMissing(Message m, MissingDataException e, AccountKey key) {
+	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
 		if (log.isDebugEnabled()) {
 			String message= "Missing data "+e.getMissingHash();
 			log.debug(message);

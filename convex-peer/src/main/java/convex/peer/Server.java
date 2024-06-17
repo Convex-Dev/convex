@@ -780,7 +780,7 @@ public class Server implements Closeable {
 	
 	/**
 	 * Checks is the server is Live, i.e. currently syncing successfully with network
-	 * @return
+	 * @return True if live, false otherwise
 	 */
 	public boolean isLive() {
 		return isLive;
@@ -788,7 +788,7 @@ public class Server implements Closeable {
 	
 	/**
 	 * Checks if the Server threads are running
-	 * @return
+	 * @return True if running, false otherwise
 	 */
 	public boolean isRunning() {
 		return isRunning;

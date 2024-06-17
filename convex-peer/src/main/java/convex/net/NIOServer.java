@@ -72,7 +72,7 @@ public class NIOServer implements Closeable {
 	 * 
 	 * @param bindAddress Address to bind to, or null to bind to all addresses (unspecified)
 	 * @param port Port to use. If 0 or null, a default port will be used, with fallback to a random port
-	 * @throws IOException
+	 * @throws IOException in case of IO problem
 	 */
 	public void launch(String bindAddress, Integer port) throws IOException {
 		if (port == null) {

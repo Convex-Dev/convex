@@ -114,10 +114,9 @@ public class PEMTools {
 	public static PrivateKey decryptPrivateKeyFromPEM(String pemText, char[] password) throws Error {
 		PrivateKey privateKey = null;
 		StringReader stringReader = new StringReader(pemText);
-		PEMParser pemParser = new PEMParser(stringReader);
 		PemObject pemObject = null;
 		JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
-		try {
+		try (PEMParser pemParser = new PEMParser(stringReader)) {
 			pemObject = pemParser.readPemObject();
 			while (pemObject != null) {
 				if (pemObject.getType().equals("ENCRYPTED PRIVATE KEY")) {
