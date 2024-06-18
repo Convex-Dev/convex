@@ -91,7 +91,7 @@ public class WalletApp extends AbstractGUI {
 	/**
 	 * Launch the application.
 	 * @param args Command line args
-	 * @throws InterruptedException 
+	 * @throws InterruptedException In case of interrupt
 	 */
 	public static void main(String[] args) throws InterruptedException {
 		// call to set up Look and Feel

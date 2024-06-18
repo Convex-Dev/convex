@@ -223,7 +223,7 @@ public abstract class Convex {
 	/**
 	 * Sets a handler for messages that are received but not otherwise processed (transaction/query results will
 	 * be relayed instead to the appropriate handler )
-	 * @param handler
+	 * @param handler Handler for received messaged
 	 */
 	public void setHandler(Consumer<Message> handler) {
 		this.delegatedHandler = handler;
@@ -237,8 +237,8 @@ public abstract class Convex {
 	 * The next valid sequence number will be one higher than the result.
 	 *
 	 * @return Sequence number as a Long value (zero or positive)
-	 * @throws TimeoutException 
-	 * @throws IOException 
+	 * @throws IOException If an IO error occurs
+	 * @throws TimeoutException If the request times out
 	 */
 	public long getSequence() throws IOException, TimeoutException {
 		if (sequence == null) {
@@ -265,10 +265,10 @@ public abstract class Convex {
 	
 	/**
 	 * Look up the sequence number for an account
-	 * @param origin
-	 * @return
-	 * @throws TimeoutException 
-	 * @throws IOException 
+	 * @param origin Account for which to check sequence
+	 * @return Sequence number of account
+	 * @throws TimeoutException if query times out
+	 * @throws IOException in case of IO error
 	 */
 	public long lookupSequence(Address origin) throws IOException, TimeoutException {
 		AOp<ACell> code= Special.forSymbol(Symbols.STAR_SEQUENCE);
@@ -377,7 +377,7 @@ public abstract class Convex {
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
-	 * @throws TimeoutException 
+	 * @throws TimeoutException  In case of timeout
 	 */
 	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException, TimeoutException {
 		SignedData<ATransaction> signed = prepareTransaction(transaction);
@@ -394,14 +394,13 @@ public abstract class Convex {
 	 * @param transaction Transaction to prepare
 	 * @return Signed transaction ready to submit
 	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
-	 * @throws TimeoutException 
+	 * @throws TimeoutException In case of timeout
 	 */
 	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws TimeoutException, IOException {
 		Address origin=transaction.getOrigin();
 		if (origin == null) {
 			origin=address;
 			transaction = transaction.withOrigin(origin);
-			
 		}
 		
 		final long originalSeq=transaction.getSequence(); // zero or negative means autosequence
@@ -451,7 +450,7 @@ public abstract class Convex {
 	 * @param code Code to execute
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
-	 * @throws TimeoutException 
+	 * @throws TimeoutException In case of timeout
 	 */
 	public synchronized CompletableFuture<Result> transact(String code) throws IOException, TimeoutException {
 		return transact((ACell)Reader.read(code));
@@ -463,7 +462,7 @@ public abstract class Convex {
 	 * @param code Code to execute
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
-	 * @throws TimeoutException 
+	 * @throws TimeoutException In case of timeout
 	 */
 	public synchronized CompletableFuture<Result> transact(ACell code) throws IOException, TimeoutException {
 		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
@@ -515,7 +514,7 @@ public abstract class Convex {
 	 * @param amount Amount of Convex Coins to transfer
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken, or the send buffer is full
-	 * @throws TimeoutException 
+	 * @throws TimeoutException In case of timeout
 	 */
 	public CompletableFuture<Result> transfer(Address target, long amount) throws IOException, TimeoutException {
 		ATransaction trans = Transfer.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, target, amount);

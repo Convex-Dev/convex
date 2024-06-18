@@ -256,7 +256,7 @@ public class Toolkit {
 
 	/**
 	 * Relinquish focus from a component
-	 * @param c
+	 * @param c Component to remove focus from
 	 */
 	public static void relinquishFocus(Component c) {
 		if (c.isFocusable()) {
@@ -290,7 +290,7 @@ public class Toolkit {
 
 	/**
 	 * Adds a popup menu to a component, including necessary mouse listeners
-	 * @param jPopupMenu
+	 * @param popupMenu Op up menu component
 	 */
 	public static void addPopupMenu(JComponent comp,javax.swing.JPopupMenu popupMenu) {
 		comp.addMouseListener(new MouseAdapter () {

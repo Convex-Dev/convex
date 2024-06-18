@@ -107,16 +107,6 @@ public class Main extends ACommand {
 			description = "Specify verbosity level. Use -v0 to suppress user output. Default: ${DEFAULT-VALUE}")
 	private Integer verbose;
 
-	@Option(names = { "-V", "--version" }, 
-			versionHelp = true, 
-			description = "Display version info")
-	boolean versionInfoRequested;
-
-	@Option(names = { "-h", "--help" }, 
-			usageHelp = true, 
-			description = "Display help for this command")
-	boolean usageHelpRequested;
-
 	public Main() {
 		commandLine = commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
 	}
@@ -257,13 +247,13 @@ public class Main extends ACommand {
 	/**
 	 * Keys the password for the current key
 	 * 
-	 * @return
+	 * @return password
 	 */
 	public char[] getKeyPassword() {
 		char[] keypass = null;
 
-		if (this.keystorePassword != null) {
-			keypass = this.keystorePassword.toCharArray();
+		if (this.keyPassword != null) {
+			keypass = this.keyPassword.toCharArray();
 		} else {
 			if (!nonInteractive) {
 				keypass = readPassword("Private Key Encryption Password: ");
@@ -274,7 +264,7 @@ public class Main extends ACommand {
 				keypass = new char[0];
 			}
 			
-			this.keystorePassword=new String(keypass);
+			this.keyPassword=new String(keypass);
 		}
 		if (keypass.length == 0) {
 			paranoia("Cannot use an empty private key password");
@@ -312,7 +302,6 @@ public class Main extends ACommand {
 	/**
 	 * Loads the currently configured key Store
 	 * 
-	 * @param isCreate Flag to indicate if keystore should be created if absent
 	 * @return KeyStore instance, or null if does not exist
 	 */
 	public KeyStore loadKeyStore() {
@@ -381,11 +370,11 @@ public class Main extends ACommand {
 				String alias = aliases.nextElement();
 				if (alias.indexOf(publicKey) == 0) {
 					log.trace("found keypair " + alias);
-					keyPair = PFXTools.getKeyPair(keyStore, alias, storePassword);
+					keyPair = PFXTools.getKeyPair(keyStore, alias, getKeyPassword());
 					break;
 				}
 			}
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			throw new CLIError("Cannot load key store", t);
 		}
 

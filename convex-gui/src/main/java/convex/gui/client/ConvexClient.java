@@ -36,8 +36,8 @@ public class ConvexClient extends AbstractGUI {
 	/**
 	 * Launch the application.
 	 * @param args Command line argument
-	 * @throws TimeoutException 
-	 * @throws IOException 
+	 * @throws TimeoutException  In case of timeout
+	 * @throws IOException In case of connection error
 	 */
 	public static void main(String[] args) throws IOException, TimeoutException {
 		log.info("Starting Convex Client");

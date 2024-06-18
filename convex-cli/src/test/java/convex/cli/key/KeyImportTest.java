@@ -20,6 +20,8 @@ public class KeyImportTest {
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
 	private static final char[] IMPORT_PASSWORD = "testImportPassword".toCharArray();
 	
+	private static final String KEY_PASSWORD="testPass";
+	
 	private static final File KEYSTORE_FILE;
 	private static final String KEYSTORE_FILENAME;
 	static {
@@ -68,7 +70,8 @@ public class KeyImportTest {
 			"--keystore-password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--text", keyPair.getSeed().toString(), 
-			"--import-password", new String("")
+			"--password", KEY_PASSWORD, 
+			"--import-password", new String("") // BIP39 password
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		
@@ -77,6 +80,7 @@ public class KeyImportTest {
 		CLTester t2=CLTester.run(
 				"key" , 
 				"list",
+				"--password",KEY_PASSWORD,
 				"--keystore-password", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
@@ -97,6 +101,7 @@ public class KeyImportTest {
 			"bip39",
 			"--keystore-password", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
+			"--password",KEY_PASSWORD,
 			"--text", "elder mail trick garage hour enjoy attack fringe problem motion poem security caught false penalty", 
 			"--import-password", new String("")
 		);
@@ -107,6 +112,7 @@ public class KeyImportTest {
 		CLTester t2=CLTester.run(
 				"key" , 
 				"list",
+				"--password",KEY_PASSWORD,
 				"--keystore-password", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
