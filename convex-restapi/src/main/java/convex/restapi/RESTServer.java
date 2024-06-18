@@ -100,7 +100,7 @@ public class RESTServer {
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
 			
             pluginConfig.withDefinitionConfiguration((version, definition) -> {
-                definition.withInfo(info -> {
+                definition.withOpenApiInfo(info -> {
 					info.setTitle("Convex REST API");
 					info.setVersion("0.1.1");
                 });
