@@ -385,13 +385,17 @@
   ^{:doc {:description "Adds an amount of a token to the liquidity pool, matched by an amount of CVX. "
           :signature   [{:params [token token-amount cvx-amount]}]}}
 
-  [token token-amount cvx-amount]
+  ([token token-amount]
+    (if-let [p (price token)]
+      (recur token token-amount (inc (int (* p token-amount))))
+      (fail "No liquidity to set market price yet")))
 
-  (let [market (create-market token)]
-    (asset/offer market token token-amount)
-    (call market
-          (int cvx-amount)
-          (add-liquidity token-amount))))
+  ([token token-amount cvx-amount]
+	  (let [market (create-market token)]
+	    (asset/offer market token token-amount)
+	    (call market
+	          (int cvx-amount)
+	          (add-liquidity token-amount)))))
 
 
 

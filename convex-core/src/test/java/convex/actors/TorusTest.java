@@ -5,6 +5,7 @@ import static convex.test.Assertions.assertError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -62,6 +63,14 @@ public class TorusTest extends ACVMTest {
 		assertNull(eval(ctx,"(torus/price GBP)"));
 		assertNull(eval(ctx,"(torus/price #789798789)"));
 
+		// Adding liquidity without a convex amount should fail
+		assertError(step(ctx,"(torus/add-liquidity GBP 100)"));
+		
+		// Adding liquidity should work if CVX amount provided
+		assertEquals(1000L,evalL(ctx,"(torus/add-liquidity GBP 100 10000)"));
+		
+		// Adding liquidity multiple times in single transaction
+		assertEquals(3000L,evalL(ctx,"(do (dotimes [i 3] (torus/add-liquidity GBP 100 10000)) (asset/balance (torus/get-market GBP)))"));
 	}
 
 	@Test public void testDeployedCurrencies() {
@@ -99,7 +108,26 @@ public class TorusTest extends ACVMTest {
 	@Test public void testLiquidityShareToken() {
 		Context ctx=context();
 	
-		AssetTester.doFungibleTests(ctx, GBP, ctx.getAddress());
+		// Set up some liquidity
+		ctx=step(ctx,"(torus/add-liquidity USD 100 10000)");
+		
+		AssetTester.doFungibleTests(ctx, USD_MARKET, ctx.getAddress());
+		
+		// Withdraw some liquidity
+		ctx=step(ctx,"(torus/withdraw-liquidity USD 500)");
+
+		AssetTester.doFungibleTests(ctx, USD_MARKET, ctx.getAddress());
+
+		// Withdraw remaining liquidity, should cause fungible tests to fail because no balance to test
+		final Context fctx=step(ctx,"(torus/withdraw-liquidity USD 500)");		
+		assertThrows(Throwable.class,()->{
+			AssetTester.doFungibleTests(fctx, USD_MARKET, fctx.getAddress());
+		});
+		
+		// Tests should fail for a non-existent market
+		assertThrows(Throwable.class,()->{
+			AssetTester.doFungibleTests(fctx, eval(fctx,"(torus/get-market GBP)"), fctx.getAddress());
+		});
 	}
 
 	@Test public void testTorusAPI() {
