@@ -24,7 +24,7 @@ public class DLFSBrowser extends AbstractGUI {
 	
 	protected DLFileSystem drive;
 	
-	protected static ArrayList<DLFileSystem> allDrives=new ArrayList<>(); 
+	public static ArrayList<DLFileSystem> allDrives=new ArrayList<>(); 
 
 	public JMenuBar menuBar=new JMenuBar();
 	public JMenu fileMenu=new JMenu("File");
@@ -35,6 +35,8 @@ public class DLFSBrowser extends AbstractGUI {
 	public DLFSBrowser(DLFileSystem drive) {
 		super (	"Data Lattice");
 
+		DLFS.provider().fileSystems.put("drive",drive);
+		
 		allDrives.add(drive);
 		setLayout(new MigLayout());
 		this.drive=drive;

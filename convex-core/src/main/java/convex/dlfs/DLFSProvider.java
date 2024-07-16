@@ -29,7 +29,7 @@ import convex.dlfs.impl.DLFSLocal;
 
 public class DLFSProvider extends FileSystemProvider {
 
-	SoftCache<String,DLFileSystem> fileSystems=new SoftCache<>();
+	public SoftCache<String,DLFileSystem> fileSystems=new SoftCache<>();
 	
 	@Override
 	public String getScheme() {

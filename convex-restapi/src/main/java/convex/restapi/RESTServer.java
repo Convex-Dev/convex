@@ -14,6 +14,7 @@ import convex.core.data.Keyword;
 import convex.core.util.Utils;
 import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
+import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
 import io.javalin.Javalin;
 import io.javalin.community.ssl.SslPlugin;
@@ -113,6 +114,7 @@ public class RESTServer {
 
 	protected ChainAPI chainAPI;
 	protected DepAPI depAPI;
+	protected DLAPI dlAPI;
 
 	private void addAPIRoutes(Javalin app) {
 		chainAPI = new ChainAPI(this);
@@ -120,6 +122,10 @@ public class RESTServer {
 
 		depAPI = new DepAPI(this);
 		depAPI.addRoutes(app);
+
+		dlAPI = new DLAPI(this);
+		dlAPI.addRoutes(app);
+
 	}
 
 	/**
