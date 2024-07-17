@@ -158,7 +158,6 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public Long getBalance() {
-		// TODO Auto-generated method stub
 		return server.getPeer().getConsensusState().getBalance(address);
 	}
 

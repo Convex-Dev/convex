@@ -6,6 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+
+import static convex.test.Assertions.*;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -88,6 +91,36 @@ public class ServerTest {
 			results.put(id, code);
 		}
 	};
+	
+	/**
+	 * Smoke test for ConvexLocal connection 
+	 * @throws IOException
+	 * @throws InterruptedException
+	 * @throws TimeoutException
+	 */
+	@Test
+	public void testLocalConnect() throws IOException, InterruptedException, TimeoutException {
+		Server server=network.SERVER;
+
+		AKeyPair  kp=server.getKeyPair();
+
+		Convex convex = network.CONVEX;
+		assertTrue(convex.getBalance()>0);
+		
+		Result r=convex.transactSync("(create-account "+kp.getAccountKey()+")");
+		Address user=r.getValue();
+		assertNotNull(user);
+		
+		r=convex.transactSync("(transfer "+user+" 10000000)");
+		assertFalse(r.isError());
+		
+		convex=Convex.connect(server, user, kp);
+		assertEquals(10000000,convex.getBalance());
+
+		r=convex.transactSync("(do (transfer "+user+" 100000) *balance*)");
+		assertCVMEquals(10000000,r.getValue());
+
+	}
 
 	@Test
 	public void testServerConnect() throws IOException, InterruptedException, TimeoutException {
