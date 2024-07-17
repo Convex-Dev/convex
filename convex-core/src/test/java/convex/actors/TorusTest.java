@@ -16,7 +16,6 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.util.Utils;
 import convex.lib.AssetTester;
 
 public class TorusTest extends ACVMTest {
@@ -26,37 +25,60 @@ public class TorusTest extends ACVMTest {
 	Address TORUS;
 	Address USD_MARKET;
 	
+	private static final long SUPPLY=1000000000;
+	
 	@Override public Context buildContext(Context ctx) {
-		try {
-			ctx=exec(ctx,"(import convex.fungible :as fun)");
-			ctx=exec(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(import convex.fungible :as fun)");
+		ctx=exec(ctx,"(import convex.asset :as asset)");
 
-			// Deploy currencies for testing (10m each, 2 decimal places)
-			ctx=exec(ctx,"(def USD (deploy (fun/build-token {:supply 1000000000})))");
-			USD=(Address) ctx.getResult();
-			//System.out.println("USD deployed Address = "+USD);
-			ctx=exec(ctx,"(def GBP (deploy (fun/build-token {:supply 1000000000})))");
-			GBP=(Address) ctx.getResult();
+		// Deploy currencies for testing (10m each, 2 decimal places)
+		ctx=exec(ctx,"(def USD (deploy (fun/build-token {:supply "+SUPPLY+"})))");
+		USD=(Address) ctx.getResult();
+		//System.out.println("USD deployed Address = "+USD);
+		ctx=exec(ctx,"(def GBP (deploy (fun/build-token {:supply "+SUPPLY+"})))");
+		GBP=(Address) ctx.getResult();
 
-			// Deploy Torus actor itself
-			ctx= exec(ctx,"(def TORUS (import torus.exchange :as torus))");
-			TORUS=(Address)ctx.getResult();
-			assertNotNull(ctx.getAccountStatus(TORUS));
-			//System.out.println("Torus deployed Address = "+TORUS);
+		// Deploy Torus actor itself
+		ctx= exec(ctx,"(def TORUS (import torus.exchange :as torus))");
+		TORUS=(Address)ctx.getResult();
+		assertNotNull(ctx.getAccountStatus(TORUS));
+		//System.out.println("Torus deployed Address = "+TORUS);
 
-			// Deploy USD market. No market for GBP yet!
-			ctx= exec(ctx,"(def USDM (call TORUS (create-market USD)))");
-			USD_MARKET=(Address)ctx.getResult();
-			
-			return ctx;
-		} catch (Throwable e) {
-			throw Utils.sneakyThrow(e);
-		}		
+		// Deploy USD market. NOTE: No market for GBP yet!
+		ctx= exec(ctx,"(def USDM (call TORUS (create-market USD)))");
+		USD_MARKET=(Address)ctx.getResult();
+		
+		return ctx;
+	}
+	
+	// Basic tests for a range of USD trades
+	@Test public void testUSDTrades() {
+		long STK=1000000;
+		Context baseContext=context();
+		baseContext=exec(baseContext,"(torus/add-liquidity USD "+STK+" "+STK+")");
+		{ // Buy 100 USD
+			Context ctx=baseContext;
+			ctx=exec(ctx,"(torus/buy-tokens USD 100)");
+			assertEquals(101L,RT.ensureLong(ctx.getResult()).longValue()); ;; // price should be 101
+			assertEquals(1000000000-STK+100,evalL(ctx,"(fun/balance USD)")); // should have gained 100 USD
+			assertEquals(STK,evalL(ctx,"(fun/balance USDM)")); // market shares unchanged
+			assertTrue(evalB(ctx,"(< 1.0 (torus/price USD))")); // price has increased
+		}
+		
+		{ // Buy 0 USD
+			Context ctx=baseContext;
+			ctx=exec(ctx,"(torus/buy-tokens USD 0)");
+			assertEquals(0L,RT.ensureLong(ctx.getResult()).longValue()); ;; // price should be 0
+			assertEquals(1000000000-STK,evalL(ctx,"(fun/balance USD)")); // should have gained 100 USD
+			assertEquals(STK,evalL(ctx,"(fun/balance USDM)")); // market shares unchanged
+			assertTrue(evalB(ctx,"(= 1.0 (torus/price USD))")); // price should be unchanged
+		}
 	}
 
 	@Test public void testMissingMarket() {
 		Context ctx=context();
 
+		// The GBP market should not exist initially
 		assertNull(eval(ctx,"(torus/get-market GBP)"));
 
 		// price should be null for missing markets, regardless of whether or not a token exists

@@ -6,10 +6,6 @@
                                "Each market offers CVX/Token trading pairs with a liquidity pool."]
                  :name        "Torus DEX"}))
 
-
-;; TODO. Add docstrings to library functions.
-
-
 ;;;;;;;;;; Imports
 
 
@@ -22,7 +18,7 @@
 
 
 (def markets
-  ;; Map of `token address` -> `market actor address`.
+  ;; Map of `token id` -> `market actor address`.
   {})
 
 
@@ -119,8 +115,7 @@
         ^{:callable true}
         [amount]
         ;; Security: check pool can provide.
-        (when-not (< 0 amount *balance*)
-          (return nil))
+        (when-not (<= 0 amount *balance*) (return nil))
         (let [;; Computes pool and fees/
               cvx-balance *balance*
               pool        (* (double token-balance) cvx-balance)
@@ -162,11 +157,8 @@
         [amount]
 
         ;; Security: check pool can provide.
-        ;;
-        (when-not (< 0
-                     amount
-                     token-balance)
-          (return nil))
+        (when-not (<= 0 amount token-balance) (return nil))
+        
         (let [;; Computes pool and fees.
               cvx-balance *balance*
               pool        (* (double token-balance)
@@ -228,9 +220,7 @@
 
         ;; Security: check amount is positive.
         ;;
-        (when (< amount
-                 0)
-          (return nil))
+        (when (<= amount 0) (return nil))
         (let [;; Computes pool and fees.
               cvx-balance     *balance*
               pool            (* (double token-balance)
@@ -275,10 +265,8 @@
          [amount]
 
          ;; Security: check amount is positive.
-         ;;
-         (when-not (< 0
-                      amount)
-           (return nil))
+         (when-not (<= 0 amount) (return nil))
+         
          (let [;; Computes pool and fees.
                cvx-balance       *balance*
                pool              (* (double token-balance)
