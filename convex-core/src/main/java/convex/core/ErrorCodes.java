@@ -213,5 +213,10 @@ public class ErrorCodes {
 	 */
    public static final Keyword SYNTAX = Keyword.create("SYNTAX");
 
+   /**
+    * Error code indicating insufficient liquidity in state for a Torus or other trade
+    */
+	public static final Keyword LIQUIDITY = Keyword.create("LIQUIDITY");
+
 
 }

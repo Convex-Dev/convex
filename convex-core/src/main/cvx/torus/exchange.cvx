@@ -96,6 +96,7 @@
          [amount]
 
          (let [amount          (int amount)
+               _ (cond (< amount 0) (fail :ARGUMENT "Cannot buy negative coin quantity"))
                required-tokens (or (buy-cvx-quote amount)
                                    (fail :LIQUIDITY "Pool cannot supply this amount of CVX"))]
            (asset/accept *caller*
@@ -115,7 +116,10 @@
         ^{:callable true}
         [amount]
         ;; Security: check pool can provide.
-        (when-not (<= 0 amount *balance*) (return nil))
+        (cond 
+          (< amount 0) (return nil)
+          (>= amount *balance*) (return nil))
+        
         (let [;; Computes pool and fees/
               cvx-balance *balance*
               pool        (* (double token-balance) cvx-balance)
@@ -128,7 +132,6 @@
                                   amount))
                             token-balance))))))
 
-
        (defn buy-tokens
 
          ^{:callable true}
@@ -136,6 +139,7 @@
          [amount]
 
          (let [amount       (int amount)
+               _ (cond (< amount 0) (fail :ARGUMENT "Cannot buy negative token quantity"))
                required-cvx (or (buy-tokens-quote amount)
                                 (fail :LIQUIDITY "Pool cannot supply this amount of tokens"))]
            (core/accept required-cvx)
@@ -157,7 +161,9 @@
         [amount]
 
         ;; Security: check pool can provide.
-        (when-not (<= 0 amount token-balance) (return nil))
+        (cond 
+          (< amount 0) (return nil)
+          (>= amount token-balance) (return nil))
         
         (let [;; Computes pool and fees.
               cvx-balance *balance*
@@ -199,7 +205,7 @@
 
         (let [amount        (int amount)
               gained-tokens (or (sell-cvx-quote amount)
-                                (fail "Cannot sell this amount into pool"))]
+                                (fail :ARGUMENT "Cannot sell negative coin amount"))]
           (core/accept amount)
           (def token-balance
                (- token-balance
@@ -220,7 +226,8 @@
 
         ;; Security: check amount is positive.
         ;;
-        (when (<= amount 0) (return nil))
+        (cond (< amount 0) (return nil))
+        
         (let [;; Computes pool and fees.
               cvx-balance     *balance*
               pool            (* (double token-balance)
@@ -244,7 +251,7 @@
 
           (let [amount     (int amount)
                 gained-cvx (or (sell-tokens-quote amount)
-                               (fail "Cannot sell this amount into pool"))]
+                               (fail :ARGUMENT "Cannot sell this negative token amount"))]
             (asset/accept *caller*
                           [token
                            amount])
@@ -265,7 +272,7 @@
          [amount]
 
          ;; Security: check amount is positive.
-         (when-not (<= 0 amount) (return nil))
+         (cond (< amount 0) (return nil))
          
          (let [;; Computes pool and fees.
                cvx-balance       *balance*

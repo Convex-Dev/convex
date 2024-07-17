@@ -1,7 +1,6 @@
 package convex.actors;
 
-import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -10,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.ErrorCodes;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
@@ -56,23 +56,69 @@ public class TorusTest extends ACVMTest {
 		long STK=1000000;
 		Context baseContext=context();
 		baseContext=exec(baseContext,"(torus/add-liquidity USD "+STK+" "+STK+")");
+		long USDBAL = evalL(baseContext,"(fun/balance USD)");
+		assertEquals(USDBAL,SUPPLY-STK);
+		
 		{ // Buy 100 USD
 			Context ctx=baseContext;
 			ctx=exec(ctx,"(torus/buy-tokens USD 100)");
 			assertEquals(101L,RT.ensureLong(ctx.getResult()).longValue()); ;; // price should be 101
-			assertEquals(1000000000-STK+100,evalL(ctx,"(fun/balance USD)")); // should have gained 100 USD
+			assertEquals(USDBAL+100,evalL(ctx,"(fun/balance USD)")); // should have gained 100 USD
 			assertEquals(STK,evalL(ctx,"(fun/balance USDM)")); // market shares unchanged
 			assertTrue(evalB(ctx,"(< 1.0 (torus/price USD))")); // price has increased
+		}
+		
+		{ // Buy whole pool
+			Context ctx=baseContext;
+			ctx=step(ctx,"(torus/buy-tokens USD "+STK+")");
+			assertEquals(ErrorCodes.LIQUIDITY,ctx.getErrorCode());
 		}
 		
 		{ // Buy 0 USD
 			Context ctx=baseContext;
 			ctx=exec(ctx,"(torus/buy-tokens USD 0)");
 			assertEquals(0L,RT.ensureLong(ctx.getResult()).longValue()); ;; // price should be 0
-			assertEquals(1000000000-STK,evalL(ctx,"(fun/balance USD)")); // should have gained 100 USD
+			assertEquals(USDBAL,evalL(ctx,"(fun/balance USD)")); // no balance change
 			assertEquals(STK,evalL(ctx,"(fun/balance USDM)")); // market shares unchanged
 			assertTrue(evalB(ctx,"(= 1.0 (torus/price USD))")); // price should be unchanged
 		}
+		
+		{ // Buy -100 USD
+			Context ctx=baseContext;
+			ctx=step(ctx,"(torus/buy-tokens USD -100)");
+			assertArgumentError(ctx);
+		}
+		
+		{ // Sell 100 USD
+			Context ctx=baseContext;
+			ctx=exec(ctx,"(torus/sell-tokens USD 100)");
+			assertEquals(99L,RT.ensureLong(ctx.getResult()).longValue()); ;; // price should be 99
+			assertEquals(USDBAL-100,evalL(ctx,"(fun/balance USD)")); // should have gained 100 USD
+			assertEquals(STK,evalL(ctx,"(fun/balance USDM)")); // market shares unchanged
+			assertTrue(evalB(ctx,"(> 1.0 (torus/price USD))")); // price has decreased
+		}
+		
+		{ // Sell whole USD holding
+			Context ctx=baseContext;
+			ctx=step(ctx,"(torus/sell-tokens USD (fun/balance USD))");
+			assertEquals(0,evalL(ctx,"(fun/balance USD)")); // should have no USD left
+		}
+		
+		{ // Sell 0 USD
+			Context ctx=baseContext;
+			ctx=exec(ctx,"(torus/sell-tokens USD 0)");
+			assertEquals(0L,RT.ensureLong(ctx.getResult()).longValue()); ;; // price should be 0
+			assertEquals(USDBAL,evalL(ctx,"(fun/balance USD)"));  // no balance change
+			assertEquals(STK,evalL(ctx,"(fun/balance USDM)")); // market shares unchanged
+			assertTrue(evalB(ctx,"(= 1.0 (torus/price USD))")); // price should be unchanged
+		}
+		
+		{ // Sell -100 USD
+			Context ctx=baseContext;
+			ctx=step(ctx,"(torus/sell-tokens USD -100)");
+			assertArgumentError(ctx);
+		}
+
 	}
 
 	@Test public void testMissingMarket() {
