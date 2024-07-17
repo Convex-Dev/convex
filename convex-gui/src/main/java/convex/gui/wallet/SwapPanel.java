@@ -64,10 +64,14 @@ public class SwapPanel extends AbstractGUI {
 		// Main action buttons
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.add(new ActionButton("Trade!",0xe933,e->{
+			executeTrade();
 			super.closeGUI();
 		})); 
 		actionPanel.add(new ActionButton("Close",0xe5c9,e->{
 			super.closeGUI();
+		})); 
+		actionPanel.add(new ActionButton("Refresh",0xe5d5,e->{
+			refreshRates();
 		})); 
 		add(actionPanel,"dock south");
 	}
@@ -135,6 +139,35 @@ public class SwapPanel extends AbstractGUI {
 				}
 			});
 		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	protected void executeTrade() {
+		ACell torus=TokenInfo.getTorusAddress(convex);
+		receiveLabel.setDecimals(token2.getDecimals());
+		AInteger amount=amountField.getAmount();
+		String qs;
+		if (token1.isConvex()) {
+			System.err.println(amount +" :dec "+token1.getDecimals());
+			qs="("+torus+"/sell-cvx "+token2.getID()+" "+amount+")";
+		} else if (token2.isConvex()) {
+			qs="("+torus+"/sell-tokens "+token1.getID()+" "+amount+")";
+		} else {
+			qs="("+torus+"/sell "+token1.getID()+" "+amount+" "+token2.getID()+")";
+		}
+		System.out.println(qs);
+		try {
+			convex.transact(qs).thenAccept(r->{
+				ACell val=r.getValue();
+				System.out.println(r);
+				if (val instanceof AInteger) {
+					receiveLabel.setBalance((AInteger) val);
+				} else {
+					receiveLabel.setBalance(null);
+				}
+			});
+		} catch (IOException | TimeoutException e) {
 			e.printStackTrace();
 		}
 	}
