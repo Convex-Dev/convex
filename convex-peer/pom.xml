@@ -26,6 +26,15 @@
 			<groupId>world.convex</groupId>
 			<artifactId>convex-core</artifactId>
 			<version>${convex.version}</version>
+			 <type>jar</type>
+        	<scope>compile</scope>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-core</artifactId>
+			<version>${convex.version}</version>
+		    <classifier>tests</classifier>
+		    <scope>test</scope>
 		</dependency>
 		
 		<dependency>
