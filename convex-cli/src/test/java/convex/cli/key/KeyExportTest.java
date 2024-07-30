@@ -42,7 +42,7 @@ public class KeyExportTest {
 		CLTester tester =  CLTester.run(
 			"key", "generate",
 			"--storepass", new String(KEYSTORE_PASSWORD),
-			"--password", new String(KEY_PASSWORD),
+			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME
 		);
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
@@ -63,7 +63,7 @@ public class KeyExportTest {
 			"key",
 			"export",
 			"--storepass", new String(KEYSTORE_PASSWORD),
-			"--password", new String(KEY_PASSWORD),
+			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
@@ -80,7 +80,7 @@ public class KeyExportTest {
 			"export",
 			"seed",
 			"--storepass", new String(KEYSTORE_PASSWORD),
-			"--password", new String(KEY_PASSWORD),
+			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", publicKey
 		);

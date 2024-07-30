@@ -27,7 +27,7 @@ public class Key extends ATopCommand {
 	@Override
 	public void run() {
 		// sub command run with no command provided
-		CommandLine.usage(new Key(), System.out);
+		showUsage();
 	}
 
 

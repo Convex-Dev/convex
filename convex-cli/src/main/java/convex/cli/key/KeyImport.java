@@ -12,7 +12,6 @@ import convex.core.data.ABlob;
 import convex.core.data.Blobs;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 
@@ -25,7 +24,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="import",
-	description="Import key pairs to the keystore.")
+	description="Import key pairs to the keystore. Can specify either a raw key with --text or --import-file")
 public class KeyImport extends AKeyCommand {
 
 	@ParentCommand
@@ -38,13 +37,14 @@ public class KeyImport extends AKeyCommand {
 	@Option(names={"-t", "--text"},
 			description="Text string to import.")
 		private String importText;
-
-	@Option(names={"--import-password"},
-		description="Password for the imported key.")
-    private String importPassword;
 	
-	@Parameters(index = "0", arity = "0..1", description = "Type of file imported. Supports: pem, seed, bip39")
-    private String type;
+	@Option(names={"--passphrase"},
+			description="Passphrase for BIP39 or encrypted PEM imported key")
+	private String importPassphrase;
+	
+	@Option(names={"--type"},
+			description="Text string to import. Type of file imported. Supports: pem, seed, bip39. Will attempt to autodetect")
+	private String type;
 
 	@Override
 	public void run() {
@@ -54,22 +54,18 @@ public class KeyImport extends AKeyCommand {
 			importText=cli().loadFileAsString(importFilename);
 		}
 		if (importText == null || importText.length() == 0) {
-			throw new CLIError("You need to provide '--text' or import filename '--import-file' to import a private key");
-		}
-		
-		// Get import password
-		if (importPassword == null) {
-			if (cli().isInteractive()) {
-				importPassword=new String(System.console().readPassword("Enter import password:"));
-			} else {
-				throw new CLIError("--import-password not provided during non-interatice import");
-			}
+			showUsage();
+			return;
 		}
 		
 		// Parse input as hex string, will be null if not parsed. For BIP39 is 64 bytes, Ed25519 32
 		ABlob hex=Blobs.parse(importText.trim());
 		if (type==null) {
+			if (cli().isParanoid()) {
+				cli().informError("Not permitted to infer key import type in strict mode");
+			}
 			cli().inform("No import file type specified, attempting to auto-detect");
+			
 			if (hex!=null) {
 				if (hex.count()==AKeyPair.SEED_LENGTH) {
 					type="seed";
@@ -88,14 +84,14 @@ public class KeyImport extends AKeyCommand {
 		} else if ("bip39".equals(type)) {
 			if (hex==null) {
 				try {
-					hex=BIP39.getSeed(importText, importPassword);
+					hex=BIP39.getSeed(importText, importPassphrase);
 				} catch (Exception e) {
 					throw new CLIError("Error interpreting BIP39 seed",e);
 				}
 			}
 			keyPair=BIP39.seedToKeyPair(hex.toFlatBlob());
 		} else if ("pem".equals(type)) {
-			PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassword.toCharArray());
+			PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassphrase.toCharArray());
 			keyPair = AKeyPair.create(privateKey);
 		}
 		if (keyPair==null) throw new CLIError("Unable to import keypair");

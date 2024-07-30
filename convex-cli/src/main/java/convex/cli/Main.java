@@ -80,10 +80,10 @@ public class Main extends ACommand {
 			description = "Public key to use. Default: ${DEFAULT-VALUE}")
 	private String keySpec;
 
-	@Option(names = { "-p","--password" }, 
+	@Option(names = { "-p","--keypass" }, 
 			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
-			description = "Keystore filename. Default: ${DEFAULT-VALUE}")
+			description = "Key password in key store. Can also specify with CONVEX_KEY_PASSWORD environment variable.")
 	private String keyPassword;
 
 	@Option(names = { "-S","--strict-security" }, 
@@ -217,15 +217,16 @@ public class Main extends ACommand {
 			if (ex instanceof CLIError) {
 				CLIError ce = (CLIError) ex;
 				String msg=ce.getMessage();
-				msg=noColour?msg:Coloured.red(msg);
-				err.println(msg);
+				informError(msg);
 				Throwable cause = ce.getCause();
-				if (cause != null) {
+				if ((verbose>=2) && (cause != null)) {
 					err.println("Underlying cause: ");
 					cause.printStackTrace(err);
 				}
 			} else {
-				ex.printStackTrace(err);
+				if (verbose>=1) {
+					ex.printStackTrace(err);
+				}
 			}
 			// Exit with correct code for exception type
 			return ExitCodes.getExitCode(ex);
@@ -518,6 +519,10 @@ public class Main extends ACommand {
 
 	public void informSuccess(String message) {
 		inform(1, noColour?message:Coloured.green(message));
+	}
+	
+	public void informError(String message) {
+		inform(1, noColour?message:Coloured.red(message));
 	}
 
 	public void inform(String message) {
