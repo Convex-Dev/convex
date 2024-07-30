@@ -13,7 +13,8 @@
 	<url>https://convex.world</url>
 
 	<properties>
-		<logback.version>1.4.14</logback.version>
+		<logback.version>1.5.6</logback.version>
+		<picocli.version>4.7.6</picocli.version>
 		<asciidoctorj.pdf.version>2.3.7</asciidoctorj.pdf.version>
 		<asciidoctor.spring.version>0.6.0</asciidoctor.spring.version>
 		<maven.compiler.release>21</maven.compiler.release>
@@ -144,7 +145,7 @@
 		<dependency>
 			<groupId>info.picocli</groupId>
 			<artifactId>picocli</artifactId>
-			<version>4.7.5</version>
+			<version>${picocli.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.pholser</groupId>
