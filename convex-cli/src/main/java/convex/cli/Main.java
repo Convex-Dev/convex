@@ -501,12 +501,17 @@ public class Main extends ACommand {
 		}
 		return result;
 	}
+	
+
+	public void informSuccess(String msg) {
+		inform(1, Coloured.green(msg));
+	}
 
 	public void inform(String message) {
-		inform(1,message);
+		inform(1, Coloured.yellow(message));
 	}
 	
-	public void inform(int level, String message) {
+	private void inform(int level, String message) {
 		if (verbose<level) return;
 		commandLine.getErr().println(message);
 	}
@@ -565,5 +570,6 @@ public class Main extends ACommand {
 		// We are the top level command!
 		return this;
 	}
+
 
 }

@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 
 import convex.cli.CLIError;
-import convex.cli.output.Coloured;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
@@ -51,19 +50,19 @@ public class PeerGenesis extends APeerCommand {
 			}
 		} else {
 //			if (cli().prompt("No key pair specified. Continue by creating a new one? (Y/N)")) {
-//				throw new CLIError("Unable to obtain genersis key pair, aborting");
+//				throw new CLIError("Unable to obtain genesis key pair, aborting");
 //			}
 			if (cli().isParanoid()) throw new CLIError("Aborting due to strict security: no key pair specified");
 			keyPair=AKeyPair.generate();
 			cli().addKeyPairToStore(keyPair,cli().getKeyPassword());
 			cli().saveKeyStore();
-			cli().inform(2,Coloured.yellow("Generated new Keypair with public key: "+keyPair.getAccountKey()));
+			cli().inform("Generated new Keypair with public key: "+keyPair.getAccountKey());
 		}
 
 		EtchStore store=getEtchStore();
 		
 		State genesisState=Init.createState(List.of(keyPair.getAccountKey()));
-		cli().inform(1, Coloured.yellow("Created genersis state with hash: "+genesisState.getHash()));
+		cli().inform("Created genersis state with hash: "+genesisState.getHash());
 		
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
@@ -71,6 +70,6 @@ public class PeerGenesis extends APeerCommand {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server s=API.launchPeer(config);
 		s.close();
-		cli().inform(1, Coloured.green("Convex genesis succeeded!"));
+		cli().informSuccess("Convex genesis succeeded!");
 	}
 }
