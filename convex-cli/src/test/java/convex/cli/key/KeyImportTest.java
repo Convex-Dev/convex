@@ -41,7 +41,7 @@ public class KeyImportTest {
 			"import",
 			"pem",
 			"-n",
-			"--keystore-password", new String(KEYSTORE_PASSWORD), 
+			"--storepass", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--text", pemText, 
 			"--import-password", new String(IMPORT_PASSWORD)
@@ -51,7 +51,7 @@ public class KeyImportTest {
 		CLTester t2=CLTester.run(
 				"key" , 
 				"list",
-				"--keystore-password", new String(KEYSTORE_PASSWORD), 
+				"--storepass", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());
@@ -67,7 +67,7 @@ public class KeyImportTest {
 			"key", 
 			"import",
 			"seed",
-			"--keystore-password", new String(KEYSTORE_PASSWORD), 
+			"--storepass", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--text", keyPair.getSeed().toString(), 
 			"--password", KEY_PASSWORD, 
@@ -81,7 +81,7 @@ public class KeyImportTest {
 				"key" , 
 				"list",
 				"--password",KEY_PASSWORD,
-				"--keystore-password", new String(KEYSTORE_PASSWORD), 
+				"--storepass", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());
@@ -99,7 +99,7 @@ public class KeyImportTest {
 			"key", 
 			"import",
 			"bip39",
-			"--keystore-password", new String(KEYSTORE_PASSWORD), 
+			"--storepass", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--password",KEY_PASSWORD,
 			"--text", "elder mail trick garage hour enjoy attack fringe problem motion poem security caught false penalty", 
@@ -113,7 +113,7 @@ public class KeyImportTest {
 				"key" , 
 				"list",
 				"--password",KEY_PASSWORD,
-				"--keystore-password", new String(KEYSTORE_PASSWORD), 
+				"--storepass", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
 		assertEquals(ExitCodes.SUCCESS,t2.getResult());

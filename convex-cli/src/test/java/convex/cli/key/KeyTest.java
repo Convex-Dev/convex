@@ -39,7 +39,7 @@ public class KeyTest {
 				"key", 
 				"generate", 
 				"-p", KEY_PASSWORD, 
-				"--keystore-password", KEYSTORE_PASSWORD, 
+				"--storepass", KEYSTORE_PASSWORD, 
 				"--keystore", fileName);
 		tester.assertResult(0);
 		String key = tester.getOutput().trim();
@@ -50,11 +50,11 @@ public class KeyTest {
 		assertTrue(fp.exists());
 
 		// command key.list
-		tester =  CLTester.run("key", "list", "--keystore-password", KEYSTORE_PASSWORD, "--keystore", fileName);
+		tester =  CLTester.run("key", "list", "--storepass", KEYSTORE_PASSWORD, "--keystore", fileName);
 		//tester.assertOutputMatch("^Index Public Key\\s+1");
 
 		// command key.list with non-existant keystore
-		tester =  CLTester.run("key", "list", "--keystore-password", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");
+		tester =  CLTester.run("key", "list", "--storepass", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");
 		assertNotEquals(ExitCodes.SUCCESS,tester.getResult());
 
 	}

@@ -77,7 +77,7 @@ public class Main extends ACommand {
 	@Option(names = { "-k","--key" }, 
 			defaultValue = "${env:CONVEX_KEY}", 
 			scope = ScopeType.INHERIT, 
-			description = "Keystore filename. Default: ${DEFAULT-VALUE}")
+			description = "Public key to use. Default: ${DEFAULT-VALUE}")
 	private String keySpec;
 
 	@Option(names = { "-p","--password" }, 
@@ -92,7 +92,10 @@ public class Main extends ACommand {
 			description = "Apply strict security. Will forbid actions with dubious security implications.")
 	private boolean paranoid;
 
-	@Option(names = {"--keystore-password" }, 
+	/**
+	 * Password for keystore. Option named to match Java keytool
+	 */
+	@Option(names = {"--storepass" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:CONVEX_KEYSTORE_PASSWORD}", 
 			description = "Password to read/write to the Keystore")
@@ -112,7 +115,7 @@ public class Main extends ACommand {
 	@Option(names = { "-v","--verbose" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-2}", 
-			description = "Specify verbosity level. Use -v0 to suppress user output. Default: ${DEFAULT-VALUE}")
+			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}")
 	private Integer verbose;
 
 	public Main() {
@@ -173,7 +176,9 @@ public class Main extends ACommand {
 			if (verbose == null)
 				verbose = 0;
 			if (verbose >= 0 && verbose < verboseLevels.length) {
-				// OK
+				// Set root logger level?
+				ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+				root.setLevel(verboseLevels[verbose]);
 			} else {
 				commandLine.getErr().println("ERROR: Invalid verbosity level: " + verbose);
 				return ExitCodes.ERROR;
@@ -560,6 +565,11 @@ public class Main extends ACommand {
 		}
 	}
 
+	/**
+	 * Prompt the user for a Y/N answer
+	 * @param string
+	 * @return
+	 */
 	public boolean question(String string) {
 		if (!isInteractive()) throw new CLIError("Can't ask user question in non-interactive mode: "+string);
 		try {
@@ -573,6 +583,11 @@ public class Main extends ACommand {
 		return false;
 	}
 	
+	/**
+	 * Prompt the user for String input
+	 * @param string
+	 * @return
+	 */
 	public String prompt(String string) {
 		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+string);
 		

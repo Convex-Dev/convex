@@ -41,7 +41,7 @@ public class KeyExportTest {
 		// command key.generate
 		CLTester tester =  CLTester.run(
 			"key", "generate",
-			"--keystore-password", new String(KEYSTORE_PASSWORD),
+			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--password", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME
 		);
@@ -62,7 +62,7 @@ public class KeyExportTest {
 		tester =  CLTester.run(
 			"key",
 			"export",
-			"--keystore-password", new String(KEYSTORE_PASSWORD),
+			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--password", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", publicKey,
@@ -79,7 +79,7 @@ public class KeyExportTest {
 			"key",
 			"export",
 			"seed",
-			"--keystore-password", new String(KEYSTORE_PASSWORD),
+			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--password", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
 			"--public-key", publicKey
