@@ -1,6 +1,7 @@
 package convex.cli.client;
 
 import java.io.IOException;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -85,7 +86,7 @@ public abstract class AClientCommand extends ATopCommand {
 
 	protected convex.api.Convex connect() throws IOException,TimeoutException {
 		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
-		if (hostname==null) hostname="localhost";
+		if (hostname==null) hostname=convex.cli.Constants.HOSTNAME_PEER;
 		try {
 			InetSocketAddress sa=new InetSocketAddress(hostname,port);
 			Convex c;
@@ -99,6 +100,8 @@ public abstract class AClientCommand extends ATopCommand {
 			}
 			
 			return c;
+		} catch (ConnectException ce) {
+			throw new CLIError("Cannot connect to: "+hostname+" on port "+port);
 		} catch (Exception e) {
 			throw e;
 		}

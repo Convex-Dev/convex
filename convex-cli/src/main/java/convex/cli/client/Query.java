@@ -3,9 +3,6 @@ package convex.cli.client;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.core.Result;
@@ -23,31 +20,34 @@ import picocli.CommandLine.Parameters;
  */
 @Command(name="query",
 	mixinStandardHelpOptions=true,
-	description="Execute a user query.")
+	description="Execute user queries. ")
 public class Query extends AClientCommand {
 
-	private static final Logger log = LoggerFactory.getLogger(Query.class);
-
-	@Parameters(paramLabel="queryCommand", description="Query Command")
-	private String queryCommand;
-
+	@Parameters(paramLabel="queryCommand", description="Query command(s). Multiple commands will be executed in sequence unless one fails")
+	private String[] commands;
 
 	@Override
 	public void run() {
 		// sub command run with no command provided
-		log.debug("query command: {}", queryCommand);
+		if ((commands==null)||(commands.length==0)) {
+			showUsage();
+			return;
+		}
 
 		try {
 			Convex convex =  connect();
-			log.debug("Executing query: %s\n", queryCommand);
-			ACell message = Reader.read(queryCommand);
-			Result result = convex.querySync(message, timeout);
-			mainParent.printResult(result);
+			for (int i=0; i<commands.length; i++) {
+				ACell message = Reader.read(commands[i]);
+				Result result = convex.querySync(message, timeout);
+				cli().printResult(result);
+				if (result.isError()) {
+					break;
+				}
+			}
 		} catch (IOException e) {
 			throw new CLIError("IO Error executing query",e);
 		} catch (TimeoutException e) {
 			throw new CLIError("Query timed out");
 		}
 	}
-
 }

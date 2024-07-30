@@ -115,7 +115,7 @@ public class Main extends ACommand {
 	@Override
 	public void run() {
 		// no command provided - so show help
-		CommandLine.usage(new Main(), System.out);
+		showUsage();
 	}
 
 	/**

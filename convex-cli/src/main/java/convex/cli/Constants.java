@@ -16,7 +16,7 @@ public class Constants {
 
 	public static final String CONFIG_FILENAME = "~/.convex/convex.properties";
 
-	public static final String ETCH_FILENAME = "~/.convex//etch.db";
+	public static final String ETCH_FILENAME = "~/.convex/etch.db";
 	
 	public static final int KEY_GENERATE_COUNT = 1;
 
