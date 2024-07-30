@@ -47,7 +47,7 @@ public class Query extends AClientCommand {
 		} catch (IOException e) {
 			throw new CLIError("IO Error executing query",e);
 		} catch (TimeoutException e) {
-			throw new CLIError("Query timed out");
+			throw new CLIError("Query timed out. Perhaps there is a network problem, or the host is not an operational Convex peer?");
 		}
 	}
 }

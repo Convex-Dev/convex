@@ -206,7 +206,7 @@ public class Connection {
 
 		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
 		pc.startClientListening();
-		log.debug("Connect succeeded for host: {}", socketAddress);
+		log.trace("Connect succeeded for host: {}", socketAddress);
 		return pc;
 	}
 
@@ -554,7 +554,7 @@ public class Connection {
 	private static Runnable selectorLoop = new Runnable() {
 		@Override
 		public void run() {
-			log.debug("Client selector loop starting...");
+			log.trace("Client selector loop starting...");
 			while (true) {
 				try {
 					selector.select(300);
@@ -583,7 +583,7 @@ public class Connection {
 							log.trace("Unexpected IOException, cancelling key: {}", e);
 							key.cancel();
 						} catch (CancelledKeyException e) {
-							log.debug("Cancelled key");
+							log.trace("Cancelled key");
 						}
 					}
 				} catch (Exception t) {
@@ -610,12 +610,12 @@ public class Connection {
 			int n = conn.handleChannelRecieve();
 			if (n<0) {
 				// Deregister interest in reading if EOS
-				log.debug("Cancelled Key due to EOS");
+				log.trace("Cancelled Key due to EOS");
 				key.cancel();
 			}
 			// log.finest("Received bytes: " + n);
 		} catch (ClosedChannelException e) {
-			log.debug("Channel closed from: {}", conn.getRemoteAddress());
+			log.trace("Channel closed from: {}", conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
 			log.warn("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "

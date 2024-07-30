@@ -99,8 +99,14 @@ public class Main extends ACommand {
 
 	@Option(names = { "-n","--noninteractive" }, 
 			scope = ScopeType.INHERIT, 
-			description = "Specify to disable interactive prompts")
+			description = "Specify to disable interactive prompts. Intended for scripts.")
 	private boolean nonInteractive;
+	
+	@Option(names = { "--no-color" }, 
+			scope = ScopeType.INHERIT, 
+			defaultValue = "${env:NO_COLOR}", 
+			description = "Suppress ANSI colour output. Can also stop with NO_COLOR uenviornment variable")
+	private boolean noColour;
 
 	@Option(names = { "-v","--verbose" }, 
 			scope = ScopeType.INHERIT, 
@@ -204,7 +210,8 @@ public class Main extends ACommand {
 			PrintWriter err = commandLine.getErr();
 			if (ex instanceof CLIError) {
 				CLIError ce = (CLIError) ex;
-				String msg=Coloured.red(ce.getMessage());
+				String msg=ce.getMessage();
+				msg=noColour?msg:Coloured.red(msg);
 				err.println(msg);
 				Throwable cause = ce.getCause();
 				if (cause != null) {
@@ -503,12 +510,12 @@ public class Main extends ACommand {
 	}
 	
 
-	public void informSuccess(String msg) {
-		inform(1, Coloured.green(msg));
+	public void informSuccess(String message) {
+		inform(1, noColour?message:Coloured.green(message));
 	}
 
 	public void inform(String message) {
-		inform(1, Coloured.yellow(message));
+		inform(1, noColour?message:Coloured.yellow(message));
 	}
 	
 	private void inform(int level, String message) {
