@@ -85,6 +85,8 @@ public abstract class AClientCommand extends ATopCommand {
 	}
 
 	protected convex.api.Convex connect() throws IOException,TimeoutException {
+		Address a=addressValue==null?null:Address.parse(addressValue);
+		
 		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
 		if (hostname==null) hostname=convex.cli.Constants.HOSTNAME_PEER;
 		try {
@@ -92,11 +94,8 @@ public abstract class AClientCommand extends ATopCommand {
 			Convex c;
 			c=Convex.connect(sa);
 			
-			if (addressValue!=null) {
-				Address a=Address.parse(addressValue);
-				if (a!=null) {
-					c.setAddress(a);
-				}
+			if (a!=null) {
+				c.setAddress(a);
 			}
 			
 			return c;
