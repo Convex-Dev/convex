@@ -50,7 +50,7 @@ public class PeerStart extends APeerCommand {
 			description = "Port number for the peer. Default is ${DEFAULT-VALUE}. If set to 0, will choose a random port.")
 	private int port = 0;
 
-	@Option(names = { "--url" }, description = "Public URL of the peer.")
+	@Option(names = { "--url" }, description = "URL for the peer to publish. If not provided, the peer will have no public URL.")
 	private String url;
 
 //	@Option(names = { "-b",
@@ -62,7 +62,7 @@ public class PeerStart extends APeerCommand {
 			"--peer" }, description = "URL of remote peer. If not provided then try to connect to a local peer")
 	private String remotePeerHostname;
 
-	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer.")
+	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer controller.")
 	private long addressNumber;
 
 	@Override

@@ -27,6 +27,7 @@ import convex.cli.client.Transact;
 import convex.cli.etch.Etch;
 import convex.cli.key.Key;
 import convex.cli.local.Local;
+import convex.cli.output.Coloured;
 import convex.cli.output.RecordOutput;
 import convex.cli.peer.Peer;
 import convex.core.Result;
@@ -147,7 +148,7 @@ public class Main extends ACommand {
 			try {
 				commandLine.parseArgs(args);
 			} catch (Exception t) {
-				commandLine.getErr().println("ERROR: Unable to parse arguments: " + t.getMessage());
+				commandLine.getErr().println(Coloured.red("ERROR: Unable to parse arguments: " + t.getMessage()));
 				commandLine.getErr().println("For more information on options and commands try 'convex help'.");
 				return ExitCodes.ERROR;
 			}
@@ -203,7 +204,8 @@ public class Main extends ACommand {
 			PrintWriter err = commandLine.getErr();
 			if (ex instanceof CLIError) {
 				CLIError ce = (CLIError) ex;
-				err.println(ce.getMessage());
+				String msg=Coloured.red(ce.getMessage());
+				err.println(msg);
 				Throwable cause = ce.getCause();
 				if (cause != null) {
 					err.println("Underlying cause: ");
@@ -548,7 +550,7 @@ public class Main extends ACommand {
 	public boolean prompt(String string) {
 		if (!isInteractive()) return false;
 		try {
-			inform(0,string);
+			inform(0,Coloured.blue(string));
 			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
 			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
 			if (Character.toLowerCase(c)=='y') return true;

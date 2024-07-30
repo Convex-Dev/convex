@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import convex.cli.CLIError;
+import convex.cli.output.Coloured;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
@@ -56,13 +57,13 @@ public class PeerGenesis extends APeerCommand {
 			keyPair=AKeyPair.generate();
 			cli().addKeyPairToStore(keyPair,cli().getKeyPassword());
 			cli().saveKeyStore();
-			cli().inform(2,"Generated new Keypair with public key: "+keyPair.getAccountKey());
+			cli().inform(2,Coloured.yellow("Generated new Keypair with public key: "+keyPair.getAccountKey()));
 		}
 
 		EtchStore store=getEtchStore();
 		
 		State genesisState=Init.createState(List.of(keyPair.getAccountKey()));
-		cli().inform(1, "Created genersis state with hash: "+genesisState.getHash());
+		cli().inform(1, Coloured.yellow("Created genersis state with hash: "+genesisState.getHash()));
 		
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
@@ -70,6 +71,6 @@ public class PeerGenesis extends APeerCommand {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server s=API.launchPeer(config);
 		s.close();
-		cli().inform(1, "Convex genesis succeeded!");
+		cli().inform(1, Coloured.green("Convex genesis succeeded!"));
 	}
 }
