@@ -15,6 +15,7 @@ import java.security.UnrecoverableKeyException;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.Scanner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -559,10 +560,10 @@ public class Main extends ACommand {
 		}
 	}
 
-	public boolean prompt(String string) {
-		if (!isInteractive()) return false;
+	public boolean question(String string) {
+		if (!isInteractive()) throw new CLIError("Can't ask user question in non-interactive mode: "+string);
 		try {
-			inform(0,Coloured.blue(string));
+			inform(0,noColour?string:Coloured.blue(string));
 			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
 			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
 			if (Character.toLowerCase(c)=='y') return true;
@@ -570,6 +571,16 @@ public class Main extends ACommand {
 			throw new CLIError("Unexpected error getting console input: "+e);
 		}
 		return false;
+	}
+	
+	public String prompt(String string) {
+		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+string);
+		
+		inform(0,noColour?string:Coloured.blue(string));
+		try (Scanner scanner = new Scanner(System.in)) {
+			String s=scanner.nextLine();
+			return s;
+		}
 	}
 
 	@Override

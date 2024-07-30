@@ -15,6 +15,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.lang.Symbols;
 import picocli.CommandLine.Option;
 
 public abstract class AClientCommand extends ATopCommand {
@@ -62,26 +63,38 @@ public abstract class AClientCommand extends ATopCommand {
 		if (keyPair!=null) return true;
 
 		Address address=convex.getAddress();
+		
+		// Try to identify the required keypair for the Address
+		Result ar;
 		try {
-			// Try to identify the required keypair
-			Result ar=convex.query("*key*").get(1000,TimeUnit.MILLISECONDS);
-			if (ar.isError()) throw new CLIError("Unable to determine *key* for Address "+address+" : "+ar);
-			
+			ar = convex.query(Symbols.STAR_KEY).get(1000,TimeUnit.MILLISECONDS);
+		} catch (Exception e) {
+			ar=null;
+		}
+		
+		String pk=null;
+		if (ar==null) {
+			// we couldn't query the *key*, so prompt the user
+		} else if (!ar.isError()) {
+			// Attempt to use query result as public key
 			ACell v=ar.getValue();
 			if (v instanceof ABlob) {
-				String pk=((ABlob)v).toHexString();
-				keyPair=mainParent.loadKeyFromStore(pk);
-				if (keyPair==null) {
-					// We didn't find required keypair
-					throw new CLIError("Unable to find keypair with public key "+v+" for Address "+address+" : "+ar);
-				}
-				convex.setKeyPair(keyPair);
-				return true;
+				pk=((ABlob)v).toHexString();
 			}
-		} catch(Exception e) {
-			return false;
 		}
-		return false;
+		
+		if (pk==null) {
+			pk=cli().prompt("Enter public key: ");
+		}
+		
+
+		keyPair=mainParent.loadKeyFromStore(pk);
+		if (keyPair==null) {
+			// We didn't find required keypair
+			throw new CLIError("Can't find keypair with public key "+pk+" for Address "+address);
+		}
+		convex.setKeyPair(keyPair);
+		return true;
 	}
 
 	protected convex.api.Convex connect() throws IOException,TimeoutException {

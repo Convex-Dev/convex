@@ -43,7 +43,6 @@ public class Transact extends AClientCommand {
 	public void run() {
 		try {
 			Convex convex = connect();
-			Address address=convex.getAddress();
 			if (!ensureAddress(convex)) {	
 				throw new CLIError("Must specify a valid address for transaction.");
 			}
@@ -52,9 +51,11 @@ public class Transact extends AClientCommand {
 				throw new CLIError("Must provide a key pair to sign transaction.");
 			}
 
-			log.debug("Executing transaction: '{}'\n", transactionCode);
+			Address address=convex.getAddress();
+
+			log.trace("Executing transaction: '{}'\n", transactionCode);
 			ACell message = Reader.read(transactionCode);
-			ATransaction transaction = Invoke.create(address, -1, message);
+			ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
 			Result result = convex.transactSync(transaction, timeout);
 			mainParent.printResult(result);
 		} catch (CLIError e) {
