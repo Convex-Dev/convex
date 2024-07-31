@@ -1,5 +1,8 @@
 package convex.cli.key;
 
+import java.io.IOException;
+import java.nio.file.Paths;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,7 +11,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
 
@@ -35,19 +37,21 @@ public class KeyExport extends AKeyCommand {
 			+ "You only need to enter in the first distinct hex values of the public key.%n"
 			+ "For example: 0xf0234 or f0234")
 	private String keystorePublicKey ;
+	
+	@Option(names={"-o", "--output-file"},
+			description="Output file for the private key. Use '-' for STDOUT (default).")
+	private String outputFilename;
+
 
 	@Option(names={"--export-password"},
-		description="Password of the exported key.")
+		description="Password for the exported key, if applicable")
     private String exportPassword;
 	
-	@Parameters(
-			index = "0", 
-			arity = "0..1", 
-			defaultValue="pem",
-			description = "Type of file exported. Supports: pem, seed")
-    private String type;
+	@Option(names={"--type"},
+			description="Type of file exported. Supports: pem, seed (default).")
+	private String type;
 	
-	private void ensureExportPAssword() {
+	private void ensureExportPassword() {
 		if (exportPassword == null || exportPassword.length() == 0) {
 			log.warn("No export password '--export-password' provided: Defaulting to blank.");
 			exportPassword="";
@@ -68,9 +72,15 @@ public class KeyExport extends AKeyCommand {
 			throw new CLIError("Key pair not found for key: "+keystorePublicKey);
 		}
 		
+		// Default to "seed" type unless security is strict
+		if (type==null) {
+			if (cli().isParanoid()) throw new CLIError("Strict security: must specifiy key export type");
+			type="seed";
+		}
+		
 		String output;
 		if ("pem".equals(type)) {
-			ensureExportPAssword();
+			ensureExportPassword();
 			String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
 			output=pemText;
 		} else if ("seed".equals(type)){
@@ -81,7 +91,15 @@ public class KeyExport extends AKeyCommand {
 			throw new CLIError("Export type not recognised: "+type);
 		}
 
-		cli().println(output);
+		if ((outputFilename==null)||("-".equals(outputFilename.trim()))) {
+			cli().println(output);
+		} else {
+			try {
+				cli().writeFileAsString(Paths.get(outputFilename),output);
+			} catch (IOException e) {
+				throw new CLIError("Failed to write output file: "+e.getMessage());
+			}
+		}
 	}
 
 

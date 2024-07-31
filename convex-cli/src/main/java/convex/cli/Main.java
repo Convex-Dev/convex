@@ -493,6 +493,7 @@ public class Main extends ACommand {
 			throw new CLIError(
 					"Unable to request password because console is unavaiable. Consider passing a password parameter, or running in interactive mode.");
 
+		if (!noColour) prompt = Coloured.blue(prompt);
 		return c.readPassword(prompt);
 	}
 
@@ -514,6 +515,11 @@ public class Main extends ACommand {
 			throw new CLIError("Unable to read import file", e);
 		}
 		return result;
+	}
+	
+	public void writeFileAsString(Path file, String content) throws IOException {
+		byte[] bs=content.getBytes(StandardCharsets.UTF_8);
+		Files.write(file, bs);
 	}
 	
 

@@ -26,7 +26,7 @@ public class PEMToolsTest {
 	public void testPEMPrivateKey() {
 		AKeyPair keyPair = KP;
 
-		String testPassword = generateRandomHex(32);
+		String testPassword = "test-password";
 		String pemText = null;
 		pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), testPassword.toCharArray());
 

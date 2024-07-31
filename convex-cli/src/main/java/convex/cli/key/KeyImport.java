@@ -31,7 +31,7 @@ public class KeyImport extends AKeyCommand {
 	protected Key keyParent;
 
 	@Option(names={"-i", "--import-file"},
-		description="Import file for the the keypair.")
+		description="Import file for the the keypair. Use '-' for STDIN.")
 	private String importFilename;
 	
 	@Option(names={"-t", "--text"},
@@ -43,7 +43,7 @@ public class KeyImport extends AKeyCommand {
 	private String importPassphrase;
 	
 	@Option(names={"--type"},
-			description="Text string to import. Type of file imported. Supports: pem, seed, bip39. Will attempt to autodetect")
+			description="Type of file imported. Supports: pem, seed, bip39. Will attempt to autodetect unless strict security is enabled")
 	private String type;
 
 	@Override
