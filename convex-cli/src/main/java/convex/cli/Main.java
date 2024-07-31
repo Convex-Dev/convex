@@ -41,6 +41,7 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
 import picocli.CommandLine.IVersionProvider;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.ScopeType;
@@ -68,17 +69,14 @@ public class Main extends ACommand {
 
 	public CommandLine commandLine = new CommandLine(this);
 
-	@Option(names = { "--keystore" }, 
-			defaultValue = "${env:CONVEX_KEYSTORE:-" + Constants.KEYSTORE_FILENAME+ "}", 
-			scope = ScopeType.INHERIT, 
-			description = "Keystore filename. Default: ${DEFAULT-VALUE}")
-	private String keyStoreFilename;
+	@Mixin
+	private StoreMixin storeMixin; 
 
 	@Option(names = { "-k","--key" }, 
 			defaultValue = "${env:CONVEX_KEY}", 
 			scope = ScopeType.INHERIT, 
 			description = "Public key to use. Default: ${DEFAULT-VALUE}")
-	private String keySpec;
+	public String publicKey;
 
 	@Option(names = { "-p","--keypass" }, 
 			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
@@ -92,14 +90,7 @@ public class Main extends ACommand {
 			description = "Apply strict security. Will forbid actions with dubious security implications.")
 	private boolean paranoid;
 
-	/**
-	 * Password for keystore. Option named to match Java keytool
-	 */
-	@Option(names = {"--storepass" }, 
-			scope = ScopeType.INHERIT, 
-			defaultValue = "${env:CONVEX_KEYSTORE_PASSWORD}", 
-			description = "Password to read/write to the Keystore")
-	private String keystorePassword;
+
 
 	@Option(names = { "-n","--noninteractive" }, 
 			scope = ScopeType.INHERIT, 
@@ -219,7 +210,7 @@ public class Main extends ACommand {
 				String msg=ce.getMessage();
 				informError(msg);
 				Throwable cause = ce.getCause();
-				if ((verbose>=2) && (cause != null)) {
+				if ((verbose>=3) && (cause != null)) {
 					err.println("Underlying cause: ");
 					cause.printStackTrace(err);
 				}
@@ -243,12 +234,12 @@ public class Main extends ACommand {
 	public char[] getStorePassword() {
 		char[] storepass = null;
 
-		if (this.keystorePassword != null) {
-			storepass = this.keystorePassword.toCharArray();
+		if (storeMixin.keystorePassword != null) {
+			storepass = storeMixin.keystorePassword.toCharArray();
 		} else {
 			if (!nonInteractive) {
 				storepass = readPassword("Enter Keystore Password: ");
-				keystorePassword=new String(storepass);
+				storeMixin.keystorePassword=new String(storepass);
 			}
 
 			if (storepass == null) {
@@ -288,20 +279,9 @@ public class Main extends ACommand {
 		return keypass;
 	}
 
-	/**
-	 * Gets the keystore file name currently used for the CLI
-	 * 
-	 * @return File name, or null if not specified
-	 */
-	public File getKeyStoreFile() {
-		if (keyStoreFilename != null) {
-			File f = Utils.getPath(keyStoreFilename);
-			return f;
-		}
-		return null;
-	}
 
-	private KeyStore keyStore = null;
+	KeyStore keyStore = null;
+	
 
 	/**
 	 * Gets the current key store
@@ -331,7 +311,7 @@ public class Main extends ACommand {
 	 * @return KeyStore instance, or null if does not exist
 	 */
 	public KeyStore loadKeyStore(boolean isCreate, char[] password) {
-		File keyFile = getKeyStoreFile();
+		File keyFile = storeMixin.getKeyStoreFile();
 		try {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
@@ -373,7 +353,7 @@ public class Main extends ACommand {
 
 		char[] storePassword = getStorePassword();
 
-		File keyFile = getKeyStoreFile();
+		File keyFile = storeMixin.getKeyStoreFile();
 		try {
 			if (!keyFile.exists()) {
 				throw new CLIError("Cannot find keystore file " + keyFile.getCanonicalPath());
@@ -450,15 +430,15 @@ public class Main extends ACommand {
 		if (keyStore == null)
 			throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
-			PFXTools.saveStore(keyStore, getKeyStoreFile(), storePassword);
+			PFXTools.saveStore(keyStore, storeMixin.getKeyStoreFile(), storePassword);
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
 		}
 	}
 	
 	public void saveKeyStore() {
-		if (keystorePassword==null) throw new CLIError("Key store password not provided");
-		saveKeyStore(keystorePassword.toCharArray());
+		if (storeMixin.keystorePassword==null) throw new CLIError("Key store password not provided");
+		saveKeyStore(storeMixin.keystorePassword.toCharArray());
 	}
 
 	public boolean isParanoid() {

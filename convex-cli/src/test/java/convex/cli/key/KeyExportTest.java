@@ -19,7 +19,7 @@ import convex.core.util.Utils;
 
 public class KeyExportTest {
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
-	private static final char[] KEY_PASSWORD = "testKeytPassword".toCharArray();
+	private static final char[] KEY_PASSWORD = "testKeyPassword".toCharArray();
 	private static final char[] EXPORT_PASSWORD = "testExportPassword".toCharArray();
 
 	private static final File TEMP_FILE;
@@ -66,7 +66,7 @@ public class KeyExportTest {
 			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
-			"--public-key", publicKey,
+			"--key", publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
 		String s=tester.getOutput();
@@ -83,7 +83,7 @@ public class KeyExportTest {
 			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME,
-			"--public-key", publicKey
+			"--key", publicKey
 		);
 		String s2=tester.getOutput();
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());

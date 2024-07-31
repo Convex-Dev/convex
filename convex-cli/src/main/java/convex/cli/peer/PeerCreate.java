@@ -1,6 +1,5 @@
 package convex.cli.peer;
 
-import java.io.File;
 import java.security.KeyStore;
 
 import org.slf4j.Logger;
@@ -87,11 +86,7 @@ public class PeerCreate extends APeerCommand {
 
 			// save the new keypair in the keystore
 			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getKeyPassword());
-
-			File keyFile = mainParent.getKeyStoreFile();
-
-			// save the store to a file
-			PFXTools.saveStore(keyStore, keyFile, mainParent.getStorePassword());
+			mainParent.saveKeyStore();
 
 			// connect using the default first user
 			Convex convex = mainParent.connect();

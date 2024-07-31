@@ -96,7 +96,7 @@ public class KeyImport extends AKeyCommand {
 			try {
 				keyPair = PEMTools.decryptPrivateKeyFromPEM(importText, importPassphrase.toCharArray());
 			} catch (Exception e) {
-				throw new CLIError("Cannot decode PEM",e);
+				throw new CLIError("Cannot decode PEM. File may be corrupt or wrong passphrase used.",e);
 			}
 		}
 		if (keyPair==null) throw new CLIError("Unable to import keypair");

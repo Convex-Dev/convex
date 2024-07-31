@@ -31,12 +31,6 @@ public class KeyExport extends AKeyCommand {
 
 	@ParentCommand
 	protected Key keyParent;
-
-	@Option(names = {"--public-key" },
-		description = "Hex string of the public key in the Keystore to use for the peer.%n"
-			+ "You only need to enter in the first distinct hex values of the public key.%n"
-			+ "For example: 0xf0234 or f0234")
-	private String keystorePublicKey ;
 	
 	@Option(names={"-o", "--output-file"},
 			description="Output file for the private key. Use '-' for STDOUT (default).")
@@ -61,7 +55,7 @@ public class KeyExport extends AKeyCommand {
 			if (cli().isParanoid()) {
 				throw new CLIError("Strict security: attempting to export PEM with no passphrase.");
 			} else {
-				log.warn("No export password '--export-password' provided: Defaulting to blank.");
+				log.warn("No export passphrase '--export-password' provided: Defaulting to blank.");
 			}
 			exportPassword="";
 		}
@@ -69,9 +63,15 @@ public class KeyExport extends AKeyCommand {
 	
 	@Override
 	public void run() {
+		String keystorePublicKey=cli().publicKey;
 		if ((keystorePublicKey == null)||(keystorePublicKey.isEmpty())) {
-			log.warn("You need to provide at least --public-key parameter");
-			return;
+			if (outputFilename==null) {
+				cli().inform("You must provide a --key parameter");
+				showUsage();
+				return;
+			}
+			
+			keystorePublicKey=cli().prompt("Enter public key to export: ");
 		}
 
 		String publicKey = keystorePublicKey;
