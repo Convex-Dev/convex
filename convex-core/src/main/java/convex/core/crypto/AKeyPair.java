@@ -112,11 +112,12 @@ public abstract class AKeyPair {
 	/**
 	 * Creates a key pair using specific key material.
 	 * 
-	 * @param keyMaterial Bytes to use as key
+	 * @param keyMaterial Bytes to use as key. Last 32 bytes will be used
 	 * @return New key pair
 	 */
 	public static AKeyPair create(byte[] keyMaterial) {
-		return create(Blob.wrap(keyMaterial));
+		int n=keyMaterial.length;
+		return create(Blob.wrap(keyMaterial,n-SEED_LENGTH,SEED_LENGTH));
 	}
 	
 	/**
@@ -167,11 +168,11 @@ public abstract class AKeyPair {
 	/**
 	 * Gets the seed from a JCA Private Key.
 	 * Should always be last 32 bytes of the encoding
-	 * @param priv Private Key in JCA format
+	 * @param privateKey Private Key in JCA format
 	 * @return
 	 */
-	protected static Blob extractSeed(PrivateKey priv) {
-		byte[] data=priv.getEncoded();
+	protected static Blob extractSeed(PrivateKey privateKey) {
+		byte[] data=privateKey.getEncoded();
 		int n=data.length;
 		Blob seed=Blob.wrap(data,n-SEED_LENGTH,SEED_LENGTH);
 		return seed;

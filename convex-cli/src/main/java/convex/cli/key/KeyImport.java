@@ -1,7 +1,5 @@
 package convex.cli.key;
 
-import java.security.PrivateKey;
-
 import org.bouncycastle.util.Arrays;
 
 import convex.cli.CLIError;
@@ -91,8 +89,15 @@ public class KeyImport extends AKeyCommand {
 			}
 			keyPair=BIP39.seedToKeyPair(hex.toFlatBlob());
 		} else if ("pem".equals(type)) {
-			PrivateKey privateKey = PEMTools.decryptPrivateKeyFromPEM(importText, importPassphrase.toCharArray());
-			keyPair = AKeyPair.create(privateKey);
+			if (importPassphrase==null) {
+				importPassphrase=new String(cli().readPassword("Enter passphrase for imported PEM key: "));
+			}
+			
+			try {
+				keyPair = PEMTools.decryptPrivateKeyFromPEM(importText, importPassphrase.toCharArray());
+			} catch (Exception e) {
+				throw new CLIError("Cannot decode PEM",e);
+			}
 		}
 		if (keyPair==null) throw new CLIError("Unable to import keypair");
 		

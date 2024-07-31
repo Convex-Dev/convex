@@ -24,7 +24,7 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(name="export",
 	mixinStandardHelpOptions=false,
-	description="Export a key pair from the keystore to a PEM file.")
+	description="Export a private key from the keystore. Uee with caution")
 public class KeyExport extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyExport.class);
@@ -52,8 +52,17 @@ public class KeyExport extends AKeyCommand {
 	private String type;
 	
 	private void ensureExportPassword() {
+		if ((exportPassword==null)&&(cli().isInteractive())) {
+			exportPassword=new String(cli().readPassword("Enter passphrase for exported key: "));
+		}
+		
 		if (exportPassword == null || exportPassword.length() == 0) {
-			log.warn("No export password '--export-password' provided: Defaulting to blank.");
+			
+			if (cli().isParanoid()) {
+				throw new CLIError("Strict security: attempting to export PEM with no passphrase.");
+			} else {
+				log.warn("No export password '--export-password' provided: Defaulting to blank.");
+			}
 			exportPassword="";
 		}
 	}
@@ -74,15 +83,19 @@ public class KeyExport extends AKeyCommand {
 		
 		// Default to "seed" type unless security is strict
 		if (type==null) {
-			if (cli().isParanoid()) throw new CLIError("Strict security: must specifiy key export type");
+			if (cli().isParanoid()) throw new CLIError("Strict security: must specifiy key export type, e.g. --type=seed");
 			type="seed";
 		}
 		
 		String output;
 		if ("pem".equals(type)) {
 			ensureExportPassword();
-			String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), exportPassword.toCharArray());
+			try {
+			String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair, exportPassword.toCharArray());
 			output=pemText;
+			} catch (Exception e) {
+				throw new CLIError("Cannot encrypt PEM",e);
+			}
 		} else if ("seed".equals(type)){
 			cli().paranoia("Raw seed export forbidden in strict mode.");
 			String rawSeed = keyPair.getSeed().toHexString();

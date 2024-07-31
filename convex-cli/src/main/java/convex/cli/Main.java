@@ -489,10 +489,11 @@ public class Main extends ACommand {
 
 	public char[] readPassword(String prompt) {
 		Console c = System.console();
-		if (c == null)
+		if (c == null) {
 			throw new CLIError(
 					"Unable to request password because console is unavaiable. Consider passing a password parameter, or running in interactive mode.");
-
+		}
+		
 		if (!noColour) prompt = Coloured.blue(prompt);
 		return c.readPassword(prompt);
 	}

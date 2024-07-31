@@ -36,7 +36,7 @@ public class KeyExportTest {
 	}
 
 	@Test
-	public void testKeyGenerateAndExport() {
+	public void testKeyGenerateAndExport() throws Exception {
 
 		// command key.generate
 		CLTester tester =  CLTester.run(
@@ -72,7 +72,7 @@ public class KeyExportTest {
 		String s=tester.getOutput();
 		assertEquals("",tester.getError());
 		assertEquals(ExitCodes.SUCCESS,tester.getResult());
-		AKeyPair kp=AKeyPair.create(PEMTools.decryptPrivateKeyFromPEM(s, EXPORT_PASSWORD));
+		AKeyPair kp=PEMTools.decryptPrivateKeyFromPEM(s, EXPORT_PASSWORD);
 		assertEquals(ak,kp.getAccountKey());
 		
 		// export publicKey as pem

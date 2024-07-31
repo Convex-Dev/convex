@@ -30,11 +30,11 @@ public class KeyImportTest {
 	}	
 
 	@Test
-	public void testKeyImportPEM() {
+	public void testKeyImportPEM() throws Exception {
 	 
 		AKeyPair keyPair = SodiumKeyPair.generate();
 		AccountKey accountKey=keyPair.getAccountKey();
-		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair.getPrivate(), IMPORT_PASSPHRASE);
+		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair, IMPORT_PASSPHRASE);
  
 		CLTester tester =  CLTester.run(
 			"key", 

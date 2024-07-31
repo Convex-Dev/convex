@@ -13,7 +13,6 @@ import java.util.Base64;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.PKCS8Generator;
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter;
 import org.bouncycastle.openssl.jcajce.JcaPKCS8Generator;
 import org.bouncycastle.operator.InputDecryptorProvider;
@@ -79,14 +78,15 @@ public class PEMTools {
 	}
 
 	/**
-	 * Encrypt a priavte key into a PEM formated text
+	 * Encrypt a private key into a PEM formated text
 	 *
 	 * @param privateKey Private key to encrypt
 	 * @param password Password to use for encryption
 	 * @return PEM text that can be saved or sent to another keystore
 	 * @throws Error Any encryption error that occurs
 	 */
-	public static String encryptPrivateKeyToPEM(PrivateKey privateKey, char[] password) throws Error {
+	public static String encryptPrivateKeyToPEM(AKeyPair keyPair, char[] password) throws Exception {
+		PrivateKey privateKey=keyPair.getPrivate();
 		StringWriter stringWriter = new StringWriter();
 		JcaPEMWriter writer = new JcaPEMWriter(stringWriter);
 		
@@ -98,24 +98,22 @@ public class PEMTools {
 			writer.writeObject(generator);
 			writer.close();
 		} catch (IOException | OperatorCreationException e) {
-			throw new Error("cannot encrypt private key to PEM: " + e);
+			throw new GeneralSecurityException("cannot encrypt private key to PEM: " + e);
 		} 
 		return stringWriter.toString();
 	}
 
 	/**
-	 * Decrypt a PEM string to a private key. The PEM string must contain the "ENCRYPTED PRIVATE KEY" type.
+	 * Decrypt a PEM string to a key pair. The PEM string must contain the "ENCRYPTED PRIVATE KEY" type.
 	 *
 	 * @param pemText PEM string to decode
 	 * @param password Password that was used to encrypt the private key
-	 * @return PrivateKey stored in the PEM
+	 * @return Key pair as stored in the PEM
 	 * @throws Error on reading the PEM, decryption and decoding the private key
 	 */
-	public static PrivateKey decryptPrivateKeyFromPEM(String pemText, char[] password) throws Error {
-		PrivateKey privateKey = null;
+	public static AKeyPair decryptPrivateKeyFromPEM(String pemText, char[] password) throws Exception {
 		StringReader stringReader = new StringReader(pemText);
 		PemObject pemObject = null;
-		JcaPEMKeyConverter converter = new JcaPEMKeyConverter();
 		try (PEMParser pemParser = new PEMParser(stringReader)) {
 			pemObject = pemParser.readPemObject();
 			while (pemObject != null) {
@@ -126,7 +124,7 @@ public class PEMTools {
 			}
 
 		} catch (IOException e) {
-			throw new Error("cannot read PEM",e);
+			throw new GeneralSecurityException("cannot read PEM",e);
 		}
 
 		if (pemObject == null) {
@@ -136,15 +134,15 @@ public class PEMTools {
 			PKCS8EncryptedPrivateKeyInfo encryptedInfo = new PKCS8EncryptedPrivateKeyInfo(pemObject.getContent());
 
 			JcePKCSPBEInputDecryptorProviderBuilder inputBuilder = new JcePKCSPBEInputDecryptorProviderBuilder();
-			inputBuilder.setProvider("BC");
 			InputDecryptorProvider decryptor = inputBuilder.build(password);
 
 			PrivateKeyInfo privateKeyInfo = encryptedInfo.decryptPrivateKeyInfo(decryptor);
-			privateKey = converter.getPrivateKey(privateKeyInfo);
+			byte[] data=privateKeyInfo.getEncoded();
+			AKeyPair kp=AKeyPair.create(data);
+			return kp;
 		} catch (IOException | PKCSException e) {
-			throw new Error("cannot decrypt password from PEM ", e);
+			throw new GeneralSecurityException("cannot decrypt password from PEM ", e);
 		}
-		return privateKey;
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -155,5 +153,4 @@ public class PEMTools {
 		AKeyPair kp2=readPEM(pem);
 		System.out.println(kp2);
 	}
-
 }
