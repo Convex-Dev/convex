@@ -75,7 +75,7 @@ public class PeerCreate extends APeerCommand {
 
 		try {
 			// create a keystore if it does not exist
-			keyStore = mainParent.storeMixin.loadKeyStore(mainParent);
+			keyStore = mainParent.storeMixin.loadKeyStore();
 		} catch (Error e) {
 			log.info(e.getMessage());
 			return;

@@ -258,7 +258,7 @@ public class Main extends ACommand {
 			return null;
 		}
 
-		char[] storePassword = storeMixin.getStorePassword(this);
+		char[] storePassword = storeMixin.getStorePassword();
 
 		File keyFile = storeMixin.getKeyStoreFile();
 		try {
@@ -297,7 +297,7 @@ public class Main extends ACommand {
 		for (int index = 0; index < count; index++) {
 			AKeyPair keyPair = AKeyPair.generate();
 			keyPairList.add(keyPair);
-			storeMixin.addKeyPairToStore(this, keyPair, keyPassword);
+			storeMixin.addKeyPairToStore(keyPair, keyPassword);
 		}
 
 		return keyPairList;

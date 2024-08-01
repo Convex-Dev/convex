@@ -27,7 +27,7 @@ public class KeyList extends AKeyCommand {
 
 	@Override
 	public void run() {
-		KeyStore keyStore = cli().storeMixin.loadKeyStore(cli());
+		KeyStore keyStore = cli().storeMixin.loadKeyStore();
 		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid keystore or use `convex key gen` to create one.");
 		
 		Enumeration<String> aliases;
@@ -40,7 +40,7 @@ public class KeyList extends AKeyCommand {
 				output.addRow(String.format("%5d", index), alias);
 				index ++;
 			}
-			cli().println(output);
+			println(output);
 		} catch (KeyStoreException e) {
 			throw new CLIError("Unexpected error reading keystore",e);
 		}

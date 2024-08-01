@@ -10,7 +10,7 @@ import etch.EtchStore;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
-public class EtchMixin {
+public class EtchMixin extends AMixin {
 
 	@Option(names={"-e", "--etch"},
 			scope = ScopeType.INHERIT,

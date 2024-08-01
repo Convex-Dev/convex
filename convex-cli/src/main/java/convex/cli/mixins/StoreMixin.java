@@ -12,14 +12,13 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
-public class StoreMixin {
+public class StoreMixin extends AMixin {
 
 	@Option(names = { "--keystore" }, 
 			defaultValue = "${env:CONVEX_KEYSTORE:-" + Constants.KEYSTORE_FILENAME+ "}", 
@@ -61,19 +60,19 @@ public class StoreMixin {
 	 * @param main TODO
 	 * @return Password string
 	 */
-	public char[] getStorePassword(Main main) {
+	public char[] getStorePassword() {
 		char[] storepass = null;
 	
 		if (keystorePassword != null) {
 			storepass = keystorePassword.toCharArray();
 		} else {
-			if (main.isInteractive()) {
-				storepass = main.readPassword("Enter Keystore Password: ");
+			if (isInteractive()) {
+				storepass = readPassword("Enter Keystore Password: ");
 				keystorePassword=new String(storepass);
 			}
 	
 			if (storepass == null) {
-				main.paranoia("Keystore password must be explicitly provided");
+				paranoia("Keystore password must be explicitly provided");
 				log.warn("No password for keystore: defaulting to blank password");
 				storepass = new char[0];
 			}
@@ -87,9 +86,9 @@ public class StoreMixin {
 	 * @param main TODO
 	 * @return KeyStore instance, or null if it does not exist
 	 */
-	public KeyStore getKeystore(Main main) {
+	public KeyStore getKeystore() {
 		if (keyStore == null) {
-			keyStore = loadKeyStore(false, getStorePassword(main));
+			keyStore = loadKeyStore(false, getStorePassword());
 		}
 		return keyStore;
 	}
@@ -100,8 +99,8 @@ public class StoreMixin {
 	 * @param main TODO
 	 * @return KeyStore instance, or null if does not exist
 	 */
-	public KeyStore loadKeyStore(Main main) {
-		return main.storeMixin.loadKeyStore(false, getStorePassword(main));
+	public KeyStore loadKeyStore() {
+		return loadKeyStore(false, getStorePassword());
 	}
 
 	/**
@@ -157,9 +156,9 @@ public class StoreMixin {
 	 * @param keyPair Keypair to add
 	 * @param keyPassword TODO
 	 */
-	public void addKeyPairToStore(Main main, AKeyPair keyPair, char[] keyPassword) {
+	public void addKeyPairToStore(AKeyPair keyPair, char[] keyPassword) {
 	
-		KeyStore keyStore = getKeystore(main);
+		KeyStore keyStore = getKeystore();
 		if (keyStore == null) {
 			throw new CLIError("Trying to add key pair but keystore does not exist");
 		}

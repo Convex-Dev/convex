@@ -79,7 +79,7 @@ public class PeerStart extends APeerCommand {
 			}
 		} else {
 			keyPair=AKeyPair.generate();
-			mainParent.storeMixin.addKeyPairToStore(mainParent, keyPair,mainParent.getKeyPassword());
+			mainParent.storeMixin.addKeyPairToStore(keyPair,mainParent.getKeyPassword());
 			log.warn("Generated new Keypair with public key: "+keyPair.getAccountKey());
 		}
 

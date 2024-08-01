@@ -71,7 +71,7 @@ public class KeyGenerate extends AKeyCommand {
 			return;
 		}
 		
-		char[] storePass=cli().storeMixin.getStorePassword(cli());
+		char[] storePass=cli().storeMixin.getStorePassword();
 		try {
 			KeyStore ks=cli().storeMixin.loadKeyStore(true,storePass);
 			for ( int index = 0; index < count; index ++) {
