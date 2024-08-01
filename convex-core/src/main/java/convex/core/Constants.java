@@ -150,7 +150,7 @@ public class Constants {
 	/**
 	 * Minimum stake for a Peer to be considered by other Peers in consensus
 	 */
-	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1;
+	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1000;
 
 	/**
 	 * Option for static compilation support. Set to true for static inlines on core
