@@ -1,5 +1,6 @@
 package convex.cli;
 
+import java.io.Console;
 import java.util.Scanner;
 
 import convex.cli.output.Coloured;
@@ -93,6 +94,17 @@ public abstract class ACommand implements Runnable {
 			String s=scanner.nextLine();
 			return s;
 		}
+	}
+	
+	public char[] readPassword(String prompt) {
+		Console c = System.console();
+		if (c == null) {
+			throw new CLIError(
+					"Unable to request password because console is unavaiable. Consider passing a password parameter, or running in interactive mode.");
+		}
+		
+		if (isColoured()) prompt = Coloured.blue(prompt);
+		return c.readPassword(prompt);
 	}
 
 	/**

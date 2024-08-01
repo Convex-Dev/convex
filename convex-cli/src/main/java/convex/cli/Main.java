@@ -1,6 +1,5 @@
 package convex.cli;
 
-import java.io.Console;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -334,16 +333,7 @@ public class Main extends ACommand {
 		return !nonInteractive;
 	}
 
-	public char[] readPassword(String prompt) {
-		Console c = System.console();
-		if (c == null) {
-			throw new CLIError(
-					"Unable to request password because console is unavaiable. Consider passing a password parameter, or running in interactive mode.");
-		}
-		
-		if (!noColour) prompt = Coloured.blue(prompt);
-		return c.readPassword(prompt);
-	}
+
 
 	public void informSuccess(String message) {
 		inform(1, noColour?message:Coloured.green(message));
