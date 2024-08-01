@@ -98,7 +98,7 @@ public class KeyExport extends AKeyCommand {
 				throw new CLIError("Cannot encrypt PEM",e);
 			}
 		} else if ("seed".equals(type)){
-			cli().paranoia("Raw seed export forbidden in strict mode.");
+			paranoia("Raw seed export forbidden in strict mode.");
 			String rawSeed = keyPair.getSeed().toHexString();
 			output=rawSeed;
 		} else {
@@ -106,7 +106,7 @@ public class KeyExport extends AKeyCommand {
 		}
 
 		if ((outputFilename==null)||("-".equals(outputFilename.trim()))) {
-			cli().println(output);
+			println(output);
 		} else {
 			try {
 				CLIUtils.writeFileAsString(Paths.get(outputFilename),output);
