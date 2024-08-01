@@ -61,18 +61,18 @@ public class EtchValidate extends AEtchCommand{
 		etch.visitIndex(visitor);
 		
 		long fails=visitor.failures;
-		if (visitor.failures>0) throw new CLIError("Etch validation failed!");
+		if (fails>0) throw new CLIError("Etch validation failed!");
 		
 		long len=etch.getDataLength();
 		long cellCount=visitor.values;
 		
 		cli().println("Etch validation completed with "+fails+" error(s)");
-		cli().println("Index nodes:          "+Text.toFriendlyNumber(visitor.indexPtrs));
-		cli().println("Cells:                "+Text.toFriendlyNumber(cellCount));
-		cli().println("Empty:                "+Text.toFriendlyNumber(visitor.empty));
-		cli().println("Database size:        "+Text.toFriendlyNumber(len));
-		cli().println("Avg. Encoding Length: "+Text.toFriendlyDecimal(((double)visitor.encoded)/cellCount));
-		cli().println("Storage per Cell:     "+Text.toFriendlyDecimal(((double)len)/cellCount));
+		cli().println("Index nodes:              "+Text.toFriendlyNumber(visitor.indexPtrs));
+		cli().println("Cells:                    "+Text.toFriendlyNumber(cellCount));
+		cli().println("Empty:                    "+Text.toFriendlyNumber(visitor.empty));
+		cli().println("Database size:            "+Text.toFriendlyNumber(len));
+		cli().println("Avg. Encoding Length:     "+Text.toFriendlyDecimal(((double)visitor.encoded)/cellCount));
+		cli().println("Storage per Cell (bytes): "+Text.toFriendlyDecimal(((double)len)/cellCount));
 
 	}
 }

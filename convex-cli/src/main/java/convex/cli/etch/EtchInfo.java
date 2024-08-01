@@ -2,6 +2,7 @@ package convex.cli.etch;
 
 import java.io.IOException;
 
+import convex.cli.CLIError;
 import convex.core.data.ACell;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -28,21 +29,21 @@ public class EtchInfo extends AEtchCommand{
 		
 			EtchStore store=store();
 			etch.Etch etch=store.getEtch();
-			cli().println("Etch file:        "+store.getFileName());
+			println("Etch file:        "+store.getFileName());
 			
-			cli().println("Etch version:     0x"+Utils.toHexString(etch.getVersion()));
-			cli().println("Data length:      "+Text.toFriendlyNumber(etch.getDataLength()));
+			println("Etch version:     0x"+Utils.toHexString(etch.getVersion()));
+			println("Data length:      "+Text.toFriendlyNumber(etch.getDataLength()));
 			
-			cli().println("Data root:        "+etch.getRootHash());
+			println("Data root:        "+etch.getRootHash());
 			try {
 				ACell root=store.getRootData();
-				cli().println("Root memory size: "+root.getMemorySize());
-				cli().println("Root data type:   "+RT.getType(root));
+				println("Root memory size: "+root.getMemorySize());
+				println("Root data type:   "+RT.getType(root));
 			} catch (MissingDataException e) {
-				cli().println("Root data missing");
+				println("Root data missing");
 			}
 		} catch (IOException e) {
-			cli().inform("IO Error: "+e.getMessage());
+			throw new CLIError("IO Error accessing Etch database: "+e.getMessage());
 		}
 	}
 }

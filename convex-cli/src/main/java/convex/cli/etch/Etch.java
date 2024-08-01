@@ -21,7 +21,7 @@ import picocli.CommandLine.Command;
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=false,
-	description="Manage etch database.")
+	description="Manage an etch database.")
 public class Etch extends ATopCommand {
 
 	@Override
