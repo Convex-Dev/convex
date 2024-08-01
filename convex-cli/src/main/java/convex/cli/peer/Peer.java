@@ -1,9 +1,8 @@
 package convex.cli.peer;
 
 import convex.cli.ATopCommand;
-import convex.cli.Main;
 import convex.cli.Constants;
-import etch.EtchStore;
+import convex.cli.Main;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -35,11 +34,6 @@ public class Peer extends ATopCommand {
 			description="Use the specified config file. If not specified, will default to CONVEX_PEER_CONFIG or "+Constants.CONFIG_FILENAME)
 	private String configFilename;
 
-	@Option(names={"-e", "--etch"},
-			scope = ScopeType.INHERIT,
-			defaultValue="${env:CONVEX_ETCH_FILE:-~/.convex/etch.db}",
-			description="Convex Etch database filename. Will default to CONVEX_ETCH_FILE or "+Constants.ETCH_FILENAME)
-	String etchStoreFilename;
 
 	@ParentCommand
 	protected Main mainParent;
@@ -50,8 +44,6 @@ public class Peer extends ATopCommand {
 		CommandLine.usage(new Peer(), System.out);
 	}
 
-	public EtchStore getEtchStore() {
-		return cli().getEtchStore(etchStoreFilename);
-	}
+
 
 }

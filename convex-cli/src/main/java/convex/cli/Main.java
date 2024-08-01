@@ -21,6 +21,7 @@ import convex.cli.client.Transact;
 import convex.cli.etch.Etch;
 import convex.cli.key.Key;
 import convex.cli.local.Local;
+import convex.cli.mixins.StoreMixin;
 import convex.cli.output.Coloured;
 import convex.cli.output.RecordOutput;
 import convex.cli.peer.Peer;
@@ -29,7 +30,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
-import etch.EtchStore;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
@@ -82,8 +82,6 @@ public class Main extends ACommand {
 			scope = ScopeType.INHERIT, 
 			description = "Apply strict security. Will forbid actions with dubious security implications.")
 	private boolean paranoid;
-
-
 
 	@Option(names = { "-n","--noninteractive" }, 
 			scope = ScopeType.INHERIT, 
@@ -318,10 +316,7 @@ public class Main extends ACommand {
 		throw new TODOException();
 	}
 
-	public void saveKeyStore() {
-		if (storeMixin.keystorePassword==null) throw new CLIError("Key store password not provided");
-		storeMixin.saveKeyStore(storeMixin.keystorePassword.toCharArray());
-	}
+
 
 	public boolean isParanoid() {
 		return this.paranoid;
@@ -397,21 +392,7 @@ public class Main extends ACommand {
 		}
 	}
 
-	public EtchStore getEtchStore(String etchStoreFilename) {
-		if (etchStoreFilename == null) {
-			throw new CLIError(
-					"No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
-		}
 
-		File etchFile = Utils.getPath(etchStoreFilename);
-
-		try {
-			EtchStore store = EtchStore.create(etchFile);
-			return store;
-		} catch (IOException e) {
-			throw new CLIError("Unable to load Etch store at: " + etchFile + " cause: " + e.getMessage());
-		}
-	}
 
 	/**
 	 * Prompt the user for a Y/N answer

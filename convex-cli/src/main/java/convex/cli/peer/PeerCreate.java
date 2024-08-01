@@ -86,7 +86,7 @@ public class PeerCreate extends APeerCommand {
 
 			// save the new keypair in the keystore
 			PFXTools.setKeyPair(keyStore, keyPair, mainParent.getKeyPassword());
-			mainParent.saveKeyStore();
+			mainParent.storeMixin.saveKeyStore();
 
 			// connect using the default first user
 			Convex convex = mainParent.connect();

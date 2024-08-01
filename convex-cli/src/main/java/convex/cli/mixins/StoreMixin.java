@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.mixins;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -7,6 +7,12 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.UnrecoverableKeyException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
@@ -20,6 +26,9 @@ public class StoreMixin {
 			scope = ScopeType.INHERIT, 
 			description = "Keystore filename. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
+
+	
+	static Logger log = LoggerFactory.getLogger(StoreMixin.class);
 
 	/**
 	 * Password for keystore. Option named to match Java keytool
@@ -58,14 +67,14 @@ public class StoreMixin {
 		if (keystorePassword != null) {
 			storepass = keystorePassword.toCharArray();
 		} else {
-			if (!main.nonInteractive) {
+			if (main.isInteractive()) {
 				storepass = main.readPassword("Enter Keystore Password: ");
 				keystorePassword=new String(storepass);
 			}
 	
 			if (storepass == null) {
 				main.paranoia("Keystore password must be explicitly provided");
-				Main.log.warn("No password for keystore: defaulting to blank password");
+				log.warn("No password for keystore: defaulting to blank password");
 				storepass = new char[0];
 			}
 		}
@@ -108,7 +117,7 @@ public class StoreMixin {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else if (isCreate) {
-				Main.log.debug("No keystore exists, creating at: " + keyFile.getCanonicalPath());
+				log.debug("No keystore exists, creating at: " + keyFile.getCanonicalPath());
 				Utils.ensurePath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			}
@@ -123,6 +132,11 @@ public class StoreMixin {
 			throw new CLIError("Unable to read keystore at: " + keyFile, e);
 		}
 		return keyStore;
+	}
+	
+	public void saveKeyStore() {
+		if (keystorePassword==null) throw new CLIError("Key store password not provided, unable to save");
+		saveKeyStore(keystorePassword.toCharArray());
 	}
 
 	public void saveKeyStore(char[] storePassword) {

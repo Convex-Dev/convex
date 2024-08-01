@@ -55,7 +55,7 @@ public class PeerGenesis extends APeerCommand {
 			if (cli().isParanoid()) throw new CLIError("Aborting due to strict security: no key pair specified");
 			keyPair=AKeyPair.generate();
 			cli().storeMixin.addKeyPairToStore(cli(), keyPair,cli().getKeyPassword());
-			cli().saveKeyStore();
+			cli().storeMixin.saveKeyStore();
 			cli().inform("Generated new Keypair with public key: "+keyPair.getAccountKey());
 		}
 
