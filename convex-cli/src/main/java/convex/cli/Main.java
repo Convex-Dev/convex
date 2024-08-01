@@ -392,8 +392,6 @@ public class Main extends ACommand {
 		}
 	}
 
-
-
 	/**
 	 * Prompt the user for a Y/N answer
 	 * @param string
