@@ -333,21 +333,6 @@ public class Main extends ACommand {
 		return !nonInteractive;
 	}
 
-
-
-	public void informSuccess(String message) {
-		inform(1, noColour?message:Coloured.green(message));
-	}
-	
-	public void informError(String message) {
-		inform(1, noColour?message:Coloured.red(message));
-	}
-
-	public void inform(String message) {
-		inform(1, noColour?message:Coloured.yellow(message));
-	}
-
-
 	public void setOut(String outFile) {
 		if (outFile == null || outFile.equals("-")) {
 			commandLine.setOut(new PrintWriter(System.out));
@@ -362,27 +347,6 @@ public class Main extends ACommand {
 			}
 		}
 	}
-
-	/**
-	 * Prompt the user for a Y/N answer
-	 * @param string
-	 * @return
-	 */
-	public boolean question(String string) {
-		if (!isInteractive()) throw new CLIError("Can't ask user question in non-interactive mode: "+string);
-		try {
-			if (isColoured()) string=Coloured.blue(string);
-			inform(0,string);
-			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
-			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
-			if (Character.toLowerCase(c)=='y') return true;
-		} catch (IOException e) {
-			throw new CLIError("Unexpected error getting console input: "+e);
-		}
-		return false;
-	}
-	
-
 
 	@Override
 	public Main cli() {

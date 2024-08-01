@@ -1,6 +1,7 @@
 package convex.cli;
 
 import java.io.Console;
+import java.io.IOException;
 import java.util.Scanner;
 
 import convex.cli.output.Coloured;
@@ -106,6 +107,27 @@ public abstract class ACommand implements Runnable {
 		if (isColoured()) prompt = Coloured.blue(prompt);
 		return c.readPassword(prompt);
 	}
+	
+	/**
+	 * Prompt the user for a Y/N answer
+	 * @param string
+	 * @return
+	 */
+	public boolean question(String string) {
+		if (!isInteractive()) throw new CLIError("Can't ask user question in non-interactive mode: "+string);
+		try {
+			if (isColoured()) string=Coloured.blue(string);
+			inform(0,string);
+			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
+			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
+			if (Character.toLowerCase(c)=='y') return true;
+		} catch (IOException e) {
+			throw new CLIError("Unexpected error getting console input: "+e);
+		}
+		return false;
+	}
+	
+
 
 	/**
 	 * Checks if the CLI should output ANSI colours
@@ -114,6 +136,24 @@ public abstract class ACommand implements Runnable {
 	protected boolean isColoured() {
 		return cli().isColoured();
 	}
+	
+
+	public void informSuccess(String message) {
+		if (isColoured()) message=Coloured.green(message);
+		inform(1, message);
+	}
+	
+	public void informError(String message) {
+		if (isColoured()) message=Coloured.red(message);
+		inform(1, message);
+	}
+
+	public void inform(String message) {
+		if (isColoured()) message=Coloured.yellow(message);
+		inform(1,message);
+	}
+
+
 
 
 }
