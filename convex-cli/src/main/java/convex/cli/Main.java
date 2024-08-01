@@ -8,7 +8,6 @@ import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
-import java.util.Scanner;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,9 +22,7 @@ import convex.cli.key.Key;
 import convex.cli.local.Local;
 import convex.cli.mixins.StoreMixin;
 import convex.cli.output.Coloured;
-import convex.cli.output.RecordOutput;
 import convex.cli.peer.Peer;
-import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.exceptions.TODOException;
@@ -96,8 +93,8 @@ public class Main extends ACommand {
 	@Option(names = { "-v","--verbose" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-2}", 
-			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}")
-	private Integer verbose;
+			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}") 
+	Integer verbose;
 
 	public Main() {
 		commandLine = commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
@@ -316,30 +313,23 @@ public class Main extends ACommand {
 		throw new TODOException();
 	}
 
-
-
+	@Override
 	public boolean isParanoid() {
 		return this.paranoid;
 	}
+	
 
-	public void println(String s) {
-		if (s == null)
-			s = "null";
-		commandLine.getOut().println(s);
+	@Override
+	public boolean isColoured() {
+		return !noColour;
+	}
+	
+	@Override
+	public CommandLine commandLine() {
+		return commandLine;
 	}
 
-	public void printResult(Result result) {
-		commandLine.getOut().println(result.toString());
-	}
-
-	public void printRecord(RecordOutput output) {
-		output.writeToStream(commandLine.getOut());
-	}
-
-	public void println(Object value) {
-		println(Utils.toString(value));
-	}
-
+	@Override
 	public boolean isInteractive() {
 		return !nonInteractive;
 	}
@@ -366,16 +356,7 @@ public class Main extends ACommand {
 	public void inform(String message) {
 		inform(1, noColour?message:Coloured.yellow(message));
 	}
-	
-	private void inform(int level, String message) {
-		if (verbose<level) return;
-		commandLine.getErr().println(message);
-	}
 
-	public void paranoia(String message) {
-		if (isParanoid())
-			throw new CLIError("STRICT SECURITY: " + message);
-	}
 
 	public void setOut(String outFile) {
 		if (outFile == null || outFile.equals("-")) {
@@ -400,7 +381,8 @@ public class Main extends ACommand {
 	public boolean question(String string) {
 		if (!isInteractive()) throw new CLIError("Can't ask user question in non-interactive mode: "+string);
 		try {
-			inform(0,noColour?string:Coloured.blue(string));
+			if (isColoured()) string=Coloured.blue(string);
+			inform(0,string);
 			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
 			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
 			if (Character.toLowerCase(c)=='y') return true;
@@ -410,20 +392,7 @@ public class Main extends ACommand {
 		return false;
 	}
 	
-	/**
-	 * Prompt the user for String input
-	 * @param string
-	 * @return
-	 */
-	public String prompt(String string) {
-		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+string);
-		
-		inform(0,noColour?string:Coloured.blue(string));
-		try (Scanner scanner = new Scanner(System.in)) {
-			String s=scanner.nextLine();
-			return s;
-		}
-	}
+
 
 	@Override
 	public Main cli() {

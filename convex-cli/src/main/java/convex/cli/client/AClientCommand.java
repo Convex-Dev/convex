@@ -47,7 +47,7 @@ public abstract class AClientCommand extends ATopCommand {
 	protected boolean ensureAddress(Convex convex) {
 		Address a = convex.getAddress();
 		if (a!=null) return true;
-		if (cli().isInteractive()) {
+		if (isInteractive()) {
 			String s=System.console().readLine("Enter origin address: ");
 			a=Address.parse(s);
 		}
@@ -84,7 +84,7 @@ public abstract class AClientCommand extends ATopCommand {
 		}
 		
 		if (pk==null) {
-			pk=cli().prompt("Enter public key: ");
+			pk=prompt("Enter public key: ");
 		}
 		
 
