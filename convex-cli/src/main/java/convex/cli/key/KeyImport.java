@@ -102,11 +102,11 @@ public class KeyImport extends AKeyCommand {
 		if (keyPair==null) throw new CLIError("Unable to import keypair");
 		
 		// Finally write to store
-		char[] storePassword=cli().getStorePassword();
+		char[] storePassword=cli().storeMixin.getStorePassword(cli());
 		char[] keyPassword=cli().getKeyPassword();
 		cli().addKeyPairToStore(keyPair,keyPassword);
 		Arrays.fill(keyPassword, 'x');
-		cli().saveKeyStore(storePassword);	
+		cli().storeMixin.saveKeyStore(storePassword);	
 		cli().println(keyPair.getAccountKey().toHexString());
 	}
 }

@@ -71,9 +71,9 @@ public class KeyGenerate extends AKeyCommand {
 			return;
 		}
 		
-		char[] storePass=cli().getStorePassword();
+		char[] storePass=cli().storeMixin.getStorePassword(cli());
 		try {
-			KeyStore ks=cli().loadKeyStore(true,storePass);
+			KeyStore ks=cli().storeMixin.loadKeyStore(true,storePass);
 			for ( int index = 0; index < count; index ++) {
 				AKeyPair kp=generateKeyPair();
                 String publicKeyHexString =  kp.getAccountKey().toHexString();
@@ -82,7 +82,7 @@ public class KeyGenerate extends AKeyCommand {
 				PFXTools.setKeyPair(ks, kp, keyPassword); 
 				Arrays.fill(keyPassword, 'p');
 			}
-			cli().saveKeyStore(storePass);
+			cli().storeMixin.saveKeyStore(storePass);
 		} catch (Throwable e) {
 			throw Utils.sneakyThrow(e);
 		} finally {
