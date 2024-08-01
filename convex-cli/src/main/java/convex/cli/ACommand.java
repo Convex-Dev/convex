@@ -11,7 +11,7 @@ import convex.core.util.Utils;
 import picocli.CommandLine;
 
 /**
- * Base class for Convex CLI commands
+ * Base class for Convex CLI command components and mixins
  */
 public abstract class ACommand implements Runnable {
 
@@ -152,8 +152,5 @@ public abstract class ACommand implements Runnable {
 		if (isColoured()) message=Coloured.yellow(message);
 		inform(1,message);
 	}
-
-
-
 
 }

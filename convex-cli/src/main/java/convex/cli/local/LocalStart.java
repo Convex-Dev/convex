@@ -80,7 +80,7 @@ public class LocalStart implements Runnable {
 				String keyPrefix = values.get(index);
 				if (keyPrefix.isBlank()) continue;
 
-				AKeyPair keyPair = mainParent.loadKeyFromStore(keyPrefix);
+				AKeyPair keyPair = mainParent.storeMixin.loadKeyFromStore(mainParent, keyPrefix);
 				if (keyPair == null) {
 					log.warn("Unable to find public key in store: "+keyPrefix);
 				} else {

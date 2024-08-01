@@ -76,7 +76,7 @@ public class KeyExport extends AKeyCommand {
 		}
 
 		String publicKey = keystorePublicKey;
-		AKeyPair keyPair = cli().loadKeyFromStore(publicKey);
+		AKeyPair keyPair = cli().storeMixin.loadKeyFromStore(cli(), publicKey);
 		if (keyPair==null) {
 			// TODO: maybe prompt?
 			throw new CLIError("Key pair not found for key: "+keystorePublicKey);

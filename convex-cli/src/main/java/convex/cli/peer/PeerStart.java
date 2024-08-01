@@ -72,7 +72,7 @@ public class PeerStart extends APeerCommand {
 
 		AKeyPair keyPair = null;
 		if (keystorePublicKey!=null) {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
+			keyPair = mainParent.storeMixin.loadKeyFromStore(mainParent, keystorePublicKey);
 			if (keyPair == null) {
 				log.warn("Cannot load specified key pair to perform peer start: "+keystorePublicKey);
 				return;

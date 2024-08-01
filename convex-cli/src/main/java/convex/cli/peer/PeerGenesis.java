@@ -44,7 +44,7 @@ public class PeerGenesis extends APeerCommand {
 
 		AKeyPair keyPair = null;
 		if (genesisKey!=null) {
-			keyPair = cli().loadKeyFromStore(genesisKey);
+			keyPair = cli().storeMixin.loadKeyFromStore(cli(), genesisKey);
 			if (keyPair == null) {
 				throw new CLIError("Cannot find specified key pair to perform peer start: "+genesisKey);
 			}

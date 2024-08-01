@@ -6,12 +6,14 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.UnrecoverableKeyException;
+import java.util.Enumeration;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
@@ -169,6 +171,51 @@ public class StoreMixin extends AMixin {
 			throw new CLIError("Cannot store the key to the key store " + t);
 		}
 	
+	}
+
+	/**
+	 * Loads a keypair from configured keystore
+	 * 
+	 * @param main TODO
+	 * @param publicKey String identifying the public key. May be a prefix
+	 * @return Keypair instance, or null if not found
+	 */
+	public AKeyPair loadKeyFromStore(Main main, String publicKey) {
+		if (publicKey == null)
+			return null;
+	
+		AKeyPair keyPair = null;
+	
+		publicKey = publicKey.trim();
+		publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
+		if (publicKey.isEmpty()) {
+			return null;
+		}
+	
+		char[] storePassword = getStorePassword();
+	
+		File keyFile = getKeyStoreFile();
+		try {
+			if (!keyFile.exists()) {
+				throw new CLIError("Cannot find keystore file " + keyFile.getCanonicalPath());
+			}
+			KeyStore keyStore = PFXTools.loadStore(keyFile, storePassword);
+	
+			Enumeration<String> aliases = keyStore.aliases();
+	
+			while (aliases.hasMoreElements()) {
+				String alias = aliases.nextElement();
+				if (alias.indexOf(publicKey) == 0) {
+					log.trace("found keypair " + alias);
+					keyPair = PFXTools.getKeyPair(keyStore, alias, main.getKeyPassword());
+					break;
+				}
+			}
+		} catch (Exception t) {
+			throw new CLIError("Cannot load key store", t);
+		}
+	
+		return keyPair;
 	}
 
 }

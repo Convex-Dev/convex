@@ -56,7 +56,7 @@ public class AccountCreate implements Runnable {
 		AKeyPair keyPair = null;
 
 		if (!keystorePublicKey.isEmpty()) {
-			keyPair = mainParent.loadKeyFromStore(keystorePublicKey);
+			keyPair = mainParent.storeMixin.loadKeyFromStore(mainParent, keystorePublicKey);
 			if (keyPair == null) {
 				throw new CLIError("Cannot find the provided public key in keystore: "+keystorePublicKey);
 			}

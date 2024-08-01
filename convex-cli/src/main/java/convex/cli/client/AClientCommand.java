@@ -88,7 +88,7 @@ public abstract class AClientCommand extends ATopCommand {
 		}
 		
 
-		keyPair=mainParent.loadKeyFromStore(pk);
+		keyPair=mainParent.storeMixin.loadKeyFromStore(mainParent, pk);
 		if (keyPair==null) {
 			// We didn't find required keypair
 			throw new CLIError("Can't find keypair with public key "+pk+" for Address "+address);

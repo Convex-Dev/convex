@@ -3,9 +3,7 @@ package convex.cli;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.security.KeyStore;
 import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -23,7 +21,6 @@ import convex.cli.mixins.StoreMixin;
 import convex.cli.output.Coloured;
 import convex.cli.peer.Peer;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.PFXTools;
 import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 import picocli.CommandLine;
@@ -54,7 +51,7 @@ import picocli.CommandLine.ScopeType;
 		description = "Convex Command Line Interface")
 
 public class Main extends ACommand {
-	static Logger log = LoggerFactory.getLogger(Main.class);
+	private static Logger log = LoggerFactory.getLogger(Main.class);
 
 	public CommandLine commandLine = new CommandLine(this);
 
@@ -239,50 +236,6 @@ public class Main extends ACommand {
 		return keypass;
 	}
 
-
-	/**
-	 * Loads a keypair from configured keystore
-	 * 
-	 * @param publicKey String identifying the public key. May be a prefix
-	 * @return Keypair instance, or null if not found
-	 */
-	public AKeyPair loadKeyFromStore(String publicKey) {
-		if (publicKey == null)
-			return null;
-
-		AKeyPair keyPair = null;
-
-		publicKey = publicKey.trim();
-		publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
-		if (publicKey.isEmpty()) {
-			return null;
-		}
-
-		char[] storePassword = storeMixin.getStorePassword();
-
-		File keyFile = storeMixin.getKeyStoreFile();
-		try {
-			if (!keyFile.exists()) {
-				throw new CLIError("Cannot find keystore file " + keyFile.getCanonicalPath());
-			}
-			KeyStore keyStore = PFXTools.loadStore(keyFile, storePassword);
-
-			Enumeration<String> aliases = keyStore.aliases();
-
-			while (aliases.hasMoreElements()) {
-				String alias = aliases.nextElement();
-				if (alias.indexOf(publicKey) == 0) {
-					log.trace("found keypair " + alias);
-					keyPair = PFXTools.getKeyPair(keyStore, alias, getKeyPassword());
-					break;
-				}
-			}
-		} catch (Exception t) {
-			throw new CLIError("Cannot load key store", t);
-		}
-
-		return keyPair;
-	}
 
 	/**
 	 * Generate key pairs and add to store. Does not save store!
