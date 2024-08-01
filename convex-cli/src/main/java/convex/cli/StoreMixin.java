@@ -7,6 +7,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.UnrecoverableKeyException;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
 import picocli.CommandLine.Option;
@@ -133,6 +134,28 @@ public class StoreMixin {
 		} catch (Throwable t) {
 			throw Utils.sneakyThrow(t);
 		}
+	}
+
+	/**
+	 * Adds key pair to store. Does not save keystore!
+	 * 
+	 * @param main TODO
+	 * @param keyPair Keypair to add
+	 * @param keyPassword TODO
+	 */
+	public void addKeyPairToStore(Main main, AKeyPair keyPair, char[] keyPassword) {
+	
+		KeyStore keyStore = getKeystore(main);
+		if (keyStore == null) {
+			throw new CLIError("Trying to add key pair but keystore does not exist");
+		}
+		try {
+			// save the key in the keystore
+			PFXTools.setKeyPair(keyStore, keyPair, keyPassword);
+		} catch (Throwable t) {
+			throw new CLIError("Cannot store the key to the key store " + t);
+		}
+	
 	}
 
 }

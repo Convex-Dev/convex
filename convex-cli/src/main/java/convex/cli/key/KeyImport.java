@@ -3,6 +3,7 @@ package convex.cli.key;
 import org.bouncycastle.util.Arrays;
 
 import convex.cli.CLIError;
+import convex.cli.util.CLIUtils;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.PEMTools;
@@ -49,7 +50,7 @@ public class KeyImport extends AKeyCommand {
 		// Ensure importText is filled
 		if (importFilename != null && importFilename.length() > 0) {
 			if (importText!=null) throw new CLIError("Please provide either --import-file or --text, not both!");
-			importText=cli().loadFileAsString(importFilename);
+			importText=CLIUtils.loadFileAsString(importFilename);
 		}
 		if (importText == null || importText.length() == 0) {
 			showUsage();
@@ -104,7 +105,7 @@ public class KeyImport extends AKeyCommand {
 		// Finally write to store
 		char[] storePassword=cli().storeMixin.getStorePassword(cli());
 		char[] keyPassword=cli().getKeyPassword();
-		cli().addKeyPairToStore(keyPair,keyPassword);
+		cli().storeMixin.addKeyPairToStore(cli(), keyPair,keyPassword);
 		Arrays.fill(keyPassword, 'x');
 		cli().storeMixin.saveKeyStore(storePassword);	
 		cli().println(keyPair.getAccountKey().toHexString());

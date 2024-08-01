@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
+import convex.cli.util.CLIUtils;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import picocli.CommandLine.Command;
@@ -108,7 +109,7 @@ public class KeyExport extends AKeyCommand {
 			cli().println(output);
 		} else {
 			try {
-				cli().writeFileAsString(Paths.get(outputFilename),output);
+				CLIUtils.writeFileAsString(Paths.get(outputFilename),output);
 			} catch (IOException e) {
 				throw new CLIError("Failed to write output file: "+e.getMessage());
 			}

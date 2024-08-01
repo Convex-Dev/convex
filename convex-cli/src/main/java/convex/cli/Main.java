@@ -4,10 +4,6 @@ import java.io.Console;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.security.KeyStore;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -307,30 +303,10 @@ public class Main extends ACommand {
 		for (int index = 0; index < count; index++) {
 			AKeyPair keyPair = AKeyPair.generate();
 			keyPairList.add(keyPair);
-			addKeyPairToStore(keyPair, keyPassword);
+			storeMixin.addKeyPairToStore(this, keyPair, keyPassword);
 		}
 
 		return keyPairList;
-	}
-
-	/**
-	 * Adds key pair to store. Does not save keystore!
-	 * 
-	 * @param keyPair Keypair to add
-	 */
-	public void addKeyPairToStore(AKeyPair keyPair, char[] keyPassword) {
-
-		KeyStore keyStore = storeMixin.getKeystore(this);
-		if (keyStore == null) {
-			throw new CLIError("Trying to add key pair but keystore does not exist");
-		}
-		try {
-			// save the key in the keystore
-			PFXTools.setKeyPair(keyStore, keyPair, keyPassword);
-		} catch (Throwable t) {
-			throw new CLIError("Cannot store the key to the key store " + t);
-		}
-
 	}
 
 	/**
@@ -383,32 +359,6 @@ public class Main extends ACommand {
 		if (!noColour) prompt = Coloured.blue(prompt);
 		return c.readPassword(prompt);
 	}
-
-	public String loadFileAsString(String fname) {
-		String result = null;
-		try {
-			fname = fname.trim();
-			if ("-".equals(fname)) {
-				byte[] bs = System.in.readAllBytes();
-				result = new String(bs);
-			} else {
-				Path path = Paths.get(fname);
-				if (!path.toFile().exists()) {
-					throw new CLIError("Import file does not exist: " + path);
-				}
-				result = Files.readString(path, StandardCharsets.UTF_8);
-			}
-		} catch (IOException e) {
-			throw new CLIError("Unable to read import file", e);
-		}
-		return result;
-	}
-	
-	public void writeFileAsString(Path file, String content) throws IOException {
-		byte[] bs=content.getBytes(StandardCharsets.UTF_8);
-		Files.write(file, bs);
-	}
-	
 
 	public void informSuccess(String message) {
 		inform(1, noColour?message:Coloured.green(message));
