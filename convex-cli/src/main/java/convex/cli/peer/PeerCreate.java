@@ -35,7 +35,7 @@ import picocli.CommandLine.Spec;
 
 @Command(name="create",
 	aliases={"cr"},
-	description="Creates a keypair, new account and a funding stake: to run a local peer.")
+	description="Creates a peer ready to join a Convex network.")
 public class PeerCreate extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
@@ -50,7 +50,7 @@ public class PeerCreate extends APeerCommand {
 	private String keystorePublicKey;
 
 	@Option(names={"--port"},
-		description="Port number of nearest peer to connect too.")
+		description="Port number of remote peer to connect too.")
 	private int port = 0;
 
 	@Option(names={"--host"},

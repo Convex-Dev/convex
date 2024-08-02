@@ -13,7 +13,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
-import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -39,13 +38,15 @@ public class JoinNetworkTest {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 
-		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*10;
+		// We plan to stake twice the minimum amount
+		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*2;
+		
 		synchronized(network.SERVER) {
 			Convex heroConvex=network.CONVEX;
 
-			// Create new peer controller account
+			// Create new peer controller account, ensure it has enough coins to stake
 			Address controller=heroConvex.createAccountSync(kp.getAccountKey());
-			Result trans=heroConvex.transferSync(controller,Coin.DIAMOND);
+			Result trans=heroConvex.transferSync(controller,STAKE*2);
 			assertFalse(trans.isError());
 
 			// create test user account
