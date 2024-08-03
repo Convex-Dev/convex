@@ -56,7 +56,7 @@ As such the license has been written based on the following principles:
 
 "Originator" shall mean the original author of the Convex software, Michael Richard Anderson, who established to Convex Foundation to further the goals of building effective decentralised economic systems.
 
-"Governance Body" shall mean the the Legal Entity legally authorised by the Originator to administer governance decisions relating to the Work, which as of April 2023 is the Convex Foundation.
+"Governance Body" shall mean the Legal Entity legally authorised by the Originator to administer governance decisions relating to the Work, which as of April 2023 is the Convex Foundation.
 
 "Convex Network Governance Rules" shall mean the set of rules established and updated from time to time by the Governance Body for the secure, equitable and efficient operation of the Convex Network. The current version shall be made publicly available by the Governance Body, at time of writing [here](docs/network-governance-rules.md).
 
