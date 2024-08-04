@@ -41,7 +41,7 @@ public class KeyTest {
 				"-p", KEY_PASSWORD, 
 				"--storepass", KEYSTORE_PASSWORD, 
 				"--keystore", fileName);
-		tester.assertResult(0);
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		String key = tester.getOutput().trim();
 		assertEquals(64,key.length());
 		
@@ -51,7 +51,7 @@ public class KeyTest {
 
 		// command key.list
 		tester =  CLTester.run("key", "list", "--storepass", KEYSTORE_PASSWORD, "--keystore", fileName);
-		//tester.assertOutputMatch("^Index Public Key\\s+1");
+		tester.assertExitCode(ExitCodes.SUCCESS);
 
 		// command key.list with non-existant keystore
 		tester =  CLTester.run("key", "list", "--storepass", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");

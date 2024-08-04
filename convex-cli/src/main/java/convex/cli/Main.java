@@ -3,31 +3,25 @@ package convex.cli;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ch.qos.logback.classic.Level;
-import convex.api.Convex;
+import convex.cli.account.Account;
 import convex.cli.client.Query;
 import convex.cli.client.Status;
 import convex.cli.client.Transact;
 import convex.cli.etch.Etch;
 import convex.cli.key.Key;
 import convex.cli.local.Local;
-import convex.cli.mixins.StoreMixin;
 import convex.cli.output.Coloured;
 import convex.cli.peer.Peer;
-import convex.core.crypto.AKeyPair;
-import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
 import picocli.CommandLine.IVersionProvider;
-import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.ScopeType;
@@ -55,20 +49,6 @@ public class Main extends ACommand {
 
 	public CommandLine commandLine = new CommandLine(this);
 
-	@Mixin
-	public StoreMixin storeMixin; 
-
-	@Option(names = { "-k","--key" }, 
-			defaultValue = "${env:CONVEX_KEY}", 
-			scope = ScopeType.INHERIT, 
-			description = "Public key to use. Default: ${DEFAULT-VALUE}")
-	public String publicKey;
-
-	@Option(names = { "-p","--keypass" }, 
-			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
-			scope = ScopeType.INHERIT, 
-			description = "Key password in key store. Can also specify with CONVEX_KEY_PASSWORD environment variable.")
-	private String keyPassword;
 
 	@Option(names = { "-S","--strict-security" }, 
 			defaultValue = "false", 
@@ -78,12 +58,13 @@ public class Main extends ACommand {
 
 	@Option(names = { "-n","--noninteractive" }, 
 			scope = ScopeType.INHERIT, 
-			description = "Specify to disable interactive prompts. Intended for scripts.") boolean nonInteractive;
+			description = "Specify to disable interactive prompts. Useful for scripts.") 
+	boolean nonInteractive;
 	
 	@Option(names = { "--no-color" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:NO_COLOR}", 
-			description = "Suppress ANSI colour output. Can also stop with NO_COLOR uenviornment variable")
+			description = "Suppress ANSI colour output. Can also suppress with NO_COLOR environment variable.")
 	private boolean noColour;
 
 	@Option(names = { "-v","--verbose" }, 
@@ -208,63 +189,6 @@ public class Main extends ACommand {
 
 	}
 
-	/**
-	 * Keys the password for the current key
-	 * 
-	 * @return password
-	 */
-	public char[] getKeyPassword() {
-		char[] keypass = null;
-
-		if (this.keyPassword != null) {
-			keypass = this.keyPassword.toCharArray();
-		} else {
-			if (!nonInteractive) {
-				keypass = readPassword("Private Key Encryption Password: ");
-			}
-
-			if (keypass == null) {
-				log.warn("No password for key: defaulting to blank password");
-				keypass = new char[0];
-			}
-			
-			this.keyPassword=new String(keypass);
-		}
-		if (keypass.length == 0) {
-			paranoia("Cannot use an empty private key password");
-		}
-		return keypass;
-	}
-
-
-	/**
-	 * Generate key pairs and add to store. Does not save store!
-	 * 
-	 * @param count Number of key pairs to generate
-	 * @return List of key pairs
-	 */
-	public List<AKeyPair> generateKeyPairs(int count, char[] keyPassword) {
-		List<AKeyPair> keyPairList = new ArrayList<>(count);
-
-		// generate `count` keys
-		for (int index = 0; index < count; index++) {
-			AKeyPair keyPair = AKeyPair.generate();
-			keyPairList.add(keyPair);
-			storeMixin.addKeyPairToStore(keyPair, keyPassword);
-		}
-
-		return keyPairList;
-	}
-
-	/**
-	 * Connect as a client to the currently configured Convex network
-	 * 
-	 * @return Convex instance
-	 */
-	public Convex connect() {
-		throw new TODOException();
-	}
-
 	@Override
 	public boolean isParanoid() {
 		return this.paranoid;
@@ -288,11 +212,13 @@ public class Main extends ACommand {
 
 	public void setOut(String outFile) {
 		if (outFile == null || outFile.equals("-")) {
+			log.trace("Setting output to STDOUT");
 			commandLine.setOut(new PrintWriter(System.out));
 		} else {
 			File file = new File(outFile);
 			try {
 				file = Utils.ensurePath(file);
+				log.trace("Setting output to "+file);
 				PrintWriter pw = new PrintWriter(file);
 				commandLine.setOut(pw);
 			} catch (IOException e) {

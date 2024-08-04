@@ -26,4 +26,6 @@ public class Constants {
 
 	public static final long DEFAULT_TIMEOUT_MILLIS = 10000;
 
+	public static final int DEFAULT_PEER_PORT = convex.core.Constants.DEFAULT_PEER_PORT;
+
 }

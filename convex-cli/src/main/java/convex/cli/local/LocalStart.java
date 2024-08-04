@@ -11,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.Helpers;
-import convex.cli.Main;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
@@ -33,7 +32,7 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="start",
 	mixinStandardHelpOptions=true,
 	description="Starts a temporary local convex test network. Useful for development and testing purposes.")
-public class LocalStart implements Runnable {
+public class LocalStart extends ALocalCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(LocalStart.class);
 
@@ -69,8 +68,6 @@ public class LocalStart implements Runnable {
      */
     private List<AKeyPair> getPeerKeyPairs(int n) {
     	ArrayList<AKeyPair> keyPairList = new ArrayList<AKeyPair>();
-    	
-    	Main mainParent = localParent.cli();
       
 		// load in the list of public keys to use as peers
 		if (keystorePublicKey.length > 0) {
@@ -80,7 +77,7 @@ public class LocalStart implements Runnable {
 				String keyPrefix = values.get(index);
 				if (keyPrefix.isBlank()) continue;
 
-				AKeyPair keyPair = mainParent.storeMixin.loadKeyFromStore(mainParent, keyPrefix);
+				AKeyPair keyPair = storeMixin.loadKeyFromStore(keyPrefix, keyMixin.getKeyPassword());
 				if (keyPair == null) {
 					log.warn("Unable to find public key in store: "+keyPrefix);
 				} else {

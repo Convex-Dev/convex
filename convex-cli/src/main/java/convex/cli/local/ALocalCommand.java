@@ -1,26 +1,21 @@
-package convex.cli.peer;
+package convex.cli.local;
 
 import convex.cli.ACommand;
 import convex.cli.Main;
-import convex.cli.mixins.EtchMixin;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.StoreMixin;
-import etch.EtchStore;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.ParentCommand;
 
-public abstract class APeerCommand extends ACommand {
+public abstract class ALocalCommand extends ACommand {
 
-	@Mixin
-    protected EtchMixin etchMixin;
-	
-	@Mixin
-    protected KeyMixin keyMixin;
-	
 	@Mixin
 	protected StoreMixin storeMixin; 
-	
 
+	@Mixin
+	protected KeyMixin keyMixin; 
+
+	
 	@ParentCommand
 	private ACommand parent;
 	
@@ -29,7 +24,4 @@ public abstract class APeerCommand extends ACommand {
 		return parent.cli();
 	}
 
-	public EtchStore getEtchStore() {
-		return etchMixin.getEtchStore();
-	}
 }

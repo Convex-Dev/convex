@@ -17,7 +17,7 @@ import picocli.CommandLine.ParentCommand;
 	aliases={},
 	mixinStandardHelpOptions=true,
 	description="Starts a local convex test network using the peer manager GUI application.")
-public class LocalGUI implements Runnable {
+public class LocalGUI extends ALocalCommand {
 
 	// private static final Logger log = LoggerFactory.getLogger(LocalGUI.class);
 
@@ -33,4 +33,5 @@ public class LocalGUI implements Runnable {
 			throw new CLIError("Error launching GUI: ",t);
 		}
 	}
+
 }

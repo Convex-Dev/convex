@@ -13,7 +13,7 @@ public abstract class AEtchCommand extends ACommand {
 	protected Etch etchParent;
 
 	@Mixin
-    protected EtchMixin  etchMixin;
+    protected EtchMixin etchMixin;
 
 	
 	@Override

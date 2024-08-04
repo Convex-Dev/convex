@@ -56,10 +56,10 @@ public class CLTester {
 		return error;
 	}
 
-	public void assertResult(int expected) {
+	public void assertExitCode(int expected) {
 		if (result==expected) return;
 		System.err.println("STDOUT: "+output);
 		System.err.println("STDERR: "+error);
-		fail("Unexpected CLI result, expected "+expected+" but got "+result);
+		fail("Unexpected CLI result, expected "+expected+" but got "+result+ "with error: "+error);
 	}
 }

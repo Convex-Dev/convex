@@ -1,4 +1,4 @@
-package convex.cli;
+package convex.cli.account;
 
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
@@ -7,6 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Main;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -28,21 +31,12 @@ import picocli.CommandLine.ParentCommand;
 	aliases={"info", "in"},
 	mixinStandardHelpOptions=true,
 	description="Get account information.")
-public class AccountInformation implements Runnable {
+public class AccountInformation extends AAccountCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(AccountInformation.class);
 
 	@ParentCommand
 	private Account accountParent;
-
-	@Option(names={"--port"},
-		description="Port number to connect to a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
 
 
 	@Parameters(paramLabel="address",
@@ -64,7 +58,7 @@ public class AccountInformation implements Runnable {
 			return;
 		}
 
-		Convex convex = mainParent.connect();
+		Convex convex = connect();
 		Address address = Address.create(addressNumber);
         String queryCommand = String.format("(account #%d)", address.longValue());
 		ACell message = Reader.read(queryCommand);

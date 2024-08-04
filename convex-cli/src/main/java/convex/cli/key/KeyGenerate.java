@@ -1,14 +1,11 @@
 package convex.cli.key;
 
-import java.security.KeyStore;
 import java.util.Arrays;
 
 import convex.cli.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
-import convex.core.crypto.PFXTools;
 import convex.core.data.Blob;
-import convex.core.util.Utils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -43,17 +40,17 @@ public class KeyGenerate extends AKeyCommand {
 	private AKeyPair generateKeyPair() {	
 		if (bip39) {
 			String mnemonic=BIP39.createSecureMnemonic(12);
-			cli().println(mnemonic);
+			println(mnemonic);
 			if (passphrase==null) {
-				if (cli().isInteractive()) {
-					passphrase=new String(cli().readPassword("Enter BIP39 passphrase: "));
+				if (isInteractive()) {
+					passphrase=new String(readPassword("Enter BIP39 passphrase: "));
 				} else {
-					cli().paranoia("Passphrase must be explicity provided");
+					paranoia("Passphrase must be explicity provided");
 					passphrase="";
 				}
 			}
 			if (passphrase.isBlank()) {
-				cli().paranoia("Cannot use an empty BIP39 passphrase for secure key generation");
+				paranoia("Cannot use an empty BIP39 passphrase for key generation with strict security");
 			}
 			Blob bipseed = BIP39.getSeed(mnemonic, passphrase);
 			AKeyPair result= BIP39.seedToKeyPair(bipseed);
@@ -71,26 +68,17 @@ public class KeyGenerate extends AKeyCommand {
 			return;
 		}
 		
-		char[] storePass=cli().storeMixin.getStorePassword();
-		try {
-			KeyStore ks=cli().storeMixin.loadKeyStore(true,storePass);
-			for ( int index = 0; index < count; index ++) {
-				AKeyPair kp=generateKeyPair();
-                String publicKeyHexString =  kp.getAccountKey().toHexString();
-				cli().println(publicKeyHexString); // Output generated public key		
-				char[] keyPassword=cli().getKeyPassword();
-				PFXTools.setKeyPair(ks, kp, keyPassword); 
-				Arrays.fill(keyPassword, 'p');
-			}
-			cli().storeMixin.saveKeyStore(storePass);
-		} catch (Throwable e) {
-			throw Utils.sneakyThrow(e);
-		} finally {
-			Arrays.fill(storePass,'z');
+		char[] storePass=storeMixin.getStorePassword();
+		storeMixin.ensureKeyStore();
+
+		for ( int index = 0; index < count; index ++) {
+			AKeyPair kp=generateKeyPair();
+            String publicKeyHexString =  kp.getAccountKey().toHexString();
+			cli().println(publicKeyHexString); // Output generated public key		
+			char[] keyPassword=keyMixin.getKeyPassword();
+			storeMixin.addKeyPairToStore(kp, keyPassword); 
+			Arrays.fill(keyPassword, 'p');
 		}
+		storeMixin.saveKeyStore(storePass);
 	}
-
-
-
-
 }

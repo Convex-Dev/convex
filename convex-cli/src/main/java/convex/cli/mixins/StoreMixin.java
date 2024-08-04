@@ -13,7 +13,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
@@ -22,15 +21,16 @@ import picocli.CommandLine.ScopeType;
 
 public class StoreMixin extends AMixin {
 
+	/**
+	 * Keystore option
+	 */
 	@Option(names = { "--keystore" }, 
 			defaultValue = "${env:CONVEX_KEYSTORE:-" + Constants.KEYSTORE_FILENAME+ "}", 
 			scope = ScopeType.INHERIT, 
-			description = "Keystore filename. Default: ${DEFAULT-VALUE}")
+			description = "Keystore filename. Can specify with CONVEX_KEYSTORE environment variable. Defaulting to: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
 
 	
-	static Logger log = LoggerFactory.getLogger(StoreMixin.class);
-
 	/**
 	 * Password for keystore. Option named to match Java keytool
 	 */
@@ -42,12 +42,14 @@ public class StoreMixin extends AMixin {
 
 	KeyStore keyStore = null;
 	
+	static Logger log = LoggerFactory.getLogger(StoreMixin.class);
+
 	/**
 	 * Gets the keystore file name currently used for the CLI
 	 * 
 	 * @return File name, or null if not specified
 	 */
-	public File getKeyStoreFile() {
+	private File getKeyStoreFile() {
 		if (keyStoreFilename != null) {
 			File f = Utils.getPath(keyStoreFilename);
 			return f;
@@ -59,7 +61,6 @@ public class StoreMixin extends AMixin {
 	 * Get the currently configured password for the keystore. Will emit warning and
 	 * default to blank password if not provided
 	 * 
-	 * @param main TODO
 	 * @return Password string
 	 */
 	public char[] getStorePassword() {
@@ -85,20 +86,24 @@ public class StoreMixin extends AMixin {
 	/**
 	 * Gets the current key store
 	 * 
-	 * @param main TODO
-	 * @return KeyStore instance, or null if it does not exist
+	 * @return KeyStore instance, or null if it is not loaded
 	 */
 	public KeyStore getKeystore() {
-		if (keyStore == null) {
-			keyStore = loadKeyStore(false, getStorePassword());
-		}
 		return keyStore;
 	}
 
 	/**
-	 * Loads the currently configured key Store
+	 * Loads the currently specified key Store, creating it if it does not exist
 	 * 
-	 * @param main TODO
+	 * @return KeyStore instance
+	 */
+	public KeyStore ensureKeyStore() {
+		return loadKeyStore(true, getStorePassword());
+	}
+	
+	/**
+	 * Loads the currently specified key Store
+	 * 
 	 * @return KeyStore instance, or null if does not exist
 	 */
 	public KeyStore loadKeyStore() {
@@ -108,19 +113,21 @@ public class StoreMixin extends AMixin {
 	/**
 	 * Loads the currently configured key Store
 	 * 
-	 * @param isCreate Flag to indicate if keystore should be created if absent
-	 * @param password TODO
+	 * @param shouldCreate Flag to indicate if keystore should be created if absent
+	 * @param password Key store password
 	 * @return KeyStore instance, or null if does not exist
 	 */
-	public KeyStore loadKeyStore(boolean isCreate, char[] password) {
+	private KeyStore loadKeyStore(boolean shouldCreate, char[] password) {
 		File keyFile = getKeyStoreFile();
 		try {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
-			} else if (isCreate) {
-				log.debug("No keystore exists, creating at: " + keyFile.getCanonicalPath());
+			} else if (shouldCreate) {
+				log.warn("No keystore exists, creating at: " + keyFile.getCanonicalPath());
 				Utils.ensurePath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
+			} else {
+				keyStore=null;
 			}
 		} catch (FileNotFoundException e) {
 			return null;
@@ -162,7 +169,7 @@ public class StoreMixin extends AMixin {
 	
 		KeyStore keyStore = getKeystore();
 		if (keyStore == null) {
-			throw new CLIError("Trying to add key pair but keystore does not exist");
+			throw new CLIError("Trying to add key pair but keystore is not loaded");
 		}
 		try {
 			// save the key in the keystore
@@ -176,15 +183,12 @@ public class StoreMixin extends AMixin {
 	/**
 	 * Loads a keypair from configured keystore
 	 * 
-	 * @param main TODO
 	 * @param publicKey String identifying the public key. May be a prefix
 	 * @return Keypair instance, or null if not found
 	 */
-	public AKeyPair loadKeyFromStore(Main main, String publicKey) {
+	public AKeyPair loadKeyFromStore(String publicKey, char[] keyPassword) {
 		if (publicKey == null)
 			return null;
-	
-		AKeyPair keyPair = null;
 	
 		publicKey = publicKey.trim();
 		publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
@@ -207,15 +211,13 @@ public class StoreMixin extends AMixin {
 				String alias = aliases.nextElement();
 				if (alias.indexOf(publicKey) == 0) {
 					log.trace("found keypair " + alias);
-					keyPair = PFXTools.getKeyPair(keyStore, alias, main.getKeyPassword());
-					break;
+					return PFXTools.getKeyPair(keyStore, alias, keyPassword);
 				}
 			}
+			return null;
 		} catch (Exception t) {
 			throw new CLIError("Cannot load key store", t);
 		}
-	
-		return keyPair;
 	}
 
 }

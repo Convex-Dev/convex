@@ -1,56 +1,64 @@
 package convex.cli.client;
 
-import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetSocketAddress;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.cli.ATopCommand;
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.mixins.AddressMixin;
+import convex.cli.mixins.KeyMixin;
+import convex.cli.mixins.RemotePeerMixin;
+import convex.cli.mixins.StoreMixin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.lang.Symbols;
+import convex.core.lang.ops.Special;
+import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
 public abstract class AClientCommand extends ATopCommand {
+	
+	@Mixin
+	protected StoreMixin storeMixin; 
+	
+	@Mixin
+	protected KeyMixin keyMixin;
+
+	@Mixin
+	protected RemotePeerMixin peerMixin;
+	
+	@Mixin
+	protected AddressMixin addressMixin;
+	
 	@Option(names={"--timeout"},
 			description="Timeout in miliseconds.")
 	protected long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
 
-	@Option(names={"-a", "--address"},
-			defaultValue="${env:CONVEX_ADDRESS}",
-			description = "Account address to use. Default: ${DEFAULT-VALUE}")
-	protected String addressValue = null;
+
+	/**
+	 * Connect as a client to the convex network
+	 * @return
+	 */
+	protected Convex clientConnect() {
+		try {
+		return peerMixin.connect();
+		} catch (Exception ex) {
+			throw new CLIError("Unable to connect to Convex: "+ex.getMessage(),ex);
+		}
+	}
 	
-	@Option(names={"--port"},
-			defaultValue="${env:CONVEX_PORT}",
-			description="Port number to connect to a peer.")
-	private Integer port;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
-
 	
 	public Address getUserAddress() {
-		Address result= Address.parse(addressValue);	
+		Address result= addressMixin.getAddress("Enter Convex account address: ");	
 		return result;
 	}
 	
 	protected boolean ensureAddress(Convex convex) {
-		Address a = convex.getAddress();
-		if (a!=null) return true;
-		if (isInteractive()) {
-			String s=System.console().readLine("Enter origin address: ");
-			a=Address.parse(s);
-		}
+		Address a = getUserAddress();
 		if (a!=null) {
 			convex.setAddress(a);
 			return true;
@@ -67,7 +75,7 @@ public abstract class AClientCommand extends ATopCommand {
 		// Try to identify the required keypair for the Address
 		Result ar;
 		try {
-			ar = convex.query(Symbols.STAR_KEY).get(1000,TimeUnit.MILLISECONDS);
+			ar = convex.query(Special.forSymbol(Symbols.STAR_KEY)).get(1000,TimeUnit.MILLISECONDS);
 		} catch (Exception e) {
 			ar=null;
 		}
@@ -87,8 +95,7 @@ public abstract class AClientCommand extends ATopCommand {
 			pk=prompt("Enter public key: ");
 		}
 		
-
-		keyPair=mainParent.storeMixin.loadKeyFromStore(mainParent, pk);
+		keyPair=storeMixin.loadKeyFromStore(pk,keyMixin.getKeyPassword());
 		if (keyPair==null) {
 			// We didn't find required keypair
 			throw new CLIError("Can't find keypair with public key "+pk+" for Address "+address);
@@ -97,25 +104,5 @@ public abstract class AClientCommand extends ATopCommand {
 		return true;
 	}
 
-	protected convex.api.Convex connect() throws IOException,TimeoutException {
-		Address a=addressValue==null?null:Address.parse(addressValue);
-		
-		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
-		if (hostname==null) hostname=convex.cli.Constants.HOSTNAME_PEER;
-		try {
-			InetSocketAddress sa=new InetSocketAddress(hostname,port);
-			Convex c;
-			c=Convex.connect(sa);
-			
-			if (a!=null) {
-				c.setAddress(a);
-			}
-			
-			return c;
-		} catch (ConnectException ce) {
-			throw new CLIError("Cannot connect to: "+hostname+" on port "+port);
-		} catch (Exception e) {
-			throw e;
-		}
-	}
+
 }

@@ -31,10 +31,8 @@ public class Status extends AClientCommand {
 	@SuppressWarnings("unchecked")
 	@Override
 	public void run() {
-
-
 		try {
-			Convex convex = connect();
+			Convex convex = clientConnect();
 			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);

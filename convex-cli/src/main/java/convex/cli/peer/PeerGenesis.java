@@ -44,7 +44,7 @@ public class PeerGenesis extends APeerCommand {
 
 		AKeyPair keyPair = null;
 		if (genesisKey!=null) {
-			keyPair = cli().storeMixin.loadKeyFromStore(cli(), genesisKey);
+			keyPair = storeMixin.loadKeyFromStore(genesisKey,keyMixin.getKeyPassword());
 			if (keyPair == null) {
 				throw new CLIError("Cannot find specified key pair to perform peer start: "+genesisKey);
 			}
@@ -52,17 +52,17 @@ public class PeerGenesis extends APeerCommand {
 //			if (cli().prompt("No key pair specified. Continue by creating a new one? (Y/N)")) {
 //				throw new CLIError("Unable to obtain genesis key pair, aborting");
 //			}
-			if (cli().isParanoid()) throw new CLIError("Aborting due to strict security: no key pair specified");
+			if (isParanoid()) throw new CLIError("Aborting due to strict security: no key pair specified");
 			keyPair=AKeyPair.generate();
-			cli().storeMixin.addKeyPairToStore(keyPair,cli().getKeyPassword());
-			cli().storeMixin.saveKeyStore();
-			cli().inform("Generated new Keypair with public key: "+keyPair.getAccountKey());
+			storeMixin.addKeyPairToStore(keyPair,keyMixin.getKeyPassword());
+			storeMixin.saveKeyStore();
+			inform("Generated new Keypair with public key: "+keyPair.getAccountKey());
 		}
 
 		EtchStore store=getEtchStore();
 		
 		State genesisState=Init.createState(List.of(keyPair.getAccountKey()));
-		cli().inform("Created genersis state with hash: "+genesisState.getHash());
+		inform("Created genersis state with hash: "+genesisState.getHash());
 		
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
@@ -70,6 +70,6 @@ public class PeerGenesis extends APeerCommand {
 		config.put(Keywords.KEYPAIR, keyPair);
 		Server s=API.launchPeer(config);
 		s.close();
-		cli().informSuccess("Convex genesis succeeded!");
+		informSuccess("Convex genesis succeeded!");
 	}
 }

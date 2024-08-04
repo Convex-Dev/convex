@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.nio.file.Files;
 
 import org.junit.jupiter.api.Test;
 
@@ -50,6 +51,8 @@ public class KeyExportTest {
 		File fp = TEMP_FILE;
 		assertTrue(fp.exists());
 		
+		assertTrue(Files.exists(Utils.getPath(KEYSTORE_FILENAME).toPath()));
+		
 		// Check output is hex key
 		String output=tester.getOutput().trim();
 		assertEquals(64,output.length());
@@ -69,9 +72,9 @@ public class KeyExportTest {
 			"--key", publicKey,
 			"--export-password", new String(EXPORT_PASSWORD)
 		);
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		String s=tester.getOutput();
 		assertEquals("",tester.getError());
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		AKeyPair kp=PEMTools.decryptPrivateKeyFromPEM(s, EXPORT_PASSWORD);
 		assertEquals(ak,kp.getAccountKey());
 		
@@ -85,8 +88,8 @@ public class KeyExportTest {
 			"--keystore", KEYSTORE_FILENAME,
 			"--key", publicKey
 		);
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		String s2=tester.getOutput();
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
 		assertTrue(s2.contains(kp.getSeed().toHexString()));
 	}
 }

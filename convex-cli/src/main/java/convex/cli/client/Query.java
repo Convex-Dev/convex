@@ -35,7 +35,7 @@ public class Query extends AClientCommand {
 		}
 
 		try {
-			Convex convex =  connect();
+			Convex convex =  clientConnect();
 			for (int i=0; i<commands.length; i++) {
 				ACell message = Reader.read(commands[i]);
 				Result result = convex.querySync(message, timeout);

@@ -1,14 +1,16 @@
 package convex.cli.key;
 
+import java.io.IOException;
+
 import org.bouncycastle.util.Arrays;
 
 import convex.cli.CLIError;
-import convex.cli.util.CLIUtils;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.PEMTools;
 import convex.core.data.ABlob;
 import convex.core.data.Blobs;
+import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -45,12 +47,17 @@ public class KeyImport extends AKeyCommand {
 			description="Type of file imported. Supports: pem, seed, bip39. Will attempt to autodetect unless strict security is enabled")
 	private String type;
 
+	
 	@Override
 	public void run() {
 		// Ensure importText is filled
 		if (importFilename != null && importFilename.length() > 0) {
 			if (importText!=null) throw new CLIError("Please provide either --import-file or --text, not both!");
-			importText=CLIUtils.loadFileAsString(importFilename);
+			try {
+				importText=FileUtils.loadFileAsString(importFilename);
+			} catch (IOException e ) {
+				throw new CLIError("Unable to import key file",e);
+			}
 		}
 		if (importText == null || importText.length() == 0) {
 			showUsage();
@@ -103,11 +110,14 @@ public class KeyImport extends AKeyCommand {
 		if (keyPair==null) throw new CLIError("Unable to import keypair");
 		
 		// Finally write to store
-		char[] storePassword=cli().storeMixin.getStorePassword();
-		char[] keyPassword=cli().getKeyPassword();
-		cli().storeMixin.addKeyPairToStore(keyPair,keyPassword);
+		char[] storePassword=storeMixin.getStorePassword();
+		char[] keyPassword=keyMixin.getKeyPassword();
+		if (storeMixin.loadKeyStore()==null) {
+			throw new CLIError("Key store specified for import does not exist");
+		}
+		storeMixin.addKeyPairToStore(keyPair,keyPassword);
 		Arrays.fill(keyPassword, 'x');
-		cli().storeMixin.saveKeyStore(storePassword);	
-		cli().println(keyPair.getAccountKey().toHexString());
+		storeMixin.saveKeyStore(storePassword);	
+		println(keyPair.getAccountKey().toHexString());
 	}
 }

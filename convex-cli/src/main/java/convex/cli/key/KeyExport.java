@@ -7,9 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
-import convex.cli.util.CLIUtils;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
+import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
@@ -30,6 +30,7 @@ public class KeyExport extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyExport.class);
 
+	
 	@ParentCommand
 	protected Key keyParent;
 	
@@ -45,6 +46,8 @@ public class KeyExport extends AKeyCommand {
 	@Option(names={"--type"},
 			description="Type of file exported. Supports: pem, seed (default).")
 	private String type;
+	
+	
 	
 	private void ensureExportPassword() {
 		if ((exportPassword==null)&&(cli().isInteractive())) {
@@ -64,7 +67,7 @@ public class KeyExport extends AKeyCommand {
 	
 	@Override
 	public void run() {
-		String keystorePublicKey=cli().publicKey;
+		String keystorePublicKey=keyMixin.getPublicKey();
 		if ((keystorePublicKey == null)||(keystorePublicKey.isEmpty())) {
 			if (outputFilename==null) {
 				cli().inform("You must provide a --key parameter");
@@ -76,7 +79,7 @@ public class KeyExport extends AKeyCommand {
 		}
 
 		String publicKey = keystorePublicKey;
-		AKeyPair keyPair = cli().storeMixin.loadKeyFromStore(cli(), publicKey);
+		AKeyPair keyPair = storeMixin.loadKeyFromStore(publicKey,keyMixin.getKeyPassword());
 		if (keyPair==null) {
 			// TODO: maybe prompt?
 			throw new CLIError("Key pair not found for key: "+keystorePublicKey);
@@ -109,7 +112,7 @@ public class KeyExport extends AKeyCommand {
 			println(output);
 		} else {
 			try {
-				CLIUtils.writeFileAsString(Paths.get(outputFilename),output);
+				FileUtils.writeFileAsString(Paths.get(outputFilename),output);
 			} catch (IOException e) {
 				throw new CLIError("Failed to write output file: "+e.getMessage());
 			}

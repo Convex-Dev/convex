@@ -47,7 +47,7 @@ public class KeyImportTest {
 			"--passphrase",new String(IMPORT_PASSPHRASE),
 			"--keypass", new String(KEY_PASSWORD)
 		);
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		tester.assertExitCode(ExitCodes.SUCCESS);
 
 		CLTester t2=CLTester.run(
 				"key" , 
@@ -55,7 +55,7 @@ public class KeyImportTest {
 				"--storepass", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
-		assertEquals(ExitCodes.SUCCESS,t2.getResult());
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertTrue(t2.getOutput().contains(accountKey.toHexString()));
 	}
 	
@@ -74,7 +74,7 @@ public class KeyImportTest {
 			"--keypass", KEY_PASSWORD, 
 			"--passphrase", new String("") // BIP39 password, ignored
 		);
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		
 		// Should give Ed25519 Seed: 616421a4ea27c65919faa5555e923f6005d76695c7d9ba0fe2a484b90e23de89
 
@@ -84,7 +84,7 @@ public class KeyImportTest {
 				"--storepass", new String(KEYSTORE_PASSWORD), 
 				"--keystore", KEYSTORE_FILENAME);
 		
-		assertEquals(ExitCodes.SUCCESS,t2.getResult());
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertTrue(t2.getOutput().contains(accountKey.toHexString()));
 	}
 	

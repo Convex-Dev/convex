@@ -1,6 +1,9 @@
-package convex.cli;
+package convex.cli.account;
 
 import convex.api.Convex;
+import convex.cli.CLIError;
+import convex.cli.Constants;
+import convex.cli.Main;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -24,22 +27,12 @@ import picocli.CommandLine.ParentCommand;
 @Command(name="balance",
 	aliases={"bal"},
 	mixinStandardHelpOptions=true,
-	description="Get account balance.")
-public class AccountBalance implements Runnable {
+	description="Get account balance of the specified address.")
+public class AccountBalance extends AAccountCommand {
 	private static final Logger log = LoggerFactory.getLogger(AccountBalance.class);
  
 	@ParentCommand
 	private Account accountParent;
-
-	@Option(names={"--port"},
-		description="Port number to connect to a peer.")
-	private int port = 0;
-
-	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname to connect to a peer. Default: ${DEFAULT-VALUE}")
-	private String hostname;
-
 
 	@Parameters(paramLabel="address",
 	description="Address of the account to get the balance .")
@@ -59,14 +52,14 @@ public class AccountBalance implements Runnable {
 			return;
 		}
 
-		Convex convex = null;
 		Address address = Address.create(addressNumber);
 
-		convex = mainParent.connect();
-		String queryCommand = "(balance "+address+")";
-		ACell message = Reader.read(queryCommand);
 		
 		try {
+			
+			Convex convex = peerMixin.connect();
+			String queryCommand = "(balance "+address+")";
+			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message, timeout);
 			mainParent.printResult(result);
 		} catch (Exception e) {

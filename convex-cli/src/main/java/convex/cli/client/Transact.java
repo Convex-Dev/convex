@@ -42,7 +42,7 @@ public class Transact extends AClientCommand {
 	@Override
 	public void run() {
 		try {
-			Convex convex = connect();
+			Convex convex = clientConnect();
 			if (!ensureAddress(convex)) {	
 				throw new CLIError("Must specify a valid address for transaction.");
 			}
@@ -65,4 +65,6 @@ public class Transact extends AClientCommand {
 			throw new CLIError("Error executing transation",e);
 		}
 	}
+
+
 }
