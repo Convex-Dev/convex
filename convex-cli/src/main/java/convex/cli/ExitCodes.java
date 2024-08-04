@@ -5,6 +5,8 @@ import picocli.CommandLine;
 /**
  * Exit codes
  * 
+ * See sysexits.h from FreeBSD for guides
+ * 
  * TODO: may need to make partially platform-specific?
  */
 public class ExitCodes {
@@ -19,14 +21,46 @@ public class ExitCodes {
 	public static final int ERROR=1;
 	
 	/**
-	 * Usage error (2 according to standard bash / linux conventions)
+	 * Usage error (64 as per )
 	 */
-	public static final int USAGE=CommandLine.ExitCode.USAGE;
+	public static final int USAGE = 64;
+	
+	/**
+	 * Error in input data, e.g. badly formatted
+	 */
+	public static final int DATAERR = 65;
+	
+	/**
+	 * No input file / not readable
+	 */
+	public static final int NOINPUT = 66;
+	
+	/**
+	 * No user exists (probably a bad account?)
+	 */
+	public static final int NOUSER = 67;
 
 	/**
-	 * Fatal uncaught exception, should be reported as bug
+	 * No host exists (probably not a peer?)
 	 */
-	public static final int FATAL = 13;
+	public static final int NOHOST = 68;
+
+
+	/**
+	 * Fatal uncaught software error, should be reported as bug
+	 */
+	public static final int SOFTWARE = 70;
+	
+	/**
+	 * Lack of permissions to complete an application operation
+	 */
+	public static final int NOPERM = 77;
+	
+	/**
+	 * Something was not configured properly
+	 */
+	public static final int CONFIG = 78;
+
 
 	public static int getExitCode(Throwable t) {
 		if (t instanceof CLIError) {
@@ -37,7 +71,9 @@ public class ExitCodes {
 		if (t instanceof Exception) {
 			return ERROR;
 		}
-		return FATAL;
+		
+		// Was throwable but not an exception, so some kind of Error
+		return SOFTWARE;
 	}
 	
 }
