@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 
 import convex.cli.CLIError;
+import convex.cli.ExitCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
@@ -43,10 +44,11 @@ public class PeerGenesis extends APeerCommand {
 	public void run() {
 
 		AKeyPair keyPair = null;
+		storeMixin.loadKeyStore();
 		if (genesisKey!=null) {
 			keyPair = storeMixin.loadKeyFromStore(genesisKey,keyMixin.getKeyPassword());
 			if (keyPair == null) {
-				throw new CLIError("Cannot find specified key pair to perform peer start: "+genesisKey);
+				throw new CLIError(ExitCodes.CONFIG,"Cannot find specified key pair to perform peer start: "+genesisKey);
 			}
 		} else {
 //			if (cli().prompt("No key pair specified. Continue by creating a new one? (Y/N)")) {
