@@ -52,6 +52,17 @@ public class ExitCodes {
 	public static final int SOFTWARE = 70;
 	
 	/**
+	 * IO Error
+	 */
+	public static final int IOERR = 74;
+	
+	/**
+	 * Temporary failure, e.g. a timeout
+	 */
+	public static final int TEMPFAIL = 75;
+	
+	
+	/**
 	 * Lack of permissions to complete an application operation
 	 */
 	public static final int NOPERM = 77;
