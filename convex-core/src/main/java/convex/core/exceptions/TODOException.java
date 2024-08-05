@@ -8,7 +8,7 @@ public class TODOException extends RuntimeException {
 	}
 	
 	public TODOException() {
-		this("TODO");
+		super("TODO");
 	}
 
 	public TODOException(Exception e) {

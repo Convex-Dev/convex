@@ -67,15 +67,14 @@ public class PeerStart extends APeerCommand {
 	public void run() {
 		log.debug("Preparing to start peer: "+peerPublicKey);
 		
-
 		try {
 
 			throw new TODOException();
 			// peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
 			// peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
 			// peerManager.showPeerEvents();
-		} catch (Throwable t) {
-			throw new CLIError("Error starting peer",t);
+		} catch (Exception t) {
+			throw new CLIError("Error starting peer: "+t.getMessage(),t);
 		}
 	}
 }
