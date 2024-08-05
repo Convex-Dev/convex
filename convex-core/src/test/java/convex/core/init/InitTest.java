@@ -116,7 +116,7 @@ public class InitTest extends ACVMTest {
 	
 	@Test
 	public void testInitRef() {
-		State s=Init.createBaseState(PEER_KEYS);
+		State s=STATE;
 		Ref<State> sr=s.getRef();
 		
 		Refs.RefTreeStats s1s=Refs.getRefTreeStats(sr);

@@ -64,11 +64,10 @@ public class Init {
 
 	/**
 	 * Creates the base genesis state (before deployment of standard libraries and actors)
-	 * @param genesisKeys Keys for genesis users and peers
+	 * @param peerKeys Keys for genesis users and peers
 	 * @return Base genesis state
 	 */
-	public static State createBaseState(List<AccountKey> genesisKeys) {
-		AccountKey genesisKey=genesisKeys.get(0);
+	public static State createBaseState(AccountKey governanceKey, AccountKey genesisKey, List<AccountKey> peerKeys) {
 		
 		// accumulators for initial state maps
 		Index<AccountKey, PeerStatus> peers = EMPTY_PEERS;
@@ -91,7 +90,7 @@ public class Init {
 		// Foundation fund for initial operations and fallback governance
 		{
 			long foundationFund = 1*Coin.EMERALD;
-			AccountStatus foundationAccount=AccountStatus.create(foundationFund,genesisKey);
+			AccountStatus foundationAccount=AccountStatus.create(foundationFund,governanceKey);
 			accts = addAccount(accts, FOUNDATION_ADDRESS, foundationAccount); 
 			supply-=foundationFund;
 		}
@@ -99,7 +98,7 @@ public class Init {
 		// Foundation reserve fund (rest of foundation 25%, controlled by foundation account)
 		{
 			long reserve = 248*Coin.EMERALD;
-			AccountStatus reserveAccount=AccountStatus.create(reserve,AccountKey.NULL);
+			AccountStatus reserveAccount=AccountStatus.create(reserve,governanceKey);
 			reserveAccount=reserveAccount.withController(FOUNDATION_ADDRESS);
 			accts = addAccount(accts, RESERVE_ADDRESS, reserveAccount); // 24% Foundation
 			supply -= reserve;
@@ -108,7 +107,7 @@ public class Init {
 		// Reserve for distribution via release curve - 74% for coin purchasers
 		{
 			long releaseCurveFund = 740 * Coin.EMERALD; 
-			AccountStatus releaseCurveAccount=AccountStatus.create(releaseCurveFund,AccountKey.NULL);
+			AccountStatus releaseCurveAccount=AccountStatus.create(releaseCurveFund,governanceKey);
 			releaseCurveAccount=releaseCurveAccount.withController(FOUNDATION_ADDRESS);
 			accts = addAccount(accts, UNRELEASED_ADDRESS, releaseCurveAccount); 
 			supply -= releaseCurveFund;
@@ -117,7 +116,7 @@ public class Init {
 		// Initial account for release curve distribution - 1% for initial coin purchasers
 		{
 			long distributionFund = 10 * Coin.EMERALD; 
-			AccountStatus releaseCurveAccount=AccountStatus.create(distributionFund,AccountKey.NULL);
+			AccountStatus releaseCurveAccount=AccountStatus.create(distributionFund,governanceKey);
 			releaseCurveAccount=releaseCurveAccount.withController(FOUNDATION_ADDRESS);
 			accts = addAccount(accts, DISTRIBUTION_ADDRESS, releaseCurveAccount); 	
 			supply -= distributionFund;
@@ -126,13 +125,13 @@ public class Init {
 		// Governance Address, used to manage key network operations e.g. CNS root changes
 		{
 			long governFund = 1 * Coin.DIAMOND; 
-			AccountStatus governanceAccount=AccountStatus.create(governFund,AccountKey.NULL);
+			AccountStatus governanceAccount=AccountStatus.create(governFund,governanceKey);
 			governanceAccount=governanceAccount.withController(FOUNDATION_ADDRESS);
 			accts = addAccount(accts, GOVERNANCE_ADDRESS, governanceAccount); 	
 			supply -= governFund;
 		}
 
-		// Admin address, used for non-critical operations
+		// Admin address, used for non-critical operations, accessible with genesis Key
 		{ 
 			long admin = 1 * Coin.DIAMOND; 
 			AccountStatus governanceAccount=AccountStatus.create(admin,genesisKey);
@@ -148,7 +147,7 @@ public class Init {
 
 		
 		// Always have at least one user and one peer setup
-		int keyCount = genesisKeys.size();
+		int keyCount = peerKeys.size();
 		assert(keyCount > 0);
 
 
@@ -178,14 +177,14 @@ public class Init {
 			
 			// Genesis user gets half of all user funds
 			long genFunds = userFunds/2;
-			accts = addAccount(accts, GENESIS_ADDRESS, genesisKeys.get(0), genFunds);
+			accts = addAccount(accts, GENESIS_ADDRESS, peerKeys.get(0), genFunds);
 			userFunds -= genFunds;
 			
 			// One Peer account for each  specified key (including initial genesis user)
 			for (int i = 0; i < keyCount; i++) {
 				Address address = Address.create(accts.count());
 				assert(address.longValue() == accts.count());
-				AccountKey key = genesisKeys.get(i);
+				AccountKey key = peerKeys.get(i);
 				long userBalance = userFunds / (keyCount-i);
 				accts = addAccount(accts, address, key, userBalance);
 				userFunds -= userBalance;
@@ -201,7 +200,7 @@ public class Init {
 			long peerFunds = supply;
 			supply -= peerFunds;
 			for (int i = 0; i < keyCount; i++) {
-				AccountKey peerKey = genesisKeys.get(i);
+				AccountKey peerKey = peerKeys.get(i);
 				Address peerController = getGenesisPeerAddress(i);
 	
 				// Divide funds among peers
@@ -252,22 +251,28 @@ public class Init {
 	}
 
 	public static State createState(List<AccountKey> genesisKeys) {
-
-			State s=createBaseState(genesisKeys);
-			s = addStandardLibraries(s);
-			s = addTestingCurrencies(s);
-			
-			s = addCNSTree(s);
-
-			// Final funds check
-			long finalTotal = s.computeTotalFunds();
-			if (finalTotal != Constants.MAX_SUPPLY)
-				throw new Error("Bad total funds in init state amount: " + finalTotal);
-
-			return s;
-
-
+		return createState(genesisKeys.get(0),genesisKeys);
 	}
+	
+	public static State createState(AccountKey genesisKey,List<AccountKey> peerKeys) {
+		return createState(genesisKey,genesisKey,peerKeys);
+	}
+	
+	public static State createState(AccountKey governanceKey, AccountKey genesisKey,List<AccountKey> peerKeys) {
+
+		State s=createBaseState(governanceKey, genesisKey, peerKeys);
+		s = addStandardLibraries(s);
+		s = addTestingCurrencies(s);
+		
+		s = addCNSTree(s);
+
+		// Final funds check
+		long finalTotal = s.computeTotalFunds();
+		if (finalTotal != Constants.MAX_SUPPLY)
+			throw new Error("Bad total funds in init state amount: " + finalTotal);
+
+		return s;
+}
 
 	private static State addTestingCurrencies(State s)  {
 		try {

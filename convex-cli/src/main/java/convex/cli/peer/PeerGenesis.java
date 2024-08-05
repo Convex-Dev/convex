@@ -39,7 +39,7 @@ public class PeerGenesis extends APeerCommand {
 	@Option(names = { "--governance-key" }, 
 			defaultValue = "${env:CONVEX_GOVERNANCE_KEY}", 
 			scope = ScopeType.INHERIT, 
-			description = "Governance Key. Should be a valid account key. Genesis key will be used if not specified (unless security is strict).")
+			description = "Network Governance Key. Must be a valid Ed25519 public key. Genesis key will be used if not specified (unless security is strict).")
 	protected String governanceKey;
 
 	@Override

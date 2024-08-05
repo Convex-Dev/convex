@@ -61,7 +61,7 @@ public class BaseTest extends ACVMTest {
 	/**
 	 * Standard base state used for testing
 	 */
-	public static final State STATE= Init.createBaseState(PEER_KEYS);
+	public static final State STATE= Init.createBaseState(HERO_KEY,HERO_KEY,PEER_KEYS);
 	
 	public static Address HERO=Init.getGenesisAddress();
 	public static Address VILLAIN=Init.getGenesisPeerAddress(1);
