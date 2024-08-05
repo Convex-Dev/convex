@@ -21,6 +21,10 @@ public class PeerKeyMixin extends AMixin {
 			description = "Peer Key pair password in key store. Can also specify with CONVEX_PEER_KEY_PASSWORD environment variable.")
 	protected String keyPassword;
 
+	/**
+	 * Gets the specified public key alias for the Peer
+	 * @return Public key alias specified on CLI, or null if unspecified
+	 */
 	public String getPublicKey() {
 		return publicKey;
 	}
@@ -39,7 +43,7 @@ public class PeerKeyMixin extends AMixin {
 			keypass = this.keyPassword.toCharArray();
 		} else {
 			if (isInteractive()) {
-				keypass = readPassword("Private Key Encryption Password: ");
+				keypass = readPassword("Peer Key Encryption Password: ");
 			}
 
 			if (keypass == null) {
@@ -50,7 +54,7 @@ public class PeerKeyMixin extends AMixin {
 			this.keyPassword=new String(keypass);
 		}
 		if (keypass.length == 0) {
-			paranoia("Cannot use an empty private key password");
+			paranoia("Cannot use an empty password in --strict-security mode");
 		}
 		return keypass;
 	}

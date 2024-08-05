@@ -48,13 +48,25 @@ public abstract class APeerCommand extends ACommand {
 		if (peerPublicKey==null) {
 			if (!isInteractive()) {
 				throw new CLIError(ExitCodes.USAGE,"--peer-key must be specified in non-interactive mode");
+			} else {
+				boolean shouldGenerate=question("No --peer-key specified. Generate one? (y/n)");
+				if (shouldGenerate) {
+					AKeyPair kp=AKeyPair.generate();
+					inform(2,"Generated peer key: "+kp.getAccountKey());
+					char[] keyPass=peerKeyMixin.getKeyPassword();
+					storeMixin.addKeyPairToStore(kp, keyPass);
+					storeMixin.saveKeyStore();
+					return kp;
+				} else {
+					throw new CLIError("Opertation cancelled");
+				}
 			}
+		} else {
+			char[] keyPass=peerKeyMixin.getKeyPassword();
+			AKeyPair result=storeMixin.loadKeyFromStore(peerPublicKey, keyPass);
+			if (result==null) throw new CLIError("Peer key not found in store");
+			return result;
 		}
-		
-		char[] keyPass=peerKeyMixin.getKeyPassword();
-		
-		AKeyPair result=storeMixin.loadKeyFromStore(peerPublicKey, keyPass);
-		return result;
 	}
 	
 	/**
@@ -65,12 +77,13 @@ public abstract class APeerCommand extends ACommand {
 		if (peerPublicKey==null) {
 			if (!isInteractive()) {
 				throw new CLIError(ExitCodes.USAGE,"Controller --key must be specified in non-interactive mode");
-			}
+			} 
 		}
 		
 		char[] keyPass=keyMixin.getKeyPassword();
 		
 		AKeyPair result=storeMixin.loadKeyFromStore(peerPublicKey, keyPass);
+		if (result==null) throw new CLIError("Peer controller key not found in store");
 		return result;
 	}
 }

@@ -84,13 +84,14 @@ public abstract class ACommand implements Runnable {
 	
 	/**
 	 * Prompt the user for String input
-	 * @param string
+	 * @param message
 	 * @return
 	 */
-	public String prompt(String string) {
-		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+string);
+	public String prompt(String message) {
+		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+message);
 		
-		inform(0,isColoured()?string:Coloured.blue(string));
+		if (isColoured()) message=Coloured.blue(message);
+		inform(0,message);
 		try (Scanner scanner = new Scanner(System.in)) {
 			String s=scanner.nextLine();
 			return s;

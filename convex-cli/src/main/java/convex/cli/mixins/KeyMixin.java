@@ -51,7 +51,7 @@ public class KeyMixin extends AMixin {
 		}
 		
 		if (keypass.length == 0) {
-			paranoia("Cannot use an empty private key password in --strict-security mode");
+			paranoia("Cannot use an empty password in --strict-security mode");
 		}
 		return keypass;
 	}
