@@ -63,7 +63,8 @@ public class Init {
 
 
 	/**
-	 * Creates the base genesis state (before deployment of standard libraries and actors)
+	 * Creates the base genesis state (before deployment of standard libraries and actors). This is the minimum state required for Convex operation.
+	 * 
 	 * @param peerKeys Keys for genesis users and peers
 	 * @return Base genesis state
 	 */
@@ -245,6 +246,13 @@ public class Init {
 						             
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
+			
+			s = register(s, FOUNDATION_ADDRESS, "Foundation Governance", "Master network governance account.");
+			s = register(s, RESERVE_ADDRESS, "Foundation Reserve", "Unreleased Foundation coin reserve.");
+			s = register(s, UNRELEASED_ADDRESS, "Release Curve Reserve", "Release curve unreleased coins.");
+			s = register(s, DISTRIBUTION_ADDRESS, "Release Curve Pre-Distribution", "Release curve coins for future distribution.");
+			s = register(s, GOVERNANCE_ADDRESS, "Network Governance", "Network governance account.");
+			s = register(s, ADMIN_ADDRESS, "Network Admin", "Network admin accouns.");
 		}
 
 		return s;
@@ -348,10 +356,14 @@ public class Init {
 	//
 	private static State doActorDeploy(State s, String resource) {
 		Context ctx = Context.createFake(s, INIT_ADDRESS);
-
+		ACell ADD_NETWORK_GOVERNANCE=Reader.read("(set-controller "+GOVERNANCE_ADDRESS+")");
+		
 		try {
 			AList<ACell> forms = Reader.readAll(Utils.readResourceAsString(resource));
 			AList<ACell> code=forms.drop(1);
+			
+			// Add network governance controller
+			code=code.cons(ADD_NETWORK_GOVERNANCE);
 			
 			ctx = ctx.deploy(code.toCellArray());
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
