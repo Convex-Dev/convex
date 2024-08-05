@@ -58,7 +58,7 @@ public class StateExplorer extends AbstractGUI {
 	public static void main(String[] args) {
 		Toolkit.init();
 		AKeyPair kp=AKeyPair.createSeeded(564646);
-		ACell state=Init.createBaseState(List.of(kp.getAccountKey()));
+		ACell state=Init.createState(List.of(kp.getAccountKey()));
 		new StateExplorer(state).run();
 	}
 }

@@ -7,6 +7,7 @@ import convex.cli.CLIError;
 import convex.cli.ExitCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.Init;
@@ -17,6 +18,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.ScopeType;
 import picocli.CommandLine.Spec;
 
 /**
@@ -33,6 +35,12 @@ public class PeerGenesis extends APeerCommand {
 
 	@Spec
 	CommandSpec spec;
+	
+	@Option(names = { "--governance-key" }, 
+			defaultValue = "${env:CONVEX_GOVERNANCE_KEY}", 
+			scope = ScopeType.INHERIT, 
+			description = "Governance Key. Should be a valid account key. Genesis key will be used if not specified (unless security is strict).")
+	protected String governanceKey;
 
 	@Override
 	public void run() {
@@ -40,12 +48,23 @@ public class PeerGenesis extends APeerCommand {
 
 		AKeyPair peerKey = ensurePeerKey();
 		AKeyPair genesisKey=ensureControllerKey();
+		
+		AccountKey govKey=AccountKey.parse(governanceKey);
+		if (govKey==null) {
+			paranoia("--gioverannce-key must be specified in strict security mode");
+			if (governanceKey==null) {
+				govKey=genesisKey.getAccountKey();
+			} else {
+				throw new CLIError(ExitCodes.DATAERR,"Unable to parse --governance-key argument. Should be a 32-byte hex key.");
+			}
+		}
 
 		EtchStore store=getEtchStore();
 		
 		State genesisState=Init.createState(List.of(peerKey.getAccountKey()));
 		inform("Created genesis state with hash: "+genesisState.getHash());
 		
+		inform(2,"Testing genesis state peer initialisation");
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
 		config.put(Keywords.STATE, genesisState);

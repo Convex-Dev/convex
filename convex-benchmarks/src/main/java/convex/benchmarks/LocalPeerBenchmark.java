@@ -48,7 +48,7 @@ public class LocalPeerBenchmark {
 	public static ArrayList<AccountKey> PEER_KEYS=(ArrayList<AccountKey>) Arrays.asList(KEYPAIRS).stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
 	
-	private static State GENESIS=Init.createBaseState(PEER_KEYS);
+	private static State GENESIS=Init.createState(PEER_KEYS);
 	private static Server SERVER;
 	private static Address HERO;
 	private static ConvexLocal PEER_CLIENT;

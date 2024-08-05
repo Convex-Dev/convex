@@ -252,7 +252,7 @@ public class Init {
 	}
 
 	public static State createState(List<AccountKey> genesisKeys) {
-		try {
+
 			State s=createBaseState(genesisKeys);
 			s = addStandardLibraries(s);
 			s = addTestingCurrencies(s);
@@ -265,18 +265,20 @@ public class Init {
 				throw new Error("Bad total funds in init state amount: " + finalTotal);
 
 			return s;
-		} catch (Exception e) {
-			throw new RuntimeException("Unable to initialise core",e);
-		}
+
 
 	}
 
-	private static State addTestingCurrencies(State s) throws IOException {
-		@SuppressWarnings("unchecked")
-		AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
-				.readResourceAsData("torus/genesis-currencies.cvx");
-		for (AVector<ACell> row : table) {
-			s = doCurrencyDeploy(s, row);
+	private static State addTestingCurrencies(State s)  {
+		try {
+			@SuppressWarnings("unchecked")
+			AVector<AVector<ACell>> table = (AVector<AVector<ACell>>) Reader
+					.readResourceAsData("torus/genesis-currencies.cvx");
+			for (AVector<ACell> row : table) {
+				s = doCurrencyDeploy(s, row);
+			}
+		} catch (IOException e) {
+			throw new Error("Failre reading source data for currencies",e);
 		}
 		return s;
 	}
