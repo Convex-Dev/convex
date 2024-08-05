@@ -178,6 +178,11 @@ public class Main extends ACommand {
 					err.println("Underlying cause: ");
 					cause.printStackTrace(err);
 				}
+			} else if (ex.getClass().getSimpleName().equals("UserInterruptException")) {
+				informError("Operation cancelled by user");
+				if (verbose>=3) {
+					ex.printStackTrace(err);
+				}
 			} else {
 				if (verbose>=1) {
 					ex.printStackTrace(err);

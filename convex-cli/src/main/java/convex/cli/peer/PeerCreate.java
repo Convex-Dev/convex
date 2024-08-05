@@ -44,13 +44,6 @@ public class PeerCreate extends APeerCommand {
 
 	@Spec CommandSpec spec;
 
-	@Option(names={"--peer"},
-		defaultValue="",
-		description="Hex string of the public key in the Keystore to use for the peer.%n"
-			+ "You only need to enter in the first distinct hex values of the public key.%n"
-			+ "For example: 0xf0234 or f0234")
-	private String keystorePublicKey;
-
 	@Mixin
 	RemotePeerMixin peerMixin;
 

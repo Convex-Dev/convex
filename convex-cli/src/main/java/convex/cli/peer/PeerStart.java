@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.mixins.RemotePeerMixin;
+import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.TODOException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -34,12 +35,6 @@ public class PeerStart extends APeerCommand {
 	@Spec
 	CommandSpec spec;
 
-	@Option(names = {
-			"--peer" }, description = "Public key to use for the peer. Can specify a key in the cuurent store. "
-					+ "You only need to enter in the first distinct hex values of the public key.%n"
-					+ "For example: 0xf0234 or f0234")
-	private String peerPublicKey;
-
 	@Option(names = {"--reset" }, 
 			description = "Reset and delete the etch database if it exists. Default: ${DEFAULT-VALUE}")
 	private boolean isReset;
@@ -62,10 +57,15 @@ public class PeerStart extends APeerCommand {
 
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer controller.")
 	private long addressNumber;
+	
+
 
 	@Override
 	public void run() {
-		log.debug("Preparing to start peer: "+peerPublicKey);
+		storeMixin.loadKeyStore();
+		AKeyPair peerKey=ensurePeerKey();
+		
+		log.debug("Preparing to start peer: "+peerKey.getAccountKey());
 		
 		try {
 
@@ -77,4 +77,6 @@ public class PeerStart extends APeerCommand {
 			throw new CLIError("Error starting peer: "+t.getMessage(),t);
 		}
 	}
+
+	
 }

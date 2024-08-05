@@ -6,26 +6,26 @@ import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
-public class KeyMixin extends AMixin {
+public class PeerKeyMixin extends AMixin {
 
-	@Option(names = { "-k","--key" }, 
-			defaultValue = "${env:CONVEX_KEY}", 
+	@Option(names = { "--peer-key" }, 
+			defaultValue = "${env:CONVEX_PEER_KEY}", 
 			scope = ScopeType.INHERIT, 
-			description = "Key pair to use. Specifiy with a hex prefix of a public key / alias. Can specify with CONVEX_KEY environment variable.")
+			description = "Peer Key pair. Specifiy with a hex prefix of a public key. "+
+			   "Can ALSO specify with CONVEX_PEER_KEY environment variable.")
 	protected String publicKey;
 
-	@Option(names = { "-p","--keypass" }, 
-			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
+	@Option(names = { "--peer-keypass" }, 
+			defaultValue = "${env:CONVEX_PEER_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
-			description = "Key pair password in key store. Can also specify with CONVEX_KEY_PASSWORD environment variable.")
+			description = "Peer Key pair password in key store. Can also specify with CONVEX_PEER_KEY_PASSWORD environment variable.")
 	protected String keyPassword;
 
 	public String getPublicKey() {
 		return publicKey;
 	}
 
-	
-	static Logger log = LoggerFactory.getLogger(KeyMixin.class);
+	static Logger log = LoggerFactory.getLogger(PeerKeyMixin.class);
 
 	/**
 	 * Keys the password for the current key
@@ -49,9 +49,8 @@ public class KeyMixin extends AMixin {
 			
 			this.keyPassword=new String(keypass);
 		}
-		
 		if (keypass.length == 0) {
-			paranoia("Cannot use an empty private key password in --strict-security mode");
+			paranoia("Cannot use an empty private key password");
 		}
 		return keypass;
 	}

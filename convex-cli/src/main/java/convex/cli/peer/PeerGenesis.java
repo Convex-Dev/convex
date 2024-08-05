@@ -34,42 +34,22 @@ public class PeerGenesis extends APeerCommand {
 	@Spec
 	CommandSpec spec;
 
-	@Option(names = {"--public-key" }, 
-			description = "Hex string of the public key in the Keystore to use for the genesis peer.%n"
-					+ "You only need to enter in the first distinct hex values of the public key.%n"
-					+ "For example: 0xf0234 or f0234")
-	private String genesisKey;
-
 	@Override
 	public void run() {
-
-		AKeyPair keyPair = null;
 		storeMixin.loadKeyStore();
-		if (genesisKey!=null) {
-			keyPair = storeMixin.loadKeyFromStore(genesisKey,keyMixin.getKeyPassword());
-			if (keyPair == null) {
-				throw new CLIError(ExitCodes.CONFIG,"Cannot find specified key pair to perform peer start: "+genesisKey);
-			}
-		} else {
-//			if (cli().prompt("No key pair specified. Continue by creating a new one? (Y/N)")) {
-//				throw new CLIError("Unable to obtain genesis key pair, aborting");
-//			}
-			if (isParanoid()) throw new CLIError("Aborting due to strict security: no key pair specified");
-			keyPair=AKeyPair.generate();
-			storeMixin.addKeyPairToStore(keyPair,keyMixin.getKeyPassword());
-			storeMixin.saveKeyStore();
-			inform("Generated new Keypair with public key: "+keyPair.getAccountKey());
-		}
+
+		AKeyPair peerKey = ensurePeerKey();
+		AKeyPair genesisKey=ensureControllerKey();
 
 		EtchStore store=getEtchStore();
 		
-		State genesisState=Init.createState(List.of(keyPair.getAccountKey()));
-		inform("Created genersis state with hash: "+genesisState.getHash());
+		State genesisState=Init.createState(List.of(peerKey.getAccountKey()));
+		inform("Created genesis state with hash: "+genesisState.getHash());
 		
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
 		config.put(Keywords.STATE, genesisState);
-		config.put(Keywords.KEYPAIR, keyPair);
+		config.put(Keywords.KEYPAIR, peerKey);
 		Server s=API.launchPeer(config);
 		s.close();
 		informSuccess("Convex genesis succeeded!");

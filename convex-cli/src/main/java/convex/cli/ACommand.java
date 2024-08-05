@@ -100,8 +100,11 @@ public abstract class ACommand implements Runnable {
 	public char[] readPassword(String prompt) {
 		Console c = System.console();
 		if (c == null) {
-			throw new CLIError(
-					"Unable to request password because console is unavaiable. Consider passing a password parameter, or running in interactive mode.");
+			if (verbose()>=3) {
+				informError("Can't give user prompt: "+prompt);
+			}
+			throw new CLIError(ExitCodes.USAGE,
+					"Unable to request password because console is unavailable. Consider passing a password parameter, or running in interactive mode.");
 		}
 		
 		if (isColoured()) prompt = Coloured.blue(prompt);

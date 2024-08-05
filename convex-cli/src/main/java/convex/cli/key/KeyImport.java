@@ -93,11 +93,11 @@ public class KeyImport extends AKeyCommand {
 			keyPair=AKeyPair.create(hex.toFlatBlob());
 		} else if ("bip39".equals(type)) {
 			if (hex==null) {
-				try {
-					hex=BIP39.getSeed(importText, importPassphrase);
-				} catch (Exception e) {
-					throw new CLIError("Error interpreting BIP39 seed",e);
+				// We attempt to interpret as BIP39 mnemonic
+				if (importPassphrase==null) {
+					importPassphrase=new String(readPassword("Enter passphrase for imported BIP39 memonic: "));
 				}
+				hex=BIP39.getSeed(importText, importPassphrase);
 			}
 			keyPair=BIP39.seedToKeyPair(hex.toFlatBlob());
 		} else if ("pem".equals(type)) {
