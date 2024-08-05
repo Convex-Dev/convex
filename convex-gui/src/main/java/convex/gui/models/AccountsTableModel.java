@@ -19,7 +19,7 @@ public class AccountsTableModel extends BaseTableModel {
 		this.state = state;
 	}
 
-	private static final String[] FIXED_COLS = new String[] { "Address", "Type", "Seq.", "Balance", "Name", "Env.Size", "Allowance","Key" };
+	private static final String[] FIXED_COLS = new String[] { "Address", "Type", "Seq.", "Balance", "Name", "Env.Size", "Allowance","Controller","Key" };
 
 	public String getColumnName(int col) {
 		if (col < FIXED_COLS.length) return FIXED_COLS[col];
@@ -70,7 +70,11 @@ public class AccountsTableModel extends BaseTableModel {
 			return Text.toFriendlyNumber(as.getMemorySize());
 		case 6:
 			return Text.toFriendlyNumber(as.getMemory());
-		case 7:
+		case 7: {
+			ACell control= as.getController();
+			return (control==null)?"":control;
+		}
+		case 8:
 			return as.getAccountKey();
 		default:
 			return "";

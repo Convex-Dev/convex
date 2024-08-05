@@ -152,13 +152,22 @@ public class AccountsPanel extends JPanel {
 			table.getColumnModel().getColumn(6).setPreferredWidth(100);
 			table.getColumnModel().getColumn(6).setCellRenderer(cr);
 		}
+		
+		{	// Account Controller
+			CellRenderer cr=new CellRenderer(JLabel.LEFT);
+			cr.setToolTipText("Account Controller. May recover, modify or update the controlled account.");
+			cr.setForeground(Color.WHITE);
+			table.getColumnModel().getColumn(7).setPreferredWidth(80);
+			table.getColumnModel().getColumn(7).setCellRenderer(cr);
+		}
+
 
 		
 		{	// Account public key
 			AccountKeyRenderer cr=new AccountKeyRenderer(); 
 			cr.setToolTipText("Public key of the account. Used to validate transactions from users.");
-			table.getColumnModel().getColumn(7).setPreferredWidth(150);
-			table.getColumnModel().getColumn(7).setCellRenderer(cr);
+			table.getColumnModel().getColumn(8).setPreferredWidth(150);
+			table.getColumnModel().getColumn(8).setCellRenderer(cr);
 		}
 
 		final JPopupMenu popupMenu = new JPopupMenu();
