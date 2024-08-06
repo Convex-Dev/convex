@@ -193,10 +193,10 @@ public class CompilerTest extends ACVMTest {
 
 
 	@Test public void testDef() {
-		assertEquals(2L,evalL("(do (def a 2) (def b 3) a)"));
-		assertEquals(7L,evalL("(do (def a 2) (def a 7) a)"));
-		assertEquals(9L,evalL("(do (def a 9) (def a) a)"));
-		assertEquals(9L,evalL("(do (def a) (def a 9) a)"));
+		assertCVMEquals(2L,eval("(do (def a 2) (def b 3) a)"));
+		assertCVMEquals(7L,eval("(do (def a 2) (def a 7) a)"));
+		assertCVMEquals(9L,eval("(do (def a 9) (def a) a)"));
+		assertCVMEquals(9L,eval("(do (def a) (def a 9) a)"));
 		assertNull(eval("(do (def a 9) (def a nil) a)"));
 
 		// TODO: check if these are most logical error types?
@@ -205,11 +205,11 @@ public class CompilerTest extends ACVMTest {
 	}
 	
 	@Test public void testDefOverCore() {
-		// TODO consider better compilation unit handling in static case
-		if (!Constants.OPT_STATIC) {
-			assertEquals(13L,evalL("(do (def count 13) count)"));
+		// TODO: This might not be sane?
+		if (Constants.OPT_STATIC) {
+			assertCVMEquals(Core.COUNT,eval("(do (def count 13) count)"));
 		} else {
-			assertEquals(Core.COUNT,eval("(do (def count 13) count)"));
+			assertCVMEquals(13L,eval("(do (def count 13) count)"));
 		}
 	}
 

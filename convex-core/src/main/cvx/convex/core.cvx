@@ -201,8 +201,9 @@
     (empty? decl) (fail :ARITY "`defn` requires at least one function definition"))
     (let [fnform (cons 'fn 
 		                decl)
-          name   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list
-    `(def ~name ~fnform)))
+          nf   (syntax name (meta (first decl)))]   ;; Note: merges in metadata on parameter list
+      (eval `(def ~name))    ;; ensure we have a forward declaration at expand time
+      `(def ~nf ~fnform)))
   
 (defn identity
    ^{:doc {:description "An identity function which returns its first argument unchanged."
