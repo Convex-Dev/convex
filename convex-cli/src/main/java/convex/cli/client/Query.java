@@ -25,7 +25,7 @@ public class Query extends AClientCommand {
 
 	@Parameters(
 			paramLabel="queryCommand", 
-			description="Query command(s). Multiple commands will be executed in sequence unless one fails")
+			description="Query command(s). Multiple commands will be executed in sequence unless one fails.")
 	private String[] commands;
 
 	@Override
@@ -37,11 +37,11 @@ public class Query extends AClientCommand {
 		}
 
 		try {
-			Convex convex =  clientConnect();
+			Convex convex =  connectQuery();
 			for (int i=0; i<commands.length; i++) {
 				ACell message = Reader.read(commands[i]);
 				Result result = convex.querySync(message, timeout);
-				cli().printResult(result);
+				printResult(result);
 				if (result.isError()) {
 					break;
 				}

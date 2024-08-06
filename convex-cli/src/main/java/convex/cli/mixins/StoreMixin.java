@@ -124,7 +124,7 @@ public class StoreMixin extends AMixin {
 			if (keyFile.exists()) {
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else if (shouldCreate) {
-				log.warn("No keystore exists, creating at: " + keyFile.getCanonicalPath());
+				informWarning("No keystore exists, creating at: " + keyFile.getCanonicalPath());
 				Utils.ensurePath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			} else {
@@ -154,8 +154,8 @@ public class StoreMixin extends AMixin {
 			throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
 			PFXTools.saveStore(keyStore, getKeyStoreFile(), storePassword);
-		} catch (Throwable t) {
-			throw Utils.sneakyThrow(t);
+		} catch (Exception t) {
+			throw new CLIError("Failed to save keystore",t);
 		}
 	}
 
@@ -170,15 +170,25 @@ public class StoreMixin extends AMixin {
 	
 		KeyStore keyStore = getKeystore();
 		if (keyStore == null) {
-			throw new CLIError("Trying to add key pair but keystore is not loaded");
+			throw new CLIError("Trying to add key pair but keystore is not yet loaded!");
 		}
 		try {
 			// save the key in the keystore
 			PFXTools.setKeyPair(keyStore, keyPair, keyPassword);
-		} catch (Throwable t) {
-			throw new CLIError("Cannot store the key to the key store " + t);
+		} catch (Exception t) {
+			throw new CLIError("Cannot store the key to the key store",t);
 		}
 	
+	}
+	
+	public static String trimKey(String publicKey) {
+		publicKey = publicKey.trim();
+
+		publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
+		if (publicKey.isEmpty()) {
+			return null;
+		}
+		return publicKey;
 	}
 
 	/**
@@ -191,23 +201,13 @@ public class StoreMixin extends AMixin {
 		if (publicKey == null)
 			return null;
 	
-		publicKey = publicKey.trim();
-		publicKey = publicKey.toLowerCase().replaceFirst("^0x", "").strip();
-		if (publicKey.isEmpty()) {
-			return null;
-		}
-	
-		char[] storePassword = getStorePassword();
-	
-		File keyFile = getKeyStoreFile();
+		publicKey = trimKey(publicKey);
+		if (publicKey==null) return null;		
+
 		try {
-			if (!keyFile.exists()) {
-				throw new CLIError("Cannot find keystore file " + keyFile.getCanonicalPath());
-			}
-			KeyStore keyStore = PFXTools.loadStore(keyFile, storePassword);
+			KeyStore keyStore = ensureKeyStore();
 	
 			Enumeration<String> aliases = keyStore.aliases();
-	
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
 				if (alias.indexOf(publicKey) == 0) {
@@ -217,8 +217,32 @@ public class StoreMixin extends AMixin {
 			}
 			return null;
 		} catch (Exception t) {
-			throw new CLIError("Cannot load key store", t);
+			throw new CLIError("Cannot load aliases from key Store", t);
 		}
+	}
+
+	public boolean hasSingleKey(String pk) {
+		return keyCount(pk)==1;
+	}
+
+	public int keyCount(String pk) {
+		pk=trimKey(pk);
+		
+		int result=0;
+		try {
+			KeyStore keyStore = ensureKeyStore();
+	
+			Enumeration<String> aliases = keyStore.aliases();
+			while (aliases.hasMoreElements()) {
+				String alias = aliases.nextElement();
+				if (alias.indexOf(pk) == 0) {
+					result++;
+				}
+			}
+		} catch (Exception t) {
+			throw new CLIError("Cannot load aliases from key Store", t);
+		}
+		return result;
 	}
 
 }

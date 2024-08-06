@@ -39,15 +39,11 @@ public class Transact extends AClientCommand {
 	@Override
 	public void run() {
 
-		Convex convex = clientConnect();
-		if (!ensureAddress(convex)) {	
-			throw new CLIError(ExitCodes.USAGE,"Must specify a valid address for transaction.");
-		}
-			
-		if (!ensureKeyPair(convex)) {	
-			throw new CLIError(ExitCodes.USAGE,"Must provide a key pair to sign transaction.");
-		}
-
+		Address a=getUserAddress();
+		if (a==null) throw new CLIError(ExitCodes.USAGE,"You must specify a valid origin address for the transaction.");
+		
+		Convex convex = connectTransact();
+		
 		Address address=convex.getAddress();
 		log.trace("Executing transaction: '{}'\n", transactionCode);
 			

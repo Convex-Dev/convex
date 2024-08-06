@@ -2,7 +2,6 @@ package convex.cli;
 
 import java.io.Console;
 import java.io.IOException;
-import java.util.Scanner;
 
 import convex.cli.output.Coloured;
 import convex.cli.output.RecordOutput;
@@ -96,10 +95,7 @@ public abstract class ACommand implements Runnable {
 		
 		if (isColoured()) message=Coloured.blue(message);
 		inform(0,message);
-		try (Scanner scanner = new Scanner(System.in)) {
-			String s=scanner.nextLine();
-			return s;
-		}
+		return System.console().readLine();
 	}
 	
 	public char[] readPassword(String prompt) {

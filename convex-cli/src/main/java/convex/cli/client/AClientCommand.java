@@ -1,22 +1,16 @@
 package convex.cli.client;
 
-import java.util.concurrent.TimeUnit;
-
 import convex.api.Convex;
 import convex.cli.ATopCommand;
 import convex.cli.CLIError;
-import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.cli.mixins.AddressMixin;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.cli.mixins.StoreMixin;
-import convex.core.Result;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.ABlob;
-import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
-import convex.core.lang.Symbols;
-import convex.core.lang.ops.Special;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 
@@ -36,7 +30,7 @@ public abstract class AClientCommand extends ATopCommand {
 	
 	@Option(names={"--timeout"},
 			description="Timeout in miliseconds.")
-	protected long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
+	protected Long timeout;
 
 
 	/**
@@ -45,64 +39,82 @@ public abstract class AClientCommand extends ATopCommand {
 	 */
 	protected Convex clientConnect() {
 		try {
-		return peerMixin.connect();
+			Convex convex= peerMixin.connect();
+			if (timeout!=null) {
+				convex.setTimeout(timeout);
+			}
+			return convex;
 		} catch (Exception ex) {
 			throw new CLIError("Unable to connect to Convex: "+ex.getMessage(),ex);
 		}
 	}
 	
+	/**
+	 * Connect to Convex ready to query
+	 * @return
+	 */
+	protected Convex connectQuery() {
+		Convex convex=clientConnect();
+		Address a=getUserAddress();
+		convex.setAddress(a);
+		return convex;
+	}
 	
+	/**
+	 * Connect to Convex ready to transact
+	 * @return
+	 */
+	protected Convex connectTransact() {
+		Convex convex=connectQuery();
+		ensureKeyPair(convex);
+		return convex;
+	}
+	
+	/**
+	 * Gets user address, prompting of not provided.
+	 * @return Valid Address or null if Address not valid
+	 */
 	public Address getUserAddress() {
-		Address result= addressMixin.getAddress("Enter Convex account address: ");	
-		return result;
+		return addressMixin.getAddress("Enter Convex user account address: ");	
 	}
 	
-	protected boolean ensureAddress(Convex convex) {
-		Address a = getUserAddress();
-		if (a!=null) {
-			convex.setAddress(a);
-			return true;
-		}
-		return false;
-	}
 	
-	protected boolean ensureKeyPair(Convex convex) {
+	protected void ensureKeyPair(Convex convex) {
+		Address a=convex.getAddress();
 		AKeyPair keyPair = convex.getKeyPair();
-		if (keyPair!=null) return true;
+		if (keyPair!=null) return;
 
-		Address address=convex.getAddress();
-		
-		// Try to identify the required keypair for the Address
-		Result ar;
-		try {
-			ar = convex.query(Special.forSymbol(Symbols.STAR_KEY)).get(1000,TimeUnit.MILLISECONDS);
-		} catch (Exception e) {
-			ar=null;
-		}
-		
-		String pk=null;
-		if (ar==null) {
-			// we couldn't query the *key*, so prompt the user
-		} else if (!ar.isError()) {
-			// Attempt to use query result as public key
-			ACell v=ar.getValue();
-			if (v instanceof ABlob) {
-				pk=((ABlob)v).toHexString();
+		String pk=keyMixin.getPublicKey();
+		if (pk==null) {
+			paranoia("You must set --key explicitly in strict security mode");
+			
+			AccountKey k=convex.getAccountKey(a);
+			if (k!=null) {
+				pk=k.toHexString();
+				inform("Address "+a+" requires public key "+pk);
+			} else if (isInteractive()) {
+				pk=prompt("Enter public key for Address "+a+": ");
+			} else {
+				throw new CLIError(ExitCodes.USAGE,"Public key required.");
 			}
 		}
 		
-		if (pk==null) {
-			pk=prompt("Enter public key: ");
+		storeMixin.loadKeyStore();
+		int c=storeMixin.keyCount(pk);
+		if (c==0) {
+			throw new CLIError(ExitCodes.CONFIG,"Can't find keypair with public key: "+pk);
+		} else if (c>1) {
+			throw new CLIError(ExitCodes.CONFIG,"Multiple key pairs found");
 		}
 		
 		keyPair=storeMixin.loadKeyFromStore(pk,keyMixin.getKeyPassword());
 		if (keyPair==null) {
 			// We didn't find required keypair
-			throw new CLIError("Can't find keypair with public key "+pk+" for Address "+address);
+			throw new CLIError(ExitCodes.CONFIG,"Can't find keypair with public key: "+pk);
 		}
 		convex.setKeyPair(keyPair);
-		return true;
 	}
+
 
 
 }
