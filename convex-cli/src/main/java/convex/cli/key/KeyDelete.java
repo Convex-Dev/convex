@@ -24,7 +24,7 @@ public class KeyDelete extends AKeyCommand {
 	
 	protected void deleteEntry(String alias) throws KeyStoreException {
 		storeMixin.getKeystore().deleteEntry(alias);
-		inform(2,"Deleting Key: "+alias);
+		inform("Deleting Key: "+alias);
 	}
 	
 	@Override
@@ -91,9 +91,7 @@ public class KeyDelete extends AKeyCommand {
 				}
 			}
 		}
-		
 		storeMixin.saveKeyStore();
-		
 	}
 
 

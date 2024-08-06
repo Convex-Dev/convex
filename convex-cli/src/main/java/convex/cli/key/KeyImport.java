@@ -26,7 +26,7 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 @Command(name="import",
-	description="Import key pairs to the keystore. Can specify either a raw key with --text or --import-file")
+	description="Import key pairs to the keystore.")
 public class KeyImport extends AKeyCommand {
 
 	@ParentCommand

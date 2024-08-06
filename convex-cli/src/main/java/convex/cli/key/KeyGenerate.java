@@ -21,7 +21,7 @@ import picocli.CommandLine.Option;
 @Command(name="generate",
 	aliases={"gen"},
 	mixinStandardHelpOptions=true,
-	description="Generate private key pair(s) in the currently configured keystore. Will create a keystore if it does not exist.")
+	description="Generate private key pair(s) in the currently configured keystore.")
 public class KeyGenerate extends AKeyCommand {
 
 	@Option(names="--count",
@@ -75,8 +75,8 @@ public class KeyGenerate extends AKeyCommand {
 			AKeyPair kp=generateKeyPair();
             String publicKeyHexString =  kp.getAccountKey().toHexString();
 			char[] keyPassword=keyMixin.getKeyPassword();
-			cli().println(publicKeyHexString); // Output generated public key		
 			storeMixin.addKeyPairToStore(kp, keyPassword); 
+			println(publicKeyHexString); // Output generated public key		
 			Arrays.fill(keyPassword, 'p');
 		}
 		informSuccess(count+ " key(s) generated");
