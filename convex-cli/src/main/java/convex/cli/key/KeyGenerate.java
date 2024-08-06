@@ -64,7 +64,7 @@ public class KeyGenerate extends AKeyCommand {
 	public void run() {
 		// check the number of keys to generate.
 		if (count <= 0) {
-			cli().inform("No keys generated. Perhaps specify a positive --count ?");
+			informWarning("No keys generated. Perhaps specify a positive --count ?");
 			return;
 		}
 		
@@ -74,11 +74,12 @@ public class KeyGenerate extends AKeyCommand {
 		for ( int index = 0; index < count; index ++) {
 			AKeyPair kp=generateKeyPair();
             String publicKeyHexString =  kp.getAccountKey().toHexString();
-			cli().println(publicKeyHexString); // Output generated public key		
 			char[] keyPassword=keyMixin.getKeyPassword();
+			cli().println(publicKeyHexString); // Output generated public key		
 			storeMixin.addKeyPairToStore(kp, keyPassword); 
 			Arrays.fill(keyPassword, 'p');
 		}
+		informSuccess(count+ " key(s) generated");
 		storeMixin.saveKeyStore(storePass);
 	}
 }

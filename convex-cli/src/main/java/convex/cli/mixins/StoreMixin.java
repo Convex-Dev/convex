@@ -98,6 +98,7 @@ public class StoreMixin extends AMixin {
 	 * @return KeyStore instance
 	 */
 	public KeyStore ensureKeyStore() {
+		if (keyStore!=null) return keyStore;
 		return loadKeyStore(true, getStorePassword());
 	}
 	
