@@ -17,6 +17,7 @@ import picocli.CommandLine.Command;
 		KeyGenerate.class,
 		KeyList.class,
 		KeyExport.class,
+		KeyDelete.class,
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=false,

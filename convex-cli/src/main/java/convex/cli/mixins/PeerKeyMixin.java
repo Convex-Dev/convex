@@ -11,14 +11,14 @@ public class PeerKeyMixin extends AMixin {
 	@Option(names = { "--peer-key" }, 
 			defaultValue = "${env:CONVEX_PEER_KEY}", 
 			scope = ScopeType.INHERIT, 
-			description = "Peer Key pair. Specifiy with a hex prefix of a public key. "+
-			   "Can ALSO specify with CONVEX_PEER_KEY environment variable.")
+			description = "Peer key. Allows a hex prefix of a public key in keystore. "+
+			   "Can also specify with CONVEX_PEER_KEY.")
 	protected String publicKey;
 
 	@Option(names = { "--peer-keypass" }, 
 			defaultValue = "${env:CONVEX_PEER_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
-			description = "Peer Key pair password in key store. Can also specify with CONVEX_PEER_KEY_PASSWORD environment variable.")
+			description = "Peer key password in keystore. Can also specify with CONVEX_PEER_KEY_PASSWORD.")
 	protected String keyPassword;
 
 	/**

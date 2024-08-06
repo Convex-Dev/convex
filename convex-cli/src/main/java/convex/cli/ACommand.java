@@ -22,7 +22,11 @@ public abstract class ACommand implements Runnable {
 	public abstract Main cli();
 	
 	public void showUsage() {
-		CommandLine.usage(this, System.out);
+		CommandLine cl=new CommandLine(this);
+		cl.setUsageHelpAutoWidth(true);
+		cl.setUsageHelpWidth(100);
+		cl.setUsageHelpLongOptionsMaxWidth(40);
+		cl.usage(System.out);
 	}
 	
 	public CommandLine commandLine() {
@@ -154,6 +158,11 @@ public abstract class ACommand implements Runnable {
 
 	public void inform(String message) {
 		if (isColoured()) message=Coloured.yellow(message);
+		inform(1,message);
+	}
+	
+	public void informWarning(String message) {
+		if (isColoured()) message=Coloured.orange(message);
 		inform(1,message);
 	}
 

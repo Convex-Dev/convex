@@ -21,11 +21,11 @@ import picocli.CommandLine.Command;
 		CommandLine.HelpCommand.class
 	},
 	mixinStandardHelpOptions=true,
-	description="Operate a local Convex network and related utilities.")
+	description="Operate a local Convex network and related utilities. Primarily useful for development / testing.")
 public class Local extends ATopCommand {
 
 	@Override
 	public void run() {
-
+		showUsage();
 	}
 }

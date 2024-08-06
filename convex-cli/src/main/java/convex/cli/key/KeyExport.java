@@ -25,7 +25,7 @@ import picocli.CommandLine.ParentCommand;
  */
 @Command(name="export",
 	mixinStandardHelpOptions=false,
-	description="Export a private key from the keystore. Uee with caution")
+	description="Export a private key from the keystore. Use with caution.")
 public class KeyExport extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyExport.class);

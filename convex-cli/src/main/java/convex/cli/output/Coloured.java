@@ -19,4 +19,8 @@ public class Coloured {
 	public static String yellow(String text) {
 		return Ansi.ON.string("@|fg(226) "+text+"|@");
 	}
+
+	public static String orange(String text) {
+		return Ansi.ON.string("@|fg(172) "+text+"|@");
+	}
 }

@@ -23,7 +23,9 @@ import picocli.CommandLine.Parameters;
 	description="Execute user queries. ")
 public class Query extends AClientCommand {
 
-	@Parameters(paramLabel="queryCommand", description="Query command(s). Multiple commands will be executed in sequence unless one fails")
+	@Parameters(
+			paramLabel="queryCommand", 
+			description="Query command(s). Multiple commands will be executed in sequence unless one fails")
 	private String[] commands;
 
 	@Override

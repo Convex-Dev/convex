@@ -40,8 +40,7 @@ public class Peer extends ATopCommand {
 
 	@Override
 	public void run() {
-		// sub command run with no command provided
-		CommandLine.usage(new Peer(), System.out);
+		showUsage();
 	}
 
 

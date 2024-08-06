@@ -13,13 +13,13 @@ import picocli.CommandLine.Option;
 public class RemotePeerMixin extends AMixin {
 	
 	@Option(names={"--port"},
-			defaultValue="${env:CONVEX_PORT:-"+Constants.DEFAULT_PEER_PORT+"",
-			description="Port number to connect to a peer.")
+			defaultValue="${env:CONVEX_PORT:-"+Constants.DEFAULT_PEER_PORT+"}",
+			description="Port number to connect to a peer. Defaulting to: ${DEFAULT-VALUE}")
 	private Integer port;
 
 	@Option(names={"--host"},
-		defaultValue=Constants.HOSTNAME_PEER,
-		description="Hostname for remote peer connection. Default: ${DEFAULT-VALUE}")
+		defaultValue="${env:CONVEX_HOST:-"+Constants.HOSTNAME_PEER+"}",
+		description="Hostname for remote peer connection. Defaulting to: ${DEFAULT-VALUE}")
 	private String hostname;
 
 	/**

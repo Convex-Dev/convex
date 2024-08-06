@@ -41,7 +41,7 @@ public abstract class APeerCommand extends ACommand {
 	}
 	
 	/**
-	 * Get the keypair for the peer
+	 * Get the keypair for the peer. Always returns a valid key pair, may generate one.
 	 */
 	protected AKeyPair ensurePeerKey() {
 		String peerPublicKey=peerKeyMixin.getPublicKey();
@@ -52,7 +52,7 @@ public abstract class APeerCommand extends ACommand {
 				boolean shouldGenerate=question("No --peer-key specified. Generate one? (y/n)");
 				if (shouldGenerate) {
 					AKeyPair kp=AKeyPair.generate();
-					inform(2,"Generated peer key: "+kp.getAccountKey());
+					inform(2,"Generated peer key: "+kp.getAccountKey().toChecksumHex());
 					char[] keyPass=peerKeyMixin.getKeyPassword();
 					storeMixin.addKeyPairToStore(kp, keyPass);
 					storeMixin.saveKeyStore();

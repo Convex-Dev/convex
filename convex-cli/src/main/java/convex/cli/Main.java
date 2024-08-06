@@ -104,9 +104,6 @@ public class Main extends ACommand {
 	 */
 	public int mainExecute(String[] args) {
 		try {
-			// commandLine
-			// .setUsageHelpLongOptionsMaxWidth(80)
-			// .setUsageHelpWidth(40 * 4);
 
 			// do a pre-parse to get the config filename. We need to load
 			// in the defaults before running the full execute
@@ -119,7 +116,7 @@ public class Main extends ACommand {
 			}
 
 			if (commandLine.isUsageHelpRequested()) {
-				commandLine.usage(commandLine.getOut());
+				showUsage();
 				return ExitCodes.SUCCESS;
 			} else if (commandLine.isVersionHelpRequested()) {
 				commandLine.printVersionHelp(commandLine.getOut());

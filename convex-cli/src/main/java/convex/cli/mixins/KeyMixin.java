@@ -11,13 +11,13 @@ public class KeyMixin extends AMixin {
 	@Option(names = { "-k","--key" }, 
 			defaultValue = "${env:CONVEX_KEY}", 
 			scope = ScopeType.INHERIT, 
-			description = "Key pair to use. Specifiy with a hex prefix of a public key / alias. Can specify with CONVEX_KEY environment variable.")
+			description = "Key pair to use from keystore. Supports a hex prefix. Can specify with CONVEX_KEY.")
 	protected String publicKey;
 
 	@Option(names = { "-p","--keypass" }, 
 			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
-			description = "Key pair password in key store. Can also specify with CONVEX_KEY_PASSWORD environment variable.")
+			description = "Key pair password in keystore. Can specify with CONVEX_KEY_PASSWORD.")
 	protected String keyPassword;
 
 	public String getPublicKey() {
