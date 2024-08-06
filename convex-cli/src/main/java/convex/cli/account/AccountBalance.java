@@ -60,7 +60,7 @@ public class AccountBalance extends AAccountCommand {
 			Convex convex = peerMixin.connect();
 			String queryCommand = "(balance "+address+")";
 			ACell message = Reader.read(queryCommand);
-			Result result = convex.querySync(message, timeout);
+			Result result = convex.querySync(message);
 			mainParent.printResult(result);
 		} catch (Exception e) {
 			throw new CLIError("Error executing query",e);

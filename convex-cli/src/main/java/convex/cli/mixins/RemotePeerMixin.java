@@ -29,19 +29,21 @@ public class RemotePeerMixin extends AMixin {
 	 * @throws IOException
 	 * @throws TimeoutException
 	 */
-	public convex.api.Convex connect() throws IOException,TimeoutException {
+	public convex.api.Convex connect()  {
 		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
 		if (hostname==null) hostname=convex.cli.Constants.HOSTNAME_PEER;
+		InetSocketAddress sa=new InetSocketAddress(hostname,port);
 		try {
-			InetSocketAddress sa=new InetSocketAddress(hostname,port);
 			Convex c;
 			c=Convex.connect(sa);
 			
 			return c;
 		} catch (ConnectException ce) {
-			throw new CLIError("Cannot connect to: "+hostname+" on port "+port,ce);
+			throw new CLIError("Cannot connect to: "+sa,ce);
 		} catch (TimeoutException e) {
 			throw new CLIError("Timeout while attempting to connect to peer: "+hostname,e);
+		} catch (IOException e) {
+			throw new CLIError("IO Error: "+e.getMessage(),e);
 		}
 	}
 

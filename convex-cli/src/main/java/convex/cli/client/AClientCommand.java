@@ -32,21 +32,16 @@ public abstract class AClientCommand extends ATopCommand {
 			description="Timeout in miliseconds.")
 	protected Long timeout;
 
-
 	/**
 	 * Connect as a client to the convex network
 	 * @return
 	 */
 	protected Convex clientConnect() {
-		try {
-			Convex convex= peerMixin.connect();
-			if (timeout!=null) {
-				convex.setTimeout(timeout);
-			}
-			return convex;
-		} catch (Exception ex) {
-			throw new CLIError("Unable to connect to Convex: "+ex.getMessage(),ex);
+		Convex convex= peerMixin.connect();
+		if (timeout!=null) {
+			convex.setTimeout(timeout);
 		}
+		return convex;
 	}
 	
 	/**

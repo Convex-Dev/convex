@@ -64,7 +64,7 @@ public class AccountInformation extends AAccountCommand {
 		ACell message = Reader.read(queryCommand);
 		Result result;
 		try {
-			result = convex.querySync(message, timeout);
+			result = convex.querySync(message);
 			mainParent.printResult(result);
 		} catch (TimeoutException e) {
 			throw new CLIError("Timeout",e);

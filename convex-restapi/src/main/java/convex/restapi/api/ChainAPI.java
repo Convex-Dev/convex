@@ -56,7 +56,6 @@ public class ChainAPI extends ABaseAPI {
 	
     private static final String ROUTE = "/api/v1/";
 
-
 	@Override
 	public void addRoutes(Javalin app) {
 		String prefix=ROUTE;
@@ -171,9 +170,6 @@ public class ChainAPI extends ABaseAPI {
 		}
 		
 		boolean isUser=!as.isActor();
-		// TODO: consider if isLibrary is useful?
-		// boolean isLibrary=as.getCallableFunctions().isEmpty();
-		
 		
 		HashMap<String,Object> hm=new HashMap<>();
 		hm.put("address",addr.longValue());

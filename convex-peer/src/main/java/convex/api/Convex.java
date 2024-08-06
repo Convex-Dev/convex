@@ -814,20 +814,6 @@ public abstract class Convex {
 	/**
 	 * Executes a query synchronously and waits for the Result
 	 *
-	 * @param timeoutMillis Timeout to wait for query result. Will throw
-	 *                      TimeoutException if not received in this time
-	 * @param query         Query to execute, as a Form or Op
-	 * @return Result of query
-	 * @throws TimeoutException If the synchronous request timed out
-	 * @throws IOException      In case of network error
-	 */
-	public Result querySync(ACell query, long timeoutMillis) throws IOException, TimeoutException {
-		return querySync(query, getAddress(), timeoutMillis);
-	}
-
-	/**
-	 * Executes a query synchronously and waits for the Result
-	 *
 	 * @param address Address to use for the query
 	 * @param query   Query to execute, as a Form or Op
 	 * @return Result of query
@@ -849,7 +835,7 @@ public abstract class Convex {
 	 * @throws TimeoutException If the synchronous request timed out
 	 * @throws IOException      In case of network error
 	 */
-	public Result querySync(ACell query, Address address, long timeoutMillis) throws TimeoutException, IOException {
+	protected Result querySync(ACell query, Address address, long timeoutMillis) throws TimeoutException, IOException {
 		Future<Result> cf = query(query, address);
 		Result result;
 		try {
