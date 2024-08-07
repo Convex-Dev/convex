@@ -84,7 +84,7 @@ public class KeyGenerate extends AKeyCommand {
 					int c=System.console().reader().read();
 					ABlob entropy=Blobs.forLong(c).append(Blobs.forLong(System.currentTimeMillis()));
 					h=h.append(entropy).getContentHash();
-					println(h.getContentHash());
+					informWarning(h.getContentHash().toHexString());
 					if ((c=='\r')||(c=='\n')) break;
 				} catch (IOException e) {
 					throw new CLIError(ExitCodes.IOERR,"Unable to collect entropy");
