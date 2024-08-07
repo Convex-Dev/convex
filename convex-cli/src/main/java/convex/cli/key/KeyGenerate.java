@@ -2,7 +2,9 @@ package convex.cli.key;
 
 import java.util.Arrays;
 
+import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.data.Blob;
@@ -34,16 +36,17 @@ public class KeyGenerate extends AKeyCommand {
 			description="Number of words in BIP39 mnemonic. Default: ${DEFAULT-VALUE}")
 		private int words;
 	
-	@Option(names="--bip39",
-			description="Generate BIP39 mnemonic seed phrases and passphrase")
-	private boolean bip39;
+	@Option(names={"--type"},
+			defaultValue="bip39",
+			description="Type of key generation. Supports random, bip39")
+	private String type;
 	
 	@Option(names="--passphrase",
 			description="BIP39 passphrase. If not provided, will be requested from user (or assumed blank in non-interactive mode).")
 	private String passphrase;
 
 	private AKeyPair generateKeyPair() {	
-		if (bip39) {
+		if ("bip39".equals(type)) {
 			if (words<12) {
 				paranoia("Can't use less than 12 BIP39 words in strict security mode");
 			}
@@ -65,8 +68,10 @@ public class KeyGenerate extends AKeyCommand {
 			Blob bipseed = BIP39.getSeed(mnemonic, passphrase);
 			AKeyPair result= BIP39.seedToKeyPair(bipseed);
 			return result;
-		} else {
+		} else if ("random".equals(type)) {
 			return AKeyPair.generate();
+		} else {
+			throw new CLIError(ExitCodes.USAGE,"Unsupprted key generation type: "+type);
 		}
 	}
 	

@@ -21,7 +21,7 @@ Key pairs are stored in a PKCS #12 key store. By default this is stored in the u
 To generate a cryptographic key, it is recommended to use the following command:
 
 ```
-convex key generate --bip39
+convex key generate
 ```
 
 This generates and outputs a BIP39 mnemonic phrase of 12 words consistent with the BIP39 standard. The words will look something like this:
@@ -30,12 +30,14 @@ This generates and outputs a BIP39 mnemonic phrase of 12 words consistent with t
 evidence expand family claw crack dawn name salmon resource leg once curious
 ```
 
-You will be also prompted for three keys:
-- The overall password for the key store. This is shared for all keys in the key store
+You will be also prompted for three passwords:
+- The key store password. This is needed to access all keys in the key store
 - A BIP39 passphrase. This is the passphrase that will be used to generate the 
 - A private key encryption password. This protects the new key generated
 
-If you wish to be able to recover the private key, you should make sure you securely record the following:
+After the key is successfully generated, you will be able to use it providing you have the key store password and the private key password.
+
+If the key is important to you, you will want to be able to recover it even if you permanently lose access to the key store (e.g. if your laptop is stolen, disk drive corrupted etc.). In tis case, you should make sure you securely record the following:
 - The BIP39 mnemonic word list
 - The BIP39 passphrase
  

@@ -30,7 +30,6 @@ public class KeyExport extends AKeyCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(KeyExport.class);
 
-	
 	@ParentCommand
 	protected Key keyParent;
 	

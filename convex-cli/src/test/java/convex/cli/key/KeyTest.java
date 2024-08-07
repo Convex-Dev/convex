@@ -40,6 +40,8 @@ public class KeyTest {
 				"key", 
 				"generate", 
 				"-p", KEY_PASSWORD, 
+				"--type","bip39",
+				"--passphrase","testBIP39pass",
 				"--storepass", KEYSTORE_PASSWORD, 
 				"--keystore", fileName);
 		tester.assertExitCode(ExitCodes.SUCCESS);

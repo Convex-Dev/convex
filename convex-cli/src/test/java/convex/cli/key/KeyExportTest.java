@@ -42,11 +42,12 @@ public class KeyExportTest {
 		// command key.generate
 		CLTester tester =  CLTester.run(
 			"key", "generate",
+			"--type", "random",
 			"--storepass", new String(KEYSTORE_PASSWORD),
 			"--keypass", new String(KEY_PASSWORD),
 			"--keystore", KEYSTORE_FILENAME
 		);
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		tester.assertExitCode(ExitCodes.SUCCESS);
 
 		File fp = TEMP_FILE;
 		assertTrue(fp.exists());
