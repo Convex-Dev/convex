@@ -12,6 +12,43 @@ The `convex-cli` module provides a CLI interface to Convex, including the abilit
 convex --help
 ```
 
+### Generating a key pair
+
+To execute transactions or operate peers on Convex you will need a cryptographic Ed25519 key pair.
+
+Key pairs are stored in a PKCS #12 key store. By default this is stored in the user's home directory in the location `~/.convex/keystore.pfx`. The keystore encrypts keys so that they cannot be accessed without the correct passwords.
+
+To generate a cryptographic key, it is recommended to use the following command:
+
+```
+convex key generate --bip39
+```
+
+This generates and outputs a BIP39 mnemonic phrase of 12 words consistent with the BIP39 standard. The words will look something like this:
+
+```
+evidence expand family claw crack dawn name salmon resource leg once curious
+```
+
+You will be also prompted for three keys:
+- The overall password for the key store. This is shared for all keys in the key store
+- A BIP39 passphrase. This is the passphrase that will be used to generate the 
+- A private key encryption password. This protects the new key generated
+
+If you wish to be able to recover the private key, you should make sure you securely record the following:
+- The BIP39 mnemonic word list
+- The BIP39 passphrase
+ 
+### Importing a key pair
+
+To re-import a key pair from a BIP39 seed, you can used the following command:
+
+```
+convex key import --type=bip39 --text='evidence expand family claw crack dawn name salmon resource leg once curious'
+```
+
+This will re-import the same key pair that was generated, assuming you have the correct BIP39 passphrase. You can confirm this by checking that the public key is the one you expect.
+
 ## Installation
 
 ### Pre-requisites

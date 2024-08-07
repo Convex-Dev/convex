@@ -29,6 +29,11 @@ public class KeyGenerate extends AKeyCommand {
 		description="Number of keys to generate. Default: ${DEFAULT-VALUE}")
 	private int count;
 	
+	@Option(names="--words",
+			defaultValue="12",
+			description="Number of words in BIP39 mnemonic. Default: ${DEFAULT-VALUE}")
+		private int words;
+	
 	@Option(names="--bip39",
 			description="Generate BIP39 mnemonic seed phrases and passphrase")
 	private boolean bip39;
@@ -39,8 +44,13 @@ public class KeyGenerate extends AKeyCommand {
 
 	private AKeyPair generateKeyPair() {	
 		if (bip39) {
-			String mnemonic=BIP39.createSecureMnemonic(12);
-			println(mnemonic);
+			if (words<12) {
+				paranoia("Can't use less than 12 BIP39 words in strict security mode");
+			}
+			
+			String mnemonic=BIP39.createSecureMnemonic(words);
+			inform("BIP39 mnemonic generated with "+words+" words:");
+			inform(mnemonic);
 			if (passphrase==null) {
 				if (isInteractive()) {
 					passphrase=new String(readPassword("Enter BIP39 passphrase: "));
@@ -64,22 +74,22 @@ public class KeyGenerate extends AKeyCommand {
 	public void run() {
 		// check the number of keys to generate.
 		if (count <= 0) {
-			informWarning("No keys generated. Perhaps specify a positive --count ?");
+			informWarning("No keys generated. Perhaps you want a positive --count ?");
 			return;
 		}
 		
-		char[] storePass=storeMixin.getStorePassword();
-		storeMixin.ensureKeyStore();
-
 		for ( int index = 0; index < count; index ++) {
 			AKeyPair kp=generateKeyPair();
+			
             String publicKeyHexString =  kp.getAccountKey().toHexString();
+			storeMixin.ensureKeyStore();
 			char[] keyPassword=keyMixin.getKeyPassword();
 			storeMixin.addKeyPairToStore(kp, keyPassword); 
+			inform ("Public key added to store: "+kp.getAccountKey());
 			println(publicKeyHexString); // Output generated public key		
 			Arrays.fill(keyPassword, 'p');
 		}
-		informSuccess(count+ " key(s) generated");
-		storeMixin.saveKeyStore(storePass);
+		storeMixin.saveKeyStore();
+		informSuccess(count+ " key(s) generated and saved in store "+storeMixin.getStorePath());
 	}
 }

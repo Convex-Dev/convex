@@ -3,6 +3,7 @@ package convex.cli.mixins;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.UnrecoverableKeyException;
@@ -55,6 +56,10 @@ public class StoreMixin extends AMixin {
 			return f;
 		}
 		return null;
+	}
+	
+	public Path getStorePath() {
+		return getKeyStoreFile().toPath();
 	}
 
 	/**
@@ -244,5 +249,7 @@ public class StoreMixin extends AMixin {
 		}
 		return result;
 	}
+
+
 
 }
