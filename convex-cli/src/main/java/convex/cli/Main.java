@@ -69,9 +69,9 @@ public class Main extends ACommand {
 
 	@Option(names = { "-v","--verbose" }, 
 			scope = ScopeType.INHERIT, 
-			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-2}", 
+			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-"+Constants.DEFAULT_VERBOSE_LEVEL+"}", 
 			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}") 
-	Integer verbose;
+	private Integer verbose;
 
 	public Main() {
 		commandLine = commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
@@ -114,8 +114,8 @@ public class Main extends ACommand {
 			try {
 				commandLine.parseArgs(args);
 			} catch (Exception t) {
-				commandLine.getErr().println(Coloured.red("ERROR: Unable to parse arguments: " + t.getMessage()));
-				commandLine.getErr().println("For more information on options and commands try 'convex help'.");
+				informError("ERROR: Unable to parse arguments: " + t.getMessage());
+				informWarning("For more information on options and commands try 'convex help'.");
 				return ExitCodes.ERROR;
 			}
 
@@ -136,7 +136,7 @@ public class Main extends ACommand {
 				ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
 				root.setLevel(verboseLevels[verbose]);
 			} else {
-				commandLine.getErr().println("ERROR: Invalid verbosity level: " + verbose);
+				informError("ERROR: Invalid verbosity level: " + verbose);
 				return ExitCodes.ERROR;
 			}
 
@@ -214,6 +214,12 @@ public class Main extends ACommand {
 	@Override
 	public boolean isInteractive() {
 		return !nonInteractive;
+	}
+	
+	@Override
+	protected int verbose() {
+		if (verbose==null) verbose=Constants.DEFAULT_VERBOSE_LEVEL;
+		return verbose;
 	}
 
 	public void setOut(String outFile) {

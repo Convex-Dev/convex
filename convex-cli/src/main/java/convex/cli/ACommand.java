@@ -8,6 +8,8 @@ import convex.cli.output.RecordOutput;
 import convex.core.Result;
 import convex.core.util.Utils;
 import picocli.CommandLine;
+import picocli.CommandLine.Help;
+import picocli.CommandLine.Help.Ansi;
 
 /**
  * Base class for Convex CLI command components and mixins
@@ -25,7 +27,7 @@ public abstract class ACommand implements Runnable {
 		cl.setUsageHelpAutoWidth(true);
 		cl.setUsageHelpWidth(100);
 		cl.setUsageHelpLongOptionsMaxWidth(40);
-		cl.usage(System.out);
+		cl.usage(System.out,Help.defaultColorScheme(Ansi.ON));
 	}
 	
 	public CommandLine commandLine() {
@@ -56,7 +58,7 @@ public abstract class ACommand implements Runnable {
 	 * @return
 	 */
 	protected int verbose() {
-		return cli().verbose;
+		return cli().verbose();
 	}
 	
 	public void println(String s) {

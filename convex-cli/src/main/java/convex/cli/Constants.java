@@ -28,4 +28,6 @@ public class Constants {
 
 	public static final int DEFAULT_PEER_PORT = convex.core.Constants.DEFAULT_PEER_PORT;
 
+	public static final int DEFAULT_VERBOSE_LEVEL = 2;
+
 }

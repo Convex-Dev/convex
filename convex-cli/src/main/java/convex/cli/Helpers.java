@@ -10,6 +10,8 @@ import java.util.regex.Pattern;
 
 import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
+import picocli.CommandLine.Help.Ansi.Style;
+import picocli.CommandLine.Help.ColorScheme;
 
 /**
  *
@@ -19,6 +21,15 @@ import convex.core.util.Utils;
  *
 */
 public class Helpers {
+	
+	public static final ColorScheme usageColourScheme = new ColorScheme.Builder()
+	        .commands    (Style.bold, Style.underline)    // combine multiple styles
+	        .options     (Style.fg_yellow)                // yellow foreground color
+	        .parameters  (Style.fg_yellow)
+	        .optionParams(Style.italic)
+	        .errors      (Style.fg_red, Style.bold)
+	        .stackTraces (Style.italic)
+	        .build();
 
 	/**
 	 * Split a parameter list by ','. 
