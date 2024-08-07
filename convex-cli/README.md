@@ -31,25 +31,36 @@ evidence expand family claw crack dawn name salmon resource leg once curious
 ```
 
 You will be also prompted for three passwords:
+- A BIP39 passphrase. This is the passphrase that will be used to generate the private key
 - The key store password. This is needed to access all keys in the key store
-- A BIP39 passphrase. This is the passphrase that will be used to generate the 
 - A private key encryption password. This protects the new key generated
 
-After the key is successfully generated, you will be able to use it providing you have the key store password and the private key password.
+After the key pair is successfully generated, you will be able to use it providing you have the key store password and the private key password.
 
-If the key is important to you, you will want to be able to recover it even if you permanently lose access to the key store (e.g. if your laptop is stolen, disk drive corrupted etc.). In tis case, you should make sure you securely record the following:
+If the key is important to you, you will want to be able to recover it even if you permanently lose access to the key store (e.g. if your laptop is stolen, disk drive corrupted etc.). In this case, you SHOULD make sure you securely record the following:
 - The BIP39 mnemonic word list
 - The BIP39 passphrase
+
+The command will output a 32 byte hex public key that will look something like this:
+
+```
+021efb3ff24898dffb30c9c7e490e86b2d0cb7a87c974a51894354532ff4670f
+```
+
+The public key MAY be shared publicly, and is important because it is used to:
+- Identify your key pair in the key store
+- Validate signatures made with the key pair (e.g. in Convex transactions)
+- Create a Convex account protected by the key pair (as the "account key")
  
 ### Importing a key pair
 
-To re-import a key pair from a BIP39 seed, you can used the following command:
+To import a key pair from a BIP39 seed generated previously, you can use the following command:
 
 ```
 convex key import --type=bip39 --text='evidence expand family claw crack dawn name salmon resource leg once curious'
 ```
 
-This will re-import the same key pair that was generated, assuming you have the correct BIP39 passphrase. You can confirm this by checking that the public key is the one you expect.
+This will re-import the same key pair that was originally generated, assuming you have the correct BIP39 passphrase. You can confirm this by checking that the public key is the one you expect.
 
 ## Installation
 

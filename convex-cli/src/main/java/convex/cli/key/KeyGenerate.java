@@ -111,7 +111,7 @@ public class KeyGenerate extends AKeyCommand {
 			storeMixin.ensureKeyStore();
 			char[] keyPassword=keyMixin.getKeyPassword();
 			storeMixin.addKeyPairToStore(kp, keyPassword); 
-			inform ("Public key added to store: "+kp.getAccountKey());
+			inform ("Public key added to store: 0x"+kp.getAccountKey().toChecksumHex());
 			println(publicKeyHexString); // Output generated public key		
 			Arrays.fill(keyPassword, 'p');
 		}
