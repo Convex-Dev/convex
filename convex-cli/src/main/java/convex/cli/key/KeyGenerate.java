@@ -1,5 +1,7 @@
 package convex.cli.key;
 
+import java.io.IOException;
+import java.security.SecureRandom;
 import java.util.Arrays;
 
 import convex.cli.CLIError;
@@ -7,7 +9,10 @@ import convex.cli.Constants;
 import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
+import convex.core.data.ABlob;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Hash;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -38,7 +43,7 @@ public class KeyGenerate extends AKeyCommand {
 	
 	@Option(names={"--type"},
 			defaultValue="bip39",
-			description="Type of key generation. Supports random, bip39")
+			description="Type of key generation. Supports random, bip39, entropy")
 	private String type;
 	
 	@Option(names="--passphrase",
@@ -70,6 +75,22 @@ public class KeyGenerate extends AKeyCommand {
 			return result;
 		} else if ("random".equals(type)) {
 			return AKeyPair.generate();
+		} else if ("entropy".equals(type)) {
+			if (!isInteractive()) throw new CLIError(ExitCodes.USAGE,"Entropy based genration requires interactive mode");
+			inform("Press some random keys to generate entropy. Press ENTER to finish.");
+			Hash h=Blob.createRandom(new SecureRandom(), 64).getContentHash();
+			while (true) {
+				try {
+					int c=System.console().reader().read();
+					ABlob entropy=Blobs.forLong(c).append(Blobs.forLong(System.currentTimeMillis()));
+					h=h.append(entropy).getContentHash();
+					println(h.getContentHash());
+					if ((c=='\r')||(c=='\n')) break;
+				} catch (IOException e) {
+					throw new CLIError(ExitCodes.IOERR,"Unable to collect entropy");
+				}
+			}
+			return AKeyPair.create(h.toFlatBlob());
 		} else {
 			throw new CLIError(ExitCodes.USAGE,"Unsupprted key generation type: "+type);
 		}

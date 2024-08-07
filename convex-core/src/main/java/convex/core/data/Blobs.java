@@ -178,4 +178,13 @@ public class Blobs {
 		}
 	}
 
+	/**
+	 * Create a 8-byte Blob representing a long value
+	  */
+	public static Blob forLong(long c) {
+		byte[] bs=new byte[8];
+		Utils.writeLong(bs, 0, c);
+		return Blob.wrap(bs);
+	}
+
 }
