@@ -79,6 +79,10 @@ public class Main extends ACommand {
 
 	@Override
 	public void run() {
+		String art=Helpers.getConvexArt();
+		if (isColoured()) art=Coloured.blue(art);
+		inform(2,art);
+		
 		// no command provided - so show help
 		showUsage();
 	}

@@ -96,6 +96,15 @@ public class Helpers {
 		}
 		return portList.stream().mapToInt(Integer::intValue).toArray();
 	}
+
+	public static String getConvexArt() {
+		try {
+			String art=Utils.readResourceAsString("art/convex.logo");
+			return art;
+		} catch (Exception e) {
+			return null;
+		}
+	}
 }
 
 
