@@ -38,6 +38,7 @@ import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.restapi.RESTServer;
+import convex.restapi.model.CreateAccountRequest;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -112,11 +113,15 @@ public class ChainAPI extends ABaseAPI {
 	        operationId = "createAccount",
 	        summary="Create a new Convex account",
 	        requestBody = @OpenApiRequestBody(
-	                description = "Complex bodies",
+	                description = "Create Account request, must provide an accountKey for the new Account",
 	                content= {@OpenApiContent(
-	                		from = String.class,
-	                		// type = "application/json",
-	                		example = "{}")}))
+	                		from = CreateAccountRequest.class,
+	                		type = "application/json",
+	                		exampleObjects = {
+	                	        @OpenApiExampleProperty(name="accountKey", value = "d82e78594610f708ad47f666bbacbab1711760652cb88bf7515ed6c3ae84a08d")
+	                		}
+	                	    //example = "{\"accountKey\": \"d82e78594610f708ad47f666bbacbab1711760652cb88bf7515ed6c3ae84a08d\"}")}
+	                )}))
 	public void createAccount(Context ctx) {
 		Map<String, Object> req=getJSONBody(ctx);
 		Object key = req.get("accountKey");

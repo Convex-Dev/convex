@@ -16,7 +16,7 @@
 
 	<properties>
 		<json.simple.version>1.1.1</json.simple.version>
-		<javalin.version>6.1.6</javalin.version>
+		<javalin.version>6.2.0</javalin.version>
 	</properties>
 
 	<build>

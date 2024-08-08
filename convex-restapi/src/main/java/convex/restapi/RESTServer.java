@@ -20,6 +20,8 @@ import io.javalin.Javalin;
 import io.javalin.community.ssl.SslPlugin;
 import io.javalin.config.JavalinConfig;
 import io.javalin.http.staticfiles.Location;
+import io.javalin.openapi.JsonSchemaLoader;
+import io.javalin.openapi.JsonSchemaResource;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
@@ -98,9 +100,13 @@ public class RESTServer {
 	}
 
 	protected void addOpenApiPlugins(JavalinConfig config) {
+		String docsPath="openapi-plugin/openapi-default.json";
+		
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
 			
-            pluginConfig.withDefinitionConfiguration((version, definition) -> {
+            pluginConfig
+            .withDocumentationPath(docsPath)
+            .withDefinitionConfiguration((version, definition) -> {
                 definition.withOpenApiInfo(info -> {
 					info.setTitle("Convex REST API");
 					info.setVersion("0.1.1");
@@ -108,8 +114,16 @@ public class RESTServer {
             });
 		}));
 
-		config.registerPlugin(new SwaggerPlugin());
-		config.registerPlugin(new ReDocPlugin());
+		config.registerPlugin(new SwaggerPlugin(swaggerConfiguration->{
+			swaggerConfiguration.setDocumentationPath(docsPath);
+		}));
+		config.registerPlugin(new ReDocPlugin(reDocConfiguration -> {
+	        reDocConfiguration.setDocumentationPath(docsPath);
+	    }));
+		
+		for (JsonSchemaResource generatedJsonSchema : new JsonSchemaLoader().loadGeneratedSchemes()) {
+	        System.out.println(generatedJsonSchema.getName());
+	    }
 	}
 
 	protected ChainAPI chainAPI;

@@ -87,11 +87,11 @@ public class LocalStart extends ALocalCommand {
 		}
 		int left=n-keyPairList.size();
 		if (left>0) {
-			log.warn("Insufficient key pairs specified. Additional "+left+" keypair(s) will be generated");
+			informWarning("Insufficient key pairs specified. Additional "+left+" keypair(s) will be generated");
 			for (int i=0; i<left; i++) {
 				AKeyPair kp=AKeyPair.generate();
 				keyPairList.add(kp);
-				log.warn("Generated key: "+kp.getAccountKey().toChecksumHex()+" Priv: "+kp.getSeed());
+				log.info("Generated key: "+kp.getAccountKey().toChecksumHex()+" Priv: "+kp.getSeed());
 			}
 		}
 		
@@ -111,7 +111,7 @@ public class LocalStart extends ALocalCommand {
 			try {
 				peerPorts = Helpers.getPortList(ports, count);
 			} catch (NumberFormatException e) {
-				log.warn("cannot convert port number " + e);
+				informWarning("Cannot convert port number " + e);
 				return;
 			}
 			if (peerPorts.length < count) {
@@ -130,7 +130,7 @@ public class LocalStart extends ALocalCommand {
 			}
 			launchRestAPI(servers.get(0));
 		} catch (Throwable t) {
-			log.warn("Failed to start REST server: "+t);
+			informWarning("Failed to start REST server: "+t);
 		}
 		
 		// Loop until we end
