@@ -220,4 +220,6 @@ public class Constants {
 	 */
 	public static final long MAX_BLOCK_BACKDATE = 60*1000;
 
+	public static final int PBE_ITERATIONS = 100000;
+
 }

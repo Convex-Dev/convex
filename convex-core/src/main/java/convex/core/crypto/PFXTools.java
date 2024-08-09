@@ -7,13 +7,17 @@ import java.io.IOException;
 import java.security.GeneralSecurityException;
 import java.security.Key;
 import java.security.KeyStore;
+import java.security.KeyStore.PasswordProtection;
+import java.security.KeyStore.SecretKeyEntry;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 
 import javax.crypto.SecretKey;
+import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import convex.core.Constants;
 import convex.core.util.Utils;
 
 
@@ -126,8 +130,17 @@ public class PFXTools {
 		if (keyPassword == null) throw new IllegalArgumentException("Password is mandatory for private key");
 
 		byte[] bs=((AKeyPair)kp).getSeed().getBytes();
-		SecretKey secretKeyPrivate = new SecretKeySpec(bs, "Ed25519");
-		ks.setKeyEntry(alias, secretKeyPrivate, keyPassword, null);
+		SecretKey secretKeySeed = new SecretKeySpec(bs, "Ed25519");
+		
+		// See https://neilmadden.blog/2017/11/17/java-keystores-the-gory-details/
+		SecretKeyEntry keyEntry=new SecretKeyEntry(secretKeySeed);
+		byte[] salt=new byte[20];
+		
+		PasswordProtection protection= new PasswordProtection(keyPassword,
+                "PBEWithHmacSHA512AndAES_128",
+                new PBEParameterSpec(salt, Constants.PBE_ITERATIONS));
+		ks.setEntry(alias, keyEntry, protection);
+		// ks.setKeyEntry(alias, secretKeySeed, keyPassword, null);
 
 		return ks;
 	}
