@@ -28,7 +28,7 @@ public class KeyStoreMixin extends AMixin {
 	@Option(names = { "--keystore" }, 
 			defaultValue = "${env:CONVEX_KEYSTORE:-" + Constants.KEYSTORE_FILENAME+ "}", 
 			scope = ScopeType.INHERIT, 
-			description = "Keystore filename. Can specify with CONVEX_KEYSTORE environment variable. Defaulting to: ${DEFAULT-VALUE}")
+			description = "Keystore filename. Can specify with CONVEX_KEYSTORE. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
 
 	
@@ -38,7 +38,7 @@ public class KeyStoreMixin extends AMixin {
 	@Option(names = {"--storepass" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:CONVEX_KEYSTORE_PASSWORD}", 
-			description = "Password to read/write to the Keystore") 
+			description = "Password for the Keystore") 
 	String keystorePassword;
 
 	KeyStore keyStore = null;

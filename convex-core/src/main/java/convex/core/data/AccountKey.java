@@ -148,6 +148,7 @@ public class AccountKey extends AArrayBlob {
 	 * @return AccountKey, or null if not possible to parse
 	 */
 	public static AccountKey parse(String s) {
+		if (s==null) return null;
 		s=s.trim();
 		if (s.startsWith("0x")) s=s.substring(2);
 		return fromHexOrNull(s);

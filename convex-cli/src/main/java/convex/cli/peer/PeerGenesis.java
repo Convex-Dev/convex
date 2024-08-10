@@ -51,7 +51,7 @@ public class PeerGenesis extends APeerCommand {
 		
 		AccountKey govKey=AccountKey.parse(governanceKey);
 		if (govKey==null) {
-			paranoia("--gioverannce-key must be specified in strict security mode");
+			paranoia("--goverannce-key must be specified in strict security mode");
 			if (governanceKey==null) {
 				govKey=genesisKey.getAccountKey();
 			} else {

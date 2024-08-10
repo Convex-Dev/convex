@@ -49,12 +49,15 @@ public class GenesisTest {
 		importTester.assertExitCode(ExitCodes.SUCCESS);
 		assertEquals(expectedKey,importTester.getOutput().trim());
 		
-//		CLTester tester =  CLTester.run(
-//				"peer", "genesis",
-//				"--storepass", new String(KEYSTORE_PASSWORD),
-//				"--keypass", new String(KEY_PASSWORD),
-//				"--keystore", KEYSTORE_FILENAME
-//		);
-//		tester.assertExitCode(ExitCodes.SUCCESS);
+		CLTester tester =  CLTester.run(
+				"peer", "genesis", "-n",
+				"--peer-key", expectedKey,
+				"--peer-keypass", new String(KEY_PASSWORD),
+				"--key", expectedKey,
+				"--keypass", new String(KEY_PASSWORD),
+				"--storepass", new String(KEYSTORE_PASSWORD),
+				"--keystore", KEYSTORE_FILENAME
+		);
+		tester.assertExitCode(ExitCodes.SUCCESS);
 	}
 }

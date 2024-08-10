@@ -52,7 +52,7 @@ public class KeyImport extends AKeyCommand {
 	@Option(names = { "-p","--keypass" }, 
 			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
-			description = "Key pair password for generated key. Can specify with CONVEX_KEY_PASSWORD.")
+			description = "Key pair password for imported key. Can specify with CONVEX_KEY_PASSWORD.")
 	protected char[] keyPassword;
 
 	/**
@@ -81,7 +81,7 @@ public class KeyImport extends AKeyCommand {
 				informError("Not permitted to infer key import type in strict mode");
 				return null;
 			}
-			inform("No import file type specified, attempting to auto-detect");
+			inform("No import type specified, attempting to auto-detect");
 			
 			if (hex!=null) {
 				if (hex.count()==AKeyPair.SEED_LENGTH) {
