@@ -30,7 +30,7 @@ public class FileList extends JList<Path> {
 				try {
 					Path p=getSelectedPath();
 					System.out.println("Deleting:"+ p);
-			    	Files.delete(p);
+			    	if (p!=null) Files.delete(p);
 			    	refreshList();
 				} catch (IOException e) {
 					Toast.display(null, "Can't delete file!", Color.ORANGE);
