@@ -7,7 +7,7 @@ import convex.cli.Main;
 import convex.cli.mixins.EtchMixin;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.PeerKeyMixin;
-import convex.cli.mixins.StoreMixin;
+import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
 import etch.EtchStore;
 import picocli.CommandLine.Mixin;
@@ -25,7 +25,7 @@ public abstract class APeerCommand extends ACommand {
 	protected PeerKeyMixin peerKeyMixin;
 	
 	@Mixin
-	protected StoreMixin storeMixin; 
+	protected KeyStoreMixin storeMixin; 
 	
 
 	@ParentCommand

@@ -20,7 +20,7 @@ import convex.core.util.Utils;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
-public class StoreMixin extends AMixin {
+public class KeyStoreMixin extends AMixin {
 
 	/**
 	 * Keystore option
@@ -43,7 +43,7 @@ public class StoreMixin extends AMixin {
 
 	KeyStore keyStore = null;
 	
-	static Logger log = LoggerFactory.getLogger(StoreMixin.class);
+	static Logger log = LoggerFactory.getLogger(KeyStoreMixin.class);
 
 	/**
 	 * Gets the keystore file name currently used for the CLI

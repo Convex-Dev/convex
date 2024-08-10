@@ -8,5 +8,5 @@ public class ClientKeyMixin {
 	public KeyMixin keyMixin;
 	
 	@Mixin
-	public StoreMixin storeMixin;
+	public KeyStoreMixin storeMixin;
 }

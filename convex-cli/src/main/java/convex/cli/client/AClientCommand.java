@@ -7,7 +7,7 @@ import convex.cli.ExitCodes;
 import convex.cli.mixins.AddressMixin;
 import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.RemotePeerMixin;
-import convex.cli.mixins.StoreMixin;
+import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -17,7 +17,7 @@ import picocli.CommandLine.Option;
 public abstract class AClientCommand extends ATopCommand {
 	
 	@Mixin
-	protected StoreMixin storeMixin; 
+	protected KeyStoreMixin storeMixin; 
 	
 	@Mixin
 	protected KeyMixin keyMixin;

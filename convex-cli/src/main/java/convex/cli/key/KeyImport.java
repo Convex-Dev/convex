@@ -15,6 +15,7 @@ import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
+import picocli.CommandLine.ScopeType;
 
 
 /**
@@ -47,6 +48,12 @@ public class KeyImport extends AKeyCommand {
 	@Option(names={"--type"},
 			description="Type of file imported. Supports: pem, seed, bip39. Will attempt to autodetect unless strict security is enabled")
 	private String type;
+	
+	@Option(names = { "-p","--keypass" }, 
+			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
+			scope = ScopeType.INHERIT, 
+			description = "Key pair password for generated key. Can specify with CONVEX_KEY_PASSWORD.")
+	protected char[] keyPassword;
 
 	/**
 	 * Import key pair
@@ -121,11 +128,16 @@ public class KeyImport extends AKeyCommand {
 		AKeyPair keyPair=importKeyPair();
 		if (keyPair==null) return; // returning without failure, presumably usage to show or otherwise cancelled
 		
+		// Get password for key
+		if (keyPassword==null) {
+			keyPassword=readPassword("Enter password for imported key: ");
+		}
+
 		// Finally write to store
-		char[] keyPassword=keyMixin.getKeyPassword();
 		if (storeMixin.loadKeyStore()==null) {
 			throw new CLIError("Key store specified for import does not exist");
 		}
+		
 		storeMixin.addKeyPairToStore(keyPair,keyPassword);
 		Arrays.fill(keyPassword, 'x');
 		storeMixin.saveKeyStore();	

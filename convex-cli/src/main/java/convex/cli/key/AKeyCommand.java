@@ -2,8 +2,7 @@ package convex.cli.key;
 
 import convex.cli.ACommand;
 import convex.cli.Main;
-import convex.cli.mixins.KeyMixin;
-import convex.cli.mixins.StoreMixin;
+import convex.cli.mixins.KeyStoreMixin;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.ParentCommand;
 
@@ -16,10 +15,7 @@ public abstract class AKeyCommand extends ACommand {
 	protected Key keyParent;
 	
 	@Mixin
-	protected StoreMixin storeMixin; 
-	
-	@Mixin
-	protected KeyMixin keyMixin;
+	protected KeyStoreMixin storeMixin; 
 
 	
 	@Override

@@ -15,6 +15,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Hash;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.ScopeType;
 
 
 /**
@@ -49,6 +50,12 @@ public class KeyGenerate extends AKeyCommand {
 	@Option(names="--passphrase",
 			description="BIP39 passphrase. If not provided, will be requested from user (or assumed blank in non-interactive mode).")
 	private String passphrase;
+	
+	@Option(names = { "-p","--keypass" }, 
+			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
+			scope = ScopeType.INHERIT, 
+			description = "Key pair password for generated key. Can specify with CONVEX_KEY_PASSWORD.")
+	protected char[] keyPassword;
 
 	private AKeyPair generateKeyPair() {	
 		if ("bip39".equals(type)) {
@@ -109,9 +116,14 @@ public class KeyGenerate extends AKeyCommand {
 			
             String publicKeyHexString =  kp.getAccountKey().toHexString();
 			storeMixin.ensureKeyStore();
-			char[] keyPassword=keyMixin.getKeyPassword();
+			
+			inform("Generated key pair with public key: 0x"+kp.getAccountKey().toChecksumHex());
+
+			if (keyPassword==null) {
+				keyPassword=readPassword("Enter password for generated key: ");
+			}
+			
 			storeMixin.addKeyPairToStore(kp, keyPassword); 
-			inform ("Public key added to store: 0x"+kp.getAccountKey().toChecksumHex());
 			println(publicKeyHexString); // Output generated public key		
 			Arrays.fill(keyPassword, 'p');
 		}
