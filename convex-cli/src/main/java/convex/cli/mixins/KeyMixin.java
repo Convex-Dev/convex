@@ -18,7 +18,7 @@ public class KeyMixin extends AMixin {
 			defaultValue = "${env:CONVEX_KEY_PASSWORD}", 
 			scope = ScopeType.INHERIT, 
 			description = "Key pair password in keystore. Can specify with CONVEX_KEY_PASSWORD.")
-	protected String keyPassword;
+	protected char[] keyPassword;
 
 	public String getPublicKey() {
 		return publicKey;
@@ -36,7 +36,7 @@ public class KeyMixin extends AMixin {
 		char[] keypass = null;
 
 		if (this.keyPassword != null) {
-			keypass = this.keyPassword.toCharArray();
+			keypass = this.keyPassword;
 		} else {
 			if (isInteractive()) {
 				keypass = readPassword("Private Key Encryption Password: ");
@@ -47,7 +47,7 @@ public class KeyMixin extends AMixin {
 				keypass = new char[0];
 			}
 			
-			this.keyPassword=new String(keypass);
+			this.keyPassword=keypass;
 		}
 		
 		if (keypass.length == 0) {

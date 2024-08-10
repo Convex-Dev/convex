@@ -52,7 +52,7 @@ public abstract class APeerCommand extends ACommand {
 				boolean shouldGenerate=question("No --peer-key specified. Generate one? (y/n)");
 				if (shouldGenerate) {
 					AKeyPair kp=AKeyPair.generate();
-					inform(2,"Generated peer key: "+kp.getAccountKey().toChecksumHex());
+					inform("Generated peer key: "+kp.getAccountKey().toChecksumHex());
 					char[] keyPass=peerKeyMixin.getKeyPassword();
 					storeMixin.addKeyPairToStore(kp, keyPass);
 					storeMixin.saveKeyStore();
@@ -76,8 +76,9 @@ public abstract class APeerCommand extends ACommand {
 		String peerPublicKey=keyMixin.getPublicKey();
 		if (peerPublicKey==null) {
 			if (!isInteractive()) {
-				throw new CLIError(ExitCodes.USAGE,"Controller --key must be specified in non-interactive mode");
+				throw new CLIError(ExitCodes.USAGE,"--key for controller must be specified in non-interactive mode");
 			} 
+			peerPublicKey=keyMixin.getPublicKey();
 		}
 		
 		char[] keyPass=keyMixin.getKeyPassword();

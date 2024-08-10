@@ -46,12 +46,16 @@ public class PeerGenesis extends APeerCommand {
 	public void run() {
 		storeMixin.loadKeyStore();
 
+		// Key for initial peer. Needed for genesis start
 		AKeyPair peerKey = ensurePeerKey();
-		AKeyPair genesisKey=ensureControllerKey();
+		
+		// Key for controller. Used for genesis / governance in non-strict mode
+		// Otherwise peer key can be used
+		AKeyPair genesisKey = ensureControllerKey();
 		
 		AccountKey govKey=AccountKey.parse(governanceKey);
 		if (govKey==null) {
-			paranoia("--goverannce-key must be specified in strict security mode");
+			paranoia("--governance-key must be specified in strict security mode");
 			if (governanceKey==null) {
 				govKey=genesisKey.getAccountKey();
 			} else {
@@ -61,10 +65,10 @@ public class PeerGenesis extends APeerCommand {
 
 		EtchStore store=getEtchStore();
 		
-		State genesisState=Init.createState(List.of(peerKey.getAccountKey()));
+		State genesisState=Init.createState(govKey,genesisKey.getAccountKey(),List.of(peerKey.getAccountKey()));
 		inform("Created genesis state with hash: "+genesisState.getHash());
 		
-		inform(2,"Testing genesis state peer initialisation");
+		inform("Testing genesis state peer initialisation");
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.STORE, store);
 		config.put(Keywords.STATE, genesisState);
