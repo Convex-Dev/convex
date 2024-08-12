@@ -354,7 +354,10 @@ public class ChainAPI extends ABaseAPI {
 										from=TransactionPrepareResponse.class,
 										type = "application/json", 
 										exampleObjects = {
-											@OpenApiExampleProperty(name = "value", value = "6")
+											@OpenApiExampleProperty(name = "sequence", value = "14"),
+											@OpenApiExampleProperty(name = "address", value = "12"),
+											@OpenApiExampleProperty(name = "source", value = "(* 2 3)"),
+											@OpenApiExampleProperty(name = "hash", value = "d00c0e81031103110232012a")
 										}
 										)}),
 					@OpenApiResponse(status = "503", 
@@ -442,7 +445,7 @@ public class ChainAPI extends ABaseAPI {
 		// Get ED25519 seed
 		ABlob seed = Blobs.parse(req.get("seed"));
 		if (!(seed instanceof ABlob))
-			throw new BadRequestResponse("Ed25519 seed required for transact (e.g. as hex string)");
+			throw new BadRequestResponse("Valid Ed25519 seed required for transact (hex string)");
 		if (seed.count() != AKeyPair.SEED_LENGTH)
 			throw new BadRequestResponse("Seed must be 32 bytes");
 

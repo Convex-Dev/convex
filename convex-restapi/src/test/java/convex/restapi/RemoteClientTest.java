@@ -13,7 +13,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.init.Init;
 import convex.core.lang.Symbols;
 import convex.java.Convex;
 import convex.java.JSON;
@@ -25,6 +27,8 @@ public class RemoteClientTest {
 	static RESTServer server;
 	static int port;
 	static String host;
+	static AKeyPair skp;
+	static Address genesis=Init.GENESIS_ADDRESS;
 	
 	@BeforeAll
 	public static void init() {
@@ -33,6 +37,7 @@ public class RemoteClientTest {
 		rs.start(0);
 		port=rs.getPort();
 		server=rs;
+		skp=s.getKeyPair();
 		host="http://localhost:"+port;
 	}
 	
@@ -73,7 +78,7 @@ public class RemoteClientTest {
 	}
 	
 	@Test 
-	public void testQuery() {
+	public void testAccount() {
 		Convex c=Convex.connect(host);
 		AKeyPair kp=AKeyPair.generate();
 		Address addr=c.createAccount(kp);
@@ -88,6 +93,19 @@ public class RemoteClientTest {
 		// Query *key*
 		res=c.query(Symbols.STAR_KEY.toString());
 		assertEquals(JSON.toString(kp.getAccountKey()),res.get("value"));
+	}
+	
+	@Test 
+	public void testAccountGenesisInfo() {
+		Convex c=Convex.connect(host);
+		Address addr=genesis;
+		c.setAddress(addr);
+		
+		// Test values for basic new account
+		Map<String,Object> res=c.queryAccount();
+		assertEquals(addr.longValue(),res.get("address"));
+		assertTrue(res.get("balance") instanceof Long);
+		assertEquals(skp.getAccountKey(),AccountKey.parse(res.get("key")));
 	}
 	
 	@Test 
@@ -110,6 +128,20 @@ public class RemoteClientTest {
 		res=c.queryAccount(10000);
 		assertNull(res);
 	}
+	
+	@Test 
+	public void testTransactGenesis() {
+		Convex c=Convex.connect(host);
+		AKeyPair kp=skp;
+		Address addr=genesis;
+		c.setKeyPair(kp);
+		c.setAddress(addr);
+		
+		Map<String,Object> rm=c.transact("(+ 1 2)");
+		// System.out.println(JSON.toPrettyString(rm));
+		assertEquals(3L,rm.get("value"));
+	}
+	
 	
 	@Test 
 	public void testTransactNoFunds() {
