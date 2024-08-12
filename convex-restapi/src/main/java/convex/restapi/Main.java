@@ -7,6 +7,7 @@ public class Main {
 
 	public static void main(String[] args) {
 		Server s=API.launchPeer();
+		System.out.println("Using Ed25519 seed: "+s.getKeyPair().getSeed());
 		RESTServer rs=RESTServer.create(s);
 		rs.start();
 		

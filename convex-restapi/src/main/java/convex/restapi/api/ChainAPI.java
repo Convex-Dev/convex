@@ -43,6 +43,7 @@ import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.QueryAccountResponse;
 import convex.restapi.model.QueryRequest;
+import convex.restapi.model.TransactRequest;
 import convex.restapi.model.TransactionPrepareRequest;
 import convex.restapi.model.TransactionPrepareResponse;
 import convex.restapi.model.TransactionSubmitRequest;
@@ -50,6 +51,7 @@ import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
+import io.javalin.http.NotFoundResponse;
 import io.javalin.http.ServiceUnavailableResponse;
 import io.javalin.openapi.HttpMethod;
 import io.javalin.openapi.OpenApi;
@@ -243,10 +245,7 @@ public class ChainAPI extends ABaseAPI {
 
 		PeerStatus as = r.getValue();
 		if (as == null) {
-			ctx.result(
-					"{\"errorCode\": \"NOBODY\", \"source\": \"Server\",\"value\": \"The peer requested does not exist.\"}");
-			ctx.status(404);
-			return;
+			throw new NotFoundResponse("Peer does not exist: "+addrParam);
 		}
 
 		Object hm = JSON.from(as);
@@ -264,11 +263,11 @@ public class ChainAPI extends ABaseAPI {
 		try {
 			return convex.querySync(form);
 		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse(jsonError("Timeout in query request"));
+			throw new ServiceUnavailableResponse("Timeout in query request");
 		} catch (IOException e) {
-			throw new InternalServerErrorResponse(jsonError("IOException in query request: " + e));
+			throw new InternalServerErrorResponse("IOException in query request: " + e);
 		} catch (Exception e) {
-			throw new InternalServerErrorResponse(jsonError("Failed to execute query: " + e));
+			throw new InternalServerErrorResponse("Failed to execute query: " + e);
 		}
 	}
 
@@ -282,12 +281,9 @@ public class ChainAPI extends ABaseAPI {
 		try {
 			return convex.transactSync(signedTransaction);
 		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse(
-					jsonError("Timeout executing transaction - unable to confirm result."));
-		} catch (IOException e) {
-			throw new InternalServerErrorResponse(jsonError("IOException in request: " + e));
+			throw new ServiceUnavailableResponse("Timeout executing transaction - unable to confirm result.");
 		} catch (Exception e) {
-			throw new InternalServerErrorResponse(jsonError("Failed to execute transaction: " + e));
+			throw new InternalServerErrorResponse("Failed to execute transaction: " + e);
 		}
 	}
 
@@ -305,12 +301,12 @@ public class ChainAPI extends ABaseAPI {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse(jsonError("Expected JSON body containing 'address' field"));
+			throw new BadRequestResponse("Expected JSON body containing 'address' field");
 
 		Object o = req.get("amount");
 		CVMLong l = CVMLong.parse(o);
 		if (l == null)
-			throw new BadRequestResponse(jsonError("faucet requires an 'amount' field containing a long value."));
+			throw new BadRequestResponse("faucet requires an 'amount' field containing a long value.");
 
 		long amt = l.longValue();
 		// Do any limits on faucet issue here
@@ -329,9 +325,9 @@ public class ChainAPI extends ABaseAPI {
 				ctx.result(JSON.toPrettyString(req));
 			}
 		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
+			throw new ServiceUnavailableResponse("Timeout in request");
 		} catch (IOException e) {
-			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+			throw new InternalServerErrorResponse("Fauncet failure: "+e.getMessage());
 		}
 
 	}
@@ -369,7 +365,7 @@ public class ChainAPI extends ABaseAPI {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse(jsonError("Transaction prepare requires a valid 'address' field."));
+			throw new BadRequestResponse("Transaction prepare requires a valid 'address' field.");
 		
 		Object srcValue = req.get("source");
 		ACell code = readCode(srcValue);
@@ -395,10 +391,41 @@ public class ChainAPI extends ABaseAPI {
 
 			ctx.result(JSON.toPrettyString(rmap));
 		} catch (Exception e) {
-			throw new InternalServerErrorResponse(jsonError("Error preparing transaction: " + e.getMessage()));
+			throw new InternalServerErrorResponse("Error preparing transaction: " + e.getMessage());
 		}
 	}
 
+	@OpenApi(path = ROUTE+"transact",
+			methods = HttpMethod.POST,
+			operationId = "transact",
+			tags= {"Transactions"},
+			summary="Execute a Convex transaction. WARNING: sends Ed25519 seed over the network for peer to complete signature.",
+			requestBody = @OpenApiRequestBody(
+					description = "Transaction execution request",
+					content= @OpenApiContent(
+							from=TransactRequest.class,
+							type = "application/json",
+							exampleObjects = {
+									@OpenApiExampleProperty(name = "address", value = "12"),
+									@OpenApiExampleProperty(name = "source", value = "(* 2 3)"),
+									@OpenApiExampleProperty(name = "seed", value = "0x690f51d2eb7163f820fdb861b33d5b077034f09923a2d31946ac199f28639506")
+								}
+							)),
+			responses = {
+					@OpenApiResponse(status = "200", 
+							description = "Transaction executed", 
+							content = {
+								@OpenApiContent(
+										from=CVMResult.class,
+										type = "application/json", 
+										exampleObjects = {
+											@OpenApiExampleProperty(name = "value", value = "6")
+										}
+										)}),
+					@OpenApiResponse(status = "503", 
+							description = "Transaction service unavailable" )
+				}
+			)
 	public void runTransact(Context ctx) {
 		Map<String, Object> req = getJSONBody(ctx);
 		if (!req.containsKey("seed") || req.containsKey("sig")) {
@@ -408,16 +435,16 @@ public class ChainAPI extends ABaseAPI {
 
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse(jsonError("Transact requires an 'address' field."));
+			throw new BadRequestResponse("Transact requires an valid address.");
 		Object srcValue = req.get("source");
 		ACell code = readCode(srcValue);
 
 		// Get ED25519 seed
 		ABlob seed = Blobs.parse(req.get("seed"));
 		if (!(seed instanceof ABlob))
-			throw new BadRequestResponse(jsonError("Ed25519 seed required for transact (e.g. as hex string)"));
+			throw new BadRequestResponse("Ed25519 seed required for transact (e.g. as hex string)");
 		if (seed.count() != AKeyPair.SEED_LENGTH)
-			throw new BadRequestResponse(jsonError("Seed must be 32 bytes"));
+			throw new BadRequestResponse("Seed must be 32 bytes");
 
 		try {
 			long sequence = convex.getSequence(addr);
@@ -432,9 +459,9 @@ public class ChainAPI extends ABaseAPI {
 			HashMap<String, Object> rm = jsonResult(r);
 			ctx.result(JSON.toPrettyString(rm));
 		} catch (NullPointerException e) {
-			throw new BadRequestResponse(jsonError("Account does not exist: " + addr));
+			throw new BadRequestResponse("Account does not exist: " + addr);
 		} catch (Exception e) {
-			throw new InternalServerErrorResponse(jsonError("Error preparing transaction: " + e.getMessage()));
+			throw new InternalServerErrorResponse("Error executing transaction: " + e.getMessage());
 		}
 	}
 
@@ -483,23 +510,20 @@ public class ChainAPI extends ABaseAPI {
 		// Get the transaction hash
 		Object hashValue = req.get("hash");
 		if (!(hashValue instanceof String))
-			throw new BadRequestResponse(jsonError("Parameter 'hash' must be provided as a String"));
+			throw new BadRequestResponse("Parameter 'hash' must be provided as a String");
 		Blob h = Blob.parse((String) hashValue);
 		if (h == null)
-			throw new BadRequestResponse(
-					jsonError("Parameter 'hash' did not parse correctly, must be a hex string."));
+			throw new BadRequestResponse("Parameter 'hash' did not parse correctly, must be a hex string.");
 
 		ATransaction trans = null;
 		try {
 			Ref<?> ref = Format.readRef(h, 0);
 			ACell maybeTrans = ref.getValue();
 			if (!(maybeTrans instanceof ATransaction))
-				throw new BadRequestResponse(
-						jsonError("Value with hash " + h + " is not a transaction: can't submit it!"));
+				throw new BadRequestResponse("Value with hash " + h + " is not a transaction: can't submit it!");
 			trans = (ATransaction) maybeTrans;
 		} catch (MissingDataException e) {
-			throw new BadRequestResponse(jsonError(
-					"Could not find transaction with hash " + h + ": probably you need to call 'prepare' first?"));
+			throw new BadRequestResponse("Could not load transaction with hash " + h + ": probably you need to call 'prepare' first?");
 		} catch (Exception e) {
 			throw new BadRequestResponse(
 					jsonError("Failed to identify transaction with hash " + h + ": " + e.getMessage()));
@@ -508,19 +532,19 @@ public class ChainAPI extends ABaseAPI {
 		// Get the account key
 		Object keyValue = req.get("accountKey");
 		if (!(keyValue instanceof String))
-			throw new BadRequestResponse(jsonError("Expected JSON body containing 'accountKey' field"));
+			throw new BadRequestResponse("Expected JSON body containing 'accountKey' field");
 		AccountKey key = AccountKey.parse(keyValue);
 		if (key == null)
 			throw new BadRequestResponse(
-					jsonError("Parameter 'accountKey' did not parse correctly, must be 64 hex characters (32 bytes)."));
+					"Parameter 'accountKey' did not parse correctly, must be 64 hex characters (32 bytes).");
 
 		// Get the signature
 		Object sigValue = req.get("sig");
 		if (!(sigValue instanceof String))
-			throw new BadRequestResponse(jsonError("Parameter 'sig' must be provided as a String"));
+			throw new BadRequestResponse("Parameter 'sig' must be provided as a String");
 		ABlob sigData = Blobs.parse(sigValue);
 		if ((sigData == null) || (sigData.count() != Ed25519Signature.SIGNATURE_LENGTH)) {
-			throw new BadRequestResponse(jsonError("Parameter 'sig' must be a 64 byte hex String (128 hex chars)"));
+			throw new BadRequestResponse("Parameter 'sig' must be a 64 byte hex String (128 hex chars)");
 		}
 		ASignature sig = Ed25519Signature.fromBlob(sigData);
 
@@ -563,7 +587,7 @@ public class ChainAPI extends ABaseAPI {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse(jsonError("query requires an 'address' field."));
+			throw new BadRequestResponse("query requires an 'address' field.");
 		Object srcValue = req.get("source");
 		ACell form = readCode(srcValue);
 
@@ -573,9 +597,9 @@ public class ChainAPI extends ABaseAPI {
 
 			ctx.result(JSON.toPrettyString(rmap));
 		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
+			throw new ServiceUnavailableResponse("Timeout in request");
 		} catch (IOException e) {
-			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+			throw new InternalServerErrorResponse("IO Failure in query: "+e.getMessage());
 		}
 	}
 
