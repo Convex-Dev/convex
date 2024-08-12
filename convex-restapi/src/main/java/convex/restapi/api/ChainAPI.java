@@ -40,13 +40,19 @@ import convex.java.JSON;
 import convex.restapi.RESTServer;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
-import convex.restapi.model.QueryAccountRequest;
+import convex.restapi.model.QueryAccountResponse;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
 import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.http.ServiceUnavailableResponse;
-import io.javalin.openapi.*;
+import io.javalin.openapi.HttpMethod;
+import io.javalin.openapi.OpenApi;
+import io.javalin.openapi.OpenApiContent;
+import io.javalin.openapi.OpenApiExampleProperty;
+import io.javalin.openapi.OpenApiParam;
+import io.javalin.openapi.OpenApiRequestBody;
+import io.javalin.openapi.OpenApiResponse;
 
 public class ChainAPI extends ABaseAPI {
 
@@ -154,40 +160,32 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result("{\"address\": " + a.longValue() + "}");
 	}
 
-	@OpenApi(path = ROUTE + "account/{account}", 
-			methods = HttpMethod.POST, 
+	@OpenApi(path = ROUTE + "accounts/{address}", 
+			methods = HttpMethod.GET, 
 			operationId = "queryAccount", 
 			tags = { "Account"},
 			summary = "Get Convex account information", 
-			requestBody = @OpenApiRequestBody(
-				description = "Query Account request, must provide a valid address", 
-				content = {@OpenApiContent(
-								from = QueryAccountRequest.class, 
-								type = "application/json", 
-								exampleObjects = {
-										@OpenApiExampleProperty(name = "address", value = "#14") })}
-			), 
+			pathParams = {
+				 @OpenApiParam(name = "address", description = "Address of Account", required = true, type = String.class, example="14")
+			},
 			responses = {
 				@OpenApiResponse(status = "200", 
 						description = "Account queried sucecssfully", 
 						content = {
 							@OpenApiContent(
+									from=QueryAccountResponse.class,
 									type = "application/json") }),
-				@OpenApiResponse(status = "400", 
+				@OpenApiResponse(status = "404", 
 						description = "Account does not exist" )
 			}
 		)
 	public void queryAccount(Context ctx) {
 		Address addr = null;
 		String addrParam = ctx.pathParam("addr");
-		try {
-			long a = Long.parseLong(addrParam);
-			addr = Address.create(a);
-			if (addr == null)
-				throw new BadRequestResponse(jsonError("Invalid address: " + a));
-		} catch (Exception e) {
-			throw new BadRequestResponse(
-					jsonError("Expected valid account number in path but got [" + addrParam + "]"));
+
+		addr = Address.parse(addrParam);
+		if (addr == null) {
+			throw new BadRequestResponse(jsonError("Invalid address: " + addrParam));
 		}
 
 		Result r = doQuery(Lists.of(Symbols.ACCOUNT, addr));

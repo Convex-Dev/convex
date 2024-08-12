@@ -109,7 +109,7 @@ public class RESTServer {
             .withDefinitionConfiguration((version, definition) -> {
                 definition.withOpenApiInfo(info -> {
 					info.setTitle("Convex REST API");
-					info.setVersion("0.1.1");
+					info.setVersion("0.7.0");
                 });
             });
 		}));
