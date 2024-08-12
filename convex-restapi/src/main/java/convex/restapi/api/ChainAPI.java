@@ -40,6 +40,7 @@ import convex.java.JSON;
 import convex.restapi.RESTServer;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
+import convex.restapi.model.QueryAccountRequest;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -80,7 +81,9 @@ public class ChainAPI extends ABaseAPI {
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
 			methods = HttpMethod.POST, 
-			summary = "Get data from the server with the specified hash", operationId = "data", 
+			tags = { "Data Lattice"},
+			summary = "Get data from the server with the specified hash", 
+			operationId = "data", 
 			pathParams = {
 					@OpenApiParam(name = "hash", description = "Data hash as a hex string. Leading '0x' is optional but discouraged.", required = true, type = String.class, example = "0x1234567812345678123456781234567812345678123456781234567812345678") })
 	public void getData(Context ctx) {
@@ -105,6 +108,7 @@ public class ChainAPI extends ABaseAPI {
 	@OpenApi(path = ROUTE + "createAccount", 
 			methods = HttpMethod.POST, 
 			operationId = "createAccount", 
+			tags = { "Account"},
 			summary = "Create a new Convex account", 
 			requestBody = @OpenApiRequestBody(
 				description = "Create Account request, must provide an accountKey for the new Account", 
@@ -150,6 +154,29 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result("{\"address\": " + a.longValue() + "}");
 	}
 
+	@OpenApi(path = ROUTE + "account/{account}", 
+			methods = HttpMethod.POST, 
+			operationId = "queryAccount", 
+			tags = { "Account"},
+			summary = "Get Convex account information", 
+			requestBody = @OpenApiRequestBody(
+				description = "Query Account request, must provide a valid address", 
+				content = {@OpenApiContent(
+								from = QueryAccountRequest.class, 
+								type = "application/json", 
+								exampleObjects = {
+										@OpenApiExampleProperty(name = "address", value = "#14") })}
+			), 
+			responses = {
+				@OpenApiResponse(status = "200", 
+						description = "Account queried sucecssfully", 
+						content = {
+							@OpenApiContent(
+									type = "application/json") }),
+				@OpenApiResponse(status = "400", 
+						description = "Account does not exist" )
+			}
+		)
 	public void queryAccount(Context ctx) {
 		Address addr = null;
 		String addrParam = ctx.pathParam("addr");
