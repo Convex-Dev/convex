@@ -9,5 +9,6 @@ public class QueryAccountResponse {
 	public long balance;
 	public long allowance;
 	public long memorySize;
+	public String key;
 	public String type;
 }

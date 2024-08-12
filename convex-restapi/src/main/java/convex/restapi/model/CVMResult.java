@@ -6,5 +6,5 @@ import io.javalin.openapi.OpenApiByFields;
 public class CVMResult {
 	public String value;
 	public String errorCode;
-	
+	public Object info;
 }

@@ -209,6 +209,7 @@ public class ChainAPI extends ABaseAPI {
 
 		HashMap<String, Object> hm = new HashMap<>();
 		hm.put("address", addr.longValue());
+		hm.put("key", as.getAccountKey().toString());
 		hm.put("allowance", as.getMemory());
 		hm.put("balance", as.getBalance());
 		hm.put("memorySize", as.getMemorySize());
@@ -288,10 +289,14 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	private HashMap<String, Object> jsonResult(Result r) {
-		if (r.isError())
-			return jsonForErrorResult(r);
-		HashMap<String, Object> hm = new HashMap<>();
-		hm.put("value", RT.json(r.getValue()));
+		HashMap<String, Object> hm;
+		if (r.isError()) {
+			hm=jsonForErrorResult(r);
+		} else {
+			hm = new HashMap<>();
+			hm.put("value", RT.json(r.getValue()));
+		}
+		hm.put("info", RT.json(r.getInfo()));
 		return hm;
 	}
 
@@ -494,7 +499,8 @@ public class ChainAPI extends ABaseAPI {
 									from=CVMResult.class,
 									type = "application/json", 
 									exampleObjects = {
-											@OpenApiExampleProperty(name = "value", value = "6") }
+										@OpenApiExampleProperty(name = "value", value = "6")
+									}
 									)}),
 				@OpenApiResponse(status = "503", 
 						description = "Query service unavailable" )
@@ -512,7 +518,7 @@ public class ChainAPI extends ABaseAPI {
 			Result r = convex.querySync(form, addr);
 			HashMap<String, Object> rmap = jsonResult(r);
 
-			ctx.result(JSON.toString(rmap));
+			ctx.result(JSON.toPrettyString(rmap));
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
 		} catch (IOException e) {
