@@ -45,6 +45,7 @@ import convex.restapi.model.QueryAccountResponse;
 import convex.restapi.model.QueryRequest;
 import convex.restapi.model.TransactionPrepareRequest;
 import convex.restapi.model.TransactionPrepareResponse;
+import convex.restapi.model.TransactionSubmitRequest;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -450,11 +451,34 @@ public class ChainAPI extends ABaseAPI {
 		}
 	}
 
+	@OpenApi(path = ROUTE+"transaction/submit",
+			methods = HttpMethod.POST,
+			operationId = "transactionSubmit",
+			tags= {"Transactions"},
+			summary="Submit a pre-prepared Convex transaction. If sucessful, will return transaction result.",
+			requestBody = @OpenApiRequestBody(
+					description = "Transaction preparation request",
+					content= @OpenApiContent(
+							from=TransactionSubmitRequest.class,
+							type = "application/json" 
+							)),
+			responses = {
+					@OpenApiResponse(status = "200", 
+							description = "Transaction executed", 
+							content = {
+								@OpenApiContent(
+										from=CVMResult.class,
+										type = "application/json", 
+										exampleObjects = {
+											@OpenApiExampleProperty(name = "value", value = "6")
+										}
+										)}),
+					@OpenApiResponse(status = "503", 
+							description = "Transaction service unavailable" )
+				}
+			)
 	public void runTransactionSubmit(Context ctx) {
 		Map<String, Object> req = getJSONBody(ctx);
-		Address addr = Address.parse(req.get("address"));
-		if (addr == null)
-			throw new BadRequestResponse(jsonError("query requires an 'address' field."));
 
 		// Get the transaction hash
 		Object hashValue = req.get("hash");
@@ -463,7 +487,7 @@ public class ChainAPI extends ABaseAPI {
 		Blob h = Blob.parse((String) hashValue);
 		if (h == null)
 			throw new BadRequestResponse(
-					jsonError("Parameter 'hash' did not parse correctly, must be 64 hex characters."));
+					jsonError("Parameter 'hash' did not parse correctly, must be a hex string."));
 
 		ATransaction trans = null;
 		try {
@@ -488,7 +512,7 @@ public class ChainAPI extends ABaseAPI {
 		AccountKey key = AccountKey.parse(keyValue);
 		if (key == null)
 			throw new BadRequestResponse(
-					jsonError("Parameter 'accountKey' did not parse correctly, must be 64 hex characters."));
+					jsonError("Parameter 'accountKey' did not parse correctly, must be 64 hex characters (32 bytes)."));
 
 		// Get the signature
 		Object sigValue = req.get("sig");
@@ -496,7 +520,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse(jsonError("Parameter 'sig' must be provided as a String"));
 		ABlob sigData = Blobs.parse(sigValue);
 		if ((sigData == null) || (sigData.count() != Ed25519Signature.SIGNATURE_LENGTH)) {
-			throw new BadRequestResponse(jsonError("Parameter 'sig' must be a 64 byte hex String"));
+			throw new BadRequestResponse(jsonError("Parameter 'sig' must be a 64 byte hex String (128 hex chars)"));
 		}
 		ASignature sig = Ed25519Signature.fromBlob(sigData);
 
