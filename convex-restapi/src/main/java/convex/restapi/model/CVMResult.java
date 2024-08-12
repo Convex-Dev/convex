@@ -4,5 +4,7 @@ import io.javalin.openapi.OpenApiByFields;
 
 @OpenApiByFields
 public class CVMResult {
+	public String value;
+	public String errorCode;
 	
 }

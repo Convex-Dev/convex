@@ -38,9 +38,11 @@ import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.restapi.RESTServer;
+import convex.restapi.model.CVMResult;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.QueryAccountResponse;
+import convex.restapi.model.QueryRequest;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -296,7 +298,6 @@ public class ChainAPI extends ABaseAPI {
 	private HashMap<String, Object> jsonForErrorResult(Result r) {
 		HashMap<String, Object> hm = new HashMap<>();
 		hm.put("errorCode", RT.name(r.getErrorCode()).toString());
-		hm.put("source", "Server");
 		hm.put("value", RT.json(r.getValue()));
 		return hm;
 	}
@@ -341,10 +342,8 @@ public class ChainAPI extends ABaseAPI {
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
 			throw new BadRequestResponse(jsonError("Transaction prepare requires an 'address' field."));
+		
 		Object srcValue = req.get("source");
-		if (!(srcValue instanceof String))
-			throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
-
 		ACell code = readCode(srcValue);
 
 		try {
@@ -376,16 +375,14 @@ public class ChainAPI extends ABaseAPI {
 		if (addr == null)
 			throw new BadRequestResponse(jsonError("Transact requires an 'address' field."));
 		Object srcValue = req.get("source");
-		if (!(srcValue instanceof String))
-			throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
+		ACell code = readCode(srcValue);
 
+		// Get ED25519 seed
 		ABlob seed = Blobs.parse(req.get("seed"));
 		if (!(seed instanceof ABlob))
-			throw new BadRequestResponse(jsonError("Seed required for transact (e.g. as hex string)"));
+			throw new BadRequestResponse(jsonError("Ed25519 seed required for transact (e.g. as hex string)"));
 		if (seed.count() != AKeyPair.SEED_LENGTH)
 			throw new BadRequestResponse(jsonError("Seed must be 32 bytes"));
-
-		ACell code = readCode(srcValue);
 
 		try {
 			long sequence = convex.getSequence(addr);
@@ -406,6 +403,11 @@ public class ChainAPI extends ABaseAPI {
 		}
 	}
 
+	/**
+	 * Read code on best efforts basis, expecting a String
+	 * @param srcValue
+	 * @return Object to interpret as code
+	 */
 	private static ACell readCode(Object srcValue) {
 		try {
 			return Reader.read((String) srcValue);
@@ -470,32 +472,45 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(JSON.toPrettyString(rm));
 	}
 
-//	@OpenApi(path = ROUTE+"query",
-//		methods = HttpMethod.POST,
-//		operationId = "query",
-//		summary="Query as Convex account",
-//		requestBody = @OpenApiRequestBody(
-//				description = "Complex bodies",
-//				content= @OpenApiContent(type = "application/json")))
+	@OpenApi(path = ROUTE+"query",
+		methods = HttpMethod.POST,
+		operationId = "query",
+		tags= {"Transactions"},
+		summary="Query as Convex account",
+		requestBody = @OpenApiRequestBody(
+				description = "Query request",
+				content= @OpenApiContent(
+						from=QueryRequest.class,
+						type = "application/json", 
+						exampleObjects = {
+							@OpenApiExampleProperty(name = "address", value = "12"),
+							@OpenApiExampleProperty(name = "source", value = "(* 2 3)")
+						})),
+		responses = {
+				@OpenApiResponse(status = "200", 
+						description = "Query executed", 
+						content = {
+							@OpenApiContent(
+									from=CVMResult.class,
+									type = "application/json", 
+									exampleObjects = {
+											@OpenApiExampleProperty(name = "value", value = "6") }
+									)}),
+				@OpenApiResponse(status = "503", 
+						description = "Query service unavailable" )
+			}
+		)
 	public void runQuery(Context ctx) {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
 			throw new BadRequestResponse(jsonError("query requires an 'address' field."));
 		Object srcValue = req.get("source");
-		if (!(srcValue instanceof String))
-			throw new BadRequestResponse(jsonError("Source code required for query (as a string)"));
-
-		Object cvxRaw = req.get("raw");
-
 		ACell form = readCode(srcValue);
+
 		try {
 			Result r = convex.querySync(form, addr);
-
 			HashMap<String, Object> rmap = jsonResult(r);
-			if (cvxRaw != null) {
-				rmap.put("value", RT.toString(r.getValue()));
-			}
 
 			ctx.result(JSON.toString(rmap));
 		} catch (TimeoutException e) {
