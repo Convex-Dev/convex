@@ -43,6 +43,8 @@ import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.QueryAccountResponse;
 import convex.restapi.model.QueryRequest;
+import convex.restapi.model.TransactionPrepareRequest;
+import convex.restapi.model.TransactionPrepareResponse;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
@@ -193,7 +195,7 @@ public class ChainAPI extends ABaseAPI {
 		Result r = doQuery(Lists.of(Symbols.ACCOUNT, addr));
 
 		if (r.isError()) {
-			ctx.json(jsonForErrorResult(r));
+			ctx.json(jsonResult(r));
 			return;
 		}
 
@@ -234,7 +236,7 @@ public class ChainAPI extends ABaseAPI {
 		Result r = doQuery(Reader.read("(get-in *state* [:peers " + addr + "])"));
 
 		if (r.isError()) {
-			ctx.json(jsonForErrorResult(r));
+			ctx.json(jsonResult(r));
 			return;
 		}
 
@@ -289,21 +291,12 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	private HashMap<String, Object> jsonResult(Result r) {
-		HashMap<String, Object> hm;
+		HashMap<String, Object> hm=new HashMap<>();
 		if (r.isError()) {
-			hm=jsonForErrorResult(r);
-		} else {
-			hm = new HashMap<>();
-			hm.put("value", RT.json(r.getValue()));
-		}
-		hm.put("info", RT.json(r.getInfo()));
-		return hm;
-	}
-
-	private HashMap<String, Object> jsonForErrorResult(Result r) {
-		HashMap<String, Object> hm = new HashMap<>();
-		hm.put("errorCode", RT.name(r.getErrorCode()).toString());
+			hm.put("errorCode", RT.name(r.getErrorCode()).toString());
+		} 
 		hm.put("value", RT.json(r.getValue()));
+		hm.put("info", RT.json(r.getInfo()));
 		return hm;
 	}
 
@@ -328,7 +321,7 @@ public class ChainAPI extends ABaseAPI {
 			// Optional: pre-compile to Op
 			Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
 			if (r.isError()) {
-				HashMap<String, Object> hm = jsonForErrorResult(r);
+				HashMap<String, Object> hm = jsonResult(r);
 				ctx.json(hm);
 			} else {
 				req.put("amount", r.getValue());
@@ -342,25 +335,61 @@ public class ChainAPI extends ABaseAPI {
 
 	}
 
+	@OpenApi(path = ROUTE+"transaction/prepare",
+			methods = HttpMethod.POST,
+			operationId = "transactionPrepare",
+			tags= {"Transactions"},
+			summary="Prepare a Convex transaction. If sucessful, will return a hash to be signed.",
+			requestBody = @OpenApiRequestBody(
+					description = "Transaction preparation request",
+					content= @OpenApiContent(
+							from=TransactionPrepareRequest.class,
+							type = "application/json", 
+							exampleObjects = {
+								@OpenApiExampleProperty(name = "address", value = "12"),
+								@OpenApiExampleProperty(name = "source", value = "(* 2 3)")
+							})),
+			responses = {
+					@OpenApiResponse(status = "200", 
+							description = "Transaction prepared", 
+							content = {
+								@OpenApiContent(
+										from=TransactionPrepareResponse.class,
+										type = "application/json", 
+										exampleObjects = {
+											@OpenApiExampleProperty(name = "value", value = "6")
+										}
+										)}),
+					@OpenApiResponse(status = "503", 
+							description = "Transaction service unavailable" )
+				}
+			)
 	public void runTransactionPrepare(Context ctx) {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse(jsonError("Transaction prepare requires an 'address' field."));
+			throw new BadRequestResponse(jsonError("Transaction prepare requires a valid 'address' field."));
 		
 		Object srcValue = req.get("source");
 		ACell code = readCode(srcValue);
+		Object maybeSeq=req.get("sequence");
 
 		try {
-			long sequence = convex.getSequence(addr);
-			long nextSeq = sequence + 1;
-			ATransaction trans = Invoke.create(addr, nextSeq, code);
+			long sequence;
+			if (maybeSeq!=null) {
+				CVMLong lv=CVMLong.parse(maybeSeq);
+				if (lv==null) throw new BadRequestResponse("sequence (if provided) must be an integer");
+				sequence=lv.longValue();
+			} else {
+				sequence = convex.getSequence(addr)+1;
+			}
+			ATransaction trans = Invoke.create(addr, sequence, code);
 			Ref<ATransaction> ref = Cells.persist(trans).getRef();
 
 			HashMap<String, Object> rmap = new HashMap<>();
 			rmap.put("source", srcValue);
 			rmap.put("address", RT.json(addr));
-			rmap.put("hash", RT.json(SignedData.getMessageForRef(ref)));
+			rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
 			rmap.put("sequence", sequence);
 
 			ctx.result(JSON.toPrettyString(rmap));
