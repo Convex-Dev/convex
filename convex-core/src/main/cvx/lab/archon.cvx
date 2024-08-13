@@ -1,26 +1,58 @@
-'asset.nft.basic
+'archon
 
 (call *registry*
-      (register {:description ["Enables the creation of Basic NFTs."
-                               "A Basic NFT is merely an ownable Integer ID with immutable arbitrary metadata."
-                               "Follows the interface described in `convex.asset`."]
-                 :name         "Basic NFT creation and management"}))
+      (register {:description ["Actor for the Archon NFT collection."]
+                 :name         "Archon Actor"}))
 
 (declare balance)
 
-;;;;;;;;;; Values
+;;;;;;;;;; Governance
+;; We set a controller with upgrade and access rights. This can be removed / modified later
+;; Use the current controller, or the geneses peer account #12 if unspecified
 
-(define counter
-  ^{:doc {:description "Used for creating NFT ids."}}
-  0)
+(define guv (or *controller* #12))
+(set-controller guv)
+
+;;;;;;;;;; Values
 
 (define offers
   ^{:doc {:description "Map of `owner` -> map of `recipient address` -> `set of NFT ids`"}}
   {})
 
-(define meta
-  ^{:doc {:description "Map of ID -> NFT metadata. May be nil for no metadata"}}
-  {})
+(define base-url "http://localhost:8080/dlfs/archon")
+
+
+;;;;;;;;;; Archon specific functionality
+
+
+;; Determine if an ID is valid
+(defn valid-id? [id]
+		  (cond
+			(and
+			  (blob? id)
+			  (= 2 (count id))
+			  (<= 1 (int id) 1024))
+			true
+			false))
+
+;; Archon NFT minting, performed once
+(loop [nfts #{} i 1]
+  (cond
+    ;; looping for each Archon NFT
+    (<= i 1024)
+    
+    ;; Run this branch for each NFT
+    (let [;; Generate a 2 byte blob. Small new numeric IDs need an extra byte
+          nft (blob i)
+          nft (if (< i 128) (blob (str "00" nft)) nft)]
+      (if (valid-id? nft)
+    	  (recur (conj nfts nft) (inc i))
+    	  (fail (str "Somehow created an invalid NFT:" nft))))
+		
+    ;; When done give all NFTs to governance account
+    (do (set-holding guv nfts)
+        (or (= (count nfts) 1024) (fail "Unexpected total number of Archons" (count nfts))))))
+
 
 ;;;;;;;;;; Implementation of `convex.asset` interface
 
@@ -29,7 +61,7 @@
 		    :private? true}
 		  [q]
 		  (cond (set? q) q              ;; base case, quantity should always be a Set
-				(int? q) #{q} 
+				(blob? q) #{q} 
 		        (nil? q) #{}
 		        (fail :ARGUMENT "Invalid NFT quantity")))
 
@@ -48,8 +80,8 @@
         new-sender-balance   (difference sender-balance q)
         new-receiver-balance (union receiver-balance q)]
     (set-holding sender new-sender-balance)
-    (set-holding receiver new-receiver-balance))
-    quantity)
+    (set-holding receiver new-receiver-balance)
+    quantity))
 
 
 (defn accept
@@ -83,8 +115,7 @@
                       quantity)))
 
 (defn balance
-  ^{:callable true
-    :private?  true}
+  ^{:callable true}
   [owner]
   (or (get-holding owner)
       #{}))
@@ -124,51 +155,16 @@
 ;;;;;;;;;; Callable functions
 
 
-(defn burn
-  ^{:callable true
-    :doc       {:description "Destroys a set of NFTs. NFTs must be owned by the caller."
-                :signature   [{:params [nft-set]}]}}
-  [nft-set]
-  (let [owned-nfts (get-holding *caller*)
-        nft-set    (cond
-                     (int? nft-set) #{nft-set}
-                     (set? nft-set)  nft-set
-                     :else           (set nft-set))]
-    (when-not (subset? nft-set
-                       owned-nfts)
-      (fail :TRUST
-            "Can only burn owned NFTs"))
-    (set-holding *caller*
-                 (difference owned-nfts
-                             nft-set))
-    ;; Remove metadata if it is there
-    (set! meta (reduce dissoc meta nft-set))
-    nft-set))
-
 (defn get-metadata 
   ^{:callable true
     :doc       {:description "Gets metadata for a given NFT ID."
                 :signature   [{:params []}
                               {:params [id]}]}}
   ([] (recur *scope*))
-  ([id] (get meta id)))
-
-(defn create
-  ^{:callable true
-    :doc       {:description "Creates a new NFT with a fresh ID."
-                :signature   [{:params []}
-       {:params [metadata]}]}}
-  ([] (recur nil))
-  ([metadata]
-    (let [id         counter
-          owner      *caller*
-          owned-nfts (or (get-holding owner)
-                       #{})]
-      (set-holding owner
-        (conj owned-nfts
-          id))
-      (or (nil? metadata)
-        (def meta (assoc meta id metadata)))
-      (set! counter
-        (inc counter))
-      id)))
+  ([id] 
+	(or (valid-id? id) nil)
+    (let [hex (str id)
+	      img (str base-url hex ".png")]
+	  {
+		"image" img
+	  })))

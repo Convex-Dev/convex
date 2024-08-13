@@ -4209,6 +4209,7 @@ public class CoreTest extends ACVMTest {
 		// set! fails on undeclared values
 		assertUndeclaredError(step("(set! not-declared 1)"));
 		assertUndeclaredError(step("(do (set! a 13) a)"));
+		assertUndeclaredError(step("(let [foo 3] (set! a 13) a)"));
 
 		// set! works in a function body
 		assertEquals(35L,evalL("(let [a 13 f (fn [x] (set! a 25) (+ x a))] (f 10))"));

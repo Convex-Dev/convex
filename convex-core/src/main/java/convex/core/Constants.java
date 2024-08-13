@@ -169,7 +169,7 @@ public class Constants {
 	/**
 	 * Default print limit
 	 */
-	public static final long PRINT_LIMIT = 4096;
+	public static final long PRINT_LIMIT = 65536;
 
 	public static final String PRINT_EXCEEDED_STRING = "<<Print limit exceeded>>";
 	public static final AString PRINT_EXCEEDED_MESSAGE = Strings.create(PRINT_EXCEEDED_STRING);

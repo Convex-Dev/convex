@@ -191,6 +191,16 @@
 		    	  (apply m# (next x))
 		          e)))))
 
+(defmacro define
+		^{:doc {:description "Defines a value in the current environment, like def, but at expand time."
+	          :examples    [{:code "(define cols [:red :green])"}]
+	          :signature   [{:params [name]}
+	                        {:params [name vale]}]}}
+  ([name]
+    (eval `(def ~name)))
+  ([name value]
+     (eval `(def ~name ~value))))
+
 (defmacro defn
   ^{:doc {:description "Defines a function in the current environment."
           :examples    [{:code "(defn my-square [x] (* x x))"}]
