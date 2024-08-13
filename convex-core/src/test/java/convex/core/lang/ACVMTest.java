@@ -52,15 +52,15 @@ public abstract class ACVMTest {
 	 */
 	protected ACVMTest(State genesis) {
 		Context c = Context.createFake(genesis, Init.GENESIS_ADDRESS);
-		c=buildContext(c);
-		this.INITIAL=c.getState();
-		this.CONTEXT=c;
 		HERO = BaseTest.HERO;
 		VILLAIN = BaseTest.VILLAIN;
-		c=c.withJuice(0); // reset juice used
 		INITIAL_JUICE = c.getJuiceAvailable();
 		HERO_BALANCE = c.getAccountStatus(HERO).getBalance();
 		VILLAIN_BALANCE = c.getAccountStatus(VILLAIN).getBalance();
+		c=buildContext(c);
+		c=c.withJuice(0); // reset juice used
+		this.INITIAL=c.getState();
+		this.CONTEXT=c;
 	}
 
 	/**

@@ -6,8 +6,6 @@
                                "Follows the interface described in `convex.asset`."]
                  :name         "Basic NFT creation and management"}))
 
-(declare balance)
-
 ;;;;;;;;;; Values
 
 (define counter
@@ -23,6 +21,9 @@
   {})
 
 ;;;;;;;;;; Implementation of `convex.asset` interface
+;; These functions provide full CAD19 asset functionality
+;;
+
 
 (defn -qc
 		  ^{:doc {:description "Checks a basic NFT quantity."}

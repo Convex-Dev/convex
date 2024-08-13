@@ -1,10 +1,8 @@
 'archon
 
 (call *registry*
-      (register {:description ["Actor for the Archon NFT collection."]
+      (register {:description ["Archon NFT collection actor."]
                  :name         "Archon Actor"}))
-
-(declare balance)
 
 ;;;;;;;;;; Governance
 ;; We set a controller with upgrade and access rights. This can be removed / modified later
@@ -55,6 +53,9 @@
 
 
 ;;;;;;;;;; Implementation of `convex.asset` interface
+;; These functions provide full CAD19 asset functionality
+;;
+
 
 (defn -qc
 		  ^{:doc {:description "Checks a basic NFT quantity."}
@@ -162,7 +163,7 @@
                               {:params [id]}]}}
   ([] (recur *scope*))
   ([id] 
-	(or (valid-id? id) nil)
+	(or (valid-id? id) (return nil))
     (let [hex (str id)
 	      img (str base-url hex ".png")]
 	  {
