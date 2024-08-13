@@ -52,7 +52,17 @@ public class TrustActorTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(trust/trusted? (mon/delegate #3 #4 #5) #33)"));
 		assertTrue(evalB(ctx,"(trust/trusted? (mon/delegate #3 #4 #5) #5)"));
 		assertFalse(evalB(ctx,"(trust/trusted? (mon/delegate #3 #4 #5) nil)"));
+		
+		// any 
+		assertTrue(evalB(ctx,"(trust/trusted? (mon/any #3 #4 #5) #4)"));
+		assertTrue(evalB(ctx,"(trust/trusted? (mon/any #3 #4 #5) #3)"));
+		assertFalse(evalB(ctx,"(trust/trusted? (mon/any #3 #4 #5) #8)"));
 
+		// all
+		assertTrue(evalB(ctx,"(trust/trusted? (mon/all #3 #3) #3)"));
+		assertFalse(evalB(ctx,"(trust/trusted? (mon/all #3 #4 #5) #3)"));
+		assertTrue(evalB(ctx,"(trust/trusted? (mon/all #3 (mon/any #3 #4)) #3)"));
+		
 	}
 	
 	@Test

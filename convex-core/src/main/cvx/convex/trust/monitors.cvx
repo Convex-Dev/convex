@@ -6,12 +6,6 @@
 (import convex.trust.whitelist :as wl)
 (import convex.trust.ownership-monitor :as ownership)
 
-(defn trand
-  [a b] (and a (trust/trusted? b subject action object)))
-
-(defn tror
-  [a b] (or a (trust/trusted? b subject action object)))
-
 ;; Generic check
 (defn check-trusted?
   ^:callable
@@ -20,13 +14,12 @@
   (let [[type arg] *scope*]
     (boolean
       (cond
-        (= :wl type) (contains-key? arg subject)
         (= :actions type) (contains-key? arg action)
-        (= :all type) (reduce trand true arg)
-        (= :any type) (reduce tror false arg)
+        (= :all type) (do (for [m arg] (cond (trust/trusted? m subject action object) nil (return false))) true)
+        (= :any type) (do (for [m arg] (cond (trust/trusted? m subject action object) (return true))) false)
         (= :not type) (not (trust/trusted? arg subject action object))
         (= :time type) (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
-        (= :rule type) (boolean (query (arg subject action object)))
+        (= :rule type) (query (arg subject action object))
         (= :delegate type) 
           (let [[allow deny base] arg]
             (cond
