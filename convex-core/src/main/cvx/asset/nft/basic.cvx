@@ -54,8 +54,7 @@
 
 
 (defn accept
-  ^{:callable true
-    :private?  true}
+  ^{:callable true}
   [sender quantity]
   (let [q                (-qc quantity)
         sender           (address sender)

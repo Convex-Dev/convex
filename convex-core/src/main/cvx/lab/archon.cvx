@@ -17,7 +17,7 @@
   ^{:doc {:description "Map of `owner` -> map of `recipient address` -> `set of NFT ids`"}}
   {})
 
-(define base-url "http://localhost:8080/dlfs/archon")
+(define base-url "http://localhost:8080/dlfs/archon0x")
 
 
 ;;;;;;;;;; Archon specific functionality
@@ -56,15 +56,14 @@
 ;; These functions provide full CAD19 asset functionality
 ;;
 
-
+;; Quanity check
 (defn -qc
-		  ^{:doc {:description "Checks a basic NFT quantity."}
-		    :private? true}
-		  [q]
-		  (cond (set? q) q              ;; base case, quantity should always be a Set
-				(blob? q) #{q} 
-		        (nil? q) #{}
-		        (fail :ARGUMENT "Invalid NFT quantity")))
+	  [q]
+	  (cond 
+	    (set? q) q              ;; base case, quantity should always be a Set
+		(valid-id? q) #{q}      ;; we allow a blob ID to be used as a quanitity if valid
+        (nil? q) #{}
+        (fail :ARGUMENT "Invalid NFT quantity")))
 
 (defn -direct-transfer
   ^{:private? true}
@@ -86,8 +85,7 @@
 
 
 (defn accept
-  ^{:callable true
-    :private?  true}
+  ^{:callable true}
   [sender quantity]
   (let [q                (-qc quantity)
         sender           (address sender)
