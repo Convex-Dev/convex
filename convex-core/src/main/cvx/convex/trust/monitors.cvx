@@ -6,23 +6,37 @@
 (import convex.trust.whitelist :as wl)
 (import convex.trust.ownership-monitor :as ownership)
 
+(defn trand
+  [a b] (and a (trust/trusted? b subject action object)))
+
+(defn tror
+  [a b] (or a (trust/trusted? b subject action object)))
+
 ;; Generic check
 (defn check-trusted?
   ^:callable
 	[subject action object]
   (or *scope* (fail :ARGUMENT "Null scope in generic trust monitor"))
   (let [[type arg] *scope*]
-    (cond
-      (= :wl type) (contains-key? arg subject)
-      (= :actions type) (contains-key? arg action)
-      (= :all type) (reduce (fn [a b] (and a (trust/trusted? b subject action object))) true arg)
-      (= :any type) (reduce (fn [a b] (or a (trust/trusted? b subject action object))) false arg)
-      (= :not type) (not (trust/trusted? arg subject action object))
-      (= :time type) (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
-      (= :rule type) (boolean (query (arg subject action object)))
-      (address? type) (call *scope* (check-trusted? subject action object))
-      false
-    )))
+    (boolean
+      (cond
+        (= :wl type) (contains-key? arg subject)
+        (= :actions type) (contains-key? arg action)
+        (= :all type) (reduce trand true arg)
+        (= :any type) (reduce tror false arg)
+        (= :not type) (not (trust/trusted? arg subject action object))
+        (= :time type) (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
+        (= :rule type) (boolean (query (arg subject action object)))
+        (= :delegate type) 
+          (let [[allow deny base] arg]
+            (cond
+        	   (trust/trusted? deny subject action object) false
+        	   (trust/trusted? allow subject action object) true
+               (trust/trusted? base subject action object)))
+      
+        ;; All other values untrusted
+        false
+    ))))
 
 (defn permit-subjects [& addresses]
   [wl (set addresses)])
@@ -53,5 +67,9 @@
 
 (defn owns [asset]
   [ownership asset])
+
+(defn delegate [allow deny base]
+  [~*address* [:delegate [allow deny base]]])
+
 
   

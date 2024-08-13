@@ -59,7 +59,7 @@
                                   action
                                   object)))
   	 
-     ;; Basic case:	check for address equality  
+     ;; Basic case:	check for callable equality  
   	 (address? monitor) 
   	   (= monitor subject)
    
