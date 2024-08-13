@@ -63,6 +63,10 @@ public class TrustActorTest extends ACVMTest {
 		assertFalse(evalB(ctx,"(trust/trusted? (mon/all #3 #4 #5) #3)"));
 		assertTrue(evalB(ctx,"(trust/trusted? (mon/all #3 (mon/any #3 #4)) #3)"));
 		
+		// rule
+		assertTrue(evalB(ctx,"(trust/trusted? (mon/rule (fn [s a o] true)) #3)"));
+		assertFalse(evalB(ctx,"(trust/trusted? (mon/rule (fn [s a o] false)) #3)"));
+		
 	}
 	
 	@Test
