@@ -165,5 +165,6 @@
     (let [hex (str id)
 	      img (str base-url hex ".png")]
 	  {
-		"image" img
+		"name" "Archon"
+    	"image" img
 	  })))
