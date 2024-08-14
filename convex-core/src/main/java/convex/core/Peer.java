@@ -321,7 +321,7 @@ public class Peer {
 		}
 
 		// Run query in a fake context
-		Context ctx=Context.createInitial(state, address, Constants.MAX_TRANSACTION_JUICE);
+		Context ctx=Context.create(state, address, Constants.MAX_TRANSACTION_JUICE);
 		ctx=ctx.run(form);
 		ResultContext rctx=ResultContext.fromContext(ctx);
 		return rctx;

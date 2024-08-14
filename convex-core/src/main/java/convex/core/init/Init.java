@@ -241,7 +241,7 @@ public class Init {
 		s = doActorDeploy(s, "convex/trust.cvx");
 
 		{ // Register core library now that registry exists
-			Context ctx = Context.createFake(s, INIT_ADDRESS);
+			Context ctx = Context.create(s, INIT_ADDRESS);
 			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
 						             
 			s = ctx.getState();
@@ -325,7 +325,7 @@ public class Init {
 	}
 	
 	private static State addCNSTree(State s) {
-		Context ctx=Context.createFake(s, INIT_ADDRESS);
+		Context ctx=Context.create(s, INIT_ADDRESS);
 		//ctx=ctx.eval(Reader.read("(do (*registry*/create 'user.init))"));
 		//ctx.getResult();
 
@@ -355,7 +355,7 @@ public class Init {
 	// First form is the name that must be used when registering the actor.
 	//
 	private static State doActorDeploy(State s, String resource) {
-		Context ctx = Context.createFake(s, INIT_ADDRESS);
+		Context ctx = Context.create(s, INIT_ADDRESS);
 		ACell ADD_NETWORK_GOVERNANCE=Reader.read("(set-controller "+GOVERNANCE_ADDRESS+")");
 		
 		try {
@@ -399,7 +399,7 @@ public class Init {
 		double cvx = cvxPrice * supply / subDivisions;
 
 		
-		Context ctx = Context.createFake(s, GENESIS_ADDRESS);
+		Context ctx = Context.create(s, GENESIS_ADDRESS);
 		ctx = ctx.eval(Reader
 				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + " :decimals "+decimals+"})))"));
 		Address addr = ctx.getResult();
@@ -414,7 +414,7 @@ public class Init {
 	}
 
 	private static State register(State state, Address origin, String name, String description) {
-		Context ctx = Context.createFake(state, origin);
+		Context ctx = Context.create(state, origin);
 		ctx = ctx.eval(Reader.read("(call *registry* (register {:description \"" + description + "\" :name \"" + name + "\"}))"));
 		return ctx.getState();
 	}

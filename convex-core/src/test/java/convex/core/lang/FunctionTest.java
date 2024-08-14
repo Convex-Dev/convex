@@ -17,7 +17,7 @@ public class FunctionTest {
 	State STATE=State.EMPTY.addActor();
 	
 	@Test public void testFnApply() {
-		Context ctx=Context.createFake(STATE);
+		Context ctx=Context.create(STATE);
 		Fn<CVMLong> f0=Fn.create(Vectors.empty(), Constant.create(CVMLong.ONE));	
 		assertEquals(CVMLong.ONE,f0.invoke(ctx, new ACell[0]).getResult());
 		

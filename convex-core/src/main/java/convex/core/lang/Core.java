@@ -2856,7 +2856,7 @@ public class Core {
 		for (int i=0; i<=CORE_ADDRESS.longValue(); i++) {
 			state = state.putAccount(Address.create(i), AccountStatus.createActor());
 		}
-		Context ctx = Context.createFake(state, CORE_ADDRESS);
+		Context ctx = Context.create(state, CORE_ADDRESS);
 
 		// Map in forms from env.
 		for (Map.Entry<Symbol,ACell> me : env.entrySet()) {

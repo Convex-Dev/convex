@@ -44,13 +44,13 @@ public class CVMBenchmark {
 		HERO=Benchmarks.HERO;
 		
 		// Move some USD to Hero
-		Context ctx=Context.createFake(STATE, Init.INIT_ADDRESS);
+		Context ctx=Context.create(STATE, Init.INIT_ADDRESS);
 		ctx=ctx.eval(Reader.read("(do (import convex.fungible :as fun) (import currency.CFUSD :as usd) (fun/transfer usd "+HERO+" 0))"));
 		if (ctx.isError()) throw new Error("Problem moving USD: "+ctx.getError().toString());
 		STATE=ctx.getState();
 
 		// Get a USD MARKET
-		ctx=Context.createFake(STATE, HERO);
+		ctx=Context.create(STATE, HERO);
 		ctx=ctx.eval(Reader.read("(do (import currency.CFUSD :as usd) "
 				+ "(import torus.exchange :as torus) "
 				+ "(def market (torus/create-market usd)))"));

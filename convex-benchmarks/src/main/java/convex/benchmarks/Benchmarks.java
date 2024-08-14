@@ -50,6 +50,6 @@ public class Benchmarks {
 	}
 
 	public static Context context() {
-		return Context.createFake(STATE,HERO);
+		return Context.create(STATE,HERO);
 	}
 }

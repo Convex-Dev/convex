@@ -17,7 +17,7 @@ public class GenTestCode {
 
 	@Property
 	public void testExpand(@From(FormGen.class) ACell form) {
-		Context ctx = Context.createFake(TestState.STATE, InitTest.HERO);
+		Context ctx = Context.create(TestState.STATE, InitTest.HERO);
 		ctx = ctx.expand(form);
 
 		if (!ctx.isExceptional()) {

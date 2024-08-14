@@ -264,19 +264,19 @@ public class Context {
 	}
 
 	/**
-	 * Creates an execution context with a default actor address.
+	 * Creates an CVM execution context
 	 *
-	 * Useful for Testing
+	 * Useful for Testing or local execution
 	 *
 	 * @param state State to use for this Context
 	 * @return Fake context
 	 */
-	public static Context createFake(State state) {
-		return createFake(state,Address.ZERO);
+	public static Context create(State state) {
+		return create(state,Address.ZERO);
 	}
 
 	/**
-	 * Creates a "fake" execution context for the given address.
+	 * Creates a execution context for the given address.
 	 *
 	 * Not valid for use in real transactions, but can be used to
 	 * compute stuff off-chain "as-if" the actor made the call.
@@ -285,13 +285,13 @@ public class Context {
 	 * @param origin Origin address to use
 	 * @return Fake context
 	 */
-	public static Context createFake(State state, Address origin) {
+	public static Context create(State state, Address origin) {
 		if (origin==null) throw new IllegalArgumentException("Null address!");
 		return create(state,0,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin, ZERO_OFFER, DEFAULT_LOG,null);
 	}
 
 	/**
-	 * Creates an initial execution context with the specified actor as origin, and reserving the appropriate
+	 * Creates an execution context with the specified actor as origin, and reserving the appropriate
 	 * amount of juice.
 	 *
 	 * Juice reserve is extracted from the actor's current balance.
@@ -301,11 +301,11 @@ public class Context {
 	 * @param juiceLimit Initial juice requested for Context
 	 * @return Initial execution context with reserved juice.
 	 */
-	public static Context createInitial(State state, Address origin,long juiceLimit) {
+	public static Context create(State state, Address origin,long juiceLimit) {
 		AccountStatus as=state.getAccount(origin);
 		if (as==null) {
 			// no account
-			return Context.createFake(state).withError(ErrorCodes.NOBODY);
+			return Context.create(state).withError(ErrorCodes.NOBODY);
 		}
 
 		return create(state,0,juiceLimit,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
@@ -971,7 +971,7 @@ public class Context {
 	}
 	
 	/**
-	 * Executes a form at the top level. Handles top level halt, recur and return.
+	 * Executes a form at the top level in the current account. Handles top level halt, recur and return.
 	 *
 	 * Returning an updated context containing the result or an exceptional error.
 	 *
@@ -2182,7 +2182,7 @@ public class Context {
 	 * @return Result type of new Context
 	 */
 	public Context forkWithAddress(Address newAddress) {
-		return createFake(getState(),newAddress);
+		return create(getState(),newAddress);
 	}
 
 	/**

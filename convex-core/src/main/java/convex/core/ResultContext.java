@@ -33,7 +33,7 @@ public class ResultContext {
 
 	public static ResultContext error(State state, Keyword error, String message) {
 		ResultContext rc=new ResultContext(null,0);
-		rc.context= Context.createFake(state).withError(error, message);
+		rc.context= Context.create(state).withError(error, message);
 		return rc;
 	}
 

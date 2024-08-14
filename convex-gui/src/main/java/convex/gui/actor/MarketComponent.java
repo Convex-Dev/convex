@@ -170,7 +170,7 @@ public class MarketComponent extends BaseListComponent {
 	private void updateStatus(State state) {
 		try {
 			Address caller = marketsPanel.acctChooser.getAddress();
-			Context ctx = Context.createFake(state, caller); // fake for caller
+			Context ctx = Context.create(state, caller); // fake for caller
 			for (int i = 0; i < numOutcomes; i++) {
 				ACell outcome = outcomes.get(i);
 
@@ -197,7 +197,7 @@ public class MarketComponent extends BaseListComponent {
 
 	private Long getStake(State state, Object outcome) {
 		Address caller = marketsPanel.acctChooser.getAddress();
-		Context ctx = Context.createFake(state, caller);
+		Context ctx = Context.create(state, caller);
 		@SuppressWarnings("unchecked")
 		AMap<Address, CVMLong> stks = (AMap<Address, CVMLong>) ctx.actorCall(address, 0, "stakes", RT.cvm(outcome)).getResult();
 		return stks.get(caller).longValue();

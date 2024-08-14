@@ -70,7 +70,7 @@ public class ParamTestJuice {
 
 	static {
 		try {
-			INITIAL_CONTEXT = Context.createInitial(INITIAL, InitTest.HERO, INITIAL_JUICE);
+			INITIAL_CONTEXT = Context.create(INITIAL, InitTest.HERO, INITIAL_JUICE);
 		} catch (Throwable e) {
 			throw new Error(e);
 		}

@@ -41,7 +41,7 @@ public class TestState {
 
 	static {
 		State s = InitTest.STATE;
-		Context ctx = Context.createFake(s, InitTest.HERO);
+		Context ctx = Context.create(s, InitTest.HERO);
 		for (int i = 0; i < NUM_CONTRACTS; i++) {
 			// Construct code for each contract
 			ACell contractCode = Reader.read(
@@ -55,7 +55,7 @@ public class TestState {
 
 		s= ctx.getState();
 		STATE = s;
-		CONTEXT = Context.createFake(STATE, InitTest.HERO);
+		CONTEXT = Context.create(STATE, InitTest.HERO);
 	}
 
 	/**
@@ -122,7 +122,7 @@ public class TestState {
 
 	@Test
 	public void testInitial() {
-		Context ctx = Context.createFake(STATE,InitTest.HERO);
+		Context ctx = Context.create(STATE,InitTest.HERO);
 		State s = ctx.getState();
 		assertEquals(STATE, s);
 		assertSame(Core.COUNT, ctx.lookup(Symbols.COUNT).getResult());
@@ -134,7 +134,7 @@ public class TestState {
 
 	@Test
 	public void testContractCall() {
-		Context ctx0 = Context.createFake(STATE, InitTest.HERO);
+		Context ctx0 = Context.create(STATE, InitTest.HERO);
 		Address TARGET = CONTRACTS[0];
 		ctx0 = ctx0.exec(compile(ctx0, "(def target " + TARGET + ")"));
 		ctx0 = ctx0.exec(compile(ctx0, "(def hero *address*)"));
@@ -223,9 +223,9 @@ public class TestState {
 	 * @return Updated context
 	 */
 	public static Context stepAs(Address address, Context c, String source) {
-		Context rc = Context.createFake(c.getState(), address);
+		Context rc = Context.create(c.getState(), address);
 		rc = step(rc, source);
-		return Context.createFake(rc.getState(), c.getAddress()).withValue(rc.getValue());
+		return Context.create(rc.getState(), c.getAddress()).withValue(rc.getValue());
 	}
 
 	@Test public void testStateSetup() {

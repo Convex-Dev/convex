@@ -4549,7 +4549,7 @@ public class CoreTest extends ACVMTest {
 		BlockResult br = s.applyBlock(sb);
 		State s2 = br.getState();
 
-		Context ctx2 = Context.createInitial(s2, HERO, INITIAL_JUICE);
+		Context ctx2 = Context.create(s2, HERO, INITIAL_JUICE);
 		assertEquals(2L, evalL(ctx2, "a"));
 	}
 

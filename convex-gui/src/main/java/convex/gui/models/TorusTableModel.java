@@ -91,7 +91,7 @@ public class TorusTableModel extends BaseTableModel {
 
 	@SuppressWarnings("unchecked")
 	private <T extends ACell> T eval(String code) {
-		Context ctx=Context.createFake(state);
+		Context ctx=Context.create(state);
 		T result=(T) ctx.eval(Reader.read(code)).getValue();
 		return result;
 	}

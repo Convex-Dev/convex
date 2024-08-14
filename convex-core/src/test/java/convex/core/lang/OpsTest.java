@@ -95,7 +95,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testOutOfJuice() {
 		long JUICE = Juice.CONSTANT - 1; // insufficient juice to run operation
-		Context c = Context.createInitial(INITIAL, HERO, JUICE);
+		Context c = Context.create(INITIAL, HERO, JUICE);
 
 		AOp<CVMLong> op = Constant.of(10L);
 		assertJuiceError(c.execute(op));

@@ -442,7 +442,7 @@ public class State extends ARecord {
 			Context ctx;
 			
 			// TODO juice limit? juice refund?
-			ctx = Context.createInitial(state, origin, Constants.MAX_TRANSACTION_JUICE);
+			ctx = Context.create(state, origin, Constants.MAX_TRANSACTION_JUICE);
 			ctx = ctx.run(op);
 			if (ctx.isExceptional()) {
 				// TODO: what to do here? probably ignore
@@ -589,7 +589,7 @@ public class State extends ARecord {
 		// Pre-transaction state updates (persisted even if transaction fails)
 		AccountStatus account = getAccount(origin);
 		if (account == null) {
-			return Context.createFake(this).withError(ErrorCodes.NOBODY);
+			return Context.create(this).withError(ErrorCodes.NOBODY);
 		}
 
 
@@ -599,11 +599,11 @@ public class State extends ARecord {
 		juiceLimit=Math.min(Constants.MAX_TRANSACTION_JUICE,juiceLimit);
 		long initialJuice=0;
 		if (juiceLimit<=initialJuice) {
-			return Context.createFake(this,origin).withJuiceError();
+			return Context.create(this,origin).withJuiceError();
 		}
 		
 		// Create context ready to execute, with at least some available juice
-		Context ctx = Context.createInitial(this, origin, juiceLimit);
+		Context ctx = Context.create(this, origin, juiceLimit);
 		ctx=ctx.withJuice(initialJuice);
 		return ctx;
 	}
@@ -870,7 +870,7 @@ public class State extends ARecord {
 	 * @return Address from CNS, or null if not found
 	 */
 	public Address lookupCNS(String name) {
-		Context ctx=Context.createFake(this);
+		Context ctx=Context.create(this);
 		return (Address) ctx.lookupCNS(name).getResult();
 	}
 

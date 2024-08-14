@@ -61,7 +61,7 @@ public class ParamTestOps {
 	@Test
 	public void testExpectedResult() {
 		long JUICE = 10000;
-		Context c = Context.createInitial(INITIAL_STATE, InitTest.HERO, JUICE);
+		Context c = Context.create(INITIAL_STATE, InitTest.HERO, JUICE);
 		Context c2 = c.execute(op);
 
 		assertCVMEquals(expected, c2.getResult());
