@@ -9,6 +9,8 @@ import convex.core.data.ACell;
  * semantics we want so we return exceptional values in response to errors
  * during on-chain execution.
  * 
+ * This can be considered an application of the principle of "errors as values".
+ * 
  * Notable uses: - Early return values from functions - Tail calls - Loop /
  * recur
  * 
@@ -18,13 +20,17 @@ import convex.core.data.ACell;
 public abstract class AExceptional {
 
 	/**
-	 * Returns the Exception code for this exceptional value
-	 * @return Exception Code
+	 * Returns the Error code for this exceptional value, as defined in CAD11
+	 * 
+	 * The Error Code may be any value, but
+	 * by convention (and exclusively in Convex runtime code) it is a upper-case keyword e.g. :ASSERT
+	 * 
+	 * @return Error code value
 	 */
 	public abstract ACell getCode();
 
 	/**
-	 * Gets the message for an exceptional value. May or may not be meaningful.
+	 * Gets the message for an exceptional value.
 	 * @return Exception Message
 	 */
 	public abstract ACell getMessage();

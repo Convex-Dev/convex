@@ -25,17 +25,15 @@ import convex.core.data.Strings;
  * - Pablo Picasso
  * 
  */
-public class ErrorValue extends AExceptional {
+public class ErrorValue extends AThrowable {
 
-	private final ACell code;
 	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();
 	private ACell log;
 	private Address address=null;
 
 	private ErrorValue(ACell code, ACell message) {
-		if (code==null) throw new IllegalArgumentException("Error code must not be null");
-		this.code=code;
+		super (code);
 		this.message=message;
 	}
 
@@ -73,15 +71,7 @@ public class ErrorValue extends AExceptional {
 		return new ErrorValue(code,Strings.create(message));
 	}
 
-	/**
-	 * Gets the Error Code for this ErrorValue instance. The Error Code may be any value, but
-	 * by convention (and exclusively in Convex runtime code) it is a upper-case keyword e.g. :ASSERT
-	 * 
-	 * @return Error code value
-	 */
-	public ACell getCode() {
-		return code;
-	} 
+
 	
 	public void addTrace(String traceMessage) {
 		trace.add(Strings.create(traceMessage));
@@ -111,11 +101,7 @@ public class ErrorValue extends AExceptional {
 		return address;
 	}
 	
-	
-	/**
-	 * Gets the optional message associated with this error value, or null if not supplied.
-	 * @return The message carried with this error
-	 */
+	@Override
 	public ACell getMessage() {
 		return message;
 	}
@@ -147,8 +133,6 @@ public class ErrorValue extends AExceptional {
 	
 	/**
 	 * Gets the CVM local log at the time of the Error.
-	 * 
-	 * The trace List is mutable, and may be used to implement accumulation of additional trace entries.
 	 * 
 	 * @return List of trace entries.
 	 */
