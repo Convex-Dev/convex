@@ -14,5 +14,7 @@ public abstract class AThrowable extends AExceptional {
 	@Override
 	public final ACell getCode() {
 		return code;
-	} 
+	}
+
+	public abstract void addTrace(String traceMessage);
 }

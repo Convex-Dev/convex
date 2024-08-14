@@ -28,8 +28,10 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.util.BlobBuilder;
+import convex.core.exceptions.Failure;
 import convex.core.init.Init;
 import convex.core.lang.exception.AExceptional;
+import convex.core.lang.exception.AThrowable;
 import convex.core.lang.exception.ATrampoline;
 import convex.core.lang.exception.ErrorValue;
 import convex.core.lang.exception.HaltValue;
@@ -876,7 +878,7 @@ public class Context {
 	public Context withJuiceError() {
 		// set juice to zero. Can't consume more that we have!
 		this.juice=juiceLimit;
-		return withError(ErrorCodes.JUICE,"Out of juice!");
+		return withException(Failure.juice());
 	}
 
 	public Context withException(AExceptional exception) {
@@ -1038,9 +1040,9 @@ public class Context {
 				return ctx.withResult(val);
 			}
 
-			if (v instanceof ErrorValue) {
+			if (v instanceof AThrowable) {
 				if (fn instanceof CoreFn) {
-					ErrorValue ev=(ErrorValue)v;
+					AThrowable ev=(AThrowable)v;
 					ev.addTrace("In core function: "+RT.str(fn)); // TODO: Core.getCoreName() ?
 				}
 			}
@@ -1781,15 +1783,19 @@ public class Context {
 				rv=((ReturnValue<?>)ex).getValue();
 			} else {
 				rollback=true;
-				String msg;
-				if (ex instanceof ATrampoline) {
-					msg="attempt to recur or tail call outside of a function body";
-				} if (ex instanceof ReducedValue) {
-					msg="reduced used outside of a reduce operation";
+				if (ex instanceof Failure) {
+					rv=ex;
 				} else {
-					msg="Unhandled Exception with Code:"+ex.getCode();
+					String msg;
+					if (ex instanceof ATrampoline) {
+						msg="attempt to recur or tail call outside of a function body";
+					} if (ex instanceof ReducedValue) {
+						msg="reduced used outside of a reduce operation";
+					} else {
+						msg="Unhandled Exception with Code:"+ex.getCode();
+					}
+					rv=ErrorValue.create(ErrorCodes.EXCEPTION, msg);
 				}
-				rv=ErrorValue.create(ErrorCodes.EXCEPTION, msg);
 			}
 		} else {
 			rv=returnContext.getResult();

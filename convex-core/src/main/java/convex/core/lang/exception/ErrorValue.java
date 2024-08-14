@@ -73,7 +73,7 @@ public class ErrorValue extends AThrowable {
 	}
 
 
-	
+	@Override 
 	public void addTrace(String traceMessage) {
 		trace.add(Strings.create(traceMessage));
 	}
@@ -84,6 +84,11 @@ public class ErrorValue extends AThrowable {
 	 */
 	public void addLog(ACell log) {
 		this.log=log;
+	}
+	
+	@Override
+	public boolean isCatchable() {
+		return true;
 	}
 	
 	/**
