@@ -20,12 +20,34 @@ public class JuiceTest extends ACVMTest {
 	public void testSimpleValues() {
 		assertEquals(Juice.CONSTANT, juice("1"));
 		assertEquals(Juice.CORE, juice("count")); // core symbol lookup, might be static
-		assertEquals(Juice.DO, juice("(do)"));
+	}
+	
+	@Test public void testDo() {
+		// Special case, gets compiled to constant nil
+		assertEquals(Juice.CONSTANT, juice("(do)"));
+		
+		assertEquals(Juice.DO+Juice.CONSTANT*2, juice("(do 1 2)"));
+		
+		// special case, single element do gets compiled to single op
+		assertEquals(Juice.SPECIAL, juice("(do *result*)"));
+	}
+	
+	@Test public void testTry() {
+		// Special case, gets compiled to constant nil
+		assertEquals(Juice.CONSTANT, juice("(try)"));
+		
+		// special case, single element try gets compiled to single op
+		assertEquals(Juice.SPECIAL, juice("(try *balance*)"));
+		
+		// TRY cost gets applied for each forked execution required
+		assertEquals(Juice.TRY+Juice.CONSTANT, juice("(try 1 2 3 4 5)"));
+
 	}
 
 	@Test
 	public void testFunctionCalls() {
 		assertEquals(Juice.CORE + Juice.EQUALS, juice("(=)"));
+		assertEquals(Juice.CORE + Juice.EQUALS+ Juice.CONSTANT*2, juice("(= 1 1)"));
 	}
 
 	@Test

@@ -80,7 +80,13 @@ public class Juice {
 	 * Very cheap, no allocs.
 	 */
 	public static final long DO = 5;
-
+	
+	/**
+	 * Juice required to execute a Try block
+	 * 
+	 * Pretty cheap, more expensive than do because of potential for rollbacks.
+	 */
+	public static final long TRY = 50;
 
 	/**
 	 * Juice required to execute a Let block
@@ -89,8 +95,6 @@ public class Juice {
 	 * costs?
 	 */
 	public static final long LET = 30;
-
-
 
 	/**
 	 * Juice required to execute a Cond expression
@@ -355,6 +359,7 @@ public class Juice {
 	private static final int MIN_NUMERIC_COST = 8;
 
 	public static final int MEMORY_TRADE = 200;
+
 
 	/**
 	 * Saturating multiply and add: result = a + (b * c)

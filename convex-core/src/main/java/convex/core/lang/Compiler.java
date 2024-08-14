@@ -42,6 +42,7 @@ import convex.core.lang.ops.Local;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Query;
 import convex.core.lang.ops.Special;
+import convex.core.lang.ops.Try;
 
 /**
  * Compiler class responsible for transforming forms (code as data) into an
@@ -390,6 +391,8 @@ public class Compiler {
 			
 			if (sym.equals(Symbols.LET)) return compileLet(list, context, false);
 
+			if (sym.equals(Symbols.LOOKUP)) return compileLookup(list, context);
+
 			if (sym.equals(Symbols.COND)) {
 				context = context.compileAll(list.next());
 				if (context.isExceptional()) return context;
@@ -423,6 +426,8 @@ public class Compiler {
 				// need to expand and compile here, since we just created a raw form
 				return expandCompile(resultForm, context);
 			}
+			
+			if (sym.equals(Symbols.TRY)) return compileTry(list,context);
 
 			if (sym.equals(Symbols.QUERY)) {
 				context = context.compileAll(list.next());
@@ -433,9 +438,6 @@ public class Compiler {
 
 			if (sym.equals(Symbols.LOOP)) return compileLet(list, context, true);
 			if (sym.equals(Symbols.SET_BANG)) return compileSetBang(list, context);
-			
-			if (sym.equals(Symbols.LOOKUP)) return compileLookup(list, context);
-
 		}
 		
 		// must be a regular function call
@@ -685,6 +687,21 @@ public class Compiler {
 		if (list.count()==1) return context.withResult(Juice.COMPILE_NODE, ops.get(0));
 		
 		Do<?> op = Do.create(ops);
+		return context.withResult(Juice.COMPILE_NODE, op);
+	}
+	
+	// Compile do: note optimisation for small forms 
+	private static Context compileTry(AList<ACell> list, Context context){
+		list=list.next(); // advance past "try", might be nothing left....
+		if (list==null) return context.withResult(Juice.COMPILE_NODE,Constant.NULL);
+
+		context = context.compileAll(list);
+		if (context.isExceptional()) return context;
+		AVector<AOp<ACell>> ops=context.getResult();
+		
+		if (list.count()==1) return context.withResult(Juice.COMPILE_NODE, ops.get(0));
+		
+		Try<?> op = Try.create(ops);
 		return context.withResult(Juice.COMPILE_NODE, op);
 	}
 

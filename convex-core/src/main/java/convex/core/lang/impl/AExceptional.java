@@ -29,4 +29,12 @@ public abstract class AExceptional {
 	 */
 	public abstract ACell getMessage();
 
+	/**
+	 * Return true if this exceptional value is catchable
+	 * @return
+	 */
+	public boolean isCatchable() {
+		return false;
+	}
+
 }
