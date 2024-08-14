@@ -6,12 +6,13 @@ import java.util.List;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Address;
+import convex.core.data.Keyword;
 import convex.core.data.Strings;
 
 /**
  * Class representing an Error value produced by the CVM.
  * 
- * See "Error Handling" CAD.
+ * See "Error Handling" CAD11.
  * 
  * Contains:
  * <ul>
@@ -37,17 +38,17 @@ public class ErrorValue extends AThrowable {
 		this.message=message;
 	}
 
-	public static ErrorValue create(ACell code) {
+	public static ErrorValue create(Keyword code) {
 		return new ErrorValue(code,null);
 	}
 	
 	/**
 	 * Creates an ErrorValue with the specified type and message. Message may be null.
-	 * @param code Type of error
+	 * @param code Keyword error code
 	 * @param message Off-chain message as CVM String
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(ACell code, AString message) {
+	public static ErrorValue create(Keyword code, AString message) {
 		return new ErrorValue(code,message);
 	}
 	
@@ -67,7 +68,7 @@ public class ErrorValue extends AThrowable {
 	 * @param message Off-chain message as Java String
 	 * @return New ErrorValue instance
 	 */
-	public static ErrorValue create(ACell code, String message) {
+	public static ErrorValue create(Keyword code, String message) {
 		return new ErrorValue(code,Strings.create(message));
 	}
 
