@@ -1,18 +1,18 @@
-package convex.core.lang.impl;
+package convex.core.lang.exception;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 
-public class Reduced extends AReturn {
+public class ReducedValue extends AReturn {
 
 	private final ACell value;
 
-	public Reduced(ACell value) {
+	public ReducedValue(ACell value) {
 		this.value=value;
 	}
 
-	public static Reduced wrap(ACell value) {
-		return new Reduced(value);
+	public static ReducedValue wrap(ACell value) {
+		return new ReducedValue(value);
 	}
 	
 	@Override

@@ -14,7 +14,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.lang.impl.RecurValue;
+import convex.core.lang.exception.RecurValue;
 
 /**
  * Op for executing a body after lexically binding one or more symbols.

@@ -1,4 +1,4 @@
-package convex.core.lang.impl;
+package convex.core.lang.exception;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
@@ -10,16 +10,16 @@ import convex.core.data.ACell;
  * 
  * @param <T> Type of return value
  */
-public class RollbackValue<T extends ACell> extends AReturn {
+public class ReturnValue<T extends ACell> extends AReturn {
 
 	private final T value;
 
-	public RollbackValue(T value) {
+	public ReturnValue(T value) {
 		this.value = value;
 	}
 
-	public static <T extends ACell> RollbackValue<T> wrap(T value) {
-		return new RollbackValue<T>(value);
+	public static <T extends ACell> ReturnValue<T> wrap(T value) {
+		return new ReturnValue<T>(value);
 	}
 
 	public T getValue() {
@@ -28,16 +28,16 @@ public class RollbackValue<T extends ACell> extends AReturn {
 
 	@Override
 	public String toString() {
-		return "RollbackValue: " + value;
+		return "ReturnValue: " + value;
 	}
-	
+
 	@Override
 	public ACell getCode() {
-		return ErrorCodes.ROLLBACK;
+		return ErrorCodes.RETURN;
 	}
 
 	@Override
 	public ACell getMessage() {
-		return value;
+		return null;
 	}
 }

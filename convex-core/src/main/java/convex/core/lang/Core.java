@@ -50,17 +50,17 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.impl.AExceptional;
+import convex.core.lang.exception.AExceptional;
+import convex.core.lang.exception.ErrorValue;
+import convex.core.lang.exception.HaltValue;
+import convex.core.lang.exception.RecurValue;
+import convex.core.lang.exception.ReducedValue;
+import convex.core.lang.exception.ReturnValue;
+import convex.core.lang.exception.RollbackValue;
+import convex.core.lang.exception.TailcallValue;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
-import convex.core.lang.impl.ErrorValue;
-import convex.core.lang.impl.HaltValue;
 import convex.core.lang.impl.ICoreDef;
-import convex.core.lang.impl.RecurValue;
-import convex.core.lang.impl.Reduced;
-import convex.core.lang.impl.ReturnValue;
-import convex.core.lang.impl.RollbackValue;
-import convex.core.lang.impl.TailcallValue;
 import convex.core.lang.ops.Special;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -2640,8 +2640,8 @@ public class Core {
 	// Helper function for reduce
 	private static final Context reduceResult(Context ctx) {
 		Object ex=ctx.getValue(); // might be an ACell or Exception. We need to check for a Reduced result only
-	 	if (ex instanceof Reduced) {
-	 		ctx=ctx.withResult(((Reduced)ex).getValue());
+	 	if (ex instanceof ReducedValue) {
+	 		ctx=ctx.withResult(((ReducedValue)ex).getValue());
 	 	}
 	 	return ctx.consumeJuice(Juice.REDUCE); // bail out with exception
 	}
@@ -2652,7 +2652,7 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
-			AExceptional result = Reduced.wrap((ACell) args[0]);
+			AExceptional result = ReducedValue.wrap((ACell) args[0]);
 			return context.withException(Juice.RETURN, result);
 		}
 	});

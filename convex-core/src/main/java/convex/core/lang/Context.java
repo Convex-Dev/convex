@@ -29,16 +29,16 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.util.BlobBuilder;
 import convex.core.init.Init;
-import convex.core.lang.impl.AExceptional;
-import convex.core.lang.impl.ATrampoline;
+import convex.core.lang.exception.AExceptional;
+import convex.core.lang.exception.ATrampoline;
+import convex.core.lang.exception.ErrorValue;
+import convex.core.lang.exception.HaltValue;
+import convex.core.lang.exception.RecurValue;
+import convex.core.lang.exception.ReducedValue;
+import convex.core.lang.exception.ReturnValue;
+import convex.core.lang.exception.RollbackValue;
+import convex.core.lang.exception.TailcallValue;
 import convex.core.lang.impl.CoreFn;
-import convex.core.lang.impl.ErrorValue;
-import convex.core.lang.impl.HaltValue;
-import convex.core.lang.impl.RecurValue;
-import convex.core.lang.impl.Reduced;
-import convex.core.lang.impl.ReturnValue;
-import convex.core.lang.impl.RollbackValue;
-import convex.core.lang.impl.TailcallValue;
 import convex.core.util.Economics;
 import convex.core.util.Errors;
 
@@ -1784,7 +1784,7 @@ public class Context {
 				String msg;
 				if (ex instanceof ATrampoline) {
 					msg="attempt to recur or tail call outside of a function body";
-				} if (ex instanceof Reduced) {
+				} if (ex instanceof ReducedValue) {
 					msg="reduced used outside of a reduce operation";
 				} else {
 					msg="Unhandled Exception with Code:"+ex.getCode();

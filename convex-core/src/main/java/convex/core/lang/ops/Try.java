@@ -12,7 +12,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
-import convex.core.lang.impl.AExceptional;
+import convex.core.lang.exception.AExceptional;
 
 /**
  * Op for executing a sequence of child operations until one succeeds

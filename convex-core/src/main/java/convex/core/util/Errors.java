@@ -4,7 +4,7 @@ import convex.core.ErrorCodes;
 import convex.core.data.ARecord;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.lang.impl.ErrorValue;
+import convex.core.lang.exception.ErrorValue;
 
 /**
  * Utility class for generating appropriate error messages

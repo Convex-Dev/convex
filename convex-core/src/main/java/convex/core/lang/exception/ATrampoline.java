@@ -1,4 +1,4 @@
-package convex.core.lang.impl;
+package convex.core.lang.exception;
 
 import convex.core.data.ACell;
 
