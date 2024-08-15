@@ -9,9 +9,11 @@ import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Cells;
+import convex.core.data.Keywords;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
@@ -39,7 +41,10 @@ import static convex.test.Assertions.*;
 public class TransactionTest extends ACVMTest {
 	
 	Address HERO=InitTest.HERO;
+	AKeyPair HERO_KP=InitTest.HERO_KEYPAIR;
+	
 	Address VILLAIN=InitTest.VILLAIN;
+	AKeyPair VILLAIN_KP=InitTest.VILLAIN_KEYPAIR;
 	long JP=Constants.INITIAL_JUICE_PRICE;
 	
 	protected State state() {
@@ -235,6 +240,34 @@ public class TransactionTest extends ACVMTest {
 		assertEquals(0L,ctx.getAccountStatus(HERO).getSequence());
 		
 		doTransactionTests(t1);
+	}
+	
+	/**
+	 * TEsts for transactions that don't get as far as code execution
+	 */
+	@Test public void testBadSignedTransactions() {
+		State s=state();
+		long SEQ=s.getAccount(HERO).getSequence()+1;
+		
+		{ // wrong sequence
+			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(HERO, SEQ+1,Keywords.FOO)));
+			assertEquals(ErrorCodes.SEQUENCE,rc.getErrorCode());
+		}
+
+		{ // non-existent account
+			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.create(777777), SEQ,Keywords.FOO)));
+			assertEquals(ErrorCodes.NOBODY,rc.getErrorCode());
+		}
+		
+		{ // wrong key 
+			ResultContext rc=s.applyTransaction(VILLAIN_KP.signData(Invoke.create(HERO, SEQ,Keywords.FOO)));
+			assertEquals(ErrorCodes.SIGNATURE,rc.getErrorCode());
+		}
+		
+		{ // account without public key
+			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.ZERO, SEQ,Keywords.FOO)));
+			assertEquals(ErrorCodes.STATE,rc.getErrorCode());
+		}
 	}
 	
 	@Test public void testBigValues() {

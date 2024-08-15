@@ -34,7 +34,6 @@ import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
@@ -506,7 +505,7 @@ public class State extends ARecord {
 	 *
 	 * @return ResultContext containing the result of the transaction
 	 */
-	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws BadSignatureException {
+	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) {
 		// Extract transaction, performs signature check
 		ATransaction t=signedTransaction.getValue();
 		Address addr=t.getOrigin();
@@ -523,7 +522,7 @@ public class State extends ARecord {
 			}
 			
 			AccountKey key=as.getAccountKey();
-			if (key==null) return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for account that is an Actor: "+addr);
+			if (key==null) return ResultContext.error(this,ErrorCodes.STATE,"Transaction for account that is an Actor: "+addr);
 			
 			boolean sigValid=signedTransaction.checkSignature(key);
 			if (!sigValid) return ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
