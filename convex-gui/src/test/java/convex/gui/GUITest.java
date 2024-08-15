@@ -2,6 +2,9 @@ package convex.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+import java.awt.HeadlessException;
 
 import org.junit.jupiter.api.Test;
 
@@ -24,26 +27,30 @@ import convex.peer.Server;
  */
 public class GUITest {
 	
-	Server SERVER;
-	Convex CONVEX;
+	static Server SERVER;
+	static Convex CONVEX;
+	static PeerGUI manager = null;
 	
+
 	static {
-		Toolkit.init();
-	}
-	
-	{
-		SERVER=API.launchPeer();
-		CONVEX=Convex.connect(SERVER);
+		try {
+			Toolkit.init();
+			manager=new PeerGUI(3,AKeyPair.generate());
+			SERVER=manager.getPrimaryServer();
+			CONVEX=Convex.connect(SERVER);
+		} catch (HeadlessException e) {
+			// we should have null manager
+		}
 	}
 	
 	/**
 	 * Manager is the root panel of the GUI. A lot of other stuff is built in its
 	 * constructor.
 	 */
-	static final PeerGUI manager = new PeerGUI(3,AKeyPair.generate());
 
 	@Test
 	public void testState() throws InvalidDataException {
+		assumeTrue(manager!=null);
 		State s = manager.getLatestState();
 		s.validate();
 	}
@@ -53,6 +60,7 @@ public class GUITest {
 	 */
 	@Test
 	public void testDLFSBrowser() {
+		assumeTrue(manager!=null);
 		DLFSBrowser browser=new DLFSBrowser();
 		DLFileSystem drive=browser.getDrive();
 		assertEquals(0,drive.getRoot().getNameCount());
@@ -60,12 +68,14 @@ public class GUITest {
 	
 	@Test
 	public void testHackerTools() {
+		assumeTrue(manager!=null);
 		HackerTools tools=new HackerTools();
 		assertNotNull(tools.tabs);
 	}
 	
 	@Test
 	public void testClientTools() {
+		assumeTrue(manager!=null);
 		ConvexClient client=new ConvexClient(CONVEX);
 		assertNotNull(client.tabs);
 	}
