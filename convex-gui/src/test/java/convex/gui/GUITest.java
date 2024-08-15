@@ -18,7 +18,6 @@ import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
-import convex.peer.API;
 import convex.peer.Server;
 
 /**
