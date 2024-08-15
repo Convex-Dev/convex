@@ -3,6 +3,7 @@ package convex.core;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AVector;
+import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Cells;
 import convex.core.data.Keywords;
@@ -247,29 +249,43 @@ public class TransactionTest extends ACVMTest {
 	 */
 	@Test public void testBadSignedTransactions() {
 		State s=state();
-		long SEQ=s.getAccount(HERO).getSequence()+1;
+		AccountStatus as=s.getAccount(HERO);
+		long SEQ=as.getSequence()+1;
 		
 		{ // wrong sequence
 			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(HERO, SEQ+1,Keywords.FOO)));
 			assertEquals(ErrorCodes.SEQUENCE,rc.getErrorCode());
+			checkNoTransactionEffects(s,rc);
 		}
 
 		{ // non-existent account
 			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.create(777777), SEQ,Keywords.FOO)));
 			assertEquals(ErrorCodes.NOBODY,rc.getErrorCode());
+			checkNoTransactionEffects(s,rc);
 		}
 		
 		{ // wrong key 
 			ResultContext rc=s.applyTransaction(VILLAIN_KP.signData(Invoke.create(HERO, SEQ,Keywords.FOO)));
 			assertEquals(ErrorCodes.SIGNATURE,rc.getErrorCode());
+			checkNoTransactionEffects(s,rc);
 		}
 		
 		{ // account without public key
 			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.ZERO, SEQ,Keywords.FOO)));
 			assertEquals(ErrorCodes.STATE,rc.getErrorCode());
+			checkNoTransactionEffects(s,rc);
 		}
 	}
 	
+	private void checkNoTransactionEffects(State s, ResultContext rc) {
+		Context ctx=rc.context;
+		
+		// No change to state would be sufficient, but object identity means we are being more efficient so test for that
+		assertSame(s,rc.getState());
+		
+		assertEquals(0,ctx.getJuiceUsed());
+	}
+
 	@Test public void testBigValues() {
 		// Checks in case there are oddities with big values / VLC encoding
 		doTransactionTests(Invoke.create(HERO, 99, "(+ 2 5)"));
