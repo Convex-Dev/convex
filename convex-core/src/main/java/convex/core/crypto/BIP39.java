@@ -368,5 +368,17 @@ public class BIP39 {
 		}
 		return sb.toString();
 	}
+
+	/**
+	 * Check a list of words, returns the first word not in word list
+	 * @param words
+	 * @return
+	 */
+	public static String checkWords(List<String> words) {
+		for (String w: words) {
+			if (!lookup.containsKey(w)) return w;
+		}
+		return null;
+	}
 	
 }

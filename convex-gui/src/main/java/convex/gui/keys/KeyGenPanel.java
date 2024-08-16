@@ -87,13 +87,17 @@ public class KeyGenPanel extends JPanel {
 		String s = mnemonicArea.getText();
 		String p = new String(passArea.getPassword());
 		List<String> words=BIP39.getWords(s);
+		String badWord=BIP39.checkWords(words);
 		
 		String warn="";
 		if (words.size()<12) {
-			warn+="You have only "+words.size()+" words. ";
+			warn+="Only "+words.size()+" words. ";
+		}
+		if (badWord!=null) {
+			warn +="Not in standard word list: "+badWord+". ";
 		}
 		if (p.isBlank()) {
-			warn+="Your passphrse is blank!";
+			warn+="Passphrse is blank!";
 		} else {
 			int entropy=Passwords.estimateEntropy(p);
 			if (entropy<10) {
