@@ -261,14 +261,14 @@ public class BIP39 {
 	}
 	
 	/**
-	 * Return true if the string is a valid mnemonic phrase
+	 * Tests if the string is a valid mnemonic phrase, returns null if no problem
 	 * @param s String to be tested as a mnemonic phrase
 	 * @return String containing reason that mnemonic is not valid, or null if OK
 	 */
 	public static String checkMnemonic(String s) {
 		List<String> words=getWords(s);
 		if (words.size()<MIN_WORDS) return "Insufficient words in BIP39 mnemonic (min="+MIN_WORDS+")";
-		return null;
+		return checkWords(words);
 	}
 	
 	/**

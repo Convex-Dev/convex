@@ -110,7 +110,7 @@ public class SLIP10Test {
 	
 	@Test 
 	public void testSLIP10Fails () {
-		assertThrows(Error.class,()->SLIP10.derive(Blobs.empty(),1,2));
+		assertThrows(IllegalArgumentException.class,()->SLIP10.derive(Blobs.empty(),1,2));
 	}
 	
 } 

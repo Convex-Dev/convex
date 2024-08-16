@@ -1,5 +1,6 @@
 package convex.core.crypto;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.SecureRandom;
@@ -7,6 +8,7 @@ import java.security.SecureRandom;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.AString;
+import convex.core.data.Blob;
 import convex.core.data.Strings;
 import convex.core.util.Utils;
 
@@ -37,11 +39,9 @@ public class PEMToolsTest {
 		ASignature rightSignature = importKeyPair.sign(data.getHash());
 		assertTrue(leftSignature.equals(rightSignature));
 
-		// TODO: fix equality testing
-	    // Blob key1 = keyPair.getEncodedPrivateKey();
-		// Blob key2 = importKeyPair.getEncodedPrivateKey();
-		//assertEquals(key1,key2);
-		//(keyPair,importKeyPair);
+	    Blob seed1 = keyPair.getSeed();
+		Blob seed2 = importKeyPair.getSeed();
+		assertEquals(seed1,seed2);
 	}
 	
 	public static void main(String... args) throws Exception {

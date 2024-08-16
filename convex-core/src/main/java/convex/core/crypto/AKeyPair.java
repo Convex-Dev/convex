@@ -84,7 +84,7 @@ public abstract class AKeyPair {
 	public abstract ASignature sign(AArrayBlob message);
 
 	/**
-	 * Create a deterministic key pair with the given seed.
+	 * Create a deterministic key pair with the given long seed.
 	 * 
 	 * SECURITY: Never use this for valuable keys or real assets: intended for deterministic testing only.
 	 * @param seed Any long value. The same seed will produce the same key pair.

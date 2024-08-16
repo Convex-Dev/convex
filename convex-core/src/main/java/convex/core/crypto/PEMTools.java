@@ -21,7 +21,10 @@ import org.bouncycastle.pkcs.jcajce.JcePKCSPBEOutputEncryptorBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 
 public class PEMTools {
-	// private static String encryptionAlgorithm="AES-128-CBC";
+	/**
+	 * Default iteration count for PBE. TODO: is this sane?
+	 */
+	private static final int PBE_ITERATIONS=65536;
 	
 	static {
 		// Ensure we have BC provider initialised etc.
@@ -43,7 +46,7 @@ public class PEMTools {
 		
 		try {
 			JcePKCSPBEOutputEncryptorBuilder builder = new JcePKCSPBEOutputEncryptorBuilder(PKCS8Generator.PBE_SHA1_RC2_128);
-			builder.setIterationCount(4096); // TODO: double check requirements here?
+			builder.setIterationCount(PBE_ITERATIONS); // TODO: double check requirements here?
 			OutputEncryptor encryptor = builder.build(password);
 			JcaPKCS8Generator generator = new JcaPKCS8Generator(privateKey, encryptor);
 			writer.writeObject(generator);

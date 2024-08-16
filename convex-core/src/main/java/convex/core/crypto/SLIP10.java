@@ -26,15 +26,15 @@ public class SLIP10 {
 
 	/**
 	 * Gets the the master key for a given seed according to SLIP10
-	 * @param seed BIP39 seed value (or other source of good entropy!)
-	 * @return Blob containing the seed (bip39 seed, or some other good entropy source)
+	 * @param bip39seed BIP39 seed value (or other source of good entropy!)
+	 * @return Blob containing the SLIP10 master key
 	 */
-	public static Blob getMaster(Blob seed) {
+	public static Blob getMaster(Blob bip39seed) {
 		try {
 			Mac hmac=Mac.getInstance(HMAC_ALGORITHM);
 			
 			hmac.init(masterKey);
-			byte[] data=seed.getBytes();
+			byte[] data=bip39seed.getBytes();
 			hmac.update(data);
 			Blob result=Blob.wrap(hmac.doFinal());
 			return result;
@@ -50,11 +50,12 @@ public class SLIP10 {
 	 */
 	public static Blob derive(Blob master, int... ixs)  {
 		if (ixs.length==0) return master;
-		try {
-			byte[] bs=master.getBytes();
-			if (bs.length!=64) throw new Error("Invalid SLIP10 master key, must be 64 bytes");
-			byte[] data=new byte[1+32+4]; // 0x00 || ser256(kpar) || ser32(i)) from SLIP-10
+		if (ixs.length>255) throw new IllegalArgumentException("Maximum BIP32 path length exceeded (must be 255 or less)");
+		byte[] bs=master.getBytes();
+		if (bs.length!=64) throw new IllegalArgumentException("Invalid SLIP10 master key, must be 64 bytes");
+		byte[] data=new byte[1+32+4]; // 0x00 || ser256(kpar) || ser32(i)) from SLIP-10
 			
+		try {
 			Mac hmac=Mac.getInstance(HMAC_ALGORITHM);
 			
 			for (int i=0; i<ixs.length; i++) {
@@ -75,8 +76,8 @@ public class SLIP10 {
 		}
 	}
 
-	public static AKeyPair deriveKeyPair(Blob seed, int... ixs) {
-		Blob master = getMaster(seed);
+	public static AKeyPair deriveKeyPair(Blob bip39seed, int... ixs) {
+		Blob master = getMaster(bip39seed);
 		Blob keySeed = derive(master,ixs).slice(0, 32);
 		AKeyPair kp=AKeyPair.create(keySeed);
 		return kp;
