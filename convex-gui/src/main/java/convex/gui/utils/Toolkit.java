@@ -7,6 +7,7 @@ import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.HeadlessException;
 import java.awt.Image;
 import java.awt.RenderingHints;
 import java.awt.datatransfer.Clipboard;
@@ -74,13 +75,10 @@ public class Toolkit {
 	public static final Color SYMBOL_COLOUR = new Color(100,170,200);
 	public static final Color BUTTON_FG = new Color(176,190,197);
 
-
-
-
 	static {
-		loadFonts();
-		UIManager.getLookAndFeelDefaults().put("defaultFont", DEFAULT_FONT);
 		try {
+			loadFonts();
+			UIManager.getLookAndFeelDefaults().put("defaultFont", DEFAULT_FONT);
 			//LookAndFeel laf = installMDLaf();
 			LookAndFeel laf=installFlatLaf();
 			
@@ -99,6 +97,8 @@ public class Toolkit {
 			// Override button foreground, too dark by default
 			UIManager.put( "Button.foreground", UIManager.get("Label.foreground") );
 			// System.out.println(UIManager.get("Label.foreground"));
+		} catch (HeadlessException e) {
+			log.info("Unable to initialise GUI Toolkit due to headless execution mode.");
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
@@ -112,13 +112,17 @@ public class Toolkit {
 		return laf;
 	}
 
-	public static float getUIScale() {
-		GraphicsDevice screen = GraphicsEnvironment
-			    .getLocalGraphicsEnvironment()
-			    .getDefaultScreenDevice();
-		Double scale=screen.getDefaultConfiguration().getDefaultTransform().getScaleX();
-		log.debug("UI Scale: "+scale);
-		return (float)(scale.doubleValue());
+	private static float getUIScale() {
+		try {
+			GraphicsDevice screen = GraphicsEnvironment
+				    .getLocalGraphicsEnvironment()
+				    .getDefaultScreenDevice();
+			Double scale=screen.getDefaultConfiguration().getDefaultTransform().getScaleX();
+			log.debug("UI Scale: "+scale);
+			return (float)(scale.doubleValue());
+		} catch (HeadlessException e) {
+			return 1.0f;
+		}
 	}
 
 	// public static final ImageIcon LOCKED_ICON =
