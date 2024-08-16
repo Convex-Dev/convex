@@ -244,7 +244,7 @@ public class BIP39 {
 	}
 
 	/**
-	 * Converts a BIP39 seed to an Ed25519 seed. This is defined as the SHA3-256 hash of the BIP39 seed
+	 * Converts a BIP39 seed to an Ed25519 seed. This is done by taking the first 32 bytes of the SLIP-10 master key
 	 * 
 	 * Note: longer term users may want hierarchical deterministic wallet generation
 	 * 
@@ -302,11 +302,12 @@ public class BIP39 {
 			throw new Error("Security error getting BIP39 seed",e);
 		}
 	}
-
-	public static String createSecureMnemonic() {
-		return createSecureMnemonic(12);
-	}
 	
+	/**
+	 * Creates a normalised BIP39 mnemonic with the specified number of words
+	 * @param numWords
+	 * @return
+	 */
 	public static String createSecureMnemonic(int numWords) {
 		return Utils.joinStrings(createWords(new SecureRandom(),numWords)," ");
 	}

@@ -121,14 +121,14 @@ public abstract class AKeyPair {
 	}
 	
 	/**
-	 * Create a key pair with the given seed. Public key is generated
+	 * Create a key pair with the given Ed25519 seed. Public key is generated
 	 * automatically from the private key
 	 *
-	 * @param seed 32 bytes of seed material
+	 * @param ed25519seed 32 bytes of seed material
 	 * @return A new key pair using the given seed
 	 */
-	public static AKeyPair create(Blob seed) {
-		return Providers.generate(seed);
+	public static AKeyPair create(Blob ed25519seed) {
+		return Providers.generate(ed25519seed);
 	}
 
 	/**

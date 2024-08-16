@@ -97,7 +97,7 @@ public class KeyGenPanel extends JPanel {
 			warn +="Not in standard word list: "+badWord+". ";
 		}
 		if (p.isBlank()) {
-			warn+="Passphrse is blank!";
+			warn+="Passphrase is blank!";
 		} else {
 			int entropy=Passwords.estimateEntropy(p);
 			if (entropy<10) {
@@ -111,7 +111,7 @@ public class KeyGenPanel extends JPanel {
 
 		if (warn.isBlank()) {
 			warningArea.setForeground(Color.GREEN);
-			warningArea.setText("Looks OK");
+			warningArea.setText("OK: Reasonable mnemonic and passphrase");
 		} else {
 			warningArea.setForeground(Color.ORANGE);
 			warningArea.setText("WARNING: "+warn);
@@ -288,6 +288,7 @@ public class KeyGenPanel extends JPanel {
 			warningArea.setLineWrap(true);
 			warningArea.setWrapStyleWord(true);
 			warningArea.setEditable(false);
+			warningArea.setToolTipText("This is a quick heuristic check of mnemonic and passphrase.\nHeeding any warnings is advised, but you can ignore them if you know what you are doing (or don't care).");
 			formPanel.add(warningArea,TEXTAREA_CONSTRAINT);			
 	    }
 	
