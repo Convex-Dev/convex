@@ -105,7 +105,7 @@ public class KeyGenPanel extends JPanel {
 			} else if (entropy<20) {
 				warn+="Weak passphrase. ";
 			} else if (entropy<30) {
-				warn+="Moderately weak passphrase. ";
+				warn+="Moderate passphrase. ";
 			}
 		}
 
@@ -125,6 +125,7 @@ public class KeyGenPanel extends JPanel {
 			String pks = "<mnemonic not valid>";
 			if (s.isBlank()) pks = "<enter valid private key or mnemonic>";
 			masterKeyArea.setText(pks);
+			warningArea.setText("");
 			derivedKeyArea.setText(pks);
 			privateKeyArea.setText(pks);
 		}		
