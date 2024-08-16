@@ -16,6 +16,7 @@ import javax.swing.SpinnerNumberModel;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
+import convex.core.crypto.Passwords;
 import convex.core.crypto.SLIP10;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
@@ -33,11 +34,14 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class KeyGenPanel extends JPanel {
 
-	private static final String NOTE_CONSTRAINT = "align 50%,span 2,width 100:600:1000";
+	private static final String NOTE_CONSTRAINT = "align 50%,span,width 100:600:1000";
 	private static final String TEXTAREA_CONSTRAINT = "grow,width 10:500:800";
 	JTextArea mnemonicArea;
 	JPasswordField passArea;
 	JTextArea seedArea;
+	
+	JTextArea warningArea;
+	
 	JTextArea masterKeyArea;
 	JTextArea derivationArea;
 	JTextArea derivedKeyArea;
@@ -71,19 +75,45 @@ public class KeyGenPanel extends JPanel {
 	}
 
 	private void updateMnemonic() {
-		generateSeed();
+		generateBIP39Seed();
 	}
 	
 
 	private void updatePass() {
-		generateSeed();
+		generateBIP39Seed();
 	}
 	
-	private void generateSeed() {
+	private void generateBIP39Seed() {
 		String s = mnemonicArea.getText();
 		String p = new String(passArea.getPassword());
+		List<String> words=BIP39.getWords(s);
+		
+		String warn="";
+		if (words.size()<12) {
+			warn+="You have only "+words.size()+" words. ";
+		}
+		if (p.isBlank()) {
+			warn+="Your passphrse is blank!";
+		} else {
+			int entropy=Passwords.estimateEntropy(p);
+			if (entropy<10) {
+				warn+="Very weak passphrase! ";
+			} else if (entropy<20) {
+				warn+="Weak passphrase. ";
+			} else if (entropy<30) {
+				warn+="Moderately weak passphrase. ";
+			}
+		}
+
+		if (warn.isBlank()) {
+			warningArea.setForeground(Color.GREEN);
+			warningArea.setText("Looks OK");
+		} else {
+			warningArea.setForeground(Color.ORANGE);
+			warningArea.setText("WARNING: "+warn);
+		}
+		
 		try {
-			List<String> words=BIP39.getWords(s);
 			Blob bipSeed=BIP39.getSeed(words,p);
 			seedArea.setText(bipSeed.toHexString());
 			deriveSeed();
@@ -199,11 +229,11 @@ public class KeyGenPanel extends JPanel {
 		
 		formPanel = new JPanel();
 		// formPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
-		formPanel.setLayout(new MigLayout("wrap 2","[]10[grow,fill]",""));
+		formPanel.setLayout(new MigLayout("wrap 3","[][40]10[grow,fill]",""));
 		add(formPanel, BorderLayout.CENTER);
 
 		{ // Mnemonic entry box
-			addLabel("Mnenomic Phrase");	
+			addLabel("Mnenomic Phrase","BIP39 Menemonic phrase. These should be random words from the BIP39 standard word list.");	
 			mnemonicArea = makeTextArea();
 			mnemonicArea.setWrapStyleWord(true);
 			mnemonicArea.setLineWrap(true);
@@ -220,7 +250,7 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{ // Passphrase entry box
-			addLabel("Passphrase");	
+			addLabel("Passphrase","BIP39 secret passphrase. This acts as a secret 'extra word' to generate the BIP39 seed alongside the mnemonic. Strong passphrase recommended.");	
 			passArea = new JPasswordField();
 			passArea.setBackground(Color.BLACK);
 			formPanel.add(passArea,"grow,width 10:300:400");
@@ -231,7 +261,7 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			addLabel("BIP39 Seed");
+			addLabel("BIP39 Seed","This is the BIP39 seed generated from the mnemonic and passphrase.");
 			seedArea = makeTextArea();
 			seedArea.setRows(2);
 			seedArea.setLineWrap(true);
@@ -245,10 +275,22 @@ public class KeyGenPanel extends JPanel {
 			}));
 		}
 		
+	    {
+	    	formPanel.add(new JPanel()); // skip first 2 columns
+	    	formPanel.add(new JPanel()); // skip first 2 columns
+			warningArea = makeTextArea();
+
+			warningArea.setLineWrap(true);
+			warningArea.setWrapStyleWord(true);
+			warningArea.setEditable(false);
+			formPanel.add(warningArea,TEXTAREA_CONSTRAINT);			
+	    }
+	
+		
 		addNote("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. Instead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
 		
 		{
-			addLabel("SLIP-10 Master Key");
+			addLabel("SLIP-10 Master Key","SLIP-10 creates a Master Key from the BIP39 seed, which acts as the root of key generation for a heirarchical deterministic wallet.");
 			masterKeyArea = makeTextArea();
 
 			masterKeyArea.setLineWrap(true);
@@ -259,7 +301,7 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			addLabel("BIP32 Path");
+			addLabel("BIP32 Path","This is the hierarchical path for key generation as defined in BIP32. 'm' just specifies the master key.");
 			derivationArea = makeTextArea();
 
 			derivationArea.setLineWrap(true);
@@ -275,7 +317,7 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			addLabel("SLIP-10 Ext. Priv. Key");
+			addLabel("SLIP-10 Ext. Priv. Key","This is the extended private key produced by SLIP-10 after applying the BIP32 derivation path. The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed.");
 			derivedKeyArea = makeTextArea();
 			derivedKeyArea.setLineWrap(true);
 			derivedKeyArea.setWrapStyleWord(false);
@@ -283,12 +325,9 @@ public class KeyGenPanel extends JPanel {
 			formPanel.add(derivedKeyArea,TEXTAREA_CONSTRAINT);
 			derivedKeyArea.setText("(not ready)");
 		}
-		
-		addNote("The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed. This is all you strictly need to sign transactions in Convex. Any 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
-
 
 		{
-			addLabel("Private Ed25519 seed");
+			addLabel("Private Ed25519 seed","This is the Ed25519 private seed you need to sign transactions in Convex. Any 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
 			privateKeyArea = makeTextArea();
 			privateKeyArea.setBackground(Color.BLACK);
 
@@ -301,7 +340,7 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{
-			addLabel("Ed25519 Public Key");
+			addLabel("Ed25519 Public Key","This is the Ed25519 public key, which can be shared publicly and may be used as the account key for a Convex account.");
 			publicKeyArea = makeTextArea();
 			publicKeyArea.setEditable(false);
 			publicKeyArea.setRows(1);
@@ -312,7 +351,7 @@ public class KeyGenPanel extends JPanel {
 		
 		identicon=new Identicon(null);
 		// identicon.setBorder(null);
-		addLabel("Identicon:");
+		addLabel("Identicon","This is a visual representation of the public key. It can be used to visually identify different keys.");
 		formPanel.add(identicon,"grow 0");
 
 		////////////////////////////////////////////////////////////////
@@ -377,9 +416,10 @@ public class KeyGenPanel extends JPanel {
 	 * @param panel
 	 * @param string
 	 */
-	private void addLabel(String labelText) {
+	private void addLabel(String labelText,String helpText) {
 		JLabel lblMnemonic = new JLabel(labelText);
 		formPanel.add(lblMnemonic);
+		formPanel.add(Toolkit.makeHelp(helpText));
 	}
 
 
