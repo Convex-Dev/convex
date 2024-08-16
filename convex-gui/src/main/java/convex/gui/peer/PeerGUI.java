@@ -443,24 +443,24 @@ public class PeerGUI extends AbstractGUI {
 
 	public static void runLaunchDialog(JComponent parent) {
 		JPanel pan=new JPanel();
-		pan.setLayout(new MigLayout("fill,wrap 2","","[fill]10[fill]"));
+		pan.setLayout(new MigLayout("fill,wrap 3","","[fill]10[fill][40]"));
 		
-		pan.add(Toolkit.makeNote("Select a number of peers to include in the genesis state and launch initially. More can be added later. 3-5 recommended for local devnet testing"),
-				"grow,span 2");
 		pan.add(new JLabel("Number of Peers:"));
 		JSpinner peerCountSpinner = new JSpinner();
 		// Note: about 300 max number of clients before hitting juice limits for account creation
 		peerCountSpinner.setModel(new SpinnerNumberModel(PeerGUI.DEFAULT_NUM_PEERS, 1, 100, 1));
 		pan.add(peerCountSpinner);
+		pan.add(Toolkit.makeHelp("Select a number of peers to include in the genesis state and launch initially. More can be added later. 3-5 recommended for local devnet testing"));
+
 
 		
-		pan.add(Toolkit.makeNote("Select genesis key for the network. The genesis key will be the key used for the first peer and initial governance accounts."),
-				"grow,span 2");
 		pan.add(new JLabel("Genesis Key:   "));
 		AKeyPair kp=AKeyPair.generate();
 		KeyPairCombo keyField=KeyPairCombo.create(kp);
 
 		pan.add(keyField);
+		pan.add(Toolkit.makeHelp("Select genesis key for the network. The genesis key will be the key used for the first peer and initial governance accounts."));
+
 		pan.add(new JPanel());
 		
 		JButton randomise=new JButton("Randomise",SymbolIcon.get(0xe863,Toolkit.SMALL_ICON_SIZE)); 
@@ -472,13 +472,13 @@ public class PeerGUI extends AbstractGUI {
 			keyField.getModel().setSelectedItem(HotWalletEntry.create(newKP));
 		});
 		pan.add(randomise);
-
+		pan.add(Toolkit.makeHelp("Randomise the genesis key. Fine for testing purposes."));
 
 		int result = JOptionPane.showConfirmDialog(parent, pan, 
 	               "Enter Launch Details", 
 	               JOptionPane.OK_CANCEL_OPTION, 
 	               JOptionPane.QUESTION_MESSAGE,
-	               SymbolIcon.get(0xeb9b,72));
+	               SymbolIcon.get(0xeb9b,Toolkit.ICON_SIZE));
 	    if (result == JOptionPane.OK_OPTION) {
 	    	try {
 	    		int numPeers=(Integer)peerCountSpinner.getValue();

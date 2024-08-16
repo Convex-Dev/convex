@@ -24,15 +24,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 
-import javax.swing.AbstractAction;
-import javax.swing.BorderFactory;
-import javax.swing.Icon;
-import javax.swing.ImageIcon;
-import javax.swing.InputMap;
-import javax.swing.JComponent;
-import javax.swing.JFrame;
-import javax.swing.JMenuItem;
-import javax.swing.JTextArea;
+import javax.swing.*;
 import javax.swing.KeyStroke;
 import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
@@ -58,12 +50,12 @@ public class Toolkit {
 
 	public static final float SCALE=getUIScale();
 	
-	public static final int ICON_SIZE = (int) (24*SCALE);
+	public static final int ICON_SIZE = (int) (36*SCALE);
 	public static final int IDENTICON_SIZE = (int) (14*SCALE);
 	public static final int SMALL_ICON_SIZE = (int) (16*SCALE);
-	public static final int MAIN_ICON_SIZE = (int) (64*SCALE);
+	public static final int MAIN_ICON_SIZE = (int) (72*SCALE);
 
-	public static final float DEFAULT_FONT_SIZE=16;
+	public static final float DEFAULT_FONT_SIZE=12*SCALE;
 	
 	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,(int)DEFAULT_FONT_SIZE);
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE));
@@ -324,24 +316,31 @@ public class Toolkit {
 	public static Border createEmptyBorder(int x) {
 		return BorderFactory.createEmptyBorder(x, x, x, x);
 	}
+	
+	public static JComponent makeHelp(String helpText) {
+		JLabel help=new JLabel(SymbolIcon.get(0xe887,Toolkit.SMALL_ICON_SIZE));
+		help.setToolTipText(helpText);
+		return help;
+	}
 
-	public static JTextArea makeNote(String title, String note) {
+	public static JComponent makeNote(String title, String note) {
+		// JLabel ta = new JLabel("<html>"+note+"</html>"); // Alternative, but doesn't scale component height?
 		JTextArea ta = new JTextArea(note);
 		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder(title), createEmptyBorder(10));
 		
 		// This allows the text area to shrink, for some odd reason....
-		ta.setMinimumSize(new Dimension(40,40));
+		ta.setMinimumSize(new Dimension(50,50));
 		
 		ta.setBorder(b);
-		ta.setEditable(false);
-		ta.setFocusable(false);
+		ta.setEditable(false); // Can't edit notes
+		ta.setFocusable(false); // informational only, shouldn't focus
 		// ta.setFont(Toolkit.DEFAULT_FONT);
-		ta.setWrapStyleWord(true);
-		ta.setLineWrap(true);
+		ta.setLineWrap(true); // for wrapping
+		ta.setWrapStyleWord(true); // for nice text when it wraps
 		return ta;
 	}
 	
-	public static JTextArea makeNote(String note) {
+	public static JComponent makeNote(String note) {
 		return makeNote("NOTE",note);
 	}
 

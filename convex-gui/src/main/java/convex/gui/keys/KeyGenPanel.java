@@ -6,6 +6,7 @@ import java.awt.Font;
 import java.util.List;
 
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
@@ -358,7 +359,7 @@ public class KeyGenPanel extends JPanel {
 	}
 
 	private void addNote(String s) {
-		JTextArea ta = Toolkit.makeNote("NOTE",s);
+		JComponent ta = Toolkit.makeNote("NOTE",s);
 		formPanel.add(ta,NOTE_CONSTRAINT);
 	}
 

@@ -19,6 +19,7 @@ import convex.core.util.Utils;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.SymbolIcon;
+import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -35,20 +36,22 @@ public class ConnectPanel extends JPanel {
 
 	public ConnectPanel() {
 		ConnectPanel pan=this;
-		pan.setLayout(new MigLayout("fill,wrap 2",""));
+		pan.setLayout(new MigLayout("fill,wrap 3",""));
 		
 		{	// Peer selection
 			pan.add(new JLabel("Peer"));
 			hostField=new HostCombo();
-			hostField.setToolTipText("Connect your wallet to a Convex peer that you trust");
+			hostField.setToolTipText("Connect to a Convex peer that you trust. The peer is resposible for handling transactions on your behalf.");
 			pan.add(hostField,"width 50:250:");
+			pan.add(Toolkit.makeHelp(hostField.getToolTipText()));
 		}
 		
 		{	// Address selection
 			pan.add(new JLabel("Address"));
 			addressField=new AddressCombo(Init.GENESIS_ADDRESS);
-			addressField.setToolTipText("Set the initial account address to use");
+			addressField.setToolTipText("Set the initial account address to use. This should be an account for which you possess the private key.");
 			pan.add(addressField,"width 50:250:");
+			pan.add(Toolkit.makeHelp(addressField.getToolTipText()));
 		}
 
 	}
@@ -61,7 +64,7 @@ public class ConnectPanel extends JPanel {
 		ConnectPanel pan=new ConnectPanel();
 		
 		int result = JOptionPane.showConfirmDialog(parent, pan, 
-	               prompt, JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,SymbolIcon.get(0xea77));
+	               prompt, JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,SymbolIcon.get(0xea77,Toolkit.ICON_SIZE));
 
 		if (result == JOptionPane.OK_OPTION) {
 	    	try {
