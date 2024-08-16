@@ -3,6 +3,7 @@ package convex.gui.utils;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Desktop;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.GraphicsDevice;
@@ -98,6 +99,7 @@ public class Toolkit {
 			UIManager.put( "Button.foreground", UIManager.get("Label.foreground") );
 			// System.out.println(UIManager.get("Label.foreground"));
 		} catch (HeadlessException e) {
+			// We need this to stop things like tests failing in headless mode (e.g. in CI builds)
 			log.info("Unable to initialise GUI Toolkit due to headless execution mode.");
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -106,8 +108,6 @@ public class Toolkit {
 	}
 
 	protected static LookAndFeel installFlatLaf() {
-		System.setProperty("flatlaf.uiScale", "1.5");
-		// System.setProperty("flatlaf.uiScale", Double.toString(SCALE));
 		FlatDarculaLaf laf=new FlatDarculaLaf();
 		return laf;
 	}
@@ -118,7 +118,9 @@ public class Toolkit {
 				    .getLocalGraphicsEnvironment()
 				    .getDefaultScreenDevice();
 			Double scale=screen.getDefaultConfiguration().getDefaultTransform().getScaleX();
-			log.debug("UI Scale: "+scale);
+			scale*=1.3;
+			System.setProperty( "flatlaf.uiScale", ""+scale );
+			log.info("UI Scale: "+scale);
 			return (float)(scale.doubleValue());
 		} catch (HeadlessException e) {
 			return 1.0f;
@@ -326,6 +328,10 @@ public class Toolkit {
 	public static JTextArea makeNote(String title, String note) {
 		JTextArea ta = new JTextArea(note);
 		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder(title), createEmptyBorder(10));
+		
+		// This allows the text area to shrink, for some odd reason....
+		ta.setMinimumSize(new Dimension(40,40));
+		
 		ta.setBorder(b);
 		ta.setEditable(false);
 		ta.setFocusable(false);

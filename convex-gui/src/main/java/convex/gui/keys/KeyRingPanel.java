@@ -52,7 +52,7 @@ public class KeyRingPanel extends JPanel {
 	 * Create the panel.
 	 */
 	public KeyRingPanel() {
-		setLayout(new MigLayout());
+		setLayout(new MigLayout("fill"));
 		
 		JTextArea note=Toolkit.makeNote("These are currently loaded keys. Locked keys cannot be used until unlocked. Keys that are unlocked are accessible to users with control over the local machine - DO NOT unlock high value keys unless you are confident that your machine is secure.");
 		add(note,"dock north");
