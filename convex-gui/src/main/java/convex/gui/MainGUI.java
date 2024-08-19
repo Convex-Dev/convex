@@ -16,7 +16,7 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.panels.HomePanel;
-import convex.gui.peer.PeerGUI;
+import convex.gui.peer.PeerLaunchDialog;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
 import convex.gui.wallet.WalletApp;
@@ -71,7 +71,7 @@ public class MainGUI extends AbstractGUI {
 	
 	
 	public void launchTestNet() {
-		PeerGUI.runLaunchDialog(this);
+		PeerLaunchDialog.runLaunchDialog(this);
 	}
 	
 	public void launchDiscord() {

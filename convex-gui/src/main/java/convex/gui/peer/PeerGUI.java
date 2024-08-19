@@ -14,15 +14,9 @@ import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JFrame;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
-import javax.swing.JSpinner;
 import javax.swing.JTabbedPane;
-import javax.swing.SpinnerNumberModel;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,7 +28,6 @@ import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -48,18 +41,14 @@ import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.Toast;
 import convex.gui.components.account.AccountsPanel;
-import convex.gui.components.account.KeyPairCombo;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
-import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.models.StateModel;
 import convex.gui.tools.MessageFormatPanel;
-import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
-import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class PeerGUI extends AbstractGUI {
@@ -442,68 +431,9 @@ public class PeerGUI extends AbstractGUI {
 		}
 	}
 
-	public static void runLaunchDialog(JComponent parent) {
-		JPanel pan=new JPanel();
-		pan.setLayout(new MigLayout("fill,wrap 3","","[fill]10[fill][40]"));
-		
-		pan.add(new JLabel("Number of Peers:"));
-		JSpinner peerCountSpinner = new JSpinner();
-		// Note: about 300 max number of clients before hitting juice limits for account creation
-		peerCountSpinner.setModel(new SpinnerNumberModel(PeerGUI.DEFAULT_NUM_PEERS, 1, 100, 1));
-		pan.add(peerCountSpinner);
-		pan.add(Toolkit.makeHelp("Select a number of peers to include in the genesis state and launch initially. More can be added later. 3-5 recommended for local devnet testing"));
+	public void addPeer(ConvexLocal cvl) {
+		peerList.addElement(cvl);
 
-
-		
-		pan.add(new JLabel("Genesis Key:   "));
-		AKeyPair kp=AKeyPair.generate();
-		KeyPairCombo keyField=KeyPairCombo.create(kp);
-
-		pan.add(keyField);
-		pan.add(Toolkit.makeHelp("Select genesis key for the network. The genesis key will be the key used for the first peer and initial governance accounts."));
-
-		pan.add(new JPanel());
-		
-		JButton randomise=new JButton("Randomise",SymbolIcon.get(0xe863,Toolkit.SMALL_ICON_SIZE)); 
-		randomise.addActionListener(e->{
-			AKeyPair newKP=AKeyPair.generate();
-			// System.err.println("Generated key "+newKP.getAccountKey());
-			// Note we go to the model directly, JComboBox doeesn't like
-			// setting a selected item to something not in the list when not editable
-			keyField.getModel().setSelectedItem(HotWalletEntry.create(newKP,"Random genesis key pair for testing"));
-		});
-		pan.add(randomise);
-		pan.add(Toolkit.makeHelp("Randomise the genesis key. Fine for testing purposes."));
-
-		int result = JOptionPane.showConfirmDialog(parent, pan, 
-	               "Enter Launch Details", 
-	               JOptionPane.OK_CANCEL_OPTION, 
-	               JOptionPane.QUESTION_MESSAGE,
-	               SymbolIcon.get(0xeb9b,Toolkit.ICON_SIZE));
-	    if (result == JOptionPane.OK_OPTION) {
-	    	try {
-	    		int numPeers=(Integer)peerCountSpinner.getValue();
-	    		AWalletEntry we=keyField.getWalletEntry();
-	    		if (we==null) throw new Exception("No key pair selected");
-	    		
-	    		if (we.isLocked()) {
-					boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
-					if (!unlocked) {
-						Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
-						return;
-					}
-	    		}
-	    		
-	       		kp=we.getKeyPair();
-	    		
-	    		PeerGUI.launchPeerGUI(numPeers, kp,false);
-	    	} catch (Exception e) {
-	    		Toast.display(parent, "Launch Failed: "+e.getMessage(), Color.RED);
-	    		e.printStackTrace();
-	    	}
-	    }
-		
-		
 	}
 
 }

@@ -18,11 +18,14 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
 import convex.core.Coin;
+import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.TODOException;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
+import convex.peer.API;
+import convex.peer.Server;
 
 @SuppressWarnings({ "serial", "unused" })
 public class ServerListPanel extends JPanel {
@@ -67,23 +70,27 @@ public class ServerListPanel extends JPanel {
 		btnLaunch.setToolTipText("Launch an extra peer for the network. Allocates some stake from genesis account");
 		toolBar.add(btnLaunch);
 
-		JButton btnConnect = new ActionButton("Connect...",0xe157,e -> {
-			String input = JOptionPane.showInputDialog("Enter host address: ", "localhost:18888");
-			if (input==null) return; // no result?
-
-			InetSocketAddress hostAddress = Utils.toInetSocketAddress(input);
-			ConvexRemote pc;
-			try {
-				// TODO: we want to receive anything?
-				pc = Convex.connect(hostAddress, null,null);
-				throw new TODOException();
-				//addPeer(pc);
-			} catch (Throwable e1) {
-				JOptionPane.showMessageDialog(this, "Connect failed: " + e1.toString());
-			}
-
-		});
-		toolBar.add(btnConnect);
+// TODO: We probably want to restore this, but semantics not obvious
+//		JButton btnConnect = new ActionButton("Connect New Peer...",0xe157,e -> {
+//			String input = JOptionPane.showInputDialog("Enter host address: ", "localhost:18888");
+//			if (input==null) return; // no result?
+//
+//			InetSocketAddress hostAddress = Utils.toInetSocketAddress(input);
+//			ConvexRemote pc;
+//			try {
+//				// TODO: we want to receive anything?
+//				pc = Convex.connect(hostAddress, null,null);
+//				AKeyPair kp=AKeyPair.generate();
+//				Server s = API.launchPeer();
+//				ConvexLocal cvl=Convex.connect(s);
+//				manager.addPeer(cvl);
+//			} catch (Throwable e1) {
+//				JOptionPane.showMessageDialog(this, "Connect failed: " + e1.toString());
+//			}
+//
+//		});
+//		btnLaunch.setToolTipText("Connect a new, unstaked peer to a network");
+//		toolBar.add(btnConnect);
 
 		ScrollyList<ConvexLocal> scrollyList = new ScrollyList<>(manager.getPeerList(),
 				peer -> new PeerComponent(peer));
