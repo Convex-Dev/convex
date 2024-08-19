@@ -44,6 +44,10 @@ public class KeySign extends AKeyCommand {
 			description="Output file for the signature. Use '-' for STDIN.")
 	private String inputFilename;
 	
+	@Option(names={"--hex"},
+			description="Hex data to sign. Used instead of --input-file if specified")
+	private String dataString;
+	
 //	@Option(names={"--raw"},
 //			description="Specify this option to use raw byte input instead of hex.")
 //	private boolean rawdata;
@@ -67,19 +71,19 @@ public class KeySign extends AKeyCommand {
 			throw new CLIError(ExitCodes.NOUSER,"Key pair not found for requested signing key: "+keystorePublicKey);
 		}
 		
-		String dataString;
-		
-		// Ensure importText is filled
-		if (inputFilename != null && inputFilename.length() > 0) {
-			try {
-				dataString=FileUtils.loadFileAsString(inputFilename);
-			} catch (IOException ex) {
-				throw new CLIError(ExitCodes.IOERR,ex.getMessage());
+		if (dataString==null) {
+			// Ensure importText is filled
+			if (inputFilename != null && inputFilename.length() > 0) {
+				try {
+					dataString=FileUtils.loadFileAsString(inputFilename);
+				} catch (IOException ex) {
+					throw new CLIError(ExitCodes.IOERR,ex.getMessage());
+				}
+			} else if (isInteractive()) {
+				dataString=prompt("Enter hex data to sign: ");
+			} else {
+				throw new CLIError("No input file specified");
 			}
-		} else if (isInteractive()) {
-			dataString=prompt("Enter hex data to sign: ");
-		} else {
-			throw new CLIError("No input file specified");
 		}
 		
 		// Try to remove all whitespace and parse

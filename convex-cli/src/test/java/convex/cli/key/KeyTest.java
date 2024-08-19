@@ -31,6 +31,38 @@ public class KeyTest {
 
 	
 	@Test
+	public void testKeySign() throws IOException {
+		File f=new File("tempKeystoreSign101", ".pfx");
+		f.deleteOnExit();
+		String kfname=f.getCanonicalPath();
+		
+		// Import a seed from Ed25519 test case
+		CLTester tester =  CLTester.run(
+				"key", 
+				"import", 
+				"--type","seed",
+				"-v4",
+				"--keystore", kfname, 
+				"--text", "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7", 
+				"--keypass", KEY_PASSWORD);
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		
+		tester =  CLTester.run(
+				"key", 
+				"sign", 
+				"--key","fc51cd8e", // fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025 from test case
+				"--keystore",kfname,
+				"--keypass", KEY_PASSWORD, 
+				"--hex", "af82");
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		String out=tester.getOutput().trim();
+		
+		assertEquals("6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a",out);
+		
+
+	}
+	
+	@Test
 	public void testKeyListNoFile() throws IOException {
 		CLTester tester =  CLTester.run(
 				"key", 

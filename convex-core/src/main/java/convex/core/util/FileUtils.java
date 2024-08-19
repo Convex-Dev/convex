@@ -8,25 +8,39 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Generic file handling utilities. Used in CLI etc.
+ */
 public class FileUtils {
 
-	public static String loadFileAsString(String fname) throws IOException {
+	/**
+	 * Loads a file as a String. Handles `-` for STDIN
+	 * @param fileName
+	 * @return String contents of file
+	 * @throws IOException
+	 */
+	public static String loadFileAsString(String fileName) throws IOException {
 		String result = null;
-		fname = fname.trim();
-		if ("-".equals(fname)) {
+		fileName = fileName.trim();
+		if ("-".equals(fileName)) {
 			byte[] bs = System.in.readAllBytes();
 			result = new String(bs);
 		} else {
-			Path path = Paths.get(fname);
+			Path path = Paths.get(fileName);
 			if (!path.toFile().exists()) {
 				throw new FileNotFoundException("File does not exist: " + path);
 			}
 			result = Files.readString(path, StandardCharsets.UTF_8);
 		}
-
 		return result;
 	}
 
+	/**
+	 * Write a file as a UTF-8 String to the specified path
+	 * @param file
+	 * @param content String content to write as UTF-8
+	 * @throws IOException If an IO error occurs
+	 */
 	public static void writeFileAsString(Path file, String content) throws IOException {
 		byte[] bs=content.getBytes(StandardCharsets.UTF_8);
 		Files.write(file, bs);
