@@ -2,6 +2,7 @@ package convex.core.crypto;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -58,6 +59,8 @@ public class PFXTools {
 		// Need to load in bouncy castle crypto providers to set/get keys from the keystore.
 		Providers.init();
 
+		if (!keyFile.exists()) throw new FileNotFoundException();
+		
 		KeyStore ks = KeyStore.getInstance(KEYSTORE_TYPE);
 
 		try (FileInputStream fis = new FileInputStream(keyFile)) {

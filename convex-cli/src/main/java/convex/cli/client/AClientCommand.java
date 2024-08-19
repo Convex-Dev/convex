@@ -94,7 +94,7 @@ public abstract class AClientCommand extends ATopCommand {
 			}
 		}
 		
-		storeMixin.loadKeyStore();
+		storeMixin.ensureKeyStore();
 		int c=storeMixin.keyCount(pk);
 		if (c==0) {
 			throw new CLIError(ExitCodes.CONFIG,"Can't find keypair with public key: "+pk);

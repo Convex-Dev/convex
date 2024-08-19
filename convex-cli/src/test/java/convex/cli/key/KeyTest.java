@@ -53,7 +53,7 @@ public class KeyTest {
 		assertTrue(fp.exists());
 
 		// command key.list
-		tester =  CLTester.run("key", "list", "--storepass", KEYSTORE_PASSWORD, "--keystore", fileName);
+		tester =  CLTester.run("key", "list", "--keystore", fileName);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertTrue(tester.getOutput().contains(key));
 

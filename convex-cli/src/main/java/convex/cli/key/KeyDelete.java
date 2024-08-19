@@ -35,7 +35,7 @@ public class KeyDelete extends AKeyCommand {
 			return;
 		}
 		
-		KeyStore keyStore = storeMixin.loadKeyStore();
+		KeyStore keyStore = storeMixin.ensureKeyStore();
 		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
 		
 		HashSet<String> toDelete=new HashSet<>();

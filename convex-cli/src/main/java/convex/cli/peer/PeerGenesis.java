@@ -44,7 +44,7 @@ public class PeerGenesis extends APeerCommand {
 
 	@Override
 	public void run() {
-		storeMixin.loadKeyStore();
+		storeMixin.ensureKeyStore();
 
 		// Key for initial peer. Needed for genesis start
 		AKeyPair peerKey = ensurePeerKey();

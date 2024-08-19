@@ -62,7 +62,7 @@ public class PeerStart extends APeerCommand {
 
 	@Override
 	public void run() {
-		storeMixin.loadKeyStore();
+		storeMixin.ensureKeyStore();
 		AKeyPair peerKey=ensurePeerKey();
 		
 		log.debug("Preparing to start peer: "+peerKey.getAccountKey());

@@ -134,7 +134,7 @@ public class KeyImport extends AKeyCommand {
 		}
 
 		// Finally write to store
-		if (storeMixin.loadKeyStore()==null) {
+		if (storeMixin.ensureKeyStore()==null) {
 			throw new CLIError("Key store specified for import does not exist");
 		}
 		

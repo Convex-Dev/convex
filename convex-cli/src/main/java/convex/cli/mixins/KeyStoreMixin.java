@@ -73,17 +73,16 @@ public class KeyStoreMixin extends AMixin {
 	
 		if (keystorePassword != null) {
 			storepass = keystorePassword.toCharArray();
-		} else {
+		} else if (isParanoid()) {
+			// enforce integrity check in strict mode
 			if (isInteractive()) {
-				storepass = readPassword("Enter Keystore Password: ");
+				storepass = readPassword("Enter keystore integrity password: ");
 				keystorePassword=new String(storepass);
+			} else {
+				paranoia("Keystore integrity password must be explicitly provided");
 			}
-	
-			if (storepass == null) {
-				paranoia("Keystore password must be explicitly provided");
-				log.warn("No password for keystore: defaulting to blank password");
-				storepass = new char[0];
-			}
+		} else {
+			log.warn("No integrity password for keystore provided, not checking integrity");
 		}
 		return storepass;
 	}
@@ -108,11 +107,12 @@ public class KeyStoreMixin extends AMixin {
 	}
 	
 	/**
-	 * Loads the currently specified key Store
+	 * Loads the currently specified key Store. Does not create
 	 * 
-	 * @return KeyStore instance, or null if does not exist
+	 * @return KeyStore instance, or null if it does not exist
 	 */
 	public KeyStore loadKeyStore() {
+		if (keyStore!=null) return keyStore;
 		return loadKeyStore(false, getStorePassword());
 	}
 
