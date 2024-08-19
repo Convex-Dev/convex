@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
-import convex.cli.Constants;
 import convex.cli.Main;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.cli.output.RecordOutput;
@@ -22,7 +21,6 @@ import convex.core.transactions.Invoke;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
 /**
@@ -36,8 +34,8 @@ import picocli.CommandLine.Spec;
  */
 
 @Command(name="create",
-	aliases={"cr"},
-	description="Creates a peer ready to join a Convex network.")
+	mixinStandardHelpOptions = true, 
+	description="Configures and creates a peer ready to join a Convex network.")
 public class PeerCreate extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
@@ -46,11 +44,6 @@ public class PeerCreate extends APeerCommand {
 
 	@Mixin
 	RemotePeerMixin peerMixin;
-
-	@Option(names={"-t", "--timeout"},
-		description="Timeout in miliseconds.")
-	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
-
 
 	@Override
 	public void run() {
@@ -90,7 +83,7 @@ public class PeerCreate extends APeerCommand {
 			String transactionCommand = String.format("(create-peer 0x%s %d)", accountKeyString, stakeAmount);
 			ACell message = Reader.read(transactionCommand);
 			ATransaction transaction = Invoke.create(address, -1, message);
-			Result result = convex.transactSync(transaction, timeout);
+			Result result = convex.transactSync(transaction);
 			if (result.isError()) {
                 cli().printResult(result);
 				return;

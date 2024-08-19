@@ -16,6 +16,7 @@ import picocli.CommandLine.Command;
 		KeyImport.class,
 		KeyGenerate.class,
 		KeyList.class,
+		KeySign.class,
 		KeyExport.class,
 		KeyDelete.class,
 		CommandLine.HelpCommand.class

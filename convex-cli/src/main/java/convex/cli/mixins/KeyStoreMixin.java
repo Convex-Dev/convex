@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.util.FileUtils;
@@ -215,8 +216,10 @@ public class KeyStoreMixin extends AMixin {
 				}
 			}
 			return null;
+		} catch (UnrecoverableKeyException t) {
+			throw new CLIError(ExitCodes.CONFIG,"Cannot load key from key Store - possibly incorrect password?", t);
 		} catch (Exception t) {
-			throw new CLIError("Cannot load aliases from key Store", t);
+			throw new CLIError("Cannot load key from key Store", t);
 		}
 	}
 

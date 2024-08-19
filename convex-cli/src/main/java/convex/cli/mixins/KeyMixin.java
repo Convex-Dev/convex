@@ -28,31 +28,20 @@ public class KeyMixin extends AMixin {
 	static Logger log = LoggerFactory.getLogger(KeyMixin.class);
 
 	/**
-	 * Keys the password for the current key
+	 * Gets the password for the current key. Prompts for missing password in interactive mode.
 	 * 
 	 * @return password
 	 */
 	public char[] getKeyPassword() {
-		char[] keypass = null;
-
-		if (this.keyPassword != null) {
-			keypass = this.keyPassword;
-		} else {
-			if (isInteractive()) {
-				keypass = readPassword("Private Key Encryption Password: ");
-			}
-
-			if (keypass == null) {
-				log.warn("No password for key: defaulting to blank password");
-				keypass = new char[0];
-			}
-			
-			this.keyPassword=keypass;
+		if (this.keyPassword!=null) return keyPassword;
+		
+		if (isInteractive()) {
+			keyPassword = readPassword("Private Key Encryption Password: ");
 		}
 		
-		if (keypass.length == 0) {
+		if (keyPassword.length == 0) {
 			paranoia("Cannot use an empty password in --strict-security mode");
 		}
-		return keypass;
+		return keyPassword;
 	}
 }
