@@ -21,14 +21,15 @@ public class KeystoreWalletEntry extends AWalletEntry {
 	private String alias=null;
 	private AccountKey key=null;
 
-	public KeystoreWalletEntry(KeyStore ks, String alias) {
+	public KeystoreWalletEntry(KeyStore ks, String alias, String source) {
+		super (source);
 		this.ks=ks;
 		this.alias=alias;
 		this.key=AccountKey.parse(alias);;
 	}
 
-	public static KeystoreWalletEntry create(KeyStore ks, String alias) {
-		return new KeystoreWalletEntry(ks,alias);
+	public static KeystoreWalletEntry create(KeyStore ks, String alias, String source) {
+		return new KeystoreWalletEntry(ks,alias,source);
 	}
 
 	@Override
@@ -38,7 +39,7 @@ public class KeystoreWalletEntry extends AWalletEntry {
 
 	@Override
 	public synchronized AKeyPair getKeyPair() {
-		if (isLocked()) throw new IllegalStateException("Wallet not unlocked!");
+		// Note: null if locked
 		return keyPair;
 	}
 
@@ -78,6 +79,21 @@ public class KeystoreWalletEntry extends AWalletEntry {
 	
 	@Override
 	public synchronized void lock(char[] password) {
+		keyPair=null;
+	}
+
+	@Override
+	public String getSource() {
+		return source;
+	}
+
+	@Override
+	public boolean needsLockPassword() {
+		return false;
+	}
+
+	@Override
+	public void lock() {
 		keyPair=null;
 	}
 

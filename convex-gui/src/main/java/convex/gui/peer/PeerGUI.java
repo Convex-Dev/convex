@@ -379,7 +379,7 @@ public class PeerGUI extends AbstractGUI {
 				peerList.addElement(convex);
 				
 				// initial wallet list
-		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair());
+		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair");
 				KeyRingPanel.addWalletEntry(we);
 			}
 		} catch (Exception e) {
@@ -401,7 +401,7 @@ public class PeerGUI extends AbstractGUI {
 			long amt=convex.getBalance()/10;
 			convex.transferSync(a, amt);
 			
-			KeyRingPanel.addWalletEntry(HotWalletEntry.create(kp));
+			KeyRingPanel.addWalletEntry(HotWalletEntry.create(kp,"Generated peer key"));
 			
 			// Set up Peer in base server
 			convex=Convex.connect(base, a, kp);
@@ -469,7 +469,7 @@ public class PeerGUI extends AbstractGUI {
 			// System.err.println("Generated key "+newKP.getAccountKey());
 			// Note we go to the model directly, JComboBox doeesn't like
 			// setting a selected item to something not in the list when not editable
-			keyField.getModel().setSelectedItem(HotWalletEntry.create(newKP));
+			keyField.getModel().setSelectedItem(HotWalletEntry.create(newKP,"Random genesis key pair for testing"));
 		});
 		pan.add(randomise);
 		pan.add(Toolkit.makeHelp("Randomise the genesis key. Fine for testing purposes."));

@@ -108,7 +108,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	}
 
 	private static AKeyPair TEMP_KEYPAIR = AKeyPair.createSeeded(1337);
-	private static HotWalletEntry PROTOTYPE=HotWalletEntry.create(TEMP_KEYPAIR);
+	private static HotWalletEntry PROTOTYPE=HotWalletEntry.create(TEMP_KEYPAIR, "Prototype key");
 
 	public KeyPairCombo(ComboBoxModel<AWalletEntry> model) {
 		this.setModel(model);
@@ -125,7 +125,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 		p.setLayout(new MigLayout("insets 20 20 20 20, wrap 1"));
 		
 		KeyPairModel model=new KeyPairModel();
-		model.addElement(HotWalletEntry.create(AKeyPair.generate()));
+		model.addElement(HotWalletEntry.create(AKeyPair.generate(),"Test key"));
 		KeyPairCombo kpCombo=new KeyPairCombo(model);
 		p.add(kpCombo);
 		
@@ -156,7 +156,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 			AccountKey publicKey=kp.getAccountKey();
 			AWalletEntry we=KeyRingPanel.getKeyRingEntry(publicKey);
 			if (we==null) {
-				we=new HotWalletEntry(kp);
+				we=new HotWalletEntry(kp,null);
 			}
 			model.setSelectedItem(we);
 		}

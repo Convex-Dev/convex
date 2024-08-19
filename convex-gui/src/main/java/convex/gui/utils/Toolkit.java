@@ -50,8 +50,9 @@ public class Toolkit {
 
 	public static final float SCALE=getUIScale();
 	
-	public static final int ICON_SIZE = (int) (36*SCALE);
+	public static final int ICON_SIZE = (int) (32*SCALE);
 	public static final int IDENTICON_SIZE = (int) (14*SCALE);
+	public static final int IDENTICON_SIZE_LARGE = 2*IDENTICON_SIZE;
 	public static final int SMALL_ICON_SIZE = (int) (16*SCALE);
 	public static final int MAIN_ICON_SIZE = (int) (72*SCALE);
 
@@ -66,6 +67,7 @@ public class Toolkit {
 	public static Font SYMBOL_FONT = new Font(Font.MONOSPACED, Font.PLAIN, (int)SYMBOL_FONT_SIZE);
 	
 	public static final Color SYMBOL_COLOUR = new Color(100,170,200);
+	public static final Color WARNING_COLOUR = Color.ORANGE;
 	public static final Color BUTTON_FG = new Color(176,190,197);
 
 	static {
@@ -126,8 +128,8 @@ public class Toolkit {
 	//public static final ImageIcon LOCKED_ICON = scaledIcon(ICON_SIZE, "/images/padlock.png");
 	//public static final ImageIcon UNLOCKED_ICON = scaledIcon(ICON_SIZE, "/images/padlock-open.png");
 	
-	public static final ImageIcon LOCKED_ICON = SymbolIcon.get(0xe897,ICON_SIZE);
-	public static final ImageIcon UNLOCKED_ICON = SymbolIcon.get(0xe898,ICON_SIZE);
+	public static final ImageIcon LOCKED_ICON = SymbolIcon.get(0xe897,ICON_SIZE,Toolkit.SYMBOL_COLOUR.getRGB());
+	public static final ImageIcon UNLOCKED_ICON = SymbolIcon.get(0xe898,ICON_SIZE,Toolkit.WARNING_COLOUR.getRGB());
 	public static final ImageIcon WARNING = scaledIcon(ICON_SIZE, "/images/ic_priority_high_black_36dp.png");
 	public static final ImageIcon CAKE = scaledIcon(ICON_SIZE, "/images/ic_cake_black_36dp.png");
 	public static final ImageIcon CONVEX = scaledIcon(ICON_SIZE, "/images/Convex.png");

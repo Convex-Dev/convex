@@ -22,6 +22,8 @@ import convex.gui.utils.Toolkit;
  */
 @SuppressWarnings("serial")
 public class Identicon extends JLabel {
+	
+	protected int displaySize=Toolkit.IDENTICON_SIZE;
 
 	protected static final int SIZE=7;
 	
@@ -81,9 +83,10 @@ public class Identicon extends JLabel {
 		wm.put(hash, result);
 		return result;
 	}
-
-	public Identicon(AArrayBlob a) {
+	
+	public Identicon(AArrayBlob a, int displaySize) {
 		super();
+		this.displaySize=displaySize;
 		setKey(a);
 		setFont(Toolkit.MONO_FONT);
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
@@ -91,6 +94,10 @@ public class Identicon extends JLabel {
 		Toolkit.addPopupMenu(this,new JPopupMenu() {
 			
 		});
+	}
+
+	public Identicon(AArrayBlob a) {
+		this(a,Toolkit.IDENTICON_SIZE);
 	}
 
 	public static class IdenticApp extends AbstractGUI{
@@ -128,7 +135,7 @@ public class Identicon extends JLabel {
 	}
 
 	public void setKey(AArrayBlob a) {
-		ImageIcon icon=createIcon(a, Toolkit.IDENTICON_SIZE); 
+		ImageIcon icon=createIcon(a, displaySize); 
 		this.setToolTipText(icon.getDescription());
 
 		setIcon(icon);

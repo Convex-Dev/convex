@@ -7,6 +7,7 @@ import java.awt.Rectangle;
 import java.util.function.Function;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.ListModel;
 import javax.swing.Scrollable;
@@ -30,6 +31,7 @@ public class ScrollyList<E> extends JScrollPane {
 	private final MigLayout listLayout;
 	
 	public void refreshList() {
+		boolean bottom=isAtBottom();
 		EventQueue.invokeLater(()->{;
 			listPanel.removeAll();
 			int n = model.getSize();
@@ -38,7 +40,15 @@ public class ScrollyList<E> extends JScrollPane {
 				listPanel.add(builder.apply(we),"span");
 			}
 			this.revalidate();
+			if (bottom) {
+				EventQueue.invokeLater(this::scrollToBottom);
+			}
 		});
+	}
+
+	private boolean isAtBottom() {
+		JScrollBar bar = this.getVerticalScrollBar();
+		return bar.getValue()==bar.getMaximum();
 	}
 
 	private static class ScrollablePanel extends JPanel implements Scrollable {
@@ -111,5 +121,10 @@ public class ScrollyList<E> extends JScrollPane {
 
 	public Component[] getListComponents() {
 		return listPanel.getComponents();
+	}
+
+	public void scrollToBottom() {
+		JScrollBar bar = this.getVerticalScrollBar();
+		bar.setValue(bar.getMaximum());
 	}
 }

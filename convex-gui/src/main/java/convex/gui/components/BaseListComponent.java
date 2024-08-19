@@ -11,7 +11,7 @@ public class BaseListComponent extends JPanel {
 
 	public BaseListComponent() {
 		setBorder(new CompoundBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null),
-				Toolkit.createEmptyBorder(3)));
+				Toolkit.createEmptyBorder(2)));
 
 	}
 }

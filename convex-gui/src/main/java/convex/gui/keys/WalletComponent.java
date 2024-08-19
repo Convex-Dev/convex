@@ -1,5 +1,7 @@
 package convex.gui.keys;
 
+import java.awt.Color;
+
 import javax.swing.Icon;
 import javax.swing.JButton;
 import javax.swing.JComponent;
@@ -42,7 +44,7 @@ public class WalletComponent extends BaseListComponent {
 		setLayout(new MigLayout());
 
 		//////////  identicon
-		JLabel identicon = new Identicon(walletEntry.getPublicKey());
+		JLabel identicon = new Identicon(walletEntry.getPublicKey(),Toolkit.IDENTICON_SIZE*2);
 		JPanel idPanel=new JPanel();
 		idPanel.add(identicon);
 		add(idPanel,"dock west"); // add to MigLayout
@@ -72,11 +74,16 @@ public class WalletComponent extends BaseListComponent {
 				UnlockWalletDialog.offerUnlock(this,walletEntry);
 			} else {
 				try {
-					String s=JOptionPane.showInputDialog(WalletComponent.this,"Enter lock password");
-					if (s!=null) {
-						walletEntry.lock(s.toCharArray());
-					}	
-				} catch (IllegalStateException e1) {
+					if (walletEntry.needsLockPassword()) {
+						String s=JOptionPane.showInputDialog(WalletComponent.this,"Enter lock password");
+						if (s!=null) {
+							walletEntry.lock(s.toCharArray());
+						}	
+					} else {
+						walletEntry.lock();
+					}
+				
+				} catch (Exception e1) {
 					e1.printStackTrace();
 				}	
 			}
@@ -93,7 +100,7 @@ public class WalletComponent extends BaseListComponent {
 			if (kp!=null) {
 				JPanel panel=new JPanel();
 				panel.setLayout(new MigLayout("wrap 1","[200]"));
-				panel.add(new Identicon(kp.getAccountKey()),"align center");
+				panel.add(new Identicon(kp.getAccountKey(),Toolkit.IDENTICON_SIZE_LARGE),"align center");
 				
 				panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString()))); 
 				panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
@@ -128,22 +135,25 @@ public class WalletComponent extends BaseListComponent {
 		resetTooltipText(lockButton);
 		infoLabel.setText(getInfoString());
 		Icon icon=walletEntry.isLocked()? Toolkit.LOCKED_ICON:Toolkit.UNLOCKED_ICON;
+		
 		this.lockButton.setIcon(icon);
+		this.lockButton.setForeground(Color.WHITE);
 	}
 
 
 	private void resetTooltipText(JComponent b) {
 		if (walletEntry.isLocked()) {
-			b.setToolTipText("Unlock");
+			b.setToolTipText("Currently locked. Press to unlock.");
 		} else {
-			b.setToolTipText("Lock");
+			b.setToolTipText("Currently unlocked. Press to lock.");
 		}
 	}
 
 	private String getInfoString() {
 		StringBuilder sb=new StringBuilder();
 		sb.append("Public Key: " + walletEntry.getPublicKey()+"\n");
-		sb.append("Status:     " + (walletEntry.isLocked()?"Locked":"Unlocked"));
+		// sb.append("Status:     " + (walletEntry.isLocked()?"Locked":"Unlocked")+"\n");
+		sb.append("Source:     " + walletEntry.getSource());
 		
 		//sb.append("\n");
 		//sb.append("Key: "+walletEntry.getAccountKey()+ "   Controller: "+as.getController());

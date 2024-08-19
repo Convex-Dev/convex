@@ -12,7 +12,6 @@ import java.util.concurrent.CompletableFuture;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
-import javax.swing.JComponent;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
@@ -72,9 +71,6 @@ public class KeyRingPanel extends JPanel {
 	public KeyRingPanel() {
 		setLayout(new MigLayout("fill"));
 		
-		JComponent note=Toolkit.makeNote("These are currently loaded keys. Locked keys cannot be used until unlocked. Keys that are unlocked are accessible to users with control over the local machine - DO NOT unlock high value keys unless you are confident that your machine is secure.");
-		add(note,"dock north");
-
 		// Scrollable list of wallet entries
 		walletList = new ScrollyList<AWalletEntry>(listModel, we -> new WalletComponent(we));
 		add(walletList, "dock center");
@@ -86,7 +82,8 @@ public class KeyRingPanel extends JPanel {
 		JButton btnNew = new ActionButton("New Keypair",0xe145,e -> {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
-				listModel.addElement(HotWalletEntry.create(newKP));
+				walletList.scrollToBottom();
+				listModel.addElement(HotWalletEntry.create(newKP,"Generated key in memory"));
 			} catch (Exception  t) {
 				Toast.display(this,"Error creating key pair: "+t.getMessage(),Color.RED);
 				t.printStackTrace();
@@ -104,7 +101,7 @@ public class KeyRingPanel extends JPanel {
 			
 			try {
 				AKeyPair newKP=AKeyPair.create(seed);
-				listModel.addElement(HotWalletEntry.create(newKP));
+				listModel.addElement(HotWalletEntry.create(newKP, "Imported from Ed25519 seed"));
 			} catch (Exception  t) {
 				Toast.display(this,"Exception importing seed: "+t.getMessage(),Color.RED);
 				t.printStackTrace();
@@ -127,7 +124,7 @@ public class KeyRingPanel extends JPanel {
 		if (!f.exists()) return -1;
 		try {
 			KeyStore ks=PFXTools.loadStore(f, null);
-			return loadKeys(ks);
+			return loadKeys(ks, f.getCanonicalPath());
 		} catch (IOException e) {
 			log.debug("Can't load key store: "+e.getMessage());
 			return -1;
@@ -137,12 +134,12 @@ public class KeyRingPanel extends JPanel {
 		}
 	}
 
-	private static int loadKeys(KeyStore keyStore) throws KeyStoreException {
+	private static int loadKeys(KeyStore keyStore, String source) throws KeyStoreException {
 		int n=0;
 		Enumeration<String> aliases = keyStore.aliases();
 		while (aliases.hasMoreElements()) {
 			String alias = aliases.nextElement();
-			AWalletEntry we=KeystoreWalletEntry.create(keyStore, alias);
+			AWalletEntry we=KeystoreWalletEntry.create(keyStore, alias, source);
 			listModel.addElement(we);
 			n++;
 		}

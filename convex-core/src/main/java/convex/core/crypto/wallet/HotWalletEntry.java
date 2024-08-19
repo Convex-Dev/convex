@@ -18,13 +18,16 @@ public class HotWalletEntry extends AWalletEntry {
 	private final AKeyPair keyPair;
 	private Hash passHash=null;
 	boolean locked=false;
+	private String source;
 
-	public HotWalletEntry(AKeyPair kp) {
+	public HotWalletEntry(AKeyPair kp, String source) {
+		super (source);
 		this.keyPair = kp;
+		this.source=source;
 	}
 
-	public static HotWalletEntry create(AKeyPair kp) {
-		return new HotWalletEntry(kp);
+	public static HotWalletEntry create(AKeyPair kp,String source) {
+		return new HotWalletEntry(kp,source);
 	}
 
 	@Override
@@ -88,6 +91,21 @@ public class HotWalletEntry extends AWalletEntry {
 		String s=new String(password);
 		Hash h=Strings.create(s).getHash();
 		return h;
+	}
+
+	@Override
+	public String getSource() {
+		return source;
+	}
+
+	@Override
+	public boolean needsLockPassword() {
+		return passHash==null;
+	}
+
+	@Override
+	public void lock() {
+		locked=true;
 	}
 
 }
