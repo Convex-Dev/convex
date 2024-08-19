@@ -29,6 +29,16 @@ public class KeyTest {
 	private static final String KEYSTORE_PASSWORD = "testPassword";
 	private static final String KEY_PASSWORD = "testKeyPassword";
 
+	
+	@Test
+	public void testKeyListNoFile() throws IOException {
+		CLTester tester =  CLTester.run(
+				"key", 
+				"list", 
+				"--keystore", "foo.bar");
+		tester.assertExitCode(ExitCodes.NOINPUT);
+	}
+	
 	@Test
 	public void testKeyGenerateAndUse() throws IOException {
 		File f=TEMP_FILE;
@@ -65,8 +75,8 @@ public class KeyTest {
 		tester =  CLTester.run("key", "delete", "--storepass", KEYSTORE_PASSWORD, "--keystore", fileName, "+");
 		tester.assertExitCode(ExitCodes.SUCCESS);
 
-		// command key.list
-		tester =  CLTester.run("key", "list", "-v0", "--storepass", KEYSTORE_PASSWORD, "--keystore", fileName);
+		// command key.list, no keys left
+		tester =  CLTester.run("key", "list", "-v0", "--keystore", fileName);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertFalse(tester.getOutput().contains(key));
 

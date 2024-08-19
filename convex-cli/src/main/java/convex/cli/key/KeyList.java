@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
+import convex.cli.ExitCodes;
 import picocli.CommandLine.Command;
 
 /**
@@ -27,7 +28,7 @@ public class KeyList extends AKeyCommand {
 	@Override
 	public void run() {
 		KeyStore keyStore = storeMixin.loadKeyStore();
-		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
+		if (keyStore==null) throw new CLIError(ExitCodes.NOINPUT,"Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
 		
 		Enumeration<String> aliases;
 		int n=0;
@@ -41,6 +42,10 @@ public class KeyList extends AKeyCommand {
 		} catch (KeyStoreException e) {
 			throw new CLIError("Unexpected error reading keystore",e);
 		}
-		this.inform(3, n+" key(s) found");
+		if (n==0) {
+			this.inform("Keystore contains no keys");		
+		} else {
+			this.inform(3, n+" key(s) found");
+		}
 	}
 }
