@@ -6,8 +6,6 @@ import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.Graphics2D;
-import java.awt.GraphicsDevice;
-import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
 import java.awt.Image;
 import java.awt.RenderingHints;
@@ -24,7 +22,16 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 
-import javax.swing.*;
+import javax.swing.AbstractAction;
+import javax.swing.BorderFactory;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
+import javax.swing.InputMap;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenuItem;
+import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
 import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
@@ -48,6 +55,7 @@ public class Toolkit {
 	
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
+	public static final double BASE_SCALE=1.2;
 	public static final float SCALE=getUIScale();
 	
 	public static final int ICON_SIZE = (int) (32*SCALE);
@@ -108,11 +116,11 @@ public class Toolkit {
 
 	private static float getUIScale() {
 		try {
-			GraphicsDevice screen = GraphicsEnvironment
-				    .getLocalGraphicsEnvironment()
-				    .getDefaultScreenDevice();
-			Double scale=screen.getDefaultConfiguration().getDefaultTransform().getScaleX();
-			scale*=1.3;
+			//GraphicsDevice screen = GraphicsEnvironment
+			//	    .getLocalGraphicsEnvironment()
+			//	    .getDefaultScreenDevice();
+			//Double scale=screen.getDefaultConfiguration().getDefaultTransform().getScaleX();
+			Double scale=BASE_SCALE;
 			System.setProperty( "flatlaf.uiScale", ""+scale );
 			log.info("UI Scale: "+scale);
 			return (float)(scale.doubleValue());
