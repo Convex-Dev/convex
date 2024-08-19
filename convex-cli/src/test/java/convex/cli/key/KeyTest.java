@@ -98,6 +98,10 @@ public class KeyTest {
 		tester =  CLTester.run("key", "list", "--keystore", fileName);
 		tester.assertExitCode(ExitCodes.SUCCESS);
 		assertTrue(tester.getOutput().contains(key));
+		
+		// command key.list with wrong store password
+		tester =  CLTester.run("key", "list", "--keystore", fileName, "--storepass","thisisBAD");
+		tester.assertExitCode(ExitCodes.NOPERM);
 
 		// command key.list with non-existant keystore
 		tester =  CLTester.run("key", "list", "--storepass", KEYSTORE_PASSWORD, "--keystore","bad-keystore.pfx");

@@ -129,15 +129,16 @@ public class KeyStoreMixin extends AMixin {
 			} else {
 				keyStore=null;
 			}
-		} catch (FileNotFoundException e) {
+		}  catch (FileNotFoundException e) {
 			return null;
 		} catch (GeneralSecurityException e) {
 			throw new CLIError("Unexpected security error: " + e.getClass(), e);
 		} catch (IOException e) {
 			if (e.getCause() instanceof UnrecoverableKeyException) {
-				throw new CLIError("Invalid password for keystore: " + keyFile);
+				throw new CLIError(ExitCodes.NOPERM,"Integrity password check failed for keystore: " + keyFile, e.getCause());
 			}
-			throw new CLIError("Unable to read keystore at: " + keyFile, e);
+			
+			throw new CLIError("Unable to load keystore due to unexpected IO Error: " + keyFile, e);
 		}
 		return keyStore;
 	}
