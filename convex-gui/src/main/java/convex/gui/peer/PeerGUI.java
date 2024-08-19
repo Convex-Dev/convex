@@ -51,6 +51,7 @@ import convex.gui.components.account.AccountsPanel;
 import convex.gui.components.account.KeyPairCombo;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.models.StateModel;
 import convex.gui.tools.MessageFormatPanel;
 import convex.gui.utils.SymbolIcon;
@@ -485,8 +486,16 @@ public class PeerGUI extends AbstractGUI {
 	    		AWalletEntry we=keyField.getWalletEntry();
 	    		if (we==null) throw new Exception("No key pair selected");
 	    		
+	    		if (we.isLocked()) {
+					boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
+					if (!unlocked) {
+						Toast.display(parent, "Launch cancelled: Locked genesis key", Color.RED);
+						return;
+					}
+	    		}
+	    		
 	       		kp=we.getKeyPair();
-	    		if (kp==null) throw new Exception("Invalid Genesis Key!");
+	    		
 	    		PeerGUI.launchPeerGUI(numPeers, kp,false);
 	    	} catch (Exception e) {
 	    		Toast.display(parent, "Launch Failed: "+e.getMessage(), Color.RED);

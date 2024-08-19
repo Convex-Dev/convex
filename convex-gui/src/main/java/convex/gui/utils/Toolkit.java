@@ -55,7 +55,7 @@ public class Toolkit {
 	
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
-	public static final double BASE_SCALE=1.2;
+	public static final double BASE_SCALE=1.3;
 	public static final float SCALE=getUIScale();
 	
 	public static final int ICON_SIZE = (int) (32*SCALE);

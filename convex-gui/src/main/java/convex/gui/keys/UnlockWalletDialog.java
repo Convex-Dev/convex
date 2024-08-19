@@ -44,7 +44,7 @@ public class UnlockWalletDialog extends JDialog {
 		setAlwaysOnTop(true);
 
 		setModalityType(ModalityType.DOCUMENT_MODAL);
-		setTitle("Unlock Wallet");
+		setTitle("Unlock Key");
 		setModal(true);
 
 		JPanel mainPanel = new JPanel();
@@ -52,7 +52,7 @@ public class UnlockWalletDialog extends JDialog {
 		mainPanel.setBorder(Toolkit.createDialogBorder());
 		getContentPane().add(mainPanel, BorderLayout.NORTH);
 
-		Identicon a = new Identicon(walletEntry.getIdenticonData());
+		Identicon a = new Identicon(walletEntry.getIdenticonData(),Toolkit.IDENTICON_SIZE_LARGE);
 		a.setText("0x"+walletEntry.getPublicKey().toChecksumHex());
 		mainPanel.add(a,"span");
 
