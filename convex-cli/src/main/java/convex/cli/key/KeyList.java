@@ -30,14 +30,17 @@ public class KeyList extends AKeyCommand {
 		if (keyStore==null) throw new CLIError("Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
 		
 		Enumeration<String> aliases;
+		int n=0;
 		try {
 			aliases = keyStore.aliases();
 			while (aliases.hasMoreElements()) {
 				String alias = aliases.nextElement();
 				println(alias);
+				n++;
 			}
 		} catch (KeyStoreException e) {
 			throw new CLIError("Unexpected error reading keystore",e);
 		}
+		this.inform(3, n+" key(s) found");
 	}
 }

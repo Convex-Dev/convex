@@ -68,7 +68,6 @@ public class KeyImportTest {
 			"key", 
 			"import",
 			"--type","seed",
-			"--storepass", new String(KEYSTORE_PASSWORD), 
 			"--keystore", KEYSTORE_FILENAME, 
 			"--text", keyPair.getSeed().toString(), 
 			"--keypass", KEY_PASSWORD, 

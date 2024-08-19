@@ -16,6 +16,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
+import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 
 public class KeyExportTest {
@@ -52,7 +53,7 @@ public class KeyExportTest {
 		File fp = TEMP_FILE;
 		assertTrue(fp.exists());
 		
-		assertTrue(Files.exists(Utils.getPath(KEYSTORE_FILENAME).toPath()));
+		assertTrue(Files.exists(FileUtils.getFile(KEYSTORE_FILENAME).toPath()));
 		
 		// Check output is hex key
 		String output=tester.getOutput().trim();

@@ -17,6 +17,7 @@ import convex.cli.key.Key;
 import convex.cli.local.Local;
 import convex.cli.output.Coloured;
 import convex.cli.peer.Peer;
+import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
@@ -229,7 +230,7 @@ public class Main extends ACommand {
 		} else {
 			File file = new File(outFile);
 			try {
-				file = Utils.ensurePath(file);
+				file = FileUtils.ensureFilePath(file);
 				log.trace("Setting output to "+file);
 				PrintWriter pw = new PrintWriter(file);
 				commandLine.setOut(pw);

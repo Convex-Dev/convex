@@ -32,6 +32,7 @@ import convex.core.data.Blob;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Special;
+import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
@@ -58,7 +59,7 @@ public class KeyRingPanel extends JPanel {
 	
 	static {
 		try {
-			File f=Utils.getPath(Constants.DEFAULT_KEYSTORE_FILENAME);
+			File f=FileUtils.getFile(Constants.DEFAULT_KEYSTORE_FILENAME);
 			loadKeys(f);
 		} catch (Exception e) {
 			log.warn("Failed to load default key store: "+e.getMessage());

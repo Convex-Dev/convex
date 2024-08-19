@@ -19,7 +19,7 @@ import javax.crypto.spec.PBEParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
 import convex.core.Constants;
-import convex.core.util.Utils;
+import convex.core.util.FileUtils;
 
 
 /**
@@ -79,7 +79,7 @@ public class PFXTools {
 	 * @throws GeneralSecurityException if a security exception occurs
 	 */
 	public static KeyStore saveStore(KeyStore ks, File keyFile, char[] storePassword) throws GeneralSecurityException, IOException {
-		Utils.ensurePath(keyFile);
+		FileUtils.ensureFilePath(keyFile);
 
 		try (FileOutputStream fos = new FileOutputStream(keyFile)) {
 		    ks.store(fos, storePassword);

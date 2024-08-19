@@ -5,7 +5,7 @@ import java.io.IOException;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
-import convex.core.util.Utils;
+import convex.core.util.FileUtils;
 import etch.EtchStore;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
@@ -24,7 +24,7 @@ public class EtchMixin extends AMixin {
 					"No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
 		}
 
-		File etchFile = Utils.getPath(fileName);
+		File etchFile = FileUtils.getFile(fileName);
 
 		try {
 			EtchStore store = EtchStore.create(etchFile);

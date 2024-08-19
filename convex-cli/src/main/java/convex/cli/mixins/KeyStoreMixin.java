@@ -16,7 +16,7 @@ import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
-import convex.core.util.Utils;
+import convex.core.util.FileUtils;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
@@ -31,28 +31,27 @@ public class KeyStoreMixin extends AMixin {
 			description = "Keystore filename. Can specify with CONVEX_KEYSTORE. Default: ${DEFAULT-VALUE}")
 	private String keyStoreFilename;
 
-	
 	/**
 	 * Password for keystore. Option named to match Java keytool
 	 */
 	@Option(names = {"--storepass" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:CONVEX_KEYSTORE_PASSWORD}", 
-			description = "Password for the Keystore") 
-	String keystorePassword;
+			description = "Store integrity password for the keystore.") 
+	char[] keystorePassword;
 
 	KeyStore keyStore = null;
 	
 	static Logger log = LoggerFactory.getLogger(KeyStoreMixin.class);
 
 	/**
-	 * Gets the keystore file name currently used for the CLI
+	 * Gets the keystore file name currently specified for the CLI
 	 * 
 	 * @return File name, or null if not specified
 	 */
 	private File getKeyStoreFile() {
 		if (keyStoreFilename != null) {
-			File f = Utils.getPath(keyStoreFilename);
+			File f = FileUtils.getFile(keyStoreFilename);
 			return f;
 		}
 		return null;
@@ -63,28 +62,21 @@ public class KeyStoreMixin extends AMixin {
 	}
 
 	/**
-	 * Get the currently configured password for the keystore. Will emit warning and
-	 * default to blank password if not provided
+	 * Get the currently configured password for the keystore.
 	 * 
-	 * @return Password string
+	 * @return Password, or null if unspecified
 	 */
 	public char[] getStorePassword() {
-		char[] storepass = null;
-	
-		if (keystorePassword != null) {
-			storepass = keystorePassword.toCharArray();
-		} else if (isParanoid()) {
+		if (keystorePassword != null) return keystorePassword;	
+		else if (isParanoid()) {
 			// enforce integrity check in strict mode
 			if (isInteractive()) {
-				storepass = readPassword("Enter keystore integrity password: ");
-				keystorePassword=new String(storepass);
+				keystorePassword = readPassword("Enter keystore integrity password: ");
 			} else {
 				paranoia("Keystore integrity password must be explicitly provided");
 			}
-		} else {
-			log.warn("No integrity password for keystore provided, not checking integrity");
-		}
-		return storepass;
+		} 
+		return keystorePassword;
 	}
 
 	/**
@@ -127,10 +119,11 @@ public class KeyStoreMixin extends AMixin {
 		File keyFile = getKeyStoreFile();
 		try {
 			if (keyFile.exists()) {
+				this.inform(3, "Loading key store at: "+keyFile);
 				keyStore = PFXTools.loadStore(keyFile, password);
 			} else if (shouldCreate) {
 				informWarning("No keystore exists, creating at: " + keyFile.getCanonicalPath());
-				Utils.ensurePath(keyFile);
+				FileUtils.ensureFilePath(keyFile);
 				keyStore = PFXTools.createStore(keyFile, password);
 			} else {
 				keyStore=null;
@@ -149,8 +142,7 @@ public class KeyStoreMixin extends AMixin {
 	}
 	
 	public void saveKeyStore() {
-		if (keystorePassword==null) throw new CLIError("Key store password not provided, unable to save");
-		saveKeyStore(keystorePassword.toCharArray());
+		saveKeyStore(keystorePassword);
 	}
 
 	public void saveKeyStore(char[] storePassword) {
@@ -158,6 +150,9 @@ public class KeyStoreMixin extends AMixin {
 		if (keyStore == null)
 			throw new CLIError("Trying to save a keystore that has not been loaded!");
 		try {
+			if (keystorePassword==null) {
+				paranoia("Trying to save keystore in strict mode with no integrity password");
+			}
 			PFXTools.saveStore(keyStore, getKeyStoreFile(), storePassword);
 		} catch (Exception t) {
 			throw new CLIError("Failed to save keystore",t);
@@ -167,9 +162,8 @@ public class KeyStoreMixin extends AMixin {
 	/**
 	 * Adds key pair to store. Does not save keystore!
 	 * 
-	 * @param main TODO
 	 * @param keyPair Keypair to add
-	 * @param keyPassword TODO
+	 * @param keyPassword PAssword for new key
 	 */
 	public void addKeyPairToStore(AKeyPair keyPair, char[] keyPassword) {
 	

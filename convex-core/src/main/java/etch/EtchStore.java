@@ -12,6 +12,7 @@ import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.store.ACachedStore;
+import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 
 /**
@@ -79,7 +80,7 @@ public class EtchStore extends ACachedStore {
 	 * @throws IOException If an IO error occurs
 	 */
 	public static EtchStore create(File file) throws IOException {
-		file = Utils.ensurePath(file);
+		file = FileUtils.ensureFilePath(file);
 		Etch etch = Etch.create(file);
 		return new EtchStore(etch);
 	}
