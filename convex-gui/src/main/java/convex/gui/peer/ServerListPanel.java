@@ -25,7 +25,7 @@ import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
 
 @SuppressWarnings({ "serial", "unused" })
-public class PeersListPanel extends JPanel {
+public class ServerListPanel extends JPanel {
 
 	JPanel peersPanel;
 
@@ -34,7 +34,7 @@ public class PeersListPanel extends JPanel {
 
 	PeerGUI manager;
 
-	static final Logger log = LoggerFactory.getLogger(PeersListPanel.class.getName());
+	static final Logger log = LoggerFactory.getLogger(ServerListPanel.class.getName());
 
 	/**
 	 * Gets a list of all locally operating Servers from the current peer list.
@@ -56,7 +56,7 @@ public class PeersListPanel extends JPanel {
 	 * Create the panel.
 	 * @param manager PeerGUI instance
 	 */
-	public PeersListPanel(PeerGUI manager) {
+	public ServerListPanel(PeerGUI manager) {
 		this.manager=manager;
 		setLayout(new BorderLayout(0, 0));
 

@@ -111,7 +111,7 @@ public class WalletComponent extends BaseListComponent {
 			}
 		});
 		menu.add(m2);
-		JMenuItem m3=new JMenuItem("Delete");
+		JMenuItem m3=new JMenuItem("Remove...");
 		m3.addActionListener(e-> {
 			int confirm =JOptionPane.showConfirmDialog(WalletComponent.this, "Are you sure you want to delete this keypair from your keyring?","Confirm Delete",JOptionPane.WARNING_MESSAGE);
 			if (confirm==JOptionPane.OK_OPTION) {

@@ -110,7 +110,7 @@ public class PeerGUI extends AbstractGUI {
 				frame.addWindowListener(new java.awt.event.WindowAdapter() {
 			        public void windowClosing(WindowEvent winEvt) {
 			        	// shut down peers gracefully
-			    		manager.peerPanel.manager.closePeers();
+			    		manager.serverPanel.manager.closePeers();
 			    		manager.restServer.stop();
 			        }
 			    });
@@ -124,7 +124,7 @@ public class PeerGUI extends AbstractGUI {
 	/*
 	 * Main component panel
 	 */
-	PeersListPanel peerPanel;
+	ServerListPanel serverPanel;
 	KeyRingPanel keyRingPanel;
 	
 	KeyGenPanel keyGenPanel;
@@ -155,7 +155,7 @@ public class PeerGUI extends AbstractGUI {
 		tickState = StateModel.create(0L);
 		
 		// launch local peers 
-		peerPanel= new PeersListPanel(this);
+		serverPanel= new ServerListPanel(this);
 		keyRingPanel = new KeyRingPanel();
 
 		launchAllPeers();
@@ -181,7 +181,7 @@ public class PeerGUI extends AbstractGUI {
 		tabs = new JTabbedPane();
 		this.add(tabs, BorderLayout.CENTER);
 
-		tabs.add("Servers", peerPanel);
+		tabs.add("Peer Servers", serverPanel);
 		tabs.add("Accounts", accountsPanel);
 		tabs.add("Keyring", keyRingPanel);
 		tabs.add("KeyGen", keyGenPanel);
@@ -190,7 +190,7 @@ public class PeerGUI extends AbstractGUI {
 		tabs.add("Torus", new TorusPanel(this));
 		tabs.add("About", new AboutPanel(convex));
 		
-		tabs.setSelectedComponent(peerPanel);
+		tabs.setSelectedComponent(serverPanel);
 
 		ThreadUtils.runVirtual(updateThread);
 	}
@@ -209,8 +209,8 @@ public class PeerGUI extends AbstractGUI {
 					Thread.sleep(100);
 					tickState.setValue(tickState.getValue()+1);
 					
-					java.util.List<ConvexLocal> peerViews = peerPanel.getPeerViews();
-					peerPanel.repaint();
+					java.util.List<ConvexLocal> peerViews = serverPanel.getPeerViews();
+					serverPanel.repaint();
 					State latest = latestState.getValue();
 					for (ConvexLocal s : peerViews) {
 

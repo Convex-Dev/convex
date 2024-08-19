@@ -78,9 +78,10 @@ public class PeerComponent extends BaseListComponent {
 		button.addActionListener(e -> {
 			launchPeerWindow(this.convex);
 		});
-		button.setToolTipText("Launch Peer management window");
+		button.setToolTipText("Launch Peer management window for this peer server");
 		add(button, "dock west");
 		
+		//////////////////////////////////
 		// Central area
 
 		JPanel centralPanel = new JPanel();
@@ -88,19 +89,27 @@ public class PeerComponent extends BaseListComponent {
 		
 		Server server=convex.getLocalServer();
 		AccountKey peerKey=server.getPeerKey();
-		Identicon identicon=new Identicon(peerKey);
-		centralPanel.add(identicon);
-		centralPanel.add(new CodeLabel("0x"+peerKey.toChecksumHex()),"span");
 		
-		description = new CodeLabel(getPeerDescription());
-		description.setFont(Toolkit.MONO_FONT);
-		description.setEditable(false);
-		description.setBorder(null);
-		description.setBackground(null);
-		centralPanel.add(description, "span 2");
-		add(centralPanel,"dock center");
-
-		// Setup popup menu for peer
+		{ // Identicon / peer key heading row
+			Identicon identicon=new Identicon(peerKey,Toolkit.IDENTICON_SIZE_LARGE);
+			centralPanel.add(identicon);
+			CodeLabel peerKeyLabel=(new CodeLabel("0x"+peerKey.toChecksumHex()));
+			peerKeyLabel.setToolTipText("Public key of the peer.");
+			centralPanel.add(peerKeyLabel,"span");
+		}
+		
+		{ // Description of peer status
+			description = new CodeLabel(getPeerDescription());
+			description.setFont(Toolkit.MONO_FONT);
+			description.setEditable(false);
+			description.setBorder(null);
+			description.setBackground(null);
+			centralPanel.add(description, "span 2");
+			add(centralPanel,"dock center");
+		}
+		
+		//////////////////////////////////
+		// Settings Popup menu for peer
 		JPopupMenu popupMenu = new JPopupMenu();
 
 		JMenuItem closeButton = new JMenuItem("Shutdown Peer",Toolkit.menuIcon(0xe8ac));
@@ -144,10 +153,10 @@ public class PeerComponent extends BaseListComponent {
 		popupMenu.add(walletButton);
 
 
-
 		DropdownMenu dm = new DropdownMenu(popupMenu);
 		add(dm, "dock east");
 
+		////////////////////////////////////////////////
 		// Block view at bottom
 		
 		JPanel blockView = new BlockViewComponent(convex);
@@ -164,6 +173,8 @@ public class PeerComponent extends BaseListComponent {
 		}
 		add(blockView, "dock south");
 
+		
+		// Final stuff
 		updateDescription();
 	}
 
@@ -217,7 +228,7 @@ public class PeerComponent extends BaseListComponent {
 				sb.append("Not currently a registered peer    ");
 			}
 			ConnectionManager cm=server.getConnectionManager();
-			sb.append("Connections: "+cm.getConnectionCount());				
+			sb.append("C: "+cm.getConnectionCount());				
 		} else if (convex != null) {
 			sb.append(convex.toString());
 		} else {

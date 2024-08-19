@@ -31,7 +31,8 @@ public class BlockViewComponent extends JPanel {
 		this.peerView = peer;
 
 		setBackground(null);
-		setPreferredSize(new Dimension(1000, 10));
+		setMinimumSize(new Dimension(100, 10));
+		setPreferredSize(new Dimension(800, 10));
 	}
 
 	@Override
