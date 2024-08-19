@@ -34,6 +34,10 @@ public class TokenComponent extends JPanel {
 		
 		// Action buttons
 		JPanel actions=new JPanel();
+		actions.add(ActionButton.build(0xe8b7,e->{
+			// Token send TODO
+		},"Send this token to another account"));
+
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
 			new SwapPanel(convex,token,WalletPanel.getDefaultToken()).run();

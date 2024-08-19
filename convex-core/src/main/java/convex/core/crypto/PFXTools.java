@@ -49,7 +49,7 @@ public class PFXTools {
 	/**
 	 * Loads an existing PKCS12 Key store.
 	 * @param keyFile File for the existing key store
-	 * @param storePassword Passphrase for decrypting the key store. May be blank or null if not encrypted.
+	 * @param storePassword Passphrase for integrity check of the key store. May be blank. If null, no integrity check is performed.
 	 * @return Found key store
 	 * @throws IOException If an IO error occurs
 	 * @throws GeneralSecurityException If a security error occurs

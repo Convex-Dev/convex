@@ -12,7 +12,7 @@ public class Constants {
 
 	public static final String HOSTNAME_PEER = "localhost";
 
-	public static final String KEYSTORE_FILENAME = "~/.convex/keystore.pfx";
+	public static final String KEYSTORE_FILENAME = convex.core.Constants.DEFAULT_KEYSTORE_FILENAME;
 
 	public static final String CONFIG_FILENAME = "~/.convex/convex.properties";
 

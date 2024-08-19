@@ -1,6 +1,12 @@
 package convex.gui.keys;
 
 import java.awt.Color;
+import java.io.File;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
@@ -14,9 +20,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PFXTools;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
+import convex.core.crypto.wallet.KeystoreWalletEntry;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -46,6 +55,15 @@ public class KeyRingPanel extends JPanel {
 	public static void addWalletEntry(AWalletEntry we) {
 		listModel.addElement(we);
 		log.debug("Wallet entry added to KeyRing: ",we.getPublicKey());
+	}
+	
+	static {
+		try {
+			File f=Utils.getPath(Constants.DEFAULT_KEYSTORE_FILENAME);
+			loadKeys(f);
+		} catch (Exception e) {
+			log.warn("Failed to load default key store: "+e.getMessage());
+		}
 	}
 
 	/**
@@ -98,6 +116,37 @@ public class KeyRingPanel extends JPanel {
 		
 		add(toolBar, "dock south");
 
+	}
+
+	/**
+	 * Load keys from a file. Returns number of keys loaded, or -1 if file could not be opened 
+	 * @param f
+	 * @return
+	 */
+	private static int loadKeys(File f) {
+		if (!f.exists()) return -1;
+		try {
+			KeyStore ks=PFXTools.loadStore(f, null);
+			return loadKeys(ks);
+		} catch (IOException e) {
+			log.debug("Can't load key store: "+e.getMessage());
+			return -1;
+		} catch (GeneralSecurityException e) {
+			log.debug("Can't load key store: "+e.getMessage());
+			return -1;
+		}
+	}
+
+	private static int loadKeys(KeyStore keyStore) throws KeyStoreException {
+		int n=0;
+		Enumeration<String> aliases = keyStore.aliases();
+		while (aliases.hasMoreElements()) {
+			String alias = aliases.nextElement();
+			AWalletEntry we=KeystoreWalletEntry.create(keyStore, alias);
+			listModel.addElement(we);
+			n++;
+		}
+		return n;
 	}
 
 	public static DefaultListModel<AWalletEntry> getListModel() {

@@ -48,8 +48,6 @@ public class SwapPanel extends AbstractGUI {
 		setLayout(new MigLayout("fill,wrap","[]","[][][grow]"));
 		setBorder(Toolkit.createDialogBorder());
 		
-
-		
 		swapPanel=new JPanel();
 		addSwapComponents();
 		add(swapPanel,"align center,span,growx");
