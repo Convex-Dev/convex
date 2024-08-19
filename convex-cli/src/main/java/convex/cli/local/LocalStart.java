@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.cli.ExitCodes;
 import convex.cli.Helpers;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -52,21 +53,21 @@ public class LocalStart extends ALocalCommand {
 	private String[] keystorePublicKey;
 
   @Option(names={"--ports"},
-		description="List of ports to assign to peers in the cluster. If not specified, will attempt to find available ports."
-			+ "or a single --ports=8081,8082,8083 or --ports=8080-8090")
+		description="List of ports to assign to peers. If not specified, will attempt to find available ports."
+			+ "e.g. --ports=8081,8082,8083 ")
 	private String[] ports;
 
 	@Option(names={"--api-port"},
 		defaultValue = "8080",
-		description="REST API port, if set enable REST API to a peer in the local cluster")
+		description="REST API port, enables REST API to the first peer in the local cluster. Default: ${DEFAULT-VALUE}")
 	private int apiPort;
 
     /**
      * Gets n public keys for local test cluster
-     * @param n Number of public keys
+     * @param count Number of public keys
      * @return List of distinct public keys
      */
-    private List<AKeyPair> getPeerKeyPairs(int n) {
+    private List<AKeyPair> getPeerKeyPairs(int count) {
     	ArrayList<AKeyPair> keyPairList = new ArrayList<AKeyPair>();
       
 		// load in the list of public keys to use as peers
@@ -85,7 +86,7 @@ public class LocalStart extends ALocalCommand {
 				}
 			}
 		}
-		int left=n-keyPairList.size();
+		int left=count-keyPairList.size();
 		if (left>0) {
 			informWarning("Insufficient key pairs specified. Additional "+left+" keypair(s) will be generated");
 			for (int i=0; i<left; i++) {
@@ -102,27 +103,33 @@ public class LocalStart extends ALocalCommand {
 		return new ArrayList<AKeyPair>(keyPairList);
     }
     
-	@Override
-	public void run() {
-		List<AKeyPair> keyPairList = getPeerKeyPairs(count);
-
-		int peerPorts[] = null;
+    /**
+     * Gets array of ports to assign to peers
+     * @return
+     */
+	private int[] getPeerPorts() {
+		int peerPorts[]=null;
 		if (ports != null) {
 			try {
 				peerPorts = Helpers.getPortList(ports, count);
-			} catch (NumberFormatException e) {
-				informWarning("Cannot convert port number " + e);
-				return;
+			} catch (Exception e) {
+				throw new CLIError(ExitCodes.DATAERR,"Failed to parse port list",e);
 			}
 			if (peerPorts.length < count) {
-				log.warn("Only {} ports specified for {} peers", peerPorts.length, count);
-				return;
+				log.debug("Only {} ports specified for {} peers", peerPorts.length, count);
 			}
 		}
-		log.info("Starting local test network with "+count+" peer(s)");
+		return peerPorts;
+	}
+    
+	@Override
+	public void run() {
+		List<AKeyPair> keyPairList = getPeerKeyPairs(count);
+		int peerPorts[] = getPeerPorts();
+		
+		inform("Starting local test network with "+count+" peer(s)");
 		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
 		int n=servers.size();
-		log.debug("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
 		
 		try {
 			if (apiPort > 0) {
@@ -132,6 +139,8 @@ public class LocalStart extends ALocalCommand {
 		} catch (Throwable t) {
 			informWarning("Failed to start REST server: "+t);
 		}
+		
+		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
 		
 		// Loop until we end
 		while (true) {
@@ -143,6 +152,8 @@ public class LocalStart extends ALocalCommand {
 		}
 	}
 	
+
+
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 

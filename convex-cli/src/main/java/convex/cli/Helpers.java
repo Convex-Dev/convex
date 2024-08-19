@@ -80,7 +80,7 @@ public class Helpers {
 		
 	}
 	
-	public static int[] getPortList(String ports[], int count) throws NumberFormatException {
+	public static int[] getPortList(String ports[], int count)  {
 		Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
 		List<String> portTextList = Helpers.splitArrayParameter(ports);
 		List<Integer> portList = new ArrayList<Integer>();
@@ -98,9 +98,9 @@ public class Helpers {
 					portList.add(portIndex);
 				}
 			}
-			else if (item.strip().length() == 0) {
-			}
-			else {
+			else if (item.isBlank()) {
+				// just skip
+			} else {
 				portList.add(Integer.parseInt(item));
 				countLeft --;
 			}
