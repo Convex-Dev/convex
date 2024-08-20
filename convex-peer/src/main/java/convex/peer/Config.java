@@ -2,10 +2,13 @@ package convex.peer;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
 import java.util.HashMap;
 import java.util.Map;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.PFXTools;
 import convex.core.data.AString;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
@@ -95,7 +98,7 @@ public class Config {
 
 	/**
 	 * Checks if the config specifies a valid store
-	 * @param config Configuration map fpr peer
+	 * @param config Configuration map for peer
 	 * @return Store specified in Config, or null if not specified
 	 */
 	@SuppressWarnings("unchecked")
@@ -118,6 +121,56 @@ public class Config {
 		return null;
 	}
 	
+	/**
+	 * Checks if the config specifies a valid keystore
+	 * @param config Configuration map for peer
+	 * @return Keystore specified in Config, or null if not specified
+	 */
+	public static KeyStore checkKeyStore(Map<Keyword, Object> config) {
+		Object o=config.get(Keywords.KEYSTORE);
+		if (o==null) return null;
+		if (o instanceof KeyStore) return (KeyStore)o;
+		
+		if ((o instanceof String)||(o instanceof AString)) {
+			String fname=o.toString();
+			File f=FileUtils.getFile(fname);
+			if (f.exists()) {
+				try {
+					char[] pass=Config.checkPass(config,Keywords.STOREPASS);
+					KeyStore ks=PFXTools.loadStore(f, pass);
+					return ks;
+				} catch (GeneralSecurityException e) {
+					throw new ConfigException("Security error loading keystore "+fname,e);
+				} catch (IOException e) {
+					throw new ConfigException("IO Error loading keystore "+fname,e);
+				}
+			} else {
+				throw new ConfigException("Specified keystore "+fname+" does not exist");
+			}
+		}
+		throw new ConfigException("Unexpected type for keystore : "+Utils.getClassName(o));
+	}
+	
+	/**
+	 * Gets a password from the config
+	 * @param config Config map to check
+	 * @param key
+	 * @return Password, or null if unspecified
+	 */
+	private static char[] checkPass(Map<Keyword, Object> config, Keyword key) {
+		Object po=config.get(key);
+		if (po==null) return null;
+		if (po instanceof char[]) {
+			return (char[]) po;
+		}
+		if (po instanceof String) {
+			char[] cs=((String)po).toCharArray();
+			config.put(key, cs);
+			return cs;
+		}
+		throw new ConfigException("Unexpected type for password "+key+" : "+Utils.getClassName(po));
+	}
+
 	/**
 	 * Establishes a store in the given config
 	 * @param config Configuration map fpr peer (may be modified)

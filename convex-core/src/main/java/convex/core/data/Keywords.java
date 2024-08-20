@@ -131,6 +131,11 @@ public class Keywords {
 	public static final Keyword HISTORY = Keyword.create("history");
 	public static final Keyword ORDER = Keyword.create("order");
 	
+	// key store stuff
+	public static final Keyword KEYSTORE = Keyword.create("keystore");
+	public static final Keyword STOREPASS = Keyword.create("storepass");
+
+	
 	public static final Keyword MIN_BLOCK_TIME = Keyword.create("min-block-time");
 	
 	// Commond trust keys

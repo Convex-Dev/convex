@@ -64,6 +64,7 @@ public class API {
 	
 		// These are sanity checks before we have a store
 		Config.ensureFlags(config);
+		Config.checkKeyStore(config);
 		
 		AStore tempStore=Stores.current();
 		try {
