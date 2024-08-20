@@ -41,7 +41,8 @@ public class API {
 	 * <ul>
 	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
 	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Zero causes random allocation (also the default).
-	 * <li>:store (optional, AStore) - AStore instance. Defaults to the configured global store
+	 * <li>:store (optional, AStore or String filename) - AStore instance. Defaults to the configured global store
+	 * <li>:keystore (optional, string or string filename) - AStore instance. Defaults to the configured global store
 	 * <li>:source (optional, String) - URL for Peer to replicate initial State/Belief from.
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
@@ -60,7 +61,7 @@ public class API {
 	
 		AStore tempStore=Stores.current();
 		try {
-			// Configure the store and use on this thread
+			// Configure the store and use on this thread during launch
 			AStore store=Config.ensureStore(config);
 			Stores.setCurrent(store);
 
@@ -72,7 +73,7 @@ public class API {
 				throw new IllegalArgumentException("Peer launch requires a genesis :state, remote :source or existing :store in config");
 			}
 
-			if (!config.containsKey(Keywords.KEYPAIR)) throw new ConfigException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
+			Config.ensurePeerKey(config);
 	
 			Config.ensureFlags(config);
 

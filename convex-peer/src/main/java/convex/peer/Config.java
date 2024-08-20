@@ -2,14 +2,17 @@ package convex.peer;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.AString;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.store.AStore;
 import convex.core.util.FileUtils;
+import convex.core.util.Utils;
 import etch.EtchStore;
 
 /**
@@ -95,16 +98,17 @@ public class Config {
 	 * @param config Configuration map fpr peer
 	 * @return Store specified in Config, or null if not specified
 	 */
-	public static AStore checkStore(Map<Keyword, Object> config) {
+	@SuppressWarnings("unchecked")
+	public static <T extends AStore> T checkStore(Map<Keyword, Object> config) {
 		Object o=config.get(Keywords.STORE);
-		if (o instanceof AStore) return (AStore)o;
+		if (o instanceof AStore) return (T)o;
 		
 		if ((o instanceof String)||(o instanceof AString)) {
 			String fname=o.toString();
 			File f=FileUtils.getFile(fname);
 			if (f.exists()) {
 				try {
-					return EtchStore.create(f);
+					return (T) EtchStore.create(f);
 				} catch (IOException e) {
 					return null;
 				}
@@ -119,11 +123,12 @@ public class Config {
 	 * @param config Configuration map fpr peer (may be modified)
 	 * @return Store specified in Config under :store
 	 */
-	public static AStore ensureStore(Map<Keyword, Object> config) {
-		AStore store=checkStore(config);
+	@SuppressWarnings("unchecked")
+	public static  <T extends AStore> T ensureStore(Map<Keyword, Object> config) {
+		T store=checkStore(config);
 		if (store!=null) return store;
 		
-		store=EtchStore.createTemp("defaultPeerStore");
+		store=(T) EtchStore.createTemp("defaultPeerStore");
 		config.put(Keywords.STORE, store);
 		return store;
 	}
@@ -141,6 +146,24 @@ public class Config {
 		// Port defaults to null, which uses default port if available or picks a random port 
 		if (!config.containsKey(Keywords.PORT)) {
 			config.put(Keywords.PORT, null);
+		}
+	}
+
+	/**
+	 * Ensures we have a hot peer :keypair set in config
+	 * 
+	 * @param config Configuration map for peer (may be modified)
+	 */
+	public static AKeyPair ensurePeerKey(HashMap<Keyword, Object> config) {
+		Object o=config.get(Keywords.KEYPAIR);
+		if (o!=null) {
+			if (o instanceof AKeyPair) {
+				AKeyPair kp= (AKeyPair)o;
+				return kp;
+			}
+			throw new ConfigException("Invalid type of :keypair - expected AKeyPair, got "+Utils.getClassName(o));
+		} else {
+			throw new ConfigException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
 		}
 	}
 
