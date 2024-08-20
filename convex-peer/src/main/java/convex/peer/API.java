@@ -42,7 +42,8 @@ public class API {
 	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
 	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Zero causes random allocation (also the default).
 	 * <li>:store (optional, AStore or String filename) - AStore instance. Defaults to the configured global store
-	 * <li>:keystore (optional, string or string filename) - AStore instance. Defaults to the configured global store
+	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Used for key lookup if necessary
+	 * <li>:storepass (optional, string) - Integrity password for keystore. If omitted, no integrity check is performed
 	 * <li>:source (optional, String) - URL for Peer to replicate initial State/Belief from.
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
@@ -52,30 +53,28 @@ public class API {
      * <li>:bind-address (optional String) - IP address of the ethernet device to bind too. For public peers set too 0.0.0.0. Default to 127.0.0.1.
 	 * </ul>
 	 *
-	 * @param peerConfig Config map for the new Peer
+	 * @param peerConfig Configuration map for the new Peer
      *
-	 * @return New Server instance
+	 * @return New peer Server instance
+	 * @throws ConfigException if configuration is invalid
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
+		// clone the config, we don't want to change the input. Can use getConfig() on Server to see final result.
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 	
+		// These are sanity checks before we have a store
+		Config.ensureFlags(config);
+		Config.ensureGenesisState(config);
+		
 		AStore tempStore=Stores.current();
 		try {
 			// Configure the store and use on this thread during launch
 			AStore store=Config.ensureStore(config);
 			Stores.setCurrent(store);
 
-			// State not strictly necessary? Should be possible to restore a Peer from store
-			if (!(config.containsKey(Keywords.STATE)
-					||config.containsKey(Keywords.STORE)
-					||config.containsKey(Keywords.SOURCE)
-					)) {
-				throw new IllegalArgumentException("Peer launch requires a genesis :state, remote :source or existing :store in config");
-			}
-
-			Config.ensurePeerKey(config);
 	
-			Config.ensureFlags(config);
+
+			Config.ensurePeerKey(config);	
 
 			// if URL is set and it is not a local address and no BIND_ADDRESS is set, then the default for BIND_ADDRESS will be 0.0.0.0
 			if (config.containsKey(Keywords.URL) && !config.containsKey(Keywords.BIND_ADDRESS)) {

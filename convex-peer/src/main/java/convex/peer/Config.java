@@ -167,4 +167,18 @@ public class Config {
 		}
 	}
 
+	/**
+	 * Checks that the config specifies a source for the genesis state
+	 * @param config
+	 */
+	public static void ensureGenesisState(HashMap<Keyword, Object> config) {
+		
+		if (!(config.containsKey(Keywords.STATE)
+				||config.containsKey(Keywords.STORE)
+				||config.containsKey(Keywords.SOURCE)
+				)) {
+			throw new ConfigException("Peer launch requires a genesis :state, remote :source or existing :store in config");
+		}
+	}
+
 }

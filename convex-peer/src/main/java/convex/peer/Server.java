@@ -187,10 +187,11 @@ public class Server implements Closeable {
 	private Peer establishPeer() throws TimeoutException, IOException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
 		try {
-			AKeyPair keyPair = (AKeyPair) getConfig().get(Keywords.KEYPAIR);
+			AKeyPair keyPair = Config.ensurePeerKey(config);
 			if (keyPair==null) {
 				log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
 				keyPair=AKeyPair.generate();
+				config.put(Keywords.KEYPAIR,keyPair);
 				log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
 			}
 
@@ -198,7 +199,7 @@ public class Server implements Closeable {
 			Object source=getConfig().get(Keywords.SOURCE);
 			if (Utils.bool(source)) {
 				InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
-				if (sourceAddr==null) throw new IllegalStateException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
+				if (sourceAddr==null) throw new ConfigException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
 				return syncPeer(keyPair,sourceAddr);
 
 			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
