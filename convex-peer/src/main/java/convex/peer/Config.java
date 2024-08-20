@@ -196,7 +196,7 @@ public class Config {
 		if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
 		if (!config.containsKey(Keywords.AUTO_MANAGE)) config.put(Keywords.AUTO_MANAGE, true);
 		
-		// Port defaults to null, which uses default port if available or picks a random port 
+		// Port defaults to null, which uses default port if available or picks a random port (behaviour of 0)
 		if (!config.containsKey(Keywords.PORT)) {
 			config.put(Keywords.PORT, null);
 		}

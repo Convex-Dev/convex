@@ -42,7 +42,7 @@ public class API {
 	 * <li>:keypair (required, AKeyPair) - AKeyPair instance.
 	 * <li>:port (optional, Integer) - Integer port number to use for incoming connections. Zero causes random allocation (also the default).
 	 * <li>:store (optional, AStore or String filename) - AStore instance. Defaults to the configured global store
-	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Used for key lookup if necessary
+	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Read only, used for key lookup if necessary.
 	 * <li>:storepass (optional, string) - Integrity password for keystore. If omitted, no integrity check is performed
 	 * <li>:source (optional, String) - URL for Peer to replicate initial State/Belief from.
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
@@ -73,9 +73,7 @@ public class API {
 			Stores.setCurrent(store);
 
 			Config.ensurePeerKey(config);	
-
 			Config.ensureGenesisState(config);
-
 			
 			// if URL is set and it is not a local address and no BIND_ADDRESS is set, then the default for BIND_ADDRESS will be 0.0.0.0
 			if (config.containsKey(Keywords.URL) && !config.containsKey(Keywords.BIND_ADDRESS)) {
