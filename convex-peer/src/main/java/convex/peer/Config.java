@@ -181,4 +181,21 @@ public class Config {
 		}
 	}
 
+	/**
+	 * Build a Config map
+	 * @param kvs key/value arguments
+	 * @return Config map
+	 */
+	public static HashMap<Keyword, Object> of(Object... kvs) {
+		int n=kvs.length;
+		if ((n%2)!=0) throw new IllegalArgumentException("Needs even number of args (key / value pairs)");
+		HashMap<Keyword,Object> hm=new HashMap<>(n/2);
+		for (int i=0; i<n; i+=2) {
+			Keyword k=(Keyword)kvs[i];
+			Object o=kvs[i+1];
+			hm.put(k, o);
+		}
+		return hm;
+	}
+
 }

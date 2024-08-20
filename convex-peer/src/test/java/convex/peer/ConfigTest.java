@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +44,17 @@ public class ConfigTest {
 	@Test public void testNullLaunch() {
 		assertThrows(ConfigException.class,()->API.launchPeer(new HashMap<>()));
 		assertThrows(NullPointerException.class,()->API.launchPeer(null));
+	}
+	
+	@Test public void testMinimalLaunch() {
+		AKeyPair kp=AKeyPair.generate();
+		
+		{ // just a peer keypair
+			Map<Keyword,Object> config=Config.of(Keywords.KEYPAIR,kp);
+			Server s=API.launchPeer(config);
+			assertSame(kp,s.getKeyPair());
+			s.close();
+		}
 	}
 
 }

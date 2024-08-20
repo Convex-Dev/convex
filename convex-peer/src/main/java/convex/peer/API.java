@@ -64,7 +64,6 @@ public class API {
 	
 		// These are sanity checks before we have a store
 		Config.ensureFlags(config);
-		Config.ensureGenesisState(config);
 		
 		AStore tempStore=Stores.current();
 		try {
@@ -72,10 +71,11 @@ public class API {
 			AStore store=Config.ensureStore(config);
 			Stores.setCurrent(store);
 
-	
-
 			Config.ensurePeerKey(config);	
 
+			Config.ensureGenesisState(config);
+
+			
 			// if URL is set and it is not a local address and no BIND_ADDRESS is set, then the default for BIND_ADDRESS will be 0.0.0.0
 			if (config.containsKey(Keywords.URL) && !config.containsKey(Keywords.BIND_ADDRESS)) {
 				InetAddress ip = InetAddress.getByName((String) config.get(Keywords.URL));
