@@ -1,6 +1,16 @@
 package convex.peer;
 
+import java.io.File;
+import java.io.IOException;
+import java.util.Map;
+
+import convex.core.data.AString;
 import convex.core.data.Format;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
+import convex.core.store.AStore;
+import convex.core.util.FileUtils;
+import etch.EtchStore;
 
 /**
  * Static tools and utilities for Peer configuration
@@ -79,5 +89,59 @@ public class Config {
 	 * Size of incoming Belief queue
 	 */
 	public static final int BELIEF_QUEUE_SIZE = 200;
+
+	/**
+	 * Checks if the config specifies a valid store
+	 * @param config Configuration map fpr peer
+	 * @return Store specified in Config, or null if not specified
+	 */
+	public static AStore checkStore(Map<Keyword, Object> config) {
+		Object o=config.get(Keywords.STORE);
+		if (o instanceof AStore) return (AStore)o;
+		
+		if ((o instanceof String)||(o instanceof AString)) {
+			String fname=o.toString();
+			File f=FileUtils.getFile(fname);
+			if (f.exists()) {
+				try {
+					return EtchStore.create(f);
+				} catch (IOException e) {
+					return null;
+				}
+			}
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * Establishes a store in the given config
+	 * @param config Configuration map fpr peer (may be modified)
+	 * @return Store specified in Config under :store
+	 */
+	public static AStore ensureStore(Map<Keyword, Object> config) {
+		AStore store=checkStore(config);
+		if (store!=null) return store;
+		
+		store=EtchStore.createTemp("defaultPeerStore");
+		config.put(Keywords.STORE, store);
+		return store;
+	}
+	
+	/**
+	 * Ensures standard flags are set to defaults(if not specified).
+	 * 
+	 * @param config Configuration map for peer (may be modified)
+	 */
+	public static void ensureFlags(Map<Keyword, Object> config) {
+		if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
+		if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
+		if (!config.containsKey(Keywords.AUTO_MANAGE)) config.put(Keywords.AUTO_MANAGE, true);
+		
+		// Port defaults to null, which uses default port if available or picks a random port 
+		if (!config.containsKey(Keywords.PORT)) {
+			config.put(Keywords.PORT, null);
+		}
+	}
 
 }

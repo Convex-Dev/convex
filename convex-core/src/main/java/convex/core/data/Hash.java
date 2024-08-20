@@ -2,8 +2,6 @@ package convex.core.data;
 
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
-import convex.core.data.type.AType;
-import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -27,11 +25,6 @@ public class Hash extends AArrayBlob {
 	 */
 	public static final int LENGTH = Constants.HASH_LENGTH;
 	
-	/**
-	 * Type of Hash values is just a regular Blob
-	 */
-	public static final AType TYPE = Types.BLOB;
-
 	private Hash(byte[] hashBytes, int offset) {
 		super(hashBytes, offset, LENGTH);
 		this.memorySize=0;

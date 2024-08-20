@@ -9,10 +9,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -20,7 +18,6 @@ import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
-import etch.EtchStore;
 
 
 /**
@@ -60,38 +57,24 @@ public class API {
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
-
-		// State not strictly necessary? Should be possible to restore a Peer from store
-		if (!(config.containsKey(Keywords.STATE)
-				||config.containsKey(Keywords.STORE)
-				||config.containsKey(Keywords.SOURCE)
-				)) {
-			throw new IllegalArgumentException("Peer launch requires a genesis :state, remote :source or existing :store in config");
-		}
-
-		if (!config.containsKey(Keywords.KEYPAIR)) throw new IllegalArgumentException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
-
+	
 		AStore tempStore=Stores.current();
 		try {
-			// Port defaults to null, which uses default port if available or picks a random port 
-			if (!config.containsKey(Keywords.PORT)) {
-				config.put(Keywords.PORT, null);
-			}
-			
 			// Configure the store and use on this thread
-			AStore store;
-			if (config.containsKey(Keywords.STORE)) {
-				store=(AStore)config.get(Keywords.STORE);
-			} else {
-				store=EtchStore.createTemp("defaultPeerStore");
-				//config.put(Keywords.STORE, tempStore);
-				config.put(Keywords.STORE, store);
-			}
+			AStore store=Config.ensureStore(config);
 			Stores.setCurrent(store);
-			
-			if (!config.containsKey(Keywords.RESTORE)) config.put(Keywords.RESTORE, true);
-			if (!config.containsKey(Keywords.PERSIST)) config.put(Keywords.PERSIST, true);
-			if (!config.containsKey(Keywords.AUTO_MANAGE)) config.put(Keywords.AUTO_MANAGE, true);
+
+			// State not strictly necessary? Should be possible to restore a Peer from store
+			if (!(config.containsKey(Keywords.STATE)
+					||config.containsKey(Keywords.STORE)
+					||config.containsKey(Keywords.SOURCE)
+					)) {
+				throw new IllegalArgumentException("Peer launch requires a genesis :state, remote :source or existing :store in config");
+			}
+
+			if (!config.containsKey(Keywords.KEYPAIR)) throw new ConfigException("Peer launch requires a "+Keywords.KEYPAIR+" in config");
+	
+			Config.ensureFlags(config);
 
 			// if URL is set and it is not a local address and no BIND_ADDRESS is set, then the default for BIND_ADDRESS will be 0.0.0.0
 			if (config.containsKey(Keywords.URL) && !config.containsKey(Keywords.BIND_ADDRESS)) {
@@ -202,47 +185,6 @@ public class API {
 			server.setHostname("localhost:"+server.getPort());
 		}
 
-		// wait for the peers to sync upto 10 seconds
-		//API.waitForNetworkReady(serverList, 10);
 		return serverList;
 	}
-
-	/**
-	 * Returns a true value if the local network is ready and synced with the same consensus state hash.
-	 *
-	 * @param serverList List of local peer servers running on the local network.
-	 *
-	 * @param timeoutMillis Number of milliseconds to wait before exiting with a failure.
-	 *
-	 * @return Return true if all server peers have the same consensus hash, else false is a timeout.
-	 *
-	 */
-	public static boolean isNetworkReady(List<Server> serverList, long timeoutMillis) {
-		boolean isReady = false;
-		long timeoutTime = Utils.getTimeMillis() + timeoutMillis;
-		while (timeoutTime > Utils.getTimeMillis()) {
-			isReady = true;
-			Hash consensusHash = null;
-			for (Server server: serverList) {
-				Peer peer = server.getPeer();
-				if (consensusHash == null) {
-					consensusHash = peer.getConsensusState().getHash();
-				}
-				if (!consensusHash.equals(peer.getConsensusState().getHash())) {
-					isReady=false;
-				}
-			}
-			if (isReady) {
-				break;
-			}
-			try {
-				Thread.sleep(100);
-			} catch ( InterruptedException e) {
-				return false;
-			}
-		}
-		return isReady;
-    }
-
-
 }
