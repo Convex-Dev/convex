@@ -1,8 +1,5 @@
 package convex.cli.mixins;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
@@ -20,12 +17,13 @@ public class KeyMixin extends AMixin {
 			description = "Key pair password in keystore. Can specify with CONVEX_KEY_PASSWORD.")
 	protected char[] keyPassword;
 
+	/**
+	 * Gets the key specified on the CLI with --key
+	 * @return
+	 */
 	public String getPublicKey() {
 		return publicKey;
 	}
-
-	
-	static Logger log = LoggerFactory.getLogger(KeyMixin.class);
 
 	/**
 	 * Gets the password for the current key. Prompts for missing password in interactive mode.

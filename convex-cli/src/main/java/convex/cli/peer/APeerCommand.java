@@ -41,11 +41,12 @@ public abstract class APeerCommand extends ACommand {
 	}
 	
 	/**
-	 * Get the keypair for the peer. Always returns a valid key pair, may generate one.
+	 * Get the keypair for the peer. May return null if not specified
 	 */
-	protected AKeyPair ensurePeerKey() {
+	protected AKeyPair checkPeerKey() {
 		String peerPublicKey=peerKeyMixin.getPublicKey();
 		if (peerPublicKey==null) {
+			paranoia("You must specify a --peer-key for the peer");
 			if (!isInteractive()) {
 				throw new CLIError(ExitCodes.USAGE,"--peer-key must be specified in non-interactive mode");
 			} else {
@@ -53,12 +54,13 @@ public abstract class APeerCommand extends ACommand {
 				if (shouldGenerate) {
 					AKeyPair kp=AKeyPair.generate();
 					inform("Generated peer key: "+kp.getAccountKey().toChecksumHex());
+					inform("Generated peer seed: "+kp.getSeed());
 					char[] keyPass=peerKeyMixin.getKeyPassword();
 					storeMixin.addKeyPairToStore(kp, keyPass);
 					storeMixin.saveKeyStore();
 					return kp;
 				} else {
-					throw new CLIError("Opertation cancelled");
+					throw new CLIError("Operation cancelled");
 				}
 			}
 		} else {
@@ -73,17 +75,15 @@ public abstract class APeerCommand extends ACommand {
 	 * Get the keypair for the peer controller account
 	 */
 	protected AKeyPair ensureControllerKey() {
-		String peerPublicKey=keyMixin.getPublicKey();
-		if (peerPublicKey==null) {
-			if (!isInteractive()) {
-				throw new CLIError(ExitCodes.USAGE,"--key for controller must be specified in non-interactive mode");
-			} 
-			peerPublicKey=keyMixin.getPublicKey();
+		String controllerKey=keyMixin.getPublicKey();
+		if (controllerKey==null) {
+			paranoia("You must specify a --key for the peer controller");
+			return null;
 		}
 		
 		char[] keyPass=keyMixin.getKeyPassword();
 		
-		AKeyPair result=storeMixin.loadKeyFromStore(peerPublicKey, keyPass);
+		AKeyPair result=storeMixin.loadKeyFromStore(controllerKey, keyPass);
 		if (result==null) throw new CLIError("Peer controller key not found in store");
 		return result;
 	}

@@ -3,20 +3,30 @@ package convex.cli.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.concurrent.TimeoutException;
 
 import org.junit.jupiter.api.Test;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
 import convex.cli.Helpers;
+import convex.core.crypto.AKeyPair;
+import convex.core.crypto.BIP39;
 import convex.core.crypto.PFXTools;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.util.Utils;
+import convex.peer.API;
+import convex.peer.Server;
 
 public class GenesisTest {
 	private static final char[] KEYSTORE_PASSWORD = "genesisStorePassword".toCharArray();
 	private static final char[] KEY_PASSWORD = "genesisKeyPassword".toCharArray();
 
 	private static final File TEMP_FILE;
+	private static final File TEMP_ETCH;
 	private static final String KEYSTORE_FILENAME;
 	
 	private static final String bip39="miracle source lizard gun neutral year dust recycle drama nephew infant enforce";
@@ -27,15 +37,16 @@ public class GenesisTest {
 	static {
 		try {
 			TEMP_FILE=Helpers.createTempFile("tempGenesisKeystore", ".pfx");
+			TEMP_ETCH=Helpers.createTempFile("tempEtxhDatabase", ".db");
 			PFXTools.createStore(TEMP_FILE, KEYSTORE_PASSWORD);
 			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			throw Utils.sneakyThrow(t);
 		} 
 		
 	}
 
-	@Test public void testGenesisPeer() {
+	@Test public void testGenesisPeer() throws IOException, TimeoutException {
 		CLTester importTester =  CLTester.run(
 				"key", 
 				"import",
@@ -53,11 +64,21 @@ public class GenesisTest {
 				"peer", "genesis", "-n",
 				"--peer-key", expectedKey,
 				"--peer-keypass", new String(KEY_PASSWORD),
+				"--etch", TEMP_ETCH.getCanonicalPath(), 
 				"--key", expectedKey,
 				"--keypass", new String(KEY_PASSWORD),
-				"--storepass", new String(KEYSTORE_PASSWORD),
 				"--keystore", KEYSTORE_FILENAME
 		);
 		tester.assertExitCode(ExitCodes.SUCCESS);
+		
+		AKeyPair kp=BIP39.seedToKeyPair(BIP39.getSeed(bip39, bipPassphrase));
+		assertEquals(expectedKey,kp.getAccountKey().toHexString());
+		
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.STORE, TEMP_ETCH);
+		config.put(Keywords.KEYPAIR, kp);
+		Server s=API.launchPeer(config); 
+		assertEquals(expectedKey,s.getPeerKey() .toHexString());
+		s.shutdown();
 	}
 }

@@ -1,7 +1,6 @@
 package convex.cli;
 
 import java.io.Console;
-import java.io.IOException;
 
 import convex.cli.output.Coloured;
 import convex.cli.output.RecordOutput;
@@ -124,10 +123,9 @@ public abstract class ACommand implements Runnable {
 		try {
 			if (isColoured()) string=Coloured.blue(string);
 			inform(0,string);
-			char c=(char)System.in.read(); // Doesn't work because console is not in non-blocking mode?
-			if (c==-1) throw new CLIError("Unexpected end of input stream when expecting a keypress");
-			if (Character.toLowerCase(c)=='y') return true;
-		} catch (IOException e) {
+			String resp=System.console().readLine().trim(); // Doesn't work because console is not in non-blocking mode?
+			if (!resp.isBlank()&&Character.toLowerCase(resp.charAt(0))=='y') return true;
+		} catch (Exception e) {
 			throw new CLIError("Unexpected error getting console input: "+e);
 		}
 		return false;
