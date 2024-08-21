@@ -36,10 +36,6 @@ public class KeyMixin extends AMixin {
 		if (isInteractive()) {
 			keyPassword = readPassword("Private Key Encryption Password: ");
 		}
-		
-		if (keyPassword.length == 0) {
-			paranoia("Cannot use an empty password in --strict-security mode");
-		}
 		return keyPassword;
 	}
 }

@@ -49,38 +49,49 @@ public class PeerGenesis extends APeerCommand {
 		// Key for controller. Used for genesis / governance in non-strict mode
 		// Otherwise peer key can be used
 		AKeyPair genesisKey = ensureControllerKey();
-
-		// Key for initial peer. Needed for genesis start
-		AKeyPair peerKey = checkPeerKey();
-		if (peerKey==null) {
-			paranoia("--peer-key must be specified in strict mode");
-			peerKey=genesisKey;
-			inform("Using genesis key for first peer: "+genesisKey.getAccountKey());
+		if (genesisKey==null) {
+			informWarning("You must specify at least a genesis --key");
+			showUsage();
+			return;
 		}
 		
-		AccountKey govKey=AccountKey.parse(governanceKey);
-		if (govKey==null) {
-			paranoia("--governance-key must be specified in strict security mode");
-			if (governanceKey==null) {
-				inform("Using genesis key for governance: "+genesisKey.getAccountKey());
-				govKey=genesisKey.getAccountKey();
-			} else {
-				throw new CLIError(ExitCodes.DATAERR,"Unable to parse --governance-key argument. Should be a 32-byte hex key.");
+		EtchStore etch=etchMixin.getEtchStore();
+		try {
+
+			// Key for initial peer. Needed for genesis start
+			AKeyPair peerKey = checkPeerKey();
+			if (peerKey==null) {
+				paranoia("--peer-key must be specified in strict mode");
+				peerKey=genesisKey;
+				inform("Using genesis key for first peer: "+genesisKey.getAccountKey());
 			}
+			
+			AccountKey govKey=AccountKey.parse(governanceKey);
+			if (govKey==null) {
+				paranoia("--governance-key must be specified in strict security mode");
+				if (governanceKey==null) {
+					inform("Using genesis key for governance: "+genesisKey.getAccountKey());
+					govKey=genesisKey.getAccountKey();
+				} else {
+					throw new CLIError(ExitCodes.DATAERR,"Unable to parse --governance-key argument. Should be a 32-byte hex key.");
+				}
+			}
+	
+			EtchStore store=getEtchStore();
+			
+			State genesisState=Init.createState(govKey,genesisKey.getAccountKey(),List.of(peerKey.getAccountKey()));
+			inform("Created genesis state with hash: "+genesisState.getHash());
+			
+			inform("Testing genesis state peer initialisation");
+			HashMap<Keyword,Object> config=new HashMap<>();
+			config.put(Keywords.STORE, store);
+			config.put(Keywords.STATE, genesisState);
+			config.put(Keywords.KEYPAIR, peerKey);
+			Server s=API.launchPeer(config); 
+			s.close();
+			informSuccess("Convex genesis succeeded!");
+		} finally {
+			etch.close();
 		}
-
-		EtchStore store=getEtchStore();
-		
-		State genesisState=Init.createState(govKey,genesisKey.getAccountKey(),List.of(peerKey.getAccountKey()));
-		inform("Created genesis state with hash: "+genesisState.getHash());
-		
-		inform("Testing genesis state peer initialisation");
-		HashMap<Keyword,Object> config=new HashMap<>();
-		config.put(Keywords.STORE, store);
-		config.put(Keywords.STATE, genesisState);
-		config.put(Keywords.KEYPAIR, peerKey);
-		Server s=API.launchPeer(config); 
-		s.close();
-		informSuccess("Convex genesis succeeded!");
 	}
 }

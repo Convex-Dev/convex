@@ -18,7 +18,11 @@ public class EtchMixin extends AMixin {
 			description="Convex Etch database filename. Will default to CONVEX_ETCH_FILE or "+Constants.ETCH_FILENAME)
 	String etchStoreFilename;
 	
-	public EtchStore getEtchStore(String fileName) {
+	EtchStore etch=null;
+	
+	public synchronized EtchStore getEtchStore(String fileName) {
+		if (etch!=null) return etch;
+		
 		if (fileName == null) {
 			throw new CLIError(
 					"No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
@@ -27,8 +31,8 @@ public class EtchMixin extends AMixin {
 		File etchFile = FileUtils.getFile(fileName);
 
 		try {
-			EtchStore store = EtchStore.create(etchFile);
-			return store;
+			etch = EtchStore.create(etchFile);
+			return etch;
 		} catch (IOException e) {
 			throw new CLIError("Unable to load Etch store at: " + etchFile + " cause: " + e.getMessage());
 		}
