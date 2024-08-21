@@ -225,13 +225,13 @@ public class Main extends ACommand {
 
 	public void setOut(String outFile) {
 		if (outFile == null || outFile.equals("-")) {
-			log.trace("Setting output to STDOUT");
+			log.debug("Setting output to STDOUT");
 			commandLine.setOut(new PrintWriter(System.out));
 		} else {
 			File file = new File(outFile);
 			try {
 				file = FileUtils.ensureFilePath(file);
-				log.trace("Setting output to "+file);
+				log.debug("Setting output to "+file);
 				PrintWriter pw = new PrintWriter(file);
 				commandLine.setOut(pw);
 			} catch (IOException e) {

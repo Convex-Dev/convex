@@ -19,6 +19,7 @@ import picocli.CommandLine.ScopeType;
 	subcommands = {
 		PeerCreate.class,
 		PeerStart.class,
+		PeerList.class,
 		PeerGenesis.class,
 		CommandLine.HelpCommand.class
 	},

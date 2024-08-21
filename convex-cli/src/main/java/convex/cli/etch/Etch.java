@@ -17,6 +17,7 @@ import picocli.CommandLine.Command;
 		EtchInfo.class,
 		EtchRead.class,
 		EtchWrite.class,
+		EtchClear.class,
 		EtchValidate.class,
 		CommandLine.HelpCommand.class
 	},
@@ -26,8 +27,7 @@ public class Etch extends ATopCommand {
 
 	@Override
 	public void run() {
-		// sub command run with no command provided
-		CommandLine.usage(new Etch(), System.out);
+		showUsage();
 	}
 
 }

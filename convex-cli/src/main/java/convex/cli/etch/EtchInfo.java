@@ -29,16 +29,19 @@ public class EtchInfo extends AEtchCommand{
 		
 			EtchStore store=store();
 			etch.Etch etch=store.getEtch();
-			println("Etch file:        "+store.getFileName());
+			println("Etch file:          "+store.getFile().getCanonicalPath());
 			
-			println("Etch version:     0x"+Utils.toHexString(etch.getVersion()));
-			println("Data length:      "+Text.toFriendlyNumber(etch.getDataLength()));
+			println("Etch version:       0x"+Utils.toHexString(etch.getVersion()));
+			println("Data length:        "+Text.toFriendlyNumber(etch.getDataLength()));
 			
-			println("Data root:        "+etch.getRootHash());
+			println("Data root:          "+etch.getRootHash());
 			try {
 				ACell root=store.getRootData();
-				println("Root memory size: "+root.getMemorySize());
-				println("Root data type:   "+RT.getType(root));
+				println("Root memory size:   "+Text.toFriendlyNumber(ACell.getMemorySize(root)));
+				println("Root data type:     "+RT.getType(root));
+				
+				Long n=RT.count(root);
+				if (n!=null) println("Root element count: "+n);
 			} catch (MissingDataException e) {
 				println("Root data missing");
 			}

@@ -289,8 +289,8 @@ public class EtchStore extends ACachedStore {
 	@Override
 	public <T extends ACell> Ref<T> setRootData(T data) throws IOException {
 		// Ensure data if persisted at sufficient level
-		Ref<T> ref = storeTopRef(data.getRef(), Ref.PERSISTED, null);
-		Hash h = ref.getHash();
+		Ref<T> ref = storeTopRef(Ref.get(data), Ref.PERSISTED, null);
+		Hash h = Hash.get(data);
 		Etch etch = getWriteEtch();
 		etch.setRootHash(h);
 		etch.writeDataLength(); // ensure data length updated for root data addition
