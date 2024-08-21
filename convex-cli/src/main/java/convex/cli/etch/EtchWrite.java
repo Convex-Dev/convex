@@ -1,6 +1,7 @@
 package convex.cli.etch;
 
 import convex.core.data.ACell;
+import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.lang.Reader;
 import etch.EtchStore;
@@ -25,10 +26,16 @@ public class EtchWrite extends AEtchCommand{
 		}
 		
 		EtchStore store=store();
-		ACell cell=Reader.read(cvxData);
-		
-		store.storeTopRef(Ref.get(cell), Ref.PERSISTED, null);
-		
-		cli().inform("Data saved with hash: "+Ref.get(cell).getHash());
+		try {
+			ACell cell=Reader.read(cvxData);
+			
+			store.storeTopRef(Ref.get(cell), Ref.PERSISTED, null);
+			
+			Hash h=Ref.get(cell).getHash();
+			println(h);
+			informSuccess("Data saved with hash: "+h);
+		} finally {
+			store.close();
+		}
 	}
 }

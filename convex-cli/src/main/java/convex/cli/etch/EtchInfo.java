@@ -25,9 +25,9 @@ public class EtchInfo extends AEtchCommand{
 	public void run() {
 		cli().setOut(outputFilename);
 		
+		EtchStore store=store();
 		try {
 		
-			EtchStore store=store();
 			etch.Etch etch=store.getEtch();
 			println("Etch file:          "+store.getFile().getCanonicalPath());
 			
@@ -47,6 +47,8 @@ public class EtchInfo extends AEtchCommand{
 			}
 		} catch (IOException e) {
 			throw new CLIError("IO Error accessing Etch database: "+e.getMessage());
+		} finally {
+			store.close();
 		}
 	}
 }
