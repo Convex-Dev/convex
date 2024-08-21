@@ -8,7 +8,6 @@ import java.io.StringWriter;
 
 import picocli.CommandLine;
 
-
 public class CLTester {
 	protected String output;
 	protected String error;

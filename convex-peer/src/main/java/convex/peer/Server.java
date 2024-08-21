@@ -134,12 +134,13 @@ public class Server implements Closeable {
 	 */
 	private NIOServer nio = NIOServer.create(this);
 
-	private Server(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
+	private Server(HashMap<Keyword, Object> config) throws IOException, TimeoutException {
 		this.config = config;
 		final AStore savedStore=Stores.current();
 
-		AStore configStore = (AStore) config.get(Keywords.STORE);
-		this.store = (configStore == null) ? savedStore : configStore;
+		AStore configStore = Config.ensureStore(config);
+		this.store=configStore;
+		// this.store = (configStore == null) ? savedStore : configStore;
 		
 		// Switch to use the configured store for setup
 		try {
@@ -821,7 +822,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Shut down the Server, as gracefully as possible.
-	 * @throws TimeoutException If shitdown attempt times out
+	 * @throws TimeoutException If shutdown attempt times out
 	 * @throws IOException  In case of IO Error
 	 */
 	public void shutdown() throws IOException, TimeoutException {
