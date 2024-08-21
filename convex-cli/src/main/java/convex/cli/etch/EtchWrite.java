@@ -32,7 +32,7 @@ public class EtchWrite extends AEtchCommand{
 			store.storeTopRef(Ref.get(cell), Ref.PERSISTED, null);
 			
 			Hash h=Ref.get(cell).getHash();
-			println(h);
+			println(h.toString());
 			informSuccess("Data saved with hash: "+h);
 		} finally {
 			store.close();

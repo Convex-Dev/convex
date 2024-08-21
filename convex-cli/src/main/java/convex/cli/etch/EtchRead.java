@@ -1,5 +1,7 @@
 package convex.cli.etch;
 
+import convex.cli.CLIError;
+import convex.cli.ExitCodes;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -15,7 +17,7 @@ description="Reads data values from the Etch store.")
 public class EtchRead extends AEtchCommand{
 	
 	@Option(names={"-o", "--output-file"},
-			description="Output file for the the Etch data. Defaults to STDOUT.")
+			description="Output file for the retreived data. Defaults to STDOUT.")
 	private String outputFilename;
 
 	@Option(names={"--limit"},
@@ -30,30 +32,34 @@ public class EtchRead extends AEtchCommand{
 
 	@Override
 	public void run() {
-		cli().setOut(outputFilename);
+		if (outputFilename!=null) cli().setOut(outputFilename);
 		
 		if ((hash==null)|| hash.length==0) {
-			cli().inform("No hash(es) provided to read. Suggestion: list one or more hashes at end of the command.");
+			inform("No hash(es) provided to read. Suggestion: list one or more hashes at end of the command.");
 			return;
 		}
 		
 		EtchStore store=store();
-		for (String hs:hash) {
-			Hash h=Hash.parse(hs);
-			if (h==null) {
-				cli().inform("Parameter ["+hs+"] not valid - should be 32-byte hash value");
-				continue;
+		try {
+			for (String hs:hash) {
+				Hash h=Hash.parse(hs);
+				if (h==null) {
+					throw new CLIError(ExitCodes.DATAERR,"Parameter ["+hs+"] not valid - should be 32-byte hash value");
+				}
+				
+				Ref<ACell> r=store.refForHash(h);
+				if (r==null) {
+					inform("Hash not found ["+hs+"]");
+					println("");
+					continue;				
+				}
+				
+				long limit=(printLimit==null)?Long.MAX_VALUE:printLimit;
+				String s=RT.toString(r.getValue(),limit);
+				println(s);
 			}
-			
-			Ref<ACell> r=store.refForHash(h);
-			if (r==null) {
-				cli().inform("Hash not found ["+hs+"]");
-				continue;				
-			}
-			
-			long limit=(printLimit==null)?Long.MAX_VALUE:printLimit;
-			String s=RT.toString(r.getValue(),limit);
-			cli().println(s);
+		} finally {
+			store.close();
 		}
 	}
 }
