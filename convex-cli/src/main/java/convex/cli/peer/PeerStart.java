@@ -127,7 +127,6 @@ public class PeerStart extends APeerCommand {
 			if (controller==null) {
 				paranoia("--address for peer controller not specified");
 				log.debug("Controller address not specified.");
-				
 			}
 
 			RESTServer restServer=null;;
@@ -137,9 +136,10 @@ public class PeerStart extends APeerCommand {
 				config.put(Keywords.STORE, store);
 				Server server=API.launchPeer(config);
 				
-				restServer=RESTServer.create(server);
-				restServer.start(apiport);
-
+				if (!norest) {
+					restServer=RESTServer.create(server);
+					restServer.start(apiport);
+				}
 				
 				while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 					Thread.sleep(400);
@@ -149,6 +149,7 @@ public class PeerStart extends APeerCommand {
 				throw new CLIError(ExitCodes.CONFIG,"Error in peer configuration: "+t.getMessage(),t);
 			} catch (InterruptedException e) {
 				informWarning("Peer interrupted before normal shutdown");
+				Thread.currentThread().interrupt();
 				return;
 			} finally {
 				if (restServer!=null) restServer.stop();
