@@ -58,9 +58,19 @@ public class ClientTest {
 			config.put(Keywords.KEYPAIR, kp);
 			config.put(Keywords.STORE, store);
 			Server s=API.launchPeer(config);
+			String port=Integer.toString(s.getPort());
 		
-			CLTester tester =  CLTester.run(
+			CLTester tester;
+			
+			tester =  CLTester.run(
+					"status", 
+					"--port",port
+				);
+			tester.assertExitCode(ExitCodes.SUCCESS);
+			
+			tester=  CLTester.run(
 					"query", "-a", "#11",
+					"--port",port,
 					"--keystore", KEYSTORE_FILENAME, 
 					"--keypass",new String(KEY_PASSWORD),
 					"*balance*"
@@ -69,11 +79,14 @@ public class ClientTest {
 			
 			tester =  CLTester.run(
 					"transact", "-a", "11",
+					"--port",port,
 					"--keystore", KEYSTORE_FILENAME, 
 					"--keypass",new String(KEY_PASSWORD),
 					"*balance*"
 				);
 			tester.assertExitCode(ExitCodes.SUCCESS);
+			
+
 
 		
 			s.close();
