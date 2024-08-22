@@ -5,6 +5,9 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * So the JVM doesn't give us a nice way to run shutdown hooks in a defined order.
  *
@@ -17,12 +20,15 @@ public class Shutdown {
 	public static final int ETCH = 100;
 	public static final int EXECUTOR = 110;
 	public static final int CLI = 120;
+	
+	private static final Logger log=LoggerFactory.getLogger(Shutdown.class.getName());
 
 	static {
 		try {
 			Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
 				@Override
 				public void run() {
+					log.debug("Running Convex shutdown hooks");
 					Shutdown.runHooks();
 				}
 			},"Convex Shutdown"));
@@ -41,6 +47,7 @@ public class Shutdown {
 		public synchronized void runHooks() {
 			Collection<Runnable> hooks=hookSet.keySet();
 			hooks.stream().forEach(r->{
+				log.trace("Running shutdown hook: "+Utils.getClassName(r));
 				try {
 					r.run();
 				} catch (Throwable t) {
@@ -75,8 +82,11 @@ public class Shutdown {
 	 */
 	private synchronized static void runHooks() {
 		for (Map.Entry<Integer,Group> me: order.entrySet()) {
+			log.debug("Running shutdown hooks at level: "+me.getKey());
 			me.getValue().runHooks();
 		}
 		order.clear();
+		log.debug("Convex shutdown hooks complete");
+
 	}
 }

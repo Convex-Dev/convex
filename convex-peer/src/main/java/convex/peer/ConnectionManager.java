@@ -612,6 +612,7 @@ public class ConnectionManager extends AThreadedComponent {
 			Message msg = Message.createGoodBye();
 			broadcast(msg);
 		} catch (Throwable e1) {
+			// TODO: should we do something else here?
 			// Ignore
 		}
 		

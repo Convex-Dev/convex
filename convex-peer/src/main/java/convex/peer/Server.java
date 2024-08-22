@@ -689,9 +689,13 @@ public class Server implements Closeable {
 		log.debug("Peer shutdown starting for "+getPeerKey());
 		isLive=false;
 		isRunning = false;
-		
-		// Shut down propagator first, no point sending any more Beliefs
+
+		// Close manager, we don't want any management actions during shutdown!
+		manager.close();
+
+		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
+		
 		
 		queryHandler.close();
 		transactionHandler.close();
@@ -707,7 +711,6 @@ public class Server implements Closeable {
 			}
 		}
 
-		manager.close();
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
 		log.info("Peer shutdown complete for "+getPeerKey());

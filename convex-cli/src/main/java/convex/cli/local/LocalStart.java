@@ -143,7 +143,7 @@ public class LocalStart extends ALocalCommand {
 		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
 		
 		// Loop until we end
-		while (true) {
+		while (!Thread.currentThread().isInterrupted()) {
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {

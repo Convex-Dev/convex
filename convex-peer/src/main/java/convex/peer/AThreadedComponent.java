@@ -36,7 +36,7 @@ public abstract class AThreadedComponent {
 			}
 			
 			// Finally close the component properly
-			log.debug("Component thread stopping: {}",thread);
+			log.trace("Component thread stopping: {}",thread);
 			close();
 		}
 	}

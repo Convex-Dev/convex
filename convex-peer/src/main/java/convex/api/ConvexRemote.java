@@ -119,10 +119,10 @@ public class ConvexRemote extends Convex {
 		CompletableFuture<Result> cf;
 		long id = -1;
 		long wait=1;
-		
 		// loop until request is queued
 		
 		while (true) {
+			if (connection.isClosed()) throw new IOException("Connection closed");
 			synchronized (awaiting) {
 				id = connection.sendTransaction(signed);
 				if (id>=0) {

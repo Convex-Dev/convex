@@ -126,7 +126,7 @@ public class PeerStart extends APeerCommand {
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
 				Server s=API.launchPeer(config);
-				while (s.isRunning()) {
+				while (s.isRunning()&&!Thread.currentThread().isInterrupted()) {
 					Thread.sleep(400);
 				}
 				informSuccess("Peer shutdown completed");
@@ -138,9 +138,6 @@ public class PeerStart extends APeerCommand {
 			}
 		}
 	}
-
-
-
 
 
 	

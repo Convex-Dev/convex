@@ -61,7 +61,7 @@ public class GenesisTest {
 		assertEquals(expectedKey,importTester.getOutput().trim());
 		
 		CLTester tester =  CLTester.run(
-				"peer", "genesis", "-n",
+				"peer", "genesis", "-n", "-v1",
 				"--peer-key", expectedKey,
 				"--peer-keypass", new String(KEY_PASSWORD),
 				"--etch", TEMP_ETCH.getCanonicalPath(), 
@@ -80,5 +80,15 @@ public class GenesisTest {
 		Server s=API.launchPeer(config); 
 		assertEquals(expectedKey,s.getPeerKey() .toHexString());
 		s.shutdown();
+		
+//		tester =  CLTester.run(
+//				"peer", "start", "-n",
+//              "-v2",		
+//				"--peer-key", expectedKey,
+//				"--keystore", KEYSTORE_FILENAME, 
+//				"--peer-keypass", new String(KEY_PASSWORD),
+//				"--etch", TEMP_ETCH.getCanonicalPath()
+//		);
+//		tester.assertExitCode(ExitCodes.SUCCESS);
 	}
 }

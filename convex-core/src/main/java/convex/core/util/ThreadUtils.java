@@ -3,6 +3,7 @@ package convex.core.util;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -11,12 +12,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Utilities for threading and concurrency
  */
 public class ThreadUtils {
 
 	private static ExecutorService virtualExecutor = null;
+	
+	private static final Logger log=LoggerFactory.getLogger(ThreadUtils.class.getName());
+
 
 	/**
 	 * Get the current virtual thread ExecutorService, intended for IO-bound blocking operations 
@@ -28,15 +35,22 @@ public class ThreadUtils {
 			
 			Shutdown.addHook(Shutdown.EXECUTOR, ()-> {
 				ExecutorService executor=virtualExecutor;
+				List<Runnable> tasks=List.of();
 				if (executor==null) return;
-				// Try a gentle termination. If not fast enough, terminate with extreme prejudice
-				executor.shutdown();
 				try {
-				    if (!executor.awaitTermination(200, TimeUnit.MILLISECONDS)) {
-				    	executor.shutdownNow();
+					// Try a gentle termination. If not fast enough, terminate with extreme prejudice
+					executor.shutdown();
+				    if (!executor.awaitTermination(300, TimeUnit.MILLISECONDS)) {
+				    	log.warn("Slow shutdown of executor threads");
+				    	tasks=executor.shutdownNow();
+				    	if (!executor.awaitTermination(300, TimeUnit.MILLISECONDS)) {
+				    		log.warn("Executor Pool did not terminate");
+				    		System.err.println("Tasks still running "+tasks);
+				    	}     
 				    } 
 				} catch (InterruptedException e) {
 					executor.shutdownNow();
+					Thread.currentThread().interrupt();
 				} 
 			});
 		}
