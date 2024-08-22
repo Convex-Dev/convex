@@ -17,6 +17,7 @@ import convex.core.data.Keywords;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.Server;
+import convex.restapi.RESTServer;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
@@ -57,6 +58,14 @@ public class PeerStart extends APeerCommand {
 
 	@Option(names = { "--url" }, description = "URL for the peer to publish. If not provided, the peer will have no public URL.")
 	private String url;
+	
+	@Option(names = { "--norest" }, description = "Disable REST srever.")
+	private boolean norest;
+	
+	@Option(names = { "--api-port" }, description = "Port for REST API.")
+	private Integer apiport;
+
+
 
 //	@Option(names = { "-b",
 //			"--bind-address" }, description = "Bind address of the network interface. Defaults to local loop back device for %n"
@@ -121,12 +130,18 @@ public class PeerStart extends APeerCommand {
 				
 			}
 
+			RESTServer restServer=null;;
 			try {
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
-				Server s=API.launchPeer(config);
-				while (s.isRunning()&&!Thread.currentThread().isInterrupted()) {
+				Server server=API.launchPeer(config);
+				
+				restServer=RESTServer.create(server);
+				restServer.start(apiport);
+
+				
+				while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 					Thread.sleep(400);
 				}
 				informSuccess("Peer shutdown completed");
@@ -135,6 +150,8 @@ public class PeerStart extends APeerCommand {
 			} catch (InterruptedException e) {
 				informWarning("Peer interrupted before normal shutdown");
 				return;
+			} finally {
+				if (restServer!=null) restServer.stop();
 			}
 		}
 	}
