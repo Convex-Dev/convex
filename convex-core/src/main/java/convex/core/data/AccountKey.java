@@ -9,14 +9,9 @@ import convex.core.util.Errors;
 import convex.core.util.Utils;
 
 /**
- * Immutable class representing an Ed25519 Public Key for an Account
+ * Immutable class representing an Ed25519 public key for a Convex account
  * 
- * <p>
- * Using Ed25519:
- * </p>
- * <ul>
- * <li>AccountKey is the Public Key (32 bytes)</li>
- * </ul>
+ * AccountKey is basically the public key represented as a 256-bit blob (32 bytes)
  * 
  */
 public class AccountKey extends AArrayBlob {
@@ -168,6 +163,13 @@ public class AccountKey extends AArrayBlob {
 		return wrap(bs);
 	}
 	
+	/**
+	 * Constructs an AccountKey object from a hex string
+	 * 
+	 * @param hexString Hex String
+	 * @return An AccountKey constructed from the hex string, or null if not a valid
+	 *         hex string
+	 */
 	public static AccountKey fromHexOrNull(AString a) {
 		if (a.count()!=LENGTH*2) return null;
 		return fromHexOrNull(a.toString());

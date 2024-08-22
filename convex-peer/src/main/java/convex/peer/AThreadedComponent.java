@@ -24,7 +24,7 @@ public abstract class AThreadedComponent {
 			Stores.setCurrent(server.getStore());
 			
 			// Run main component loop
-			while (server.isRunning()) {
+			while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 				try {
 					loop();		
 				} catch (InterruptedException e) {

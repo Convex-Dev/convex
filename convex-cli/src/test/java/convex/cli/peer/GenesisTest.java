@@ -43,7 +43,6 @@ public class GenesisTest {
 		} catch (Exception t) {
 			throw Utils.sneakyThrow(t);
 		} 
-		
 	}
 
 	@Test public void testGenesisPeer() throws IOException, TimeoutException {

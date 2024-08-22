@@ -51,7 +51,7 @@ public class Transact extends AClientCommand {
 		ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
 		
 		try {
-			Result result = convex.transactSync(transaction, timeout);
+			Result result = convex.transactSync(transaction);
 			mainParent.printResult(result);
 		} catch (IOException e) {
 			throw new CLIError(ExitCodes.IOERR,"IO Error executing transaction",e);

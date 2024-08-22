@@ -33,7 +33,7 @@ public class Status extends AClientCommand {
 	public void run() {
 		try {
 			Convex convex = clientConnect();
-			Result result = convex.requestStatus().get(timeout, TimeUnit.MILLISECONDS);
+			Result result = convex.requestStatus().get(getClientTimeout(), TimeUnit.MILLISECONDS);
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);
 			// Hash hash = Hash.wrap(stateHash.getBytes());
@@ -55,5 +55,6 @@ public class Status extends AClientCommand {
 			throw new CLIError("Error getting network status",e);
 		}
 	}
+
 
 }

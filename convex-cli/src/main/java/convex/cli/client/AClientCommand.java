@@ -3,6 +3,7 @@ package convex.cli.client;
 import convex.api.Convex;
 import convex.cli.ATopCommand;
 import convex.cli.CLIError;
+import convex.cli.Constants;
 import convex.cli.ExitCodes;
 import convex.cli.mixins.AddressMixin;
 import convex.cli.mixins.KeyMixin;
@@ -30,8 +31,14 @@ public abstract class AClientCommand extends ATopCommand {
 	
 	@Option(names={"--timeout"},
 			description="Timeout in miliseconds.")
-	protected Long timeout;
+	private Long timeout;
 
+	protected long getClientTimeout() {
+		// Gets timeout specified at CLI, or default value
+		return timeout==null?Constants.DEFAULT_TIMEOUT_MILLIS : timeout;
+	}
+
+	
 	/**
 	 * Connect as a client to the convex network
 	 * @return
