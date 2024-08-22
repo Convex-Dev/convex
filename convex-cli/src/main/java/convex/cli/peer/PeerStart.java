@@ -1,12 +1,23 @@
 package convex.cli.peer;
 
+import java.util.HashMap;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.cli.CLIError;
+import convex.cli.ExitCodes;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.core.crypto.AKeyPair;
-import convex.core.exceptions.TODOException;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
+import convex.peer.API;
+import convex.peer.ConfigException;
+import convex.peer.Server;
+import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Model.CommandSpec;
@@ -56,27 +67,81 @@ public class PeerStart extends APeerCommand {
 	protected RemotePeerMixin peerMixin;
 
 	@Option(names = { "-a", "--address" }, description = "Account address to use for the peer controller.")
-	private long addressNumber;
+	private String controllerAddress;
 	
-
+	private AKeyPair findPeerKey(EtchStore store) {
+		// First check user supplied peer key. If we have it, use it
+		AKeyPair kp=checkPeerKey();
+		if (kp!=null) return kp;
+		
+		// if user specified a --peer-key, but it wasn't found in keystore
+		String specifiedKey=peerKeyMixin.getPublicKey();
+		if (specifiedKey!=null) {
+			throw new CLIError(ExitCodes.CONFIG,"Peer key not found in Store: "+specifiedKey);
+		}
+		
+		// In strict mode, we insist on a peer key
+		paranoia("--peer-key not sepcified");
+		
+		log.debug("--peer-key not available, attempting to infer from store");
+		try {
+			List<AccountKey> peerList=API.listPeers(store);
+			if (peerList.size()==0) {
+				throw new CLIError(ExitCodes.CONFIG,"No peers configured in Etch store "+store+". Consider using `convex peer create` or `convex peer genesis` first.");
+			} else if (peerList.size()>1) {
+				throw new CLIError(ExitCodes.CONFIG,"Multiple peers configured in Etch store "+store+". specify which one you want with --peer-key.");
+			}
+			AccountKey peerKey=peerList.get(0);
+			AKeyPair pkp=storeMixin.loadKeyFromStore(peerKey.toHexString(), peerKeyMixin.getKeyPassword());
+			return pkp;
+		} catch (Exception e) {
+			log.debug("Exception trying to read etch peer list",e);
+		}
+		
+		return null;
+	}
 
 	@Override
 	public void run() {
 		storeMixin.ensureKeyStore();
-		AKeyPair peerKey=checkPeerKey();
-		
-		log.debug("Preparing to start peer: "+peerKey.getAccountKey());
-		
-		try {
+		try (EtchStore store = etchMixin.getEtchStore()) {
+			AKeyPair peerKey=findPeerKey(store);
+			if (peerKey==null) {
+				informWarning("No --peer-key specified or inferred from Etch Store.");
+				showUsage();
+				return;
+			}
+			
+			inform("Preparing to start peer: "+peerKey.getAccountKey());
 
-			throw new TODOException();
-			// peerManager = PeerManager.create(mainParent.getSessionFilename(), keyPair, peerAddress, store);
-			// peerManager.launchPeer(port, remotePeerHostname, url, bindAddress);
-			// peerManager.showPeerEvents();
-		} catch (Exception t) {
-			throw new CLIError("Error starting peer: "+t.getMessage(),t);
+			Address controller=Address.parse(controllerAddress);
+			if (controller==null) {
+				paranoia("--address for peer controller not specified");
+				log.debug("Controller address not specified.");
+				
+			}
+
+			try {
+				HashMap<Keyword,Object> config=new HashMap<>();
+				config.put(Keywords.KEYPAIR, peerKey);
+				config.put(Keywords.STORE, store);
+				Server s=API.launchPeer(config);
+				while (s.isRunning()) {
+					Thread.sleep(400);
+				}
+				informSuccess("Peer shutdown completed");
+			} catch (ConfigException t) {
+				throw new CLIError(ExitCodes.CONFIG,"Error in peer configuration: "+t.getMessage(),t);
+			} catch (InterruptedException e) {
+				informWarning("Peer interrupted before normal shutdown");
+				return;
+			}
 		}
 	}
+
+
+
+
 
 	
 }

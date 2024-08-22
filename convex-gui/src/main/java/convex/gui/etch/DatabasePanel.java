@@ -1,28 +1,23 @@
 package convex.gui.etch;
 
-import javax.swing.JPanel;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-
-import javax.swing.JLabel;
-import javax.swing.SwingConstants;
-
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.io.File;
 import java.io.IOException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.awt.Color;
-import javax.swing.border.EtchedBorder;
-import javax.swing.border.TitledBorder;
-
-import convex.gui.components.ActionPanel;
-import etch.EtchStore;
 
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.SwingConstants;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.gui.components.ActionPanel;
+import etch.EtchStore;
 
 @SuppressWarnings("serial")
 public class DatabasePanel extends JPanel {
@@ -43,7 +38,9 @@ public class DatabasePanel extends JPanel {
 		panel.setLayout(new GridLayout(0, 1, 0, 0));
 		
 		JPanel filePanel = new JPanel();
-		filePanel.setBorder(new TitledBorder(new EtchedBorder(EtchedBorder.LOWERED, new Color(255, 255, 255), new Color(160, 160, 160)), "File", TitledBorder.LEADING, TitledBorder.TOP, null, new Color(0, 0, 0)));
+		//Border eb=new EtchedBorder(EtchedBorder.LOWERED, Color.WHITE, new Color(160, 160, 160));
+		//Border b = new TitledBorder(eb, "File", TitledBorder.LEADING, TitledBorder.TOP, (Font)null, Color.BLACK);
+		//filePanel.setBorder(b);
 		panel.add(filePanel);
 		filePanel.setLayout(new BorderLayout(0, 0));
 		

@@ -3,6 +3,9 @@ package convex.peer;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.core.Result;
 import convex.core.ResultContext;
 import convex.core.data.ACell;
@@ -15,6 +18,8 @@ import convex.net.Message;
 import convex.net.MessageType;
 
 public class QueryHandler extends AThreadedComponent {
+
+	private static final Logger log = LoggerFactory.getLogger(QueryHandler.class.getName());
 
 	/**
 	 * Queue for received messages to be processed by this Peer Server

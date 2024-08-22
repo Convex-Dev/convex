@@ -1,5 +1,6 @@
 package convex.core.store;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.util.function.Consumer;
 
@@ -18,7 +19,7 @@ import convex.core.exceptions.MissingDataException;
  * made" ― Robert C. Martin
  *
  */
-public abstract class AStore {
+public abstract class AStore implements Closeable {
 	
 	/**
 	 * Stores a @Ref in long term storage as defined by this store implementation.

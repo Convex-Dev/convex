@@ -204,7 +204,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			belief=belief.proposeBlock(server.getKeyPair(),signedBlock);
 			if (log.isDebugEnabled()) {
 				Block bl=signedBlock.getValue();
-				log.debug("New block proposed: {} transaction(s), size= {}, hash={}", bl.getTransactions().count(), signedBlock.getMemorySize(),signedBlock.getHash());
+				log.debug("Block proposed: {} tx(s), size={}, hash={}", bl.getTransactions().count(), signedBlock.getMemorySize(),signedBlock.getHash());
 			}
 			published=true;
 		}

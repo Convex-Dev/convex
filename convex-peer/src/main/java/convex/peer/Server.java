@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -249,12 +250,12 @@ public class Server implements Closeable {
 			AccountKey remoteKey=RT.ensureAccountKey(status.get(3));
 			Hash genesisHash=RT.ensureHash(status.get(2));
 			Hash stateHash=RT.ensureHash(status.get(4));
-			log.info("Attempting to sync remote state: "+stateHash + " on network: "+genesisHash);
+			log.debug("Attempting to sync remote state: "+stateHash + " on network: "+genesisHash);
 			State genF=(State) convex.acquire(genesisHash).get(timeout,TimeUnit.MILLISECONDS);
-			log.info("Retrieved Consensus State: "+genesisHash);
+			log.debug("Retrieved Genesis State: "+genesisHash);
 			
 			// Belief acquisition
-			log.info("Attempting to obtain peer Belief: "+beliefHash);
+			log.debug("Attempting to obtain peer Belief: "+beliefHash);
 			Belief belF=null;
 			long timeElapsed=0;
 			while (belF==null) {
@@ -385,7 +386,7 @@ public class Server implements Closeable {
 			}
 
 			goLive();
-			log.info( "Peer Server started at "+nio.getHostAddress()+" with Peer Address: {}",getPeerKey());
+			log.info( "Peer Server started at "+nio.getHostAddress()+" with peer key: {}",getPeerKey());
 		} catch (Exception e) {
 			close();
 			throw new Error("Failed to launch Server", e);
@@ -653,7 +654,7 @@ public class Server implements Closeable {
 	 * Note: Does not flush buffers to disk. 
 	 *
 	 * This will overwrite any previously persisted peer data.
-	 * @return Updater Peer value with persisted data
+	 * @return Updated Peer value with persisted data
 	 * @throws IOException In case of any IO Error
 	 */
 	@SuppressWarnings("unchecked")
@@ -669,16 +670,23 @@ public class Server implements Closeable {
 
 			newRootData=store.setRootData(newRootData).getValue();
 			peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
-			log.debug( "Stored peer data for Server with hash: {}", peerData.getHash().toHexString());
+			log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
 			return Peer.fromData(getKeyPair(), peerData);
 		}  finally {
 			Stores.setCurrent(tempStore);
 		}
 	}
 
+	/**
+	 * Future to complete with timestamp at time of shutdown
+	 */
+	private CompletableFuture<Long> shutdownFuture=new CompletableFuture<Long>(); 
+	
 	@Override
 	public void close() {
+		
 		if (!isRunning) return; // already shut down
+		log.debug("Peer shutdown starting for "+getPeerKey());
 		isLive=false;
 		isRunning = false;
 		
@@ -703,6 +711,7 @@ public class Server implements Closeable {
 		nio.close();
 		// Note we don't do store.close(); because we don't own the store.
 		log.info("Peer shutdown complete for "+getPeerKey());
+		shutdownFuture.complete(Utils.getCurrentTimestamp());
 	}
 
 	/**
@@ -837,6 +846,16 @@ public class Server implements Closeable {
 		} finally {
 			isLive=false;
 			close();
+		}
+	}
+
+	public void waitForShutdown() throws InterruptedException {
+		while (isRunning()) {
+			Thread.sleep(500);
+			//} catch (ExecutionException e) {
+			//	return;
+			//} catch (TimeoutException e) {
+			//	continue;
 		}
 	}
 

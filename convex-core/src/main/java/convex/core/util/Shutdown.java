@@ -41,8 +41,12 @@ public class Shutdown {
 		public synchronized void runHooks() {
 			Collection<Runnable> hooks=hookSet.keySet();
 			hooks.stream().forEach(r->{
-				r.run();
-			});
+				try {
+					r.run();
+				} catch (Throwable t) {
+					t.printStackTrace();
+				}
+ 			});
 			hookSet.clear();
 		}
 

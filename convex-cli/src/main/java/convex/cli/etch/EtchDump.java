@@ -40,7 +40,9 @@ public class EtchDump extends AEtchCommand{
 	public void run() {
 		cli().setOut(outputFilename);
 		
-		EtchStore store=store();
-		store.getEtch().visitIndex(new DumpVisitor(cli()));
+		try (EtchStore store=store()) {
+		
+			store.getEtch().visitIndex(new DumpVisitor(cli()));
+		}
 	}
 }

@@ -200,11 +200,7 @@ public class Etch {
 		}
 
 		// shutdown hook to close file / release lock
-		convex.core.util.Shutdown.addHook(Shutdown.ETCH,new Runnable() {
-		    public void run() {
-		        close();
-		    }
-		});
+		convex.core.util.Shutdown.addHook(Shutdown.ETCH,this::close);
 	}
 
 	/**
@@ -590,23 +586,24 @@ public class Etch {
 	 * Close all files resources with this Etch store, including writing the final
 	 * data length.
 	 */
-	synchronized void close() {
+	void close() {
 		if (!(data.getChannel().isOpen())) return; // already closed
-		try {
-			// Update data length
-			writeDataLength();
-
-			// Send writes to disk
-			flush();
-			
-			regionMap.clear();
-			System.gc();
-
-			data.close();
-
-			log.trace("Etch closed on file: "+ getFileName() +" with data length: "+dataLength);
-		} catch (IOException e) {
-			log.error("Error closing Etch file: "+file);
+		synchronized(this) {
+			try {
+				// Update data length
+				writeDataLength();
+	
+				// Send writes to disk
+				flush();
+				
+				regionMap.clear();
+	
+				data.close();
+	
+				log.debug("Etch closed on file: "+ getFileName() +" with data length: "+dataLength);
+			} catch (Exception e) {
+				log.error("Error closing Etch file: "+file,e);
+			}
 		}
 	}
 

@@ -142,6 +142,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	 * @return Address parsed, or null if not valid
 	 */
 	public static Address parse(String s) {
+		if (s==null) return null;
 		s=s.trim();
 		if (s.startsWith("#")) {
 			s=s.substring(1);

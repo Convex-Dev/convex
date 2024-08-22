@@ -11,7 +11,7 @@ import convex.core.util.LoadMonitor;
  */
 public abstract class AThreadedComponent {
 
-	static final Logger log = LoggerFactory.getLogger(AThreadedComponent.class.getName());
+	private static final Logger log = LoggerFactory.getLogger(AThreadedComponent.class.getName());
 
 	protected final Server server;
 	

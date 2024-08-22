@@ -15,7 +15,7 @@ public class EtchMixin extends AMixin {
 	@Option(names={"-e", "--etch"},
 			scope = ScopeType.INHERIT,
 			defaultValue="${env:CONVEX_ETCH_FILE:-~/.convex/etch.db}",
-			description="Convex Etch database filename. Will default to CONVEX_ETCH_FILE or "+Constants.ETCH_FILENAME)
+			description="Etch database. Defaults to CONVEX_ETCH_FILE or "+Constants.ETCH_FILENAME)
 	String etchStoreFilename;
 	
 	EtchStore etch=null;

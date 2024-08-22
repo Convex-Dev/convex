@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.io.IOException;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -11,10 +12,14 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.init.Init;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -185,5 +190,26 @@ public class API {
 		}
 
 		return serverList;
+	}
+
+	/**
+	 * Gets the list of peers registered in the given Etch Store
+	 * @param store
+	 * @return null if peer list not present
+	 * @throws IOException 
+	 */
+	public static List<AccountKey> listPeers(AStore store) throws IOException {
+		AMap<ACell,ACell> data=store.getRootData();
+		
+		ArrayList<AccountKey> results=new ArrayList<>();
+		
+		long n=data.count();
+		for (int i=0; i<n; i++) {
+			ACell k=data.entryAt(i).getKey();
+			AccountKey ak = RT.ensureAccountKey(k);
+			if (ak!=null) results.add(ak);
+		}
+		
+		return results;
 	}
 }

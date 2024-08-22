@@ -1,11 +1,12 @@
 package convex.cli.peer;
 
 import java.io.IOException;
+import java.util.List;
 
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
-import convex.core.data.ACell;
-import convex.core.data.AMap;
+import convex.core.data.AccountKey;
+import convex.peer.API;
 import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
@@ -28,15 +29,9 @@ public class PeerList extends APeerCommand {
 		
 		EtchStore etch=etchMixin.getEtchStore();
 		try {
-			AMap<ACell,ACell> rootData=etch.getRootData();
-			if (rootData==null) {
-				informWarning("No root data in store "+etch);
-				return;
-			}
-			
-			long n=rootData.count();
-			for (long i=0; i<n; i++) {
-				println(rootData.entryAt(i).getKey());
+			List<AccountKey> keys=API.listPeers(etch);
+			for (AccountKey k: keys) {
+				println(k.toHexString());
 			}
 		} catch (IOException e) {
 			throw new CLIError(ExitCodes.IOERR,"IO Error reating etch store at "+etch,e);
