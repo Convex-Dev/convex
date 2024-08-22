@@ -29,6 +29,7 @@ public abstract class AThreadedComponent {
 					loop();		
 				} catch (InterruptedException e) {
 					log.trace("Component thread interrupted: {}",thread);
+					Thread.currentThread().interrupt();
 					break;
 				} catch (Exception e) {
 					log.warn("Unexpected exception in "+AThreadedComponent.this.getClass().getSimpleName(),e);

@@ -86,8 +86,9 @@ public class NIOServer implements Closeable {
 		ssc.socket().setReuseAddress(true);
 
 		bindAddress = (bindAddress == null) ? "::" : bindAddress;
-		InetSocketAddress address;
 		
+		// Bind to a port
+		InetSocketAddress address;		
 		if (port==0) {
 			try {
 				address = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
@@ -102,9 +103,12 @@ public class NIOServer implements Closeable {
 			ssc.bind(address);
 		}
 		
+		// Find out which port we actually bound to
 		address = (InetSocketAddress) ssc.getLocalAddress();
-		ssc.configureBlocking(false);
 		port = ssc.socket().getLocalPort();
+
+		// change to bnon-blocking mode
+		ssc.configureBlocking(false);
 
 		// Register for accept. Do this before selection loop starts and
 		// before we return from launch!

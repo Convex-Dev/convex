@@ -90,7 +90,7 @@ public class API {
 			Server server = Server.create(config);
 			server.launch();
 			return server;
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			throw Utils.sneakyThrow(t);
 		} finally {
 			Stores.setCurrent(tempStore);

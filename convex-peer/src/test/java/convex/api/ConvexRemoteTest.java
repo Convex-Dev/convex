@@ -3,9 +3,11 @@ package convex.api;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +71,11 @@ public class ConvexRemoteTest {
 		}
 	}
 
+	@Test
+	public void testBadConnect() throws IOException, TimeoutException {
+		assertThrows(IOException.class,()->Convex.connect(new InetSocketAddress("localhost", 0)));
+	}
+	
 	@Test
 	public void testConvex() throws IOException, TimeoutException {
 		synchronized (network.SERVER) {

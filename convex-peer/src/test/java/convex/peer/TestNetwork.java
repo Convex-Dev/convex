@@ -98,7 +98,7 @@ public class TestNetwork {
 			network.CONVEX.transferSync(addr, Coin.GOLD);
 			ConvexRemote client=Convex.connect(network.SERVER.getHostAddress(),addr,kp);
 			return client;
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			throw Utils.sneakyThrow(t);
 		}
 	}

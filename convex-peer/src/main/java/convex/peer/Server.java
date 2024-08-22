@@ -343,7 +343,7 @@ public class Server implements Closeable {
 	/**
 	 * Launch the Peer Server, including all main server threads
 	 */
-	public void launch() {
+	public void launch() throws IOException {
 		AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -368,7 +368,6 @@ public class Server implements Closeable {
 			propagator.start();
 			transactionHandler.start();
 			executor.start();
-			
 
 			// Connect to source peer if specified
 			if (getConfig().containsKey(Keywords.SOURCE)) {
@@ -386,10 +385,7 @@ public class Server implements Closeable {
 			}
 
 			goLive();
-			log.info( "Peer Server started at "+nio.getHostAddress()+" with peer key: {}",getPeerKey());
-		} catch (Exception e) {
-			close();
-			throw new Error("Failed to launch Server", e);
+			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
 		} finally {
 			Stores.setCurrent(savedStore);
 		}
