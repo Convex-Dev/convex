@@ -155,7 +155,7 @@ public class Server implements Closeable {
 			if (rk==null) rk=peer.getPeerKey();
 			rootKey=rk;
 
-			// Ensure Peer is stored in executor and persisted
+			// Ensure Peer is stored in executor and initially persisted prior to launch
 			executor.setPeer(peer);
 			executor.persistPeerData();
 			

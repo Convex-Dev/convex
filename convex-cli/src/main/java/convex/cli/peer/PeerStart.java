@@ -114,9 +114,10 @@ public class PeerStart extends APeerCommand {
 	public void run() {
 		storeMixin.ensureKeyStore();
 		try (EtchStore store = etchMixin.getEtchStore()) {
+			
 			AKeyPair peerKey=findPeerKey(store);
 			if (peerKey==null) {
-				informWarning("No --peer-key specified or inferred from Etch Store.");
+				informWarning("No --peer-key specified or inferred from Etch Store "+store);
 				showUsage();
 				return;
 			}

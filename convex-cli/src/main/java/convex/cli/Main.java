@@ -128,18 +128,7 @@ public class Main extends ACommand {
 				return ExitCodes.SUCCESS;
 			}
 
-			Level[] verboseLevels = { Level.OFF, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL };
-
-			if (verbose == null)
-				verbose = 0;
-			if (verbose >= 0 && verbose < verboseLevels.length) {
-				// Set root logger level?
-				ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-				root.setLevel(verboseLevels[verbose]);
-			} else {
-				informError("ERROR: Invalid verbosity level: " + verbose);
-				return ExitCodes.ERROR;
-			}
+			setupVerbosity();
 
 			int result = commandLine.execute(args);
 			return result;
@@ -147,6 +136,24 @@ public class Main extends ACommand {
 			commandLine.getOut().flush();
 			commandLine.getErr().flush();
 
+		}
+	}
+
+	private void setupVerbosity() {
+		Level[] verboseLevels = { Level.OFF, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL };
+
+		if (verbose == null)
+			verbose = 0;
+		if (verbose >= 0 && verbose < verboseLevels.length) {
+			// Set root logger level?
+			try {
+			ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+			root.setLevel(verboseLevels[verbose]);
+			} catch (Exception e) {
+				informWarning("Failed to set verbosity level: "+e.getMessage());
+			}
+		} else {
+			throw new CLIError(ExitCodes.USAGE,"Invalid verbosity level: " + verbose);
 		}
 	}
 

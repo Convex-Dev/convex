@@ -249,7 +249,11 @@ public class EtchStore extends ACachedStore {
 
 	@Override
 	public String toString() {
-		return "EtchStore at: " + getFileName();
+		try {
+			return "EtchStore: " + getFile().getCanonicalPath();
+		} catch (Exception e) {
+			return "EtchStore: <File name lookup failed>";
+		}
 	}
 
 	/**
