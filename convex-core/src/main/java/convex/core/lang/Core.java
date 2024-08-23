@@ -624,7 +624,7 @@ public class Core {
 		}
 	});
 
-	public static final CorePred SYNTAX_Q = reg(new CorePred(Symbols.SYNTAX_Q,24) {
+	public static final CoreFn<CVMBool> SYNTAX_Q = reg(new CorePred(Symbols.SYNTAX_Q,24) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Syntax;
@@ -1728,7 +1728,7 @@ public class Core {
 		}
 	});
 
-	public static final CorePred BOOLEAN_Q = reg(new CorePred(Symbols.BOOLEAN_Q,135) {
+	public static final CoreFn<CVMBool> BOOLEAN_Q = reg(new CorePred(Symbols.BOOLEAN_Q,135) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isBoolean(val);
@@ -2660,56 +2660,56 @@ public class Core {
 	// =====================================================================================================
 	// Predicates
 
-	public static final CorePred NIL_Q = reg(new CorePred(Symbols.NIL_Q,240) {
+	public static final CoreFn<CVMBool> NIL_Q = reg(new CorePred(Symbols.NIL_Q,240) {
 		@Override
 		public boolean test(ACell val) {
 			return val == null;
 		}
 	});
 
-	public static final CorePred VECTOR_Q = reg(new CorePred(Symbols.VECTOR_Q,241) {
+	public static final CoreFn<CVMBool> VECTOR_Q = reg(new CorePred(Symbols.VECTOR_Q,241) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AVector;
 		}
 	});
 
-	public static final CorePred LIST_Q = reg(new CorePred(Symbols.LIST_Q,242) {
+	public static final CoreFn<CVMBool> LIST_Q = reg(new CorePred(Symbols.LIST_Q,242) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AList;
 		}
 	});
 
-	public static final CorePred SET_Q = reg(new CorePred(Symbols.SET_Q,243) {
+	public static final CoreFn<CVMBool> SET_Q = reg(new CorePred(Symbols.SET_Q,243) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof ASet;
 		}
 	});
 
-	public static final CorePred MAP_Q = reg(new CorePred(Symbols.MAP_Q,244) {
+	public static final CoreFn<CVMBool> MAP_Q = reg(new CorePred(Symbols.MAP_Q,244) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AMap;
 		}
 	});
 
-	public static final CorePred COLL_Q = reg(new CorePred(Symbols.COLL_Q,245) {
+	public static final CoreFn<CVMBool> COLL_Q = reg(new CorePred(Symbols.COLL_Q,245) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof ADataStructure;
 		}
 	});
 	
-	public static final CorePred COUNTABLE_Q = reg(new CorePred(Symbols.COUNTABLE_Q,256) {
+	public static final CoreFn<CVMBool> COUNTABLE_Q = reg(new CorePred(Symbols.COUNTABLE_Q,256) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isCountable(val);
 		}
 	});
 
-	public static final CorePred EMPTY_Q = reg(new CorePred(Symbols.EMPTY_Q,246) {
+	public static final CoreFn<CVMBool> EMPTY_Q = reg(new CorePred(Symbols.EMPTY_Q,246) {
 		@Override
 		public boolean test(ACell val) {
 			// consider null as an empty object
@@ -2720,21 +2720,21 @@ public class Core {
 		}
 	});
 
-	public static final CorePred SYMBOL_Q = reg(new CorePred(Symbols.SYMBOL_Q,247) {
+	public static final CoreFn<CVMBool> SYMBOL_Q = reg(new CorePred(Symbols.SYMBOL_Q,247) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Symbol;
 		}
 	});
 
-	public static final CorePred KEYWORD_Q = reg(new CorePred(Symbols.KEYWORD_Q,248) {
+	public static final CoreFn<CVMBool> KEYWORD_Q = reg(new CorePred(Symbols.KEYWORD_Q,248) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Keyword;
 		}
 	});
 
-	public static final CorePred BLOB_Q = reg(new CorePred(Symbols.BLOB_Q,249) {
+	public static final CoreFn<CVMBool> BLOB_Q = reg(new CorePred(Symbols.BLOB_Q,249) {
 		@Override
 		public boolean test(ACell val) {
 			if (!(val instanceof ABlob)) return false;
@@ -2742,14 +2742,14 @@ public class Core {
 		}
 	});
 
-	public static final CorePred ADDRESS_Q = reg(new CorePred(Symbols.ADDRESS_Q,250) {
+	public static final CoreFn<CVMBool> ADDRESS_Q = reg(new CorePred(Symbols.ADDRESS_Q,250) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof Address;
 		}
 	});
 
-	public static final CorePred LONG_Q = reg(new CorePred(Symbols.LONG_Q,251) {
+	public static final CoreFn<CVMBool> LONG_Q = reg(new CorePred(Symbols.LONG_Q,251) {
 		@Override
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
@@ -2759,7 +2759,7 @@ public class Core {
 		}
 	});
 	
-	public static final CorePred INT_Q = reg(new CorePred(Symbols.INT_Q,252) {
+	public static final CoreFn<CVMBool> INT_Q = reg(new CorePred(Symbols.INT_Q,252) {
 		@Override
 		public boolean test(ACell val) {
 			if (val instanceof AInteger) {
@@ -2769,42 +2769,42 @@ public class Core {
 		}
 	});
 	
-	public static final CorePred DOUBLE_Q = reg(new CorePred(Symbols.DOUBLE_Q,253) {
+	public static final CoreFn<CVMBool> DOUBLE_Q = reg(new CorePred(Symbols.DOUBLE_Q,253) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof CVMDouble;
 		}
 	});
 
-	public static final CorePred STR_Q = reg(new CorePred(Symbols.STR_Q,254) {
+	public static final CoreFn<CVMBool> STR_Q = reg(new CorePred(Symbols.STR_Q,254) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AString;
 		}
 	});
 
-	public static final CorePred NUMBER_Q = reg(new CorePred(Symbols.NUMBER_Q,255) {
+	public static final CoreFn<CVMBool> NUMBER_Q = reg(new CorePred(Symbols.NUMBER_Q,255) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isNumber(val);
 		}
 	});
 
-	public static final CorePred NAN_Q = reg(new CorePred(Symbols.NAN_Q,270) {
+	public static final CoreFn<CVMBool> NAN_Q = reg(new CorePred(Symbols.NAN_Q,270) {
 		@Override
 		public boolean test(ACell val) {
 			return RT.isNaN(val);
 		}
 	});
 
-	public static final CorePred FN_Q = reg(new CorePred(Symbols.FN_Q,271) {
+	public static final CoreFn<CVMBool> FN_Q = reg(new CorePred(Symbols.FN_Q,271) {
 		@Override
 		public boolean test(ACell val) {
 			return val instanceof AFn;
 		}
 	});
 
-	public static final CorePred ZERO_Q = reg(new CorePred(Symbols.ZERO_Q,272) {
+	public static final CoreFn<CVMBool> ZERO_Q = reg(new CorePred(Symbols.ZERO_Q,272) {
 		@Override
 		public boolean test(ACell val) {
 			if (!RT.isNumber(val)) return false;
@@ -2833,7 +2833,7 @@ public class Core {
 		return env.assoc(sym, o);
 	}
 	
-	public static void registerCode(ICoreDef o) {
+	static void registerCode(ICoreDef o) {
 		int code=o.getCoreCode();
 		ACell there=CODE_MAP[code];
 		if (there!=null) {

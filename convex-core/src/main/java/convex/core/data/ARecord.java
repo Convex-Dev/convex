@@ -7,7 +7,7 @@ import java.util.function.BiFunction;
 import convex.core.Block;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * Base class for Record data types. 

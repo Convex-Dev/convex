@@ -18,7 +18,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * The Multi class enables multiple child transactions to be grouped into a single 

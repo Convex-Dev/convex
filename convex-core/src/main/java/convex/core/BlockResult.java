@@ -16,7 +16,7 @@ import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 import convex.core.util.Utils;
 
 /**

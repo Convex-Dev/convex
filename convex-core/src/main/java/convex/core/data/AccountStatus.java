@@ -7,7 +7,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
 import convex.core.lang.RT;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * Class representing the current on-chain status of an account.

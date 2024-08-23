@@ -1,7 +1,7 @@
 package convex.core.data;
 
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * Abstract base class for generic records.

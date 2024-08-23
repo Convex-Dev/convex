@@ -13,8 +13,8 @@ import convex.core.Result;
 import convex.core.State;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
+import convex.core.lang.RecordFormat;
 import convex.core.lang.TestState;
-import convex.core.lang.impl.RecordFormat;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Transfer;
 

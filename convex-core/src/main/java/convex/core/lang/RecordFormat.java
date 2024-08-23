@@ -1,4 +1,4 @@
-package convex.core.lang.impl;
+package convex.core.lang;
 
 import java.util.HashMap;
 import java.util.Set;

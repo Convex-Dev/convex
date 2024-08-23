@@ -6,7 +6,6 @@ module convex.core {
 	exports convex.core.data.type;
 	exports convex.core.init;
 	exports convex.core.lang.exception;
-	exports convex.core.lang.reader.antlr;
 	exports convex.core.transactions;
 	exports convex.core.util;
 	exports convex.core.exceptions;
@@ -14,8 +13,6 @@ module convex.core {
 	exports convex.core.crypto.bc;
 	exports convex.core.text;
 	exports convex.core.lang.reader;
-	exports convex.core.data.impl;
-	exports convex.core.lang.impl;
 	exports convex.core.crypto.wallet;
 	exports convex.core.lang.ops;
 	exports convex.core.data;

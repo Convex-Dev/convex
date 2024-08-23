@@ -22,9 +22,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
+import convex.core.lang.RecordFormat;
 import convex.core.lang.exception.AExceptional;
 import convex.core.lang.exception.ErrorValue;
-import convex.core.lang.impl.RecordFormat;
 
 /**
  * Class representing the result of a Query or Transaction.

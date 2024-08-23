@@ -21,7 +21,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 

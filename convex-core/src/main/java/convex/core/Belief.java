@@ -23,7 +23,7 @@ import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * Class representing a Peer's view of the overall network consensus state.

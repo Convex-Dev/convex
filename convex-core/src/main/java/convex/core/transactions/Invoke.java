@@ -16,7 +16,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Reader;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * Transaction class representing the Invoke of an on-chain operation.

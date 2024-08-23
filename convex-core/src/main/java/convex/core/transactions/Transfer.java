@@ -15,7 +15,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
-import convex.core.lang.impl.RecordFormat;
+import convex.core.lang.RecordFormat;
 
 /**
  * Transaction class representing a coin Transfer from one account to another
