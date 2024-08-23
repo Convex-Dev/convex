@@ -2866,7 +2866,7 @@ public class Core {
 		ACell form = null;
 
 		// Compile and execute forms in turn. Later definitions can use earlier macros!
-		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("convex/core.cvx"));
+		AList<ACell> forms = Reader.readAll(Utils.readResourceAsString("/convex/core/core.cvx"));
 		for (ACell f : forms) {
 			form = f;
 			ctx = ctx.expandCompile(form);
@@ -2967,7 +2967,7 @@ public class Core {
 		AHashMap<Symbol, AHashMap<ACell,ACell>> coreMeta = Maps.empty();
 
 		try {
-			METAS=Reader.read(Utils.readResourceAsString("convex/core/metadata.cvx"));
+			METAS=Reader.read(Utils.readResourceAsString("/convex/core/metadata.cvx"));
 			
 			// Register all objects from registered runtime
 			for (ACell o : tempReg) {
@@ -2982,7 +2982,8 @@ public class Core {
 
 			METADATA = coreMeta;
 			ENVIRONMENT = coreEnv;
-		} catch (IOException e) {
+		} catch (Exception e) {
+			e.printStackTrace();
 			throw new RuntimeException("IO Error initialising core!",e);
 		}
 	}

@@ -38,7 +38,7 @@ public class SimpleNFTTest extends ACVMTest {
 	}
 	
 	@Test public void testScript1() {
-		Context c=Testing.runTests(context(),"contracts/nft/simple-nft-test.con");
+		Context c=Testing.runTests(context(),"/contracts/nft/simple-nft-test.con");
 		assertNotError(c);
 	}
 	

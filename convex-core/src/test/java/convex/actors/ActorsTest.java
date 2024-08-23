@@ -90,7 +90,7 @@ public class ActorsTest extends ACVMTest {
 		Context ctx=exec(context(),"(do (def HERO "+HERO+") (def VILLAIN "+VILLAIN+"))");
 
 		// Technique of constructing a contract using a String
-		String contractString=Utils.readResourceAsString("contracts/token.con");
+		String contractString=Utils.readResourceAsString("/contracts/token.con");
 		ctx=exec(ctx,"(def my-token (deploy ("+contractString+" 101 1000 HERO)))"); // contract initialisation args
 
 		assertEquals(1000L,evalL(ctx,"(call my-token (balance *address*))"));
@@ -120,7 +120,7 @@ public class ActorsTest extends ACVMTest {
 		Context ctx=step("(do )");
 
 		// Technique for deploying contract with a quoted form
-		String contractString=Utils.readResourceAsString("contracts/hello.con");
+		String contractString=Utils.readResourceAsString("/contracts/hello.con");
 		ctx=step(ctx,"(def hello (deploy (quote "+contractString+")))");
 
 		ctx=step(ctx,"(call hello (greet \"Nikki\"))");
@@ -140,7 +140,7 @@ public class ActorsTest extends ACVMTest {
 
 		Address addr=ctx.getAddress();
 
-		String contractString=Utils.readResourceAsString("contracts/funding.con");
+		String contractString=Utils.readResourceAsString("/contracts/funding.con");
 		ctx=step(ctx,"(def funcon (deploy '"+contractString+"))");
 		assertFalse(ctx.isExceptional());
 		Address caddr=(Address) ctx.getResult();
@@ -227,7 +227,7 @@ public class ActorsTest extends ACVMTest {
 	@Test public void testExceptionContract() throws IOException {
 		Context ctx=step("(do )");
 
-		String contractString=Utils.readResourceAsString("contracts/exceptional.con");
+		String contractString=Utils.readResourceAsString("/contracts/exceptional.con");
 		ctx=exec(ctx,"(def ex (deploy '"+contractString+"))");
 
 		ctx=exec(ctx,"(call ex (halt-fn \"Jenny\"))");

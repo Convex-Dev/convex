@@ -48,7 +48,7 @@ public class DLFSLocal extends DLFileSystem {
 	}
 
 	@Override
-	public DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) {
+	protected DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter) {
 		AVector<ACell> result=DLFSNode.navigate(rootNode,dir);
 		return DLDirectoryStream.create(dir,result);
 	}

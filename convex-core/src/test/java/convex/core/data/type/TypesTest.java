@@ -31,8 +31,6 @@ import convex.test.Samples;
 import convex.test.Samples.ValueArgumentsProvider;
 
 public class TypesTest {
-
-
 	
 	@Test
 	public void testNil() {
@@ -187,7 +185,7 @@ public class TypesTest {
 	}
 	
 	
-	public static class TypeArgumentsProvider implements ArgumentsProvider {
+	static class TypeArgumentsProvider implements ArgumentsProvider {
 	    @Override
 	    public Stream<? extends Arguments> provideArguments(ExtensionContext context) {
 	    	return Stream.of(Types.ALL_TYPES).map(t -> Arguments.of(t));

@@ -9,7 +9,7 @@ import java.util.WeakHashMap;
  */
 public class LoadMonitor {
 
-	private static class LoadMetrics {
+	public static class LoadMetrics {
 		long last=0;
 		boolean isUp=false;
 		double load=0.0;

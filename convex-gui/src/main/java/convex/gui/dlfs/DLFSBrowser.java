@@ -13,7 +13,6 @@ import convex.core.data.AVector;
 import convex.dlfs.DLFS;
 import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
-import convex.dlfs.impl.DLFSLocal;
 import convex.gui.components.AbstractGUI;
 import convex.gui.state.StateExplorer;
 import convex.gui.utils.Toolkit;
@@ -102,8 +101,8 @@ public class DLFSBrowser extends AbstractGUI {
 	}
 
 
-	public static DLFSLocal createDemoDrive() {
-		DLFSLocal drive=DLFS.createLocal();
+	public static DLFileSystem createDemoDrive() {
+		DLFileSystem drive=DLFS.createLocal();
 		drive.updateTimestamp();
 		
 		DLPath p=drive.getRoot();

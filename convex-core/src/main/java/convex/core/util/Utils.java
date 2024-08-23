@@ -720,8 +720,7 @@ public class Utils {
 	
 
 	public static InputStream getResourceAsStream(String path) throws IOException {
-		ClassLoader classLoader = ClassLoader.getSystemClassLoader();
-		InputStream inputStream = classLoader.getResourceAsStream(path);
+		InputStream inputStream = Utils.class.getResourceAsStream(path);
 		if (inputStream == null) throw new IOException("Resource not found: " + path);
 		return inputStream;
 	}

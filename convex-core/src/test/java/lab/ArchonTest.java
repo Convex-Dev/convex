@@ -38,7 +38,7 @@ public class ArchonTest extends ACVMTest  {
 		ARCHON=ctx.getResult();
 		
 		try {
-			String code=Utils.readResourceAsString("lab/archon.cvx");
+			String code=Utils.readResourceAsString("/convex/lab/archon.cvx");
 			ctx=exec(ctx,"(eval-as archon '(do "+code+"))");
 			
 			

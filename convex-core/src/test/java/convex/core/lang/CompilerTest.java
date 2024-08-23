@@ -125,7 +125,7 @@ public class CompilerTest extends ACVMTest {
 	@Test public void testMinCompileRegression() throws IOException {
 		// a simple function to test
 		Context c=context();
-		String src=Utils.readResourceAsString("testsource/min.con");
+		String src=Utils.readResourceAsString("/testsource/min.con");
 		ACell form=Reader.read(src);
 		Context exp=c.expand(form);
 		assertNotError(exp);

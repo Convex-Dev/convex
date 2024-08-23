@@ -183,9 +183,9 @@ public abstract class DLFileSystem extends FileSystem implements Cloneable {
 	 * Implementation for delegation by DLFSProvider
 	 * @return Directory stream
 	 */
-	public abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter);
+	protected abstract DLDirectoryStream newDirectoryStream(DLPath dir, Filter<? super Path> filter);
 
-	public DLFSFileAttributes getFileAttributes(DLPath path) {
+	DLFSFileAttributes getFileAttributes(DLPath path) {
 		AVector<ACell> node=getNode(path);
 		return DLFSFileAttributes.create(node);
 	}

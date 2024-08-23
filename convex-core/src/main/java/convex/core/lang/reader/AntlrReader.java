@@ -69,7 +69,7 @@ import convex.core.util.Utils;
  
 public class AntlrReader {
 	
-	public static class CRListener implements ConvexListener {
+	static class CRListener implements ConvexListener {
 		ArrayList<ArrayList<ACell>> stack=new ArrayList<>();
 		
 		public CRListener() {
@@ -490,7 +490,7 @@ public class AntlrReader {
 		return read(CharStreams.fromReader(r));
 	}
 	
-	public static ACell read(CharStream cs) {
+	static ACell read(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		lexer.removeErrorListeners();
 		lexer.addErrorListener(new ConvexErrorListener() );
@@ -515,7 +515,7 @@ public class AntlrReader {
 		return readAll(CharStreams.fromString(source));
 	}
 
-	public static AList<ACell> readAll(CharStream cs) {
+	static AList<ACell> readAll(CharStream cs) {
 		ParseTree tree = getParseTree(cs);
 		
 		CRListener visitor=new CRListener();
@@ -525,12 +525,12 @@ public class AntlrReader {
 		return Lists.create(top);
 	}
 
-	public static ParseTree getParseTree(String input) {
+	static ParseTree getParseTree(String input) {
 		CharStream cs=CharStreams.fromString(input);
 		return getParseTree(cs);
 	}
 	
-	public static ParseTree getParseTree(CharStream cs) {
+	static ParseTree getParseTree(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		lexer.removeErrorListeners();
 		lexer.addErrorListener(new ConvexErrorListener() );

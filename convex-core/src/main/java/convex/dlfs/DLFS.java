@@ -25,7 +25,7 @@ public class DLFS {
 		return PROVIDER;
 	}
 	
-	public static DLFSLocal createLocal() {
+	public static DLFileSystem createLocal() {
 		return DLFSLocal.create(provider());
 	}
 

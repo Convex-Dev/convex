@@ -22,11 +22,18 @@ import convex.core.util.Utils;
 public class PredictionMarketTest extends ACVMTest {
 	Address addr;
 	
+	static String CONTRACT_STRING;
+	static {
+		try {
+			CONTRACT_STRING = Utils.readResourceAsString("/convex/lab/prediction-market.cvx");
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+	}
+	
 	@Override protected Context buildContext(Context ctx) {
 		try {
-			String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
-			
-			ctx=exec(ctx,contractString);
+			ctx=exec(ctx,CONTRACT_STRING);
 			ctx=exec(ctx,"(deploy (build-prediction-market *address* :bar #{true,false}))");
 
 			addr = (Address) ctx.getResult();
@@ -113,8 +120,7 @@ public class PredictionMarketTest extends ACVMTest {
 		ctx = exec(ctx, "(oaddr/register :bar {:trust #{*address*}})");
 
 		// deploy a prediction market using the oracle
-		String contractString = Utils.readResourceAsString("lab/prediction-market.cvx");
-		ctx=exec(ctx,"(deploy ("+contractString+" oaddr :bar #{true,false}))");
+		ctx=exec(ctx,"(deploy ("+CONTRACT_STRING+" oaddr :bar #{true,false}))");
 		Address pmaddr = (Address) ctx.getResult();
 		ctx = exec(ctx, "(def pmaddr " + pmaddr + ")");
 		ctx = stepAs(VILLAIN, ctx, "(def pmaddr "+pmaddr+")");
