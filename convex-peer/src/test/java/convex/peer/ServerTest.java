@@ -6,9 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
-import static convex.test.Assertions.*;
-
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -118,7 +115,7 @@ public class ServerTest {
 		assertEquals(10000000,convex.getBalance());
 
 		r=convex.transactSync("(do (transfer "+user+" 100000) *balance*)");
-		assertCVMEquals(10000000,r.getValue());
+		assertEquals("10000000",r.getValue().toString());
 
 	}
 
