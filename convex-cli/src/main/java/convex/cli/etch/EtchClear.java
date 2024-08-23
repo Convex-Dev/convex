@@ -3,7 +3,7 @@ package convex.cli.etch;
 import java.io.IOException;
 
 import convex.cli.CLIError;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 import picocli.CommandLine.Command;
 
 @Command(name="clear",

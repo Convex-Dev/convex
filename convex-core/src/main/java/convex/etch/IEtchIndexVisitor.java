@@ -1,4 +1,4 @@
-package etch;
+package convex.etch;
 
 /**
  * Visitor for Etch index

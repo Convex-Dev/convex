@@ -8,7 +8,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.text.Text;
 import convex.core.util.Utils;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -28,7 +28,7 @@ public class EtchInfo extends AEtchCommand{
 		EtchStore store=store();
 		try {
 		
-			etch.Etch etch=store.getEtch();
+			convex.etch.Etch etch=store.getEtch();
 			println("Etch file:          "+store.getFile().getCanonicalPath());
 			
 			println("Etch version:       0x"+Utils.toHexString(etch.getVersion()));

@@ -1,4 +1,4 @@
-package etch;
+package convex.etch;
 
 import java.io.IOException;
 

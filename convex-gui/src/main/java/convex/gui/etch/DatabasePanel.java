@@ -16,8 +16,8 @@ import javax.swing.SwingConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.etch.EtchStore;
 import convex.gui.components.ActionPanel;
-import etch.EtchStore;
 
 @SuppressWarnings("serial")
 public class DatabasePanel extends JPanel {

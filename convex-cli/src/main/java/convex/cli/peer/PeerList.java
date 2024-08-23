@@ -6,8 +6,8 @@ import java.util.List;
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
 import convex.core.data.AccountKey;
+import convex.etch.EtchStore;
 import convex.peer.API;
-import etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 

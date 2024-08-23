@@ -7,7 +7,7 @@ import convex.cli.mixins.KeyMixin;
 import convex.cli.mixins.PeerKeyMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.ParentCommand;
 

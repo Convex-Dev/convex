@@ -4,7 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.lang.Reader;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 

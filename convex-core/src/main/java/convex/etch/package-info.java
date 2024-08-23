@@ -1,4 +1,4 @@
 /**
  * Convex network transaction types.
  */
-package etch;
+package convex.etch;

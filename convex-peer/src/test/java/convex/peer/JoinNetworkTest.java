@@ -23,7 +23,7 @@ import convex.core.data.Keywords;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.lang.RT;
 import convex.core.transactions.Invoke;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 public class JoinNetworkTest {
 	private static TestNetwork network;

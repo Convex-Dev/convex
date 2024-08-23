@@ -13,7 +13,7 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 /**
  * Benchmarks from the Etch database

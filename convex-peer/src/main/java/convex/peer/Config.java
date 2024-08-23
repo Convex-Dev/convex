@@ -16,7 +16,7 @@ import convex.core.data.Keywords;
 import convex.core.store.AStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 /**
  * Static tools and utilities for Peer configuration

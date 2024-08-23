@@ -15,9 +15,9 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.util.Utils;
+import convex.etch.EtchStore;
 import convex.peer.API;
 import convex.peer.Server;
-import etch.EtchStore;
 
 public class JoinTestNetwork {
 	InetSocketAddress hostAddress=Utils.toInetSocketAddress("convex.world:18888");

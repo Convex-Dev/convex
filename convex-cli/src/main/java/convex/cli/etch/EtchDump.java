@@ -4,8 +4,8 @@ import convex.cli.Main;
 import convex.core.data.ACell;
 import convex.core.data.type.AType;
 import convex.core.lang.RT;
-import etch.EtchStore;
-import etch.EtchUtils.EtchCellVisitor;
+import convex.etch.EtchStore;
+import convex.etch.EtchUtils.EtchCellVisitor;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 

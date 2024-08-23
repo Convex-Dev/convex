@@ -28,10 +28,10 @@ import convex.core.init.Init;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
 import convex.core.transactions.Invoke;
-import etch.Etch;
-import etch.EtchStore;
-import etch.EtchUtils;
-import etch.EtchUtils.FullValidator;
+import convex.etch.Etch;
+import convex.etch.EtchStore;
+import convex.etch.EtchUtils;
+import convex.etch.EtchUtils.FullValidator;
 
 public class RestoreTest {
 	AKeyPair KP=AKeyPair.createSeeded(123456781);

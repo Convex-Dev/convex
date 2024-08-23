@@ -25,8 +25,8 @@ import convex.core.init.InitTest;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
+import convex.etch.EtchStore;
 import convex.test.Samples;
-import etch.EtchStore;
 
 public class StoresTest {
 	EtchStore testStore=EtchStore.createTemp();

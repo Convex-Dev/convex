@@ -6,7 +6,7 @@ import java.io.IOException;
 import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.core.util.FileUtils;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 

@@ -7,8 +7,8 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.text.Text;
-import etch.EtchStore;
-import etch.EtchUtils.FullValidator;
+import convex.etch.EtchStore;
+import convex.etch.EtchUtils.FullValidator;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -31,7 +31,7 @@ public class EtchValidate extends AEtchCommand{
 		}
 
 		@Override
-		public void visitHash(etch.Etch e, Hash h) {
+		public void visitHash(convex.etch.Etch e, Hash h) {
 			try {
 				Ref<ACell> r=e.read(h);
 				ACell cell=r.getValue();
@@ -57,7 +57,7 @@ public class EtchValidate extends AEtchCommand{
 		
 		EtchStore store=store();
 		ValidateVisitor visitor=new ValidateVisitor(cli());
-		etch.Etch etch=store.getEtch();
+		convex.etch.Etch etch=store.getEtch();
 		etch.visitIndex(visitor);
 		
 		long fails=visitor.failures;

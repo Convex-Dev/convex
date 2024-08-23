@@ -21,6 +21,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.PeerStatus;
 import convex.core.text.Text;
+import convex.etch.EtchStore;
 import convex.gui.client.ConvexClient;
 import convex.gui.components.BaseImageButton;
 import convex.gui.components.BaseListComponent;
@@ -35,7 +36,6 @@ import convex.gui.utils.Toolkit;
 import convex.gui.wallet.WalletApp;
 import convex.peer.ConnectionManager;
 import convex.peer.Server;
-import etch.EtchStore;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")

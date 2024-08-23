@@ -3,7 +3,7 @@ package convex.cli.etch;
 import convex.cli.ACommand;
 import convex.cli.Main;
 import convex.cli.mixins.EtchMixin;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.ParentCommand;
 

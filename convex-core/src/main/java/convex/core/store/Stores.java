@@ -1,6 +1,6 @@
 package convex.core.store;
 
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 public class Stores {
 

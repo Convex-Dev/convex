@@ -18,9 +18,9 @@ import convex.core.crypto.PFXTools;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.util.Utils;
+import convex.etch.EtchStore;
 import convex.peer.API;
 import convex.peer.Server;
-import etch.EtchStore;
 
 public class ClientTest {
 	private static final char[] KEYSTORE_PASSWORD = "genesisStorePassword".toCharArray();

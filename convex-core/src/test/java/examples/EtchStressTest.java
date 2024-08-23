@@ -8,7 +8,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.store.Stores;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 /**
  * A test application that just writes a lot of random Blobs to Etch in order to test

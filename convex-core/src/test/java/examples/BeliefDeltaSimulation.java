@@ -1,6 +1,6 @@
 package examples;
 
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 /**
  * Test class for processing of Belief Delta messages

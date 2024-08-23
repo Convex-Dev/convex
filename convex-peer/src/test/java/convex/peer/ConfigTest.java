@@ -16,7 +16,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import etch.EtchStore;
+import convex.etch.EtchStore;
 
 public class ConfigTest {
 	

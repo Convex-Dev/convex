@@ -12,9 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.store.Stores;
+import convex.etch.EtchStore;
 import convex.gui.components.AbstractGUI;
 import convex.gui.models.StateModel;
-import etch.EtchStore;
 
 /**
  * A Client application for exploring an Etch store
