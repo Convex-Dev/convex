@@ -11,6 +11,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.impl.HandlerException;
 
 /**
  * Tests for the low level Connection class
@@ -18,7 +19,7 @@ import convex.core.util.Utils;
 public class ConnectionTest {
 	
 	@Test
-	public void testMessageFlood() throws IOException, BadFormatException, InterruptedException {
+	public void testMessageFlood() throws IOException, BadFormatException, InterruptedException, HandlerException {
 		final ArrayList<Message> received = new ArrayList<>();
 
 		MemoryByteChannel chan = MemoryByteChannel.create(100);
@@ -33,15 +34,15 @@ public class ConnectionTest {
 		}, conn);
 		
 		Thread receiveThread=new Thread(()-> {
-			while (true) {
+			while (!Thread.currentThread().isInterrupted()) {
 				try {
 					mr.receiveFromChannel(chan);
 					if(Thread.interrupted()) return;
-				} catch (BadFormatException | IOException e) {
+				} catch (BadFormatException | IOException | HandlerException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 					throw Utils.sneakyThrow(e);
-				}
+				} 
 			}
 		});
 		receiveThread.start();

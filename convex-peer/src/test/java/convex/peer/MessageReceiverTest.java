@@ -23,11 +23,12 @@ import convex.net.MemoryByteChannel;
 import convex.net.Message;
 import convex.net.MessageReceiver;
 import convex.net.MessageType;
+import convex.net.impl.HandlerException;
 
 public class MessageReceiverTest {
 
 	@Test
-	public void testSimpleMessages() throws IOException, BadFormatException {
+	public void testSimpleMessages() throws IOException, BadFormatException, HandlerException {
 		final ArrayList<Message> received = new ArrayList<>();
 
 		MemoryByteChannel chan = MemoryByteChannel.create(10000);
@@ -57,7 +58,7 @@ public class MessageReceiverTest {
 	}
 	
 	@Test
-	public void testBigMessage() throws IOException, BadFormatException {
+	public void testBigMessage() throws IOException, BadFormatException, HandlerException {
 		final ArrayList<Message> received = new ArrayList<>();
 
 		MemoryByteChannel chan = MemoryByteChannel.create(1000);

@@ -22,6 +22,7 @@ import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.impl.HandlerException;
 import convex.peer.Config;
 import convex.peer.Server;
 
@@ -45,7 +46,6 @@ public class NIOServer implements Closeable {
 	protected static final long PRUNE_TIMEOUT = 60000;
 
 	private ServerSocketChannel ssc = null;
-
 
 	private Selector selector = null;
 
@@ -119,7 +119,7 @@ public class NIOServer implements Closeable {
 		running = true;
 
 		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + port);
-		selectorThread.setDaemon(true);
+		selectorThread.setDaemon(true); // daemon thread so it doesn't stop shutdown
 		selectorThread.start();
 		log.debug("NIO server started on port {}", port);
 	}
@@ -136,8 +136,9 @@ public class NIOServer implements Closeable {
 			// Use the store configured for the owning server.
 			Stores.setCurrent(server.getStore());
 			try {
-
-				while (running) {
+				// loop unless we are interrupted
+				while (running && !Thread.currentThread().isInterrupted()) {
+					
 					selector.select(SELECT_TIMEOUT);
 					
 
@@ -176,7 +177,6 @@ public class NIOServer implements Closeable {
 						lastConnectionPrune=ts;
 					}
 
-					
 					// keys.clear();
 				}
 			} catch (IOException e) {
@@ -288,6 +288,9 @@ public class NIOServer implements Closeable {
 			log.info("Cancelled connection: Bad data format from: {} message: {}", conn.getRemoteAddress(),
 					e.getMessage());
 			// TODO: blacklist peer?
+			key.cancel();
+		} catch (HandlerException e) {
+			log.warn("Unexpected exception in receive handler", e.getCause());
 			key.cancel();
 		}
 	}

@@ -41,6 +41,7 @@ import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
+import convex.net.impl.HandlerException;
 import convex.peer.Config;
 
 /**
@@ -198,7 +199,7 @@ public class Connection {
 			if (elapsed > Config.DEFAULT_CLIENT_TIMEOUT)
 				throw new TimeoutException("Couldn't connect after "+elapsed+"ms");
 			try {
-				Thread.sleep(10+elapsed/5);
+				Thread.sleep(10+elapsed/3);
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
 				throw new IOException("Connect interrupted", e);
@@ -376,7 +377,7 @@ public class Connection {
 	 * @throws IOException In the event of an IO error, e.g. closed connection
 	 */
 	public long sendTransaction(SignedData<ATransaction> signed) throws IOException {
-		AStore temp = Stores.current();
+		AStore savedStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
 			long id = getNextID();
@@ -384,7 +385,7 @@ public class Connection {
 			boolean sent = sendObject(MessageType.TRANSACT, v);
 			return (sent) ? id : -1;
 		} finally {
-			Stores.setCurrent(temp);
+			Stores.setCurrent(savedStore);
 		}
 	}
 
@@ -556,7 +557,7 @@ public class Connection {
 		@Override
 		public void run() {
 			log.trace("Client selector loop starting...");
-			while (true) {
+			while (!Thread.currentThread().isInterrupted()) {
 				try {
 					selector.select(300);
 					Set<SelectionKey> keys = selector.selectedKeys();
@@ -622,6 +623,10 @@ public class Connection {
 			log.warn("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
 					+ e.getMessage());
 			key.cancel();
+		} catch (HandlerException e) {
+			log.warn("Cancelled connection: error in handler: " +e.getMessage());
+			key.cancel();
+			
 		}
 	}
 
@@ -636,8 +641,8 @@ public class Connection {
 	 * @throws IOException If IO error occurs
 	 * @throws BadFormatException If there is an encoding error
 	 */
-	public int handleChannelRecieve() throws IOException, BadFormatException {
-		AStore tempStore = Stores.current();
+	public int handleChannelRecieve() throws IOException, BadFormatException, HandlerException {
+		AStore savedStore = Stores.current();
 		try {
 			// set the current store for handling incoming messages
 			Stores.setCurrent(store);
@@ -650,7 +655,7 @@ public class Connection {
 			if (recd>0) lastActivity=System.currentTimeMillis();
 			return total;
 		} finally {
-			Stores.setCurrent(tempStore);
+			Stores.setCurrent(savedStore);
 		}
 	}
 

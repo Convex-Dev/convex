@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
+import convex.net.impl.HandlerException;
 import convex.peer.Config;
 
 /**
@@ -79,8 +80,9 @@ public class MessageReceiver {
 	 * @throws IOException If IO error occurs
 	 * @return The number of bytes read from the channel, or -1 if EOS
 	 * @throws BadFormatException If a bad encoding is received
-	 */
-	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws IOException, BadFormatException {
+	 * @throws HandlerException If the message handler throws an unexpected Exception
+ 	 */
+	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws IOException, BadFormatException, HandlerException {
 		int numRead=0;
 
 		numRead = chan.read(buffer);
@@ -137,26 +139,26 @@ public class MessageReceiver {
 	 *
 	 * SECURITY: Gets called on NIO thread for Server / Client connections
 	 *
-	 * @throws BadFormatException if the message is incorrectly formatted`
+	 * @throws BadFormatException if the message is incorrectly formatted
+	 * @throws HandlerException If the message handler throws an unexpected Exception
 	 */
-	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException {
-		try {
-			Message message = Message.create(connection, type, encoding);
-			
-			// call the receiver hook, if registered
-			maybeCallHook(message);
-			
-			// Otherwise, send to the message receive action
-			receivedMessageCount++;
-			if (action != null) {
-				log.trace("Message received: {}", message.getType());
+	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException, HandlerException {
+		Message message = Message.create(connection, type, encoding);
+		
+		// call the receiver hook, if registered
+		maybeCallHook(message);
+		
+		// Otherwise, send to the message receive action
+		receivedMessageCount++;
+		if (action != null) {
+			log.trace("Message received: {}", message.getType());
+			try {
 				action.accept(message);
-			} else {
-				log.warn("Ignored message because no receive action set: " + message);
+			} catch (Exception e) {
+				throw new HandlerException("Error in message receive action handler: "+e.getMessage(),e);
 			}
-		} catch (Exception e) {
-			// TODO: handle Throwable vs Exception differently? Close connection?
-			log.warn("Exception in receive action from: " + connection.getRemoteAddress(),e);
+		} else {
+			log.warn("Ignored message because no receive action set: " + message);
 		}
 	}
 
