@@ -367,9 +367,6 @@ public class Connection {
 	 * Sends a transaction if possible, returning the message ID (greater than zero)
 	 * if successful.
 	 *
-	 * Uses the configured CLIENT_STORE to store the transaction, so that any
-	 * missing data requests from the server can be honoured.
-	 *
 	 * Returns -1 if the message could not be sent because of a full buffer.
 	 *
 	 * @param signed Signed transaction
@@ -377,16 +374,10 @@ public class Connection {
 	 * @throws IOException In the event of an IO error, e.g. closed connection
 	 */
 	public long sendTransaction(SignedData<ATransaction> signed) throws IOException {
-		AStore savedStore = Stores.current();
-		try {
-			Stores.setCurrent(store);
-			long id = getNextID();
-			AVector<ACell> v = Vectors.of(id, signed);
-			boolean sent = sendObject(MessageType.TRANSACT, v);
-			return (sent) ? id : -1;
-		} finally {
-			Stores.setCurrent(savedStore);
-		}
+		long id = getNextID();
+		AVector<ACell> v = Vectors.of(id, signed);
+		boolean sent = sendObject(MessageType.TRANSACT, v);
+		return (sent) ? id : -1;
 	}
 
 	/**
