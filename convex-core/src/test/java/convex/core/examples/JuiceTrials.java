@@ -1,4 +1,4 @@
-package examples;
+package convex.core.examples;
 
 /**
  * Test class for juice costs relative to execution time

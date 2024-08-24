@@ -1,13 +1,13 @@
 package convex.peer;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
 import convex.core.data.ABlob;

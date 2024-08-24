@@ -1,4 +1,4 @@
-package examples;
+package convex.peer.examples;
 
 import java.io.IOException;
 import java.net.Inet4Address;

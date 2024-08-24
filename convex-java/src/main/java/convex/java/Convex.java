@@ -382,7 +382,6 @@ public class Convex {
 		req.put("accountKey", getKeyPair().getAccountKey().toHexString());
 		req.put("sig", sd.toHexString());
 		String json=JSON.toPrettyString(req);
-		// System.out.println("Submitting:\n "+json);
 		return doPostAsync(url+"/api/v1/transaction/submit",json);
 	}
 

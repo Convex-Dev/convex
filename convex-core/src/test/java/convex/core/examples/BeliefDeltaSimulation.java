@@ -1,4 +1,4 @@
-package examples;
+package convex.core.examples;
 
 import convex.etch.EtchStore;
 

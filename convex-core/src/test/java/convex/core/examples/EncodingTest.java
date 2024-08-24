@@ -1,4 +1,4 @@
-package examples;
+package convex.core.examples;
 
 import convex.core.data.AVector;
 import convex.core.data.Cells;

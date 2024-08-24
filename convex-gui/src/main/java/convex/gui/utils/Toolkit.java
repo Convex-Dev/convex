@@ -167,12 +167,12 @@ public class Toolkit {
 	private static void loadFonts() {
 		try {
 			{ // Source Code Pro
-				InputStream is = Utils.getResourceAsStream("fonts/SourceCodePro-Regular.ttf");
+				InputStream is = Utils.getResourceAsStream("/fonts/SourceCodePro-Regular.ttf");
 				MONO_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(DEFAULT_FONT_SIZE);
 			}
 			
 			{ // Material Symbols
-				InputStream is = Utils.getResourceAsStream("fonts/MaterialSymbolsSharp.ttf");
+				InputStream is = Utils.getResourceAsStream("/fonts/MaterialSymbolsSharp.ttf");
 				SYMBOL_FONT = Font.createFont(Font.TRUETYPE_FONT, is).deriveFont(SYMBOL_FONT_SIZE);
 			}
 			DEFAULT_FONT=DEFAULT_FONT.deriveFont(DEFAULT_FONT_SIZE).deriveFont(Font.PLAIN);

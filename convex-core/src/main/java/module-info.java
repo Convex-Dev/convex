@@ -20,7 +20,7 @@ module convex.core {
 	exports convex.etch;
 	exports convex.dlfs;
 
-	requires transitive org.antlr.antlr4.runtime;
+	requires org.antlr.antlr4.runtime;
 	requires org.apache.commons.text;
 	requires org.bouncycastle.pkix;
 	requires transitive org.bouncycastle.provider;

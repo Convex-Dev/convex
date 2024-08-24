@@ -27,15 +27,7 @@
 			<artifactId>convex-core</artifactId>
 			<version>${convex.version}</version>
         	<scope>compile</scope>
-		</dependency>
-		<dependency>
-			<groupId>world.convex</groupId>
-			<artifactId>convex-core</artifactId>
-			<version>${convex.version}</version>
-		    <classifier>tests</classifier>
-		    <scope>test</scope>
-		</dependency>
-		
+		</dependency>		
 		<dependency>
 		    <groupId>org.slf4j</groupId>
 		    <artifactId>slf4j-simple</artifactId>
@@ -55,6 +47,12 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.junit.jupiter</groupId>
+			<artifactId>junit-jupiter-api</artifactId>
+			<version>${junit.version}</version>
+			<scope>test</scope>
+		</dependency>
+<!--	<dependency>
 			<groupId>org.junit.vintage</groupId>
 			<artifactId>junit-vintage-engine</artifactId>
 			<version>${junit.version}</version>
@@ -66,5 +64,6 @@
 			<version>${junit.version}</version>
 			<scope>test</scope>
 		</dependency>
+		-->	
 	</dependencies>
 </project>

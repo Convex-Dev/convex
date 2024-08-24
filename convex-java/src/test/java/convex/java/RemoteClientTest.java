@@ -27,18 +27,10 @@ public class RemoteClientTest {
 		AKeyPair kp=AKeyPair.generate();
 		Convex convex=Convex.connect(TEST_PEER);
 		
-		try {
-			Address addr=convex.createAccount(kp);
-			convex.setAddress(addr);
-			convex.setKeyPair(kp);
-			return convex;
-		} catch (Throwable t) {
-			System.err.println("Skipping remote tests to: "+TEST_PEER);
-			System.err.println("reason: "+t);
-			skip=true;
-			return null;
-		}
-
+		Address addr=convex.createAccount(kp);
+		convex.setAddress(addr);
+		convex.setKeyPair(kp);
+		return convex;
 	}
 	
 	@Test public void testQuery() {
@@ -120,7 +112,6 @@ public class RemoteClientTest {
 
 	protected void checkValid(Convex convex) {
 		if (convex==null) {
-			System.err.println("null convex instance, skipping tests");
 			Assume.assumeTrue(false);
 		} else {
 			// OK?
