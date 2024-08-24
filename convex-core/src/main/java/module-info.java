@@ -10,7 +10,6 @@ module convex.core {
 	exports convex.core.util;
 	exports convex.core.exceptions;
 	exports convex.core.data.prim;
-	exports convex.core.crypto.bc;
 	exports convex.core.text;
 	exports convex.core.lang.reader;
 	exports convex.core.crypto.wallet;
@@ -20,7 +19,7 @@ module convex.core {
 	exports convex.etch;
 	exports convex.dlfs;
 
-	requires org.antlr.antlr4.runtime;
+	requires transitive org.antlr.antlr4.runtime;
 	requires org.apache.commons.text;
 	requires org.bouncycastle.pkix;
 	requires transitive org.bouncycastle.provider;

@@ -16,6 +16,42 @@
 		<version>0.7.14-SNAPSHOT</version>
 	</parent>
 
+	<build>
+		<plugins>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>3.7.1</version>
+				<configuration>
+					<outputDirectory>${project.directory}</outputDirectory>
+					<archive>
+						<manifest>
+							<mainClass>convex.main.Main</mainClass>
+							<!-- Used to add Maven implementation version  -->
+							<addDefaultImplementationEntries>
+								true
+							</addDefaultImplementationEntries>
+						</manifest>
+					</archive>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<finalName>convex</finalName>
+					<!-- We want differentiated outputs  -->
+					<appendAssemblyId>false</appendAssemblyId>
+				</configuration>
+				<executions>
+					<execution>
+						<id>create-archive</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
 	<dependencies>
 		<dependency>
 			<groupId>world.convex</groupId>
@@ -43,6 +79,16 @@
 			<artifactId>convex-java</artifactId>
 			<version>${convex.version}</version>
 		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-cli</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-gui</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
 
 		<!-- TEST DEPENDENCIES -->
 		<dependency>
@@ -55,6 +101,7 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-nop</artifactId>
 			<version>${slf4j.version}</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 </project>

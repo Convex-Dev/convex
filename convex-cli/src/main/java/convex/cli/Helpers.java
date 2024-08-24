@@ -110,7 +110,7 @@ public class Helpers {
 
 	public static String getConvexArt() {
 		try {
-			String art=Utils.readResourceAsString("art/convex.logo");
+			String art=Utils.readResourceAsString("/art/convex.logo");
 			return art;
 		} catch (Exception e) {
 			return null;

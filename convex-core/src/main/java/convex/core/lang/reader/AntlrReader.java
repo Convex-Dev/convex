@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
@@ -539,6 +540,10 @@ public class AntlrReader {
 		parser.removeErrorListeners();
 		ParseTree tree = parser.allForms();
 		return tree;
+	}
+
+	public static Lexer getLexer(CharStream cs) {
+		return new ConvexLexer(cs);
 	}
 
 }

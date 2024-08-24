@@ -12,9 +12,10 @@ import javax.swing.text.StyledDocument;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 
-import convex.core.lang.reader.antlr.ConvexLexer;
+import convex.core.lang.reader.AntlrReader;
 
 /**
  * Tools for highlighting Convex Lisp code in Swing
@@ -52,7 +53,7 @@ public class CVXHighlighter {
 			String input=d.getText(start, end-start);
 			
 			CharStream cs=CharStreams.fromString(input);
-			ConvexLexer lexer=new ConvexLexer(cs);
+			Lexer lexer=AntlrReader.getLexer(cs);
 			lexer.removeErrorListeners();
 			CommonTokenStream tokens = new CommonTokenStream(lexer);
 			tokens.fill();
