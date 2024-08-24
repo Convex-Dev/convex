@@ -4,6 +4,6 @@ module convex.java {
 
 	requires transitive convex.core;
 	requires json.simple;
-	requires org.apache.httpcomponents.client5.httpclient5;
-	requires org.apache.httpcomponents.core5.httpcore5;
+	requires transitive org.apache.httpcomponents.client5.httpclient5;
+	requires transitive org.apache.httpcomponents.core5.httpcore5;
 }

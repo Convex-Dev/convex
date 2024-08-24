@@ -1,5 +1,6 @@
 package convex.restapi;
 
+import java.io.Closeable;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -27,7 +28,7 @@ import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
 
-public class RESTServer {
+public class RESTServer implements Closeable {
 	protected static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
 
 	protected final Server server;
@@ -58,7 +59,7 @@ public class RESTServer {
 			config.staticFiles.add(staticFiles -> {
 				staticFiles.hostedPath = "/";
 				staticFiles.location = Location.CLASSPATH; // Specify resources from classpath
-				staticFiles.directory = "/public"; // Resource location in classpath
+				staticFiles.directory = "/convex/restapi/pub"; // Resource location in classpath
 				staticFiles.precompress = false; // if the files should be pre-compressed and cached in memory
 													// (optimization)
 				staticFiles.aliasCheck = null; // you can configure this to enable symlinks (=
@@ -108,7 +109,7 @@ public class RESTServer {
             pluginConfig
             .withDocumentationPath(docsPath)
             .withDefinitionConfiguration((version, definition) -> {
-                definition.withOpenApiInfo(info -> {
+                definition.withInfo(info -> {
 					info.setTitle("Convex REST API");
 					info.setVersion("0.7.0");
                 });
@@ -186,6 +187,10 @@ public class RESTServer {
 	public void stop() {
 		app.stop();
 		// app.close(); // Gone In Javalin 6?
+	}
+	
+	public void close() {
+		stop();
 	}
 
 	public Convex getConvex() {

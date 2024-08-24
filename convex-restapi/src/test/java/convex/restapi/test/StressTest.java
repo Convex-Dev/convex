@@ -1,4 +1,4 @@
-package convex.restapi;
+package convex.restapi.test;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -15,6 +15,7 @@ import convex.java.Convex;
 import convex.java.JSON;
 import convex.peer.API;
 import convex.peer.Server;
+import convex.restapi.RESTServer;
 
 public class StressTest {
 

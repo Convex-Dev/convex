@@ -194,6 +194,7 @@ public class GenTestCore {
 		assertNull(RT.vec(a));
 	}
 	
+	@SuppressWarnings("exports")
 	@Property 
 	public void testCoreArgs(@From(VectorGen.class) AVector<@From(ValueGen.class) ACell> a) throws IOException {
 		Context ctx=new CoreTest().context();

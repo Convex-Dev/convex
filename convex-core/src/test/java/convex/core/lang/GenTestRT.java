@@ -19,6 +19,7 @@ import convex.test.generators.ValueGen;
 @RunWith(JUnitQuickcheck.class)
 public class GenTestRT {
 
+	@SuppressWarnings("exports")
 	@Property
 	public void setConversion(@From(CollectionGen.class) ACollection<@From(ValueGen.class) ACell> a) {
 		long ac = a.count();
@@ -35,6 +36,7 @@ public class GenTestRT {
 		assertNotNull(s);
 	}
 
+	@SuppressWarnings("exports")
 	@Property
 	public void conjTest(@From(CollectionGen.class) ACollection<@From(ValueGen.class) ACell> a, @From(ValueGen.class) ACell b) {
 		ACollection<ACell> ac = a.conj(b);

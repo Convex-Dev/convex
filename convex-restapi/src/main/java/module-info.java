@@ -1,5 +1,4 @@
 module convex.restapi {
-	exports convex.restapi.api;
 	exports convex.restapi;
 	exports convex.restapi.model;
 
@@ -13,10 +12,13 @@ module convex.restapi {
 	requires javalin.swagger.plugin;
 	// requires static com.fasterxml.jackson.databind;
 	requires jetty.servlet.api;
-	requires kotlin.stdlib;
+	requires transitive kotlin.stdlib;
+	requires kotlin.reflect;
 	requires org.eclipse.jetty.server;
 	
 	requires org.slf4j;
 	requires convex.java;
 	// requires org.junit.jupiter.api;
+	
+	opens convex.restapi.pub; 
 }

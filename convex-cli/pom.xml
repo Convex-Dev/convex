@@ -127,20 +127,6 @@
 			<groupId>world.convex</groupId>
 			<artifactId>convex-restapi</artifactId>
 			<version>${convex.version}</version>
-			<exclusions>
-				<exclusion>
-					<groupId>org.slf4j</groupId>
-					<artifactId>slf4j-simple</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>log4j</groupId>
-					<artifactId>log4j</artifactId>
-				</exclusion>
-				<exclusion>
-					<groupId>com.bladejava</groupId>
-					<artifactId>blade-log</artifactId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>info.picocli</groupId>

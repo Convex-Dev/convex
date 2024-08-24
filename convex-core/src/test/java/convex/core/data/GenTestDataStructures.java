@@ -16,9 +16,11 @@ import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 import convex.core.lang.RT;
 import convex.test.generators.*;
 
+@SuppressWarnings("exports")
 @RunWith(JUnitQuickcheck.class)
 public class GenTestDataStructures {
 
+	
 	@Property
 	public void empty(@From(DataStructureGen.class) ADataStructure<@From(ValueGen.class) ACell> a) {
 		long c = a.count();
