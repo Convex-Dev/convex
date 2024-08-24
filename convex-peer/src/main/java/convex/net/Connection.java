@@ -395,8 +395,7 @@ public class Connection {
 	}
 
 	/**
-	 * Sends a full payload for the given message type. Should be called on the thread
-	 * that responds to missing data messages from the destination.
+	 * Sends a message with full payload for the given message type.
 	 *
 	 * @param type    Type of message
 	 * @param payload Payload value for message

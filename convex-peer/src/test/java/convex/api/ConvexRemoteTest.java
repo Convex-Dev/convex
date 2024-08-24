@@ -21,6 +21,7 @@ import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.data.Address;
+import convex.core.data.Blobs;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
@@ -31,6 +32,8 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.net.Connection;
+import convex.net.Message;
+import convex.net.MessageType;
 import convex.peer.TestNetwork;
 
 /**
@@ -69,6 +72,13 @@ public class ConvexRemoteTest {
 			convex.reconnect();
 			assertTrue(convex.isConnected());
 		}
+	}
+	
+	@Test
+	public void testBadQueryMessage() throws IOException, TimeoutException {
+		ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
+		Connection conn=convex.connection;
+		conn.sendMessage(Message.create(MessageType.QUERY, Blobs.empty()));
 	}
 
 	@Test

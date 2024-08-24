@@ -111,9 +111,9 @@ public class Message {
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T getPayload() throws BadFormatException {
 		if (payload!=null) return (T) payload;
-		if (messageData==null) return null;
+		if (messageData==null) return null; // no message data, so must actually be null
 		
-		// actual null payload :-)
+		// detect actual message data for null payload :-)
 		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
 		
 		switch(type) {

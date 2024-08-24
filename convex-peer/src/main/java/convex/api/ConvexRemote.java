@@ -119,8 +119,8 @@ public class ConvexRemote extends Convex {
 		CompletableFuture<Result> cf;
 		long id = -1;
 		long wait=1;
-		// loop until request is queued
 		
+		// loop until request is queued. We need this for backpressure
 		while (true) {
 			if (connection.isClosed()) throw new IOException("Connection closed");
 			synchronized (awaiting) {
@@ -137,21 +137,20 @@ public class ConvexRemote extends Convex {
 				Thread.sleep(wait);
 				wait+=1; // linear backoff
 			} catch (InterruptedException e) {
-				throw Utils.sneakyThrow(e);
+				Thread.currentThread().interrupt();
+				throw new IOException("Transaction sending interrupted",e);
 			}
 		}
 
 		log.trace("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
 		return cf;
 	}
-	
-
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
 		long wait=1;
 		
-		// loop until request is queued
+		// loop until request is queued. We need this for backpressure
 		while (true) {
 			synchronized (awaiting) {
 				long id = connection.sendQuery(query, address);
@@ -166,7 +165,8 @@ public class ConvexRemote extends Convex {
 				Thread.sleep(wait);
 				wait+=wait; // exponential backoff
 			} catch (InterruptedException e) {
-				throw new IOException("Transaction sending interrupted",e);
+				Thread.currentThread().interrupt();
+				throw new IOException("Query sending interrupted",e);
 			}
 		}
 	}
