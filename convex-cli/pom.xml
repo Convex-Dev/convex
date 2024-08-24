@@ -9,7 +9,7 @@
 	<artifactId>convex-cli</artifactId>
 
 	<name>Convex CLI</name>
-	<description>Convex command line integration and tools</description>
+	<description>Convex command line interface</description>
 	<url>https://convex.world</url>
 
 	<properties>

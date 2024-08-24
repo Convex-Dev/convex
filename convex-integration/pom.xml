@@ -1,11 +1,41 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
 
-  <parent>
-    <groupId>world.convex</groupId>
-    <artifactId>convex</artifactId>
-    <version>0.7.14-SNAPSHOT</version>
-  </parent>
-  
-  <artifactId>convex-integration</artifactId>
+
+	<artifactId>convex-integration</artifactId>
+	<description>
+		Module intented primarily to implement integration testing across
+		different Convex artifacts
+	</description>
+
+	<parent>
+		<groupId>world.convex</groupId>
+		<artifactId>convex</artifactId>
+		<version>0.7.14-SNAPSHOT</version>
+	</parent>
+	
+	<dependencies>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-peer</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-sodium</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-core</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>world.convex</groupId>
+			<artifactId>convex-java</artifactId>
+			<version>${convex.version}</version>
+		</dependency>
+	</dependencies>
 </project>
