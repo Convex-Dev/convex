@@ -43,7 +43,7 @@ public class RemoteClientTest {
 	
 	@AfterAll 
 	public static void cleanShutdown() {
-		server.stop();
+		server.close();
 	}
 	
 	@Test 

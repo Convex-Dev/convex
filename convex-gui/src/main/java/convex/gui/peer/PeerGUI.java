@@ -101,7 +101,7 @@ public class PeerGUI extends AbstractGUI {
 			        public void windowClosing(WindowEvent winEvt) {
 			        	// shut down peers gracefully
 			    		manager.serverPanel.manager.closePeers();
-			    		manager.restServer.stop();
+			    		manager.restServer.close();
 			        }
 			    });
 

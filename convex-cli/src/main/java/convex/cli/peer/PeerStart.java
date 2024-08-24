@@ -130,7 +130,7 @@ public class PeerStart extends APeerCommand {
 				log.debug("Controller address not specified.");
 			}
 
-			RESTServer restServer=null;;
+			RESTServer restServer=null;
 			try {
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
@@ -153,7 +153,7 @@ public class PeerStart extends APeerCommand {
 				Thread.currentThread().interrupt();
 				return;
 			} finally {
-				if (restServer!=null) restServer.stop();
+				if (restServer!=null) restServer.close();
 			}
 		}
 	}

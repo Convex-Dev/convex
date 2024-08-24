@@ -1,7 +1,10 @@
 package convex.restapi.test;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import java.io.IOException;
 
+import org.apache.hc.client5.http.fluent.Content;
 import org.apache.hc.client5.http.fluent.Request;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -27,7 +30,7 @@ public class RESTAPITest {
 	@AfterAll 
 	public static void cleanShutdown() {
 		if (server!=null) {
-			server.stop();
+			server.close();
 		}
 	}
 	
@@ -36,6 +39,8 @@ public class RESTAPITest {
 	}
 	
 	@Test public void testSwagger() throws IOException {
-		Request.get("http://localhost:" + server.getPort()+"/swagger").execute().returnContent();
+		Content c = Request.get("http://localhost:" + server.getPort()+"/swagger").execute().returnContent();
+		String s = c.asString();
+		assertFalse(s.isBlank());
 	}
 }

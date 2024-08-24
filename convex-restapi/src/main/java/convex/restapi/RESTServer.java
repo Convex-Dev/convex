@@ -184,13 +184,9 @@ public class RESTServer implements Closeable {
 		}
 	}
 
-	public void stop() {
+	public void close() {
 		app.stop();
 		// app.close(); // Gone In Javalin 6?
-	}
-	
-	public void close() {
-		stop();
 	}
 
 	public Convex getConvex() {
