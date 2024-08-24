@@ -1161,8 +1161,9 @@ public class Utils {
 	 * @param timeoutMillis Timeout interval
 	 * @param test Test to run until true
 	 * @return True if the operation timed out, false otherwise
+	 * @throws InterruptedException 
 	 */
-	public static boolean timeout(int timeoutMillis, Supplier<Boolean> test) {
+	public static boolean timeout(int timeoutMillis, Supplier<Boolean> test) throws InterruptedException {
 		long start = getTimeMillis();
 		long end=start+timeoutMillis;
 		long now = start;
@@ -1172,17 +1173,12 @@ public class Utils {
 			if (test.get()) return false;
 
 			// test failed, so sleep
-			try {
-				// compute sleep time
-				long nextInterval=(long) ((now - start) * 0.3 + 1);
-				long sleepTime=Math.min(nextInterval, end-now);
-				if (sleepTime<0L) return true;
-				Thread.sleep(sleepTime);
-			} catch (InterruptedException e) {
-				// ignore? Probably shouldn't happen though
-				// But should set interrupt flag as below;
-				Thread.currentThread().interrupt();
-			}
+			// compute sleep time
+			long nextInterval=(long) ((now - start) * 0.3 + 1);
+			long sleepTime=Math.min(nextInterval, end-now);
+			if (sleepTime<0L) return true;
+			Thread.sleep(sleepTime);
+
 			now = getTimeMillis();
 		}
 	}

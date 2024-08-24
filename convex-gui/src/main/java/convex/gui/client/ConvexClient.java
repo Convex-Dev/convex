@@ -5,6 +5,7 @@ import java.awt.Dimension;
 import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
+import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JTabbedPane;
 
@@ -16,6 +17,7 @@ import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.panels.REPLPanel;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * A Client application for the Convex Network.
@@ -50,7 +52,10 @@ public class ConvexClient extends AbstractGUI {
 		if (convex==null) {
 			System.exit(1);
 		}
-		new ConvexClient(convex).run();
+		ConvexClient gui=new ConvexClient(convex);
+		gui.run();
+		gui.waitForClose();
+		System.exit(0);
 	}
 
 	public JTabbedPane tabs = new JTabbedPane();
@@ -86,6 +91,12 @@ public class ConvexClient extends AbstractGUI {
 			}
 		}
 		System.err.println("Missing tab: " + title);
+	}
+
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
 	}
 
 

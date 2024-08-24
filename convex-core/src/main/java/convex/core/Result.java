@@ -100,6 +100,10 @@ public final class Result extends ARecordGeneric {
 	public static Result error(Keyword errorCode, AString message) {
 		return error(errorCode,message,null);
 	}
+	
+	public static Result error(Keyword errorCode, String message) {
+		return error(errorCode,Strings.create(message),null);
+	}
 
 	private static Result error(Keyword errorCode, AString message, AHashMap<Keyword,ACell> info) {
 		return create(CVMLong.ZERO,message,errorCode,info);
@@ -337,4 +341,6 @@ public final class Result extends ARecordGeneric {
 		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
+
+
 }

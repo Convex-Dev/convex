@@ -2,8 +2,7 @@ package convex.gui.peer;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.EventQueue;
-import java.awt.event.WindowEvent;
+import java.awt.Dimension;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.channels.ClosedChannelException;
@@ -49,6 +48,7 @@ import convex.gui.utils.Toolkit;
 import convex.peer.API;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class PeerGUI extends AbstractGUI {
@@ -72,43 +72,18 @@ public class PeerGUI extends AbstractGUI {
 	 * @param args Command line args
 	 */
 	public static void main(String[] args) {
-		
-		// TODO: Store config
-		// Stores.setGlobalStore(EtchStore.create(new File("peers-shared-db")));
-
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate(),true);
+		PeerGUI gui=launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate(),true);
+		gui.waitForClose();
+		System.exit(0);
 	}
 
-	public static void launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) {
-		EventQueue.invokeLater(()->{
-			try {
-				PeerGUI manager = new PeerGUI(peerNum,genesis);
-				JFrame frame = new JFrame();
-				manager.frame=frame;
-				frame.setTitle("Peer Manager");
-				frame.setIconImage(Toolkit.getDefaultToolkit()
-						.getImage(PeerGUI.class.getResource("/images/Convex.png")));
-				frame.setBounds(200, 150, 1000, 800);
-				Toolkit.closeIfFirstFrame(frame);
-
-				frame.getContentPane().add(manager, BorderLayout.CENTER);
-				frame.setVisible(true);
-
-				frame.addWindowListener(new java.awt.event.WindowAdapter() {
-			        public void windowClosing(WindowEvent winEvt) {
-			        	// shut down peers gracefully
-			    		manager.serverPanel.manager.closePeers();
-			    		manager.restServer.close();
-			        }
-			    });
-
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		});
+	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) {
+		PeerGUI manager = new PeerGUI(peerNum,genesis);
+		manager.run();
+		return manager;
 	}
 
 	/*
@@ -169,6 +144,7 @@ public class PeerGUI extends AbstractGUI {
 		setLayout(new BorderLayout());
 
 		tabs = new JTabbedPane();
+		tabs.setPreferredSize(new Dimension(1000,800));
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("Peer Servers", serverPanel);
@@ -225,9 +201,9 @@ public class PeerGUI extends AbstractGUI {
 					latestState.setValue(latest); // trigger peer view repaints etc.
 
 				} catch (InterruptedException e) {
-					//
-					log.trace("Update thread interrupted, presumably shutting down");
 					updateRunning=false;
+					Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
+					log.trace("Update thread interrupted, presumably shutting down");
 				}
 			}
 			log.debug("GUI Peer Manager update thread ending");
@@ -434,6 +410,12 @@ public class PeerGUI extends AbstractGUI {
 	public void addPeer(ConvexLocal cvl) {
 		peerList.addElement(cvl);
 
+	}
+
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
 	}
 
 }

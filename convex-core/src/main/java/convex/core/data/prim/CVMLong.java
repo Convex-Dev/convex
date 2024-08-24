@@ -68,9 +68,10 @@ public final class CVMLong extends AInteger {
 	/**
 	 * Creates a CVMLong wrapping the given Java long value. Always succeeds.
 	 * @param value Java long
-	 * @return CVMLong instance.
+	 * @return CVMLong instance, or null if value was null
 	 */
 	public static CVMLong create(Long value) {
+		if (value==null) return null;
 		return create(value.longValue());
 	}
 	

@@ -78,7 +78,7 @@ public class AccountsPanel extends JPanel {
 			this.setAlignmentX(RIGHT_ALIGNMENT);
 			this.setSize(table.getColumnModel().getColumn(column).getWidth(), getHeight());
 			if (value==null) {
-				setBalance(0);
+				setBalance(0L);
 			} else {
 				this.setBalance((Long)value);
 			}

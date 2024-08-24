@@ -102,7 +102,7 @@ public class Toolkit {
 			// System.out.println(UIManager.get("Label.foreground"));
 		} catch (HeadlessException e) {
 			// We need this to stop things like tests failing in headless mode (e.g. in CI builds)
-			log.info("Unable to initialise GUI Toolkit due to headless execution mode.");
+			log.warn("Unable to initialise GUI Toolkit due to headless execution mode.");
 		} catch (Exception e) {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
@@ -270,14 +270,6 @@ public class Toolkit {
 		if (c.isFocusable()) {
 			c.setFocusable(false);
 			c.setFocusable(true);
-		}
-	}
-
-	private static JFrame firstFrame=null;
-	public static synchronized void closeIfFirstFrame(JFrame frame) {
-		if (firstFrame==null) {
-			frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-			firstFrame=frame;
 		}
 	}
 

@@ -847,17 +847,4 @@ public class Server implements Closeable {
 			close();
 		}
 	}
-
-	public void waitForShutdown() throws InterruptedException {
-		while (isRunning()) {
-			Thread.sleep(500);
-			//} catch (ExecutionException e) {
-			//	return;
-			//} catch (TimeoutException e) {
-			//	continue;
-		}
-	}
-
-
-
 }

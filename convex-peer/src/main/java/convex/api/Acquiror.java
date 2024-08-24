@@ -50,7 +50,6 @@ public class Acquiror {
 	}
 	
 	
-	
 	public <T extends ACell> CompletableFuture<T> getFuture() {
 		CompletableFuture<T> f = new CompletableFuture<T>();
 		Ref<T> checkRef = store.refForHash(hash);
@@ -138,8 +137,9 @@ public class Acquiror {
 					}
 				}
 			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
 				f.completeExceptionally(e);
-			} catch (Throwable t) {
+			} catch (Exception t) {
 				log.warn("UNEXPECTED acquire fail: ",t);
 				f.completeExceptionally(t);
 			}

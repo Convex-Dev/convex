@@ -12,6 +12,7 @@ import convex.cli.account.Account;
 import convex.cli.client.Query;
 import convex.cli.client.Status;
 import convex.cli.client.Transact;
+import convex.cli.desktop.Desktop;
 import convex.cli.etch.Etch;
 import convex.cli.key.Key;
 import convex.cli.local.Local;
@@ -31,7 +32,7 @@ import picocli.CommandLine.ScopeType;
  * Convex CLI implementation
  */
 @Command(name = "convex", 
-		subcommands = { Account.class, Key.class, Local.class, Peer.class, Query.class, Status.class,
+		subcommands = { Account.class, Key.class, Local.class, Peer.class, Query.class, Status.class, Desktop.class,
 		Etch.class, Transact.class,
 		CommandLine.HelpCommand.class }, 
 		usageHelpAutoWidth = true, 

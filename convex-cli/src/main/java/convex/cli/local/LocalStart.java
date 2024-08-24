@@ -147,7 +147,7 @@ public class LocalStart extends ALocalCommand {
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
-				return;
+				Thread.currentThread().interrupt();  // set interrupt flag again
 			}
 		}
 	}

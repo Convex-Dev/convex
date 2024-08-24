@@ -1,5 +1,6 @@
 package convex.gui.etch;
 
+import javax.swing.JFrame;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
@@ -29,6 +30,12 @@ public class EtchWindow extends AbstractGUI {
 		add(pcom, "dock north");
 		
 		add(tabbedPane, "dock center");
+	}
+
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
 	}
 
 }

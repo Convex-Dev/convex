@@ -1,5 +1,6 @@
 package convex.gui.actor;
 
+import javax.swing.JFrame;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
@@ -33,6 +34,12 @@ public class AccountWindow extends AbstractGUI {
 		tabbedPane.add("Overview", new AccountInfoPanel(manager, account));
 		tabbedPane.add("Environment", new StateTreePanel((as==null)?null:as.getEnvironment()));
 		tabbedPane.add("Operations", new ActorInvokePanel(convex,manager, account));
+	}
+
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
 	}
 
 }

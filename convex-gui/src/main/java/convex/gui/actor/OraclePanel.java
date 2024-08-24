@@ -157,7 +157,7 @@ public class OraclePanel extends JPanel {
 				try {
 					Thread.sleep(200);
 				} catch (InterruptedException e) {
-					// ignore
+					Thread.currentThread().interrupt();  // set interrupt flag
 				}
 				Address addr = (Address) m;
 				MarketsPanel.marketList.addElement(addr);

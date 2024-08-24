@@ -2,6 +2,7 @@ package convex.gui.server;
 
 import java.awt.Dimension;
 
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JScrollPane;
 import javax.swing.JTabbedPane;
@@ -59,5 +60,11 @@ public class PeerWindow extends AbstractGUI {
 
 		PeerComponent pcom = new PeerComponent(peer);
 		add(pcom, "dock north");
+	}
+
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
 	}
 }

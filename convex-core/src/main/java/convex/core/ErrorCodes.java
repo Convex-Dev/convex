@@ -218,5 +218,10 @@ public class ErrorCodes {
     */
 	public static final Keyword LIQUIDITY = Keyword.create("LIQUIDITY");
 
+	/**
+	 * Error code indicating an operation was interrupted
+	 */
+	public static final Keyword INTERRUPTED = Keyword.create("INTERRUPTED");
+
 
 }

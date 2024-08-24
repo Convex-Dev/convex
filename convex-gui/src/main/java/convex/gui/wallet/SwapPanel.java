@@ -133,7 +133,7 @@ public class SwapPanel extends AbstractGUI {
 				if (val instanceof AInteger) {
 					receiveLabel.setBalance((AInteger) val);
 				} else {
-					receiveLabel.setBalance(null);
+					receiveLabel.setBalance((AInteger)null);
 				}
 			});
 		} catch (IOException e) {
@@ -162,7 +162,7 @@ public class SwapPanel extends AbstractGUI {
 				if (val instanceof AInteger) {
 					receiveLabel.setBalance((AInteger) val);
 				} else {
-					receiveLabel.setBalance(null);
+					receiveLabel.setBalance((AInteger)null);
 				}
 			});
 		} catch (IOException | TimeoutException e) {

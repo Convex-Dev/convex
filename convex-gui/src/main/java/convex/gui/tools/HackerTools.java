@@ -2,7 +2,6 @@ package convex.gui.tools;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.EventQueue;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JFrame;
@@ -12,13 +11,13 @@ import javax.swing.JTabbedPane;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.util.Utils;
 import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.Toolkit;
+import net.miginfocom.swing.MigLayout;
 
 /**
  * A Client application for the Convex Network.
@@ -40,12 +39,14 @@ public class HackerTools extends AbstractGUI {
 	 */
 	public static void main(String[] args) throws TimeoutException {
 		log.info("Running Convex HackerTools");
-		clientMode=true;
 		
 		// call to set up Look and Feel
 		Toolkit.init();
 
-		EventQueue.invokeLater(()->launch());
+		HackerTools gui=new HackerTools();
+		gui.run();
+		gui.waitForClose();
+		System.exit(0);
 	}
 
 	public JTabbedPane tabs = new JTabbedPane();
@@ -75,8 +76,6 @@ public class HackerTools extends AbstractGUI {
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		
 		this.setPreferredSize(new Dimension(1000,800));
-		
-
 	}
 
 	public void switchPanel(String title) {
@@ -90,25 +89,13 @@ public class HackerTools extends AbstractGUI {
 		System.err.println("Missing tab: " + title);
 	}
 	
-	public static HackerTools launch() {
-		try {
-			JFrame frame = new JFrame();
-			frame.setTitle("Hacker Tools");
-			frame.setIconImage(Toolkit.getImage(HackerTools.class.getResource("/images/Convex.png")));
-			frame.setBounds(200, 200, 1024, 768);
-			if (clientMode) {
-				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-			}
-			HackerTools window = new HackerTools();
-			window.frame=frame;
-			frame.getContentPane().add(window, BorderLayout.CENTER);
-			frame.pack();
-			frame.setVisible(true);
-			return window;
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
+		frame.setBounds(200, 200, 1024, 768);
 	}
+	
 
 	
 	

@@ -1,6 +1,7 @@
 package convex.gui.wallet;
 
 import java.awt.Font;
+import java.io.IOException;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -60,11 +61,11 @@ public class AccountOverview extends JPanel {
 		add(al);
 		}
 
-		 try { // Coin Balance
+		try { // Coin Balance
 			//add(new JLabel(Toolkit.CONVEX)); // convex icon
 			balance.setFont(bigfont);
 			balance.setBalance(convex.getBalance()); 
-		} catch (Exception e) {
+		} catch (IOException e) {
 			// nothing
 		} finally {
 			add(balance);
@@ -82,6 +83,7 @@ public class AccountOverview extends JPanel {
 					balance.setBalance(convex.getBalance()); 
 				}
 			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
 				return;
 			} catch (Exception e) {
 				e.printStackTrace();

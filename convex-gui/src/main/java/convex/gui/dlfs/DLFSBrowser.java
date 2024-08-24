@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 
+import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 
@@ -137,6 +138,14 @@ public class DLFSBrowser extends AbstractGUI {
 		
 		DLFSBrowser gui=new DLFSBrowser();
 		gui.run();
+		gui.waitForClose();
+		System.exit(0);
+	}
+
+	@Override
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
 	}
 	
 

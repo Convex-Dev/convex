@@ -59,6 +59,10 @@ public class StateExplorer extends AbstractGUI {
 		Toolkit.init();
 		AKeyPair kp=AKeyPair.createSeeded(564646);
 		ACell state=Init.createState(List.of(kp.getAccountKey()));
-		new StateExplorer(state).run();
+		
+		StateExplorer gui=new StateExplorer(state);
+		gui.run();
+		gui.waitForClose();
+		System.exit(0);
 	}
 }

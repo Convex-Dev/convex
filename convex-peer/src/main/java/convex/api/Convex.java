@@ -13,6 +13,7 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
@@ -582,10 +583,11 @@ public abstract class Convex {
 				sequence=null;
 			}
 			return result;
-		} catch (InterruptedException e) {
-			throw Utils.sneakyThrow(e);
 		} catch (ExecutionException e) {
 			return Result.fromException(e.getCause());
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
+			return Result.error(ErrorCodes.INTERRUPTED, "Transaction interrupted while awaiting result");
 		}
 	}
 
@@ -599,6 +601,7 @@ public abstract class Convex {
 	 * @throws IOException      If the connection is broken
 	 * @throws TimeoutException If the attempt to transact with the network is not
 	 *                          confirmed by the specified timeout
+	 * @throws InterruptedException 
 	 */
 	public Result transactSync(SignedData<ATransaction> transaction, long timeout)
 			throws TimeoutException, IOException {
@@ -614,11 +617,12 @@ public abstract class Convex {
 		try {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
 			return result;
-		} catch (InterruptedException e) {
-			throw Utils.sneakyThrow(e);
 		} catch (ExecutionException e) {
 			throw Utils.sneakyThrow(e);
 			// return Result.fromException(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
+			return Result.error(ErrorCodes.INTERRUPTED, "Transaction interrupted while awaiting result");
 		} finally {
 			cf.cancel(true);
 		}
@@ -705,8 +709,11 @@ public abstract class Convex {
 		Future<Result> statusFuture = requestStatus();
 		try {
 			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException | ExecutionException e) {
+		} catch (ExecutionException e) {
 			throw Utils.sneakyThrow(e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
+			return Result.error(ErrorCodes.INTERRUPTED, "Status request interrupted");
 		} finally {
 			// in case the future is still running?
 			statusFuture.cancel(true);
@@ -832,7 +839,8 @@ public abstract class Convex {
 		try {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (InterruptedException e) {
-			throw Utils.sneakyThrow(e);
+			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
+			return Result.error(ErrorCodes.INTERRUPTED, "Query interrupted while awaiting result");
 		} catch (ExecutionException e) {
 			return Result.fromException(e.getCause());
 		} finally {
@@ -935,7 +943,10 @@ public abstract class Convex {
 			}
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
-		} catch (ExecutionException | InterruptedException | TimeoutException ex) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
+			throw new IOException("Unable to query balance due to interrupt waiting for result");
+		} catch (ExecutionException | TimeoutException ex) {
 			throw new IOException("Unable to query balance", ex);
 		}
 	}

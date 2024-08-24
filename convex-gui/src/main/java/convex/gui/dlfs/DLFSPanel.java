@@ -97,7 +97,8 @@ public class DLFSPanel extends JPanel {
 					Thread.sleep(100);
 				}
 			} catch (InterruptedException e) {
-				// finished
+				// set interrupt flag	
+				Thread.currentThread().interrupt();  
 			}
 		});
 	}

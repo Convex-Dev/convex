@@ -2,13 +2,13 @@ package convex.gui.components;
 
 
 import java.awt.EventQueue;
+import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import convex.gui.MainGUI;
 import convex.gui.utils.Toolkit;
@@ -18,9 +18,7 @@ import net.miginfocom.swing.MigLayout;
  * Base class for Convex GUI apps
  */
 @SuppressWarnings("serial")
-public class AbstractGUI extends JPanel implements Runnable {
-
-	private static final Logger log = LoggerFactory.getLogger(AbstractGUI.class.getName());
+public abstract class AbstractGUI extends JPanel implements Runnable {
 	
 	protected JFrame frame=new JFrame();
 	private String title;
@@ -29,47 +27,69 @@ public class AbstractGUI extends JPanel implements Runnable {
 		this.title=title;
 	}
 	
+	static {
+		Toolkit.init();
+	}
+	
+	private CompletableFuture<String> finished=new CompletableFuture<>();
 
 	@Override
-	public void run() {
-		// call to set up Look and Feel
-		Toolkit.init();
-		
+	public final void run() {
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
-				try {
-					frame.setTitle(title);
-					frame.setIconImage(Toolkit.getDefaultToolkit()
-							.getImage(MainGUI.class.getResource("/images/Convex.png")));
-					
-					// Prefer not to have explicit frame size / position?
-					// frame.setBounds(50, 50, 1200, 920);
-					
-					Toolkit.closeIfFirstFrame(frame);
+				frame.setTitle(title);
+				frame.setIconImage(Toolkit.getDefaultToolkit()
+						.getImage(MainGUI.class.getResource("/images/Convex.png")));
+				
+			
+				frame.addWindowListener(new WindowAdapter() {
+					@Override
+			        public void windowClosing(WindowEvent e) {
+			            finished.complete("Closed");
+			        }
+				});
 
-					frame.getContentPane().setLayout(new MigLayout());
-					frame.getContentPane().add(AbstractGUI.this,"dock center");
-					frame.pack();
-					frame.setVisible(true);
-
-				} catch (Exception e) {
-					log.warn("GUI launch failed");
-					e.printStackTrace();
-					// General exit code with error
-					System.exit(1);
-				}
+				setupFrame(frame);
+				frame.pack();
+				frame.setVisible(true);
 			}
 		});
+	}
+	
+	/**
+	 * Implementations should override this to add the gui components and configure the GUI frame
+	 * @param frame
+	 */
+	public void setupFrame(JFrame frame) {
+		frame.getContentPane().setLayout(new MigLayout());
+		frame.getContentPane().add(this,"dock center");
+	}
+	
+	public void waitForClose() {
+		try {
+			finished.get();
+			close();
+		} catch (ExecutionException e) {
+			// Probably won't happen?
+		} catch (InterruptedException e) {
+			// Set interrupt status, in case caller wants to handle this
+			Thread.currentThread().interrupt();
+		}
 	}
 	
 	public JFrame getFrame() {
 		return frame;
 	}
 
-
+	public void close() {
+		// nothing to do
+	}
+	
+	
 	public void closeGUI() {
 		frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
+		close();
 	}
 
 }

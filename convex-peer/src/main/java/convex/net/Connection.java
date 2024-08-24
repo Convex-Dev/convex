@@ -200,6 +200,7 @@ public class Connection {
 			try {
 				Thread.sleep(10+elapsed/5);
 			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
 				throw new IOException("Connect interrupted", e);
 			}
 		}
