@@ -1,7 +1,5 @@
 package convex.cli.client;
 
-import java.util.concurrent.TimeoutException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,8 +50,6 @@ public class Transact extends AClientCommand {
 		try {
 			Result result = convex.transactSync(transaction);
 			mainParent.printResult(result);
-		} catch (TimeoutException e) {
-			throw new CLIError(ExitCodes.TEMPFAIL,"Timeout executing transaction",e);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 		}

@@ -93,11 +93,11 @@ public class Connection {
 	private final MessageReceiver receiver;
 	private final MessageSender sender;
 
-	private Connection(ByteChannel clientChannel, Consumer<Message> receiveAction, AStore store,
+	private Connection(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey) {
-		this.channel = clientChannel;
+		this.channel = channel;
 		receiver = new MessageReceiver(receiveAction, this);
-		sender = new MessageSender(clientChannel);
+		sender = new MessageSender(channel);
 		this.store = store;
 		this.lastActivity=Utils.getCurrentTimestamp();
 		this.trustedPeerKey = trustedPeerKey;

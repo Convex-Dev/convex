@@ -42,7 +42,7 @@ public class MessageSender {
 		// try to send bytes immediately
 		maybeSendBytes();
 		
-		// Return true because the message is in flight / buffered sucessfully
+		// Return true because the message is in flight / buffered successfully
 		return true;
 	}
 
@@ -71,7 +71,7 @@ public class MessageSender {
 	}
 
 	/**
-	 * Checks if this sender is ready to send a message. Caller should syncronize on 
+	 * Checks if this sender is ready to send a message. Caller should synchronise on 
 	 * this sender in case the state changes concurrently
 	 * 
 	 * @return True if ready, false otherwise

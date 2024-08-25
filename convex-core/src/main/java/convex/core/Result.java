@@ -368,6 +368,11 @@ public final class Result extends ARecordGeneric {
 		return RESULT_FORMAT;
 	}
 
+	/**
+	 * Constructs a result from a caught exception 
+	 * @param e Exception caught
+	 * @return
+	 */
 	public static Result fromException(Throwable e) {
 		if (e instanceof TimeoutException) {
 			String msg=e.getMessage();
@@ -384,7 +389,21 @@ public final class Result extends ARecordGeneric {
 		if (e instanceof ResultException) {
 			return ((ResultException) e).getResult();
 		}
+		if (e instanceof InterruptedException) {
+			return interruptThread();
+		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
+	}
+
+	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!"));
+	
+	/**
+	 * Returns a Result representing a thread interrup, AND sets the interrupt status on the current thread
+	 * @return
+	 */
+	public static Result interruptThread() {
+		Thread.currentThread().interrupt();
+		return INTERRUPTED_RESULT;
 	}
 
 

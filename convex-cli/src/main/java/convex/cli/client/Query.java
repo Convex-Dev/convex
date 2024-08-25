@@ -1,9 +1,6 @@
 package convex.cli.client;
 
-import java.util.concurrent.TimeoutException;
-
 import convex.api.Convex;
-import convex.cli.CLIError;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
@@ -45,8 +42,8 @@ public class Query extends AClientCommand {
 					break;
 				}
 			}
-		} catch (TimeoutException e) {
-			throw new CLIError("Query timed out. Perhaps there is a network problem, or the host is not an operational Convex peer?");
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 	}
 }

@@ -1,12 +1,9 @@
 package convex.cli.account;
 
-import java.util.concurrent.TimeoutException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.Main;
 import convex.core.Result;
@@ -65,8 +62,8 @@ public class AccountInformation extends AAccountCommand {
 		try {
 			result = convex.querySync(message);
 			mainParent.printResult(result);
-		} catch (TimeoutException e) {
-			throw new CLIError("Timeout",e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		} 
 	}
 }

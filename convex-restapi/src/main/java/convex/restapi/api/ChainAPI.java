@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.core.Coin;
@@ -159,8 +158,6 @@ public class ChainAPI extends ABaseAPI {
 			if (amt != null) {
 				convex.transferSync(a, amt.longValue());
 			}
-		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
 		} catch (ResultException e) {
 			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
 		} catch (InterruptedException e) {
@@ -261,14 +258,13 @@ public class ChainAPI extends ABaseAPI {
 	 * 
 	 * @param form
 	 * @return
+	 * @throws InterruptedException 
 	 */
 	private Result doQuery(ACell form) {
 		try {
 			return convex.querySync(form);
-		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse("Timeout in query request");
-		} catch (Exception e) {
-			throw new InternalServerErrorResponse("Failed to execute query: " + e);
+		} catch (InterruptedException e) {
+			return Result.interruptThread();
 		}
 	}
 
@@ -281,9 +277,8 @@ public class ChainAPI extends ABaseAPI {
 	private Result doTransaction(SignedData<ATransaction> signedTransaction) {
 		try {
 			return convex.transactSync(signedTransaction);
-		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse("Timeout executing transaction - unable to confirm result.");
-		} catch (Exception e) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			throw new InternalServerErrorResponse("Failed to execute transaction: " + e);
 		}
 	}
@@ -325,8 +320,6 @@ public class ChainAPI extends ABaseAPI {
 				req.put("amount", r.getValue());
 				ctx.result(JSON.toPrettyString(req));
 			}
-		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse("Timeout in request");
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new ServiceUnavailableResponse("Handler interrupted");
@@ -600,8 +593,9 @@ public class ChainAPI extends ABaseAPI {
 			HashMap<String, Object> rmap = jsonResult(r);
 
 			ctx.result(JSON.toPrettyString(rmap));
-		} catch (TimeoutException e) {
-			throw new ServiceUnavailableResponse("Timeout in request");
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new ServiceUnavailableResponse("Request interrupted");
 		} 
 	}
 

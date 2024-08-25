@@ -107,9 +107,10 @@ public class LocalPeerBenchmark {
 	 * Benchmark to test a single small op in a query. Basically the fastest we can
 	 * get a single query result.
 	 * @throws TimeoutException If client times out
+	 * @throws InterruptedException 
 	 */
 	@Benchmark
-	public void constantOpQuery() throws TimeoutException {
+	public void constantOpQuery() throws InterruptedException {
 		Result r=CONVEX.querySync(Constant.create(CVMLong.ONE));
 		if (r.isError()) {
 			throw new Error("Query Failed: "+r.toString());
@@ -121,9 +122,10 @@ public class LocalPeerBenchmark {
 	 * get a k/v store query result.
 	 * @throws TimeoutException If client times out
 	 * @throws IOException In case of IO error
+	 * @throws InterruptedException 
 	 */
 	@Benchmark
-	public void readWriteOpQuery() throws TimeoutException, IOException {
+	public void readWriteOpQuery() throws InterruptedException {
 		Result r=CONVEX.querySync(readWriteCmd);
 		if (r.isError()) {
 			throw new Error("Query Failed: "+r.toString());
