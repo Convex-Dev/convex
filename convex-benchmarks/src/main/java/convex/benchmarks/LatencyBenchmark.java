@@ -65,13 +65,13 @@ public class LatencyBenchmark {
 	}
 
 	@Benchmark
-	public void roundTripTransaction() throws TimeoutException, IOException {
+	public void roundTripTransaction() throws TimeoutException, InterruptedException {
 		client.transactSync(Invoke.create(Benchmarks.HERO,0, Constant.of(1L)));
 		// System.out.println(server.getBroadcastCount());
 	}
 
 	@Benchmark
-	public void roundTripTwoTransactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public void roundTripTwoTransactions() throws TimeoutException, InterruptedException, ExecutionException {
 		Future<Result> r1=client.transact(Invoke.create(HERO,0, Constant.of(1L)));
 		Future<Result> r2=client2.transact(Invoke.create(VILLAIN,0, Constant.of(1L)));
 		r1.get(1000,TimeUnit.MILLISECONDS);
@@ -79,22 +79,22 @@ public class LatencyBenchmark {
 	}
 
 	@Benchmark
-	public void roundTrip10Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public void roundTrip10Transactions() throws TimeoutException, InterruptedException, ExecutionException {
 		doTransactions(10);
 	}
 
 	@Benchmark
-	public void roundTrip50Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public void roundTrip50Transactions() throws TimeoutException,InterruptedException, ExecutionException {
 		doTransactions(50);
 	}
 
 	@Benchmark
-	public void roundTrip1000Transactions() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public void roundTrip1000Transactions() throws TimeoutException, InterruptedException, ExecutionException {
 		doTransactions(1000);
 	}
 
 	@SuppressWarnings("unchecked")
-	private void doTransactions(int n) throws IOException, InterruptedException, ExecutionException, TimeoutException {
+	private void doTransactions(int n) throws InterruptedException,  TimeoutException, ExecutionException {
 		CompletableFuture<Result>[] rs=new CompletableFuture[n];
 		for (int i=0; i<n; i++) {
 			CompletableFuture<Result> f=client.transact(Invoke.create(HERO,0, Constant.of(i)));
@@ -108,7 +108,7 @@ public class LatencyBenchmark {
 	}
 
 	@Benchmark
-	public void roundTripQuery() throws TimeoutException, IOException, InterruptedException, ExecutionException {
+	public void roundTripQuery() throws TimeoutException, InterruptedException {
 		client.querySync(Constant.of(1L));
 	}
 

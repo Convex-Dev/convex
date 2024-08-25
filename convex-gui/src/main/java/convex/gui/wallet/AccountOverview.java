@@ -1,12 +1,12 @@
 package convex.gui.wallet;
 
 import java.awt.Font;
-import java.io.IOException;
 
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.util.ThreadUtils;
 import convex.gui.components.BalanceLabel;
@@ -65,8 +65,8 @@ public class AccountOverview extends JPanel {
 			//add(new JLabel(Toolkit.CONVEX)); // convex icon
 			balance.setFont(bigfont);
 			balance.setBalance(convex.getBalance()); 
-		} catch (IOException e) {
-			// nothing
+		} catch (ResultException e) {
+			// ignore?
 		} finally {
 			add(balance);
 		}

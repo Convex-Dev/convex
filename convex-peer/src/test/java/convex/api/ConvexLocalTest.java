@@ -55,7 +55,7 @@ public class ConvexLocalTest {
 	}
 
 	@Test
-	public void testConvexTransact() throws IOException, TimeoutException {
+	public void testConvexTransact() throws TimeoutException, InterruptedException {
 		synchronized (network.SERVER) {
 			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
 			

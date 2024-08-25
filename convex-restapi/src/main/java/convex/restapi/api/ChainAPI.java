@@ -1,6 +1,5 @@
 package convex.restapi.api;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -8,7 +7,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
-import convex.core.exceptions.ResultException;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -31,6 +29,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -162,7 +161,7 @@ public class ChainAPI extends ABaseAPI {
 			}
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
-		} catch (IOException | ResultException e) {
+		} catch (ResultException e) {
 			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -268,8 +267,6 @@ public class ChainAPI extends ABaseAPI {
 			return convex.querySync(form);
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse("Timeout in query request");
-		} catch (IOException e) {
-			throw new InternalServerErrorResponse("IOException in query request: " + e);
 		} catch (Exception e) {
 			throw new InternalServerErrorResponse("Failed to execute query: " + e);
 		}
@@ -330,10 +327,10 @@ public class ChainAPI extends ABaseAPI {
 			}
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse("Timeout in request");
-		} catch (IOException e) {
-			throw new InternalServerErrorResponse("Fauncet failure: "+e.getMessage());
-		}
-
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new ServiceUnavailableResponse("Handler interrupted");
+		} 
 	}
 
 	@OpenApi(path = ROUTE+"transaction/prepare",
@@ -605,9 +602,7 @@ public class ChainAPI extends ABaseAPI {
 			ctx.result(JSON.toPrettyString(rmap));
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse("Timeout in request");
-		} catch (IOException e) {
-			throw new InternalServerErrorResponse("IO Failure in query: "+e.getMessage());
-		}
+		} 
 	}
 
 }

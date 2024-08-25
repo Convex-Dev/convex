@@ -127,18 +127,15 @@ public class SwapPanel extends AbstractGUI {
 		} else {
 			qs="("+torus+"/sell-quote "+token1.getID()+" "+amount+" "+token2.getID()+")";
 		}
-		try {
-			convex.query(qs).thenAccept(r->{
-				ACell val=r.getValue();
-				if (val instanceof AInteger) {
-					receiveLabel.setBalance((AInteger) val);
-				} else {
-					receiveLabel.setBalance((AInteger)null);
-				}
-			});
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+
+		convex.query(qs).thenAccept(r->{
+			ACell val=r.getValue();
+			if (val instanceof AInteger) {
+				receiveLabel.setBalance((AInteger) val);
+			} else {
+				receiveLabel.setBalance((AInteger)null);
+			}
+		});
 	}
 	
 	protected void executeTrade() {
@@ -155,19 +152,17 @@ public class SwapPanel extends AbstractGUI {
 			qs="("+torus+"/sell "+token1.getID()+" "+amount+" "+token2.getID()+")";
 		}
 		System.out.println(qs);
-		try {
-			convex.transact(qs).thenAccept(r->{
-				ACell val=r.getValue();
-				System.out.println(r);
-				if (val instanceof AInteger) {
-					receiveLabel.setBalance((AInteger) val);
-				} else {
-					receiveLabel.setBalance((AInteger)null);
-				}
-			});
-		} catch (IOException | TimeoutException e) {
-			e.printStackTrace();
-		}
+
+		convex.transact(qs).thenAccept(r->{
+			ACell val=r.getValue();
+			System.out.println(r);
+			if (val instanceof AInteger) {
+				receiveLabel.setBalance((AInteger) val);
+			} else {
+				receiveLabel.setBalance((AInteger)null);
+			}
+		});
+
 	}
 
 	public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {

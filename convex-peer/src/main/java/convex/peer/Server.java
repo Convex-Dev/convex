@@ -832,8 +832,9 @@ public class Server implements Closeable {
 	 * Shut down the Server, as gracefully as possible.
 	 * @throws TimeoutException If shutdown attempt times out
 	 * @throws IOException  In case of IO Error
+	 * @throws InterruptedException 
 	 */
-	public void shutdown() throws IOException, TimeoutException {
+	public void shutdown() throws IOException, TimeoutException, InterruptedException {
 		try {
 			AKeyPair kp= getKeyPair();
 			AccountKey key=kp.getAccountKey();

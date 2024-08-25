@@ -45,7 +45,7 @@ public class GenesisTest {
 		} 
 	}
 
-	@Test public void testGenesisPeer() throws IOException, TimeoutException {
+	@Test public void testGenesisPeer() throws TimeoutException, InterruptedException, IOException {
 		CLTester importTester =  CLTester.run(
 				"key", 
 				"import",

@@ -39,6 +39,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -94,9 +95,10 @@ public class ServerTest {
 	 * @throws IOException
 	 * @throws InterruptedException
 	 * @throws TimeoutException
+	 * @throws ResultException 
 	 */
 	@Test
-	public void testLocalConnect() throws IOException, InterruptedException, TimeoutException {
+	public void testLocalConnect() throws IOException, InterruptedException, TimeoutException, ResultException {
 		Server server=network.SERVER;
 
 		AKeyPair  kp=server.getKeyPair();
@@ -150,7 +152,7 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testBalanceQuery() throws IOException, TimeoutException {
+	public void testBalanceQuery() throws IOException, TimeoutException, ResultException {
 		Convex convex=Convex.connect(network.SERVER.getHostAddress(),network.VILLAIN,network.VILLAIN_KEYPAIR);
 
 		// test the connection is still working
@@ -158,7 +160,7 @@ public class ServerTest {
 	}
 	
 	@Test
-	public void testSequence() throws IOException, TimeoutException {
+	public void testSequence() throws ResultException, TimeoutException, InterruptedException {
 		Convex convex=network.getClient();
 		// sequence number should be zero for fresh account
 		assertEquals(0,convex.getSequence());

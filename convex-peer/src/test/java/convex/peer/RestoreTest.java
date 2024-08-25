@@ -24,6 +24,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
 import convex.core.lang.Symbols;
 import convex.core.store.AStore;
@@ -41,7 +42,7 @@ public class RestoreTest {
 	Address HERO=Init.GENESIS_ADDRESS;
 
 	@Test
-	public void restoreTest() throws IOException, InterruptedException, ExecutionException, TimeoutException {
+	public void restoreTest() throws InterruptedException, ExecutionException, TimeoutException, ResultException, IOException {
 //		 {
 //		   System.out.println("Test store = "+Stores.current());
 //

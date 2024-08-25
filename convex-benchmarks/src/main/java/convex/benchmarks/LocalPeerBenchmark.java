@@ -77,10 +77,10 @@ public class LocalPeerBenchmark {
 	 * Benchmark to test a single small op in a transaction. Basically the fastest we can
 	 * get a single transaction confirmed on a local Peer.
 	 * @throws TimeoutException If client times out
-	 * @throws IOException In case of IO error
+	 * @throws InterruptedException 
 	 */
 	@Benchmark
-	public void constantOpTransaction() throws TimeoutException, IOException {
+	public void constantOpTransaction() throws TimeoutException, InterruptedException {
 		Result r=CONVEX.transactSync(Invoke.create(HERO, 0, Constant.create(CVMLong.ONE)));
 		if (r.isError()) {
 			throw new Error("Transaction Failed: "+r.toString());
@@ -93,10 +93,10 @@ public class LocalPeerBenchmark {
 	 * Benchmark to test read and write in a transaction. Basically the fastest we can
 	 * confirm update of an immutable data structure in user's environment.
 	 * @throws TimeoutException If client times out
-	 * @throws IOException In case of IO error
+	 * @throws InterruptedException 
 	 */
 	@Benchmark
-	public void readWriteTransaction() throws TimeoutException, IOException {
+	public void readWriteTransaction() throws TimeoutException, InterruptedException {
 		Result r=CONVEX.transactSync(Invoke.create(HERO, 0, readWriteCmd));
 		if (r.isError()) {
 			throw new Error("Transaction Failed: "+r.toString());
@@ -107,10 +107,9 @@ public class LocalPeerBenchmark {
 	 * Benchmark to test a single small op in a query. Basically the fastest we can
 	 * get a single query result.
 	 * @throws TimeoutException If client times out
-	 * @throws IOException In case of IO error
 	 */
 	@Benchmark
-	public void constantOpQuery() throws TimeoutException, IOException {
+	public void constantOpQuery() throws TimeoutException {
 		Result r=CONVEX.querySync(Constant.create(CVMLong.ONE));
 		if (r.isError()) {
 			throw new Error("Query Failed: "+r.toString());

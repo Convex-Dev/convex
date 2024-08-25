@@ -1,6 +1,5 @@
 package convex.cli.account;
 
-import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
@@ -68,9 +67,6 @@ public class AccountInformation extends AAccountCommand {
 			mainParent.printResult(result);
 		} catch (TimeoutException e) {
 			throw new CLIError("Timeout",e);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			throw new CLIError("IO Exception while requesting account info: ",e);
-		}
+		} 
 	}
 }

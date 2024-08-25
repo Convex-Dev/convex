@@ -1,6 +1,5 @@
 package convex.cli.client;
 
-import java.io.IOException;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
@@ -46,8 +45,6 @@ public class Query extends AClientCommand {
 					break;
 				}
 			}
-		} catch (IOException e) {
-			throw new CLIError("IO Error executing query",e);
 		} catch (TimeoutException e) {
 			throw new CLIError("Query timed out. Perhaps there is a network problem, or the host is not an operational Convex peer?");
 		}
