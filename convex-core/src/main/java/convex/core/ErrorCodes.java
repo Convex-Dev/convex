@@ -223,5 +223,15 @@ public class ErrorCodes {
 	 */
 	public static final Keyword INTERRUPTED = Keyword.create("INTERRUPTED");
 
+	/**
+	 * Error code indicating a closed io channel or resource
+	 */
+	public static final Keyword CLOSED = Keyword.create("CLOSED");
+
+	/**
+	 * Error code indicating a general IO exception
+	 */
+	public static final Keyword IO = Keyword.create("IO");
+
 
 }

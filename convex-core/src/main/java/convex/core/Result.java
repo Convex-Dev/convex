@@ -1,5 +1,6 @@
 package convex.core;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
@@ -155,6 +156,19 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	/**
+	 * Returns this Result with extra info field
+	 * @param k
+	 * @param v
+	 * @return
+	 */
+	public Result withInfo(Keyword k, ACell v) {
+		AMap<Keyword, ACell> info = getInfo();
+		if (info==null) info=Maps.empty();
+		info=info.assoc(k, v);
+		return new Result(values.assoc(INFO_POS, info));
+	}
+	
+	/**
 	 * Returns the log for this Result. May be an empty vector.
 	 * 
 	 * @return Log Vector from this Result
@@ -171,10 +185,25 @@ public final class Result extends ARecordGeneric {
 	 * 
 	 * Will be null if no error occurred.
 	 * 
-	 * @return ID from this result
+	 * @return Error code from this result
 	 */
 	public ACell getErrorCode() {
 		return values.get(ERROR_POS);
+	}
+	
+	/**
+	 * Returns the error source code from this Result (see CAD11). This  a Keyword.
+	 * 
+	 * Will be null if :source info not available
+	 * 
+	 * @return Source code keyword from this result,. or null if not present / invalid
+	 */
+	public Keyword getSource() {
+		AMap<Keyword, ACell> info = getInfo();
+		if (info==null) return null;;
+		ACell source=info.get(Keywords.SOURCE);
+		if (source instanceof Keyword) return (Keyword)source;
+		return null;
 	}
 	
 	@Override
@@ -339,8 +368,15 @@ public final class Result extends ARecordGeneric {
 			if (msg==null) msg=e.getClass().getName();
 			return Result.create(null,ErrorCodes.TIMEOUT,Strings.create(msg));
 		}
+		if (e instanceof IOException) {
+			String msg=e.getMessage();
+			if (msg==null) msg=e.getClass().getName();
+			return Result.create(null,ErrorCodes.IO,Strings.create(msg));
+		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
+
+
 
 
 }

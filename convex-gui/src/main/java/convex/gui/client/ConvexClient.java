@@ -16,7 +16,6 @@ import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.panels.REPLPanel;
-import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -30,8 +29,6 @@ public class ConvexClient extends AbstractGUI {
 	private static final Logger log = LoggerFactory.getLogger(ConvexClient.class.getName());
 
 	public static long maxBlock = 0;
-	
-	static boolean clientMode=false;
 
 	protected Convex convex=null;
 
@@ -43,10 +40,6 @@ public class ConvexClient extends AbstractGUI {
 	 */
 	public static void main(String[] args) throws IOException, TimeoutException {
 		log.info("Starting Convex Client");
-		clientMode=true;
-		
-		// call to set up Look and Feel
-		Toolkit.init();
 
 		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		if (convex==null) {

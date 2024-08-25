@@ -83,7 +83,7 @@ public class QueryHandler extends AThreadedComponent {
 			if (!resultReturned) {
 				log.warn("Failed to send query result back to client with ID: {}", id);
 			}
-		} catch (BadFormatException e) {
+		} catch (BadFormatException | ClassCastException e) {
 			log.debug("Terminated client due to bad query format");
 			m.closeConnection();
 		}

@@ -839,7 +839,7 @@ public class Format {
 		if (result==null) return null; // null value OK at top level
 		
 		int rl=Utils.checkedInt(result.getEncodingLength());
-		if (rl==ml) return result; // Already complete
+		if (rl==ml) return result; // Fast path if already complete
 		
 		// read remaining cells
 		HashMap<Hash,ACell> hm=new HashMap<>();

@@ -11,13 +11,16 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Hash;
+import convex.core.data.Keywords;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
@@ -115,58 +118,67 @@ public class ConvexRemote extends Convex {
 	}
 	
 	@Override
-	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException {
-		CompletableFuture<Result> cf;
+	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		long id = -1;
-		long wait=1;
+		long wait=10;
 		
 		// loop until request is queued. We need this for backpressure
 		while (true) {
-			if (connection.isClosed()) throw new IOException("Connection closed");
-			synchronized (awaiting) {
-				id = connection.sendTransaction(signed);
-				if (id>=0) {
-					// Store future for completion by result message
-					maybeUpdateSequence(signed);
-					cf = awaitResult(id,timeout);
-					break;
-				} 
-			}
+			if (connection.isClosed()) return closedResult;
 			
 			try {
+				synchronized (awaiting) {
+					id = connection.sendTransaction(signed);
+					if (id>=0) {
+						// Store future for completion by result message
+						maybeUpdateSequence(signed);
+						CompletableFuture<Result> cf = awaitResult(id,timeout);
+						log.trace("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
+						return cf;
+					} 
+				}
+				
 				Thread.sleep(wait);
-				wait+=1; // linear backoff
+				wait+=1+wait/3; // slow exponential backoff
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				throw new IOException("Transaction sending interrupted",e);
+				return interruptedResult;
+			} catch (IOException e) {
+				Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
+				return CompletableFuture.completedFuture(r);
 			}
 		}
-
-		log.trace("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
-		return cf;
 	}
 
+	private static CompletableFuture<Result> closedResult=CompletableFuture.completedFuture(Result.error(ErrorCodes.CLOSED, "Transaction interrupted before sending").withInfo(Keywords.SOURCE,SourceCodes.COMM));
+	private static CompletableFuture<Result> interruptedResult=CompletableFuture.completedFuture(Result.error(ErrorCodes.INTERRUPTED, "Interrupted before sending").withInfo(Keywords.SOURCE,SourceCodes.COMM));
+
 	@Override
-	public CompletableFuture<Result> query(ACell query, Address address) throws IOException {
-		long wait=1;
+	public CompletableFuture<Result> query(ACell query, Address address)  {
+		long wait=10;
 		
 		// loop until request is queued. We need this for backpressure
 		while (true) {
-			synchronized (awaiting) {
-				long id = connection.sendQuery(query, address);
-				if(id>=0) {
-					CompletableFuture<Result> cf= awaitResult(id,timeout);
-					return cf;
-				}
-			}
+			if (connection.isClosed()) return closedResult;
 			
 			// If we can't send yet, block briefly and try again
 			try {
+				synchronized (awaiting) {
+					long id = connection.sendQuery(query, address);
+					if(id>=0) {
+						CompletableFuture<Result> cf= awaitResult(id,timeout);
+						return cf;
+					}
+				}
+
 				Thread.sleep(wait);
-				wait+=wait; // exponential backoff
+				wait+=1+wait/3; // slow exponential backoff
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				throw new IOException("Query sending interrupted",e);
+				return interruptedResult;
+			} catch (IOException e) {
+				Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
+				return CompletableFuture.completedFuture(r);
 			}
 		}
 	}
