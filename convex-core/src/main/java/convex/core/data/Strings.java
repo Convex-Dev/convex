@@ -80,9 +80,10 @@ public class Strings {
 	/**
 	 * Create a canonical CVM String from a regular Java String
 	 * @param s Java String to convert.
-	 * @return CVM String instance.
+	 * @return CVM String instance, or null if input was null
 	 */
 	public static AString create(String s) {
+		if (s==null) return null;
 		int n=s.length();
 		if (n==0) return StringShort.EMPTY;
 		ABlob utfBlob=null;

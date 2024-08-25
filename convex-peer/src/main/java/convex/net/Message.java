@@ -218,6 +218,45 @@ public class Message {
 			return null;
 		}
 	}
+	
+	/**
+	 * Sets the message ID, if supported
+	 * @param id
+	 * @return Message with updated ID, or null if message does not support IDs
+	 */
+	@SuppressWarnings("unchecked")
+	public Message withID(CVMLong id) {
+		try {
+			switch (type) {
+				// Query and transact use a vector [ID ...]
+				case QUERY:
+				case TRANSACT: 
+					return Message.create(type, ((AVector<ACell>)getPayload()).assoc(0, id));
+	
+				// Result is a special record type
+				case RESULT: 
+					return Message.create(type, ((Result)getPayload()).withID(id));
+	
+				// Status ID is the single value
+				case STATUS: 
+					return Message.create(type, id);
+				
+				case DATA: {
+					ACell o=getPayload();
+					if (o instanceof AVector) {
+						AVector<ACell> v = (AVector<ACell>)o; 
+						if (v.count()==0) return null;
+						// first element assumed to be ID
+						return Message.create(type, v.assoc(0, id));
+					}
+				}
+	
+				default: return null;
+			}
+		} catch (BadFormatException | ClassCastException | IndexOutOfBoundsException e) {
+			return null;
+		}
+	}
 
 
 	/**

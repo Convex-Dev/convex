@@ -365,13 +365,15 @@ public final class Result extends ARecordGeneric {
 	public static Result fromException(Throwable e) {
 		if (e instanceof TimeoutException) {
 			String msg=e.getMessage();
-			if (msg==null) msg=e.getClass().getName();
 			return Result.create(null,ErrorCodes.TIMEOUT,Strings.create(msg));
 		}
 		if (e instanceof IOException) {
 			String msg=e.getMessage();
-			if (msg==null) msg=e.getClass().getName();
 			return Result.create(null,ErrorCodes.IO,Strings.create(msg));
+		}
+		if (e instanceof BadFormatException) {
+			String msg=e.getMessage();
+			return Result.create(null,ErrorCodes.FORMAT,Strings.create(msg));
 		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
