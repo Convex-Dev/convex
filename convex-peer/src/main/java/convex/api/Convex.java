@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
@@ -265,7 +266,7 @@ public abstract class Convex {
 	public long lookupSequence(Address origin) throws IOException, TimeoutException {
 		AOp<ACell> code= Special.forSymbol(Symbols.STAR_SEQUENCE);
 		Result r= querySync(code,origin);
-		if (r.isError()) throw new RuntimeException("Error trying to get sequence number: "+r);
+		if (r.isError()) throw new IOException("Error trying to get sequence number: "+r);
 		ACell rv=r.getValue();
 		if (!(rv instanceof CVMLong)) throw new RuntimeException("Unexpected sequence result type: "+Utils.getClassName(rv));
 		long seq=((CVMLong)rv).longValue();
@@ -371,7 +372,7 @@ public abstract class Convex {
 	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
 	 * @throws TimeoutException  In case of timeout
 	 */
-	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) throws IOException, TimeoutException {
+	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) throws TimeoutException, IOException {
 		SignedData<ATransaction> signed = prepareTransaction(transaction);
 		CompletableFuture<Result> r= transact(signed);
 		return r;
@@ -388,7 +389,7 @@ public abstract class Convex {
 	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
 	 * @throws TimeoutException In case of timeout
 	 */
-	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws TimeoutException, IOException {
+	public SignedData<ATransaction> prepareTransaction(ATransaction transaction) throws IOException, TimeoutException {
 		Address origin=transaction.getOrigin();
 		if (origin == null) {
 			origin=address;
@@ -496,7 +497,7 @@ public abstract class Convex {
 	 * @return A Future for the result of the transaction
 	 * @throws IOException If the connection is broken or send buffer is full
 	 */
-	public abstract CompletableFuture<Result> transact(SignedData<ATransaction> signed) throws IOException;
+	public abstract CompletableFuture<Result> transact(SignedData<ATransaction> signed);
 
 	/**
 	 * Submits a transfer transaction to the Convex network, returning a future once
@@ -587,7 +588,7 @@ public abstract class Convex {
 			return Result.fromException(e.getCause());
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
-			return Result.error(ErrorCodes.INTERRUPTED, "Transaction interrupted while awaiting result");
+			return Result.error(ErrorCodes.INTERRUPTED, "Transaction interrupted while awaiting result").withSource(SourceCodes.CLIENT);
 		}
 	}
 

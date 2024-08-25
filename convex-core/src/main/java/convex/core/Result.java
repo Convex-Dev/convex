@@ -168,6 +168,11 @@ public final class Result extends ARecordGeneric {
 		return new Result(values.assoc(INFO_POS, info));
 	}
 	
+
+	public Result withSource(Keyword source) {
+		return withInfo(Keywords.SOURCE, source);
+	}
+	
 	/**
 	 * Returns the log for this Result. May be an empty vector.
 	 * 
@@ -377,6 +382,7 @@ public final class Result extends ARecordGeneric {
 		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
+
 
 
 

@@ -46,6 +46,7 @@ import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
+import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.BaseTextPane;
 import convex.gui.components.CodePane;
@@ -61,6 +62,7 @@ public class REPLPanel extends JPanel {
 
 	protected final  CodePane input;
 	protected final CodePane output;
+	private final JButton btnRun;
 	private final JButton btnClear;
 	private final JButton btnInfo;
 	private final JCheckBox btnResults;
@@ -186,10 +188,17 @@ public class REPLPanel extends JPanel {
 		actionPanel = new ActionPanel();
 		add(actionPanel, "dock south");
 
+		btnRun = new ActionButton("Run",0xe1c4,e -> {
+			sendMessage(input.getText());
+			input.requestFocus();
+		});
+		actionPanel.add(btnRun);
+		
 		btnClear = new JButton("Clear");
 		actionPanel.add(btnClear);
 		btnClear.addActionListener(e -> {
 			output.setText("");
+			input.requestFocus();
 		});
 
 		btnInfo = new JButton("Connection Info");
@@ -253,14 +262,14 @@ public class REPLPanel extends JPanel {
 
 	private void sendMessage(String s) {
 		if (s.isBlank()) return;
+		output.append(s);
+		output.append("\n");
 		
 		history.add(s);
 		historyPosition=history.size();
 
 		SwingUtilities.invokeLater(() -> {
 			input.setText("");
-			output.append(s);
-			output.append("\n");
 			try {
 				AList<ACell> forms = Reader.readAll(s);
 				ACell code = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
@@ -302,12 +311,17 @@ public class REPLPanel extends JPanel {
 				}
 				log.trace("Sent message");
 				
-				handleResult(start,future.get(5000, TimeUnit.MILLISECONDS));
+				handleResult(start,future.get(3000, TimeUnit.MILLISECONDS));
 			} catch (ParseException e) {
 				output.append(" PARSE ERROR: "+e.getMessage(),Color.RED);
 			} catch (TimeoutException t) {
-				output.append(" TIMEOUT waiting for result",Color.RED);
+				output.append(" TIMEOUT waiting for result\n",Color.RED);
+			} catch (IllegalStateException t) {
+				// General errors we understand
+				output.append(" ERROR: ",Color.RED);
+				output.append(t.getMessage() + "\n"); 
 			} catch (Exception t) {
+				// Something bad.....
 				output.append(" ERROR: ",Color.RED);
 				output.append(t.getMessage() + "\n"); 
 				t.printStackTrace();
