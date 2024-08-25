@@ -736,26 +736,26 @@ public abstract class Convex {
 	 * @return
 	 */
 	protected CompletableFuture<Result> awaitResult(long id, long timeout) {
-		// TODO: timeout parameter, maybe allow 0 timeout for never fail?
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
-		cf=cf.whenComplete((m,e)->{
+		CompletableFuture<Result> cr=cf.handle((m,e)->{
 			synchronized(awaiting) {
 				awaiting.remove(id);
 			}
-		});
-		awaiting.put(id, cf);
-		CompletableFuture<Result> cr=cf.thenApply(m->{
+			// clear sequence if something went wrong. It is probably invalid now....
+			if (e!=null) {
+				sequence=null;
+				return Result.fromException(e);
+			}
 			Result r=m.toResult();
-			
 			if (r.getErrorCode()!=null) {
-				// clear sequence if something went wrong. It is probably invalid now....
 				sequence=null;
 			}
 			return r;
 		});
+		awaiting.put(id, cf);
 		return cr;
 	}
 

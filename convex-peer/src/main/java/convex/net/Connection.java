@@ -384,14 +384,11 @@ public class Connection {
 	 * Sends a message over this connection
 	 *
 	 * @param msg Message to send
-	 * @return true if message buffered successfully, false if failed
+	 * @return true if message buffered successfully, false if failed due to full buffer
+	 * @throws IOException 
 	 */
-	public boolean sendMessage(Message msg)  {
-		try {
-			return sendBuffer(msg.getType(),msg.getMessageData());
-		} catch (IOException e) {
-			return false;
-		}
+	public boolean sendMessage(Message msg) throws IOException  {
+		return sendBuffer(msg.getType(),msg.getMessageData());
 	}
 
 	/**

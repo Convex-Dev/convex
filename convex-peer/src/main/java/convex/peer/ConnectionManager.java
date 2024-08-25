@@ -535,7 +535,14 @@ public class ConnectionManager extends AThreadedComponent {
 			
 			for (Map.Entry<AccountKey,Connection> me: left) {
 				Connection pc=me.getValue();
-				boolean sent = pc.sendMessage(msg);
+				boolean sent;
+				try {
+					sent = pc.sendMessage(msg);
+				} catch (IOException e) {
+					// Something went wrong, lose this connection
+					closeConnection(me.getKey());
+					sent=false;
+				}
 				if (sent) {
 					hm.remove(me.getKey());	
 				} else {
