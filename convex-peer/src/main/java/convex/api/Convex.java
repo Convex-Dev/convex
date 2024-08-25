@@ -558,10 +558,9 @@ public abstract class Convex {
 	 * @param target Destination address for transfer
 	 * @param amount Amount of Convex Coins to transfer
 	 * @return A Future for the result of the transaction
-	 * @throws IOException If the connection is broken, or the send buffer is full
 	 * @throws TimeoutException In case of timeout
 	 */
-	public CompletableFuture<Result> transfer(Address target, long amount) throws IOException, TimeoutException {
+	public CompletableFuture<Result> transfer(Address target, long amount) {
 		ATransaction trans = Transfer.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, target, amount);
 		return transact(trans);
 	}
@@ -818,7 +817,7 @@ public abstract class Convex {
 	 * @throws IOException if the connection fails.
 	 *
 	 */
-	public abstract CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException;
+	public abstract CompletableFuture<Result> requestChallenge(SignedData<ACell> data);
 
 	/**
 	 * Submits a query to the Convex network, returning a Future once the query has
@@ -1024,8 +1023,9 @@ public abstract class Convex {
 	 * 
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
+	 * @throws InterruptedException 
 	 */
-	public abstract CompletableFuture<State> acquireState() throws TimeoutException;
+	public abstract CompletableFuture<State> acquireState() throws TimeoutException, InterruptedException;
 	
 	/**
 	 * Sets the default timeout for this Convex client instance.
@@ -1071,8 +1071,5 @@ public abstract class Convex {
 	public void setPreCompile(boolean preCompile) {
 		this.preCompile = preCompile;
 	}
-
-
-
 
 }

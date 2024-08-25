@@ -3,9 +3,6 @@ package convex.api;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
@@ -17,16 +14,15 @@ import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
-import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
 import convex.core.data.SignedData;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
-import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.peer.Server;
 
@@ -102,19 +98,17 @@ public class ConvexRemote extends Convex {
 	 * 
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
+	 * @throws InterruptedException 
 	 */
-	public CompletableFuture<State> acquireState() throws TimeoutException {
-		try {
-			Future<Result> sF = requestStatus();
-			AVector<ACell> status = sF.get(timeout, TimeUnit.MILLISECONDS).getValue();
+	public CompletableFuture<State> acquireState() throws TimeoutException, InterruptedException {
+		return requestStatus().thenCompose(status->{
 			Hash stateHash = RT.ensureHash(status.get(4));
 
-			if (stateHash == null)
-				throw new Error("Bad status response from Peer");
+			if (stateHash == null) {
+				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
+			}
 			return acquire(stateHash,Stores.current());
-		} catch (InterruptedException | ExecutionException e) {
-			throw Utils.sneakyThrow(e);
-		}
+		});	
 	}
 	
 	@Override
@@ -141,6 +135,7 @@ public class ConvexRemote extends Convex {
 				Thread.sleep(wait);
 				wait+=1+wait/3; // slow exponential backoff
 			} catch (InterruptedException e) {
+				// we honour the interruption, but return a failed result
 				Thread.currentThread().interrupt();
 				return interruptedResult;
 			} catch (IOException e) {
@@ -174,6 +169,7 @@ public class ConvexRemote extends Convex {
 				Thread.sleep(wait);
 				wait+=1+wait/3; // slow exponential backoff
 			} catch (InterruptedException e) {
+				// we honour the interruption, but return a failed result
 				Thread.currentThread().interrupt();
 				return interruptedResult;
 			} catch (IOException e) {
@@ -205,12 +201,17 @@ public class ConvexRemote extends Convex {
 	}
 	
 	@Override
-	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) throws IOException {
+	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
 		synchronized (awaiting) {
-			long id = connection.sendChallenge(data);
+			long id;
+			try {
+				id = connection.sendChallenge(data);
+			} catch (IOException e) {
+				return CompletableFuture.completedFuture(Result.error(ErrorCodes.IO, "Error requesting challenge"));
+			}
 			if (id < 0) {
 				// TODO: too fragile?
-				throw new IOException("Failed to send challenge due to full buffer");
+				return CompletableFuture.completedFuture(Result.error(ErrorCodes.IO, "Full buffer while requesting challenge"));
 			}
 
 			// Store future for completion by result message
