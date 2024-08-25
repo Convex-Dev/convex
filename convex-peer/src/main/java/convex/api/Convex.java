@@ -729,7 +729,7 @@ public abstract class Convex {
 	public abstract CompletableFuture<Result> requestStatus();
 
 	/**
-	 * Method to start waiting for a complete result. Should be called with lock on
+	 * Method to start waiting for a complete result. Must be called with lock on
 	 * `awaiting` map to prevent risk of missing results before it is called.
 	 * 
 	 * @param id ID of result message to await

@@ -198,8 +198,9 @@ public class ConvexRemote extends Convex {
 	
 				return cf;
 			}
-		} catch (Exception e) {
-			return CompletableFuture.failedFuture(e);
+		} catch (IOException e) {
+			Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
+			return CompletableFuture.completedFuture(r);
 		}
 	}
 	
@@ -219,9 +220,7 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public <T extends ACell> CompletableFuture<T> acquire(Hash hash, AStore store) {
-		
 		Acquiror acquiror=Acquiror.create(hash, store, this);
-		
 		return acquiror.getFuture();
 
 	}
