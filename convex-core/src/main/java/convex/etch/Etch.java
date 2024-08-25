@@ -250,7 +250,7 @@ public class Etch {
 		position=rawPointer(position); // ensure we don't have any pesky type bits
 
 		if ((position<0)||(position>dataLength)) {
-			throw new Error("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
+			throw new EtchCorruptionError("Seek out of range in Etch file: position="+Utils.toHexString(position)+ " dataLength="+Utils.toHexString(dataLength)+" file="+file.getName());
 		}
 
 		MappedByteBuffer mbb=(MappedByteBuffer)((ByteBuffer)getInternalBuffer(position)).duplicate();

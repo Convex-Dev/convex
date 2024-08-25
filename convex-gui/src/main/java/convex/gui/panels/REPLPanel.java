@@ -8,8 +8,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.ArrayList;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
@@ -37,14 +36,12 @@ import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
-import convex.core.data.List;
 import convex.core.data.SignedData;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
@@ -103,17 +100,21 @@ public class REPLPanel extends JPanel {
 		if (btnTiming.isSelected()) {
 			output.append("Completion time: " + (Utils.getCurrentTimestamp()-start) + " ms\n");
 		}
+		if (r==null) {
+			output.append(" No result??\n",Color.ORANGE);
+			return;
+		}
 		if (btnResults.isSelected()) {
-			handleResult((ACell)r);
+			showResultValue((ACell)r);
 	    } else if (r.isError()) {
 			handleError(r.getErrorCode(),r.getValue(),r.getTrace());
 		} else {
-			handleResult((ACell)r.getValue());
+			showResultValue((ACell)r.getValue());
 		}
 		execPanel.updateBalance();
 	}
 
-	protected void handleResult(ACell m) {
+	protected void showResultValue(ACell m) {
 		AString s=RT.print(m);
 		String resultString=(s==null)?"Print limit exceeded!":s.toString();
 		
@@ -264,6 +265,7 @@ public class REPLPanel extends JPanel {
 		if (s.isBlank()) return;
 		output.append(s);
 		output.append("\n");
+		input.setText("");
 		
 		history.add(s);
 		historyPosition=history.size();
@@ -273,13 +275,9 @@ public class REPLPanel extends JPanel {
 			try {
 				AList<ACell> forms = Reader.readAll(s);
 				ACell code = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
-				Future<Result> future;
+				CompletableFuture<Result> future;
 				
-				if (btnCompile.isSelected()) {
-					ACell compileStep=List.of(Symbols.COMPILE,List.of(Symbols.QUOTE,code));
-					Result cr=convex.querySync(compileStep);
-					code=cr.getValue();
-				}
+				convex.setPreCompile(btnCompile.isSelected());
 
 				String mode = execPanel.getMode();
 
@@ -297,8 +295,8 @@ public class REPLPanel extends JPanel {
 					AKeyPair kp=getKeyPair();
 					if (kp==null) throw new IllegalStateException("Can't transact without a valid key pair");
 					convex.setKeyPair(kp);
-					ATransaction trans = Invoke.create(address,0, code);
-					SignedData<ATransaction> strans=convex.prepareTransaction(trans);
+					
+					SignedData<ATransaction> strans=convex.prepareTransaction(code);
 					
 					if (btnTX.isSelected()) {
 						addOutputWithHighlight(output,strans.toString()+"\n");
@@ -311,7 +309,13 @@ public class REPLPanel extends JPanel {
 				}
 				log.trace("Sent message");
 				
-				handleResult(start,future.get(3000, TimeUnit.MILLISECONDS));
+				future.handleAsync((m,e)->{
+					if (e!=null) {
+						e.printStackTrace();
+					} 
+					handleResult(start,m);
+					return m;
+				});
 			} catch (ParseException e) {
 				output.append(" PARSE ERROR: "+e.getMessage(),Color.RED);
 			} catch (TimeoutException t) {

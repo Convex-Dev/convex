@@ -26,9 +26,11 @@ import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.AOp;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -76,6 +78,11 @@ public abstract class Convex {
 	 * Determines if auto-sequencing should be attempted. Default to true.
 	 */
 	private boolean autoSequence = true;
+	
+	/**
+	 * Determines if transactions should be pre-compiled.
+	 */
+	private boolean preCompile = true;
 
 	/**
 	 * Sequence number for this client, or null if not yet known. Used to number new
@@ -309,13 +316,16 @@ public abstract class Convex {
 	 * @return Address of account created
 	 * @throws TimeoutException If attempt times out
 	 * @throws IOException      If IO error occurs
+	 * @throws ResultException  If account creation failed
 	 */
-	public Address createAccountSync(AccountKey publicKey) throws TimeoutException, IOException {
-		Invoke trans = Invoke.create(address, 0, Lists.of(Symbols.CREATE_ACCOUNT, publicKey));
-		Result r = transactSync(trans);
-		if (r.isError())
-			throw new Error("Error creating account: " + r.getErrorCode() + " " + r.getValue());
-		return (Address) r.getValue();
+	public Address createAccountSync(AccountKey publicKey) throws InterruptedException, ResultException {
+		Address address;
+		try {
+			address = createAccount(publicKey).get();
+		} catch (ExecutionException e) {
+			throw new ResultException(Result.fromException(e));
+		}
+		return address;
 	}
 
 	/**
@@ -326,7 +336,7 @@ public abstract class Convex {
 	 * @throws TimeoutException If attempt times out
 	 * @throws IOException      If IO error occurs
 	 */
-	public CompletableFuture<Address> createAccount(AccountKey publicKey) throws TimeoutException, IOException {
+	public CompletableFuture<Address> createAccount(AccountKey publicKey) {
 		Invoke trans = Invoke.create(address, 0, Lists.of(Symbols.CREATE_ACCOUNT, publicKey));
 		CompletableFuture<Result> fr = transact(trans);
 		return fr.thenApply(r -> r.getValue());
@@ -372,12 +382,41 @@ public abstract class Convex {
 	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
 	 * @throws TimeoutException  In case of timeout
 	 */
-	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) throws TimeoutException, IOException {
-		SignedData<ATransaction> signed = prepareTransaction(transaction);
-		CompletableFuture<Result> r= transact(signed);
-		return r;
+	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) {
+		SignedData<ATransaction> signed;
+		try {
+			signed = prepareTransaction(transaction);
+			CompletableFuture<Result> r= transact(signed);
+			return r;
+		} catch (IOException | TimeoutException e) {
+			Result r=Result.fromException(e).withSource(SourceCodes.COMM);
+			return CompletableFuture.completedFuture(r);
+		} 
 	}
 
+	/**
+	 * Prepares a transaction for network submission
+	 * - Pre-compiles if needed
+	 * - Sets sequence number (if autosequencing is enabled)
+	 * - Signs transaction with current key pair
+	 *
+	 * @param code Code to prepare as transaction
+	 * @return Signed transaction ready to submit
+	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
+	 * @throws TimeoutException In case of timeout
+	 */
+	public SignedData<ATransaction> prepareTransaction(ACell code) throws IOException, TimeoutException {
+		ATransaction transaction;
+		if (code instanceof ATransaction) {
+			transaction=(ATransaction)code;
+		} else if (code instanceof SignedData) {
+			throw new IllegalArgumentException("Can't prepare transaction that is already signed");
+		} else {
+			transaction=Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, code);
+		}
+		return prepareTransaction(transaction);
+	}
+	
 	/**
 	 * Prepares a transaction for network submission
 	 * - Sets origin account if needed
@@ -458,6 +497,17 @@ public abstract class Convex {
 	 * @throws TimeoutException In case of timeout
 	 */
 	public synchronized CompletableFuture<Result> transact(ACell code) throws IOException, TimeoutException {
+		if (code instanceof ATransaction) return transact((ATransaction)code);
+		
+		if (isPreCompile()) {
+			ACell compileStep=List.of(Symbols.COMPILE,List.of(Symbols.QUOTE,code));
+			return query(compileStep).thenCompose(r->{
+				if (r.isError()) return CompletableFuture.completedFuture(r);
+				ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, r.getValue());
+				return transact(trans);
+			});
+		}
+		
 		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
 		return transact(trans);
 	}
@@ -552,7 +602,7 @@ public abstract class Convex {
 	 * @throws TimeoutException If the attempt to transact with the network is not
 	 *                          confirmed within a reasonable time
 	 */
-	public Result transactSync(ATransaction transaction) throws TimeoutException, IOException {
+	public Result transactSync(ACell transaction) throws TimeoutException, IOException {
 		return transactSync(transaction, timeout);
 	}
 
@@ -567,7 +617,7 @@ public abstract class Convex {
 	 * @throws TimeoutException If the attempt to transact with the network is not
 	 *                          confirmed by the specified timeout
 	 */
-	public synchronized Result transactSync(ATransaction transaction, long timeout) throws TimeoutException, IOException {
+	public synchronized Result transactSync(ACell transaction, long timeout) throws TimeoutException, IOException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
 		Result result;
@@ -1012,6 +1062,20 @@ public abstract class Convex {
 	 * @return Socket address
 	 */
 	public abstract InetSocketAddress getHostAddress();
+
+	/**
+	 * @return True if pre-compilation is enabled
+	 */
+	public boolean isPreCompile() {
+		return preCompile;
+	}
+
+	/**
+	 * @param preCompile the preCompile to set
+	 */
+	public void setPreCompile(boolean preCompile) {
+		this.preCompile = preCompile;
+	}
 
 
 

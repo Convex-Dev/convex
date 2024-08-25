@@ -21,6 +21,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.exceptions.BadSignatureException;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.transactions.Invoke;
 import convex.etch.EtchStore;
@@ -34,7 +35,7 @@ public class JoinNetworkTest {
 	}
 
 	@Test
-	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException, ResultException {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 

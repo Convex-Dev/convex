@@ -22,6 +22,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.Context;
 import convex.core.lang.RecordFormat;
 import convex.core.lang.exception.AExceptional;
@@ -379,6 +380,9 @@ public final class Result extends ARecordGeneric {
 		if (e instanceof BadFormatException) {
 			String msg=e.getMessage();
 			return Result.create(null,ErrorCodes.FORMAT,Strings.create(msg));
+		}
+		if (e instanceof ResultException) {
+			return ((ResultException) e).getResult();
 		}
 		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}

@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
+import convex.core.exceptions.ResultException;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -161,7 +162,10 @@ public class ChainAPI extends ABaseAPI {
 			}
 		} catch (TimeoutException e) {
 			throw new ServiceUnavailableResponse(jsonError("Timeout in request"));
-		} catch (IOException e) {
+		} catch (IOException | ResultException e) {
+			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
 		}
 		ctx.result("{\"address\": " + a.longValue() + "}");

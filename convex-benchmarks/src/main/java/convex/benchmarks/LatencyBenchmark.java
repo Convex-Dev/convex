@@ -13,6 +13,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.api.Convex;
+import convex.core.exceptions.ResultException;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
@@ -55,11 +56,10 @@ public class LatencyBenchmark {
 			
 			client=Convex.connect(server.getHostAddress(), HERO,KPS[0]);
 			client2=Convex.connect(server.getHostAddress(), VILLAIN,KPS[1]);
-		} catch (IOException | TimeoutException e) {
+		} catch (ResultException | IOException | TimeoutException e) {
 			e.printStackTrace();
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			Thread.currentThread().interrupt();
 		}
 
 	}
