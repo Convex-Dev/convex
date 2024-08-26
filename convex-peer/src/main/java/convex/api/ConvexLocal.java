@@ -2,7 +2,6 @@ package convex.api;
  
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 import convex.core.Result;
@@ -117,7 +116,7 @@ public class ConvexLocal extends Convex {
 	}
 
 	@Override
-	public CompletableFuture<State> acquireState() throws TimeoutException {
+	public CompletableFuture<State> acquireState() {
 		return CompletableFuture.completedFuture(getState());
 	}
 	
