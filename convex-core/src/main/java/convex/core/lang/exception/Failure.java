@@ -1,10 +1,9 @@
-package convex.core.exceptions;
+package convex.core.lang.exception;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.Keyword;
 import convex.core.data.StringShort;
-import convex.core.lang.exception.AThrowable;
 
 /**
  * Exceptional value representing a CVM condition the CVM should not catch in user code
