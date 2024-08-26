@@ -322,6 +322,7 @@ public final class Result extends ARecordGeneric {
 		if (rc.memUsed>0) info=info.assoc(Keywords.MEM, CVMLong.create(rc.memUsed));
 		if (rc.totalFees>0) info=info.assoc(Keywords.FEES, CVMLong.create(rc.totalFees));
 		if (rc.juiceUsed>0) info=info.assoc(Keywords.JUICE, CVMLong.create(rc.juiceUsed));
+		if (rc.source!=null) info=info.assoc(Keywords.SOURCE, rc.source);
 		
 		return create(id,(ACell)result,errorCode,info);
 	}
@@ -346,6 +347,7 @@ public final class Result extends ARecordGeneric {
 	 */
 	public static Result fromContext(Context ctx) {
 		ACell rval=(ctx.isExceptional())?ctx.getExceptional().getMessage():ctx.getResult();
+		
 		return create(null,rval,ctx.getErrorCode(),null);
 	}
 
@@ -398,7 +400,7 @@ public final class Result extends ARecordGeneric {
 	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!"));
 	
 	/**
-	 * Returns a Result representing a thread interrup, AND sets the interrupt status on the current thread
+	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
 	 * @return
 	 */
 	public static Result interruptThread() {

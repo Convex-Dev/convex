@@ -17,6 +17,7 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.Peer;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -117,7 +118,7 @@ public class TransactionHandler extends AThreadedComponent{
 			// Check our transaction is valid and we want to process it
 			Result error=checkTransaction(sd);
 			if (error!=null) {
-				m.returnResult(error);
+				m.returnResult(error.withSource(SourceCodes.PEER));
 				return;
 			}
 
@@ -173,8 +174,7 @@ public class TransactionHandler extends AThreadedComponent{
 				return Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 			}
 		} catch (Exception e) {
-			log.warn("Unexpected exception while checking transaction",e);
-			return Result.error(ErrorCodes.UNEXPECTED, Strings.BAD_SIGNATURE);
+			return Result.fromException(e);
 		}
 		// All checks passed OK!
 		return null;

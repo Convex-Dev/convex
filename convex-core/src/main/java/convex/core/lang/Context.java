@@ -4,6 +4,7 @@ import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.ResultContext;
+import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -352,6 +353,7 @@ public class Context {
 			// consume whole balance
 			juiceFees=balance;
 		} else if (!rc.context.isExceptional()) {
+			// Transaction appears to have succeeded, and will do unless memory accounting fails
 			// do memory accounting as long as we didn't fail for any other reason
 			// compute memory delta (memUsed) and store in ResultContext
 			long memUsed=state.getMemorySize()-initialState.getMemorySize();
@@ -389,6 +391,9 @@ public class Context {
 				long allowanceCredit=-memUsed;
 				account=account.withMemory(allowance+allowanceCredit);
 			}
+		} else {
+			// Transaction failed in user code
+			rc.source=SourceCodes.CODE;
 		}
 
 		// Compute total fees
@@ -413,8 +418,10 @@ public class Context {
 		Context rctx=this.withState(state);
 		if (juiceFailure) {
 			rctx=rctx.withError(ErrorCodes.JUICE, "Insuffienct balance to cover juice fees of "+rc.getJuiceFees());
+			rc.source=SourceCodes.CVM;
 		} else if (memoryFailure) {
 			rctx=rctx.withError(ErrorCodes.MEMORY, "Unable to allocate additional memory required for transaction ("+rc.memUsed+" bytes)");
+			rc.source=SourceCodes.CVM;
 		}
 		return rctx;
 	}

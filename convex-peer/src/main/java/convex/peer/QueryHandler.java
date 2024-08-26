@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
 import convex.core.ResultContext;
+import convex.core.SourceCodes;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -78,7 +79,7 @@ public class QueryHandler extends AThreadedComponent {
 			ResultContext resultContext = server.getPeer().executeQuery(form, address);
 			
 			// Report result back to message sender
-			boolean resultReturned= m.returnResult(Result.fromContext(id, resultContext));
+			boolean resultReturned= m.returnResult(Result.fromContext(id, resultContext).withSource(SourceCodes.PEER));
 	
 			if (!resultReturned) {
 				log.warn("Failed to send query result back to client with ID: {}", id);

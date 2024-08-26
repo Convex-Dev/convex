@@ -238,6 +238,10 @@ public class TransactionTest extends ACVMTest {
 		Context ctx=rc.context;
 		assertEquals(ErrorCodes.SEQUENCE,ctx.getError().getCode());
 		
+		// check source correctly identified
+		assertEquals(SourceCodes.CVM, rc.source);
+
+		
 		// Sequence number in state should be unchanged
 		assertEquals(0L,ctx.getAccountStatus(HERO).getSequence());
 		
@@ -284,6 +288,18 @@ public class TransactionTest extends ACVMTest {
 		assertSame(s,rc.getState());
 		
 		assertEquals(0,ctx.getJuiceUsed());
+	}
+	
+	@Test 
+	public void testJuiceFail() {
+		State s=state();
+		AccountStatus as=s.getAccount(HERO);
+		long SEQ=as.getSequence()+1;
+		ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(HERO, SEQ,"(loop [] (def a 2) (recur))")));
+		assertEquals(ErrorCodes.JUICE,rc.getErrorCode());
+		assertEquals(SourceCodes.CVM,rc.getSource());
+		checkNoTransactionEffects(s,rc);
+		
 	}
 
 	@Test public void testBigValues() {

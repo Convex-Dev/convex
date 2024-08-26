@@ -8,7 +8,7 @@ import convex.core.lang.Juice;
 import convex.core.transactions.ATransaction;
 
 /**
- * Class for preparation of transaction results
+ * Class for preparation of transaction results from the CVM
  * 
  * Mutable so that results can be accumulated efficiently as processing proceeds
  */
@@ -20,6 +20,7 @@ public class ResultContext {
 	public Context context=null;
 	public long totalFees=0;
 	public long juiceUsed=0;
+	public Keyword source=null;
 
 	public ResultContext(ATransaction transaction, long juicePrice) {
 		this.juicePrice=juicePrice;
@@ -83,6 +84,15 @@ public class ResultContext {
 
 	public boolean isError() {
 		return context.isError();
+	}
+
+	public ResultContext withSource(Keyword sourceCode) {
+		this.source=sourceCode;
+		return this;
+	}
+
+	public Keyword getSource() {
+		return source;
 	}
 
 }

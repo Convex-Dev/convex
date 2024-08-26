@@ -18,6 +18,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.data.Address;
@@ -104,6 +105,16 @@ public class ConvexRemoteTest {
 			Ref<ATransaction> tr = Invoke.create(ADDRESS, convex.getSequence()+1, Reader.read("*address*")).getRef();
 			Result r = convex.transact(SignedData.create(KEYPAIR.getAccountKey(), Ed25519Signature.ZERO, tr)).get();
 			assertEquals(ErrorCodes.SIGNATURE, r.getErrorCode());
+		}
+	}
+	
+	@Test
+	public void testNobody() throws IOException, TimeoutException, InterruptedException, ExecutionException  {
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER.getHostAddress(), Address.create(666666), KEYPAIR);
+			Result r = convex.transact(CVMLong.ONE).get();
+			assertEquals(ErrorCodes.NOBODY, r.getErrorCode());
+			assertEquals(SourceCodes.PEER, r.getSource());
 		}
 	}
 	

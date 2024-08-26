@@ -511,21 +511,29 @@ public class State extends ARecord {
 		Address addr=t.getOrigin();
 		AccountStatus as = getAccount(addr);
 		if (as==null) {
-			return ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
+			ResultContext rc=ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
+			return rc.withSource(SourceCodes.CVM);
 		} else {
 
 			// Update sequence number for target account
 			long sequence=t.getSequence();
 			long expectedSequence=as.getSequence()+1;
 			if (sequence!=expectedSequence) {
-				return ResultContext.error(this,ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+expectedSequence);
+				ResultContext rc=ResultContext.error(this,ErrorCodes.SEQUENCE, "Sequence = "+sequence+" but expected "+expectedSequence);
+				return rc.withSource(SourceCodes.CVM);
 			}
 			
 			AccountKey key=as.getAccountKey();
-			if (key==null) return ResultContext.error(this,ErrorCodes.STATE,"Transaction for account that is an Actor: "+addr);
+			if (key==null) {
+				ResultContext rc= ResultContext.error(this,ErrorCodes.STATE,"Transaction for account that is an Actor: "+addr);
+				return rc.withSource(SourceCodes.CVM);
+			}
 			
 			boolean sigValid=signedTransaction.checkSignature(key);
-			if (!sigValid) return ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
+			if (!sigValid) {
+				ResultContext rc= ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
+				return rc.withSource(SourceCodes.CVM);
+			}
 		}
 
 		ResultContext ctx=applyTransaction(t);
@@ -575,6 +583,7 @@ public class State extends ARecord {
 			// - Non-existent Origin account
 			// - Bad sequence number
 			// Return context with no change, i.e. before executing the transaction
+			rc.source=SourceCodes.CVM;
 		}
 
 		return rc.withContext(ctx);
