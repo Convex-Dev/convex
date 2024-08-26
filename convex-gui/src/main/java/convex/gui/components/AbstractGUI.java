@@ -5,7 +5,6 @@ import java.awt.EventQueue;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
@@ -67,15 +66,8 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	}
 	
 	public void waitForClose() {
-		try {
-			finished.get();
-			close();
-		} catch (ExecutionException e) {
-			// Probably won't happen?
-		} catch (InterruptedException e) {
-			// Set interrupt status, in case caller wants to handle this
-			Thread.currentThread().interrupt();
-		}
+		finished.join();
+		close();
 	}
 	
 	public JFrame getFrame() {
