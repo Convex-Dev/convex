@@ -350,8 +350,9 @@ public class Context {
 		long memorySpend=0L; // usually zero
 
 		if (juiceFailure) {
-			// consume whole balance
+			// consume whole balance, reset state
 			juiceFees=balance;
+			state=initialState;
 		} else if (!rc.context.isExceptional()) {
 			// Transaction appears to have succeeded, and will do unless memory accounting fails
 			// do memory accounting as long as we didn't fail for any other reason
@@ -392,8 +393,10 @@ public class Context {
 				account=account.withMemory(allowance+allowanceCredit);
 			}
 		} else {
-			// Transaction failed in user code
-			rc.source=SourceCodes.CODE;
+			// Transaction failed for reason other than juice usage exceeding balance
+			AExceptional ex=rc.context.getExceptional();
+			// It's user :CODE that caused the error if catchable, otherwise :CVM source 
+			rc.source=(ex.isCatchable())?SourceCodes.CODE:SourceCodes.CVM;
 		}
 
 		// Compute total fees

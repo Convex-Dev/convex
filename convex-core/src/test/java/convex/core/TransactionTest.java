@@ -2,6 +2,7 @@ package convex.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -285,9 +286,16 @@ public class TransactionTest extends ACVMTest {
 		Context ctx=rc.context;
 		
 		// No change to state would be sufficient, but object identity means we are being more efficient so test for that
+		assertEquals(s,rc.getState());
 		assertSame(s,rc.getState());
 		
+		// If :CODE Result source, something should have changed in State
+		assertNotEquals(SourceCodes.CODE,rc.getSource());
+		
+		// No juice should have been used
 		assertEquals(0,ctx.getJuiceUsed());
+		assertEquals(0,rc.juiceUsed);
+		assertEquals(0,rc.memUsed);
 	}
 	
 	@Test 
@@ -295,11 +303,14 @@ public class TransactionTest extends ACVMTest {
 		State s=state();
 		AccountStatus as=s.getAccount(HERO);
 		long SEQ=as.getSequence()+1;
-		ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(HERO, SEQ,"(loop [] (def a 2) (recur))")));
+		SignedData<ATransaction> st=HERO_KP.signData(Invoke.create(HERO, SEQ,"(loop [] (def a 2) (recur))"));
+		ResultContext rc=s.applyTransaction(st);
 		assertEquals(ErrorCodes.JUICE,rc.getErrorCode());
 		assertEquals(SourceCodes.CVM,rc.getSource());
-		checkNoTransactionEffects(s,rc);
+		assertSame(st.getValue(),rc.tx);
 		
+		// Note there will be state effects because juice got consumed 
+		//checkNoTransactionEffects(s,rc);
 	}
 
 	@Test public void testBigValues() {

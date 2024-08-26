@@ -540,6 +540,11 @@ public class State extends ARecord {
 		return ctx;
 	}
 	
+	/**
+	 * Creates an initial ResultContext for a transaction
+	 * @param t
+	 * @return
+	 */
 	private ResultContext createResultContext(ATransaction t) {
 		long juicePrice=getJuicePrice().longValue();
 		ResultContext rc=new ResultContext(t,juicePrice);
@@ -589,6 +594,11 @@ public class State extends ARecord {
 		return rc.withContext(ctx);
 	}
 
+	/**
+	 * Prepares a CVM execution context and ResultContext for a transaction
+	 * @param rc ResultContext to populate
+	 * @return
+	 */
 	private Context prepareTransaction(ResultContext rc) {
 		ATransaction t=rc.tx;
 		long juicePrice=rc.juicePrice;

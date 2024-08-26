@@ -7,7 +7,8 @@ import convex.core.data.StringShort;
 import convex.core.lang.exception.AThrowable;
 
 /**
- * Exceptional value representing a condition the CVM should not catch
+ * Exceptional value representing a CVM condition the CVM should not catch in user code
+ * Typically unrecoverable failure, e.g. JUICE error
  */
 public class Failure extends AThrowable {
 
