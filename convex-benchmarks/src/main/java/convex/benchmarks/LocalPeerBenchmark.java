@@ -24,7 +24,6 @@ import convex.core.init.Init;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.Invoke;
-import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.Server;
 
@@ -68,8 +67,8 @@ public class LocalPeerBenchmark {
 			HERO=hr.getValue();
 			CONVEX=Convex.connect(SERVER, HERO, HERO_KP);
 			CONVEX.transactSync("(def bm (index))");
-		} catch (Throwable t) {
-			Utils.sneakyThrow(t);
+		} catch (Exception t) {
+			throw new Error(t);
 		}
 	}
 

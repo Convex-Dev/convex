@@ -865,13 +865,9 @@ public class Etch {
 		mbb.putLong(slotValue);
 	}
 	
-	public void visitIndex(IEtchIndexVisitor v) {
+	public void visitIndex(IEtchIndexVisitor v) throws IOException {
 		int[] bs=new int[32];
-		try {
-			visitIndex(v,bs,0,INDEX_START);
-		}catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+		visitIndex(v,bs,0,INDEX_START);
 	}
 
 	private void visitIndex(IEtchIndexVisitor v, int[] digits, int level, long indexPointer) throws IOException {

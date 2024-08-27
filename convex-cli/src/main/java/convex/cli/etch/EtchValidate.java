@@ -1,5 +1,7 @@
 package convex.cli.etch;
 
+import java.io.IOException;
+
 import convex.cli.CLIError;
 import convex.cli.Main;
 import convex.core.data.ACell;
@@ -77,6 +79,8 @@ public class EtchValidate extends AEtchCommand{
 
 		} catch (EtchCorruptionError e) {
 			throw new CLIError("Etch file corrupt: "+store,e);
+		} catch (IOException e) {
+			throw new CLIError("IO Error traversing etch store: "+store,e);
 		}
 	}
 }

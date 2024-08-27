@@ -25,7 +25,6 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
-import convex.core.util.Utils;
 
 /**
  * Abstract base class for key pairs in Convex.
@@ -271,9 +270,11 @@ public abstract class AKeyPair {
 	 * Gets a Ed25519 Private Key from a 32-byte array.
 	 * @param privKey Bytes to use as a private key seed
 	 * @return PrivateKey instance
+	 * @throws NoSuchAlgorithmException 
+	 * @throws IOException 
+	 * @throws InvalidKeySpecException 
 	 */
-	public static PrivateKey privateFromBytes(byte[] privKey) {
-		try {
+	public static PrivateKey privateFromBytes(byte[] privKey) throws NoSuchAlgorithmException, IOException, InvalidKeySpecException {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), new DEROctetString(privKey));
 	
@@ -281,9 +282,6 @@ public abstract class AKeyPair {
 	
 	        PrivateKey result = keyFactory.generatePrivate(pkcs8KeySpec);
 	        return result;
-		} catch (IOException | NoSuchAlgorithmException | InvalidKeySpecException e) {
-			throw Utils.sneakyThrow(e);
-		}
 	}
 
 	public static PublicKey publicKeyFromBytes(byte[] key) {

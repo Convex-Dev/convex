@@ -17,7 +17,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
-import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.peer.API;
 import convex.peer.Server;
@@ -42,7 +41,7 @@ public class ClientTest {
 			PFXTools.saveStore(keystore, TEMP_KEYSTORE, KEYSTORE_PASSWORD);
 			KEYSTORE_FILENAME = TEMP_KEYSTORE.getCanonicalPath();
 		} catch (Exception t) {
-			throw Utils.sneakyThrow(t);
+			throw new Error(t);
 		} 
 	}
 	
@@ -85,10 +84,7 @@ public class ClientTest {
 					"*balance*"
 				);
 			tester.assertExitCode(ExitCodes.SUCCESS);
-			
-
-
-		
+				
 			s.close();
 		}
 	}

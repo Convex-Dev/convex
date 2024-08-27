@@ -28,13 +28,9 @@ public class Reader {
 		return Syntax.create(read(source));
 	}
 
-	public static ACell readResource(String path)  {
+	public static ACell readResource(String path) throws IOException  {
 		String source;
-		try {
-			source = Utils.readResourceAsString(path);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+		source = Utils.readResourceAsString(path);
 		return read(source);
 	}
 	

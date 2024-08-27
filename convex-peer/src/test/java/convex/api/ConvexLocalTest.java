@@ -22,11 +22,11 @@ import convex.core.data.Address;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.core.util.Utils;
 import convex.peer.TestNetwork;
 
 /**
@@ -40,17 +40,12 @@ public class ConvexLocalTest {
 	private static TestNetwork network;
 
 	@BeforeAll
-	public static void init() {
+	public static void init() throws InterruptedException, ResultException, ExecutionException, TimeoutException {
 		network =  TestNetwork.getInstance();
 		synchronized(network.SERVER) {
-			try {
-				ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
-				Result r=network.CONVEX.transfer(ADDRESS, 1000000000L).get(5000,TimeUnit.MILLISECONDS);
-				assertFalse(r.isError(),()->"Error transferring init funds: "+r);
-			} catch (Throwable e) {
-				e.printStackTrace();
-				throw Utils.sneakyThrow(e);
-			}
+			ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
+			Result r=network.CONVEX.transfer(ADDRESS, 1000000000L).get(5000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError(),()->"Error transferring init funds: "+r);
 		}
 	}
 

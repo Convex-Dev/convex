@@ -6,7 +6,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.util.Utils;
 
 /**
  * Reference class implemented via a soft reference and store lookup.
@@ -94,7 +93,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		if (result == null) {
 			Ref<T> storeRef = store.refForHash(hash);
 			if (storeRef == null) {
-				throw Utils.sneakyThrow(new MissingDataException(store,hash));
+				throw new MissingDataException(store,hash);
 			}
 			this.flags=Ref.mergeFlags(this.flags, storeRef.flags);
 			result = storeRef.getValue();

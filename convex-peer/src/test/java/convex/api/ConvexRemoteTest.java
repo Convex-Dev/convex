@@ -32,7 +32,6 @@ import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
-import convex.core.util.Utils;
 import convex.net.Connection;
 import convex.net.Message;
 import convex.net.MessageType;
@@ -49,17 +48,12 @@ public class ConvexRemoteTest {
 	private static TestNetwork network;
 
 	@BeforeAll
-	public static void init() {
+	public static void init() throws InterruptedException, ResultException, ExecutionException, TimeoutException {
 		network =  TestNetwork.getInstance();
 		synchronized(network.SERVER) {
-			try {
-				ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
-				Result r=network.CONVEX.transfer(ADDRESS, 1000000000L).get(5000,TimeUnit.MILLISECONDS);
-				assertFalse(r.isError(),()->"Error transferring init funds: "+r);
-			} catch (Throwable e) {
-				e.printStackTrace();
-				throw Utils.sneakyThrow(e);
-			}
+			ADDRESS=network.CONVEX.createAccountSync(KEYPAIR.getAccountKey());
+			Result r=network.CONVEX.transfer(ADDRESS, 1000000000L).get(5000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError(),()->"Error transferring init funds: "+r);
 		}
 	}
 

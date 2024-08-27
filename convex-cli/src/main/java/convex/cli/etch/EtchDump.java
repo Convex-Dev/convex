@@ -41,15 +41,12 @@ public class EtchDump extends AEtchCommand{
 
 	@Override
 	public void run() {
-		try {
-			cli().setOut(outputFilename);
-		} catch (IOException e) {
-			throw new CLIError("Unable to open output file",e);
-		}
+		cli().setOut(outputFilename);
 		
 		try (EtchStore store=store()) {
-		
 			store.getEtch().visitIndex(new DumpVisitor(cli()));
+		} catch (IOException e) {
+			throw new CLIError("IO Error traversing Etch store",e);
 		}
 	}
 }

@@ -377,7 +377,7 @@ public class Init {
 
 			return ctx.getState();
 		} catch (Exception e) { 
-			throw Utils.sneakyThrow(e);
+			throw new Error(e);
 		}
 	}
 

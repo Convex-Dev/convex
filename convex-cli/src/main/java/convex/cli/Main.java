@@ -239,16 +239,20 @@ public class Main extends ACommand {
 	 * @param outFile String specifying file. `-` or `null` specifies STDOUT
 	 * @throws IOException
 	 */
-	public void setOut(String outFile) throws IOException {
-		if (outFile == null || outFile.equals("-")) {
-			log.debug("Setting output to STDOUT");
-			commandLine.setOut(new PrintWriter(System.out));
-		} else {
-			File file = new File(outFile);
-			file = FileUtils.ensureFilePath(file);
-			log.debug("Setting output to "+file);
-			PrintWriter pw = new PrintWriter(file);
-			commandLine.setOut(pw);
+	public void setOut(String outFile) {
+		try {
+			if (outFile == null || outFile.equals("-")) {
+				log.debug("Setting output to STDOUT");
+				commandLine.setOut(new PrintWriter(System.out));
+			} else {
+				File file = new File(outFile);
+				file = FileUtils.ensureFilePath(file);
+				log.debug("Setting output to "+file);
+				PrintWriter pw = new PrintWriter(file);
+				commandLine.setOut(pw);
+			}
+		} catch (IOException e) {
+			throw new CLIError("Unavble to open output file: "+outFile);
 		}
 	}
 
