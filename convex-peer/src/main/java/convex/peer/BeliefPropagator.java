@@ -276,37 +276,27 @@ public class BeliefPropagator extends AThreadedComponent {
 	 */
 	private Belief awaitBelief() throws InterruptedException {
 		ArrayList<Message> beliefMessages=new ArrayList<>();
-		try {
 		
-			// if we did a belief merge recently, pause for a bit to await more Beliefs
-			LoadMonitor.down();
-			Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
-			LoadMonitor.up();
-			if (firstEvent==null) return null; // nothing arrived
-			
-			beliefMessages.add(firstEvent);
-			beliefQueue.drainTo(beliefMessages); 
-			HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
-			// log.info("Merging Beliefs: "+allBeliefs.size());
-			
-			boolean anyOrderChanged=false;
-			for (Message m: beliefMessages) {
-				boolean changed=mergeBeliefMessage(newOrders,m);
-				if (changed) anyOrderChanged=true;
-			}
-			if (!anyOrderChanged) return null;
-			
-			Belief newBelief= Belief.create(newOrders);
-			return newBelief;
-			
-		} catch (InterruptedException e) {
-			// This is expected sometimes, e.g. peer shutdown
-			throw e;
-		} catch (Exception e) {
-			// we didn't expect this!
-			log.warn("UNEXPECTED error awaiting Belief",e);
-			return null;
+		// if we did a belief merge recently, pause for a bit to await more Beliefs
+		LoadMonitor.down();
+		Message firstEvent=beliefQueue.poll(AWAIT_BELIEFS_PAUSE, TimeUnit.MILLISECONDS);
+		LoadMonitor.up();
+		if (firstEvent==null) return null; // nothing arrived
+		
+		beliefMessages.add(firstEvent);
+		beliefQueue.drainTo(beliefMessages); 
+		HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
+		// log.info("Merging Beliefs: "+allBeliefs.size());
+		
+		boolean anyOrderChanged=false;
+		for (Message m: beliefMessages) {
+			boolean changed=mergeBeliefMessage(newOrders,m);
+			if (changed) anyOrderChanged=true;
 		}
+		if (!anyOrderChanged) return null;
+		
+		Belief newBelief= Belief.create(newOrders);
+		return newBelief;
 	}
 	
 

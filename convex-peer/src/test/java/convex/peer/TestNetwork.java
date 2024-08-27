@@ -1,8 +1,10 @@
 package convex.peer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
@@ -16,6 +18,7 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
 import convex.core.util.Utils;
 
@@ -98,8 +101,11 @@ public class TestNetwork {
 			network.CONVEX.transferSync(addr, Coin.GOLD);
 			ConvexRemote client=Convex.connect(network.SERVER.getHostAddress(),addr,kp);
 			return client;
-		} catch (Exception t) {
+		} catch (IOException | ResultException | TimeoutException t) {
 			throw Utils.sneakyThrow(t);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return null;
 		}
 	}
 
