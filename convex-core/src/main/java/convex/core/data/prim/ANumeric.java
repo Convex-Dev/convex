@@ -18,6 +18,7 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 */
 	public abstract CVMDouble toDouble();
 
+	@Override
 	public abstract double doubleValue();
 	
 	/**

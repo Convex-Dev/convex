@@ -30,6 +30,8 @@ import picocli.CommandLine.ScopeType;
 
 /**
  * Convex CLI implementation
+ * 
+ * This is the main `convex` command and root for child commands.
  */
 @Command(name = "convex", 
 		subcommands = { Account.class, Key.class, Local.class, Peer.class, Query.class, Status.class, Desktop.class,
@@ -161,7 +163,7 @@ public class Main extends ACommand {
 	/**
 	 * Version provider class
 	 */
-	public static final class VersionProvider implements IVersionProvider {
+	private static final class VersionProvider implements IVersionProvider {
 		@Override
 		public String[] getVersion() throws Exception {
 			String s = Main.class.getPackage().getImplementationVersion();

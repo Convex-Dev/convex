@@ -49,6 +49,7 @@ public final class Syntax extends ACell {
 		this.meta = props;
 	}
 	
+	@Override
 	public AType getType() {
 		return Types.SYNTAX;
 	}
