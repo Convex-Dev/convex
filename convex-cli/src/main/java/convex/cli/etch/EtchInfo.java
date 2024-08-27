@@ -23,7 +23,11 @@ public class EtchInfo extends AEtchCommand{
 
 	@Override
 	public void run() {
-		cli().setOut(outputFilename);
+		try {
+			cli().setOut(outputFilename);
+		} catch (IOException e) {
+			throw new CLIError("Unable to open output file",e);
+		}
 		
 		EtchStore store=store();
 		try {

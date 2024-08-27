@@ -1,5 +1,8 @@
 package convex.cli.etch;
 
+import java.io.IOException;
+
+import convex.cli.CLIError;
 import convex.cli.Main;
 import convex.core.data.ACell;
 import convex.core.data.type.AType;
@@ -38,7 +41,11 @@ public class EtchDump extends AEtchCommand{
 
 	@Override
 	public void run() {
-		cli().setOut(outputFilename);
+		try {
+			cli().setOut(outputFilename);
+		} catch (IOException e) {
+			throw new CLIError("Unable to open output file",e);
+		}
 		
 		try (EtchStore store=store()) {
 		

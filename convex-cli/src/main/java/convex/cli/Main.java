@@ -19,7 +19,6 @@ import convex.cli.local.Local;
 import convex.cli.output.Coloured;
 import convex.cli.peer.Peer;
 import convex.core.util.FileUtils;
-import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
@@ -234,20 +233,21 @@ public class Main extends ACommand {
 		return verbose;
 	}
 
-	public void setOut(String outFile) {
+	/**
+	 * Sets output to the specified file. 
+	 * @param outFile String specifying file. `-` or `null` specifies STDOUT
+	 * @throws IOException
+	 */
+	public void setOut(String outFile) throws IOException {
 		if (outFile == null || outFile.equals("-")) {
 			log.debug("Setting output to STDOUT");
 			commandLine.setOut(new PrintWriter(System.out));
 		} else {
 			File file = new File(outFile);
-			try {
-				file = FileUtils.ensureFilePath(file);
-				log.debug("Setting output to "+file);
-				PrintWriter pw = new PrintWriter(file);
-				commandLine.setOut(pw);
-			} catch (IOException e) {
-				Utils.sneakyThrow(e);
-			}
+			file = FileUtils.ensureFilePath(file);
+			log.debug("Setting output to "+file);
+			PrintWriter pw = new PrintWriter(file);
+			commandLine.setOut(pw);
 		}
 	}
 

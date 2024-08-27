@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,6 @@ import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.util.Utils;
 
 
 /**
@@ -61,9 +61,10 @@ public class API {
 	 * @param peerConfig Configuration map for the new Peer
      *
 	 * @return New peer Server instance
+	 * @throws InterruptedException 
 	 * @throws ConfigException if configuration is invalid
 	 */
-	public static Server launchPeer(Map<Keyword, Object> peerConfig) {
+	public static Server launchPeer(Map<Keyword, Object> peerConfig) throws InterruptedException {
 		// clone the config, we don't want to change the input. Can use getConfig() on Server to see final result.
 		HashMap<Keyword,Object> config=new HashMap<>(peerConfig);
 	
@@ -90,8 +91,8 @@ public class API {
 			Server server = Server.create(config);
 			server.launch();
 			return server;
-		} catch (Exception t) {
-			throw Utils.sneakyThrow(t);
+		} catch (TimeoutException | IOException e) {
+			throw new Error("Failed to launch peer",e);
 		} finally {
 			Stores.setCurrent(tempStore);
 		}
@@ -100,8 +101,9 @@ public class API {
 	/**
 	 * Launches a peer with a default configuration. Mainly for testing.
 	 * @return Newly launched Server instance
+	 * @throws InterruptedException 
 	 */
-	public static Server launchPeer() {
+	public static Server launchPeer() throws InterruptedException {
 		AKeyPair kp=AKeyPair.generate();
 		State genesis=Init.createState(Lists.of(kp.getAccountKey()));
 		HashMap<Keyword, Object> config=new HashMap<>();
@@ -119,9 +121,10 @@ public class API {
 	 * @param genesisState genesis state for local network
 	 *
 	 * @return List of Servers launched
+	 * @throws InterruptedException 
 	 *
 	 */
-	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState) {
+	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState) throws InterruptedException {
 		return launchLocalPeers(keyPairs, genesisState, null);
 	}
 	/**
@@ -134,9 +137,10 @@ public class API {
 	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
 	 *
 	 * @return List of Servers launched
+	 * @throws InterruptedException 
 	 *
 	 */
-	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[]) {
+	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[]) throws InterruptedException {
 		int count=keyPairs.size();
 
 		List<Server> serverList = new ArrayList<Server>();

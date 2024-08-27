@@ -39,6 +39,9 @@ public class GUITest {
 			CONVEX=Convex.connect(SERVER);
 		} catch (HeadlessException e) {
 			// we should have null manager
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new Error(e);
 		}
 	}
 	

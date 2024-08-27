@@ -67,11 +67,7 @@ public class CVMExecutor extends AThreadedComponent {
 		Consumer<Peer> hook=updateHook;
 		if (hook==null) return;
 		
-		try {
-			hook.accept(p);
-		} catch (Throwable t) {
-			// Ignore
-		}
+		hook.accept(p);
 	}
 
 	@Override

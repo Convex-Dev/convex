@@ -26,11 +26,16 @@ public class StressTest {
 	static AKeyPair KP = AKeyPair.generate();
 
 	static {
-		Server s = API.launchPeer();
-		RESTServer rs = RESTServer.create(s);
-		rs.start(0);
-		port = rs.getPort();
-		server = rs;
+		try {
+			Server s = API.launchPeer();
+			RESTServer rs = RESTServer.create(s);
+			rs.start(0);
+			port = rs.getPort();
+			server = rs;
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new Error(e);
+		}
 	}
 
 	public static void main(String... args) throws InterruptedException, ExecutionException, TimeoutException {

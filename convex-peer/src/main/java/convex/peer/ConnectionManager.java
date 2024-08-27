@@ -89,8 +89,9 @@ public class ConnectionManager extends AThreadedComponent {
 
 	/**
 	 * Celled by the connection manager to ensure we are tracking latest Beliefs on the network
+	 * @throws InterruptedException 
 	 */
-	private void pollBelief() {
+	private void pollBelief() throws InterruptedException {
 		try {
 			// Poll only if no recent consensus updates
 			long lastConsensus = server.getPeer().getConsensusState().getTimestamp().longValue();
@@ -122,7 +123,10 @@ public class ConnectionManager extends AThreadedComponent {
 			} finally {
 				convex.close();
 			}
-		} catch (Throwable t) {
+		} catch (InterruptedException t) {
+			// re-throw on interrupt
+			throw t;
+		} catch (Exception t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
 			}
@@ -618,9 +622,9 @@ public class ConnectionManager extends AThreadedComponent {
 		try {
 			Message msg = Message.createGoodBye();
 			broadcast(msg);
-		} catch (Throwable e1) {
-			// TODO: should we do something else here?
-			// Ignore
+		} catch (InterruptedException e ) {
+			// maintain interrupt status
+			Thread.currentThread().interrupt();
 		}
 		
 		super.close();
@@ -639,7 +643,6 @@ public class ConnectionManager extends AThreadedComponent {
 		LoadMonitor.down();
 		Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 		LoadMonitor.up();
-		
 		maintainConnections();
 		pollBelief();
 	}

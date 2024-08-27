@@ -44,9 +44,9 @@ public class LatencyBenchmark {
 	static Convex client2;
 	static Convex peer;
 	static {
-		List<Server> servers=API.launchLocalPeers(Benchmarks.PEER_KEYPAIRS, Benchmarks.STATE);
-		server=servers.get(0);
 		try {
+			List<Server> servers=API.launchLocalPeers(Benchmarks.PEER_KEYPAIRS, Benchmarks.STATE);
+			server=servers.get(0);
 			Thread.sleep(1000);
 			peer=Convex.connect(server,server.getPeerController(),server.getKeyPair());
 			HERO=peer.createAccountSync(KPS[0].getAccountKey());

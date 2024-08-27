@@ -127,34 +127,35 @@ public class LocalStart extends ALocalCommand {
 		List<AKeyPair> keyPairList = getPeerKeyPairs(count);
 		int peerPorts[] = getPeerPorts();
 		
-		inform("Starting local test network with "+count+" peer(s)");
-		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
-		int n=servers.size();
-		
 		try {
+			inform("Starting local test network with "+count+" peer(s)");
+			List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
+			int n=servers.size();
+			
+	
 			if (apiPort > 0) {
 				log.debug("Requesting REST API on port "+apiPort);
 			}
 			launchRestAPI(servers.get(0));
-		} catch (Throwable t) {
-			informWarning("Failed to start REST server: "+t);
-		}
-		
-		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
-		
-		// Loop until we end
-		while (!Thread.currentThread().isInterrupted()) {
-			try {
+			
+			// informWarning("Failed to start REST server: "+t);
+			
+			
+			informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
+			
+			// Loop until we end
+			while (!Thread.currentThread().isInterrupted()) {
 				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();  // set interrupt flag again
 			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
+
 	}
 	
 
 
-	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) {
+	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) throws InterruptedException {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
 		State genesisState=Init.createState(keyList);

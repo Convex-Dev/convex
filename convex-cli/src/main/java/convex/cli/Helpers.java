@@ -58,15 +58,10 @@ public class Helpers {
 		return result;
 	}
 
-	public static File createTempFile(String name, String ext) {
-		try {
-			File temp=File.createTempFile(name,ext);
-			temp.deleteOnExit();
-			return temp;
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		
+	public static File createTempFile(String name, String ext) throws IOException {
+		File temp=File.createTempFile(name,ext);
+		temp.deleteOnExit();
+		return temp;
 	}
 	
 	public static File createTempKeystore(String name, char[] password) {

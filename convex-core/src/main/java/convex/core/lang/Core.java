@@ -2929,7 +2929,7 @@ public class Core {
  				}
  
  				ctx = ctx.defineWithSyntax(Syntax.create(sym, meta), value);
- 			} catch (Throwable ex) {
+ 			} catch (IllegalArgumentException ex) {
  				throw new Error("Error applying documentation:  " + entry, ex);
  			}
  		}

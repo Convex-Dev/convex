@@ -50,7 +50,7 @@ public class ClientTest {
 		assertEquals("4a12d868487648cd7a206f6d4879a7941463d80e185ccf6bb4e951429c4f4e37",kp.getAccountKey().toHexString());
 	}
  	
-	@Test public void testClientCommands() throws IOException, TimeoutException {
+	@Test public void testClientCommands() throws IOException, TimeoutException, InterruptedException {
 		
 		try (EtchStore store = EtchStore.createTemp(TEMP_ETCH.getCanonicalPath())) {
 

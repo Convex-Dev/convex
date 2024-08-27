@@ -6,7 +6,7 @@ import convex.restapi.RESTServer;
 
 public class Main {
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
 		Server s=API.launchPeer();
 		System.out.println("Using Ed25519 seed: "+s.getKeyPair().getSeed());
 		try (RESTServer rs=RESTServer.create(s)) {

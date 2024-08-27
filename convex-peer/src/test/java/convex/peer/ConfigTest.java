@@ -49,7 +49,7 @@ public class ConfigTest {
 		assertThrows(NullPointerException.class,()->API.launchPeer(null));
 	}
 	
-	@Test public void testMinimalLaunch() {
+	@Test public void testMinimalLaunch() throws InterruptedException {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 		

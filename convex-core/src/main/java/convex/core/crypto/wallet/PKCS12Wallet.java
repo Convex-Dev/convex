@@ -3,6 +3,8 @@ package convex.core.crypto.wallet;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -41,9 +43,9 @@ public class PKCS12Wallet extends AWallet {
 			file.deleteOnExit();
 			try (FileOutputStream fos = new FileOutputStream(file)) {
 			    ks.store(fos, pwdArray);
-			}
+			} 
 			return file;
-		} catch (Throwable t) {
+		} catch (IOException | GeneralSecurityException t) {
 			throw new Error("Unable to create temp keystore",t);
 		}
 	}
@@ -62,7 +64,7 @@ public class PKCS12Wallet extends AWallet {
 				log.info("Loading private key with alias: "+alias);
 			}
 			return wallet;
-		} catch (Throwable t) {
+		} catch (IOException | GeneralSecurityException t) {
 			throw new Error("Unable to load keystore with file: "+file,t);
 		}
 	}

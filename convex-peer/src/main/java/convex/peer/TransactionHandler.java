@@ -48,7 +48,7 @@ import convex.net.Message;
  * Main loop for this component handles client transaction messages, validates them and 
  * prepares them for inclusion in a Block
  */
-public class TransactionHandler extends AThreadedComponent{
+public class TransactionHandler extends AThreadedComponent {
 	
 	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
 	
@@ -134,7 +134,9 @@ public class TransactionHandler extends AThreadedComponent{
 			this.clientTransactionCount++;
 			
 			registerInterest(sd.getHash(), m);		
-		} catch (Throwable e) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (Exception e) {
 			log.warn("Unandled exception in transaction handler",e);
 		}
 	}

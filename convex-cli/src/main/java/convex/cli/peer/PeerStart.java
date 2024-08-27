@@ -1,5 +1,6 @@
 package convex.cli.peer;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 
@@ -103,8 +104,8 @@ public class PeerStart extends APeerCommand {
 			AccountKey peerKey=peerList.get(0);
 			AKeyPair pkp=storeMixin.loadKeyFromStore(peerKey.toHexString(), peerKeyMixin.getKeyPassword());
 			return pkp;
-		} catch (Exception e) {
-			log.debug("Exception trying to read etch peer list",e);
+		} catch (IOException e) {
+			log.debug("IO Exception trying to read etch peer list",e);
 		}
 		
 		return null;
@@ -138,7 +139,7 @@ public class PeerStart extends APeerCommand {
 				Server server=API.launchPeer(config);
 				
 				if (!norest) {
-					restServer=RESTServer.create(server);
+					restServer=RESTServer.create(server); 
 					restServer.start(apiport);
 				}
 				
@@ -151,7 +152,6 @@ public class PeerStart extends APeerCommand {
 			} catch (InterruptedException e) {
 				informWarning("Peer interrupted before normal shutdown");
 				Thread.currentThread().interrupt();
-				return;
 			} finally {
 				if (restServer!=null) restServer.close();
 			}

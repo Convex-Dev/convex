@@ -38,7 +38,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 					log.error("Message type ignored: ", type);
 				}
 			}
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			log.warn("Failed to accept message! {}",t);
 		}
 	}
@@ -68,7 +68,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			CVMLong cid=m.getID();
 			long id=(cid!=null)?cid.longValue():-1;
 			handleResult(id,result);
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			// If there is missing data, re-buffer the message
 			// Ignore. We probably lost this result?
 			log.warn("Exception handling result",e);

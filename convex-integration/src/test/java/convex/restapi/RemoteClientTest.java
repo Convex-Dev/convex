@@ -31,7 +31,7 @@ public class RemoteClientTest {
 	static Address genesis=Init.GENESIS_ADDRESS;
 	
 	@BeforeAll
-	public static void init() {
+	public static void init() throws InterruptedException {
 		Server s=API.launchPeer();
 		RESTServer rs=RESTServer.create(s);
 		rs.start(0);

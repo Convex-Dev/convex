@@ -77,7 +77,7 @@ public class PeerCluster {
 		return State.create(accts, peers, Constants.INITIAL_GLOBALS, State.EMPTY_SCHEDULE);
 	}
 
-	public static void main(String... args) {
+	public static void main(String... args) throws InterruptedException {
 		ArrayList<Server> peers = new ArrayList<>(NUM_PEERS);
 
 		log.info("Creating peer configurations");

@@ -1,5 +1,7 @@
 package convex.cli.etch;
 
+import java.io.IOException;
+
 import convex.cli.CLIError;
 import convex.cli.ExitCodes;
 import convex.core.data.ACell;
@@ -32,7 +34,13 @@ public class EtchRead extends AEtchCommand{
 
 	@Override
 	public void run() {
-		if (outputFilename!=null) cli().setOut(outputFilename);
+		if (outputFilename!=null) {
+			try {
+				cli().setOut(outputFilename);
+			} catch (IOException e) {
+				throw new CLIError("Unable to open output file",e);
+			}
+		}
 		
 		if ((hash==null)|| hash.length==0) {
 			inform("No hash(es) provided to read. Suggestion: list one or more hashes at end of the command.");

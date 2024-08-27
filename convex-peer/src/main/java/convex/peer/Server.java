@@ -39,6 +39,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
@@ -135,7 +136,7 @@ public class Server implements Closeable {
 	 */
 	private NIOServer nio = NIOServer.create(this);
 
-	private Server(HashMap<Keyword, Object> config) throws IOException, TimeoutException {
+	private Server(HashMap<Keyword, Object> config) throws IOException, TimeoutException, InterruptedException {
 		this.config = config;
 		final AStore savedStore=Stores.current();
 
@@ -186,7 +187,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	private Peer establishPeer() throws TimeoutException, IOException {
+	private Peer establishPeer() throws TimeoutException, IOException, InterruptedException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
 		try {
 			AKeyPair keyPair = Config.ensurePeerKey(config);
@@ -233,7 +234,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	private Peer syncPeer(AKeyPair keyPair, InetSocketAddress sourceAddr) throws IOException, TimeoutException {
+	private Peer syncPeer(AKeyPair keyPair, InetSocketAddress sourceAddr) throws IOException, TimeoutException, InterruptedException {
 		// Peer sync case
 		try {
 			Convex convex = Convex.connect(sourceAddr);
@@ -278,7 +279,7 @@ public class Server implements Closeable {
 			}
 			Peer peer=Peer.create(keyPair, genF, belF);
 			return peer;
-		} catch (ExecutionException|InterruptedException e) {
+		} catch (ExecutionException | InvalidDataException e) {
 			throw Utils.sneakyThrow(e);
 		}
 	}
@@ -298,8 +299,9 @@ public class Server implements Closeable {
 	 * @return New Server instance
 	 * @throws IOException If an IO Error occurred establishing the Peer
 	 * @throws TimeoutException If Peer creation timed out
+	 * @throws InterruptedException 
 	 */
-	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException {
+	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException, InterruptedException {
 		return new Server(new HashMap<>(config));
 	}
 
@@ -451,7 +453,7 @@ public class Server implements Closeable {
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
-		} catch (Throwable e) {
+		} catch (Exception e) {
 			log.warn("Error processing client message: {}", e);
 		} finally {
 			Stores.setCurrent(tempStore);

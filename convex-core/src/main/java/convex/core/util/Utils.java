@@ -740,7 +740,7 @@ public class Utils {
 			}
 			// StandardCharsets.UTF_8.name() > JDK 7
 			return result.toString("UTF-8");
-		} catch (Throwable t) {
+		} catch (IOException t) {
 			return null;
 		}
 	}

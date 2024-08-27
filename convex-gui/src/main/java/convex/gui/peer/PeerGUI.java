@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +35,6 @@ import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
-import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.Toast;
 import convex.gui.components.account.AccountsPanel;
@@ -70,8 +68,9 @@ public class PeerGUI extends AbstractGUI {
 	/**
 	 * Launch the application.
 	 * @param args Command line args
+	 * @throws InterruptedException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
@@ -80,7 +79,7 @@ public class PeerGUI extends AbstractGUI {
 		System.exit(0);
 	}
 
-	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) {
+	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) throws InterruptedException {
 		PeerGUI manager = new PeerGUI(peerNum,genesis);
 		manager.run();
 		return manager;
@@ -104,8 +103,9 @@ public class PeerGUI extends AbstractGUI {
 	 * Create the application.
 	 * @param genesis Genesis key pair
 	 * @param peerCount number of peers to initialise in genesis
+	 * @throws InterruptedException 
 	 */
-	public PeerGUI(int peerCount, AKeyPair genesis) {
+	public PeerGUI(int peerCount, AKeyPair genesis) throws InterruptedException {
 		super ("Peer Manager");
 		// Create key pairs for peers, use genesis key as first keypair
 		genesisKey=genesis;
@@ -271,12 +271,8 @@ public class PeerGUI extends AbstractGUI {
 		return Convex.connect(getPrimaryServer(),contract,null);
 	}
 
-	public Convex connectClient(Address address, AKeyPair keyPair) {
-		try {
+	public Convex connectClient(Address address, AKeyPair keyPair) throws IOException, TimeoutException {
 			return makeConnection(address,keyPair);
-		} catch (IOException | TimeoutException e) {
-			throw Utils.sneakyThrow(e);
-		}
 	}
 	
 	private static HashMap<Server,StateModel<Peer>> models=new HashMap<>();
@@ -337,23 +333,15 @@ public class PeerGUI extends AbstractGUI {
 		return null;
 	}
 
-	public void launchAllPeers() {
-		try {
-			List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
-			for (Server server: serverList) {
-				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
-				peerList.addElement(convex);
-				
-				// initial wallet list
-		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair");
-				KeyRingPanel.addWalletEntry(we);
-			}
-		} catch (Exception e) {
-			if (e instanceof ClosedChannelException) {
-				// Ignore
-			} else {
-				throw(e);
-			}		
+	public void launchAllPeers() throws InterruptedException {
+		List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
+		for (Server server: serverList) {
+			ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
+			peerList.addElement(convex);
+			
+			// initial wallet list
+	        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair");
+			KeyRingPanel.addWalletEntry(we);
 		}
 	}
 

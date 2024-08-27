@@ -90,6 +90,9 @@ public class PeerGenesis extends APeerCommand {
 			Server s=API.launchPeer(config); 
 			s.close();
 			informSuccess("Convex genesis succeeded!");
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new CLIError("Peer genesis interrupted");
 		} finally {
 			etch.close();
 		}
