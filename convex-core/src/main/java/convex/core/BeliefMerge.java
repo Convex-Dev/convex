@@ -178,12 +178,8 @@ public class BeliefMerge {
 		
 		if (!Constants.ENABLE_FORK_RECOVERY) {
 			filteredOrders= accOrders.filterValues(signedOrder -> {
-				try {
-					Order otherOrder = signedOrder.getValue();
-					return myOrder.checkConsistent(otherOrder);
-				} catch (Exception e) {
-					throw Utils.sneakyThrow(e);
-				}
+				Order otherOrder = signedOrder.getValue();
+				return myOrder.checkConsistent(otherOrder);
 			});
 		}
 
@@ -261,22 +257,18 @@ public class BeliefMerge {
 	public static double prepareStakedOrders(AMap<AccountKey, SignedData<Order>> peerOrders,
 			HashMap<AccountKey, Double> peerStakes, HashMap<Order, Double> dest) {
 		return peerOrders.reduceValues((acc, signedOrder) -> {
-			try {
-				// Get the Order for this peer
-				Order order = signedOrder.getValue();
-				AccountKey cAddress = signedOrder.getAccountKey();
-				Double cStake = peerStakes.get(cAddress);
-				if ((cStake == null) || (cStake == 0.0)) return acc;
-				Double stake = dest.get(order);
-				if (stake == null) {
-					dest.put(order, cStake); // new Order to consider
-				} else {
-					dest.put(order, stake + cStake); // add stake to existing Order
-				}
-				return acc + cStake;
-			} catch (Exception e) {
-				throw Utils.sneakyThrow(e);
+			// Get the Order for this peer
+			Order order = signedOrder.getValue();
+			AccountKey cAddress = signedOrder.getAccountKey();
+			Double cStake = peerStakes.get(cAddress);
+			if ((cStake == null) || (cStake == 0.0)) return acc;
+			Double stake = dest.get(order);
+			if (stake == null) {
+				dest.put(order, cStake); // new Order to consider
+			} else {
+				dest.put(order, stake + cStake); // add stake to existing Order
 			}
+			return acc + cStake;
 		}, 0.0);
 	}
 

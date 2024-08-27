@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -125,8 +125,8 @@ public class ConnectionManager extends AThreadedComponent {
 			}
 		} catch (InterruptedException t) {
 			// re-throw on interrupt
-			throw t;
-		} catch (Exception t) {
+			throw t; 
+		} catch (IOException | TimeoutException | ExecutionException t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
 			}
@@ -135,7 +135,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 	private long lastConnectionUpdate=Utils.getCurrentTimestamp();
 	
-	protected void maintainConnections() {
+	protected void maintainConnections() throws InterruptedException {
 		State s=server.getPeer().getConsensusState();
 
 		long now=Utils.getCurrentTimestamp();
@@ -201,7 +201,7 @@ public class ConnectionManager extends AThreadedComponent {
 		lastConnectionUpdate=Utils.getCurrentTimestamp();
 	}
 
-	private void tryRandomConnect(State s) {
+	private void tryRandomConnect(State s) throws InterruptedException {
 		// Connect to a random peer with host address by stake
 		// SECURITY: stake weighted connection is important to avoid bad peers
 		// influencing the connection pool
@@ -582,8 +582,9 @@ public class ConnectionManager extends AThreadedComponent {
 	 * Connects explicitly to a Peer at the given host address
 	 * @param hostAddress Address to connect to
 	 * @return new Connection, or null if attempt fails
+	 * @throws InterruptedException 
 	 */
-	public Connection connectToPeer(InetSocketAddress hostAddress) {
+	public Connection connectToPeer(InetSocketAddress hostAddress) throws InterruptedException {
 		Connection newConn = null;
 		try {
 			// Use temp client connection to query status
@@ -612,6 +613,7 @@ public class ConnectionManager extends AThreadedComponent {
 			return null;
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);
+			return null;
 		}
 		return newConn;
 	}

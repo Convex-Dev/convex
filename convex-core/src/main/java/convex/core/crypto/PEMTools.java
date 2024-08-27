@@ -37,9 +37,9 @@ public class PEMTools {
 	 * @param privateKey Private key to encrypt
 	 * @param password Password to use for encryption
 	 * @return PEM text that can be saved or sent to another keystore
-	 * @throws Error Any encryption error that occurs
+	 * @throws GeneralSecurityException Any encryption error that occurs
 	 */
-	public static String encryptPrivateKeyToPEM(AKeyPair keyPair, char[] password) throws Exception {
+	public static String encryptPrivateKeyToPEM(AKeyPair keyPair, char[] password) throws GeneralSecurityException {
 		PrivateKey privateKey=keyPair.getPrivate();
 		StringWriter stringWriter = new StringWriter();
 		JcaPEMWriter writer = new JcaPEMWriter(stringWriter);

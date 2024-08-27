@@ -176,8 +176,8 @@ public class NIOServer implements Closeable {
 
 					// keys.clear();
 				}
-			} catch (Exception e) {
-				log.error("Unexpected Exception, terminating selector loop: ", e);
+			} catch (IOException e) {
+				log.error("Unexpected IO Exception, terminating selector loop: ", e);
 			} finally {
 				try {
 					// close all client channels

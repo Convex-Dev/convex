@@ -235,7 +235,7 @@ public class Connection {
 			return null;
 		try {
 			return (InetSocketAddress) ((SocketChannel) channel).getRemoteAddress();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			// anything fails, we have no address
 			return null;
 		}
@@ -260,7 +260,7 @@ public class Connection {
 			return null;
 		try {
 			return (InetSocketAddress) ((SocketChannel) channel).getLocalAddress();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			// anything fails, we have no address
 			return null;
 		}
@@ -479,7 +479,7 @@ public class Connection {
 		if (chan != null) {
 			try {
 				chan.close();
-			} catch (Exception e) {
+			} catch (IOException e) {
 				// TODO OK to ignore?
 			}
 		}
@@ -575,8 +575,8 @@ public class Connection {
 							log.trace("Cancelled key");
 						}
 					}
-				} catch (Exception t) {
-					log.warn("Uncaught error in PeerConnection client selector loop: ", t);
+				} catch (IOException t) {
+					log.warn("Uncaught IO error in PeerConnection client selector loop: ", t);
 				}
 			}
 		}

@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.store.Stores;
 
 /**
@@ -19,27 +21,23 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 	@Override
 	public void accept(Message m) {
-		try {
-			MessageType type = m.getType();
-			switch (type) {
-				case DATA: {
-					handleDataProvided(m);
-					break;
-				}
-				case REQUEST_DATA: {
-					handleDataRequest(m);
-					break;
-				}
-				case RESULT: {
-					handleResultMessage(m);
-					break;
-				}
-				default: {
-					log.error("Message type ignored: ", type);
-				}
+		MessageType type = m.getType();
+		switch (type) {
+			case DATA: {
+				handleDataProvided(m);
+				break;
 			}
-		} catch (Exception t) {
-			log.warn("Failed to accept message! {}",t);
+			case REQUEST_DATA: {
+				handleDataRequest(m);
+				break;
+			}
+			case RESULT: {
+				handleResultMessage(m);
+				break;
+			}
+			default: {
+				log.error("Message type ignored: ", type);
+			}
 		}
 	}
 
@@ -49,10 +47,11 @@ public abstract class ResultConsumer implements Consumer<Message> {
 
 	private void handleDataRequest(Message m) {
 		try {
-			Message response=m.makeDataResponse(Stores.current());
+			Message response = m.makeDataResponse(Stores.current());
 			m.returnMessage(response);
-		} catch (Exception e) {
-			log.warn("Error replying to MISSING DATA request",e);
+		} catch (BadFormatException e) {
+			// Request was bad
+			m.closeConnection();
 		}
 	}
 
@@ -68,7 +67,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 			CVMLong cid=m.getID();
 			long id=(cid!=null)?cid.longValue():-1;
 			handleResult(id,result);
-		} catch (Exception e) {
+		} catch (BadFormatException | MissingDataException e) {
 			// If there is missing data, re-buffer the message
 			// Ignore. We probably lost this result?
 			log.warn("Exception handling result",e);

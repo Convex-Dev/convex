@@ -189,49 +189,40 @@ public class Server implements Closeable {
 
 	private Peer establishPeer() throws TimeoutException, IOException, InterruptedException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
-		try {
-			AKeyPair keyPair = Config.ensurePeerKey(config);
-			if (keyPair==null) {
-				log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
-				keyPair=AKeyPair.generate();
-				config.put(Keywords.KEYPAIR,keyPair);
-				log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
-			}
-
-			// TODO: should probably move acquisition to launch phase?
-			Object source=getConfig().get(Keywords.SOURCE);
-			if (Utils.bool(source)) {
-				InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
-				if (sourceAddr==null) throw new ConfigException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
-				return syncPeer(keyPair,sourceAddr);
-
-			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
-				// Restore from storage case
-				try {
-					ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
-					if (rk==null) rk=keyPair.getAccountKey();
-
-					Peer peer = Peer.restorePeer(store, keyPair, rk);
-					if (peer != null) {
-						log.info("Restored Peer with root data hash: {}",store.getRootHash());
-						return peer;
-					}
-				} catch (Throwable e) {
-					log.error("Can't restore Peer from store: {}",e);
-				}
-			}
-			State genesisState = (State) config.get(Keywords.STATE);
-			if (genesisState!=null) {
-				log.debug("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
-			} else {
-				AccountKey peerKey=keyPair.getAccountKey();
-				genesisState=Init.createState(List.of(peerKey));
-				log.debug("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
-			}
-			return Peer.createGenesisPeer(keyPair,genesisState);
-		} finally {
-			
+		AKeyPair keyPair = Config.ensurePeerKey(config);
+		if (keyPair==null) {
+			log.warn("No keypair provided for Server, deafulting to generated keypair for testing purposes");
+			keyPair=AKeyPair.generate();
+			config.put(Keywords.KEYPAIR,keyPair);
+			log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
 		}
+
+		// TODO: should probably move acquisition to launch phase?
+		Object source=getConfig().get(Keywords.SOURCE);
+		if (Utils.bool(source)) {
+			InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
+			if (sourceAddr==null) throw new ConfigException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
+			return syncPeer(keyPair,sourceAddr);
+
+		} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
+			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+			if (rk==null) rk=keyPair.getAccountKey();
+
+			Peer peer = Peer.restorePeer(store, keyPair, rk);
+			if (peer != null) {
+				log.info("Restored Peer with root data hash: {}",store.getRootHash());
+				return peer;
+			}
+		}
+		State genesisState = (State) config.get(Keywords.STATE);
+		if (genesisState!=null) {
+			log.debug("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+		} else {
+			AccountKey peerKey=keyPair.getAccountKey();
+			genesisState=Init.createState(List.of(peerKey));
+			log.debug("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
+		}
+		return Peer.createGenesisPeer(keyPair,genesisState);
 	}
 
 	private Peer syncPeer(AKeyPair keyPair, InetSocketAddress sourceAddr) throws IOException, TimeoutException, InterruptedException {
@@ -344,8 +335,9 @@ public class Server implements Closeable {
 
 	/**
 	 * Launch the Peer Server, including all main server threads
+	 * @throws InterruptedException 
 	 */
-	public void launch() throws IOException {
+	public void launch() throws IOException, InterruptedException {
 		AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -449,12 +441,9 @@ public class Server implements Closeable {
 				m.returnResult(r);
 				break;
 			}
-
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
-		} catch (Exception e) {
-			log.warn("Error processing client message: {}", e);
 		} finally {
 			Stores.setCurrent(tempStore);
 		}

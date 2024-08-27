@@ -64,15 +64,10 @@ public class Helpers {
 		return temp;
 	}
 	
-	public static File createTempKeystore(String name, char[] password) {
-		try {
-			File temp=File.createTempFile(name,".pfx");
-			PFXTools.createStore(temp, password);
-			return temp;
-		} catch (IOException|GeneralSecurityException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		
+	public static File createTempKeystore(String name, char[] password) throws IOException, GeneralSecurityException {
+		File temp=File.createTempFile(name,".pfx");
+		PFXTools.createStore(temp, password);
+		return temp;
 	}
 	
 	public static int[] getPortList(String ports[], int count)  {
@@ -107,7 +102,7 @@ public class Helpers {
 		try {
 			String art=Utils.readResourceAsString("/art/convex.logo");
 			return art;
-		} catch (Exception e) {
+		} catch (IOException e) {
 			return null;
 		}
 	}

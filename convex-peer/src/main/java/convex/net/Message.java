@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.Belief;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -178,7 +179,7 @@ public class Message {
 			return "#message {:type " + getType() + " :payload " + ps + "}";
 		} catch (MissingDataException e) {
 			return "#message {:type " + getType() + " :payload <partial, some still missing>}";
-		} catch (Exception e) {
+		} catch (BadFormatException e) {
 			return "#message <CORRUPED "+getType()+": "+e.getMessage();
 		}
 	}
@@ -354,8 +355,8 @@ public class Message {
 			default:
 				return Result.create(getID(), Strings.create("Unexpected message type for Result: "+type), ErrorCodes.UNEXPECTED);
 			}
-		} catch (Exception e) {
-			return Result.create(null, Strings.create("Error building Result: "+e.getMessage()), ErrorCodes.FATAL);
+		} catch (BadFormatException e) {
+			return Result.fromException(e).withSource(SourceCodes.CLIENT);
 		}
 	}
 

@@ -24,6 +24,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
 import picocli.CommandLine.IVersionProvider;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
 import picocli.CommandLine.ScopeType;
 
@@ -116,7 +117,7 @@ public class Main extends ACommand {
 			// in the defaults before running the full execute
 			try {
 				commandLine.parseArgs(args);
-			} catch (Exception t) {
+			} catch (ParameterException t) {
 				informError("ERROR: Unable to parse arguments: " + t.getMessage());
 				informWarning("For more information on options and commands try 'convex help'.");
 				return ExitCodes.ERROR;
@@ -151,7 +152,7 @@ public class Main extends ACommand {
 //			try {
 //			ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
 //			root.setLevel(verboseLevels[verbose]);
-//			} catch (Exception e) {
+//			} catch (XXException e) {
 //				informWarning("Failed to set verbosity level: "+e.getMessage());
 //			}
 		} else {

@@ -486,10 +486,10 @@ public class State extends ARecord {
 				
 				// state update
 				state = rc.context.getState();
-			} catch (Exception t) {
-				String msg= "Unexpected fatal exception applying transaction: "+t.toString();
-				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED);
-				log.error(msg,t);
+			} catch (Exception e) {
+				String msg= "Unexpected fatal exception applying transaction: "+e.toString();
+				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED).withSource(SourceCodes.CVM);
+				log.error(msg,e);
 			}
 		}
 

@@ -2,6 +2,7 @@ package convex.gui.actor;
 
 import java.awt.BorderLayout;
 import java.awt.Font;
+import java.io.IOException;
 import java.util.function.Consumer;
 
 import javax.swing.JButton;
@@ -137,18 +138,14 @@ public class OraclePanel extends JPanel {
 						+ oracleAddress.toString() + " " + key + " " + outcomeString + ")))";
 				ACell code = Reader.read(source);
 				manager.transact(code).thenAcceptAsync(createMarketAction);
-			} catch (Exception e1) {
+			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
 		});
 	}
 
 	private void execute(ACell code) {
-		try {
-			manager.transact(code).thenAcceptAsync(receiveAction);
-		} catch (Throwable t) {
-			throw Utils.sneakyThrow(t);
-		}
+		manager.transact(code).thenAcceptAsync(receiveAction);
 	}
 
 	private final Consumer<Result> createMarketAction = new Consumer<Result>() {

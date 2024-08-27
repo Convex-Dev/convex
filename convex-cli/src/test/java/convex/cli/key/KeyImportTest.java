@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 
 import org.junit.jupiter.api.Test;
 
@@ -12,7 +14,6 @@ import convex.cli.ExitCodes;
 import convex.cli.Helpers;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PEMTools;
-import convex.core.crypto.sodium.SodiumKeyPair;
 import convex.core.data.AccountKey; 
 
 public class KeyImportTest {
@@ -25,14 +26,18 @@ public class KeyImportTest {
 	private static final File KEYSTORE_FILE;
 	private static final String KEYSTORE_FILENAME;
 	static {
-		KEYSTORE_FILE=Helpers.createTempKeystore("tempKeystore", KEYSTORE_PASSWORD);
-		KEYSTORE_FILENAME = KEYSTORE_FILE.getAbsolutePath();
+		try {
+			KEYSTORE_FILE=Helpers.createTempKeystore("tempKeystore", KEYSTORE_PASSWORD);
+			KEYSTORE_FILENAME = KEYSTORE_FILE.getAbsolutePath();
+		} catch (IOException | GeneralSecurityException e) {
+			throw new Error(e);
+		}
 	}	
 
 	@Test
-	public void testKeyImportPEM() throws Exception {
+	public void testKeyImportPEM() throws GeneralSecurityException {
 	 
-		AKeyPair keyPair = SodiumKeyPair.generate();
+		AKeyPair keyPair = AKeyPair.generate();
 		AccountKey accountKey=keyPair.getAccountKey();
 		String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair, IMPORT_PASSPHRASE);
  

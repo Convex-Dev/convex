@@ -743,15 +743,15 @@ public abstract class Convex {
 	 * @throws TimeoutException If operation times out
 	 *
 	 */
-	public Result requestStatusSync(long timeoutMillis) throws IOException, TimeoutException {
+	public Result requestStatusSync(long timeoutMillis) throws InterruptedException {
 		Future<Result> statusFuture = requestStatus();
 		try {
 			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
-		} catch (ExecutionException e) {
-			throw Utils.sneakyThrow(e);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
 			return Result.error(ErrorCodes.INTERRUPTED, "Status request interrupted");
+		} catch (Exception e ) {
+			return Result.fromException(e);
 		} finally {
 			// in case the future is still running?
 			statusFuture.cancel(true);
