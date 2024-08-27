@@ -16,11 +16,8 @@ import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
-import java.io.Console;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -368,22 +365,5 @@ public class Toolkit {
 
 	public static Icon menuIcon(int codePoint) {
 		return SymbolIcon.get(codePoint,Toolkit.BUTTON_FONT.getSize());
-	}
-
-	public static boolean checkIfTerminal() {
-		Console c=System.console();
-		// If null, we have no terminal (Java up to 21)
-		if (c==null) return false;
-		
-		// We have a console, but in Java 22+ we need to check if it is actually a terminal
-		try {
-			Method m=c.getClass().getMethod("isTerminal");
-			return  (Boolean)m.invoke(c);
-		} catch (NoSuchMethodException e) {
-			return true;
-		} catch (SecurityException | IllegalAccessException | InvocationTargetException e) {
-			// Shouldn't happen?
-			return false;
-		} 
 	}
 }
