@@ -6,8 +6,8 @@ import java.io.PrintWriter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.event.Level;
 
-import ch.qos.logback.classic.Level;
 import convex.cli.account.Account;
 import convex.cli.client.Query;
 import convex.cli.client.Status;
@@ -141,18 +141,18 @@ public class Main extends ACommand {
 	}
 
 	private void setupVerbosity() {
-		Level[] verboseLevels = { Level.OFF, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.ALL };
+		Level[] verboseLevels = { Level.ERROR, Level.WARN, Level.INFO, Level.DEBUG, Level.TRACE, Level.TRACE };
 
 		if (verbose == null)
 			verbose = 0;
 		if (verbose >= 0 && verbose < verboseLevels.length) {
 			// Set root logger level?
-			try {
-			ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-			root.setLevel(verboseLevels[verbose]);
-			} catch (Exception e) {
-				informWarning("Failed to set verbosity level: "+e.getMessage());
-			}
+//			try {
+//			ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+//			root.setLevel(verboseLevels[verbose]);
+//			} catch (Exception e) {
+//				informWarning("Failed to set verbosity level: "+e.getMessage());
+//			}
 		} else {
 			throw new CLIError(ExitCodes.USAGE,"Invalid verbosity level: " + verbose);
 		}
