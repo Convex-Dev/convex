@@ -27,31 +27,25 @@ Download the Convex GUI today.
 
 ### Building
 
-You will need a recent version of Java (21+) and Maven installed
+You will need a recent version of Java (21+) and Maven (3.7+) installed
 
 You can then build the latest version of Convex Desktop as follows:
 
 - Download the convex repository via git `https://github.com/Convex-Dev/convex.git` or using the zip download `https://github.com/Convex-Dev/convex/archive/refs/heads/develop.zip`
 - Run `mvn install` in the root directory (this will build all Convex modules)
-- The Convex Desktop `.jar` file should be created at `convex-gui/target/convex-desktop.jar` 
+- The Convex `.jar` file should be created at `convex-integration/target/convex.jar` 
 
 ### Running Convex Desktop
 
-If Java is properly installed on your machine, you should be able to run the `convex-desktop.jar` file directly as a Java application (double click on Windows).
+If Java is properly installed on your machine, you should be able to run the `convex.jar` file directly as a Java application (double click on Windows).
 
-Alternatively, from the command line you can run the main class `convex.gui.MainGUI`, with a Java command such as:
+Alternatively, from the command line you can run the desktop with a Java command such as:
 
 ```bash
-java -jar convex-desktop.jar
+java -jar convex.jar desktop
 ```
 
 This launches the Convex Desktop application main screen.
-
-### Flight recorder
-
-```
-java -cp target/convex-gui-jar-with-dependencies.jar -XX:+FlightRecorder -XX:StartFlightRecording=duration=200s,filename=flight.jfr convex.gui.MainGUI
-```
 
 ## License
 
