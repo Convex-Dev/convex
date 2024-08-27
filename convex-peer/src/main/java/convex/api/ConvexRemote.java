@@ -185,7 +185,7 @@ public class ConvexRemote extends Convex {
 			synchronized (awaiting) {
 				long id = connection.sendStatusRequest();
 				if (id < 0) {
-					return CompletableFuture.failedFuture(new IOException("Failed to send status request due to full buffer"));
+					return CompletableFuture.completedFuture(Result.error(ErrorCodes.LOAD, "Full buffer, can't send status request").withSource(SourceCodes.COMM));
 				}
 	
 				// TODO: ensure status is fully loaded

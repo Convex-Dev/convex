@@ -23,6 +23,7 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.RefSoft;
+import convex.core.exceptions.BadFormatException;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
@@ -601,7 +602,7 @@ public class Etch {
 				data.close();
 	
 				log.debug("Etch closed on file: "+ getFileName() +" with data length: "+dataLength);
-			} catch (Exception e) {
+			} catch (IOException e) {
 				log.error("Error closing Etch file: "+file,e);
 			}
 		}
@@ -760,7 +761,7 @@ public class Etch {
 			cell.attachRef(ref);
 
 			return ref;
-		} catch (Exception e) {
+		} catch (BadFormatException e) {
 			throw new Error("Failed to read data in etch store: "+encoding.toHexString()+" flags = "+Utils.toHexString(flagByte)+" length ="+length+" pointer = "+Utils.toHexString(pointer)+ " memorySize="+memorySize,e);
 		}
 	}

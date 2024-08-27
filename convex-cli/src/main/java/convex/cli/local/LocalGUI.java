@@ -28,8 +28,9 @@ public class LocalGUI extends ALocalCommand {
 		// sub command to launch peer manager
 		try {
 			convex.gui.peer.PeerGUI.main(new String[0]);
-		} catch (Exception t) {
-			throw new CLIError("Error launching GUI: ",t);
+		} catch (InterruptedException t) {
+			Thread.currentThread().interrupt();
+			throw new CLIError("Interrupted while running GUI",t);
 		}
 	}
 

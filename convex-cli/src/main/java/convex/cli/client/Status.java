@@ -1,12 +1,9 @@
 package convex.cli.client;
 
-import java.util.concurrent.TimeUnit;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.cli.CLIError;
 import convex.cli.output.RecordOutput;
 import convex.core.Result;
 import convex.core.data.ABlob;
@@ -29,11 +26,12 @@ public class Status extends AClientCommand {
 	protected static final Logger log = LoggerFactory.getLogger(Status.class);
 
 	@SuppressWarnings("unchecked")
-	@Override
+	@Override 
 	public void run() {
-		try {
 			Convex convex = clientConnect();
-			Result result = convex.requestStatus().get(getClientTimeout(), TimeUnit.MILLISECONDS);
+			Result result;
+			result = convex.requestStatus().join();
+
 			AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
 			ABlob stateHash = (ABlob) resultVector.get(1);
 			// Hash hash = Hash.wrap(stateHash.getBytes());
@@ -51,9 +49,6 @@ public class Status extends AClientCommand {
 			//output.addField("Number of accounts", accountList.size());
 			//output.addField("Number of peers", peerList.size());
 			mainParent.printRecord(output);
-		} catch (Exception e) {
-			throw new CLIError("Error getting network status",e);
-		}
 	}
 
 

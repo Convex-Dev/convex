@@ -251,7 +251,7 @@ public class EtchStore extends ACachedStore {
 	public String toString() {
 		try {
 			return "EtchStore: " + getFile().getCanonicalPath();
-		} catch (Exception e) {
+		} catch (IOException e) {
 			return "EtchStore: <File name lookup failed>";
 		}
 	}

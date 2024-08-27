@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.NoSuchAlgorithmException;
 
 import javax.crypto.Cipher;
@@ -56,7 +57,7 @@ public class Symmetric {
 			cipher = Cipher.getInstance(SYMMETRIC_ENCRYPTION_ALGO);
 			cipher.init(Cipher.ENCRYPT_MODE, key);
 			iv = cipher.getIV();
-		} catch (Exception e) {
+		} catch (GeneralSecurityException e) {
 			throw new Error("Failed to initialise encryption cipher", e);
 		}
 
@@ -126,7 +127,7 @@ public class Symmetric {
 			cipher = Cipher.getInstance(SYMMETRIC_ENCRYPTION_ALGO);
 			IvParameterSpec ivParamSpec = new IvParameterSpec(iv);
 			cipher.init(Cipher.DECRYPT_MODE, key, ivParamSpec);
-		} catch (Exception e) {
+		} catch (GeneralSecurityException e) {
 			throw new Error("Failed to initialise decryption cipher", e);
 		}
 

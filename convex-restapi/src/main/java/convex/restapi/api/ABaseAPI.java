@@ -32,7 +32,7 @@ public abstract class ABaseAPI {
 		try {
 			Map<String, Object> req= JSON.toMap(ctx.body());
 			return req;
-		} catch (Exception e) {
+		} catch (IllegalArgumentException e) {
 			throw new BadRequestResponse(jsonError("Invalid JSON body"));
 		}
 	}

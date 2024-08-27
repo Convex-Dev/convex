@@ -71,7 +71,7 @@ public class SLIP10 {
 			// Wrap the bytes of the newly derived seed to get the derived Ed25519 key
 			Blob result= Blob.wrap(bs);
 			return result;
-		} catch (Exception e) {
+		} catch (GeneralSecurityException e) {
 			throw new Error("Failure in SLIP-10!!!",e);
 		}
 	}

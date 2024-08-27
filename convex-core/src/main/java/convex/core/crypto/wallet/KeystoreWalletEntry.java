@@ -1,5 +1,6 @@
 package convex.core.crypto.wallet;
 
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 
 import convex.core.crypto.AKeyPair;
@@ -71,7 +72,7 @@ public class KeystoreWalletEntry extends AWalletEntry {
 		try {
 			keyPair=PFXTools.getKeyPair(ks, alias, password);
 			return (keyPair!=null);
-		} catch (Exception e) {
+		} catch (GeneralSecurityException e) {
 			return false;
 		}
 		

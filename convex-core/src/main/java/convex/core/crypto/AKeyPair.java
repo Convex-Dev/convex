@@ -1,6 +1,7 @@
 package convex.core.crypto;
 
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.NoSuchAlgorithmException;
@@ -136,7 +137,11 @@ public abstract class AKeyPair {
 	 * @return Private Key
 	 */
 	public PrivateKey getPrivate() {
-		return getJCAKeyPair().getPrivate();
+		try {
+			return getJCAKeyPair().getPrivate();
+		} catch (GeneralSecurityException e) {
+			throw new Error(e);
+		}
 	}
 
 	/**
@@ -144,7 +149,11 @@ public abstract class AKeyPair {
 	 * @return Public Key
 	 */
 	public PublicKey getPublic() {
-		return getJCAKeyPair().getPublic();
+		try {
+			return getJCAKeyPair().getPublic();
+		} catch (GeneralSecurityException e) {
+			throw new Error(e);
+		}
 	}
 	
 	@Override
@@ -155,8 +164,9 @@ public abstract class AKeyPair {
 	/**
 	 * Gets the JCA representation of this Key Pair
 	 * @return JCA KepPair
+	 * @throws GeneralSecurityException 
 	 */
-	public KeyPair getJCAKeyPair() {
+	public KeyPair getJCAKeyPair() throws GeneralSecurityException {
 		if (keyPair==null) {
 			PublicKey pub=publicKeyFromBytes(getAccountKey().getBytes());
 			PrivateKey priv=privateKeyFromBytes(getSeed().getBytes());
@@ -225,7 +235,7 @@ public abstract class AKeyPair {
 	 * @param key 32 bytes private key data
 	 * @return Ed25519 Private Key instance
 	 */
-	public static PrivateKey privateKeyFromBytes(byte[] key) {
+	public static PrivateKey privateKeyFromBytes(byte[] key) throws GeneralSecurityException {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
@@ -233,7 +243,7 @@ public abstract class AKeyPair {
 			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(privKeyInfo.getEncoded());
 			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
 			return privateKey;
-		} catch (Exception e) {
+		} catch (IOException e) {
 			throw new Error(e);
 		}
 	}
@@ -250,15 +260,11 @@ public abstract class AKeyPair {
 		return AccountKey.wrap(bytes,n-AccountKey.LENGTH);
 	}
 
-	public static PrivateKey privateKeyFromBlob(Blob encodedKey) {
-		try {
-			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
-			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
-			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
-			return privateKey;
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
+	public static PrivateKey privateKeyFromBlob(Blob encodedKey) throws GeneralSecurityException {
+		KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+		PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
+		PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
+		return privateKey;
 	}
 
 	/**

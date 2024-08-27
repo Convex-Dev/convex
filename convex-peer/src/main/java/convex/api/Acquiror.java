@@ -1,5 +1,6 @@
 package convex.api;
 
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -15,6 +16,7 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
@@ -139,7 +141,7 @@ public class Acquiror {
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
 				f.completeExceptionally(e);
-			} catch (Exception t) {
+			} catch (BadFormatException | IOException t) {
 				log.warn("UNEXPECTED acquire fail: ",t);
 				f.completeExceptionally(t);
 			}

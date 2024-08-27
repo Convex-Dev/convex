@@ -739,23 +739,10 @@ public abstract class Convex {
 	 * @param timeoutMillis Milliseconds to wait for request timeout
 	 * @return Status Vector from target Peer
 	 *
-	 * @throws IOException      If an IO Error occurs
-	 * @throws TimeoutException If operation times out
-	 *
 	 */
-	public Result requestStatusSync(long timeoutMillis) throws InterruptedException {
-		Future<Result> statusFuture = requestStatus();
-		try {
-			return statusFuture.get(timeoutMillis, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
-			return Result.error(ErrorCodes.INTERRUPTED, "Status request interrupted");
-		} catch (Exception e ) {
-			return Result.fromException(e);
-		} finally {
-			// in case the future is still running?
-			statusFuture.cancel(true);
-		}
+	public Result requestStatusSync(long timeoutMillis) {
+		CompletableFuture<Result> statusFuture = requestStatus();
+		return statusFuture.join();
 	}
 
 	/**

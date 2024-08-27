@@ -1,5 +1,6 @@
 package convex.core.util;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -64,7 +65,8 @@ public class ThreadUtils {
 		try{
 		    Method method = Executors.class.getMethod("newVirtualThreadPerTaskExecutor");
 		    ex = (ExecutorService) method.invoke(null);
-		} catch (Exception e) {
+		} catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+			// fall back to a cached thread pool
 		    ex = Executors.newCachedThreadPool();
 		}
 		return ex;

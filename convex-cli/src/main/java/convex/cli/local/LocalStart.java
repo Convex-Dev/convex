@@ -110,11 +110,8 @@ public class LocalStart extends ALocalCommand {
 	private int[] getPeerPorts() {
 		int peerPorts[]=null;
 		if (ports != null) {
-			try {
-				peerPorts = Helpers.getPortList(ports, count);
-			} catch (Exception e) {
-				throw new CLIError(ExitCodes.DATAERR,"Failed to parse port list",e);
-			}
+			peerPorts = Helpers.getPortList(ports, count);
+			if (peerPorts==null) throw new CLIError(ExitCodes.DATAERR,"Failed to parse port list");
 			if (peerPorts.length < count) {
 				log.debug("Only {} ports specified for {} peers", peerPorts.length, count);
 			}

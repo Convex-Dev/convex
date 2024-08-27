@@ -65,7 +65,7 @@ public class PEMTools {
 	 * @return Key pair as stored in the PEM
 	 * @throws Error on reading the PEM, decryption and decoding the private key
 	 */
-	public static AKeyPair decryptPrivateKeyFromPEM(String pemText, char[] password) throws Exception {
+	public static AKeyPair decryptPrivateKeyFromPEM(String pemText, char[] password) throws GeneralSecurityException {
 		StringReader stringReader = new StringReader(pemText);
 		PemObject pemObject = null;
 		try (PEMParser pemParser = new PEMParser(stringReader)) {

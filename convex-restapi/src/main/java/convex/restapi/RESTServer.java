@@ -1,8 +1,10 @@
 package convex.restapi;
 
 import java.io.Closeable;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.HashMap;
 
@@ -95,7 +97,7 @@ public class RESTServer implements Closeable {
 			} else {
 				log.warn("Failed to find SSL cerificates, defaulting back to HTTP");
 			}
-		} catch (Exception e) {
+		} catch (InvalidPathException | IOException e) {
 			log.warn("Failed to create SSL plugin, will use insecure HTTP only", e);
 		}
 		return sslPlugin;

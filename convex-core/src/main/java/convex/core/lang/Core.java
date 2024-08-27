@@ -2982,7 +2982,7 @@ public class Core {
 
 			METADATA = coreMeta;
 			ENVIRONMENT = coreEnv;
-		} catch (Exception e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 			throw new RuntimeException("IO Error initialising core!",e);
 		}

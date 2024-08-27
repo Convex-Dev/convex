@@ -2,6 +2,7 @@ package convex.cli.key;
 
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -103,7 +104,7 @@ public class KeyExport extends AKeyCommand {
 			try {
 				String pemText = PEMTools.encryptPrivateKeyToPEM(keyPair, exportPassword.toCharArray());
 				output=pemText;
-			} catch (Exception e) {
+			} catch (GeneralSecurityException e) {
 				throw new CLIError("Cannot encrypt PEM",e);
 			}
 		} else if ("seed".equals(type)){

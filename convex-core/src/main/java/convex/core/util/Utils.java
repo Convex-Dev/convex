@@ -9,7 +9,9 @@ import java.io.InputStreamReader;
 import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.net.InetSocketAddress;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -914,7 +916,7 @@ public class Utils {
 			URL url=new URI(s).toURL();
 			InetSocketAddress sa= toInetSocketAddress(url);
 			return sa;
-		} catch (Exception ex) {
+		} catch (URISyntaxException | MalformedURLException | IllegalArgumentException ex) {
 			// Try to parse as host:port
 			int colon = s.lastIndexOf(':');
 			if (colon < 0) return null;
@@ -923,8 +925,9 @@ public class Utils {
 				int port = Utils.toInt(s.substring(colon + 1)); // after last colon
 				InetSocketAddress addr = new InetSocketAddress(hostName, port);
 				return addr;
-			} catch (Exception e) {
-				return null;
+			} catch (SecurityException e) {
+				// shouldn't happen, so error
+				throw new Error(e);
 			}
 		}
 	}

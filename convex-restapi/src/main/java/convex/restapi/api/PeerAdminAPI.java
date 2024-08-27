@@ -8,7 +8,6 @@ import convex.restapi.RESTServer;
 import convex.restapi.model.CreateAccountResponse;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
-import io.javalin.http.InternalServerErrorResponse;
 import io.javalin.openapi.HttpMethod;
 import io.javalin.openapi.OpenApi;
 import io.javalin.openapi.OpenApiContent;
@@ -49,12 +48,8 @@ public class PeerAdminAPI extends ABaseAPI {
 				})
 	public void shutDown(Context ctx) {
 		ensureLocalAdmin(ctx);
-		try {
-			server.shutdown();
-		} catch (Exception e) {
-			e.printStackTrace();
-			throw new InternalServerErrorResponse("Failed to initiate sutdown: "+e.getMessage());
-		}
+		server.shutdown();
+
 		ctx.result("Shutdown initiated.");
 	}
 	

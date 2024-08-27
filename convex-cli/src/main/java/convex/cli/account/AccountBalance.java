@@ -62,7 +62,8 @@ public class AccountBalance extends AAccountCommand {
 			ACell message = Reader.read(queryCommand);
 			Result result = convex.querySync(message);
 			mainParent.printResult(result);
-		} catch (Exception e) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 			throw new CLIError("Error executing query",e);
 		}
 	}

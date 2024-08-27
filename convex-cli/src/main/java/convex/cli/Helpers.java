@@ -70,32 +70,42 @@ public class Helpers {
 		return temp;
 	}
 	
+	/**
+	 * Gets list of ports from strings containing port ranges
+	 * @param ports
+	 * @param count
+	 * @return Port list, or null if parsing failed
+	 */
 	public static int[] getPortList(String ports[], int count)  {
-		Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
-		List<String> portTextList = Helpers.splitArrayParameter(ports);
-		List<Integer> portList = new ArrayList<Integer>();
-		int countLeft = count;
-		for (int index = 0; index < portTextList.size() && countLeft > 0; index ++) {
-			String item = portTextList.get(index);
-			Matcher matcher = rangePattern.matcher(item);
-			if (matcher.matches()) {
-				int portFrom = Integer.parseInt(matcher.group(1));
-				int portTo = portFrom  + count + 1;
-				if (!matcher.group(2).isEmpty()) {
-					portTo = Integer.parseInt(matcher.group(2));
+		try {
+			Pattern rangePattern = Pattern.compile(("([0-9]+)\\s*-\\s*([0-9]*)"));
+			List<String> portTextList = Helpers.splitArrayParameter(ports);
+			List<Integer> portList = new ArrayList<Integer>();
+			int countLeft = count;
+			for (int index = 0; index < portTextList.size() && countLeft > 0; index ++) {
+				String item = portTextList.get(index);
+				Matcher matcher = rangePattern.matcher(item);
+				if (matcher.matches()) {
+					int portFrom = Integer.parseInt(matcher.group(1));
+					int portTo = portFrom  + count + 1;
+					if (!matcher.group(2).isEmpty()) {
+						portTo = Integer.parseInt(matcher.group(2));
+					}
+					for ( int portIndex = portFrom; portIndex <= portTo && countLeft > 0; portIndex ++, --countLeft ) {
+						portList.add(portIndex);
+					}
 				}
-				for ( int portIndex = portFrom; portIndex <= portTo && countLeft > 0; portIndex ++, --countLeft ) {
-					portList.add(portIndex);
+				else if (item.isBlank()) {
+					// just skip
+				} else {
+					portList.add(Integer.parseInt(item));
+					countLeft --;
 				}
 			}
-			else if (item.isBlank()) {
-				// just skip
-			} else {
-				portList.add(Integer.parseInt(item));
-				countLeft --;
-			}
+			return portList.stream().mapToInt(Integer::intValue).toArray();
+		} catch (NumberFormatException e) {
+			return null;
 		}
-		return portList.stream().mapToInt(Integer::intValue).toArray();
 	}
 
 	public static String getConvexArt() {

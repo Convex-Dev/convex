@@ -823,9 +823,8 @@ public class Server implements Closeable {
 	 * Shut down the Server, as gracefully as possible.
 	 * @throws TimeoutException If shutdown attempt times out
 	 * @throws IOException  In case of IO Error
-	 * @throws InterruptedException 
 	 */
-	public void shutdown() throws IOException, TimeoutException, InterruptedException {
+	public void shutdown()  {
 		try {
 			AKeyPair kp= getKeyPair();
 			AccountKey key=kp.getAccountKey();
@@ -834,6 +833,8 @@ public class Server implements Closeable {
 			if (r.isError()) {
 				log.warn("Unable to remove Peer stake: "+r);
 			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		} finally {
 			isLive=false;
 			close();
