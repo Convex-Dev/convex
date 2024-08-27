@@ -165,10 +165,7 @@ public class NIOServer implements Closeable {
 						}  catch (CancelledKeyException e) {
 							log.debug("Cancelled key: {}", e.getMessage());
 							key.cancel();
-						} catch (Throwable e) {
-							log.warn("Unexpected Exception, canceling key:", e);
-							key.cancel();
-						}
+						} 
 					}
 					
 					long ts=System.currentTimeMillis();
@@ -179,8 +176,8 @@ public class NIOServer implements Closeable {
 
 					// keys.clear();
 				}
-			} catch (IOException e) {
-				log.error("Unexpected IOException, terminating selector loop: ", e);
+			} catch (Exception e) {
+				log.error("Unexpected Exception, terminating selector loop: ", e);
 			} finally {
 				try {
 					// close all client channels
