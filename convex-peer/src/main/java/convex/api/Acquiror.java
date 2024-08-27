@@ -51,7 +51,12 @@ public class Acquiror {
 		return new Acquiror(hash, store, source);
 	}
 	
-	
+	/**
+	 * Gets a future for the result of a virtual task attempting to acquire data from a remote source.
+	 * 
+	 * @param <T> Type of data acquired
+	 * @return Future for the acquired data value
+	 */
 	public <T extends ACell> CompletableFuture<T> getFuture() {
 		CompletableFuture<T> f = new CompletableFuture<T>();
 		Ref<T> checkRef = store.refForHash(hash);

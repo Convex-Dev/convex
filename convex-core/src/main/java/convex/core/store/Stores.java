@@ -1,5 +1,7 @@
 package convex.core.store;
 
+import java.io.IOException;
+
 import convex.etch.EtchStore;
 
 public class Stores {
@@ -39,7 +41,11 @@ public class Stores {
 	
 	private synchronized static AStore getDefaultStore() {
 		if (defaultStore==null) {
-			defaultStore=EtchStore.createTemp("convex-db");;
+			try {
+				defaultStore=EtchStore.createTemp("convex-db");
+			} catch (IOException e) {
+				throw new Error(e);
+			};
 		}
 		return defaultStore;
 	}

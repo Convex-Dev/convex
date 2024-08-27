@@ -1,5 +1,6 @@
 package convex.core.examples;
 
+import java.io.IOException;
 import java.util.Random;
 
 import convex.core.data.ABlob;
@@ -16,7 +17,7 @@ import convex.etch.EtchStore;
  */
 public class EtchStressTest {
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		Random r=new Random(123);
 		EtchStore store=EtchStore.createTemp();
 		Stores.setCurrent(store);

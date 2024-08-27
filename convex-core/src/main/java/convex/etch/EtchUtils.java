@@ -22,7 +22,7 @@ public class EtchUtils {
 		public long values=0;
 		public long indexPtrs=0;
 		@Override
-		public void visit(Etch e, int level, int[] digits, long indexPointer) {
+		public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {
 			visited++;
 			
 			int isize=e.indexSize(level);
@@ -34,52 +34,48 @@ public class EtchUtils {
 				ps=ps+Utils.toHexString(digits[ll]).substring(8-hd);
 			}
 			
-			try {
-				entries+=isize;
+			entries+=isize;
+			
+			if (isize<=0) fail("Bad index size:"+isize);
+			
+			for (int i=0; i<isize; i++) {
+				long slot=e.readSlot(indexPointer, i);
+				long ptr=e.rawPointer(slot);
+				long type=e.extractType(slot);			
+				if ((ptr|type)!=slot) fail("Inconsistent slot code?!?");
 				
-				if (isize<=0) fail("Bad index size:"+isize);
-				
-				for (int i=0; i<isize; i++) {
-					long slot=e.readSlot(indexPointer, i);
-					long ptr=e.rawPointer(slot);
-					long type=e.extractType(slot);			
-					if ((ptr|type)!=slot) fail("Inconsistent slot code?!?");
+				if (slot==0) {
+					empty++;
+				} else if (type!=Etch.PTR_INDEX) {
+					values++;
 					
-					if (slot==0) {
-						empty++;
-					} else if (type!=Etch.PTR_INDEX) {
-						values++;
-						
-						Hash h=e.readValueKey(ptr);
-						String hp=h.toHexString(ps.length());
-						if (!hp.equals(ps)) {
-							fail("Index "+ps+" inconsistent with hash "+h);
-						}
-						
-						visitHash(e,h);
-					} else {
-						indexPtrs++;
+					Hash h=e.readValueKey(ptr);
+					String hp=h.toHexString(ps.length());
+					if (!hp.equals(ps)) {
+						fail("Index "+ps+" inconsistent with hash "+h);
 					}
 					
-					if (type==Etch.PTR_START) {
-						int ipp=(i+1)%isize; // next slot
-						long nextSlot=e.readSlot(indexPointer, ipp);
-						if (e.extractType(nextSlot)!=Etch.PTR_CHAIN) {
-							fail("Invalid slot after chain start: "+Utils.toHexString(nextSlot));
-						}
-					}
-					
-					if (type==Etch.PTR_CHAIN) {
-						int imm=(i+isize-1)%isize; // prev slot
-						long prevSlot=e.readSlot(indexPointer, imm);
-						long pt=e.extractType(prevSlot);
-						if (!((pt==Etch.PTR_CHAIN)||(pt==Etch.PTR_START))) {
-							fail("Invalid slot before chain entry: "+Utils.toHexString(prevSlot));
-						}
+					visitHash(e,h);
+				} else {
+					indexPtrs++;
+				}
+				
+				if (type==Etch.PTR_START) {
+					int ipp=(i+1)%isize; // next slot
+					long nextSlot=e.readSlot(indexPointer, ipp);
+					if (e.extractType(nextSlot)!=Etch.PTR_CHAIN) {
+						fail("Invalid slot after chain start: "+Utils.toHexString(nextSlot));
 					}
 				}
-			} catch (IOException e1) {
-				throw Utils.sneakyThrow(e1);
+				
+				if (type==Etch.PTR_CHAIN) {
+					int imm=(i+isize-1)%isize; // prev slot
+					long prevSlot=e.readSlot(indexPointer, imm);
+					long pt=e.extractType(prevSlot);
+					if (!((pt==Etch.PTR_CHAIN)||(pt==Etch.PTR_START))) {
+						fail("Invalid slot before chain entry: "+Utils.toHexString(prevSlot));
+					}
+				}
 			}
 		}
 		
@@ -95,25 +91,21 @@ public class EtchUtils {
 	
 	public static abstract class EtchCellVisitor implements IEtchIndexVisitor {
 		@Override
-		public void visit(Etch e, int level, int[] digits, long indexPointer) {
+		public void visit(Etch e, int level, int[] digits, long indexPointer) throws IOException {
 			int isize=e.indexSize(level);			
-			try {
-				for (int i=0; i<isize; i++) {
-					long slot=e.readSlot(indexPointer, i);
-					if (slot==0) continue;
-					
-					long ptr=e.rawPointer(slot);
-					long type=e.extractType(slot);			
-					if ((ptr|type)!=slot) throw new Error("Inconsistent slot code?!?");
-					
-					if (type==Etch.PTR_INDEX) continue;
-					
-					ACell cell=e.readCell(ptr);
-					
-					visitCell(cell);
-				}
-			} catch (IOException e1) {
-				throw Utils.sneakyThrow(e1);
+			for (int i=0; i<isize; i++) {
+				long slot=e.readSlot(indexPointer, i);
+				if (slot==0) continue;
+				
+				long ptr=e.rawPointer(slot);
+				long type=e.extractType(slot);			
+				if ((ptr|type)!=slot) throw new Error("Inconsistent slot code?!?");
+				
+				if (type==Etch.PTR_INDEX) continue;
+				
+				ACell cell=e.readCell(ptr);
+				
+				visitCell(cell);
 			}
 		}
 		

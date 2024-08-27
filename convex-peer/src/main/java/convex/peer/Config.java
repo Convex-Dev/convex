@@ -181,7 +181,11 @@ public class Config {
 		T store=checkStore(config);
 		if (store!=null) return store;
 		
-		store=(T) EtchStore.createTemp("defaultPeerStore");
+		try {
+			store=(T) EtchStore.createTemp("defaultPeerStore");
+		} catch (IOException e) {
+			throw new ConfigException("Unable to configure temporary store due to IO error",e);
+		}
 		config.put(Keywords.STORE, store);
 		return store;
 	}

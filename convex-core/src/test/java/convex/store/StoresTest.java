@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,15 @@ import convex.etch.EtchStore;
 import convex.test.Samples;
 
 public class StoresTest {
-	EtchStore testStore=EtchStore.createTemp();
+	static EtchStore testStore;
+	
+	static {
+		try {
+			testStore=EtchStore.createTemp();
+		} catch (IOException e) {
+			throw new Error(e);
+		}
+	}
 
 	@Test public void testInitState() throws InvalidDataException {
 		AStore temp=Stores.current();
@@ -50,7 +59,7 @@ public class StoresTest {
 		}
 	}
 	
-	@Test public void testCrossStores() throws InvalidDataException {
+	@Test public void testCrossStores() throws InvalidDataException, IOException {
 		AStore m1=new MemoryStore();
 		AStore m2=new MemoryStore();
 		

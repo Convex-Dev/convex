@@ -11,12 +11,11 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Core;
 import convex.core.lang.Symbols;
-import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class AccountStatusTest {
 
-	@Test public void testEmpty() {
+	@Test public void testEmpty() throws InvalidDataException {
 		AccountStatus as=AccountStatus.create();
 		doAccountStatusTest(as);
 	}
@@ -27,12 +26,12 @@ public class AccountStatusTest {
 		assertThrows(BadFormatException.class,()->Format.read(b));
 	}
 	
-	@Test public void testBigSequence() throws BadFormatException {
+	@Test public void testBigSequence() throws BadFormatException, InvalidDataException {
 		AccountStatus as=AccountStatus.create(80, 1000, Samples.ACCOUNT_KEY);
 		doAccountStatusTest(as);
 	}
 	
-	@Test public void testFull() throws BadFormatException {
+	@Test public void testFull() throws BadFormatException, InvalidDataException {
 		AccountStatus as=AccountStatus.create(10, 1000, Samples.ACCOUNT_KEY);
 		as=as.withMemory(10000);
 		as=as.withHolding(Address.create(127), Symbols.FOO);
@@ -58,15 +57,10 @@ public class AccountStatusTest {
 		doAccountStatusTest(as);
 	}
 
-	private void doAccountStatusTest(AccountStatus as)  {
+	private void doAccountStatusTest(AccountStatus as) throws InvalidDataException  {
 		assertTrue(as.isCanonical());
-		
-		try {
-			as.validateCell();
-		} catch (InvalidDataException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		
+		as.validateCell();
+	
 		RecordTest.doRecordTests(as);
 	}
 }

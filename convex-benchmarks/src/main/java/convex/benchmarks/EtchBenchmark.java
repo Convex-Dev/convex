@@ -27,7 +27,7 @@ import convex.etch.EtchStore;
  */
 public class EtchBenchmark {
 	
-	static final EtchStore store=EtchStore.createTemp();
+	static final EtchStore store;
 	
 	static long nonce=0;
 	
@@ -39,6 +39,11 @@ public class EtchBenchmark {
 	static final Random rand=new Random();
 	
 	static {
+		try {
+			store =EtchStore.createTemp();
+		} catch (IOException e) {
+			throw new Error(e);
+		}
 		for (int i=0; i<NUMVALS; i++) {
 			AVector<CVMLong> v=Vectors.of(0L,(long)i);
 			Ref<ACell> r=v.getRef();

@@ -222,7 +222,7 @@ public class EtchTest {
 	}
 	
 	@Test 
-	public void testCopyAcrossStores() {
+	public void testCopyAcrossStores() throws IOException {
 		EtchStore store=EtchStore.createTemp();
 		EtchStore store2=EtchStore.createTemp();
 		AString nestedString=Samples.NON_EMBEDDED_STRING;

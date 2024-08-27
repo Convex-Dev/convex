@@ -90,28 +90,22 @@ public class EtchStore extends ACachedStore {
 	 *
 	 * @param prefix String prefix for temporary file
 	 * @return New EtchStore instance
+	 * @throws IOException 
 	 */
-	public static EtchStore createTemp(String prefix) {
-		try {
-			Etch etch = Etch.createTempEtch(prefix);
-			return new EtchStore(etch);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+	public static EtchStore createTemp(String prefix) throws IOException {
+		Etch etch = Etch.createTempEtch(prefix);
+		return new EtchStore(etch);
 	}
 
 	/**
 	 * Create an Etch store using a new temporary file with a generated prefix
 	 *
 	 * @return New EtchStore instance
+	 * @throws IOException 
 	 */
-	public static EtchStore createTemp() {
-		try {
-			Etch etch = Etch.createTempEtch();
-			return new EtchStore(etch);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+	public static EtchStore createTemp() throws IOException {
+		Etch etch = Etch.createTempEtch();
+		return new EtchStore(etch);
 	}
 
 	@SuppressWarnings("unchecked")

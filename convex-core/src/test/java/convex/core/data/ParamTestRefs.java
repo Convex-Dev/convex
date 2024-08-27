@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -27,10 +28,14 @@ public class ParamTestRefs {
 
 	@Parameterized.Parameters(name = "{index}: {0}")
 	public static Collection<Object[]> dataExamples() {
-		return Arrays
-				.asList(new Object[][] { 
-					    { "Memory Store", new MemoryStore() }, 
-						{ "Temp Etch Store", EtchStore.createTemp() } });
+		try {
+			return Arrays
+					.asList(new Object[][] { 
+						    { "Memory Store", new MemoryStore() }, 
+							{ "Temp Etch Store", EtchStore.createTemp() } });
+		} catch (IOException e) {
+			throw new Error(e);
+		}
 	}
 	
 	@Test
