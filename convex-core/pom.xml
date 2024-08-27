@@ -8,7 +8,7 @@
 	</parent>
 	
 	<properties>
-	  <antlr.version>4.13.1</antlr.version>
+	  <antlr.version>4.13.2</antlr.version>
 	  <bc.version>1.78</bc.version>
 	  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
@@ -67,7 +67,7 @@
 			<plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.4.0</version>
+                <version>3.6.0</version>
                 <executions>
                     <execution>
                         <id>add-source</id>
@@ -84,7 +84,7 @@
                 </executions>
             </plugin>
             
-           <!-- This plugin ensures we get a test-jar which is used as a dependency for some other tests -->
+           <!-- This plugin ensures we get a test-jar which is used as a dependency for some other tests. Not needed any more?
            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -96,6 +96,7 @@
                     </execution>
                 </executions>
             </plugin>
+            -->
 		</plugins>
 		<resources>
 			<resource>
