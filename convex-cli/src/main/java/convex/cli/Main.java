@@ -161,15 +161,16 @@ public class Main extends ACommand {
 	}
 
 	/**
-	 * Version provider class
+	 * Version provider class. 
+	 * 
 	 */
-	private static final class VersionProvider implements IVersionProvider {
+	// Note: GitHub Maven builds seem to need this to be public?
+	public static final class VersionProvider implements IVersionProvider {
 		@Override
 		public String[] getVersion() throws Exception {
 			String s = Main.class.getPackage().getImplementationVersion();
 			return new String[] { "Convex version: " + s };
 		}
-
 	}
 
 	/**
