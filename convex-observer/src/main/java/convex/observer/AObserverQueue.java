@@ -57,9 +57,10 @@ public abstract class AObserverQueue<T> {
 				try {
 					loop();		
 				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt(); // maintain interrupt status
 					log.debug("Component thread interrupted: {}",thread);
 					break;
-				} catch (Throwable e) {
+				} catch (Exception e) {
 					log.warn("Unexpected exception in "+this.getClass().getSimpleName(),e);
 					// Stop observer ??
 					// break;

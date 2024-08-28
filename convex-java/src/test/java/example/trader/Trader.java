@@ -11,7 +11,7 @@ public class Trader {
 	    	InputStream is=classLoader.getResourceAsStream("example/trader/APIKEY");
 	    	String text = new String(is.readAllBytes());
 	    	System.out.println("Using API key: "+text);
-	    } catch (Throwable e) {
+	    } catch (Exception e) {
 			e.printStackTrace();
 			throw new Error(e);
 	    	

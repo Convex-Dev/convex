@@ -214,7 +214,7 @@ public class StressPanel extends JPanel {
 					running=repeatCheckBox.isSelected();
 					if (running) Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
 				};
-			} catch (Throwable e) {
+			} catch (Exception e) {
 				log.warn("Stress test worker terminated unexpectedly",e);
 				resultArea.setText("Test Error: "+e);
 			} finally {

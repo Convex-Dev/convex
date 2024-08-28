@@ -17,7 +17,6 @@ import convex.core.crypto.PEMTools;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AccountKey;
 import convex.core.util.FileUtils;
-import convex.core.util.Utils;
 
 public class KeyExportTest {
 	private static final char[] KEYSTORE_PASSWORD = "testPassword".toCharArray();
@@ -31,10 +30,9 @@ public class KeyExportTest {
 			TEMP_FILE=Helpers.createTempFile("tempKeystore", ".pfx");
 			PFXTools.createStore(TEMP_FILE, KEYSTORE_PASSWORD);
 			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
-		} catch (Throwable t) {
-			throw Utils.sneakyThrow(t);
-		} 
-		
+		} catch (Exception t) {
+			throw new Error(t);
+		} 	
 	}
 
 	@Test
