@@ -321,8 +321,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		AccountKey myKey=server.getPeerKey();
 		try {
 			// Add to map of new Beliefs received for each Peer
-			beliefReceivedCount++;
-			
+			beliefReceivedCount++;			
 			try {
 				ACell payload=m.getPayload();
 				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
@@ -355,6 +354,12 @@ public class BeliefPropagator extends AThreadedComponent {
 						changed=true;
 					} catch (MissingDataException e) {
 						server.getConnectionManager().alertMissing(m,e,key);
+					} catch (IOException e) {
+						// This is pretty bad, probably we lost the store?
+						// We certainly can't propagate the newly received order
+						// throw new Error(e);
+						log.warn("IO exception tryin to merge Order",e);
+						return changed;
 					}
 				}
 			} catch (MissingDataException e) {
@@ -363,10 +368,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		} catch (ClassCastException | BadFormatException e) {
 			// Bad message from Peer
 			server.getConnectionManager().alertBadMessage(m,Utils.getClassName(e)+" merging Belief!!");
-		}  catch (Exception e) {
-			log.warn("Unexpected exception getting Belief",e);
-			server.getConnectionManager().alertBadMessage(m,"Unexpected exception getting Belief: "+e.getMessage());
-		}
+		}  
 		return changed;
 	}
 	

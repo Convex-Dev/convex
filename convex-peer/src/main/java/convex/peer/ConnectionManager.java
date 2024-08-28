@@ -29,6 +29,7 @@ import convex.core.data.Keywords;
 import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
@@ -123,9 +124,6 @@ public class ConnectionManager extends AThreadedComponent {
 			} finally {
 				convex.close();
 			}
-		} catch (InterruptedException t) {
-			// re-throw on interrupt
-			throw t; 
 		} catch (IOException | TimeoutException | ExecutionException t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
@@ -248,7 +246,7 @@ public class ConnectionManager extends AThreadedComponent {
 		Integer target;
 		try {
 			target = Utils.toInt(server.getConfig().get(Keywords.OUTGOING_CONNECTIONS));
-		} catch (Exception ex) {
+		} catch (IllegalArgumentException ex) {
 			target=null;
 		}
 		if (target==null) target=Config.DEFAULT_OUTGOING_CONNECTION_COUNT;
@@ -401,91 +399,97 @@ public class ConnectionManager extends AThreadedComponent {
 		}
 	}
 
+	/**
+	 * Processes a response message received from a peer
+	 * @param m
+	 * @param thisPeer
+	 * @return
+	 */
 	AccountKey processResponse(Message m, Peer thisPeer) {
+		SignedData<ACell> signedData;
 		try {
-			SignedData<ACell> signedData = m.getPayload();
-
-			log.debug( "Processing response request");
-
-			@SuppressWarnings("unchecked")
-			AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
-
-			if (responseValues.size() != 4) {
-				log.warn( "response data incorrect number of items should be 4 not {}",responseValues.size());
-				return null;
-			}
-
-
-			// get the signed token
-			Hash token = RT.ensureHash(responseValues.get(0));
-			if (token == null) {
-				log.warn( "no response token provided");
-				return null;
-			}
-
-			// check to see if we are both want to connect to the same network
-			Hash networkId = RT.ensureHash(responseValues.get(1));
-			if ( networkId == null || !networkId.equals(thisPeer.getNetworkID())) {
-				log.warn( "response data has incorrect networkId");
-				return null;
-			}
-			// check to see if the challenge is for this peer
-			AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
-			if ( toPeer == null || !toPeer.equals(thisPeer.getPeerKey())) {
-				log.warn( "response data has incorrect addressed peer");
-				return null;
-			}
-
-			// hash sent by the response
-			Hash challengeHash = RT.ensureHash(responseValues.get(3));
-
-			// get who sent this challenge
-			AccountKey fromPeer = signedData.getAccountKey();
-
-
-			if ( !challengeList.containsKey(fromPeer)) {
-				log.warn( "response from an unkown challenge");
-				return null;
-			}
-			synchronized(challengeList) {
-
-				// get the challenge data we sent out for this peer
-				ChallengeRequest challengeRequest = challengeList.get(fromPeer);
-
-				Hash challengeToken = challengeRequest.getToken();
-				if (!challengeToken.equals(token)) {
-					log.warn( "invalid response token sent");
-					return null;
-				}
-
-				AccountKey challengeFromPeer = challengeRequest.getPeerKey();
-				if (!signedData.getAccountKey().equals(challengeFromPeer)) {
-					log.warn("response key does not match requested key, sent from a different peer");
-					return null;
-				}
-
-				// hash sent by this peer for the challenge
-				Hash challengeSourceHash = challengeRequest.getSendHash();
-				if ( !challengeHash.equals(challengeSourceHash)) {
-					log.warn("response hash of the challenge does not match");
-					return null;
-				}
-				// remove from list incase this fails, we can generate another challenge
-				challengeList.remove(fromPeer);
-
-				Connection connection = getConnection(fromPeer);
-				if (connection != null) {
-					connection.setTrustedPeerKey(fromPeer);
-				}
-
-				// return the trusted peer key
-				return fromPeer;
-			}
-
-		} catch (Exception e) {
-			log.error("Response Error: {}",e);
+			signedData = m.getPayload();
+		} catch (BadFormatException e) {
+			return null;
 		}
-		return null;
+
+		log.debug( "Processing response request");
+
+		@SuppressWarnings("unchecked")
+		AVector<ACell> responseValues = (AVector<ACell>) signedData.getValue();
+
+		if (responseValues.size() != 4) {
+			log.warn( "response data incorrect number of items should be 4 not {}",responseValues.size());
+			return null;
+		}
+
+
+		// get the signed token
+		Hash token = RT.ensureHash(responseValues.get(0));
+		if (token == null) {
+			log.warn( "no response token provided");
+			return null;
+		}
+
+		// check to see if we are both want to connect to the same network
+		Hash networkId = RT.ensureHash(responseValues.get(1));
+		if ( networkId == null || !networkId.equals(thisPeer.getNetworkID())) {
+			log.warn( "response data has incorrect networkId");
+			return null;
+		}
+		// check to see if the challenge is for this peer
+		AccountKey toPeer = RT.ensureAccountKey(responseValues.get(2));
+		if ( toPeer == null || !toPeer.equals(thisPeer.getPeerKey())) {
+			log.warn( "response data has incorrect addressed peer");
+			return null;
+		}
+
+		// hash sent by the response
+		Hash challengeHash = RT.ensureHash(responseValues.get(3));
+
+		// get who sent this challenge
+		AccountKey fromPeer = signedData.getAccountKey();
+
+
+		if ( !challengeList.containsKey(fromPeer)) {
+			log.warn( "response from an unkown challenge");
+			return null;
+		}
+		
+		synchronized(challengeList) {
+
+			// get the challenge data we sent out for this peer
+			ChallengeRequest challengeRequest = challengeList.get(fromPeer);
+
+			Hash challengeToken = challengeRequest.getToken();
+			if (!challengeToken.equals(token)) {
+				log.warn( "invalid response token sent");
+				return null;
+			}
+
+			AccountKey challengeFromPeer = challengeRequest.getPeerKey();
+			if (!signedData.getAccountKey().equals(challengeFromPeer)) {
+				log.warn("response key does not match requested key, sent from a different peer");
+				return null;
+			}
+
+			// hash sent by this peer for the challenge
+			Hash challengeSourceHash = challengeRequest.getSendHash();
+			if ( !challengeHash.equals(challengeSourceHash)) {
+				log.warn("response hash of the challenge does not match");
+				return null;
+			}
+			// remove from list incase this fails, we can generate another challenge
+			challengeList.remove(fromPeer);
+
+			Connection connection = getConnection(fromPeer);
+			if (connection != null) {
+				connection.setTrustedPeerKey(fromPeer);
+			}
+
+			// return the trusted peer key
+			return fromPeer;
+		}
 	}
 
 
