@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Set;
@@ -55,7 +56,7 @@ public class RefTest {
 	}
 
 	@Test
-	public void testShallowPersist() {
+	public void testShallowPersist() throws IOException {
 		Blob bb = Blob.createRandom(new Random(), 100); // unique blob but embedded
 		assertTrue(bb.isEmbedded());
 		
@@ -145,7 +146,7 @@ public class RefTest {
 	}
 
 	@Test
-	public void testPersistEmbeddedNull() throws InvalidDataException {
+	public void testPersistEmbeddedNull() throws InvalidDataException, IOException {
 		Ref<ACell> nr = Ref.get(null);
 		assertSame(Ref.NULL_VALUE, nr);
 		assertSame(nr, nr.persist());
@@ -154,7 +155,7 @@ public class RefTest {
 	}
 
 	@Test
-	public void testPersistEmbeddedLong() {
+	public void testPersistEmbeddedLong() throws IOException {
 		ACell val=RT.cvm(10001L);
 		Ref<ACell> nr = Ref.get(val);
 		Ref<ACell> nrp = nr.persist();
@@ -169,7 +170,7 @@ public class RefTest {
 	}
 	
 	@Test
-	public void testPersistNestedBlob() {
+	public void testPersistNestedBlob() throws IOException {
 		ABlob bigBlob=Blobs.createRandom(17*Blob.CHUNK_LENGTH); // 16 full chunks plus one extra (3 levels)
 		RefTreeStats rs=Refs.getRefTreeStats(bigBlob.getRef());
 		assertEquals(19,rs.total);
@@ -189,7 +190,7 @@ public class RefTest {
 	}
 	
 	@Test
-	public void testGoodData() {
+	public void testGoodData() throws IOException {
 		AVector<ASymbolic> value = Vectors.of(Keywords.FOO, Symbols.FOO);
 		// a good ref
 		Ref<?> orig = value.getRef();
@@ -207,7 +208,7 @@ public class RefTest {
 	}
 
 	@Test
-	public void testCompare() {
+	public void testCompare() throws IOException {
 		assertEquals(0, Ref.get(RT.cvm(1L)).compareTo(Cells.persist(RT.cvm(1L)).getRef()));
 		assertEquals(1, Ref.get(RT.cvm(1L)).compareTo(
 				Ref.forHash(Hash.fromHex("0000000000000000000000000000000000000000000000000000000000000000"))));

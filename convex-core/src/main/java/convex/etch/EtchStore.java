@@ -133,18 +133,18 @@ public class EtchStore extends ACachedStore {
 	}
 
 	@Override
-	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) throws IOException {
 		return storeRef(ref, status, noveltyHandler, false);
 	}
 
 	@Override
-	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) {
+	public <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status, Consumer<Ref<ACell>> noveltyHandler) throws IOException {
 		return storeRef(ref, status, noveltyHandler, true);
 	}
 
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> storeRef(Ref<T> ref, int requiredStatus, Consumer<Ref<ACell>> noveltyHandler,
-			boolean topLevel) {
+			boolean topLevel) throws IOException {
 
 		// Get the value. If we are persisting, should be there!
 		ACell cell = ref.getValue();
@@ -179,7 +179,11 @@ public class EtchStore extends ACachedStore {
 		if ((requiredStatus > Ref.STORED) && (cell.getRefCount() > 0)) {
 			// TODO: probably slow to rebuild these all the time!
 			IRefFunction func = r -> {
-				return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false);
+				try {
+					return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false);
+				} catch (IOException e) {
+					throw Utils.sneakyThrow(e);
+				}
 			};
 
 			// need to do recursive persistence
@@ -206,22 +210,19 @@ public class EtchStore extends ACachedStore {
 			}
 
 			Ref<ACell> result;
-			try {
-				// ensure status is set when we write to store
-				ref = ref.withMinimumStatus(requiredStatus);
-				cell.attachRef(ref); // make sure we are using current ref within cell
-				result = etch.write(fHash, (Ref<ACell>) ref);
 
-				if (!embedded) {
-					// Ensure we have soft Refpointing to this store
-					result = result.toSoft(this);
-				}
+			// ensure status is set when we write to store
+			ref = ref.withMinimumStatus(requiredStatus);
+			cell.attachRef(ref); // make sure we are using current ref within cell
+			result = etch.write(fHash, (Ref<ACell>) ref);
 
-				cell.attachRef(result);
-				addToCache(result); // cache for subsequent writes
-			} catch (IOException e) {
-				throw Utils.sneakyThrow(e);
+			if (!embedded) {
+				// Ensure we have soft Refpointing to this store
+				result = result.toSoft(this);
 			}
+
+			cell.attachRef(result);
+			addToCache(result); // cache for subsequent writes
 
 			// call novelty handler if newly persisted non-embedded
 			if (noveltyHandler != null) {

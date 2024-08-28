@@ -1,5 +1,6 @@
 package convex.api;
  
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -55,7 +56,11 @@ public class ConvexLocal extends Convex {
 			if (ref==null) {
 				f.completeExceptionally(new MissingDataException(peerStore,hash));
 			} else {
-				ref=store.storeTopRef(ref, Ref.PERSISTED, null);
+				try {
+					ref=store.storeTopRef(ref, Ref.PERSISTED, null);
+				} catch (IOException e) {
+					f.completeExceptionally(e);
+				}
 				f.complete((T) ref.getValue());
 			}
 		});

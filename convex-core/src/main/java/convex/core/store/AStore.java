@@ -37,8 +37,9 @@ public abstract class AStore implements Closeable {
 	 * @param status Status to store at
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
+	 * @throws IOException 
 	 */
-	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T extends ACell> Ref<T> storeRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
 	/**
 	 * Stores a top level @Ref in long term storage as defined by this store implementation.
@@ -55,8 +56,9 @@ public abstract class AStore implements Closeable {
 	 * @param status Status to store at
 	 * @param noveltyHandler Novelty Handler function for Novelty detected. May be null.
 	 * @return The persisted Ref, of status STORED at minimum
+	 * @throws IOException 
 	 */
-	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler);
+	public abstract <T extends ACell> Ref<T> storeTopRef(Ref<T> ref, int status,Consumer<Ref<ACell>> noveltyHandler) throws IOException;
 
 	
 	/**

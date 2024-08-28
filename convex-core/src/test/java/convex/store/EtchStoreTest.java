@@ -63,7 +63,7 @@ public class EtchStoreTest {
 	}
 
 	@Test
-	public void testEmptyStore() {
+	public void testEmptyStore() throws IOException {
 		AStore oldStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -129,7 +129,7 @@ public class EtchStoreTest {
 	}
 
 	@Test
-	public void testPersistedStatus() throws BadFormatException {
+	public void testPersistedStatus() throws BadFormatException, IOException {
 		AStore oldStore = Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -161,7 +161,7 @@ public class EtchStoreTest {
 	}
 
 	@Test
-	public void testBeliefAnnounce() {
+	public void testBeliefAnnounce() throws IOException {
 		AStore oldStore = Stores.current();
 		AtomicLong counter=new AtomicLong(0L);
 
@@ -239,7 +239,7 @@ public class EtchStoreTest {
 	}
 
 	@Test
-	public void testNoveltyHandler() {
+	public void testNoveltyHandler() throws IOException {
 		AStore oldStore = Stores.current();
 		ArrayList<Ref<ACell>> al = new ArrayList<>();
 		try {
@@ -266,7 +266,7 @@ public class EtchStoreTest {
 		}
 	}
 	
-	@Test public void testDecodeCache() throws BadFormatException {
+	@Test public void testDecodeCache() throws BadFormatException, IOException {
 		AStore oldStore = Stores.current();
 		try {
 			Stores.setCurrent(store);

@@ -596,19 +596,21 @@ public class Server implements Closeable {
 		ACell payload;
 		try {
 			payload = m.getPayload();
-		} catch (BadFormatException e) {
+			Counters.peerDataReceived++;
+			
+			// Note: partial messages are handled in Connection now
+			Ref<?> r = Ref.get(payload);
+			if (r.isEmbedded()) {
+				log.warn("DATA with embedded value: "+payload);
+				return;
+			}
+			r = r.persistShallow();
+		} catch (BadFormatException | IOException e) {
+			log.debug("Error processing data: "+e.getMessage());
 			m.closeConnection();
 			return;
 		}
-		Counters.peerDataReceived++;
-		
-		// Note: partial messages are handled in Connection now
-		Ref<?> r = Ref.get(payload);
-		if (r.isEmbedded()) {
-			log.warn("DATA with embedded value: "+payload);
-			return;
-		}
-		r = r.persistShallow();
+
 	}
 
 	/**

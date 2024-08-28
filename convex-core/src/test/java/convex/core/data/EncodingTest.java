@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -272,7 +273,7 @@ public class EncodingTest {
 		assertThrows(BadFormatException.class,()->Format.read(b));
 	}
 	
-	@Test public void testDeltaEncoding() throws BadFormatException {
+	@Test public void testDeltaEncoding() throws BadFormatException, IOException {
 		Blob randBlob=Blob.createRandom(new Random(1234), 2*Format.MAX_EMBEDDED_LENGTH);
 		AVector<?> v=Vectors.of(1,randBlob,randBlob);
 		
@@ -326,7 +327,7 @@ public class EncodingTest {
 		
 	}
 	
-	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException {
+	@Test public void testBeliefEncoding() throws BadFormatException, InvalidDataException, IOException {
 		AKeyPair kp=Samples.KEY_PAIR;
 		Order order=Order.create();
 		order.append(kp.signData(Block.create(0, Vectors.empty())));
@@ -436,7 +437,7 @@ public class EncodingTest {
 	}
 
 
-	@Test public void testDeltaBeliefEncoding() throws BadFormatException {
+	@Test public void testDeltaBeliefEncoding() throws BadFormatException, IOException {
 		AKeyPair kp=AKeyPair.createSeeded(101);
 		Order o=Order.create();
 		o=o.append(kp.signData(Block.create(0, Vectors.of(kp.signData(Invoke.create(Address.ZERO, 1, o))))));

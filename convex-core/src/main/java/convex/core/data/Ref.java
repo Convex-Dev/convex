@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.function.Consumer;
@@ -404,11 +405,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return the persisted Ref 
+	 * @throws IOException 
 	 * @throws MissingDataException If the Ref's value does not exist or has been
 	 *         garbage collected before being persisted 
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) {
+	public <R extends ACell> Ref<R> persist(Consumer<Ref<ACell>> noveltyHandler) throws IOException {
 		int status = getStatus();
 		if (status >= PERSISTED) return (Ref<R>) this; // already persisted in some form
 		AStore store=Stores.current();
@@ -423,8 +425,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @throws MissingDataException if the Ref cannot be fully persisted.
 	 * @return the persisted Ref
+	 * @throws IOException 
 	 */
-	public <R extends ACell> Ref<R> persist() {
+	public <R extends ACell> Ref<R> persist() throws IOException {
 		return persist(null);
 	}
 
@@ -531,8 +534,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Status will be updated to STORED or higher.
 	 * 
 	 * @return Ref with status of STORED or above
+	 * @throws IOException 
 	 */
-	public <R extends ACell> Ref<R> persistShallow() {
+	public <R extends ACell> Ref<R> persistShallow() throws IOException {
 		return persistShallow(null);
 	}
 	
@@ -544,9 +548,10 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return Ref with status of STORED or above
+	 * @throws IOException 
 	 */
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) {
+	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) throws IOException {
 		AStore store=Stores.current();
 		return (Ref<R>) store.storeTopRef((Ref<ACell>)this, Ref.STORED, noveltyHandler);
 	}

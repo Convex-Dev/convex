@@ -1,5 +1,6 @@
 package convex.peer;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -126,6 +127,8 @@ public class BeliefPropagator extends AThreadedComponent {
 		
 		// Wait for some new Beliefs to accumulate up to a given time
 		Belief incomingBelief = awaitBelief();
+		
+		// Try belief update
 		boolean updated= maybeUpdateBelief(incomingBelief);
 		
 		if (updated) {
@@ -143,15 +146,38 @@ public class BeliefPropagator extends AThreadedComponent {
 			}
 		}
 		
+		maybeBroadcast(updated);
+		
+		// Persist Belief in all cases, just without announcing
+		// This is mainly in case we get missing data / sync requests for the Belief
+		// This is super cheap if already persisted, so no problem
+		try {
+			belief=Cells.persist(belief);
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+		
+		/* Update Belief again after persistence. We want to be using
+		 * Latest persisted version as much as possible
+		 */
+		server.updateBelief(belief);
+	}
+
+
+	protected void maybeBroadcast(boolean updated) throws InterruptedException {
 		long ts=Utils.getCurrentTimestamp();
 		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
 			lastBroadcastTime=ts;
-			Message msg;
-			if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
-				msg=createFullUpdateMessage();
-				lastFullBroadcastTime=ts;
-			} else {
-				msg=createQuickUpdateMessage();
+			Message msg=null;
+			try {
+				if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
+					msg=createFullUpdateMessage();
+					lastFullBroadcastTime=ts;
+				} else {
+					msg=createQuickUpdateMessage();
+				}
+			} catch (IOException e) {
+				log.warn("IO Error attempting to create broadcast message",e);
 			}
 			
 			// Actually broadcast the message to outbound connected Peers
@@ -161,16 +187,6 @@ public class BeliefPropagator extends AThreadedComponent {
 				log.warn("null message in BeliefPropagator!");
 			}
 		}
-		
-		// Persist Belief in all cases, just without announcing
-		// This is mainly in case we get missing data / sync requests for the Belief
-		// This is super cheap if already persisted, so no problem
-		belief=Cells.persist(belief);
-		
-		/* Update Belief again after persistence. We want to be using
-		 * Latest persisted version as much as possible
-		 */
-		server.updateBelief(belief);
 	}
 	
 	@Override public void start() {
@@ -184,7 +200,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * @return true if Peer Belief changed, false otherwise
 	 * @throws InterruptedException
 	 */
-	protected boolean maybeUpdateBelief(Belief newBelief) throws InterruptedException {
+	protected boolean maybeUpdateBelief(Belief newBelief) {
 
 		// we are in full consensus if there are no unconfirmed blocks after the consensus point
 		//boolean inConsensus=peer.getConsensusPoint()==peer.getPeerOrder().getBlockCount();
@@ -366,7 +382,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefBroadcastCount++;
 	}
 	
-	private Message createFullUpdateMessage() {
+	private Message createFullUpdateMessage() throws IOException {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -390,7 +406,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		return msg;
 	}
 	
-	private Message createQuickUpdateMessage() {
+	private Message createQuickUpdateMessage() throws IOException {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast

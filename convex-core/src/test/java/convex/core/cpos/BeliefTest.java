@@ -1,5 +1,7 @@
 package convex.core.cpos;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.Belief;
@@ -30,7 +32,7 @@ public class BeliefTest {
 	}
 	
 	@SuppressWarnings("unchecked")
-	@Test public void testBasicBelief() throws BadFormatException {
+	@Test public void testBasicBelief() throws BadFormatException, IOException {
 		Order o=Order.create();
 		for (int i=0; i<PEERS; i++) {
 			AKeyPair kp=kps[i];

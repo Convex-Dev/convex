@@ -1,5 +1,6 @@
 package convex.benchmarks;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 
@@ -53,7 +54,7 @@ public class BigBlockBenchmark {
 	}
 
 	@Benchmark
-	public void benchmark() throws BadSignatureException {
+	public void benchmark() throws BadSignatureException, IOException {
 		BlockResult br=state.applyBlock(block);
 		Cells.persist(br.getState());
 	}

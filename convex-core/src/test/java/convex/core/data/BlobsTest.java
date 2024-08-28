@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
 
@@ -389,7 +390,7 @@ public class BlobsTest {
 	}
 
 	@Test
-	public void testBigBlob() throws InvalidDataException, BadFormatException {
+	public void testBigBlob() throws InvalidDataException, BadFormatException, IOException {
 		BlobTree bb = Samples.BIG_BLOB_TREE;
 		long len = bb.count();
 
@@ -532,7 +533,7 @@ public class BlobsTest {
 	 *  Test case from issue #357, credit @jcoultas
 	 */
 	@Test
-	public void testLongBlobBroken() throws BadFormatException {
+	public void testLongBlobBroken() throws BadFormatException, IOException {
 	   ABlob value = Blob.fromHex("f".repeat(8194));  // 4KB + 1 byte
 	   assertEquals(value,BlobTree.create(value)); // Check equality with canonical version
 	   

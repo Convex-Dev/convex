@@ -99,7 +99,7 @@ public class MemoryStore extends AStore {
 		
 		// need to do recursive persistence
 		cell  = cell.updateRefs(r -> {
-			return r.persist(noveltyHandler);
+			return persistRef(r,noveltyHandler,requiredStatus,false);
 		});
 		
 		ref=ref.withValue((T)cell);

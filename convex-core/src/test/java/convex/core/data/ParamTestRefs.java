@@ -39,7 +39,7 @@ public class ParamTestRefs {
 	}
 	
 	@Test
-	public void testStoreUsage() {
+	public void testStoreUsage() throws IOException {
 		AStore temp=Stores.current();
 
 		try {

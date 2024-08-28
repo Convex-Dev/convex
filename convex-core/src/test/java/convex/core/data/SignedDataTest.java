@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -21,7 +23,7 @@ import convex.test.Samples;
 public class SignedDataTest {
 	@SuppressWarnings("unchecked")
 	@Test
-	public void testBadSignature() {
+	public void testBadSignature() throws IOException {
 		Ref<CVMLong> dref = Ref.get(RT.cvm(13L));
 		SignedData<CVMLong> sd = SignedData.create(Samples.BAD_ACCOUNTKEY, Samples.BAD_SIGNATURE, dref);
 
@@ -82,7 +84,7 @@ public class SignedDataTest {
 	
 	@SuppressWarnings("unchecked")
 	@Test 
-	public void testSignatureCache() {
+	public void testSignatureCache() throws IOException {
 		CVMLong cl=RT.cvm(1585856457);
 		AKeyPair kp = InitTest.HERO_KEYPAIR;
 		SignedData<CVMLong> sd = kp.signData(cl);

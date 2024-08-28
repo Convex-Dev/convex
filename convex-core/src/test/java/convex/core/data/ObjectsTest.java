@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.IOException;
 
 import convex.core.Constants;
 import convex.core.data.Refs.RefTreeStats;
@@ -30,11 +33,16 @@ public class ObjectsTest {
 	 * *any* ACell where RT.isCVM(..) returns true and validate(...) succeeds.
 	 * 
 	 * @param a Value to test
+	 * @throws IOException 
 	 */
 	public static void doAnyValueTests(ACell a) {
 		Hash h=Hash.get(a);
 				
-		a=Cells.persist(a);
+		try {
+			a=Cells.persist(a);
+		} catch (IOException e) {
+			fail(e);
+		}
 		Ref<ACell> r = Ref.get(a);
 		assertEquals(h,r.getHash());
 		assertSame(a, r.getValue()); // shouldn't get GC'd because we have a strong reference
@@ -315,7 +323,7 @@ public class ObjectsTest {
 	}
 
 	@SuppressWarnings("unused")
-	private static void doCellStorageTest(ACell a) throws InvalidDataException {
+	private static void doCellStorageTest(ACell a) throws InvalidDataException, IOException {
 		
 		AStore temp=Stores.current();
 		try {

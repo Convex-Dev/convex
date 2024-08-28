@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -115,7 +116,7 @@ public class ParamTestValues extends ACVMTest {
 	}
 
 	@Test
-	public void testHexRoundTrip() throws InvalidDataException, ValidationException {
+	public void testHexRoundTrip() throws InvalidDataException, ValidationException, IOException {
 		Cells.persist(data);
 		String hex = Format.encodedBlob(data).toHexString();
 		Blob d2 = Blob.fromHex(hex);

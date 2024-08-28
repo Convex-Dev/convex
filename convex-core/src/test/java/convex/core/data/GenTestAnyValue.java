@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -35,7 +37,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
-	public void genericTests(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException {
+	public void genericTests(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException, IOException {
 		ObjectsTest.doAnyValueTests(o);
 	}
 	
@@ -71,7 +73,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property
-	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException {
+	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException, IOException {
 		if (Format.isEmbedded(o)) {
 			Cells.persist(o); // NOTE: may have child refs to persist
 			
@@ -97,7 +99,7 @@ public class GenTestAnyValue {
 	}
 	
 	@Property (trials=20)
-	public void dataRoundTrip(@From(ValueGen.class) ACell o) throws BadFormatException {
+	public void dataRoundTrip(@From(ValueGen.class) ACell o) throws BadFormatException, IOException {
 		Blob data=Format.encodedBlob(o);
 		
 		// introduce a small offset to ensure blobs working correctly

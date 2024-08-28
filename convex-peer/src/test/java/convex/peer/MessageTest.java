@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -35,7 +36,7 @@ public class MessageTest {
 	}
 	
 	@Test 
-	public void testDataMessages() throws BadFormatException {
+	public void testDataMessages() throws BadFormatException, IOException {
 		Blob b=Blob.createRandom(new Random(1256785), 1000);
 		Cells.persist(b);
 		

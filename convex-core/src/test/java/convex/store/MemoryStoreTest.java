@@ -6,6 +6,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.function.Consumer;
@@ -35,7 +36,7 @@ public class MemoryStoreTest {
 	private static final Hash BAD_HASH = Samples.BAD_HASH;
 
 	@Test
-	public void testEmptyStore() {
+	public void testEmptyStore() throws IOException {
 		AStore oldStore = Stores.current();
 		MemoryStore ms = new MemoryStore();
 		try {
@@ -64,7 +65,7 @@ public class MemoryStoreTest {
 	}
 
 	@Test
-	public void testPersistedStatus() throws BadFormatException {
+	public void testPersistedStatus() throws BadFormatException, IOException {
 		// generate Hash of unique secure random bytes to test - should not already be
 		// in store
 		Blob value = Blob.createRandom(new Random(), Format.MAX_EMBEDDED_LENGTH);
@@ -86,7 +87,7 @@ public class MemoryStoreTest {
 	}
 
 	@Test
-	public void testNoveltyHandler() {
+	public void testNoveltyHandler() throws IOException {
 		AStore oldStore = Stores.current();
 		MemoryStore ms = new MemoryStore();
 		ArrayList<Ref<ACell>> al = new ArrayList<>();

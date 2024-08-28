@@ -41,21 +41,22 @@ public class EtchBenchmark {
 	static {
 		try {
 			store =EtchStore.createTemp();
+			for (int i=0; i<NUMVALS; i++) {
+				AVector<CVMLong> v=Vectors.of(0L,(long)i);
+				Ref<ACell> r=v.getRef();
+				refs[i]=r;
+				r.getHash();
+				store.storeTopRef(r, Ref.STORED, null);
+			}	
 		} catch (IOException e) {
 			throw new Error(e);
 		}
-		for (int i=0; i<NUMVALS; i++) {
-			AVector<CVMLong> v=Vectors.of(0L,(long)i);
-			Ref<ACell> r=v.getRef();
-			refs[i]=r;
-			r.getHash();
-			store.storeTopRef(r, Ref.STORED, null);
-		}
+
 		System.out.println("Refs stored for testing");
 	}
 	
 	@Benchmark
-	public void writeData() {
+	public void writeData() throws IOException {
 		AVector<CVMLong> v=Vectors.of(1L,nonce++);
 		store.storeTopRef(v.getRef(), Ref.STORED, null);
 	}

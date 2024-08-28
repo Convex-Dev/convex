@@ -7,6 +7,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +108,7 @@ public class TransactionHandler extends AThreadedComponent {
 		interests.put(signedTransactionHash, m);
 	}
 	
-	protected void processMessage(Message m) {
+	protected void processMessage(Message m) throws InterruptedException {
 		try {
 			this.receivedTransactionCount++;
 			
@@ -135,10 +136,9 @@ public class TransactionHandler extends AThreadedComponent {
 			this.clientTransactionCount++;
 			
 			registerInterest(sd.getHash(), m);		
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		} catch (BadFormatException e) {
+		} catch (BadFormatException | IOException e) {
 			log.warn("Unandled exception in transaction handler",e);
+			m.closeConnection();
 		}
 	}
 	

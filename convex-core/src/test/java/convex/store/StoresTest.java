@@ -26,6 +26,7 @@ import convex.core.init.InitTest;
 import convex.core.store.AStore;
 import convex.core.store.MemoryStore;
 import convex.core.store.Stores;
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.test.Samples;
 
@@ -40,7 +41,7 @@ public class StoresTest {
 		}
 	}
 
-	@Test public void testInitState() throws InvalidDataException {
+	@Test public void testInitState() throws InvalidDataException, IOException {
 		AStore temp=Stores.current();
 		try {
 			Stores.setCurrent(testStore);
@@ -77,12 +78,16 @@ public class StoresTest {
 		assertTrue(Cells.isCompletelyEncoded(ev));
 		
 		AVector<?> v=Vectors.of(Vectors.of(nv,ev),nv,ev);
-		
+		 
 		Consumer<ACell> crossTest=x->{
-			doCrossStoreTest(x,e1,e2);
-			doCrossStoreTest(x,m1,e1);
-			doCrossStoreTest(x,e2,m2);			
-			doCrossStoreTest(x,m1,m2);
+			try {
+				doCrossStoreTest(x,e1,e2);
+				doCrossStoreTest(x,m1,e1);
+				doCrossStoreTest(x,e2,m2);			
+				doCrossStoreTest(x,m1,m2);
+			} catch (IOException e) {
+				throw Utils.sneakyThrow(e);
+			}
 		};
 		
 		AStore temp=Stores.current();
@@ -104,7 +109,7 @@ public class StoresTest {
 		}
 	}
 
-	private void doCrossStoreTest(ACell a, AStore s1, AStore s2) {
+	private void doCrossStoreTest(ACell a, AStore s1, AStore s2) throws IOException {
 		Hash ha=Cells.getHash(a);
 		
 		ACell a1=Cells.persist(a, s1);

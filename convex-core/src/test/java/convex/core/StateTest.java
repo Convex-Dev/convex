@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
@@ -53,7 +55,7 @@ public class StateTest {
 	}
 
 	@Test
-	public void testRoundTrip() throws BadFormatException {
+	public void testRoundTrip() throws BadFormatException, IOException {
 		State s = INIT_STATE;
 
 		assertEquals(0,s.getRef().getStatus());
@@ -97,7 +99,7 @@ public class StateTest {
 	}
 	
 	@SuppressWarnings("unused")
-	@Test public void testStateRefs() {
+	@Test public void testStateRefs() throws IOException {
 		AKeyPair kp=AKeyPair.createSeeded(578587);
 		State s=Init.createState(Lists.of(kp.getAccountKey()));
 		

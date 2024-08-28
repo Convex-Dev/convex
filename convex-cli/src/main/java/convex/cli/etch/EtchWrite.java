@@ -1,5 +1,8 @@
 package convex.cli.etch;
 
+import java.io.IOException;
+
+import convex.cli.CLIError;
 import convex.core.data.ACell;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -34,6 +37,8 @@ public class EtchWrite extends AEtchCommand{
 			Hash h=Ref.get(cell).getHash();
 			println(h.toString());
 			informSuccess("Data saved with hash: "+h);
+		} catch (IOException e) {
+			throw new CLIError("Unable to write to store",e);
 		} finally {
 			store.close();
 		}

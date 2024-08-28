@@ -2,6 +2,8 @@ package convex.comms;
 
 import static org.junit.Assert.assertEquals;
 
+import java.io.IOException;
+
 import org.junit.runner.RunWith;
 
 import com.pholser.junit.quickcheck.From;
@@ -35,7 +37,7 @@ public class GenTestFormat {
 	}
 
 	@Property
-	public void primitiveRoundTrip(@From(PrimitiveGen.class) ACell prim) throws BadFormatException {
+	public void primitiveRoundTrip(@From(PrimitiveGen.class) ACell prim) throws BadFormatException, IOException {
 		Blob b = Format.encodedBlob(prim);
 		if (!Format.isEmbedded(prim)) {
 			// persist in case large
@@ -49,7 +51,7 @@ public class GenTestFormat {
 	}
 
 	@Property
-	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException {
+	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException, IOException {
 		Ref<ACell> pref = Ref.get(Cells.persist(value)); // ensure persisted
 		Blob b = Format.encodedBlob(value);
 		ACell o = Format.read(b);

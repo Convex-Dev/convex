@@ -1,5 +1,7 @@
 package convex.benchmarks;
 
+import java.io.IOException;
+
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
@@ -25,7 +27,11 @@ public class SignatureBenchmark {
 
 	private static SignedData<ABlob> makeSigned() {
 		SignedData<ABlob> signed= KEYPAIR.signData(Blobs.fromHex("cafebabe"));
-		Cells.persist(signed);
+		try {
+			Cells.persist(signed);
+		} catch (IOException e) {
+			throw new Error(e);
+		}
 		return signed;
 	}
 	

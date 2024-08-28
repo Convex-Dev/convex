@@ -3,6 +3,7 @@ package convex.core.lang;
 import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.Assert.assertEquals;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -100,7 +101,7 @@ public class ParamTestEvals {
 	}
 
 	@Test
-	public void testOpRoundTrip() throws BadFormatException {
+	public void testOpRoundTrip() throws BadFormatException, IOException {
 		AOp<?> op = compile(source);
 		Blob b = Format.encodedBlob(op);
 		Cells.persist(op); // persist to allow re-creation
