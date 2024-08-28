@@ -107,7 +107,7 @@ public class BalanceLabel extends BaseTextPane {
 			}
 			
 			Toolkit.addPopupMenu(this, new BalanceMenu());
-		} catch (Throwable e) {
+		} catch (NullPointerException e) {
 			e.printStackTrace();
 			setText(e.getMessage());
 			balance=null;

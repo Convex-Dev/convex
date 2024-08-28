@@ -193,12 +193,8 @@ public class Peer {
 //		Belief b=Belief.create(order,myOrder); // two orders in Belief at least....
 //		Peer peer=create(peerKP,genesisState,consensusState,b);
 //		peer=peer.updateTimestamp(Utils.getCurrentTimestamp());
-//		try {
-//			peer=peer.mergeBeliefs(remoteBelief);
-//			return peer;
-//		} catch (Throwable  e) {
-//			throw Utils.sneakyThrow(e);
-//		}
+//		peer=peer.mergeBeliefs(remoteBelief);
+//		return peer;
 //	}
 
 	/**

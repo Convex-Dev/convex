@@ -110,7 +110,9 @@ public class PeerCreate extends APeerCommand {
 				)
 			);
 			output.writeToStream(mainParent.commandLine.getOut());
-		} catch (Throwable t) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (Exception t) {
 			throw new CLIError("Error creating Peer",t);
 		}
 	}

@@ -125,7 +125,7 @@ public class AccountChooserPanel extends JPanel {
 			convex.query(Special.get("*balance*"),a).thenAccept(r-> {
 				balanceLabel.setFromResult(r);
 			});
-		} catch (Throwable t) {
+		} catch (NullPointerException t) {
 			balanceLabel.setText(t.getClass().getName());
 		}
 	}

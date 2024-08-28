@@ -2,6 +2,7 @@ package convex.core;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.data.ACell;
@@ -390,6 +391,10 @@ public final class Result extends ARecordGeneric {
 		}
 		if (e instanceof ResultException) {
 			return ((ResultException) e).getResult();
+		}
+		if (e instanceof ExecutionException) {
+			// use the underlying cause
+			return fromException(e.getCause());
 		}
 		if (e instanceof InterruptedException) {
 			return interruptThread();

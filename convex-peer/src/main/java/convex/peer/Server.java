@@ -528,16 +528,10 @@ public class Server implements Closeable {
 	}
 	
 	protected void processStatus(Message m) {
-		try {
-			// We can ignore payload
-
-			AVector<ACell> reply = getStatusVector();
-			Result r=Result.create(m.getID(), reply);
-
-			m.returnResult(r);
-		} catch (Throwable t) {
-			log.warn("Status Request Error:", t);
-		}
+		// We can ignore payload
+		AVector<ACell> reply = getStatusVector();
+		Result r=Result.create(m.getID(), reply);
+		m.returnResult(r);
 	}
 
 	/**

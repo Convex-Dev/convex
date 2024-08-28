@@ -93,12 +93,10 @@ public class StressTest {
 			long transTime = Utils.getTimeMillis();
 			System.out.println(CLIENTCOUNT + " transactions executed in " + compTime(faucetTime, transTime));
 
-		} catch (Throwable t) {
+		} catch (Exception t) {
 			t.printStackTrace();
-		} finally {
-			System.exit(0);
+			throw new Error(t);
 		}
-
 	}
 
 	private static String compTime(long a, long b) {

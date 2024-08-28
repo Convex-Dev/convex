@@ -385,12 +385,9 @@ public abstract class Convex {
 			signed = prepareTransaction(transaction);
 			CompletableFuture<Result> r= transact(signed);
 			return r;
-		} catch (ResultException  e) {
-			Result r=Result.fromException(e);
-			return CompletableFuture.completedFuture(r);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return CompletableFuture.completedFuture(Result.interruptThread());
+		} catch (Exception e) {
+			// Note this handles InterruptedException correctly (maintains interrupt)
+			return CompletableFuture.completedFuture(Result.fromException(e));
 		} 
 	}
 
@@ -660,7 +657,7 @@ public abstract class Convex {
 			result = cf.get(timeout, TimeUnit.MILLISECONDS);
 			return result;
 		} catch (ExecutionException | TimeoutException e) {
-			return Result.fromException(e.getCause());
+			return Result.fromException(e);
 		} finally {
 			cf.cancel(true);
 		}
@@ -879,19 +876,15 @@ public abstract class Convex {
 	 * Returns the current AccountKey for the specified address. Performs a sync query
 	 *
 	 * @return AcountKey instance, or null if unavailable
+	 * @throws InterruptedException 
 	 */
-	public AccountKey getAccountKey(Address a) {
+	public AccountKey getAccountKey(Address a) throws InterruptedException {
 		if (a==null) return null;
 		
-		try {
-			Result r=querySync(Reader.read("(:key (account "+a+"))"));
-			if (r.isError()) return null;
-			ABlob b=RT.ensureBlob(r.getValue());
-			return AccountKey.create(b);
-		} catch (Exception e) {
-			return null;
-		}
-		
+		Result r=querySync(Reader.read("(:key (account "+a+"))"));
+		if (r.isError()) return null;
+		ABlob b=RT.ensureBlob(r.getValue());
+		return AccountKey.create(b);
 	}
 
 
@@ -959,10 +952,8 @@ public abstract class Convex {
 			}
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();
-		} catch (InterruptedException e) {
-			// note this sets interrupt flag since an interruption has occurred	
-			throw new ResultException(Result.interruptThread());
-		} catch (ExecutionException | TimeoutException ex) {
+		} catch (Exception ex) {
+			// Note InterruptedException correctly handled here
 			throw new ResultException(ex);
 		}
 	}

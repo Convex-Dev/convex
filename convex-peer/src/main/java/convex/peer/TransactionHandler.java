@@ -223,30 +223,25 @@ public class TransactionHandler extends AThreadedComponent {
 		int nTrans = block.length();
 		HashMap<Keyword,ACell> extInfo=new HashMap<>(5);
 		for (long j = 0; j < nTrans; j++) {
-			try {
-				SignedData<ATransaction> t = block.getTransactions().get(j);
-				Hash h = t.getHash();
-				Message m = interests.get(h);
-				if (m != null) {
-					ACell id = m.getID();
-					log.trace("Returning transaction result ID {}", id);
-					Result res = br.getResults().get(j);
-					
-					extInfo.put(Keywords.LOC,Vectors.of(blockNum,j));
-					extInfo.put(Keywords.TX,t.getHash());
-					
-					res=res.withExtraInfo(extInfo);
+			SignedData<ATransaction> t = block.getTransactions().get(j);
+			Hash h = t.getHash();
+			Message m = interests.get(h);
+			if (m != null) {
+				ACell id = m.getID();
+				log.trace("Returning transaction result ID {}", id);
+				Result res = br.getResults().get(j);
+				
+				extInfo.put(Keywords.LOC,Vectors.of(blockNum,j));
+				extInfo.put(Keywords.TX,t.getHash());
+				
+				res=res.withExtraInfo(extInfo);
 
-					boolean reported = m.returnResult(res);
-					if (!reported) {
-						// ignore?
-					}
-					observeTransactionResponse(t,res);
-					interests.remove(h);
+				boolean reported = m.returnResult(res);
+				if (!reported) {
+					// ignore?
 				}
-			} catch (Throwable e) {
-				log.warn("Exception while reporting transaction Result: ",e);
-				// ignore
+				observeTransactionResponse(t,res);
+				interests.remove(h);
 			}
 		}
 	}

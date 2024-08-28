@@ -62,7 +62,9 @@ public class AccountFund extends AAccountCommand {
 			convex.transferSync(address, amount);
 			Long balance = convex.getBalance(address);
 			mainParent.println(balance);
-		} catch (Throwable t) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (Exception t) {
 			throw new CLIError("Error funding account",t);
 		}
 	}

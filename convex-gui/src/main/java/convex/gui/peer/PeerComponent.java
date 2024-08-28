@@ -45,12 +45,8 @@ public class PeerComponent extends BaseListComponent {
 	JTextArea description;
 
 	public void launchPeerWindow(ConvexLocal peer) {
-		try {
-			PeerWindow pw = new PeerWindow(peer);
-			pw.run();
-		} catch (Exception e) {
-			// Ignore
-		}
+		PeerWindow pw = new PeerWindow(peer);
+		pw.run();
 	}
 
 	public void launchEtchWindow(ConvexLocal peer) {
@@ -114,11 +110,7 @@ public class PeerComponent extends BaseListComponent {
 
 		JMenuItem closeButton = new JMenuItem("Shutdown Peer",Toolkit.menuIcon(0xe8ac));
 		closeButton.addActionListener(e -> {
-			try {
-				server.shutdown();
-			} catch (Exception e1) {
-				// ignore
-			}
+			server.shutdown();
 		});
 		popupMenu.add(closeButton);
 
@@ -201,7 +193,6 @@ public class PeerComponent extends BaseListComponent {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
 	}
 	
 	public String getPeerDescription() {

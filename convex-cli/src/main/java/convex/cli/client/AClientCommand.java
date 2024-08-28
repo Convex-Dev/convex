@@ -65,8 +65,9 @@ public abstract class AClientCommand extends ATopCommand {
 	/**
 	 * Connect to Convex ready to transact
 	 * @return
+	 * @throws InterruptedException 
 	 */
-	protected Convex connectTransact() {
+	protected Convex connectTransact() throws InterruptedException {
 		Convex convex=connectQuery();
 		ensureKeyPair(convex);
 		return convex;
@@ -81,7 +82,7 @@ public abstract class AClientCommand extends ATopCommand {
 	}
 	
 	
-	protected void ensureKeyPair(Convex convex) {
+	protected void ensureKeyPair(Convex convex) throws InterruptedException {
 		Address a=convex.getAddress();
 		AKeyPair keyPair = convex.getKeyPair();
 		if (keyPair!=null) return;

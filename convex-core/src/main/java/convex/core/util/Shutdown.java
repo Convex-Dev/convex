@@ -52,6 +52,7 @@ public class Shutdown {
 					r.run();
 				} catch (Throwable t) {
 					t.printStackTrace();
+					// Otherwise ignore. This is the same as what the JVM shutdown does
 				}
  			});
 			hookSet.clear();
