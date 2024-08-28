@@ -46,10 +46,9 @@ public abstract class ACommand implements Runnable {
 			throw new CLIError("STRICT SECURITY: " + message);
 	}
 
-	
-	protected void inform(int level, String message) {
+	protected void inform(int level, String formattedMessage) {
 		if (verbose()<level) return;
-		commandLine().getErr().println(message);
+		commandLine().getErr().println(formattedMessage);
 	}
 
 	/**
@@ -114,33 +113,12 @@ public abstract class ACommand implements Runnable {
 	}
 	
 	/**
-	 * Prompt the user for a Y/N answer
-	 * @param string
-	 * @return
-	 */
-	public boolean question(String string) {
-		if (!isInteractive()) throw new CLIError("Can't ask user question in non-interactive mode: "+string);
-		try {
-			if (isColoured()) string=Coloured.blue(string);
-			inform(0,string);
-			String resp=System.console().readLine().trim(); // Doesn't work because console is not in non-blocking mode?
-			if (!resp.isBlank()&&Character.toLowerCase(resp.charAt(0))=='y') return true;
-		} catch (Exception e) {
-			throw new CLIError("Unexpected error getting console input: "+e);
-		}
-		return false;
-	}
-	
-
-
-	/**
 	 * Checks if the CLI should output ANSI colours
 	 * @return
 	 */
 	protected boolean isColoured() {
 		return cli().isColoured();
 	}
-	
 
 	public void informSuccess(String message) {
 		if (isColoured()) message=Coloured.green(message);
