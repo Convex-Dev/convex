@@ -12,6 +12,42 @@ The `convex-cli` module provides a CLI interface to Convex, including the abilit
 convex --help
 ```
 
+### Run a local develop testnet with a GUI
+
+```
+convex local start
+```
+
+### Run the main Convex Desktop GUI application
+
+```
+convex desktop
+```
+
+### Query the network
+
+This runs the `*balance*` query to get the Convex Coin balance of account `#11`
+
+```
+convex query -a 11 *balance*
+```
+
+Queries are free, don't require a signature and you can query for any account on the network.
+
+## Key Management
+
+Operating Convex based systems correctly requires cryptographic keys for signing and verification. The CLI helpfully provides a number of useful tools for managing your keys.
+
+### Listing keys
+
+You can get a list of all public keys in the current key store as follows:
+
+```
+convex key list
+```
+
+By default, keys are store in the `.convex/keystore.pfx` file in the user's home director, but you can override this by either sertting the `CONVEX_KEYSTORE` environment variable or passing the `--keystore` option (works with most CLI commands).
+
 ### Generating a key pair
 
 To execute transactions or operate peers on Convex you will need a cryptographic Ed25519 key pair.
@@ -30,12 +66,11 @@ This generates and outputs a BIP39 mnemonic phrase of 12 words consistent with t
 evidence expand family claw crack dawn name salmon resource leg once curious
 ```
 
-You will be also prompted for three passwords:
+You will be also prompted for passwords including:
 - A BIP39 passphrase. This is the passphrase that will be used to generate the private key
-- The key store password. This is needed to access all keys in the key store
-- A private key encryption password. This protects the new key generated
+- A private key encryption password. This protects the new key by encrypting it in the key store
 
-After the key pair is successfully generated, you will be able to use it providing you have the key store password and the private key password.
+After the key pair is successfully generated, you will be able to use it providing have the private key password.
 
 If the key is important to you, you will want to be able to recover it even if you permanently lose access to the key store (e.g. if your laptop is stolen, disk drive corrupted etc.). In this case, you SHOULD make sure you securely record the following:
 - The BIP39 mnemonic word list
@@ -61,6 +96,8 @@ convex key import --type=bip39 --text='evidence expand family claw crack dawn na
 ```
 
 This will re-import the same key pair that was originally generated, assuming you have the correct BIP39 passphrase. You can confirm this by checking that the public key is the one you expect.
+
+
 
 ## Installation
 
