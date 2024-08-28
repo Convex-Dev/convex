@@ -19,6 +19,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.util.Utils;
 import convex.peer.API;
+import convex.peer.ConfigException;
+import convex.peer.LaunchException;
 import convex.peer.Server;
 
 public class GenesisTest {
@@ -45,7 +47,7 @@ public class GenesisTest {
 		} 
 	}
 
-	@Test public void testGenesisPeer() throws TimeoutException, InterruptedException, IOException {
+	@Test public void testGenesisPeer() throws TimeoutException, InterruptedException, IOException, LaunchException, ConfigException {
 		CLTester importTester =  CLTester.run(
 				"key", 
 				"import",

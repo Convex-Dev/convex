@@ -20,6 +20,8 @@ import convex.core.lang.Symbols;
 import convex.java.Convex;
 import convex.java.JSON;
 import convex.peer.API;
+import convex.peer.ConfigException;
+import convex.peer.LaunchException;
 import convex.peer.Server;
 
 public class RemoteClientTest {
@@ -31,7 +33,7 @@ public class RemoteClientTest {
 	static Address genesis=Init.GENESIS_ADDRESS;
 	
 	@BeforeAll
-	public static void init() throws InterruptedException {
+	public static void init() throws InterruptedException, ConfigException, LaunchException {
 		Server s=API.launchPeer();
 		RESTServer rs=RESTServer.create(s);
 		rs.start(0);

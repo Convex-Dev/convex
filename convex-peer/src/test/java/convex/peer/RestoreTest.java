@@ -42,7 +42,7 @@ public class RestoreTest {
 	Address HERO=Init.GENESIS_ADDRESS;
 
 	@Test
-	public void restoreTest() throws InterruptedException, ExecutionException, TimeoutException, ResultException, IOException {
+	public void restoreTest() throws InterruptedException, ExecutionException, TimeoutException, ResultException, IOException, PeerException {
 //		 {
 //		   System.out.println("Test store = "+Stores.current());
 //

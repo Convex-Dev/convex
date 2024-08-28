@@ -17,6 +17,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;
 import convex.peer.API;
+import convex.peer.PeerException;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import picocli.CommandLine.Command;
@@ -156,7 +157,11 @@ public class LocalStart extends ALocalCommand {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
 
 		State genesisState=Init.createState(keyList);
-		return API.launchLocalPeers(keyPairList,genesisState, peerPorts);
+		try {
+			return API.launchLocalPeers(keyPairList,genesisState, peerPorts);
+		} catch (PeerException e) {
+			throw new CLIError(ExitCodes.CONFIG,"Failed to launch peer(s) : "+e.getMessage(),e);
+		} 
 	}
 	
 	public RESTServer launchRestAPI(Server server) {

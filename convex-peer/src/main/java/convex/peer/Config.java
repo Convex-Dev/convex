@@ -125,8 +125,9 @@ public class Config {
 	 * Checks if the config specifies a valid keystore
 	 * @param config Configuration map for peer
 	 * @return Keystore specified in Config, or null if not specified
+	 * @throws ConfigException 
 	 */
-	public static KeyStore checkKeyStore(Map<Keyword, Object> config) {
+	public static KeyStore checkKeyStore(Map<Keyword, Object> config) throws ConfigException {
 		Object o=config.get(Keywords.KEYSTORE);
 		if (o==null) return null;
 		if (o instanceof KeyStore) return (KeyStore)o;
@@ -156,8 +157,9 @@ public class Config {
 	 * @param config Config map to check
 	 * @param key
 	 * @return Password, or null if unspecified
+	 * @throws ConfigException 
 	 */
-	private static char[] checkPass(Map<Keyword, Object> config, Keyword key) {
+	private static char[] checkPass(Map<Keyword, Object> config, Keyword key) throws ConfigException {
 		Object po=config.get(key);
 		if (po==null) return null;
 		if (po instanceof char[]) {
@@ -175,9 +177,10 @@ public class Config {
 	 * Establishes a store in the given config
 	 * @param config Configuration map fpr peer (may be modified)
 	 * @return Store specified in Config under :store
+	 * @throws ConfigException 
 	 */
 	@SuppressWarnings("unchecked")
-	public static  <T extends AStore> T ensureStore(Map<Keyword, Object> config) {
+	public static  <T extends AStore> T ensureStore(Map<Keyword, Object> config) throws ConfigException {
 		T store=checkStore(config);
 		if (store!=null) return store;
 		
@@ -210,8 +213,9 @@ public class Config {
 	 * Ensures we have a hot peer :keypair set in config
 	 * 
 	 * @param config Configuration map for peer (may be modified)
+	 * @throws ConfigException 
 	 */
-	public static AKeyPair ensurePeerKey(HashMap<Keyword, Object> config) {
+	public static AKeyPair ensurePeerKey(HashMap<Keyword, Object> config) throws ConfigException {
 		Object o=config.get(Keywords.KEYPAIR);
 		if (o!=null) {
 			if (o instanceof AKeyPair) {
@@ -227,8 +231,9 @@ public class Config {
 	/**
 	 * Checks that the config specifies a source for the genesis state
 	 * @param config
+	 * @throws ConfigException 
 	 */
-	public static void ensureGenesisState(HashMap<Keyword, Object> config) {
+	public static void ensureGenesisState(HashMap<Keyword, Object> config) throws ConfigException {
 		
 		if (!(config.containsKey(Keywords.STATE)
 				||config.containsKey(Keywords.STORE)

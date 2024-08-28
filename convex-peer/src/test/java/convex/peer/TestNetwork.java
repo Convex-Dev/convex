@@ -68,12 +68,11 @@ public class TestNetwork {
 		VILLAIN=HERO.offset(2);
 	}
 
-	private void waitForLaunch() throws InterruptedException {
+	private void waitForLaunch() throws PeerException, InterruptedException {
 		if (SERVERS == null) {
 			SERVERS=API.launchLocalPeers(PEER_KEYPAIRS, GENESIS_STATE);
 			SERVER = SERVERS.get(0);
 			CONVEX=Convex.connect(SERVER, HERO, HERO_KEYPAIR);
-
 		}
 		log.debug("*** Test Network ready ***");
 	}
@@ -112,10 +111,9 @@ public class TestNetwork {
 		}
 		try {
 			instance.waitForLaunch();
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+		} catch (Exception e) {
 			throw new Error(e);
-		}
+		} 
 		return instance;
 	}
 }

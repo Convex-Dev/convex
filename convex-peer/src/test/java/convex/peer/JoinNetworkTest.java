@@ -35,7 +35,7 @@ public class JoinNetworkTest {
 	}
 
 	@Test
-	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException, ResultException {
+	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException, ResultException, PeerException {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 

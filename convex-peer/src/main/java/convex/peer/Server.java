@@ -136,7 +136,7 @@ public class Server implements Closeable {
 	 */
 	private NIOServer nio = NIOServer.create(this);
 
-	private Server(HashMap<Keyword, Object> config) throws IOException, TimeoutException, InterruptedException {
+	private Server(HashMap<Keyword, Object> config) throws ConfigException, InterruptedException {
 		this.config = config;
 		final AStore savedStore=Stores.current();
 
@@ -161,6 +161,10 @@ public class Server implements Closeable {
 			executor.persistPeerData();
 			
 			establishController();
+		} catch (TimeoutException e) {
+			throw new ConfigException("Timeout trying to configure peer",e);
+		} catch (IOException e) {
+			throw new ConfigException("IO Error while trying to configure peer",e);
 		} finally {
 			Stores.setCurrent(savedStore);
 		}
@@ -187,7 +191,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	private Peer establishPeer() throws TimeoutException, IOException, InterruptedException {
+	private Peer establishPeer() throws ConfigException, TimeoutException, IOException, InterruptedException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
 		AKeyPair keyPair = Config.ensurePeerKey(config);
 		if (keyPair==null) {
@@ -288,11 +292,10 @@ public class Server implements Closeable {
 	 * @param config Server configuration map. Will be defensively copied.
 	 *
 	 * @return New Server instance
-	 * @throws IOException If an IO Error occurred establishing the Peer
-	 * @throws TimeoutException If Peer creation timed out
+	 * @throws ConfigException If Peer configuration failed, possible multiple causes
 	 * @throws InterruptedException 
 	 */
-	public static Server create(HashMap<Keyword, Object> config) throws TimeoutException, IOException, InterruptedException {
+	public static Server create(HashMap<Keyword, Object> config) throws ConfigException, InterruptedException {
 		return new Server(new HashMap<>(config));
 	}
 

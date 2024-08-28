@@ -18,6 +18,7 @@ import convex.core.data.Keywords;
 import convex.etch.EtchStore;
 import convex.peer.API;
 import convex.peer.ConfigException;
+import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import picocli.CommandLine.Command;
@@ -152,6 +153,8 @@ public class PeerStart extends APeerCommand {
 			} catch (InterruptedException e) {
 				informWarning("Peer interrupted before normal shutdown");
 				Thread.currentThread().interrupt();
+			} catch (LaunchException e) {
+				throw new CLIError("Error in peer configuration: "+e.getMessage(),e);
 			} finally {
 				if (restServer!=null) restServer.close();
 			}

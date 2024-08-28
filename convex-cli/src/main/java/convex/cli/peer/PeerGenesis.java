@@ -13,6 +13,7 @@ import convex.core.data.Keywords;
 import convex.core.init.Init;
 import convex.etch.EtchStore;
 import convex.peer.API;
+import convex.peer.PeerException;
 import convex.peer.Server;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -93,6 +94,8 @@ public class PeerGenesis extends APeerCommand {
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new CLIError("Peer genesis interrupted");
+		} catch (PeerException e) {
+			throw new CLIError("Peer genesis failed: "+e.getMessage(),e);
 		} finally {
 			etch.close();
 		}

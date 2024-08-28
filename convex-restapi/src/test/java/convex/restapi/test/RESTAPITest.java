@@ -11,6 +11,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.peer.API;
+import convex.peer.ConfigException;
+import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 
@@ -19,7 +21,7 @@ public class RESTAPITest {
 	static int port;
 	
 	@BeforeAll
-	public static void init() throws InterruptedException {
+	public static void init() throws InterruptedException, ConfigException, LaunchException {
 		Server s=API.launchPeer();
 		RESTServer rs=RESTServer.create(s);
 		rs.start(0);

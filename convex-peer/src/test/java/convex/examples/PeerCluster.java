@@ -24,6 +24,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.util.Utils;
 import convex.peer.API;
+import convex.peer.PeerException;
 import convex.peer.Server;
 
 public class PeerCluster {
@@ -77,7 +78,7 @@ public class PeerCluster {
 		return State.create(accts, peers, Constants.INITIAL_GLOBALS, State.EMPTY_SCHEDULE);
 	}
 
-	public static void main(String... args) throws InterruptedException {
+	public static void main(String... args) throws InterruptedException, PeerException {
 		ArrayList<Server> peers = new ArrayList<>(NUM_PEERS);
 
 		log.info("Creating peer configurations");

@@ -32,8 +32,7 @@ public class StressTest {
 			rs.start(0);
 			port = rs.getPort();
 			server = rs;
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+		} catch (Exception e) {
 			throw new Error(e);
 		}
 	}

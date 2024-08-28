@@ -1,6 +1,7 @@
 package convex.cli.local;
 
 import convex.cli.CLIError;
+import convex.peer.PeerException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.ParentCommand;
 
@@ -31,6 +32,8 @@ public class LocalGUI extends ALocalCommand {
 		} catch (InterruptedException t) {
 			Thread.currentThread().interrupt();
 			throw new CLIError("Interrupted while running GUI",t);
+		} catch (PeerException e) {
+			throw new CLIError("Peer launch failed",e);
 		}
 	}
 

@@ -62,7 +62,7 @@ public class PeerLaunchDialog {
 	    	try {
 	    		int numPeers=(Integer)peerCountSpinner.getValue();
 	    		AWalletEntry we=keyField.getWalletEntry();
-	    		if (we==null) throw new Exception("No key pair selected");
+	    		if (we==null) throw new IllegalStateException("No key pair selected");
 	    		
 	    		if (we.isLocked()) {
 					boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
@@ -75,9 +75,11 @@ public class PeerLaunchDialog {
 	       		kp=we.getKeyPair();
 	    		
 	    		PeerGUI.launchPeerGUI(numPeers, kp,false);
+	    	} catch (InterruptedException e) {
+	    		Thread.currentThread().interrupt();
 	    	} catch (Exception e) {
-	    		Toast.display(parent, "Launch Failed: "+e.getMessage(), Color.RED);
 	    		e.printStackTrace();
+	    		JOptionPane.showMessageDialog(parent, "Peer launch failed\n\nReason : "+e.getMessage());
 	    	}
 	    }
 	}

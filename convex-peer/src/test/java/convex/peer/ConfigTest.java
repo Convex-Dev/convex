@@ -20,7 +20,7 @@ import convex.etch.EtchStore;
 
 public class ConfigTest {
 	
-	@Test public void testStoreSetup() {
+	@Test public void testStoreSetup() throws ConfigException {
 		// Empty config should create a default new store
 		HashMap<Keyword,Object> config=new HashMap<>();
 		EtchStore store=Config.ensureStore(config);
@@ -29,7 +29,7 @@ public class ConfigTest {
 		assertTrue(store.getFile().exists());
 	}
 	
-	@Test public void testKeypair() {
+	@Test public void testKeypair() throws ConfigException {
 		// Empty config should create a default new store
 		HashMap<Keyword,Object> config=new HashMap<>();
 	
@@ -49,7 +49,7 @@ public class ConfigTest {
 		assertThrows(NullPointerException.class,()->API.launchPeer(null));
 	}
 	
-	@Test public void testMinimalLaunch() throws InterruptedException {
+	@Test public void testMinimalLaunch() throws InterruptedException, PeerException {
 		AKeyPair kp=AKeyPair.generate();
 		AccountKey peerKey=kp.getAccountKey();
 		

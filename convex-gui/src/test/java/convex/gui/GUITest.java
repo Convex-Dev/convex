@@ -18,6 +18,7 @@ import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
+import convex.peer.PeerException;
 import convex.peer.Server;
 
 /**
@@ -37,12 +38,14 @@ public class GUITest {
 			manager=new PeerGUI(3,AKeyPair.generate());
 			SERVER=manager.getPrimaryServer();
 			CONVEX=Convex.connect(SERVER);
-		} catch (HeadlessException e) {
-			// we should have null manager
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
 			throw new Error(e);
-		}
+		} catch (HeadlessException e) {
+			// we should have null manager
+		} catch (PeerException e) {
+			throw new Error(e);
+		} 
 	}
 	
 	/**

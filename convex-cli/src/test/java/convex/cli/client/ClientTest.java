@@ -19,6 +19,8 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.etch.EtchStore;
 import convex.peer.API;
+import convex.peer.ConfigException;
+import convex.peer.LaunchException;
 import convex.peer.Server;
 
 public class ClientTest {
@@ -49,7 +51,7 @@ public class ClientTest {
 		assertEquals("4a12d868487648cd7a206f6d4879a7941463d80e185ccf6bb4e951429c4f4e37",kp.getAccountKey().toHexString());
 	}
  	
-	@Test public void testClientCommands() throws IOException, TimeoutException, InterruptedException {
+	@Test public void testClientCommands() throws IOException, TimeoutException, InterruptedException, LaunchException, ConfigException {
 		
 		try (EtchStore store = EtchStore.createTemp(TEMP_ETCH.getCanonicalPath())) {
 

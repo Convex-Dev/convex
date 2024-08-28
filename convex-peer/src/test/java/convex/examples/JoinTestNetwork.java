@@ -17,6 +17,7 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.peer.API;
+import convex.peer.PeerException;
 import convex.peer.Server;
 
 public class JoinTestNetwork {
@@ -25,7 +26,7 @@ public class JoinTestNetwork {
 	Address acct=Address.create(47);
 	AccountKey peerKey=kp.getAccountKey();
 	
-	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException {
+	public void testJoinNetwork() throws IOException, InterruptedException, ExecutionException, TimeoutException, BadSignatureException, PeerException {
 		
 		System.out.println("PublicKey: "+kp.getAccountKey());
 
@@ -45,7 +46,7 @@ public class JoinTestNetwork {
 		System.out.println("State count:"+peer.getStatePosition());
 	}
 	
-	public static void main(String[] args) throws BadSignatureException, IOException, InterruptedException, ExecutionException, TimeoutException {
+	public static void main(String[] args) throws BadSignatureException, IOException, InterruptedException, ExecutionException, TimeoutException, PeerException {
 		new JoinTestNetwork().testJoinNetwork();
 	}
 }

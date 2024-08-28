@@ -44,6 +44,7 @@ import convex.gui.models.StateModel;
 import convex.gui.tools.MessageFormatPanel;
 import convex.gui.utils.Toolkit;
 import convex.peer.API;
+import convex.peer.PeerException;
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import net.miginfocom.swing.MigLayout;
@@ -69,8 +70,9 @@ public class PeerGUI extends AbstractGUI {
 	 * Launch the application.
 	 * @param args Command line args
 	 * @throws InterruptedException 
+	 * @throws PeerException 
 	 */
-	public static void main(String[] args) throws InterruptedException {
+	public static void main(String[] args) throws InterruptedException, PeerException {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
@@ -79,7 +81,7 @@ public class PeerGUI extends AbstractGUI {
 		System.exit(0);
 	}
 
-	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) throws InterruptedException {
+	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesis, boolean topLevel) throws InterruptedException, PeerException {
 		PeerGUI manager = new PeerGUI(peerNum,genesis);
 		manager.run();
 		return manager;
@@ -104,8 +106,9 @@ public class PeerGUI extends AbstractGUI {
 	 * @param genesis Genesis key pair
 	 * @param peerCount number of peers to initialise in genesis
 	 * @throws InterruptedException 
+	 * @throws PeerException If peer startup fails
 	 */
-	public PeerGUI(int peerCount, AKeyPair genesis) throws InterruptedException {
+	public PeerGUI(int peerCount, AKeyPair genesis) throws InterruptedException, PeerException {
 		super ("Peer Manager");
 		// Create key pairs for peers, use genesis key as first keypair
 		genesisKey=genesis;
@@ -333,7 +336,7 @@ public class PeerGUI extends AbstractGUI {
 		return null;
 	}
 
-	public void launchAllPeers() throws InterruptedException {
+	public void launchAllPeers() throws InterruptedException, PeerException {
 		List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
 		for (Server server: serverList) {
 			ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
