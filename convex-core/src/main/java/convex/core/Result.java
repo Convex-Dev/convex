@@ -379,15 +379,15 @@ public final class Result extends ARecordGeneric {
 	public static Result fromException(Throwable e) {
 		if (e instanceof TimeoutException) {
 			String msg=e.getMessage();
-			return Result.create(null,ErrorCodes.TIMEOUT,Strings.create(msg));
+			return Result.error(ErrorCodes.TIMEOUT,Strings.create(msg));
 		}
 		if (e instanceof IOException) {
 			String msg=e.getMessage();
-			return Result.create(null,ErrorCodes.IO,Strings.create(msg));
+			return Result.error(ErrorCodes.IO,Strings.create(msg));
 		}
 		if (e instanceof BadFormatException) {
 			String msg=e.getMessage();
-			return Result.create(null,ErrorCodes.FORMAT,Strings.create(msg));
+			return Result.error(ErrorCodes.FORMAT,Strings.create(msg));
 		}
 		if (e instanceof ResultException) {
 			return ((ResultException) e).getResult();
@@ -399,10 +399,12 @@ public final class Result extends ARecordGeneric {
 		if (e instanceof InterruptedException) {
 			return interruptThread();
 		}
-		return Result.create(null, ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
+		return Result.error(ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
 	}
 
-	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!"));
+	// Standard result in case of interrupts
+	// Note interrupts are always caused by CLIENT from a local perspective
+	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!")).withSource(SourceCodes.CLIENT);
 	
 	/**
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread

@@ -136,8 +136,8 @@ public class ConvexRemote extends Convex {
 				wait+=1+wait/3; // slow exponential backoff
 			} catch (InterruptedException e) {
 				// we honour the interruption, but return a failed result
-				Thread.currentThread().interrupt();
-				return interruptedResult;
+				Result r=Result.fromException(e);
+				return CompletableFuture.completedFuture(r);
 			} catch (IOException e) {
 				Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
 				return CompletableFuture.completedFuture(r);
@@ -145,8 +145,7 @@ public class ConvexRemote extends Convex {
 		}
 	}
 
-	private static CompletableFuture<Result> closedResult=CompletableFuture.completedFuture(Result.error(ErrorCodes.CLOSED, "Transaction interrupted before sending").withInfo(Keywords.SOURCE,SourceCodes.COMM));
-	private static CompletableFuture<Result> interruptedResult=CompletableFuture.completedFuture(Result.error(ErrorCodes.INTERRUPTED, "Interrupted before sending").withInfo(Keywords.SOURCE,SourceCodes.COMM));
+	private static CompletableFuture<Result> closedResult=CompletableFuture.completedFuture(Result.error(ErrorCodes.CLOSED, "Transaction interrupted before sending").withSource(SourceCodes.COMM));
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address)  {
@@ -169,9 +168,9 @@ public class ConvexRemote extends Convex {
 				Thread.sleep(wait);
 				wait+=1+wait/3; // slow exponential backoff
 			} catch (InterruptedException e) {
-				// we honour the interruption, but return a failed result
-				Thread.currentThread().interrupt();
-				return interruptedResult;
+				// This handles interrupts correctly, returning a failed result
+				Result r= Result.fromException(e);
+				return CompletableFuture.completedFuture(r);
 			} catch (IOException e) {
 				Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
 				return CompletableFuture.completedFuture(r);
@@ -188,10 +187,7 @@ public class ConvexRemote extends Convex {
 					return CompletableFuture.completedFuture(Result.error(ErrorCodes.LOAD, "Full buffer, can't send status request").withSource(SourceCodes.COMM));
 				}
 	
-				// TODO: ensure status is fully loaded
-				// Store future for completion by result message
 				CompletableFuture<Result> cf = awaitResult(id,timeout);
-	
 				return cf;
 			}
 		} catch (IOException e) {

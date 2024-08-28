@@ -124,7 +124,9 @@ public class ConnectionManager extends AThreadedComponent {
 			} finally {
 				convex.close();
 			}
-		} catch (IOException | TimeoutException | ExecutionException t) {
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+		} catch (Exception t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
 			}
@@ -600,7 +602,8 @@ public class ConnectionManager extends AThreadedComponent {
 			convex.close();
 			
 			if (status == null || status.count()!=Config.STATUS_COUNT) {
-				throw new Error("Bad status message from remote Peer");
+				log.info("Bad status message from remote Peer");
+				return null;
 			}
 
 			AccountKey peerKey =RT.ensureAccountKey(status.get(3));

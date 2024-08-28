@@ -43,7 +43,11 @@ public class Transact extends AClientCommand {
 			
 			Address address=convex.getAddress();
 			log.trace("Executing transaction: '{}'\n", transactionCode);
-				
+			
+//			if (transactionCode==null) {
+//				transactionCode=prompt("Enter trasnaction command: ");
+//			}
+			
 			ACell message = Reader.read(transactionCode);
 			ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
 			Result result = convex.transactSync(transaction);

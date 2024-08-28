@@ -26,13 +26,13 @@ public class Query extends AClientCommand {
 
 	@Override
 	public void run() {
-		// sub command run with no command provided
-		if ((commands==null)||(commands.length==0)) {
-			showUsage();
-			return;
-		}
-
 		try {
+			// sub command run with no command provided
+			if ((commands==null)||(commands.length==0)) {
+				showUsage();
+				return;
+			}
+	
 			Convex convex =  connectQuery();
 			for (int i=0; i<commands.length; i++) {
 				ACell message = Reader.read(commands[i]);

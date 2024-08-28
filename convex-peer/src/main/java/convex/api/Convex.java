@@ -381,6 +381,7 @@ public abstract class Convex {
 	 */
 	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) {
 		SignedData<ATransaction> signed;
+		if (transaction==null) throw new IllegalArgumentException("null transaction");
 		try {
 			signed = prepareTransaction(transaction);
 			CompletableFuture<Result> r= transact(signed);
@@ -594,7 +595,7 @@ public abstract class Convex {
 	 *                          confirmed within a reasonable time
 	 * @throws InterruptedException 
 	 */
-	public Result transactSync(ACell transaction) throws InterruptedException {
+	public final Result transactSync(ACell transaction) throws InterruptedException {
 		return transactSync(transaction, timeout);
 	}
 
@@ -609,7 +610,7 @@ public abstract class Convex {
 	 *                          confirmed by the specified timeout
 	 * @throws InterruptedException 
 	 */
-	public synchronized Result transactSync(ACell transaction, long timeout) throws InterruptedException {
+	public final synchronized Result transactSync(ACell transaction, long timeout) throws InterruptedException {
 		// sample time at start of transaction attempt
 		long start = Utils.getTimeMillis();
 		Result result;
@@ -626,10 +627,8 @@ public abstract class Convex {
 				sequence=null;
 			}
 			return result;
-		} catch (ExecutionException e) {
-			return Result.fromException(e.getCause());
-		} catch (TimeoutException e) {
-			return Result.error(ErrorCodes.TIMEOUT, "Transaction result time out").withSource(SourceCodes.COMM);
+		} catch (ExecutionException | TimeoutException e) {
+			return Result.fromException(e);
 		} 
 	}
 

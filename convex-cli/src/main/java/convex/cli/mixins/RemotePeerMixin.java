@@ -19,7 +19,7 @@ public class RemotePeerMixin extends AMixin {
 
 	@Option(names={"--host"},
 		defaultValue="${env:CONVEX_HOST:-"+Constants.HOSTNAME_PEER+"}",
-		description="Hostname for remote peer connection. Defaulting to: ${DEFAULT-VALUE}")
+		description="Hostname for remote peer connection. Can specify with CONVEX_HOST. Defaulting to: ${DEFAULT-VALUE}")
 	private String hostname;
 
 	/**

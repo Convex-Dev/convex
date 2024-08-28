@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.panels.REPLPanel;
 import net.miginfocom.swing.MigLayout;
 
@@ -66,6 +67,7 @@ public class ConvexClient extends AbstractGUI {
 		this.add(tabs, BorderLayout.CENTER);
 
 		tabs.add("REPL", replPanel);
+		tabs.add("KeyRing", new KeyRingPanel());
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		

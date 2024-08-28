@@ -8,7 +8,7 @@ public class AddressMixin extends AMixin {
 	
 	@Option(names={"-a", "--address"},
 			defaultValue="${env:CONVEX_ADDRESS}",
-			description = "Account address to use. Can specify with CONVEX_ADDRESS environment variable.}")
+			description = "Account address to use. Can specify with CONVEX_ADDRESS environment variable.")
 	protected String addressValue = null;
 
 	private Address address=null;

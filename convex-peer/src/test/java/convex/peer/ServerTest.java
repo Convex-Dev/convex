@@ -175,22 +175,29 @@ public class ServerTest {
 
 	@Test
 	public void testConvexAPI() throws IOException, InterruptedException, ExecutionException, TimeoutException {
-		Convex convex=Convex.connect(network.SERVER.getHostAddress(),network.VILLAIN,network.VILLAIN_KEYPAIR);
-
-		Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
-		convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
-
-		assertEquals(network.VILLAIN,f2.getValue());
-		assertTrue(f.get().getValue() instanceof CVMLong);
-		
-		assertThrows(NullPointerException.class,()->convex.transact((ATransaction)null));
-		
-		
-		convex.core.Result r3=convex.querySync(Reader.read("(fail :foo)"));
-		assertTrue(r3.isError());
-		assertEquals(ErrorCodes.ASSERT,r3.getErrorCode());
-		assertEquals(Keywords.FOO,r3.getValue());
-		assertNotNull(r3.getTrace());
+		synchronized(network.SERVER) {
+			Convex convex=network.getClient();
+	
+			Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
+			convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
+	
+			assertEquals(convex.getAddress(),f2.getValue());
+			assertTrue(f.get().getValue() instanceof CVMLong);
+			
+			// Note difference by argument type. `nil` code can make a valid transaction
+			assertThrows(IllegalArgumentException.class,()->convex.transact((ATransaction)null));
+			{
+				Result r=convex.transactSync((ACell)null);
+				// System.out.println(r);
+				assertEquals(null,r.getValue());
+			}
+			
+			convex.core.Result r3=convex.querySync(Reader.read("(fail :foo)"));
+			assertTrue(r3.isError());
+			assertEquals(ErrorCodes.ASSERT,r3.getErrorCode());
+			assertEquals(Keywords.FOO,r3.getValue());
+			assertNotNull(r3.getTrace());
+		}
 	}
 
 	@Test
@@ -203,8 +210,7 @@ public class ServerTest {
 			assertThrows(ExecutionException.class,()->{
 				ACell c = convex.acquire(BAD_HASH).get();
 				System.out.println("Didn't expect to acquire: "+c);
-			}
-			);
+			});
 		}
 	}
 	

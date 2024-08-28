@@ -65,7 +65,7 @@ public class TestNetwork {
 		// Use fresh State
 		GENESIS_STATE=Init.createState(PEER_KEYS);
 		HERO=Address.create(Init.GENESIS_ADDRESS);
-		VILLAIN=HERO.offset(1);
+		VILLAIN=HERO.offset(2);
 	}
 
 	private void waitForLaunch() throws InterruptedException {
