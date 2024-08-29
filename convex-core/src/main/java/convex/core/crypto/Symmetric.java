@@ -14,6 +14,7 @@ import javax.crypto.CipherOutputStream;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.IvParameterSpec;
+import convex.core.exceptions.Panic;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
@@ -152,7 +153,7 @@ public class Symmetric {
 			kgen = KeyGenerator.getInstance(SYMMETRIC_KEY_ALGORITHM);
 			kgen.init(KEY_LENGTH);
 		} catch (NoSuchAlgorithmException e) {
-			throw new Error("Key generator not initialised sucessfully", e);
+			throw new Panic("Key generator not initialised sucessfully", e);
 		}
 		SecretKey key = kgen.generateKey();
 		return key;

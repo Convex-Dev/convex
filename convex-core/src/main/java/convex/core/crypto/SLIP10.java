@@ -2,12 +2,15 @@ package convex.core.crypto;
 
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import convex.core.data.Blob;
 import convex.core.util.Utils;
+import convex.core.exceptions.Panic;
 
 /**
  * Class implementing SLIP-0010 private key generations for Ed25519 private keys
@@ -38,8 +41,8 @@ public class SLIP10 {
 			hmac.update(data);
 			Blob result=Blob.wrap(hmac.doFinal());
 			return result;
-		} catch (GeneralSecurityException e) {
-			throw new Error("Security problem getting SLIP10 master seed",e);
+		} catch (NoSuchAlgorithmException | InvalidKeyException e) {
+			throw new Panic(e);
 		}
 	}
 	

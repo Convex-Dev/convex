@@ -7,6 +7,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
+import convex.core.exceptions.Panic;
+
 public class PBE {
 
 	/**
@@ -28,7 +30,7 @@ public class PBE {
 			System.arraycopy(secretKey.getEncoded(), 0, key, 0, byteLen);
 			return key;
 		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-			throw new Error(e);
+			throw new Panic(e);
 		}
 	}
 }

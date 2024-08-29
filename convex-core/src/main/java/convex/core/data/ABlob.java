@@ -11,6 +11,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
+import convex.core.exceptions.Panic;
 
 /**
  * Abstract base class for data objects containing immutable chunks of binary
@@ -353,8 +354,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		ABlob result= firstPart.append(tail);
 		
 		if (result.count()<0) {
-			head.append(b);
-			throw new Error("This is bad!!");
+			throw new Panic("Blob with negative size?? This is bad!!");
 		}
 		return result;
 	}

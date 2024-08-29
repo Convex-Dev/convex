@@ -7,6 +7,7 @@ import java.security.NoSuchAlgorithmException;
 import org.bouncycastle.jcajce.provider.digest.Keccak;
 
 import convex.core.data.Hash;
+import convex.core.exceptions.Panic;
 
 /**
  * Class for static Hashing functionality
@@ -127,7 +128,7 @@ public class Hashing {
 			try {
 				return MessageDigest.getInstance("SHA-256");
 			} catch (NoSuchAlgorithmException e) {
-				throw new Error("SHA-256 algorithm not available", e);
+				throw new Panic("SHA-256 algorithm not available", e);
 			}
 		});
 		
@@ -135,7 +136,7 @@ public class Hashing {
 			try {
 				return MessageDigest.getInstance("SHA3-256");
 			} catch (NoSuchAlgorithmException e) {
-				throw new Error("SHA3-256 algorithm not available", e);
+				throw new Panic("SHA3-256 algorithm not available", e);
 			}
 		});
 	}

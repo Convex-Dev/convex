@@ -6,6 +6,7 @@ import java.security.MessageDigest;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.Panic;
 import convex.core.util.Utils;
 
 /**
@@ -51,7 +52,7 @@ public class BlobTree extends ABlob {
 		if (blob instanceof BlobTree) return (BlobTree) blob; // already a BlobTree
 
 		long length = blob.count();
-		if (length<=Blob.CHUNK_LENGTH) throw new Error("Can't make BlobTree for too small length: "+length);
+		if (length<=Blob.CHUNK_LENGTH) throw new IllegalArgumentException("Can't make BlobTree for too small length: "+length);
 		
 		int chunks = Utils.checkedInt(calcChunks(length));
 		Blob[] blobs = new Blob[chunks];
@@ -562,7 +563,7 @@ public class BlobTree extends ABlob {
 	@SuppressWarnings("unchecked")
 	private BlobTree appendChild(ABlob newChild) {
 		int ch=children.length;
-		if (ch>=FANOUT) throw new Error("Trying to add a child beyond allowable fanout!");
+		if (ch>=FANOUT) throw new Panic("Trying to add a child beyond allowable fanout!");
 		Ref<ABlob>[] newChildren=new Ref[ch+1];
 		System.arraycopy(children, 0, newChildren, 0, ch);
 		newChildren[ch]=newChild.getRef();

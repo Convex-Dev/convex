@@ -100,9 +100,9 @@ public class StoresTest {
 			assertNull(e2.refForHash(hv));
 			assertNull(m1.refForHash(hv));
 			
-			crossTest.accept(v);
 			crossTest.accept(nv);
 			crossTest.accept(ev);
+			crossTest.accept(v);
 			crossTest.accept(null);
 		} finally {
 			Stores.setCurrent(temp);

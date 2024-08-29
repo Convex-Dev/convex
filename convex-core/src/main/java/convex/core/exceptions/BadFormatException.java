@@ -17,5 +17,9 @@ public class BadFormatException extends ValidationException {
 	public BadFormatException(String message, Throwable cause) {
 		super(message, cause);
 	}
+	
+	public BadFormatException(Throwable cause) {
+		this("Bad format", cause);
+	}
 
 }

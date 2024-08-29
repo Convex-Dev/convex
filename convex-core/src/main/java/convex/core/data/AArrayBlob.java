@@ -85,7 +85,7 @@ public abstract class AArrayBlob extends ABlob {
 		
 	protected ABlob appendSmall(ABlob d) {
 		int n=Utils.checkedInt(count() + d.count());
-		if (n>Blob.CHUNK_LENGTH) throw new Error("Illegal Blob appendSmall size: "+n);
+		if (n>Blob.CHUNK_LENGTH) throw new IllegalStateException("Illegal Blob appendSmall size: "+n);
 		byte[] newData = new byte[n];
 		getBytes(newData, 0);
 		d.getBytes(newData, (int) count);

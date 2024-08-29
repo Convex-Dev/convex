@@ -25,6 +25,8 @@ import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.SignedData;
+import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.Panic;
 
 /**
  * Abstract base class for key pairs in Convex.
@@ -138,8 +140,8 @@ public abstract class AKeyPair {
 	public PrivateKey getPrivate() {
 		try {
 			return getJCAKeyPair().getPrivate();
-		} catch (GeneralSecurityException e) {
-			throw new Error(e);
+		} catch (BadFormatException e) {
+			throw new Panic(e);
 		}
 	}
 
@@ -150,8 +152,8 @@ public abstract class AKeyPair {
 	public PublicKey getPublic() {
 		try {
 			return getJCAKeyPair().getPublic();
-		} catch (GeneralSecurityException e) {
-			throw new Error(e);
+		} catch (BadFormatException e) {
+			throw new Panic(e);
 		}
 	}
 	
@@ -164,8 +166,9 @@ public abstract class AKeyPair {
 	 * Gets the JCA representation of this Key Pair
 	 * @return JCA KepPair
 	 * @throws GeneralSecurityException 
+	 * @throws BadFormatException 
 	 */
-	public KeyPair getJCAKeyPair() throws GeneralSecurityException {
+	public KeyPair getJCAKeyPair() throws BadFormatException {
 		if (keyPair==null) {
 			PublicKey pub=publicKeyFromBytes(getAccountKey().getBytes());
 			PrivateKey priv=privateKeyFromBytes(getSeed().getBytes());
@@ -199,8 +202,9 @@ public abstract class AKeyPair {
 	 *
 	 * @param privateKey An PrivateKey item for private key
 	 * @return A new key pair using the given private key
+	 * @throws BadFormatException If the private key is not in correct format to create a key pair
 	 */
-	public static AKeyPair create(PrivateKey privateKey) {
+	public static AKeyPair create(PrivateKey privateKey) throws BadFormatException {
 		Ed25519PrivateKeyParameters privateKeyParam = new Ed25519PrivateKeyParameters(privateKey.getEncoded(), 16);
 		Ed25519PublicKeyParameters publicKeyParam = privateKeyParam.generatePublicKey();
 		PublicKey generatedPublicKey = publicKeyFromBytes(publicKeyParam.getEncoded());
@@ -234,7 +238,7 @@ public abstract class AKeyPair {
 	 * @param key 32 bytes private key data
 	 * @return Ed25519 Private Key instance
 	 */
-	public static PrivateKey privateKeyFromBytes(byte[] key) throws GeneralSecurityException {
+	public static PrivateKey privateKeyFromBytes(byte[] key) throws BadFormatException {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519),
@@ -243,7 +247,9 @@ public abstract class AKeyPair {
 			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
 			return privateKey;
 		} catch (IOException e) {
-			throw new Error(e);
+			throw new BadFormatException(e);
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw new Panic(e);
 		}
 	}
 
@@ -259,11 +265,17 @@ public abstract class AKeyPair {
 		return AccountKey.wrap(bytes,n-AccountKey.LENGTH);
 	}
 
-	public static PrivateKey privateKeyFromBlob(Blob encodedKey) throws GeneralSecurityException {
-		KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
-		PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
-		PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
-		return privateKey;
+	public static PrivateKey privateKeyFromBlob(Blob encodedKey) throws BadFormatException {
+		try {
+			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
+			PKCS8EncodedKeySpec pkcs8KeySpec = new PKCS8EncodedKeySpec(encodedKey.getBytes());
+			PrivateKey privateKey = keyFactory.generatePrivate(pkcs8KeySpec);
+			return privateKey;
+		} catch (InvalidKeySpecException e) {
+			throw new BadFormatException("Extracting key from Blob failed",e);
+		} catch (NoSuchAlgorithmException e) {
+			throw new Panic(e);
+		}
 	}
 
 	/**
@@ -284,7 +296,7 @@ public abstract class AKeyPair {
 	        return result;
 	}
 
-	public static PublicKey publicKeyFromBytes(byte[] key) {
+	public static PublicKey publicKeyFromBytes(byte[] key) throws BadFormatException {
 		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			SubjectPublicKeyInfo pubKeyInfo = new SubjectPublicKeyInfo(
@@ -292,9 +304,11 @@ public abstract class AKeyPair {
 			X509EncodedKeySpec x509KeySpec = new X509EncodedKeySpec(pubKeyInfo.getEncoded());
 			PublicKey publicKey = keyFactory.generatePublic(x509KeySpec);
 			return publicKey;
-		} catch (NoSuchAlgorithmException | InvalidKeySpecException | IOException e) {
-			throw new Error(e);
-		}
+		} catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+			throw new Panic(e);
+		} catch (IOException e) {
+			throw new BadFormatException("Can't get public key from bytes",e);
+		} 
 	}
 
 }

@@ -1,7 +1,6 @@
 package convex.cli.key;
 
 import java.io.IOException;
-import java.security.GeneralSecurityException;
 
 import org.bouncycastle.util.Arrays;
 
@@ -12,6 +11,7 @@ import convex.core.crypto.BIP39;
 import convex.core.crypto.PEMTools;
 import convex.core.data.ABlob;
 import convex.core.data.Blobs;
+import convex.core.exceptions.BadFormatException;
 import convex.core.util.FileUtils;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -115,7 +115,7 @@ public class KeyImport extends AKeyCommand {
 			
 			try {
 				keyPair = PEMTools.decryptPrivateKeyFromPEM(importText, importPassphrase.toCharArray());
-			} catch (GeneralSecurityException e) {
+			} catch (BadFormatException e) {
 				throw new CLIError(ExitCodes.DATAERR,"Cannot decode PEM. File may be corrupt or wrong passphrase used.",e);
 			}
 		}

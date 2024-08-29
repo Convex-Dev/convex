@@ -90,7 +90,7 @@ public class SodiumTest {
 	}
 
 	@Test
-	public void testCreateFromPrivateKey() {
+	public void testCreateFromPrivateKey() throws BadFormatException {
 		AKeyPair kp1=PROVIDER.generate();
 		PrivateKey priv=kp1.getPrivate();
 		// PublicKey pub=kp1.getPublic();
@@ -120,7 +120,7 @@ public class SodiumTest {
 	}
 
 	@Test
-	public void testAccountKeyRoundTrip() {
+	public void testAccountKeyRoundTrip() throws BadFormatException {
 		// Address should round trip to a Ed25519 public key and back again
 		AccountKey a=AccountKey.fromHex("0123456701234567012345670123456701234567012345670123456701234567");
 		PublicKey pk=AKeyPair.publicKeyFromBytes(a.getBytes());

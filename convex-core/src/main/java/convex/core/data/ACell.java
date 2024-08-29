@@ -201,7 +201,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 				pos=encode(bs,pos);
 				break;
 			} catch (IndexOutOfBoundsException be) {
-				if (capacity>Format.LIMIT_ENCODING_LENGTH) throw new Error("Encoding size limit exceeded in cell: "+this);
+				if (capacity>Format.LIMIT_ENCODING_LENGTH) throw new IllegalStateException("Encoding size limit exceeded in cell: "+this);
 				
 				// We really want to eliminate these, because exception handling is expensive
 				// However don't want to be too conservative or we waste memory

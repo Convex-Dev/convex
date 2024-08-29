@@ -10,6 +10,7 @@ import java.util.function.Function;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
+import convex.core.exceptions.Panic;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
@@ -246,7 +247,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			// reduce to a ListMap
 			HashSet<Entry<K, V>> eset = entrySet();
 			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, V>) e).getKeyRef(), keyRef));
-			if (!removed) throw new Error("Expected to remove at least one entry!");
+			if (!removed) throw new Panic("Expected to remove at least one entry!");
 			return MapLeaf.create(eset.toArray((MapEntry<K, V>[]) MapLeaf.EMPTY_ENTRIES));
 		} else {
 			// replace child
@@ -272,7 +273,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int bsize = children.length;
 		int i = Bits.positionForDigit(digit, mask);
 		short newMask = (short) (mask | (1 << digit));
-		if (mask == newMask) throw new Error("Digit already present!");
+		if (mask == newMask) throw new Panic("Digit already present!");
 
 		Ref<AHashMap<K, V>>[] newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize + 1];
 		System.arraycopy(children, 0, newChildren, 0, i);
@@ -326,7 +327,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	protected MapTree<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
 		if (this.shift != shift) {
-			throw new Error("Invalid shift!");
+			throw new Panic("Invalid shift!");
 		}
 		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
@@ -526,11 +527,11 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	protected AHashMap<K, V> mergeWith(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
-			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
+			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
 			return mergeWith(bt, func, shift);
 		}
 		if ((b instanceof MapLeaf)) return mergeWith((MapLeaf<K, V>) b, func, shift);
-		throw new Error("Unrecognised map type: " + b.getClass());
+		throw new Panic("Unrecognised map type: " + b.getClass());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -613,7 +614,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if ((b instanceof MapTree)) {
 			MapTree<K, V> bt = (MapTree<K, V>) b;
 			// this is OK, top levels should both have shift 0 and be aligned down the tree.
-			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
+			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
 			return mergeDifferences(bt, func,shift);
 		} else {
 			// must be ListMap

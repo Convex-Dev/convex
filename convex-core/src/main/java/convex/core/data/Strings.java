@@ -14,6 +14,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.Panic;
 
 public class Strings {
 	public static final StringShort EMPTY = StringShort.EMPTY;
@@ -99,7 +100,7 @@ public class Strings {
 			try {
 				bb = encoder.encode(CharBuffer.wrap(s));
 			} catch (CharacterCodingException e) {
-				throw new Error("Shouldn't happen!",e);
+				throw new Panic("Shouldn't happen!",e);
 			}
 			BlobBuilder builder=new BlobBuilder();
 			builder.append(bb);

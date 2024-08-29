@@ -16,6 +16,7 @@ import javax.crypto.spec.PBEKeySpec;
 
 import convex.core.data.Blob;
 import convex.core.util.Utils;
+import convex.core.exceptions.Panic;
 
 public class BIP39 {
 	static final String[] wordlist = { "abandon", "ability", "able", "about", "above", "absent", "absorb",
@@ -299,7 +300,7 @@ public class BIP39 {
 		    byte[] bs = key.getEncoded();
 		    return Blob.wrap(bs);
 		} catch (NoSuchAlgorithmException| InvalidKeySpecException e) {
-			throw new Error("Security error getting BIP39 seed",e);
+			throw new Panic("Security error getting BIP39 seed",e);
 		}
 	}
 	

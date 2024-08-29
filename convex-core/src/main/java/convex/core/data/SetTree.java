@@ -2,6 +2,7 @@ package convex.core.data;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.Panic;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
 
@@ -253,7 +254,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		int bsize = children.length;
 		int i = Bits.positionForDigit(digit, mask);
 		short newMask = (short) (mask | (1 << digit));
-		if (mask == newMask) throw new Error("Digit already present!");
+		if (mask == newMask) throw new Panic("Digit already present!");
 
 		Ref<AHashSet<T>>[] newChildren = (Ref<AHashSet<T>>[]) new Ref<?>[bsize + 1];
 		System.arraycopy(children, 0, newChildren, 0, i);
@@ -442,11 +443,11 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	protected AHashSet<T> mergeWith(AHashSet<T> b, int setOp, int shift) {
 		if ((b instanceof SetTree)) {
 			SetTree<T> bt = (SetTree<T>) b;
-			if (this.shift != bt.shift) throw new Error("Misaligned shifts!");
+			if (this.shift != bt.shift) throw new Panic("Misaligned shifts!");
 			return mergeWith(bt, setOp, shift);
 		}
 		if ((b instanceof SetLeaf)) return mergeWith((SetLeaf<T>) b, setOp, shift);
-		throw new Error("Unrecognised map type: " + b.getClass());
+		throw new Panic("Unrecognised map type: " + b.getClass());
 	}
 
 	@SuppressWarnings("unchecked")

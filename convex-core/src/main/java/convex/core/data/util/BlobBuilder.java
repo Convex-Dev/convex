@@ -8,6 +8,7 @@ import convex.core.data.Blob;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMChar;
 import convex.core.util.Utils;
+import convex.core.exceptions.Panic;
 
 /**
  * Similar to Java StringBuilder designed for concatenating multiple small Blobs to produce a larger 
@@ -90,7 +91,7 @@ public class BlobBuilder {
 	 * Completes a chunk to the accumulated Blob and clears the tail
 	 */
 	private void completeChunk() {
-		if (tail.length!=Blob.CHUNK_LENGTH) throw new Error("tail not complete! Has length: "+tail.length);
+		if (tail.length!=Blob.CHUNK_LENGTH) throw new IllegalStateException("tail not complete! Has length: "+tail.length);
 		Blob b=Blob.wrap(tail,0,arrayPos());
 		acc=acc.append(b);
 		tail=null;
@@ -101,7 +102,7 @@ public class BlobBuilder {
 	 * @param n
 	 */
 	private void ensureArray(long n) {
-		if (n>Blob.CHUNK_LENGTH) throw new Error("Invalid array size request: "+n);
+		if (n>Blob.CHUNK_LENGTH) throw new IllegalStateException("Invalid array size request: "+n);
 		if (tail==null) {
 			tail=new byte[Utils.checkedInt(Math.min(Blob.CHUNK_LENGTH,n*2))];
 		}
@@ -129,7 +130,7 @@ public class BlobBuilder {
 		if (tail==null) return acc;
 		
 		result=result.append(Blob.wrap(tail,0,arrayPos()));	
-		if (result.count()!=count) throw new Error("Invalid count!!");
+		if (result.count()!=count) throw new Panic("Invalid count!!");
 		return result;
 	}
 	
@@ -170,7 +171,7 @@ public class BlobBuilder {
 	
 	public BlobBuilder append(byte b) {
 		int spare=spare();
-		if (spare<1) throw new Error("BlobBuilder should always have spare bytes but was: "+spare);
+		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
 		ensureArray(arrayPos()+1);
 		tail[Blob.CHUNK_LENGTH-spare]=b;
 		count+=1;

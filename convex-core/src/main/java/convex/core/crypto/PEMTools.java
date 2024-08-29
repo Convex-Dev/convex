@@ -20,6 +20,8 @@ import org.bouncycastle.pkcs.jcajce.JcePKCSPBEInputDecryptorProviderBuilder;
 import org.bouncycastle.pkcs.jcajce.JcePKCSPBEOutputEncryptorBuilder;
 import org.bouncycastle.util.io.pem.PemObject;
 
+import convex.core.exceptions.BadFormatException;
+
 public class PEMTools {
 	/**
 	 * Default iteration count for PBE. TODO: is this sane?
@@ -65,22 +67,9 @@ public class PEMTools {
 	 * @return Key pair as stored in the PEM
 	 * @throws Error on reading the PEM, decryption and decoding the private key
 	 */
-	public static AKeyPair decryptPrivateKeyFromPEM(String pemText, char[] password) throws GeneralSecurityException {
-		StringReader stringReader = new StringReader(pemText);
-		PemObject pemObject = null;
-		try (PEMParser pemParser = new PEMParser(stringReader)) {
-			pemObject = pemParser.readPemObject();
-			while (pemObject != null) {
-				if (pemObject.getType().equals("ENCRYPTED PRIVATE KEY")) {
-					break;
-				}
-				pemObject = pemParser.readPemObject();
-			}
-
-		} catch (IOException e) {
-			throw new GeneralSecurityException("cannot read PEM",e);
-		}
-
+	public static AKeyPair decryptPrivateKeyFromPEM(String pemText, char[] password) throws BadFormatException {
+		PemObject pemObject = readPEMObject(pemText,"ENCRYPTED PRIVATE KEY");
+		
 		if (pemObject == null) {
 			throw new Error("no encrypted private key found in pem text");
 		}
@@ -95,7 +84,24 @@ public class PEMTools {
 			AKeyPair kp=AKeyPair.create(data);
 			return kp;
 		} catch (IOException | PKCSException e) {
-			throw new GeneralSecurityException("cannot decrypt password from PEM ", e);
+			throw new BadFormatException("cannot decrypt password from PEM ", e);
+		}
+	}
+
+	private static PemObject readPEMObject(String pemText, String type) throws BadFormatException {
+		StringReader stringReader = new StringReader(pemText);
+		try (PEMParser pemParser = new PEMParser(stringReader)) {
+			PemObject pemObject = pemParser.readPemObject();
+			// read objects until we find an object of the right type
+			while (pemObject != null) {
+				if (pemObject.getType().equals(type)) {
+					return pemObject;
+				}
+				pemObject = pemParser.readPemObject();
+			}
+			return null;
+		} catch (IOException e) {
+			throw new BadFormatException("cannot read PEM",e);
 		}
 	}
 

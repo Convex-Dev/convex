@@ -93,8 +93,8 @@ public class AccountKey extends AArrayBlob {
 	 */
 	public static AccountKey dummy(String nonce) {
 		int n = nonce.length();
-		if (n == 0) throw new Error("Empty nonce");
-		if (n >= LENGTH / 2) throw new Error("Nonce too long for dummy address");
+		if (n == 0) nonce="FFFF0000";
+		if (n >= LENGTH / 2) throw new IllegalArgumentException("Nonce too long for dummy address");
 		StringBuilder sb = new StringBuilder();
 		for (int i = 0; i < LENGTH * 2; i += n) {
 			sb.append(nonce);

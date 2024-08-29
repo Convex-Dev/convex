@@ -2,6 +2,7 @@ package convex.core.data;
 
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.Panic;
 
 public abstract class AHashSet<T extends ACell> extends ASet<T> {
 
@@ -38,7 +39,7 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		case OP_INTERSECTION: return (a==null)?null:((b==null)?null:a);
 		case OP_DIFF_LEFT: return (a==null)?null:((b==null)?a:null);
 		case OP_DIFF_RIGHT: return (b==null)?null:((a==null)?b:null);
-		default: throw new Error("Invalid setOp: "+setOp);
+		default: throw new Panic("Invalid setOp: "+setOp);
 		}
 	}
 	
@@ -48,7 +49,7 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		case OP_INTERSECTION: return this;
 		case OP_DIFF_LEFT: return Sets.empty();
 		case OP_DIFF_RIGHT: return Sets.empty();
-		default: throw new Error("Invalid setOp: "+setOp);
+		default: throw new Panic("Invalid setOp: "+setOp);
 		}
 	}
 	

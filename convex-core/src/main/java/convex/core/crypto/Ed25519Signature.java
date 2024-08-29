@@ -113,16 +113,11 @@ public class Ed25519Signature extends ASignature {
 	}
 	
 //	private boolean verify(Hash hash, PublicKey publicKey) {
-//		try {
 //			Signature verifier = Signature.getInstance("Ed25519");
 //		    verifier.initVerify(publicKey);
 //		    verifier.update(hash.getInternalArray(),hash.getOffset(),Hash.LENGTH);
 //			return verifier.verify(store);
-//		} catch (SignatureException | InvalidKeyException e) {	
-//			return false;
-//		} catch (NoSuchAlgorithmException e) {
-//			throw new Error(e);
-//		} 
+
 //	}
 
 	@Override
