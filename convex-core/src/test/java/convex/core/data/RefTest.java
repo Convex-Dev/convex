@@ -15,6 +15,7 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
+import convex.core.SourceCodes;
 import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
@@ -351,6 +352,12 @@ public class RefTest {
 		checkInternal(Keywords.FOO);
 		checkInternal(Symbols.DEF);
 		checkInternal(ErrorCodes.JUICE);
+		checkInternal(SourceCodes.CODE);
+		checkInternal(Maps.empty());
+		checkInternal(Vectors.empty());
+		checkInternal(Lists.empty());
+		checkInternal(Index.EMPTY);
+
 	}
 
 	private <T extends ACell> void  checkInternal(T a)  {

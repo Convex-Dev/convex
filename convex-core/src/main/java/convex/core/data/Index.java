@@ -43,13 +43,8 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	/**
 	 * Empty Index singleton
 	 */
-	public static final Index<?, ?> EMPTY = new Index<ABlob, ACell>(0, null, EMPTY_CHILDREN,(short) 0, 0L);
+	public static final Index<?, ?> EMPTY = Cells.intern(new Index<ABlob, ACell>(0, null, EMPTY_CHILDREN,(short) 0, 0L));
 	
-	static {
-		// Set empty Ref flags as internal embedded constant
-		EMPTY.getRef().setFlags(Ref.INTERNAL_FLAGS);
-	}
-
 	/**
 	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.
 	 * Child entries must have at least one entry.
