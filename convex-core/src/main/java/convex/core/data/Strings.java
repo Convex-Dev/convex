@@ -109,6 +109,10 @@ public class Strings {
 		return Strings.create(utfBlob);
 	}
 	
+	public static <T extends AString> T intern(T value) {
+		return Cells.intern(value);
+	}
+	
 	public static AString create(CVMChar c) {
 		return create(c.toUTFBlob());
 	}

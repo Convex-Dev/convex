@@ -201,7 +201,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Updates the Ref has the given status, at minimum
+	 * Return a Ref that has the given status, at minimum. If status was updated, returns a new Ref
 	 * 
 	 * Assumes any necessary changes to storage will be made separately. 
 	 * SECURITY: Dangerous if misused since may invalidate storage assumptions
@@ -220,7 +220,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	}
 
 	/**
-	 * Create a new Ref of the same type with updated flags
+	 * Return a a similar Ref of the same type with updated flags. Creates a new Ref if lags have changed.
 	 * @param newFlags New flags to set
 	 * @return Updated Ref
 	 */

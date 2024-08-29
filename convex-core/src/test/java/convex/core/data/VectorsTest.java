@@ -31,13 +31,14 @@ public class VectorsTest {
 
 	@Test
 	public void testEmptyVector() {
-		AVector<AString> lv = Vectors.empty();
-		AArrayBlob d = lv.getEncoding();
+		AVector<AString> e = Vectors.empty();
+		RefTest.checkInternal(e);
+		AArrayBlob d = e.getEncoding();
 		assertArrayEquals(new byte[] { Tag.VECTOR, 0 }, d.getBytes());
-		
-		assertSame(lv,Vectors.empty());
-		
-		assertSame(lv,Vectors.wrap(Cells.EMPTY_ARRAY));
+		assertSame(e,Vectors.empty());
+		assertSame(e,Vectors.wrap(Cells.EMPTY_ARRAY));
+		assertSame(e,Vectors.create(new ACell[0]));
+		assertSame(e,Vectors.create(new ACell[0],0,0));
 	}
 
 	@Test

@@ -34,7 +34,7 @@ public final class StringShort extends AString {
 	/**
 	 * The canonical empty String
 	 */
-	public static final StringShort EMPTY = new StringShort(Blob.EMPTY);
+	public static final StringShort EMPTY = Cells.intern(new StringShort(Blob.EMPTY));
 
 	protected StringShort(Blob data) {
 		super(data.count);

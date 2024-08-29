@@ -80,7 +80,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	/**
-	 * Creates a VectorLeaf with the given items appended to the specified tail
+	 * Creates a VectorLeaf with the given items appended to the specified prefix vector
 	 * 
 	 * @param elements Elements to add
 	 * @param offset Offset into element array

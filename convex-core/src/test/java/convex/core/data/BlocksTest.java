@@ -28,6 +28,13 @@ public class BlocksTest {
 		RecordTest.doRecordTests(b1);
 	}
 	
+	@Test public void testValues() {
+		long ts = System.currentTimeMillis();
+		Block b1 = Block.create(ts, Vectors.empty());
+		
+		assertEquals(2,b1.values().count());
+	}
+	
 	@Test
 	public void testTransactions() throws BadSignatureException {
 		AKeyPair kp = InitTest.HERO_KEYPAIR;

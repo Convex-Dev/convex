@@ -439,7 +439,10 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Updates all Refs in this object using the given function.
+	 * Updates all child Refs in this object using the given function.
+	 * 
+	 * This clears the currently cached Ref if an update occurred. This is because, presumably, 
+	 * a new Ref for this cell needs to be created.
 	 * 
 	 * The function *must not* change the hash value of Refs, in order to ensure
 	 * structural integrity of modified data structures.
@@ -504,12 +507,19 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Updates the cached ref of this Cell
+	 * Sets the cached ref of this Cell if it is not already set. USe with caution.
 	 * 
 	 * @param ref Ref to assign
 	 */
 	@SuppressWarnings("unchecked")
 	public void attachRef(Ref<?> ref) {
+		Ref<?> current=this.cachedRef;
+		if (current!=null) {
+			// This solves problem of trashing internal cached refs
+			if (ref.getStatus()<=current.getStatus()) return;
+		//	return;
+		//	// throw new IllegalStateException("Cell of type "+Utils.getClassName(this)+" already has cached Ref");
+		}
 		this.cachedRef=(Ref<ACell>) ref;
 	}
 

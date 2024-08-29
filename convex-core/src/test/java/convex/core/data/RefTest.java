@@ -25,6 +25,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
+import convex.core.util.Utils;
 import convex.test.Samples;
 
 public class RefTest {
@@ -356,6 +357,7 @@ public class RefTest {
 		
 		// Empty data structures
 		checkInternal(Maps.empty());
+		checkInternal(Sets.empty());
 		checkInternal(Vectors.empty());
 		checkInternal(Lists.empty());
 		checkInternal(Index.EMPTY);
@@ -371,7 +373,7 @@ public class RefTest {
 
 	public static <T extends ACell> void  checkInternal(T a)  {
 		Ref<T> ref=Ref.get(a);
-		assertTrue(ref.isInternal());
+		assertTrue(ref.isInternal(),()->"Not internal ref: "+a+" of type "+Utils.getClass(a));
 		assertSame(a,ref.getValue());
 		
 		try {

@@ -129,7 +129,8 @@ public class Cells {
 	 * @throws IOException 
 	 */
 	public static <T extends ACell> T persist(T a) throws IOException {
-		return persist(a,Stores.current());
+		AStore store=Stores.current();
+		return persist(a,store);
 	}
 
 	/**
@@ -247,7 +248,10 @@ public class Cells {
 	}
 
 	/**
-	 * Intern a Cell permanently in memory (for JVM lifetime)
+	 * Intern a Cell permanently in memory (for JVM lifetime). 
+	 * 
+	 * SECURITY: do not do this for any generated structure from external sources. The could DoS your memory.
+	 * 
 	 * @param <T> Type of Cell
 	 * @param value Value to intern
 	 * @return Interned Cell
@@ -255,6 +259,7 @@ public class Cells {
 	public static <T extends ACell> T intern(T value) {
 		Ref<T> ref=Ref.get(value);
 		if (ref.isInternal()) return value;
+		
 		ref.setFlags(Ref.mergeFlags(ref.getFlags(), Ref.INTERNAL));
 		return value;
 	}

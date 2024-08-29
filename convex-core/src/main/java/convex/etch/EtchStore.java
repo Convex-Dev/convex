@@ -182,6 +182,7 @@ public class EtchStore extends ACachedStore {
 				try {
 					return storeRef((Ref<ACell>) r, requiredStatus, noveltyHandler, false);
 				} catch (IOException e) {
+					// OK because overall function throws IOException
 					throw Utils.sneakyThrow(e);
 				}
 			};
@@ -192,10 +193,8 @@ public class EtchStore extends ACachedStore {
 
 			// perhaps need to update Ref
 			if (cell != newObject) {
-
 				ref = ref.withValue((T) newObject);
 				cell = newObject;
-				cell.attachRef(ref); // make sure we are using current ref within new cell
 			}
 		}
 
@@ -209,33 +208,29 @@ public class EtchStore extends ACachedStore {
 						+ " ref of class " + Utils.getClassName(cell) + " with store " + this);
 			}
 
-			Ref<ACell> result;
-
 			// ensure status is set when we write to store
 			ref = ref.withMinimumStatus(requiredStatus);
-			cell.attachRef(ref); // make sure we are using current ref within cell
-			result = etch.write(fHash, (Ref<ACell>) ref);
+			ref = etch.write(fHash, ref);
 
 			if (!embedded) {
-				// Ensure we have soft Refpointing to this store
-				result = result.toSoft(this);
+				// Ensure we have soft Ref pointing to this store
+				ref = ref.toSoft(this);
 			}
 
-			cell.attachRef(result);
-			addToCache(result); // cache for subsequent writes
+			cell.attachRef(ref); // make sure we are using current ref within cell
+			addToCache(ref); // cache for subsequent writes
 
 			// call novelty handler if newly persisted non-embedded
 			if (noveltyHandler != null) {
 				if (!embedded)
-					noveltyHandler.accept(result);
+					noveltyHandler.accept((Ref<ACell>) ref);
 			}
-			return (Ref<T>) result;
 		} else {
 			// no need to write, just tag updated status
 			ref = ref.withMinimumStatus(requiredStatus);
-			cell.attachRef(ref);
-			return ref;
 		}
+		cell.attachRef(ref);
+		return ref;
 	}
 
 	protected <T extends ACell> void addToCache(Ref<T> ref) {

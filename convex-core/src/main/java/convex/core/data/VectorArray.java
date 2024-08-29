@@ -23,7 +23,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 
 	private ACell[] data;
 	private int start;
-
+	
 	private VectorArray(ACell[] data, long start, long count) {
 		super(count);
 		this.data=data;

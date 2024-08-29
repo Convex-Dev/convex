@@ -87,6 +87,9 @@ public class CollectionsTest {
 			assertTrue((a instanceof Keyword)||(a instanceof Symbol)||(a instanceof Address));
 		} else {
 			assertEquals(0,empty.count());
+			
+			// Canonical version of any empty structure should be internal
+			RefTest.checkInternal(empty.toCanonical());
 		}
 		
  		if (n == 0) {

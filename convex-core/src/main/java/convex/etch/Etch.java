@@ -324,11 +324,11 @@ public class Etch {
 	 * @return Ref after writing to store
 	 * @throws IOException If an IO error occurs
 	 */
-	public synchronized Ref<ACell> write(AArrayBlob key, Ref<ACell> value) throws IOException {
+	public synchronized <T extends ACell > Ref<T> write(AArrayBlob key, Ref<T> value) throws IOException {
 		return write(key,0,value,INDEX_START);
 	}
 
-	private Ref<ACell> write(AArrayBlob key, int level, Ref<ACell> ref, long indexPosition) throws IOException {
+	private <T extends ACell > Ref<T> write(AArrayBlob key, int level, Ref<T> ref, long indexPosition) throws IOException {
 		if (level>=MAX_LEVEL) {
 			throw new Error("Max Level exceeded for key: "+key);
 		}
@@ -811,7 +811,7 @@ public class Etch {
 	 * @return
 	 * @throws IOException
 	 */
-	private Ref<ACell> writeNewData(long indexPosition, int digit, AArrayBlob key, Ref<ACell> value, long type) throws IOException {
+	private <T extends ACell > Ref<T> writeNewData(long indexPosition, int digit, AArrayBlob key, Ref<T> value, long type) throws IOException {
 		long newDataPointer=appendData(key,value)|type;
 		writeSlot(indexPosition, digit, newDataPointer);
 		return value;
@@ -824,8 +824,8 @@ public class Etch {
      * @return
      * @throws IOException
      */
-	private Ref<ACell> updateInPlace(long position, Ref<ACell> ref) throws IOException {
-		// ensure we have a raw poistion
+	private <T extends ACell > Ref<T> updateInPlace(long position, Ref<T> ref) throws IOException {
+		// ensure we have a raw position
 		position=rawPointer(position);
 		
 		// Seek to status location
@@ -1020,7 +1020,7 @@ public class Etch {
 	 * @return The position of the new data block
 	 * @throws IOException
 	 */
-	private long appendData(AArrayBlob key,Ref<ACell> ref) throws IOException {
+	private long appendData(AArrayBlob key,Ref<?> ref) throws IOException {
 		assert(key.count()==KEY_SIZE);
 		Counters.etchWrite++;
 
