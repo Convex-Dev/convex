@@ -6,8 +6,8 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.data.Address;
+import convex.core.exceptions.ResultException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -45,11 +45,7 @@ public class AccountFund extends AAccountCommand {
 	private long amount;
 
 	@Override
-	public void run() {
-
-		Main mainParent = accountParent.mainParent;
-
-
+	public void execute() throws InterruptedException {
 		if (addressNumber == 0) {
 			log.warn("--address. You need to provide a valid address number");
 			return;
@@ -57,15 +53,16 @@ public class AccountFund extends AAccountCommand {
 
 		Convex convex = null;
 		Address address = Address.create(addressNumber);
+
+		convex = connect();
+		convex.transferSync(address, amount);
+		Long balance;
 		try {
-			convex = connect();
-			convex.transferSync(address, amount);
-			Long balance = convex.getBalance(address);
-			mainParent.println(balance);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		} catch (Exception t) {
-			throw new CLIError("Error funding account",t);
+			balance = convex.getBalance(address);
+			println(balance);
+		} catch (ResultException e) {
+			throw new CLIError("Error getting balance: "+e.getResult().getValue(),e);
 		}
+		
 	}
 }

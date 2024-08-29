@@ -124,7 +124,7 @@ public class KeyImport extends AKeyCommand {
 	}
 	
 	@Override
-	public void run() {
+	public void execute() {
 		// Import the key pair in requested format
 		AKeyPair keyPair=importKeyPair();
 		if (keyPair==null) return; // returning without failure, presumably usage to show or otherwise cancelled

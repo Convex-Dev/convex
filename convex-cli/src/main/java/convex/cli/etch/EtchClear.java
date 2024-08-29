@@ -12,7 +12,7 @@ description="Clears the etch root data. Does NOT collect garbage.")
 public class EtchClear extends AEtchCommand{
 
 	@Override
-	public void run() {
+	public void execute() {
 		try {
 			EtchStore store=store();
 			store.setRootData(null);

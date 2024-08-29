@@ -82,7 +82,7 @@ public class Main extends ACommand {
 	}
 
 	@Override
-	public void run() {
+	public void execute() {
 		String art=Helpers.getConvexArt();
 		if (isColoured()) art=Coloured.blue(art);
 		inform(2,art);

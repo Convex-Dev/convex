@@ -31,7 +31,7 @@ public class EtchRead extends AEtchCommand{
     private String[] hash;
 
 	@Override
-	public void run() {
+	public void execute() {
 		if (outputFilename!=null) {
 			cli().setOut(outputFilename);
 		}

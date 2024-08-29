@@ -10,7 +10,7 @@ description="Run the Convex Desktop GUI")
 public class Desktop extends ATopCommand {
 
 	@Override
-	public void run() {
+	public void execute() {
 		MainGUI gui = new MainGUI();
 		gui.run();
 		gui.waitForClose();

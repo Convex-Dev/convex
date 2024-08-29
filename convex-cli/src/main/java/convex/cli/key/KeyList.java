@@ -26,7 +26,7 @@ public class KeyList extends AKeyCommand {
 	static final Logger log = LoggerFactory.getLogger(KeyList.class);
 
 	@Override
-	public void run() {
+	public void execute() {
 		KeyStore keyStore = storeMixin.loadKeyStore();
 		if (keyStore==null) throw new CLIError(ExitCodes.NOINPUT,"Keystore does not exist. Specify a valid --keystore or use `convex key gen` to create one.");
 		

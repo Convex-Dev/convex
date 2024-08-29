@@ -28,7 +28,7 @@ public class KeyDelete extends AKeyCommand {
 	}
 	
 	@Override
-	public void run() {
+	public void execute() {
 		
 		if ((keys==null)||(keys.length==0)) {
 			showUsage();

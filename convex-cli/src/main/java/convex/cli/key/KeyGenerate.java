@@ -104,7 +104,7 @@ public class KeyGenerate extends AKeyCommand {
 	}
 	
 	@Override
-	public void run() {
+	public void execute() {
 		// check the number of keys to generate.
 		if (count <= 0) {
 			informWarning("No keys generated. Perhaps you want a positive --count ?");

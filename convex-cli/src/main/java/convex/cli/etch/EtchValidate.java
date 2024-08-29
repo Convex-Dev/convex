@@ -56,7 +56,7 @@ public class EtchValidate extends AEtchCommand{
 	}
 
 	@Override
-	public void run() {
+	public void execute() {
 		EtchStore store=store();
 		try {
 			ValidateVisitor visitor=new ValidateVisitor(cli());

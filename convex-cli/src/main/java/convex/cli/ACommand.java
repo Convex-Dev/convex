@@ -33,6 +33,22 @@ public abstract class ACommand implements Runnable {
 		return cli().commandLine;
 	}
 
+	@Override
+	public final void run() {
+		try {
+			execute();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new CLIError(ExitCodes.TEMPFAIL,"Command interrupted");
+		}
+	}
+	
+	/**
+	 * Execute this command. Subclasses should override this to provide specific command functionality
+	 * @throws InterruptedException
+	 */
+	protected abstract void execute() throws InterruptedException;
+
 	/**
 	 * Checks if the CLI is in strict (paranoid) mode
 	 * @return

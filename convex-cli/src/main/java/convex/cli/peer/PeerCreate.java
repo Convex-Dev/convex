@@ -1,5 +1,7 @@
 package convex.cli.peer;
 
+import java.io.IOException;
+import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 
 import org.slf4j.Logger;
@@ -15,6 +17,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
@@ -46,7 +49,7 @@ public class PeerCreate extends APeerCommand {
 	RemotePeerMixin peerMixin;
 
 	@Override
-	public void run() {
+	public void execute() throws InterruptedException {
 
 		Main mainParent = cli();
 
@@ -85,7 +88,7 @@ public class PeerCreate extends APeerCommand {
 			ATransaction transaction = Invoke.create(address, -1, message);
 			Result result = convex.transactSync(transaction);
 			if (result.isError()) {
-                cli().printResult(result);
+                printResult(result);
 				return;
 			}
 			long currentBalance = convex.getBalance(address);
@@ -110,9 +113,7 @@ public class PeerCreate extends APeerCommand {
 				)
 			);
 			output.writeToStream(mainParent.commandLine.getOut());
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		} catch (Exception t) {
+		}  catch (IOException | GeneralSecurityException | ResultException t) {
 			throw new CLIError("Error creating Peer",t);
 		}
 	}

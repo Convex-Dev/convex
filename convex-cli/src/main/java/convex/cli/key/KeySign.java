@@ -53,7 +53,7 @@ public class KeySign extends AKeyCommand {
 //	private boolean rawdata;
 	
 	@Override
-	public void run() {
+	public void execute() {
 		String keystorePublicKey=keyMixin.getPublicKey();
 		if ((keystorePublicKey == null)||(keystorePublicKey.isEmpty())) {
 			if (!isInteractive()) {

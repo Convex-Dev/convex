@@ -26,7 +26,7 @@ import picocli.CommandLine.Command;
 public class Etch extends ATopCommand {
 
 	@Override
-	public void run() {
+	public void execute() {
 		showUsage();
 	}
 

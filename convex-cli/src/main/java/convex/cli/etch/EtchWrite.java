@@ -21,7 +21,7 @@ public class EtchWrite extends AEtchCommand{
 	private String cvxData;
 
 	@Override
-	public void run() {
+	public void execute() {
 		
 		if ((cvxData==null)) {
 			cli().inform("No data provided. Suggestion: use arg --cvx <data>");

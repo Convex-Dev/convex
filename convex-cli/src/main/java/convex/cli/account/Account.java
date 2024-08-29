@@ -32,9 +32,9 @@ public class Account extends ATopCommand  {
 	protected Main mainParent;
 
 	@Override
-	public void run() {
+	public void execute() {
 		// sub command run with no command provided
-		CommandLine.usage(new Account(), System.out);
+		showUsage();
 	}
 
 	@Override

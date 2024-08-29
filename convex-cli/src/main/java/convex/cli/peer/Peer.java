@@ -34,7 +34,7 @@ public class Peer extends ATopCommand {
 	private String configFilename;
 
 	@Override
-	public void run() {
+	public void execute() {
 		showUsage();
 	}
 

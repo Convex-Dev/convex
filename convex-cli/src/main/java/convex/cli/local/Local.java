@@ -30,7 +30,7 @@ public class Local extends ATopCommand {
 	protected EtchMixin etchMixin;
 	
 	@Override
-	public void run() {
+	public void execute() {
 		showUsage();
 	}
 }

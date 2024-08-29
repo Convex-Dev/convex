@@ -25,13 +25,10 @@ public class LocalGUI extends ALocalCommand {
 	protected Local localParent;
 
 	@Override
-	public void run() {
+	public void execute() throws InterruptedException {
 		// sub command to launch peer manager
 		try {
 			convex.gui.peer.PeerGUI.main(new String[0]);
-		} catch (InterruptedException t) {
-			Thread.currentThread().interrupt();
-			throw new CLIError("Interrupted while running GUI",t);
 		} catch (PeerException e) {
 			throw new CLIError("Peer launch failed",e);
 		}

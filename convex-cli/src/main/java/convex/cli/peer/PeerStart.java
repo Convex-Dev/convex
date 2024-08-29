@@ -113,7 +113,7 @@ public class PeerStart extends APeerCommand {
 	}
 
 	@Override
-	public void run() {
+	public void execute() throws InterruptedException {
 		storeMixin.ensureKeyStore();
 		try (EtchStore store = etchMixin.getEtchStore()) {
 			
@@ -150,9 +150,6 @@ public class PeerStart extends APeerCommand {
 				informSuccess("Peer shutdown completed");
 			} catch (ConfigException t) {
 				throw new CLIError(ExitCodes.CONFIG,"Error in peer configuration: "+t.getMessage(),t);
-			} catch (InterruptedException e) {
-				informWarning("Peer interrupted before normal shutdown");
-				Thread.currentThread().interrupt();
 			} catch (LaunchException e) {
 				throw new CLIError("Error in peer configuration: "+e.getMessage(),e);
 			} finally {

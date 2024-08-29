@@ -10,7 +10,7 @@ public class AMixin extends ACommand{
 	ACommand parentCommand;
 
 	@Override
-	public void run() {
+	public void execute() {
 		throw new Error("Mixin should not be called as command!");
 	}
 

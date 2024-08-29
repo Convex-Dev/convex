@@ -34,27 +34,23 @@ public class Transact extends AClientCommand {
 	private String transactionCode;
 
 	@Override
-	public void run() {
-		try {
-			Address a=getUserAddress();
-			if (a==null) throw new CLIError(ExitCodes.USAGE,"You must specify a valid origin address for the transaction.");
-			
-			Convex convex = connectTransact();
-			
-			Address address=convex.getAddress();
-			log.trace("Executing transaction: '{}'\n", transactionCode);
-			
+	public void execute() throws InterruptedException {
+		Address a=getUserAddress();
+		if (a==null) throw new CLIError(ExitCodes.USAGE,"You must specify a valid origin address for the transaction.");
+		
+		Convex convex = connectTransact();
+		
+		Address address=convex.getAddress();
+		log.trace("Executing transaction: '{}'\n", transactionCode);
+		
 //			if (transactionCode==null) {
 //				transactionCode=prompt("Enter trasnaction command: ");
 //			}
-			
-			ACell message = Reader.read(transactionCode);
-			ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
-			Result result = convex.transactSync(transaction);
-			mainParent.printResult(result);
 		
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
+		ACell message = Reader.read(transactionCode);
+		ATransaction transaction = Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, message);
+		Result result = convex.transactSync(transaction);
+		mainParent.printResult(result);
+
 	}
 }

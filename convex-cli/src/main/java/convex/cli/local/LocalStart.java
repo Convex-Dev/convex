@@ -121,32 +121,28 @@ public class LocalStart extends ALocalCommand {
 	}
     
 	@Override
-	public void run() {
+	public void execute() throws InterruptedException{
 		List<AKeyPair> keyPairList = getPeerKeyPairs(count);
 		int peerPorts[] = getPeerPorts();
 		
-		try {
-			inform("Starting local test network with "+count+" peer(s)");
-			List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
-			int n=servers.size();
-			
-	
-			if (apiPort > 0) {
-				log.debug("Requesting REST API on port "+apiPort);
-			}
-			launchRestAPI(servers.get(0));
-			
-			// informWarning("Failed to start REST server: "+t);
-			
-			
-			informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
-			
-			// Loop until we end
-			while (!Thread.currentThread().isInterrupted()) {
-				Thread.sleep(1000);
-			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+		inform("Starting local test network with "+count+" peer(s)");
+		List<Server> servers=launchLocalPeers(keyPairList, peerPorts);
+		int n=servers.size();
+		
+
+		if (apiPort > 0) {
+			log.debug("Requesting REST API on port "+apiPort);
+		}
+		launchRestAPI(servers.get(0));
+		
+		// informWarning("Failed to start REST server: "+t);
+		
+		
+		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
+		
+		// Loop until we end
+		while (!Thread.currentThread().isInterrupted()) {
+			Thread.sleep(1000);
 		}
 
 	}

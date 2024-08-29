@@ -25,7 +25,7 @@ public class PeerList extends APeerCommand {
 
 
 	@Override
-	public void run() {
+	public void execute() {
 		
 		EtchStore etch=etchMixin.getEtchStore();
 		try {

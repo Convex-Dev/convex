@@ -40,7 +40,7 @@ public class EtchDump extends AEtchCommand{
 	}
 
 	@Override
-	public void run() {
+	public void execute() {
 		cli().setOut(outputFilename);
 		
 		try (EtchStore store=store()) {

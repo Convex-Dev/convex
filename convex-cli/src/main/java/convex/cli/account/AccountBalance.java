@@ -1,16 +1,15 @@
 package convex.cli.account;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
-import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.Main;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.lang.Reader;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
@@ -44,7 +43,7 @@ public class AccountBalance extends AAccountCommand {
 
 
 	@Override
-	public void run() {
+	public void execute() throws InterruptedException {
 		Main mainParent = accountParent.mainParent;
 
 		if (addressNumber == 0) {
@@ -54,17 +53,11 @@ public class AccountBalance extends AAccountCommand {
 
 		Address address = Address.create(addressNumber);
 
-		
-		try {
-			
-			Convex convex = peerMixin.connect();
-			String queryCommand = "(balance "+address+")";
-			ACell message = Reader.read(queryCommand);
-			Result result = convex.querySync(message);
-			mainParent.printResult(result);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new CLIError("Error executing query",e);
-		}
+		Convex convex = peerMixin.connect();
+		String queryCommand = "(balance "+address+")";
+		ACell message = Reader.read(queryCommand);
+		Result result = convex.querySync(message);
+		mainParent.printResult(result);
+
 	}
 }

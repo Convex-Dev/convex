@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.Constants;
-import convex.cli.Main;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -45,10 +44,7 @@ public class AccountInformation extends AAccountCommand {
 
 
 	@Override
-	public void run() {
-
-		Main mainParent = accountParent.mainParent;
-
+	public void execute() throws InterruptedException {
 		if (addressNumber == 0) {
 			log.warn("You need to provide a valid address number");
 			return;
@@ -58,12 +54,8 @@ public class AccountInformation extends AAccountCommand {
 		Address address = Address.create(addressNumber);
         String queryCommand = String.format("(account #%d)", address.longValue());
 		ACell message = Reader.read(queryCommand);
-		Result result;
-		try {
-			result = convex.querySync(message);
-			mainParent.printResult(result);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		} 
+		Result result = convex.querySync(message);
+		printResult(result);
+
 	}
 }

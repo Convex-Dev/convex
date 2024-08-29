@@ -44,7 +44,7 @@ public class PeerGenesis extends APeerCommand {
 	protected String governanceKey;
 
 	@Override
-	public void run() {
+	public void execute() throws InterruptedException {
 		storeMixin.ensureKeyStore();
 
 		// Key for controller. Used for genesis / governance in non-strict mode
@@ -91,10 +91,7 @@ public class PeerGenesis extends APeerCommand {
 			Server s=API.launchPeer(config); 
 			s.close();
 			informSuccess("Convex genesis succeeded!");
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new CLIError("Peer genesis interrupted");
-		} catch (PeerException e) {
+		}  catch (PeerException e) {
 			throw new CLIError("Peer genesis failed: "+e.getMessage(),e);
 		} finally {
 			etch.close();

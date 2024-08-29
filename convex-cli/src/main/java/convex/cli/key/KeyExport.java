@@ -73,7 +73,7 @@ public class KeyExport extends AKeyCommand {
 	}
 	
 	@Override
-	public void run() {
+	public void execute() {
 		String keystorePublicKey=keyMixin.getPublicKey();
 		if ((keystorePublicKey == null)||(keystorePublicKey.isEmpty())) {
 			if (outputFilename==null) {

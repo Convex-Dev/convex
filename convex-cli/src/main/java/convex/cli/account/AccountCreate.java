@@ -32,7 +32,7 @@ public class AccountCreate extends AAccountCommand {
 	private boolean isFund;
 	
 	@Override
-	public void run() {
+	public void execute() {
 
 		throw new TODOException();
 	}
