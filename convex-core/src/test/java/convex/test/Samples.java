@@ -112,7 +112,7 @@ public class Samples {
 	public static final ASet<CVMLong> LONG_SET_10 = Sets.create(INT_VECTOR_10);
 	public static final ASet<CVMLong> LONG_SET_100 = Sets.create(INT_VECTOR_300);
 
-	public static final Blob ONE_ZERO_BYTE_DATA = Blob.ZERO;
+	public static final Blob ONE_ZERO_BYTE_DATA = Blob.SINGLE_ZERO;
 
 	public static final Keyword FOO = Keyword.create("foo");
 	public static final Keyword BAR = Keyword.create("bar");

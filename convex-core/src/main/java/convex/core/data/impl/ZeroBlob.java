@@ -4,13 +4,14 @@ import org.bouncycastle.util.Arrays;
 
 import convex.core.data.ABlob;
 import convex.core.data.ADerivedBlob;
+import convex.core.data.Cells;
 
 /**
  * Blob filled with all zeros. Useful to avoid allocating lots of empty arrays, potentially.
  */
 public class ZeroBlob extends ADerivedBlob {
 
-	public static final ZeroBlob EMPTY = new ZeroBlob(0);
+	public static final ZeroBlob EMPTY = Cells.intern(new ZeroBlob(0));
 
 	protected ZeroBlob(long count) {
 		super(count);

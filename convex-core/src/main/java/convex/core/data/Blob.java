@@ -21,15 +21,17 @@ import convex.core.util.Utils;
  * - Byte data of the given length
  */
 public class Blob extends AArrayBlob {
-	public static final Blob EMPTY = wrap(Utils.EMPTY_BYTES);
-	public static final Blob ZERO = wrap(new byte[] {0});
-	public static final Blob ONE = wrap(new byte[] {1});;
+	public static final Blob EMPTY = Cells.intern(wrap(Utils.EMPTY_BYTES));
+	public static final Blob SINGLE_ZERO = Cells.intern(wrap(new byte[] {0}));
+	public static final Blob SINGLE_ONE = Cells.intern(wrap(new byte[] {1}));
 
 	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] {Tag.NULL});
 	
 	public static final int CHUNK_LENGTH = 4096;
 	
-	public static final Blob EMPTY_CHUNK = wrap(new byte[CHUNK_LENGTH]);
+	private static final byte[] EMPTY_CHUNK_BYTES=new byte[CHUNK_LENGTH];
+ 	
+	public static final Blob EMPTY_CHUNK = Cells.intern(wrap(EMPTY_CHUNK_BYTES));
 
 	private Blob(byte[] bytes, int offset, int length) {
 		super(bytes, offset, length);

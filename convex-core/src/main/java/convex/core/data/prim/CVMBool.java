@@ -143,7 +143,7 @@ public final class CVMBool extends APrimitive {
 	}
 
 	public Blob toBlob() {
-		return value?Blob.ONE:Blob.ZERO;
+		return value?Blob.SINGLE_ONE:Blob.SINGLE_ZERO;
 	}
 
 	public ACell not() {

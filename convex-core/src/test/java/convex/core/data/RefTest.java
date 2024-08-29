@@ -353,10 +353,13 @@ public class RefTest {
 		checkInternal(Symbols.DEF);
 		checkInternal(ErrorCodes.JUICE);
 		checkInternal(SourceCodes.CODE);
+		
+		// Empty data structures
 		checkInternal(Maps.empty());
 		checkInternal(Vectors.empty());
 		checkInternal(Lists.empty());
 		checkInternal(Index.EMPTY);
+		checkInternal(Blobs.empty());
 
 	}
 

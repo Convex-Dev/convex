@@ -38,14 +38,9 @@ import convex.core.util.Utils;
  */
 public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static final VectorLeaf<?> EMPTY = new VectorLeaf(new Ref<?>[0]);
+	public static final VectorLeaf<?> EMPTY = Cells.intern(new VectorLeaf(new Ref<?>[0]));
 	
 	public static final Ref<VectorLeaf<?>> EMPTY_REF = EMPTY.getRef();
-	
-	static {
-		// Set empty Ref flags as internal embedded constant
-		EMPTY_REF.setFlags(Ref.INTERNAL_FLAGS);
-	}
 
 	/** Maximum size of a single VectorLeaf before a tail is required */
 	public static final int MAX_SIZE = Vectors.CHUNK_SIZE;

@@ -26,14 +26,9 @@ import convex.core.util.Utils;
  */
 public class List<T extends ACell> extends AList<T> {
 	
-	public static final List<?> EMPTY = wrap(VectorLeaf.EMPTY);
+	public static final List<?> EMPTY = Cells.intern(wrap(VectorLeaf.EMPTY));
 
 	public static final Ref<List<?>> EMPTY_REF = EMPTY.getRef();
-
-	static {
-		// Set empty Ref flags as internal embedded constant
-		EMPTY_REF.setFlags(Ref.INTERNAL_FLAGS);
-	}
 
 	/**
 	 * Wrapped vector containing reversed elements
