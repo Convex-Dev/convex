@@ -69,6 +69,11 @@ public final class Symbol extends ASymbolic {
 		return sym;
 	}
 	
+	public static Symbol intern(AString name) {
+		Symbol sym=create(name);
+		return Cells.intern(sym);
+	}
+	
 	/**
 	 * Creates a Symbol in an unsafe manner (possibly invalid name), used for testing
 	 * @param rawName Raw Symbol name
@@ -194,5 +199,7 @@ public final class Symbol extends ASymbolic {
 		if ((start==0)&&(end==name.length)) return this;
 		return Symbol.create(name.slice(start, end));
 	}
+
+
 
 }

@@ -348,7 +348,7 @@ public class Symbols {
 	
 	public static Symbol intern(String s) {
 		AString name=Strings.create(s);
-		Symbol sym=Symbol.create(name);
+		Symbol sym=Symbol.intern(name);
 		return sym;
 	}
 

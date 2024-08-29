@@ -21,23 +21,23 @@ public class ErrorCodes {
 	 * and re-submit transactions with the correct sequence, although this is unreliable if multiple clients are
 	 * sending transactions for the same Account.
 	 */
-	public static final Keyword SEQUENCE = Keyword.create("SEQUENCE");
+	public static final Keyword SEQUENCE = Keyword.intern("SEQUENCE");
 	
 	/**
 	 * Error code for when the specified account does not have enough available funds to perform an operation
 	 */
-	public static final Keyword FUNDS = Keyword.create("FUNDS");
+	public static final Keyword FUNDS = Keyword.intern("FUNDS");
 	
 	/**
 	 * Error code for when a transaction runs out of available juice
 	 */
-	public static final Keyword JUICE = Keyword.create("JUICE");
+	public static final Keyword JUICE = Keyword.intern("JUICE");
 	
 	/**
 	 * Error code for when a transaction exceeds execution depth limits. Typically, this indicates
 	 * infinite recursion.
 	 */
-	public static final Keyword DEPTH = Keyword.create("DEPTH");
+	public static final Keyword DEPTH = Keyword.intern("DEPTH");
 	
 	/**
 	 * Error code for situations where a transaction is unable to complete due to insufficient 
@@ -47,83 +47,83 @@ public class ErrorCodes {
 	 * Within transactions, memory usage may exceed allowances as long as there is enough juice to 
 	 * pay for the temporary allocations.
 	 */
-	public static final Keyword MEMORY = Keyword.create("MEMORY");
+	public static final Keyword MEMORY = Keyword.intern("MEMORY");
 	
 	/**
 	 * Error code when attempting to perform an action using a non-existent Account
 	 */
-	public static final Keyword NOBODY = Keyword.create("NOBODY");
+	public static final Keyword NOBODY = Keyword.intern("NOBODY");
 	
 	/**
 	 * Error code when function or expander application has an inappropriate number of arguments.
 	 * Arity is checked first: it takes precedence over CAST and ARGUMENT errors.
 	 */
-	public static final Keyword ARITY = Keyword.create("ARITY");
+	public static final Keyword ARITY = Keyword.intern("ARITY");
 	
 	/**
 	 * Error code when an undeclared symbol is accessed
 	 */
-	public static final Keyword UNDECLARED = Keyword.create("UNDECLARED");
+	public static final Keyword UNDECLARED = Keyword.intern("UNDECLARED");
 	
 	/**
 	 * Error code when the type of some argument cannot be cast to a suitable type for
 	 * some requested operation. ARITY errors take predecence over CAST errors if both
 	 * are applicable.
 	 */
-	public static final Keyword CAST = Keyword.create("CAST");
+	public static final Keyword CAST = Keyword.intern("CAST");
 	
 	/**
 	 * Error code for when indexed access is attempted that is out of bounds for some sequential object.
 	 * 
 	 */
-	public static final Keyword BOUNDS = Keyword.create("BOUNDS");
+	public static final Keyword BOUNDS = Keyword.intern("BOUNDS");
 	
 	/**
 	 * Error code for when an argument is of the correct type, but is not an allowable value.
 	 */
-	public static final Keyword ARGUMENT = Keyword.create("ARGUMENT");
+	public static final Keyword ARGUMENT = Keyword.intern("ARGUMENT");
 	
 	/**
 	 * Error code for a request that would normally be valid, but failed because some aspect of
 	 * actor / system state was wrong. Typically indicates that some preparatory step was omitted,
 	 * appropriate pre-conditions were not checked, or an operation was attempted at an inappropriate time
 	 */
-	public static final Keyword STATE = Keyword.create("STATE");
+	public static final Keyword STATE = Keyword.intern("STATE");
 	
 	/**
 	 * Error code caused by compilation failure with an invalid AST. Should only occur during
 	 * compile phase of on-chain Compiler
 	 */
-	public static final Keyword COMPILE = Keyword.create("COMPILE");
+	public static final Keyword COMPILE = Keyword.intern("COMPILE");
 	
 	/**
 	 * Error code caused by failure to successfully expand an AST node. Should only occur during
 	 * expand phase of on-chain Compiler
 	 */
-	public static final Keyword EXPAND = Keyword.create("EXPAND");
+	public static final Keyword EXPAND = Keyword.intern("EXPAND");
 
 	/**
 	 * Error code indicating that an asserted condition was not met. This usually indicates invalid
 	 * input that failed a precondition check. The message should be used to give meaningful feedback to
 	 * the User.
 	 */
-	public static final Keyword ASSERT = Keyword.create("ASSERT");
+	public static final Keyword ASSERT = Keyword.intern("ASSERT");
 	
 	/**
 	 * Error code indicating that an a trust condition was violated. This usually means a USer or Actor
 	 * attempted to perform an unauthorised operation.
 	 */
-	public static final Keyword TRUST = Keyword.create("TRUST");
+	public static final Keyword TRUST = Keyword.intern("TRUST");
 
 	/**
 	 * ErrorCode for an unexpected Error. Likely fatal.
 	 */
-	public static final Keyword UNEXPECTED = Keyword.create("UNEXPECTED");
+	public static final Keyword UNEXPECTED = Keyword.intern("UNEXPECTED");
 	
 	/**
 	 * Error code for unhandled exceptions
 	 */
-	public static final Keyword EXCEPTION = Keyword.create("EXCEPTION");
+	public static final Keyword EXCEPTION = Keyword.intern("EXCEPTION");
 
 	// Error codes for non-error values
 	
@@ -132,7 +132,7 @@ public class ErrorCodes {
 	 * 
 	 * This will halt the currently executing transaction context and return to the caller.
 	 */
-	public static final Keyword HALT = Keyword.create("HALT");
+	public static final Keyword HALT = Keyword.intern("HALT");
 	
 	/**
 	 * Exceptional Condition indicating a recur operation was executed
@@ -140,7 +140,7 @@ public class ErrorCodes {
 	 * This will return execution to the surrounding loop or function binding, which will be 
 	 * re-executed with new bindings provided to the recur operation.
 	 */
-	public static final Keyword RECUR = Keyword.create("RECUR");
+	public static final Keyword RECUR = Keyword.intern("RECUR");
 	
 	/**
 	 * Exceptional Condition indicating a tailcall operation has been executed
@@ -148,7 +148,7 @@ public class ErrorCodes {
 	 * This will return execution to the surrounding loop or function binding, which will be 
 	 * re-executed with new bindings provided to the recur operation.
 	 */
-	public static final Keyword TAILCALL = Keyword.create("TAILCALL");
+	public static final Keyword TAILCALL = Keyword.intern("TAILCALL");
 
 	/**
 	 * Exceptional Condition indicating a return operation was executed
@@ -156,12 +156,12 @@ public class ErrorCodes {
 	 * This will return execution to the caller of surrounding function binding, with whatever
 	 * value is passed to the return operation as a result.
 	 */
-	public static final Keyword RETURN = Keyword.create("RETURN");
+	public static final Keyword RETURN = Keyword.intern("RETURN");
 	
 	/**
 	 * Exceptional condition indicated a 'reduced' result.
 	 */
-	public static final Keyword REDUCED = Keyword.create("REDUCED");
+	public static final Keyword REDUCED = Keyword.intern("REDUCED");
 	
 	/**
 	 * Exceptional Condition indicating a halt operation was executed.
@@ -169,69 +169,69 @@ public class ErrorCodes {
 	 * This will terminate the currently executing transaction context, roll back any state changes
 	 * and return to the caller with whatever value is passed as the rollback result.
 	 */
-	public static final Keyword ROLLBACK =  Keyword.create("ROLLBACK");
+	public static final Keyword ROLLBACK =  Keyword.intern("ROLLBACK");
 
 	/**
 	 * Exceptional Condition indicating a bad signature on a transaction.
 	 */
-	public static final Keyword SIGNATURE = Keyword.create("SIGNATURE");
+	public static final Keyword SIGNATURE = Keyword.intern("SIGNATURE");
 
 	/**
 	 * Exceptional Condition indicating something is not yet implemented
 	 */
-	public static final Keyword TODO = Keyword.create("TODO");
+	public static final Keyword TODO = Keyword.intern("TODO");
 
 	/**
 	 * ErrorCode for a FATAL Error. Should trigger Peer shutdown.
 	 */
-	public static final Keyword FATAL = Keyword.create("FATAL");
+	public static final Keyword FATAL = Keyword.intern("FATAL");
 
 	/**
 	 * ErrorCode for a message format error.
 	 */
-	public static final Keyword FORMAT = Keyword.create("FORMAT");
+	public static final Keyword FORMAT = Keyword.intern("FORMAT");
 
-	public static final Keyword LOAD = Keyword.create("LOAD");
+	public static final Keyword LOAD = Keyword.intern("LOAD");
 
 	/**
 	 * ErrorCode indicating failure of a child transaction
 	 */
-	public static final Keyword CHILD = Keyword.create("CHILD");
+	public static final Keyword CHILD = Keyword.intern("CHILD");
 
 	/**
 	 * ErrorCode indicating timeout
 	 */
-	public static final Keyword TIMEOUT = Keyword.create("TIMEOUT");
+	public static final Keyword TIMEOUT = Keyword.intern("TIMEOUT");
 
 	/**
 	 * ErrorCode indicating a peer-specific error
 	 */
-	public static final Keyword PEER = Keyword.create("PEER");
+	public static final Keyword PEER = Keyword.intern("PEER");
 
 	/**
 	 * ErrorCode indicating a syntax problem in code
 	 */
-   public static final Keyword SYNTAX = Keyword.create("SYNTAX");
+   public static final Keyword SYNTAX = Keyword.intern("SYNTAX");
 
    /**
     * Error code indicating insufficient liquidity in state for a Torus or other trade
     */
-	public static final Keyword LIQUIDITY = Keyword.create("LIQUIDITY");
+	public static final Keyword LIQUIDITY = Keyword.intern("LIQUIDITY");
 
 	/**
 	 * Error code indicating an operation was interrupted
 	 */
-	public static final Keyword INTERRUPTED = Keyword.create("INTERRUPTED");
+	public static final Keyword INTERRUPTED = Keyword.intern("INTERRUPTED");
 
 	/**
 	 * Error code indicating a closed io channel or resource
 	 */
-	public static final Keyword CLOSED = Keyword.create("CLOSED");
+	public static final Keyword CLOSED = Keyword.intern("CLOSED");
 
 	/**
 	 * Error code indicating a general IO exception
 	 */
-	public static final Keyword IO = Keyword.create("IO");
+	public static final Keyword IO = Keyword.intern("IO");
 
 
 }

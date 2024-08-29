@@ -247,6 +247,12 @@ public class Cells {
 		return;
 	}
 
+	/**
+	 * Intern a Cell permanently in memory (for JVM lifetime)
+	 * @param <T> Type of Cell
+	 * @param value Value to intern
+	 * @return Interned Cell
+	 */
 	public static <T extends ACell> T intern(T value) {
 		Ref<T> ref=Ref.get(value);
 		if (ref.isInternal()) return value;
