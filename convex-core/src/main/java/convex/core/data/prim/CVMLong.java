@@ -6,6 +6,7 @@ import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.LongBlob;
 import convex.core.data.Strings;
@@ -32,7 +33,7 @@ public final class CVMLong extends AInteger {
 
 	static {
 		for (int i=0; i<256; i++) {
-			CACHE[i]=new CVMLong(i);
+			CACHE[i]=Cells.intern(new CVMLong(i));
 		}
 		ZERO=CACHE[0];
 		ONE=CACHE[1];
@@ -40,9 +41,9 @@ public final class CVMLong extends AInteger {
 	
 	public static final CVMLong ZERO;
 	public static final CVMLong ONE;
-	public static final CVMLong MINUS_ONE = CVMLong.create(-1L);
-	public static final CVMLong MAX_VALUE = CVMLong.create(Long.MAX_VALUE);
-	public static final CVMLong MIN_VALUE = CVMLong.create(Long.MIN_VALUE);
+	public static final CVMLong MINUS_ONE = Cells.intern(CVMLong.create(-1L));
+	public static final CVMLong MAX_VALUE = Cells.intern(CVMLong.create(Long.MAX_VALUE));
+	public static final CVMLong MIN_VALUE = Cells.intern(CVMLong.create(Long.MIN_VALUE));
 	
 	public static final int MAX_ENCODING_LENGTH = 9;
 	

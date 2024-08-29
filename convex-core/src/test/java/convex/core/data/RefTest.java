@@ -360,10 +360,16 @@ public class RefTest {
 		checkInternal(Lists.empty());
 		checkInternal(Index.EMPTY);
 		checkInternal(Blobs.empty());
-
+		
+		// Cached integers
+		checkInternal(CVMLong.ZERO);
+		checkInternal(CVMLong.ONE);
+		checkInternal(CVMLong.MINUS_ONE);
+		checkInternal(CVMLong.MAX_VALUE);
+		checkInternal(CVMLong.create(100));
 	}
 
-	private <T extends ACell> void  checkInternal(T a)  {
+	public static <T extends ACell> void  checkInternal(T a)  {
 		Ref<T> ref=Ref.get(a);
 		assertTrue(ref.isInternal());
 		assertSame(a,ref.getValue());
