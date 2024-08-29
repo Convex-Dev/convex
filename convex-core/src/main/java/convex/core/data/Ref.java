@@ -675,13 +675,15 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public abstract boolean isMissing();
 
 	/**
-	 * Merges flags in an idempotent way. Assume flags are valid
+	 * Merges flags in an idempotent way. Assume flags are valid. Takes the maximum status
 	 * @param a First set of flags
 	 * @param b Second set of flags
 	 * @return Merged flags
 	 */
 	public static int mergeFlags(int a, int b) {
-		return ((a|b)&~STATUS_MASK)|Math.max(a&STATUS_MASK, b& STATUS_MASK);
+		int statusPart=Math.max(a&STATUS_MASK, b& STATUS_MASK);
+		int flagsPart=((a|b)&~STATUS_MASK);
+		return statusPart|flagsPart;
 	}
 
 	/**

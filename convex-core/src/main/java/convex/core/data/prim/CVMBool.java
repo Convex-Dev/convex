@@ -3,6 +3,7 @@ package convex.core.data.prim;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
@@ -22,8 +23,8 @@ public final class CVMBool extends APrimitive {
 
 	private final boolean value;
 	
-	public static final CVMBool TRUE=new CVMBool(true);
-	public static final CVMBool FALSE=new CVMBool(false);
+	public static final CVMBool TRUE=Cells.intern(new CVMBool(true));
+	public static final CVMBool FALSE=Cells.intern(new CVMBool(false));
 
 	public static final int MAX_ENCODING_LENGTH = 1;
 

@@ -126,6 +126,7 @@ public class Core {
 	 * @return
 	 */
 	private static <T extends ACell> T reg(T o) {
+		o=Cells.intern(o);
 		if (tempReg.contains(o)) throw new Error("Duplicate core form! = "+o);
 		tempReg.add(o);
 		

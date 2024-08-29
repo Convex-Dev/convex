@@ -15,10 +15,12 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Refs.RefTreeStats;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
 import convex.test.Samples;
@@ -338,6 +340,24 @@ public class RefTest {
 		assertEquals(11,rts.total);
 		assertEquals(11,rts.embedded);
 		// assertEquals(0,rts.persisted); Might not be true if Sample is persisted?
+	}
+	
+	@Test 
+	public void testInternal() {
+		checkInternal(null);
+		checkInternal(CVMBool.TRUE);
+		checkInternal(Core.COUNT);
+	}
+
+	private void checkInternal(ACell a)  {
+		assertTrue(Ref.get(a).isInternal());
+		
+		
+		try {
+			assertSame(a,Cells.persist(a));
+		} catch (IOException e) {
+			throw new Error(e);
+		}
 	}
 
 	@Test

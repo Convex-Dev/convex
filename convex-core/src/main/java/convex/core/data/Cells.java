@@ -250,6 +250,7 @@ public class Cells {
 	public static <T extends ACell> T intern(T value) {
 		Ref<T> ref=Ref.get(value);
 		if (ref.isInternal()) return value;
+		ref.setFlags(Ref.mergeFlags(ref.getFlags(), Ref.INTERNAL));
 		return value;
 	}
 
