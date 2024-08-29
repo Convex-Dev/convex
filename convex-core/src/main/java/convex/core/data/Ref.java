@@ -55,7 +55,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	/**
 	 * Ref status indicating the Ref has been deeply persisted in long term storage.
 	 * The Ref and its children can be assumed to be accessible for the life of the
-	 * storage subsystem execution.
+	 * storage subsystem execution. Embedded cells can assume persisted at minimum.
 	 */
 	public static final int PERSISTED = 2;
 
@@ -75,7 +75,14 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Ref status indicating the value is marked in the store for GC copying. Marked values
 	 * are retained until next GC cycle
 	 */
-	public static final int MARKED = 15;
+	public static final int MARKED = 5;
+	
+	/**
+	 * Ref status indicating the Ref in internal data that should never be discarded
+	 */
+	public static final int INTERNAL = 15;
+
+	
 
 	/**
 	 * Maximum Ref status
@@ -118,9 +125,15 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int VERIFICATION_MASK = VERIFIED_MASK | BAD_MASK;
 
 	/**
-	 * Flags for internal constant values
+	 * Flags for valid embedded values, typically used on creation
 	 */
-	public static final int INTERNAL_FLAGS=KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
+	public static final int VALID_EMBEDDED_FLAGS=PERSISTED|KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
+	
+	/**
+	 * Flags for valid embedded values, typically used on creation
+	 */
+	public static final int INTERNAL_FLAGS=INTERNAL|VERIFIED_MASK;
+
 	
 	/**
 	 * Ref status indicating that the Ref refers to data that has been proven to be invalid
@@ -700,5 +713,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	@SuppressWarnings("unchecked")
 	public static final <T extends ACell> Ref<T> nil() {
 		return (Ref<T>)NULL_VALUE;
+	}
+
+	public boolean isInternal() {
+		return (flags & STATUS_MASK) == INTERNAL;
 	}
 }

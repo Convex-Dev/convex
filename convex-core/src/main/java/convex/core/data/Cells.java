@@ -247,4 +247,10 @@ public class Cells {
 		return;
 	}
 
+	public static <T extends ACell> T intern(T value) {
+		Ref<T> ref=Ref.get(value);
+		if (ref.isInternal()) return value;
+		return value;
+	}
+
 }

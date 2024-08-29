@@ -127,6 +127,18 @@ public class EtchStoreTest {
 			assertNull(store.readStoreRef(h));
 		}
 	}
+	
+	/**
+	 * It's important we don't re-persist internal refs
+	 */
+	@Test
+	public void testPersistInternal() {
+		// an example internal definition
+		ACell c=Keywords.ADDRESS;
+		
+		// Interning is idempotent
+		assertSame(c,Cells.intern(c));
+	}
 
 	@Test
 	public void testPersistedStatus() throws BadFormatException, IOException {

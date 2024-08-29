@@ -46,6 +46,15 @@ public final class Keyword extends ASymbolic {
 	}
 	
 	/**
+	 * Creates an interned Keyword. Use only for internal constants, won't get GC'd
+	 * @param name
+	 * @return
+	 */
+	public static Keyword intern(String name) {
+		return Cells.intern(Keyword.create(name));
+	}
+	
+	/**
 	 * Creates a Keyword in an unsafe manner (possibly invalid name), used for testing
 	 * @param rawName Raw Keyword name
 	 * @return Possibly invalid Keyword

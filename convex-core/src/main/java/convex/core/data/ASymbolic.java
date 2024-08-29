@@ -19,8 +19,8 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	@Override
 	@SuppressWarnings("unchecked")
 	protected <R extends ACell> Ref<R> createRef() {
-		// Create Ref at maximum status to reflect internal embedded status
-		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.INTERNAL_FLAGS);
+		// Create Ref with known embedded status
+		Ref<ACell> newRef= RefDirect.create(this,cachedHash(),Ref.VALID_EMBEDDED_FLAGS);
 		cachedRef=newRef;
 		return (Ref<R>) newRef;
 	}
