@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 import com.formdev.flatlaf.FlatDarculaLaf;
 import com.formdev.flatlaf.intellijthemes.materialthemeuilite.FlatMaterialOceanicIJTheme;
+import com.formdev.flatlaf.util.SystemInfo;
 
 import convex.core.util.Utils;
 
@@ -80,6 +81,8 @@ public class Toolkit {
 
 	static {
 		try {
+			if (SystemInfo.isMacOS)
+				setupForApple();
 			loadFonts();
 			UIManager.getLookAndFeelDefaults().put("defaultFont", DEFAULT_FONT);
 			//LookAndFeel laf = installMDLaf();
@@ -107,6 +110,13 @@ public class Toolkit {
 			e.printStackTrace();
 			log.warn("Unable to set look and feel: {}", e);
 		}
+	}
+
+	protected static void setupForApple() {
+		// For Mac, use Convex as the application name
+		System.setProperty( "apple.awt.application.name", "Convex" );
+		System.setProperty( "apple.awt.application.appearance", "system" );
+		System.setProperty( "apple.laf.useScreenMenuBar", "true" );
 	}
 
 	protected static LookAndFeel installFlatLaf() {
