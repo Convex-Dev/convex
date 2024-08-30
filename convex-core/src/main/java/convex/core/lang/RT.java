@@ -1333,6 +1333,22 @@ public class RT {
 	public static boolean bool(ACell a) {
 		return !((a == null) || (a == CVMBool.FALSE));
 	}
+	
+	/**
+	 * Converts any value to a boolean value. A value is considered falsey if
+	 * null, java false or CVMBool.FALSE, truthy otherwise
+	 * 
+	 * @param a Object to convert to boolean value
+	 * @return true if object is truthy, false otherwise
+	 */
+	public static boolean bool(Object a) {
+		if (a==null) return false;
+		if (a instanceof Boolean) {
+			return ((Boolean)a);
+		}
+ 		return !(a==CVMBool.FALSE);
+	}
+
 
 	/**
 	 * Converts an object to a map entry. Handles MapEntries and length 2 Vectors.
@@ -1849,12 +1865,4 @@ public class RT {
 		if (maybeTx instanceof ATransaction) return (ATransaction)maybeTx;
 		return null;
 	}
-
-
-
-
-
-
-
-
 }

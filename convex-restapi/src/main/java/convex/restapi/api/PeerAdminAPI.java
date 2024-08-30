@@ -3,6 +3,9 @@ package convex.restapi.api;
 import java.util.Arrays;
 import java.util.HashSet;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.peer.Server;
 import convex.restapi.RESTServer;
 import convex.restapi.model.CreateAccountResponse;
@@ -14,6 +17,8 @@ import io.javalin.openapi.OpenApiContent;
 import io.javalin.openapi.OpenApiResponse;
 
 public class PeerAdminAPI extends ABaseAPI {
+
+	protected static final Logger log = LoggerFactory.getLogger(PeerAdminAPI.class.getName());
 
 	public Server server;
 
@@ -48,6 +53,7 @@ public class PeerAdminAPI extends ABaseAPI {
 				})
 	public void shutDown(Context ctx) {
 		ensureLocalAdmin(ctx);
+		log.warn("Server Shuttting down due to REST admin shutdown request");
 		server.shutdown();
 
 		ctx.result("Shutdown initiated.");

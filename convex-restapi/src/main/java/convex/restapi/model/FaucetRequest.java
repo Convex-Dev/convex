@@ -3,8 +3,7 @@ package convex.restapi.model;
 import io.javalin.openapi.OpenApiByFields;
 
 @OpenApiByFields
-public class CreateAccountResponse {
+public class FaucetRequest {
 	public String address;
-	
-	public String amount;
+	public Object amount;
 }

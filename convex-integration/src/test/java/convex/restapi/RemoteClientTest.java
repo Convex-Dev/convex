@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import org.junit.jupiter.api.AfterAll;
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.init.Init;
 import convex.core.lang.Symbols;
 import convex.java.Convex;
@@ -34,7 +37,10 @@ public class RemoteClientTest {
 	
 	@BeforeAll
 	public static void init() throws InterruptedException, ConfigException, LaunchException {
-		Server s=API.launchPeer();
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, AKeyPair.generate());
+		config.put(Keyword.create("faucet"), true);
+		Server s=API.launchPeer(config);
 		RESTServer rs=RESTServer.create(s);
 		rs.start(0);
 		port=rs.getPort();

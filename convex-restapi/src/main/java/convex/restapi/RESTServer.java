@@ -13,8 +13,13 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
+import convex.core.crypto.AKeyPair;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.util.Utils;
+import convex.peer.API;
+import convex.peer.ConfigException;
+import convex.peer.LaunchException;
 import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.DLAPI;
@@ -206,5 +211,27 @@ public class RESTServer implements Closeable {
 
 	public int getPort() {
 		return app.port();
+	}
+
+	public HashMap<Keyword, Object> getConfig() {
+		return server.getConfig();
+	}
+	
+	public static void main(String[] args) throws InterruptedException, ConfigException, LaunchException {
+		HashMap<Keyword,Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, AKeyPair.generate());
+		config.put(Keyword.create("faucet"), true);
+		Server s=API.launchPeer(config);
+		System.out.println("Using Ed25519 seed:   "+s.getKeyPair().getSeed());
+		System.out.println("Using peer port:      "+s.getPort());
+		try (RESTServer rs=RESTServer.create(s)) {
+			rs.start();
+			System.out.println("Started on REST port: "+rs.getPort());
+			
+			while (s.isRunning()) {
+				Thread.sleep(1000);
+			}
+		}
+		System.out.println("Server shutting down.... bye!");
 	}
 }

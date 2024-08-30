@@ -21,6 +21,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
@@ -40,6 +41,7 @@ import convex.restapi.RESTServer;
 import convex.restapi.model.CVMResult;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
+import convex.restapi.model.FaucetRequest;
 import convex.restapi.model.QueryAccountResponse;
 import convex.restapi.model.QueryRequest;
 import convex.restapi.model.TransactRequest;
@@ -47,11 +49,7 @@ import convex.restapi.model.TransactionPrepareRequest;
 import convex.restapi.model.TransactionPrepareResponse;
 import convex.restapi.model.TransactionSubmitRequest;
 import io.javalin.Javalin;
-import io.javalin.http.BadRequestResponse;
-import io.javalin.http.Context;
-import io.javalin.http.InternalServerErrorResponse;
-import io.javalin.http.NotFoundResponse;
-import io.javalin.http.ServiceUnavailableResponse;
+import io.javalin.http.*;
 import io.javalin.openapi.HttpMethod;
 import io.javalin.openapi.OpenApi;
 import io.javalin.openapi.OpenApiContent;
@@ -121,7 +119,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST, 
 			operationId = "createAccount", 
 			tags = { "Account"},
-			summary = "Create a new Convex account", 
+			summary = "Create a new Convex account. Requires a peer winning to accept faucet requests.", 
 			requestBody = @OpenApiRequestBody(
 				description = "Create Account request, must provide an accountKey for the new Account", 
 				content = {@OpenApiContent(
@@ -140,6 +138,8 @@ public class ChainAPI extends ABaseAPI {
 									from = CreateAccountResponse.class) })
 				})
 	public void createAccount(Context ctx) {
+		checkFaucetAllowed();
+
 		Map<String, Object> req = getJSONBody(ctx);
 		Object key = req.get("accountKey");
 		if (key == null)
@@ -151,7 +151,7 @@ public class ChainAPI extends ABaseAPI {
 
 		Object faucet = req.get("faucet");
 		AInteger amt = AInteger.parse(faucet);
-
+		
 		Address a;
 		try {
 			a = convex.createAccountSync(pk);
@@ -211,10 +211,11 @@ public class ChainAPI extends ABaseAPI {
 		}
 
 		boolean isUser = !as.isActor();
+		AccountKey publicKey=as.getAccountKey();
 
 		HashMap<String, Object> hm = new HashMap<>();
 		hm.put("address", addr.longValue());
-		hm.put("key", as.getAccountKey().toString());
+		hm.put("key", publicKey==null?null:publicKey.toString());
 		hm.put("allowance", as.getMemory());
 		hm.put("balance", as.getBalance());
 		hm.put("memorySize", as.getMemorySize());
@@ -293,16 +294,46 @@ public class ChainAPI extends ABaseAPI {
 		return hm;
 	}
 
+	private static Keyword K_FAUCET=Keyword.create("faucet");
+	
+	@OpenApi(path = ROUTE + "faucet", 
+			methods = HttpMethod.POST, 
+			operationId = "faucetRequest", 
+			tags = { "Account"},
+			summary = "Request coins from a Fucet provider. Requires a peer winning to accept faucet requests.", 
+			requestBody = @OpenApiRequestBody(
+				description = "Fauncet request, must provide an address for coins to be deposited in", 
+				content = {@OpenApiContent(
+								from = FaucetRequest.class, 
+								type = "application/json", 
+								exampleObjects = {
+										@OpenApiExampleProperty(name = "address", value = "#11"),
+										@OpenApiExampleProperty(name = "amount", value = "10000000")})}
+			), 
+			responses = {
+				@OpenApiResponse(
+						status = "200", 
+						description = "Faucet request executed", 
+						content = {
+							@OpenApiContent(
+									type = "application/json", 
+									from = CreateAccountResponse.class) }),
+				@OpenApiResponse(
+						status = "403", 
+						description = "Faucet request forbidden, probably Server is not accepting faucet requests")
+				})
 	public void faucetRequest(Context ctx) {
+		checkFaucetAllowed();
+		
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse("Expected JSON body containing 'address' field");
+			throw new BadRequestResponse("Expected JSON body containing valid 'address' field");
 
 		Object o = req.get("amount");
 		CVMLong l = CVMLong.parse(o);
 		if (l == null)
-			throw new BadRequestResponse("faucet requires an 'amount' field containing a long value.");
+			throw new BadRequestResponse("Faucet requires an 'amount' field containing a long value.");
 
 		long amt = l.longValue();
 		// Do any limits on faucet issue here
@@ -317,6 +348,7 @@ public class ChainAPI extends ABaseAPI {
 				HashMap<String, Object> hm = jsonResult(r);
 				ctx.json(hm);
 			} else {
+				req.put("address", addr.longValue());
 				req.put("amount", r.getValue());
 				ctx.result(JSON.toPrettyString(req));
 			}
@@ -324,6 +356,15 @@ public class ChainAPI extends ABaseAPI {
 			Thread.currentThread().interrupt();
 			throw new ServiceUnavailableResponse("Handler interrupted");
 		} 
+	}
+
+	private void checkFaucetAllowed() {
+		boolean faucet=isFaucetEnabled();
+		if (!faucet) throw new ForbiddenResponse("Faucet use not authorised on this server");
+	}
+
+	private boolean isFaucetEnabled() {
+		return RT.bool(restServer.getConfig().get(K_FAUCET));
 	}
 
 	@OpenApi(path = ROUTE+"transaction/prepare",
