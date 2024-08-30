@@ -65,10 +65,11 @@ public class Toolkit {
 	public static final int SMALL_ICON_SIZE = (int) (16*SCALE);
 	public static final int MAIN_ICON_SIZE = (int) (72*SCALE);
 
-	public static final float DEFAULT_FONT_SIZE=12*SCALE;
+	public static final float DEFAULT_FONT_SIZE=13*SCALE;
 	
 	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,(int)DEFAULT_FONT_SIZE);
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE));
+	public static Font BIG_MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE*1.5));
 	public static Font BUTTON_FONT = new Font(Font.SANS_SERIF, Font.PLAIN, (int)(DEFAULT_FONT_SIZE*1.2));
 	
 	public static final float SYMBOL_FONT_SIZE= DEFAULT_FONT_SIZE;

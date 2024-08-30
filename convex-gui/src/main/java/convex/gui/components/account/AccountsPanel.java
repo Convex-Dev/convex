@@ -14,7 +14,6 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
 import javax.swing.BorderFactory;
-import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -25,6 +24,7 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableCellRenderer;
 
 import convex.api.Convex;
+import convex.api.ConvexLocal;
 import convex.core.State;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountStatus;
@@ -38,6 +38,7 @@ import convex.gui.components.Identicon;
 import convex.gui.models.AccountsTableModel;
 import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
+import convex.gui.wallet.WalletApp;
 
 /**
  * Panel showing account information
@@ -86,7 +87,7 @@ public class AccountsPanel extends JPanel {
 		}
 	}
 
-	public AccountsPanel(Convex convex,StateModel<State> model) {
+	public AccountsPanel(ConvexLocal convex,StateModel<State> model) {
 		setLayout(new BorderLayout());
 
 		
@@ -197,10 +198,13 @@ public class AccountsPanel extends JPanel {
 			}
 		});
 
+		// ============================================
+		// Actionbuttons at bottom
+		
 		JPanel actionPanel = new ActionPanel();
 		add(actionPanel, BorderLayout.SOUTH);
 
-		JButton btnActor = new ActionButton("Examine Account...",0xf5e1,e -> {
+		ActionButton btnActor = new ActionButton("Examine Account...",0xf5e1,e -> {
 			long ix=table.getSelectedRow();
 			if (ix<0) return;
 			AccountStatus as = tableModel.getEntry(ix);
@@ -210,6 +214,15 @@ public class AccountsPanel extends JPanel {
 			pw.run();
 		});
 		actionPanel.add(btnActor);
+		
+		ActionButton btnWallet = new ActionButton("Launch Wallet",0xe89e,e -> {
+			Convex cv=Convex.connect(convex.getLocalServer());
+			long ix=table.getSelectedRow();
+			if (ix<0) return;
+			cv.setAddress(Address.create(ix));
+			new WalletApp(cv).run();
+		});
+		actionPanel.add(btnWallet);
 
 		// Turn off auto-resize, since we want a scrollable table
 		table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);

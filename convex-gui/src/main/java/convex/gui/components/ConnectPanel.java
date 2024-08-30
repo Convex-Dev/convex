@@ -1,8 +1,10 @@
 package convex.gui.components;
 
 import java.awt.Color;
+import java.io.IOException;
 import java.net.ConnectException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.TimeoutException;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -84,7 +86,7 @@ public class ConnectPanel extends JPanel {
 	    	} catch (ConnectException e) {
 				log.info("Failed to connect");
 	    		Toast.display(parent, e.getMessage(), Color.RED);
-	    	} catch (Exception e) {
+	    	} catch (TimeoutException | IOException e) {
 	    		Toast.display(parent, e.getMessage(), Color.RED);
 	    		e.printStackTrace();
 	    	}

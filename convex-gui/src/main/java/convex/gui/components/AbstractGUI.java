@@ -52,6 +52,7 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 				setupFrame(frame);
 				frame.pack();
 				frame.setVisible(true);
+				EventQueue.invokeLater(AbstractGUI.this::afterRun);
 			}
 		});
 	}
@@ -63,6 +64,13 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	public void setupFrame(JFrame frame) {
 		frame.getContentPane().setLayout(new MigLayout());
 		frame.getContentPane().add(this,"dock center");
+	}
+	
+	/**
+	 * Called after the wallet is run
+	 */
+	public void afterRun() {
+		
 	}
 	
 	public void waitForClose() {

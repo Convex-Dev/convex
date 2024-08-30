@@ -92,8 +92,8 @@ public class WalletComponent extends BaseListComponent {
 		
 		// Menu Button
 		JPopupMenu menu=new JPopupMenu();
-		JMenuItem m1=new JMenuItem("Edit...");
-		menu.add(m1);
+		//JMenuItem m1=new JMenuItem("Edit...");
+		//menu.add(m1);
 		JMenuItem m2=new JMenuItem("Show seed...");
 		m2.addActionListener(e-> {
 			AKeyPair kp=walletEntry.getKeyPair();
