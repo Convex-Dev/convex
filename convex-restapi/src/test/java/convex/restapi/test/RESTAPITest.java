@@ -5,13 +5,17 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import java.io.IOException;
 
-import org.apache.hc.client5.http.fluent.*;
+import org.apache.hc.client5.http.fluent.Content;
+import org.apache.hc.client5.http.fluent.Request;
+import org.apache.hc.client5.http.fluent.Response;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpResponse;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
+import convex.core.init.Init;
 import convex.java.JSON;
 import convex.peer.API;
 import convex.peer.ConfigException;
@@ -24,6 +28,7 @@ public class RESTAPITest {
 	static int port;
 	static String HOST_PATH;
 	static String API_PATH;
+	static AKeyPair KP;
 	
 	@BeforeAll
 	public static void init() throws InterruptedException, ConfigException, LaunchException {
@@ -34,6 +39,7 @@ public class RESTAPITest {
 		server=rs;
 		HOST_PATH="http://localhost:" + server.getPort();
 		API_PATH=HOST_PATH+"/api/v1";
+		KP=s.getKeyPair();
 	}
 	
 	@AfterAll 
@@ -58,6 +64,12 @@ public class RESTAPITest {
 			HttpResponse res=Request.post(API_PATH+"/transact").execute().returnResponse();
 			assertEquals(400,res.getCode());
 		}
+		
+		{ // should execute successfully on genesis account
+			String tx=JSON.toPrettyString(JSON.map("address",Init.GENESIS_ADDRESS,"source","(* 2 3)","seed",KP.getSeed()));
+			HttpResponse res=Request.post(API_PATH+"/transact").bodyString(tx, ContentType.APPLICATION_JSON).execute().returnResponse();
+			assertEquals(200,res.getCode());
+		}
 	}
 	
 	@Test public void testQuery() throws IOException {
@@ -73,6 +85,16 @@ public class RESTAPITest {
 			HttpResponse res=req.execute().returnResponse();
 			assertEquals(200,res.getCode());
 		}
+		
+		{ // should be a failure of query
+			String query=JSON.toPrettyString(JSON.map("address",11,"source","(count)"));
+			Request req=Request.post(API_PATH+"/query").bodyString(query, ContentType.APPLICATION_JSON);
+			Response res=req.execute();
+			HttpResponse httpr=res.returnResponse();
+			assertEquals(422,httpr.getCode());
+			// assertEquals("ARITY",((Map<String,Object>)JSON.parse(c.asString())).get("errorCode"));
+		}
+			
 	}
 	
 	@Test public void testQueryAccount() throws IOException {

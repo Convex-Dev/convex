@@ -322,6 +322,9 @@ public class ChainAPI extends ABaseAPI {
 									type = "application/json", 
 									from = CreateAccountResponse.class)}),
 				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, probably e.g.  missing or invalid recipient address"),
+				@OpenApiResponse(
 						status = "422", 
 						description = "Faucet request failed", 
 						content = {
@@ -332,7 +335,7 @@ public class ChainAPI extends ABaseAPI {
 						status = "403", 
 						description = "Faucet request forbidden, probably Server is not accepting faucet requests")
 				})
-	public void faucetRequest(Context ctx) {
+	public void faucetRequest(Context ctx) throws InterruptedException {
 		checkFaucetAllowed();
 		
 		Map<String, Object> req = getJSONBody(ctx);
@@ -341,31 +344,25 @@ public class ChainAPI extends ABaseAPI {
 
 		Object o = req.get("amount");
 		CVMLong l = CVMLong.parse(o);
-		if (l == null)
-			throw new BadRequestResponse("Faucet requires an 'amount' field containing a long value.");
+		if (l == null) {failBadRequest("Faucet requires an 'amount' field containing a long value."); return;}
 
 		long amt = l.longValue();
 		// Do any limits on faucet issue here
 		if (amt > Coin.GOLD)
 			amt = Coin.GOLD;
 
-		try {
-			// SECURITY: Make sure this is not subject to injection attack
-			// Optional: pre-compile to Op
-			Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
-			if (r.isError()) {
-				HashMap<String, Object> hm = jsonResult(r);
-				ctx.result(JSON.toPrettyString(hm));
-				ctx.status(422);
-			} else {
-				req.put("address", RT.castLong(addr).longValue());
-				req.put("amount", r.getValue());
-				ctx.result(JSON.toPrettyString(req));
-			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new ServiceUnavailableResponse("Handler interrupted");
-		} 
+		// SECURITY: Make sure this is not subject to injection attack
+		// Optional: pre-compile to Op
+		Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
+		if (r.isError()) {
+			HashMap<String, Object> hm = jsonResult(r);
+			ctx.result(JSON.toPrettyString(hm));
+			ctx.status(422);
+		} else {
+			req.put("address", RT.castLong(addr).longValue());
+			req.put("amount", r.getValue());
+			ctx.result(JSON.toPrettyString(req));
+		}
 	}
 
 	/**
