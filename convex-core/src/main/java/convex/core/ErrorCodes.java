@@ -233,5 +233,10 @@ public class ErrorCodes {
 	 */
 	public static final Keyword IO = Keyword.intern("IO");
 
+	/**
+	 * Error code indicating missing data
+	 */
+	public static final Keyword MISSING = Keyword.intern("MISSING");
+
 
 }

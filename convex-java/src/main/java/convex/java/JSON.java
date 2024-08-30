@@ -4,6 +4,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -13,6 +14,7 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 import convex.core.data.ACell;
+import convex.core.data.ASymbolic;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -43,7 +45,31 @@ public class JSON {
         }
     }
     
-    /**
+	/**
+	 * Constructs a JSON object represented by a HashMap
+	 * @param kvs Keys and Values
+	 * @return JSON map
+	 */
+	public static HashMap<String,Object> map(Object... kvs) {
+		int n=kvs.length;
+		if ((n&1)!=0) throw new IllegalArgumentException("Needs key value pairs (even number of arguments)");
+		HashMap<String,Object> hm=new HashMap<>();
+		for (int i=0; i<n; i+=2) {
+			String key=key(kvs[i]);
+			Object val=from(kvs[i+1]);
+			hm.put(key, val);
+		}
+		return hm;
+	}
+    
+    private static String key(Object a) {
+    	if (a==null) throw new IllegalArgumentException("Null key");
+		if (a instanceof String) return ((String)a);
+		if (a instanceof ASymbolic) return ((ASymbolic)a).getName().toString(); // keywords and symbols
+		return a.toString();
+	}
+
+	/**
      * Converts a string to a JSON Value
      *
      * @param jsonString A string containing valid JSON
@@ -95,6 +121,18 @@ public class JSON {
      */
     public static Object from(ACell a) {
     	return RT.json(a);
+    }
+    
+    /**
+     * Converts an arbitrary Value to a Java JSON representation
+     *
+     * @param a Value to convert to JSON
+     * @return Java Object representing the value as JSON
+     */
+    public static Object from(Object a) {
+    	if (a==null) return null;
+    	if (a instanceof ACell) return from((ACell)a);
+    	return a;
     }
 
     @SuppressWarnings("unchecked")
@@ -178,4 +216,6 @@ public class JSON {
         }
 		return (T) parsed;
 	}
+
+
 }

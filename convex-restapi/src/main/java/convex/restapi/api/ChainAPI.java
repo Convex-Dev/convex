@@ -1,5 +1,6 @@
 package convex.restapi.api;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -7,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import convex.api.Convex;
 import convex.core.Coin;
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
@@ -28,6 +30,7 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
@@ -38,7 +41,7 @@ import convex.core.transactions.Invoke;
 import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.restapi.RESTServer;
-import convex.restapi.model.CVMResult;
+import convex.restapi.model.ResultResponse;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.FaucetRequest;
@@ -131,7 +134,7 @@ public class ChainAPI extends ABaseAPI {
 			responses = {
 				@OpenApiResponse(
 						status = "200", 
-						description = "Account created sucecssfully", 
+						description = "Account creation executed", 
 						content = {
 							@OpenApiContent(
 									type = "application/json", 
@@ -307,7 +310,7 @@ public class ChainAPI extends ABaseAPI {
 								from = FaucetRequest.class, 
 								type = "application/json", 
 								exampleObjects = {
-										@OpenApiExampleProperty(name = "address", value = "#11"),
+										@OpenApiExampleProperty(name = "address", value = "11"),
 										@OpenApiExampleProperty(name = "amount", value = "10000000")})}
 			), 
 			responses = {
@@ -317,7 +320,14 @@ public class ChainAPI extends ABaseAPI {
 						content = {
 							@OpenApiContent(
 									type = "application/json", 
-									from = CreateAccountResponse.class) }),
+									from = CreateAccountResponse.class)}),
+				@OpenApiResponse(
+						status = "422", 
+						description = "Faucet request failed", 
+						content = {
+							@OpenApiContent(
+									type = "application/json", 
+									from = ResultResponse.class)}),
 				@OpenApiResponse(
 						status = "403", 
 						description = "Faucet request forbidden, probably Server is not accepting faucet requests")
@@ -327,8 +337,7 @@ public class ChainAPI extends ABaseAPI {
 		
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
-		if (addr == null)
-			throw new BadRequestResponse("Expected JSON body containing valid 'address' field");
+		if (addr == null) failBadRequest("Expected JSON body containing valid 'address' field");
 
 		Object o = req.get("amount");
 		CVMLong l = CVMLong.parse(o);
@@ -346,9 +355,10 @@ public class ChainAPI extends ABaseAPI {
 			Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
 			if (r.isError()) {
 				HashMap<String, Object> hm = jsonResult(r);
-				ctx.json(hm);
+				ctx.result(JSON.toPrettyString(hm));
+				ctx.status(422);
 			} else {
-				req.put("address", addr.longValue());
+				req.put("address", RT.castLong(addr).longValue());
 				req.put("amount", r.getValue());
 				ctx.result(JSON.toPrettyString(req));
 			}
@@ -356,6 +366,21 @@ public class ChainAPI extends ABaseAPI {
 			Thread.currentThread().interrupt();
 			throw new ServiceUnavailableResponse("Handler interrupted");
 		} 
+	}
+
+	/**
+	 *  Throws a bad request exception, with the given message, formatted as a result
+	 * @param message Message to include as error value
+	 */
+	protected void failBadRequest(String message) {
+		HashMap<String, Object> hm = new HashMap<>();
+		hm.put("errorCode","FAILED");
+		hm.put("value","message");
+		failBadRequest(hm);
+	}
+	
+	protected void failBadRequest(HashMap<String, Object> result) {
+		throw new BadRequestResponse(JSON.toPrettyString(result));
 	}
 
 	private void checkFaucetAllowed() {
@@ -399,7 +424,7 @@ public class ChainAPI extends ABaseAPI {
 							description = "Transaction service unavailable" )
 				}
 			)
-	public void runTransactionPrepare(Context ctx) {
+	public void runTransactionPrepare(Context ctx) throws InterruptedException, IOException {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
@@ -409,8 +434,8 @@ public class ChainAPI extends ABaseAPI {
 		ACell code = readCode(srcValue);
 		Object maybeSeq=req.get("sequence");
 
+		long sequence;
 		try {
-			long sequence;
 			if (maybeSeq!=null) {
 				CVMLong lv=CVMLong.parse(maybeSeq);
 				if (lv==null) throw new BadRequestResponse("sequence (if provided) must be an integer");
@@ -418,19 +443,19 @@ public class ChainAPI extends ABaseAPI {
 			} else {
 				sequence = convex.getSequence(addr)+1;
 			}
-			ATransaction trans = Invoke.create(addr, sequence, code);
-			Ref<ATransaction> ref = Cells.persist(trans).getRef();
-
-			HashMap<String, Object> rmap = new HashMap<>();
-			rmap.put("source", srcValue);
-			rmap.put("address", RT.json(addr));
-			rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
-			rmap.put("sequence", sequence);
-
-			ctx.result(JSON.toPrettyString(rmap));
-		} catch (Exception e) {
-			throw new InternalServerErrorResponse("Error preparing transaction: " + e.getMessage());
+		} catch (ResultException e) {
+			prepareResult(ctx,e.getResult());
+			return;
 		}
+
+		ATransaction trans = Invoke.create(addr, sequence, code);
+		Ref<ATransaction> ref = Cells.persist(trans).getRef();
+		HashMap<String, Object> rmap = new HashMap<>();
+		rmap.put("source", srcValue);
+		rmap.put("address", RT.json(addr));
+		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
+		rmap.put("sequence", sequence);
+		ctx.result(JSON.toPrettyString(rmap));
 	}
 
 	@OpenApi(path = ROUTE+"transact",
@@ -451,29 +476,37 @@ public class ChainAPI extends ABaseAPI {
 							)),
 			responses = {
 					@OpenApiResponse(status = "200", 
-							description = "Transaction executed", 
+							description = "Transaction executed sucessfully", 
 							content = {
 								@OpenApiContent(
-										from=CVMResult.class,
+										from=ResultResponse.class,
 										type = "application/json", 
 										exampleObjects = {
 											@OpenApiExampleProperty(name = "value", value = "6")
 										}
 										)}),
+					@OpenApiResponse(status = "422", 
+					description = "Transaction failed", 
+					content = {
+						@OpenApiContent(
+								from=ResultResponse.class,
+								type = "application/json", 
+								exampleObjects = {
+									@OpenApiExampleProperty(name = "errorCode", value = ":NOBODY"),
+									@OpenApiExampleProperty(name = "value", value = "Account does not exist")
+								}
+								)}),
+
 					@OpenApiResponse(status = "503", 
 							description = "Transaction service unavailable" )
 				}
 			)
-	public void runTransact(Context ctx) {
+	public void runTransact(Context ctx) throws InterruptedException, IOException {
 		Map<String, Object> req = getJSONBody(ctx);
-		if (!req.containsKey("seed") || req.containsKey("sig")) {
-			runTransactionPrepare(ctx);
-			return;
-		}
 
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
-			throw new BadRequestResponse("Transact requires an valid address.");
+			throw new BadRequestResponse("Transact requires a valid address.");
 		Object srcValue = req.get("source");
 		ACell code = readCode(srcValue);
 
@@ -484,23 +517,22 @@ public class ChainAPI extends ABaseAPI {
 		if (seed.count() != AKeyPair.SEED_LENGTH)
 			throw new BadRequestResponse("Seed must be 32 bytes");
 
+		long nextSeq;
 		try {
 			long sequence = convex.getSequence(addr);
-			long nextSeq = sequence + 1;
-			ATransaction trans = Invoke.create(addr, nextSeq, code);
+			nextSeq = sequence + 1;
+		} catch (ResultException e) {
+			prepareResult(ctx,e.getResult());
+			return;
+		} 
+		
+		ATransaction trans = Invoke.create(addr, nextSeq, code);
 
-			AKeyPair kp = AKeyPair.create(seed.toFlatBlob());
-			SignedData<ATransaction> sd = kp.signData(trans);
+		AKeyPair kp = AKeyPair.create(seed.toFlatBlob());
+		SignedData<ATransaction> sd = kp.signData(trans);
 
-			Result r = doTransaction(sd);
-
-			HashMap<String, Object> rm = jsonResult(r);
-			ctx.result(JSON.toPrettyString(rm));
-		} catch (NullPointerException e) {
-			throw new BadRequestResponse("Account does not exist: " + addr);
-		} catch (Exception e) {
-			throw new InternalServerErrorResponse("Error executing transaction: " + e.getMessage());
-		}
+		Result r = doTransaction(sd);
+		prepareResult(ctx,r);
 	}
 
 	/**
@@ -532,7 +564,7 @@ public class ChainAPI extends ABaseAPI {
 							description = "Transaction executed", 
 							content = {
 								@OpenApiContent(
-										from=CVMResult.class,
+										from=ResultResponse.class,
 										type = "application/json", 
 										exampleObjects = {
 											@OpenApiExampleProperty(name = "value", value = "6")
@@ -558,14 +590,17 @@ public class ChainAPI extends ABaseAPI {
 			Ref<?> ref = Format.readRef(h, 0);
 			ACell maybeTrans = ref.getValue();
 			if (!(maybeTrans instanceof ATransaction))
-				throw new BadRequestResponse("Value with hash " + h + " is not a transaction: can't submit it!");
+				throw new BadFormatException("Value with hash " + h + " is not a transaction: can't submit it!");
 			trans = (ATransaction) maybeTrans;
 		} catch (MissingDataException e) {
-			throw new BadRequestResponse("Could not load transaction with hash " + h + ": probably you need to call 'prepare' first?");
-		} catch (Exception e) {
-			throw new BadRequestResponse(
-					jsonError("Failed to identify transaction with hash " + h + ": " + e.getMessage()));
-		}
+			prepareResult(ctx,Result.error(ErrorCodes.MISSING, "Missing data for transaction. Possible need to prepare first?"));
+			ctx.status(404);
+			return;
+		} catch (BadFormatException e) {
+			prepareResult(ctx,Result.error(ErrorCodes.FORMAT, "Bad format: "+e));
+			ctx.status(400);
+			return;
+		} 
 
 		// Get the account key
 		Object keyValue = req.get("accountKey");
@@ -588,8 +623,7 @@ public class ChainAPI extends ABaseAPI {
 
 		SignedData<ATransaction> sd = SignedData.create(key, sig, trans.getRef());
 		Result r = doTransaction(sd);
-		HashMap<String, Object> rm = jsonResult(r);
-		ctx.result(JSON.toPrettyString(rm));
+		prepareResult(ctx,r);
 	}
 
 	@OpenApi(path = ROUTE+"query",
@@ -611,17 +645,28 @@ public class ChainAPI extends ABaseAPI {
 						description = "Query executed", 
 						content = {
 							@OpenApiContent(
-									from=CVMResult.class,
+									from=ResultResponse.class,
 									type = "application/json", 
 									exampleObjects = {
 										@OpenApiExampleProperty(name = "value", value = "6")
 									}
 									)}),
+				@OpenApiResponse(status = "422", 
+				description = "Query failed", 
+				content = {
+					@OpenApiContent(
+							from=ResultResponse.class,
+							type = "application/json", 
+							exampleObjects = {
+								@OpenApiExampleProperty(name = "errorCode", value = ":SYNTAX"),
+								@OpenApiExampleProperty(name = "value", value = "Bad syntax")
+							}
+							)}),
 				@OpenApiResponse(status = "503", 
 						description = "Query service unavailable" )
 			}
 		)
-	public void runQuery(Context ctx) {
+	public void runQuery(Context ctx) throws InterruptedException {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
@@ -629,15 +674,14 @@ public class ChainAPI extends ABaseAPI {
 		Object srcValue = req.get("source");
 		ACell form = readCode(srcValue);
 
-		try {
-			Result r = convex.querySync(form, addr);
-			HashMap<String, Object> rmap = jsonResult(r);
+		Result r = convex.querySync(form, addr);
+		prepareResult(ctx,r);
+	}
 
-			ctx.result(JSON.toPrettyString(rmap));
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new ServiceUnavailableResponse("Request interrupted");
-		} 
+	private void prepareResult(Context ctx, Result r) {
+		HashMap<String, Object> rmap = jsonResult(r);
+		ctx.status(r.isError()?422:200);
+		ctx.result(JSON.toPrettyString(rmap));
 	}
 
 }
