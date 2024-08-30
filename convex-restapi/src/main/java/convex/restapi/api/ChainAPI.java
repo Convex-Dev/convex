@@ -138,9 +138,12 @@ public class ChainAPI extends ABaseAPI {
 						content = {
 							@OpenApiContent(
 									type = "application/json", 
-									from = CreateAccountResponse.class) })
+									from = CreateAccountResponse.class) }),
+				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, probably a missing or invalid accountKey")
 				})
-	public void createAccount(Context ctx) {
+	public void createAccount(Context ctx) throws InterruptedException {
 		checkFaucetAllowed();
 
 		Map<String, Object> req = getJSONBody(ctx);
@@ -162,10 +165,8 @@ public class ChainAPI extends ABaseAPI {
 				convex.transferSync(a, amt.longValue());
 			}
 		} catch (ResultException e) {
-			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new InternalServerErrorResponse(jsonError(e.getMessage()));
+			prepareResult(ctx,e.getResult());
+			return;
 		}
 		ctx.result("{\"address\": " + a.longValue() + "}");
 	}
@@ -185,11 +186,14 @@ public class ChainAPI extends ABaseAPI {
 							@OpenApiContent(
 									from=QueryAccountResponse.class,
 									type = "application/json") }),
+				@OpenApiResponse(
+						status = "400", 
+						description = "Bad request, probably an invalid address parameter"),
 				@OpenApiResponse(status = "404", 
 						description = "Account does not exist" )
 			}
 		)
-	public void queryAccount(Context ctx) {
+	public void queryAccount(Context ctx) throws InterruptedException {
 		Address addr = null;
 		String addrParam = ctx.pathParam("addr");
 
@@ -201,14 +205,14 @@ public class ChainAPI extends ABaseAPI {
 		Result r = doQuery(Lists.of(Symbols.ACCOUNT, addr));
 
 		if (r.isError()) {
-			ctx.json(jsonResult(r));
+			prepareResult(ctx,r);
 			return;
 		}
 
 		AccountStatus as = r.getValue();
 		if (as == null) {
-			ctx.result(
-					"{\"errorCode\": \"NOBODY\", \"source\": \"Server\",\"value\": \"The Account requested does not exist.\"}");
+			ctx.result("{\"errorCode\": \"NOBODY\",\"value\": \"The Account requested does not exist.\"}");
+			ctx.contentType("application/json");
 			ctx.status(404);
 			return;
 		}
@@ -228,7 +232,7 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(JSON.toPrettyString(hm));
 	}
 
-	public void queryPeer(Context ctx) {
+	public void queryPeer(Context ctx) throws InterruptedException {
 		AccountKey addr = null;
 		String addrParam = ctx.pathParam("addr");
 		try {
@@ -243,7 +247,7 @@ public class ChainAPI extends ABaseAPI {
 		Result r = doQuery(Reader.read("(get-in *state* [:peers " + addr + "])"));
 
 		if (r.isError()) {
-			ctx.json(jsonResult(r));
+			prepareResult(ctx,r);
 			return;
 		}
 
@@ -264,12 +268,8 @@ public class ChainAPI extends ABaseAPI {
 	 * @return
 	 * @throws InterruptedException 
 	 */
-	private Result doQuery(ACell form) {
-		try {
-			return convex.querySync(form);
-		} catch (InterruptedException e) {
-			return Result.interruptThread();
-		}
+	private Result doQuery(ACell form) throws InterruptedException {
+		return convex.querySync(form);
 	}
 
 	/**

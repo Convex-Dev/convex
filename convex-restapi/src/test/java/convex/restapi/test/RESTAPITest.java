@@ -74,4 +74,18 @@ public class RESTAPITest {
 			assertEquals(200,res.getCode());
 		}
 	}
+	
+	@Test public void testQueryAccount() throws IOException {
+		{ // should be a bad request with bad JSON
+			Request req=Request.get(API_PATH+"/accounts/999999");
+			HttpResponse res=req.execute().returnResponse();
+			assertEquals(404,res.getCode());
+		}
+		
+		{ // should be OK
+			Request req=Request.get(API_PATH+"/accounts/11");
+			HttpResponse res=req.execute().returnResponse();
+			assertEquals(200,res.getCode());
+		}
+	}
 }
