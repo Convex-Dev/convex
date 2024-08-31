@@ -16,6 +16,7 @@ import convex.core.data.Maps;
 import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 
 public class ResultTest {
@@ -53,9 +54,18 @@ public class ResultTest {
 		RecordTest.doRecordTests(r1);
 	}
 	
+	@Test public void fromException() {
+		assertEquals(ErrorCodes.EXCEPTION,Result.fromException(null).getErrorCode());
+		
+		// This should round trip efficiently
+		Result a=Result.error(Keywords.FOO, "Blah").withSource(SourceCodes.CLIENT);
+		assertSame(a,Result.fromException(new ResultException(a)));
+	}
+	
 	@Test
 	public void testBadBuild() {
-		assertThrows(IllegalArgumentException.class,()->Result.buildFromVector(Vectors.of(1,2)));
+		assertThrows(IllegalArgumentException.class,()->Result.buildFromVector(Vectors.of(1,2,3,4,5,6,7)));
+		assertThrows(IllegalArgumentException.class,()->Result.buildFromVector(Vectors.empty()));
 	}
 
 }

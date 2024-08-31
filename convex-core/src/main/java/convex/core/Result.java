@@ -377,6 +377,7 @@ public final class Result extends ARecordGeneric {
 	 * @return
 	 */
 	public static Result fromException(Throwable e) {
+		if (e==null) return Result.error(ErrorCodes.EXCEPTION,Strings.NIL);
 		if (e instanceof TimeoutException) {
 			String msg=e.getMessage();
 			return Result.error(ErrorCodes.TIMEOUT,Strings.create(msg));

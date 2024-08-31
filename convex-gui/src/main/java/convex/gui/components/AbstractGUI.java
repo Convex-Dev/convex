@@ -58,6 +58,14 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	}
 	
 	/**
+	 * Runs this GUI element until it is closed
+	 */
+	public void runUntilClosed() {
+		run();
+		waitForClose();
+	}
+	
+	/**
 	 * Implementations should override this to add the gui components and configure the GUI frame
 	 * @param frame
 	 */

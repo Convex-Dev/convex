@@ -20,7 +20,7 @@ public class TokenComponent extends JPanel {
 		this.convex=convex;
 		this.token=token;
 		
-		this.setLayout(new MigLayout("","["+(Toolkit.ICON_SIZE+100)+"][300][300]push"));
+		this.setLayout(new MigLayout("","["+(Toolkit.ICON_SIZE+100)+"][400][300]push"));
 		this.setBorder(Toolkit.createEmptyBorder(20));
 		
 		tokenButton=new TokenButton(token);
@@ -32,13 +32,15 @@ public class TokenComponent extends JPanel {
 		balanceLabel.setToolTipText("Account balance for "+token.getSymbol());
 		add(balanceLabel,"align right");
 		
+		
+		
 		// Action buttons
 		JPanel actions=new JPanel();
 		actions.add(ActionButton.build(0xe88e,e->{
 			// Token info TODO
 		},"Show token information"));
 
-		actions.add(ActionButton.build(0xe8b7,e->{
+		actions.add(ActionButton.build(0xe163,e->{
 			// Token send TODO
 		},"Send this token to another account"));
 
@@ -52,9 +54,10 @@ public class TokenComponent extends JPanel {
 		actions.add(ActionButton.build(0xe872,e->{
 			TokenListPanel.model.removeElement(token);
 		},"Remove token from tracked list"));
-
 		
 		add(actions,"dock east");
+		
+		
 		refresh(convex);
 	}
 
