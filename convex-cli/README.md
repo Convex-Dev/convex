@@ -127,7 +127,7 @@ For Linux and other Unix-like systems:
 
 ```
 #!/bin/bash
-java -jar path/to/convex-cli.jar $@
+java -jar path/to/convex.jar $@
 ```
 
 Ensure the wrapper is somewhere in your `$PATH`, and you should be good to go!
