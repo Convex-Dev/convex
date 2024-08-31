@@ -1,9 +1,11 @@
 package convex.gui.components;
 
+import java.awt.Font;
 import java.awt.event.ActionListener;
 
 import javax.swing.JButton;
 
+import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 
 /**
@@ -13,8 +15,17 @@ import convex.gui.utils.Toolkit;
 public class ActionButton extends JButton {
 
 	public ActionButton(String text, int iconCode, ActionListener action) {
-		super(text,(iconCode>0)?Toolkit.menuIcon(iconCode):null);
-		this.setFont(Toolkit.BUTTON_FONT);
+		this(text,iconCode,1.0,action);
+	}
+	
+	public ActionButton(String text, int iconCode, double scale, ActionListener action) {
+		super(text,(iconCode>0)?SymbolIcon.get(iconCode,Toolkit.BUTTON_FONT.getSize()*scale):null);
+		
+		Font font=Toolkit.BUTTON_FONT;
+		if (scale!=1.0) {
+			font=font.deriveFont((float)scale);
+		}
+		this.setFont(font);
 		this.addActionListener(action);
 	}
 	
@@ -33,7 +44,7 @@ public class ActionButton extends JButton {
 	}
 	
 	public static ActionButton build(int iconCode, ActionListener action, String toolTip) {
-		ActionButton b=new ActionButton(iconCode,action);
+		ActionButton b=new ActionButton(null,iconCode,1.8,action);
 		b.setToolTipText(toolTip);
 		return b;
 	}

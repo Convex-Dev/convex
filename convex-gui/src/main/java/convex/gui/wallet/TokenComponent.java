@@ -34,6 +34,10 @@ public class TokenComponent extends JPanel {
 		
 		// Action buttons
 		JPanel actions=new JPanel();
+		actions.add(ActionButton.build(0xe88e,e->{
+			// Token info TODO
+		},"Show token information"));
+
 		actions.add(ActionButton.build(0xe8b7,e->{
 			// Token send TODO
 		},"Send this token to another account"));
