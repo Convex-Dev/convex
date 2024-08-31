@@ -113,6 +113,10 @@ public class BalanceLabel extends BaseTextPane {
 			balance=null;
 		}	
 	}
+	
+	public AInteger getBalance() {
+		return balance;
+	}
 
 	private static Color[] CCOLS=new Color[] {SILVER, BRONZE, COPPER};
 	

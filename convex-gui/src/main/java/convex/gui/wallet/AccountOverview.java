@@ -6,9 +6,13 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
+import convex.core.data.AccountKey;
+import convex.core.data.Address;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.util.ThreadUtils;
+import convex.core.util.Utils;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.Identicon;
 import convex.gui.utils.SymbolIcon;
@@ -19,15 +23,17 @@ import net.miginfocom.swing.MigLayout;
 public class AccountOverview extends JPanel {
 
 	final BalanceLabel balance=new BalanceLabel();
-	private Convex convex;
+	final JLabel nameLabel=new JLabel("anonymous");
+	final JLabel addressLabel=new JLabel();
+	Identicon identicon=new Identicon(null,Toolkit.IDENTICON_SIZE*2);
 	
+	private Convex convex;
 
 	public AccountOverview(Convex convex) {
 		this.convex=convex;
 		setLayout(new MigLayout("fill","","push[][]"));
 		Font font=this.getFont();
 		
-		String addrString=RT.toString(convex.getAddress());
 		
 		{ //Account Label
 			JLabel accountLabel=new JLabel(SymbolIcon.get(0xe7fd,200));
@@ -53,36 +59,29 @@ public class AccountOverview extends JPanel {
 		Font bigfont=font.deriveFont(40f);
 		
 		{ // Name label
-			JLabel nl=new JLabel("anonymous");
-			nl.setFont(bigfont);
-			add(nl);
+			nameLabel.setFont(bigfont);
+			nameLabel.setToolTipText("Convex user ID associated with this account (can be anonymous)");
+			add(nameLabel);
 		}
 		
 		{ // Address label
-		JLabel al=new JLabel(addrString);
-		al.setFont(bigfont);
-		add(al);
+			addressLabel.setToolTipText("Address of this account in the global state");
+			addressLabel.setFont(bigfont);
+			add(addressLabel);
 		}
 		
-		try { // Address label
-			Identicon  key=new Identicon(convex.getAccountKey(convex.getAddress()),Toolkit.IDENTICON_SIZE*2);
-			add(key);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-		}
+		{ // Address label
+			add(identicon);
+		} 
 
-		try { // Coin Balance
-			//add(new JLabel(Toolkit.CONVEX)); // convex icon
+		{ // Coin Balance
 			balance.setFont(bigfont);
-			balance.setBalance(convex.getBalance()); 
-		} catch (ResultException e) {
-			// ignore?
-		} finally {
 			add(balance);
 		}
 		//add(KeyPairCombo.forConvex(convex));
 		 
-		 ThreadUtils.runVirtual(this::updateLoop);
+		update();
+		ThreadUtils.runVirtual(this::updateLoop);
 	}
 	
 	private void updateLoop() {
@@ -90,14 +89,45 @@ public class AccountOverview extends JPanel {
 			try {
 				Thread.sleep(1000);
 				if (isShowing()) {
-					balance.setBalance(convex.getBalance()); 
+					update();
 				}
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				return;
-			} catch (Exception e) {
-				e.printStackTrace();
 			}
+		}
+	}
+
+	private void update() {
+		try {
+			Address a=convex.getAddress();
+			
+			// TODO: user name update
+			
+			String addrString=RT.toString(a);
+			if (addressLabel.getText()!=addrString) {
+				addressLabel.setText(addrString);
+			}
+			
+			AccountKey key=convex.getAccountKey(a);
+			identicon.setKey(key);
+			
+			try {
+				CVMLong bal=CVMLong.create(convex.getBalance());
+				if (!Utils.equals(bal,balance.getBalance())) {
+					balance.setBalance(bal); 
+					if (bal!=null) {
+						balance.setToolTipText("Convex coin balance ("+bal+" coppers)");
+					} else {
+						balance.setToolTipText("Convex coin balance not available");
+					}
+				}
+			} catch (ResultException e) {
+				balance.setBalance(null);
+				balance.setToolTipText("Convex coin balance not available: "+e.getMessage());
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			
 		}
 	}
 }
