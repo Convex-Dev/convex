@@ -83,8 +83,8 @@ public class KeyRingPanel extends JPanel {
 		JButton btnNew = new ActionButton("New Keypair",0xe145,e -> {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
-				walletList.scrollToBottom();
 				listModel.addElement(HotWalletEntry.create(newKP,"Generated key in memory"));
+				walletList.scrollToBottom();
 			} catch (Exception  t) {
 				Toast.display(this,"Error creating key pair: "+t.getMessage(),Color.RED);
 				t.printStackTrace();

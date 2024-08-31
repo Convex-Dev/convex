@@ -113,7 +113,7 @@ public class MainGUI extends AbstractGUI {
 	}
 
 	/**
-	 * Launch the application.
+	 * Launch the Convex Desktop application and waits until main frame is closed.
 	 * @param args Command line args
 	 */
 	public static void main(String... args) {

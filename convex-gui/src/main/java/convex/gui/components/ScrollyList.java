@@ -24,6 +24,8 @@ import net.miginfocom.swing.MigLayout;
  */
 @SuppressWarnings("serial")
 public class ScrollyList<E> extends JScrollPane {
+	public static final int VIEWPORT_HEIGHT = 660;
+	
 	private final Function<E, Component> builder;
 	private final ListModel<E> model;
 	private final ScrollablePanel listPanel = new ScrollablePanel();
@@ -48,7 +50,9 @@ public class ScrollyList<E> extends JScrollPane {
 
 	private boolean isAtBottom() {
 		JScrollBar bar = this.getVerticalScrollBar();
-		return bar.getValue()==bar.getMaximum();
+		int pos= bar.getValue();
+		if (pos==0) return false; // we are the top
+		return pos==bar.getMaximum();
 	}
 
 	/**
@@ -59,8 +63,8 @@ public class ScrollyList<E> extends JScrollPane {
 		@Override
 		public Dimension getPreferredScrollableViewportSize() {
 			Dimension d = getPreferredSize();
-			if (d.getHeight()>800) {
-				d=new Dimension(d.width,800);
+			if (d.getHeight()>VIEWPORT_HEIGHT) {
+				d=new Dimension(d.width,VIEWPORT_HEIGHT);
 			}
 			return d;
 		}

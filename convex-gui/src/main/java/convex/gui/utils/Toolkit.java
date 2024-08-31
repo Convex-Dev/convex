@@ -83,8 +83,10 @@ public class Toolkit {
 
 	static {
 		try {
-			if (SystemInfo.isMacOS)
+			if (SystemInfo.isMacOS) {
+				// Apple needs some special setup
 				setupForApple();
+			}
 			loadFonts();
 			UIManager.getLookAndFeelDefaults().put("defaultFont", DEFAULT_FONT);
 			//LookAndFeel laf = installMDLaf();
