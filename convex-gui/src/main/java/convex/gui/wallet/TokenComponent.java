@@ -44,13 +44,13 @@ public class TokenComponent extends JPanel {
 
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
-			new SwapPanel(convex,token,WalletPanel.getDefaultToken()).run();
+			new SwapPanel(convex,token,TokenListPanel.getDefaultToken()).run();
 		},"Open token swap window for this token"));
 		actions.add(ActionButton.build(0xe5d5,e->{
 			refresh(convex);
 		},"Refresh token info")); 
 		actions.add(ActionButton.build(0xe872,e->{
-			WalletPanel.model.removeElement(token);
+			TokenListPanel.model.removeElement(token);
 		},"Remove token from tracked list"));
 
 		

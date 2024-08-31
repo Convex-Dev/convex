@@ -18,7 +18,7 @@ import convex.gui.components.Toast;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
-public class WalletPanel extends JPanel {
+public class TokenListPanel extends JPanel {
 	protected ScrollyList<TokenInfo> list;
 	
 	protected Convex convex;
@@ -28,7 +28,7 @@ public class WalletPanel extends JPanel {
 	
 	static TokenInfo defaultToken=TokenInfo.convexCoin();
 
-	public WalletPanel(Convex convex) {
+	public TokenListPanel(Convex convex) {
 		this.convex=convex;
 		setLayout(new MigLayout("fill"));
 		
@@ -49,20 +49,20 @@ public class WalletPanel extends JPanel {
 		// add(new AccountChooserPanel(convex),"dock south");
 		ActionPanel ap=new ActionPanel();
 		ap.add(ActionButton.build("Track Token",0xe145,e->{
-			String newID=JOptionPane.showInputDialog(WalletPanel.this, "Enter Token ID");
+			String newID=JOptionPane.showInputDialog(TokenListPanel.this, "Enter Token ID");
 			if (newID==null) return;
 			try {
 				ACell tokenID=newID.isBlank()?null:Reader.read(newID);
 				TokenInfo token=TokenInfo.get(convex,tokenID);
 				if (token==null) {
-					Toast.display(WalletPanel.this, "Token does not exist: "+tokenID,Color.ORANGE);
+					Toast.display(TokenListPanel.this, "Token does not exist: "+tokenID,Color.ORANGE);
 				} else if (model.contains(token)) {
-					Toast.display(WalletPanel.this, "Token already added",Color.ORANGE);
+					Toast.display(TokenListPanel.this, "Token already added",Color.ORANGE);
 				} else {
 					addTokenTracking(token);
 				}
 			} catch (Exception ex) {
-				Toast.display(WalletPanel.this, "Error adding token: "+ex.getMessage(),Color.ORANGE);
+				Toast.display(TokenListPanel.this, "Error adding token: "+ex.getMessage(),Color.ORANGE);
 			}
 		},"Add a token to the tracked token list"));
 		ap.add(ActionButton.build("Refresh",0xe5d5,e->{

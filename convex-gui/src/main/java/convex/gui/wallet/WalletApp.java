@@ -44,7 +44,7 @@ public class WalletApp extends AbstractGUI {
 		
 		add(new AccountOverview(convex),"dock north");
 
-		addTab("Wallet", SymbolIcon.get(0xe850,TAB_ICON_SIZE), new WalletPanel(convex));
+		addTab("Wallet", SymbolIcon.get(0xe850,TAB_ICON_SIZE), new TokenListPanel(convex));
 
 		addTab("Friends", SymbolIcon.get(0xf233,TAB_ICON_SIZE), new FriendPanel(convex));
 		

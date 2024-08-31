@@ -138,7 +138,7 @@ public class PeerComponent extends BaseListComponent {
 		replButton.addActionListener(e -> launchPeerWindow(this.convex));
 		popupMenu.add(replButton);
 		
-		JMenuItem walletButton = new JMenuItem("Open Wallet",Toolkit.menuIcon(0xe850));
+		JMenuItem walletButton = new JMenuItem("Open controller Wallet",Toolkit.menuIcon(0xe850));
 		walletButton.addActionListener(e -> {
 			new WalletApp(convex).run();
 		});

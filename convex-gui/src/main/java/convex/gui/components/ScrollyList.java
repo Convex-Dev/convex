@@ -51,11 +51,18 @@ public class ScrollyList<E> extends JScrollPane {
 		return bar.getValue()==bar.getMaximum();
 	}
 
+	/**
+	 * Internal panel that contains the list components
+	 */
 	private static class ScrollablePanel extends JPanel implements Scrollable {
 
 		@Override
 		public Dimension getPreferredScrollableViewportSize() {
-			return getPreferredSize();
+			Dimension d = getPreferredSize();
+			if (d.getHeight()>800) {
+				d=new Dimension(d.width,800);
+			}
+			return d;
 		}
 
 		@Override
@@ -65,7 +72,6 @@ public class ScrollyList<E> extends JScrollPane {
 
 		@Override
 		public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
-			// TODO Auto-generated method stub
 			return 180;
 		}
 

@@ -41,13 +41,13 @@ public class WalletComponent extends BaseListComponent {
 	public WalletComponent(AWalletEntry initialWalletEntry) {
 		this.walletEntry = initialWalletEntry;
 
-		setLayout(new MigLayout());
+		setLayout(new MigLayout("aligny center"));
 
 		//////////  identicon
 		JLabel identicon = new Identicon(walletEntry.getPublicKey(),Toolkit.IDENTICON_SIZE*2);
 		JPanel idPanel=new JPanel();
 		idPanel.add(identicon);
-		add(idPanel,"dock west"); // add to MigLayout
+		add(idPanel); // add to MigLayout
 
 		
 		/////////// Wallet Address and info fields
@@ -58,6 +58,7 @@ public class WalletComponent extends BaseListComponent {
 		// cPanel.add(addressLabel,"span");
 		
 		infoLabel = new CodeLabel(getInfoString());
+		infoLabel.setFont(Toolkit.SMALL_MONO_FONT);
 		cPanel.add(infoLabel,"dock center");
 		//add(cPanel,"dock center"); // add to MigLayout
 		add(cPanel); // add to MigLayout
@@ -121,6 +122,7 @@ public class WalletComponent extends BaseListComponent {
 		menu.add(m3);
 
 		DropdownMenu menuButton=new DropdownMenu(menu); 
+		menuButton.setToolTipText("Settings and special actions for this key");
 		buttons.add(menuButton);
 		
 		// panel of buttons on right
