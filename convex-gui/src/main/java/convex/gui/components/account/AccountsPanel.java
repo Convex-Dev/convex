@@ -213,6 +213,7 @@ public class AccountsPanel extends JPanel {
 			AccountWindow pw = new AccountWindow(convex, model, addr);
 			pw.run();
 		});
+		btnActor.setToolTipText("Opens a windows with utilities for examining an account");
 		actionPanel.add(btnActor);
 		
 		ActionButton btnWallet = new ActionButton("Launch Wallet",0xe89e,e -> {
@@ -222,6 +223,7 @@ public class AccountsPanel extends JPanel {
 			cv.setAddress(Address.create(ix));
 			new WalletApp(cv).run();
 		});
+		btnWallet.setToolTipText("Opens a Wallet interface for this account");
 		actionPanel.add(btnWallet);
 
 		// Turn off auto-resize, since we want a scrollable table

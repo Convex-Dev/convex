@@ -10,7 +10,9 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.util.ThreadUtils;
 import convex.gui.components.BalanceLabel;
+import convex.gui.components.Identicon;
 import convex.gui.utils.SymbolIcon;
+import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -44,6 +46,7 @@ public class AccountOverview extends JPanel {
 		// headings
 		add(new JLabel("Name"));
 		add(new JLabel("Address"));
+		add(new JLabel("Key"));
 		add(new JLabel("Convex Coins"),"wrap");
 		//add(new JLabel("Identicon"),"wrap");
 		
@@ -59,6 +62,13 @@ public class AccountOverview extends JPanel {
 		JLabel al=new JLabel(addrString);
 		al.setFont(bigfont);
 		add(al);
+		}
+		
+		try { // Address label
+			Identicon  key=new Identicon(convex.getAccountKey(convex.getAddress()),Toolkit.IDENTICON_SIZE*2);
+			add(key);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 
 		try { // Coin Balance
@@ -76,7 +86,7 @@ public class AccountOverview extends JPanel {
 	}
 	
 	private void updateLoop() {
-		while (true) {
+		while ((!Thread.currentThread().isInterrupted()) && convex.isConnected()) {
 			try {
 				Thread.sleep(1000);
 				if (isShowing()) {
