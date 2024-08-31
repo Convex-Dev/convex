@@ -12,6 +12,7 @@ import convex.core.text.Text;
 import convex.etch.EtchCorruptionError;
 import convex.etch.EtchStore;
 import convex.etch.EtchUtils.FullValidator;
+import convex.core.exceptions.*;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 
@@ -42,7 +43,7 @@ public class EtchValidate extends AEtchCommand{
 				
 				Blob encoding =cell.getEncoding();
 				encoded+=encoding.count();
-			} catch (Exception e1) {
+			} catch (IOException | InvalidDataException e1) {
 				fail("Failed to validate cell "+h+" cause:" + e1);
 			}
 		}

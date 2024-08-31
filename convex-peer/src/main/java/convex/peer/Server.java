@@ -469,7 +469,7 @@ public class Server implements Closeable {
 			}
 		} catch (BadFormatException e) {
 			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			log.warn("Unable to deliver missing data due to exception:", e);
 		}
 	}

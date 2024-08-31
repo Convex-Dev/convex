@@ -28,12 +28,11 @@ public abstract class AThreadedComponent {
 				try {
 					loop();		
 				} catch (InterruptedException e) {
+					// Interrupted, so we are exiting
 					log.trace("Component thread interrupted: {}",thread);
 					Thread.currentThread().interrupt();
 					break;
-				} catch (Exception e) {
-					log.warn("Unexpected exception in "+AThreadedComponent.this.getClass().getSimpleName(),e);
-				} 
+				}
 			}
 			
 			// Finally close the component properly

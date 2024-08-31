@@ -156,7 +156,7 @@ public class KeyStoreMixin extends AMixin {
 				paranoia("Trying to save keystore in strict mode with no integrity password");
 			}
 			PFXTools.saveStore(keyStore, getKeyStoreFile(), storePassword);
-		} catch (Exception t) {
+		} catch (IOException | GeneralSecurityException t) {
 			throw new CLIError("Failed to save keystore",t);
 		}
 	}
@@ -176,7 +176,7 @@ public class KeyStoreMixin extends AMixin {
 		try {
 			// save the key in the keystore
 			PFXTools.setKeyPair(keyStore, keyPair, keyPassword);
-		} catch (Exception t) {
+		} catch (IOException | GeneralSecurityException t) {
 			throw new CLIError("Cannot store the key to the key store",t);
 		}
 	
@@ -219,7 +219,7 @@ public class KeyStoreMixin extends AMixin {
 			return null;
 		} catch (UnrecoverableKeyException t) {
 			throw new CLIError(ExitCodes.CONFIG,"Cannot load key from key Store - possibly incorrect password?", t);
-		} catch (Exception t) {
+		} catch (GeneralSecurityException t) {
 			throw new CLIError("Cannot load key from key Store", t);
 		}
 	}
@@ -242,7 +242,7 @@ public class KeyStoreMixin extends AMixin {
 					result++;
 				}
 			}
-		} catch (Exception t) {
+		} catch (GeneralSecurityException t) {
 			throw new CLIError("Cannot load aliases from key Store", t);
 		}
 		return result;

@@ -151,7 +151,7 @@ public class PeerStart extends APeerCommand {
 			} catch (ConfigException t) {
 				throw new CLIError(ExitCodes.CONFIG,"Error in peer configuration: "+t.getMessage(),t);
 			} catch (LaunchException e) {
-				throw new CLIError("Error in peer configuration: "+e.getMessage(),e);
+				throw new CLIError("Error launching peer: "+e.getMessage(),e);
 			} finally {
 				if (restServer!=null) restServer.close();
 			}

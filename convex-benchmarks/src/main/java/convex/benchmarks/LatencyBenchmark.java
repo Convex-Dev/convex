@@ -56,7 +56,7 @@ public class LatencyBenchmark {
 			client2=Convex.connect(server.getHostAddress(), VILLAIN,KPS[1]);
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-		} catch (Exception e) {
+		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new Error(e);
 		} 

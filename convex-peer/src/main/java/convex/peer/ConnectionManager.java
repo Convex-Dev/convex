@@ -126,7 +126,7 @@ public class ConnectionManager extends AThreadedComponent {
 			}
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
-		} catch (Exception t) {
+		} catch (RuntimeException | TimeoutException | ExecutionException | IOException t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
 			}
