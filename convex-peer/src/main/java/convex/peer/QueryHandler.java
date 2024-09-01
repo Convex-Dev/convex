@@ -13,7 +13,6 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
 import convex.net.Message;
@@ -76,16 +75,19 @@ public class QueryHandler extends AThreadedComponent {
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +
 			// address);
+			
+			// Return result
 			ResultContext resultContext = server.getPeer().executeQuery(form, address);
+			Result result=Result.fromContext(id, resultContext).withSource(SourceCodes.PEER);
 			
 			// Report result back to message sender
-			boolean resultReturned= m.returnResult(Result.fromContext(id, resultContext).withSource(SourceCodes.PEER));
+			boolean resultReturned= m.returnResult(result);
 	
 			if (!resultReturned) {
 				log.warn("Failed to send query result back to client with ID: {}", id);
 			}
-		} catch (BadFormatException | ClassCastException e) {
-			log.debug("Terminated client due to bad query format");
+		} catch (Exception e) {
+			log.debug("Terminated client: "+e.getMessage());
 			m.closeConnection();
 		}
 

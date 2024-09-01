@@ -50,25 +50,32 @@ public class AccountChooserPanel extends JPanel {
 			keyCombo=KeyPairCombo.forConvex(convex);
 			keyCombo.setToolTipText("Select a key pair from your Keyring. This will be used to sign transactions.");
 			keyCombo.addItemListener(e->{
-				if (e.getStateChange()==ItemEvent.DESELECTED) return;
+				if (e.getStateChange()==ItemEvent.DESELECTED) {
+					convex.setKeyPair(null);
+					return;
+				};
 				AWalletEntry we=(AWalletEntry)e.getItem();
-				AKeyPair kp;
-				if (we.isLocked()) {
-					String s=JOptionPane.showInputDialog(AccountChooserPanel.this,"Enter password to unlock wallet:\n"+we.getPublicKey());
-					if (s==null) {
-						return;
-					}
-					char[] pass=s.toCharArray();
-					boolean unlock=we.tryUnlock(s.toCharArray());
-					if (!unlock) {
-						return;
-					}
-					kp=we.getKeyPair();
-					we.lock(pass);
+				if (we==null) {
+					convex.setKeyPair(null);
 				} else {
-					kp=we.getKeyPair();
+					AKeyPair kp;
+					if (we.isLocked()) {
+						String s=JOptionPane.showInputDialog(AccountChooserPanel.this,"Enter password to unlock wallet:\n"+we.getPublicKey());
+						if (s==null) {
+							return;
+						}
+						char[] pass=s.toCharArray();
+						boolean unlock=we.tryUnlock(s.toCharArray());
+						if (!unlock) {
+							return;
+						}
+						kp=we.getKeyPair();
+						we.lock(pass);
+					} else {
+						kp=we.getKeyPair();
+					}
+					convex.setKeyPair(kp);
 				}
-				convex.setKeyPair(kp);
 			});
 			mp.add(keyCombo);
 

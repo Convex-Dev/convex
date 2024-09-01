@@ -46,11 +46,13 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 
 		@Override
 		public int getSize() {
-			return underlying.getSize();
+			return underlying.getSize()+1;
 		}
 
 		@Override
 		public AWalletEntry getElementAt(int index) {
+			int n=underlying.getSize();
+			if (index>=n) return null;
 			return underlying.getElementAt(index);
 		}
 
