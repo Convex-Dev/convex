@@ -43,8 +43,8 @@ public class DecimalAmountField extends JTextField {
 		public void insertString(int offset, String s, AttributeSet a) throws BadLocationException {
 			if (s == null) return;
 
-			char[] cs = s.toCharArray();
-			int n=cs.length;
+			char[] newChars = s.toCharArray();
+			int n=newChars.length;
 			if (n==0) return;
 			
 			String text=super.getText(0, super.getLength());
@@ -52,13 +52,18 @@ public class DecimalAmountField extends JTextField {
 			int dotPos=text.indexOf('.');
 
 			for (int i = 0; i < n; i++ ) {
-				char c=cs[i];
+				char c=newChars[i];
 				if (Text.isASCIIDigit(c)) continue;
 				if ((i==0)&&(c=='.')) continue;
+				if ((c=='.')&&(dotPos<0)) {
+					// found first do
+					dotPos=i;
+					continue;
+				}
 				return; // not valid so exit function early
 			}
 			
-			if (cs[0]=='.') {
+			if (newChars[0]=='.') {
 				if (dotPos>=0) {
 					super.remove(dotPos,tlen-dotPos);
 					offset=dotPos;
@@ -72,13 +77,13 @@ public class DecimalAmountField extends JTextField {
 				int digits=(offset+n-dotPos)-1;
 				if (digits>decimals) {
 					int newN=n-digits+decimals;
-					cs=Arrays.copyOfRange(cs, 0, newN);
+					newChars=Arrays.copyOfRange(newChars, 0, newN);
 					n=newN;
 				}
 			}
 
 			// Everything valid, so just insert as normal
-	    	super.insertString(offset, new String(cs), a);
+	    	super.insertString(offset, new String(newChars), a);
 			DecimalAmountField.this.setCaretPosition(offset+n);
 		}
 	}
@@ -86,14 +91,30 @@ public class DecimalAmountField extends JTextField {
 	public AInteger getAmount() {
 		String text=getText();
 		if (text.isBlank()) return null;
+		return parse(text,decimals,true);
+	}
+	
+	public void setText(String text) {
+		AInteger amt=DecimalAmountField.parse(text,decimals,false);
+		if (amt!=null) {
+			super.setText(text.trim());
+		} else {
+			// no change
+		}
+	}
+
+	static AInteger parse(String text, int decimals, boolean exact) {
 		try {
+			text=text.trim();
 			BigDecimal dec=new BigDecimal(text);
 			if (decimals>0) {
 				dec=dec.multiply(new BigDecimal(BigInteger.TEN.pow(decimals)));
 			}
-			BigInteger bi=dec.toBigIntegerExact();
+			BigInteger bi=(exact?dec.toBigIntegerExact():dec.toBigInteger());
 			return AInteger.create(bi);
-		} catch (Exception e) {
+		} catch (NumberFormatException e) {
+			return null;
+		}catch (Exception e) {
 			e.printStackTrace();
 			return null;
 		}

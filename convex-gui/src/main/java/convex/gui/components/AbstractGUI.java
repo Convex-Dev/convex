@@ -2,13 +2,19 @@ package convex.gui.components;
 
 
 import java.awt.EventQueue;
+import java.awt.Rectangle;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.util.concurrent.CompletableFuture;
 
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import convex.core.util.Utils;
 import convex.gui.MainGUI;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -19,7 +25,10 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public abstract class AbstractGUI extends JPanel implements Runnable {
 	
-	protected JFrame frame=new JFrame();
+	private static final Logger log = LoggerFactory.getLogger(AbstractGUI.class.getName());
+
+	
+	protected JFrame frame;
 	private String title;
 	
 	public AbstractGUI(String title) {
@@ -37,26 +46,44 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 		EventQueue.invokeLater(new Runnable() {
 			@Override
 			public void run() {
-				frame.setTitle(title);
-				frame.setIconImage(Toolkit.getDefaultToolkit()
-						.getImage(MainGUI.class.getResource("/images/Convex.png")));
-				
-			
-				frame.addWindowListener(new WindowAdapter() {
-					@Override
-			        public void windowClosing(WindowEvent e) {
-			            finished.complete("Closed");
-			        }
-				});
-
-				setupFrame(frame);
-				frame.pack();
-				frame.setVisible(true);
-				EventQueue.invokeLater(AbstractGUI.this::afterRun);
+				try {
+					showFrame();
+					EventQueue.invokeLater(AbstractGUI.this::afterRun);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 		});
 	}
 	
+	public void runNonModal(JComponent parent) {
+		showFrame();
+		if (parent!=null) {
+			Rectangle b=parent.getBounds();
+			frame.setLocation(b.x+100, b.y+100);
+		}
+		
+	}
+	
+	public void showFrame() {
+		frame=new JFrame();
+		frame.setTitle(title);
+		frame.setIconImage(Toolkit.getDefaultToolkit()
+				.getImage(MainGUI.class.getResource("/images/Convex.png")));
+		
+		frame.addWindowListener(new WindowAdapter() {
+			@Override
+	        public void windowClosing(WindowEvent e) {
+	            finished.completeAsync(()->"Closed");
+	        }
+		});
+
+		setupFrame(frame);
+		frame.pack();
+		frame.setVisible(true);
+		log.info("GUI displayed: "+Utils.getClassName(this));
+	}
+
 	/**
 	 * Runs this GUI element until it is closed
 	 */
@@ -75,14 +102,16 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	}
 	
 	/**
-	 * Called after the wallet is run
+	 * Called after the GUI interface is run
 	 */
 	public void afterRun() {
 		
 	}
 	
 	public void waitForClose() {
-		finished.join();
+		if (finished!=null) {
+			finished.join();
+		}
 		close();
 	}
 	
@@ -91,7 +120,7 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	}
 
 	public void close() {
-		// nothing to do
+		// nothing to do by default
 	}
 	
 	

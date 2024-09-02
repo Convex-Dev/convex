@@ -51,6 +51,7 @@ public class AccountChooserPanel extends JPanel {
 			keyCombo.setToolTipText("Select a key pair from your Keyring. This will be used to sign transactions.");
 			keyCombo.addItemListener(e->{
 				if (e.getStateChange()==ItemEvent.DESELECTED) {
+					// key pair was deselected and/or set to null
 					convex.setKeyPair(null);
 					return;
 				};

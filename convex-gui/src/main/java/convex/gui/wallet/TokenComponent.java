@@ -1,5 +1,7 @@
 package convex.gui.wallet;
 
+import java.awt.Font;
+
 import javax.swing.JPanel;
 
 import convex.api.Convex;
@@ -14,6 +16,8 @@ public class TokenComponent extends JPanel {
 	protected Convex convex;
 	protected BalanceLabel balanceLabel;
 	private TokenInfo token;
+	
+	static final Font BALANCE_FONT=Toolkit.BIG_FONT;
 	TokenButton tokenButton;
 
 	public TokenComponent(Convex convex, TokenInfo token) {
@@ -28,7 +32,7 @@ public class TokenComponent extends JPanel {
 		
 		balanceLabel = new BalanceLabel();
 		balanceLabel.setDecimals(token.getDecimals());
-		balanceLabel.setFont(Toolkit.BIG_MONO_FONT);
+		balanceLabel.setFont(BALANCE_FONT);
 		balanceLabel.setToolTipText("Account balance for "+token.getSymbol());
 		add(balanceLabel,"align right");
 		
@@ -46,7 +50,8 @@ public class TokenComponent extends JPanel {
 
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
-			new SwapPanel(convex,token,TokenListPanel.getDefaultToken()).run();
+			TokenInfo with= TokenListPanel.getOtherToken(token);
+			new SwapPanel(convex,token,with).runNonModal(this);
 		},"Open token swap window for this token"));
 		actions.add(ActionButton.build(0xe5d5,e->{
 			refresh(convex);

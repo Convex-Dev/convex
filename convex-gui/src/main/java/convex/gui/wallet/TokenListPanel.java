@@ -11,6 +11,7 @@ import convex.api.Convex;
 import convex.core.data.ACell;
 import convex.core.lang.Reader;
 import convex.core.util.ThreadUtils;
+import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ScrollyList;
@@ -103,5 +104,29 @@ public class TokenListPanel extends JPanel {
 
 	public static TokenInfo getDefaultToken() {
 		return defaultToken;
+	}
+
+	/**
+	 * Gets the "other" token for a trade, which will be:
+	 * 1. The default token token, if the token passed is already the default
+	 * 2. The next other token in the list 
+	 * 3. Null otherwise (no other token available)
+	 * @param token
+	 * @return
+	 */
+	public static TokenInfo getOtherToken(TokenInfo token) {
+		TokenInfo other=TokenListPanel.getDefaultToken();
+		if (Utils.equals(other.getID(),token.getID())) {
+			// select next available token
+			int n=model.getSize();
+			for (int i=0; i<n; i++) {
+				other=model.elementAt(i);
+				if (!Utils.equals(other.getID(),token.getID()))	{
+					return other;
+				}
+				other=null;
+			}
+		}
+		return other;
 	}
 }

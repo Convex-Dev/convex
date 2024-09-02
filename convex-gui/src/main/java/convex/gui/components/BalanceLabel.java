@@ -50,13 +50,6 @@ public class BalanceLabel extends BaseTextPane {
 	
 	public BalanceLabel() {
 		this.setEditable(false);
-		
-		AttributeSet attribs = new SimpleAttributeSet();
-		attribs=styleContext.addAttribute(attribs, StyleConstants.Alignment, StyleConstants.ALIGN_RIGHT);
-		attribs=styleContext.addAttribute(attribs, StyleConstants.FontFamily, getFont().getFamily());
-		//StyleConstants.setAlignment(attribs, StyleConstants.ALIGN_RIGHT);
-		//StyleConstants.setFontFamily(attribs, Font.PLAIN);
-		this.setParagraphAttributes(attribs, true);
 		this.setFocusable(false);
 	}
 	
@@ -91,6 +84,14 @@ public class BalanceLabel extends BaseTextPane {
 			BigInteger coins=bi.divide(unit);
 	
 			setText("");
+			AttributeSet attribs = new SimpleAttributeSet();
+			attribs=styleContext.addAttribute(attribs, StyleConstants.Alignment, StyleConstants.ALIGN_RIGHT);
+			attribs=styleContext.addAttribute(attribs, StyleConstants.FontFamily, getFont().getFamily());
+			//StyleConstants.setAlignment(attribs, StyleConstants.ALIGN_RIGHT);
+			//StyleConstants.setFontFamily(attribs, Font.PLAIN);
+			this.setParagraphAttributes(attribs, true);
+
+			
 			String cs=Text.toFriendlyNumber(coins.longValue());
 			append(cs,balanceColour,size);
 			String ch=Text.zeroPad(change,decimals);
@@ -130,8 +131,12 @@ public class BalanceLabel extends BaseTextPane {
 	
 	@Override
 	public void setText(String s) {
-		super.setText("");
-		append(s,Color.ORANGE,getFont().getSize());
+		AInteger val=DecimalAmountField.parse(s,decimals,false);
+		if (val==null) {
+			super.setText("");
+		} else {
+			setBalance(val);
+		}
 	}
 
 	public void setFromResult(Result r) {

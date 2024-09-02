@@ -68,6 +68,7 @@ public class Toolkit {
 	public static final float DEFAULT_FONT_SIZE=13*SCALE;
 	
 	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,(int)DEFAULT_FONT_SIZE);
+	public static Font BIG_FONT = new Font(Font.SANS_SERIF, Font.BOLD, (int)(DEFAULT_FONT_SIZE*1.8));
 	public static Font MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE));
 	public static Font BIG_MONO_FONT = new Font(Font.MONOSPACED, Font.BOLD, (int)(DEFAULT_FONT_SIZE*1.5));
 	public static Font SMALL_MONO_FONT = new Font(Font.MONOSPACED, Font.PLAIN, (int)(DEFAULT_FONT_SIZE*0.8));
