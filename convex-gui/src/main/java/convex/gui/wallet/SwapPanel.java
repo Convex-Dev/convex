@@ -108,6 +108,7 @@ public class SwapPanel extends AbstractGUI {
 			System.err.println("Switching amount: "+amt);
 			addSwapComponents();
 			amountField.setText(amt);
+			System.err.println("Amount Set: "+amountField.getAmount());
 			refreshRates();
 		});
 		
@@ -147,7 +148,7 @@ public class SwapPanel extends AbstractGUI {
 		}
 
 		convex.query(qs).thenAccept(r->{
-			System.err.println(r);
+			System.err.println(qs + " => " + r);
 			ACell val=r.getValue();
 			if (val instanceof AInteger) {
 				receiveLabel.setBalance((AInteger) val);

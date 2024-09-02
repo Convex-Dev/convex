@@ -29,5 +29,34 @@ public class ComponentTest {
 		af.setText("   3.11111111");
 		assertEquals(3111,af.getAmount().longValue());
 
+		af.setText("401   ");
+		assertEquals(401000,af.getAmount().longValue());
+
+		af.setText("   401.2  ");
+		assertEquals(401200,af.getAmount().longValue());
+		
+		af.setText("  fghrt  ");
+		assertNull(af.getAmount());
+	}
+	
+	@Test public void testDecimalAmountFieldNoDecimals() {
+		DecimalAmountField af=new DecimalAmountField(0);
+		assertEquals(CVMLong.ZERO,af.getAmount());
+	
+		af.setText("   3.444");
+		assertEquals(3,af.getAmount().longValue());
+		
+		af.setText("1234.0");
+		assertEquals(1234,af.getAmount().longValue());
+
+		af.setText("  0.0001  ");
+		assertEquals(0,af.getAmount().longValue());
+
+		af.setText(".");
+		assertNull(af.getAmount());
+
+		af.setText("13.");
+		assertEquals(13,af.getAmount().longValue());
+
 	}
 }

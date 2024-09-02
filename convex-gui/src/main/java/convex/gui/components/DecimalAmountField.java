@@ -16,6 +16,9 @@ import org.bouncycastle.util.Arrays;
 import convex.core.data.prim.AInteger;
 import convex.core.text.Text;
 
+/**
+ * Component displaying a decimal quantity in an editable text field, constrained to a decimal with a maximum number of digits
+ */
 @SuppressWarnings("serial")
 public class DecimalAmountField extends JTextField {
 	
@@ -60,8 +63,10 @@ public class DecimalAmountField extends JTextField {
 					dotPos=i;
 					continue;
 				}
-				return; // not valid so exit function early
+				n=i; // end of valid input
+				break;
 			}
+			if (n==0) return;
 			
 			if (newChars[0]=='.') {
 				if (dotPos>=0) {
@@ -82,8 +87,12 @@ public class DecimalAmountField extends JTextField {
 				}
 			}
 
+			// String to insert
+			String insertS=new String(newChars);
+			if (n<newChars.length) insertS=insertS.substring(0,n);
+			
 			// Everything valid, so just insert as normal
-	    	super.insertString(offset, new String(newChars), a);
+	    	super.insertString(offset, insertS, a);
 			DecimalAmountField.this.setCaretPosition(offset+n);
 		}
 	}
@@ -95,12 +104,7 @@ public class DecimalAmountField extends JTextField {
 	}
 	
 	public void setText(String text) {
-		AInteger amt=DecimalAmountField.parse(text,decimals,false);
-		if (amt!=null) {
-			super.setText(text.trim());
-		} else {
-			// no change
-		}
+		super.setText(text.trim());
 	}
 
 	static AInteger parse(String text, int decimals, boolean exact) {
