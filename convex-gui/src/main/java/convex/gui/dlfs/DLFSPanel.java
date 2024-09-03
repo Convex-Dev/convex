@@ -103,6 +103,10 @@ public class DLFSPanel extends JPanel {
 		});
 	}
 	
+	public DLFileSystem getFileSystem() {
+		return fileSystem;
+	}
+	
 	void setSelectedPath(Path newPath) {
 		if (!(newPath instanceof DLPath)) {
 			pathLabel.setText("No path selected");

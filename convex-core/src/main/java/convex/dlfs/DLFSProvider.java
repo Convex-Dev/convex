@@ -27,6 +27,10 @@ import convex.core.util.SoftCache;
 import convex.dlfs.impl.DLDirectoryStream;
 import convex.dlfs.impl.DLFSLocal;
 
+/**
+ * DLFS filesystem provider. Maintains a cache of file systems loaded on the current system.
+ * 
+ */
 public class DLFSProvider extends FileSystemProvider {
 
 	public SoftCache<String,DLFileSystem> fileSystems=new SoftCache<>();
