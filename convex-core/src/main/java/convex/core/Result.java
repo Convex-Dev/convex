@@ -2,6 +2,7 @@ package convex.core;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
@@ -23,6 +24,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.Context;
 import convex.core.lang.RecordFormat;
@@ -390,14 +392,18 @@ public final class Result extends ARecordGeneric {
 			String msg=e.getMessage();
 			return Result.error(ErrorCodes.FORMAT,Strings.create(msg));
 		}
+		if (e instanceof MissingDataException) {
+			return MISSING_RESULT;
+		}
 		if (e instanceof ResultException) {
 			return ((ResultException) e).getResult();
 		}
-		if (e instanceof ExecutionException) {
+		if ((e instanceof ExecutionException)||(e instanceof CompletionException)) {
 			// use the underlying cause
 			return fromException(e.getCause());
 		}
 		if (e instanceof InterruptedException) {
+			// This is special, we need to ensure the interrupt status is set
 			return interruptThread();
 		}
 		return Result.error(ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
@@ -406,6 +412,7 @@ public final class Result extends ARecordGeneric {
 	// Standard result in case of interrupts
 	// Note interrupts are always caused by CLIENT from a local perspective
 	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!")).withSource(SourceCodes.CLIENT);
+	private static final Result MISSING_RESULT=Result.error(ErrorCodes.MISSING,Strings.create("Missing Data!")).withSource(SourceCodes.CLIENT);
 	
 	/**
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread

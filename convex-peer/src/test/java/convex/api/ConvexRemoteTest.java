@@ -102,6 +102,24 @@ public class ConvexRemoteTest {
 		}
 	}
 	
+	/**
+	 * Test for sending a "transaction" that is actually not a transaction, i.e. clearly the wrong format
+	 */
+	@Test
+	public void testBadTransaction() throws IOException, TimeoutException, InterruptedException, ExecutionException, ResultException {
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			@SuppressWarnings({ "unchecked", "rawtypes" })
+			SignedData<ATransaction> tr = (SignedData)KEYPAIR.signData(CVMLong.ONE); // clearly not an ATransaction...
+			Result r = convex.transact(tr).get();
+			assertEquals(ErrorCodes.FORMAT, r.getErrorCode());
+			assertEquals(SourceCodes.PEER, r.getSource());
+		}
+	}
+	
+	/**
+	 * Test for sending a "transaction" for an account that does not exist. Peer should catch this!
+	 */
 	@Test
 	public void testNobody() throws IOException, TimeoutException, InterruptedException, ExecutionException  {
 		synchronized (network.SERVER) {
@@ -119,6 +137,7 @@ public class ConvexRemoteTest {
 			ATransaction tr = Invoke.create(convex.getAddress(), 10, Reader.read("*address*"));
 			Result r = convex.transactSync(tr);
 			assertEquals(ErrorCodes.SEQUENCE, r.getErrorCode());
+			assertEquals(SourceCodes.CVM, r.getSource()); // currently gets as far as :CVM. OK, but cost to peer?
 			
 			// Sequence should recover
 			r=convex.transactSync("(+ 2 3)");
