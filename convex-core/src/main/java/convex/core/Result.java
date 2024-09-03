@@ -32,15 +32,15 @@ import convex.core.lang.exception.AExceptional;
 import convex.core.lang.exception.ErrorValue;
 
 /**
- * Class representing the result of a Query or Transaction.
+ * Class representing the result of a Convex interaction (typically a query or transaction).
  * 
- * A Result is typically used to communicate the outcome of a Query or a Transaction from a Peer to a Client.
+ * A Result is typically used to communicate the outcome of a query or a transaction from a peer to a client.
  * 
  * Contains:
  * <ol>
- * <li>Message ID</li>
- * <li>Result value</li>
- * <li>Error Code</li>
+ * <li>Message ID - used for message correlation</li>
+ * <li>Result value - Any CVM value as the result (may be an error message)</li>
+ * <li>Error Code - Error Code, or null if the Result was a success</li>
  * <li>Log Records</li>
  * <li>Additional info</li>
  * </ol>
