@@ -11,8 +11,6 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import javax.swing.text.PlainDocument;
 
-import org.bouncycastle.util.Arrays;
-
 import convex.core.data.prim.AInteger;
 import convex.core.text.Text;
 
@@ -81,9 +79,7 @@ public class DecimalAmountField extends JTextField {
 			if ((dotPos>=0)) {
 				int digits=(offset+n-dotPos)-1;
 				if (digits>decimals) {
-					int newN=n-digits+decimals;
-					newChars=Arrays.copyOfRange(newChars, 0, newN);
-					n=newN;
+					n=n-digits+decimals;
 				}
 			}
 

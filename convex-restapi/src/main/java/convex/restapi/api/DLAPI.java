@@ -4,7 +4,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Iterator;
 
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.AString;
+import convex.core.data.AVector;
+import convex.core.lang.RT;
 import convex.dlfs.DLFS;
+import convex.dlfs.DLFSNode;
 import convex.dlfs.DLFSProvider;
 import convex.dlfs.DLFileSystem;
 import convex.dlfs.DLPath;
@@ -38,7 +44,7 @@ public class DLAPI extends ABaseAPI {
 	
 	public void getFile(Context ctx) {
 		String pathParam=ctx.pathParam("path");
-
+		System.err.println("DLFS Request: "+pathParam);
 		
 		DLFSProvider provider=DLFS.provider();
 		
@@ -53,9 +59,26 @@ public class DLAPI extends ABaseAPI {
 		}
 		
 	
-		ctx.header("Content-type", "image");
 		try {
-			ctx.result(Files.newInputStream(p));
+			if (Files.isDirectory(p)) {
+				ctx.header("Content-type", "text/plain");
+				AVector<ACell> dir=fs.getNode(p);
+				AHashMap<AString, AVector<ACell>> ents = DLFSNode.getDirectoryEntries(dir);
+				ACell[] names=ents.getKeys().toCellArray();
+				StringBuilder sb=new StringBuilder();
+				for (ACell a:names) {
+					sb.append(RT.str(a));
+				}
+				if (!sb.isEmpty()) {
+					ctx.result("Empty DLFS Directory");
+				} else {
+					ctx.result(sb.toString());
+				}
+			} else {
+				ctx.header("Content-type", "image");
+				ctx.result(Files.newInputStream(p));
+			}
+			
 		} catch (IOException e) {
 			throw new InternalServerErrorResponse("Can't read file");
 		}

@@ -88,9 +88,11 @@ public class DLFSBrowser extends AbstractGUI {
 			}
 			panel.refreshView();
 		}));
-		
+	}
+	
+	@Override
+	public void afterRun() {
 		getFrame().setJMenuBar(menuBar);
-		
 	}
 	
 	public DLFileSystem getDrive() {

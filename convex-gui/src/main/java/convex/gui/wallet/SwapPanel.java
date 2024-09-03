@@ -54,9 +54,7 @@ public class SwapPanel extends AbstractGUI {
 		swapPanel=new JPanel();
 		addSwapComponents();
 		add(swapPanel,"align center,span,growx");
-		
-
-		
+	
 		// Main action buttons
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.add(new ActionButton("Trade!",0xe933,e->{
