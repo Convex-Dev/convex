@@ -31,6 +31,8 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.JScrollBar;
+import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.KeyStroke;
 import javax.swing.LookAndFeel;
@@ -380,5 +382,10 @@ public class Toolkit {
 
 	public static Icon menuIcon(int codePoint) {
 		return SymbolIcon.get(codePoint,Toolkit.BUTTON_FONT.getSize());
+	}
+
+	public static <E> void scrollToBottom(JScrollPane scrollPane) {
+		JScrollBar bar = scrollPane.getVerticalScrollBar();
+		bar.setValue(bar.getMaximum());
 	}
 }

@@ -84,7 +84,7 @@ public class KeyRingPanel extends JPanel {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
 				listModel.addElement(HotWalletEntry.create(newKP,"Generated key in memory"));
-				walletList.scrollToBottom();
+				Toolkit.scrollToBottom(walletList);
 			} catch (Exception  t) {
 				Toast.display(this,"Error creating key pair: "+t.getMessage(),Color.RED);
 				t.printStackTrace();

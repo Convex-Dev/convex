@@ -14,6 +14,7 @@ import javax.swing.Scrollable;
 import javax.swing.event.ListDataEvent;
 import javax.swing.event.ListDataListener;
 
+import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -43,7 +44,7 @@ public class ScrollyList<E> extends JScrollPane {
 			}
 			this.revalidate();
 			if (bottom) {
-				EventQueue.invokeLater(this::scrollToBottom);
+				EventQueue.invokeLater(()->Toolkit.scrollToBottom(this));
 			}
 		});
 	}
@@ -131,10 +132,5 @@ public class ScrollyList<E> extends JScrollPane {
 
 	public Component[] getListComponents() {
 		return listPanel.getComponents();
-	}
-
-	public void scrollToBottom() {
-		JScrollBar bar = this.getVerticalScrollBar();
-		bar.setValue(bar.getMaximum());
 	}
 }

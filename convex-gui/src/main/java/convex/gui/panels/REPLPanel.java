@@ -185,7 +185,7 @@ public class REPLPanel extends JPanel {
 
 		splitPane.setRightComponent(inputScrollPane);
 		
-		// stop ctrl+arrow losing focus
+		// stop CTRL+arrow losing focus
 		setFocusTraversalKeysEnabled(false);
 		
 		// BOTTOM ACTION PANEL
@@ -197,12 +197,14 @@ public class REPLPanel extends JPanel {
 			sendMessage(input.getText());
 			input.requestFocus();
 		});
+		actionPanel.setToolTipText("Run the current command from the input pane");
 		actionPanel.add(btnRun);
 		
 		btnClear = new ActionButton("Clear",0xe9d5,e -> {
 			output.setText("");
 			input.requestFocus();
 		});
+		btnClear.setToolTipText("Clear the input and output");
 		actionPanel.add(btnClear);
 
 		btnInfo = new ActionButton("Connection Info",0xe88e,e -> {
@@ -217,7 +219,7 @@ public class REPLPanel extends JPanel {
 			}
 			sb.append("Account:     " + RT.toString(convex.getAddress()) + "\n");
 			sb.append("Public Key:  " + RT.toString(convex.getAccountKey()) + "\n");
-			sb.append("Connected?:  " + convex.isConnected()+"\n");
+			sb.append("Connected:   " + convex.isConnected()+"\n");
 
 			String infoString = sb.toString();
 			JOptionPane.showMessageDialog(this, infoString);
@@ -316,6 +318,7 @@ public class REPLPanel extends JPanel {
 						e.printStackTrace();
 					} 
 					handleResult(start,m);
+					Toolkit.scrollToBottom(outputScrollPane);
 					return m;
 				});
 			} catch (ParseException e) {

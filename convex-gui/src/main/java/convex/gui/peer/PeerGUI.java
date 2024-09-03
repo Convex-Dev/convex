@@ -168,7 +168,6 @@ public class PeerGUI extends AbstractGUI {
 
 	private long cp = 0;
 
-
 	private Runnable updateThread = new Runnable() {
 		@Override
 		public void run() {
