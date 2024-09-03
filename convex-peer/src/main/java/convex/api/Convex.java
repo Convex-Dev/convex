@@ -363,6 +363,17 @@ public abstract class Convex {
 			return getSequence()+1;
 		}
 	}
+	
+	/**
+	 * Pre-compiles code, compiling the given source to a CVM Op.
+	 *
+	 * @param code Code to execute
+	 * @return A Future for the result of the compilation
+	 */
+	public CompletableFuture<Result> preCompile(ACell code) {
+		ACell compileStep=List.of(Symbols.COMPILE,List.of(Symbols.QUOTE,code));
+		return query(compileStep);
+	}
 
 	/**
 	 * Submits a transaction to the Convex network, returning a future once the
@@ -376,8 +387,6 @@ public abstract class Convex {
 	 *
 	 * @param transaction Transaction to execute
 	 * @return A Future for the result of the transaction
-	 * @throws IOException If an IO Exception occurs (most likely the connection is broken)
-	 * @throws TimeoutException  In case of timeout
 	 */
 	public final synchronized CompletableFuture<Result> transact(ATransaction transaction) {
 		SignedData<ATransaction> signed;
@@ -410,6 +419,11 @@ public abstract class Convex {
 		} else if (code instanceof SignedData) {
 			throw new IllegalArgumentException("Can't prepare transaction that is already signed");
 		} else {
+			if (isPreCompile() ) {
+				Result compResult=preCompile(code).join();
+				if (compResult.isError()) throw new ResultException(compResult);
+				code=compResult.getValue();
+			}
 			transaction=Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, code);
 		}
 		return prepareTransaction(transaction);
@@ -429,7 +443,7 @@ public abstract class Convex {
 		if (origin == null) {
 			origin=address;
 			if (origin==null) {
-				// A transaction without an origin is definitely an error?
+				// A transaction without an origin is definitely a problem. :NOBODY error detected at :CLIENT source
 				throw new ResultException(Result.error(ErrorCodes.NOBODY, "No address set for transaction").withSource(SourceCodes.CLIENT));
 			}
 			transaction = transaction.withOrigin(origin);
@@ -484,7 +498,7 @@ public abstract class Convex {
 	 * @throws IOException If the connection is broken, or the send buffer is full
 	 * @throws TimeoutException In case of timeout
 	 */
-	public synchronized CompletableFuture<Result> transact(String code) {
+	public CompletableFuture<Result> transact(String code) {
 		return transact((ACell)Reader.read(code));
 	}
 	
@@ -500,16 +514,15 @@ public abstract class Convex {
 		if (code instanceof ATransaction) return transact((ATransaction)code);
 		
 		if (isPreCompile()) {
-			ACell compileStep=List.of(Symbols.COMPILE,List.of(Symbols.QUOTE,code));
-			return query(compileStep).thenCompose(r->{
+			return preCompile(code).thenCompose(r->{
 				if (r.isError()) return CompletableFuture.completedFuture(r);
 				ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, r.getValue());
 				return transact(trans);
 			});
+		} else {
+			ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
+			return transact(trans);
 		}
-		
-		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
-		return transact(trans);
 	}
 
 	private ACell buildCodeForm(String code) {
