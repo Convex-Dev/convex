@@ -385,7 +385,9 @@ public class PeerGUI extends AbstractGUI {
 		}
 	}
 
-	public void closePeers() {
+	@Override
+	public void close() {
+		updateRunning=false;
 		DefaultListModel<ConvexLocal> peerList = getPeerList();
 		int n = peerList.getSize();
 		for (int i = 0; i < n; i++) {
@@ -396,6 +398,7 @@ public class PeerGUI extends AbstractGUI {
 				// ignore
 			}
 		}
+		super.close();
 	}
 
 	public void addPeer(ConvexLocal cvl) {

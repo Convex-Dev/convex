@@ -1,7 +1,6 @@
 package convex.gui.panels;
 		
 import java.awt.Color;
-import java.awt.Component;
 import java.awt.Font;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
@@ -49,6 +48,7 @@ import convex.gui.components.BaseTextPane;
 import convex.gui.components.CodePane;
 import convex.gui.components.account.AccountChooserPanel;
 import convex.gui.utils.CVXHighlighter;
+import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -57,8 +57,10 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class REPLPanel extends JPanel {
 
-	protected final  CodePane input;
+	protected final CodePane input;
 	protected final CodePane output;
+	protected final JScrollPane inputScrollPane;
+	protected final JScrollPane outputScrollPane;
 	private final JButton btnRun;
 	private final JButton btnClear;
 	private final JButton btnInfo;
@@ -72,8 +74,8 @@ public class REPLPanel extends JPanel {
 
 	private InputListener inputListener=new InputListener();
 
-	private Font OUTPUT_FONT=new Font("Monospaced", Font.PLAIN, 24);
-	private Font INPUT_FONT=new Font("Monospaced", Font.PLAIN, 30);
+	private Font OUTPUT_FONT=Toolkit.MONO_FONT.deriveFont(16f*Toolkit.SCALE);
+	private Font INPUT_FONT=Toolkit.MONO_FONT.deriveFont(20f*Toolkit.SCALE);
 	private Color DEFAULT_OUTPUT_COLOR=Color.LIGHT_GRAY;
 	
 	private JPanel actionPanel;
@@ -170,16 +172,18 @@ public class REPLPanel extends JPanel {
 		output.setToolTipText("Output from transaction execution");
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
-		splitPane.setLeftComponent(wrapScrollPane(output));
+		outputScrollPane=wrapScrollPane(output);
+		splitPane.setLeftComponent(outputScrollPane);
 
 		input = new CodePane();
 		input.setFont(INPUT_FONT);
 		input.getDocument().addDocumentListener(inputListener);
 		input.addKeyListener(inputListener);
 		input.setToolTipText("Input commands here (Press Enter at the end of input to send)");
+		inputScrollPane=wrapScrollPane(input);
 		//inputArea.setForeground(Color.GREEN);
 
-		splitPane.setRightComponent(wrapScrollPane(input));
+		splitPane.setRightComponent(inputScrollPane);
 		
 		// stop ctrl+arrow losing focus
 		setFocusTraversalKeysEnabled(false);
@@ -246,7 +250,7 @@ public class REPLPanel extends JPanel {
 		});
 	}
 
-	private Component wrapScrollPane(CodePane codePane) {
+	private JScrollPane wrapScrollPane(CodePane codePane) {
 		JScrollPane scrollPane=new JScrollPane(codePane);
 		return scrollPane;
 	}
