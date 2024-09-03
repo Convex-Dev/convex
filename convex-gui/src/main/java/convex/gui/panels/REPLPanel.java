@@ -195,16 +195,13 @@ public class REPLPanel extends JPanel {
 		});
 		actionPanel.add(btnRun);
 		
-		btnClear = new JButton("Clear");
-		actionPanel.add(btnClear);
-		btnClear.addActionListener(e -> {
+		btnClear = new ActionButton("Clear",0xe9d5,e -> {
 			output.setText("");
 			input.requestFocus();
 		});
+		actionPanel.add(btnClear);
 
-		btnInfo = new JButton("Connection Info");
-		actionPanel.add(btnInfo);
-		btnInfo.addActionListener(e -> {
+		btnInfo = new ActionButton("Connection Info",0xe88e,e -> {
 			StringBuilder sb=new StringBuilder();
 			if (convex instanceof ConvexRemote) {
 				sb.append("Remote host: " + convex.getHostAddress() + "\n");
@@ -221,6 +218,7 @@ public class REPLPanel extends JPanel {
 			String infoString = sb.toString();
 			JOptionPane.showMessageDialog(this, infoString);
 		});
+		actionPanel.add(btnInfo);
 		
 		btnTX=new JCheckBox("Show transaction");
 		btnTX.setToolTipText("Tick to show full transaction details.");
@@ -317,7 +315,7 @@ public class REPLPanel extends JPanel {
 					return m;
 				});
 			} catch (ParseException e) {
-				output.append(" PARSE ERROR: "+e.getMessage(),Color.RED);
+				output.append(" PARSE ERROR: "+e.getMessage()+"\n",Color.RED);
 			} catch (TimeoutException t) {
 				output.append(" TIMEOUT waiting for result\n",Color.RED);
 			} catch (IllegalStateException t) {
