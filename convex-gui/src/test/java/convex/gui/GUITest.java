@@ -29,7 +29,7 @@ public class GUITest {
 	
 	static Server SERVER;
 	static Convex CONVEX;
-	static PeerGUI manager = null;
+	private static PeerGUI manager = null;
 	
 
 	static {
@@ -42,10 +42,19 @@ public class GUITest {
 			Thread.currentThread().interrupt();
 			throw new Error(e);
 		} catch (HeadlessException e) {
-			// we should have null manager
+			// ensure null manager
+			manager=null;
 		} catch (PeerException e) {
 			throw new Error(e);
 		} 
+	}
+	
+	/**
+	 * Test assumption that the GUI can be initialised. If not, we are probably in headless mode, and there is
+	 * no point trying to test and GUI components that will just fail with HeadlessException
+	 */
+	public static void assumeGUI() {
+		assumeTrue(manager!=null);
 	}
 	
 	/**
@@ -55,7 +64,8 @@ public class GUITest {
 
 	@Test
 	public void testState() throws InvalidDataException {
-		assumeTrue(manager!=null);
+		GUITest.assumeGUI();
+		
 		State s = manager.getLatestState();
 		s.validate();
 	}
@@ -65,7 +75,8 @@ public class GUITest {
 	 */
 	@Test
 	public void testDLFSBrowser() {
-		assumeTrue(manager!=null);
+		GUITest.assumeGUI();
+		
 		DLFSBrowser browser=new DLFSBrowser();
 		DLFileSystem drive=browser.getDrive();
 		assertEquals(0,drive.getRoot().getNameCount());
@@ -73,14 +84,16 @@ public class GUITest {
 	
 	@Test
 	public void testHackerTools() {
-		assumeTrue(manager!=null);
+		GUITest.assumeGUI();
+		
 		HackerTools tools=new HackerTools();
 		assertNotNull(tools.tabs);
 	}
 	
 	@Test
 	public void testClientTools() {
-		assumeTrue(manager!=null);
+		GUITest.assumeGUI();
+		
 		ConvexClient client=new ConvexClient(CONVEX);
 		assertNotNull(client.tabs);
 	}

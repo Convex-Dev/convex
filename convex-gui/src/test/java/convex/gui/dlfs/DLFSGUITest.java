@@ -10,10 +10,13 @@ import org.junit.jupiter.api.Test;
 import convex.dlfs.DLFS;
 import convex.dlfs.DLFSProvider;
 import convex.dlfs.DLFileSystem;
+import convex.gui.GUITest;
 
 public class DLFSGUITest {
 
 	@Test public void testDLFSPanel() throws URISyntaxException {
+		GUITest.assumeGUI();
+		
 		DLFSProvider provider=DLFS.provider();
 		DLFileSystem fs=provider.newFileSystem(new URI("dlfs-test"),null);
 		DLFSPanel pan=new DLFSPanel(fs);
