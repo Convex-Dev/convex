@@ -1033,4 +1033,11 @@ public abstract class Convex {
 		this.preCompile = preCompile;
 	}
 
+	/**
+	 * Clears the sequence number cache for this client instance. Sequence number will be re-queried if required.
+	 */
+	public void clearSequence() {
+		this.sequence=null;
+	}
+
 }

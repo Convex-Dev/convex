@@ -37,6 +37,7 @@ import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.SignedData;
 import convex.core.exceptions.ParseException;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
@@ -202,6 +203,7 @@ public class REPLPanel extends JPanel {
 		
 		btnClear = new ActionButton("Clear",0xe9d5,e -> {
 			output.setText("");
+			input.setText("");
 			input.requestFocus();
 		});
 		btnClear.setToolTipText("Clear the input and output");
@@ -217,17 +219,18 @@ public class REPLPanel extends JPanel {
 			} catch (Exception e1) {
 				log.info("Failed to get sequence number");
 			}
-			sb.append("Account:     " + RT.toString(convex.getAddress()) + "\n");
+			sb.append("Account:     " + RT.print(convex.getAddress()) + "\n");
 			sb.append("Public Key:  " + RT.toString(convex.getAccountKey()) + "\n");
 			sb.append("Connected:   " + convex.isConnected()+"\n");
 
 			String infoString = sb.toString();
 			JOptionPane.showMessageDialog(this, infoString);
 		});
+		actionPanel.setToolTipText("Show diagnostic information for the Convex connection");
 		actionPanel.add(btnInfo);
 		
 		btnTX=new JCheckBox("Show transaction");
-		btnTX.setToolTipText("Tick to show full transaction details.");
+		btnTX.setToolTipText("Tick to show details of the transaction sent, including signature and transaction hash.");
 		actionPanel.add(btnTX);
 		
 		btnResults=new JCheckBox("Full Results");
@@ -239,7 +242,7 @@ public class REPLPanel extends JPanel {
 		actionPanel.add(btnTiming);
 		
 		btnCompile=new JCheckBox("Precompile");
-		btnCompile.setToolTipText("Tick to compile code before sending transaction. Usually reduces juice costs.");
+		btnCompile.setToolTipText("Tick to compile code before sending transaction. Usually reduces juice costs at the cost of slightly slower execution time.");
 		btnCompile.setSelected(convex.getLocalServer()!=null); // default: only do this if local
 		actionPanel.add(btnCompile);
 
@@ -257,11 +260,11 @@ public class REPLPanel extends JPanel {
 		return scrollPane;
 	}
 
-	private AKeyPair getKeyPair() {
+	protected AKeyPair getKeyPair() {
 		return execPanel.getConvex().getKeyPair();
 	}
 	
-	private Address getAddress() {
+	protected Address getAddress() {
 		return execPanel.getConvex().getAddress();
 	}
 
@@ -276,6 +279,7 @@ public class REPLPanel extends JPanel {
 
 		SwingUtilities.invokeLater(() -> {
 			input.setText("");
+			long start=Utils.getCurrentTimestamp();
 			try {
 				AList<ACell> forms = Reader.readAll(s);
 				ACell code = (forms.count()==1)?forms.get(0):forms.cons(Symbols.DO);
@@ -285,29 +289,22 @@ public class REPLPanel extends JPanel {
 
 				String mode = execPanel.getMode();
 
-				long start=Utils.getCurrentTimestamp();
 				if (mode.equals("Query")) {
 					Address qaddr=getAddress();
-					if (qaddr == null) {
-						future = convex.query(code,null);
-					} else {
-						future = convex.query(code, qaddr);
-					}
+					future = convex.query(code, qaddr);
 				} else if (mode.equals("Transact")) {
-					Address address = getAddress();
-					convex.setAddress(address);
-					AKeyPair kp=getKeyPair();
-					if (kp==null) throw new IllegalStateException("Can't transact without a valid key pair");
-					convex.setKeyPair(kp);
-					
-					SignedData<ATransaction> strans=convex.prepareTransaction(code);
-					
+					SignedData<ATransaction> strans=convex.prepareTransaction(code);					
 					if (btnTX.isSelected()) {
 						addOutputWithHighlight(output,strans.toString()+"\n");
 						output.append("TX Hash: "+strans.getHash()+"\n");
 					}
 					
 					future = convex.transact(strans);
+				} else if (mode.equals("Prepare")) {
+					SignedData<ATransaction> strans=convex.prepareTransaction(code);	
+					convex.clearSequence();
+					addOutputWithHighlight(output,strans.toString()+"\n");
+					return;
 				} else {
 					throw new Exception("Unrecognosed REPL mode: " + mode);
 				}
@@ -321,6 +318,8 @@ public class REPLPanel extends JPanel {
 					Toolkit.scrollToBottom(outputScrollPane);
 					return m;
 				});
+			} catch (ResultException e) {
+				handleResult(start,e.getResult());
 			} catch (ParseException e) {
 				output.append(" PARSE ERROR: "+e.getMessage()+"\n",Color.RED);
 			} catch (TimeoutException t) {

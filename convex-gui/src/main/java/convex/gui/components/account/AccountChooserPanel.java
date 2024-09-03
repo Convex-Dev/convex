@@ -103,10 +103,11 @@ public class AccountChooserPanel extends JPanel {
 			modeCombo = new JComboBox<String>();
 			modeCombo.setToolTipText("Use Transact to execute transactions (uses Convex Coins).\n\n"
 					+ "Use Query to compute results without changing on-chain state (free).\n\n"
-					//+ "Use Prepare to run transaction with advanced options."
+					+ "Use Prepare to prepare the transcation without submitting."
 					);
 			modeCombo.addItem("Transact");
 			modeCombo.addItem("Query");
+			modeCombo.addItem("Prepare");
 			// modeCombo.addItem("Prepare...");
 			if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
 			mp.add(modeCombo);
