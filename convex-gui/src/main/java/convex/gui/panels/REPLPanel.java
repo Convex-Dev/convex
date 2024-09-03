@@ -243,7 +243,7 @@ public class REPLPanel extends JPanel {
 		
 		btnCompile=new JCheckBox("Precompile");
 		btnCompile.setToolTipText("Tick to compile code before sending transaction. Usually reduces juice costs at the cost of slightly slower execution time.");
-		btnCompile.setSelected(convex.getLocalServer()!=null); // default: only do this if local
+		btnCompile.setSelected(convex.isPreCompile());
 		actionPanel.add(btnCompile);
 
 		

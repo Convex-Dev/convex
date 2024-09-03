@@ -82,7 +82,7 @@ public abstract class Convex {
 	/**
 	 * Determines if transactions should be pre-compiled.
 	 */
-	private boolean preCompile = true;
+	protected boolean preCompile = false;
 
 	/**
 	 * Sequence number for this client, or null if not yet known. Used to number new
@@ -1040,6 +1040,13 @@ public abstract class Convex {
 	}
 
 	/**
+	 * Sets the client connection pre-compilation mode.
+	 * 
+	 * When enabled, any non-compiled CVM code is sent to the peer for compilation first (as a query)
+	 * 
+	 * SECURITY: do not use if the target peer is untrusted, as it may be able to manipulate code during compilation. May be
+	 * safe if the peer and the connection to it is trusted (e.g. a local peer)
+	 * 
 	 * @param preCompile the preCompile to set
 	 */
 	public void setPreCompile(boolean preCompile) {
