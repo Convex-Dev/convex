@@ -2,9 +2,11 @@ package convex.gui.wallet;
 
 import java.awt.Font;
 
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
+import convex.core.lang.Reader;
 import convex.gui.components.ActionButton;
 import convex.gui.components.BalanceLabel;
 import convex.gui.utils.Toolkit;
@@ -45,12 +47,25 @@ public class TokenComponent extends JPanel {
 		},"Show token information"));
 
 		actions.add(ActionButton.build(0xe163,e->{
-			// Token send TODO
+			new TransferPanel(convex,token).runNonModal(this);
 		},"Send this token to another account"));
 
 		actions.add(ActionButton.build(0xe933,e->{
 			// Token swap
 			TokenInfo with= TokenListPanel.getOtherToken(token);
+			if (with==null) {
+				String tok=JOptionPane.showInputDialog(this, "Specify a token to swap with");
+				if (tok==null) return;
+				try {
+					with = TokenInfo.get(convex, Reader.read(tok));
+				} catch (Exception ex) {
+					// continue s.t. with = null
+				}
+			}
+			if (with==null) {
+				JOptionPane.showInputDialog(this, "Can't find token");
+				return;
+			}
 			new SwapPanel(convex,token,with).runNonModal(this);
 		},"Open token swap window for this token"));
 		actions.add(ActionButton.build(0xe5d5,e->{
