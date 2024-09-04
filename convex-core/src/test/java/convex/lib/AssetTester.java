@@ -1,18 +1,24 @@
 package convex.lib;
 
-import static convex.core.lang.TestState.*;
+import static convex.test.Assertions.assertArgumentError;
+import static convex.test.Assertions.assertArityError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.assertFundsError;
+import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import static convex.test.Assertions.*;
+import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
+import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
@@ -22,11 +28,23 @@ import convex.test.Samples;
  * 
  * Generic tests for ANY digital asset compatible with the convex.asset API
  */
-public class AssetTester {
+public class AssetTester extends ACVMTest {
 
 	static final AKeyPair TEST_KP = AKeyPair.generate();
 
 	static {
+
+	}
+	
+	@Test 
+	public void testAssetAPI() {
+		Context ctx = step(context(), "(import convex.asset :as asset)");
+		
+		// not an [asset quantity] pair
+		assertArgumentError(step(ctx,"(asset/transfer #15 :foo)"));
+		
+		// insufficient args
+		assertArityError(step(ctx,"(asset/transfer #15)"));
 
 	}
 
@@ -228,6 +246,11 @@ public class AssetTester {
 		ACell total = eval(ctx, "(asset/quantity-add token bal1 bal2)");
 		assertNotNull(total);
 		assertNotEquals(empty, total);
+		
+//		ACell supply=eval(ctx,"(asset/total-supply token)");
+//		if (supply!=null) {
+//			assertTrue(evalB(ctx,"(asset/quantity-contains? "+supply+" bal1)"));
+//		}
 		
 		// Trying to accept everything should be a STATE error (insufficient offer)
 		assertStateError(step(ctx,"(asset/accept user1 token "+total+")"));

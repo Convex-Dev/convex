@@ -35,6 +35,19 @@
     (vector? a) (conj {} a)
     (nil? a)    {}))
 
+;;;;;;;;;; General info
+
+(defn total-supply 
+  ^{:doc {:description "Gets the total supply of an asset. i.e. the union of all balances. May return nil if not supported."
+		  :examples    [{:code "(total-supply my-token)"}]
+		  :signature   [{:params [token amount]}]}}
+  [token]
+  (query
+    (try 
+      (call token
+        (total-supply))
+      nil)))
+
 ;;;;;;;;;; Transfers
 
 (defn accept
@@ -143,8 +156,8 @@
              {}
              asset)    
     (nil? asset) nil    
-     :else
-     (fail "Invalid asset")))
+    :else
+     (fail :ARGUMENT "Invalid asset")))
 
   ([receiver path quantity]
    (recur receiver path quantity nil))
