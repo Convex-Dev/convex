@@ -203,7 +203,8 @@ public class PeerComponent extends BaseListComponent {
 			AccountKey paddr=server.getPeerKey();
 			// sb.append("0x"+paddr.toChecksumHex()+"\n");
 			if (server.isLive()) {
-				sb.append("Local peer on port: " + server.getPort() + " with store "+server.getStore().shortName()+"\n");
+				sb.append("Local peer on port: " + server.getPort() + "\n");
+				// before:  + " with store "+server.getStore().shortName()+"\n"
 			} else {
 				sb.append("Inactive Peer\n");
 			}

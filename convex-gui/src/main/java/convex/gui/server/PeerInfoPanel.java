@@ -86,6 +86,7 @@ public class PeerInfoPanel extends JPanel {
 			sb.append("Running:              " + s.isLive() + "\n");
 			sb.append("Key:                  " + s.getPeerKey() + "\n");
 			sb.append("Address:              " + s.getHostAddress() + "\n");
+			sb.append("Store:                " + s.getStore() + "\n");
 			sb.append("\n");
 	
 			sb.append(s.getStatusVector()+"\n");
