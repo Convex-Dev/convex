@@ -1,6 +1,8 @@
 package convex.gui.components;
 
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.math.BigInteger;
 
 import javax.swing.JMenuItem;
@@ -63,6 +65,15 @@ public class BalanceLabel extends BaseTextPane {
 	
 	public void setBalanceColour(Color c) {
 		this.balanceColour=c;
+	}
+	
+	@Override
+	public Dimension getPreferredSize() {
+		Dimension d=super.getPreferredSize();
+		FontMetrics font=getFontMetrics(getFont());
+		int pw=font.charWidth('0')*(15+decimals);
+		if (d.width<pw) d.width=pw;
+		return d;
 	}
 
 	public void setBalance(AInteger a) {

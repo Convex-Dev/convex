@@ -1,5 +1,7 @@
 package convex.gui.components;
 
+import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.text.DecimalFormat;
@@ -26,7 +28,7 @@ public class DecimalAmountField extends JTextField {
 		super("0");
 		this.decimals=decimals;
 		this.setHorizontalAlignment(SwingConstants.RIGHT);
-		setColumns(20);
+		//setColumns(10+decimals);
 	}
 	
 	public static DecimalFormat getNumberFormat(int decimals) {
@@ -37,6 +39,15 @@ public class DecimalAmountField extends JTextField {
 	@Override 
 	protected Document createDefaultModel() {
 		return new DecimalDocument();
+	}
+	
+	@Override
+	public Dimension getPreferredSize() {
+		Dimension d=super.getPreferredSize();
+		FontMetrics font=getFontMetrics(getFont());
+		int pw=font.charWidth('0')*(10+decimals);
+		if (d.width<pw) d.width=pw;
+		return d;
 	}
 	
 	public class DecimalDocument extends PlainDocument {

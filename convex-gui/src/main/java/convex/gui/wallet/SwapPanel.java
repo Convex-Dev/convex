@@ -72,12 +72,13 @@ public class SwapPanel extends AbstractGUI {
 	}
 
 	protected void addSwapComponents() {
-		swapPanel.setLayout(new MigLayout("fill,wrap 3","[150][grow]"));
 		swapPanel.removeAll();
-
+		swapPanel.setLayout(new MigLayout("fill,wrap 3"));
+		
 		swapPanel.add(new JLabel("Amount:"));
 		amountField=new DecimalAmountField(token1.getDecimals()); 
 		amountField.setFont(Toolkit.BIG_FONT);
+		swapPanel.add(new TokenButton(token1));
 		swapPanel.add(amountField,"span");
 		amountField.getDocument().addDocumentListener(new DocumentListener() {
 			@Override
@@ -92,10 +93,7 @@ public class SwapPanel extends AbstractGUI {
 			public void changedUpdate(DocumentEvent e) {}
 		});
 		amountField.setToolTipText("Input amount of "+token1.getSymbol()+" to swap into "+token2.getSymbol());
-		
-		swapPanel.add(new JLabel("From:"));
-		swapPanel.add(new TokenButton(token1),"wrap,grow");
-		
+				
 		JButton switchButton=new JButton(SymbolIcon.get(0xe8d5,Toolkit.ICON_SIZE));
 		switchButton.addActionListener(e-> {
 			TokenInfo temp=token1;
@@ -113,13 +111,13 @@ public class SwapPanel extends AbstractGUI {
 		swapPanel.add(new JLabel()); // spacer
 		swapPanel.add(switchButton,"center,span");
 		swapPanel.add(new JLabel("To:"));
-		swapPanel.add(new TokenButton(token2),"wrap,grow");
+		swapPanel.add(new TokenButton(token2));
 		
-		// Receive anount line
-		swapPanel.add(new JLabel("You receive:"));
+		// Receive amount line
 		receiveLabel = new BalanceLabel();
 		receiveLabel.setFont(Toolkit.BIG_FONT);
 		receiveLabel.setDecimals(token2.getDecimals());
+		receiveLabel.setToolTipText("Amount you will receive when swap occurs");
 		swapPanel.add(receiveLabel);
 
 		swapPanel.validate();

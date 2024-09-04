@@ -26,7 +26,7 @@ public class TokenComponent extends JPanel {
 		this.convex=convex;
 		this.token=token;
 		
-		this.setLayout(new MigLayout("","["+(Toolkit.ICON_SIZE+100)+"][400][300]push"));
+		this.setLayout(new MigLayout("","["+(Toolkit.ICON_SIZE+100)+"][400]"));
 		this.setBorder(Toolkit.createEmptyBorder(20));
 		
 		tokenButton=new TokenButton(token);
@@ -37,8 +37,6 @@ public class TokenComponent extends JPanel {
 		balanceLabel.setFont(BALANCE_FONT);
 		balanceLabel.setToolTipText("Account balance for "+token.getSymbol());
 		add(balanceLabel,"align right");
-		
-		
 		
 		// Action buttons
 		JPanel actions=new JPanel();

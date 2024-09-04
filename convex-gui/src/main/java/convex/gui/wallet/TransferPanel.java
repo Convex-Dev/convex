@@ -31,6 +31,7 @@ public class TransferPanel extends AbstractGUI {
 	protected BalanceLabel balanceLabel;
 	private DecimalAmountField amountField;
 	private AddressCombo addressCombo;
+	private Address address;
 	
 	private static ComboModel<Address> model= new ComboModel<>();
 	
@@ -47,7 +48,7 @@ public class TransferPanel extends AbstractGUI {
 		this("Token Transfer for account "+convex.getAddress());
 		this.convex=convex;
 		this.token=token;
-		Address address=convex.getAddress();
+		address=convex.getAddress();
 		if (address==null) {
 			throw new IllegalStateException("Must be a valid address to transfer from");
 		}
@@ -64,7 +65,7 @@ public class TransferPanel extends AbstractGUI {
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.add(new ActionButton("Transfer!",0xe933,e->{
 			try {
-				Result done = executeTrade();
+				Result done = executeTransfer();
 				if (done==null) {
 					return;
 				} else if (done.isError()) {
@@ -83,28 +84,29 @@ public class TransferPanel extends AbstractGUI {
 	}
 
 	protected void addTransferComponents(JPanel panel) {
-		panel.setLayout(new MigLayout("fill,wrap 3","[150][grow]"));
 		panel.removeAll();
+		panel.setLayout(new MigLayout("fill,wrap 3","[150][grow]"));
 
-		panel.add(new JLabel("Token:"));
-		panel.add(new TokenButton(token),"span");
-
-		panel.add(new JLabel("Balance:"));
-		balanceLabel=new BalanceLabel();
-		balanceLabel.setDecimals(token.getDecimals());
-		balanceLabel.setBalance(token.getBalance(convex).join());
-		panel.add(balanceLabel,"span");
-
-		
-		panel.add(new JLabel("Destination:"));
-		addressCombo=new AddressCombo(model); 
-		addressCombo.setFont(Toolkit.BIG_FONT);
-		panel.add(addressCombo,"span");
-
-		panel.add(new JLabel("Amount:"));
+		panel.add(new JLabel("Amount to transfer: "));
+		panel.add(new TokenButton(token));
 		amountField=new DecimalAmountField(token.getDecimals()); 
 		amountField.setFont(Toolkit.BIG_FONT);
 		panel.add(amountField,"span");
+
+		panel.add(new JLabel("Balance:"),"span 2");
+		balanceLabel=new BalanceLabel();
+		balanceLabel.setDecimals(token.getDecimals());
+		balanceLabel.setBalance(token.getBalance(convex).join());
+		balanceLabel.setToolTipText("Current balance available in account "+address);
+		panel.add(balanceLabel,"span");
+
+		
+		panel.add(new JLabel("Destination account: "),"span 2");
+		addressCombo=new AddressCombo(model); 
+		addressCombo.setFont(Toolkit.BIG_FONT);
+		addressCombo.setToolTipText("Destination account that will receive asset after transfer");
+		panel.add(addressCombo,"span");
+
 		amountField.setToolTipText("Input amount of "+token.getSymbol()+" to transfer to the destination account");
 		
 		panel.validate();
@@ -112,7 +114,7 @@ public class TransferPanel extends AbstractGUI {
 	}
 	
 	
-	protected Result executeTrade() throws InterruptedException {
+	protected Result executeTransfer() throws InterruptedException {
 		AInteger amount=amountField.getAmount();
 		if (amount==null) {
 			JOptionPane.showMessageDialog(this, "Please specify a valid amount to transfer");
