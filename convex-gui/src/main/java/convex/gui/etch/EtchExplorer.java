@@ -43,7 +43,7 @@ public class EtchExplorer extends AbstractGUI {
 	 * Main component panel
 	 */
 	JPanel panel = new JPanel();
-
+ 
 	private static StateModel<EtchStore> etchState = StateModel.create((EtchStore)Stores.getGlobalStore());
 	
 	DatabasePanel homePanel = new DatabasePanel(this);
