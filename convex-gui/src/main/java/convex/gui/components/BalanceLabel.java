@@ -71,7 +71,7 @@ public class BalanceLabel extends BaseTextPane {
 	public Dimension getPreferredSize() {
 		Dimension d=super.getPreferredSize();
 		FontMetrics font=getFontMetrics(getFont());
-		int pw=font.charWidth('0')*(15+decimals);
+		int pw=font.charWidth('0')*(10+decimals);
 		if (d.width<pw) d.width=pw;
 		return d;
 	}

@@ -41,7 +41,7 @@ public class TokenComponent extends JPanel {
 		// Action buttons
 		JPanel actions=new JPanel();
 		actions.add(ActionButton.build(0xe88e,e->{
-			// Token info TODO
+			JOptionPane.showMessageDialog(this, new TokenInfoPanel(convex,token),"Token Info", JOptionPane.INFORMATION_MESSAGE);
 		},"Show token information"));
 
 		actions.add(ActionButton.build(0xe163,e->{

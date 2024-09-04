@@ -79,21 +79,21 @@ public class KeyRingPanel extends JPanel {
 		// Action toolbar
 		JPanel toolBar = new ActionPanel();
 
-		// new wallet button
+		// New keypair button
 		JButton btnNew = new ActionButton("New Keypair",0xe145,e -> {
 			AKeyPair newKP=AKeyPair.generate();
 			try {
-				listModel.addElement(HotWalletEntry.create(newKP,"Generated key in memory"));
+				listModel.addElement(HotWalletEntry.create(newKP,"Generated key (in memory)"));
 				Toolkit.scrollToBottom(walletList);
 			} catch (Exception  t) {
 				Toast.display(this,"Error creating key pair: "+t.getMessage(),Color.RED);
 				t.printStackTrace();
 			}
 		});
-		btnNew.setToolTipText("Create a new hot wallet keypair. Use for temporary purposes. Remember to save the seed if you want to re-use!");
+		btnNew.setToolTipText("Create a new random hot wallet keypair. Remember to save the key if you want to re-use!");
 		toolBar.add(btnNew);
 		
-		// new wallet button
+		// Import seed button
 		JButton btnImportSeed = new ActionButton("Import Seed....",0xe890,e -> {
 			String sd=(String) JOptionPane.showInputDialog(this,"Enter Ed25519 Seed","Import private key",JOptionPane.QUESTION_MESSAGE,Toolkit.menuIcon(0xe890),null,"");
 			if (sd==null) return;

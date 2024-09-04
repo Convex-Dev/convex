@@ -266,7 +266,7 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			addLabel("BIP39 Seed","This is the BIP39 seed generated from the mnemonic and passphrase.");
+			addLabel("BIP39 Seed","This is the BIP39 seed generated from the mnemonic and passphrase. You can also enter this directly.");
 			seedArea = makeTextArea();
 			seedArea.setRows(2);
 			seedArea.setLineWrap(true);
@@ -371,6 +371,7 @@ public class KeyGenPanel extends JPanel {
 			mnemonicArea.setText(BIP39.createSecureMnemonic(wc));
 			updateMnemonic();
 		});
+		btnRecreate.setToolTipText("Press to generate a new random mnemonic and derive all subsequent keys.");
 		actionPanel.add(btnRecreate);
 		
 		numSpinner = new JSpinner();
@@ -388,6 +389,7 @@ public class KeyGenPanel extends JPanel {
 				mnemonicArea.setText(BIP39.normalise(s));
 				updateMnemonic();
 			});
+			btnNormalise.setToolTipText("Press to normalise mnemonic text according to BIP39. Removes irregular whitespace.");
 			actionPanel.add(btnNormalise);
 		}
 
@@ -398,6 +400,7 @@ public class KeyGenPanel extends JPanel {
 			KeyRingPanel.addWalletEntry(we);
 			if (manager!=null) manager.switchPanel("Keyring");
 		});		
+		addWalletButton.setToolTipText("Press to add this public / private key pair to the Keyring.");
 		actionPanel.add(addWalletButton);
 		addWalletButton.setEnabled(false);
 	

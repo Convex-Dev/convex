@@ -211,11 +211,11 @@ public class PeerComponent extends BaseListComponent {
 			PeerStatus ps=state.getPeer(paddr);
 			if (ps!=null) {
 				sb.append("Controller: "+ps.getController());
-				sb.append("    ");
-				sb.append("Peer Stake: "+Text.toFriendlyBalance(ps.getPeerStake()));
-				sb.append("    ");
+				sb.append("   ");
+				sb.append("Stake: "+Text.toFriendlyBalance(ps.getPeerStake()));
+				sb.append("   ");
 				sb.append("Delegated Stake: "+Text.toFriendlyBalance(ps.getDelegatedStake()));
-				sb.append("    ");
+				sb.append("   ");
 			} else {
 				sb.append("Not currently a registered peer    ");
 			}
