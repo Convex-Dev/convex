@@ -1,9 +1,7 @@
 package convex.gui.wallet;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
 import convex.core.Result;
@@ -57,7 +55,7 @@ public class TokenInfo {
 		}
 	}
 	
-	public CompletableFuture<AInteger> getBalance(Convex convex) throws TimeoutException, IOException {
+	public CompletableFuture<AInteger> getBalance(Convex convex) {
 		String query=(id==null)?"*balance*":"("+getFungibleAddress(convex)+"/balance "+id+")";
 		
 		CompletableFuture<AInteger> cf=convex.query(query).thenApply(r->{

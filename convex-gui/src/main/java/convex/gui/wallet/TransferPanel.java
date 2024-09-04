@@ -16,8 +16,10 @@ import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.BalanceLabel;
 import convex.gui.components.DecimalAmountField;
 import convex.gui.components.account.AddressCombo;
+import convex.gui.models.ComboModel;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -26,8 +28,11 @@ public class TransferPanel extends AbstractGUI {
 
 	protected Convex convex;
 	protected TokenInfo token;
+	protected BalanceLabel balanceLabel;
 	private DecimalAmountField amountField;
 	private AddressCombo addressCombo;
+	
+	private static ComboModel<Address> model= new ComboModel<>();
 	
 	/**
 	 * Panel for swap display components
@@ -39,9 +44,14 @@ public class TransferPanel extends AbstractGUI {
 	}
 
 	public TransferPanel(Convex convex, TokenInfo token) {
-		this("Token Swap for account "+convex.getAddress());
+		this("Token Transfer for account "+convex.getAddress());
 		this.convex=convex;
 		this.token=token;
+		Address address=convex.getAddress();
+		if (address==null) {
+			throw new IllegalStateException("Must be a valid address to transfer from");
+		}
+		model.ensureContains(address);
 		
 		setLayout(new MigLayout("fill,wrap","[]","[][][grow]"));
 		setBorder(Toolkit.createDialogBorder());
@@ -76,8 +86,18 @@ public class TransferPanel extends AbstractGUI {
 		panel.setLayout(new MigLayout("fill,wrap 3","[150][grow]"));
 		panel.removeAll();
 
+		panel.add(new JLabel("Token:"));
+		panel.add(new TokenButton(token),"span");
+
+		panel.add(new JLabel("Balance:"));
+		balanceLabel=new BalanceLabel();
+		balanceLabel.setDecimals(token.getDecimals());
+		balanceLabel.setBalance(token.getBalance(convex).join());
+		panel.add(balanceLabel,"span");
+
+		
 		panel.add(new JLabel("Destination:"));
-		addressCombo=new AddressCombo(); 
+		addressCombo=new AddressCombo(model); 
 		addressCombo.setFont(Toolkit.BIG_FONT);
 		panel.add(addressCombo,"span");
 
@@ -108,6 +128,7 @@ public class TransferPanel extends AbstractGUI {
 		System.out.println(qs);
 
 		Result r = convex.transactSync(qs);
+		if (!r.isError()) model.ensureContains(target);
 		return r;
 	}
 
