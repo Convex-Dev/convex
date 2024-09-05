@@ -202,7 +202,11 @@ public class ContextTest extends ACVMTest {
 
 
 		assertEquals(1,log.count());
-		assertEquals(v,log.get(0).get(2));
+		AVector<ACell> logEntry=log.get(0);
+		assertEquals(Log.ENTRY_LENGTH,logEntry.size());
+		assertEquals(c.getAddress(),logEntry.get(Log.P_ADDRESS));
+		assertNull(logEntry.get(Log.P_SCOPE));
+		assertEquals(v,logEntry.get(Log.P_VALUES));
 	}
 
 	@Test

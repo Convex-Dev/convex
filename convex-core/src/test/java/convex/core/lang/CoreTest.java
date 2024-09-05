@@ -684,7 +684,7 @@ public class CoreTest extends ACVMTest {
 		assertNotNull(log);
 
 		assertEquals(1,log.count()); // one log entry only
-		assertEquals(v0,log.get(0).get(2));
+		assertEquals(v0,log.get(0).get(Log.P_VALUES));
 
 		// do second log in same context
 		AVector<ACell> v1=Vectors.of(3L, 4L);
@@ -692,8 +692,8 @@ public class CoreTest extends ACVMTest {
 		log=c.getLog();
 
 		assertEquals(2,log.count()); // should be two entries now
-		assertEquals(v0,log.get(0).get(2));
-		assertEquals(v1,log.get(1).get(2));
+		assertEquals(v0,log.get(0).get(Log.P_VALUES));
+		assertEquals(v1,log.get(1).get(Log.P_VALUES));
 	}
 
 
@@ -711,13 +711,13 @@ public class CoreTest extends ACVMTest {
 		AVector<AVector<ACell>> log = c.getLog();
 
 		assertEquals(1,log.count()); // should be one entry by the actor
-		assertEquals(v0,log.get(0).get(2));
+		assertEquals(v0,log.get(0).get(Log.P_VALUES));
 
 		// call actor function which rolls back - should also roll back log
 		c=step(c,"(call "+actor+" (non-event 3 4))");
 		log = c.getLog();
 		assertEquals(1,log.count()); // should be one entry by the actor
-		assertEquals(v0,log.get(0).get(2));
+		assertEquals(v0,log.get(0).get(Log.P_VALUES));
 
 	}
 
