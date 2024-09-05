@@ -104,7 +104,8 @@ public class Context {
 	private ChainState chainState;
 
 	/**
-	 * Local log is a [vector of [address values] entries]
+	 * Local log is an ordered [vector of [address caller scope location [values ...] ] entries
+	 * See CAD33 for details
 	 */
 	private AVector<AVector<ACell>> log;
 	private CompilerState compilerState;
@@ -2216,11 +2217,12 @@ public class Context {
 	 */
 	public Context appendLog(AVector<ACell> values) {
 		Address addr=getAddress();
+		ACell scope=getScope();
 		AVector<AVector<ACell>> log=this.log;
 		if (log==null) {
 			log=Vectors.empty();
 		}
-		AVector<ACell> entry = Vectors.of(addr,values);
+		AVector<ACell> entry = Vectors.of(addr,scope,values);
 		log=log.conj(entry);
 
 		this.log=log;

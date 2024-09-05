@@ -202,7 +202,7 @@ public class ContextTest extends ACVMTest {
 
 
 		assertEquals(1,log.count());
-		assertEquals(v,log.get(0).get(1));
+		assertEquals(v,log.get(0).get(2));
 	}
 
 	@Test
