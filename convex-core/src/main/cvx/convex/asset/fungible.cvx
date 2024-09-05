@@ -268,8 +268,10 @@
     :examples    [{:code "(decimals my-token)"}]
     :signature   [{:params [token amount]}]}}
   [token]
-  (call token
-    (decimals)))
+  (query 
+	(try 
+      (call token (decimals))
+      0)))
 
 (defn total-supply 
   ^{:doc {:description "Gets the total supply of a fungible token. i.e. the sum of all balances."
@@ -278,8 +280,7 @@
   [token]
   (query
     (try 
-      (call token
-        (total-supply))
+      (call token (total-supply))
       nil)))
 
 (defn balance

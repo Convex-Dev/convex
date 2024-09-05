@@ -247,10 +247,11 @@ public class AssetTester extends ACVMTest {
 		assertNotNull(total);
 		assertNotEquals(empty, total);
 		
-//		ACell supply=eval(ctx,"(asset/total-supply token)");
-//		if (supply!=null) {
-//			assertTrue(evalB(ctx,"(asset/quantity-contains? "+supply+" bal1)"));
-//		}
+		ACell supply=eval(ctx,"(asset/total-supply token)");
+		if (supply!=null) {
+			assertTrue(evalB(ctx,"(asset/quantity-contains? "+supply+" bal1)"));
+			assertTrue(evalB(ctx,"(asset/quantity-contains? "+supply+" bal2)"));
+		}
 		
 		// Trying to accept everything should be a STATE error (insufficient offer)
 		assertStateError(step(ctx,"(asset/accept user1 token "+total+")"));

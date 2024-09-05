@@ -50,6 +50,11 @@ public class Coin {
 	public static final long ZERO = 0;
 
 	/**
+	 * Number of decimals in Convex coin quantities
+	 */
+	public static final int DECIMALS = 9;
+
+	/**
 	 * Check if an amount is valid quantity of Convex Coins 
 	 * @param amount Amount to test
 	 * @return true if valid, false otherwsie

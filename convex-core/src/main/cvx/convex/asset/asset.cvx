@@ -28,7 +28,7 @@
 
 ;; Used by asset handling functions to treat a vector as a map
 (defn -make-map
-  ^{:private? true}
+  ^:private
   [a]
   (cond 
     (map? a)    a
@@ -93,9 +93,7 @@
   [sender receiver [path quantity]]
   (or (callable? path 'check-transfer) (return nil))
   (query (call path
-       (check-transfer sender
-                               receiver
-                               quantity))))
+       (check-transfer sender receiver quantity))))
 
 
 (defn get-offer
@@ -228,8 +226,6 @@
       (mint amount)))
 
 
-
-
 (defn owns?
 
   ^{:doc {:description "Tests whether owner owns at least a given quantity of an asset",
@@ -298,9 +294,9 @@
 
 (defn quantity-sub
 
-  ^{:doc {:description ["Subracts a quantity from another quantity for a given asset. Quantities must be specified in the format required by the asset type."
+  ^{:doc {:description ["Subtracts an asset quantity from another quantity. Quantities must be specified in the format required by the asset type."
                         "Subtracting a larger amount from a smaller amount should return 'zero' or equivalent, although the exact meaning of this operation may be asset-specific."
-                        "Nil may be used to indicate the 'zero' quantity in inputs."]
+                        "`nil` can be used yo indicate the 'zero' quantity in inputs."]
           :examples    [{:code "(quantity-sub fungible-token 500 300)"}
                         {:code "(quantity-sub non-fungible-token #{1 2 3 4} #{2 3})"}]
           :signature   [{:params [asset-a asset-b]}
