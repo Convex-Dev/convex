@@ -75,7 +75,7 @@
 
 (defn direct-transfer
    ^{:callable true}
-   [addr amount]
+   [addr amount data]
    (let [addr   (address addr)
          amount (if amount
                   (int amount)

@@ -565,7 +565,7 @@
   ;; This does not use the offer/accept model, and does not check whether the receiver wants to receive it.
   ;; Therefore, it is preferred to use `asset/transfer` to transfer assets.
 
-  [receiver id-set]
+  [receiver id-set data]
 
   (perform-transfer *caller*
                     receiver

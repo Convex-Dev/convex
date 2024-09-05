@@ -92,7 +92,7 @@
 
 (defn direct-transfer
   ^{:callable true}
-  [receiver quantity]
+  [receiver quantity data]
   (-direct-transfer *caller* receiver quantity))
 
 (defn offer

@@ -172,7 +172,7 @@
     ;; An actor without a receive-asset function is not a valid receiver?
     (actor? receiver) (fail :STATE "Target Actor does not have receive-asset function")
     
-    (call path (direct-transfer receiver quantity)))))
+    (call path (direct-transfer receiver quantity data)))))
   
   
 ;;;;;;;;;; Asset creation

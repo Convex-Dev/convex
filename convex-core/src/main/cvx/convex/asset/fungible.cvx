@@ -152,7 +152,7 @@
 
        (defn direct-transfer
          ^{:callable true}
-         [addr amount]
+         [addr amount data]
          (let [addr   (address addr)
                amount (if amount
                         (int amount)
@@ -312,7 +312,9 @@
   ^{:doc {:description "Transfers balance of a fungible token."
           :examples    [{:code "(transfer my-token-address my-friend 100)"}]
           :signature   [{:params [token target amount]}]}}
-  [token target amount]
+  ([token target amount]
+    (recur token target amount nil))
+  ([token target amount data]
 	  (cond
 	    ;; First check if receiver has a callable receive-asset function. If so, use this
 	    (callable? target 'receive-asset)
@@ -324,4 +326,4 @@
 	    ;; An actor without a receive-asset function is not a valid receiver?
 	    (actor? target) (fail :STATE "Target Actor does not have receive-asset function")
 				    
-	    (call token (direct-transfer target amount)))) 
+	    (call token (direct-transfer target amount data))))) 
