@@ -338,9 +338,8 @@ public class StateTransitionsTest {
 		BlockResult br2=s.applyBlock(sb2);
 		State s2=br2.getState();
 		assertEquals(memPool+Constants.MEMORY_POOL_GROWTH,s2.getGlobalMemoryPool().longValue());
-
 	}
-
+	
 	@Test
 	public void testScheduleOps() throws BadSignatureException {
 		State s = TestState.STATE;

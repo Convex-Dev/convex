@@ -684,7 +684,9 @@ public class CoreTest extends ACVMTest {
 		assertNotNull(log);
 
 		assertEquals(1,log.count()); // one log entry only
-		assertEquals(v0,log.get(0).get(Log.P_VALUES));
+		AVector<ACell> entry=log.get(0);
+		assertEquals(Log.ENTRY_LENGTH,entry.size()); // should be two entries now
+		assertEquals(v0,entry.get(Log.P_VALUES));
 
 		// do second log in same context
 		AVector<ACell> v1=Vectors.of(3L, 4L);

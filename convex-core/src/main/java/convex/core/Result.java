@@ -86,6 +86,19 @@ public final class Result extends ARecordGeneric {
 	 * @param id ID of Result message
 	 * @param value Result Value
 	 * @param errorCode Error Code (may be null for success)
+	 * @param log Log entries created during transaction
+	 * @param info Additional info
+	 * @return Result instance
+	 */
+	public static Result create(CVMLong id, ACell value, ACell errorCode, AVector<AVector<ACell>> log,AHashMap<Keyword,ACell> info) {
+		return buildFromVector(Vectors.of(id,value,errorCode,log,info));
+	}
+	
+	/**
+	 * Create a Result
+	 * @param id ID of Result message
+	 * @param value Result Value
+	 * @param errorCode Error Code (may be null for success)
 	 * @return Result instance
 	 */
 	public static Result create(CVMLong id, ACell value, ACell errorCode) {
@@ -308,6 +321,7 @@ public final class Result extends ARecordGeneric {
 		Context ctx=rc.context;
 		Object result=ctx.getValue();
 		ACell errorCode=null;
+		AVector<AVector<ACell>> log = ctx.getLog();
 		AHashMap<Keyword,ACell> info=Maps.empty();
 		if (result instanceof AExceptional) {
 			AExceptional ex=(AExceptional)result;
@@ -327,7 +341,7 @@ public final class Result extends ARecordGeneric {
 		if (rc.juiceUsed>0) info=info.assoc(Keywords.JUICE, CVMLong.create(rc.juiceUsed));
 		if (rc.source!=null) info=info.assoc(Keywords.SOURCE, rc.source);
 		
-		return create(id,(ACell)result,errorCode,info);
+		return create(id,(ACell)result,errorCode,log,info);
 	}
 	
 	public Result withExtraInfo(Map<Keyword,ACell> extInfo) {

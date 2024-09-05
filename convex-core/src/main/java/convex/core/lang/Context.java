@@ -2222,7 +2222,7 @@ public class Context {
 		if (log==null) {
 			log=Vectors.empty();
 		}
-		AVector<ACell> entry = Vectors.of(addr,scope,values);
+		AVector<ACell> entry = Vectors.of(addr,scope,null,values);
 		log=log.conj(entry);
 
 		this.log=log;
