@@ -66,8 +66,8 @@ public class TokenInfoPanel extends JPanel {
 					supplyLabel.setDecimals(0);
 				} else {
 					AInteger decs=RT.ensureInteger(r.getValue());
-					decimalsLabel.setText(RT.toString(decs));
 					supplyLabel.setDecimals((int)decs.longValue());
+					decimalsLabel.setText(RT.toString(decs));
 				}
 			});
 		}

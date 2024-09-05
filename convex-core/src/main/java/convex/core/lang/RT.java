@@ -1000,6 +1000,16 @@ public class RT {
 	public static AString print(ACell a) {
 		return print(a,Constants.PRINT_LIMIT);
 	}
+	
+	/**
+	 * Prints a value after converting to appropriate CVM type
+	 * @param o Any value to print
+	 * @return
+	 */
+	public static AString print(Object o) {
+		ACell cell=cvm(o);
+		return print(cell);
+	}
 	/**
 	 * Converts a value to a CVM String representation. Required to work for all
 	 * valid Cells.
@@ -1865,4 +1875,6 @@ public class RT {
 		if (maybeTx instanceof ATransaction) return (ATransaction)maybeTx;
 		return null;
 	}
+
+
 }

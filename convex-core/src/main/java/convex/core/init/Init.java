@@ -383,6 +383,8 @@ public class Init {
 
 	private static State doCurrencyDeploy(State s, AVector<ACell> row) {
 		String symName = row.get(0).toString();
+		String name = row.get(1).toString();
+		String desc = row.get(2).toString();
 		double usdPrice = RT.jvm(row.get(6)); // Value in USD for currency, e.g. USD=1.0, GBP=1.3
 		long decimals = RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
 		long usdValue=(Long) RT.jvm(row.get(4)); // USD value of liquidity in currency
@@ -397,11 +399,18 @@ public class Init {
 		// CVX price for currency
 		double cvxPrice = usdPrice * 1000000000; // One CVX Gold = 1 USD in genesis
 		double cvx = cvxPrice * supply / subDivisions;
-
 		
+		String metaString="{:name "+RT.print(name)+ ":desc "+RT.print(desc)+"}";
+
 		Context ctx = Context.create(s, GENESIS_ADDRESS);
 		ctx = ctx.eval(Reader
-				.read("(do (import convex.fungible :as fun) (deploy (fun/build-token {:supply " + supply + " :decimals "+decimals+"})))"));
+				.read("(do "
+						+ "(import convex.fungible :as fun) "
+						+ "(deploy "
+						  + "'(call *registry* (register "+metaString+"))"
+						  + "(fun/build-token {:supply " + supply + " :decimals "+decimals+"})"
+						  +")"
+					+ ")"));
 		Address addr = ctx.getResult();
 		ctx = ctx.eval(Reader.read("(do (import torus.exchange :as torus) (torus/add-liquidity " + addr + " "
 				+ (supply / 2) + " " + (cvx / 2) + "))"));
