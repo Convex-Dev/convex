@@ -120,8 +120,12 @@ For Windows PowerShell, the following should work:
 
 ```
 # Windows powershell - convex.ps1
-java -jar path/to/convex.jar $args
+function convex { 
+  java -jar C:\path\to\convex.jar $args
+}
 ```
+
+Put this in your PowerShell profile (typically `Profile.ps1` in `$home/documents/PowerShell`) and the `convex` command should be available in all future PowerShell sessions.
 
 For Linux and other Unix-like systems:
 
