@@ -51,7 +51,7 @@ public abstract class ACommand implements Runnable {
 
 	/**
 	 * Checks if the CLI is in strict (paranoid) mode
-	 * @return
+	 * @return true iff in strict mode
 	 */
 	public boolean isParanoid() {
 		return cli().isParanoid();
@@ -95,7 +95,7 @@ public abstract class ACommand implements Runnable {
 
 	/**
 	 * Checks if the CLI is in interactive mode (user input permitted)
-	 * @return
+	 * @return True if in interactive mode
 	 */
 	public boolean isInteractive() {
 		return cli().isInteractive();
@@ -103,8 +103,8 @@ public abstract class ACommand implements Runnable {
 	
 	/**
 	 * Prompt the user for String input
-	 * @param message
-	 * @return
+	 * @param message Message to prompt user with
+	 * @return String input from user
 	 */
 	public String prompt(String message) {
 		if (!isInteractive()) throw new CLIError("Can't prompt for user input in non-interactive mode: "+message);

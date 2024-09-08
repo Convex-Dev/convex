@@ -126,7 +126,7 @@ public class Cells {
 	 * Persist a cell in the current store
 	 * @param a Cell to persist
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	public static <T extends ACell> T persist(T a) throws IOException {
 		AStore store=Stores.current();
@@ -138,7 +138,7 @@ public class Cells {
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	public static <T extends ACell> T persist(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
@@ -151,7 +151,7 @@ public class Cells {
 	 * @param a Cell to persist
 	 * @param store Store instance to persist in
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	public static <T extends ACell> T store(T a, AStore store) throws IOException {
 		Ref<T> ref=Ref.get(a);
@@ -164,7 +164,7 @@ public class Cells {
 	 * @param a Cell to announce
 	 * @param noveltyHandler Handler for novelty values
 	 * @return Cell after announcing (may be the same Cell if no change in cell hierarchy)
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	public static <T extends ACell> T announce(T a, Consumer<Ref<ACell>> noveltyHandler) throws IOException {
 		if (a==null) {

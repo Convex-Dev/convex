@@ -1004,7 +1004,7 @@ public class RT {
 	/**
 	 * Prints a value after converting to appropriate CVM type
 	 * @param o Any value to print
-	 * @return
+	 * @return Printed representation of object, or null if print limit exceeded
 	 */
 	public static AString print(Object o) {
 		ACell cell=cvm(o);

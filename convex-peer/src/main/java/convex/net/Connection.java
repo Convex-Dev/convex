@@ -385,7 +385,7 @@ public class Connection {
 	 *
 	 * @param msg Message to send
 	 * @return true if message buffered successfully, false if failed due to full buffer
-	 * @throws IOException 
+	 * @throws IOException If IO error occurs while sending
 	 */
 	public boolean sendMessage(Message msg) throws IOException  {
 		return sendBuffer(msg.getType(),msg.getMessageData());

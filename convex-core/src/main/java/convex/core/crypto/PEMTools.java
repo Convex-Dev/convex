@@ -36,7 +36,7 @@ public class PEMTools {
 	/**
 	 * Encrypt a private key into a PEM formated text
 	 *
-	 * @param privateKey Private key to encrypt
+	 * @param keyPair Key pair containing private key to encrypt
 	 * @param password Password to use for encryption
 	 * @return PEM text that can be saved or sent to another keystore
 	 * @throws GeneralSecurityException Any encryption error that occurs

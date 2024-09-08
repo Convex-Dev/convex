@@ -90,7 +90,7 @@ public class EtchStore extends ACachedStore {
 	 *
 	 * @param prefix String prefix for temporary file
 	 * @return New EtchStore instance
-	 * @throws IOException 
+	 * @throws IOException In case of IO error creating database
 	 */
 	public static EtchStore createTemp(String prefix) throws IOException {
 		Etch etch = Etch.createTempEtch(prefix);
@@ -101,7 +101,7 @@ public class EtchStore extends ACachedStore {
 	 * Create an Etch store using a new temporary file with a generated prefix
 	 *
 	 * @return New EtchStore instance
-	 * @throws IOException 
+	 * @throws IOException In case of IO error creating database
 	 */
 	public static EtchStore createTemp() throws IOException {
 		Etch etch = Etch.createTempEtch();

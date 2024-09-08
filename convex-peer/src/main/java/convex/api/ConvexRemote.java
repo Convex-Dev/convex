@@ -98,7 +98,7 @@ public class ConvexRemote extends Convex {
 	 * 
 	 * @return Future for consensus state
 	 * @throws TimeoutException If initial status request times out
-	 * @throws InterruptedException 
+	 * @throws InterruptedException In case of interrupt while acquiring
 	 */
 	public CompletableFuture<State> acquireState() throws TimeoutException, InterruptedException {
 		return requestStatus().thenCompose(status->{

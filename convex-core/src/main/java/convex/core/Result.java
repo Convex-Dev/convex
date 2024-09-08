@@ -174,15 +174,16 @@ public final class Result extends ARecordGeneric {
 	
 	/**
 	 * Returns this Result with extra info field
-	 * @param k
-	 * @param v
-	 * @return
+	 * @param k Information field key
+	 * @param v Information field value
+	 * @return Updated result
 	 */
 	public Result withInfo(Keyword k, ACell v) {
 		AMap<Keyword, ACell> info = getInfo();
 		if (info==null) info=Maps.empty();
-		info=info.assoc(k, v);
-		return new Result(values.assoc(INFO_POS, info));
+		AMap<Keyword, ACell> newInfo=info.assoc(k, v);
+		if (newInfo==info) return this;
+		return new Result(values.assoc(INFO_POS, newInfo));
 	}
 	
 
@@ -390,7 +391,7 @@ public final class Result extends ARecordGeneric {
 	/**
 	 * Constructs a result from a caught exception 
 	 * @param e Exception caught
-	 * @return
+	 * @return Result instance representing the exception (will be an error)
 	 */
 	public static Result fromException(Throwable e) {
 		if (e==null) return Result.error(ErrorCodes.EXCEPTION,Strings.NIL);
@@ -430,7 +431,7 @@ public final class Result extends ARecordGeneric {
 	
 	/**
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
-	 * @return
+	 * @return Result instance representing an interruption
 	 */
 	public static Result interruptThread() {
 		Thread.currentThread().interrupt();

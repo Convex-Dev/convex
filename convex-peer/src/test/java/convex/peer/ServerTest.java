@@ -92,13 +92,10 @@ public class ServerTest {
 	
 	/**
 	 * Smoke test for ConvexLocal connection 
-	 * @throws IOException
-	 * @throws InterruptedException
-	 * @throws TimeoutException
-	 * @throws ResultException 
+	 * @throws Exception in case of error
 	 */
 	@Test
-	public void testLocalConnect() throws IOException, InterruptedException, TimeoutException, ResultException {
+	public void testLocalConnect() throws Exception {
 		Server server=network.SERVER;
 
 		AKeyPair  kp=server.getKeyPair();

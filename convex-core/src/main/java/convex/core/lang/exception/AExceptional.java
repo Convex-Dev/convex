@@ -37,7 +37,7 @@ public abstract class AExceptional {
 
 	/**
 	 * Return true if this exceptional value is catchable
-	 * @return
+	 * @return true iff the exception can be caught (user :CODE exceptions)
 	 */
 	public boolean isCatchable() {
 		return false;

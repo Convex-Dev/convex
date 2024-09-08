@@ -418,7 +418,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return the persisted Ref 
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 * @throws MissingDataException If the Ref's value does not exist or has been
 	 *         garbage collected before being persisted 
 	 */
@@ -438,7 +438,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @throws MissingDataException if the Ref cannot be fully persisted.
 	 * @return the persisted Ref
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	public <R extends ACell> Ref<R> persist() throws IOException {
 		return persist(null);
@@ -547,7 +547,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * Status will be updated to STORED or higher.
 	 * 
 	 * @return Ref with status of STORED or above
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	public <R extends ACell> Ref<R> persistShallow() throws IOException {
 		return persistShallow(null);
@@ -561,7 +561,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * 
 	 * @param noveltyHandler Novelty handler to call (may be null)
 	 * @return Ref with status of STORED or above
-	 * @throws IOException 
+	 * @throws IOException in case of IO error during persistence
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> Ref<R> persistShallow(Consumer<Ref<ACell>> noveltyHandler) throws IOException {

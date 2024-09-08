@@ -172,7 +172,7 @@ public class Peer {
 	 * @param genesisState Initial genesis State of the Network
 	 * @param remoteBelief Remote belief to sync with
 	 * @return New Peer instance
-	 * @throws InvalidDataException 
+	 * @throws InvalidDataException if invalid data was found in merged belief
 	 */
 	public static Peer create(AKeyPair peerKP, State genesisState, Belief remoteBelief) throws InvalidDataException {
 		Peer peer=create(peerKP,genesisState);

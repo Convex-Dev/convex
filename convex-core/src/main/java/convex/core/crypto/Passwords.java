@@ -7,8 +7,8 @@ public class Passwords {
 	 * 
 	 * Used for password strength estimation.
 	 * 
-	 * @param pass
-	 * @return
+	 * @param pass Proposed password
+	 * @return Estimated entropy in bits
 	 */
 	public static int estimateEntropy(String pass) {
 		int entropy=0;

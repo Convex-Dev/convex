@@ -125,7 +125,7 @@ public class Config {
 	 * Checks if the config specifies a valid keystore
 	 * @param config Configuration map for peer
 	 * @return Keystore specified in Config, or null if not specified
-	 * @throws ConfigException 
+	 * @throws ConfigException In case keystore is configured incorrectly or not accessible
 	 */
 	public static KeyStore checkKeyStore(Map<Keyword, Object> config) throws ConfigException {
 		Object o=config.get(Keywords.KEYSTORE);
@@ -177,7 +177,7 @@ public class Config {
 	 * Establishes a store in the given config
 	 * @param config Configuration map fpr peer (may be modified)
 	 * @return Store specified in Config under :store
-	 * @throws ConfigException 
+	 * @throws ConfigException in case of store configuration error or not accessible (IO)
 	 */
 	@SuppressWarnings("unchecked")
 	public static  <T extends AStore> T ensureStore(Map<Keyword, Object> config) throws ConfigException {
@@ -213,7 +213,7 @@ public class Config {
 	 * Ensures we have a hot peer :keypair set in config
 	 * 
 	 * @param config Configuration map for peer (may be modified)
-	 * @throws ConfigException 
+	 * @throws ConfigException in case of configuration problem
 	 */
 	public static AKeyPair ensurePeerKey(HashMap<Keyword, Object> config) throws ConfigException {
 		Object o=config.get(Keywords.KEYPAIR);
@@ -230,8 +230,8 @@ public class Config {
 
 	/**
 	 * Checks that the config specifies a source for the genesis state
-	 * @param config
-	 * @throws ConfigException 
+	 * @param config Configuration map for genesis state
+	 * @throws ConfigException in case of configuration problem
 	 */
 	public static void ensureGenesisState(HashMap<Keyword, Object> config) throws ConfigException {
 		

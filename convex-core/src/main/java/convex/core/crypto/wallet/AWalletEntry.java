@@ -29,7 +29,7 @@ public abstract class AWalletEntry implements IWalletEntry {
 
 	/**
 	 * Checks if this wallet entry needs a password to lock
-	 * @return
+	 * @return True if wallet needs a password to unlock
 	 */
 	public abstract boolean needsLockPassword();
 

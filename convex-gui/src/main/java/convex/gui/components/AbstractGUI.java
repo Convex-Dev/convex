@@ -94,7 +94,7 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	
 	/**
 	 * Implementations should override this to add the gui components and configure the GUI frame
-	 * @param frame
+	 * @param frame Frame in which to set up this GUI screen
 	 */
 	public void setupFrame(JFrame frame) {
 		frame.getContentPane().setLayout(new MigLayout());

@@ -22,8 +22,8 @@ public class EtchMixin extends AMixin {
 	
 	/**
 	 * Gets the etch store for a given file name. Throws an error if not found
-	 * @param fileName
-	 * @return
+	 * @param fileName Filename to load as Etch store
+	 * @return EtchStore instance
 	 */
 	public synchronized EtchStore getEtchStore(String fileName) {
 		if (etch!=null) return etch;

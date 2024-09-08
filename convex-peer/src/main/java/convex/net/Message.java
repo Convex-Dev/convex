@@ -229,7 +229,7 @@ public class Message {
 	
 	/**
 	 * Sets the message ID, if supported
-	 * @param id
+	 * @param id ID to set for message
 	 * @return Message with updated ID, or null if message does not support IDs
 	 */
 	@SuppressWarnings("unchecked")

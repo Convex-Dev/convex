@@ -25,11 +25,9 @@ public class RemotePeerMixin extends AMixin {
 	/**
 	 * Connects to a remote peer
 	 * 
-	 * @return
-	 * @throws IOException
-	 * @throws TimeoutException
+	 * @return Convex connection instance
 	 */
-	public convex.api.Convex connect()  {
+	public Convex connect()  {
 		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
 		if (hostname==null) hostname=convex.cli.Constants.HOSTNAME_PEER;
 		InetSocketAddress sa=new InetSocketAddress(hostname,port);

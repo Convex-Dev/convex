@@ -170,9 +170,9 @@ public class AccountKey extends AArrayBlob {
 	 * @return An AccountKey constructed from the hex string, or null if not a valid
 	 *         hex string
 	 */
-	public static AccountKey fromHexOrNull(AString a) {
-		if (a.count()!=LENGTH*2) return null;
-		return fromHexOrNull(a.toString());
+	public static AccountKey fromHexOrNull(AString hexString) {
+		if (hexString.count()!=LENGTH*2) return null;
+		return fromHexOrNull(hexString.toString());
 	}
 
 

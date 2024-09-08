@@ -33,7 +33,6 @@ public class ObjectsTest {
 	 * *any* ACell where RT.isCVM(..) returns true and validate(...) succeeds.
 	 * 
 	 * @param a Value to test
-	 * @throws IOException 
 	 */
 	public static void doAnyValueTests(ACell a) {
 		Hash h=Hash.get(a);

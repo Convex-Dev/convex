@@ -237,7 +237,6 @@ public class Main extends ACommand {
 	/**
 	 * Sets output to the specified file. 
 	 * @param outFile String specifying file. `-` or `null` specifies STDOUT
-	 * @throws IOException
 	 */
 	public void setOut(String outFile) {
 		try {

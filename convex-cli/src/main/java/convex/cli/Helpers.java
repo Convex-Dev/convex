@@ -72,8 +72,8 @@ public class Helpers {
 	
 	/**
 	 * Gets list of ports from strings containing port ranges
-	 * @param ports
-	 * @param count
+	 * @param ports List of ports or port ranges
+	 * @param count Number of ports to select
 	 * @return Port list, or null if parsing failed
 	 */
 	public static int[] getPortList(String ports[], int count)  {

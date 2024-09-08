@@ -15,9 +15,9 @@ public class FileUtils {
 
 	/**
 	 * Loads a file as a String. Handles `-` for STDIN
-	 * @param fileName
+	 * @param fileName File to load
 	 * @return String contents of file
-	 * @throws IOException
+	 * @throws IOException in case of IO failure
 	 */
 	public static String loadFileAsString(String fileName) throws IOException {
 		String result = null;
@@ -37,7 +37,7 @@ public class FileUtils {
 
 	/**
 	 * Write a file as a UTF-8 String to the specified path
-	 * @param file
+	 * @param file File path to write
 	 * @param content String content to write as UTF-8
 	 * @throws IOException If an IO error occurs
 	 */

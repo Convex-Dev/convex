@@ -165,8 +165,7 @@ public abstract class AKeyPair {
 	/**
 	 * Gets the JCA representation of this Key Pair
 	 * @return JCA KepPair
-	 * @throws GeneralSecurityException 
-	 * @throws BadFormatException 
+	 * @throws BadFormatException In case of bad format
 	 */
 	public KeyPair getJCAKeyPair() throws BadFormatException {
 		if (keyPair==null) {
@@ -282,11 +281,10 @@ public abstract class AKeyPair {
 	 * Gets a Ed25519 Private Key from a 32-byte array.
 	 * @param privKey Bytes to use as a private key seed
 	 * @return PrivateKey instance
-	 * @throws NoSuchAlgorithmException 
-	 * @throws IOException 
-	 * @throws InvalidKeySpecException 
+	 * @throws GeneralSecurityException if security utilities fail
 	 */
-	public static PrivateKey privateFromBytes(byte[] privKey) throws NoSuchAlgorithmException, IOException, InvalidKeySpecException {
+	public static PrivateKey privateFromBytes(byte[] privKey) throws GeneralSecurityException {
+		try {
 			KeyFactory keyFactory = KeyFactory.getInstance(ED25519);
 			PrivateKeyInfo privKeyInfo = new PrivateKeyInfo(new AlgorithmIdentifier(EdECObjectIdentifiers.id_Ed25519), new DEROctetString(privKey));
 	
@@ -294,6 +292,9 @@ public abstract class AKeyPair {
 	
 	        PrivateKey result = keyFactory.generatePrivate(pkcs8KeySpec);
 	        return result;
+		} catch (IOException e ) {
+			throw new GeneralSecurityException("IO filure in secure operation",e);
+		}
 	}
 
 	public static PublicKey publicKeyFromBytes(byte[] key) throws BadFormatException {

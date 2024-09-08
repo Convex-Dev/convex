@@ -19,7 +19,7 @@ public class KeyMixin extends AMixin {
 
 	/**
 	 * Gets the key specified on the CLI with --key
-	 * @return
+	 * @return Public key specified at CLI (may be prefix)
 	 */
 	public String getPublicKey() {
 		return publicKey;

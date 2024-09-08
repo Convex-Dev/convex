@@ -69,8 +69,6 @@ public class BIP39Test {
 		}
 	}
 
-
-
 	@Test public void testNewlyGenerated() {
 		doValidStringTest(BIP39.createSecureMnemonic(3));
 		doValidStringTest(BIP39.createSecureMnemonic(15));
@@ -78,14 +76,17 @@ public class BIP39Test {
 		doValidStringTest(BIP39.createSecureMnemonic(24)+"\t");
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(4), 3)));
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(16), 12)));
+		
+		String newGen=BIP39.createSecureMnemonic(24);
+		assertEquals(newGen,BIP39.normalise(newGen));
 	}
+	
 	
 	@Test 
 	public void testValidStrings() {
 		doValidStringTest("behind emotion squeeze"); // insufficient words
 		doValidStringTest("behinD Emotion SQUEEZE"); // insufficient words
 	}
-
 
 	private void doValidStringTest(String m) {
 		assertNull(BIP39.checkMnemonic(m));

@@ -60,7 +60,7 @@ public class API {
 	 * @param peerConfig Configuration map for the new Peer
      *
 	 * @return New peer Server instance
-	 * @throws InterruptedException 
+	 * @throws InterruptedException in case of interrupt
 	 * @throws ConfigException if configuration is invalid
 	 */
 	public static Server launchPeer(Map<Keyword, Object> peerConfig) throws LaunchException, InterruptedException, ConfigException {
@@ -100,9 +100,9 @@ public class API {
 	/**
 	 * Launches a peer with a default configuration. Mainly for testing.
 	 * @return Newly launched Server instance
-	 * @throws InterruptedException 
-	 * @throws ConfigException 
-	 * @throws IOException 
+	 * @throws InterruptedException in case of interrupt
+	 * @throws ConfigException in case of configuration error
+	 * @throws LaunchException if launch failed for some reason
 	 */
 	public static Server launchPeer() throws InterruptedException, ConfigException, LaunchException {
 		AKeyPair kp=AKeyPair.generate();
@@ -122,9 +122,9 @@ public class API {
 	 * @param genesisState genesis state for local network
 	 *
 	 * @return List of Servers launched
-	 * @throws InterruptedException 
-	 * @throws ConfigException 
-	 * @throws LaunchException 
+	 * @throws InterruptedException in case of interrupt
+	 * @throws ConfigException in case of configuration error
+	 * @throws LaunchException if launch failed for some reason
 	 *
 	 */
 	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState) throws InterruptedException, ConfigException, LaunchException {
@@ -140,9 +140,9 @@ public class API {
 	 * @param peerPorts Array of ports to use for each peer, if == null then randomly assign port numbers
 	 *
 	 * @return List of Servers launched
-	 * @throws InterruptedException 
-	 * @throws ConfigException 
-	 * @throws LaunchException 
+	 * @throws InterruptedException in case of interrupt
+	 * @throws ConfigException in case of configuration error
+	 * @throws LaunchException if launch failed for some reason
 	 *
 	 */
 	public static List<Server> launchLocalPeers(List<AKeyPair> keyPairs, State genesisState, int peerPorts[]) throws InterruptedException, ConfigException, LaunchException {
@@ -203,9 +203,9 @@ public class API {
 
 	/**
 	 * Gets the list of peers registered in the given Etch Store
-	 * @param store
+	 * @param store Store from which to read peers
 	 * @return null if peer list not present
-	 * @throws IOException 
+	 * @throws IOException in case of IO error reading peers from store
 	 */
 	public static List<AccountKey> listPeers(AStore store) throws IOException {
 		AMap<ACell,ACell> data=store.getRootData();

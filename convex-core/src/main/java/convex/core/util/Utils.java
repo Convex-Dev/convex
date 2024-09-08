@@ -1164,7 +1164,7 @@ public class Utils {
 	 * @param timeoutMillis Timeout interval
 	 * @param test Test to run until true
 	 * @return True if the operation timed out, false otherwise
-	 * @throws InterruptedException 
+	 * @throws InterruptedException if interrupted while awaiting timeout
 	 */
 	public static boolean timeout(int timeoutMillis, Supplier<Boolean> test) throws InterruptedException {
 		long start = getTimeMillis();

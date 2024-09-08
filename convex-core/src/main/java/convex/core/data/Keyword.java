@@ -47,8 +47,8 @@ public final class Keyword extends ASymbolic {
 	
 	/**
 	 * Creates an interned Keyword. Use only for internal constants, won't get GC'd
-	 * @param name
-	 * @return
+	 * @param name Symbolic name for keyword
+	 * @return Interned Keyword
 	 */
 	public static Keyword intern(String name) {
 		return Cells.intern(Keyword.create(name));

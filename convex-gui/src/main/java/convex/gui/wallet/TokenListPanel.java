@@ -111,8 +111,8 @@ public class TokenListPanel extends JPanel {
 	 * 1. The default token token, if the token passed is already the default
 	 * 2. The next other token in the list 
 	 * 3. Null otherwise (no other token available)
-	 * @param token
-	 * @return
+	 * @param token Token selected for swap
+	 * @return TokenInfo for other token to trade with
 	 */
 	public static TokenInfo getOtherToken(TokenInfo token) {
 		TokenInfo other=TokenListPanel.getDefaultToken();

@@ -38,9 +38,6 @@ public class GUITest {
 			manager=new PeerGUI(3,AKeyPair.generate());
 			SERVER=manager.getPrimaryServer();
 			CONVEX=Convex.connect(SERVER);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new Error(e);
 		} catch (HeadlessException e) {
 			// ensure null manager
 			manager=null;

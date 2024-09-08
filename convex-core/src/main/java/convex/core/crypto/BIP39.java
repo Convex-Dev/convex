@@ -306,8 +306,8 @@ public class BIP39 {
 	
 	/**
 	 * Creates a normalised BIP39 mnemonic with the specified number of words
-	 * @param numWords
-	 * @return
+	 * @param numWords Number of words to generate
+	 * @return String containing normalised BIP39 mnemonic
 	 */
 	public static String createSecureMnemonic(int numWords) {
 		return Utils.joinStrings(createWords(new SecureRandom(),numWords)," ");
@@ -373,8 +373,8 @@ public class BIP39 {
 
 	/**
 	 * Check a list of words, returns the first word not in word list
-	 * @param words
-	 * @return
+	 * @param words List of words to check
+	 * @return First incorrect word, or null if all OK
 	 */
 	public static String checkWords(List<String> words) {
 		for (String w: words) {
