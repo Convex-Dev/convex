@@ -2,7 +2,6 @@ package convex.cli.account;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
-import convex.cli.Constants;
 import convex.cli.ExitCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
@@ -33,17 +32,27 @@ public class AccountBalance extends AAccountCommand {
 	private Account accountParent;
 
 	@Parameters(paramLabel="addresses",
-	description="Address(es) of account to query balance for.")
+	description="Address(es) to query balance for. If omitted, will look for --address argument.")
 	private String[] addresses;
+	
+	@Option(names={"-a", "--address"},
+			defaultValue="${env:CONVEX_ADDRESS}",
+			description = "Account address to use for query. Can specify with CONVEX_ADDRESS environment variable.")
+	protected String addressValue = null;
 
 	@Override
 	public void execute() throws InterruptedException {
+		Address address=Address.parse(addressValue);
 		if (addresses==null) {
-			if (verbose()>=2) {
-				informWarning("No address(es) specified.");
-				showUsage();
+			if (address!=null) {
+				addresses=new String[] {address.toString()};
+			} else {
+				if (verbose()>=2) {
+					informWarning("No address(es) specified.");
+					showUsage();
+				}
+				return;
 			}
-			return;
 		}		
 		
 		int n = addresses.length;

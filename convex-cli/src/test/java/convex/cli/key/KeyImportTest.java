@@ -109,7 +109,7 @@ public class KeyImportTest {
 			"--text", "elder mail trick garage hour enjoy attack fringe problem motion poem security caught false penalty", 
 			"--passphrase", new String("")
 		);
-		assertEquals(ExitCodes.SUCCESS,tester.getResult());
+		tester.assertExitCode(ExitCodes.SUCCESS);
 		
 		// Should give Ed25519 Seed: 616421a4ea27c65919faa5555e923f6005d76695c7d9ba0fe2a484b90e23de89
 

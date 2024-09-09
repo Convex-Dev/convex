@@ -38,6 +38,7 @@ public class KeyStoreMixin extends AMixin {
 	@Option(names = {"--storepass" }, 
 			scope = ScopeType.INHERIT, 
 			defaultValue = "${env:CONVEX_KEYSTORE_PASSWORD}", 
+			arity="0..1",
 			description = "Store integrity password for the keystore.") 
 	char[] keystorePassword;
 

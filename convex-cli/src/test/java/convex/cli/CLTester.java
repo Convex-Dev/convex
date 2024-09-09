@@ -59,6 +59,6 @@ public class CLTester {
 		if (result==expected) return;
 		System.err.println("STDOUT: "+output);
 		System.err.println("STDERR: "+error);
-		fail("Unexpected CLI result, expected "+expected+" but got "+result+ "with error: "+error);
+		fail("Unexpected CLI result, expected "+expected+" but got "+result+ " with error: "+error);
 	}
 }
