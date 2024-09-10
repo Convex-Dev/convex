@@ -2,8 +2,10 @@ package convex.gui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.awt.GraphicsEnvironment;
 import java.awt.HeadlessException;
 
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,7 @@ public class GUITest {
 	 */
 	public static void assumeGUI() {
 		assumeTrue(manager!=null);
+		assumeFalse(GraphicsEnvironment.isHeadless());
 	}
 	
 	/**
