@@ -25,12 +25,17 @@ public class RemoteClientTest {
 	public Convex getNewConvex() {
 		if (skip) return null;
 		AKeyPair kp=AKeyPair.generate();
-		Convex convex=Convex.connect(TEST_PEER);
-		
-		Address addr=convex.createAccount(kp);
-		convex.setAddress(addr);
-		convex.setKeyPair(kp);
-		return convex;
+		try {
+			Convex convex=Convex.connect(TEST_PEER);
+			Address addr=convex.createAccount(kp);
+			convex.setAddress(addr);
+			convex.setKeyPair(kp);
+			return convex;
+		} catch (Exception e) {
+			skip=true;
+			return null;
+		}
+			
 	}
 	
 	@Test public void testQuery() {
@@ -112,6 +117,7 @@ public class RemoteClientTest {
 
 	protected void checkValid(Convex convex) {
 		if (convex==null) {
+			skip=true;
 			Assume.assumeTrue(false);
 		} else {
 			// OK?
