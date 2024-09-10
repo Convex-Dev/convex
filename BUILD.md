@@ -7,7 +7,7 @@ Convex main repository is structured as a multi-module Maven project.
 ## Build and test
 
 ```
-mvn clean install
+GraphicsEnvironment.isHeadless()
 ```
 
 ## Release preparation

@@ -6,6 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased 
 
+## [0.7.14] - 2024-09-10
+
+### Added
+- New main class for both GUI and desktop ("MainGUI")
+- New `convex-integration` module
+- DLFS base implementation and browser
+- Better Result and `log` information
+
+### Changed
+- Updated CLI and GUI functionality
+- Significant internal refactoring
+- Upgrades to default REST API and OpenAPI documentation
+- Better error handling
+- Convert core modules to JPMS
 
 ## [0.7.13] - 2024-05-21
 
