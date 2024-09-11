@@ -26,7 +26,7 @@ public abstract class ACommand implements Runnable {
 		cl.setUsageHelpAutoWidth(true);
 		cl.setUsageHelpWidth(100);
 		cl.setUsageHelpLongOptionsMaxWidth(40);
-		cl.usage(System.out,Help.defaultColorScheme(Ansi.ON));
+		cl.usage(cli().commandLine().getOut(),Help.defaultColorScheme(Ansi.ON));
 	}
 	
 	public CommandLine commandLine() {

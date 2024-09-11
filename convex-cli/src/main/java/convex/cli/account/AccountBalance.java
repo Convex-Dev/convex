@@ -47,11 +47,8 @@ public class AccountBalance extends AAccountCommand {
 			if (address!=null) {
 				addresses=new String[] {address.toString()};
 			} else {
-				if (verbose()>=2) {
-					informWarning("No address(es) specified.");
-					showUsage();
-				}
-				return;
+				showUsage();
+				throw new CLIError(ExitCodes.USAGE,"No addressed specified");
 			}
 		}		
 		

@@ -42,6 +42,7 @@ public class AccountTest {
 	public void testBalance() {
 		CLTester tester;;
 		
+		AccountStatus as=SERVER.getPeer().getConsensusState().getAccount(Address.create(11));
 		tester =  CLTester.run(
 				"account", 
 				"balance",
@@ -49,8 +50,25 @@ public class AccountTest {
 				"11"
 			);
 		tester.assertExitCode(ExitCodes.SUCCESS);
-		AccountStatus as=SERVER.getPeer().getConsensusState().getAccount(Address.create(11));
 		assertEquals(""+as.getBalance(),tester.getOutput().trim());
+		
+		tester =  CLTester.run(
+				"account", 
+				"balance",
+				"--port",PORT,
+				"-a11"
+			);
+		tester.assertExitCode(ExitCodes.SUCCESS);
+		assertEquals(""+as.getBalance(),tester.getOutput().trim());
+		
+		// No account specified
+		tester =  CLTester.run(
+				"account", 
+				"balance",
+				"--port",PORT
+			);
+		tester.assertExitCode(ExitCodes.USAGE);
+
 	}
 	
 	@AfterAll
