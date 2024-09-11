@@ -57,6 +57,21 @@ mvn clean deploy -DperformRelease
 - Create new CHANGELOG "Unreleased" section for next version
 - Run `mvn versions:set -DnewVersion='0.7.4-SNAPSHOT'` for next snapshot version as required 
 
+## Docker build
+
+To build a peer container using docker in the current directory from the provided `Dockerfile`
+
+```bash
+docker build -t convexlive/convex:latest .
+```
+
+To deploy to docker hub:
+
+```
+docker login -u "convexlive" docker.io
+docker push convexlive/convex
+```
+
 ## Repeatable Builds
 
 It is the intention that builds should be repeatable. Any issues, please report!
