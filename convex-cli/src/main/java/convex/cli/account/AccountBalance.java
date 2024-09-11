@@ -59,9 +59,10 @@ public class AccountBalance extends AAccountCommand {
 			StringBuilder sb=new StringBuilder();
 			sb.append("(map balance [");
 			for (int i=0; i<n; i++) {
-				Address addr=Address.parse(addresses[i]);
+				String aString=addresses[i];
+				Address addr=Address.parse(aString);
 				if (addr==null) {
-					throw new CLIError(ExitCodes.USAGE,"Address not valid: "+addresses[i]);
+					throw new CLIError(ExitCodes.USAGE,"Address not valid: "+aString);
 				}
 				sb.append(addr);
 			}
