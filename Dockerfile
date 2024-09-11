@@ -8,7 +8,7 @@
 
 # Run stage
 
-FROM eclipse-temurin:21 AS run
+FROM eclipse-temurin:22-jdk-alpine AS run
 ENV HOME=/home/convex
 WORKDIR $HOME
 COPY ./convex-integration/target/convex.jar convex.jar
