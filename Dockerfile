@@ -14,8 +14,8 @@ WORKDIR $HOME
 COPY ./convex-integration/target/convex.jar convex.jar
 
 # Expose ports. These can be mapped to host ports
-EXPOSE 18888:18888
-EXPOSE 8080:8080
+EXPOSE 18888
+EXPOSE 8080
 
 ENTRYPOINT java -jar convex.jar local start
 

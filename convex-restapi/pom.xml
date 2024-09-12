@@ -67,7 +67,7 @@
 			<artifactId>json-simple</artifactId>
 			<version>${json.simple.version}</version>
 		</dependency>
-			<dependency>
+		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
@@ -77,6 +77,11 @@
 			<artifactId>slf4j-simple</artifactId>
 			<version>${slf4j.version}</version>
 			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.j2html</groupId>
+			<artifactId>j2html</artifactId>
+			<version>1.6.0</version>
 		</dependency>
 		<dependency>
 			<groupId>io.javalin</groupId>
@@ -99,9 +104,9 @@
 			<version>${javalin.version}</version>
 		</dependency>
 		<dependency>
-    		<groupId>io.javalin.community.ssl</groupId>
-    		<artifactId>ssl-plugin</artifactId>
-   			 <version>${javalin.version}</version>
+			<groupId>io.javalin.community.ssl</groupId>
+			<artifactId>ssl-plugin</artifactId>
+			<version>${javalin.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
@@ -123,13 +128,13 @@
 		</dependency>
 		<dependency>
 			<groupId>org.apache.httpcomponents.client5</groupId>
-  			<artifactId>httpclient5</artifactId>
-    		<version>${hc.version}</version>
+			<artifactId>httpclient5</artifactId>
+			<version>${hc.version}</version>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.httpcomponents.client5</groupId>
-  			<artifactId>httpclient5-fluent</artifactId>
-    		<version>${hc.version}</version>
+			<artifactId>httpclient5-fluent</artifactId>
+			<version>${hc.version}</version>
 		</dependency>
 	</dependencies>
 </project>

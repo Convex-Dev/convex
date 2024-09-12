@@ -138,6 +138,7 @@ public class RESTServer implements Closeable {
 	protected ChainAPI chainAPI;
 	protected DepAPI depAPI;
 	protected DLAPI dlAPI;
+	protected WebApp webApp;
 	protected PeerAdminAPI peerAPI;
 
 	private void addAPIRoutes(Javalin app) {
@@ -150,6 +151,8 @@ public class RESTServer implements Closeable {
 		peerAPI = new PeerAdminAPI(this);
 		peerAPI.addRoutes(app);
 
+		webApp = new WebApp(this);
+		webApp.addRoutes(app);
 
 		dlAPI = new DLAPI(this);
 		dlAPI.addRoutes(app);

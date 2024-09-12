@@ -33,7 +33,7 @@ public class StressTest {
 			port = rs.getPort();
 			server = rs;
 		} catch (Exception e) {
-			throw new Error(e);
+			throw Utils.sneakyThrow(e);
 		}
 	}
 
@@ -83,7 +83,7 @@ public class StressTest {
 				// System.out.println(cc.queryAccount());
 				Map<String, Object> res = cc.transact("(def a 1)");
 				if (res.get("errorCode") != null)
-					throw new Error(JSON.toPrettyString(res));
+					throw new RuntimeException(JSON.toPrettyString(res));
 				return res;
 			}, clients);
 			// wait for everything to be sent
@@ -94,7 +94,7 @@ public class StressTest {
 
 		} catch (Exception t) {
 			t.printStackTrace();
-			throw new Error(t);
+			throw Utils.sneakyThrow(t);
 		}
 	}
 
