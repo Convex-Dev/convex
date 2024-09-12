@@ -163,7 +163,8 @@ public class ObjectsTest {
 		try {
 			b = Format.read(enc);
 		} catch (BadFormatException e) {
-			throw new Error("Reload from complete encoding failed for: " + a + " with encoding "+enc);
+			fail("Reload from complete encoding failed for: " + a + " with encoding "+enc);
+			return;
 		}
 		assertEquals(a,b);
 		assertEquals(enc,b.getEncoding()); // Encoding should be the same
@@ -219,7 +220,8 @@ public class ObjectsTest {
 			ACell a3= Format.read(offsetEncoding);
 			assertEquals(a, a3);
 		} catch (BadFormatException e) {
-			throw new Error("Can't read encoding: 0x" + encoding.toHexString(), e);
+			fail("Can't read encoding: 0x" + encoding.toHexString(), e);
+			return;
 		}
 		
 		assertThrows(BadFormatException.class,()->Format.read(encoding.append(Samples.SMALL_BLOB).toFlatBlob()));

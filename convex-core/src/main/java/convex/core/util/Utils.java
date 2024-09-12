@@ -1440,7 +1440,9 @@ public class Utils {
 	}
 
 	public static String getVersion() {
-		return Utils.class.getPackage().getImplementationVersion();
+		String v= Utils.class.getPackage().getImplementationVersion();
+		if (v==null) v="Unlabelled SNAPSHOT";
+		return v;
 	}
 
 

@@ -2,6 +2,7 @@ package convex.core.examples;
 
 import java.io.IOException;
 
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
 
 /**
@@ -9,8 +10,8 @@ import convex.etch.EtchStore;
  */
 public class BeliefDeltaSimulation {
 
-	public static EtchStore store1=createTemp("store-one");
-	public static EtchStore store2=createTemp("store-two");
+	public EtchStore store1=createTemp("store-one");
+	public EtchStore store2=createTemp("store-two");
 	
 	public static void main(String[] args) {
 
@@ -19,9 +20,9 @@ public class BeliefDeltaSimulation {
 
 	private static EtchStore createTemp(String name) {
 		try {
-		return EtchStore.createTemp(name);
+			return EtchStore.createTemp(name);
 		} catch (IOException e) {
-			throw new Error(e);
+			throw Utils.sneakyThrow(e);
 		}
 	}
 

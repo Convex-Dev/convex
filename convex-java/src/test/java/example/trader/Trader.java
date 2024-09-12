@@ -2,6 +2,8 @@ package example.trader;
 
 import java.io.InputStream;
 
+import convex.core.util.Utils;
+
 public class Trader {
 
 	public static void main(String [] args) {
@@ -13,7 +15,7 @@ public class Trader {
 	    	System.out.println("Using API key: "+text);
 	    } catch (Exception e) {
 			e.printStackTrace();
-			throw new Error(e);
+			throw Utils.sneakyThrow(e);
 	    	
 	    }
 	}

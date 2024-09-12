@@ -17,6 +17,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.peer.API;
 import convex.peer.ConfigException;
@@ -43,7 +44,7 @@ public class ClientTest {
 			PFXTools.saveStore(keystore, TEMP_KEYSTORE, KEYSTORE_PASSWORD);
 			KEYSTORE_FILENAME = TEMP_KEYSTORE.getCanonicalPath();
 		} catch (Exception t) {
-			throw new Error(t);
+			throw Utils.sneakyThrow(t);
 		} 
 	}
 	

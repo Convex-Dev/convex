@@ -37,7 +37,7 @@ public class RefTest {
 		// equals comparison should work
 		assertEquals(ref, Ref.forHash(Samples.BAD_HASH));
 
-		// gneric properties of missing Ref
+		// generic properties of missing Ref
 		assertEquals(Samples.BAD_HASH, ref.getHash());
 		assertEquals(Ref.UNKNOWN, ref.getStatus()); // shouldn't know anything about this Ref yet
 		assertFalse(ref.isDirect());
@@ -379,7 +379,7 @@ public class RefTest {
 		try {
 			assertSame(a,Cells.persist(a));
 		} catch (IOException e) {
-			throw new Error(e);
+			throw Utils.sneakyThrow(e);
 		}
 	}
 
