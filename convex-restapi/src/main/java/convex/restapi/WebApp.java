@@ -1,6 +1,19 @@
 package convex.restapi;
 
-import static j2html.TagCreator.*;
+import static j2html.TagCreator.a;
+import static j2html.TagCreator.article;
+import static j2html.TagCreator.aside;
+import static j2html.TagCreator.body;
+import static j2html.TagCreator.div;
+import static j2html.TagCreator.each;
+import static j2html.TagCreator.h1;
+import static j2html.TagCreator.h4;
+import static j2html.TagCreator.head;
+import static j2html.TagCreator.html;
+import static j2html.TagCreator.join;
+import static j2html.TagCreator.link;
+import static j2html.TagCreator.p;
+import static j2html.TagCreator.title;
 
 import java.util.List;
 
@@ -8,7 +21,6 @@ import convex.core.util.Utils;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
-import j2html.tags.specialized.HtmlTag;
 
 public class WebApp {
 
@@ -33,7 +45,7 @@ public class WebApp {
 		ctx.status(200);
 	}
 	
-	private void missingPage(Context ctx) {
+	protected void missingPage(Context ctx) { 
 		DomContent content= html(
 				makeHeader("404: Not Found"),
 				body(
@@ -48,7 +60,6 @@ public class WebApp {
 		ctx.header("Content-Type", "text/html");
 		ctx.status(404);
 	}
-
 
 	static final List<String[]> LINKS = List.of(
 		sa("Open API documentation for this peer: ","Swagger API" ,"/swagger"),
@@ -81,6 +92,7 @@ public class WebApp {
 	public void addRoutes(Javalin app) {
 		app.get("/index.html", this::indexPage);
 		app.get("/", this::indexPage);
+		app.get("/404.html", this::missingPage);
 		
 		// app.error(404, this::missingPage);
 	}
