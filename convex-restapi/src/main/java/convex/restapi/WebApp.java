@@ -17,37 +17,53 @@ public class WebApp {
 	public WebApp(RESTServer restServer) {
 		this.server=restServer;
 	}
-
-	public HtmlTag index() {
-		return html(
-			makeHeader(),
-			body(
-				h1("Convex Peer Server"),
-				p("Version: "+Utils.getVersion()),
-				p("This is the default page for a Convex Peer Server with REST API"),
-				h3("Useful Link: "),
-				makeLinks()
-			)
-		);
-	}
 	
 	private void indexPage(Context ctx) {
-		ctx.header("Content-Type", "text.html");
+		DomContent content= html(
+				makeHeader("Convex Peer Server"),
+				body(
+					h1("Convex Peer Server"),
+					aside(makeLinks()).withStyle("float: right"),
+					p("Version: "+Utils.getVersion()),
+					p("This is the default page for a Convex Peer Server running the REST API")
+				)
+			);
+		ctx.result(content.render());
+		ctx.header("Content-Type", "text/html");
 		ctx.status(200);
-		ctx.result(index().render());
+	}
+	
+	private void missingPage(Context ctx) {
+		DomContent content= html(
+				makeHeader("404: Not Found"),
+				body(
+					h1("404: not found: "+ctx.path()),
+					p("This is not the page you are looking for."),
+					a("Go back to index").withHref("/index.html"),
+					makeLinks()
+					
+				)
+			);
+		ctx.result(content.render());
+		ctx.header("Content-Type", "text/html");
+		ctx.status(404);
 	}
 
 
 	static final List<String[]> LINKS = List.of(
 		sa("Open API documentation for this peer: ","Swagger API" ,"/swagger"),
-		sa("Convex Website: ","https://convex.world", "https://convex.world"),
-		sa("The Convex ","Project Discord", "https://discord.com/invite/xfYGq4CT7v")
+		sa("General information at the ","Convex Website", "https://convex.world"),
+		sa("Chat with the community at the ","Convex Discord Server", "https://discord.com/invite/xfYGq4CT7v"),
+		sa("Join the open source development: ","Convex-Dev", "https://github.com/Convex-Dev")
 	);
 	
 	private DomContent makeLinks() {
-		return each(LINKS,a->{
-			return li(join(a[0],a(a[1]).withHref(a[2])));
-		});
+		return article(
+			h4("Useful links: "),
+			each(LINKS,a->{
+				return div(join(a[0],a(a[1]).withHref(a[2])));
+			})
+		); //.withClass("grid");
 	}
 
 	// Silly helper function
@@ -55,14 +71,17 @@ public class WebApp {
 		return strings;
 	}
 
-	private DomContent makeHeader() {
+	private DomContent makeHeader(String title) {
 		return head(
-				title("Convex Peer Server"),
+				title(title),
 		        link().withRel("stylesheet").withHref("/css/pico.min.css")
 		);
 	}
 
 	public void addRoutes(Javalin app) {
 		app.get("/index.html", this::indexPage);
+		app.get("/", this::indexPage);
+		
+		// app.error(404, this::missingPage);
 	}
 }
