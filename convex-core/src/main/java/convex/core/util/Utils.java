@@ -880,7 +880,7 @@ public class Utils {
 		} else if (v instanceof Character) {
 			sb.append(((Character)v).toString());
 		} else {
-			throw new Error("Can't print: " + Utils.getClass(v));
+			throw new IllegalArgumentException("Can't print: " + Utils.getClass(v));
 		}
 	}
 
@@ -926,8 +926,8 @@ public class Utils {
 				InetSocketAddress addr = new InetSocketAddress(hostName, port);
 				return addr;
 			} catch (SecurityException e) {
-				// shouldn't happen, so error
-				throw new Error(e);
+				// shouldn't happen?
+				throw Utils.sneakyThrow(e);
 			}
 		}
 	}
@@ -956,7 +956,7 @@ public class Utils {
 	 */
 	public static <T> T[] filterArray(T[] arr, Predicate<T> predicate) {
 		if (arr.length <= 32) return filterSmallArray(arr, predicate);
-		throw new Error("Can't Filter large arrays");
+		throw new IllegalArgumentException("Can't Filter large arrays");
 	}
 
 	/**
@@ -1065,6 +1065,10 @@ public class Utils {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends Throwable> T sneakyThrow(Throwable t) throws T {
+		// Preserve interrupt in this case
+		if (t instanceof InterruptedException) {
+			Thread.currentThread().interrupt();
+		}
 		throw (T) t;
 	}
 
@@ -1433,6 +1437,10 @@ public class Utils {
 
 	public static long longByteAt(long value,long i) {
 		return 0xFF&(value >> ((ALongBlob.LENGTH - i - 1) * 8));
+	}
+
+	public static String getVersion() {
+		return Utils.class.getPackage().getImplementationVersion();
 	}
 
 

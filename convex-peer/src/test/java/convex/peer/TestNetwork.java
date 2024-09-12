@@ -112,7 +112,7 @@ public class TestNetwork {
 		try {
 			instance.waitForLaunch();
 		} catch (Exception e) {
-			throw new Error(e);
+			throw Utils.sneakyThrow(e);
 		} 
 		return instance;
 	}

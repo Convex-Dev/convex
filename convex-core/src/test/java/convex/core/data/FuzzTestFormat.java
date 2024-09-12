@@ -60,7 +60,7 @@ public class FuzzTestFormat {
 			try {
 				doFuzzTest(b);
 			} catch (Exception e) {
-				throw new Error("Uncaught problem in fix test for encoding: "+b);
+				throw Utils.sneakyThrow(e);
 			}
 		}
 	}

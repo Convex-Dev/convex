@@ -4,6 +4,7 @@ import static j2html.TagCreator.*;
 
 import java.util.List;
 
+import convex.core.util.Utils;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import j2html.tags.DomContent;
@@ -22,8 +23,9 @@ public class WebApp {
 			makeHeader(),
 			body(
 				h1("Convex Peer Server"),
+				p("Version: "+Utils.getVersion()),
 				p("This is the default page for a Convex Peer Server with REST API"),
-				p("You may be interested in: "),
+				h3("Useful Link: "),
 				makeLinks()
 			)
 		);
@@ -44,7 +46,6 @@ public class WebApp {
 	
 	private DomContent makeLinks() {
 		return each(LINKS,a->{
-			
 			return li(join(a[0],a(a[1]).withHref(a[2])));
 		});
 	}
@@ -56,7 +57,7 @@ public class WebApp {
 
 	private DomContent makeHeader() {
 		return head(
-		        title("Convex Peer Server"),
+				title("Convex Peer Server"),
 		        link().withRel("stylesheet").withHref("/css/pico.min.css")
 		);
 	}

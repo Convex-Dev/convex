@@ -19,6 +19,7 @@ import convex.cli.local.Local;
 import convex.cli.output.Coloured;
 import convex.cli.peer.Peer;
 import convex.core.util.FileUtils;
+import convex.core.util.Utils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
@@ -168,7 +169,7 @@ public class Main extends ACommand {
 	public static final class VersionProvider implements IVersionProvider {
 		@Override
 		public String[] getVersion() throws Exception {
-			String s = Main.class.getPackage().getImplementationVersion();
+			String s = Utils.getVersion();
 			return new String[] { "Convex version: " + s };
 		}
 	}
