@@ -47,9 +47,9 @@ public class RESTServer implements Closeable {
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
 
 		SslPlugin sslPlugin = getSSLPlugin(server.getConfig());
-		
 		app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
+			config.jetty.modifyServer(this::setupJettyServer);
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
 					// replacement for enableCorsForAllOrigins()
@@ -86,6 +86,10 @@ public class RESTServer implements Closeable {
 		addAPIRoutes(app);	
 	}
 
+	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer) {
+		jettyServer.addConnector(null);
+	}
+	
 	// Get an SSL plugin, or null if SSL cannot be configured
 	protected SslPlugin getSSLPlugin(HashMap<Keyword, Object> config) {
 		boolean useSSL=true;
