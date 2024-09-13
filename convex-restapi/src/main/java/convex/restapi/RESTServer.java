@@ -8,6 +8,7 @@ import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.HashMap;
 
+import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,7 +88,9 @@ public class RESTServer implements Closeable {
 	}
 
 	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer) {
-		jettyServer.addConnector(null);
+		ServerConnector connector = new ServerConnector(jettyServer);
+	    connector.setPort(8080);
+		jettyServer.addConnector(connector);
 	}
 	
 	// Get an SSL plugin, or null if SSL cannot be configured
@@ -102,6 +105,7 @@ public class RESTServer implements Closeable {
 				InputStream privateS=Files.newInputStream(privateFile);
 				sslPlugin = new SslPlugin(conf -> {
 					conf.pemFromInputStream(certS, privateS);
+					conf.http2=true;
 				});
 			} else {
 				log.warn("Failed to find SSL cerificates, defaulting back to HTTP");
