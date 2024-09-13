@@ -6,7 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased 
 
-## [0.7.14] - 2024-09-10
+## [0.7.15] - 2024-09-13
+
+### Added
+- Docker `Dockerfile` build for self-contained peer container
+
+### Changed
+- Better format / HTML building for peer web app with j2html
+- Better CLI design for `convex account balance`
+
+
+## [0.7.14] - 2024-09-10 - MAVEN CENTRAL ISSUE
+
+NOTE: Due to to an apparent issue in Maven Central, this release was only partially uploaded. It is recommended to avoid depending upon this release.
 
 ### Added
 - New main class for both GUI and desktop ("MainGUI")
