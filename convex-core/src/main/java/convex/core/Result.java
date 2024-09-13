@@ -1,6 +1,7 @@
 package convex.core;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
@@ -27,6 +28,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.Context;
+import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
 import convex.core.lang.exception.AExceptional;
 import convex.core.lang.exception.ErrorValue;
@@ -438,8 +440,27 @@ public final class Result extends ARecordGeneric {
 		return INTERRUPTED_RESULT;
 	}
 
-
-
-
+	/**
+	 * Converts this result to a JSON representation. WARNING: some information may be lost because JSON is a terrible format.
+	 * 
+	 * @return JSON Object containing values from this Result
+	 */
+	public HashMap<String, Object> toJSON() {
+		HashMap<String, Object> hm=new HashMap<>();
+		
+		if (isError()) {
+			hm.put("errorCode", RT.name(getErrorCode()).toString());
+		} 
+		
+		hm.put("value", RT.json(getValue()));
+		
+		AVector<AVector<ACell>> log = getLog();
+		if (log!=null) hm.put("info", RT.json(log));
+		
+		AMap<Keyword, ACell> info = getInfo();
+		if (info!=null) hm.put("info", RT.json(info));
+		
+		return hm;
+	}
 
 }

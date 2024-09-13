@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Address;
 
-public class RemoteClientTest {
+public class RemoteRESTClientTest {
 	
 	// Use to skip remote tests
 	static boolean skip=false;

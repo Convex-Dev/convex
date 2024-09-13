@@ -287,15 +287,6 @@ public class ChainAPI extends ABaseAPI {
 		}
 	}
 
-	private HashMap<String, Object> jsonResult(Result r) {
-		HashMap<String, Object> hm=new HashMap<>();
-		if (r.isError()) {
-			hm.put("errorCode", RT.name(r.getErrorCode()).toString());
-		} 
-		hm.put("value", RT.json(r.getValue()));
-		hm.put("info", RT.json(r.getInfo()));
-		return hm;
-	}
 
 	private static Keyword K_FAUCET=Keyword.create("faucet");
 	
@@ -355,7 +346,7 @@ public class ChainAPI extends ABaseAPI {
 		// Optional: pre-compile to Op
 		Result r = convex.transactSync("(transfer " + addr + " " + amt + ")");
 		if (r.isError()) {
-			HashMap<String, Object> hm = jsonResult(r);
+			HashMap<String, Object> hm = r.toJSON();
 			ctx.result(JSON.toPrettyString(hm));
 			ctx.status(422);
 		} else {
@@ -676,9 +667,9 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	private void prepareResult(Context ctx, Result r) {
-		HashMap<String, Object> rmap = jsonResult(r);
+		HashMap<String, Object> resultJSON = r.toJSON();
 		ctx.status(r.isError()?422:200);
-		ctx.result(JSON.toPrettyString(rmap));
+		ctx.result(JSON.toPrettyString(resultJSON));
 	}
 
 }

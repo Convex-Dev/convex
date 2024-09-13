@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Better format / HTML building for peer web app with j2html
 - Better CLI design for `convex account balance`
+- Better handling for JSON results in REST client
 
 
 ## [0.7.14] - 2024-09-10 - MAVEN CENTRAL ISSUE

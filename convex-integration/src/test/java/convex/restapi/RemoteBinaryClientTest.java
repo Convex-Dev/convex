@@ -27,7 +27,10 @@ import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
 
-public class RemoteClientTest {
+/**
+ * Tests for remote binary client
+ */
+public class RemoteBinaryClientTest {
 
 	static RESTServer server;
 	static int port;

@@ -14,6 +14,8 @@ import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
 import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.ContentType;
 
+import convex.core.ErrorCodes;
+import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.data.Address;
@@ -32,10 +34,10 @@ import convex.core.util.Utils;
  * limitation.
  */
 public class Convex {
-	private static final CloseableHttpAsyncClient httpasyncclient = HttpAsyncClients.createDefault();
+	private static final CloseableHttpAsyncClient httpasyncclient ;
 
 	static {
-		httpasyncclient.start();
+		httpasyncclient = HttpAsyncClients.createDefault();
 		Shutdown.addHook(Shutdown.CLIENTHTTP, ()->{
 			try {
 				httpasyncclient.close();
@@ -44,6 +46,7 @@ public class Convex {
 				e.printStackTrace();
 			}
 		});
+		httpasyncclient.start();
 	}
 
 	private final String url;
@@ -323,7 +326,7 @@ public class Convex {
 			Map<String, Object> result=future.get();
 			return result;
 		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
+			return Result.fromException(e).toJSON();
 		}
 	}
 
@@ -362,7 +365,7 @@ public class Convex {
 					if (hash==null) throw new Error("Hash provided by server not valid hex, got: "+hashHex);
 					CompletableFuture<Map<String,Object>> tr = submitAsync(hash);
 					return tr;
-				} catch (Throwable e) {
+				} catch (Exception e) {
 					throw Utils.sneakyThrow(e);
 				}
 			}
@@ -447,21 +450,19 @@ public class Convex {
 			CompletableFuture<SimpleHttpResponse> future=toCompletableFuture(fc -> {
 				httpasyncclient.execute(request, (FutureCallback<SimpleHttpResponse>) fc);
 			});
-			return future.thenApply(r->{
-				String rbody=null;;
-				SimpleHttpResponse response=r;
+			return future.thenApply(response->{
+				String rbody=null;
 				try {
 					rbody=response.getBody().getBodyText();
 					return JSON.parse(rbody);
 				} catch (Exception e) {
-					
 					if (rbody==null) rbody="<Body not readable as String>";
-					throw new RuntimeException("Error in response "+response+" because can't parse body: " +rbody,e);
+					Result res= Result.error(ErrorCodes.FORMAT,"Error in response "+response+" because can't parse body: " +rbody);
+					return res.toJSON();
 				}
 			});
-
 		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
+			return CompletableFuture.completedFuture(Result.fromException(e).toJSON());
 		}
 	}
 
