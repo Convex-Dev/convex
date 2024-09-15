@@ -35,22 +35,24 @@ import io.javalin.openapi.JsonSchemaResource;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
+import io.javalin.util.JavalinBindException;
 
 public class RESTServer implements Closeable {
 	protected static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
 
 	protected final Server server;
 	protected final Convex convex;
-	protected final Javalin app;
+	protected Javalin javalin;
 
 	private RESTServer(Server server) {
 		this.server = server;
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
-
+	}
+	
+	private Javalin buildApp() {
 		SslPlugin sslPlugin = getSSLPlugin(server.getConfig());
-		app = Javalin.create(config -> {
+		Javalin app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
-			config.jetty.modifyServer(this::setupJettyServer);
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
 					// replacement for enableCorsForAllOrigins()
@@ -85,13 +87,11 @@ public class RESTServer implements Closeable {
 		});
 
 		addAPIRoutes(app);	
+		return app;
 	}
 
-	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer) {
-		ServerConnector connector = new ServerConnector(jettyServer);
-		jettyServer.addConnector(connector);
-	}
-	
+
+
 	// Get an SSL plugin, or null if SSL cannot be configured
 	protected SslPlugin getSSLPlugin(HashMap<Keyword, Object> config) {
 		boolean useSSL=true;
@@ -188,22 +188,51 @@ public class RESTServer implements Closeable {
 	public static RESTServer create(Convex convex) {
 		return create(convex.getLocalServer());
 	}
+	
+	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer, Integer port) {
+		if (port==null) port=8080;
+		ServerConnector connector = new ServerConnector(jettyServer);
+		connector.setPort(port);
+		jettyServer.addConnector(connector);
+	}
 
+	/**
+	 * Start app with default port
+	 */
 	public void start() {
+		start(null);
+	}
+
+	/**
+	 * Start app with specific port
+	 */
+	public synchronized void start(Integer port) {
+		close();
+		try {
+			javalin=buildApp();
+			start(javalin,port);
+		} catch (JavalinBindException e) {
+			if (port!=null) throw e; // only try again if port unspecified
+			log.warn("Specified port "+port+"already in use, chosing another at random");
+			close();
+			
+			port=0; // use random port
+			javalin=buildApp();
+			start(javalin,port);
+		}
+	}
+	
+	protected void start(Javalin app, Integer port) {
+		org.eclipse.jetty.server.Server jettyServer=app.jettyServer().server();
+		setupJettyServer(jettyServer,port);
 		app.start();
 	}
 
-	public void start(Integer port) {
-		if (port==null) {
-			app.start();
-		} else {
-			app.start(port);
-		}
-	}
-
-	public void close() {
-		app.stop();
-		// app.close(); // Gone In Javalin 6?
+	public synchronized void close() {
+		if (javalin!=null) javalin.stop();
+		javalin=null;
+		
+		// we don't own the Convex server, so do nothing to it
 	}
 
 	public Convex getConvex() {
@@ -211,7 +240,7 @@ public class RESTServer implements Closeable {
 	}
 
 	/**
-	 * Gets the local Server instance, or null if not a local connection.
+	 * Gets the local Convex Server instance, or null if not using a local connection.
 	 * 
 	 * @return Server instance, or null if not available.
 	 */
@@ -220,7 +249,8 @@ public class RESTServer implements Closeable {
 	}
 
 	public int getPort() {
-		return app.port();
+		if (javalin==null) throw new Error("Javalin ot started");
+		return javalin.port();
 	}
 
 	public HashMap<Keyword, Object> getConfig() {

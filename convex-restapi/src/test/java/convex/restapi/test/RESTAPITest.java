@@ -35,6 +35,8 @@ public class RESTAPITest {
 		Server s=API.launchPeer();
 		RESTServer rs=RESTServer.create(s);
 		rs.start(0);
+		rs.close();
+		rs.start();
 		port=rs.getPort();
 		server=rs;
 		HOST_PATH="http://localhost:" + server.getPort();
