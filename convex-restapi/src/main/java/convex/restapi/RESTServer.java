@@ -89,7 +89,6 @@ public class RESTServer implements Closeable {
 
 	protected void setupJettyServer(org.eclipse.jetty.server.Server jettyServer) {
 		ServerConnector connector = new ServerConnector(jettyServer);
-	    connector.setPort(8080);
 		jettyServer.addConnector(connector);
 	}
 	
