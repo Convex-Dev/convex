@@ -14,7 +14,7 @@ public class CLIHelpTest {
 		assertExecuteCommandLineResult(0, "^Usage: convex account ", "account", "help");
 		assertExecuteCommandLineResult(0, "^Usage: convex account balance ", "account",  "balance", "--help");
 		assertExecuteCommandLineResult(0, "^Usage: convex account create ", "account",  "create", "--help");
-		assertExecuteCommandLineResult(0, "^Usage: convex account information ", "account",  "information", "--help");
+		assertExecuteCommandLineResult(0, "^Usage: convex account info ", "account",  "info", "--help");
 		assertExecuteCommandLineResult(0, "^Usage: convex account fund ", "account",  "fund", "--help");
 		assertExecuteCommandLineResult(0, "^Usage: convex key ", "key", "help");
 		assertExecuteCommandLineResult(0, "^Usage: convex key generate ", "key", "generate", "--help");

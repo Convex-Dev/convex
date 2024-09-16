@@ -1,16 +1,14 @@
 package convex.cli.account;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import convex.api.Convex;
-import convex.cli.Constants;
+import convex.cli.CLIError;
+import convex.cli.ExitCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
-import convex.core.lang.Reader;
+import convex.core.data.List;
+import convex.core.lang.Symbols;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;
 
@@ -22,39 +20,33 @@ import picocli.CommandLine.ParentCommand;
  *
  */
 
-@Command(name="information",
-	aliases={"info", "in"},
+@Command(name="info",
 	mixinStandardHelpOptions=true,
 	description="Get account information.")
 public class AccountInformation extends AAccountCommand {
-
-	private static final Logger log = LoggerFactory.getLogger(AccountInformation.class);
-
 	@ParentCommand
 	private Account accountParent;
 
-
 	@Parameters(paramLabel="address",
 	description="Address of the account to get information.")
-	private long addressNumber;
-
-    @Option(names={"-t", "--timeout"},
-		description="Timeout in miliseconds.")
-	private long timeout = Constants.DEFAULT_TIMEOUT_MILLIS;
-
+	private String addressValue;
 
 	@Override
 	public void execute() throws InterruptedException {
-		if (addressNumber == 0) {
-			log.warn("You need to provide a valid address number");
+		if (addressValue==null) {
+			this.informWarning("You need to provide an address / account number to get information");
+			showUsage();
 			return;
 		}
-
+		
+		Address address=Address.parse(addressValue);
+		if (address==null) {
+			throw new CLIError(ExitCodes.DATAERR,"Address cannot be parsed.");
+		}
+		
 		Convex convex = connect();
-		Address address = Address.create(addressNumber);
-        String queryCommand = String.format("(account #%d)", address.longValue());
-		ACell message = Reader.read(queryCommand);
-		Result result = convex.querySync(message);
+		ACell queryCommand = List.of(Symbols.ACCOUNT,address);
+		Result result = convex.querySync(queryCommand);
 		printResult(result);
 
 	}
