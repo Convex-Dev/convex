@@ -18,7 +18,7 @@ import convex.core.data.Address;
 public class RemoteRESTClientTest {
 	
 	// Use to skip remote tests
-	static boolean skip=false;
+	static boolean skip=true;
 	
 	static final String TEST_PEER="https://convex.world";
 	

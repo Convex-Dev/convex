@@ -3,7 +3,7 @@
   <parent>
     <groupId>world.convex</groupId>
     <artifactId>convex</artifactId>
-    <version>0.7.15-SNAPSHOT</version>
+    <version>0.7.15</version>
   </parent>
   <artifactId>convex-sodium</artifactId>
   <name>Sodium integration for Convex</name>

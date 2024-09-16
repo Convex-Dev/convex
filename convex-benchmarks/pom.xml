@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.7.15-SNAPSHOT</version>
+		<version>0.7.15</version>
 	</parent>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -45,7 +45,6 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
-					<appendAssemblyId>false</appendAssemblyId>
 				</configuration>
 				<executions>
 					<execution>

@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>world.convex</groupId>
 	<artifactId>convex</artifactId>
-	<version>0.7.15-SNAPSHOT</version>
+	<version>0.7.15</version>
 	<packaging>pom</packaging>
 
 	<name>Convex Parent</name>
@@ -36,7 +36,7 @@
 		<hc.version>5.3</hc.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2024-09-10T11:43:32Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2024-09-16T19:33:40Z</project.build.outputTimestamp>
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
 		</argLine>
