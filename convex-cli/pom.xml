@@ -36,6 +36,8 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
+					<outputDirectory>${project.build.directory}/..</outputDirectory>
+					<appendAssemblyId>false</appendAssemblyId>
 					<finalName>convex-cli</finalName>
 				</configuration>
 				<executions>
