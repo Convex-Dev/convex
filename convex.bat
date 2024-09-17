@@ -1,3 +1,3 @@
 @echo off
-java -jar convex-cli/target/convex-cli.jar %*
+java -jar convex-integration/target/convex.jar %*
 exit /b %errorlevel%
