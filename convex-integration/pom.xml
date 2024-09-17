@@ -43,7 +43,7 @@
 					<execution>
 						<id>create-archive</id>
 						<!-- Use install phase so it doesn't go in deployed Maven artifacts'  -->
-						<phase>install</phase>
+						<phase>site</phase>
 						<goals>
 							<goal>single</goal>
 						</goals>
