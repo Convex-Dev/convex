@@ -35,14 +35,15 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
-					<outputDirectory>${project.build.directory}/..</outputDirectory>
+					<outputDirectory>${project.build.directory}</outputDirectory>
 					<appendAssemblyId>false</appendAssemblyId>
 					<finalName>convex</finalName>
 				</configuration>
 				<executions>
 					<execution>
 						<id>create-archive</id>
-						<phase>package</phase>
+						<!-- Use install phase so it doesn't go in deployed Maven artifacts'  -->
+						<phase>install</phase>
 						<goals>
 							<goal>single</goal>
 						</goals>

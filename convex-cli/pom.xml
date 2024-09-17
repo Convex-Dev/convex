@@ -35,14 +35,14 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
-					<outputDirectory>${project.build.directory}/..</outputDirectory>
+					<outputDirectory>${project.build.directory}</outputDirectory>
 					<appendAssemblyId>false</appendAssemblyId>
 					<finalName>convex-cli</finalName>
 				</configuration>
 				<executions>
 					<execution>
 						<id>create-archive</id>
-						<phase>package</phase>
+						<phase>install</phase>
 						<goals>
 							<goal>single</goal>
 						</goals>
