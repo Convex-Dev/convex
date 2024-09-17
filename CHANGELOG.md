@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased 
 
+### Changed
+
+- `set!` now doesn't fail on pending definitions
+
 ## [0.7.15] - 2024-09-17
 
 ### Added

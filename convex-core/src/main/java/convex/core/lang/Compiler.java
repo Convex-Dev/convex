@@ -245,11 +245,17 @@ public class Compiler {
 		
 		if (position==null) {
 			// If not a local binding, create a Def Op iff definition already exists
+			Def<?> op = Def.create(sym, exp);
 			if (context.getEnvironment().containsKey(sym)) {
-				Def<?> op = Def.create(sym, exp);
 				return context.withResult(Juice.COMPILE_NODE,op);
+			} else {
+				Constant<Symbol> symOp=Constant.of(sym);
+				Invoke<?> check=Invoke.create(Constant.of(Core.LOOKUP_META),Special.forSymbol(Symbols.STAR_ADDRESS),symOp);
+				Invoke<?> fail=Invoke.create(Constant.of(Core.FAIL),Constant.of(ErrorCodes.UNDECLARED),symOp);
+				Cond<?> cond=Cond.create(check,op,fail);
+				// a bit more expensive for multiple ops
+				return context.withResult(Juice.COMPILE_NODE*3,cond);
 			}
-			return context.withUndeclaredError(sym);
 		} else {
 			// Otherwise must be a Local binding, so use a Set op
 			AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);

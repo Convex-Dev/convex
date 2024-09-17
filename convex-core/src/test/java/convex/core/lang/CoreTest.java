@@ -4246,6 +4246,9 @@ public class CoreTest extends ACVMTest {
 			assertCVMEquals(3L, eval(ctx,"(do (let [a 2] (def a 3)) a)"));
 		}
 		
+		// Set on a earlier definition
+		assertSame(CVMLong.ZERO, eval("(do (def a 3) (set! a 0) a)"));
+		
 		// Bad types
 		assertSyntaxError(step("(set! :a 2)"));
 		assertSyntaxError(step("(set! 'noff 2)"));
