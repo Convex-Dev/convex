@@ -23,7 +23,6 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.7.1</version>
 				<configuration>
-					<outputDirectory>${project.directory}</outputDirectory>
 					<archive>
 						<manifest>
 							<mainClass>convex.main.Main</mainClass>
@@ -36,6 +35,8 @@
 					<descriptorRefs>
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
+					<outputDirectory>${project.build.directory}/..</outputDirectory>
+					<appendAssemblyId>false</appendAssemblyId>
 					<finalName>convex</finalName>
 				</configuration>
 				<executions>

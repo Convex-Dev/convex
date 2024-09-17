@@ -31,31 +31,6 @@
 					</annotationProcessorPaths>
 				</configuration>
 			</plugin>
-			
-			<plugin>
-				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.7.1</version>
-				<configuration>
-					<outputDirectory>${project.directory}</outputDirectory>
-					<archive>
-						<manifest>
-							<mainClass>convex.cli.Main</mainClass>
-						</manifest>
-					</archive>
-					<descriptorRefs>
-						<descriptorRef>jar-with-dependencies</descriptorRef>
-					</descriptorRefs>
-				</configuration>
-				<executions>
-					<execution>
-						<id>create-archive</id>
-						<phase>package</phase>
-						<goals>
-							<goal>single</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
 		</plugins>
 	</build>
 

@@ -23,7 +23,6 @@
 				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.7.1</version>
 				<configuration>
-					<outputDirectory>${project.directory}</outputDirectory>
 					<archive>
 						<manifest>
 							<mainClass>convex.cli.Main</mainClass>
