@@ -94,9 +94,8 @@ public class RESTServer implements Closeable {
 
 	// Get an SSL plugin, or null if SSL cannot be configured
 	protected SslPlugin getSSLPlugin(HashMap<Keyword, Object> config) {
-		boolean useSSL=true;
 		SslPlugin sslPlugin=null;
-		if (useSSL) try {
+		try {
 			Path certFile=Utils.getHomePath().resolve(".convex/ssl/certificate.pem");
 			Path privateFile=Utils.getHomePath().resolve(".convex/ssl/private.pem");
 			if (Files.exists(certFile)&&Files.exists(privateFile)) {
