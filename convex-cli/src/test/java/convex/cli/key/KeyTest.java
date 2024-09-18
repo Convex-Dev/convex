@@ -2,6 +2,7 @@ package convex.cli.key;
 
 import java.io.File;
 import java.io.IOException;
+import java.security.GeneralSecurityException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -11,38 +12,36 @@ import org.junit.jupiter.api.Test;
 
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
+import convex.core.crypto.PFXTools;
 import convex.core.util.Utils;
 
 public class KeyTest {
 
 	private static final File TEMP_FILE;
 	private static final String KEYSTORE_FILENAME;
+	private static final String KEYSTORE_PASSWORD = "testPassword";
+	private static final String KEY_PASSWORD = "testKeyPassword";
+	
 	static {
 		try {
 			TEMP_FILE=File.createTempFile("tempKeystore", ".pfx");
+			PFXTools.createStore(TEMP_FILE, KEYSTORE_PASSWORD.toCharArray());
 			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
-		} catch (IOException e) {
+		} catch (IOException | GeneralSecurityException e) {
 			throw Utils.sneakyThrow(e);
 		}
 		TEMP_FILE.deleteOnExit();
 	}
-	private static final String KEYSTORE_PASSWORD = "testPassword";
-	private static final String KEY_PASSWORD = "testKeyPassword";
 
 	
 	@Test
 	public void testKeySign() throws IOException {
-		File f=new File("tempKeystoreSign101", ".pfx");
-		f.deleteOnExit();
-		String kfname=f.getCanonicalPath();
-		
 		// Import a seed from Ed25519 test case
 		CLTester tester =  CLTester.run(
 				"key", 
 				"import", 
 				"--type","seed",
-				"-v4",
-				"--keystore", kfname, 
+				"--keystore", KEYSTORE_FILENAME, 
 				"--text", "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7", 
 				"--keypass", KEY_PASSWORD);
 		tester.assertExitCode(ExitCodes.SUCCESS);
@@ -51,7 +50,7 @@ public class KeyTest {
 				"key", 
 				"sign", 
 				"--key","fc51cd8e", // fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025 from test case
-				"--keystore",kfname,
+				"--keystore",KEYSTORE_FILENAME,
 				"--keypass", KEY_PASSWORD, 
 				"--hex", "af82");
 		tester.assertExitCode(ExitCodes.SUCCESS);

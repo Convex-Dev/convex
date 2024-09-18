@@ -86,7 +86,7 @@
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-gpg-plugin</artifactId>
-						<version>3.2.5</version>
+						<version>3.2.6</version>
 						<executions>
 							<execution>
 								<id>sign-artifacts</id>
@@ -188,6 +188,11 @@
 					<artifactId>maven-surefire-plugin</artifactId>
 					<version>3.5.0</version>
 				</plugin>
+				<plugin>
+                	<groupId>org.apache.maven.plugins</groupId>
+                	<artifactId>maven-resources-plugin</artifactId>
+                	<version>3.2.0</version>
+            	</plugin>
 
 				<!-- This adds sources -->
 				<plugin>
