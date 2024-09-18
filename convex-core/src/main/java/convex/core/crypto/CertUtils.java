@@ -75,9 +75,14 @@ public class CertUtils {
 		return kpGen.generateKeyPair();
 	}
 	
-	public static void createCertificateFiles(Path path) throws GeneralSecurityException, OperatorCreationException, IOException {
+	public static void createCertificateFiles(String subjectDN, Path path) throws GeneralSecurityException, IOException {
 		KeyPair kp=generateRSAKeyPair();
-		X509Certificate cert=selfSign(kp,"CN=cn, O=o, L=L, ST=il, C=c");
+		X509Certificate cert;
+		try {
+			cert = selfSign(kp,subjectDN);
+		} catch (OperatorCreationException e) {
+			throw new GeneralSecurityException("Failed to self sign certificate",e);
+		}
 		
 		Path keyPath=path.resolve("private.pem");
 		Path certPath=path.resolve("certificate.pem");
@@ -96,7 +101,7 @@ public class CertUtils {
 	
 	public static void main(String... args) throws OperatorCreationException, GeneralSecurityException, IOException {
 		Providers.init();
-		createCertificateFiles(Path.of("."));
+		createCertificateFiles("CN=localhost, O=o, L=L, ST=il, C=c",Path.of("."));
 	}
 	
 }

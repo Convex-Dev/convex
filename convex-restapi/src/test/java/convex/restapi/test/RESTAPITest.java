@@ -55,6 +55,12 @@ public class RESTAPITest {
 		
 	}
 	
+//  Not obvious how to make this work given self signed certificates?
+//	@Test public void testHTTPS() throws IOException {
+//		Content c = Request.get("https://localhost").execute().returnContent();
+//		assertNotNull(c);
+//	}
+	
 	@Test public void testSwagger() throws IOException {
 		Content c = Request.get("http://localhost:" + server.getPort()+"/swagger").execute().returnContent();
 		String s = c.asString();

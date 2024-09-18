@@ -1,10 +1,8 @@
 package convex.restapi;
 
 import java.io.Closeable;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
-import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.HashMap;
 
@@ -15,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.CertUtils;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.util.Utils;
@@ -96,19 +95,26 @@ public class RESTServer implements Closeable {
 	protected SslPlugin getSSLPlugin(HashMap<Keyword, Object> config) {
 		SslPlugin sslPlugin=null;
 		try {
-			Path certFile=Utils.getHomePath().resolve(".convex/ssl/certificate.pem");
-			Path privateFile=Utils.getHomePath().resolve(".convex/ssl/private.pem");
+			Path basePath=Utils.getHomePath().resolve(".convex/ssl");
+			Path certFile=basePath.resolve("certificate.pem");
+			Path privateFile=basePath.resolve("private.pem");
 			if (Files.exists(certFile)&&Files.exists(privateFile)) {
-				InputStream certS=Files.newInputStream(certFile);
-				InputStream privateS=Files.newInputStream(privateFile);
-				sslPlugin = new SslPlugin(conf -> {
-					conf.pemFromInputStream(certS, privateS);
-					conf.http2=true;
-				});
+				// Use provided files
 			} else {
-				log.warn("Failed to find SSL cerificates, defaulting back to HTTP");
+				basePath = Files.createTempDirectory("certs");
+				String subjectDN="CN=localhost, O=o, L=L, ST=il, C=c";
+				CertUtils.createCertificateFiles(subjectDN,basePath);
 			}
-		} catch (InvalidPathException | IOException e) {
+
+			InputStream certS=Files.newInputStream(certFile);
+			InputStream privateS=Files.newInputStream(privateFile);
+			sslPlugin = new SslPlugin(conf -> {
+				conf.pemFromInputStream(certS, privateS);
+				conf.http2=true;
+			});
+
+		} catch (Exception e) {
+			e.printStackTrace();
 			log.warn("Failed to create SSL plugin, will use insecure HTTP only", e);
 		}
 		return sslPlugin;
