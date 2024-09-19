@@ -607,7 +607,7 @@ public class Connection {
 			log.trace("Channel closed from: {}", conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.warn("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
+			log.debug("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
 					+ e.getMessage());
 			key.cancel();
 		} catch (HandlerException e) {

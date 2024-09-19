@@ -254,7 +254,7 @@ public class RESTServer implements Closeable {
 	}
 
 	public int getPort() {
-		if (javalin==null) throw new Error("Javalin ot started");
+		if (javalin==null) throw new Error("Javalin not started");
 		return javalin.port();
 	}
 

@@ -84,9 +84,9 @@ public abstract class AStore implements Closeable {
 	 * Gets the Root Data from the Store. Root data is typically used to store the Peer state
 	 * in situations where the Peer needs to be restored from persistent storage.
 	 * 
-	 * @return Root data value from this store.
+	 * @return Root data value from this store. May be nil.
 	 * @throws IOException In case of store IO error
-	 * @throws MissingDataException is Root Data is missing
+	 * @throws MissingDataException if Root Data is missing
 	 */
 	public <T extends ACell> T getRootData() throws IOException {
 		Ref<T> ref=getRootRef();
@@ -95,15 +95,21 @@ public abstract class AStore implements Closeable {
 	}
 	
 	/**
-	 * Gets a Ref for Root Data. Root data is typically used to store the Peer state
+	 * Gets a Ref for the Root Data. Root data is typically used to store the Peer state
 	 * in situations where the Peer needs to be restored from persistent storage.
 	 * 
 	 * @return Root Data Ref from this store, or null if not found.
 	 * @throws IOException In case of store IO error
 	 */
+	@SuppressWarnings("unchecked")
 	public <T extends ACell> Ref<T> getRootRef() throws IOException {
 		Hash h=getRootHash();
 		Ref<T> ref=refForHash(h);
+		
+		// special case, we always recognise null even if not in store
+		if ((ref==null) &&(Hash.NULL_HASH.equals(h))) {
+			return (Ref<T>) Ref.NULL_VALUE;
+		}
 		return ref;
 	}
 

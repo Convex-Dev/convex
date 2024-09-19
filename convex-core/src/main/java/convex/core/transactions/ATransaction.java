@@ -31,7 +31,7 @@ public abstract class ATransaction extends ARecord {
 
 	protected ATransaction(long count,Address origin, long sequence) {
 		super(count);
-		if (origin==null) throw new ClassCastException("Null Origin Address for transaction");
+		if (origin==null) throw new IllegalArgumentException("Null Origin Address for transaction");
 		this.origin=origin;
 		this.sequence = sequence;
 	}

@@ -170,7 +170,7 @@ public class Etch {
 			// Need to populate  new file, with data length long and initial index block
 			MappedByteBuffer mbb=seekMap(0);
 
-			// write Header
+			// write Header, initally zeros expect magic number and version
 			byte[] temp=new byte[SIZE_HEADER];
 			System.arraycopy(MAGIC_NUMBER, 0, temp, 0, SIZE_HEADER_MAGIC);
 			Utils.writeShort(temp, (int)OFFSET_VERSION, ETCH_VERSION);
@@ -632,7 +632,7 @@ public class Etch {
 	 * @return Return Etch version number
 	 */
 	public short getVersion() {
-		// TODO: Override when we have more versions
+		// Override when we have more versions
 		return ETCH_VERSION;
 	}
 

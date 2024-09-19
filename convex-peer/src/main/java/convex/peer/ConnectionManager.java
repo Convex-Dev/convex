@@ -267,12 +267,10 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param peerKey Peer key linked to the connection to close and remove.
 	 *
 	 */
-	public synchronized void closeConnection(AccountKey peerKey) {
-		if (connections.containsKey(peerKey)) {
-			Connection conn=connections.get(peerKey);
-			if (conn!=null) {
-				conn.close();
-			}
+	public void closeConnection(AccountKey peerKey) {
+		Connection conn=connections.get(peerKey);
+		if (conn!=null) {
+			conn.close();
 			connections.remove(peerKey);
 		}
 	}
@@ -280,7 +278,7 @@ public class ConnectionManager extends AThreadedComponent {
 	/**
 	 * Close all outgoing connections from this Peer
 	 */
-	public synchronized void closeAllConnections() {
+	public void closeAllConnections() {
 		for (Connection conn:connections.values()) {
 			if (conn!=null) conn.close();
 		}
@@ -534,7 +532,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @throws InterruptedException If broadcast is interrupted
 	 *
 	 */
-	public synchronized void broadcast(Message msg) throws InterruptedException {
+	public void broadcast(Message msg) throws InterruptedException {
 		HashMap<AccountKey,Connection> hm=getCurrentConnections();
 		
 		long start=Utils.getCurrentTimestamp();

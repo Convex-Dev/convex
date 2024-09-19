@@ -209,8 +209,8 @@ public class API {
 	 */
 	public static List<AccountKey> listPeers(AStore store) throws IOException {
 		AMap<ACell,ACell> data=store.getRootData();
-		
 		ArrayList<AccountKey> results=new ArrayList<>();
+		if (data==null) return results;
 		
 		long n=data.count();
 		for (int i=0; i<n; i++) {

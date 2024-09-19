@@ -235,13 +235,10 @@ public class ChainAPI extends ABaseAPI {
 	public void queryPeer(Context ctx) throws InterruptedException {
 		AccountKey addr = null;
 		String addrParam = ctx.pathParam("addr");
-		try {
 
-			addr = AccountKey.parse(addrParam);
-			if (addr == null)
-				throw new BadRequestResponse(jsonError("Invalid peer key: " + addrParam));
-		} catch (Exception e) {
-			throw new BadRequestResponse(jsonError("Expected valid peer key in path but got [" + addrParam + "]"));
+		addr = AccountKey.parse(addrParam);
+		if (addr == null) {
+			throw new BadRequestResponse(jsonError("Invalid peer key: " + addrParam));
 		}
 
 		Result r = doQuery(Reader.read("(get-in *state* [:peers " + addr + "])"));

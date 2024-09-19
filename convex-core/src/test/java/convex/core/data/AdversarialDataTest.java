@@ -309,7 +309,7 @@ public class AdversarialDataTest {
 		invalidTest(Call.create(HERO, 0, HERO,-10,Symbols.FOO,Vectors.empty())); 
 	
 		// invalid origin in Call. TODO: reconsider?
-		assertThrows(ClassCastException.class, ()->Call.create(null, 0, HERO,0,Symbols.FOO,Vectors.empty())); 
+		assertThrows(IllegalArgumentException.class, ()->Call.create(null, 0, HERO,0,Symbols.FOO,Vectors.empty())); 
 	}
 
 	private void invalidTest(ACell b) {

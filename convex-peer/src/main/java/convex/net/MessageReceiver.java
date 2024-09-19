@@ -155,6 +155,10 @@ public class MessageReceiver {
 			try {
 				action.accept(message);
 			} catch (Exception e) {
+				if (e instanceof InterruptedException) {
+					// maintain interrupt status
+					Thread.currentThread().interrupt();
+				}
 				throw new HandlerException("Error in message receive action handler: "+e.getMessage(),e);
 			}
 		} else {

@@ -144,6 +144,7 @@ public class PeerStart extends APeerCommand {
 					restServer.start(apiport);
 				}
 				
+				informSuccess("Peer started");
 				while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
 					Thread.sleep(400);
 				}
@@ -155,6 +156,7 @@ public class PeerStart extends APeerCommand {
 			} finally {
 				if (restServer!=null) restServer.close();
 			}
+			informWarning("Peer exiting normally...");
 		}
 	}
 

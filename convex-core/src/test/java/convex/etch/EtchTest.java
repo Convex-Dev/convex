@@ -48,6 +48,9 @@ public class EtchTest {
 		assertEquals(v.getEncoding(), etch.read(h).getValue().getEncoding());
 
 		assertEquals(h,r2.getHash());
+		
+		store.setRootData(null);
+		assertNull(store.getRootData());
 	}
 	
 	@Test 
