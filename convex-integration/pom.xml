@@ -36,6 +36,10 @@
 						<descriptorRef>jar-with-dependencies</descriptorRef>
 					</descriptorRefs>
 					<outputDirectory>${project.build.directory}</outputDirectory>
+					
+					<!-- This creates full convex.jar. We don't want it attached, just built -->
+					<attach>false</attach>
+					<appendAssemblyId>false</appendAssemblyId>
 					<finalName>convex</finalName>
 				</configuration>
 				<executions>
