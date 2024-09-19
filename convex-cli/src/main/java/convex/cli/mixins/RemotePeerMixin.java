@@ -14,7 +14,7 @@ public class RemotePeerMixin extends AMixin {
 	
 	@Option(names={"--port"},
 			defaultValue="${env:CONVEX_PORT:-"+Constants.DEFAULT_PEER_PORT+"}",
-			description="Port number to connect to a peer. Defaulting to: ${DEFAULT-VALUE}")
+			description="Port number to connect to host peer. Defaulting to: ${DEFAULT-VALUE}")
 	private Integer port;
 
 	@Option(names={"--host"},
@@ -37,7 +37,7 @@ public class RemotePeerMixin extends AMixin {
 			
 			return c;
 		} catch (ConnectException ce) {
-			throw new CLIError("Cannot connect to: "+sa,ce);
+			throw new CLIError("Cannot connect to host: "+sa,ce);
 		} catch (TimeoutException e) {
 			throw new CLIError("Timeout while attempting to connect to peer: "+hostname,e);
 		} catch (IOException e) {

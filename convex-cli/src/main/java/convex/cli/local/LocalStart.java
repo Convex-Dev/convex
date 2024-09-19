@@ -146,8 +146,6 @@ public class LocalStart extends ALocalCommand {
 		}
 
 	}
-	
-
 
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) throws InterruptedException {
 		List<AccountKey> keyList=keyPairList.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());

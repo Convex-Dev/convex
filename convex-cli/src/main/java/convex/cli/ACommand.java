@@ -115,6 +115,7 @@ public abstract class ACommand implements Runnable {
 	}
 	
 	public char[] readPassword(String prompt) {
+		// For some reason using this stops CTRL-C from being subsequently handled :-(
 		Console c = System.console();
 		if (c == null) {
 			if (verbose()>=3) {
@@ -125,7 +126,9 @@ public abstract class ACommand implements Runnable {
 		}
 		
 		if (isColoured()) prompt = Coloured.blue(prompt);
-		return c.readPassword(prompt);
+		char[] pass= c.readPassword(prompt);
+		c.flush();
+		return pass;
 	}
 	
 	/**

@@ -41,6 +41,7 @@ import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
+import convex.core.util.Shutdown;
 import convex.net.impl.HandlerException;
 import convex.peer.Config;
 
@@ -535,6 +536,9 @@ public class Connection {
 					// make this a daemon thread so it shuts down if everything else exits
 					selectorThread.setDaemon(true);
 					selectorThread.start();				
+					
+					// shut down connection loop at end of shutdown process
+					Shutdown.addHook(Shutdown.CONNECTION,()->{selectorThread.interrupt();});
 				}
 			}
 		}

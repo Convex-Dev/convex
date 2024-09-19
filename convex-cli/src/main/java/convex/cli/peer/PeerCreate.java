@@ -9,7 +9,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.cli.CLIError;
-import convex.cli.Main;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.cli.output.RecordOutput;
 import convex.core.Result;
@@ -31,14 +30,13 @@ import picocli.CommandLine.Spec;
  *
  *		convex.peer.create
  *
- *  This creates an account and provides enougth funds, for a new peer account
+ *  This creates an peer on an existing network
  *
  *
  */
-
 @Command(name="create",
 	mixinStandardHelpOptions = true, 
-	description="Configures and creates a peer ready to join a Convex network.")
+	description="Configures and creates a peer on a Convex network. Needs an esisting peer as --host and a valid peer controller account. Will generate a new peer key if not otherwise specified.")
 public class PeerCreate extends APeerCommand {
 
 	private static final Logger log = LoggerFactory.getLogger(PeerCreate.class);
@@ -50,8 +48,6 @@ public class PeerCreate extends APeerCommand {
 
 	@Override
 	public void execute() throws InterruptedException {
-
-		Main mainParent = cli();
 
 		long peerStake = convex.core.Constants.MINIMUM_EFFECTIVE_STAKE;
 
@@ -67,14 +63,16 @@ public class PeerCreate extends APeerCommand {
 		}
 
 		try {
+			// connect using the default first user
+			Convex convex = peerMixin.connect();
+			
 			keyPair = AKeyPair.generate();
 
 			// save the new keypair in the keystore
 			PFXTools.setKeyPair(keyStore, keyPair, keyMixin.getKeyPassword());
 			storeMixin.saveKeyStore();
+			inform("Created new peer key: "+keyPair.getAccountKey());
 
-			// connect using the default first user
-			Convex convex = peerMixin.connect();
 			// create an account
 			Address address = convex.createAccountSync(keyPair.getAccountKey());
 			convex.transferSync(address, peerStake);
@@ -94,10 +92,10 @@ public class PeerCreate extends APeerCommand {
 			long currentBalance = convex.getBalance(address);
 
 			String shortAccountKey = accountKeyString.substring(0, 6);
-			RecordOutput output=new RecordOutput();
-			
+
+			RecordOutput output=new RecordOutput();			
 			output.addField("Public Peer Key", keyPair.getAccountKey().toString());
-			output.addField("Address", address.longValue());
+			output.addField("Controller Address", address.longValue());
 			output.addField("Balance", currentBalance);
 			output.addField("Inital stake amount", stakeAmount);
 			// System.out.println("You can now start this peer by executing the following line:\n");
@@ -107,12 +105,12 @@ public class PeerCreate extends APeerCommand {
 
 			output.addField("Peer start line",
 				String.format(
-					"./convex peer start --password=xx --address=%d --public-key=%s",
+					"./convex peer start --address=%d --peer-key=%s",
 					address.longValue(),
 					shortAccountKey
 				)
 			);
-			output.writeToStream(mainParent.commandLine.getOut());
+			output.writeToStream(cli().commandLine().getOut());
 		}  catch (IOException | GeneralSecurityException | ResultException t) {
 			throw new CLIError("Error creating Peer",t);
 		}

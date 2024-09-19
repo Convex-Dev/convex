@@ -114,6 +114,7 @@ public class PeerStart extends APeerCommand {
 
 	@Override
 	public void execute() throws InterruptedException {
+		
 		storeMixin.ensureKeyStore();
 		try (EtchStore store = etchMixin.getEtchStore()) {
 			
