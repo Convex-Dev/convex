@@ -1,5 +1,6 @@
 package convex.api;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
@@ -58,7 +59,7 @@ import convex.peer.Server;
  * professional like gnu)" - Linus Torvalds
  */
 @SuppressWarnings("unused")
-public abstract class Convex {
+public abstract class Convex implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(Convex.class.getName());
 

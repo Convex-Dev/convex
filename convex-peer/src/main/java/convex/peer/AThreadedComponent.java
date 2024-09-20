@@ -9,7 +9,7 @@ import convex.core.util.LoadMonitor;
 /**
  * Base class for a threaded execution component that runs within the context of a Peer Server
  */
-public abstract class AThreadedComponent {
+public abstract class AThreadedComponent implements AutoCloseable {
 
 	private static final Logger log = LoggerFactory.getLogger(AThreadedComponent.class.getName());
 
@@ -72,10 +72,5 @@ public abstract class AThreadedComponent {
 	public void close() {
 		Thread t=thread;
 		t.interrupt();
-	}
-	
-	@Override
-	public void finalize() {
-		close();
 	}
 }

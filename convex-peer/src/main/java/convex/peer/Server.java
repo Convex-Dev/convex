@@ -629,11 +629,6 @@ public class Server implements Closeable {
 		return nio.getPort();
 	}
 
-	@Override
-	public void finalize() {
-		close();
-	}
-
 	/**
 	 * Writes the Peer data to the configured store.
 	 * 

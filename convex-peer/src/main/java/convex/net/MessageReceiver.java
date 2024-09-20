@@ -77,12 +77,12 @@ public class MessageReceiver {
 	 * creates sufficient backpressure on clients sending a lot of messages.
 	 *
 	 * @param chan Byte channel
-	 * @throws IOException If IO error occurs
 	 * @return The number of bytes read from the channel, or -1 if EOS
+	 * @throws IOException If IO error occurs
 	 * @throws BadFormatException If a bad encoding is received
 	 * @throws HandlerException If the message handler throws an unexpected Exception
  	 */
-	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws IOException, BadFormatException, HandlerException {
+	public synchronized int receiveFromChannel(ReadableByteChannel chan) throws BadFormatException, HandlerException, IOException {
 		int numRead=0;
 
 		numRead = chan.read(buffer);
