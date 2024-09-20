@@ -10,46 +10,12 @@ import org.apache.hc.client5.http.fluent.Request;
 import org.apache.hc.client5.http.fluent.Response;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.HttpResponse;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import convex.core.crypto.AKeyPair;
 import convex.core.init.Init;
 import convex.java.JSON;
-import convex.peer.API;
-import convex.peer.ConfigException;
-import convex.peer.LaunchException;
-import convex.peer.Server;
-import convex.restapi.RESTServer;
 
-public class RESTAPITest {
-	static RESTServer server;
-	static int port;
-	static String HOST_PATH;
-	static String API_PATH;
-	static AKeyPair KP;
-	
-	@BeforeAll
-	public static void init() throws InterruptedException, ConfigException, LaunchException {
-		Server s=API.launchPeer();
-		RESTServer rs=RESTServer.create(s);
-		rs.start(0);
-		rs.close();
-		rs.start();
-		port=rs.getPort();
-		server=rs;
-		HOST_PATH="http://localhost:" + server.getPort();
-		API_PATH=HOST_PATH+"/api/v1";
-		KP=s.getKeyPair();
-	}
-	
-	@AfterAll 
-	public static void cleanShutdown() {
-		if (server!=null) {
-			server.close();
-		}
-	}
+public class RESTAPITest extends ARESTTest {
 	
 	@Test public void testDataAPI() {
 		

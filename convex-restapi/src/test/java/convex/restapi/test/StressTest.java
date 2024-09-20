@@ -13,29 +13,12 @@ import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.java.Convex;
 import convex.java.JSON;
-import convex.peer.API;
-import convex.peer.Server;
-import convex.restapi.RESTServer;
 
-public class StressTest {
+public class StressTest extends ARESTTest {
 
-	static RESTServer server;
-	static int port;
 	static int CLIENTCOUNT = 100;
 	static int TRANSCOUNT = 100;
-	static AKeyPair KP = AKeyPair.generate();
 
-	static {
-		try {
-			Server s = API.launchPeer();
-			RESTServer rs = RESTServer.create(s);
-			rs.start(0);
-			port = rs.getPort();
-			server = rs;
-		} catch (Exception e) {
-			throw Utils.sneakyThrow(e);
-		}
-	}
 
 	public static void main(String... args) throws InterruptedException, ExecutionException, TimeoutException {
 		try {
