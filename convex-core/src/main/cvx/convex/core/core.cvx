@@ -677,6 +677,24 @@
         (recur ~change new-value#))
       value#)))
  
+ (defmacro switch
+	^{:doc {:description "Switches on the result of an expression. Tests are computed in turn, based on equality, with an option default value, like `cond`."
+	  :examples    [{:code "(switch (+ 1 1) 0 :zero 1 :one 2 :two :default-value)"}]
+	  :signature   [{:params [exp & cases]}]}}	 
+   [exp & cases]
+   `(let [v# ~exp]
+	  ~(let [n (dec (count cases))]
+		 (loop [v cases i 0]
+		   (cond
+			 (>= i n) (cons 'cond 
+					    v)
+			 (recur (assoc v i (list 
+					   '= 
+					   (get v i) 
+					   'v#
+					   ))
+					(+ i 2)))))))
+ 
  (defn update
 	^{:doc {:description "Update a value in a associative data structure by applying a function."
 		          :examples    [{:code "(update {:count 1} :count inc)"}]

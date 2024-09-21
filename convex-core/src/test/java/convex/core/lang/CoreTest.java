@@ -597,6 +597,36 @@ public class CoreTest extends ACVMTest {
 		// No expressions, fall through to null
 		assertNull(eval("(cond)"));
 	}
+	
+	@Test public void testSwitch() {
+		// basic matches
+		assertEquals(1L,evalL("(switch true true 1)"));
+		assertEquals(4L,evalL("(switch 3 1 2 3 4)"));
+		assertEquals(4L,evalL("(switch 3 1 2 3 4 (fail))")); // default value ignored
+		assertEquals(7L,evalL("(switch 4 1 2 3 4 7)")); // default value taken
+		assertEquals(666L,evalL("(switch 88 666)")); // single default value
+		
+		// expressions work
+		assertEquals(6L,evalL("(switch (+ 2 3) (+ 1 4) (* 2 3) :missed)"));
+		
+		// later branches not evaluated
+		assertEquals(1L,evalL("(switch true true 1 (fail))"));
+		assertEquals(1L,evalL("(switch true true 1 (fail) (fail))"));
+		
+		// fail on early test
+		assertArgumentError(step("(switch 1 2 3 (fail :ARGUMENT \"bad test reached\") nil 7)"));
+		
+		// nil as default if not otherwise provided
+		assertNull(eval("(switch 1)"));
+		assertNull(eval("(switch 1 2 3)"));
+		assertNull(eval("(switch 1 2 3 4 5)"));
+		
+		// basic expansions
+		assertEquals(Reader.read("(let [v# 1] (cond))"),expand("(switch 1)"));
+		
+		// No expressions, fall through to null
+		assertArityError(step("(switch)"));
+	}
 
 	@Test
 	public void testEquals() {
@@ -1260,11 +1290,11 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(assoc (index) 1 2)"));
 		assertArgumentError(step("(assoc [1 2 3] :foo 7)"));
 	
-		// Definitiely Non-associative values
+		// Definitely non-associative values
 		assertCastError(step("(assoc 1 2 3)"));
 		assertCastError(step("(assoc :foo 2 3)"));
 		
-		// TODO: Not currently associative, but maybe should be?
+		// Not associative
 		assertCastError(step("(assoc \"abc\" 2 \\d)"));
 		assertCastError(step("(assoc 0xabcdef 2 12)"));
 		
@@ -1424,6 +1454,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(1L,2L),eval("(assoc-in #{1} [2] true)"));
 		assertArgumentError(step("(assoc-in #{3} [2] :fail)")); // bad value type
 		assertCastError(step("(assoc-in #{3} [3 2] :fail)")); // 'true' is not a data structure
+		
+		// nil cases
+		assertEquals(Maps.of(1L,Maps.of(5L,6L)), eval("(assoc-in nil [1 5] 6)"));
 
 		// Cast error - wrong key types
 		assertCastError(step("(assoc-in (index) :foo :bar)"));
