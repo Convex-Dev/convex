@@ -242,16 +242,14 @@
           :examples    [{:code "(mint my-token-address 1000)"}]
           :signature   [{:params [token amount]}]}}
   [token amount]
-  (call token
-        (burn amount)))
+  (call token (burn amount)))
 
 (defn mint 
   ^{:doc {:description "Mints an amount of tokens for the given token. User must have minting privileges. Amount may be negative to burn fungible tokens."
           :examples    [{:code "(mint my-token-address 1000)"}]
           :signature   [{:params [token amount]}]}}
   [token amount]
-  (call token
-        (mint amount)))
+  (call token (mint amount)))
 
 (defn transfer 
   ^{:doc {:description "Transfers balance of a fungible token."
@@ -263,8 +261,8 @@
 	  (cond
 	    ;; First check if receiver has a callable receive-asset function. If so, use this
 	    (callable? target 'receive-asset)
-	      (do 
-	        (offer target token amopunt) ;; Offer correct quantity
+	      (let [amount (int amount)] 
+	        (offer target token amount) ;; Offer correct quantity
 	        (call target 
 	          (receive-asset token amount nil)))
 				     

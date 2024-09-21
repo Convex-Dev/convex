@@ -44,10 +44,11 @@
          amount (-qc amount)
          bal    (-get-balance *caller*)
          tbal   (-get-balance addr)]
+        		 
      ;; Amount must be in valid range.
-     (assert (<= 0
-                 amount
-                 bal)) 
+     (cond (< amount 0) (fail :ARGUMENT "negative transfer"))
+     (cond (> amount bal) (fail :FUNDS "insufficent token balance")) 
+
      ;; Need this check in case of self-transfers.
      (when (= *caller* addr)
        (return amount))

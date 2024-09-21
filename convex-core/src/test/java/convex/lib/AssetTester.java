@@ -150,7 +150,7 @@ public class AssetTester extends ACVMTest {
 		ctx = step(ctx, "(asset/transfer *address* [token " + BAL + "])");
 		assertEquals(BAL, RT.jvm(ctx.getResult()));
 		assertEquals(BAL, evalL(ctx, "(asset/balance token *address*)"));
-
+		
 		// transfer nothing to self, should not affect balance
 		ctx = step(ctx, "(asset/transfer *address* [token nil])");
 		assertEquals(0L, (long) RT.jvm(ctx.getResult()));
@@ -160,6 +160,11 @@ public class AssetTester extends ACVMTest {
 		ctx = step(ctx, "(asset/offer *address* [token 0])");
 		assertCVMEquals(0, ctx.getResult());
 		assertCVMEquals(0, eval(ctx, "(asset/get-offer token *address* *address*)"));
+		
+		// negative transfers fail, even to self
+		assertArgumentError(step(ctx,"(asset/transfer *address* [token -1])"));
+		assertArgumentError(step(ctx,"(fungible/transfer token *address* -1)"));
+
 
 		// set a non-zero offer
 		ctx = step(ctx, "(asset/offer *address* token 666)");
