@@ -1,11 +1,14 @@
 package convex.restapi.api;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import convex.api.ContentTypes;
 import convex.api.Convex;
 import convex.core.Coin;
 import convex.core.ErrorCodes;
@@ -98,7 +101,12 @@ public class ChainAPI extends ABaseAPI {
 			summary = "Get data from the server with the specified hash", 
 			operationId = "data", 
 			pathParams = {
-					@OpenApiParam(name = "hash", description = "Data hash as a hex string. Leading '0x' is optional but discouraged.", required = true, type = String.class, example = "0x1234567812345678123456781234567812345678123456781234567812345678") })
+					@OpenApiParam(
+							name = "hash", 
+							description = "Data hash as a hex string. Leading '0x' is optional but discouraged.", 
+							required = true, 
+							type = String.class, 
+							example = "0x1234567812345678123456781234567812345678123456781234567812345678") })
 	public void getData(Context ctx) {
 		String hashParam = ctx.pathParam("hash");
 		Hash h = Hash.parse(hashParam);
@@ -202,7 +210,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse(jsonError("Invalid address: " + addrParam));
 		}
 
-		Result r = doQuery(Lists.of(Symbols.ACCOUNT, addr));
+		Result r = convex.querySync(Lists.of(Symbols.ACCOUNT, addr));
 
 		if (r.isError()) {
 			prepareResult(ctx,r);
@@ -241,7 +249,7 @@ public class ChainAPI extends ABaseAPI {
 			throw new BadRequestResponse(jsonError("Invalid peer key: " + addrParam));
 		}
 
-		Result r = doQuery(Reader.read("(get-in *state* [:peers " + addr + "])"));
+		Result r = convex.querySync(Reader.read("(get-in *state* [:peers " + addr + "])"));
 
 		if (r.isError()) {
 			prepareResult(ctx,r);
@@ -257,33 +265,6 @@ public class ChainAPI extends ABaseAPI {
 
 		ctx.result(JSON.toPrettyString(hm));
 	}
-
-	/**
-	 * Runs a query, wrapping exceptions
-	 * 
-	 * @param form
-	 * @return
-	 * @throws InterruptedException 
-	 */
-	private Result doQuery(ACell form) throws InterruptedException {
-		return convex.querySync(form);
-	}
-
-	/**
-	 * Runs a transaction, wrapping exceptions
-	 * 
-	 * @param form
-	 * @return
-	 */
-	private Result doTransaction(SignedData<ATransaction> signedTransaction) {
-		try {
-			return convex.transactSync(signedTransaction);
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new InternalServerErrorResponse("Failed to execute transaction: " + e);
-		}
-	}
-
 
 	private static Keyword K_FAUCET=Keyword.create("faucet");
 	
@@ -516,7 +497,7 @@ public class ChainAPI extends ABaseAPI {
 		AKeyPair kp = AKeyPair.create(seed.toFlatBlob());
 		SignedData<ATransaction> sd = kp.signData(trans);
 
-		Result r = doTransaction(sd);
+		Result r = convex.transactSync(sd);
 		prepareResult(ctx,r);
 	}
 
@@ -559,7 +540,7 @@ public class ChainAPI extends ABaseAPI {
 							description = "Transaction service unavailable" )
 				}
 			)
-	public void runTransactionSubmit(Context ctx) {
+	public void runTransactionSubmit(Context ctx) throws InterruptedException {
 		Map<String, Object> req = getJSONBody(ctx);
 
 		// Get the transaction hash
@@ -607,7 +588,7 @@ public class ChainAPI extends ABaseAPI {
 		ASignature sig = Ed25519Signature.fromBlob(sigData);
 
 		SignedData<ATransaction> sd = SignedData.create(key, sig, trans.getRef());
-		Result r = doTransaction(sd);
+		Result r = convex.transactSync(sd);
 		prepareResult(ctx,r);
 	}
 
@@ -664,9 +645,36 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	private void prepareResult(Context ctx, Result r) {
-		HashMap<String, Object> resultJSON = r.toJSON();
 		ctx.status(r.isError()?422:200);
-		ctx.result(JSON.toPrettyString(resultJSON));
+		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
+		String accept=ContentTypes.JSON;
+		if (accepts!=null) {
+			for (String a:Collections.list(accepts)) {
+				if (a.contains(ContentTypes.CVX_RAW)) {
+					accept=ContentTypes.CVX_RAW;
+					break;
+				}
+				if (a.contains(ContentTypes.CVX)) {
+					accept=ContentTypes.CVX;
+				}
+			}
+		}
+		
+		if (accept.equals(ContentTypes.JSON)) {
+			ctx.contentType(ContentTypes.JSON);
+			HashMap<String, Object> resultJSON = r.toJSON();
+			ctx.result(JSON.toPrettyString(resultJSON));
+		} else if (accept.equals(ContentTypes.CVX)) {
+			ctx.contentType(ContentTypes.CVX);
+			ctx.result(RT.print(r).toString());
+		} else if (accept.equals(ContentTypes.CVX_RAW)) {
+			ctx.contentType(ContentTypes.CVX_RAW);
+			ctx.result(Format.encodeMultiCell(r, true).getBytes());
+		} else {
+			ctx.contentType(ContentTypes.TEXT);
+			ctx.status(400);
+			ctx.result("Unsupported content type: "+accept);
+		}
 	}
 
 }
