@@ -633,9 +633,9 @@ public class ConnectionManager extends AThreadedComponent {
 		} catch (InterruptedException e ) {
 			// maintain interrupt status
 			Thread.currentThread().interrupt();
+		} finally {
+			super.close();
 		}
-		
-		super.close();
 	}
 	
 	@Override

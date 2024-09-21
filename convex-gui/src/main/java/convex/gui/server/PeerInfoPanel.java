@@ -108,7 +108,6 @@ public class PeerInfoPanel extends JPanel {
 			sb.append("- Belief Propagator:    "+load(s.getBeliefPropagator())+"\n");
 			sb.append("- CVM Executor:         "+load(s.getCVMExecutor())+"\n");
 			sb.append("- Connection Manager:   "+load(s.getConnectionManager())+"\n");
-
 		}
 		
 		textArea.setText(sb.toString());

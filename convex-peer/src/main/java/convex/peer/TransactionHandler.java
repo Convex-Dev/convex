@@ -384,10 +384,6 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 
-	public void close() {
-		super.close();
-	}
-
 	public void start() {
 		this.reportedConsensusPoint=server.getPeer().getFinalityPoint();
 		super.start();
