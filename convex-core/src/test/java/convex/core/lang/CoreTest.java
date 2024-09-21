@@ -609,17 +609,21 @@ public class CoreTest extends ACVMTest {
 		// expressions work
 		assertEquals(6L,evalL("(switch (+ 2 3) (+ 1 4) (* 2 3) :missed)"));
 		
-		// later branches not evaluated
+		// later / missed branches not evaluated
 		assertEquals(1L,evalL("(switch true true 1 (fail))"));
+		assertEquals(1L,evalL("(switch true false (fail) true 1)"));
 		assertEquals(1L,evalL("(switch true true 1 (fail) (fail))"));
 		
 		// fail on early test
 		assertArgumentError(step("(switch 1 2 3 (fail :ARGUMENT \"bad test reached\") nil 7)"));
 		
+		// nil can be matched
+		assertEquals(1L,evalL("(switch nil nil 1 (fail))"));
+
 		// nil as default if not otherwise provided
 		assertNull(eval("(switch 1)"));
-		assertNull(eval("(switch 1 2 3)"));
-		assertNull(eval("(switch 1 2 3 4 5)"));
+		assertNull(eval("(switch nil 2 3)"));
+		assertNull(eval("(switch :foo 2 (fail) 4 5)"));
 		
 		// basic expansions
 		assertEquals(Reader.read("(let [v# 1] (cond))"),expand("(switch 1)"));
