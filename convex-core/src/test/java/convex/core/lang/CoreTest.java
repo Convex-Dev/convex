@@ -276,9 +276,14 @@ public class CoreTest extends ACVMTest {
 	public void testLetDestructuring() {
 		assertNull(eval("(let[[] []])"));
 		assertSame(Vectors.empty(),eval("(let [[& a] []] a)"));
+		assertEquals(Vectors.of(2,3),eval("(let [[a & more] [1 2 3]] more)"));
 		
 		// nil treated as empty sequence
 		assertSame(Vectors.empty(),eval("(let [[& a] nil] a)"));
+		
+		// _ is never bound, ignores argument
+		assertCVMEquals(1,eval("(let [[a _] [1 2]] a)"));
+		assertUndeclaredError(step("(let [[a _] [1 2]] _)"));
 		
 		assertEquals(2L,evalL("(let [[a b] [1 2]] b)"));
 		assertEquals(2L,evalL("(let [[a b] '(1 2)] b)"));
@@ -287,8 +292,12 @@ public class CoreTest extends ACVMTest {
 
 		assertArityError(step("(let [[a b] nil] b)"));
 		assertArityError(step("(let [[a b] [1]] b)"));
+		
+		// extra values to bind
+		assertArityError(step("(let [[a b] [1 2 3]] b)"));
+		assertEquals(Vectors.of(1,2),eval("(let [[a b & _] [1 2 3 4]] [a b])"));
 
-		// See issue #62
+		// too few values to bind, See issue #62
 		assertArityError(step("(let [[a b & c d] [1 2]] c)"));
 	}
 
