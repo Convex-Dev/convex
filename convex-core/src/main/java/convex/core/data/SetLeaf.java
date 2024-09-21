@@ -224,7 +224,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		
 		int epos=pos+headerLen;
 		if (count == 0) return Sets.empty();
-		if (count < 0) throw new BadFormatException("Negative count of map elements!");
+		if (count < 0) throw new BadFormatException("Negative count of set elements!");
 		if (count > MAX_ELEMENTS) throw new BadFormatException("SetLeaf too big: " + count);
 		
 		@SuppressWarnings("unchecked")

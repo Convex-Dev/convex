@@ -626,7 +626,8 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
-			if (children[i] == null) return false;
+			Ref<AHashSet<T>> child = children[i];
+			if (child == null) return false;
 		}
 		return true;
 	}

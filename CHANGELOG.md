@@ -6,9 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased 
 
+### Added
+
+- `dissoc-in`, `update` and `update-in` core functions
+- `switch` conditional macro
+
 ### Changed
 
-- `set!` now doesn't fail on pending definitions
+- `set!` now allows pending definitions
 
 ## [0.7.15] - 2024-09-17
 
