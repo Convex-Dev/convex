@@ -73,7 +73,7 @@
         decimals (int (or (:decimals config) 0))
         initial-holder (address (or (:initial-holder config) *address*))]
     `(do
-    	(defn -qc [q]
+       (defn -qc [q]
     	  (cond (int? q) q              ;; base case, quantity should always be an integer
     			(nil? q) 0 
     			(fail :ARGUMENT "Invalid quantity")))
@@ -154,9 +154,7 @@
          ^{:callable true}
          [addr amount data]
          (let [addr   (address addr)
-               amount (if amount
-                        (int amount)
-                        0)
+               amount (-qc amount)
                bal    (or (get-holding *caller*)
                           0)
                tbal   (or (get-holding addr)
@@ -166,100 +164,52 @@
            ~(if (:checked? config) 
         	   `(if-let [f (check-transfer *caller* addr amount)] (fail :BLOCK f)))
            
-           (assert (<= 0
-                       amount
-                       bal)) 
+           (cond (< amount 0) (fail :ARGUMENT "negative transfer"))
+           (cond (> amount bal) (fail :FUNDS "insufficent token balance")) 
+           
            ;; Need this check in case of self-transfers.
            (when (= *caller*
                     addr)
              (return amount))
-           (set-holding *caller*
-                        (- bal
-                           amount))
-           (set-holding addr
-                        (+ tbal
-                           amount))))
+           (set-holding *caller* (- bal amount))
+           (set-holding addr (+ tbal amount))))
 
        (defn get-offer
          ^{:callable true}
          [sender receiver]
-         (or (get-in offers
-                     [sender
-                      receiver])
-             0))
+         (get-in offers [sender receiver] 0))
 
        (defn offer
          ^{:callable true}
          [receiver quantity]
          (let [receiver (address receiver)
-               quantity (-qc quantity)
-               om       (get offers
-                             *caller*)]
-           (if (<= quantity
-                   0)
-             (when (get om
-                        receiver)
-               (def offers
-                    (assoc offers
-                           *caller*
-                           (dissoc om
-                                   receiver))))
-             (def offers
-                  (assoc-in offers
-                            [*caller*
-                             receiver]
-                            quantity)))
+               quantity (-qc quantity)]
+           (if (<= quantity 0)
+        	 (set! offers (dissoc-in offers [*caller* receiver]))
+             (set! offers (assoc-in offers [*caller* receiver] quantity)))
            quantity))
 
-
-       ;; TODO. Shouldn't also implement `owns?`
-
-
        (defn quantity-add
-
          ^{:callable true}
-
          [a b]
-
-         (let [a (if a
-                   (int a)
-                   0)
-               b (if b
-                   (int b)
-                   0)]
+         (let [a (cond a (int a) 0)
+               b (cond b (int b) 0)]
            (+ a b)))
 
-
        (defn quantity-sub
-
          ^{:callable true}
-
          [a b]
-
-         (let [a (if a
-                   (int a)
-                   0)
-               b (if b
-                   (int b)
-                   0)] 
+         (let [a (cond a (int a) 0)
+               b (cond b (int b) 0)] 
            (if (> a b)
-             (- a
-                b)
+             (- a b)
              0)))
 
-
        (defn quantity-subset?
-
          ^{:callable true}
-
          [a b]
-
-         (<= (if a
-               (int a)
-               0)
-             (if b
-               (int b)
-               0))))))
+         (<= (cond a (int a) 0)
+             (cond b (int b) 0))))))
 
 ;;;;;;;;;; API for handling fungible tokens
 

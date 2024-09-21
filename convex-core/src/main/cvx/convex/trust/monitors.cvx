@@ -1,6 +1,9 @@
 'convex.trust.monitors
 
-;; This library implements some generic value based trust moniotors that can be composed to implement more compex logic
+;; This library implements some generic value based trust moniotors 
+;; These work inline, i.e. no actor code needs to be delpoyed
+;;
+;; These can be composed to implement more complex logic
 
 (import convex.trust :as trust)
 (import convex.trust.whitelist :as wl)
@@ -13,14 +16,14 @@
   (or *scope* (fail :ARGUMENT "Null scope in generic trust monitor"))
   (let [[type arg] *scope*]
     (boolean
-      (cond
-        (= :actions type) (contains-key? arg action)
-        (= :all type) (do (for [m arg] (cond (trust/trusted? m subject action object) nil (return false))) true)
-        (= :any type) (do (for [m arg] (cond (trust/trusted? m subject action object) (return true))) false)
-        (= :not type) (not (trust/trusted? arg subject action object))
-        (= :time type) (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
-        (= :rule type) (query (arg subject action object))
-        (= :delegate type) 
+      (switch type
+        :actions (contains-key? arg action)
+        :all  (do (for [m arg] (cond (trust/trusted? m subject action object) nil (return false))) true)
+        :any  (do (for [m arg] (cond (trust/trusted? m subject action object) (return true))) false)
+        :not  (not (trust/trusted? arg subject action object))
+        :time (let [[start end] arg] (and (<= start *timestamp*) (or (nil? end) (> end *timestamp*))))
+        :rule (query (arg subject action object))
+        :delegate 
           (let [[allow deny base] arg]
             (cond
         	   (trust/trusted? deny subject action object) false

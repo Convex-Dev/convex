@@ -580,7 +580,7 @@ public class CoreTest extends ACVMTest {
 		
 		// fallthroughs not taken
 		assertEquals(1L,evalL("(cond true 1 2)"));
-		assertEquals(2L,evalL("(cond false 1 true 2 3)"));
+		assertEquals(2L,evalL("(cond false (fail) true 2 (fail))"));
 		
 		// fallthroughs to default value
 		assertEquals(2L,evalL("(cond false 1 2)"));
@@ -594,7 +594,7 @@ public class CoreTest extends ACVMTest {
 		assertNull(eval("(cond false 1)"));
 		assertEquals(CVMLong.ONE,eval("(cond true 1)"));
 		
-		// No expressions, fall through to null
+		// No expressions, fall through to nil
 		assertNull(eval("(cond)"));
 	}
 	
@@ -606,7 +606,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(7L,evalL("(switch 4 1 2 3 4 7)")); // default value taken
 		assertEquals(666L,evalL("(switch 88 666)")); // single default value
 		
-		// expressions work
+		// expressions work at runtime
 		assertEquals(6L,evalL("(switch (+ 2 3) (+ 1 4) (* 2 3) :missed)"));
 		
 		// later / missed branches not evaluated

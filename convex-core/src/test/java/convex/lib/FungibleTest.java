@@ -127,8 +127,8 @@ public class FungibleTest extends ACVMTest {
 		assertNotError(step(ctx,"(fungible/transfer token *address* "+bal+")"));
 
 		// bad transfers
-		assertAssertError(step(ctx,"(fungible/transfer token *address* -1)"));
-		assertAssertError(step(ctx,"(fungible/transfer token *address* "+(bal+1)+")"));
+		assertArgumentError(step(ctx,"(fungible/transfer token *address* -1)"));
+		assertFundsError(step(ctx,"(fungible/transfer token *address* "+(bal+1)+")"));
 	}
 
 	@Test public void testMint() {
