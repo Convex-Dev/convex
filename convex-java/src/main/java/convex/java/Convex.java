@@ -1,6 +1,5 @@
 package convex.java;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -9,8 +8,6 @@ import java.util.function.Consumer;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
 import org.apache.hc.client5.http.async.methods.SimpleRequestBuilder;
-import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
-import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
 import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.ContentType;
 
@@ -20,7 +17,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 
 /**
@@ -34,19 +30,7 @@ import convex.core.util.Utils;
  * limitation.
  */
 public class Convex {
-	private static final CloseableHttpAsyncClient httpasyncclient ;
 
-	static {
-		httpasyncclient = HttpAsyncClients.createDefault();
-		Shutdown.addHook(Shutdown.CLIENTHTTP, ()->{
-			try {
-				httpasyncclient.close();
-			} catch (IOException e) {
-				// ignore, probably dead anyway
-			}
-		});
-		httpasyncclient.start();
-	}
 
 	private final String url;
 	private AKeyPair keyPair;
@@ -447,7 +431,7 @@ public class Convex {
 	private CompletableFuture<Map<String,Object>> doRequest(SimpleHttpRequest request) {
 		try {
 			CompletableFuture<SimpleHttpResponse> future=toCompletableFuture(fc -> {
-				httpasyncclient.execute(request, (FutureCallback<SimpleHttpResponse>) fc);
+				HTTPClients.execute(request, (FutureCallback<SimpleHttpResponse>) fc);
 			});
 			return future.thenApply(response->{
 				String rbody=null;

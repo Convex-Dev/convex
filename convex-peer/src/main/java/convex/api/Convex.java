@@ -975,10 +975,18 @@ public abstract class Convex implements AutoCloseable {
 	 * Gets the consensus state from the remote Peer
 	 * 
 	 * @return Future for consensus state
-	 * @throws TimeoutException If initial status request times out
-	 * @throws InterruptedException In case of interrupt while awaiting Result
 	 */
-	public abstract CompletableFuture<State> acquireState() throws TimeoutException, InterruptedException;
+	public CompletableFuture<State> acquireState()  {
+		AStore store=Stores.current();
+		return requestStatus().thenCompose(status->{
+			Hash stateHash = RT.ensureHash(status.get(4));
+
+			if (stateHash == null) {
+				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
+			}
+			return acquire(stateHash,store);
+		});	
+	}
 	
 	/**
 	 * Sets the default timeout for this Convex client instance.
@@ -1003,7 +1011,9 @@ public abstract class Convex implements AutoCloseable {
 	 * Gets the local Server instance, or null if not a local connection
 	 * @return Server instance (or null)
 	 */
-	public abstract Server getLocalServer();
+	public Server getLocalServer() {
+		return null;
+	}
 
 	/**
 	 * Gets the remote address for this Convex client instance

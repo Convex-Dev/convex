@@ -100,14 +100,15 @@ public class ConvexRemote extends Convex {
 	 * @throws TimeoutException If initial status request times out
 	 * @throws InterruptedException In case of interrupt while acquiring
 	 */
-	public CompletableFuture<State> acquireState() throws TimeoutException, InterruptedException {
+	public CompletableFuture<State> acquireState() {
+		AStore store=Stores.current();
 		return requestStatus().thenCompose(status->{
 			Hash stateHash = RT.ensureHash(status.get(4));
 
 			if (stateHash == null) {
 				return CompletableFuture.failedStage(new ResultException(ErrorCodes.FORMAT,"Bad status response from Peer"));
 			}
-			return acquire(stateHash,Stores.current());
+			return acquire(stateHash,store);
 		});	
 	}
 	
