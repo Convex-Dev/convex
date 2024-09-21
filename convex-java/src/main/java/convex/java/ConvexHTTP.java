@@ -47,8 +47,7 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		// TODO Auto-generated method stub
-		return null;
+		throw new UnsupportedOperationException();
 	}
 
 	@Override

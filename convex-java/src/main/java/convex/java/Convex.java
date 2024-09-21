@@ -430,9 +430,7 @@ public class Convex {
 	 */
 	private CompletableFuture<Map<String,Object>> doRequest(SimpleHttpRequest request) {
 		try {
-			CompletableFuture<SimpleHttpResponse> future=toCompletableFuture(fc -> {
-				HTTPClients.execute(request, (FutureCallback<SimpleHttpResponse>) fc);
-			});
+			CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
 			return future.thenApply(response->{
 				String rbody=null;
 				try {
@@ -449,27 +447,7 @@ public class Convex {
 		}
 	}
 
-	private static <T> CompletableFuture<T> toCompletableFuture(Consumer<FutureCallback<T>> c) {
-        CompletableFuture<T> promise = new CompletableFuture<>();
 
-        c.accept(new FutureCallback<T>() {
-            @Override
-            public void completed(T t) {
-                promise.complete(t);
-            }
-
-            @Override
-            public void failed(Exception e) {
-                promise.completeExceptionally(e);
-            }
-
-            @Override
-            public void cancelled() {
-                promise.cancel(true);
-            }
-        });
-        return promise;
-    }
 
 
 

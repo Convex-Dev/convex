@@ -691,7 +691,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the resolved CNS value
 	 */
 	public CompletableFuture<ACell> resolve(String cnsName) {
-		ACell form = buildCodeForm("(import "+cnsName+")");
+		ACell form = buildCodeForm("(resolve "+cnsName+")");
 		return query(form).thenApply(r->{
 			if (r.isError()) throw new RuntimeException("Resolve failed "+r);
 			return r.getValue();
