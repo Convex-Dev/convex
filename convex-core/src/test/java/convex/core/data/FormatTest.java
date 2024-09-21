@@ -22,8 +22,8 @@ public class FormatTest {
 		assertBadVLCEncoding("80ffffffffffffffffff7f"); // too long
 		assertBadVLCEncoding("ff80808080808080808000"); // long negative
 		
-		// TODO: fix this
-		// assertBadVLCEncoding("8000"); // excess leading bytes
+		assertBadVLCEncoding("8000"); // excess leading bytes
+		assertBadVLCEncoding("8080"); // no termination
 		
 		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MAX_VALUE));
 		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MIN_VALUE));
@@ -31,7 +31,10 @@ public class FormatTest {
 	
 	private void assertBadVLCEncoding(String hex) {
 		Blob b=Blob.fromHex(hex);
-		assertThrows(BadFormatException.class,()->Format.readVLCLong(b.getInternalArray(), b.getInternalOffset()));
+		assertThrows(BadFormatException.class,()->{
+			long val=Format.readVLCLong(b.getInternalArray(), b.getInternalOffset());
+			if (Format.getVLCLength(val)!=b.count()) throw new BadFormatException("Wrong length");
+		});
 	}
 
 	private void checkVLCEncoding(String hex, long a) {
