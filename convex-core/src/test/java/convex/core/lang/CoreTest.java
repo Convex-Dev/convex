@@ -1371,6 +1371,33 @@ public class CoreTest extends ACVMTest {
 		// arity error on count
 		assertArityError(step("(update-in [[2]] [0] count 666)"));
 	}
+	
+	@Test
+	public void testDissocIn() {
+		assertEquals(Maps.of(1,2),eval("(dissoc-in {1 2,3 4} [3])"));
+		assertSame(Maps.empty(),eval("(dissoc-in {:data {:count 1}} [:data :count])"));
+		
+		assertEquals(Maps.of(1,Maps.of(2,Maps.of(5,6))),eval("(dissoc-in {1 {2 {3 4, 5 6}}} [1 2 3])"));
+		assertEquals(Maps.of(1,Maps.of(2,Maps.of(5,6))),eval("(dissoc-in {1 {2 {5 6}}} [1 2 3])"));
+		assertEquals(Maps.empty(),eval("(dissoc-in {1 {2 {5 6}}} [1 2])"));
+		
+		// special case: no change for empty keys
+		assertCVMEquals(3,eval("(dissoc-in 3 [])"));
+		
+		// dissoc preserves Index type
+		assertEquals(Index.EMPTY,eval("(dissoc-in (index 0x 1) [0x])"));
+
+		// nil works as empty map 
+		assertSame(Maps.empty(),eval("(dissoc-in nil [2 3])"));
+		
+		// can't dissoc from a vector or list
+		assertCastError(step("(dissoc-in [1 2 3] [2])"));
+		assertCastError(step("(dissoc-in '(1 2 3) [0])"));
+
+		assertArityError(step("(dissoc-in)"));
+		assertArityError(step("(dissoc-in {})"));
+		assertArityError(step("(dissoc-in {} [] :foo)"));
+	}
 
 	@Test
 	public void testAssocIn() {

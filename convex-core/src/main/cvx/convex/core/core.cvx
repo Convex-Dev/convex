@@ -698,3 +698,19 @@
 	 (assoc-in m ks (f (get-in m ks) x)))
    ([m k f x & more]
 	 (assoc-in m ks (apply f (get-in m ks) more))))
+ 
+ (defn dissoc-in
+	^{:doc {:description "Dissocs from a nested associative data structure. If a nested result is empty? dissoc it as well."
+		          :examples    [{:code "(dissoc-in {:data {:count 1}} [:data :count])"}]
+		          :signature   [{:params [m ks f & args]}]}}
+   ([m ks]
+	 (cond
+	   (empty? ks) m
+	   (let [[k & more] ks]
+	     (cond
+	       (empty? more) 
+	         (dissoc m k)
+	       (let [nv (dissoc-in (get m k) more)]
+	    	 (cond
+	    	   (empty? nv) (dissoc m k)
+	    	   (assoc m k nv))))))))
