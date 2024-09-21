@@ -42,8 +42,7 @@ public class Convex {
 			try {
 				httpasyncclient.close();
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				// ignore, probably dead anyway
 			}
 		});
 		httpasyncclient.start();
