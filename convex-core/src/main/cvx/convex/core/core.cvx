@@ -646,20 +646,18 @@
               (compile (quote ~code))))
 
 (defmacro tailcall
-   ^{:doc {:description ["Advanced feature. While `return` stops the execution of a function and return, `tailcall` calls another one without consuming additional stack depth."
-                         "Rest of the current function will never be executed."]
+   ^{:doc {:description ["Perform a tail call to a function without consuming additional stack depth."
+                         "Assumes tail position: rest of the current function, if any, will not be executed."]
            :examples    [{:code "(tailcall (some-function 1 2 3))"}]
            :signature   [{:params [[f & args]] }]}}
   [callspec]
-  (let []
-    (when-not (list? callspec)
-        (fail :ARGUMENT
-              "tailcall requires a list representing function invocation"))
-    (let [n (count callspec)]
-      (if (== n 0) 
-    	  (fail :ARGUMENT "Tailcall requires at least a function argument in call list"))
-      (cons 'tailcall* 
-    		  callspec))))
+  (cond
+    (not (list? callspec))
+        (fail :ARGUMENT "tailcall requires a list representing function invocation")
+    (empty? callspec) (fail :ARGUMENT "tailcall requires a function argument")
+    (cons 
+    	'tailcall* 
+    	callspec)))
 
 (defmacro undef
   ^{:doc {:description "Opposite of `def`. Undefines a symbol, removing the mapping from the current environment if it exists."
@@ -678,3 +676,16 @@
        (let [new-value# ~(cons 'do body)]
         (recur ~change new-value#))
       value#)))
+ 
+ (defn update
+	^{:doc {:description "Update a value in a associative data structure by applying a function."
+		          :examples    [{:code "(update {:count 1} :count inc)"}]
+		          :signature   [{:params [m k f & args]}]}}
+   ([m k f]
+	(assoc m k (f (get m k))))
+   
+   ([m k f x]
+	(assoc m k (f (get m k) x)))
+   
+   ([m k f x & more]
+	(assoc m k (apply f (get m k) more))))

@@ -1322,6 +1322,29 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(assoc #{} 1 2 3)")); // arity before cast
 		assertArityError(step("(assoc #{} 1)"));
 	}
+	
+	@Test
+	public void testUpdate() {
+		assertEquals(Vectors.of(1,2,4),eval("(update [1 2 3] 2 inc)"));
+		assertEquals(Vectors.of(3),eval("(update [[1 2 3]] 0 count)"));
+
+		assertEquals(Vectors.of(1,2,3),eval("(update [1 2 3] 1 identity)"));
+
+		// nil works as empty map 
+		assertEquals(Maps.of(2,Sets.of(2,3)),eval("(update nil 2 union #{2,3})"));
+		
+		assertEquals(2L, evalL("(:count (update {:count 1} :count inc))")); // Example from docstring
+
+		// 666 is a bad value in all cases
+		assertCastError(step("(update [1 2 3] 2 666)"));
+		assertCastError(step("(update 666 2 inc)"));
+
+		assertArityError(step("(update)"));
+		assertArityError(step("(update {} :k)"));
+		
+		// arity error on count
+		assertArityError(step("(update [[2]] 0 count 666)"));
+	}
 
 	@Test
 	public void testAssocIn() {
