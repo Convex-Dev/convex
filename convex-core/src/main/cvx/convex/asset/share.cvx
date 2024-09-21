@@ -2,7 +2,7 @@
 
 (call *registry*
       (register {:description ["An actor that supports revenue sharing of an underlying asset"]
-                 :name        "Revenue Share actor"}))
+                 :name         "Revenue Share actor"}))
 
 ;;;;;;;;;; Setup
 
@@ -67,8 +67,8 @@
           :signature   [{:params [underlying]}]}}
   ([underlying]
     (let [id (inc counter)]
-      (def tokens (assoc tokens id [*caller* 0 underlying 0 0]))
-      (def counter id)
+      (set! tokens (assoc tokens id [*caller* 0 underlying 0 0]))
+      (set! counter id)
       id)))
 
 ;;; Trust / control SPI
@@ -136,12 +136,13 @@
 (defn 
   receive-asset
   ^{:callable true}
-  [token quantity data]
+  [utoken quantity data]
   
   (let [token (-get-token *scope*)
+        _ (or (= token utoken) (fail :STATE "incorrect underlying asset"))
         [controller supply utoken ubalance uclaimed] token
         quantity (asset-lib/accept *caller* token quantity)
-        _ (or (int? quantity) (fail "Non-integer quantity"))
+        _ (or (int? quantity) (fail :ARGUMENT "Non-integer quantity"))
         nubalance (+ ubalance quantity)
         nrec (assoc token 3 nubalance)]
     (set! tokens (assoc tokens *scope* nrec))
@@ -173,7 +174,7 @@
         ;; Add accepted quantity to receiver
        (-set-balance receiver id (+ (-get-balance receiver id) quantity))
        quantity)
-      (fail "No offers from sender"))))
+      (fail :STATE "No offers from sender"))))
 
 (defn get-offer
   ^{:callable true}
@@ -210,41 +211,43 @@
     (when-not (trust/trusted? controller *caller* :mint)
            (fail :TRUST "No rights to mint"))
     
-    (let [amount     (int amount) ;; Mint amount.
+    (let [amount     (-qc amount) ;; Mint amount.
           new-supply (+ supply amount)
           bal        (-get-balance *caller* *scope*)
           new-bal    (+ bal amount)]
-           
+      
+      (cond (< amount 0) (fail :ARGUMENT "can't mint negative tokens"))
+  		  
       ;; New supply must be in valid range.
-      (assert (<= 0 new-supply))
+      (cond (< new-supply 0) (fail :ARGUMENT "negative total supply"))
       
       ;; new balance must be in range
-      (assert (<= 0 new-bal))
+      (assert (<= 0 new-bal new-supply))
       
       ;; Update state
       (-set-balance *caller* *scope* new-bal)
       (let [new-token (assoc token 1 new-supply)]
-        (def tokens (assoc tokens *scope* new-token))
+        (set! tokens (assoc tokens *scope* new-token))
         new-supply))))
 
 (defn quantity-add
   ^{:callable true}
   [a b]
-  (let [a (if a (int a) 0)
-        b (if b (int b) 0)]
+  (let [a (cond a (int a) 0)
+        b (cond b (int b) 0)]
     (+ a b)))
 
 (defn quantity-sub
   ^{:callable true}
   [a b]
-  (let [a (if a (int a) 0)
-        b (if b (int b) 0)] 
+  (let [a (cond a (int a) 0)
+        b (cond b (int b) 0)] 
     (if (>= a b) (- a b) 0)))
 
 (defn quantity-subset?
    ^{:callable true}
    [a b]
-    (let [a (if a (int a) 0)
-        b (if b (int b) 0)] 
+    (let [a (cond a (int a) 0)
+          b (cond b (int b) 0)] 
     (<= a b)))
 

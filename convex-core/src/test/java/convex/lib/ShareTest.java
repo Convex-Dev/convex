@@ -1,7 +1,7 @@
 package convex.lib;
 
 import static convex.test.Assertions.assertCVMEquals;
-import static convex.test.Assertions.assertError;
+import static convex.test.Assertions.*;
 import static convex.test.Assertions.assertNotError;
 import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -88,10 +88,8 @@ public class ShareTest extends ACVMTest {
 		ctx=step(ctx,"(asset/balance SSS *address*)");
 		assertEquals(CVMLong.create(4044),ctx.getResult());
 
-		// Negative mint allowed?
-		assertEquals(4043,evalL(ctx,"(call SSS (mint -1))"));
-
-		assertError(step(ctx,"(call SSS (mint -9999999999999999))"));
+		assertArgumentError(step(ctx,"(call SSS (mint -1))"));
+		assertArgumentError(step(ctx,"(call SSS (mint -9999999999999999))"));
 		
 		AVector<ACell> token=eval(ctx,"SSS");
 		assertEquals(shareActor,token.get(0)); 

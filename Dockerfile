@@ -13,9 +13,15 @@ ENV HOME=/home/convex
 WORKDIR $HOME
 COPY ./convex-integration/target/convex-jar-with-dependencies.jar convex.jar
 
-# Expose ports. These can be mapped to host ports
-EXPOSE 18888
-EXPOSE 8080
+##### Expose ports. These can be mapped to host ports
+
+# Convex binary protocol port
+EXPOSE 18888 
+
+# HTTP port. Can be used for an HTTPS proxy
+EXPOSE 8080  
+
+# HTTPS port. Usable if server has a certificate
 EXPOSE 443
 
 VOLUME ["/etc/ssl/certs"]
