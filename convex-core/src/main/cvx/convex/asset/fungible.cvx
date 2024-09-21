@@ -18,9 +18,9 @@
           :examples    [{:code "(deploy [(build-token {}) (add-mint {:minter *address* :max-supply 1000000000})])"}]
           :signature   [{:params [config]}]}}
   [config]
-  (let [max-supply (get config :max-supply)
+  (let [max-supply (int (get config :max-supply 0))
         minter     (or (:minter config) *address*)]
-    (or (<= 0 (int max-supply)) (fail "Max supply must be non-negative"))
+    (or (<= 0 max-supply) (fail "Max supply must be non-negative"))
     `(do
        (import convex.trust :as trust)
        (declare balance transfer)
@@ -38,28 +38,27 @@
          (let [amount (int amount)
                bal    (balance *caller*)]
            ;; Burn amount must be less than or equal to caller's balance.
-           (or (<= 0 amount bal) (fail :STATE "Burn amount not available" ))
-           (set-holding *caller*
-                        (- bal
-                           amount))
-           (def supply (- supply
-                          amount))))
+           (cond (< amount 0) (fail :ARGUMENT "Cannot burn negative quantity"))
+           (cond (> amount bal) (fail :FUNDS "Burn amount not available" ))
+           
+           ;; do updates to balance and supply
+           (set-holding *caller* (- bal amount))
+           (set! supply (- supply amount))))
 
        (defn mint
          ^{:callable true}
          [amount]
-         (when-not (trust/trusted? minter *caller* :mint) (fail :TRUST "No rights to mint"))
+         (when-not (trust/trusted? minter *caller* :mint amount) (fail :TRUST "No rights to mint"))
          (let [amount     (int amount)
                new-supply (+ supply amount) ;; note: might overflow, important check
                bal        (balance *caller*)
                new-bal    (+ bal amount)]
+            
            ;; New supply must be in valid range.
            ~(if max-supply `(when-not (<= 0 new-supply max-supply) (fail :STATE "Mint exceeds max supply")))
            
-           (set-holding *caller*
-                        new-bal)
-           (def supply
-                new-supply))))))
+           (set-holding *caller* new-bal)
+           (set! supply new-supply))))))
 
 (defn build-token 
   ^{:doc {:description ["Creates deployable code for a new fungible token which follows the interface described in `convex.asset`."
@@ -155,22 +154,18 @@
          [addr amount data]
          (let [addr   (address addr)
                amount (-qc amount)
-               bal    (or (get-holding *caller*)
-                          0)
-               tbal   (or (get-holding addr)
-                          0)]
-           ;; Amount must be in valid range.
-           ;;
+               bal    (or (get-holding *caller*) 0)
+               tbal   (or (get-holding addr) 0)]
            ~(if (:checked? config) 
         	   `(if-let [f (check-transfer *caller* addr amount)] (fail :BLOCK f)))
            
+           ;; Amount must be in valid range.
            (cond (< amount 0) (fail :ARGUMENT "negative transfer"))
            (cond (> amount bal) (fail :FUNDS "insufficent token balance")) 
            
-           ;; Need this check in case of self-transfers.
-           (when (= *caller*
-                    addr)
-             (return amount))
+           ;; Need this in case of self-transfers.
+           (when (= *caller* addr) (return amount))
+           
            (set-holding *caller* (- bal amount))
            (set-holding addr (+ tbal amount))))
 
@@ -185,7 +180,7 @@
          (let [receiver (address receiver)
                quantity (-qc quantity)]
            (if (<= quantity 0)
-        	 (set! offers (dissoc-in offers [*caller* receiver]))
+        	 (set! offers (dissoc-in offers [*caller* receiver])) ;; dissoc if no positive offer
              (set! offers (assoc-in offers [*caller* receiver] quantity)))
            quantity))
 
