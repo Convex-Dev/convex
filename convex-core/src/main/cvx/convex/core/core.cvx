@@ -682,10 +682,19 @@
 		          :examples    [{:code "(update {:count 1} :count inc)"}]
 		          :signature   [{:params [m k f & args]}]}}
    ([m k f]
-	(assoc m k (f (get m k))))
-   
+	 (assoc m k (f (get m k))))
    ([m k f x]
-	(assoc m k (f (get m k) x)))
-   
+	 (assoc m k (f (get m k) x)))
    ([m k f x & more]
-	(assoc m k (apply f (get m k) more))))
+	 (assoc m k (apply f (get m k) more))))
+ 
+ (defn update-in
+	^{:doc {:description "Update a value in a nested associative data structure by applying a function."
+		          :examples    [{:code "(update-in {:count 1} [:count] inc)"}]
+		          :signature   [{:params [m ks f & args]}]}}
+   ([m ks f]
+	 (assoc-in m ks (f (get-in m ks))))
+   ([m ks f x]
+	 (assoc-in m ks (f (get-in m ks) x)))
+   ([m k f x & more]
+	 (assoc-in m ks (apply f (get-in m ks) more))))
