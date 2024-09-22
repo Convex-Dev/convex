@@ -667,7 +667,9 @@ public class ChainAPI extends ABaseAPI {
 			r=r.withSource(SourceCodes.SERVER);
 		}
 		
-		ctx.status(r.isError()?422:200);
+		int status=statusForResult(r);
+		ctx.status(status);
+		
 		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
 		String type=ContentTypes.JSON;
 		if (accepts!=null) {
@@ -691,6 +693,7 @@ public class ChainAPI extends ABaseAPI {
 			AString rs=RT.print(r);
 			if (rs==null) {
 				rs=RT.print(Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
+				ctx.status(403); // Forbidden because of result size
 			}
 			ctx.result(rs.toString());
 		} else if (type.equals(ContentTypes.CVX_RAW)) {
@@ -698,9 +701,29 @@ public class ChainAPI extends ABaseAPI {
 			ctx.result(Format.encodeMultiCell(r, true).getBytes());
 		} else {
 			ctx.contentType(ContentTypes.TEXT);
-			ctx.status(400);
+			ctx.status(415); // unsupported media type for "Accept" header
 			ctx.result("Unsupported content type: "+type);
 		}
+	}
+
+	private int statusForResult(Result r) {
+		if (!r.isError()) {
+			return 200;
+		}
+		Keyword source=r.getSource();
+		ACell error=r.getErrorCode();
+		if (SourceCodes.CVM.equals(source)) {
+			return 200;
+		} else if (SourceCodes.CODE.equals(source)) {
+			return 200;
+		} else if (SourceCodes.PEER.equals(source)) {
+			if (ErrorCodes.SIGNATURE.equals(error)) return 403; // Forbidden
+			if (ErrorCodes.FUNDS.equals(error)) return 402; // payment required
+		}
+		if (ErrorCodes.FORMAT.equals(error)) return 400; // bad request
+		if (ErrorCodes.TIMEOUT.equals(error)) return 408; // timeout
+		int status = 422;
+		return status;
 	}
 
 }

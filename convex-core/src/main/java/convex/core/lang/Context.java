@@ -842,7 +842,7 @@ public class Context {
 	 * @return an AExceptional instance
 	 */
 	public AExceptional getExceptional() {
-		if (exception==null) throw new Error("Can't get exceptional value for context with result: "+exception);
+		if (exception==null) throw new IllegalStateException("Can't get exceptional value for context with result: "+exception);
 		return exception;
 	}
 

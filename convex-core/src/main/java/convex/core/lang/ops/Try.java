@@ -44,7 +44,7 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 	@Override
 	public Context execute(Context context) {
 		int n = ops.size();
-		if (n == 0) return context.withResult(Juice.TRY,  null); // need cast to avoid bindings overload
+		if (n == 0) return context.withResult(Juice.TRY,  null);
 
 		Context ctx = context;
 		
@@ -59,7 +59,10 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 			if (fctx.isExceptional()) {
 				AExceptional ex=fctx.getExceptional();
 				if (!ex.isCatchable()) return fctx;
+				
+				// exit if at last expressions
 				if (i+1>=n) return fctx;
+				
 				ctx=ctx.withResult(ex.getCode());
 				ctx=ctx.withJuice(fctx.getJuiceUsed());
 				continue;
