@@ -939,7 +939,8 @@ public abstract class Convex implements AutoCloseable {
 			Future<Result> future = query(code);
 			Result result = future.get(timeout, TimeUnit.MILLISECONDS);
 			if (result.isError()) {
-				return null;
+				System.out.println(result);
+				throw new ResultException(result);
 			}
 			CVMLong bal = (CVMLong) result.getValue();
 			return bal.longValue();

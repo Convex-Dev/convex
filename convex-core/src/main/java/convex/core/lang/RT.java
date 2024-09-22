@@ -1296,11 +1296,11 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> AMap<K, V> ensureMap(ACell a) {
+	public static <K extends ACell, V extends ACell, R extends AMap<K,V>> R ensureMap(ACell a) {
 		if (a == null)
-			return Maps.empty();
+			return (R) Maps.empty();
 		if (a instanceof AMap)
-			return (AMap<K, V>) a;
+			return (R) a;
 		return null;
 	}
 

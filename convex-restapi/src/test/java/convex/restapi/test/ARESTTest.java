@@ -20,7 +20,7 @@ public abstract class ARESTTest {
 			rs.start(0);
 			port = rs.getPort();
 			server = rs;
-			HOST_PATH="http://localhost:" + server.getPort();
+			HOST_PATH="http://localhost:" + rs.getPort();
 			API_PATH=HOST_PATH+"/api/v1";
 			KP=s.getKeyPair();
 		} catch (Exception e) {

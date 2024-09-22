@@ -13,9 +13,13 @@ public class ResultException extends Exception {
 
 	private Result result;
 
-	public ResultException(Result r) {
-		super("Error result ("+r.getErrorCode()+") : "+r.getValue());
+	public ResultException(Result r, Exception cause) {
+		super("Error result ("+r.getErrorCode()+") : "+r.getValue(),cause);
 		this.result=r;
+	}
+	
+	public ResultException(Result r) {
+		this(r,null);
 	}
 	
 	public ResultException(Keyword errorCode) {
@@ -27,7 +31,7 @@ public class ResultException extends Exception {
 	}
 
 	public ResultException(Exception ex) {
-		this(Result.fromException(ex));
+		this(Result.fromException(ex),ex);
 	}
 
 	public Result getResult() {

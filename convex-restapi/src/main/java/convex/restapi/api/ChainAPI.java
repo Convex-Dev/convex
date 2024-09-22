@@ -18,6 +18,7 @@ import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -27,6 +28,7 @@ import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
+import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
@@ -633,12 +635,27 @@ public class ChainAPI extends ABaseAPI {
 			}
 		)
 	public void runQuery(Context ctx) throws InterruptedException {
-		Map<String, Object> req = getJSONBody(ctx);
-		Address addr = Address.parse(req.get("address"));
-		if (addr == null)
-			throw new BadRequestResponse("query requires an 'address' field.");
-		Object srcValue = req.get("source");
-		ACell form = readCode(srcValue);
+		Address addr;
+		ACell form;
+		String type=ctx.req().getContentType();
+		
+		if (ContentTypes.CVX.equals(type)) {
+			ACell rbody=getCVXBody(ctx);
+			if (!(rbody instanceof AMap)) {
+				throw new BadRequestResponse("query body is not a map.");
+			}
+			@SuppressWarnings("unchecked")
+			AMap<Keyword,ACell> req=(AMap<Keyword, ACell>) rbody;
+			addr=Address.parse(RT.get(req, Keywords.ADDRESS));
+			form=RT.get(req, Keywords.SOURCE);
+		} else {
+			Map<String, Object> req = getJSONBody(ctx);
+			addr = Address.parse(req.get("address"));
+			if (addr == null)
+				throw new BadRequestResponse("query requires an 'address' field.");
+			Object srcValue = req.get("source");
+			form = readCode(srcValue);
+		}
 
 		Result r = convex.querySync(form, addr);
 		prepareResult(ctx,r);

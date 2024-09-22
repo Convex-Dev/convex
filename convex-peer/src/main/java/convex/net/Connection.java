@@ -296,7 +296,7 @@ public class Connection {
 	/**
 	 * Sends a QUERY Message on this connection.
 	 *
-	 * @param form    A data object representing the query form
+	 * @param form    A data object representing the query source form
 	 * @param address The address with which to run the query, which may be null
 	 * @return The ID of the message sent, or -1 if send buffer is full.
 	 * @throws IOException If IO error occurs

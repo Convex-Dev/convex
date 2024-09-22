@@ -15,6 +15,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.Panic;
+import convex.core.lang.RT;
 
 public class Strings {
 	public static final StringShort EMPTY = StringShort.EMPTY;
@@ -109,6 +110,20 @@ public class Strings {
 		return Strings.create(utfBlob);
 	}
 	
+	/**
+	 * Create a canonical CVM String from an object
+	 * @param s Java String to convert.
+	 * @return CVM String instance, or null if input was null
+	 */
+	public static AString create(Object o) {
+		if (o==null) return NIL;
+		if (o instanceof ACell) {
+			return RT.str((ACell) o);
+		}
+		return create(o.toString());
+	}
+
+	
 	public static <T extends AString> T intern(T value) {
 		return Cells.intern(value);
 	}
@@ -142,6 +157,25 @@ public class Strings {
 		for (long i=1; i<n; i++) {
 			builder.append(separator);
 			builder.append(ss.get(i));
+		}
+		return Strings.create(builder.toBlob());
+	}
+	
+	/**
+	 * Creates a string by joining a sequence of substrings with the given separator
+	 * @param ss Sequence of Strings to join
+	 * @param separator any String to use as a separator.
+	 * @return Concatenated String, including the separator. Will return the empty string if the seqence is empty.
+	 */
+	public static <T> AString join(T[] ss,Object separator) {
+		int n=ss.length;
+		if (n==0) return StringShort.EMPTY;
+		BlobBuilder builder=new BlobBuilder();
+		AString sep=Strings.create(separator);
+		builder.append(create(ss[0]));
+		for (int i=1; i<n; i++) {
+			builder.append(sep);
+			builder.append(create(ss[i]));
 		}
 		return Strings.create(builder.toBlob());
 	}

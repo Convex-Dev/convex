@@ -32,6 +32,7 @@ import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
 import convex.core.lang.exception.AExceptional;
 import convex.core.lang.exception.ErrorValue;
+import convex.core.util.Utils;
 
 /**
  * Class representing the result of a Convex interaction (typically a query or transaction).
@@ -423,7 +424,9 @@ public final class Result extends ARecordGeneric {
 			// This is special, we need to ensure the interrupt status is set
 			return interruptThread();
 		}
-		return Result.error(ErrorCodes.EXCEPTION,Strings.create(e.getMessage()));
+		Result err= Result.error(ErrorCodes.EXCEPTION,Strings.create(Utils.getClassName(e)+" : "+e.getMessage()));
+		err=err.withInfo(Keywords.TRACE, Strings.join(e.getStackTrace(),"\n")); 
+		return err;
 	}
 
 	// Standard result in case of interrupts
@@ -451,7 +454,7 @@ public final class Result extends ARecordGeneric {
 		if (isError()) {
 			hm.put("errorCode", RT.name(getErrorCode()).toString());
 		} 
-		
+		 
 		hm.put("value", RT.json(getValue()));
 		
 		AVector<AVector<ACell>> log = getLog();
@@ -461,6 +464,16 @@ public final class Result extends ARecordGeneric {
 		if (info!=null) hm.put("info", RT.json(info));
 		
 		return hm;
+	}
+
+	public static Result fromData(ACell data) {
+		if (data instanceof Result) {
+			return (Result) data;
+		} else if (data instanceof AMap) {
+			AMap<Keyword,ACell> m=RT.ensureMap(data);
+			return create(RT.ensureLong(m.get(Keywords.ID)),m.get(Keywords.RESULT),m.get(Keywords.ERROR),RT.ensureVector(m.get(Keywords.LOG)),RT.ensureMap(m.get(Keywords.INFO)));
+		}
+		throw new IllegalArgumentException("Unrecognised data of type: "+Utils.getClassName(data));
 	}
 
 }
