@@ -2,13 +2,18 @@ package convex.restapi.test;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import convex.core.Result;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
+import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.java.ConvexHTTP;
 
@@ -24,9 +29,13 @@ public class ConvexHTTPTest extends ARESTTest {
 		}
 	}
 	
-	@Test public void testQuery() throws ResultException {
+	@Test public void testQuery() throws ResultException, InterruptedException {
 		ConvexHTTP convex=connect();
 		Long l=convex.getBalance();
 		assertNotNull(l);
+		
+		Result r=convex.querySync(Reader.read("(+ 2 3)"), null);
+		assertFalse(r.isError());
+		assertEquals(CVMLong.create(5),r.getValue());
 	}
 }

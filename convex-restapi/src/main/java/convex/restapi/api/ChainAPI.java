@@ -13,12 +13,14 @@ import convex.api.Convex;
 import convex.core.Coin;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -33,6 +35,7 @@ import convex.core.data.Lists;
 import convex.core.data.PeerStatus;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -651,8 +654,6 @@ public class ChainAPI extends ABaseAPI {
 		} else {
 			Map<String, Object> req = getJSONBody(ctx);
 			addr = Address.parse(req.get("address"));
-			if (addr == null)
-				throw new BadRequestResponse("query requires an 'address' field.");
 			Object srcValue = req.get("source");
 			form = readCode(srcValue);
 		}
@@ -662,35 +663,43 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	private void prepareResult(Context ctx, Result r) {
+		if (r.getSource()==null) {
+			r=r.withSource(SourceCodes.SERVER);
+		}
+		
 		ctx.status(r.isError()?422:200);
 		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
-		String accept=ContentTypes.JSON;
+		String type=ContentTypes.JSON;
 		if (accepts!=null) {
 			for (String a:Collections.list(accepts)) {
 				if (a.contains(ContentTypes.CVX_RAW)) {
-					accept=ContentTypes.CVX_RAW;
+					type=ContentTypes.CVX_RAW;
 					break;
 				}
 				if (a.contains(ContentTypes.CVX)) {
-					accept=ContentTypes.CVX;
+					type=ContentTypes.CVX;
 				}
 			}
 		}
 		
-		if (accept.equals(ContentTypes.JSON)) {
+		if (type.equals(ContentTypes.JSON)) {
 			ctx.contentType(ContentTypes.JSON);
 			HashMap<String, Object> resultJSON = r.toJSON();
 			ctx.result(JSON.toPrettyString(resultJSON));
-		} else if (accept.equals(ContentTypes.CVX)) {
+		} else if (type.equals(ContentTypes.CVX)) {
 			ctx.contentType(ContentTypes.CVX);
-			ctx.result(RT.print(r).toString());
-		} else if (accept.equals(ContentTypes.CVX_RAW)) {
+			AString rs=RT.print(r);
+			if (rs==null) {
+				rs=RT.print(Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
+			}
+			ctx.result(rs.toString());
+		} else if (type.equals(ContentTypes.CVX_RAW)) {
 			ctx.contentType(ContentTypes.CVX_RAW);
 			ctx.result(Format.encodeMultiCell(r, true).getBytes());
 		} else {
 			ctx.contentType(ContentTypes.TEXT);
 			ctx.status(400);
-			ctx.result("Unsupported content type: "+accept);
+			ctx.result("Unsupported content type: "+type);
 		}
 	}
 

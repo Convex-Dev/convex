@@ -60,6 +60,8 @@ public class Strings {
 
 	public static final StringShort OLD_SEQUENCE = StringShort.create("Old sequence number");
 
+	public static final StringShort PRINT_EXCEEDED = StringShort.create(Constants.PRINT_EXCEEDED_STRING);
+
 
 	/**
 	 * Reads a String from a Blob encoding.

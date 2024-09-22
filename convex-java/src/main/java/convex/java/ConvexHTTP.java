@@ -82,7 +82,8 @@ public class ConvexHTTP extends convex.api.Convex {
 		CompletableFuture<Result> result=future.thenApply(response->{
 			String body=response.getBodyText();
 			try {
-				System.out.println(body);
+				// System.out.println(body);
+				// We expect a map containing the result fields
 				ACell data=Reader.read(body);
 				return Result.fromData(data);
 			} catch (ParseException e) {

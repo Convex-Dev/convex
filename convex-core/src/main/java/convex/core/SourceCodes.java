@@ -21,6 +21,11 @@ public class SourceCodes {
 	public static final Keyword COMM = Keyword.intern("COMM");
 	
 	/**
+	 * Source code indicating an error at the server side (e.g. REST Server)
+	 */
+	public static final Keyword SERVER = Keyword.intern("SERVER");
+
+	/**
 	 * Source code indicating a failure during peer handling
 	 */
 	public static final Keyword PEER = Keyword.intern("PEER");
@@ -39,6 +44,7 @@ public class SourceCodes {
 	 * Source code indicating a failure in CVM transaction handling
 	 */
 	public static final Keyword CODE = Keyword.intern("CODE");
+
 
 
 

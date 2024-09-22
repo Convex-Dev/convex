@@ -238,5 +238,10 @@ public class ErrorCodes {
 	 */
 	public static final Keyword MISSING = Keyword.intern("MISSING");
 
+	/**
+	 * Error code indicating a resource limit exceeded
+	 */
+	public static final Keyword LIMIT = Keyword.intern("LIMIT");
+
 
 }

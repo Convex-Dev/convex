@@ -68,6 +68,11 @@ public final class Result extends ARecordGeneric {
 		super(RESULT_FORMAT, values);
 	}
 	
+	/**
+	 * Build a Result from a vector. WARNING: does not validate values
+	 * @param values
+	 * @return
+	 */
 	public static Result buildFromVector(AVector<ACell> values) {
 		return new Result(values);
 	}
@@ -466,6 +471,12 @@ public final class Result extends ARecordGeneric {
 		return hm;
 	}
 
+	/**
+	 * Construct a result from a cell of data
+	 * @param data Result or Map including Result fields
+	 * @return Result value
+	 * @throws IllegalArgumentException if data is of incorrect type
+	 */
 	public static Result fromData(ACell data) {
 		if (data instanceof Result) {
 			return (Result) data;
