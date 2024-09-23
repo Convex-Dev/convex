@@ -864,7 +864,7 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
-	 * Returns the current AccountKey for the specified address. Performs a sync query
+	 * Returns the current AccountKey for the specified address. Performs a synchronous query
 	 *
 	 * @return AcountKey instance, or null if unavailable
 	 * @throws InterruptedException In case of interrupt while awaiting Result

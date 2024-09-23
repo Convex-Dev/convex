@@ -16,14 +16,14 @@ import convex.peer.API;
 import convex.peer.PeerException;
 import convex.peer.Server;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.ScopeType;
-import picocli.CommandLine.Spec;
 
 /**
  * Peer genesis command
+ * 
+ * Creates a genesis state and peer in the specified local store, ready for launch
  */
 @Command(
 	name = "genesis",
@@ -33,9 +33,6 @@ public class PeerGenesis extends APeerCommand {
 
 	@ParentCommand
 	private Peer peerParent;
-
-	@Spec
-	CommandSpec spec;
 	
 	@Option(names = { "--governance-key" }, 
 			defaultValue = "${env:CONVEX_GOVERNANCE_KEY}", 
@@ -60,7 +57,7 @@ public class PeerGenesis extends APeerCommand {
 		try {
 
 			// Key for initial peer. Needed for genesis start
-			AKeyPair peerKey = checkPeerKey();
+			AKeyPair peerKey = specifiedPeerKey();
 			if (peerKey==null) {
 				paranoia("--peer-key must be specified in strict mode");
 				peerKey=genesisKey;
@@ -84,6 +81,7 @@ public class PeerGenesis extends APeerCommand {
 			inform("Created genesis state with hash: "+genesisState.getHash());
 			
 			inform("Testing genesis state peer initialisation");
+			
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.STORE, store);
 			config.put(Keywords.STATE, genesisState);

@@ -137,14 +137,9 @@ public class LocalStart extends ALocalCommand {
 		
 		// informWarning("Failed to start REST server: "+t);
 		
-		
 		informSuccess("Started: "+ n+" local peer"+((n>1)?"s":"")+" launched");
-		
-		// Loop until we end
-		while (!Thread.currentThread().isInterrupted()) {
-			Thread.sleep(1000);
-		}
-
+		servers.get(0).waitForShutdown();
+		informWarning("Peer shutdown complete");
 	}
 
 	public List<Server> launchLocalPeers(List<AKeyPair> keyPairList, int peerPorts[]) throws InterruptedException {

@@ -369,6 +369,7 @@ public class TransactionHandler extends AThreadedComponent {
 			if (address==null) break trySetHostname;
 			AccountStatus as=s.getAccount(address);
 			if (as==null) break trySetHostname;
+			// if we haven't got the controller key, just skip this
 			if (!Cells.equals(peerKey, as.getAccountKey())) break trySetHostname;
 
 			String code;

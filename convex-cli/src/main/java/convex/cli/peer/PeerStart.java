@@ -62,10 +62,10 @@ public class PeerStart extends APeerCommand {
 	@Option(names = { "--norest" }, description = "Disable REST srever.")
 	private boolean norest;
 	
-	@Option(names = { "--api-port" }, description = "Port for REST API.")
+	@Option(names = { "--api-port" }, 
+			defaultValue = "8080",
+			description = "Port for REST API.")
 	private Integer apiport;
-
-
 
 //	@Option(names = { "-b",
 //			"--bind-address" }, description = "Bind address of the network interface. Defaults to local loop back device for %n"
@@ -80,7 +80,7 @@ public class PeerStart extends APeerCommand {
 	
 	private AKeyPair findPeerKey(EtchStore store) {
 		// First check user supplied peer key. If we have it, use it
-		AKeyPair kp=checkPeerKey();
+		AKeyPair kp=specifiedPeerKey();
 		if (kp!=null) return kp;
 		
 		// if user specified a --peer-key, but it wasn't found in keystore
@@ -144,18 +144,15 @@ public class PeerStart extends APeerCommand {
 				}
 				
 				informSuccess("Peer started");
-				while (server.isRunning()&&!Thread.currentThread().isInterrupted()) {
-					Thread.sleep(400);
-				}
-				informSuccess("Peer shutdown completed");
+				server.waitForShutdown();
 			} catch (ConfigException t) {
 				throw new CLIError(ExitCodes.CONFIG,"Error in peer configuration: "+t.getMessage(),t);
 			} catch (LaunchException e) {
 				throw new CLIError("Error launching peer: "+e.getMessage(),e);
 			} finally {
 				if (restServer!=null) restServer.close();
+				inform("Peer shutdown completed");
 			}
-			informWarning("Peer exiting normally...");
 		}
 	}
 

@@ -39,9 +39,9 @@ public abstract class APeerCommand extends ACommand {
 	}
 	
 	/**
-	 * Get the keypair for the peer. May return null if not specified
+	 * Get the keypair for the peer. May return null if not specified or not available in store
 	 */
-	protected AKeyPair checkPeerKey() {
+	protected AKeyPair specifiedPeerKey() {
 		String peerPublicKey=peerKeyMixin.getPublicKey();
 		if (peerPublicKey==null) {
 			paranoia("You must specify a --peer-key for the peer");

@@ -46,5 +46,4 @@ public class EtchMixin extends AMixin {
 	public EtchStore getEtchStore() {
 		return getEtchStore(etchStoreFilename);
 	}
-
 }

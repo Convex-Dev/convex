@@ -28,7 +28,6 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
@@ -129,9 +128,6 @@ public class Server implements Closeable {
 
 	private final HashMap<Keyword, Object> config;
 
-	private final ACell rootKey;
-
-
 	/**
 	 * NIO Server instance
 	 */
@@ -152,16 +148,10 @@ public class Server implements Closeable {
 			// Establish Peer state
 			Peer peer = establishPeer();
 
-			// Set up root key for Peer persistence. Default is Peer Account Key
-			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
-			if (rk==null) rk=peer.getPeerKey();
-			rootKey=rk;
 
 			// Ensure Peer is stored in executor and initially persisted prior to launch
 			executor.setPeer(peer);
 			executor.persistPeerData();
-			
-			establishController();
 		} catch (TimeoutException e) {
 			throw new ConfigException("Timeout trying to configure peer",e);
 		} catch (IOException e) {
@@ -171,26 +161,27 @@ public class Server implements Closeable {
 		}
 	}
 
-	/**
-	 * Establish the controller Account for this Peer.
-	 */
-	private void establishController() {
-		Peer peer=getPeer();
-		Address controlAddress=RT.toAddress(getConfig().get(Keywords.CONTROLLER));
-		if (controlAddress==null) {
-			controlAddress=peer.getController();
-			if (controlAddress==null) {
-				throw new IllegalStateException("Peer Controller account does not exist for Peer Key: "+peer.getPeerKey());
-			}
-		}
-		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
-		if (as==null) {
-			log.warn("Peer Controller Account does not currently exist (perhaps pending sync?): "+controlAddress);	
-		} else if (!Utils.equals(as.getAccountKey(),getKeyPair().getAccountKey())) {
-			// TODO: not a problem?
-			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
-		}
-	}
+	// This doesn't actually do anything useful? Do we need this?
+//	/**
+//	 * Establish the controller Account for this Peer.
+//	 */
+//	private void establishController() {
+//		Peer peer=getPeer();
+//		Address controlAddress=RT.toAddress(getConfig().get(Keywords.CONTROLLER));
+//		if (controlAddress==null) {
+//			controlAddress=peer.getController();
+//			if (controlAddress==null) {
+//				throw new IllegalStateException("Peer Controller account does not exist for Peer Key: "+peer.getPeerKey());
+//			}
+//		}
+//		AccountStatus as=peer.getConsensusState().getAccount(controlAddress);
+//		if (as==null) {
+//			log.warn("Peer Controller Account does not currently exist (perhaps pending sync?): "+controlAddress);	
+//		} else if (!Utils.equals(as.getAccountKey(),getKeyPair().getAccountKey())) {
+//			// TODO: not a problem?
+//			log.warn("Server keypair does not match keypair for control account: "+controlAddress);
+//		}
+//	}
 
 	private Peer establishPeer() throws ConfigException, TimeoutException, IOException, InterruptedException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
@@ -207,8 +198,7 @@ public class Server implements Closeable {
 		if (Utils.bool(source)) {
 			InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
 			if (sourceAddr==null) throw new ConfigException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
-			return syncPeer(keyPair,sourceAddr);
-
+			return syncPeer(keyPair,Convex.connect(sourceAddr));
 		} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
 			if (rk==null) rk=keyPair.getAccountKey();
@@ -230,11 +220,10 @@ public class Server implements Closeable {
 		return Peer.createGenesisPeer(keyPair,genesisState);
 	}
 
-	private Peer syncPeer(AKeyPair keyPair, InetSocketAddress sourceAddr) throws IOException, TimeoutException, InterruptedException {
+	private Peer syncPeer(AKeyPair keyPair, Convex convex) throws IOException, TimeoutException, InterruptedException {
 		// Peer sync case
 		try {
-			Convex convex = Convex.connect(sourceAddr);
-			log.info("Attempting Peer Sync with: "+sourceAddr);
+			log.info("Attempting Peer Sync with: "+convex);
 			long timeout = establishTimeout();
 			
 			// Sync status and genesis state
@@ -283,8 +272,7 @@ public class Server implements Closeable {
 	private long establishTimeout() {
 		Object maybeTimeout=getConfig().get(Keywords.TIMEOUT);
 		if (maybeTimeout==null) return Config.PEER_SYNC_TIMEOUT;
-		Utils.toInt(maybeTimeout);
-		return 0;
+		return Utils.toInt(maybeTimeout);
 	}
 
 	/**
@@ -544,7 +532,7 @@ public class Server implements Closeable {
 	 * 1 = states vector hash
 	 * 2 = genesis state hash
 	 * 3 = peer key
-	 * 4 = consensus state
+	 * 4 = consensus state hash
 	 * 5 = consensus point
 	 * 6 = proposal point
 	 * 7 = ordering length
@@ -643,8 +631,14 @@ public class Server implements Closeable {
 	public Peer persistPeerData() throws IOException {
 		AStore tempStore = Stores.current();
 		try {
+			Peer peer=getPeer();
 			Stores.setCurrent(store);
-			AMap<Keyword,ACell> peerData = getPeer().toData();
+			AMap<Keyword,ACell> peerData = peer.toData();
+
+			// Set up root key for Peer persistence. Default is Peer Account Key
+			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+			if (rk==null) rk=peer.getPeerKey();
+			ACell rootKey=rk;
 
 			Ref<AMap<ACell,ACell>> rootRef = store.refForHash(store.getRootHash());
 			AMap<ACell,ACell> currentRootData = (rootRef == null)? Maps.empty() : rootRef.getValue();
@@ -677,7 +671,6 @@ public class Server implements Closeable {
 
 		// Shut down propagator, no point sending any more Beliefs
 		propagator.close();
-		
 		
 		queryHandler.close();
 		transactionHandler.close();
@@ -833,6 +826,12 @@ public class Server implements Closeable {
 		} finally {
 			isLive=false;
 			close();
+		}
+	}
+
+	public void waitForShutdown() throws InterruptedException {
+		while (isRunning()&&!Thread.currentThread().isInterrupted()) {
+			Thread.sleep(400);
 		}
 	}
 }

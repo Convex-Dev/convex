@@ -75,10 +75,6 @@ public class NIOServer implements Closeable {
 	 * @throws IOException in case of IO problem
 	 */
 	public void launch(String bindAddress, Integer port) throws IOException {
-		if (port == null) {
-			port = 0;
-		}
-
 		ssc = ServerSocketChannel.open();
 
 		// Set receive buffer size
@@ -88,23 +84,26 @@ public class NIOServer implements Closeable {
 		bindAddress = (bindAddress == null) ? "::" : bindAddress;
 		
 		// Bind to a port
-		InetSocketAddress address;		
+		InetSocketAddress bindSA;	
+		if (port == null) {
+			port = 0;
+		}
 		if (port==0) {
 			try {
-				address = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
-				ssc.bind(address);
+				bindSA = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
+				ssc.bind(bindSA);
 			} catch (IOException e) {
 				// try again with random port
-				address = new InetSocketAddress(bindAddress, 0);
-				ssc.bind(address);
+				bindSA = new InetSocketAddress(bindAddress, 0);
+				ssc.bind(bindSA);
 			}
 		} else {
-			address = new InetSocketAddress(bindAddress, port);
-			ssc.bind(address);
+			bindSA = new InetSocketAddress(bindAddress, port);
+			ssc.bind(bindSA);
 		}
 		
 		// Find out which port we actually bound to
-		address = (InetSocketAddress) ssc.getLocalAddress();
+		bindSA = (InetSocketAddress) ssc.getLocalAddress();
 		port = ssc.socket().getLocalPort();
 
 		// change to bnon-blocking mode
