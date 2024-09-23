@@ -12,7 +12,6 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
-import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
@@ -21,6 +20,7 @@ import convex.gui.components.DecimalAmountField;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.models.ComboModel;
 import convex.gui.utils.Toolkit;
+import convex.net.IPUtils;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -137,7 +137,7 @@ public class TransferPanel extends AbstractGUI {
 	public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
 		// call to set up Look and Feel
 		Toolkit.init();
-		InetSocketAddress sa=Utils.toInetSocketAddress("localhost:18888");
+		InetSocketAddress sa=IPUtils.toInetSocketAddress("localhost:18888");
 		Convex convex=Convex.connect(sa);
 		convex.setAddress(Address.create(11));
 		new TransferPanel(convex,TokenInfo.getFungible(convex,"currency.USDF")).run();

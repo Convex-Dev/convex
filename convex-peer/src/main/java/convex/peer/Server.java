@@ -48,6 +48,7 @@ import convex.core.store.Stores;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
+import convex.net.IPUtils;
 import convex.net.Message;
 import convex.net.MessageType;
 import convex.net.NIOServer;
@@ -84,7 +85,7 @@ public class Server implements Closeable {
 	private Consumer<Message> messageReceiveObserver=null;
 
 	/**
-	 * Message Consumer that simply enqueues received client messages received by this peer
+	 * Message Consumer that handles received client messages received by this peer
 	 * Called on NIO thread: should never block
 	 */
 	Consumer<Message> receiveAction = m->{
@@ -133,32 +134,11 @@ public class Server implements Closeable {
 	 */
 	private NIOServer nio = NIOServer.create(this);
 
-	private Server(HashMap<Keyword, Object> config) throws ConfigException, InterruptedException {
+	private Server(HashMap<Keyword, Object> config) throws ConfigException {
 		this.config = config;
-		final AStore savedStore=Stores.current();
-
-		AStore configStore = Config.ensureStore(config);
-		this.store=configStore;
-		// this.store = (configStore == null) ? savedStore : configStore;
 		
-		// Switch to use the configured store for setup
-		try {
-			Stores.setCurrent(store);
-
-			// Establish Peer state
-			Peer peer = establishPeer();
-
-
-			// Ensure Peer is stored in executor and initially persisted prior to launch
-			executor.setPeer(peer);
-			executor.persistPeerData();
-		} catch (TimeoutException e) {
-			throw new ConfigException("Timeout trying to configure peer",e);
-		} catch (IOException e) {
-			throw new ConfigException("IO Error while trying to configure peer",e);
-		} finally {
-			Stores.setCurrent(savedStore);
-		}
+		// Critical to ensure we have the store set up before anything else. Stuff might break badly otherwise!
+		this.store = Config.ensureStore(config);
 	}
 
 	// This doesn't actually do anything useful? Do we need this?
@@ -183,7 +163,7 @@ public class Server implements Closeable {
 //		}
 //	}
 
-	private Peer establishPeer() throws ConfigException, TimeoutException, IOException, InterruptedException {
+	private Peer establishPeer() throws ConfigException, LaunchException, InterruptedException {
 		log.debug("Establishing Peer with store: {}",Stores.current());
 		AKeyPair keyPair = Config.ensurePeerKey(config);
 		if (keyPair==null) {
@@ -192,35 +172,42 @@ public class Server implements Closeable {
 			config.put(Keywords.KEYPAIR,keyPair);
 			log.warn("Generated keypair with public key: "+keyPair.getAccountKey());
 		}
-
-		// TODO: should probably move acquisition to launch phase?
-		Object source=getConfig().get(Keywords.SOURCE);
-		if (Utils.bool(source)) {
-			InetSocketAddress sourceAddr=Utils.toInetSocketAddress(source);
-			if (sourceAddr==null) throw new ConfigException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
-			return syncPeer(keyPair,Convex.connect(sourceAddr));
-		} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
-			ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
-			if (rk==null) rk=keyPair.getAccountKey();
-
-			Peer peer = Peer.restorePeer(store, keyPair, rk);
-			if (peer != null) {
-				log.info("Restored Peer with root data hash: {}",store.getRootHash());
-				return peer;
+		
+		try {
+			Object source=getConfig().get(Keywords.SOURCE);
+			if (Utils.bool(source)) {
+				InetSocketAddress sourceAddr=IPUtils.toInetSocketAddress(source);
+				if (sourceAddr==null) throw new ConfigException("Bad SOURCE for peer sync, should be an internet socket address: "+source);
+				try {
+					return syncPeer(keyPair,Convex.connect(sourceAddr));
+				} catch (TimeoutException e) {
+					throw new LaunchException("Timout trying to connect to remote peer");
+				}	
+			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
+				ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
+				if (rk==null) rk=keyPair.getAccountKey();
+	
+				Peer peer = Peer.restorePeer(store, keyPair, rk);
+				if (peer != null) {
+					log.info("Restored Peer with root data hash: {}",store.getRootHash());
+					return peer;
+				}
 			}
+			State genesisState = (State) config.get(Keywords.STATE);
+			if (genesisState!=null) {
+				log.debug("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+			} else {
+				AccountKey peerKey=keyPair.getAccountKey();
+				genesisState=Init.createState(List.of(peerKey));
+				log.debug("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
+			}
+			return Peer.createGenesisPeer(keyPair,genesisState);
+		} catch (IOException e) {
+			throw new LaunchException("IO Exception while establishing peer",e);
 		}
-		State genesisState = (State) config.get(Keywords.STATE);
-		if (genesisState!=null) {
-			log.debug("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
-		} else {
-			AccountKey peerKey=keyPair.getAccountKey();
-			genesisState=Init.createState(List.of(peerKey));
-			log.debug("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
-		}
-		return Peer.createGenesisPeer(keyPair,genesisState);
 	}
 
-	private Peer syncPeer(AKeyPair keyPair, Convex convex) throws IOException, TimeoutException, InterruptedException {
+	private Peer syncPeer(AKeyPair keyPair, Convex convex) throws LaunchException, InterruptedException {
 		// Peer sync case
 		try {
 			log.info("Attempting Peer Sync with: "+convex);
@@ -265,7 +252,9 @@ public class Server implements Closeable {
 			Peer peer=Peer.create(keyPair, genF, belF);
 			return peer;
 		} catch (ExecutionException | InvalidDataException e) {
-			throw Utils.sneakyThrow(e);
+			throw new LaunchException("Erring while trying to sync peer",e);
+		}  catch (TimeoutException e) {
+			throw new LaunchException("Timeout attempting to sync peer",e);
 		}
 	}
 
@@ -282,9 +271,8 @@ public class Server implements Closeable {
 	 *
 	 * @return New Server instance
 	 * @throws ConfigException If Peer configuration failed, possible multiple causes
-	 * @throws InterruptedException 
 	 */
-	public static Server create(HashMap<Keyword, Object> config) throws ConfigException, InterruptedException {
+	public static Server create(HashMap<Keyword, Object> config) throws ConfigException {
 		return new Server(new HashMap<>(config));
 	}
 
@@ -329,10 +317,17 @@ public class Server implements Closeable {
 	 * Launch the Peer Server, including all main server threads
 	 * @throws InterruptedException 
 	 */
-	public void launch() throws IOException, InterruptedException {
+	public void launch() throws LaunchException, InterruptedException {
 		AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
+			
+			// Establish Peer state
+			Peer peer = establishPeer();
+
+			// Ensure Peer is stored in executor and initially persisted prior to launch
+			executor.setPeer(peer);
+			executor.persistPeerData();
 
 			HashMap<Keyword, Object> config = getConfig();
 
@@ -358,7 +353,7 @@ public class Server implements Closeable {
 			// Connect to source peer if specified
 			if (getConfig().containsKey(Keywords.SOURCE)) {
 				Object s=getConfig().get(Keywords.SOURCE);
-				InetSocketAddress sa=Utils.toInetSocketAddress(s);
+				InetSocketAddress sa=IPUtils.toInetSocketAddress(s);
 				if (sa!=null) {
 					if (manager.connectToPeer(sa)!=null) {
 						log.debug("Automatically connected to :source peer at: {}",sa);
@@ -372,6 +367,10 @@ public class Server implements Closeable {
 
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
+		} catch (ConfigException e) {
+			throw new LaunchException("Launch failed due to config problem",e);
+		} catch (IOException e) {
+			throw new LaunchException("Launch failed due to IO Error",e);
 		} finally {
 			Stores.setCurrent(savedStore);
 		}

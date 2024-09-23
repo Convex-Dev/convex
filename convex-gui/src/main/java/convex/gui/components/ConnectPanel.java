@@ -17,11 +17,11 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.init.Init;
-import convex.core.util.Utils;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
+import convex.net.IPUtils;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -71,7 +71,7 @@ public class ConnectPanel extends JPanel {
 		if (result == JOptionPane.OK_OPTION) {
 	    	try {
 	    		String target=pan.hostField.getText();
-	    		InetSocketAddress sa=Utils.toInetSocketAddress(target);
+	    		InetSocketAddress sa=IPUtils.toInetSocketAddress(target);
 	    		log.info("Attempting connect to: "+sa);
 	    		Convex convex=Convex.connect(sa);
 	    		convex.setAddress(pan.addressField.getAddress());

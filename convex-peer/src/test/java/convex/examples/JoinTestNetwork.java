@@ -14,14 +14,14 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.exceptions.BadSignatureException;
-import convex.core.util.Utils;
 import convex.etch.EtchStore;
+import convex.net.IPUtils;
 import convex.peer.API;
 import convex.peer.PeerException;
 import convex.peer.Server;
 
 public class JoinTestNetwork {
-	InetSocketAddress hostAddress=Utils.toInetSocketAddress("convex.world:18888");
+	InetSocketAddress hostAddress=IPUtils.toInetSocketAddress("convex.world:18888");
 	AKeyPair kp=AKeyPair.createSeeded(578578); // for user
 	Address acct=Address.create(47);
 	AccountKey peerKey=kp.getAccountKey();

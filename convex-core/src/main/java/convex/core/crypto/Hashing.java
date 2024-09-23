@@ -119,7 +119,7 @@ public class Hashing {
 	 */
 	private static final ThreadLocal<MessageDigest> sha256Store;
 	/**
-	 * Private store for thread-local MessageDigent objects. Avoids cost of
+	 * Private store for thread-local MessageDigest objects. Avoids cost of
 	 * recreating these every time they are needed.
 	 */
 	private static final ThreadLocal<MessageDigest> sha3Store;
@@ -141,7 +141,7 @@ public class Hashing {
 		});
 	}
 	/**
-	 * Threadlocal store for MessageDigest instances. TODO: figure out if this is
+	 * Thread local store for MessageDigest instances. TODO: figure out if this is
 	 * useful for performance. Probably not since digest initialisation is the
 	 * bottleneck anyway?
 	 */

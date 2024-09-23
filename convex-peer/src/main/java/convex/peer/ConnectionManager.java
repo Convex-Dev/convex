@@ -36,6 +36,7 @@ import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.ChallengeRequest;
 import convex.net.Connection;
+import convex.net.IPUtils;
 import convex.net.Message;
 
 /**
@@ -219,7 +220,7 @@ public class ConnectionManager extends AThreadedComponent {
 			if (ps==null) continue; // skip
 			AString hostName=ps.getHostname();
 			if (hostName==null) continue;
-			InetSocketAddress maybeAddress=Utils.toInetSocketAddress(hostName.toString());
+			InetSocketAddress maybeAddress=IPUtils.toInetSocketAddress(hostName.toString());
 			if (maybeAddress==null) continue;
 			long peerStake=ps.getPeerStake();
 			if (peerStake>Constants.MINIMUM_EFFECTIVE_STAKE) {

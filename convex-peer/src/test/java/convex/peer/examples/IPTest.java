@@ -11,7 +11,7 @@ import java.net.Socket;
 import java.util.Enumeration;
 import java.util.Iterator;
 
-import convex.core.util.Utils;
+import convex.net.IPUtils;
 
 public class IPTest {
 	
@@ -45,7 +45,7 @@ public class IPTest {
 		//InetSocketAddress sa=new InetSocketAddress("[::1]",PORT);
 		//System.out.println("Socket Address: "+sa);
 		
-		InetSocketAddress sa2=Utils.toInetSocketAddress("::1:6666");
+		InetSocketAddress sa2=IPUtils.toInetSocketAddress("::1:6666");
 		System.out.println("Utils.toInetSocketAddress: "+sa2);
 		Socket socket = new Socket();
 		socket.connect(sa2);

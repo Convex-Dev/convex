@@ -4,13 +4,11 @@ import static convex.core.lang.TestState.STATE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigInteger;
-import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
 import java.util.function.Function;
@@ -281,22 +279,6 @@ public class UtilsTest {
 		assertEquals(7, Utils.toInt(7.0f));
 		assertEquals(8, Utils.toInt("8"));
 		assertEquals(-1, Utils.toInt("-1"));
-	}
-
-	@Test
-	public void testInetSocketAddress() {
-		String s = "http://www.something-unusual.com:18888";
-		InetSocketAddress sa = Utils.toInetSocketAddress(s);
-		assertNotNull(sa);
-		
-		assertNotNull(Utils.toInetSocketAddress("localhost:8080"));
-		
-		InetSocketAddress sa1=Utils.toInetSocketAddress("12.13.14.15:8080");
-		assertNotNull(sa1);
-		assertNotNull(Utils.toInetSocketAddress("http:12.13.14.15:8080"));
-		
-		assertNull(Utils.toInetSocketAddress("@@@"));
-
 	}
 
 	@Test

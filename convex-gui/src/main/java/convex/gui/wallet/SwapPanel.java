@@ -14,7 +14,6 @@ import convex.api.Convex;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
-import convex.core.util.Utils;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
@@ -22,6 +21,7 @@ import convex.gui.components.BalanceLabel;
 import convex.gui.components.DecimalAmountField;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
+import convex.net.IPUtils;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
@@ -184,7 +184,7 @@ public class SwapPanel extends AbstractGUI {
 	public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
 		// call to set up Look and Feel
 		Toolkit.init();
-		InetSocketAddress sa=Utils.toInetSocketAddress("localhost:18888");
+		InetSocketAddress sa=IPUtils.toInetSocketAddress("localhost:18888");
 		Convex convex=Convex.connect(sa);
 		convex.setAddress(Address.create(11));
 		new SwapPanel(convex,TokenInfo.getFungible(convex,"currency.USDF"),TokenInfo.convexCoin()).run();
