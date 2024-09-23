@@ -973,7 +973,12 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	/**
-	 * Gets the consensus state from the remote Peer
+	 * Gets the consensus state from the connected Peer. The acquired state will be a snapshot
+	 * of the network global state as calculated by the Peer.
+	 * 
+	 * SECURITY: Be aware that if this client instance is connected to an untrusted Peer, the
+	 * Peer may lie about the latest state. If this is a security concern, the client should
+	 * validate the consensus state independently.
 	 * 
 	 * @return Future for consensus state
 	 */
@@ -991,7 +996,8 @@ public abstract class Convex implements AutoCloseable {
 	
 	/**
 	 * Sets the default timeout for this Convex client instance.
-	 * @param timeout timeout in milliseconds
+	 * 
+	 * @param timeout timeout in milliseconds. Set to 0 or negative for no timeout
 	 */
 	public void setTimeout(long timeout) {
 		this.timeout=timeout;

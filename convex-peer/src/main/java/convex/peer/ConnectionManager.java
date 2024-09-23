@@ -102,7 +102,6 @@ public class ConnectionManager extends AThreadedComponent {
 			ArrayList<Connection> conns = new ArrayList<>(connections.values());
 			if (conns.size() == 0) {
 				// Nothing to do
-				// log.debug("No connections available to poll!");
 				return;
 			}
 			
@@ -111,8 +110,8 @@ public class ConnectionManager extends AThreadedComponent {
 			Connection c = conns.get(random.nextInt(conns.size()));
 
 			if (c.isClosed()) return;
-			Convex convex = Convex.connect(c.getRemoteAddress());
-			try {
+			;
+			try (Convex convex = Convex.connect(c.getRemoteAddress())) {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
 				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
 				AVector<ACell> status = result.getValue();
@@ -122,11 +121,7 @@ public class ConnectionManager extends AThreadedComponent {
 				Belief sb=(Belief) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
 
 				server.queueBelief(Message.createBelief(sb));
-			} finally {
-				convex.close();
-			}
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
+			} 
 		} catch (RuntimeException | TimeoutException | ExecutionException | IOException t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
@@ -596,14 +591,16 @@ public class ConnectionManager extends AThreadedComponent {
 			// Use temp client connection to query status
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
+			if (result.isError()) {
+				log.info("Bad status message from remote Peer");
+				return null;
+			}
+			
 			AVector<ACell> status = result.getValue();
 			// close the temp connection to Convex API
 			convex.close();
 			
-			if (status == null || status.count()!=Config.STATUS_COUNT) {
-				log.info("Bad status message from remote Peer");
-				return null;
-			}
+		
 
 			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
 			if (peerKey==null) return null;

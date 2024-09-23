@@ -88,18 +88,7 @@ public class ConvexRemote extends Convex {
 		close();
 	}
 	
-	/**
-	 * Gets the consensus state from the connected Peer. The acquired state will be a snapshot
-	 * of the network global state as calculated by the Peer.
-	 * 
-	 * SECURITY: Be aware that if this client instance is connected to an untrusted Peer, the
-	 * Peer may lie about the latest state. If this is a security concern, the client should
-	 * validate the consensus state independently.
-	 * 
-	 * @return Future for consensus state
-	 * @throws TimeoutException If initial status request times out
-	 * @throws InterruptedException In case of interrupt while acquiring
-	 */
+	@Override
 	public CompletableFuture<State> acquireState() {
 		AStore store=Stores.current();
 		return requestStatus().thenCompose(status->{
