@@ -487,4 +487,32 @@ public final class Result extends ARecordGeneric {
 		throw new IllegalArgumentException("Unrecognised data of type: "+Utils.getClassName(data));
 	}
 
+	/**
+	 * Construct a result from a JSON structure. WARNING: some data may be lost
+	 * @param json Result as represented in JSON 
+	 * @return Result containing key fields
+	 * @throws IllegalArgumentException if data is of incorrect type
+	 */
+	@SuppressWarnings("unchecked")
+	public static Result fromJSON(Object json) {
+		if (!(json instanceof Map)) {
+			throw new IllegalArgumentException("Not a JSON Object");
+		}
+		Map<String,Object> m=(Map<String,Object>)json;
+		CVMLong id=CVMLong.parse(m.get("id"));
+		ACell value=RT.cvm(m.get("value"));
+		
+		ACell errorCode=RT.cvm(m.get("errorCode"));
+		if (errorCode!=null) {
+			if (errorCode instanceof AString) {
+				errorCode=Keyword.create((AString)errorCode);
+				if (errorCode==null) throw new IllegalArgumentException("JSON string is not a valid keyword for errorCode");
+			} else  {
+				throw new IllegalArgumentException("JSON errorCode expected to be a string but was: "+Utils.getClassName(errorCode));
+			}
+		}
+		
+		return Result.create(id, value, errorCode);
+	}
+
 }

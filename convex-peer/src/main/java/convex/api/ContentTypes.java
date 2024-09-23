@@ -21,7 +21,7 @@ public class ContentTypes {
 	public static final String CVX="application/cvx";
 	
 	/**
-	 * Content type for CVX raw encoding
+	 * Content type for CVX raw encoding (multi cell supported)
 	 */
 	public static final String CVX_RAW="application/cvx-raw";
 }

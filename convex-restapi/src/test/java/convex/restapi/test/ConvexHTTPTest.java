@@ -38,4 +38,14 @@ public class ConvexHTTPTest extends ARESTTest {
 		assertFalse(r.isError());
 		assertEquals(CVMLong.create(5),r.getValue());
 	}
+	
+	@Test public void testTransact() throws ResultException, InterruptedException {
+		ConvexHTTP convex=connect();
+		convex.setAddress(Init.GENESIS_ADDRESS);
+		convex.setKeyPair(KP);
+		
+		Result r=convex.transactSync("(+ 2 3)");
+		assertFalse(r.isError(),()->"Get error: "+r);
+		assertEquals(CVMLong.create(5),r.getValue());
+	}
 }

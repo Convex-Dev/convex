@@ -370,13 +370,15 @@ public class ChainAPI extends ABaseAPI {
 			summary="Prepare a Convex transaction. If sucessful, will return a hash to be signed.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction preparation request",
-					content= @OpenApiContent(
+					content= {
+						@OpenApiContent(
 							from=TransactionPrepareRequest.class,
 							type = "application/json", 
 							exampleObjects = {
 								@OpenApiExampleProperty(name = "address", value = "12"),
 								@OpenApiExampleProperty(name = "source", value = "(* 2 3)")
-							})),
+							})
+						}),
 			responses = {
 					@OpenApiResponse(status = "200", 
 							description = "Transaction prepared", 
@@ -429,6 +431,8 @@ public class ChainAPI extends ABaseAPI {
 		ctx.result(JSON.toPrettyString(rmap));
 	}
 
+
+	@SuppressWarnings("unchecked")
 	@OpenApi(path = ROUTE+"transact",
 			methods = HttpMethod.POST,
 			operationId = "transact",
@@ -436,7 +440,7 @@ public class ChainAPI extends ABaseAPI {
 			summary="Execute a Convex transaction. WARNING: sends Ed25519 seed over the network for peer to complete signature.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction execution request",
-					content= @OpenApiContent(
+					content= {@OpenApiContent(
 							from=TransactRequest.class,
 							type = "application/json",
 							exampleObjects = {
@@ -444,7 +448,10 @@ public class ChainAPI extends ABaseAPI {
 									@OpenApiExampleProperty(name = "source", value = "(* 2 3)"),
 									@OpenApiExampleProperty(name = "seed", value = "0x690f51d2eb7163f820fdb861b33d5b077034f09923a2d31946ac199f28639506")
 								}
-							)),
+							),
+							@OpenApiContent(
+								type = "application/cvx-raw"
+							)}),
 			responses = {
 					@OpenApiResponse(status = "200", 
 							description = "Transaction executed sucessfully", 
@@ -473,34 +480,47 @@ public class ChainAPI extends ABaseAPI {
 				}
 			)
 	public void runTransact(Context ctx) throws InterruptedException, IOException {
-		Map<String, Object> req = getJSONBody(ctx);
-
-		Address addr = Address.parse(req.get("address"));
-		if (addr == null)
-			throw new BadRequestResponse("Transact requires a valid address.");
-		Object srcValue = req.get("source");
-		ACell code = readCode(srcValue);
-
-		// Get ED25519 seed
-		ABlob seed = Blobs.parse(req.get("seed"));
-		if (!(seed instanceof ABlob))
-			throw new BadRequestResponse("Valid Ed25519 seed required for transact (hex string)");
-		if (seed.count() != AKeyPair.SEED_LENGTH)
-			throw new BadRequestResponse("Seed must be 32 bytes");
-
-		long nextSeq;
-		try {
-			long sequence = convex.getSequence(addr);
-			nextSeq = sequence + 1;
-		} catch (ResultException e) {
-			prepareResult(ctx,e.getResult());
-			return;
-		} 
+		String type=ctx.req().getContentType();
+		SignedData<ATransaction> sd;
 		
-		ATransaction trans = Invoke.create(addr, nextSeq, code);
-
-		AKeyPair kp = AKeyPair.create(seed.toFlatBlob());
-		SignedData<ATransaction> sd = kp.signData(trans);
+		if (ContentTypes.CVX_RAW.equals(type)) {
+			// Can accept a raw convex signed transaction
+			ACell c=getRawBody(ctx);
+			if ((c instanceof SignedData)&&(((SignedData<?>) c).getValue() instanceof ATransaction)) {
+				sd=(SignedData<ATransaction>) c;
+			} else {
+				throw new BadRequestResponse("Expected signed transaction but got: "+c);
+			}
+		} else {
+			// Assume JSON type using simple form including seed
+			Map<String, Object> req = getJSONBody(ctx);
+	
+			Address addr = Address.parse(req.get("address"));
+			if (addr == null)
+				throw new BadRequestResponse("Transact requires a valid address.");
+			Object srcValue = req.get("source");
+			ACell code = readCode(srcValue);
+	
+			// Get ED25519 seed
+			ABlob seed = Blobs.parse(req.get("seed"));
+			if (!(seed instanceof ABlob))
+				throw new BadRequestResponse("Valid Ed25519 seed required for transact (hex string)");
+			if (seed.count() != AKeyPair.SEED_LENGTH)
+				throw new BadRequestResponse("Seed must be 32 bytes");
+	
+			long nextSeq;
+			try {
+				long sequence = convex.getSequence(addr);
+				nextSeq = sequence + 1;
+			} catch (ResultException e) {
+				prepareResult(ctx,e.getResult());
+				return;
+			} 
+		
+			ATransaction trans = Invoke.create(addr, nextSeq, code);
+			AKeyPair kp = AKeyPair.create(seed.toFlatBlob());
+			sd = kp.signData(trans);
+		} 
 
 		Result r = convex.transactSync(sd);
 		prepareResult(ctx,r);
@@ -604,13 +624,19 @@ public class ChainAPI extends ABaseAPI {
 		summary="Query as Convex account",
 		requestBody = @OpenApiRequestBody(
 				description = "Query request",
-				content= @OpenApiContent(
+				content= {@OpenApiContent(
 						from=QueryRequest.class,
 						type = "application/json", 
 						exampleObjects = {
 							@OpenApiExampleProperty(name = "address", value = "12"),
 							@OpenApiExampleProperty(name = "source", value = "(* 2 3)")
-						})),
+						}),
+						@OpenApiContent(
+							mimeType = "application/cvx",
+							from=String.class,
+							example="{\n  :address #12 \n  :source (* 2 3)\n}"
+						)
+				}),
 		responses = {
 				@OpenApiResponse(status = "200", 
 						description = "Query executed", 

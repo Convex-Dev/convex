@@ -3,6 +3,8 @@ package convex.restapi.api;
 import java.util.Map;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.lang.Reader;
 import convex.java.JSON;
 import convex.peer.Server;
@@ -52,6 +54,22 @@ public abstract class ABaseAPI {
 			return req;
 		} catch (Exception e) {
 			throw new BadRequestResponse(jsonError("Invalid CVX body"));
+		}
+	}
+	
+	/**
+	 * Gets body from a Context as a cell
+	 * @param ctx Request context
+	 * @return CVM Value
+	 * @throws BadRequestResponse if the body is invalid
+	 */
+	protected <T extends ACell> T getRawBody(Context ctx) {
+		try {
+			byte[] bs=ctx.bodyAsBytes();
+			T result=Format.decodeMultiCell(Blob.wrap(bs));
+			return result;
+		} catch (Exception e) {
+			throw new BadRequestResponse(jsonError("Invalid Raw body"));
 		}
 	}
 	

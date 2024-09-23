@@ -16,6 +16,8 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -26,6 +28,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
+import convex.core.util.Utils;
 
 public class ConvexHTTP extends convex.api.Convex {
 	
@@ -48,8 +51,42 @@ public class ConvexHTTP extends convex.api.Convex {
 
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signedTransaction) {
-		// TODO Auto-generated method stub
-		return null;
+		String transactPath=getAPIPath()+"/transact";
+		SimpleHttpRequest request=SimpleRequestBuilder.post(transactPath)
+				.addHeader("Accept", ContentTypes.CVX_RAW)
+				.setBody(Format.encodeMultiCell(signedTransaction, true).getBytes(), ContentType.create(ContentTypes.CVX_RAW))
+				.build();
+		CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
+		CompletableFuture<Result> result=future.thenApply(response->{
+			return extractResult(response);
+		});
+		return result;
+	}
+
+	private Result extractResult(SimpleHttpResponse response) {
+		String type=response.getContentType().getMimeType();
+		try {
+			if (ContentTypes.CVX.equals(type)) {
+				String body=response.getBodyText();
+				// System.out.println(body);
+				// We expect a map containing the result fields
+				ACell data=Reader.read(body);
+				return Result.fromData(data);
+			} else if (ContentTypes.CVX_RAW.equals(type)) {
+				byte[] body=response.getBodyBytes();
+				ACell v=Format.decodeMultiCell(Blob.wrap(body));
+				if (v instanceof Result) return (Result)v;
+				return Result.error(ErrorCodes.FORMAT, "cvx-raw data not a result but was : "+Utils.getClassName(v));
+			} else {
+				// assume JSON?
+				Object m = JSON.parse(response.getBodyText());
+				return Result.fromJSON(m);
+			}
+		} catch (ParseException e) {
+			return Result.error(ErrorCodes.FORMAT, "Can't read response of type "+type+" : "+e.getMessage());
+		} catch (Exception e) {
+			return Result.fromException(e);
+		}
 	}
 
 	@Override
