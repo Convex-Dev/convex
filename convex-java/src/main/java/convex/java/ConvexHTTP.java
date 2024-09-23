@@ -12,6 +12,7 @@ import org.apache.hc.core5.http.ContentType;
 import convex.api.ContentTypes;
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -42,7 +43,13 @@ public class ConvexHTTP extends convex.api.Convex {
 	public static ConvexHTTP connect(URI uri,Address address, AKeyPair keyPair) {
 		return new ConvexHTTP(address,keyPair,uri);
 	}
+	
 
+	private String getAPIPath() {
+		int port=uri.getPort();
+		String ps=(port==-1)?"":":"+port;
+		return uri.getScheme()+"://"+uri.getHost()+ps+"/api/v1";
+	}
 
 	@Override
 	public boolean isConnected() {
@@ -116,7 +123,10 @@ public class ConvexHTTP extends convex.api.Convex {
 				.setBody(RT.toString(query), ContentType.create(ContentTypes.CVX))
 				.build();
 		CompletableFuture<SimpleHttpResponse> future=HTTPClients.execute(request);
-		CompletableFuture<Result> result=future.thenApply(response->{
+		CompletableFuture<Result> result=future.handle((response,ex)->{
+			// In case of exception, convert to result
+			if (ex!=null) return Result.fromException(ex).withSource(SourceCodes.NET);
+			
 			String body=response.getBodyText();
 			try {
 				// System.out.println(body);
@@ -126,14 +136,10 @@ public class ConvexHTTP extends convex.api.Convex {
 			} catch (ParseException e) {
 				return Result.error(ErrorCodes.FORMAT, "Can't read CVX response: "+body);
 			} catch (Exception e) {
-				return Result.fromException(e);
+				return Result.fromException(e).withSource(SourceCodes.NET);
 			}
 		});
 		return result;
-	}
-
-	private String getAPIPath() {
-		return uri.getScheme()+"://"+uri.getHost()+"/api/v1";
 	}
 
 	@Override

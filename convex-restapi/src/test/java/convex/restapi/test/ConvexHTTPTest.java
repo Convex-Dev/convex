@@ -5,11 +5,14 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.init.Init;
@@ -47,5 +50,17 @@ public class ConvexHTTPTest extends ARESTTest {
 		Result r=convex.transactSync("(+ 2 3)");
 		assertFalse(r.isError(),()->"Get error: "+r);
 		assertEquals(CVMLong.create(5),r.getValue());
+	}
+	
+	@Test public void testBadHost() throws ResultException, InterruptedException, URISyntaxException {
+		ConvexHTTP convex= ConvexHTTP.connect(new URI("http://localhost:1"),Init.GENESIS_ADDRESS,KP);
+		assertEquals(1,convex.getHostAddress().getPort());
+		convex.setAddress(Init.GENESIS_ADDRESS);
+		convex.setKeyPair(KP);
+		
+		Result r=convex.transactSync("(+ 2 3)");
+		assertTrue(r.isError());
+		assertEquals(ErrorCodes.IO,r.getErrorCode());
+		assertEquals(SourceCodes.NET,r.getSource());
 	}
 }

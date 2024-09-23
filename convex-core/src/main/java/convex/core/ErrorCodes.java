@@ -243,5 +243,10 @@ public class ErrorCodes {
 	 */
 	public static final Keyword LIMIT = Keyword.intern("LIMIT");
 
+	/**
+	 * Error code indicating a connection failure (non-CVM)
+	 */
+	public static final Keyword CONNECT = Keyword.intern("CONNECT");
+
 
 }
