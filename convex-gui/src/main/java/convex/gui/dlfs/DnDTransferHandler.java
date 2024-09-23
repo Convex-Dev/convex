@@ -2,6 +2,7 @@ package convex.gui.dlfs;
 
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
@@ -54,6 +55,8 @@ public abstract class DnDTransferHandler extends TransferHandler {
 			boolean copied=BrowserUtils.copyFiles((JComponent)support.getComponent(), files, targetDir);
 			this.dlfsPanel.setSelectedPath(this.dlfsPanel.getSelectedPath());
 			return copied;
+		} catch (UnsupportedFlavorException e) {
+			return false;
 		} catch (Exception e) {
 			e.printStackTrace();
 			return false;

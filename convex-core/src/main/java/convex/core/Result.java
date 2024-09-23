@@ -58,8 +58,8 @@ public final class Result extends ARecordGeneric {
 	private static final long ID_POS=RESULT_FORMAT.indexFor(Keywords.ID);
 	private static final long RESULT_POS=RESULT_FORMAT.indexFor(Keywords.RESULT);
 	private static final long ERROR_POS=RESULT_FORMAT.indexFor(Keywords.ERROR);
-	private static final long INFO_POS=RESULT_FORMAT.indexFor(Keywords.INFO);
 	private static final long LOG_POS=RESULT_FORMAT.indexFor(Keywords.LOG);
+	private static final long INFO_POS=RESULT_FORMAT.indexFor(Keywords.INFO);
 	
 	// internal value used for empty logs
 	private static final AVector<AVector<ACell>> EMPTY_LOG = null;
@@ -251,12 +251,14 @@ public final class Result extends ARecordGeneric {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		super.validateCell();
-		
+	}
+	
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
 		String problem=checkValues(values);
-		
-		if (problem!=null) {
-			throw new InvalidDataException(problem, this);
-		}
+		if (problem!=null) throw new InvalidDataException(problem,this);
+
 	}
 	
 	private static String checkValues(AVector<ACell> values) {
@@ -300,8 +302,7 @@ public final class Result extends ARecordGeneric {
 		AVector<ACell> v=Vectors.read(b,epos);
 		epos+=Format.getEncodingLength(v);
 		
-		String problem=checkValues(v);
-		if (problem!=null) throw new BadFormatException(problem);
+		// we can't check values yet because might be missing data
 		
 		Blob enc=v.getEncoding();
 		Result r=buildFromVector(v);
@@ -413,10 +414,14 @@ public final class Result extends ARecordGeneric {
 		}
 		if (e instanceof BadFormatException) {
 			String msg=e.getMessage();
-			return Result.error(ErrorCodes.FORMAT,Strings.create(msg));
+			Result err= Result.error(ErrorCodes.FORMAT,Strings.create(msg));
+			// TODO: kill these after debugging
+			err=err.withInfo(Keywords.TRACE, Strings.join(e.getStackTrace(),"\n")); 
+			return err;
 		}
 		if (e instanceof MissingDataException) {
-			return MISSING_RESULT;
+			// return MISSING_RESULT;
+			return MISSING_RESULT.withInfo(Keywords.TRACE, Strings.join(e.getStackTrace(),"\n"));
 		}
 		if (e instanceof ResultException) {
 			return ((ResultException) e).getResult();
@@ -443,7 +448,7 @@ public final class Result extends ARecordGeneric {
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
 	 * @return Result instance representing an interruption
 	 */
-	public static Result interruptThread() {
+	private static Result interruptThread() {
 		Thread.currentThread().interrupt();
 		return INTERRUPTED_RESULT;
 	}

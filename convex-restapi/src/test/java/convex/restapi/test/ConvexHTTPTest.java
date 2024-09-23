@@ -48,8 +48,12 @@ public class ConvexHTTPTest extends ARESTTest {
 		convex.setKeyPair(KP);
 		
 		Result r=convex.transactSync("(+ 2 3)");
-		assertFalse(r.isError(),()->"Get error: "+r);
+		assertFalse(r.isError());
 		assertEquals(CVMLong.create(5),r.getValue());
+		
+		r=convex.transactSync("(+ :foo 3)");
+		assertEquals(ErrorCodes.CAST,r.getErrorCode());
+		assertEquals(SourceCodes.CODE,r.getSource());
 	}
 	
 	@Test public void testBadHost() throws ResultException, InterruptedException, URISyntaxException {

@@ -488,6 +488,7 @@ public class ChainAPI extends ABaseAPI {
 			ACell c=getRawBody(ctx);
 			if ((c instanceof SignedData)&&(((SignedData<?>) c).getValue() instanceof ATransaction)) {
 				sd=(SignedData<ATransaction>) c;
+				// System.out.println("tx enc: "+sd.getEncoding());
 			} else {
 				throw new BadRequestResponse("Expected signed transaction but got: "+c);
 			}
@@ -724,7 +725,8 @@ public class ChainAPI extends ABaseAPI {
 			ctx.result(rs.toString());
 		} else if (type.equals(ContentTypes.CVX_RAW)) {
 			ctx.contentType(ContentTypes.CVX_RAW);
-			ctx.result(Format.encodeMultiCell(r, true).getBytes());
+			Blob b=Format.encodeMultiCell(r, true);
+			ctx.result(b.getBytes());
 		} else {
 			ctx.contentType(ContentTypes.TEXT);
 			ctx.status(415); // unsupported media type for "Accept" header

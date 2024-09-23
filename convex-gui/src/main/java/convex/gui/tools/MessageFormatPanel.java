@@ -11,6 +11,7 @@ import javax.swing.JTextArea;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Refs;
@@ -101,8 +102,8 @@ public class MessageFormatPanel extends JPanel {
 		String data = "";
 		String msg = messageArea.getText();
 		try {
-			Blob b = Blob.fromHex(Utils.stripWhiteSpace(msg));
-			ACell o = Format.read(b);
+			Blob b = Blobs.parse(Utils.stripWhiteSpace(msg)).toFlatBlob();
+			ACell o = Format.decodeMultiCell(b);
 			data = Utils.print(o);
 			updateHashLabel(o,b);
 		} catch (ParseException e) {

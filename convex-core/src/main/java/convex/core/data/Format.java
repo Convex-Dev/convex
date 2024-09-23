@@ -22,6 +22,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.AFn;
 import convex.core.lang.AOp;
 import convex.core.lang.Core;
@@ -608,8 +609,10 @@ public class Format {
 			throw e;
 		} catch (IndexOutOfBoundsException e) {
 			throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
+		} catch (MissingDataException e) {
+			throw e;
 		} catch (Exception e) {
-			throw new BadFormatException("Unexpected Exception when decoding: "+e.getMessage(), e);
+			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
 		}
 		throw new BadFormatException(badTagMessage(tag));
 	}

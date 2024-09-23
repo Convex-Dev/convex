@@ -137,7 +137,7 @@ public class TransactionHandler extends AThreadedComponent {
 			
 			registerInterest(sd.getHash(), m);		
 		} catch (BadFormatException | IOException e) {
-			log.warn("Unandled exception in transaction handler",e);
+			log.warn("Unhandled exception in transaction handler",e);
 			m.closeConnection();
 		}
 	}

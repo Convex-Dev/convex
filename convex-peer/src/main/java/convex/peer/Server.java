@@ -21,6 +21,7 @@ import convex.core.ErrorCodes;
 import convex.core.Order;
 import convex.core.Peer;
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -481,7 +482,7 @@ public class Server implements Closeable {
 			// log.info("transaction queued");
 		} else {
 			// Failed to queue transaction
-			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD);
+			Result r=Result.create(m.getID(), Strings.SERVER_LOADED, ErrorCodes.LOAD).withSource(SourceCodes.PEER);
 			m.returnResult(r);
 		} 
 	}

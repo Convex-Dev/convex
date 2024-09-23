@@ -24,6 +24,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.SignedData;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
@@ -81,9 +82,13 @@ public class ConvexHTTP extends convex.api.Convex {
 				return Result.fromData(data);
 			} else if (ContentTypes.CVX_RAW.equals(type)) {
 				byte[] body=response.getBodyBytes();
-				ACell v=Format.decodeMultiCell(Blob.wrap(body));
-				if (v instanceof Result) return (Result)v;
-				return Result.error(ErrorCodes.FORMAT, "cvx-raw data not a result but was : "+Utils.getClassName(v));
+				try {
+					ACell v=Format.decodeMultiCell(Blob.wrap(body));
+					if (v instanceof Result) return (Result)v;
+					return Result.error(ErrorCodes.FORMAT, "cvx-raw data not a result but was : "+Utils.getClassName(v));
+				} catch (MissingDataException e) {
+					return Result.error(ErrorCodes.MISSING, "Missing data in Result : "+e.getMissingHash() + " with encoding "+Blob.wrap(body));
+				}
 			} else {
 				// assume JSON?
 				Object m = JSON.parse(response.getBodyText());
@@ -91,7 +96,7 @@ public class ConvexHTTP extends convex.api.Convex {
 			}
 		} catch (ParseException e) {
 			return Result.error(ErrorCodes.FORMAT, "Can't read response of type "+type+" : "+e.getMessage());
-		} catch (Exception e) {
+		}  catch (Exception e) {
 			return Result.fromException(e);
 		}
 	}
