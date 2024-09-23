@@ -933,10 +933,15 @@ public class Context {
 
 	private Context withChainState(ChainState newChainState) {
 		if (chainState==newChainState) return this;
-		long oldBalance=chainState.getOriginAccount().getBalance();
+		
+		// if the chain state changed, we need to check if coin balance was reduced: 
+		// in which case we have to check the juice limit again
+		AccountStatus oldOrigin=chainState.getOriginAccount();
 		chainState=newChainState;
-		long newBalance=newChainState.getOriginAccount().getBalance();
-		if (newBalance<oldBalance) {
+		AccountStatus newOrigin=newChainState.getOriginAccount();
+		if (oldOrigin==newOrigin) return this;
+		long newBalance=newOrigin.getBalance();
+		if (newBalance<oldOrigin.getBalance()) {
 			reviseJuiceLimit(newBalance);
 		}
 		return this;
@@ -944,7 +949,6 @@ public class Context {
 
 	private void reviseJuiceLimit(long newBalance) {
 		long juicePrice=chainState.state.getJuicePrice().longValue();
-		
 		juiceLimit=Math.min(juiceLimit, Juice.calcAvailable(newBalance, juicePrice));
 	}
 
