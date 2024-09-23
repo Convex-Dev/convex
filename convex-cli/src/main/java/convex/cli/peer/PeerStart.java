@@ -29,9 +29,7 @@ import picocli.CommandLine.ParentCommand;
 import picocli.CommandLine.Spec;
 
 /**
- * peer start command
- *
- * convex.peer.start
+ * Start a Convex peer
  *
  */
 

@@ -11,7 +11,7 @@
 FROM eclipse-temurin:22-jdk-alpine AS run
 ENV HOME=/home/convex
 WORKDIR $HOME
-COPY ./convex-integration/target/convex-jar-with-dependencies.jar convex.jar
+COPY ./convex-integration/target/convex.jar convex.jar
 
 ##### Expose ports. These can be mapped to host ports
 

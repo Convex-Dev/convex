@@ -28,8 +28,6 @@ import picocli.CommandLine.Spec;
 /**
  *  peer create command
  *
- *		convex.peer.create
- *
  *  This creates an peer on an existing network
  *
  *
