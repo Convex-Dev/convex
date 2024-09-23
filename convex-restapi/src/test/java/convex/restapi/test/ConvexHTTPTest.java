@@ -53,7 +53,7 @@ public class ConvexHTTPTest extends ARESTTest {
 		
 		r=convex.transactSync("(+ :foo 3)");
 		assertEquals(ErrorCodes.CAST,r.getErrorCode());
-		assertEquals(SourceCodes.CODE,r.getSource());
+		assertEquals(SourceCodes.CODE,r.getSource()); // should fail in user code
 	}
 	
 	@Test public void testBadHost() throws ResultException, InterruptedException, URISyntaxException {
