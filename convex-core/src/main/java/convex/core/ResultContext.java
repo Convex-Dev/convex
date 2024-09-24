@@ -10,7 +10,7 @@ import convex.core.transactions.ATransaction;
 /**
  * Class for preparation of transaction results from the CVM
  * 
- * Mutable so that results can be accumulated efficiently as processing proceeds
+ * Mutable so that results can be accumulated efficiently while processing proceeds. Not intended for external usage.
  */
 public class ResultContext {
 

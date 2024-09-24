@@ -232,7 +232,7 @@ public class TestState {
 		assertEquals(0,CONTEXT.getDepth());
 		assertFalse(CONTEXT.isExceptional());
 		assertNull(CONTEXT.getResult());
-		assertEquals(TestState.TOTAL_FUNDS, STATE.computeTotalFunds());
+		assertEquals(TestState.TOTAL_FUNDS, STATE.computeTotalBalance());
 
 	}
 

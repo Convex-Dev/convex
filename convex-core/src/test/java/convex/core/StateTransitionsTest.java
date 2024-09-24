@@ -69,7 +69,7 @@ public class StateTransitionsTest {
 		s=s.withPeer(ka, PeerStatus.create(ADDRESS_A, STAKE));
 		
 		s=s.updateMemoryPool(0, 0); // clear memory pool so doesn't confuse things
-		assertEquals(Constants.MAX_SUPPLY, s.computeTotalFunds());
+		assertEquals(Constants.MAX_SUPPLY, s.computeTotalBalance());
 
 		assertEquals(ABAL, s.getBalance(ADDRESS_A));
 		assertEquals(BBAL, s.getBalance(ADDRESS_B));
@@ -177,7 +177,7 @@ public class StateTransitionsTest {
 			AVector<Result> results = br.getResults();
 			assertEquals(2, results.count());
 			assertCVMEquals(50L,br.getResult(0).getValue()); // result for successful transfer
-			assertEquals(Constants.MAX_SUPPLY, br.getState().computeTotalFunds());
+			assertEquals(Constants.MAX_SUPPLY, br.getState().computeTotalBalance());
 		}
 
 		{ // transfer with an incorrect sequence number
@@ -200,7 +200,7 @@ public class StateTransitionsTest {
 			assertEquals(ErrorCodes.FUNDS, br.getResult(0).getErrorCode());
 
 			State newState = br.getState();
-			assertEquals(Constants.MAX_SUPPLY, newState.computeTotalFunds());
+			assertEquals(Constants.MAX_SUPPLY, newState.computeTotalBalance());
 		}
 
 

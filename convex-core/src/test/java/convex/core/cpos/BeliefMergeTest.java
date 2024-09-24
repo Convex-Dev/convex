@@ -77,7 +77,7 @@ public class BeliefMergeTest {
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 		globals = globals.assoc(State.GLOBAL_JUICE_PRICE, RT.cvm(1L)); // cheap juice for simplicity. USe CVM long
 		INITIAL_STATE = State.create(accounts, peers, globals, State.EMPTY_SCHEDULE);
-		TOTAL_VALUE = INITIAL_STATE.computeTotalFunds();
+		TOTAL_VALUE = INITIAL_STATE.computeTotalBalance();
 	}
 
 	private Peer initialPeerState(int i) {
@@ -270,7 +270,7 @@ public class BeliefMergeTest {
 		State finalState = bs7[0].getConsensusState();
 
 		// matter cannot be created or destroyed....
-		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
+		assertEquals(TOTAL_VALUE, finalState.computeTotalBalance());
 	}
 
 	/**
@@ -350,7 +350,7 @@ public class BeliefMergeTest {
 		assertEquals(1L, finalState.getAccount(RADDRESS).getSequence());
 
 		// law of conservation of gil
-		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
+		assertEquals(TOTAL_VALUE, finalState.computeTotalBalance());
 		
 		RecordTest.doRecordTests(bs7[0].getBelief());
 		
@@ -454,7 +454,7 @@ public class BeliefMergeTest {
 		}
 
 		// 100% of value still exists
-		assertEquals(TOTAL_VALUE, finalState.computeTotalFunds());
+		assertEquals(TOTAL_VALUE, finalState.computeTotalBalance());
 		
 		RecordTest.doRecordTests(bs4[0].getBelief());
 		RecordTest.doRecordTests(finalState);

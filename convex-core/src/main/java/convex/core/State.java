@@ -35,6 +35,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.init.Init;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
@@ -749,7 +750,7 @@ public class State extends ARecord {
 	 *
 	 * @return The total value of all funds
 	 */
-	public long computeTotalFunds() {
+	public long computeTotalBalance() {
 		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
 		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
 		total += getGlobalFees().longValue();
@@ -758,7 +759,20 @@ public class State extends ARecord {
 	}
 	
 	/**
-	 * Compute the total memory allowance, including the memory pool.
+	 * Compute the issued coin supply. This is the maximum supply cap minus the unissued coin balance.
+	 *
+	 * @return The current Convex Coin Supply
+	 */
+	public long computeSupply() {
+		long supply=Constants.MAX_SUPPLY;
+		for (int i=0; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
+			supply-=accounts.get(i).getBalance();
+		}
+		return supply;
+	}
+	
+	/**
+	 * Compute the total memory allowance, including the memory pool. WARNING: expensive full account scan.
 	 *
 	 * @return The total amount of CVM memory available
 	 */

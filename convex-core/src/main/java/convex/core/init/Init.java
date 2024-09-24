@@ -31,6 +31,11 @@ import convex.core.util.Utils;
  */
 public class Init {
 
+	/**
+	 *  Number of special "goverance" accounts. These hold all unissued coins
+	 */
+	public static final int NUM_GOVERNANCE_ACCOUNTS=8;
+	
 	// Standard accounts numbers
 	public static final Address NULL_ADDRESS = Address.create(0);
 	public static final Address INIT_ADDRESS = Address.create(1);
@@ -60,6 +65,11 @@ public class Init {
 	// Constants
 	private static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
 	private static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
+	
+	/**
+	 * Number of coins issued at genesis (one million)
+	 */
+	private static final long GENESIS_COINS=1000000*Coin.GOLD;
 
 
 	/**
@@ -116,7 +126,7 @@ public class Init {
 		
 		// Initial account for release curve distribution - 1% for initial coin purchasers
 		{
-			long distributionFund = 10 * Coin.EMERALD; 
+			long distributionFund = 10 * Coin.EMERALD - 2 *Coin.DIAMOND; 
 			AccountStatus releaseCurveAccount=AccountStatus.create(distributionFund,governanceKey);
 			releaseCurveAccount=releaseCurveAccount.withController(FOUNDATION_ADDRESS);
 			accts = addAccount(accts, DISTRIBUTION_ADDRESS, releaseCurveAccount); 	
@@ -141,6 +151,8 @@ public class Init {
 			supply -= admin;
 		}
 		
+		assert(accts.size()==NUM_GOVERNANCE_ACCOUNTS);
+		
 		// Core library at static address: CORE_ADDRESS
 		accts = addCoreLibrary(accts);
 		// Core Account should now be fully initialised
@@ -155,7 +167,8 @@ public class Init {
 		// Build globals
 		AVector<ACell> globals = Constants.INITIAL_GLOBALS;
 
-		// Create the initial state with static libraries and memory allowances
+		// Create the initial state with static libraries and memory allowances. 
+		// We now have a functional CVM State!
 		State s = State.create(accts, peers, globals, EMPTY_SCHEDULE);
 		{
 			supply-=s.getGlobalMemoryValue().longValue();
@@ -170,7 +183,7 @@ public class Init {
 			accts = s.getAccounts();
 		}
 
-		// Set up initial user accounts, one for each genesis key. 
+		// Set up initial user accounts, genesis user plus one for each genesis peer. 
 		assert(accts.count() == GENESIS_ADDRESS.longValue());
 		{
 			long userFunds = (long)(supply*0.8); // 80% to user accounts
@@ -193,8 +206,7 @@ public class Init {
 			assert(userFunds == 0L);
 		}
 
-		// Finally add peers
-		// Set up initial peers
+		// Finally add initial peers
 
 		// BASE_PEER_ADDRESS = accts.size();
 		{
@@ -220,8 +232,11 @@ public class Init {
 		s = s.withPeers(peers);
 
 		{ // Test total funds after creating user / peer accounts
-			long total = s.computeTotalFunds();
+			long total = s.computeTotalBalance();
 			if (total != Constants.MAX_SUPPLY) throw new Error("Bad total amount: " + total);
+			
+			long issuedSupply=s.computeSupply();
+			if (issuedSupply!= GENESIS_COINS) throw new Error("Bad genesis supply: " + issuedSupply);
 		}
 
 		return s;
@@ -275,7 +290,7 @@ public class Init {
 		s = addCNSTree(s);
 
 		// Final funds check
-		long finalTotal = s.computeTotalFunds();
+		long finalTotal = s.computeTotalBalance();
 		if (finalTotal != Constants.MAX_SUPPLY)
 			throw new Error("Bad total funds in init state amount: " + finalTotal);
 

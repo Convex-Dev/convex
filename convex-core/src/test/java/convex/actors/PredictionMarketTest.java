@@ -74,7 +74,7 @@ public class PredictionMarketTest extends ACVMTest {
 			// accepted so no issue.
 			Context rctx2 = step(rctx1,"(call caddr 10 (stake false 10))");
 			assertCVMEquals(4L, rctx2.getResult());
-			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
+			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalBalance());
 
 			// halve stakes
 			Context rctx3 = step(rctx2,"(call caddr 10 (stake false 5))");
@@ -92,7 +92,7 @@ public class PredictionMarketTest extends ACVMTest {
 			Context rctx5 =step(rctx4,"(call caddr 10 (stake true 0))");
 			assertCVMEquals(-5L, rctx5.getResult()); // refund of 5
 			assertEquals(0L, initalBal - rctx5.getBalance(HERO));
-			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalFunds());
+			assertEquals(TestState.TOTAL_FUNDS, rctx2.getState().computeTotalBalance());
 		}
 
 		{ // underfunded stake request
@@ -153,7 +153,7 @@ public class PredictionMarketTest extends ACVMTest {
 			assertEquals(VILLAIN_BALANCE + 4000, c.getBalance(VILLAIN));
 
 			assertEquals(0L, c.getBalance(pmaddr));
-			assertEquals(TestState.TOTAL_FUNDS, c.getState().computeTotalFunds());
+			assertEquals(TestState.TOTAL_FUNDS, c.getState().computeTotalBalance());
 		}
 	}
 

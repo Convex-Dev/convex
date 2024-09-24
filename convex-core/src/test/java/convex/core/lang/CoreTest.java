@@ -3300,7 +3300,7 @@ public class CoreTest extends ACVMTest {
 			assertNotError(rc);
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStake());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
-			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalFunds());
+			assertEquals(Constants.MAX_SUPPLY, rc.getState().computeTotalBalance());
 		}
 
 		// staking on an account key that isn't a peer

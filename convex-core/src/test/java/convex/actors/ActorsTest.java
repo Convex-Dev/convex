@@ -151,7 +151,7 @@ public class ActorsTest extends ACVMTest {
 			ctx=step(ctx,"(call funcon 1234 (echo-offer))");
 			assertCVMEquals(1234,ctx.getResult());
 			assertEquals(initialBalance,ctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,ctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,ctx.getState().computeTotalBalance());
 		}
 
 		{
@@ -161,7 +161,7 @@ public class ActorsTest extends ACVMTest {
 			assertEquals(250,rctx.getBalance(caddr));
 
 			assertEquals(initialBalance-250,rctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalBalance());
 		}
 
 		{
@@ -171,7 +171,7 @@ public class ActorsTest extends ACVMTest {
 			assertEquals(1237,rctx.getBalance(caddr));
 
 			assertEquals(initialBalance-1237,rctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalBalance());
 		}
 
 		{
@@ -181,7 +181,7 @@ public class ActorsTest extends ACVMTest {
 			assertEquals(0,rctx.getBalance(caddr));
 
 			assertEquals(initialBalance,rctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalBalance());
 		}
 
 		{
@@ -192,7 +192,7 @@ public class ActorsTest extends ACVMTest {
 			assertEquals(0,rctx.getOffer());
 
 			assertEquals(initialBalance,rctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalBalance());
 		}
 
 		{
@@ -202,7 +202,7 @@ public class ActorsTest extends ACVMTest {
 			assertEquals(1337,rctx.getBalance(caddr));
 
 			assertEquals(initialBalance-1337,rctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalBalance());
 		}
 
 		{
@@ -212,7 +212,7 @@ public class ActorsTest extends ACVMTest {
 			assertEquals(1337,rctx.getBalance(caddr));
 
 			assertEquals(initialBalance-1337,rctx.getBalance(addr));
-			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalFunds());
+			assertEquals(TOTAL_FUNDS,rctx.getState().computeTotalBalance());
 		}
 
 		// test *offer* restored after send

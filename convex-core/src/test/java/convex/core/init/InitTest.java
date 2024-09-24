@@ -97,7 +97,7 @@ public class InitTest extends ACVMTest {
 		assertEquals(0,context().getDepth());
 		assertNull(context().getResult());
 
-		assertEquals(Constants.MAX_SUPPLY, STATE.computeTotalFunds());
+		assertEquals(Constants.MAX_SUPPLY, STATE.computeTotalBalance());
 		assertEquals(Constants.INITIAL_FEES,STATE.getGlobalFees().longValue());
 		assertEquals(Constants.INITIAL_MEMORY_POOL,STATE.getGlobalMemoryPool().longValue());
 		
