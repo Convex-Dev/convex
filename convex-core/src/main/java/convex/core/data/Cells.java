@@ -19,8 +19,9 @@ public class Cells {
 	
 	/**
 	 * The maximum number of branches possible from a single Cell encoding
+	 * TODO: Verify this is 68 (vector with 16 embedded children with 4 branches each + embedded tail with 4 branches)
 	 */
-	public static final int MAX_BRANCH_COUNT = 72;
+	public static final int MAX_BRANCH_COUNT = 68;
 
 	/**
 	 * Equality method allowing for nulls
@@ -69,19 +70,9 @@ public class Cells {
 	 * @param a Cell to check (may be null)
 	 * @return Number of Refs in the object.
 	 */
-	public static int branchCount(ACell a) {
-		if (a==null) return 0;
-		int n=a.getRefCount();
-		int bc=0;
-		for (int i=0; i<n; i++) {
-			Ref<?> ref=a.getRef(i);
-			if (ref.isEmbedded()) {
-				bc+=branchCount(ref.getValue());
-			} else {
-				bc++;
-			}
-		}
-		return bc;
+	public static int branchCount(ACell v) {
+		if (v==null) return 0;
+		return v.getBranchCount();
 	}
 
 	/**
@@ -93,7 +84,7 @@ public class Cells {
 	 * @return Ref for cell
 	 */
 	public static <R extends ACell> Ref<R> getRef(ACell cell, int index) {
-		if (cell ==null) throw new IndexOutOfBoundsException("Bad ref index called on null");
+		if (cell==null) throw new IndexOutOfBoundsException("getRef called on null");
 		return cell.getRef(index);
 	}
 

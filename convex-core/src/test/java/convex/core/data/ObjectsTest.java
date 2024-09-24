@@ -80,10 +80,31 @@ public class ObjectsTest {
 		assertTrue(bc>=0);
 		assertTrue(bc<=Cells.MAX_BRANCH_COUNT);
 		
+		// out of range branches should be null
+		assertNull(a.getBranchRef(-1));
+		assertNull(a.getBranchRef(bc));
+		
+		// bc of zero equivalent to completely encoded
+		assertEquals(a.isCompletelyEncoded(),bc==0);
+		
+		int rc=a.getRefCount();
+		if (rc==0) {
+			// if no Refs, clearly none of them can be branches!
+			assertEquals(0,bc);
+		} else if (rc==1) {
+			Ref<?> cr=a.getRef(0);
+			if (cr.isEmbedded()) {
+				assertEquals(bc,cr.branchCount());
+			} else {
+				assertEquals(1,bc);
+			}
+		}
+		
 		if (bc==0) {
 			assertNull(a.getBranchRef(0));
 			Cells.visitBranches(a, v->fail("Shouldn't visit any branch!"));
 		} else {
+			// branch refs within range should be non-null
 			assertNotNull(a.getBranchRef(0));
 			assertNotNull(a.getBranchRef(bc-1));
 			

@@ -236,6 +236,16 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @return The value contained in this Ref
 	 */
 	public abstract T getValue();
+	
+	/**
+	 * Get the number of child branches from this Ref
+	 * @return Number of branches
+	 */
+	public int branchCount() {
+		ACell v=getValue();
+		if (v==null) return 0;
+		return v.getBranchCount();
+	}
 
 	@Override
 	public int hashCode() {

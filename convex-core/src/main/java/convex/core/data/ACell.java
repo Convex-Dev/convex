@@ -436,8 +436,8 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 		for (int i=0; i<rc; i++) {
 			Ref<?> r=c.getRef(i);
 			if (r.isEmbedded()) {
-				ACell child=r.getValue();
-				if (child!=null) result+=child.getBranchCount();
+				// need to recursively count branches in embedded Ref
+				result+=r.branchCount();
 			} else {
 				// we found a branch!
 				result+=1;
@@ -460,12 +460,12 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 			Ref<?> r=c.getRef(i);
 			if (r.isEmbedded()) {
 				ACell child=r.getValue();
-				if (child==null) continue; // no branch here
+				if (child==null) continue; // no branch here!
 				int cbc=child.getBranchCount();
 				if (cbc>index) return child.getBranchRef(index);
 				index-=cbc;
 			} else {
-				if (index==0) return (Ref<T>) r;
+				if (index==0) return (Ref<T>) r; // we are pointing to exactly this branch
 				index-=1;
 			}
 		}
@@ -573,7 +573,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 
 	/**
-	 * Tests if this Cell is completely encoded, i.e. has no external Refs. This implies that the 
+	 * Tests if this Cell is completely encoded, i.e. has no external branch Refs. This implies that the 
 	 * complete Cell can be represented in a single encoding.
 	 * @return true if completely encoded, false otherwise
 	 */
