@@ -16,6 +16,11 @@ public class Cells {
 	 * An empty Java array of cells
 	 */
 	public static final ACell[] EMPTY_ARRAY = new ACell[0];
+	
+	/**
+	 * The maximum number of branches possible from a single Cell encoding
+	 */
+	public static final int MAX_BRANCH_COUNT = 72;
 
 	/**
 	 * Equality method allowing for nulls

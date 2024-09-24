@@ -282,7 +282,6 @@ public class Init {
 	}
 	
 	public static State createState(AccountKey governanceKey, AccountKey genesisKey,List<AccountKey> peerKeys) {
-
 		State s=createBaseState(governanceKey, genesisKey, peerKeys);
 		s = addStandardLibraries(s);
 		s = addTestingCurrencies(s);
@@ -295,7 +294,7 @@ public class Init {
 			throw new Error("Bad total funds in init state amount: " + finalTotal);
 
 		return s;
-}
+	}
 
 	private static State addTestingCurrencies(State s)  {
 		try {

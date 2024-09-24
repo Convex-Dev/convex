@@ -72,5 +72,11 @@ public abstract  class APrimitive extends ACell {
 		// No Refs by default
 		return 0;
 	}
+	
+	@Override
+	public int getBranchCount() {
+		// Never any branches by default
+		return 0;
+	}
 
 }

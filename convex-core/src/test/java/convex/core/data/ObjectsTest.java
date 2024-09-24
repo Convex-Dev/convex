@@ -25,7 +25,7 @@ import convex.core.util.Utils;
 import convex.test.Samples;
 
 /**
- * Generic test functions for arbitrary Data Objects.
+ * Generic test functions for arbitrary Data values.
  */
 public class ObjectsTest {
 	/**
@@ -54,7 +54,7 @@ public class ObjectsTest {
 
 
 	/**
-	 * Generic tests for an arbitrary vaid Cell. May or may not be a valid CVM value. 
+	 * Generic tests for an arbitrary valid Cell. May or may not be a valid CVM value. 
 	 * 
 	 * Checks required Cell properties across a number of themes.
 	 * 
@@ -71,9 +71,32 @@ public class ObjectsTest {
 		doRefContainerTests(a);
 		doCellRefTests(a);
 		doPrintTests(a);
+		doBranchTests(a);
 		doMemorySizeTests(a);
 	}
 	
+	private static void doBranchTests(ACell a) {
+		int bc=a.getBranchCount();
+		assertTrue(bc>=0);
+		assertTrue(bc<=Cells.MAX_BRANCH_COUNT);
+		
+		if (bc==0) {
+			assertNull(a.getBranchRef(0));
+			Cells.visitBranches(a, v->fail("Shouldn't visit any branch!"));
+		} else {
+			assertNotNull(a.getBranchRef(0));
+			assertNotNull(a.getBranchRef(bc-1));
+			
+			int[] tmp=new int[1];
+			Cells.visitBranches(a, v->{
+				tmp[0]++;
+				assertFalse(v.isEmbedded());
+			});
+			
+			assertEquals(bc,tmp[0]);
+		}
+	}
+
 	private static void doMemorySizeTests(ACell a) {
 		long ms=a.calcMemorySize();
 		long fms=Cells.storageSize(a);

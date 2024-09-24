@@ -153,6 +153,12 @@ public final class StringShort extends AString {
 		return 0;
 	}
 	
+	@Override
+	public int getBranchCount() {
+		if (!isCanonical()) return super.getRefCount();
+		return 0;
+	}
+	
 	/**
 	 * Read a StringShort from an encoding. Assumes tag and length already validated. 
 	 * @param length Length of string in UTF-8 bytes

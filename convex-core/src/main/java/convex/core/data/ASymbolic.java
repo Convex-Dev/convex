@@ -153,4 +153,10 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		// Never any refs
 		return 0;
 	}
+	
+	@Override
+	public int getBranchCount() {
+		// Never any branches
+		return 0;
+	}
 }
