@@ -18,9 +18,9 @@ public class HelperTest {
 		assertEquals(List.of("a"),Helpers.splitArrayParameter(" a "));
 	}
 	
-	public static void assertExecuteCommandLineResult(int returnCode, String patternText, String ... args) {
+	public static void assertExecuteCommandLineResult(int exitCode, String patternText, String ... args) {
 		CLTester tester =  CLTester.run(args);
-		assertEquals(returnCode, tester.getResult());
+		tester.assertExitCode(exitCode);;
 		
 		String output=tester.getOutput();
 		Pattern regex = Pattern.compile(patternText, Pattern.MULTILINE + Pattern.DOTALL);

@@ -36,8 +36,7 @@ import picocli.CommandLine.ScopeType;
  */
 @Command(name = "convex", 
 		subcommands = { Account.class, Key.class, Local.class, Peer.class, Query.class, Status.class, Desktop.class,
-		Etch.class, Transact.class,
-		CommandLine.HelpCommand.class }, 
+		Etch.class, Transact.class, Help.class }, 
 		usageHelpAutoWidth = true, 
 		sortOptions = true, 
 		mixinStandardHelpOptions = true,
@@ -52,8 +51,12 @@ import picocli.CommandLine.ScopeType;
 public class Main extends ACommand {
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
-	public CommandLine commandLine = new CommandLine(this);
-
+	public CommandLine commandLine;
+	
+	public Main() {
+		commandLine= new CommandLine(this);
+		commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
+	}
 
 	@Option(names = { "-S","--strict-security" }, 
 			defaultValue = "false", 
@@ -77,10 +80,6 @@ public class Main extends ACommand {
 			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-"+Constants.DEFAULT_VERBOSE_LEVEL+"}", 
 			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}") 
 	private Integer verbose;
-
-	public Main() {
-		commandLine = commandLine.setExecutionExceptionHandler(new Main.ExceptionHandler());
-	}
 
 	@Override
 	public void execute() {
@@ -170,7 +169,7 @@ public class Main extends ACommand {
 		@Override
 		public String[] getVersion() throws Exception {
 			String s = Utils.getVersion();
-			return new String[] { "Convex version: " + s };
+			return new String[] { s };
 		}
 	}
 

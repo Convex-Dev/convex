@@ -2,7 +2,7 @@ package convex.cli.peer;
 
 import convex.cli.ATopCommand;
 import convex.cli.Constants;
-import picocli.CommandLine;
+import convex.cli.Help;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
@@ -21,7 +21,7 @@ import picocli.CommandLine.ScopeType;
 		PeerStart.class,
 		PeerList.class,
 		PeerGenesis.class,
-		CommandLine.HelpCommand.class
+		Help.class
 	},
 	mixinStandardHelpOptions=true,
 	description="Operate a Convex Peer")

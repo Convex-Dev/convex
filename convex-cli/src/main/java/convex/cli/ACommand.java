@@ -23,10 +23,15 @@ public abstract class ACommand implements Runnable {
 	
 	public void showUsage() {
 		CommandLine cl=new CommandLine(this);
+		showUsage(cl);
+	}
+	
+	protected void showUsage(CommandLine cl) {
 		cl.setUsageHelpAutoWidth(true);
 		cl.setUsageHelpWidth(100);
 		cl.setUsageHelpLongOptionsMaxWidth(40);
-		cl.usage(cli().commandLine().getOut(),Help.defaultColorScheme(Ansi.ON));
+		Ansi ansi=cli().isColoured()?Ansi.ON:Ansi.OFF;
+		cl.usage(cli().commandLine().getOut(),Help.defaultColorScheme(ansi));
 	}
 	
 	public CommandLine commandLine() {
