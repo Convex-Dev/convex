@@ -113,7 +113,8 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-simple</artifactId>
 			<version>${slf4j.version}</version>
-			<scope>test</scope>
+			<!-- optional becuase not needed by projects depending on this -->
+			<optional>true</optional>
 		</dependency>
 	</dependencies>
 </project>

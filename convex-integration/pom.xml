@@ -97,11 +97,15 @@
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-core</artifactId>
 			<version>${logback.version}</version>
+			<!-- optional becuase not needed by projects depending on this -->
+			<optional>true</optional>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
 			<version>${logback.version}</version>
+			<!-- optional becuase not needed by projects depending on this -->
+			<optional>true</optional>
 		</dependency>
 
 		<!-- TEST DEPENDENCIES -->

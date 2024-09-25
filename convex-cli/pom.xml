@@ -173,6 +173,8 @@
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-simple</artifactId>
 			<version>${slf4j.version}</version>
+			<!-- optional becuase not needed by projects depending on this -->
+			<optional>true</optional>
 		</dependency>
 		<!-- Don't really want this by default?
 		<dependency>
