@@ -22,7 +22,6 @@ import picocli.CommandLine.ParentCommand;
 		AccountInformation.class,
 		CommandLine.HelpCommand.class
 	},
-	mixinStandardHelpOptions=false,
 	description="Manage Convex accounts.")
 public class Account extends ATopCommand  {
 

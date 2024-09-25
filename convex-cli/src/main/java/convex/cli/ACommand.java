@@ -22,7 +22,7 @@ public abstract class ACommand implements Runnable {
 	public abstract Main cli();
 	
 	public void showUsage() {
-		CommandLine cl=new CommandLine(this);
+		CommandLine cl=new CommandLine(this.getClass());
 		showUsage(cl);
 	}
 	

@@ -10,7 +10,7 @@ import picocli.CommandLine.ParentCommand;
 
 @Command(
 		name="help",
-		description="Show usage help",
+		description="Show usage help and exit.",
 		helpCommand = true)
 public class Help extends ACommand implements IHelpCommandInitializable2  {
 
