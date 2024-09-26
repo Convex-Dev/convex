@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Dimension;
 
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JTree;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
@@ -150,6 +151,6 @@ public class StateTreePanel extends JPanel {
 		tree.addTreeWillExpandListener(expandListener);
 		tree.expandPath(new TreePath(tNode.getPath()));
 
-		add(tree, BorderLayout.CENTER);
+		add(new JScrollPane(tree), BorderLayout.CENTER);
 	}
 }

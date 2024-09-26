@@ -58,6 +58,7 @@ public abstract class ACVMTest {
 		HERO_BALANCE = c.getAccountStatus(HERO).getBalance();
 		VILLAIN_BALANCE = c.getAccountStatus(VILLAIN).getBalance();
 		c=buildContext(c);
+		if (c.isError()) throw new Error("Error initialising context: "+c.getExceptional());
 		c=c.withJuice(0); // reset juice used
 		this.INITIAL=c.getState();
 		this.CONTEXT=c;

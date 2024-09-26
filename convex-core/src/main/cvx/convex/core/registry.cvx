@@ -52,7 +52,7 @@
 ;; CNS root reference, i.e. this registry with an empty vector key
 (def root [~*address* []])
 
-;; Map of `node key` -> `segment symbol` -> `[value trust-monitor meta child]`
+;; Map of `path vector` -> `segment name` -> `[value trust-monitor meta child]`
 ;; Where:
 ;;    value = Target value for CNS resolution, usually an address or scoped address
 ;;	  trust-monitor = controller for this CNS entry
@@ -61,10 +61,9 @@
 ;;		
 ;; Node key is implementation defined in general, but for main registry uses:
 ;;    Empty vector for CNS root
-;;    vector of segment strings for child paths
+;;    Vector of segment strings for paths
 (def cns-database
-		  ^{:private? true}
-		  
+   ^{:private? true}
   {[] {"init" [#1 #1 nil nil]}})
 
 ;; Controllers for each CNS node managed under this actor
@@ -77,22 +76,24 @@
   {[] #1})
 
 (defn -check [sym]
-  (or (symbol? sym) (fail :ARGUMENT "CNS name must be a Symbol")))
+  (cond (symbol? sym) 
+    (split (name sym) \.)	  
+    (fail :ARGUMENT "CNS name must be a Symbol")))
 
 (defn read ^{
-	:doc       {:description "Reads a CNS record as a [value controller metadata child] vector, or nil if record does not exist."
-    :examples    [{:code "(*registry*/resolve 'my.actor.name)"}]
+	:callable    true    ;; can be called or used a library function
+	:doc         {:description "Reads a CNS record as a [value controller metadata child] vector, or nil if record does not exist."
+    :examples    [{:code "(*registry*/read 'my.actor.name)"}]
     :signature   [{:params [sym]}]}}
   ([sym]
-	(-check sym)
-	(let [path (split (name sym) \.)
-	      n (count path)]
-	  (when (zero? n) (fail :ARGUMENT "CNS path must have at least one segment"))
-      (loop [i 0 
-             ref root]
-        (let [pname (nth path i)
-              rec (call ref (cns-read pname))]
-           (cond 
+	(query 
+	  (let [path (-check sym)
+	        n (count path)]
+        (loop [i 0 
+               ref root]
+          (let [pname (nth path i)
+                rec (call ref (cns-read pname))]
+            (cond 
               ;; return nil if no entry found
         	  (nil? rec) (return nil)
               
@@ -101,11 +102,12 @@
         	  
               ;; recurse into next level CNS node
               (recur (inc i) (first rec))
-        	  
-              ))))))
+      
+              )))))))
 
 (defn resolve ^{
-	:doc       {:description "Resolves a CNS entry. Returns nil if entry does not exist"
+	:callable    true    ;; can be called or used a library function
+	:doc         {:description "Resolves a CNS entry. Returns nil if entry does not exist"
     :examples    [{:code "(*registry*/resolve 'my.actor.name)"}]
     :signature   [{:params [sym]}]}}
   ([sym]
@@ -117,28 +119,28 @@
 	       :examples    [{:code "(*registry*/create 'my.actor.name target *address* {:some :metadata})"}]
 	       :signature   [{:params [sym]}]}}
 
-  ([sym] (recur sym nil *address* nil))
-  ([sym addr] (recur sym addr *address* nil))
-  ([sym addr cont] (recur sym addr cont nil))
-  ([sym addr cont meta] 
-	(when-not (symbol? sym) (fail :ARGUMENT "CNS path must be a valid symbol"))
-	(let [path (split (name sym) \.)
+  ([sym] (recur sym nil *address* nil nil))
+  ([sym addr] (recur sym addr *address* nil nil))
+  ([sym addr cont] (recur sym addr cont nil nil))
+  ([sym addr cont meta] (recur sym addr cont meta nil))
+  ([sym addr cont meta child] 
+	(let [path (-check sym)
 	      n (count path)]
-	  (when (zero? n) (fail :ARGUMENT "CNS path must have at least one segment"))
+	  (cond (zero? n) (fail :ARGUMENT "CNS path must have at least one segment"))
 	  (loop [i 0 
 		     ref root]
 	    (let [pname (get path i)]
 		 (cond 
 			;; are we at end of path? if so perform write at current position
 		    (>= (inc i) n) 
-			   (call ref (cns-write pname addr cont meta) )
+			   (call ref (cns-write pname addr cont meta child) )
 			   
 			(if-let [rec (call ref (cns-read pname))]
 				(recur (inc i) (first rec))	
 				
 				;; need to construct a new CNS node
 				(let [nref (call ref (cns-create-node pname cont))] 
-				   (call ref (cns-write pname nref cont nil) )
+				   (call ref (cns-write pname nref cont meta child) )
 				   (recur (inc i) nref)))
 		 ))
 	  )
@@ -151,7 +153,7 @@
 (defn control
   [sym cont]
   (if-let [rec (read sym)]
-    (let [[v c m] rec]
+    (let [[v c m child] rec]
       (update sym v cont m))
     (fail :STATE "CNS record does not exist")))
 
@@ -176,8 +178,7 @@
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
   [sym controller]
-  (-check sym)
-  (let [path (split (name sym) \.)
+  (let [path (-check sym)
         record (get cns-database path)]
     (when (nil? record)
       (fail :STATE "CNS record does not exist"))
@@ -191,8 +192,7 @@
           :examples    [{:code "(call *registry* (cns-resolve 'convex.registry)"}]
           :signature   [{:params [addr]}]}}
   [sym]
-  (-check sym)
-  (let [path (split (name sym) \.)
+  (let [path (-check sym)
         record (get cns-database path)]
     (if record (first record) nil)))
 
@@ -234,7 +234,7 @@
 
 (defn cns-read
 	^{:callable true
-	  :doc {:description "Reads a child CNS record from this CNS node. Assumes a record key passed in *scope*."
+	  :doc {:description "Reads a child CNS record from this CNS node. Assumes a path vector passed in *scope*."
 			:examples    [{:code "(call [cns-node cns-key] (cns-read \\\"my-name\\\"))"}]
 			:signature   [{:params [sym]}]}}
 	[pname]
@@ -242,10 +242,10 @@
 
 (defn cns-write
 	^{:callable true
-	  :doc {:description "Writes a CNS record from this Actor. Assumes a CNS node key passed in *scope*."
+	  :doc {:description "Writes a CNS record from this Actor. Assumes a path vector passed in *scope*."
 	  :examples    [{:code "(call [cns-node cns-key] (cns-write \"my-name\" new-record))"}]
 						:signature   [{:params [sym]}]}}
-	[pname addr cont meta]
+	[pname addr cont meta child]
     (let [sm (get cns-database *scope*)]
 	  (or (str? pname) (fail :ARGUMENT "CNS path element must be a string"))  
 	  (or sm (error :STATE "CNS Node key not valid"))
@@ -256,5 +256,5 @@
     	(or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS record")))
     		
       ;; update record since at this point all required checks have passed
-	  (set-in! cns-database [*scope* pname] [addr cont meta])))
+	  (set-in! cns-database [*scope* pname] [addr cont meta child])))
 
