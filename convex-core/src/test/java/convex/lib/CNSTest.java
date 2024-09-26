@@ -1,8 +1,10 @@
 package convex.lib;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -42,7 +44,12 @@ public class CNSTest extends ACVMTest {
 		assertEquals(REG,eval(ctx,"*registry*"));
 		// assertEquals(REG,eval(ctx,"cns"));
 	}
-
+	
+	@Test public void testTrust() {
+		assertFalse(evalB("(trust/trusted? [cns []] *address*)"));
+		assertTrue(evalB("(query-as #6 `(~trust/trusted? [~cns []] *address*))"));
+	}
+	
 	@Test public void testInit() {
 		Address init=eval("(*registry*/resolve 'init)");
 		assertEquals(Init.INIT_ADDRESS,init);

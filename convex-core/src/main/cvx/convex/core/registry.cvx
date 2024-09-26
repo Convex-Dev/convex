@@ -5,7 +5,6 @@
                             "Hosts the CNS root namespace(s)."]
               :name        "Convex Name Service"})
 
-
 ;;
 ;;
 ;; Deployed by default during network initialisation at a well-known address.
@@ -78,6 +77,9 @@
   (cond (symbol? sym) 
     (split (name sym) \.)	  
     (fail :ARGUMENT "CNS name must be a Symbol")))
+
+;; ========================================================
+;; CNS User API - See CAD014
 
 (defn read ^{
 	:callable    true    ;; can be called or used a library function
@@ -264,4 +266,22 @@
     		
       ;; update record since at this point all required checks have passed
 	  (set-in! cns-database [*scope* pname] [addr cont meta child])))
+
+;; =========================================
+;; Trust SPI
+;;
+;; Yes, CNS records are trust monitors!
+;; Delegates trust check to the record controller
+
+(defn check-trusted? 
+  ^:callable
+  [subject action object]
+  (cond
+	(empty? *scope*) (trust/trusted? root-controller subject action object)
+	(let [[& ps pname] *scope*
+	      cont (get-in cns-database [ps pname 1])]
+	  (trust/trusted? cont subject action object))))
+
+
+
 
