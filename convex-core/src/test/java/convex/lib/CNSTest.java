@@ -24,8 +24,17 @@ public class CNSTest extends ACVMTest {
 		
 		ctx=step(ctx,"(import convex.asset :as asset)");
 		ctx=step(ctx,"(import convex.trust :as trust)");
-		// ctx=step(ctx,"(import convex.cns :as cns)");
+		ctx=step(ctx,"(def cns #9)");
 		return ctx;
+	}
+	
+	@Test public void testConstantSetup() {
+		assertEquals(Init.REGISTRY_ADDRESS,eval("*registry*"));
+		assertEquals(Init.REGISTRY_ADDRESS,eval("cns"));
+		assertEquals(Init.REGISTRY_ADDRESS,eval("(*registry*/resolve 'cns)"));
+		
+		// TODO: fix this
+		// assertEquals(Init.REGISTRY_ADDRESS,eval("@cns"));
 	}
 	
 	@Test public void testSpecial() {
@@ -38,11 +47,11 @@ public class CNSTest extends ACVMTest {
 		Address init=eval("(*registry*/resolve 'init)");
 		assertEquals(Init.INIT_ADDRESS,init);
 		
-		assertEquals(eval("[#1 #1 nil nil]"), eval("(*registry*/read 'init)"));
+		assertEquals(eval("[#1 #6 nil nil]"), eval("(*registry*/read 'init)"));
 	}
 	
 	@Test public void testCreateNestedFromTop() {
-		Context ctx=context().forkWithAddress(Init.INIT_ADDRESS);
+		Context ctx=context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
 		ctx=(step(ctx,"(*registry*/create 'foo.bar.bax #17)"));
 		assertNotError(ctx);
 		
@@ -55,7 +64,7 @@ public class CNSTest extends ACVMTest {
 		assertTrustError(step("(*registry*/create 'foo)"));
 		
 		// INIT should be able to create a top level CNS entry
-		Context ictx=context().forkWithAddress(Init.INIT_ADDRESS);
+		Context ictx=context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
 		ictx=step(ictx,"(import convex.trust :as trust)");
 		ictx=(step(ictx,"(*registry*/create 'foo #17)"));
 		assertNotError(ictx);

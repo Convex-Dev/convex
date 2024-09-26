@@ -283,10 +283,11 @@ public class Init {
 	
 	public static State createState(AccountKey governanceKey, AccountKey genesisKey,List<AccountKey> peerKeys) {
 		State s=createBaseState(governanceKey, genesisKey, peerKeys);
+		
+		s = addCNSTree(s);
 		s = addStandardLibraries(s);
 		s = addTestingCurrencies(s);
 		
-		s = addCNSTree(s);
 
 		// Final funds check
 		long finalTotal = s.computeTotalBalance();
@@ -339,10 +340,10 @@ public class Init {
 	}
 	
 	private static State addCNSTree(State s) {
-		Context ctx=Context.create(s, INIT_ADDRESS);
-		//ctx=ctx.eval(Reader.read("(do (*registry*/create 'user.init))"));
-		//ctx.getResult();
-
+		Context ctx=Context.create(s, GOVERNANCE_ADDRESS);
+		ctx=ctx.eval(Reader.read("(*registry*/create 'cns *registry*)"));
+		ctx.getResult();
+		
 		// check we can get access to general trust monitors
 		//ctx=ctx.eval(Reader.read("(import convex.trust.monitors :as mon)"));
 		//ctx.getResult();
