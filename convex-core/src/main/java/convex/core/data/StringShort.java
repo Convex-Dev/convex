@@ -228,10 +228,18 @@ public final class StringShort extends AString {
 				// ASCII range, might be escape character
 				Text.writeEscapedByte(sb,b);
 			} else {
-				CVMChar ch=get(i);
-				if (ch==null) ch=CVMChar.BAD_CHARACTER;
-				sb.append(ch);
-				i+=CVMChar.utfLength(ch.getCodePoint())-1;
+				int cp=charAt(i);
+				if (cp<0) {
+					sb.append(CVMChar.BAD_CHARACTER);
+					i+=1; // skip one byte? or should we error correct?
+				} else {
+					// need to copy exactly one UTF character
+					int len=CVMChar.utfLength(cp);
+					for (int j=0; j<len; j++) {
+						sb.append(byteAt(i+j));
+					}
+					i+=len-1;
+				}
 			}
 		}
 		return;

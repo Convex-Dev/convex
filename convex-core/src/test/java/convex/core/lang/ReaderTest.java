@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import static convex.test.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -276,10 +277,15 @@ public class ReaderTest {
 	}
 	
 	@Test public void testUnprintablePrint() {
-		AString bad=Strings.create(Blob.fromHex("ff"));
+		AString bad=Strings.create(Blob.fromHex("ff")); // bad UTF-8
 		AString pbad=RT.print(bad);
 		AString expected=Strings.create("\"\uFFFD\"");
 		assertEquals(expected,pbad);
+		
+		String ps=pbad.toString();
+		assertNotEquals(bad,Reader.read(ps)); // not reproducing the bad UTF-8
+		assertEquals(pbad,Reader.read(ps).print()); // printed version should round trip
+		doReadPrintTest(ps);
 	}
 	
 	@Test
