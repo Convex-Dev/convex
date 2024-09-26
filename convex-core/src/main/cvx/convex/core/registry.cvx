@@ -120,7 +120,6 @@
 	:doc  {:description "Creates a CNS entry with given reference, controller and metadata"
 	       :examples    [{:code "(*registry*/create 'my.actor.name target *address* {:some :metadata})"}]
 	       :signature   [{:params [sym]}]}}
-
   ([sym] (recur sym nil *address* nil nil))
   ([sym addr] (recur sym addr *address* nil nil))
   ([sym addr cont] (recur sym addr cont nil nil))
@@ -149,15 +148,14 @@
 				   (recur (inc i) nref)))
 		 ))
 	  )
-	)
-	sym
-	))
+	  ;; TODO: Not clear what default return value should be? [~*address* path]?
+	  )))
 
 (defn control
   [sym cont]
   (if-let [rec (read sym)]
     (let [[v c m child] rec]
-      (update sym v cont m))
+      (update sym v cont m child))
     (fail :STATE "CNS record does not exist")))
 
 

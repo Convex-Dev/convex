@@ -341,7 +341,7 @@ public class Init {
 	
 	private static State addCNSTree(State s) {
 		Context ctx=Context.create(s, GOVERNANCE_ADDRESS);
-		ctx=ctx.eval(Reader.read("(*registry*/create 'cns *registry*)"));
+		ctx=ctx.eval(Reader.read("(*registry*/create 'convex.cns *registry*)"));
 		ctx.getResult();
 		
 		// check we can get access to general trust monitors

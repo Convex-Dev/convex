@@ -33,7 +33,7 @@ public class CNSTest extends ACVMTest {
 	@Test public void testConstantSetup() {
 		assertEquals(Init.REGISTRY_ADDRESS,eval("*registry*"));
 		assertEquals(Init.REGISTRY_ADDRESS,eval("cns"));
-		assertEquals(Init.REGISTRY_ADDRESS,eval("(*registry*/resolve 'cns)"));
+		assertEquals(Init.REGISTRY_ADDRESS,eval("@convex.registry"));
 		
 		// TODO: fix this
 		// assertEquals(Init.REGISTRY_ADDRESS,eval("@cns"));
@@ -46,6 +46,7 @@ public class CNSTest extends ACVMTest {
 	}
 	
 	@Test public void testTrust() {
+		// Root CNS node should only trust governance account
 		assertFalse(evalB("(trust/trusted? [cns []] *address*)"));
 		assertTrue(evalB("(query-as #6 `(~trust/trusted? [~cns []] *address*))"));
 	}
@@ -70,26 +71,26 @@ public class CNSTest extends ACVMTest {
 		// HERO shouldn't be able to create a top level CNS entry
 		assertTrustError(step("(*registry*/create 'foo)"));
 		
-		// INIT should be able to create a top level CNS entry
-		Context ictx=context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
-		ictx=step(ictx,"(import convex.trust :as trust)");
-		ictx=(step(ictx,"(*registry*/create 'foo #17)"));
-		assertNotError(ictx);
-		ictx=step(ictx,"(def ref [*registry* [\"foo\"]])");
-		AVector<?> ref=ictx.getResult();
+		// NEed governance address to be able to create a top level CNS entry
+		Context ctx=context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
+		ctx=step(ctx,"(import convex.trust :as trust)");
+		ctx=(step(ctx,"(*registry*/create 'foo #17)"));
+		assertNotError(ctx);
+		ctx=step(ctx,"(def ref [*registry* [\"foo\"]])");
+		AVector<?> ref=ctx.getResult();
 		assertNotNull(ref);
 		
 		// System.out.println(eval(ictx,"*registry*/cns-database"));
 		
-		assertEquals(Address.create(17),eval(ictx,"(*registry*/resolve 'foo)"));
+		assertEquals(Address.create(17),eval(ctx,"(*registry*/resolve 'foo)"));
 		
-		ictx=(step(ictx,"(*registry*/create 'foo #666)"));
-		assertEquals(Address.create(666),eval(ictx,"(*registry*/resolve 'foo)"));
+		ctx=(step(ctx,"(*registry*/create 'foo #666)"));
+		assertEquals(Address.create(666),eval(ctx,"(*registry*/resolve 'foo)"));
 
 		// HERO still shouldn't be able to update a top level CNS entry
-		ictx=ictx.forkWithAddress(HERO);
-		assertTrustError(step(ictx,"(*registry*/create 'foo *address* *address* {})"));
-		assertTrustError(step(ictx,"(trust/change-control "+ref+" *address*)"));
+		ctx=ctx.forkWithAddress(HERO);
+		assertTrustError(step(ctx,"(*registry*/create 'foo *address* *address* {})"));
+		assertTrustError(step(ctx,"(trust/change-control "+ref+" *address*)"));
 
 	}
 
