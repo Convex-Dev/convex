@@ -275,6 +275,13 @@ public class ReaderTest {
 		assertParseException(() -> Reader.read("@(foo)"));
 	}
 	
+	@Test public void testUnprintablePrint() {
+		AString bad=Strings.create(Blob.fromHex("ff"));
+		AString pbad=RT.print(bad);
+		AString expected=Strings.create("\"\uFFFD\"");
+		assertEquals(expected,pbad);
+	}
+	
 	@Test
 	public void testTooManyClosingParens() {
 		// See #244

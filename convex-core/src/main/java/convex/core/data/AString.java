@@ -41,7 +41,7 @@ public abstract class AString extends ABlobLike<CVMChar> {
 			long avail=limit-sb.count();
 			if (avail>0) {
 				sb.append('"');
-				sb.append(slice(0,avail-1));
+				printEscaped(sb,0,avail-1);
 			}
 			return false;
 		}

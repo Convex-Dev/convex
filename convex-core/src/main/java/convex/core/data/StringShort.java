@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.nio.charset.StandardCharsets;
 
+import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
@@ -223,7 +224,15 @@ public final class StringShort extends AString {
 		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
 		for (long i=start; i<end; i++) {
 			byte b=data.byteAtUnchecked(i);
-			Text.writeEscapedByte(sb,b);
+			if (b>=0) {
+				// ASCII range, might be escape character
+				Text.writeEscapedByte(sb,b);
+			} else {
+				CVMChar ch=get(i);
+				if (ch==null) ch=CVMChar.BAD_CHARACTER;
+				sb.append(ch);
+				i+=CVMChar.utfLength(ch.getCodePoint())-1;
+			}
 		}
 		return;
 	}
