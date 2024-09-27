@@ -8,11 +8,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
+import convex.core.data.Keywords;
 import convex.core.init.Init;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
+import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 
 import static convex.test.Assertions.*;
@@ -56,7 +59,8 @@ public class CNSTest extends ACVMTest {
 		Address init=eval("(*registry*/resolve 'init)");
 		assertEquals(Init.INIT_ADDRESS,init);
 		
-		assertEquals(eval("[#1 #6 nil nil]"), eval("(*registry*/read 'init)"));
+		ACell INIT_REC=Reader.read("[#1 #1 nil nil]");
+		assertEquals(INIT_REC, eval("(*registry*/read 'init)"));
 	}
 	
 	@Test public void testCreateNestedFromTop() {
@@ -68,12 +72,38 @@ public class CNSTest extends ACVMTest {
 		assertNull(eval(ctx,"(*registry*/resolve 'foo.null.boo)"));
 	}
 	
+	@Test public void testCreate() {
+		Context ctx=context();
+		assertArityError(step(ctx,"(cns/create)"));
+		assertArityError(step(ctx,"(cns/create 'foo.bar #1 #2 #3 #4 #5)"));
+		assertArgumentError(step(ctx,"(cns/create :foo.bar #1 #2 #3 #4)"));
+		
+		// can't create / update root namespaces!
+		assertTrustError(step(ctx,"(cns/create 'foo #1 #2 #3 #4 )"));
+		assertTrustError(step(ctx,"(cns/create 'convex.foo #1 #2 #3 #4 )"));
+	}
+	
+//	@Test public void testDelete() {
+//		Context ctx=context();
+//		assertArityError(step(ctx,"(cns/delete 'foo.bar :baz)"));
+//		assertArityError(step(ctx,"(cns/delete)"));
+//
+//		// can't delete root namespaces!
+//		assertTrustError(step(ctx,"(cns/delete 'convex)"));
+//		assertTrustError(step(ctx,"(cns/delete 'convex.core)"));
+//	}
+	
 	/**
 	 * What happens if we insert a bad CNS node that crashes?
 	 */
 	@Test public void testBadNode() {
-		// Context ctx=context();
+		Context ctx=context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
+		ctx=exec(ctx,"(*registry*/create 'foo :foo :BROKEN nil :BAD)");
 		
+		assertEquals(Keywords.FOO,eval(ctx,"@foo"));
+		
+		// TODO: is this the right error type?
+		assertCastError(step(ctx,"@foo.bar"));
 	}
 	
 	@Test public void testCreateTopLevel() {

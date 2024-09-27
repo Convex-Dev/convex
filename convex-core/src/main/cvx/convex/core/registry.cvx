@@ -65,7 +65,7 @@
 ;;    Vector of segment strings for paths
 (def cns-database
    ^{:private? true}
-  {[] {"init" [#1         root-controller nil nil]}})
+  {[] {"init" [#1 #1 nil nil]}})
 
 ;; Controllers for each CNS node managed under this actor
 ;; Default root is controlled by INIT account
@@ -74,7 +74,7 @@
 ;;   :create  - create new CNS entry in this node (child path segment as object)
 ;;   :delete  - delete CNS entry in this node     (child path segment as object)
 (def cns-owners 
-  {[] #6})
+  {[] root-controller})
 
 (defn -check [sym]
   (cond (symbol? sym) 
@@ -85,9 +85,9 @@
   (cond 
     (vector? values) 
        (cond 
-    	 (= 4 (count values)) :OK 
+    	 (= 4 (count values)) values
     	 (fail :ARGUMENT "CNS record must have 4 elements")) 
-    (fail :ARGUMENT "CNS record values must be a Vymbol")))
+    (fail :ARGUMENT "CNS record must be a Vector")))
 
 ;; ========================================================
 ;; CNS User API - See CAD014
@@ -157,6 +157,7 @@
 			           vals) ]
 				  (call ref (cns-write pname rec)))
 			
+			;; check for existing mapping at this node
 			(let [rec (call ref (cns-read pname))]
 		    	(if-let [child (get rec 3)]
 		    		(recur (inc i) child)	
@@ -190,10 +191,10 @@
     (apply create sym (assoc rec 1 cont))
     (fail :STATE "CNS record does not exist")))
 
-;; private function to get controller for a node
+;; private function to get controller for a rexcord
 (defn -controller [path]
   (cond
-	(empty? path) root-controller
+	(empty? path) (cond (vector? path) root-controller (fail :ARGMENT "CNS path must be a vector"))
 	(let [[& ps p] path]
 	  (get-in cns-database [ps p 1]))))
 
@@ -208,7 +209,7 @@
   [controller]
   (let [path *scope*]
     (when (not (trust/trusted? (get cns-owners path) *caller* :control))
-      (fail :TRUST "Formbitten to change controller for CNS node"))
+      (fail :TRUST "Forbidden to change CNS node controller"))
     (set-in! cns-owners [path] controller)))
 
 (defn cns-create-node
@@ -225,6 +226,25 @@
 	  (set-in! cns-owners [path] owner)  ;; new node owner
 	  (set-in! cns-database [path] {})   ;; new mapping to child records
 	  ref))
+
+(defn cns-delete-node
+		^{:callable true
+		  :doc {:description "Deletes a child CNS node. Returns true if deleted"
+				:examples    [{:code "(call parent-node (cns-create-node \\\"child-name\\\"))"}]
+				:signature   [{:params [sym]}]}}
+		[pname owner]
+		(or (trust/trusted? (get cns-owners *scope*) *caller* :delete pname) 
+				(fail :TRUST "Forbidden to delete CNS node"))
+		(let [path (conj *scope* pname)
+		      existing (get cns-database path)]
+		  (when existing
+			;; if node exists in this actor, delete it
+			(set! cns-owners (dissoc cns-owners path))
+			(set! cns-database (dissoc cns-database path)))
+		  
+		  ;; delete record
+		  (set! cns-database (dissoc-in cns-database [*scope* pname])) ;; delete record
+		  (boolean existing)))
 
 (defn cns-read
 	^{:callable true
