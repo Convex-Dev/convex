@@ -700,27 +700,31 @@ public class Context {
 		return lookupDynamicEntry(as,sym);
 	}
 
-
-
 	private MapEntry<Symbol,ACell> lookupDynamicEntry(AccountStatus as,Symbol sym) {
 		// Get environment for Address, or default to initial environment
-		AHashMap<Symbol, ACell> env = (as==null)?Core.ENVIRONMENT:as.getEnvironment();
+		for (int i=0; i<16; i++) {
+			if (as==null) return Core.ENVIRONMENT.getEntry(sym);
 
-
-		MapEntry<Symbol,ACell> result=env.getEntry(sym);
-
-		if (result==null) {
-			AccountStatus aliasAccount=getAliasedAccount(env);
-			result = lookupAliasedEntry(aliasAccount,sym);
+			MapEntry<Symbol,ACell> result=as.getEnvironment().getEntry(sym);
+			if (result!=null) return result;
+			
+			Address parent=as.getParent();
+			as=(parent==null)?null:getAccountStatus(parent);
 		}
-		return result;
+		return null;
+	}
+	
+	/**
+	 * Looks up the account for an Symbol alias in the given environment.
+	 * @param env
+	 * @param path An alias path
+	 * @return AccountStatus for the alias, or null if not present
+	 */
+	private AccountStatus getAliasedAccount(AHashMap<Symbol, ACell> env) {
+		// TODO: alternative core accounts
+		return getCoreAccount();
 	}
 
-	private MapEntry<Symbol,ACell> lookupAliasedEntry(AccountStatus as,Symbol sym) {
-		if (as==null) return null;
-		AHashMap<Symbol, ACell> env = as.getEnvironment();
-		return env.getEntry(sym);
-	}
 
 	/**
 	 * Gets the account status for the current Address
@@ -736,16 +740,6 @@ public class Context {
 		return chainState.state.getAccount(a);
 	}
 
-	/**
-	 * Looks up the account for an Symbol alias in the given environment.
-	 * @param env
-	 * @param path An alias path
-	 * @return AccountStatus for the alias, or null if not present
-	 */
-	private AccountStatus getAliasedAccount(AHashMap<Symbol, ACell> env) {
-		// TODO: alternative core accounts
-		return getCoreAccount();
-	}
 
 	private AccountStatus getCoreAccount() {
 		return getState().getAccount(Core.CORE_ADDRESS);

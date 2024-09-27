@@ -3007,11 +3007,25 @@ public class CoreTest extends ACVMTest {
 	
 	@Test 
 	public void testParent() {
-		Context ctx = exec(context(),"(def dad (deploy `(defn resolve [x] :foo) `(set-controller ~*address*)))");
+		Context ctx = context();
 		
-		ctx=exec(ctx,("(def son (deploy `(set-parent ~dad)))"));
+		// Create parent actor
+		ctx = exec(ctx,"(def dad (deploy `(defn baz [x] :foo) `(set-controller ~*address*) `(def CONST ^:static :bar)))");
+		Address dad=ctx.getResult();
 		
-		// assertEquals(Keywords.FOO,eval(ctx,"(query-as son '(resolve convex.core))"));
+		// create a child actor
+		ctx=exec(ctx,("(def son (deploy `(set-parent ~dad) `(set-controller ~*address*)))"));
+		
+		// call a function in parent
+		assertEquals(Keywords.FOO,eval(ctx,"(query-as son `(baz 'convex.core))"));
+		
+		assertEquals(Keywords.FOO,eval(ctx,"(son/baz :doesnt-matter)"));
+		
+		// *parent* is correctly set
+		assertEquals(dad,eval(ctx,"(query-as son '*parent*)"));
+		
+		// compilation of constants from parent
+		assertEquals(Constant.of(Keywords.BAR),eval(ctx,"(query-as son '(compile CONST))"));
 	}
 
 	@Test

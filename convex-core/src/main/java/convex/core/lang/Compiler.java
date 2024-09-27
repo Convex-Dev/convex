@@ -198,12 +198,11 @@ public class Compiler {
 		}
 		
 		// Regular symbol lookup in environment
-		Address address=context.getAddress();
-		return compileEnvSymbol(address,sym,context);
+		return compileEnvSymbol(sym,context);
 	}
 	
-	private static Context compileEnvSymbol(Address address,Symbol sym, Context context) {
-		// Optional code for :static embedding
+	private static Context compileEnvSymbol(Symbol sym, Context context) {
+		Address address=context.getAddress();// Optional code for :static embedding
 		if (Constants.OPT_STATIC) {
 			// Get metadata for symbol.
 			AHashMap<ACell, ACell> meta=context.lookupMeta(sym);
