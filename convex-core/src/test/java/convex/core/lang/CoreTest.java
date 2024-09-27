@@ -3004,6 +3004,15 @@ public class CoreTest extends ACVMTest {
 		// Arity checks
 		assertArityError(step("(deploy)"));
 	}
+	
+	@Test 
+	public void testParent() {
+		Context ctx = exec(context(),"(def dad (deploy `(defn resolve [x] :foo) `(set-controller ~*address*)))");
+		
+		ctx=exec(ctx,("(def son (deploy `(set-parent ~dad)))"));
+		
+		// assertEquals(Keywords.FOO,eval(ctx,"(query-as son '(resolve convex.core))"));
+	}
 
 	@Test
 	public void testActorQ() {
