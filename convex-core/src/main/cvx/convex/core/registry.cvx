@@ -191,6 +191,9 @@
     (apply create sym (assoc rec 1 cont))
     (fail :STATE "CNS record does not exist")))
 
+;; ============================================================================
+;; Standard CNS SPI - exprected to be callable by libraries / advanced users
+
 ;; private function to get controller for a rexcord
 (defn -controller [path]
   (cond
@@ -198,8 +201,6 @@
 	(let [[& ps p] path]
 	  (get-in cns-database [ps p 1]))))
 
-;; ============================================================================
-;; Standard CNS SPI - exprected to be callable by libraries / advanced users
 
 (defn change-control
   ^{:callable true
