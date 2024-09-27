@@ -202,7 +202,7 @@ public class Compiler {
 	}
 	
 	private static Context compileEnvSymbol(Symbol sym, Context context) {
-		Address address=context.getAddress();// Optional code for :static embedding
+		// Optional code for :static embedding
 		if (Constants.OPT_STATIC) {
 			// Get metadata for symbol.
 			AHashMap<ACell, ACell> meta=context.lookupMeta(sym);
@@ -213,6 +213,8 @@ public class Compiler {
 				return context.withResult(Juice.COMPILE_LOOKUP,Constant.create(value));
 			}
 		}
+		
+		Address address=context.getAddress();
 		
 		// Check if the symbol references an existing declaration
 		context=context.lookupDefiningAddress(address, sym);
@@ -795,6 +797,7 @@ public class Compiler {
 						if (ctx.isExceptional()) return ctx;
 	
 						ACell newElement = ctx.getResult();
+						// TODO: can be faster if no changes?
 						updated = updated.conj(newElement);
 					}
 					return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);
@@ -815,6 +818,7 @@ public class Compiler {
 						if (ctx.isExceptional()) return ctx;
 						ACell newValue = ctx.getResult();
 	
+						// TODO: can be faster if no changes?
 						updated = updated.assoc(newKey, newValue);
 					}
 					return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);

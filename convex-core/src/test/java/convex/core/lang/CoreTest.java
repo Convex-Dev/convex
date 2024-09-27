@@ -2643,6 +2643,7 @@ public class CoreTest extends ACVMTest {
 		assertNobodyError(step("(lookup #77777777 count)"));
 		assertNobodyError(step("(do (def foo 1) (lookup #66666666 foo))"));
 
+		
 		// COMPILE Errors for bad symbols
 		assertCompileError(step("(lookup :count)"));
 		assertCompileError(step("(lookup \"count\")"));
@@ -2656,6 +2657,9 @@ public class CoreTest extends ACVMTest {
 		// CAST Errors for bad Addresses
 		assertCastError(step("(lookup 8 count)"));
 		assertCastError(step("(lookup :foo count)"));
+		
+		// CAST for lookups on a nil address?
+		assertCastError(step("(lookup nil count)"));
 
 		assertArityError(step("(lookup)"));
 		assertArityError(step("(lookup 1 2 3)"));
@@ -3979,7 +3983,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testLongPred() {
 		assertTrue(evalB("(long? 1)"));
-		assertTrue(evalB("(long? (long *balance*))")); // TODO: is this sane?
+		assertTrue(evalB("(long? *balance*)")); 
 		assertTrue(evalB("(long? (byte 1))"));
 		
 		assertFalse(evalB("(long? nil)"));

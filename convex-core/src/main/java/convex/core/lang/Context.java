@@ -526,23 +526,11 @@ public class Context {
 	/**
 	 * Looks up a symbol's value in the current execution context, without any effect on the Context (no juice consumed etc.)
 	 *
-	 * @param symbol Symbol to look up. May be qualified
+	 * @param symbol Symbol to look up
 	 * @return Context with the result of the lookup (may be an undeclared exception)
 	 */
 	public Context lookup(Symbol symbol) {
 		// try lookup in dynamic environment
-		return lookupDynamic(symbol);
-	}
-
-	/**
-	 * Looks up a value in the dynamic environment. Consumes no juice.
-	 *
-	 * Returns an UNDECLARED exception if the symbol cannot be resolved.
-	 *
-	 * @param symbol Symbol to look up
-	 * @return Updated Context
-	 */
-	public Context lookupDynamic(Symbol symbol) {
 		Address address=getAddress();
 		return lookupDynamic(address,symbol);
 	}
@@ -558,7 +546,7 @@ public class Context {
 	 */
 	public Context lookupDynamic(Address address, Symbol symbol) {
 		AccountStatus as=getAccountStatus(address);
-		if (as==null) return withError(ErrorCodes.NOBODY,"No account found for: "+address+"/"+symbol.toString());
+		if (as==null) return withError(ErrorCodes.NOBODY,"No account found for: "+address);
 		MapEntry<Symbol,ACell> envEntry=lookupDynamicEntry(as,symbol);
 
 		// if not found, return UNDECLARED error
