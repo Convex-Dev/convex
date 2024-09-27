@@ -53,10 +53,13 @@
 ;; Map of `path vector` -> `segment name` -> `[value trust-monitor meta child]`
 ;; Where:
 ;;    value = Target value for CNS resolution, usually an address or scoped address
-;;	  trust-monitor = controller for this CNS entry
+;;	  trust-monitor = controller for this CNS record
 ;;    meta = metadata field		
 ;;    child = child CNS node, may be nil. Usually a scoped address defining an actor and a path key e.g. [#5675 "bob"] 
-;;		
+;;
+;; Trust monitor may be called with following actions:
+;;   :update  - Update CNS record
+;;
 ;; Node key is implementation defined in general, but for main registry uses:
 ;;    Empty vector for CNS root
 ;;    Vector of segment strings for paths
@@ -77,6 +80,14 @@
   (cond (symbol? sym) 
     (split (name sym) \.)	  
     (fail :ARGUMENT "CNS name must be a Symbol")))
+
+(defn -check-values [values]
+  (cond 
+    (vector? values) 
+       (cond 
+    	 (= 4 (count values)) :OK 
+    	 (fail :ARGUMENT "CNS record must have 4 elements")) 
+    (fail :ARGUMENT "CNS record values must be a Vymbol")))
 
 ;; ========================================================
 ;; CNS User API - See CAD014
@@ -117,15 +128,17 @@
   (get (read sym) 0))
 
 (defn create ^{
-	:doc  {:description "Creates a CNS entry with given reference, controller and metadata"
+	:doc  {:description "Creates a CNS entry with given data [value, controller, metadata, child]"
 	       :examples    [{:code "(*registry*/create 'my.actor.name target *address* {:some :metadata})"}]
-	       :signature   [{:params [sym]}]}}
-  ([sym] (recur sym nil *address* nil nil))
-  ([sym addr] (recur sym addr *address* nil nil))
-  ([sym addr cont] (recur sym addr cont nil nil))
-  ([sym addr cont meta] (recur sym addr cont meta nil))
-  ([sym addr cont meta child] 
-	(let [path (-check sym)
+	       :signature   [{:params [sym]}
+	                     {:params [sym value]}
+	                     {:params [sym value cont]}
+	                     {:params [sym value cont meta]}
+	                     {:params [sym value cont meta child]}]}}
+  ([sym & vals] 
+	(let [nv (count vals)
+	      _ (cond (> nv 4) (fail :ARITY "Too many CNS record values"))
+	      path (-check sym)
 	      n (count path)]
 	  (cond (zero? n) (fail :ARGUMENT "CNS path must have at least one segment"))
 	  (loop [i 0 
@@ -135,109 +148,83 @@
 		    (nil? ref) 
 		      (fail :STATE (str "No CNS child path at: " (slice path 0 i)))
 		    
-			;; are we at end of path? if so perform write at current position
+			;; are we at end of path? if so, perform write at current position
 		    (>= (inc i) n) 
-			   (call ref (cns-write pname addr cont meta child) )
-			   
-			(if-let [rec (call ref (cns-read pname))]
-				(recur (inc i) (first rec))	
+			   (let [rec (cond (< nv 4) 
+					   (let [evs (call ref (cns-read pname))
+					         evs (or evs [nil *address* nil nil])] 
+						  (concat vals (slice evs nv 4)))
+			           vals) ]
+				  (call ref (cns-write pname rec)))
+			
+			(let [rec (call ref (cns-read pname))]
+		    	(if-let [child (get rec 3)]
+		    		(recur (inc i) child)	
 				
-				;; need to construct a new (empty) intermediate CNS child node here
-				(let [nref (call ref (cns-create-node pname cont))] 
-				   (call ref (cns-write pname nil cont nil nref) )
-				   (recur (inc i) nref)))
+		    		;; need to construct a new (empty) intermediate CNS child node here
+		    		(let [cont (or (get vals 1) *address*) ;; controller for intermediate node
+		    		      nref (call ref (cns-create-node pname cont))
+		    		      rec (cond rec 
+		    		    		  (assoc rec 3 nref) ;; update existing child node link
+		    		    		  [nil cont nil nref])] 
+			    	   (call ref (cns-write pname rec))
+			    	   (recur (inc i) nref))))
 		 ))
 	  )
 	  ;; TODO: Not clear what default return value should be? [~*address* path]?
 	  )))
 
+(defn update
+	^{:doc  {:description "Updates a CNS entry with given value. Record must already exist."
+    :signature   [{:params [sym value]}]}}
+  [sym value]
+  (if-let [rec (read sym)]
+	(apply create sym (assoc rec 0 value))
+	(fail :STATE (str "CNS record to update does not exist: " sym))))
+
 (defn control
+	^{:doc {:description "Change controller for a CNS node."
+			:signature   [{:params [name controller]}]}}
   [sym cont]
   (if-let [rec (read sym)]
-    (let [[v c m child] rec]
-      (update sym v cont m child))
+    (apply create sym (assoc rec 1 cont))
     (fail :STATE "CNS record does not exist")))
 
-
-(defn change-control
-   ^{:callable true
-	  :doc {:description "Changes controller for a CNS node."
-			                :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
-			                :signature   [{:params [name addr]}]}}
-  [cont]
-  (let [owners cns-owners
-        own (get owners *scope*)]
-    (cond 
-      (trust/trusted? own *caller* :control)
-      (set! cns-owners (assoc owners *scope* cont))
-      (fail :TRUST "No control right for CNS node"))))
-
+;; private function to get controller for a node
 (defn -controller [path]
   (cond
-	(empty? *scope*) root-controller
-	(let [[& ps p] *scope*]
+	(empty? path) root-controller
+	(let [[& ps p] path]
 	  (get-in cns-database [ps p 1]))))
 
 ;; ============================================================================
 ;; Standard CNS SPI - exprected to be callable by libraries / advanced users
 
-(defn cns-control
+(defn change-control
   ^{:callable true
-    :doc       {:description "Updates a CNS name mapping to set a new controller. May only be performed by a current controller."
+    :doc       {:description "Changes controller for a CNS node. May only be performed by a current controller."
                 :examples    [{:code "(call *registry* (cns-control 'my.actor trust-monitor-address)"}]
                 :signature   [{:params [name addr]}]}}
-  [sym controller]
-  (let [path (-check sym)
-        record (get cns-database path)]
-    (when (nil? record)
-      (fail :STATE "CNS record does not exist"))
-    (when (not (trust/trusted? (second record) *caller* :control))
-      (fail :TRUST "Caller is not trusted with transferring control for that CNS record"))
-    (set-in! cns-database [path 1] controller)))
-
-(defn cns-resolve
-  ^{:callable true
-    :doc {:description "Resolves a name in the Convex Name Service."
-          :examples    [{:code "(call *registry* (cns-resolve 'convex.registry)"}]
-          :signature   [{:params [addr]}]}}
-  [sym]
-  (let [path (-check sym)
-        record (get cns-database path)]
-    (if record (first record) nil)))
-
-(defn cns-update
-  ^{:callable true
-    :doc       {:description "Updates or adds a name mapping in the Convex Name Service. Only the owner of a CNS record may update the mapping for an existing name"
-                :examples    [{:code "(call *registry* (cns-update 'my.actor addr)"}]
-                :signature   [{:params [name addr]}]}}
-  ([sym addr]
-    (recur sym addr nil))
-  ([sym addr meta]
-	(when-not (account addr)
-	  (fail :NOBODY "Can only use an existing account"))
-	(let [path (-check sym)
-	      record (get cns-database path) 
-	      monitor (if record (second record) *caller*)] ;; TODO limit ability to crteate top level CNS
-      (and record (not (trust/trusted? monitor *caller* :update))
-        (fail :TRUST "Unauthorised update to CNS record"))
-    
-      (set! cns-database
-         (assoc cns-database
-                path
-                [addr monitor meta])))))
+  [controller]
+  (let [path *scope*]
+    (when (not (trust/trusted? (get cns-owners path) *caller* :control))
+      (fail :TRUST "Formbitten to change controller for CNS node"))
+    (set-in! cns-owners [path] controller)))
 
 (defn cns-create-node
 	^{:callable true
-	  :doc {:description "Creates a child CNS node."
+	  :doc {:description "Creates a child CNS node, if it does not yet exist. Returns child node scoped reference."
 			:examples    [{:code "(call parent-node (cns-create-node \\\"child-name\\\"))"}]
 			:signature   [{:params [sym]}]}}
 	[pname owner]
-	(or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS node"))
-	(let [path (conj *scope* pname)]
-	  (if (get cns-database path) (fail :STATE "CNS node already exists"))
-	  (set-in! cns-owners [path] owner)
-	  (set-in! cns-database [path] {})
-	  [~*address* path]))
+	(or (trust/trusted? (get cns-owners *scope*) *caller* :create pname) (fail :TRUST "Forbidden to create CNS node"))
+	(let [rec (get-in cns-database [*scope* pname])
+	      _ (if-let [existing (get rec 3)] (return existing))
+	      path (conj *scope* pname)
+	      ref [~*address* path]]
+	  (set-in! cns-owners [path] owner)  ;; new node owner
+	  (set-in! cns-database [path] {})   ;; new mapping to child records
+	  ref))
 
 (defn cns-read
 	^{:callable true
@@ -252,18 +239,21 @@
 	  :doc {:description "Writes a CNS record from this Actor. Assumes a path vector passed in *scope*."
 	  :examples    [{:code "(call [cns-node cns-key] (cns-write \"my-name\" new-record))"}]
 						:signature   [{:params [sym]}]}}
-	[pname addr cont meta child]
+	[pname values]
+	(or (str? pname) (fail :ARGUMENT "CNS path element must be a String"))  
+	(-check-values values)  
     (let [sm (get cns-database *scope*)]
-	  (or (str? pname) (fail :ARGUMENT "CNS path element must be a string"))  
 	  (or sm (error :STATE "CNS Node key not valid"))
 	  (if-let [rec (get sm pname)]
     	;; This is an existing record, so check record controller
-    	(or (trust/trusted? (get rec 1) *caller* :update) (fail :TRUST "No permission to update CNS record"))
-    	;; This is a new record, so check create permission TODO use per-node monitor?
-    	(or (trust/trusted? (-controller *scope*) *caller* :create pname) (fail :TRUST "No permission to create CNS record")))
+    	(or (trust/trusted? (get rec 1) *caller* :update) (fail :TRUST "Forbidden to update CNS record"))
+    	
+    	;; This is a new record, so check create permission
+    	(or (trust/trusted? (-controller *scope*) *caller* :create pname) (fail :TRUST "Forbidden to create CNS record")))
     		
       ;; update record since at this point all required checks have passed
-	  (set-in! cns-database [*scope* pname] [addr cont meta child])))
+	  (set-in! cns-database [*scope* pname] values)
+	  values))
 
 ;; =========================================
 ;; Trust SPI

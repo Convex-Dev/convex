@@ -75,20 +75,20 @@ public class InitTest extends ACVMTest {
 	@Test
 	public void testDeploy() {
 		// CNS resolution for standard libraries
-		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.box))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.box.actor))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.nft.simple))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'asset.nft.tokens))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.asset))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.fungible))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.play))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.trusted-oracle.actor))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'convex.oracle))"));
-		assertNotNull(evalA("(call *registry* (cns-resolve 'torus.exchange))"));
+		assertNotNull(evalA("(resolve asset.box)"));
+		assertNotNull(evalA("(resolve asset.box.actor)"));
+		assertNotNull(evalA("(resolve asset.nft.simple)"));
+		assertNotNull(evalA("(resolve asset.nft.tokens)"));
+		assertNotNull(evalA("(resolve convex.asset)"));
+		assertNotNull(evalA("(resolve convex.fungible)"));
+		assertNotNull(evalA("(resolve convex.play)"));
+		assertNotNull(evalA("(resolve convex.trusted-oracle.actor)"));
+		assertNotNull(evalA("(resolve convex.oracle)"));
+		assertNotNull(evalA("(resolve torus.exchange)"));
 
-		assertEquals(Init.CORE_ADDRESS, eval("(call *registry* (cns-resolve 'convex.core))"));
-		assertEquals(Init.REGISTRY_ADDRESS, eval("(call *registry* (cns-resolve 'convex.registry))"));
-		assertEquals(Init.TRUST_ADDRESS, eval("(call *registry* (cns-resolve 'convex.trust))"));
+		assertEquals(Init.CORE_ADDRESS, eval("(resolve convex.core)"));
+		assertEquals(Init.REGISTRY_ADDRESS, eval("(resolve convex.registry)"));
+		assertEquals(Init.TRUST_ADDRESS, eval("(resolve convex.trust)"));
 	}
 
 	@Test

@@ -26,11 +26,11 @@ public class BoxTest extends ACVMTest {
 		ctx=TestState.CONTEXT.fork();
 		
 		// Import basic NFTs
-		ctx=step(ctx,"(import asset.box :as box)");
-		ctx=step(ctx,"(import asset.box.actor :as box.actor)");
+		ctx=exec(ctx,"(import asset.box :as box)");
+		ctx=exec(ctx,"(import asset.box.actor :as box.actor)");
 		BOX=ctx.getResult();
 		
-		ctx=step(ctx,"(import convex.asset :as asset)");
+		ctx=exec(ctx,"(import convex.asset :as asset)");
 		return ctx;
 	}
 	

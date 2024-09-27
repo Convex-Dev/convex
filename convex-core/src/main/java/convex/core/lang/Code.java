@@ -23,9 +23,10 @@ public class Code {
 	 * @param addr Address to associate with CNS record e.g. #123
 	 * @return Code for CNS call
 	 */
-	public static AList<ACell> cnsUpdate(Symbol name, Address addr) {
-		AList<ACell> cmd=List.of(Symbols.CNS_UPDATE, Code.quote(name), addr);
-		return List.of(Symbols.CALL, Init.REGISTRY_ADDRESS, cmd );
+	public static AList<ACell> cnsUpdate(Symbol name, Address addr, ACell controller) {
+		AList<ACell> update=List.of(Symbols.LOOKUP,Init.REGISTRY_ADDRESS,Symbols.CREATE);
+		AList<ACell> cmd=List.of(update, quote(name),addr, controller);
+		return cmd;
 	}
 	
 	/**

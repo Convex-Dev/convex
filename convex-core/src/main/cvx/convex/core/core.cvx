@@ -593,10 +593,7 @@
           :examples    [{:code "(resolve convex.asset)"}]
           :signature   [{:params [& args]}]}}
   [sym]
-  `(call* *registry*
-           0
-           'cns-resolve
-           (quote ~sym)))
+  `(~*registry*/resolve (quote ~sym)))
 
 (defmacro import
   ^{:doc {:description ["Imports a library for use in the current environment."

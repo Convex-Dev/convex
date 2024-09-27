@@ -34,6 +34,7 @@ public class CNSTest extends ACVMTest {
 		assertEquals(Init.REGISTRY_ADDRESS,eval("*registry*"));
 		assertEquals(Init.REGISTRY_ADDRESS,eval("cns"));
 		assertEquals(Init.REGISTRY_ADDRESS,eval("@convex.registry"));
+		assertEquals(Init.REGISTRY_ADDRESS,eval("(call cns (resolve 'convex.registry))"));
 		
 		// TODO: fix this
 		// assertEquals(Init.REGISTRY_ADDRESS,eval("@cns"));
@@ -67,16 +68,23 @@ public class CNSTest extends ACVMTest {
 		assertNull(eval(ctx,"(*registry*/resolve 'foo.null.boo)"));
 	}
 	
+	/**
+	 * What happens if we insert a bad CNS node that crashes?
+	 */
+	@Test public void testBadNode() {
+		// Context ctx=context();
+		
+	}
+	
 	@Test public void testCreateTopLevel() {
 		// HERO shouldn't be able to create a top level CNS entry
 		assertTrustError(step("(*registry*/create 'foo)"));
 		
 		// NEed governance address to be able to create a top level CNS entry
 		Context ctx=context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
-		ctx=step(ctx,"(import convex.trust :as trust)");
-		ctx=(step(ctx,"(*registry*/create 'foo #17)"));
-		assertNotError(ctx);
-		ctx=step(ctx,"(def ref [*registry* [\"foo\"]])");
+		ctx=exec(ctx,"(import convex.trust :as trust)");
+		ctx=exec(ctx,"(*registry*/create 'foo #17)");
+		ctx=exec(ctx,"(def ref [*registry* [\"foo\"]])");
 		AVector<?> ref=ctx.getResult();
 		assertNotNull(ref);
 		
@@ -84,7 +92,7 @@ public class CNSTest extends ACVMTest {
 		
 		assertEquals(Address.create(17),eval(ctx,"(*registry*/resolve 'foo)"));
 		
-		ctx=(step(ctx,"(*registry*/create 'foo #666)"));
+		ctx=exec(ctx,"(*registry*/create 'foo #666)");
 		assertEquals(Address.create(666),eval(ctx,"(*registry*/resolve 'foo)"));
 
 		// HERO still shouldn't be able to update a top level CNS entry

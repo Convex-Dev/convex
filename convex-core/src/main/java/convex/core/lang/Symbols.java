@@ -340,6 +340,7 @@ public class Symbols {
 	public static final Symbol MEMORY = intern("memory");
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
+	public static final Symbol CREATE = intern("create");
 
 
 

@@ -2592,7 +2592,7 @@ public class CoreTest extends ACVMTest {
 		}
 
 		{ // test deploy and CNS import in a single form. See #107
-			Context ctx2=step(ctx,"(do (let [addr (deploy nil)] (call *registry* (cns-update 'foo addr)) (import foo :as foo2)))");
+			Context ctx2=step(ctx,"(query-as #6 `(let [addr (deploy nil)] (*registry*/create 'foo addr) (import foo :as foo2)))");
 			assertNotError(ctx2);
 		}
 		

@@ -18,6 +18,7 @@ import convex.core.data.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Vectors;
 import convex.core.init.BaseTest;
+import convex.core.init.Init;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.test.Samples;
@@ -30,7 +31,7 @@ public class TrustTest extends ACVMTest {
 	}
 
 	@Override protected Context buildContext(Context ctx) {
-		String importS = "(import convex.trust :as trust)";
+		String importS = "(def trust "+Init.TRUST_ADDRESS+")";
 		ctx = exec(ctx, importS);
 		trusted = (Address)ctx.getResult();
 		return ctx;

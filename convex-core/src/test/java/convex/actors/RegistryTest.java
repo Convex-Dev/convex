@@ -1,7 +1,7 @@
 package convex.actors;
 
 import static convex.test.Assertions.assertArgumentError;
-import static convex.test.Assertions.assertNobodyError;
+import static convex.test.Assertions.assertStateError;
 import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,68 +40,61 @@ public class RegistryTest extends ACVMTest {
 	}
 
 	@Test
-	public void testRegistryCNS() throws IOException {
-		Context ctx = context();
-
-		assertEquals(REG, eval(ctx, "(call *registry* (cns-resolve 'convex.registry))"));
-	}
-
-	@Test
 	public void testRegistryCNSUpdate() throws IOException {
-		Context ctx = context();
+		Context ctx = context().forkWithAddress(Init.GOVERNANCE_ADDRESS);
+		ctx=exec(ctx,"(def ^:static reg #9)");
 
-		assertNull(eval(ctx, "(call *registry* (cns-resolve 'convex.test.foo))"));
+		assertNull(eval(ctx, "(resolve convex.test.foo)"));
 
 		// Real Address we want for CNS mapping
 		final Address badAddr = Samples.BAD_ADDRESS;
 
-		ctx = step(ctx, "(call *registry* (cns-update 'convex.test.foo " + badAddr + "))");
-		assertNobodyError(ctx);
+		ctx = step(ctx, "(reg/update 'convex.test.foo " + badAddr + ")");
+		assertStateError(ctx);
 
 		// Should fail, not a Symbol
-		ctx = step(ctx, "(call *registry* (cns-update \"convex.test.foo\" #1))");
+		ctx = step(ctx, "(reg/update \"convex.test.foo\" #1)");
 		assertArgumentError(ctx);
 
 		final Address realAddr = Address.create(1); // Init address, FWIW
-		ctx = exec(ctx, "(call *registry* (cns-update 'convex.test.foo " + realAddr + "))");
+		ctx = exec(ctx, "(reg/create 'convex.test.foo " + realAddr + ")");
 
-		assertEquals(realAddr, eval(ctx, "(call *registry* (cns-resolve 'convex.test.foo))"));
+		assertEquals(realAddr, eval(ctx, "(reg/resolve 'convex.test.foo)"));
 
 		{ // Check VILLAIN can't steal CNS mapping
 			Context c = ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
-			assertTrustError(step(c, "(call *registry* (cns-update 'convex.test.foo *address*))"));
+			assertTrustError(step(c, "(#9/update 'convex.test.foo *address*)"));
 
 			// original mapping should be held
-			assertEquals(realAddr, eval(c, "(call *registry* (cns-resolve 'convex.test.foo))"));
+			assertEquals(realAddr, eval(c, "(#9/resolve 'convex.test.foo)"));
 		}
 
 		{ // Check Transfer of control to VILLAIN
-			Context c = exec(ctx, "(call *registry* (cns-control 'convex.test.foo " + VILLAIN + "))");
+			Context c = exec(ctx, "(reg/control 'convex.test.foo " + VILLAIN + ")");
 
-			// HERO shouldn't be able to use update or control any more
-			assertTrustError(step(c, "(call *registry* (cns-update 'convex.test.foo *address*))"));
-			assertTrustError(step(c, "(call *registry* (cns-control 'convex.test.foo *address*))"));
+			// This address shouldn't be able to use update or control any more
+			assertTrustError(step(c, "(reg/update 'convex.test.foo *address*)"));
+			assertTrustError(step(c, "(reg/control 'convex.test.foo *address*)"));
 
 			// Switch to VILLAIN
 			c = c.forkWithAddress(VILLAIN);
 
 			// Change mapping
-			c = exec(c, "(call *registry* (cns-update 'convex.test.foo *address*))");
-			assertEquals(VILLAIN, eval(c, "(call *registry* (cns-resolve 'convex.test.foo))"));
+			c = exec(c, "(*registry*/update 'convex.test.foo *address*)");
+			assertEquals(VILLAIN, eval(c, "(*registry*/resolve 'convex.test.foo)"));
 		}
 
-		{ // Check VILLAIN can create new mapping
-			// TODO probably shouldn't be free-for-all?
+		{ // Check VILLAIN can create new mapping ?? TODO: where??
 
-			Context c = ctx.forkWithAddress(VILLAIN);
+			//Context c = ctx.forkWithAddress(VILLAIN);
 
 			// VILLAIN shouldn't be able to use update on existing CNS mapping
-			c = exec(c, "(call *registry* (cns-update 'convex.villain *address*))");
+			//c = exec(c, "(*registry*/create 'convex.villain *address*)");
 
 			// original mapping should be held
-			assertEquals(VILLAIN, eval(c, "(call *registry* (cns-resolve 'convex.villain))"));
+			// assertEquals(VILLAIN, eval(c, "(*registry*/resolve 'convex.villain)"));
 		}
 	}
 }

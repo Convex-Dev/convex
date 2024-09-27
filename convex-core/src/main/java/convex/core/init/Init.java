@@ -32,7 +32,7 @@ import convex.core.util.Utils;
 public class Init {
 
 	/**
-	 *  Number of special "goverance" accounts. These hold all unissued coins
+	 *  Number of special "governance" accounts. These hold all unissued coins
 	 */
 	public static final int NUM_GOVERNANCE_ACCOUNTS=8;
 	
@@ -178,8 +178,11 @@ public class Init {
 	
 			// Add the static defined libraries at addresses: TRUST_ADDRESS, REGISTRY_ADDRESS
 			s = addStaticLibraries(s);
+			
+			// Add the basic CNS tree
+			s=addCNSBaseTree(s);
 	
-			// Reload accounts with the libraries
+			// Reload accounts with the base libraries
 			accts = s.getAccounts();
 		}
 
@@ -252,13 +255,11 @@ public class Init {
 	private static State addStaticLibraries(State s) {
 
 		// At this point we have a raw initial State with no user or peer accounts
-		s = doActorDeploy(s, "/convex/core/registry.cvx");
-		s = doActorDeploy(s, "/convex/core/trust.cvx");
+		s = doActorDeploy(s, "/convex/core/registry.cvx",false);
+		s = doActorDeploy(s, "/convex/core/trust.cvx",false);
 
 		{ // Register core library now that registry exists
-			Context ctx = Context.create(s, INIT_ADDRESS);
-			ctx = ctx.eval(Reader.read("(call *registry* (cns-update 'convex.core " + CORE_ADDRESS + "))"));
-						             
+			Context ctx = Context.create(s, INIT_ADDRESS);						             
 			s = ctx.getState();
 			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
 			
@@ -284,10 +285,9 @@ public class Init {
 	public static State createState(AccountKey governanceKey, AccountKey genesisKey,List<AccountKey> peerKeys) {
 		State s=createBaseState(governanceKey, genesisKey, peerKeys);
 		
-		s = addCNSTree(s);
 		s = addStandardLibraries(s);
 		s = addTestingCurrencies(s);
-		
+		s = addCNSExtraTree(s);
 
 		// Final funds check
 		long finalTotal = s.computeTotalBalance();
@@ -339,9 +339,22 @@ public class Init {
 		return s;
 	}
 	
-	private static State addCNSTree(State s) {
+	private static State addCNSBaseTree(State s) {
 		Context ctx=Context.create(s, GOVERNANCE_ADDRESS);
-		ctx=ctx.eval(Reader.read("(*registry*/create 'convex.cns *registry*)"));
+		ctx=ctx.eval(Reader.read("(*registry*/create 'convex)"));
+		ctx.getResult();
+		
+		// convex.cns is alias to root cns namespace?
+		ctx=ctx.eval(Reader.read("(*registry*/create 'convex.cns "+REGISTRY_ADDRESS+" *address* nil [#9 []])"));
+		ctx.getResult();
+
+		ctx=ctx.eval(Reader.read("(*registry*/create 'convex.registry "+REGISTRY_ADDRESS+")"));
+		ctx.getResult();
+
+		ctx=ctx.eval(Reader.read("(*registry*/create 'convex.core "+CORE_ADDRESS+")"));
+		ctx.getResult();
+		
+		ctx=ctx.eval(Reader.read("(*registry*/create 'convex.trust "+TRUST_ADDRESS+")"));
 		ctx.getResult();
 		
 		// check we can get access to general trust monitors
@@ -357,6 +370,17 @@ public class Init {
 		s=ctx.getState();
 		return s;
 	}
+	
+	private static State addCNSExtraTree(State s) {
+		Context ctx=Context.create(s, GOVERNANCE_ADDRESS);
+		
+		// ctx=ctx.eval(Reader.read("(*registry*/create 'zoo "+TRUST_ADDRESS+")"));
+		// ctx.getResult();
+
+		
+		s=ctx.getState();
+		return s;
+	}
 
 	public static Address calcPeerAddress(int userCount, int index) {
 		return Address.create(GENESIS_ADDRESS.longValue() + userCount + index);
@@ -365,12 +389,16 @@ public class Init {
 	public static Address calcUserAddress(int index) {
 		return Address.create(GENESIS_ADDRESS.longValue() + index);
 	}
+	
+	private static State doActorDeploy(State s, String resource) {
+		return doActorDeploy(s,resource,true);
+	}
 
 	// A CVX file contains forms which must be wrapped in a `(do ...)` and deployed as an actor.
 	// First form is the name that must be used when registering the actor.
 	//
-	private static State doActorDeploy(State s, String resource) {
-		Context ctx = Context.create(s, INIT_ADDRESS);
+	private static State doActorDeploy(State s, String resource, boolean addCNS) {
+		Context ctx = Context.create(s, GOVERNANCE_ADDRESS);
 		ACell ADD_NETWORK_GOVERNANCE=Reader.read("(set-controller "+GOVERNANCE_ADDRESS+")");
 		
 		try {
@@ -384,11 +412,13 @@ public class Init {
 			if (ctx.isExceptional()) throw new Error("Error deploying actor: "+resource+"\n" + ctx.getValue());
 			Address addr=ctx.getResult();
 			
-			@SuppressWarnings("unchecked")
-			AList<Symbol> qsym=(AList<Symbol>) forms.get(0);
-			Symbol sym=qsym.get(1);
-			ctx = ctx.eval(Code.cnsUpdate(sym, addr));
-			if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
+			if (addCNS) {
+				@SuppressWarnings("unchecked")
+				AList<Symbol> qsym=(AList<Symbol>) forms.get(0);
+				Symbol sym=qsym.get(1);
+				ctx = ctx.eval(Code.cnsUpdate(sym, addr,GOVERNANCE_ADDRESS));
+				if (ctx.isExceptional()) throw new Error("Error while registering actor:" + ctx.getValue());
+			}
 
 			return ctx.getState();
 		} catch (IOException e) { 
@@ -432,7 +462,8 @@ public class Init {
 		if (ctx.isExceptional()) throw new Error("Error adding market liquidity: " + ctx.getValue());
 		
 		Symbol sym=Symbol.create("currency."+symName);
-		ctx = ctx.eval(Code.cnsUpdate(sym, addr));
+		ctx = ctx.forkWithAddress(GOVERNANCE_ADDRESS);
+		ctx = ctx.eval(Code.cnsUpdate(sym, addr,GOVERNANCE_ADDRESS));
 		if (ctx.isExceptional()) throw new Error("Error registering currency in CNS: " + ctx.getValue());
 		return ctx.getState();
 	}
