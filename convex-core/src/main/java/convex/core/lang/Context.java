@@ -639,7 +639,7 @@ public class Context {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T extends ACell> T lookupValue(String symName) {
-		return (T) lookupValue(Symbol.create(symName));
+		return (T) lookupValue(getAddress(),Symbol.create(symName));
 	}
 	
 	/**
@@ -648,17 +648,7 @@ public class Context {
 	 * @return Value for the given symbol or null if undeclared
 	 */
 	public ACell lookupValue(Symbol sym) {
-		AHashMap<Symbol, ACell> env=getEnvironment();
-
-		// Lookup in current environment first
-		MapEntry<Symbol,ACell> me=env.getEntry(sym);
-		if (me!=null) {
-			return me.getValue();
-		}
-
-		AccountStatus as = getAliasedAccount(env);
-		if (as==null) return null;
-		return as.getEnvironment().get(sym);
+		return lookupValue(getAddress(),sym);
 	}
 
 	/**
@@ -668,11 +658,9 @@ public class Context {
 	 * @return Value for the given symbol or null if undeclared
 	 */
 	public ACell lookupValue(Address address,Symbol sym) {
-		if (address==null) return lookupValue(sym);
-		AccountStatus as=getAccountStatus(address);
-		if (as==null) return null;
-		AHashMap<Symbol, ACell> env=as.getEnvironment();
-		return env.get(sym);
+		MapEntry<Symbol,ACell> entry=lookupDynamicEntry(address,sym);
+		if (entry==null) return null;
+		return entry.getValue();
 	}
 
 	/**
@@ -683,6 +671,7 @@ public class Context {
 	 * @return Environment entry
 	 */
 	public MapEntry<Symbol,ACell> lookupDynamicEntry(Address address,Symbol sym) {
+		if (address==null) address=getAddress();
 		AccountStatus as=getAccountStatus(address);
 		if (as==null) return null;
 		return lookupDynamicEntry(as,sym);
