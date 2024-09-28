@@ -576,7 +576,7 @@ public class Context {
 	 */
 	public AHashMap<ACell,ACell> lookupMeta(Address address,Symbol sym) {
 		AccountStatus as=(address==null)?getAccountStatus():getAccountStatus(address);
-		for (int i=0; i<16; i++) {
+		for (int i=0; i<Constants.LOOKUP_DEPTH; i++) {
 			if (as==null) return null;
 			AHashMap<Symbol, ACell> env=as.getEnvironment();
 			if (env.containsKey(sym)) {
@@ -599,7 +599,8 @@ public class Context {
 		Context ctx=this;
 		Address addr=(address==null)?getAddress():address;
 
-		while (addr!=null) {
+		for (int i=0; i<Constants.LOOKUP_DEPTH; i++) {
+			if (addr==null) break;
 			AccountStatus as=getAccountStatus(addr);
 			if (as==null) return ctx.withResult(Juice.LOOKUP, null);
 			
@@ -672,7 +673,7 @@ public class Context {
 
 	private MapEntry<Symbol,ACell> lookupDynamicEntry(AccountStatus as,Symbol sym) {
 		// Get environment for Address, or default to initial environment
-		for (int i=0; i<16; i++) {
+		for (int i=0; i<Constants.LOOKUP_DEPTH; i++) {
 			if (as==null) return Core.ENVIRONMENT.getEntry(sym);
 
 			MapEntry<Symbol,ACell> result=as.getEnvironment().getEntry(sym);

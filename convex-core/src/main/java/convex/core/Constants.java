@@ -224,5 +224,10 @@ public class Constants {
 	
 	public static final String DEFAULT_KEYSTORE_FILENAME = "~/.convex/keystore.pfx";
 
+	/**
+	 * Maximum depth of lookups via parent accounts
+	 */
+	public static final int LOOKUP_DEPTH = 16;
+
 
 }
