@@ -12,10 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
-import convex.core.Belief;
-import convex.core.Block;
 import convex.core.Constants;
-import convex.core.Order;
 import convex.core.Peer;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;

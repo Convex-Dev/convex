@@ -1,9 +1,10 @@
-package convex.core;
+package convex.core.cpos;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;

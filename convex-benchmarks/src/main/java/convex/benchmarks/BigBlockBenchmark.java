@@ -8,8 +8,8 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
-import convex.core.Block;
-import convex.core.BlockResult;
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountStatus;

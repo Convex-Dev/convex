@@ -6,10 +6,10 @@ import java.util.function.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.Belief;
 import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
+import convex.core.cpos.Belief;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;

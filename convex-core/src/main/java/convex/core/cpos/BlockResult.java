@@ -1,5 +1,8 @@
-package convex.core;
+package convex.core.cpos;
 
+import convex.core.ErrorCodes;
+import convex.core.Result;
+import convex.core.State;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AString;

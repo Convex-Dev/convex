@@ -1,5 +1,6 @@
-package convex.core;
+package convex.core.cpos;
 
+import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;

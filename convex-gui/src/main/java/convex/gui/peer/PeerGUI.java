@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
-import convex.core.Order;
+import convex.core.cpos.Order;
 import convex.core.Peer;
 import convex.core.Result;
 import convex.core.State;

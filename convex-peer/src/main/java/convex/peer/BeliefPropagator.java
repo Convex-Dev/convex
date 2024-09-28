@@ -12,10 +12,10 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.Belief;
-import convex.core.BeliefMerge;
-import convex.core.Block;
-import convex.core.Order;
+import convex.core.cpos.Belief;
+import convex.core.cpos.BeliefMerge;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;

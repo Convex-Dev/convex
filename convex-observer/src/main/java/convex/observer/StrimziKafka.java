@@ -17,7 +17,7 @@ import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.ContentType;
 import org.json.simple.JSONValue;
 
-import convex.core.Order;
+import convex.core.cpos.Order;
 import convex.core.Result;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;

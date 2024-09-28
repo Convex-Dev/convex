@@ -1,4 +1,4 @@
-package convex.core;
+package convex.core.cpos;
 
 import java.util.Comparator;
 import java.util.List;

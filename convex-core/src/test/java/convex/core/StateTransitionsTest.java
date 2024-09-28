@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;

@@ -31,11 +31,11 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Block;
-import convex.core.BlockResult;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.State;
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;

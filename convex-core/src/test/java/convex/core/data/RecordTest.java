@@ -5,12 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Belief;
-import convex.core.Block;
 import convex.core.Constants;
-import convex.core.Order;
 import convex.core.Result;
 import convex.core.State;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
 import convex.core.lang.RecordFormat;

@@ -4,6 +4,11 @@ import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import convex.core.cpos.Belief;
+import convex.core.cpos.BeliefMerge;
+import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;

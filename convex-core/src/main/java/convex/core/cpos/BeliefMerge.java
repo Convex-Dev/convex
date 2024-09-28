@@ -1,4 +1,4 @@
-package convex.core;
+package convex.core.cpos;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -8,6 +8,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Function;
 
+import convex.core.Constants;
+import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;

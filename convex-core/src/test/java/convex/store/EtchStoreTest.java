@@ -18,9 +18,9 @@ import java.util.function.Consumer;
 
 import org.junit.Test;
 
-import convex.core.Belief;
-import convex.core.Block;
-import convex.core.Order;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
