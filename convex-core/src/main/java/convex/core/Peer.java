@@ -8,6 +8,7 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -424,7 +425,7 @@ public class Peer {
 
 		long ocp=getFinalityPoint();
 		Order newOrder=newBelief.getOrder(peerKey);
-		long ncp=newOrder.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
+		long ncp=newOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
 		if (ocp>ncp) {
 			// This probably shouldn't happen, but just in case.....
 			System.err.println("Receding consensus? Old CP="+ocp +", New CP="+ncp);
@@ -472,7 +473,7 @@ public class Peer {
 	 */
 	public Peer updateState() {
 		Order myOrder = belief.getOrder(peerKey); // this peer's Order from latest belief
-		long consensusPoint = myOrder.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
+		long consensusPoint = myOrder.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
 		AVector<SignedData<Block>> blocks = myOrder.getBlocks();
 		AVector<SignedData<Block>> consensusBlocks= consensusOrder.getBlocks();
 
@@ -481,7 +482,7 @@ public class Peer {
 		long stateIndex=statePosition;
 		long consensusMatch=blocks.commonPrefixLength(consensusBlocks);
 		if (consensusMatch<stateIndex) {
-			if (!Constants.ENABLE_FORK_RECOVERY) {
+			if (!CPoSConstants.ENABLE_FORK_RECOVERY) {
 				throw new IllegalStateException("Network Fork detected but fork recovery diabled!");
 			}
 			
@@ -612,7 +613,7 @@ public class Peer {
 	public long getFinalityPoint() {
 		Order order=getPeerOrder();
 		if (order==null) return 0;
-		return order.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY);
+		return order.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY);
 	}
 
 	/**

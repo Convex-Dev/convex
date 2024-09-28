@@ -1,6 +1,5 @@
 package convex.core.cpos;
 
-import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
@@ -54,7 +53,7 @@ public class Order extends ARecord {
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[Constants.CONSENSUS_LEVELS];
+	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[CPoSConstants.CONSENSUS_LEVELS];
 
 	private Order(Ref<AVector<SignedData<Block>>> blocks, long[] consensusPoints, long timestamp) {
 		super(FORMAT.count());
@@ -71,7 +70,7 @@ public class Order extends ARecord {
 	 * @return New Order instance
 	 */
 	private static Order create(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
-		long[] consensusPoints=new long[Constants.CONSENSUS_LEVELS];
+		long[] consensusPoints=new long[CPoSConstants.CONSENSUS_LEVELS];
 		consensusPoints[0] = blocks.getValue().count();
 		consensusPoints[1] = proposalPoint;
 		consensusPoints[2] = consensusPoint;
@@ -114,7 +113,7 @@ public class Order extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = blocks.encode(bs,pos);
-		for (int level=1; level<Constants.CONSENSUS_LEVELS; level++) {
+		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
 			pos = Format.writeVLCLong(bs,pos, consensusPoints[level]);
 		}
 		pos = Format.writeVLCLong(bs,pos, timestamp);
@@ -142,9 +141,9 @@ public class Order extends ARecord {
 		}
 		epos+=blocks.getEncodingLength();
 		
-		long[] cps=new long[Constants.CONSENSUS_LEVELS];
+		long[] cps=new long[CPoSConstants.CONSENSUS_LEVELS];
 		long last=Long.MAX_VALUE;
-		for (int level=1; level<Constants.CONSENSUS_LEVELS; level++) {
+		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
 			long pp = Format.readVLCLong(b,epos);
 			cps[level]=pp;
 			epos+=Format.getVLCLength(pp);
@@ -208,7 +207,7 @@ public class Order extends ARecord {
 	 * @return Proposal Point
 	 */
 	public long getProposalPoint() {
-		return consensusPoints[Constants.CONSENSUS_LEVEL_PROPOSAL];
+		return consensusPoints[CPoSConstants.CONSENSUS_LEVEL_PROPOSAL];
 	}
 	
 	/**
@@ -216,7 +215,7 @@ public class Order extends ARecord {
 	 * @return Consensus Point
 	 */
 	public long getConsensusPoint() {
-		return consensusPoints[Constants.CONSENSUS_LEVEL_CONSENSUS];
+		return consensusPoints[CPoSConstants.CONSENSUS_LEVEL_CONSENSUS];
 	}
 	
 	/**
@@ -380,7 +379,7 @@ public class Order extends ARecord {
 	 */
 	public boolean consensusEquals(Order b) {
 		if (b==null) return false; // definitely not equal
-		for (int i=1; i<Constants.CONSENSUS_LEVELS; i++) {
+		for (int i=1; i<CPoSConstants.CONSENSUS_LEVELS; i++) {
 			if (this.getConsensusPoint(i)!=b.getConsensusPoint(i)) return false;			
 		}
 		if (!this.blocks.equals(b.blocks)) return false;

@@ -178,7 +178,7 @@ public class BeliefMerge {
 		// TODO: figure out what to do with new blocks filtered out?
 		Index<AccountKey, SignedData<Order>> filteredOrders=accOrders;
 		
-		if (!Constants.ENABLE_FORK_RECOVERY) {
+		if (!CPoSConstants.ENABLE_FORK_RECOVERY) {
 			filteredOrders= accOrders.filterValues(signedOrder -> {
 				Order otherOrder = signedOrder.getValue();
 				return myOrder.checkConsistent(otherOrder);
@@ -462,9 +462,9 @@ public class BeliefMerge {
 	 * @return updated Order
 	 */
 	private Order updateConsensus(Order order, HashMap<Order, Double> stakedOrders, double totalStake) {
-		final double THRESHOLD = totalStake * Constants.CONSENSUS_THRESHOLD;
+		final double THRESHOLD = totalStake * CPoSConstants.CONSENSUS_THRESHOLD;
 		
-		for (int level=1; level<Constants.CONSENSUS_LEVELS; level++) {
+		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
 			order = updateLevel(order,level, stakedOrders, THRESHOLD);
 		}
 		
@@ -568,7 +568,7 @@ public class BeliefMerge {
 			// This probably shouldn't happen if peers are sticking to timestamps
 			// But we compare anyway
 			// Prefer advanced consensus
-			for (int level=Constants.CONSENSUS_LEVELS-1; level>=1; level--) {
+			for (int level=CPoSConstants.CONSENSUS_LEVELS-1; level>=1; level--) {
 				if (newOrder.getConsensusPoint(level)>oldOrder.getConsensusPoint(level)) return true;
 			}
 			

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
@@ -122,7 +123,7 @@ public class PeerTest {
 		assertUndeclaredError(p.executeQuery(Reader.read("bar"), addr).context);
 		
 		// Beyond this point, we need to assume fork recovery is enabled
-		assumeTrue(Constants.ENABLE_FORK_RECOVERY);
+		assumeTrue(CPoSConstants.ENABLE_FORK_RECOVERY);
 		
 		p=p.updateState();
 		assertEquals(CVMLong.create(17),p.executeQuery(Reader.read("bar"), addr).getResult());

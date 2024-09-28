@@ -7,10 +7,10 @@ import java.awt.Graphics;
 import javax.swing.JPanel;
 
 import convex.api.ConvexLocal;
-import convex.core.cpos.Block;
-import convex.core.Constants;
-import convex.core.cpos.Order;
 import convex.core.Peer;
+import convex.core.cpos.Block;
+import convex.core.cpos.CPoSConstants;
+import convex.core.cpos.Order;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
@@ -65,7 +65,7 @@ public class BlockViewComponent extends JPanel {
 				Color c = Color.orange;
 				if (i < order.getProposalPoint()) c = Color.yellow;
 				if (i < order.getConsensusPoint()) c = Color.green;
-				if (p.getFinalityPoint() != order.getConsensusPoint(Constants.CONSENSUS_LEVEL_FINALITY)) {
+				if (p.getFinalityPoint() != order.getConsensusPoint(CPoSConstants.CONSENSUS_LEVEL_FINALITY)) {
 					System.err.println("BlockViewComponent: Strange consensus?");
 				}
 				int x = (int) (W * i - offset);

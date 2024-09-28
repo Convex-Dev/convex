@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -336,7 +337,7 @@ public class State extends ARecord {
 		}
 		
 		// if block is too old, dump it
-		if (block.getTimeStamp()<(this.getTimestamp().longValue()-Constants.MAX_BLOCK_BACKDATE)) {
+		if (block.getTimeStamp()<(this.getTimestamp().longValue()-CPoSConstants.MAX_BLOCK_BACKDATE)) {
 			return BlockResult.createInvalidBlock(this,block,Strings.BACKDATED_BLOCK);
 		}
 		
@@ -410,7 +411,7 @@ public class State extends ARecord {
 		// walk schedule entries to determine how many there are
 		// and remove from the current schedule
 		// we can optimise bulk removal later
-		while (tcount < Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK) {
+		while (tcount < CPoSConstants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK) {
 			if (sched.isEmpty()) break;
 			MapEntry<ABlob, AVector<ACell>> me = sched.entryAt(0);
 			ABlob key = me.getKey();
@@ -418,7 +419,7 @@ public class State extends ARecord {
 			if (time > timestamp.longValue()) break; // exit if we are still in the future
 			AVector<ACell> trans = me.getValue();
 			long numScheduled = trans.count(); // number scheduled at this schedule timestamp
-			long take = Math.min(numScheduled, Constants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK - tcount);
+			long take = Math.min(numScheduled, CPoSConstants.MAX_SCHEDULED_TRANSACTIONS_PER_BLOCK - tcount);
 
 			// add scheduled transactions to List
 			if (al == null) al = new ArrayList<>();
