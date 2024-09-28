@@ -565,18 +565,7 @@ public class Context {
 	 * @return Metadata for given symbol (may be empty) or null if undeclared
 	 */
 	public AHashMap<ACell,ACell> lookupMeta(Symbol sym) {
-		AHashMap<Symbol, ACell> env=getEnvironment();
-		if ((env!=null)&&env.containsKey(sym)) {
-			return getMetadata().get(sym,Maps.empty());
-		}
-		AccountStatus as = getAliasedAccount(env);
-		if (as==null) return null;
-
-		env=as.getEnvironment();
-		if (env.containsKey(sym)) {
-			return as.getMetadata().get(sym,Maps.empty());
-		}
-		return null;
+		return lookupMeta(getAddress(),sym);
 	}
 
 	/**
@@ -586,12 +575,16 @@ public class Context {
 	 * @return Metadata for given symbol (may be empty) or null if undeclared
 	 */
 	public AHashMap<ACell,ACell> lookupMeta(Address address,Symbol sym) {
-		if (address==null) return lookupMeta(sym);
-		AccountStatus as=getAccountStatus(address);
-		if (as==null) return null;
-		AHashMap<Symbol, ACell> env=as.getEnvironment();
-		if (env.containsKey(sym)) {
-			return as.getMetadata().get(sym,Maps.empty());
+		AccountStatus as=(address==null)?getAccountStatus():getAccountStatus(address);
+		for (int i=0; i<16; i++) {
+			if (as==null) return null;
+			AHashMap<Symbol, ACell> env=as.getEnvironment();
+			if (env.containsKey(sym)) {
+				return as.getMetadata().get(sym,Maps.empty());
+			}
+			address=getParentAddress(as);
+			if (address==null) return null;
+			as=getAccountStatus(address);
 		}
 		return null;
 	}
@@ -685,23 +678,11 @@ public class Context {
 			MapEntry<Symbol,ACell> result=as.getEnvironment().getEntry(sym);
 			if (result!=null) return result;
 			
-			Address parent=as.getParent();
-			as=(parent==null)?null:getAccountStatus(parent);
+			Address parent=getParentAddress(as);
+			as=getAccountStatus(parent); // if not found, will be null
 		}
 		return null;
 	}
-	
-	/**
-	 * Looks up the account for an Symbol alias in the given environment.
-	 * @param env
-	 * @param path An alias path
-	 * @return AccountStatus for the alias, or null if not present
-	 */
-	private AccountStatus getAliasedAccount(AHashMap<Symbol, ACell> env) {
-		// TODO: alternative core accounts
-		return getCoreAccount();
-	}
-
 
 	/**
 	 * Gets the account status for the current Address
@@ -715,11 +696,6 @@ public class Context {
 		if (a==null) return null;
 
 		return chainState.state.getAccount(a);
-	}
-
-
-	private AccountStatus getCoreAccount() {
-		return getState().getAccount(Core.CORE_ADDRESS);
 	}
 
 	/**

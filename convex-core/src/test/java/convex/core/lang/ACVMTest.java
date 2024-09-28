@@ -76,7 +76,7 @@ public abstract class ACVMTest {
 	}
 	
 	/**
-	 * Builds the Context for this test class instance. Subclasses may override
+	 * Builds the base Context for this test class instance. Subclasses may override
 	 * to generate a separate context
 	 * @param ctx Context to modify
 	 * @return

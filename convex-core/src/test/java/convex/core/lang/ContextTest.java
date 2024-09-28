@@ -30,9 +30,12 @@ import convex.core.lang.ops.Special;
 
 /**
  * Tests for basic execution Context mechanics and internals
+ * 
+ 
  */
 public class ContextTest extends ACVMTest {
 
+	// TODO: should probably make independent of base state init
 	protected ContextTest() {
 		super(BaseTest.STATE);
 	}

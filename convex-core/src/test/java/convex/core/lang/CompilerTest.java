@@ -854,12 +854,12 @@ public class CompilerTest extends ACVMTest {
 
 			// Constant addresses should also get static compilation
 			assertEquals(Constant.of(Core.TRANSFER), eval("(compile '#8/transfer)"));
+			assertEquals(Constant.of(Core.COUNT), eval("(compile '#1/count)"));
 		} else {
 			assertEquals(Lookup.create(Address.create(8), Symbols.COUNT), eval("(compile 'count)"));
 		}
 
-		// Aliases that don't hit static definitions compile to dynamic lookup
-		assertEquals(Lookup.create(Address.create(1), Symbols.COUNT), eval("(compile '#1/count)"));
+		// Aliases that don't hit real accounts compile to dynamic lookup
 		assertEquals(Lookup.create(Address.create(8888), Symbols.TRANSFER), eval("(compile '#8888/transfer)"));
 	}
 
