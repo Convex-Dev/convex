@@ -22,6 +22,8 @@ public class GenTestStrings {
 		AString roundTrip=Strings.create(a.toString());
 		assertNotNull(roundTrip);
 		
+		assertEquals(-1,a.charAt(a.count()));
+		
 		// TODO: this might fail for some invalid UTF-8?
 		//if (cvm!=null) {
 		//	assertEquals(a,cvm);
