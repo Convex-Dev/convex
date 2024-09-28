@@ -258,17 +258,16 @@ public class Juice {
 	/**
 	 * Juice cost to compile a lookup which is defined in account
 	 */
-	public static final long COMPILE_LOOKUP_DEFINED = COMPILE_LOOKUP+LOOKUP;
+	public static final long COMPILE_LOOKUP_DEFINED = COMPILE_LOOKUP+LOOKUP; // ??
 
 	/**
 	 * Juice cost to compile a lookup which is defined in core
 	 */
-	public static final long COMPILE_LOOKUP_CORE = COMPILE_LOOKUP+LOOKUP*2;
-	
+	public static final long COMPILE_LOOKUP_CORE = COMPILE_LOOKUP; //+LOOKUP*2?	
 	/**
 	 * Juice cost to compile a lookup which is undefined in account and core
 	 */
-	public static final long COMPILE_LOOKUP_UNDEFINED = COMPILE_LOOKUP+LOOKUP*3;
+	public static final long COMPILE_LOOKUP_UNDEFINED = COMPILE_LOOKUP; //+LOOKUP*3?	
 
 	/**
 	 * Juice cost to compile a general AST node

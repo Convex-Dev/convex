@@ -575,16 +575,19 @@ public class Context {
 	 * @return Metadata for given symbol (may be empty) or null if undeclared
 	 */
 	public AHashMap<ACell,ACell> lookupMeta(Address address,Symbol sym) {
-		AccountStatus as=(address==null)?getAccountStatus():getAccountStatus(address);
+		if (address==null) address=getAddress();
 		for (int i=0; i<Constants.LOOKUP_DEPTH; i++) {
+			AccountStatus as=getAccountStatus(address);
 			if (as==null) return null;
 			AHashMap<Symbol, ACell> env=as.getEnvironment();
 			if (env.containsKey(sym)) {
 				return as.getMetadata().get(sym,Maps.empty());
 			}
+			
+			// go to parent
+			if (Core.CORE_ADDRESS.equals(address)) break;
 			address=getParentAddress(as);
 			if (address==null) return null;
-			as=getAccountStatus(address);
 		}
 		return null;
 	}
@@ -593,31 +596,26 @@ public class Context {
 	 * Looks up the address of the account that defines a given Symbol
 	 * @param sym Symbol to look up
 	 * @param address Address to look up in first instance (null for current address).
-	 * @return Context with result as the address defining the given symbol (or null if undeclared)
+	 * @return Address defining the given symbol (or null if undeclared)
 	 */
-	public Context lookupDefiningAddress(Address address,Symbol sym) {
-		Context ctx=this;
+	public Address lookupDefiningAddress(Address address,Symbol sym) {
 		Address addr=(address==null)?getAddress():address;
-
 		for (int i=0; i<Constants.LOOKUP_DEPTH; i++) {
 			if (addr==null) break;
 			AccountStatus as=getAccountStatus(addr);
-			if (as==null) return ctx.withResult(Juice.LOOKUP, null);
+			if (as==null) return null;
 			
 			AHashMap<Symbol, ACell> env=as.getEnvironment();
 			MapEntry<Symbol, ACell> entry = env.getEntry(sym);
 			if (entry!=null) {
-				return ctx.withResult(Juice.LOOKUP, addr);
+				return addr;
 			}
 			
-			ctx=ctx.consumeJuice(Juice.LOOKUP);
-			if (ctx.isExceptional()) return ctx;
-			
+			// go to parent
 			if (addr.equals(Core.CORE_ADDRESS)) break;
 			addr=getParentAddress(as);
 		}
-		
-		return ctx.withResult(Juice.LOOKUP, null);
+		return null;
 	}
 
 	private Address getParentAddress(AccountStatus as) {

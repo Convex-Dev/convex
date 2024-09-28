@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Constants;
 import convex.core.data.Address;
 
 import static convex.test.Assertions.*;
@@ -128,6 +129,17 @@ public class JuiceTest extends ACVMTest {
 	@Test
 	public void testDef() {
 		assertEquals(Juice.DEF + Juice.CONSTANT, juice("(def a 1)"));
+	}
+	
+	@Test public void testLookup() {
+		if (Constants.OPT_STATIC) {
+			assertEquals(Juice.CONSTANT,juice("count"));
+		} else {
+			assertEquals(Juice.LOOKUP*3,juice("count"));
+		}
+		
+		assertEquals(Juice.LOOKUP*3,juice("missing"));
+		assertEquals(Juice.LOOKUP*3,juice("if"));
 	}
 
 	@Test

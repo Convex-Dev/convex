@@ -217,9 +217,7 @@ public class Compiler {
 		Address address=context.getAddress();
 		
 		// Check if the symbol references an existing declaration
-		context=context.lookupDefiningAddress(address, sym);
-		if (context.isExceptional()) return context; // could be juice error?
-		Address a=context.getResult();
+		Address a=context.lookupDefiningAddress(address, sym);
 		if (a!=null) return context.withResult(Juice.COMPILE_LOOKUP,Lookup.create(Constant.of(a),sym));
 		
 		// Finally revert to a lookup in the current address / environment
