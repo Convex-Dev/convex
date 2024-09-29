@@ -26,7 +26,7 @@ list : '(' forms ')';
 
 vector : '[' forms ']';
 
-set : HASH '{' forms '}';
+set : '#{' forms '}';
 
 map : '{' forms '}';
 
@@ -61,11 +61,11 @@ symbol
    : SLASH 
    | SYMBOL;
    
-implicitSymbol: HASH SYMBOL;
+implicitSymbol: INTRINSIC_SYMBOL;
    
-specialLiteral: HASH HASH SYMBOL;
+specialLiteral: HASH_HASH_SYMBOL;
    
-address: HASH DIGITS;
+address: ADDRESS;
 
 nil: NIL;
 
@@ -77,7 +77,7 @@ character: CHARACTER;
 
 keyword: KEYWORD;
 
-resolve: AT symbol;
+resolve: AT_SYMBOL;
 
 pathSymbol
    : primary ('/' symbol)+
@@ -98,9 +98,7 @@ commented: COMMENTED form;
  
 COMMENTED: '#_';
 
-HASH: '#';
 
-AT: '@';
 
 META: '^';
 
@@ -126,6 +124,18 @@ DECIMAL:
 fragment 
 EPART:
   [eE] (DIGITS | SIGNED_DIGITS);  
+
+ADDRESS:
+  '#' [0-9]+;
+  
+HASH_HASH_SYMBOL:
+  '##' NAME;
+  
+INTRINSIC_SYMBOL:
+  '#%' NAME;
+  
+AT_SYMBOL: 
+  '@' NAME;
 
 DIGITS:
   [0-9]+;
@@ -217,13 +227,8 @@ ALPHA: [a-z] | [A-Z];
  * Whitespace and comments
  */
  
-fragment
-WS: [ \n\r\t,] ;
+WS: [ \n\r\t,]+ -> channel(HIDDEN);
 
-fragment
-COMMENT: ';' ~[\r\n]* ;
+COMMENT: ';' ~[\r\n]* -> channel(HIDDEN);
 
-TRASH
-    : ( WS | COMMENT ) -> channel(HIDDEN)
-    ;
 

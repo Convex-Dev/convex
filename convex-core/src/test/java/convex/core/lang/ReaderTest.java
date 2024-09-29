@@ -1,6 +1,7 @@
 package convex.core.lang;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertParseException;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -19,6 +20,7 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Syntax;
@@ -68,9 +70,8 @@ public class ReaderTest {
 		assertParseException( () -> Reader.read(":"));
 		assertParseException( () -> Reader.read(" : "));
 		
-		// TODO: fix Case spotted in #441
-		// ACell a=Reader.readAll("() : ()"); // Getting a null here?
-		//assertThrows(ParseException.class, () -> Reader.readAll("() : ()"));
+		// Case spotted in #441
+		assertParseException(()->Reader.readAll("() : ()")); 
 	}
 
 	@Test
@@ -93,8 +94,7 @@ public class ReaderTest {
 		assertEquals(Symbol.create("foo.bar"), Reader.read("foo.bar"));
 		assertEquals(Symbol.create(".bar"), Reader.read(".bar"));
 		
-		// TODO: What should happen here?
-		// assertEquals(Symbols.NIL, Reader.read("'nil"));
+		assertEquals(Lists.of(Symbols.QUOTE,null), Reader.read("'nil")); // sane?
 		
 		// Interpret leading dot as symbols always. Addresses Issue #65
 		assertEquals(Symbol.create(".56"), Reader.read(".56"));
@@ -156,8 +156,8 @@ public class ReaderTest {
 	@Test
 	public void testAddress() {
 		assertEquals(Address.ZERO, Reader.read("#0"));
-		// TODO: too generous with whitespace?
-		assertEquals(Address.ZERO, Reader.read(" # 0 "));
+
+		assertParseException(()->Reader.read(" # 0 "));
 	}
 
 	@Test
@@ -239,6 +239,15 @@ public class ReaderTest {
 		assertEquals(Lists.of(1L, 2L), Reader.read("(1 2)"));
 		assertEquals(Lists.of(Vectors.empty()), Reader.read(" ([] )"));
 	}
+	
+	@Test
+	public void testSets() {
+		assertSame(Sets.empty(), Reader.read("#{}"));
+		assertEquals(Sets.of(1L, 2L), Reader.read("#{1 2}"));
+		assertEquals(Sets.of(1L, 2L), Reader.read("#{1 2 2 1}"));
+		assertEquals(Sets.of(Vectors.empty()), Reader.read("#{[]}"));
+		assertParseException(()->Reader.read("# {}"));
+	}
 
 	@Test
 	public void testNoWhiteSpace() {
@@ -256,7 +265,7 @@ public class ReaderTest {
 	
 	@Test
 	public void testMapError() {
-		assertThrows(ParseException.class,()->Reader.read("{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}"));
+		assertParseException(()->Reader.read("{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}"));
 	}
 
 	@Test
@@ -274,6 +283,7 @@ public class ReaderTest {
 	public void testResolve() {
 		assertEquals(Lists.of(Symbols.RESOLVE, Symbols.FOO), Reader.read("@foo"));
 		assertParseException(() -> Reader.read("@(foo)"));
+		assertParseException(() -> Reader.read("@ foo"));
 	}
 	
 	@Test public void testUnprintablePrint() {
@@ -316,6 +326,7 @@ public class ReaderTest {
 	@Test
 	public void testReadMetadata() {
 		assertEquals(Syntax.create(Keywords.FOO),Reader.read("^{} :foo"));
+		assertEquals(Syntax.create(Keywords.FOO),Reader.read("^ {}:foo"));
 	}
 
 	@SuppressWarnings("unchecked")

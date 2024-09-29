@@ -373,7 +373,10 @@ public class AntlrReader {
 
 		@Override
 		public void exitResolve(ResolveContext ctx) {
-			Symbol sym=pop();
+			String s=ctx.getText();
+			s=s.substring(1); // skip leading @
+			Symbol sym=Symbol.create(s);
+			if (sym==null) throw new ParseException("Invalid @ symbol: @"+s);
 			push(List.of(Symbols.RESOLVE,sym));
 		}
 

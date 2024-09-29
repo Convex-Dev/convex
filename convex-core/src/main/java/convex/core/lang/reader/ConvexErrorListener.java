@@ -24,7 +24,6 @@ class ConvexErrorListener extends BaseErrorListener {
 			} else if ("{".equals(text)) {
 				msg="Unmatched '{'";
 			} 
-			
 		}
 		throw new ParseException("Parse error at "+line+":"+charPositionInLine+" :: "+msg,e);
 	}

@@ -182,7 +182,7 @@
   (if-let [rec (read sym)]
 	(apply create sym (assoc rec 0 value))
 	(fail :STATE (str "CNS record to update does not exist: " sym))))
-
+		
 (defn control
 	^{:doc {:description "Change controller for a CNS node."
 			:signature   [{:params [name controller]}]}}
