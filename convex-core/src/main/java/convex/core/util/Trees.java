@@ -29,7 +29,8 @@ public class Trees {
 	}
 	
 	/**
-	 * Visits elements on a stack, the element if predicate returns true.
+	 * Visits elements on a stack.
+	 * Pops the element if predicate returns true, otherwise leaves on stack for later handling.
 	 * Predicate function MAY add to the stack. Will terminate when stack is empty.
 	 * 
 	 * IMPORTANT: O(1) usage of JVM stack, may be necessary to use a function like this when 

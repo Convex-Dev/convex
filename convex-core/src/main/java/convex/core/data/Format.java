@@ -841,7 +841,10 @@ public class Format {
 		
 		// read first cell
 		T result= Format.read(data,0);
-		if (result==null) return null; // null value OK at top level
+		if (result==null) {
+			if (ml!=1) throw new BadFormatException("Extra bytes after nil message");
+			return null; // null value OK at top level
+		}
 		
 		int rl=Utils.checkedInt(result.getEncodingLength());
 		if (rl==ml) return result; // Fast path if already complete

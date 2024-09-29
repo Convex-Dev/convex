@@ -16,6 +16,8 @@ import convex.gui.utils.Toolkit;
 @SuppressWarnings("serial")
 public class CodeLabel extends JTextArea {
 
+	private static final int EXTRA = 5;
+
 	public CodeLabel() {
 		this("");
 	}
@@ -58,7 +60,7 @@ public class CodeLabel extends JTextArea {
         	if ((maxColumns>0)&&(columns>maxColumns)) columns=maxColumns;
         	
             d.width = columns * getColumnWidth() +
-                    insets.left + insets.right;
+                    insets.left + insets.right+EXTRA;
         }
         
         int rows=getRows();
@@ -86,7 +88,7 @@ public class CodeLabel extends JTextArea {
 	    Insets insets = getInsets();
 		int columns=getColumns();
 		if ((maxColumns>0)&&(columns>maxColumns)) columns=maxColumns;
-		d.width = columns * cw + insets.left + insets.right;
+		d.width = columns * cw + insets.left + insets.right+EXTRA;
 		
 		return d;
 	}

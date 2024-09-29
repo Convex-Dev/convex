@@ -1,6 +1,7 @@
 package convex.gui.tools;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -69,9 +70,12 @@ public class MessageFormatPanel extends JPanel {
 		messageArea.setEditable(true);
 		messageArea.setToolTipText("Enter binary hex representation here");
 		messageArea.setFont(Toolkit.MONO_FONT);
+		messageArea.setBackground(Color.BLACK);
 		messageArea.setLineWrap(true);
-		messageArea.setMaxColumns(64);
-		lowerPanel.add(new JScrollPane(messageArea), BorderLayout.CENTER);
+		messageArea.setMaxColumns(65);
+		JScrollPane messageScroll=new JScrollPane(messageArea);
+		messageScroll.getViewport().setBackground(Color.BLACK);
+		lowerPanel.add(messageScroll, BorderLayout.CENTER);
 
 		splitPane.setRightComponent(lowerPanel);
 
@@ -134,7 +138,7 @@ public class MessageFormatPanel extends JPanel {
 		if (!data.isBlank()) try {
 			messageArea.setEnabled(false);
 			ACell o = Reader.read(data);
-			Blob b = Format.encodedBlob(o);
+			Blob b = Format.encodeMultiCell(o,true);
 			updateHashLabel(o,b);
 			msg = b.toHexString();
 			messageArea.setEnabled(true);
@@ -157,6 +161,8 @@ public class MessageFormatPanel extends JPanel {
 		sb.append("Memory Size:   "+(empty?"<none>":Cells.storageSize(v)));
 		sb.append("\n");
 		sb.append("Cell Count:    "+(empty?"<none>":Refs.totalRefCount(v)));
+		sb.append("\n");
+		sb.append("Branch Count:  "+(empty?"<none>":Cells.branchCount(v)));
 		hashLabel.setText(sb.toString());
 	}
 
