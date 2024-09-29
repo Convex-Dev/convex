@@ -8,7 +8,6 @@ import javax.swing.JButton;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JTextArea;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -42,7 +41,7 @@ import net.miginfocom.swing.MigLayout;
 public class PeerComponent extends BaseListComponent {
 
 	public ConvexLocal convex;
-	JTextArea description;
+	CodeLabel description;
 
 	public void launchPeerWindow(ConvexLocal peer) {
 		PeerWindow pw = new PeerWindow(peer);
@@ -81,7 +80,7 @@ public class PeerComponent extends BaseListComponent {
 		// Central area
 
 		JPanel centralPanel = new JPanel();
-		centralPanel.setLayout(new MigLayout("fill, wrap 2","[][grow]")); 
+		centralPanel.setLayout(new MigLayout("wrap 2","[][]")); 
 		
 		Server server=convex.getLocalServer();
 		AccountKey peerKey=server.getPeerKey();
@@ -90,6 +89,7 @@ public class PeerComponent extends BaseListComponent {
 			Identicon identicon=new Identicon(peerKey,Toolkit.IDENTICON_SIZE_LARGE);
 			centralPanel.add(identicon);
 			CodeLabel peerKeyLabel=(new CodeLabel("0x"+peerKey.toChecksumHex()));
+			peerKeyLabel.setMaxColumns(2+64);
 			peerKeyLabel.setToolTipText("Public key of the peer.");
 			centralPanel.add(peerKeyLabel,"span");
 		}
@@ -98,6 +98,7 @@ public class PeerComponent extends BaseListComponent {
 			description = new CodeLabel(getPeerDescription());
 			description.setFont(Toolkit.MONO_FONT);
 			description.setEditable(false);
+			description.setMaxColumns(80);
 			description.setBorder(null);
 			description.setBackground(null);
 			centralPanel.add(description, "span 2");

@@ -9,12 +9,12 @@ import java.awt.event.ComponentEvent;
 import javax.swing.JButton;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTextArea;
 import javax.swing.Timer;
 
 import convex.api.Convex;
 import convex.core.text.Text;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.CodeLabel;
 import convex.gui.components.NonUpdatingCaret;
 import convex.gui.utils.Toolkit;
 import convex.peer.AThreadedComponent;
@@ -23,7 +23,7 @@ import convex.peer.Server;
 @SuppressWarnings("serial")
 public class PeerInfoPanel extends JPanel {
 
-	private final JTextArea textArea;
+	private final CodeLabel textArea;
 
 	public PeerInfoPanel(Convex p) {
 		setLayout(new BorderLayout(0, 0));
@@ -34,16 +34,16 @@ public class PeerInfoPanel extends JPanel {
 		JButton refreshButton = new JButton("Refresh");
 		panel.add(refreshButton);
 
-		textArea = new JTextArea();
+		textArea = new CodeLabel();
+		textArea.setFont(Toolkit.MONO_FONT);
 		textArea.setEditable(false);
 		textArea.setBackground(null);
 		textArea.setCaret(new NonUpdatingCaret());
 		textArea.setColumns(100);
-		textArea.setFont(Toolkit.MONO_FONT);
+		textArea.setRows(40);
+		textArea.setMaxColumns(100);
 		
-		JPanel panel1=new JPanel();
-		panel1.add(textArea);
-		JScrollPane jsp1=new JScrollPane(panel1);
+		JScrollPane jsp1=new JScrollPane(textArea);
 		add(jsp1, BorderLayout.CENTER);
 		
 		// Set up periodic refresh

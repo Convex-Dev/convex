@@ -47,19 +47,8 @@ public class StateTreeNode<T extends ACell> extends DefaultMutableTreeNode {
 	}
 
 	@Override
-	public int getIndex(TreeNode node) {
-		// TODO Auto-generated method stub
-		return 0;
-	}
-
-	@Override
 	public boolean getAllowsChildren() {
 		return isContainer;
-	}
-
-	@Override
-	public boolean isLeaf() {
-		return getChildCount() == 0;
 	}
 
 	@SuppressWarnings("unchecked")

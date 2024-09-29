@@ -1,5 +1,6 @@
 package convex.gui.state;
 
+import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.util.List;
 
@@ -28,17 +29,23 @@ public class StateExplorer extends AbstractGUI {
 	public StateExplorer(ACell state) {
 		super ("State Explorer");
 		this.state=state;
-		this.setLayout(new MigLayout());
+		this.setLayout(new BorderLayout());
 
 		StringBuilder sb=new StringBuilder();
 		sb.append("HASH: "+Cells.getHash(state)+"\n");
 		sb.append("TYPE: "+Utils.getClass(state).getSimpleName()+"\n");
-		add(new CodeLabel(sb.toString()),"dock north");
+		add(new CodeLabel(sb.toString()),BorderLayout.NORTH);
 		
 		tabbedPane.addTab("Tree", null, new StateTreePanel(state), null);
 		tabbedPane.addTab("Text", null, createTextPanel(state), null);
-		tabbedPane.addTab("Encoding", null, new CodeLabel(Cells.getEncoding(state).toHexString()), null);
-		add(tabbedPane, "dock center");
+		
+		CodeLabel encLabel=new CodeLabel(Cells.getEncoding(state).toHexString());
+		encLabel.setMaxColumns(64);
+		encLabel.setColumns(64);
+		encLabel.setWrapStyleWord(false);
+		encLabel.setLineWrap(true);
+		tabbedPane.addTab("Encoding", null, new JScrollPane(encLabel), null);
+		add(tabbedPane, BorderLayout.CENTER);
 		
 	}
 
