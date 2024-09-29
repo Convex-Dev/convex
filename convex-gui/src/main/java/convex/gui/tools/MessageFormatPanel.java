@@ -143,7 +143,7 @@ public class MessageFormatPanel extends JPanel {
 			msg = b.toHexString();
 			messageArea.setEnabled(true);
 		} catch (Exception e) {
-			msg = e.toString();
+			msg = e.getClass().getSimpleName()+": "+e.getMessage();
 		}
 		messageArea.setText(msg);
 	}

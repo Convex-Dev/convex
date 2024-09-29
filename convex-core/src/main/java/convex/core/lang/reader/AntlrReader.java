@@ -491,13 +491,16 @@ public class AntlrReader {
 		return read(CharStreams.fromReader(r));
 	}
 	
+	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
+	
 	static ACell read(CharStream cs) {
 		ConvexLexer lexer=new ConvexLexer(cs);
 		lexer.removeErrorListeners();
-		lexer.addErrorListener(new ConvexErrorListener() );
+		lexer.addErrorListener(ERROR_LISTENER);
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		ConvexParser parser = new ConvexParser(tokens);
 		parser.removeErrorListeners();
+		parser.addErrorListener(ERROR_LISTENER);
 		
 		ParseTree tree = parser.singleForm();
 		
