@@ -69,7 +69,6 @@ public abstract class AClientCommand extends ATopCommand {
 	 */
 	protected Convex connectTransact() throws InterruptedException {
 		Convex convex=connectQuery();
-		ensureKeyPair(convex);
 		return convex;
 	}
 	
