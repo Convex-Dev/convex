@@ -145,11 +145,16 @@ public final class CVMDouble extends ANumeric {
 	/**
 	 * Parses a CVM Double value. 
 	 * @param s String to parse
-	 * @return CVMDouble value
-	 * @throws NumberFormatException If number format is invalid
+	 * @return CVMDouble value, or null if not parseable as a double
 	 */
 	public static CVMDouble parse(String s) {
-		return create(Double.parseDouble(s));
+		try {
+			double d=Double.parseDouble(s);
+			return create(d);
+		} catch (NumberFormatException e) {
+			return null;
+		}
+
 	}
 	
 	@Override

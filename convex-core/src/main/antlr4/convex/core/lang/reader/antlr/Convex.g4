@@ -123,7 +123,7 @@ DECIMAL:
   
 fragment 
 EPART:
-  [eE] (DIGITS | SIGNED_DIGITS);  
+  [eE] (DIGITS | SIGNED_DIGITS) SYMBOL_FOLLOWING*;  
 
 ADDRESS:
   '#' [0-9]+;

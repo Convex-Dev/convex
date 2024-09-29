@@ -116,6 +116,12 @@ public class ReaderTest {
 	public void testSymbolPath() {
 		ACell form=Reader.read("foo/bar/baz");
 		assertEquals(Lists.of(Symbols.LOOKUP,Lists.of(Symbols.LOOKUP,Symbols.FOO,Symbols.BAR),Symbols.BAZ),form) ;
+
+		assertParseException(()->Reader.read("foo/12"));
+		
+		// TODO: is this sane?
+		// assertParseException(()->Reader.read("foo/ bar"));
+ 
 	}
 	
 	@Test 
@@ -174,9 +180,7 @@ public class ReaderTest {
 		assertParseException(() -> {
 			Reader.read("2.0e0.1234");
 		});
-		// assertNull( Reader.read("[2.0e0.1234]"));
-		// TODO: do we want this?
-		//assertThrows(Error.class, () -> Reader.read("[2.0e0.1234]")); // Issue #70
+		assertParseException( () -> Reader.read("[2.0e0.1234]")); // Issue #70
 
 		// metadata ignored
 		assertEquals(Syntax.create(RT.cvm(3.23),Maps.of(Keywords.FOO, CVMBool.TRUE)), Reader.read("^:foo 3.23"));

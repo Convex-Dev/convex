@@ -234,7 +234,9 @@ public class AntlrReader {
 		@Override
 		public void exitDoubleValue(DoubleValueContext ctx) {
 			String s=ctx.getText();
-			push( CVMDouble.parse(s));
+			CVMDouble v=CVMDouble.parse(s);
+			if (v==null) throw new ParseException("Bad double format: "+s);
+			push(v);			
 		}
 
 		@Override
