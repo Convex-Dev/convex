@@ -39,8 +39,14 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 		Toolkit.init();
 	}
 	
+	/**
+	 * Future that is completed when this GUI's frame is closed
+	 */
 	private CompletableFuture<String> finished=new CompletableFuture<>();
 
+	/**
+	 * Runs this GUI component asynchronously in a new Frame
+	 */
 	@Override
 	public final void run() {
 		EventQueue.invokeLater(new Runnable() {
@@ -56,13 +62,15 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 		});
 	}
 	
+	/**
+	 * Runs this GUI component new Frame, positioned relative to a given parent
+	 */
 	public void runNonModal(JComponent parent) {
 		showFrame();
 		if (parent!=null) {
 			Rectangle b=parent.getBounds();
 			frame.setLocation(b.x+100, b.y+100);
 		}
-		
 	}
 	
 	public void showFrame() {
@@ -125,8 +133,8 @@ public abstract class AbstractGUI extends JPanel implements Runnable {
 	
 	
 	public void closeGUI() {
-		frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
 		close();
+		frame.dispatchEvent(new WindowEvent(frame, WindowEvent.WINDOW_CLOSING));
 	}
 
 }

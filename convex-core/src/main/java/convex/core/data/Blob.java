@@ -117,7 +117,7 @@ public class Blob extends AArrayBlob {
 		if (end > this.count) return null;
 		long length=end-start;
 		int size=(int)length;
-		if (size!=length) return null;
+		if (size!=length) return null; // int overflow, too big for valid Blob slice!
 		if (length < 0) return null;
 		if (length == 0) return EMPTY;
 		if (length==this.count) return this;

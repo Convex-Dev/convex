@@ -85,6 +85,7 @@ public class CodeLabel extends JTextArea {
 		Dimension d=new Dimension(cw,cw);
 	    Insets insets = getInsets();
 		int columns=getColumns();
+		if ((maxColumns>0)&&(columns>maxColumns)) columns=maxColumns;
 		d.width = columns * cw + insets.left + insets.right;
 		
 		return d;

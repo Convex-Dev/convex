@@ -6,12 +6,12 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTextArea;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Refs;
@@ -20,6 +20,7 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
+import convex.gui.components.CodeLabel;
 import convex.gui.components.CodePane;
 import convex.gui.utils.Toolkit;
 
@@ -27,10 +28,9 @@ import convex.gui.utils.Toolkit;
 public class MessageFormatPanel extends JPanel {
 
 	final CodePane dataArea;
-	final CodePane messageArea;
+	final CodeLabel messageArea;
 	private JPanel buttonPanel;
 	private JButton clearButton;
-	private JPanel upperPanel;
 	private JPanel instructionsPanel;
 	private JLabel lblNewLabel;
 	private JTextArea hashLabel;
@@ -52,23 +52,26 @@ public class MessageFormatPanel extends JPanel {
 		add(splitPane, BorderLayout.CENTER);
 
 		// Top panel component
-		upperPanel = new JPanel();
-		upperPanel.setLayout(new BorderLayout(0, 0));
+
 		dataArea = new CodePane();
 		dataArea.setToolTipText("Enter data objects here");
-		upperPanel.add(dataArea, BorderLayout.CENTER);
+		dataArea.setMaxColumns(128);
 		dataArea.setFont(Toolkit.MONO_FONT);
 		// dataArea.setLineWrap(true);
 		dataArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> updateData()));
-
+		splitPane.setLeftComponent(new JScrollPane(dataArea));
+		
 		// Bottom panel component
 		JPanel lowerPanel = new JPanel();
 		lowerPanel.setLayout(new BorderLayout(0, 0));
 
-		messageArea = new CodePane();
+		messageArea = new CodeLabel();
+		messageArea.setEditable(true);
 		messageArea.setToolTipText("Enter binary hex representation here");
 		messageArea.setFont(Toolkit.MONO_FONT);
-		lowerPanel.add(messageArea, BorderLayout.CENTER);
+		messageArea.setLineWrap(true);
+		messageArea.setMaxColumns(64);
+		lowerPanel.add(new JScrollPane(messageArea), BorderLayout.CENTER);
 
 		splitPane.setRightComponent(lowerPanel);
 
@@ -81,7 +84,6 @@ public class MessageFormatPanel extends JPanel {
 		lowerPanel.add(hashLabel, BorderLayout.SOUTH);
 		messageArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> updateMessage()));
 
-		splitPane.setLeftComponent(upperPanel);
 
 		buttonPanel = new ActionPanel();
 		add(buttonPanel, BorderLayout.SOUTH);
@@ -102,10 +104,14 @@ public class MessageFormatPanel extends JPanel {
 		String data = "";
 		String msg = messageArea.getText();
 		try {
-			Blob b = Blobs.parse(Utils.stripWhiteSpace(msg)).toFlatBlob();
-			ACell o = Format.decodeMultiCell(b);
-			data = Utils.print(o);
-			updateHashLabel(o,b);
+			Blob b = Blob.parse(Utils.stripWhiteSpace(msg));
+			if (b==null) {
+				data = "Invalid hex";
+			} else {
+				ACell o = Format.decodeMultiCell(b);
+				data = Utils.print(o);
+				updateHashLabel(o,b);
+			}
 		} catch (ParseException e) {
 			data = "Unable to interpret message: " + e.getMessage();
 			clearHashLabel();

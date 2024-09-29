@@ -37,6 +37,8 @@ public class PeerInfoPanel extends JPanel {
 		textArea = new CodeLabel();
 		textArea.setFont(Toolkit.MONO_FONT);
 		textArea.setEditable(false);
+		textArea.setLineWrap(true);
+		textArea.setWrapStyleWord(true);
 		textArea.setBackground(null);
 		textArea.setCaret(new NonUpdatingCaret());
 		textArea.setColumns(100);

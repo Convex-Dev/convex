@@ -26,7 +26,11 @@ public class CodePane extends BaseTextPane {
 	}
 
 	@Override public boolean getScrollableTracksViewportWidth() {
-		return super.getScrollableTracksViewportWidth();
+		boolean track= super.getScrollableTracksViewportWidth();
+		if (maxColumns==0) {
+			track=true;
+		}
+		return track;
 	}
 	
 	/**
@@ -51,6 +55,7 @@ public class CodePane extends BaseTextPane {
 	    Insets insets = getInsets();
 		int columns=getMaxColumns();
 		if (columns>0) {
+			if ((maxColumns>0)&&(columns>maxColumns)) columns=maxColumns;
 			int cw=getColumnWidth();
 			d.width = columns * cw + insets.left + insets.right;
 		}

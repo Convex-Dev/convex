@@ -828,7 +828,7 @@ public class Format {
 	}
 	
 	/**
-	 * Reads a cell from a Blob of data, allowing for non-embedded children following the first cell
+	 * Reads a cell from a Blob of data, allowing for non-embedded branches following the first cell
 	 * @param data Data to decode
 	 * @return Cell instance
 	 * @throws BadFormatException If encoding format is invalid
@@ -928,15 +928,16 @@ public class Format {
 				ix+=Format.getVLCCountLength(encLength);
 				
 				Blob enc=data.slice(ix, ix+encLength);
+				if (enc==null) throw new BadFormatException("Incomplete encoding");
 				Hash h=enc.getContentHash();
 				
 				// Check store for Ref - avoids duplicate objects in many cases
 				ACell c=store.decode(enc);
 				
 				if (c==null) {
-					throw new BadFormatException("Null child encoding in Message");
+					throw new BadFormatException("Null child encoding");
 				}
-				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell provided in Message");
+				if (c.isEmbedded()) throw new BadFormatException("Embedded Cell as child");
 				
 				acc.put(h, c);
 				ix+=encLength;
