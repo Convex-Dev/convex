@@ -18,6 +18,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.List;
 import convex.core.data.Lists;
@@ -286,6 +287,36 @@ public class AntlrReader {
 			if (sym==null) throw new ParseException("Bad implicit symbol: "+s);
 			push( sym);
 		}
+		
+		@Override
+		public void enterTaggedForm(TaggedFormContext ctx) {
+			pushList();
+		}
+
+		@Override
+		public void exitTaggedForm(TaggedFormContext ctx) {
+			ArrayList<ACell> elements=popList();
+			if (elements.size()!=2) throw new ParseException("Tagged form tag and form but got:"+ elements);
+			Symbol sym=(Symbol) elements.get(0);
+			ACell value=elements.get(1);
+			
+			ACell result=Cells.createTagged(sym,value);
+			push(result);
+		}
+
+		@Override
+		public void enterTag(TagContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitTag(TagContext ctx) {
+			String s=ctx.getText();
+			s=s.substring(1); // skip leading #
+			Symbol sym=Symbol.create(s);
+			if (sym==null) throw new ParseException("Bad tag: #"+s);
+			push( sym);
+		}
 
 		@Override
 		public void enterAddress(AddressContext ctx) {
@@ -477,6 +508,8 @@ public class AntlrReader {
 		public void exitPrimary(PrimaryContext ctx) {
 			// Nothing
 		}
+
+
 
 	}
 

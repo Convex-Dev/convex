@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Better CNS functionality
+- Support for tagged forms in Convex Reader
 - `dissoc-in`, `update` and `update-in` core functions
 - `switch` conditional macro
 
 ### Changed
 
+- Class hierarchy refactoring for `convex.core.cpos`
+- More GUI updates
 - `set!` now allows pending definitions
 
 ## [0.7.15] - 2024-09-17

@@ -16,6 +16,7 @@ import convex.core.data.AString;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Lists;
@@ -60,6 +61,9 @@ public class ReaderTest {
 		assertEquals(Keyword.create(":foo"), Reader.read("::foo"));
 		
 		assertEquals(Keyword.create("nil"), Reader.read(":nil"));
+		
+		// special case, since "/" is a valid name on its own
+		assertEquals(Keyword.create("/"), Reader.read(":/"));
 		
 		assertThrows(ParseException.class,()->Reader.read(":"));
 
@@ -362,6 +366,15 @@ public class ReaderTest {
 	public void doIdempotencyTest(ACell cell) {
 		String s=RT.toString(cell);
 		assertEquals(s,RT.toString(Reader.read(s)));
+	}
+	
+	@Test public void testTagged() {
+		assertEquals(null,Reader.read("#foo nil"));
+		assertEquals(Index.EMPTY,Reader.read("#Index {}"));
+		assertEquals(Index.of(Blob.EMPTY,CVMLong.ONE),Reader.read("#Index {0x 1}"));
+		assertEquals(Index.of(Blob.fromHex("1234"),CVMLong.ONE,Blob.fromHex("12"),CVMLong.ZERO),Reader.read("#Index {0x12 0 0x1234 1}"));
+		assertParseException(()->Reader.read("#Index nil"));
+		assertParseException(()->Reader.read("#Index {true false}"));
 	}
 	
 	/**

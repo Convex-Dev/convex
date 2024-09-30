@@ -7,6 +7,8 @@ import java.util.function.BiFunction;
 import convex.core.cpos.Block;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
+import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
 
 /**
@@ -197,6 +199,29 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		if ((i<0)||(i>=count)) throw new IndexOutOfBoundsException("Index:"+i);
 		Keyword k=getFormat().getKeys().get(i);
 		return getEntry(k);
+	}
+	
+	@Override
+	public boolean print(BlobBuilder sb, long limit) {
+		AString tag=getType().getTag();
+		if (tag!=null) {
+			sb.append(tag);
+			sb.append(' ');
+		}
+		sb.append('{');
+		long n=count();
+		RecordFormat format=getFormat();
+		ACell[] vs=getValuesArray();
+		for (long i=0; i<n; i++) {
+			Keyword k=format.getKey(i);
+			if (!RT.print(sb,k,limit)) return false;
+			sb.append(' ');
+			ACell v=vs[(int)i];
+			if (!RT.print(sb,v,limit)) return false;
+			if (i<(n-1)) sb.append(',');
+		}
+		sb.append('}');
+		return sb.check(limit);
 	}
 
 	@Override

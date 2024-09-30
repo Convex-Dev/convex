@@ -6,6 +6,7 @@ import java.util.Set;
 
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.data.util.BlobBuilder;
 
 /**
  * Abstract base class for Indexes: a sorted radix-tree map of Blobs to Values.
@@ -52,6 +53,12 @@ public abstract class AIndex<K extends ABlobLike<?>, V extends ACell> extends AM
 			hs.add(me);
 		}
 		return Collections.unmodifiableSet(hs);
+	}
+	
+	@Override
+	public boolean print(BlobBuilder sb, long limit) {
+		sb.append("#Index ");
+		return super.print(sb, limit);
 	}
 
 	@Override

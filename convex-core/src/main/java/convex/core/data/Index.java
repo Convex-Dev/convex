@@ -836,7 +836,17 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 		return (R) result;
 	}
-
-
+	
+	@SuppressWarnings("unchecked")
+	public static <R extends AIndex<K, V>, K extends ABlobLike<?>, V extends ACell> R create(AHashMap<K, V> map) {
+		Index<K,V> result=(Index<K, V>) EMPTY;
+		long n=map.count();
+		for (long i=0; i<n; i++) {
+			MapEntry<K,V> me=map.entryAt(i);
+			result=result.assoc(me.getKey(), me.getValue());
+			if (result==null) return null;
+		}
+		return (R) result;
+	}
 
 }

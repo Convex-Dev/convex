@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.function.Consumer;
 
+import convex.core.exceptions.ParseException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 
@@ -257,6 +258,19 @@ public class Cells {
 		if (ref.isInternal()) return value;
 		
 		ref.setFlags(Ref.mergeFlags(ref.getFlags(), Ref.INTERNAL));
+		return value;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static ACell createTagged(Symbol sym, ACell value) throws ParseException {
+		
+		switch (sym.getName().toString()) {
+		case "Index": 
+			if (!(value instanceof AHashMap)) throw new ParseException(sym+" tag must be on a map");
+			Index<ABlobLike<?>,ACell> index= Index.create((AHashMap<ABlobLike<?>,ACell>)value);
+			if (index==null) throw new ParseException("Invalid Index keys");
+			return index;
+		}
 		return value;
 	}
 

@@ -1,9 +1,17 @@
 grammar Convex;
+
+/*  =========================================
+ *  Grammar for Convex Reader
+ *  =========================================
+ *  
+ *  Refers to tokens defined in the lexer at the bottom of this file
+ */ 
  
 form
 	: quoted
 	| pathSymbol
 	| primary
+	| taggedForm
 	;
 	
 primary
@@ -12,6 +20,8 @@ primary
 	| resolve
 	| atom
 	;
+	
+
 
 singleForm: form EOF;
 	
@@ -29,6 +39,10 @@ vector : LVEC forms RVEC;
 set : SET_LBR forms RBR;
 
 map : LBR forms RBR;
+
+taggedForm: tag form;
+
+tag: HASH_TAG;
 
 atom
   : symbol 

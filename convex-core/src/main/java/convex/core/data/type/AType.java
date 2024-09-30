@@ -1,6 +1,7 @@
 package convex.core.data.type;
 
 import convex.core.data.ACell;
+import convex.core.data.AString;
 
 /**
  * Abstract base class for CVM value types
@@ -43,4 +44,12 @@ public abstract class AType {
 	 * @return Java Class representing this Type
 	 */
 	public abstract Class<? extends ACell> getJavaClass();
+
+	/**
+	 * Gets the tag to be used for printing
+	 * @return Tag string, or null if no tag required
+	 */
+	public AString getTag() {
+		return null;
+	}
 }
