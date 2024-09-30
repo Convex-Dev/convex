@@ -15,6 +15,7 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.ASignature;
+import convex.core.crypto.InsecureRandom;
 import convex.core.data.impl.ZeroBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
@@ -195,6 +196,28 @@ public class BlobsTest {
 		assertThrows(IndexOutOfBoundsException.class,()->bb.slice(fn, fn+1));
 		assertSame(Blobs.empty(),bb.slice(0, 0));
 		assertSame(Blobs.empty(),bb.slice(fn, fn));
+	}
+	
+	@Test
+	public void testBlobBuilderBuffers() {
+		Random r=new InsecureRandom(5678);
+		Blob bv=Blob.createRandom(r, 16384);
+		
+		BlobBuilder bb=new BlobBuilder();
+		long len=0;
+		for (int i=0; i<10; i++) {
+			int start=r.nextInt(16384);
+			int end=r.nextInt(start,16384);
+			ABlob slc=bv.slice(start, end);
+			ByteBuffer bbuf=slc.toByteBuffer();
+			long n=end-start;
+			bb.append(bbuf);
+			assertEquals(len+n,bb.count());
+			
+			assertEquals(slc,bb.toBlob().slice(len, len+n));
+			len+=n;
+		}
+		assertEquals(len,bb.count());
 	}
 	
 	@Test

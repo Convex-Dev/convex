@@ -9,7 +9,6 @@ import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.LongBlob;
-import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -216,12 +215,6 @@ public final class CVMLong extends AInteger {
 		if (value>0) return CVMLong.ONE;
 		if (value<0) return CVMLong.MINUS_ONE;
 		return CVMLong.ZERO;
-	}
-
-	@Override
-	public AString toCVMString(long limit) {
-		if (limit<1) return null;
-		return Strings.create(toString());
 	}
 	
 	@Override
