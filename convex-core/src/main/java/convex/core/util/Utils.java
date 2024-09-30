@@ -878,7 +878,20 @@ public class Utils {
 		}
 	}
 
-
+	public static int longStringSize(long x) {
+        int d = 1;
+        if (x >= 0) {
+            d = 0;
+            x = -x;
+        }
+        long p = -10;
+        for (int i = 1; i < 19; i++) {
+            if (x > p)
+                return i + d;
+            p = 10 * p;
+        }
+        return 19 + d;
+    }
 
 	/**
 	 * Filters the array, returning an array containing only the elements where the

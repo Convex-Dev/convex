@@ -151,7 +151,7 @@ public final class CVMLong extends AInteger {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
-		bb.append(toCVMString(20));
+		bb.appendLongString(value);
 		return bb.check(limit);
 	}
 

@@ -169,6 +169,33 @@ public class BlobBuilder {
 		append(Strings.create(string));
 	}
 	
+	/**
+	 * Appends a long value as a UTF-8 string
+	 * @param value
+	 */
+	public void appendLongString(long value) {
+		if (value==Long.MIN_VALUE) {
+			append(Strings.LONG_MIN_VALUE);
+			return;
+		}
+		if (value<0) {
+			append('-');
+			value=-value;
+		};
+		int n=Utils.longStringSize(value);
+		if (n==1) {
+			append((byte)('0'+value));
+			return;
+		}
+		
+		byte[] bs=new byte[n];
+		for (int i=0; i<n; i++) {
+			bs[n-i-1]=(byte)('0'+(value%10));
+			value/=10;
+		}
+		append(bs);
+	}
+	
 	public BlobBuilder append(byte b) {
 		int spare=spare();
 		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);

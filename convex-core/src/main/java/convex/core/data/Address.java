@@ -206,7 +206,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("#");
-		sb.append(Long.toString(value));
+		sb.appendLongString(value);
 		return sb.check(limit);
 	}
 	

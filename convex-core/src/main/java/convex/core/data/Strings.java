@@ -62,6 +62,8 @@ public class Strings {
 
 	public static final StringShort PRINT_EXCEEDED = StringShort.create(Constants.PRINT_EXCEEDED_STRING);
 
+	public static final StringShort LONG_MIN_VALUE = StringShort.create("-9223372036854775808");
+
 
 	/**
 	 * Reads a String from a Blob encoding.
