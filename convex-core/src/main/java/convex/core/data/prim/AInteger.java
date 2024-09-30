@@ -57,6 +57,21 @@ public abstract class AInteger extends ANumeric {
 	}
 	
 	/**
+	 * Create a canonical integer from a two's complement Blob
+	 * @param o Object to parse
+	 * @return AInteger instance, or null if not convertible
+	 */
+	public static AInteger create(ABlob o) {
+		if (o.count()<=8) {
+			return CVMLong.create(o.longValue());
+		} else {
+			CVMBigInteger bi= CVMBigInteger.create(o);
+			if (bi==null) return null;
+			return bi.getCanonical();
+		}
+	}
+	
+	/**
 	 * Parse a  value as a canonical integer
 	 * @param o Object to parse
 	 * @return AInteger instance, or null if not convertible

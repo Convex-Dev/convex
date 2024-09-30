@@ -67,24 +67,37 @@ public final class CVMBigInteger extends AInteger {
 	}
 	
 	/**
-	 * Create a big integer from a valid blob representation. Blob can be non-canonical.
-	 * @param data Blob data containing minimal BigInteger twos complement representation
+	 * Create a big integer from a blob representation. Blob can be non-canonical.
+	 * @param data Blob data containing twos complement representation
 	 * @return Big Integer value or null if not valid.
 	 */
 	public static CVMBigInteger create(ABlob data) {
-		long n=data.count();
-		if (n==0) return null;
-		if (n>1) {
-			byte bs=data.byteAt(0);
-			if ((bs==0)||(bs==-1)) {
-				byte bs2=data.byteAt(1);
-				if ((bs&0x80)==(bs2&0x80)) return null; // excess leading byte not allowed
-			}
-		}
+		data=trimLeadingBytes(data);
+		if (data==null) return null;
 		return new CVMBigInteger(data,null);
 	}
 
 	
+	private static Blob trimLeadingBytes(ABlob data) {
+		long n=data.count();
+		if (n==0) return Blob.EMPTY;
+		if (n==1) return data.toFlatBlob();
+		int start=0;
+		while (start+1<n) {
+			byte bs=data.byteAt(0);
+			if ((bs==0)||(bs==-1)) {
+				byte bs2=data.byteAt(1);
+				if ((bs&0x80)==(bs2&0x80)) {
+					start++;
+					continue;
+				}
+			}
+			break;
+		}
+		if (n-start>MAX_BYTELENGTH) return null;
+		return data.slice(start,n).toFlatBlob();
+	}
+
 	@Override
 	public CVMLong toLong() {
 		return CVMLong.create(longValue());
@@ -268,11 +281,16 @@ public final class CVMBigInteger extends AInteger {
 		ABlob b=Blobs.read(blob, offset);
 		
 		if (b==null) throw new BadFormatException("Bad big integer format in read from blob");
-		if (b.count()<=LONG_BYTELENGTH) {
+		long bc=b.count();
+		if (bc<=LONG_BYTELENGTH) {
 			throw new BadFormatException("Non-canonical big integer length");
 		}
+		if (bc>MAX_BYTELENGTH) {
+			throw new BadFormatException("Encoding exceeds max big integer length");
+		}
 		CVMBigInteger result= create(b);
-		if (result==null) throw new BadFormatException("Null result in big integer create from blob");
+		if (result==null) throw new BadFormatException("Illegal creation of BigInteger from blob");
+		if (result.byteLength()!=bc) throw new BadFormatException("Excess leading bytes in BigInteger representation");
 		
 		// Attach the encoding, will be same length as Blob encoding
 		result.attachEncoding(blob.slice(offset,offset+b.getEncodingLength()));

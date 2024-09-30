@@ -634,16 +634,11 @@ public class RT {
 			return n.toInteger();
 		}
 
-		if (a instanceof APrimitive) {
-			return CVMLong.create(((APrimitive) a).longValue());
-		}
-
 		if (a instanceof ABlob) {
-			long lv = ((ABlob) a).longValue();
-			return CVMLong.create(lv);
+			return AInteger.create((ABlob) a);
 		}
 
-		return null;
+		return castLong(a);
 	}
 
 	/**

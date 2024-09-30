@@ -446,6 +446,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(-1L, evalL("(int 0xff)"));
 		assertEquals(-1L, evalL("(int 0xffffffff)"));
 		assertEquals(0x0cff00000050l, evalL("(int 0x0cff00000050)")); 
+		
+		assertCVMEquals(-1L, evalL("(int 0xffffffffffffffffffffffff)")); // big int 
+		
 
 		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
 		assertEquals(1L, evalL("(int true)"));

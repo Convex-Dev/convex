@@ -156,7 +156,7 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	/**
 	 * Converts this BlobLike to the corresponding long value.
 	 * 
-	 * Assumes big-endian format, as if the entire blob is interpreted as an unsigned big integer. Higher bytes 
+	 * Assumes big-endian format, as if the entire blob is interpreted as an big integer. Higher bytes 
 	 * outside the Long range will be ignored, i.e. the lowest 64 bits are taken
 	 * 
 	 * @return long value of this blob
