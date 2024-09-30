@@ -195,11 +195,6 @@ public class ANTLRTest {
 		
 		assertThrows(ParseException.class,()->readAll("1 2 ("));
 	}
-	
-	@Test public void testPath() {
-		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.FOO),AntlrReader.read("#0/foo"));
-		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.DIVIDE),AntlrReader.read("#0//"));
-	}
 
 	@Test public void testParseErrors() {
 		assertParseError("1 2");

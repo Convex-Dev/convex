@@ -121,7 +121,9 @@ public class ReaderTest {
 		
 		// TODO: is this sane?
 		// assertParseException(()->Reader.read("foo/ bar"));
- 
+
+		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.FOO),Reader.read("#0/foo"));
+		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.DIVIDE),Reader.read("#0//"));
 	}
 	
 	@Test 

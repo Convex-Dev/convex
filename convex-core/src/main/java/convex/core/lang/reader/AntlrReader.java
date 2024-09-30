@@ -37,35 +37,7 @@ import convex.core.lang.Symbols;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
-import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
-import convex.core.lang.reader.antlr.ConvexParser.AllFormsContext;
-import convex.core.lang.reader.antlr.ConvexParser.AtomContext;
-import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
-import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
-import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
-import convex.core.lang.reader.antlr.ConvexParser.CommentedContext;
-import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
-import convex.core.lang.reader.antlr.ConvexParser.DoubleValueContext;
-import convex.core.lang.reader.antlr.ConvexParser.FormContext;
-import convex.core.lang.reader.antlr.ConvexParser.FormsContext;
-import convex.core.lang.reader.antlr.ConvexParser.ImplicitSymbolContext;
-import convex.core.lang.reader.antlr.ConvexParser.KeywordContext;
-import convex.core.lang.reader.antlr.ConvexParser.ListContext;
-import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
-import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
-import convex.core.lang.reader.antlr.ConvexParser.MapContext;
-import convex.core.lang.reader.antlr.ConvexParser.NilContext;
-import convex.core.lang.reader.antlr.ConvexParser.PathSymbolContext;
-import convex.core.lang.reader.antlr.ConvexParser.PrimaryContext;
-import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
-import convex.core.lang.reader.antlr.ConvexParser.ResolveContext;
-import convex.core.lang.reader.antlr.ConvexParser.SetContext;
-import convex.core.lang.reader.antlr.ConvexParser.SingleFormContext;
-import convex.core.lang.reader.antlr.ConvexParser.SpecialLiteralContext;
-import convex.core.lang.reader.antlr.ConvexParser.StringContext;
-import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
-import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
-import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
+import convex.core.lang.reader.antlr.ConvexParser.*;
 import convex.core.util.Utils;
  
 public class AntlrReader {
@@ -77,6 +49,10 @@ public class AntlrReader {
 			stack.add(new ArrayList<>());
 		}
 		
+		/**
+		 * Push a cell into the topmost list on the stack
+		 * @param a
+		 */
 		public void push(ACell a) {
 			int n=stack.size()-1;
 			ArrayList<ACell> top=stack.get(n);
@@ -236,7 +212,7 @@ public class AntlrReader {
 			String s=ctx.getText();
 			CVMDouble v=CVMDouble.parse(s);
 			if (v==null) throw new ParseException("Bad double format: "+s);
-			push(v);			
+			push(v);	
 		}
 
 		@Override
@@ -381,6 +357,21 @@ public class AntlrReader {
 			if (sym==null) throw new ParseException("Invalid @ symbol: @"+s);
 			push(List.of(Symbols.RESOLVE,sym));
 		}
+		
+
+		@Override
+		public void enterSlashSymbol(SlashSymbolContext ctx) {
+			// Nothing to do
+		}
+
+		@Override
+		public void exitSlashSymbol(SlashSymbolContext ctx) {
+			String s=ctx.getText();
+			s=s.substring(1); // skip leading /
+			Symbol sym=Symbol.create(s);
+			if (sym==null) throw new ParseException("Invalid / symbol: /"+s);
+			push(sym);
+		}
 
 		@Override
 		public void enterString(StringContext ctx) {
@@ -486,6 +477,7 @@ public class AntlrReader {
 		public void exitPrimary(PrimaryContext ctx) {
 			// Nothing
 		}
+
 	}
 
 	public static ACell read(String s) {
