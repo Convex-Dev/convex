@@ -278,10 +278,12 @@ ALPHA: [a-z] | [A-Z];
 
 /*
  * Whitespace and comments
+ *
+ * TODO: Should these be skip or channel(HIDDEN)?
  */
  
-WS: [ \n\r\t,]+ -> channel(HIDDEN);
+WS: [ \n\r\t,]+ -> skip;
 
-COMMENT: ';' ~[\r\n]* -> channel(HIDDEN);
+COMMENT: ';' ~[\r\n]* -> skip;
 
 

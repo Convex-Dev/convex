@@ -1,6 +1,8 @@
 package convex.core.lang.reader;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 import org.antlr.v4.runtime.CharStream;
@@ -8,6 +10,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
@@ -233,7 +236,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitBool(BoolContext ctx) {
-			push(CVMBool.parse(ctx.getText()));
+			push(CVMBool.parse(ctx.getStop().getText()));
 		}
 
 		@Override
@@ -256,7 +259,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitKeyword(KeywordContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			Keyword k=Keyword.create(s.substring(1));
 			if (k==null) throw new ParseException("Bad Keyword format: "+s);
 			push( k);
@@ -269,7 +272,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitSymbol(SymbolContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			Symbol sym=Symbol.create(s);
 			if (sym==null) throw new ParseException("Bad Symbol format: "+s);
 			push( sym);
@@ -325,7 +328,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitAddress(AddressContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			Address addr=Address.parse(s);
 			if (addr==null) throw new ParseException("Bad Address format: "+s);
 			push (addr);
@@ -355,7 +358,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitBlob(BlobContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			Blob b=Blob.fromHex(s.substring(2));
 			if (b==null) throw new ParseException("Invalid Blob syntax: "+s);
 			push(b);
@@ -411,7 +414,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitString(StringContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			int n=s.length();
 			s=s.substring(1, n-1); // skip surrounding double quotes
 			s=ReaderUtils.unescapeString(s);
@@ -524,25 +527,35 @@ public class AntlrReader {
 	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
 	
 	static ACell read(CharStream cs) {
-		ConvexLexer lexer=new ConvexLexer(cs);
-		lexer.removeErrorListeners();
-		lexer.addErrorListener(ERROR_LISTENER);
-		CommonTokenStream tokens = new CommonTokenStream(lexer);
-		ConvexParser parser = new ConvexParser(tokens);
-		parser.removeErrorListeners();
-		parser.addErrorListener(ERROR_LISTENER);
-		
-		ParseTree tree = parser.singleForm();
-		
-		CRListener visitor=new CRListener();
-		ParseTreeWalker.DEFAULT.walk(visitor, tree);
-		
-		ArrayList<ACell> top=visitor.popList();
-		if (top.size()!=1) {
-			throw new ParseException("Bad parse output: "+top);
+		try {
+			ConvexLexer lexer=new ConvexLexer(cs);
+			lexer.removeErrorListeners();
+			lexer.addErrorListener(ERROR_LISTENER);
+			CommonTokenStream tokens = new CommonTokenStream(lexer);
+			ConvexParser parser = new ConvexParser(tokens);
+			
+			// We don't need a parse tree, just want to visit everything in our listener
+			parser.setBuildParseTree(false);
+			parser.removeErrorListeners();
+			parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
+			parser.addErrorListener(ERROR_LISTENER);
+			CRListener visitor=new CRListener();
+			parser.addParseListener(visitor);
+			
+			// ParseTree tree = parser.singleForm();
+			Method startRule = parser.getClass().getMethod("singleForm");
+			startRule.invoke(parser, (Object[]) null);
+			// ParseTreeWalker.DEFAULT.walk(visitor, tree);
+			
+			ArrayList<ACell> top=visitor.popList();
+			if (top.size()!=1) {
+				throw new ParseException("Bad parse output: "+top);
+			}
+			
+			return top.get(0);
+		} catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+			throw new ParseException("Missing parse method",e);
 		}
-		
-		return top.get(0);
 	}
 	
 	public static AList<ACell> readAll(String source) {
