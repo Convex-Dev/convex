@@ -587,6 +587,7 @@ public class RT {
 		}
 
 		if (a instanceof APrimitive) {
+			if (a instanceof CVMBool) return null; // disallow boolean -> long cast
 			return CVMLong.create(((APrimitive) a).longValue());
 		}
 		

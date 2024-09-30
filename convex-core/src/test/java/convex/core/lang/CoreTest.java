@@ -346,7 +346,6 @@ public class CoreTest extends ACVMTest {
 	public void testGetIn() {
 		assertEquals(2L, evalL("(get-in {1 2} [1])"));
 		assertEquals(4L, evalL("(get-in {1 {2 4} 3 5} [1 2])"));
-		assertEquals(1L, evalL("(get-in #{1 2} [1])"));
 		assertEquals(2L, evalL("(get-in [1 2 3] [1])"));
 		assertEquals(2L, evalL("(get-in [1 2 3] [1] :foo)"));
 		assertEquals(3L, evalL("(get-in [1 2 3] '(2))"));
@@ -356,6 +355,9 @@ public class CoreTest extends ACVMTest {
 		// special case: don't coerce to collection if empty sequence of keys
 		// so non-collection value may be used safely
 		assertEquals(3L, evalL("(get-in 3 [])"));
+		
+		assertEquals(CVMBool.TRUE, eval("(get-in #{1 2} [1])"));
+
 
 		assertEquals(Maps.of(1L, 2L), eval("(get-in {1 2} nil)"));
 		assertEquals(Maps.of(1L, 2L), eval("(get-in {1 2} [])"));
@@ -398,9 +400,6 @@ public class CoreTest extends ACVMTest {
 		assertEquals(255L, evalL("(long 0xff00000000000000ff)")); // only taking last 8 bytes
 		assertEquals(-1L, evalL("(long 0xcafebabeffffffffffffffff)")); // interpret as big endian big integer
 
-		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
-		assertEquals(1L, evalL("(long true)"));
-		assertEquals(0L, evalL("(long false)"));
 		
 		// Address casts to equivalent Long value. See #431
 		assertEquals(1L, evalL("(long #1)"));
@@ -412,6 +411,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMLong.MINUS_ONE,eval("(long -1.9)")); // note rounding towards zero
 		assertEquals(CVMLong.MAX_VALUE,eval("(long 9223372036854775807.0)")); // actual max value
 		assertEquals(CVMLong.MAX_VALUE,eval("(long 9223372036854775809.0)")); // above max value
+		
+		// Biggest exact double conversion = 2^53. Hi JavaScript!
+		assertEquals(9007199254740991L,evalL("(long 9007199254740991.0)")); 
+		assertEquals(9007199254740992L,evalL("(long 9007199254740992.0)")); // 2^53
+		assertEquals(9007199254740992L,evalL("(long (double 9007199254740993))")); 
 		
 		// Cast errors on non-finite doubles
 		assertCastError(step("(long ##NaN)"));
@@ -425,6 +429,10 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(long [])"));
 		assertCastError(step("(long :foo)"));
 		
+		// We don't allow bools to explicitly cast to longs. It doesn't round trip nicely (e.g. both 0 and 1 are truthy!)
+		assertCastError(step("(long true)"));
+		assertCastError(step("(long false)"));
+
 		// Long limits and overflow
 		assertEquals(Long.MAX_VALUE,evalL("(long 9223372036854775807)"));
 		assertEquals(Long.MIN_VALUE,evalL("(long -9223372036854775808)"));
@@ -449,11 +457,6 @@ public class CoreTest extends ACVMTest {
 		
 		assertCVMEquals(-1L, evalL("(int 0xffffffffffffffffffffffff)")); // big int 
 		
-
-		// Currently we allow bools to explicitly cast to longs like this. TODO: maybe reconsider?
-		assertEquals(1L, evalL("(int true)"));
-		assertEquals(0L, evalL("(int false)"));
-		
 		// Address casts to equivalent Long value. See #431
 		assertEquals(1L, evalL("(long #1)"));
 		assertEquals(999L, evalL("(long #999)"));
@@ -468,6 +471,10 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(int ##NaN)"));
 		assertCastError(step("(int ##Inf)"));
 		assertCastError(step("(int ##-Inf)"));
+		
+		// Currently we disallow bools to explicitly cast to longs. Not round trippable
+		assertCastError(step("(int true)"));
+		assertCastError(step("(int false)"));
 
 		assertArityError(step("(int)"));
 		assertArityError(step("(int 1 2)")); 

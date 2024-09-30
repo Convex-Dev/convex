@@ -357,9 +357,10 @@ public class CompilerTest extends ACVMTest {
 		// sets used as functions act as a predicate
 		assertCVMEquals(Boolean.TRUE, eval("(#{1 2} 1)"));
 
-		// get returns value or nil
-		assertEquals(1L, evalL("(get #{1 2} 1)"));
+		// get returns true or false based on set inclusion
+		assertSame(CVMBool.TRUE, eval("(get #{1 2} 1)"));
 		assertSame(CVMBool.FALSE, eval("(get #{1 2} 3)"));
+		assertSame(CVMLong.ONE, eval("(get #{1 2} 3 1)")); // notFound handling
 	}
 
 	@Test

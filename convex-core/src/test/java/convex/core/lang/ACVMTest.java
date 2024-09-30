@@ -178,7 +178,7 @@ public abstract class ACVMTest {
 
 	public static long evalL(Context ctx, String source) {
 		ACell result = eval(ctx, source);
-		CVMLong d = RT.castLong(result);
+		CVMLong d = RT.ensureLong(result);
 		if (d == null)
 			throw new ClassCastException("Expected Long, but got: " + RT.getType(result));
 		return d.longValue();
