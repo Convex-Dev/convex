@@ -106,7 +106,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @return Record tag byte
 	 */
 	@Override
-	public abstract byte getTag();
+	protected
+	abstract byte getTag();
 	
 	/**
 	 * Gets an array containing all values in this record, in format-defined key order.
@@ -208,6 +209,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 			sb.append(tag);
 			sb.append(' ');
 		}
+		
 		sb.append('{');
 		long n=count();
 		RecordFormat format=getFormat();

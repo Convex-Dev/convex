@@ -101,14 +101,13 @@ public class RecordTest {
 	
 	@Test
 	public void testResult() {
-		String s="{:id 4,:result #44,:error nil,:log nil,:info nil}";
+		String s="{:id 4,:result #44}";
 		AHashMap<Keyword,ACell> m=TestState.eval(s);
-		assertEquals(5,m.count);
+		assertEquals(2,m.count);
 	
 		Result r=Result.create(CVMLong.create(4), Address.create(44), null, null);
-		assertEquals(s,r.toString());
-		
-		assertEquals(m,r.toHashMap());
+		assertEquals("#Result "+s,r.toString());
+		assertEquals(5,r.count());
 		
 		doRecordTests(r);
 	}

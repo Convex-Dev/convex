@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
@@ -369,12 +370,19 @@ public class ReaderTest {
 	}
 	
 	@Test public void testTagged() {
+		// Unrecognised tags
 		assertEquals(null,Reader.read("#foo nil"));
+		assertEquals(Vectors.empty(),Reader.read("#foo []"));
+		
+		// Index types
 		assertEquals(Index.EMPTY,Reader.read("#Index {}"));
 		assertEquals(Index.of(Blob.EMPTY,CVMLong.ONE),Reader.read("#Index {0x 1}"));
 		assertEquals(Index.of(Blob.fromHex("1234"),CVMLong.ONE,Blob.fromHex("12"),CVMLong.ZERO),Reader.read("#Index {0x12 0 0x1234 1}"));
 		assertParseException(()->Reader.read("#Index nil"));
 		assertParseException(()->Reader.read("#Index {true false}"));
+		
+		// Result types
+		assertEquals(Result.create(CVMLong.ZERO,null),Reader.read("#Result {:id 0}"));
 	}
 	
 	/**

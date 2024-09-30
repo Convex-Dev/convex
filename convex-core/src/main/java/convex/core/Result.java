@@ -19,10 +19,12 @@ import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
+import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
@@ -388,7 +390,7 @@ public final class Result extends ARecordGeneric {
 	}
 
 	@Override
-	public byte getTag() {
+	protected byte getTag() {
 		return Tag.RESULT;
 	}
 
@@ -475,6 +477,34 @@ public final class Result extends ARecordGeneric {
 		
 		return hm;
 	}
+	
+	private static final StringShort RESULT_TAG=StringShort.create("#Result");
+	
+	@Override
+	public boolean print(BlobBuilder sb, long limit) {
+		sb.append(RESULT_TAG);
+		sb.append(' ');
+		sb.append('{');
+		long n=count();
+		
+		RecordFormat format=getFormat();
+		ACell[] vs=getValuesArray();
+		boolean printed=false;
+		for (long i=0; i<n; i++) {
+			Keyword k=format.getKey(i);
+			ACell v=vs[(int)i];
+			
+			if (k.equals(Keywords.RESULT)||(v!=null)) {
+				if (printed) sb.append(',');
+				if (!RT.print(sb,k,limit)) return false;
+				sb.append(' ');
+				if (!RT.print(sb,v,limit)) return false;
+				printed=true;
+			}
+		}
+		sb.append('}');
+		return sb.check(limit);
+	}
 
 	/**
 	 * Construct a result from a cell of data
@@ -487,7 +517,8 @@ public final class Result extends ARecordGeneric {
 			return (Result) data;
 		} else if (data instanceof AMap) {
 			AMap<Keyword,ACell> m=RT.ensureMap(data);
-			return create(RT.ensureLong(m.get(Keywords.ID)),m.get(Keywords.RESULT),m.get(Keywords.ERROR),RT.ensureVector(m.get(Keywords.LOG)),RT.ensureMap(m.get(Keywords.INFO)));
+			ACell info=m.get(Keywords.INFO);
+			return create(RT.ensureLong(m.get(Keywords.ID)),m.get(Keywords.RESULT),m.get(Keywords.ERROR),RT.ensureVector(m.get(Keywords.LOG)),(info==null)?null:RT.ensureMap(info));
 		}
 		throw new IllegalArgumentException("Unrecognised data of type: "+Utils.getClassName(data));
 	}

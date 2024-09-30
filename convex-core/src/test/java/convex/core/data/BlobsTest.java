@@ -215,7 +215,7 @@ public class BlobsTest {
 			assertEquals(len+n,bb.count());
 			
 			assertEquals(slc,bb.toBlob().slice(len, len+n));
-			len+=n;
+			len+=n; // update accumulated length
 		}
 		assertEquals(len,bb.count());
 	}
