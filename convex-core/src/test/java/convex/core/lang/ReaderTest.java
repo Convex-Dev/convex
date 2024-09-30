@@ -124,8 +124,9 @@ public class ReaderTest {
 
 		assertParseException(()->Reader.read("foo/12"));
 		
-		// TODO: is this sane?
-		// assertParseException(()->Reader.read("foo/ bar"));
+		// space after slash not valid
+		assertParseException(()->Reader.read("foo/ bar"));
+		assertParseException(()->Reader.read("foo / bar")); // technically 3 symbols
 
 		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.FOO),Reader.read("#0/foo"));
 		assertEquals(Lists.of(Symbols.LOOKUP,Address.ZERO,Symbols.DIVIDE),Reader.read("#0//"));
@@ -145,6 +146,7 @@ public class ReaderTest {
 
 	@Test
 	public void testSymbolsRegressionCases() {
+		// symbol staring with "nil"
 		assertEquals(Symbol.create("nils"), Reader.read("nils"));
 
 		// symbol starting with a boolean value
@@ -363,6 +365,13 @@ public class ReaderTest {
 		doIdempotencyTest(Samples.INT_INDEX_7);
 		doIdempotencyTest(Reader.readAll("(def ^{:foo 2} a 1)"));
 		doIdempotencyTest(Reader.readAll("(fn ^{:foo 2} [] bar/baz)"));
+		
+		// small signed data (embedded)
+		doIdempotencyTest(Samples.KEY_PAIR.signData(CVMLong.MAX_VALUE));
+
+		// moderate sized sized data
+		doIdempotencyTest(Samples.KEY_PAIR.signData(Samples.INT_VECTOR_256));
+
 	}
 	
 	public void doIdempotencyTest(ACell cell) {
