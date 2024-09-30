@@ -264,18 +264,25 @@ public class Cells {
 
 	@SuppressWarnings("unchecked")
 	public static ACell createTagged(Symbol sym, ACell value) throws ParseException {
-		
 		switch (sym.getName().toString()) {
-		case "Index": 
-			if (!(value instanceof AHashMap)) throw new ParseException(sym+" tag must be on a map");
-			Index<ABlobLike<?>,ACell> index= Index.create((AHashMap<ABlobLike<?>,ACell>)value);
-			if (index==null) throw new ParseException("Invalid #Index keys");
-			return index;
-		case "Result": 
-			if (!(value instanceof AHashMap)) throw new ParseException(sym+" tag must be on a map");
-			Result r= Result.fromData((AHashMap<ABlobLike<?>,ACell>)value);
-			if (r==null) throw new ParseException("Invalid #Result keys");
-			return r;
+			case "Index": {
+				if (!(value instanceof AHashMap)) throw new ParseException(sym+" tag must be on a map");
+				Index<ABlobLike<?>,ACell> index= Index.create((AHashMap<ABlobLike<?>,ACell>)value);
+				if (index==null) throw new ParseException("Invalid #Index keys");
+				return index;
+			}
+			case "Result": {
+				if (!(value instanceof AHashMap)) throw new ParseException(sym+" tag must be on a map");
+				Result r= Result.fromData((AHashMap<ABlobLike<?>,ACell>)value);
+				if (r==null) throw new ParseException("Invalid #Result keys");
+				return r;
+			}
+			case "Signed": {
+				if (!(value instanceof AHashMap)) throw new ParseException(sym+" tag must be on a map");
+				SignedData<?> r= SignedData.fromData((AHashMap<Keyword,ACell>)value);
+				if (r==null) throw new ParseException("Invalid #Signed keys");
+				return r;
+			}
 		}
 		return value;
 	}

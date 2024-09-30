@@ -360,6 +360,7 @@ public class ReaderTest {
 		doIdempotencyTest(CVMBool.TRUE);
 		doIdempotencyTest(Samples.LONG_MAP_10);
 		doIdempotencyTest(Samples.BAD_HASH);
+		doIdempotencyTest(Samples.INT_INDEX_7);
 		doIdempotencyTest(Reader.readAll("(def ^{:foo 2} a 1)"));
 		doIdempotencyTest(Reader.readAll("(fn ^{:foo 2} [] bar/baz)"));
 	}
@@ -397,6 +398,7 @@ public class ReaderTest {
 		doReadPrintTest("\"[\""); // string containing a single square bracket should be OK
 		doReadPrintTest("1.0");
 		doReadPrintTest("[:foo bar]");
+		doReadPrintTest("#Index {}");
 		doReadPrintTest("^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6");
 	}
 	

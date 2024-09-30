@@ -408,13 +408,18 @@ public abstract class Convex implements AutoCloseable {
 	 * @return Signed transaction ready to submit
 	 * @throws ResultException If an error occurs preparing the transaction (e.g. failure to pre-compile)
 	 */
+	@SuppressWarnings("unchecked")
 	public SignedData<ATransaction> prepareTransaction(ACell code) throws ResultException,InterruptedException {
 		ATransaction transaction;
 		if (code instanceof ATransaction) {
 			transaction=(ATransaction)code;
-		} else if (code instanceof SignedData) {
-			throw new IllegalArgumentException("Can't prepare transaction that is already signed");
 		} else {
+			if (code instanceof SignedData) {
+				SignedData<?> signed=(SignedData<?>) code;
+				ACell val=signed.getValue();
+				if (val instanceof ATransaction) return (SignedData<ATransaction>) signed;
+				code=val;
+			} 
 			if (isPreCompile() ) {
 				Result compResult=preCompile(code).join();
 				if (compResult.isError()) throw new ResultException(compResult);
