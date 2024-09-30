@@ -63,7 +63,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @return Tag byte for this Cell
 	 */
-	public abstract byte getTag();
+	protected abstract byte getTag();
 	
 	/**
 	 * Gets the Hash if already computed, or null if not yet available

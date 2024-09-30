@@ -117,7 +117,7 @@ public final class CVMBool extends APrimitive {
 	}
 
 	@Override
-	public byte getTag() {
+	protected final byte getTag() {
 		return (value)?Tag.TRUE:Tag.FALSE;
 	}
 

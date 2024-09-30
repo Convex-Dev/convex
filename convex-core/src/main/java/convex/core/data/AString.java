@@ -232,7 +232,7 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	public abstract int writeRawData(byte [] bs, int pos);
 	
 	@Override
-	public final byte getTag() {
+	protected final byte getTag() {
 		return Tag.STRING;
 	}
 	

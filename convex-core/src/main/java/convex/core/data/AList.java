@@ -37,6 +37,11 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 	}
 	
 	@Override
+	protected final byte getTag() {
+		return Tag.LIST;
+	}
+	
+	@Override
 	public abstract AList<T> cons(T x);
 
 	/**

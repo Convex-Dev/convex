@@ -179,7 +179,7 @@ public final class Symbol extends ASymbolic {
 	}
 
 	@Override
-	public byte getTag() {
+	protected final byte getTag() {
 		return Tag.SYMBOL;
 	}
 

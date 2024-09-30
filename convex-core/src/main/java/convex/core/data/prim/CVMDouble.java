@@ -158,7 +158,7 @@ public final class CVMDouble extends ANumeric {
 	}
 	
 	@Override
-	public byte getTag() {
+	protected final  byte getTag() {
 		return Tag.DOUBLE;
 	}
 

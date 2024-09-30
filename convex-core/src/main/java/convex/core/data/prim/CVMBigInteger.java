@@ -154,7 +154,8 @@ public final class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	public byte getTag() {
+	protected final byte getTag() {
+		// Note we might not be canonical, so this is safest
 		return getEncoding().byteAt(0);
 	}
 

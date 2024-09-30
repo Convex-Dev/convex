@@ -350,7 +350,7 @@ public final class Syntax extends ACell {
 	}
 
 	@Override
-	public byte getTag() {
+	protected byte getTag() {
 		return Tag.SYNTAX;
 	}
 

@@ -181,7 +181,7 @@ public final class Keyword extends ASymbolic {
 	}
 
 	@Override
-	public byte getTag() {
+	protected byte getTag() {
 		return Tag.KEYWORD;
 	}
 

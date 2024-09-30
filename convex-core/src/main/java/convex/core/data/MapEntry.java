@@ -312,11 +312,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public byte getTag() {
-		return Tag.VECTOR;
-	}
-
-	@Override
 	public boolean isCanonical() {
 		// TODO: probably should be canonical?
 		return false;

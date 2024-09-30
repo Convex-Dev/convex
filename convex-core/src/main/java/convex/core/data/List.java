@@ -404,12 +404,6 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public byte getTag() {
-		return Tag.LIST;
-	}
-
-
-	@Override
 	public AVector<T> reverse() {
 		return data;
 	}

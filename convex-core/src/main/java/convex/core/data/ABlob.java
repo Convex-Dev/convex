@@ -300,7 +300,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	}
 	
 	@Override
-	public final byte getTag() {
+	protected final byte getTag() {
 		return Tag.BLOB;
 	}
 
