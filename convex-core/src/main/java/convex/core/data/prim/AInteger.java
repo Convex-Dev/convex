@@ -47,6 +47,7 @@ public abstract class AInteger extends ANumeric {
 		if (n<19) return CVMLong.parse(s); // can't be a big integer
 		if (n>20) return CVMBigInteger.parse(s); // can't be a long
 				
+		// Try long first, otherwise fall back to big integer
 		AInteger r= CVMLong.parse(s);
 		if (r==null) {
 			r=CVMBigInteger.parse(s);

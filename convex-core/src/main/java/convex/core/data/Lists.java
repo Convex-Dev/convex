@@ -9,7 +9,7 @@ public class Lists {
 
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell, L extends AList<T>> L create(java.util.List<T> list) {
-		return (L) List.of(list.toArray());
+		return (L) List.create(Cells.toCellArray(list));
 	}
 
 	@SafeVarargs

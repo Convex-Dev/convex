@@ -1,8 +1,6 @@
 package convex.core.lang.reader;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 
 import org.antlr.v4.runtime.CharStream;
@@ -41,7 +39,38 @@ import convex.core.lang.Symbols;
 import convex.core.lang.reader.antlr.ConvexLexer;
 import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
-import convex.core.lang.reader.antlr.ConvexParser.*;
+import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
+import convex.core.lang.reader.antlr.ConvexParser.AllFormsContext;
+import convex.core.lang.reader.antlr.ConvexParser.AtomContext;
+import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
+import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
+import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
+import convex.core.lang.reader.antlr.ConvexParser.CommentedContext;
+import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
+import convex.core.lang.reader.antlr.ConvexParser.DoubleValueContext;
+import convex.core.lang.reader.antlr.ConvexParser.FormContext;
+import convex.core.lang.reader.antlr.ConvexParser.FormsContext;
+import convex.core.lang.reader.antlr.ConvexParser.ImplicitSymbolContext;
+import convex.core.lang.reader.antlr.ConvexParser.KeywordContext;
+import convex.core.lang.reader.antlr.ConvexParser.ListContext;
+import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
+import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
+import convex.core.lang.reader.antlr.ConvexParser.MapContext;
+import convex.core.lang.reader.antlr.ConvexParser.NilContext;
+import convex.core.lang.reader.antlr.ConvexParser.PathSymbolContext;
+import convex.core.lang.reader.antlr.ConvexParser.PrimaryContext;
+import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
+import convex.core.lang.reader.antlr.ConvexParser.ResolveContext;
+import convex.core.lang.reader.antlr.ConvexParser.SetContext;
+import convex.core.lang.reader.antlr.ConvexParser.SingleFormContext;
+import convex.core.lang.reader.antlr.ConvexParser.SlashSymbolContext;
+import convex.core.lang.reader.antlr.ConvexParser.SpecialLiteralContext;
+import convex.core.lang.reader.antlr.ConvexParser.StringContext;
+import convex.core.lang.reader.antlr.ConvexParser.SymbolContext;
+import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
+import convex.core.lang.reader.antlr.ConvexParser.TagContext;
+import convex.core.lang.reader.antlr.ConvexParser.TaggedFormContext;
+import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
 import convex.core.util.Utils;
  
 public class AntlrReader {
@@ -58,18 +87,14 @@ public class AntlrReader {
 		 * @param a
 		 */
 		public void push(ACell a) {
-			int n=stack.size()-1;
-			ArrayList<ACell> top=stack.get(n);
+			ArrayList<ACell> top=stack.getLast();
 			top.add(a);
 		}
 		
 		@SuppressWarnings("unchecked")
 		public <R extends ACell> R pop() {
-			int n=stack.size()-1;
-			ArrayList<ACell> top=stack.get(n);
-			int c=top.size()-1;
-			ACell cell=top.get(c);
-			top.remove(c);
+			ArrayList<ACell> top=stack.getLast();
+			ACell cell=top.removeLast();
 			return (R) cell;
 		}
 
@@ -79,9 +104,7 @@ public class AntlrReader {
 		}
 		
 		public ArrayList<ACell> popList() {
-			int n=stack.size()-1;
-			ArrayList<ACell> top=stack.get(n);
-			stack.remove(n);
+			ArrayList<ACell> top=stack.removeLast();
 			return top;
 		}
 
@@ -178,7 +201,7 @@ public class AntlrReader {
 		public void exitMap(MapContext ctx) {
 			ArrayList<ACell> elements=popList();
 			if (Utils.isOdd(elements.size())) {
-				throw new ParseException("Map requires an even number form forms.");
+				throw new ParseException("Map requires an even number of forms.");
 			}
 			push(Maps.create(elements.toArray(new ACell[elements.size()])));
 		}
@@ -200,7 +223,8 @@ public class AntlrReader {
 
 		@Override
 		public void exitLongValue(LongValueContext ctx) {
-			String s=ctx.getText();
+			// Just looking at the last token probably most efficient way to get string?
+			String s=ctx.getStop().getText();
 			AInteger a= AInteger.parse(s);
 			if (a==null) throw new ParseException("Unparseable number: "+s);
 			push(a);
@@ -246,7 +270,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitCharacter(CharacterContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			CVMChar c=CVMChar.parse(s);
 			if (c==null) throw new ParseException("Bad character literal format: "+s);
 			push(c);
@@ -329,9 +353,14 @@ public class AntlrReader {
 		@Override
 		public void exitAddress(AddressContext ctx) {
 			String s=ctx.getStop().getText();
-			Address addr=Address.parse(s);
-			if (addr==null) throw new ParseException("Bad Address format: "+s);
-			push (addr);
+			try {
+				long value=Long.parseLong(s.substring(1));
+				Address addr=Address.create(value);
+				if (addr==null) throw new ParseException("Bad Address format: "+s);
+				push (addr);
+			} catch (NumberFormatException e) {
+				throw new ParseException("Problem parsing Address: "+s,e);
+			}
 		}
 
 		@Override
@@ -385,7 +414,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitResolve(ResolveContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			s=s.substring(1); // skip leading @
 			Symbol sym=Symbol.create(s);
 			if (sym==null) throw new ParseException("Invalid @ symbol: @"+s);
@@ -400,7 +429,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitSlashSymbol(SlashSymbolContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			s=s.substring(1); // skip leading /
 			Symbol sym=Symbol.create(s);
 			if (sym==null) throw new ParseException("Invalid / symbol: /"+s);
@@ -465,7 +494,7 @@ public class AntlrReader {
 				
 				if (!(sym instanceof Symbol)) throw new ParseException("Expected path element to be a symbol but got: "+ RT.getType(sym));
 				// System.out.println(elements);
-				lookup=Lists.of(Symbols.LOOKUP,lookup,sym);
+				lookup=List.create(Symbols.LOOKUP,lookup,sym);
 			}
 			push(lookup);
 		}
@@ -537,14 +566,12 @@ public class AntlrReader {
 			// We don't need a parse tree, just want to visit everything in our listener
 			parser.setBuildParseTree(false);
 			parser.removeErrorListeners();
-			parser.getInterpreter().setPredictionMode(PredictionMode.SLL);
+			parser.getInterpreter().setPredictionMode(PredictionMode.SLL); // Seems OK for our grammar?
 			parser.addErrorListener(ERROR_LISTENER);
 			CRListener visitor=new CRListener();
 			parser.addParseListener(visitor);
 			
-			// ParseTree tree = parser.singleForm();
-			Method startRule = parser.getClass().getMethod("singleForm");
-			startRule.invoke(parser, (Object[]) null);
+			parser.singleForm();
 			// ParseTreeWalker.DEFAULT.walk(visitor, tree);
 			
 			ArrayList<ACell> top=visitor.popList();
@@ -553,8 +580,8 @@ public class AntlrReader {
 			}
 			
 			return top.get(0);
-		} catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
-			throw new ParseException("Missing parse method",e);
+		} catch (Exception e) {
+			throw new ParseException("Unexpected Parse Error",e);
 		}
 	}
 	

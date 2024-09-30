@@ -2,12 +2,14 @@ package convex.core.data;
 
 import java.io.IOException;
 import java.lang.reflect.Array;
+import java.util.Collection;
 import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.exceptions.ParseException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.core.util.Utils;
 
 /**
  * Static utility class for dealing with cells
@@ -39,19 +41,39 @@ public class Cells {
 	}
 
 	/**
-	 * Converts any array to an ACell[] array. Elements must be Cells.
+	 * Converts any collection object to an ACell[] array. Elements must be Cells.
 	 *
 	 * @param anyArray Array to convert
 	 * @return ACell[] array
 	 */
-	public static ACell[] toCellArray(Object anyArray) {
-		int n = Array.getLength(anyArray);
-		ACell[] result = new ACell[n];
-		for (int i = 0; i < n; i++) {
-			result[i] = (ACell) Array.get(anyArray, i);
+	@SuppressWarnings("unchecked")
+	public static ACell[] toCellArray(Object any) {
+		if (any instanceof Collection) {
+			return toCellArray((Collection<ACell>)any);
+		} else if (any.getClass().isArray()) {
+			int n = Array.getLength(any);
+			ACell[] result = new ACell[n];
+			for (int i = 0; i < n; i++) {
+				result[i] = (ACell) Array.get(any, i);
+			}
+			return result;
+		} else {
+			throw new IllegalArgumentException("Can't get cell array from "+Utils.getClassName(any));
 		}
-		return result;
 	}
+	
+	/**
+	 * Converts any array to an ACell[] array. Elements must be Cells.
+	 *
+	 * @param coll Array to convert
+	 * @return ACell[] array
+	 */
+	public static ACell[] toCellArray(Collection<? extends ACell> coll) {
+		int n=coll.size();
+		if (n==0) return Cells.EMPTY_ARRAY;
+		return coll.toArray(new ACell[n]);
+	}
+	
 
 	/**
 	 * Gets the number of Refs directly contained in a Cell (will be zero if the

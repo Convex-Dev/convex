@@ -86,10 +86,10 @@ public class Vectors {
 	 * @return New vector with the specified collection of elements
 	 */
 	@SuppressWarnings("unchecked")
-	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<?> elements) {
+	public static <R extends ACell, T extends ACell> AVector<R> create(Collection<? extends ACell> elements) {
 		if (elements instanceof ASequence) return ((ASequence<R>) elements).toVector();
-		if (elements.size() == 0) return empty();
-		ACell[] cells=Cells.toCellArray(elements.toArray());
+		if (elements.isEmpty()) return empty();
+		ACell[] cells=Cells.toCellArray(elements);
 		return wrap(cells);
 	}
 	

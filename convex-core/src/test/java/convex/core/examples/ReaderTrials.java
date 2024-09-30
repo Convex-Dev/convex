@@ -7,6 +7,7 @@ import convex.core.data.ACell;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.text.Text;
 import convex.test.Samples;
 
 /**
@@ -14,28 +15,32 @@ import convex.test.Samples;
  */
 public class ReaderTrials {
 
+	// Data file (printout of a genesis CVM state)
 	static State s=Init.createState(List.of(Samples.KEY_PAIR.getAccountKey()));
 	static String data=RT.print(s,10000000).toString();
-	static int len=data.length();
 	
 	public static void main(String[] args) {
-		System.out.println("Data Length: " + len);
-		runTrial();
-		runTrial();
-		runTrial();
+		runTrial("[1 2 3]",1000);
+		runTrial("[1 2 3]",1000);
+		runTrial("[1 2 3]",1000);
+
+		runTrial(data,10);
+		runTrial(data,10);
+		runTrial(data,10);
 	}
 
 	@SuppressWarnings("unused")
-	private static void runTrial() {
-		long REPS=10;
-		long start=System.currentTimeMillis();
+	private static void runTrial(String data, long REPS) {
+		int len=data.length();
+		long start=System.nanoTime();
 		ACell warmUp=readStuff(data);
 		for (int i=0; i<REPS; i++) {
 			ACell v=readStuff(data);
 		}
-		long end=System.currentTimeMillis();
+		long end=System.nanoTime();
 		
-		System.out.println((REPS*len)/(0.001*(end-start)));
+		double bps=(REPS*len)/(0.000000001*(end-start));
+		System.out.println("bytes/s: " +Text.toFriendlyNumber((long)bps));
 	}
 
 	private static ACell readStuff(String data) {
