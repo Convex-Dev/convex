@@ -7,12 +7,14 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
+import convex.core.data.Strings;
 import convex.core.data.Symbol;
+import convex.core.data.prim.CVMChar;
 
 public class CastTest extends ACVMTest {
 
-	String[] casts = new String[] {"double","int", "long", "boolean", "char", "str","blob","address","symbol","keyword"};
-	String[] vals = new String[] {"##Inf","1e308","0.0", "-0.0", "999999999999999999999999999", "9223372036854775807", "1","0","-1","\\c", "\"foo\"","\"\"","0xcafebabe1234567890","0x","#12",":foo","'baz","nil","true","false"};
+	static final String[] casts = new String[] {"double","int", "long", "boolean","blob","address", "str","name","symbol","keyword","char"};
+	static final String[] vals = new String[] {"##Inf","1e308","0.0", "-0.0", "999999999999999999999999999", "9223372036854775807", "1","0","-1","0xcafebabe1234567890","0x41","0x","\\c","\\u0474", "\"hello\"","\"\"","#12",":foo","'baz","true","false","nil"};
 	
 	@Test 
 	public void testAllCasts() {
@@ -37,6 +39,50 @@ public class CastTest extends ACVMTest {
 					assertEquals(r,eval(code));
 				}
 			}
+		}
+	}
+	
+	public static void main(String... args) {
+		int nc=casts.length;
+		int nv=vals.length;
+		Context context=new CastTest().context();
+		
+		StringBuilder line=new StringBuilder();
+		line.append("CASTS");
+		line.append('\t');
+		line.append("TYPE");
+		line.append('\t');
+		for (int j=0; j<nc; j++) {
+			String c=casts[j];
+			line.append(c);
+			line.append('\t');
+		}
+		System.out.println(line.toString());
+
+		
+		for (int i=0; i<nv; i++) {
+			line.setLength(0);
+			String v=vals[i];
+			line.append(RT.print(v));
+			line.append('\t');
+			line.append(RT.getType(Reader.read(v)).toString());
+			line.append('\t');
+			for (int j=0; j<nc; j++) {
+				String c=casts[j];
+				String cmd="("+c+" "+v+")";
+				Context ctx=step(context,cmd);
+				String result;
+				if (ctx.isError()) {
+					result=ctx.getErrorCode().toString();
+				} else {
+					ACell r=ctx.getResult();
+					if (r.equals(CVMChar.ZERO)) r=Strings.create("<NULL>");
+					result=RT.print(r).toString();
+				}
+				line.append(RT.print(result));
+				line.append('\t');
+			}
+			System.out.println(line.toString());
 		}
 	}
 	

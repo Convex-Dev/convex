@@ -509,10 +509,8 @@ public class CoreTest extends ACVMTest {
 		assertCVMEquals('a', eval("(char 97)"));
 		assertCVMEquals('a', eval("(nth \"bar\" 1)"));
 		
-		// Conversion from UTF-8
+		// Conversion from UTF-8 Blobs
 		assertCVMEquals(' ',eval("(char 0x20)")); 
-		assertCVMEquals('f',eval("(char :f)")); 
-		assertCVMEquals('Z',eval("(char \"Z\")")); 	
 		assertCVMEquals('\u07FF',eval("(char 0xDFBF)")); // unicode 2047
 		
 		// Out of Unicode range
@@ -523,11 +521,16 @@ public class CoreTest extends ACVMTest {
 		assertArgumentError(step("(char (long 0xff00000050))"));
 		
 		// Not single UTF-8 characters
+		assertArgumentError(step("(char 0x)")); // not valid as single byte UTF-8
 		assertArgumentError(step("(char 0xff)")); // not valid as single byte UTF-8
 		assertArgumentError(step("(char 0x2020)")); // repeated space
 		assertArgumentError(step("(char 0xdfbfdfbf)")); // repeated 2-byte UTF-8
 		assertArgumentError(step("(char 0xdf)")); // first byte of 2-byte UTF-8 only
-		assertArgumentError(step("(char :foo)")); // more characters than needed
+		
+		// Bloblikes, but not blobs
+		assertCastError(step("(char \"Z\")")); 	
+		assertCastError(step("(char :f)")); 
+		assertCastError(step("(char :foo)")); // more characters than needed
 		
 		// Bad types
 		assertCastError(step("(char false)"));

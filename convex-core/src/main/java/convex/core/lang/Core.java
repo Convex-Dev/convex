@@ -12,7 +12,6 @@ import convex.core.ErrorCodes;
 import convex.core.State;
 import convex.core.crypto.Hashing;
 import convex.core.data.ABlob;
-import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -1804,8 +1803,8 @@ public class Core {
 			CVMChar result;
 			if (a instanceof CVMChar) {
 				result= (CVMChar) a;
-			} else if (a instanceof ABlobLike) {
-				ABlobLike b=RT.ensureBlobLike(a);
+			} else if (a instanceof ABlob) {
+				ABlob b=RT.ensureBlob(a);
 				result=CVMChar.fromUTF8(b);
 				if (result == null) 
 					return context.withArgumentError("Not a valid UTF-8 character");
