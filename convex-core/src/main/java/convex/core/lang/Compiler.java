@@ -110,8 +110,9 @@ public class Compiler {
 		if (form instanceof ADataStructure) {
 	 		if (form instanceof AList) return compileList((AList<ACell>) form, context);
 			if (form instanceof AVector) return compileVector((AVector<ACell>) form, context);
-			if (form instanceof AMap) return compileMap((AMap<ACell, ACell>) form, context);
+			if (form instanceof AHashMap) return compileMap((AHashMap<ACell, ACell>) form, context);
 			if (form instanceof ASet) return compileSet((ASet<ACell>) form, context);
+			if (form instanceof AMap) return compileConstant( context,form);
 			return context.withCompileError("Unexpected data structure: "+form.getClass());
 		}
 		
@@ -309,7 +310,7 @@ public class Compiler {
 	 * @param context
 	 * @return Op producing the given map
 	 */
-	private static Context compileMap(AMap<ACell, ACell> form, Context context) {
+	private static Context compileMap(AHashMap<ACell, ACell> form, Context context) {
 		int n = form.size();
 		if (n==0) return context.withResult(Juice.COMPILE_CONSTANT, Constant.EMPTY_MAP);
 		
@@ -801,7 +802,7 @@ public class Compiler {
 					return ctx.withResult(Juice.EXPAND_SEQUENCE, updated);
 				}
 	
-				if (form instanceof AMap) {
+				if (form instanceof AHashMap) {
 					Context ctx =  context;
 					AMap<ACell, ACell> updated = Maps.empty();
 					for (Map.Entry<ACell, ACell> me : ((AMap<ACell, ACell>) form).entrySet()) {
