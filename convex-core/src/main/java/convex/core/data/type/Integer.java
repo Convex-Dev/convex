@@ -31,7 +31,7 @@ public final class Integer extends ANumericType<AInteger> {
 
 	@Override
 	public AInteger defaultValue() {
-		return CVMLong.ZERO;
+		return CVMLong.ONE;
 	}
 
 	@Override

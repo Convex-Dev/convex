@@ -1,8 +1,10 @@
 package convex.core.lang.exception;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
+import convex.core.ErrorCodes;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Address;
@@ -28,17 +30,32 @@ import convex.core.data.Strings;
  */
 public class ErrorValue extends AThrowable {
 
+	private static final HashMap<Keyword,ErrorValue> defaultErrors= new HashMap<>();
+	
 	private final ACell message;
 	private final ArrayList<AString> trace=new ArrayList<>();
 	private ACell log;
 	private Address address=null;
+	
+	static {
+		addDefaultError(ErrorCodes.ARGUMENT,"Invalid argument value");
+		addDefaultError(ErrorCodes.NOBODY,"Account does not exist");
+	}
 
 	private ErrorValue(ACell code, ACell message) {
 		super (code);
 		this.message=message;
 	}
 
+	private static void addDefaultError(Keyword code, String message) {
+		defaultErrors.put(code,create(code,message));
+	}
+
 	public static ErrorValue create(Keyword code) {
+		if (defaultErrors.containsKey(code)) {
+			return defaultErrors.get(code);
+		}
+		
 		return new ErrorValue(code,null);
 	}
 	

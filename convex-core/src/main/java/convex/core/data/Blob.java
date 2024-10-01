@@ -24,6 +24,7 @@ public class Blob extends AArrayBlob {
 	public static final Blob EMPTY = Cells.intern(wrap(Utils.EMPTY_BYTES));
 	public static final Blob SINGLE_ZERO = Cells.intern(wrap(new byte[] {0}));
 	public static final Blob SINGLE_ONE = Cells.intern(wrap(new byte[] {1}));
+	public static final Blob SINGLE_A =wrap(new byte[] {0x41});
 
 	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] {Tag.NULL});
 	
@@ -250,6 +251,7 @@ public class Blob extends AArrayBlob {
 	 * Maximum encoding size for a regular Blob
 	 */
 	public static final int MAX_ENCODING_LENGTH=1+Format.getVLCCountLength(CHUNK_LENGTH)+CHUNK_LENGTH;
+
 
 	@Override
 	public boolean isCanonical() {

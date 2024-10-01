@@ -417,10 +417,11 @@ public class CoreTest extends ACVMTest {
 		assertEquals(9007199254740992L,evalL("(long 9007199254740992.0)")); // 2^53
 		assertEquals(9007199254740992L,evalL("(long (double 9007199254740993))")); 
 		
-		// Cast errors on non-finite doubles
-		assertCastError(step("(long ##NaN)"));
-		assertCastError(step("(long ##Inf)"));
-		assertCastError(step("(long ##-Inf)"));
+		// :ARGUMENT errors on non-finite or out of range doubles
+		assertArgumentError(step("(long ##NaN)"));
+		assertArgumentError(step("(long ##Inf)"));
+		assertArgumentError(step("(long ##-Inf)"));
+		assertArgumentError(step("(long 1e50)"));
 
 		assertArityError(step("(long)"));
 		assertArityError(step("(long 1 2)")); 
@@ -436,9 +437,9 @@ public class CoreTest extends ACVMTest {
 		// Long limits and overflow
 		assertEquals(Long.MAX_VALUE,evalL("(long 9223372036854775807)"));
 		assertEquals(Long.MIN_VALUE,evalL("(long -9223372036854775808)"));
-		assertCastError(step("(long 18446744073709551616)"));
-		assertCastError(step("(long 9223372036854775808)"));
-		assertCastError(step("(long -9223372036854775809)"));
+		assertArgumentError(step("(long 18446744073709551616)"));
+		assertArgumentError(step("(long 9223372036854775808)"));
+		assertArgumentError(step("(long -9223372036854775809)"));
 
 	}
 	
@@ -468,9 +469,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(CVMLong.MAX_VALUE,eval("(int 9223372036854775807.0)")); // actual max value
 		assertEquals(CVMLong.MAX_VALUE,eval("(int 9223372036854775809.0)")); // above max value
 		
-		assertCastError(step("(int ##NaN)"));
-		assertCastError(step("(int ##Inf)"));
-		assertCastError(step("(int ##-Inf)"));
+		// These are :ARGUMENT error because of out of range. Other doubles might work.
+		assertArgumentError(step("(int ##NaN)"));
+		assertArgumentError(step("(int ##Inf)"));
+		assertArgumentError(step("(int ##-Inf)"));
 		
 		// Currently we disallow bools to explicitly cast to longs. Not round trippable
 		assertCastError(step("(int true)"));

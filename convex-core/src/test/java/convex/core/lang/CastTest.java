@@ -2,19 +2,30 @@ package convex.core.lang;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;
+import convex.core.data.Address;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMChar;
+import convex.core.data.type.AType;
+
+import static convex.test.Assertions.*;
 
 public class CastTest extends ACVMTest {
 
 	static final String[] casts = new String[] {"double","int", "long", "boolean","blob","address", "str","name","symbol","keyword","char"};
 	static final String[] vals = new String[] {"##Inf","1e308","0.0", "-0.0", "999999999999999999999999999", "9223372036854775807", "1","0","-1","0xcafebabe1234567890","0x41","0x","\\c","\\u0474", "\"hello\"","\"\"","#12",":foo","'baz","true","false","nil"};
+	
+	@Test
+	public void testRoundTrips() {
+		assertCVMEquals(1L,eval("(long (address 1))"));
+		assertCVMEquals(Address.ZERO,eval("(address (blob #0))"));
+	}
 	
 	@Test 
 	public void testAllCasts() {
@@ -25,7 +36,12 @@ public class CastTest extends ACVMTest {
 				if (ctx.isError()) {
 					ACell code=ctx.getErrorCode();
 					if (ErrorCodes.ARGUMENT.equals(code)) {
-						// anything to test?
+						// the default value should be in range
+						AType type=RT.getType(Reader.read(v));
+						Context nctx=step("("+c+" "+RT.print(type.defaultValue())+")");
+						if (nctx.isError()) {
+							fail("ARGUMENT fallback not working in: "+cmd);
+						}
 					} else {
 						assertEquals(ErrorCodes.CAST,code,()->"Unexpected "+code+" in "+cmd);
 					}

@@ -9,7 +9,7 @@ import convex.core.data.ACell;
 public class Blob extends AStandardType<ABlob> {
 
 	public static final Blob INSTANCE = new Blob();
-	
+		
 	private Blob() {
 		super(ABlob.class);
 	}
@@ -26,7 +26,7 @@ public class Blob extends AStandardType<ABlob> {
 
 	@Override
 	public ABlob defaultValue() {
-		return convex.core.data.Blob.EMPTY;
+		return convex.core.data.Blob.SINGLE_A;
 	}
 
 	@Override

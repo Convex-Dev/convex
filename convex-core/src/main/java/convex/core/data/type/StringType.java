@@ -8,6 +8,8 @@ import convex.core.data.StringShort;
  * Type that represents CVM Byte values
  */
 public final class StringType extends AStandardType<AString> {
+	
+	private static final StringShort DEFAULT_VALUE=StringShort.create("A");
 	/**
 	 * Singleton runtime instance
 	 */
@@ -30,7 +32,7 @@ public final class StringType extends AStandardType<AString> {
 
 	@Override
 	public AString defaultValue() {
-		return StringShort.EMPTY;
+		return DEFAULT_VALUE;
 	}
 
 	@Override

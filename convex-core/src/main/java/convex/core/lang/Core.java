@@ -1759,7 +1759,10 @@ public class Core {
 
 			ACell a = args[0];
 			CVMLong result = RT.castLong(a);
-			if (result == null) return context.withCastError(0, args,Types.LONG);
+			if (result == null) {
+				if (a instanceof ANumeric) return context.withArgumentError("Out of range");
+				return context.withCastError(0, args,Types.LONG);
+			}
 
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
@@ -1773,7 +1776,10 @@ public class Core {
 
 			ACell a = args[0];
 			AInteger result = RT.castInteger(a);
-			if (result == null) return context.withCastError(0, args,Types.INTEGER);
+			if (result == null) {
+				if (a instanceof ANumeric) return context.withArgumentError("Out of range");
+				return context.withCastError(0, args,Types.INTEGER);
+			}
 			// TODO: bigint construction cost?
 			return context.withResult(Juice.ARITHMETIC, result);
 		}

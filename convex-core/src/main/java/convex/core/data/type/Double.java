@@ -30,7 +30,7 @@ public final class Double extends ANumericType<CVMDouble> {
 
 	@Override
 	public CVMDouble defaultValue() {
-		return CVMDouble.ZERO;
+		return CVMDouble.ONE;
 	}
 
 	@Override
