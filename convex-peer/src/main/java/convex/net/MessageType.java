@@ -119,7 +119,14 @@ public enum MessageType {
 	 *
 	 * Expected Result is a Vector: [signed-belief-hash states-hash initial-state-hash peer-key consensus-state-hash]
 	 */
-	STATUS(12);
+	STATUS(12),
+	
+	/**
+	 * Unknown message type
+	 * 
+	 * Payload could be anything
+	 */
+	UNKNOWN(13);
 
 	private final byte messageCode;
 
@@ -153,6 +160,8 @@ public enum MessageType {
 			return GOODBYE;
 		case 12:
 			return STATUS;
+		case 13:
+			return UNKNOWN;
 		}
 		throw new BadFormatException("Invalid message code: " + i);
 	}

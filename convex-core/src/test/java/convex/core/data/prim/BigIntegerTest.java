@@ -46,6 +46,13 @@ public class BigIntegerTest {
 		assertEquals(s.substring(0, 20)+Constants.PRINT_EXCEEDED_MESSAGE,bi.print(20).toString());
 	}
 	
+	@Test public void testHashCode() {
+		CVMLong a=CVMLong.create(100);
+		CVMBigInteger b=CVMBigInteger.wrap(new byte[] {0x64});
+		assertFalse(b.isCanonical());
+		assertEquals(a.hashCode(),b.hashCode());
+	}
+	
 	@Test public void testZero() throws BadFormatException {
 		CVMBigInteger bi=CVMBigInteger.wrap(new byte[] {0});
 		assertEquals(0,bi.longValue());
