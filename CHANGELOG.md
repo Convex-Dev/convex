@@ -12,11 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for tagged forms in Convex Reader
 - `dissoc-in`, `update` and `update-in` core functions
 - `switch` conditional macro
+- Tagged values in Reader (e.g. `#Index {}`)
 
 ### Changed
 
 - Class hierarchy refactoring for `convex.core.cpos`
 - More GUI updates
+- Reader performance enhancements
+- Booleans no longer cast to the Integers 0 / 1
+- Update some errors thrown for failed casts
 - `set!` now allows pending definitions
 
 ## [0.7.15] - 2024-09-17
