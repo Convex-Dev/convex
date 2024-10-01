@@ -691,12 +691,21 @@ public abstract class Convex implements AutoCloseable {
 	}
 	
 	/**
-	 * Submits a raw message to the Convex network, returning a Future for any result
+	 * Submits raw message data to the Convex network, returning a Future for any Result
 	 *
-	 * @param query Query to execute, as String containing one or more forms
+	 * @param message Raw message data
 	 * @return A Future for the result of the query
 	 */
 	public abstract CompletableFuture<Result> message(Blob message);
+	
+	/**
+	 * Submits a Message to the Convex network, returning a Future for any Result
+	 *
+	 * @param message Message data
+	 * @return A Future for the result of the query
+	 */
+	public abstract CompletableFuture<Result> message(Message message);
+
 	
 	/**
 	 * Attempts to resolve a CNS name

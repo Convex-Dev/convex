@@ -174,13 +174,18 @@ public class ConvexLocal extends Convex {
 	}
 
 	@Override
-	public CompletableFuture<Result> message(Blob message) {
+	public CompletableFuture<Result> message(Blob rawData) {
 		try {
-			Message m=Message.create(message);
-			return makeMessageFuture(m);
+			Message m=Message.create(rawData);
+			return message(m);
 		} catch (Exception e) {
 			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
 		}
+	}
+
+	@Override
+	public CompletableFuture<Result> message(Message message) {
+		return makeMessageFuture(message);
 	}
 
 }

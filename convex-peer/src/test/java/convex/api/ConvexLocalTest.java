@@ -18,6 +18,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Ref;
@@ -67,12 +68,14 @@ public class ConvexLocalTest {
 	}
 	
 	@Test
-	public void testQueryMessage() throws TimeoutException, InterruptedException {
+	public void testQueryMessage() throws TimeoutException, InterruptedException, ExecutionException {
 		synchronized (network.SERVER) {
 			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
 			
 			Message m=Message.createQuery(675678567,"*balance*",ADDRESS);
-			Result r = convex.message(m.getMessageData()).join();
+			// ABlob data=Blob.wrap(new byte[] {MessageType.QUERY.getMessageCode()}).append(m.getMessageData());
+			ABlob data=m.getMessageData();
+			Result r = convex.message(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
 			assertNotNull(r);
 		}
 	}

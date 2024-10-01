@@ -32,6 +32,7 @@ import convex.core.lang.Reader;
 import convex.core.store.AStore;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
+import convex.net.Message;
 
 public class ConvexHTTP extends convex.api.Convex {
 	
@@ -150,6 +151,11 @@ public class ConvexHTTP extends convex.api.Convex {
 	
 	@Override
 	public CompletableFuture<Result> message(Blob message) {
+		throw new TODOException();
+	}
+	
+	@Override
+	public CompletableFuture<Result> message(Message message) {
 		throw new TODOException();
 	}
 

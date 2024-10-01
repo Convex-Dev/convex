@@ -31,14 +31,14 @@ import convex.core.store.AStore;
 import convex.core.util.Utils;
 
 /**
- * <p>Class representing a message to / from a specific connection</p>
+ * <p>Class representing a message to / from a network participant</p>
  * 
  * <p>Encapsulates both message content and a means of return communication</p>.
  *
  * <p>This class is an immutable data structure, but NOT a representable on-chain
  * data structure, as it is part of the peer protocol layer.</p>
  *
- * <p>Messages may contain a Payload, which can be any Data Value.</p>
+ * <p>Messages contain a payload, which can be any data value.</p>
  */
 public class Message {
 	
@@ -69,7 +69,7 @@ public class Message {
 	
 	public static Message create(Blob data) throws BadFormatException {
 		if (data.count()==0) throw new BadFormatException("Empty Message");
-		return new Message(MessageType.decode(data.byteAt(0)), null,data,null);
+		return new Message(null, null,data,null);
 	}
 	
 	public static Message create(MessageType type,ACell payload) {
@@ -408,7 +408,7 @@ public class Message {
 		return new Message(type,payload,messageData,resultHandler);
 	}
 
-	public static Message createQuery(long id,String code, Address address) {
+	public static Message createQuery(long id, String code, Address address) {
 		return createQuery(id,Reader.read(code),address);
 	}
 	

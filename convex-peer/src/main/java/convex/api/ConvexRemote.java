@@ -27,6 +27,7 @@ import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.transactions.ATransaction;
 import convex.net.Connection;
+import convex.net.Message;
 import convex.peer.Server;
 
 public class ConvexRemote extends Convex {
@@ -173,6 +174,11 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> message(Blob message) {
+		throw new TODOException();
+	}
+	
+	@Override
+	public CompletableFuture<Result> message(Message message) {
 		throw new TODOException();
 	}
 	
