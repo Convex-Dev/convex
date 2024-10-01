@@ -141,7 +141,7 @@ public class Context {
 	}
 
 	/**
-	 * Inner class for less-frequently changing CVM state related to Actor execution
+	 * Immutable inner class for less-frequently changing CVM state
 	 * Should save some allocation / GC on average, since it will change less
 	 * frequently than the surrounding Context and can be cheaply copied by reference.
 	 *

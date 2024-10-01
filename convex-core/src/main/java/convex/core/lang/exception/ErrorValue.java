@@ -38,8 +38,16 @@ public class ErrorValue extends AThrowable {
 	private Address address=null;
 	
 	static {
-		addDefaultError(ErrorCodes.ARGUMENT,"Invalid argument value");
+		addDefaultError(ErrorCodes.ARGUMENT,"Invalid argument");
 		addDefaultError(ErrorCodes.NOBODY,"Account does not exist");
+		addDefaultError(ErrorCodes.FUNDS,"Funds not available");
+		addDefaultError(ErrorCodes.JUICE,"Out of juice");
+		addDefaultError(ErrorCodes.CAST,"Illegal type cast");
+		addDefaultError(ErrorCodes.ASSERT,"Assertion failed");
+		addDefaultError(ErrorCodes.ARITY,"Wrong number of arguments");
+		addDefaultError(ErrorCodes.BOUNDS,"Out of bounds");
+		addDefaultError(ErrorCodes.TODO,"Not implemented");
+		addDefaultError(ErrorCodes.MEMORY,"Out of memory");
 	}
 
 	private ErrorValue(ACell code, ACell message) {
