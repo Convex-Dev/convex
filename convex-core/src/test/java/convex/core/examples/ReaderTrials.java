@@ -20,10 +20,14 @@ public class ReaderTrials {
 	static String data=RT.print(s,10000000).toString();
 	
 	public static void main(String[] args) {
+		System.out.println("Small vectors");
 		runTrial("[1 2 3]",1000);
 		runTrial("[1 2 3]",1000);
 		runTrial("[1 2 3]",1000);
 
+		System.out.println("State dumps");
+		runTrial(data,10);
+		runTrial(data,10);
 		runTrial(data,10);
 		runTrial(data,10);
 		runTrial(data,10);
