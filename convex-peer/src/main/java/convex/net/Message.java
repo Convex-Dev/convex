@@ -13,6 +13,7 @@ import convex.core.cpos.Belief;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
@@ -25,6 +26,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.core.store.AStore;
 
 /**
@@ -62,6 +64,11 @@ public class Message {
 			}
 		};
 		return new Message(type, null,data,handler);
+	}
+	
+	public static Message create(Blob data) throws BadFormatException {
+		if (data.count()==0) throw new BadFormatException("Empty Message");
+		return new Message(MessageType.decode(data.byteAt(0)), null,data,null);
 	}
 	
 	public static Message create(MessageType type,ACell payload) {
@@ -370,5 +377,20 @@ public class Message {
 	public static Message create(MessageType type, ACell payload, Predicate<Message> handler) {
 		return new Message(type,payload,null,handler);
 	}
+	
+
+	public Message withResultHandler(Predicate<Message> resultHandler) {
+		if (this.returnHandler==resultHandler) return this;
+		return new Message(type,payload,messageData,resultHandler);
+	}
+
+	public static Message createQuery(long id,String code, Address address) {
+		return createQuery(id,Reader.read(code),address);
+	}
+	
+	public static Message createQuery(long id, ACell code, Address address) {
+		return create(MessageType.QUERY,Vectors.of(id,code,address));
+	}
+
 
 }

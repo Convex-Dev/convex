@@ -6,11 +6,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
 import convex.core.Result;
+import convex.core.SourceCodes;
 import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -88,7 +90,7 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) {
-		return makeMessageFuture(MessageType.QUERY,Vectors.of(makeID(),query,address));
+		return makeMessageFuture(Message.createQuery(makeID(),query,address));
 	}
 	
 	private long idCounter=0;
@@ -98,9 +100,14 @@ public class ConvexLocal extends Convex {
 	}
 
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
+		Message ml=Message.create(type,payload);
+		return makeMessageFuture(ml);
+	}
+	
+	private CompletableFuture<Result> makeMessageFuture(Message message) {
 		CompletableFuture<Result> cf=new CompletableFuture<>();
 		Predicate<Message> resultHandler=makeResultHandler(cf);
-		Message ml=Message.create(type,payload, resultHandler);
+		Message ml=message.withResultHandler(resultHandler);
 		server.getReceiveAction().accept(ml);
 		return cf;
 	}
@@ -164,6 +171,16 @@ public class ConvexLocal extends Convex {
 	@Override
 	public Long getBalance() {
 		return server.getPeer().getConsensusState().getBalance(address);
+	}
+
+	@Override
+	public CompletableFuture<Result> message(Blob message) {
+		try {
+			Message m=Message.create(message);
+			return makeMessageFuture(m);
+		} catch (Exception e) {
+			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
+		}
 	}
 
 }

@@ -25,6 +25,7 @@ import convex.core.data.AList;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.List;
@@ -688,6 +689,14 @@ public abstract class Convex implements AutoCloseable {
 		ACell form = buildCodeForm(query);
 		return query(form, getAddress());
 	}
+	
+	/**
+	 * Submits a raw message to the Convex network, returning a Future for any result
+	 *
+	 * @param query Query to execute, as String containing one or more forms
+	 * @return A Future for the result of the query
+	 */
+	public abstract CompletableFuture<Result> message(Blob message);
 	
 	/**
 	 * Attempts to resolve a CNS name

@@ -36,26 +36,32 @@ public class CVMExecutor extends AThreadedComponent {
 		Belief beliefUpdate=update.poll(100, TimeUnit.MILLISECONDS);
 		LoadMonitor.up();
 		
-		synchronized(this) {
-			if (beliefUpdate!=null) {
-				peer=peer.updateBelief(beliefUpdate);
+		try {
+			synchronized(this) {
+				if (beliefUpdate!=null) {
+					peer=peer.updateBelief(beliefUpdate);
+				}
+				
+				// Trigger State update (if any new Blocks are confirmed)
+				Peer updatedPeer=peer.updateState();
+				if (updatedPeer!=peer) {
+					peer=updatedPeer;
+					try {
+						persistPeerData();
+					} catch (IOException e) {
+						log.debug("IO Exception ("+e.getMessage()+") while persisting peer data",e);
+						throw new InterruptedException("IO Exception while persisting peer data");
+					}
+					maybeCallHook(peer);
+				}
 			}
 			
-			// Trigger State update (if any new Blocks are confirmed)
-			Peer updatedPeer=peer.updateState();
-			if (updatedPeer!=peer) {
-				peer=updatedPeer;
-				try {
-					persistPeerData();
-				} catch (IOException e) {
-					log.debug("IO Exception ("+e.getMessage()+") while persisting peer data",e);
-					throw new InterruptedException("IO Exception while persisting peer data");
-				}
-				maybeCallHook(peer);
-			}
+			server.transactionHandler.maybeReportTransactions(peer);
+		} catch (Exception e) {
+			// This is some fatal failure
+			log.error("Fatal exception encountered in CVM Executor",e);
+			server.close();
 		}
-		
-		server.transactionHandler.maybeReportTransactions(peer);
 	}
 	
 	public synchronized void persistPeerData() throws IOException {

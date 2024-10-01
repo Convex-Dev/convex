@@ -478,7 +478,7 @@ public class State extends ARecord {
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
 			// SECURITY: catch-all exception handler, needs consideration
-			try {
+			//try {
 				// extract the signed transaction from the block
 				SignedData<? extends ATransaction> signed = transactions.get(i);
 				
@@ -490,11 +490,11 @@ public class State extends ARecord {
 				
 				// state update
 				state = rc.context.getState();
-			} catch (Exception e) {
-				String msg= "Unexpected fatal exception applying transaction: "+e.toString();
-				results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.UNEXPECTED).withSource(SourceCodes.CVM);
-				log.error(msg,e);
-			}
+			//} catch (Exception e) {
+			//	String msg= "Unexpected fatal exception applying transaction: "+e.toString();
+			//	results[i] = Result.create(CVMLong.create(i), Strings.create(msg),ErrorCodes.FATAL).withSource(SourceCodes.CVM);
+			//	log.error(msg,e);
+			//}
 		}
 
 		// TODO: changes for complete block?

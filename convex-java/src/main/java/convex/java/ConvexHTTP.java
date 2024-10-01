@@ -26,6 +26,7 @@ import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
@@ -145,6 +146,11 @@ public class ConvexHTTP extends convex.api.Convex {
 			}
 		});
 		return result;
+	}
+	
+	@Override
+	public CompletableFuture<Result> message(Blob message) {
+		throw new TODOException();
 	}
 
 	@Override

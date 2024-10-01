@@ -15,10 +15,12 @@ import convex.core.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
 import convex.core.data.SignedData;
 import convex.core.exceptions.ResultException;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -169,6 +171,11 @@ public class ConvexRemote extends Convex {
 	}
 	
 	@Override
+	public CompletableFuture<Result> message(Blob message) {
+		throw new TODOException();
+	}
+	
+	@Override
 	public CompletableFuture<Result> requestStatus() {
 		try {
 			synchronized (awaiting) {
@@ -233,4 +240,6 @@ public class ConvexRemote extends Convex {
 	public Server getLocalServer() {
 		return null;
 	}
+
+
 }

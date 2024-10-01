@@ -2,6 +2,7 @@ package convex.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.IOException;
@@ -27,6 +28,7 @@ import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
 import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
+import convex.net.Message;
 import convex.peer.TestNetwork;
 
 /**
@@ -61,6 +63,17 @@ public class ConvexLocalTest {
 			assertEquals(ADDRESS, r.getValue());
 			
 			assertEquals(s+1,convex.getSequence());
+		}
+	}
+	
+	@Test
+	public void testQueryMessage() throws TimeoutException, InterruptedException {
+		synchronized (network.SERVER) {
+			ConvexLocal convex = Convex.connect(network.SERVER, ADDRESS, KEYPAIR);
+			
+			Message m=Message.createQuery(675678567,"*balance*",ADDRESS);
+			Result r = convex.message(m.getMessageData()).join();
+			assertNotNull(r);
 		}
 	}
 

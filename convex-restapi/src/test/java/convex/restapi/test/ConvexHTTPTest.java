@@ -1,7 +1,5 @@
 package convex.restapi.test;
 
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -9,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+
+import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
@@ -40,6 +40,15 @@ public class ConvexHTTPTest extends ARESTTest {
 		Result r=convex.querySync(Reader.read("(+ 2 3)"), null);
 		assertFalse(r.isError());
 		assertEquals(CVMLong.create(5),r.getValue());
+	}
+	
+	@Test public void testOffensiveMessages() throws ResultException, InterruptedException {
+		ConvexHTTP convex=connect();
+		convex.setAddress(Init.GENESIS_ADDRESS);
+		convex.setKeyPair(KP);
+		
+		// TODO: blast with illegal messages
+		// CompletableFuture<Result> r=convex.message(Blob.fromHex("0xBADBADBADBAD"));
 	}
 	
 	@Test public void testTransact() throws ResultException, InterruptedException {
