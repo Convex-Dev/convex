@@ -104,7 +104,13 @@ public class Blob extends AArrayBlob {
 		if ((offset < 0) || (offset + length > data.length))
 			throw new IndexOutOfBoundsException(Errors.badRange(offset, offset+length));
 		if (length==0) return Blob.EMPTY;
-		return new Blob(data, offset, length);
+		Blob b= new Blob(data, offset, length);
+		
+		// optimisation to re-use Blob encoding if present
+		if ((offset>=2)&&(length<128)&&(data[offset-1]==(byte)length)&&(data[offset-2]==Tag.BLOB)) {
+			b.attachEncoding(Blob.wrap(data,offset-2,length+2));
+		}
+		return b;
 	}
 
 	@Override
@@ -202,7 +208,8 @@ public class Blob extends AArrayBlob {
 
 
 	/**
-	 * Fast read of a Blob from its encoding inside another Blob object,
+	 * Fast read of a Blob from its encoding inside another Blob object.
+	 * Assumes count is correct at start of encoding (pos+1)
 	 * 
 	 * @param source Source Blob object.
 	 * @param pos Position in source to start reading from (location of tag byte)

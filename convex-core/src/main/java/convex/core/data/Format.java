@@ -439,7 +439,7 @@ public class Format {
 	
 	/**
 	 * Reads UTF-8 String data from a Blob. Assumes any tag has already been read
-	 * @param blob Blob data to read from
+	 * @param blob Blob data to read from. Must be immutable.
 	 * @param pos Position of first UTF-8 byte
 	 * @param len Number of UTF-8 bytes to read
 	 * @return String from ByteBuffer
@@ -449,10 +449,7 @@ public class Format {
 		if (len == 0) return Strings.empty();
 		if (blob.count()<pos+len) throw new BadFormatException("Insufficient bytes in blob to read UTF-8 bytes");
 
-		byte[] bs = new byte[len];
-		System.arraycopy(blob.getInternalArray(), blob.getInternalOffset()+pos, bs, 0, len);
-
-		AString s = Strings.create(Blob.wrap(bs));
+		AString s = Strings.create(blob.slice(pos,pos+len));
 		return s;
 	}
 

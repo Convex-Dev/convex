@@ -142,6 +142,13 @@ public class AdversarialDataTest {
 		
 		invalidEncoding(Tag.KEYWORD,"00");
 		invalidEncoding(Tag.KEYWORD,"0120ff");
+		
+		{
+			byte[] bs=new byte[256];
+			bs[0]=Tag.KEYWORD;
+			bs[1]=(byte)160;
+			assertThrows(BadFormatException.class,()->Keyword.read(Blob.wrap(bs),0));
+		}
 	}
 	
 	@Test public void testBadConstant() {

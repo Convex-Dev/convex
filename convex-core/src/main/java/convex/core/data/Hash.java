@@ -94,7 +94,7 @@ public class Hash extends AArrayBlob {
 	/**
 	 * Wraps the specified bytes as a Data object Warning: underlying bytes are used
 	 * directly. Use only if no external references to the byte array will be
-	 * retained.
+	 * retained, and the byte array is effectively immutable.
 	 * 
 	 * @param hashBytes Byte array containing hash value
 	 * @param offset Offset into byte array for start of hash value
@@ -103,7 +103,11 @@ public class Hash extends AArrayBlob {
 	public static Hash wrap(byte[] hashBytes, int offset) {
 		if ((offset < 0) || (offset + LENGTH > hashBytes.length))
 			throw new IllegalArgumentException(Errors.badRange(offset, offset+LENGTH));
-		return new Hash(hashBytes, offset);
+		Hash h= new Hash(hashBytes, offset);
+		if ((offset>=2)&&(hashBytes[offset-1]==LENGTH)&&(hashBytes[offset-2]==Tag.BLOB)) {
+			h.attachEncoding(Blob.wrap(hashBytes, offset-2, LENGTH+2));
+		}
+		return h;
 	}
 	
 	/**

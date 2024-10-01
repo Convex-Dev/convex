@@ -169,9 +169,9 @@ public final class StringShort extends AString {
 	 */
 	public static StringShort read(long length, Blob blob, int pos) {
 		int len=Utils.checkedInt(length);
-		int dataOffset=pos+1+Format.getVLCCountLength(length);
-		byte[] data = new byte[len];
-		System.arraycopy(blob.getInternalArray(), blob.getInternalOffset()+dataOffset, data, 0, len);
+		int headerLen=1+Format.getVLCCountLength(length);
+		int dataOffset=pos+headerLen;
+		Blob data=blob.slice(dataOffset,dataOffset+length);
 		StringShort result= new StringShort(data);
 		
 		result.attachEncoding(blob.slice(pos,dataOffset+len));

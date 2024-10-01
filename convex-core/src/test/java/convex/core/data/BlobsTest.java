@@ -550,6 +550,14 @@ public class BlobsTest {
 		byte[] bf = new byte[] { Tag.BLOB, 0 };
 		Blob b = Format.read(Blob.wrap(bf));
 		assertSame(Blob.EMPTY,b);
+		
+		Blob enc=Blob.createRandom(new InsecureRandom(3452534), 100).getEncoding();
+		
+		// Blob should re-use encoding array
+		Blob b2=Format.read(enc);
+		assertSame(enc.getInternalArray(),b2.getInternalArray());	
+		assertTrue(b2.isEmbedded());
+		assertEquals(0,b2.getBranchCount());
 	}
 	
 	/*
