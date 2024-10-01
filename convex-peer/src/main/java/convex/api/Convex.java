@@ -95,14 +95,14 @@ public abstract class Convex implements AutoCloseable {
 	/**
 	 * Map of results awaiting completion.
 	 */
-	protected HashMap<Long, CompletableFuture<Message>> awaiting = new HashMap<>();
+	protected HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
 
 	/**
 	 * Result Consumer for messages received back from a client connection
 	 */
 	protected final Consumer<Message> messageHandler = new ResultConsumer() {
 		@Override
-		protected synchronized void handleResult(long id, Result v) {
+		protected synchronized void handleResult(ACell id, Result v) {
 			ACell ec=v.getErrorCode();
 			
 			if ((ec!=null)&&(!SourceCodes.CODE.equals(v.getSource()))) {
@@ -116,8 +116,8 @@ public abstract class Convex implements AutoCloseable {
 		public void accept(Message m) {
 			// Check if we are waiting for a Result with this ID for this connection
 			synchronized (awaiting) {
-				CVMLong id=m.getID();
-				CompletableFuture<Message> cf = (id==null)?null:awaiting.remove((Long)id.longValue());
+				ACell id=m.getID();
+				CompletableFuture<Message> cf = (id==null)?null:awaiting.remove(id);
 				if (cf != null) {
 					// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
 					if (cf.complete(m)) return;
@@ -766,7 +766,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @param id ID of result message to await
 	 * @return
 	 */
-	protected CompletableFuture<Result> awaitResult(long id, long timeout) {
+	protected CompletableFuture<Result> awaitResult(ACell id, long timeout) {
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);

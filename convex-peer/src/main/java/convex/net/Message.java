@@ -204,7 +204,7 @@ public class Message {
 	 *
 	 * @return Message ID, or null if the message does not have a message ID
 	 */
-	public CVMLong getID()  {
+	public ACell getID()  {
 		try {
 			switch (type) {
 				// Query and transact use a vector [ID ...]
@@ -378,7 +378,11 @@ public class Message {
 		return new Message(type,payload,null,handler);
 	}
 	
-
+	/**
+	 * Updates this message with a new result handler
+	 * @param resultHandler New result handler to set (may be null to remove handler)
+	 * @return Updated Message. May be the same Message if no change to result handler
+	 */
 	public Message withResultHandler(Predicate<Message> resultHandler) {
 		if (this.returnHandler==resultHandler) return this;
 		return new Message(type,payload,messageData,resultHandler);

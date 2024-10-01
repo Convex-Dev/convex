@@ -60,7 +60,7 @@ public class Vectors {
 	 * @param elements Elements to include
 	 * @return New vector with the specified elements
 	 */
-	public static <T extends ACell> AVector<T> create(ACell[] elements) {
+	public static <T extends ACell> AVector<T> create(ACell... elements) {
 		return create(elements, 0, elements.length);
 	}
 	

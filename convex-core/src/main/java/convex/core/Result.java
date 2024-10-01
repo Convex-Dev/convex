@@ -87,8 +87,8 @@ public final class Result extends ARecordGeneric {
 	 * @param info Additional info
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode, AHashMap<Keyword,ACell> info) {
-		return buildFromVector(Vectors.of(id,value,errorCode,EMPTY_LOG,info));
+	public static Result create(ACell id, ACell value, ACell errorCode, AHashMap<Keyword,ACell> info) {
+		return buildFromVector(Vectors.create(id,value,errorCode,EMPTY_LOG,info));
 	}
 	
 	/**
@@ -100,7 +100,7 @@ public final class Result extends ARecordGeneric {
 	 * @param info Additional info
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode, AVector<AVector<ACell>> log,AHashMap<Keyword,ACell> info) {
+	public static Result create(ACell id, ACell value, ACell errorCode, AVector<AVector<ACell>> log,AHashMap<Keyword,ACell> info) {
 		return buildFromVector(Vectors.of(id,value,errorCode,log,info));
 	}
 	
@@ -111,7 +111,7 @@ public final class Result extends ARecordGeneric {
 	 * @param errorCode Error Code (may be null for success)
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value, ACell errorCode) {
+	public static Result create(ACell id, ACell value, ACell errorCode) {
 		return create(id,value,errorCode,null);
 	}
 
@@ -121,7 +121,7 @@ public final class Result extends ARecordGeneric {
 	 * @param value Result Value
 	 * @return Result instance
 	 */
-	public static Result create(CVMLong id, ACell value) {
+	public static Result create(ACell id, ACell value) {
 		return create(id,value,null,null);
 	}
 	

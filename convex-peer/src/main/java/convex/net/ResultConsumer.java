@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
 import convex.core.data.ACell;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.Stores;
@@ -64,9 +63,8 @@ public abstract class ResultConsumer implements Consumer<Message> {
 		try {
 			Result result = m.getPayload();
 			// we now have the full result, so notify those interested
-			CVMLong cid=m.getID();
-			long id=(cid!=null)?cid.longValue():-1;
-			handleResult(id,result);
+			ACell cid=m.getID();
+			handleResult(cid,result);
 		} catch (BadFormatException | MissingDataException e) {
 			// If there is missing data, re-buffer the message
 			// Ignore. We probably lost this result?
@@ -80,7 +78,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param id ID of message received (or -1 if no message ID present)
 	 * @param result Result value
 	 */
-	protected void handleResult(long id, Result result) {
+	protected void handleResult(ACell id, Result result) {
 		ACell rv = result.getValue();
 		ACell err = result.getErrorCode();
 		if (err!=null) {
@@ -99,7 +97,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param code The error code received. May not be null, and is usually a Keyword
 	 * @param errorMessage The error message associated with the result (may be null)
 	 */
-	protected void handleError(long id, ACell code, ACell errorMessage) {
+	protected void handleError(ACell id, ACell code, ACell errorMessage) {
 		log.warn("UNHANDLED ERROR RECEIVED: {} :  {}", code, errorMessage);
 	}
 	
@@ -109,7 +107,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 	 * @param id The ID of the original message to which this result corresponds
 	 * @param value The result value
 	 */
-	protected void handleNormalResult(long id, ACell value) {
+	protected void handleNormalResult(ACell id, ACell value) {
 		log.debug("UNHANDLED RESULT RECEIVED: id={}, value={}", id,value);
 	}
 

@@ -90,8 +90,8 @@ public class Acquiror {
 						ref.findMissing(missingSet,LIMIT);
 					}
 					
-					long id=source.connection.getNextID();
-					Message dataRequest=Message.createDataRequest(CVMLong.create(id), missingSet.toArray(Utils.EMPTY_HASHES));
+					CVMLong id=CVMLong.create(source.connection.getNextID());
+					Message dataRequest=Message.createDataRequest(id, missingSet.toArray(Utils.EMPTY_HASHES));
 					CompletableFuture<Message> cf=new CompletableFuture<Message>();
 					synchronized (source.awaiting) {
 						boolean sent=source.connection.sendMessage(dataRequest);

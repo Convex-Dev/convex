@@ -19,6 +19,7 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Keywords;
 import convex.core.data.SignedData;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
@@ -118,7 +119,7 @@ public class ConvexRemote extends Convex {
 					if (id>=0) {
 						// Store future for completion by result message
 						maybeUpdateSequence(signed);
-						CompletableFuture<Result> cf = awaitResult(id,timeout);
+						CompletableFuture<Result> cf = awaitResult(CVMLong.create(id),timeout);
 						log.trace("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
 						return cf;
 					} 
@@ -152,7 +153,7 @@ public class ConvexRemote extends Convex {
 				synchronized (awaiting) {
 					long id = connection.sendQuery(query, address);
 					if(id>=0) {
-						CompletableFuture<Result> cf= awaitResult(id,timeout);
+						CompletableFuture<Result> cf= awaitResult(CVMLong.create(id),timeout);
 						return cf;
 					}
 				}
@@ -184,7 +185,7 @@ public class ConvexRemote extends Convex {
 					return CompletableFuture.completedFuture(Result.error(ErrorCodes.LOAD, "Full buffer, can't send status request").withSource(SourceCodes.COMM));
 				}
 	
-				CompletableFuture<Result> cf = awaitResult(id,timeout);
+				CompletableFuture<Result> cf = awaitResult(CVMLong.create(id),timeout);
 				return cf;
 			}
 		} catch (IOException e) {
@@ -208,7 +209,7 @@ public class ConvexRemote extends Convex {
 			}
 
 			// Store future for completion by result message
-			return awaitResult(id,timeout);
+			return awaitResult(CVMLong.create(id),timeout);
 		}
 	}
 	
