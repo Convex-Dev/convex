@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -12,6 +13,7 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 
 public class DoubleTest {
 
@@ -20,7 +22,7 @@ public class DoubleTest {
 		
 		assertSame(CVMDouble.NaN,CVMDouble.create(Double.NaN));
 
-		// Canonical NaN encoding has just high bit set
+		// Canonical NaN encoding has just zeros as payload
 		assertEquals(Blob.fromHex("1d7ff8000000000000"),nan.getEncoding());
 		
 		// create coerces to correct NaN
@@ -28,6 +30,11 @@ public class DoubleTest {
 		
 		Blob BAD_NAN=Blob.fromHex("1d7ff8000000ffffff");
 		assertThrows(BadFormatException.class,()->Format.read(BAD_NAN));
+		
+		// We can artificially create a bad NaN, but it is invalid
+		CVMDouble badNaN=CVMDouble.unsafeCreate(Double.longBitsToDouble(0x7ff8000000ffffffL));
+		assertNotEquals(nan,badNaN);
+		assertThrows(InvalidDataException.class,()->badNaN.validate());
 	}
 	
 	@Test public void testCompares() {
@@ -44,6 +51,7 @@ public class DoubleTest {
 	}
 	
 	@Test public void testEquality() {
+		// Regular object equality
 		ObjectsTest.doEqualityTests(CVMDouble.ONE, CVMDouble.create(1.0));
 		ObjectsTest.doEqualityTests(CVMDouble.create(12345.0),CVMDouble.create(12345.0));
 		

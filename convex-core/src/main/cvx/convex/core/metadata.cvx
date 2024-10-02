@@ -352,7 +352,7 @@
                        :return Any}]}}
 
  callable?
- {:doc {:description "Returns true if the target is callable. If symbol is provided, also checks that this symbol references a callable function in the specified account. See `call`."
+ {:doc {:description "Returns true if the target can be called. If symbol is provided, checks that this symbol references a callable function in the specified account. See `call`."
         :errors      {:CAST "If the symbol argument is not a Symbol."}
         :examples    [{:code "(callable? actor-address 'function-name)"}]
         :signature   [{:params [target]}
@@ -374,21 +374,21 @@
                        :return Character}]}}
 
  coll?
- {:doc {:description "Returns `true` if and only if the argument is a collection: List, Map, Set, or Vector. Returns false otherwise."
+ {:doc {:description "Tests if the argument is a data struture."
         :examples    [{:code "(coll? [1 2 3])"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
  cond
- {:doc      {:description ["Performs conditional tests on successive pairs of `test` -> `result`, returning the `result` for the first `test` that succeeds."
-                           "Performs short-circuit evaluation: result expressions that are not used and any test expressions after the first success will not be executed."
-                           "In the case that no test succeeds, a single aditional argument may be added as a fallback value. If no fallback value is available, nil will be returned."]
+ {:doc      {:description ["Performs conditional tests on successive (test, result) pairs, computing the result for the first test that succeeds."
+                           "Result expressions that are not used and any test expressions after the first success will not be executed."
+                           "If no test succeeds, a final expression may be added as a fallback. If no fallback value is available, nil will be returned."]
              :examples    [{:code "(cond test-1 result-1 else-value)"}
                            {:code "(cond test-1 result-1 test-2 result-2 test-3 result--3)"}]
              :signature   [{:params []}
                            {:params [test]}
                            {:params [test result]}
-                           {:params [test result fallback-value]}
+                           {:params [test result fallback]}
                            {:params [test-1 result-1 test-2 result-2 & more]}]}
   :special true}
 

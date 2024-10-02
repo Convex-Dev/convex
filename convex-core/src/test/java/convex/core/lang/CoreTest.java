@@ -101,7 +101,6 @@ import convex.test.Samples;
  */
 public class CoreTest extends ACVMTest {
 
-
 	protected CoreTest() throws IOException {
 		super(BaseTest.STATE);
 	}
@@ -654,6 +653,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(= 1 2)"));
 		assertFalse(evalB("(= 1 nil)"));
 		assertFalse(evalB("(= 1 1.0)"));
+		assertFalse(evalB("(= false nil)"));
 		assertFalse(evalB("(= \\a \\b)"));
 		assertFalse(evalB("(= :foo :baz)"));
 		assertFalse(evalB("(= :foo 'foo)"));
@@ -3904,13 +3904,23 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(map? '(3 4 5))"));
 		assertTrue(evalB("(map? {1 2 3 4})"));
 		assertFalse(evalB("(map? #{1 2})"));
+		
+		// This is technically a map since it is a record
+		assertTrue(evalB("(map? (account #0))")); // this is a record
+		
+		// This is technically a map since it is Index
+		assertTrue(evalB("(map? (index))")); // this is a record
+
 	}
 
 	@Test
 	public void testCollPred() {
+		// Like Clojure coll?, returns true for any data structure
 		assertFalse(evalB("(coll? nil)"));
 		assertFalse(evalB("(coll? 1)"));
 		assertFalse(evalB("(coll? :foo)"));
+		
+		
 		assertTrue(evalB("(coll? {})"));
 		assertTrue(evalB("(coll? [])"));
 		assertTrue(evalB("(coll? ())"));
@@ -3921,6 +3931,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(coll? {1 2 3 4})"));
 		assertTrue(evalB("(coll? #{1 2})"));
 		assertTrue(evalB("(coll? (index))"));
+		assertTrue(evalB("(coll? (account #0))")); // this is a record
 		assertTrue(evalB("(coll? (index 0x 0x))"));
 	}
 
@@ -3942,6 +3953,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(empty? #{[]})"));
 		
 		assertFalse(evalB("(empty? 0)"));
+		assertFalse(evalB("(empty? false)"));
 		assertFalse(evalB("(empty? :foo)"));
 		assertFalse(evalB("(empty? 'bar)"));
 	}
@@ -3949,6 +3961,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testSymbolPred() {
 		assertTrue(evalB("(symbol? 'foo)"));
+		assertTrue(evalB("(symbol? (quote .))"));
 		assertTrue(evalB("(symbol? (symbol :bar))"));
 
 		assertFalse(evalB("(symbol? (str 1))"));
@@ -3963,6 +3976,7 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(keyword? (keyword 'bar))"));
 		
 		assertFalse(evalB("(keyword? nil)"));
+		assertFalse(evalB("(keyword? 'zzz)"));
 		assertFalse(evalB("(keyword? 1)"));
 		assertFalse(evalB("(keyword? [:foo])"));
 	}
@@ -3975,6 +3989,7 @@ public class CoreTest extends ACVMTest {
 		
 		assertFalse(evalB("(address? nil)"));
 		assertFalse(evalB("(address? 1)"));
+		assertFalse(evalB("(address? [#1 #2])"));
 		assertFalse(evalB("(address? \"0a1b2c3d\")"));
 		assertFalse(evalB("(address? (blob *origin*))"));
 	}
@@ -4002,7 +4017,7 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB("(long? nil)"));
 		assertFalse(evalB("(long? 0xFF)"));
 		assertFalse(evalB("(long? [1 2])"));
-		assertFalse(evalB("(long? 7.0)"));
+		assertFalse(evalB("(long? 7.0)")); // not a long, even though numerically equivalent to one
 		
 		// big integer boundaries
 		assertTrue(evalB("(long? 9223372036854775807)"));
@@ -4018,8 +4033,10 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(str? (str :foo))"));
 		assertTrue(evalB("(str? (str nil))"));
 		assertTrue(evalB("(str? \"\")"));
+		assertTrue(evalB("(str? \"Hello World\")"));
 		
 		// These are not strings
+		assertFalse(evalB("(str? \\Q)")); // character is not itself a string
 		assertFalse(evalB("(str? 1)"));
 		assertFalse(evalB("(str? :foo)"));
 		assertFalse(evalB("(str? nil)"));
@@ -4724,7 +4741,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Strings.create("foo"), eval("(expand (name :foo) (fn [x e] x))"));
 		assertEquals(CVMLong.create(3), eval("(expand '[1 2 3] (fn [x e] (nth x 2)))"));
 
-		assertNull(Syntax.unwrap(eval("(expand nil)")));
+		assertNull(eval("(expand nil)"));
 
 		assertCastError(step("(expand 1 :foo)"));
 		assertCastError(step("(expand { 888 227 723 560} [75 561 258 833])"));
@@ -4747,7 +4764,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testExpandEdgeCases() {
-		// BAd functions
+		// Bad functions
 		assertCastError(step("(expand 123 #0 :foo)"));
 		assertCastError(step("(expand 123 #0)"));
 
@@ -4778,6 +4795,7 @@ public class CoreTest extends ACVMTest {
 	public void testMacro() {
 		Context c=step("(defmacro foo [] :foo)");
 		assertEquals(Keywords.FOO,eval(c,"(foo)"));
+		assertEquals(Keywords.FOO,eval(c,"(expand '(foo))"));
 	}
 
 	@Test
@@ -4790,6 +4808,9 @@ public class CoreTest extends ACVMTest {
 
 		// interior macros shouldn't get expanded
 		assertEquals(Vectors.of(1,Lists.of(Symbols.IF,4,7),3),eval("(quote [1 (if 4 7) 3])"));
+		
+		assertArityError(step ("(quote foo bar)"));
+		assertArityError(step ("(quote)"));
 	}
 
 	@Test
@@ -4878,7 +4899,10 @@ public class CoreTest extends ACVMTest {
 		assertFalse(evalB(ctx, "(callable? nil)"));
 		assertFalse(evalB(ctx, "(callable? :foo)"));
 		assertFalse(evalB(ctx, "(callable? [])"));
-
+		
+		// Missing accounts definitely not callable
+		assertFalse(evalB(ctx, "(callable? #6666666)"));
+		assertFalse(evalB(ctx, "(callable? #6666666 'something)"));
 		
 		assertCastError(step(ctx, "(callable? caddr :public)")); // not a Symbol
 		assertCastError(step(ctx, "(callable? caddr :random-name)"));

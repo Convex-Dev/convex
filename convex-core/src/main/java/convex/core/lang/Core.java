@@ -670,9 +670,12 @@ public class Core {
 		
 		@Override
 		public Context invoke(Context context, ACell[] args) {
+			// When used as a predicate
 			if (args.length==1) {
 				Address addr = RT.callableAddress(args[0]);
-				return context.withResult(Juice.LOOKUP,CVMBool.create(addr!=null));
+				if (addr==null) return context.withResult(Juice.LOOKUP,CVMBool.FALSE);
+				AccountStatus as = context.getState().getAccount(addr);
+				return context.withResult(Juice.LOOKUP,CVMBool.create(as!=null));
 			}
 			
 			if (args.length != 2) return context.withArityError(rangeArityMessage(1,2, args.length));
