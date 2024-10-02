@@ -33,34 +33,12 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.lang.RT;
 
+/**
+ * Miscellaneous utility functions used in Convex, mostly bit fiddling
+ */
 public class Utils {
 	public static final byte[] EMPTY_BYTES = new byte[0];
 
-	/**
-	 * Converts an array of bytes into an unsigned BigInteger
-	 *
-	 * Assumes big-endian format as per new BigInteger(int, byte[]);
-	 *
-	 * @param data Array of bytes containing an unsigned integer (big-endian)
-	 * @return A new non-negative BigInteger
-	 */
-	public static BigInteger toBigInteger(byte[] data) {
-		return new BigInteger(1, data);
-	}
-
-	/**
-	 * Converts an array of bytes into a signed BigInteger
-	 *
-	 * Assumes two's-complement big-endian binary representation format as per new
-	 * BigInteger(byte[]);
-	 *
-	 * @param data Byte array to convert to BigInteger
-	 * @return A signed BigInteger
-	 */
-	public static BigInteger toSignedBigInteger(byte[] data) {
-		return new BigInteger(data);
-	}
-	
 	/**
 	 * Converts an int to a hex string e.g. "80cafe80"
 	 *
@@ -68,19 +46,19 @@ public class Utils {
 	 * @return Lowercase hex string
 	 */
 	public static String toHexString(int val) {
-		StringBuffer sb = new StringBuffer(8);
+		char[] chars=new char[8];
 		for (int i = 0; i < 8; i++) {
-			sb.append(Utils.toHexChar((val >> ((7 - i) * 4)) & 0xf));
+			chars[i]=(Utils.toHexChar((val >> ((7 - i) * 4)) & 0xf));
 		}
-		return sb.toString();
+		return new String(chars);
 	}
 
 	public static String toHexString(short val) {
-		StringBuffer sb = new StringBuffer(4);
+		char[] chars=new char[4];
 		for (int i = 0; i < 4; i++) {
-			sb.append(Utils.toHexChar((val >> ((3 - i) * 4)) & 0xf));
+			chars[i]=(Utils.toHexChar((val >> ((3 - i) * 4)) & 0xf));
 		}
-		return sb.toString();
+		return new String(chars);
 	}
 
 	/**
@@ -243,7 +221,7 @@ public class Utils {
 	 * Converts an int value in the range 0..15 to a hexadecimal character
 	 *
 	 * @param i Value to convert
-	 * @return Hex digit value (lowercase)
+	 * @return Hex digit character (lower case)
 	 */
 	public static char toHexChar(int i) {
 		if (i >= 0) {
@@ -266,19 +244,19 @@ public class Utils {
 	}
 
 	/**
-	 * Converts a hex string to a byte array. Must contain an the expected number of
+	 * Converts a hex string to a byte array. Must contain at least the expected number of
 	 * hex digits, or else null will be returned
 	 *
 	 * @param hex          String containing Hex digits
-	 * @param stringLength number of hex digits in the string to use
-	 * @return byte array with the given hex value, or null if not valud
+	 * @param hexLength   number of hex digits in the string to use (must be even)
+	 * @return byte array with the given hex value, or null if not valid hex
 	 */
-	public static byte[] hexToBytes(String hex, int stringLength) {
-		if (hex.length() != stringLength) {
+	public static byte[] hexToBytes(String hex, int hexLength) {
+		if (hex.length() < hexLength) {
 			return null;
 		}
-		int N = stringLength / 2;
-		if (N * 2 != stringLength) {
+		int N = hexLength / 2;
+		if (N * 2 != hexLength) {
 			return null;
 		}
 		byte[] result = new byte[N];
@@ -307,18 +285,23 @@ public class Utils {
 	}
 
 	/**
-	 * Gets the value of a single hex car e.g. hexVal('c') => 12
+	 * Gets the value of a single hex character e.g. hexVal('c') => 12
 	 *
 	 * @param c Character representing a hex digit
 	 * @return int in the range 0..15 inclusive, or -1 if not a hex char
 	 */
 	public static int hexVal(char c) {
 		int v = (int) c;
-		if (v <= 102) {
-			if (v >= 97) return v - 87; // lowercase
-			if ((v >= 65) && (v <= 70)) return v - 55; // uppercase
-			if ((v >= 48) && (v <= 57)) return v - 48; // digit
-		}
+		
+		if ((v<48)||(v>102)) return -1; // out of possible range
+		
+		if (v >= 97) return v - 87; // lowercase 97-102
+		
+		if (v <= 57) return v - 48; // digit 48-57
+		
+		// uppercase, put this last as not likely to be needed on fast path
+		if ((v >= 65) && (v <= 70)) return v - 55; 
+		
 		return -1;
 	}
 
@@ -438,40 +421,6 @@ public class Utils {
 		}
 		sb.append(s);
 		return sb.toString();
-	}
-
-	/**
-	 * Writes an unsigned big integer to a specific segment of a byte[] array. Pads
-	 * with zeros if necessary to fill the specified length.
-	 *
-	 * @param a Value to write
-	 * @param dest Destination array
-	 * @param offset Offset into destination array
-	 * @param length Length to write
-	 */
-	public static void writeUInt(BigInteger a, byte[] dest, int offset, int length) {
-		if (a.signum() < 0) throw new IllegalArgumentException("Non-negative big integer expected!");
-		if ((offset + length) > dest.length) {
-			throw new IllegalArgumentException(
-					"Insufficient buffer space in byte array, available = " + (dest.length - offset));
-		}
-		byte[] bs = a.toByteArray();
-		int bl = bs.length;
-		if (bl == length) {
-			// expected case, correct number of bytes in unsigned representation
-			System.arraycopy(bs, 0, dest, offset, length);
-		} else if ((bl == (length + 1)) && (bs[0] == 0)) {
-			// OK because this is just an overflow of sign bit
-			// We just need to skip the zero bute that includes the sign
-			System.arraycopy(bs, 1, dest, offset, length);
-		} else if (bl < length) {
-			// rare case, our representation is too short, so need to pad
-			int pad = length - bl;
-			Arrays.fill(dest, offset, offset + pad, (byte) 0);
-			System.arraycopy(bs, 0, dest, offset + pad, bl);
-		} else {
-			throw new IllegalArgumentException("Insufficient buffer size, was " + length + " but needed " + bl);
-		}
 	}
 
 	/**
@@ -878,19 +827,7 @@ public class Utils {
         return 19 + d;
     }
 
-	/**
-	 * Filters the array, returning an array containing only the elements where the
-	 * predicate returns true. May return the same array if all elements are
-	 * included.
-	 *
-	 * @param arr Array to filter
-	 * @param predicate Predicate to test array elements
-	 * @return Filtered array.
-	 */
-	public static <T> T[] filterArray(T[] arr, Predicate<T> predicate) {
-		if (arr.length <= 32) return filterSmallArray(arr, predicate);
-		throw new IllegalArgumentException("Can't Filter large arrays");
-	}
+
 
 	/**
 	 * Return a list of values, sorted according to the score computed using the
@@ -920,6 +857,20 @@ public class Utils {
 			}
 		});
 		return result;
+	}
+	
+	/**
+	 * Filters the array, returning an array containing only the elements where the
+	 * predicate returns true. May return the same array if all elements are
+	 * included.
+	 *
+	 * @param arr Array to filter
+	 * @param predicate Predicate to test array elements
+	 * @return Filtered array.
+	 */
+	public static <T> T[] filterArray(T[] arr, Predicate<T> predicate) {
+		if (arr.length <= 32) return filterSmallArray(arr, predicate);
+		throw new IllegalArgumentException("Can't Filter large arrays");
 	}
 
 	/**

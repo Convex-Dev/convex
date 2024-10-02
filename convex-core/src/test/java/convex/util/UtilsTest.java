@@ -34,13 +34,6 @@ import convex.core.util.Utils;
 public class UtilsTest {
 
 	@Test
-	public void testToBigInteger() {
-		assertEquals(BigInteger.valueOf(255), Utils.toBigInteger(new byte[] { -1 }));
-		assertEquals(BigInteger.valueOf(256), Utils.toBigInteger(new byte[] { 1, 0 }));
-		assertEquals(BigInteger.valueOf(65536), Utils.toBigInteger(new byte[] { 1, 0, 0 }));
-	}
-
-	@Test
 	public void testHexChar() {
 		assertEquals('f', Utils.toHexChar(15));
 		assertEquals('a', Utils.toHexChar(10));
@@ -66,6 +59,8 @@ public class UtilsTest {
 		assertEquals("7f", Utils.toHexString(new byte[] { 127 }));
 		assertEquals("7c", Utils.toHexString(new byte[] { 124 }));
 		assertEquals("0012457c", Utils.toHexString(0x0012457c));
+		assertEquals("ffffffff", Utils.toHexString(-1));
+		assertEquals("ffffffffffffffff", Utils.toHexString(-1L));
 	}
 
 	@Test
@@ -174,21 +169,6 @@ public class UtilsTest {
 		assertEquals(32, bs.length);
 		assertEquals(0, b.remaining());
 		assertEquals("0000000000000000000000000000000000000000000000000000000000000007", Utils.toHexString(bs));
-	}
-
-	@Test
-	public void testWriteBigUInt() {
-		byte[] ds = new byte[4];
-		assertEquals("00000000", Utils.toHexString(ds));
-		Utils.writeUInt(BigInteger.valueOf(7), ds, 0, 4);
-		assertEquals("00000007", Utils.toHexString(ds));
-		assertEquals((short) 7, Utils.readShort(ds, 2)); // check short encoding
-		Utils.writeUInt(BigInteger.valueOf(0xffffffffl), ds, 0, 4);
-		assertEquals("ffffffff", Utils.toHexString(ds));
-
-		assertThrows(IllegalArgumentException.class,
-				() -> Utils.writeUInt(BigInteger.valueOf(0x100000000L), ds, 0, 32));
-		assertThrows(IllegalArgumentException.class, () -> Utils.writeUInt(BigInteger.valueOf(-1), ds, 0, 32));
 	}
 
 	@Test
