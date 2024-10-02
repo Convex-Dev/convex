@@ -21,7 +21,6 @@ public class ThreadCoordinationBenchmark {
 					o = INPUT.take();
 					OUTPUT.put(o);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}

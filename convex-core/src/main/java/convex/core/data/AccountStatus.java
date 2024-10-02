@@ -192,7 +192,7 @@ public class AccountStatus extends ARecord {
 		};		
 		Address controller=null;
 		if ((included&HAS_CONTROLLER)!=0) {
-			controller=Format.read(b, epos); // TODO should be raw Address, save a byte?
+			controller=Format.read(b, epos);
 			epos+=controller.getEncodingLength();
 		}
 		AHashMap<Symbol, ACell> environment = null;

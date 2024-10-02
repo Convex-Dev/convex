@@ -303,7 +303,6 @@ public final class Address extends ABlobLike<CVMLong> {
 
 	@Override
 	public long longValue() {
-		// TODO Auto-generated method stub
 		return value;
 	}
 

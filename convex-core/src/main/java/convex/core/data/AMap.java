@@ -237,7 +237,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	 * @return Value for the specified key, or the notFound value.
 	 */
 	@SuppressWarnings("unchecked")
-	public final V get(ACell key, ACell notFound) {
+	public V get(ACell key, ACell notFound) {
 		MapEntry<K, V> me = getEntry((K) key);
 		if (me == null) {
 			return (V) notFound;

@@ -53,8 +53,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		return true;
 	}
 	
-
-
 	/**
 	 * Gets a vector of keys for this record
 	 * 
@@ -161,7 +159,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 
 	@Override
 	public MapEntry<Keyword, ACell> getKeyRefEntry(Ref<ACell> keyRef) {
-		// TODO: could maybe be more efficient?
 		return getEntry(keyRef.getValue());
 	}
 
@@ -228,8 +225,16 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 
 	@Override
 	public MapEntry<Keyword, ACell> getEntry(ACell k) {
-		if (!containsKey(k)) return null;
-		return MapEntry.create((Keyword)k,get(k));
+		ACell v=get(k);
+		if ((v==null)&&!containsKey(k)) return null; //if null, need to check if key exists
+		return MapEntry.create((Keyword)k,v);
+	}
+	
+	@Override
+	public ACell get(ACell key, ACell notFound) {
+		ACell v=get(key);
+		if ((v==null)&&!containsKey(key)) return notFound; //if null, need to check if key exists
+		return v;
 	}
 
 	@Override

@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.function.Consumer;
 
 import convex.core.Result;
+import convex.core.data.impl.DummyCell;
 import convex.core.exceptions.ParseException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -26,6 +27,8 @@ public class Cells {
 	 * TODO: Verify this is 68 (vector with 16 embedded children with 4 branches each + embedded tail with 4 branches)
 	 */
 	public static final int MAX_BRANCH_COUNT = 68;
+
+	public static final ACell DUMMY = new DummyCell();
 
 	/**
 	 * Equality method allowing for nulls
