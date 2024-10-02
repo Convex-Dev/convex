@@ -24,14 +24,14 @@ import convex.core.util.Utils;
  */
 public final class CVMDouble extends ANumeric {
 
-	public static final CVMDouble ZERO = CVMDouble.create(0.0);
-	public static final CVMDouble NEGATIVE_ZERO = CVMDouble.create(-0.0);
-	public static final CVMDouble ONE = CVMDouble.create(1.0);
-	public static final CVMDouble MINUS_ONE = CVMDouble.create(-1.0);
+	public static final CVMDouble ZERO = new CVMDouble(0.0);
+	public static final CVMDouble NEGATIVE_ZERO = new CVMDouble(-0.0);
+	public static final CVMDouble ONE = new CVMDouble(1.0);
+	public static final CVMDouble MINUS_ONE = new CVMDouble(-1.0);
 
-	public static final CVMDouble NaN = CVMDouble.create(Double.NaN);
-	public static final CVMDouble POSITIVE_INFINITY = CVMDouble.create(Double.POSITIVE_INFINITY);
-	public static final CVMDouble NEGATIVE_INFINITY = CVMDouble.create(Double.NEGATIVE_INFINITY);
+	public static final CVMDouble NaN = new CVMDouble(Double.NaN);
+	public static final CVMDouble POSITIVE_INFINITY = new CVMDouble(Double.POSITIVE_INFINITY);
+	public static final CVMDouble NEGATIVE_INFINITY = new CVMDouble(Double.NEGATIVE_INFINITY);
 	
 	private final double value;
 	
@@ -51,8 +51,18 @@ public final class CVMDouble extends ANumeric {
 	 */
 	public static CVMDouble create(double value) {
 		// We must use a canonical NaN value (0x7ff8000000000000L);
-		if (Double.isNaN(value)) value=Double.NaN;
+		if (Double.isNaN(value)) {
+			return CVMDouble.NaN;
+		}
 		return new CVMDouble(value);
+	}
+	
+	public static CVMDouble createChecked(double value) throws BadFormatException {
+		// Need to check for non-canonical NaN values
+		if (!isValidEncoding(value)) {
+			throw new BadFormatException("Non-canonical NaN value");
+		}
+		return create(value);
 	}
 	
 	public static CVMDouble unsafeCreate(double value) {
@@ -94,9 +104,14 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		if (!isValidEncoding(value)) throw new InvalidDataException("Non-canonical NaN value",this);
+	}
+	
+	private static boolean isValidEncoding(double value) {
 		if (Double.isNaN(value)) {
-			if (Double.doubleToRawLongBits(value)!=RAW_NAN_BITS) throw new InvalidDataException("Non-canonical NaN value",this);
+			return Double.doubleToRawLongBits(value)==RAW_NAN_BITS;
 		}
+		return true;
 	}
 
 	@Override
@@ -162,21 +177,13 @@ public final class CVMDouble extends ANumeric {
 		return Tag.DOUBLE;
 	}
 
-	public static CVMDouble read(double value) throws BadFormatException {
-		// Need to check for non-canonical NaN values
-		if (Double.isNaN(value)) {
-			if (Double.doubleToRawLongBits(value)!=RAW_NAN_BITS) {
-				throw new BadFormatException("Non-canonical NaN value");
-			}
-		}
-		return create(value);
-	}
+
 	
 	public static CVMDouble read(byte tag, Blob blob, int offset) throws BadFormatException {
 		if (blob.count()<offset+1+8) throw new BadFormatException("Insufficient blob bytes to read Double");
 		long bits=Utils.readLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1,8);
 		double d=Double.longBitsToDouble(bits);
-		CVMDouble result= read(d);
+		CVMDouble result= createChecked(d);
 		result.attachEncoding(blob.slice(offset,offset+1+8));
 		return result;
 	}

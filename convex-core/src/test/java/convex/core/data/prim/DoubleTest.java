@@ -2,6 +2,7 @@ package convex.core.data.prim;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -17,11 +18,15 @@ public class DoubleTest {
 	@Test public void testNanEncoding() {
 		CVMDouble nan=CVMDouble.NaN;
 		
-		// Canonical NaN encoding has just high 
+		assertSame(CVMDouble.NaN,CVMDouble.create(Double.NaN));
+
+		// Canonical NaN encoding has just high bit set
 		assertEquals(Blob.fromHex("1d7ff8000000000000"),nan.getEncoding());
 		
-		Blob BAD_NAN=Blob.fromHex("1d7ff8000000ffffff");
+		// create coerces to correct NaN
+		assertSame(CVMDouble.NaN,CVMDouble.create(Double.longBitsToDouble(0x7ff8000000ffffffL)));
 		
+		Blob BAD_NAN=Blob.fromHex("1d7ff8000000ffffff");
 		assertThrows(BadFormatException.class,()->Format.read(BAD_NAN));
 	}
 	
@@ -41,7 +46,7 @@ public class DoubleTest {
 	@Test public void testEquality() {
 		ObjectsTest.doEqualityTests(CVMDouble.ONE, CVMDouble.create(1.0));
 		ObjectsTest.doEqualityTests(CVMDouble.create(12345.0),CVMDouble.create(12345.0));
-		ObjectsTest.doEqualityTests(CVMDouble.NaN,CVMDouble.create(Double.NaN));
+		
 		
 		assertFalse(CVMDouble.NEGATIVE_ZERO.equals(CVMDouble.ZERO));
 		assertTrue(CVMDouble.NaN.equals(CVMDouble.NaN));
