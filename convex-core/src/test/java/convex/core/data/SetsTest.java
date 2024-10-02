@@ -41,6 +41,14 @@ public class SetsTest {
 		assertTrue(s.isEmpty());
 		assertSame(s, Sets.empty());
 	}
+	
+	@Test 
+	public void testSetEncoding() {
+		// Set should be encoded as a map with different tag and extra value Ref(s)
+		ASet<?> s=Sets.of(123);
+		AMap<?,?> m=Maps.of(123,null);
+		assertEquals(m.getEncoding().slice(1),s.getEncoding().append(Blob.SINGLE_ZERO).slice(1));
+	}
 
 	@Test
 	public void testPrimitiveEquality() {

@@ -46,27 +46,26 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	public static final Index<?, ?> EMPTY = Cells.intern(new Index<ABlob, ACell>(0, null, EMPTY_CHILDREN,(short) 0, 0L));
 	
 	/**
-	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.
-	 * Child entries must have at least one entry.
-	 */
-	private final Ref<Index<K, V>>[] children;
-
-	/**
 	 * Entry for this node of the radix tree. Invariant assumption that the prefix
 	 * is correct. May be null if there is no entry at this node.
 	 */
 	private final MapEntry<K, V> entry;
 
 	/**
-	 * Mask of child entries, 16 bits for each hex digit that may be present.
-	 */
-	private final short mask;
-
-	/**
 	 * Depth of radix tree entry in number of hex digits.
 	 */
 	private final long depth;
 
+	/**
+	 * Mask of child entries, 16 bits for each hex digit that may be present.
+	 */
+	private final short mask;
+	
+	/**
+	 * Child entries, i.e. nodes with keys where this node is a common prefix. Only contains children where mask is set.
+	 * Child entries must have at least one entry.
+	 */
+	private final Ref<Index<K, V>>[] children;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	protected Index(long depth, MapEntry<K, V> entry, Ref<Index>[] entries,
@@ -523,7 +522,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (count == 1) return pos; // must be a single entry
 
 		// We only have a meaningful depth if more than one entry
-		pos = Format.writeVLCCount(bs,pos, depth);
+		bs[pos++] = (byte)depth;
 
 		// finally write children
 		pos = Utils.writeShort(bs,pos,mask);
@@ -586,13 +585,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		}
 
 		Index<K,V> result;
-		long depth = Format.readVLCCount(b,epos);
-		if (depth < 0) throw new BadFormatException("Negative depth!");
+		int depth = 0xFF & b.byteAt(epos);
 		if (depth >=MAX_DEPTH) {
 			if (depth==MAX_DEPTH) throw new BadFormatException("More than one entry and MAX_DEPTH");
 			throw new BadFormatException("Excessive depth!");
 		}
-		epos+=Format.getVLCCountLength(depth);
+		epos+=1;
 
 		// Need to include children
 		short mask = b.shortAt(epos);
