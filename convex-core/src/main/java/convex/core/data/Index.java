@@ -47,7 +47,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	
 	/**
 	 * Entry for this node of the radix tree. Invariant assumption that the prefix
-	 * is correct. May be null if there is no entry at this node.
+	 * is correct. Will be null if there is no entry at this node.
 	 */
 	private final MapEntry<K, V> entry;
 
@@ -518,14 +518,28 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		pos = Format.writeVLCCount(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 
-		pos = MapEntry.encodeCompressed(entry,bs,pos); // entry may be null
-		if (count == 1) return pos; // must be a single entry
+		if (count == 1) {
+			// directly encode single entry
+			pos=entry.getKeyRef().encode(bs,pos);
+			pos=entry.getValueRef().encode(bs,pos);
+			return pos; // must be a single entry, exit early
+		} else {
+			if (entry==null) {
+				bs[pos++]=Tag.NULL; // no entry present
+			} else {
+				bs[pos++]=Tag.VECTOR;
+				pos=entry.getKeyRef().encode(bs,pos);
+				pos=entry.getValueRef().encode(bs,pos);
+			}
+		}
 
 		// We only have a meaningful depth if more than one entry
 		bs[pos++] = (byte)depth;
+		
+		// write mask
+		pos = Utils.writeShort(bs,pos,mask);
 
 		// finally write children
-		pos = Utils.writeShort(bs,pos,mask);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			pos = encodeChild(bs,pos,i);
@@ -559,14 +573,22 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		if (count < 0) throw new BadFormatException("Negative count!");
 		if (count == 0) return (Index<K, V>) EMPTY;
 		
+		// index for reading
 		int epos=pos+1+Format.getVLCCountLength(count);
 		
-
-		byte etype=b.byteAt(epos++);
 		MapEntry<K,V> me;
-		if (etype==Tag.NULL) {
-			me=null;
-		} else if (etype==Tag.VECTOR){
+		boolean hasEntry;
+		if (count==1) {
+			hasEntry=true;
+		} else {
+			byte c=b.byteAt(epos++); // Read byte
+			switch (c) {
+			case Tag.NULL: hasEntry=false; break;
+			case Tag.VECTOR: hasEntry=true; break;
+			default: throw new BadFormatException("Invalid MapEntry tag in Index: "+c);
+			}
+		}
+		if (hasEntry) {
 			Ref<K> kr=Format.readRef(b,epos);
 			epos+=kr.getEncodingLength();
 			Ref<V> vr=Format.readRef(b,epos);
@@ -581,7 +603,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 				return result;
 			} 
 		} else {
-			throw new BadFormatException("Invalid MapEntry tag in Index: "+etype);
+			me=null;
 		}
 
 		Index<K,V> result;

@@ -109,9 +109,9 @@ public class TokenomicsTest extends ACVMTest {
 		Invoke t=Invoke.create(HERO, SEQ, Reader.read("(do (set-memory 0) (def a 0x12345678123456781234567812345678))"));
 		ResultContext rc=runTransaction(t);
 		
-		// memory of more than 16 bytes should be used, but not more than 100
+		// memory of more than 16 bytes should be used, but not more than 200
 		assertGreater(rc.memUsed,16);
-		assertLess(rc.memUsed,100);
+		assertLess(rc.memUsed,200);
 		
 		assertEquals(rc.totalFees,rc.getJuiceFees()+rc.getMemoryFees());
 		

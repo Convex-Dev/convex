@@ -258,25 +258,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}
-	
-	/**
-	 * Writes a MapEntry or null content in compressed format (no count). Useful for
-	 * embedding an optional MapEntry inside a larger Encoding
-	 * 
-	 * @param me MapEntry to encode
-	 * @param bs Byte array to write to
-	 * @param pos Starting position for encoding in byte array
-	 * @return Updated position after writing
-	 */
-	public static int encodeCompressed(MapEntry<?,?> me,byte[] bs, int pos) {
-		if (me==null) {
-			bs[pos++]=Tag.NULL;
-		} else {
-			bs[pos++]=Tag.VECTOR;
-			pos = me.encodeRefs(bs,pos);
-		}
-		return pos;
-	}
 
 	@Override
 	public int estimatedEncodingSize() {
