@@ -102,17 +102,19 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	private static <K extends ACell, V extends ACell> AHashMap<K, V> createFull(Ref<AHashMap<K, V>>[] children, int shift, long count) {
 		if (children.length != FANOUT) throw new IllegalArgumentException("16 children required!");
-		Ref<AHashMap<K, V>>[] newChildren = Utils.filterArray(children, a -> {
-			if (a == null) return false;
-			AMap<K, V> m = a.getValue();
-			return ((m != null) && !m.isEmpty());
-		});
-
-		if (children != newChildren) {
-			return create(newChildren, shift, Utils.computeMask(children, newChildren), count);
-		} else {
-			return create(children, shift, (short) 0xFFFF, count);
+		int mask=0;
+		for (int i=0; i<FANOUT; i++) {
+			Ref<AHashMap<K, V>> ch=children[i];
+			if (ch!=null) {
+				AMap<K, V> m = ch.getValue();
+				if ((m!=null)&&(!m.isEmpty())) {
+					mask|=(1<<i);
+				}
+			}
 		}
+		if (mask==0xFFFF) return create(children, shift, (short) 0xFFFF, count);
+		Ref<AHashMap<K, V>>[] newChildren = Refs.filterSmallArray(children, mask);
+		return create(newChildren, shift, (short)mask, count);
 	}
 
 	/**
@@ -171,7 +173,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			}
 		}
 		if (mask != newMask) {
-			return new MapTree<K, V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
+			return new MapTree<K, V>(Refs.filterSmallArray(children, sel), shift, newMask, count);
 		}
 		return new MapTree<K, V>(children, shift, mask, count);
 	}

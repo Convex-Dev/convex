@@ -190,4 +190,31 @@ public class Refs {
 		}
 	}
 
+	/**
+	 * Filters an array of Refs, returning an array containing only the elements where the
+	 * mask bit is set. May return the same array if all elements areincluded.
+	 *
+	 * @param arr Array to filter
+	 * @param mask Mask of elements to include
+	 * @return Filtered array.
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> Ref<T>[] filterSmallArray(Ref<T>[] arr, int mask) {
+		int n = arr.length;
+		if (n > 32) throw new IllegalArgumentException("Array too long to filter: " + n);
+		int fullMask = (1 << n) - 1;
+		if (mask == fullMask) return arr;
+		int nn = Integer.bitCount(mask);
+		Ref<T>[] result = new Ref[nn];
+		if (nn == 0) return result;
+		int ix = 0;
+		for (int i = 0; i < n; i++) {
+			if ((mask & (1 << i)) != 0) {
+				result[ix++] = arr[i];
+			}
+		}
+		assert (ix == nn);
+		return result;
+	}
+
 }

@@ -104,17 +104,19 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 */
 	private static <T extends ACell> AHashSet<T> createFull(Ref<AHashSet<T>>[] children, int shift, long count) {
 		if (children.length != 16) throw new IllegalArgumentException("16 children required!");
-		Ref<AHashSet<T>>[] newChildren = Utils.filterArray(children, a -> {
-			if (a == null) return false;
-			AHashSet<T> m = a.getValue();
-			return ((m != null) && !m.isEmpty());
-		});
-
-		if (children != newChildren) {
-			return create(newChildren, shift, Utils.computeMask(children, newChildren), count);
-		} else {
-			return create(children, shift, (short) 0xFFFF, count);
+		int mask=0;
+		for (int i=0; i<16; i++) {
+			Ref<AHashSet<T>> ch=children[i];
+			if (ch!=null) {
+				AHashSet<T> m = ch.getValue();
+				if ((m!=null)&&(!m.isEmpty())) {
+					mask|=(1<<i);
+				}
+			}
 		}
+		if (mask==0xFFFF) return create(children, shift, (short) 0xFFFF, count);
+		Ref<AHashSet<T>>[] newChildren = Refs.filterSmallArray(children, mask);
+		return create(newChildren, shift, (short)mask, count);
 	}
 
 	/**
@@ -173,7 +175,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			}
 		}
 		if (mask != newMask) {
-			return new SetTree<V>(Utils.filterSmallArray(children, sel), shift, newMask, count);
+			return new SetTree<V>(Refs.filterSmallArray(children, sel), shift, newMask, count);
 		}
 		return new SetTree<V>(children, shift, mask, count);
 	}

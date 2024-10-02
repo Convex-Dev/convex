@@ -20,7 +20,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -856,59 +855,6 @@ public class Utils {
 				return Long.signum(comp);
 			}
 		});
-		return result;
-	}
-	
-	/**
-	 * Filters the array, returning an array containing only the elements where the
-	 * predicate returns true. May return the same array if all elements are
-	 * included.
-	 *
-	 * @param arr Array to filter
-	 * @param predicate Predicate to test array elements
-	 * @return Filtered array.
-	 */
-	public static <T> T[] filterArray(T[] arr, Predicate<T> predicate) {
-		if (arr.length <= 32) return filterSmallArray(arr, predicate);
-		throw new IllegalArgumentException("Can't Filter large arrays");
-	}
-
-	/**
-	 * Filters the array, returning an array containing only the elements where the
-	 * predicate returns true. May return the same array if all elements are
-	 * included.
-	 *
-	 * Array must have a maximum of 32 elements
-	 *
-	 * @param arr
-	 * @param predicate
-	 * @return
-	 */
-	private static <T> T[] filterSmallArray(T[] arr, Predicate<T> predicate) {
-		int mask = 0;
-		int n = arr.length;
-		for (int i = 0; i < n; i++) {
-			if (predicate.test(arr[i])) mask |= (1 << i);
-		}
-		return filterSmallArray(arr, mask);
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <T> T[] filterSmallArray(T[] arr, int mask) {
-		int n = arr.length;
-		if (n > 32) throw new IllegalArgumentException("Array too long to filter: " + n);
-		int fullMask = (1 << n) - 1;
-		if (mask == fullMask) return arr;
-		int nn = Integer.bitCount(mask);
-		T[] result = (T[]) Array.newInstance(arr.getClass().getComponentType(), nn);
-		if (nn == 0) return result;
-		int ix = 0;
-		for (int i = 0; i < n; i++) {
-			if ((mask & (1 << i)) != 0) {
-				result[ix++] = arr[i];
-			}
-		}
-		assert (ix == nn);
 		return result;
 	}
 
