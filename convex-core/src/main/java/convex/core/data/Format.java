@@ -466,7 +466,7 @@ public class Format {
 	 * @param <T> Type of referenced value
 	 * @param b Blob containing a ref to read
 	 * @param pos Position to read Ref from (should point to tag)
-	 * @return Ref as read from ByteBuffer
+	 * @return Ref as read from Blob at the specified position
 	 * @throws BadFormatException If the data is badly formatted, or a non-embedded
 	 *                            value is found where it should be a Ref.
 	 */
@@ -476,10 +476,10 @@ public class Format {
 		
 		if (tag==Tag.NULL) return Ref.nil();
 		
-		// Looks like an embedded cell, so try to read this
+		// We now expect a non-null embedded cell
 		T cell= Format.read(tag,b,pos);
-		if (!Format.isEmbedded(cell)) throw new BadFormatException("Non-embedded Cell found instead of ref: type = " +RT.getType(cell));
-		return Ref.get(cell);
+		if (!cell.isEmbedded()) throw new BadFormatException("Non-embedded cell found instead of ref: type = " +RT.getType(cell));
+		return cell.getRef();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -529,7 +529,7 @@ public class Format {
 	public static <T extends ACell> T read(Blob blob) throws BadFormatException {
 		long n=blob.count();
 		if (n<1) throw new BadFormatException("Attempt to decode from empty Blob");
-		byte tag = blob.byteAt(0);
+		byte tag = blob.byteAtUnchecked(0);
 		T result= read(tag,blob,0);
 		if (result==null) {
 			if (n!=1) throw new BadFormatException("Decode of nil value but blob size = "+n);

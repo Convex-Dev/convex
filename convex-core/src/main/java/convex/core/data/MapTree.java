@@ -333,7 +333,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present, need to insert new child
-			AHashMap<K, V> newChild = MapLeaf.create(MapEntry.createRef(keyRef, Ref.get(value)));
+			AHashMap<K, V> newChild = MapLeaf.create(MapEntry.fromRefs(keyRef, Ref.get(value)));
 			return insertChild(digit, newChild.getRef());
 		} else {
 			// child exists, so assoc in new ref at lower shift level

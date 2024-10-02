@@ -593,7 +593,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			epos+=kr.getEncodingLength();
 			Ref<V> vr=Format.readRef(b,epos);
 			epos+=vr.getEncodingLength();
-			me=MapEntry.createRef(kr, vr);
+			me=MapEntry.fromRefs(kr, vr);
 			
 			if (count == 1) {
 				// single entry map, doesn't need separate depth encoding

@@ -349,7 +349,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			epos+=kr.getEncodingLength();
 			Ref<V> vr=Format.readRef(b,epos);
 			epos+=vr.getEncodingLength();
-			items[i] = MapEntry.createRef(kr, vr);
+			items[i] = MapEntry.fromRefs(kr, vr);
 		}
 
 		if (!isValidOrder(items)) {

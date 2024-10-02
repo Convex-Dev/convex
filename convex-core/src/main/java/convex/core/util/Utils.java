@@ -90,10 +90,10 @@ public class Utils {
 	 * @return Lowercase hex string
 	 */
 	public static String toHexString(byte value) {
-		StringBuilder sb = new StringBuilder(2);
-		sb.append(toHexChar((((int) value) & 0xF0) >>> 4));
-		sb.append(toHexChar(((int) value) & 0xF));
-		return sb.toString();
+		char[] chars=new char[2];
+		chars[0]=(toHexChar((((int) value) & 0xF0) >>> 4));
+		chars[1]=(toHexChar(((int) value) & 0xF));
+		return new String(chars);
 	}
 
 
@@ -104,26 +104,11 @@ public class Utils {
 	 * @return Hex string for the given long
 	 */
 	public static String toHexString(long x) {
-		StringBuffer sb = new StringBuffer(16);
+		char[] chars=new char[16];
 		for (int i = 15; i >= 0; i--) {
-			sb.append(toHexChar(((int) (x >> (4 * i))) & 0xF));
+			chars[i]=(toHexChar(((int) (x >> (4 * i))) & 0xF));
 		}
-		return sb.toString();
-	}
-
-	/**
-	 * Converts a hex string to a friendly version ( first x chars).
-	 * SECURITY; do not use this output for any comparison.
-	 *
-	 * @param hexString String to show in friendly format.
-     * @param size Number of hex chars to output.
-	 * @return Hex String
-	 */
-	public static String toFriendlyHexString(String hexString, int size) {
-		String cleanHexString = hexString.replaceAll("^0[Xx]", "");
-		String result = cleanHexString.substring(0, size);
-		// + ".." + cleanHexString.substring(cleanHexString.length() - size);
-		return result;
+		return new String(chars);
 	}
 	
 	/**
@@ -144,7 +129,7 @@ public class Utils {
 	
 	/**
 	 * Reads an int from a specified location in a byte array. Assumes 4-byte
-	 * big-endian representation. Assumes zeros beyong end of array
+	 * big-endian representation. Assumes zeros beyond end of array
 	 *
 	 * @param data Byte array from which to read the 4-byte int representation
 	 * @param offset Offset into byte array to read

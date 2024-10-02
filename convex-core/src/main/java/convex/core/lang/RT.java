@@ -1373,7 +1373,7 @@ public class RT {
 			AVector<?> v = (AVector<?>) x;
 			if (v.count() != 2)
 				return null;
-			me = MapEntry.createRef(v.getRef(0), v.getRef(1));
+			me = MapEntry.fromRefs(v.getRef(0), v.getRef(1));
 		} else {
 			return null;
 		}

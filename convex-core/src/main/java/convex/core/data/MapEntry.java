@@ -43,7 +43,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapEntry<K, V> createRef(Ref<? extends K> keyRef, Ref<? extends V> valueRef) {
+	public static <K extends ACell, V extends ACell> MapEntry<K, V> fromRefs(Ref<? extends K> keyRef, Ref<? extends V> valueRef) {
 		// ensure we have a hash at least
 		return new MapEntry<K, V>((Ref<K>) keyRef, (Ref<V>) valueRef);
 	}
@@ -57,7 +57,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	 * @return New MapEntry instance
 	 */
 	public static <K extends ACell, V extends ACell> MapEntry<K, V> create(K key, V value) {
-		return createRef(Ref.get(key), Ref.get(value));
+		return fromRefs(Ref.get(key), Ref.get(value));
 	}
 	
 	/**
@@ -75,7 +75,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static MapEntry convertOrNull(AVector v) {
 		if (v.count()!=2) return null;
-		return createRef(v.getElementRef(0),v.getElementRef(1));
+		return fromRefs(v.getElementRef(0),v.getElementRef(1));
 	}
 
 	@Override
