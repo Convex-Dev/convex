@@ -3462,7 +3462,7 @@ public class CoreTest extends ACVMTest {
 			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 			assertCVMEquals(PEERSTAKE,eval(ctx,"(get-in *state* [:peers "+PK+" :stake])"));
 			ctx=exec(ctx,"(evict-peer "+PK+")");
-			assertCVMEquals(PEERSTAKE,ctx.getResult());
+			assertCVMEquals(-PEERSTAKE,ctx.getResult());
 			assertNull(ctx.getState().getPeer(PK));
 			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 		}
@@ -3488,6 +3488,7 @@ public class CoreTest extends ACVMTest {
 			
 			// We can evict, user refund should happen
 			ctx=exec(ctx,"(evict-peer "+PK+")");
+			assertCVMEquals(-PEERSTAKE,ctx.getResult());
 			assertEquals(USERFUND,ctx.getBalance(USER));
 			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 		}

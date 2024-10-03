@@ -1964,15 +1964,26 @@ public class Context {
 	 * @return Context with amount of coins transferred to Peer as result (may be negative if stake withdrawn)
 	 */
 	public Context setDelegatedStake(AccountKey peerKey, long newStake) {
+		return setDelegatedStake(peerKey,getAddress(),newStake);
+	}
+	
+	/**
+	 * Sets the delegated stake on a specified peer to the specified level.
+	 * May set to zero to remove stake. Stake will be capped by current balance.
+	 *
+	 * @param peerKey Peer Account key on which to stake
+	 * @param newStake Amount to stake
+	 * @return Context with amount of coins transferred to Peer as result (may be negative if stake withdrawn)
+	 */
+	public Context setDelegatedStake(AccountKey peerKey, Address staker, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
 		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
 		if (newStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
 
-		Address myAddress=getAddress();
-		long balance=getBalance(myAddress);
-		long currentStake=ps.getDelegatedStake(myAddress);
+		long balance=getBalance(staker);
+		long currentStake=ps.getDelegatedStake(staker);
 		long delta=newStake-currentStake;
 
 		if (delta==0) return this; // no change
@@ -1981,29 +1992,41 @@ public class Context {
 		if (delta>balance) return this.withFundsError("Insufficient balance ("+balance+") to increase Delegated Stake to "+newStake);
 
 		// Final updates. Hopefully everything balances. SECURITY: test this. A lot.
-		PeerStatus updatedPeer=ps.withDelegatedStake(myAddress, newStake);
-		s=s.withBalance(myAddress, balance-delta); // adjust own balance
+		PeerStatus updatedPeer=ps.withDelegatedStake(staker, newStake);
+		s=s.withBalance(staker, balance-delta); // adjust own balance
 		s=s.withPeer(peerKey, updatedPeer); // adjust peer
 		return withState(s).withResult(CVMLong.create(delta));
 	}
 	
 	/**
-	 * Sets the stake for a given Peer, transferring coins from the current address.
+	 * Sets the stake for a given Peer, transferring coins to/from the current address.
+	 * Current address must be the controller of the peer.
+	 * 
 	 * @param peerKey Peer Account Key for which to update Stake
 	 * @param newStake New stake for Peer
 	 * @return Updated Context
 	 */
 	public Context setPeerStake(AccountKey peerKey, long newStake) {
+		return setPeerStake(peerKey,newStake);
+	}
+	
+	/**
+	 * Sets the stake for a given Peer, transferring coins to/from the controller address.
+	 * @param peerKey Peer Account Key for which to update Stake
+	 * @param controller Controller address for the specified peer
+	 * @param newStake New stake for Peer
+	 * @return Updated Context
+	 */
+	public Context setPeerStake(AccountKey peerKey, Address controller, long newStake) {
 		State s=getState();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for account key: "+peerKey);
 		if (newStake<0) return this.withArgumentError("Cannot set a negative stake");
 		if (newStake>Constants.MAX_SUPPLY) return this.withArgumentError("Target stake out of valid Amount range");
 	
-		Address myAddress=getAddress();
-		if (!ps.getController().equals(myAddress)) return withError(ErrorCodes.STATE,"Current address "+myAddress+" is not the controller of this peer account");
+		if (!ps.getController().equals(controller)) return withError(ErrorCodes.STATE,"Address "+controller+" is not the controller of this peer account");
 		
-		long balance=getBalance(myAddress);
+		long balance=getBalance(controller);
 		long currentStake=ps.getPeerStake();
 		long delta=newStake-currentStake;
 		
@@ -2014,7 +2037,7 @@ public class Context {
 
 		// Final updates assuming everything OK. Hopefully everything balances. SECURITY: test this. A lot.
 		PeerStatus updatedPeer=ps.withPeerStake(newStake);
-		s=s.withBalance(myAddress, balance-delta); // adjust own balance
+		s=s.withBalance(controller, balance-delta); // adjust own balance
 		s=s.withPeer(peerKey, updatedPeer); // adjust peer
 
 		return withState(s).withResult(CVMLong.create(delta));
@@ -2085,32 +2108,20 @@ public class Context {
 			ctx=ctx.withJuiceLimit(getJuiceLimit()+Juice.TRANSFER);
 			ctx=ctx.consumeJuice(Juice.TRANSFER);
 			Address stakedAddress=staked.getKey();
-			long stake=staked.getValue().longValue();
-			if (stake<=0) continue; // shouldn't happen? just in case....
-			
-			// Do refund to delegated staker
-			AccountStatus stakingAccount=ctx.getAccountStatus(stakedAddress); // should always exist
-			stakingAccount=stakingAccount.withBalance(stakingAccount.getBalance()+stake);
-			ctx=ctx.withAccountStatus(stakedAddress, stakingAccount);
+			ctx=ctx.setDelegatedStake(peerKey, stakedAddress, 0L);
+			if (ctx.isExceptional()) return ctx;
 		}
 		
-		// Get the controller account for stake refund
-		AccountStatus controlAccount=ctx.getAccountStatus(controller); // should always exist. Use ctx!!!
-		if (controlAccount==null) {
-			// we refund the caller
-			controller=getAddress();
-			controlAccount=getAccountStatus();
-		}
-		
-		long peerStake=ps.getPeerStake();
-		controlAccount=controlAccount.withBalance(controlAccount.getBalance()+peerStake);
-		ctx=ctx.withAccountStatus(controller, controlAccount);
+		// Controller stake refund
+		ctx=ctx.setPeerStake(peerKey, controller,0);
+		if (ctx.isExceptional()) return ctx;
+		ACell peerStake=ctx.getResult();
 		
 		// Finally remove peer record from state
 		State s=ctx.getState();
 		ctx=ctx.withState(s.withPeers(s.getPeers().dissoc(peerKey)));
 		
-		return ctx.withResult(CVMLong.create(peerStake));
+		return ctx.withResult(peerStake);
 	}
 
 	/**
