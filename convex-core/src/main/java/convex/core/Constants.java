@@ -24,7 +24,7 @@ public class Constants {
 	/**
 	 * Juice price in the initial Genesis State
 	 */
-	public static final long INITIAL_JUICE_PRICE = 2L;
+	public static final long INITIAL_JUICE_PRICE = 10L;
 
 	/**
 	 * Initial memory Pool of 1mb

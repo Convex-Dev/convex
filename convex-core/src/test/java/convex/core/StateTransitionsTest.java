@@ -54,8 +54,8 @@ public class StateTransitionsTest {
 
 	final Address ADDRESS_NIKI = Address.create(4);
 	
-	final long ABAL=10000;
-	final long BBAL=2000;
+	final long ABAL=100000;
+	final long BBAL=20000;
 
 	@Test
 	public void testAccountTransfers() throws BadSignatureException {
@@ -195,7 +195,7 @@ public class StateTransitionsTest {
 		}
 
 		{ // transfer amount greater than current balance
-			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 50000);
+			Transfer t1 = Transfer.create(ADDRESS_A,1, ADDRESS_C, 10*ABAL);
 			SignedData<ATransaction> st = KEYPAIR_A.signData(t1);
 			Block b = Block.of(System.currentTimeMillis(), st);
 			SignedData<Block> sb=KEYPAIR_A.signData(b);
