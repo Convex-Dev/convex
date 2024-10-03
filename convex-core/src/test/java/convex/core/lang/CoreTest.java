@@ -2861,6 +2861,13 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(balance)"));
 		assertArityError(step("(balance 1 2)"));
 	}
+	
+	@Test
+	public void testCoinSupply() {
+		Context ctx=context();
+		CVMLong supply=eval("(coin-supply)");
+		assertTrue(supply.longValue()>ctx.getBalance());
+	}
 
 	@Test
 	public void testCreateAccount() {

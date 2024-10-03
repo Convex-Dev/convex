@@ -40,9 +40,16 @@ public class TokenInfoPanel extends JPanel {
 		add(decimalsLabel,"wrap");
 		
 		if (id==null) {
-			descLabel.setText("(Native coin)");
+			descLabel.setText("(Convex Gold: Native coin)");
 			supplyLabel.setDecimals(Coin.DECIMALS);
-			supplyLabel.setBalance(Coin.SUPPLY);
+			decimalsLabel.setText(Integer.toString(Coin.DECIMALS));
+			convex.query("(coin-supply)").thenAcceptAsync(r->{
+				if (r.isError()) {
+					supplyLabel.setBalance(null);
+				} else {
+					supplyLabel.setBalance(RT.ensureInteger(r.getValue()));
+				}
+			});
 		} else {
 			convex.query("(get (call *registry* (lookup (address "+id+"))) :name)").thenAcceptAsync(r->{
 				if (r.isError()) {

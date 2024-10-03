@@ -729,3 +729,14 @@
 	    	 (cond
 	    	   (empty? nv) (dissoc m k)
 	    	   (assoc m k nv))))))))
+
+ (defn coin-supply
+	^{:doc {:description "Gets the total supply of Convex Coins."
+	        :examples    [{:code "(coin-supply)"}]
+	        :signature   [{:params []}]}}
+	([]
+	  (loop [i 0
+	         supply 1000000000000000000]
+		(cond (>= i 8)
+		  supply
+		  (recur (inc i) (- supply (balance (address i))))))))

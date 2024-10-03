@@ -64,7 +64,7 @@ public class TokenomicsTest extends ACVMTest {
 	
 	@Test
 	public void testTransferFail() {
-		Transfer t=Transfer.create(HERO, BALANCE, VILLAIN, Coin.SUPPLY);
+		Transfer t=Transfer.create(HERO, BALANCE, VILLAIN, Coin.MAX_SUPPLY);
 		ResultContext rc=runTransaction(t);
 		
 		// We failed because of insufficient funds for transfer
@@ -179,7 +179,7 @@ public class TokenomicsTest extends ACVMTest {
 
 	protected void checkFinalState(ResultContext rc, boolean memUsed) {
 		// Nothing should have gone wrong with total coin supply
-		assertEquals(Coin.SUPPLY,rc.getState().computeTotalBalance());
+		assertEquals(Coin.MAX_SUPPLY,rc.getState().computeTotalBalance());
 		
 		if (memUsed) {
 			// we expect total memory to have fallen because of memory used

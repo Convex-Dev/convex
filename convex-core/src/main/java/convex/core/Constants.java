@@ -88,7 +88,7 @@ public class Constants {
 	/**
 	 * Maximum supply of Convex Coins set at protocol level
 	 */
-	public static final long MAX_SUPPLY = Coin.SUPPLY;
+	public static final long MAX_SUPPLY = Coin.MAX_SUPPLY;
 
 	/**
 	 * Maximum CVM execution depth

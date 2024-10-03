@@ -40,9 +40,10 @@ public class Coin {
 	public static final long EMERALD=1000*DIAMOND;
 	
 	/**
-	 * The total Convex Coin maximum supply limit. One billion Gold Coins
+	 * The maximum Convex Coin supply limit. One billion Gold Coins. In practice, the actual supply 
+	 * will be less than this.
 	 */
-	public static final long SUPPLY=1000*EMERALD;
+	public static final long MAX_SUPPLY=1000*EMERALD;
 
 	/**
 	 * A zero quantity of coins, the minimum possible
@@ -60,6 +61,6 @@ public class Coin {
 	 * @return true if valid, false otherwsie
 	 */
 	public static boolean isValidAmount(long amount) {
-		return (amount >=0) &&(amount <=Coin.SUPPLY) ;
+		return (amount >=0) &&(amount <=Coin.MAX_SUPPLY) ;
 	}
 }

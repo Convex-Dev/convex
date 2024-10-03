@@ -322,7 +322,7 @@ public class TransactionTest extends ACVMTest {
 		
 		// 99 chosen to be outside 1-byte VLC Long range
 		doTransactionTests(Transfer.create(HERO, 99, VILLAIN,1000));
-		doTransactionTests(Transfer.create(HERO, 199, VILLAIN,Coin.SUPPLY));
+		doTransactionTests(Transfer.create(HERO, 199, VILLAIN,Coin.MAX_SUPPLY));
 		
 		doTransactionTests(Call.create(HERO, 99, VILLAIN, 178,Symbols.FOO,Vectors.empty()));
 	}
