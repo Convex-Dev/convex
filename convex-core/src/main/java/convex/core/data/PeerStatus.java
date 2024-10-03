@@ -85,6 +85,10 @@ public class PeerStatus extends ARecord {
 	public long getDelegatedStake() {
 		return delegatedStake;
 	}
+	
+	public Index<Address,CVMLong> getStakes() {
+		return stakes;
+	}
 
 	/**
 	 * Gets the self-owned stake of this peer

@@ -31,6 +31,7 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.cpos.Block;
@@ -3448,7 +3449,54 @@ public class CoreTest extends ACVMTest {
 	public void testCreatePeerRegression() {
 		assertJuiceError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e *balance*)"));
 		assertFundsError(step("(create-peer 0x42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e (inc *balance*))"));
+	}
+	
+	@Test 
+	public void testEvictPeer() {
+		{ // create a peer then evict it
+			Context ctx=context();
+			long PEERSTAKE=2*Constants.MINIMUM_EFFECTIVE_STAKE;
+			AccountKey PK=AccountKey.fromHex("42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e");
+			ctx=exec(ctx,"(create-peer "+PK+" "+PEERSTAKE+")");
+			assertNotNull(ctx.getState().getPeer(PK));
+			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
+			assertCVMEquals(PEERSTAKE,eval(ctx,"(get-in *state* [:peers "+PK+" :stake])"));
+			ctx=exec(ctx,"(evict-peer "+PK+")");
+			assertCVMEquals(PEERSTAKE,ctx.getResult());
+			assertNull(ctx.getState().getPeer(PK));
+			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
+		}
 		
+		{ // create a peer with delegated stake and evict
+			Context ctx=context();
+			long PEERSTAKE=2*Constants.MINIMUM_EFFECTIVE_STAKE;
+			long USERFUND=10000000;
+			long USERSTAKE=7000000;
+			AccountKey PK=AccountKey.fromHex("42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e");
+			ctx=exec(ctx,"(create-peer "+PK+" "+PEERSTAKE+")");
+			ctx=exec(ctx,"(def USER (deploy '(set-controller *caller*) '(defn ^:callable receive-coin [& args] (accept *offer*))))");
+			Address USER=ctx.getResult();
+			ctx=exec(ctx,"(transfer USER "+USERFUND+")");
+			ctx=exec(ctx,"(eval-as USER '(stake "+PK+" "+USERSTAKE+"))");
+			assertCVMEquals(USERSTAKE,ctx.getResult());
+			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
+			assertEquals(PEERSTAKE+USERSTAKE,ctx.getState().getPeer(PK).getTotalStake());
+			assertEquals(USERFUND-USERSTAKE,ctx.getBalance(USER));
+			
+			// USER should't be able to evict
+			assertStateError(step(ctx,"(eval-as USER '(evict-peer "+PK+"))"));
+			
+			// We can evict, user refund should happen
+			ctx=exec(ctx,"(evict-peer "+PK+")");
+			assertEquals(USERFUND,ctx.getBalance(USER));
+			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
+		}
+		
+		assertCastError(step("(evict-peer nil)"));
+		assertCastError(step("(evict-peer 0x)"));
+		assertCastError(step("(evict-peer [])"));
+		assertArityError(step("(evict-peer :foo :bar)"));
+		assertArityError(step("(evict-peer)"));
 	}
 
 	@Test

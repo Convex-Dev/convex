@@ -967,7 +967,6 @@ public class Core {
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
 			return context.setDelegatedStake(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
-
 		}
 	});
 
@@ -993,10 +992,17 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			
 			AccountKey accountKey = RT.ensureAccountKey(args[0]);
 			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
+			
+			// Security: Consume juice first, since eviction can potentially use arbitrary juice
+			// We still want juice to be paid in case of any error
+			context=context.consumeJuice(Juice.PEER_UPDATE);
+			if (context.isExceptional()) return context;
 
-			return context.evictPeer(accountKey).consumeJuice(Juice.PEER_UPDATE);
+			// SECURITY: no juice consumption here, we always let this succeed if last op
+			return context.evictPeer(accountKey);
 		}
 	});
 

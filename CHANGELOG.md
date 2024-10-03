@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dissoc-in`, `update` and `update-in` core functions
 - `switch` conditional macro
 - Tagged values in Reader (e.g. `#Index {}`)
+- `evict-peer` core function to remove old / understaked peers
 
 ### Changed
 

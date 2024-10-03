@@ -44,6 +44,7 @@ import convex.core.lang.exception.TailcallValue;
 import convex.core.lang.impl.CoreFn;
 import convex.core.util.Economics;
 import convex.core.util.Errors;
+import convex.core.util.Utils;
 
 /**
  * Representation of CVM execution context.
@@ -346,7 +347,6 @@ public class Context {
 		long balance=account.getBalance();
 		boolean juiceFailure=juiceFees>balance;
 
-		
 		boolean memoryFailure=false;
 		long memorySpend=0L; // usually zero
 
@@ -2024,7 +2024,7 @@ public class Context {
 	/**
 	 * Creates a new peer with the specified stake.
 	 * The accountKey must not be in the list of peers.
-	 * The accountKey must be assigend to the current transaction address
+	 * The accountKey must be assigned to the current transaction address
 	 * Stake must be greater than 0.
 	 * Stake must be less than to the account balance.
 	 *
@@ -2053,12 +2053,54 @@ public class Context {
 	}
 	
 	public Context evictPeer(AccountKey peerKey) {
-		State s=getState();
-		PeerStatus ps=s.getPeer(peerKey);
+		Context ctx=this;
+		PeerStatus ps=ctx.getState().getPeer(peerKey);
 		if (ps==null) {
 			return this;
 		}
-		return withError(ErrorCodes.TODO,"Can't evict peers yet!");
+		Address controller=ps.getController();
+		if (Utils.equals(ctx.getAddress(),ps.getController())) {
+			// OK
+		} else {
+			if (ps.getPeerStake()>=Constants.MINIMUM_EFFECTIVE_STAKE) {
+				return ctx.withError(ErrorCodes.STATE,"Peer has too much stake to be evicted");
+			}
+		}
+		Index<Address, CVMLong> stakes = ps.getStakes();
+		long ns=stakes.count();
+		for (int i=0; i<ns; i++) {
+			// SECURITY: update juice limit while evicting delegated stakes
+			// This is safe because we are only deleting stuff
+			MapEntry<Address,CVMLong> staked=stakes.entryAt(i);
+			ctx=ctx.withJuiceLimit(getJuiceLimit()+Juice.TRANSFER);
+			ctx=ctx.consumeJuice(Juice.TRANSFER);
+			Address stakedAddress=staked.getKey();
+			long stake=staked.getValue().longValue();
+			if (stake<=0) continue; // shouldn't happen? just in case....
+			
+			// Do refund to delegated staker
+			AccountStatus stakingAccount=ctx.getAccountStatus(stakedAddress); // should always exist
+			stakingAccount=stakingAccount.withBalance(stakingAccount.getBalance()+stake);
+			ctx=ctx.withAccountStatus(stakedAddress, stakingAccount);
+		}
+		
+		// Get the controller account for stake refund
+		AccountStatus controlAccount=ctx.getAccountStatus(controller); // should always exist. Use ctx!!!
+		if (controlAccount==null) {
+			// we refund the caller
+			controller=getAddress();
+			controlAccount=getAccountStatus();
+		}
+		
+		long peerStake=ps.getPeerStake();
+		controlAccount=controlAccount.withBalance(controlAccount.getBalance()+peerStake);
+		ctx=ctx.withAccountStatus(controller, controlAccount);
+		
+		// Finally remove peer record from state
+		State s=ctx.getState();
+		ctx=ctx.withState(s.withPeers(s.getPeers().dissoc(peerKey)));
+		
+		return ctx.withResult(CVMLong.create(peerStake));
 	}
 
 	/**
