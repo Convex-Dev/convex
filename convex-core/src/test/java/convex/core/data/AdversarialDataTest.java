@@ -174,6 +174,12 @@ public class AdversarialDataTest {
 	}
 	
 	@Test
+	public void testDummy() {
+		invalidTest(Cells.DUMMY);
+		// TODO: full validation : invalidTest(Vectors.repeat(Cells.DUMMY, 4096));
+	}
+	
+	@Test
 	public void testBadResult() {
 		invalidTest(Result.buildFromVector(Vectors.of(Symbols.FOO,null,null,null,null))); // invalid ID
 		invalidTest(Result.buildFromVector(Vectors.of(CVMLong.ONE,null,null,null,Keywords.BAR))); // Invalid info map

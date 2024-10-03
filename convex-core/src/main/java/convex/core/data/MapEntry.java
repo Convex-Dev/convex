@@ -278,16 +278,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		keyRef.validate();
-		valueRef.validate();
-		if (!Cells.isCVM(getKey())) throw new InvalidDataException("MapEntry key not a CVM value: " +getKey(),this);
-		if (!Cells.isCVM(getValue())) throw new InvalidDataException("MapEntry value not a CVM value: " +getValue(),this);
-	}
-
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// TODO: is there really Nothing to do?
 	}

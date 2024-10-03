@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 
 import convex.core.Result;
 import convex.core.data.impl.DummyCell;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
@@ -310,6 +311,13 @@ public class Cells {
 			}
 		}
 		return value;
+	}
+
+	public static void validate(ACell cell) throws InvalidDataException {
+		if (cell==null) return; // OK, this is the null value
+		Ref<?> ref=cell.getRef();
+		if (ref.isValidated()) return;
+		cell.validateCell();
 	}
 
 }

@@ -730,4 +730,8 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public boolean isInternal() {
 		return (flags & STATUS_MASK) == INTERNAL;
 	}
+
+	public boolean isValidated() {
+		return getStatus()>=VALIDATED;
+	}
 }

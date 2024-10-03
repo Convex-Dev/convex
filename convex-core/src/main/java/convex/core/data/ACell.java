@@ -31,7 +31,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 
 	@Override
 	public void validate() throws InvalidDataException {
-		validateCell();
+		Cells.validate(this);
 	}
 	
 	/**
