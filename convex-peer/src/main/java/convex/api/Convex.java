@@ -402,7 +402,7 @@ public abstract class Convex implements AutoCloseable {
 	 * Prepares a transaction for network submission
 	 * - Pre-compiles if needed
 	 * - Sets origin account to current address
-	 * - Sets sequence number (if autosequencing is enabled)
+	 * - Sets sequence number (if auto-sequencing is enabled)
 	 * - Signs transaction with current key pair
 	 *
 	 * @param code Code to prepare as transaction

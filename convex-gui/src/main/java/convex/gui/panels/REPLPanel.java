@@ -121,8 +121,9 @@ public class REPLPanel extends JPanel {
 		AString s=RT.print(m);
 		String resultString=(s==null)?"Print limit exceeded!":s.toString();
 		
+		output.append("=> ", Color.CYAN);
 		int start=output.docLength();
-		output.append(" => " + resultString + "\n");
+		output.append(resultString + "\n");
 		int end=output.docLength();
 		updateHighlight(output,start,end);
 		
@@ -293,13 +294,20 @@ public class REPLPanel extends JPanel {
 					Address qaddr=getAddress();
 					future = convex.query(code, qaddr);
 				} else if (mode.equals("Transact")) {
-					SignedData<ATransaction> strans=convex.prepareTransaction(code);					
-					if (btnTX.isSelected()) {
-						addOutputWithHighlight(output,strans.toString()+"\n");
-						output.append("TX Hash: "+strans.getHash()+"\n");
-					}
+					future = CompletableFuture.supplyAsync(()->{
+						try {
+							SignedData<ATransaction> strans=convex.prepareTransaction(code);					
+							if (btnTX.isSelected()) {
+								addOutputWithHighlight(output,strans.toString()+"\n");
+								output.append("TX Hash: "+strans.getHash()+"\n");
+							}
+							return strans;
+						} catch(Exception e) {
+							throw Utils.sneakyThrow(e);
+						}
+					}).thenCompose(strans->convex.transact(strans));
+							
 					
-					future = convex.transact(strans);
 				} else if (mode.equals("Prepare")) {
 					SignedData<ATransaction> strans=convex.prepareTransaction(code);	
 					convex.clearSequence();
@@ -313,6 +321,7 @@ public class REPLPanel extends JPanel {
 				future.handleAsync((m,e)->{
 					if (e!=null) {
 						e.printStackTrace();
+						m=Result.fromException(e);
 					} 
 					handleResult(start,m);
 					Toolkit.scrollToBottom(outputScrollPane);

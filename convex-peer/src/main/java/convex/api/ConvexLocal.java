@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
@@ -77,6 +78,7 @@ public class ConvexLocal extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
+		
 		maybeUpdateSequence(signed);
 		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
 		return r;
@@ -105,6 +107,11 @@ public class ConvexLocal extends Convex {
 	}
 	
 	private CompletableFuture<Result> makeMessageFuture(Message message) {
+		if (!isConnected()) {
+			Result r=Result.error(ErrorCodes.CONNECT, "Disconnected").withSource(SourceCodes.CLIENT);
+			return CompletableFuture.completedFuture(r);
+		}
+		
 		CompletableFuture<Result> cf=new CompletableFuture<>();
 		Predicate<Message> resultHandler=makeResultHandler(cf);
 		Message ml=message.withResultHandler(resultHandler);
