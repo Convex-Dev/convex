@@ -381,18 +381,21 @@ public class TransactionHandler extends AThreadedComponent {
 		if (!Utils.bool(server.getConfig().get(Keywords.AUTO_MANAGE))) return;
 
 		State s=p.getConsensusState();
-		String desiredHostname=server.getHostname(); // Intended hostname
 		AccountKey peerKey=p.getPeerKey();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return; // No peer record in consensus state?
 		
+		// No point setting this if low staked
+		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) return;
+		
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();
+		String desiredHostname=server.getHostname(); // Intended hostname
 		
 		// Try to set hostname if not correctly set
 		trySetHostname:
 		if (!Utils.equals(desiredHostname, currentHostname)) {
-			log.debug("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
+			log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
 			Address address=ps.getController();
 			if (address==null) break trySetHostname;
 			AccountStatus as=s.getAccount(address);
