@@ -121,6 +121,9 @@ public class TransactionHandler extends AThreadedComponent {
 	
 	private Result checkPeerState() {
 		try {
+			if (!server.isLive()) {
+				return Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
+			}
 			Peer p=server.getPeer();
 			State s=server.getPeer().getConsensusState();
 			PeerStatus ps=s.getPeers().get(p.getPeerKey());

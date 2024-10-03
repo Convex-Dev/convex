@@ -175,6 +175,7 @@ public class NIOServer implements Closeable {
 
 					// keys.clear();
 				}
+				
 			} catch (IOException e) {
 				log.error("Unexpected IO Exception, terminating selector loop: ", e);
 			} finally {
@@ -201,8 +202,8 @@ public class NIOServer implements Closeable {
 					}
 				}
 
-				log.debug("Selector loop ended on port: " + getPort());
 			}
+			log.debug("Selector loop ended on port: " + getPort());
 		}
 	};
 

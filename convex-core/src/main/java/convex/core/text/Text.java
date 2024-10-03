@@ -91,15 +91,27 @@ public class Text {
 	 * @return Formatted String like "12.000567123"
 	 */
 	public static String toFriendlyBalance(long balance) {
+		return toFriendlyBalance(balance,Coin.DECIMALS);
+	}
+	
+	/**
+	 * Format function for Convex Coin balances
+	 * @param balance Balance in Convex Coins
+	 * @return Formatted String like "12.000567123"
+	 */
+	public static String toFriendlyBalance(long balance, int decimals) {
 		if (!Coin.isValidAmount(balance)) throw new IllegalArgumentException("Invalid balance)");
 		long gold=balance/Coin.GOLD;
 		long copper = balance%Coin.GOLD;
+		String goldString=toFriendlyNumber(gold);
+		if (decimals<=0) return goldString;
+		
 		String copperString=Long.toString(copper);
 		int cn=copperString.length();
-		if (cn<9) {
-			copperString=ZEROS_9.substring(cn,9)+copperString;
+		if (cn<decimals) {
+			copperString=ZEROS_9.substring(cn,decimals)+copperString;
 		}
-		return toFriendlyNumber(gold)+"."+copperString;
+		return goldString+"."+copperString;
 	}
 
 

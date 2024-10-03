@@ -213,9 +213,9 @@ public class PeerComponent extends BaseListComponent {
 			if (ps!=null) {
 				sb.append("Controller: "+ps.getController());
 				sb.append("   ");
-				sb.append("Stake: "+Text.toFriendlyBalance(ps.getPeerStake()));
+				sb.append("Stake: "+Text.toFriendlyBalance(ps.getPeerStake(),2));
 				sb.append("   ");
-				sb.append("Delegated Stake: "+Text.toFriendlyBalance(ps.getDelegatedStake()));
+				sb.append("Delegated Stake: "+Text.toFriendlyBalance(ps.getDelegatedStake(),2));
 				sb.append("   ");
 			} else {
 				sb.append("Not currently a registered peer    ");
