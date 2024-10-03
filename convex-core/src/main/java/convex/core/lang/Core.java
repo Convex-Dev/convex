@@ -986,7 +986,19 @@ public class Core {
 			return context.createPeer(accountKey, amount.longValue()).consumeJuice(Juice.PEER_UPDATE);
 		}
 	});
+	
+	public static final CoreFn<CVMLong> EVICT_PEER = reg(new CoreFn<>(Symbols.EVICT_PEER,68) {
+		
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
+			AccountKey accountKey = RT.ensureAccountKey(args[0]);
+			if (accountKey == null) return context.withCastError(0,args, Types.BLOB);
+
+			return context.evictPeer(accountKey).consumeJuice(Juice.PEER_UPDATE);
+		}
+	});
 
 	public static final CoreFn<CVMLong> SET_PEER_DATA = reg(new CoreFn<>(Symbols.SET_PEER_DATA,66) {
 		

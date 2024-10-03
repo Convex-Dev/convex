@@ -2041,10 +2041,6 @@ public class Context {
 
 		Address myAddress=getAddress();
 
-		// TODO: SECURITY fix
-		// AccountStatus as=getAccountStatus(myAddress);
-		// if (!as.getAccountKey().equals(accountKey)) return this.withArgumentError("Cannot create a peer with a different account-key");
-
 		long balance=getBalance(myAddress);
 		if (initialStake>balance) return this.withFundsError("Insufficient balance ("+balance+") to assign an initial stake of "+initialStake);
 
@@ -2054,6 +2050,15 @@ public class Context {
 		s=s.withBalance(myAddress, balance-initialStake); // adjust own balance
 		s=s.withPeer(accountKey, newPeerStatus); // add peer
 		return withState(s);
+	}
+	
+	public Context evictPeer(AccountKey peerKey) {
+		State s=getState();
+		PeerStatus ps=s.getPeer(peerKey);
+		if (ps==null) {
+			return this;
+		}
+		return withError(ErrorCodes.TODO,"Can't evict peers yet!");
 	}
 
 	/**

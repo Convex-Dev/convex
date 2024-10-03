@@ -548,6 +548,13 @@
  {:doc {:description "Like `eval` but evaluates code in the environment of the specifed account. The current account must have controller privileges to execute this operation (see `set-controller`)."
         :examples    [{:code "(eval-as #666 '(+ 1 2))"}]
         :signature   [{:params [address form]}]}}
+ 
+ evict-peer
+ {:doc {:description "Evicts a peer. Peer must be insufficiently staked, or controlled by this account"
+        :errors      {:CAST "If the first argument is not a valid account-key."}
+        :examples    [{:code "(evict-peer peer-key)"}]
+        :signature   [{:params [peer-key]
+        		      :return Long}]}}
 
  exp
  {:doc {:description "Returns `e` raised to the power of the given numerical argument."
