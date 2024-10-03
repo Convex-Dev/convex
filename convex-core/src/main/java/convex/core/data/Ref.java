@@ -53,17 +53,16 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int STORED = 1;
 
 	/**
+	 * Ref status indicating the Ref has been validated. Requires validation of full tree.
+	 */
+	public static final int VALIDATED = 2;
+	
+	/**
 	 * Ref status indicating the Ref has been deeply persisted in long term storage.
 	 * The Ref and its children can be assumed to be accessible for the life of the
 	 * storage subsystem execution. Embedded cells can assume persisted at minimum.
 	 */
-	public static final int PERSISTED = 2;
-
-	/**
-	 * Ref status indicating the Ref has been both persisted and validated as genuine
-	 * valid CVM data.
-	 */
-	public static final int VALIDATED = 3;
+	public static final int PERSISTED = 3;
 
 	/**
 	 * Ref status indicating the Ref has been shared by this peer in an announced
@@ -125,9 +124,9 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public static final int VERIFICATION_MASK = VERIFIED_MASK | BAD_MASK;
 
 	/**
-	 * Flags for valid embedded values, typically used on creation
+	 * Flags for embedded values, typically used on creation
 	 */
-	public static final int VALID_EMBEDDED_FLAGS=PERSISTED|KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
+	public static final int VALID_EMBEDDED_FLAGS=STORED|KNOWN_EMBEDDED_MASK|VERIFIED_MASK;
 	
 	/**
 	 * Flags for valid embedded values, typically used on creation
