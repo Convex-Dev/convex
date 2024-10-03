@@ -2054,10 +2054,14 @@ public class Context {
 	
 	public Context evictPeer(AccountKey peerKey) {
 		Context ctx=this;
-		PeerStatus ps=ctx.getState().getPeer(peerKey);
+		Index<AccountKey, PeerStatus> peers = ctx.getState().getPeers();
+		PeerStatus ps=peers.get(peerKey);
 		if (ps==null) {
+			// no peer to evict
 			return this;
 		}
+
+		// Check if we are allowed to evict this peer
 		Address controller=ps.getController();
 		if (Utils.equals(ctx.getAddress(),ps.getController())) {
 			// OK
@@ -2066,11 +2070,17 @@ public class Context {
 				return ctx.withError(ErrorCodes.STATE,"Peer has too much stake to be evicted");
 			}
 		}
+		if (peers.count()==1) {
+			return ctx.withError(ErrorCodes.STATE,"Cannot evict last peer");
+		}
+		
+		// Refund delegated stakes
 		Index<Address, CVMLong> stakes = ps.getStakes();
 		long ns=stakes.count();
 		for (int i=0; i<ns; i++) {
 			// SECURITY: update juice limit while evicting delegated stakes
-			// This is safe because we are only deleting stuff
+			// This is safe(ish) because we are only moving / deleting stuff
+			// so a sufficiently endowed account should always be able to evict a peer
 			MapEntry<Address,CVMLong> staked=stakes.entryAt(i);
 			ctx=ctx.withJuiceLimit(getJuiceLimit()+Juice.TRANSFER);
 			ctx=ctx.consumeJuice(Juice.TRANSFER);

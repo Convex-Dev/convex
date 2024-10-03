@@ -487,6 +487,7 @@ public abstract class Convex implements AutoCloseable {
 		if (Cells.equals(origin, address)) { 
 			this.sequence=seq;
 		}		
+		if (keyPair==null) throw new ResultException(Result.error(ErrorCodes.SIGNATURE, "No key pair set"));
 		
 		SignedData<ATransaction> signed = keyPair.signData(transaction);
 		return signed;
