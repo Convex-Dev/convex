@@ -108,6 +108,31 @@ public class TransactionHandler extends AThreadedComponent {
 		interests.put(signedTransactionHash, m);
 	}
 	
+	private void processMessages() throws InterruptedException {
+		Result problem=checkPeerState();
+		for (Message msg: messages) {
+			if (problem==null) {
+				processMessage(msg);
+			} else {
+				msg.returnResult(problem);
+			}
+		}
+	}
+	
+	private Result checkPeerState() {
+		try {
+			Peer p=server.getPeer();
+			State s=server.getPeer().getConsensusState();
+			PeerStatus ps=s.getPeers().get(p.getPeerKey());
+			if (ps==null) {
+				return Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
+			}
+			return null;
+		} catch (Exception e) {
+			return Result.error(ErrorCodes.STATE, Strings.create("Peer problem: "+e.getMessage())).withSource(SourceCodes.PEER);
+		}
+	}
+
 	protected void processMessage(Message m) throws InterruptedException {
 		try {
 			this.receivedTransactionCount++;
@@ -420,13 +445,12 @@ public class TransactionHandler extends AThreadedComponent {
 			// Process transaction messages
 			// This might block if we aren't generating blocks fast enough
 			// Which is OK, since we transfer backpressure to clients
-			for (Message msg: messages) {
-				processMessage(msg);
-			}
+			processMessages();
 		} finally {
 			messages.clear();
 		}
 	}
+
 
 	@Override
 	protected String getThreadName() {
