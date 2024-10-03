@@ -600,8 +600,6 @@ public class ConnectionManager extends AThreadedComponent {
 			// close the temp connection to Convex API
 			convex.close();
 			
-		
-
 			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
 			if (peerKey==null) return null;
 

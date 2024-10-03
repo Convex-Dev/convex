@@ -44,6 +44,7 @@ import convex.core.transactions.ATransaction;
 import convex.core.transactions.Invoke;
 import convex.core.transactions.Transfer;
 import convex.core.util.Utils;
+import convex.net.IPUtils;
 import convex.net.Message;
 import convex.net.ResultConsumer;
 import convex.peer.Config;
@@ -139,6 +140,22 @@ public abstract class Convex implements AutoCloseable {
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
 		this.address = address;
+	}
+	
+	/**
+	 * Attempts best possible connection
+	 * @throws TimeoutException 
+	 * @throws IOException 
+	 */
+	public static Convex connect(Object host) throws IOException, TimeoutException {
+		if (host instanceof Convex) return (Convex)host;
+		if (host instanceof Convex) return connect((Server)host);
+		
+		InetSocketAddress sa=IPUtils.toInetSocketAddress(host);
+		if (sa==null) {
+			throw new IllegalArgumentException("Unrecognised connect type "+Utils.getClassName(host));
+		}
+		return connect(sa);
 	}
 
 	/**

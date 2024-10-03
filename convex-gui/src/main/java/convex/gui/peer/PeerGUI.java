@@ -373,8 +373,9 @@ public class PeerGUI extends AbstractGUI {
 			HashMap<Keyword, Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR, kp);
 			config.put(Keywords.CONTROLLER, a);
-			config.put(Keywords.STATE, genesisState);
+			config.put(Keywords.SOURCE, convex);
 			Server server=API.launchPeer(config);
+			server.getCVMExecutor().setPeer(server.syncPeer(kp,convex)); 
 			server.getConnectionManager().connectToPeer(base.getHostAddress());
 			server.setHostname("localhost:"+server.getPort());
 			base.getConnectionManager().connectToPeer(server.getHostAddress());

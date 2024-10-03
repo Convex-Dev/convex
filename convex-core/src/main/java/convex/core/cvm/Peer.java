@@ -180,14 +180,14 @@ public class Peer {
 	 * Create a Peer instance from a remotely acquired Belief
 	 * @param peerKP Peer KeyPair
 	 * @param genesisState Initial genesis State of the Network
-	 * @param remoteBelief Remote belief to sync with
+	 * @param initialBelief Initial belief
 	 * @return New Peer instance
 	 * @throws InvalidDataException if invalid data was found in merged belief
 	 */
-	public static Peer create(AKeyPair peerKP, State genesisState, Belief remoteBelief) throws InvalidDataException {
+	public static Peer create(AKeyPair peerKP, State genesisState, Belief initialBelief) throws InvalidDataException {
 		Peer peer=create(peerKP,genesisState);
 		peer=peer.updateTimestamp(Utils.getCurrentTimestamp());
-		peer=peer.mergeBeliefs(remoteBelief);
+		peer=peer.updateBelief(initialBelief);
 		return peer;
 	}
 	
@@ -468,7 +468,10 @@ public class Peer {
 	 */
 	public Peer updateBelief(Belief newBelief) {
 		if (belief == newBelief) return this;
-		return new Peer(keyPair, newBelief, consensusOrder,statePosition,state, genesis, historyPosition,blockResults, timestamp);
+		Order order=belief.getOrder(peerKey);
+		if (order==null) order=this.consensusOrder;
+		// System.out.println(Lists.of(order.getConsensusPoints()));
+		return new Peer(keyPair, newBelief, order,statePosition,state, genesis, historyPosition,blockResults, timestamp);
 	}	
 	
 	/**

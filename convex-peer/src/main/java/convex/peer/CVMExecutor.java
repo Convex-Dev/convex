@@ -64,6 +64,11 @@ public class CVMExecutor extends AThreadedComponent {
 		}
 	}
 	
+	public void syncPeer(Server base) {
+		// TODO Auto-generated method stub
+		
+	}
+	
 	public synchronized void persistPeerData() throws IOException {
 		peer = server.persistPeerData();
 
@@ -96,5 +101,7 @@ public class CVMExecutor extends AThreadedComponent {
 	public void setUpdateHook(Consumer<Peer> hook) {
 		updateHook=hook;
 	}
+
+
 
 }
