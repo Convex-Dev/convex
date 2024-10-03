@@ -7,8 +7,8 @@ import java.util.function.Predicate;
 
 import convex.core.Result;
 import convex.core.SourceCodes;
-import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;

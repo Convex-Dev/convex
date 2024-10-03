@@ -5,7 +5,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.ResultContext;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;

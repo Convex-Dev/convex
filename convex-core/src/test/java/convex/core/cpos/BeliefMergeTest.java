@@ -13,9 +13,9 @@ import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
 
 import convex.core.Constants;
-import convex.core.Peer;
-import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Peer;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;

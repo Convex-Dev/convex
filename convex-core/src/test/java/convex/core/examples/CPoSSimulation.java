@@ -3,13 +3,13 @@ package convex.core.examples;
 import java.util.List;
 import java.util.Random;
 
-import convex.core.Peer;
-import convex.core.State;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Peer;
+import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;

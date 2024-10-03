@@ -14,8 +14,8 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
-import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;

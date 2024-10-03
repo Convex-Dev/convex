@@ -7,8 +7,8 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.Peer;
 import convex.core.cpos.Belief;
+import convex.core.cvm.Peer;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
 

@@ -4,7 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.Test;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;

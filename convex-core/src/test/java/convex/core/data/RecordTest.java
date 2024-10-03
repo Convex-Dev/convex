@@ -7,10 +7,10 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
+import convex.core.cvm.State;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
 import convex.core.lang.RecordFormat;

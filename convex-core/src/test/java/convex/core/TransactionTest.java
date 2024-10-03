@@ -12,6 +12,7 @@ import java.util.HashMap;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;

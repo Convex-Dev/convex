@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.State;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;

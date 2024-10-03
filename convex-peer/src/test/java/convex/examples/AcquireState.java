@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import convex.api.Convex;
-import convex.core.State;
+import convex.core.cvm.State;
 
 public class AcquireState {
 

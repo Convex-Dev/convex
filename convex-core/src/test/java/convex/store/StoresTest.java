@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;

@@ -4,7 +4,7 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ARecord;
 import convex.core.data.AccountStatus;
 import convex.core.data.PeerStatus;

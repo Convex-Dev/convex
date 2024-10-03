@@ -33,10 +33,10 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.State;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;

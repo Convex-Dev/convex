@@ -1,5 +1,6 @@
 package convex.core;
 
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Keyword;

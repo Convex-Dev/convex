@@ -12,7 +12,7 @@ import convex.cli.CLIError;
 import convex.cli.Constants;
 import convex.cli.ExitCodes;
 import convex.cli.Helpers;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.init.Init;

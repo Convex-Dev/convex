@@ -13,7 +13,7 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.Result;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;

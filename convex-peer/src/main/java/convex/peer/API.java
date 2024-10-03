@@ -9,8 +9,8 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.core.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;

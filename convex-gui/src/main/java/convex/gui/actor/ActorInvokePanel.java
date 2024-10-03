@@ -4,7 +4,7 @@ import javax.swing.DefaultListModel;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ASet;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;

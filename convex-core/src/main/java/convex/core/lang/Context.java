@@ -5,7 +5,7 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.ResultContext;
 import convex.core.SourceCodes;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;

@@ -11,8 +11,8 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Peer;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Peer;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;

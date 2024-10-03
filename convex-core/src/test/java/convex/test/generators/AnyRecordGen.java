@@ -5,9 +5,9 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.Constants;
-import convex.core.Receipt;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
+import convex.core.cvm.Receipt;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Vectors;

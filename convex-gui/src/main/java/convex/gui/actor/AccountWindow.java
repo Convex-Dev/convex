@@ -4,7 +4,7 @@ import javax.swing.JFrame;
 import javax.swing.JTabbedPane;
 
 import convex.api.Convex;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.gui.components.AbstractGUI;

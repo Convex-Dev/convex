@@ -2,7 +2,7 @@ package convex.gui.models;
 
 import javax.swing.table.TableModel;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountStatus;

@@ -16,10 +16,10 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.Constants;
-import convex.core.Peer;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.cpos.Belief;
+import convex.core.cvm.Peer;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;

@@ -3,7 +3,7 @@ package convex.gui.models;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountStatus;

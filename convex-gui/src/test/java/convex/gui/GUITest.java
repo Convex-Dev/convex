@@ -11,7 +11,7 @@ import java.awt.HeadlessException;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.InvalidDataException;
 import convex.dlfs.DLFileSystem;

@@ -13,7 +13,7 @@ import javax.swing.JTable;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.TableColumnModel;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.models.TorusTableModel;

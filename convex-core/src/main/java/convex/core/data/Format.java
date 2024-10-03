@@ -8,13 +8,13 @@ import java.util.HashSet;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import convex.core.Receipt;
 import convex.core.Result;
-import convex.core.State;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.Order;
+import convex.core.cvm.Receipt;
+import convex.core.cvm.State;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;

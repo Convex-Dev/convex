@@ -25,7 +25,7 @@ import javax.swing.table.TableCellRenderer;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.AArrayBlob;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;

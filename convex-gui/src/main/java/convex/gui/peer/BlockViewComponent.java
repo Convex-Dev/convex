@@ -7,7 +7,7 @@ import java.awt.Graphics;
 import javax.swing.JPanel;
 
 import convex.api.ConvexLocal;
-import convex.core.Peer;
+import convex.core.cvm.Peer;
 import convex.core.cpos.Block;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;

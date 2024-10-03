@@ -1,4 +1,4 @@
-package convex.core;
+package convex.core.cvm;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -7,6 +7,11 @@ import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.Constants;
+import convex.core.ErrorCodes;
+import convex.core.Result;
+import convex.core.ResultContext;
+import convex.core.SourceCodes;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;

@@ -10,8 +10,8 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Receipt;
 import convex.core.Result;
+import convex.core.cvm.Receipt;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;

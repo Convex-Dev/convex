@@ -8,7 +8,7 @@ import javax.swing.JPanel;
 import javax.swing.JTextArea;
 
 import convex.api.ConvexLocal;
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.crypto.bc.BCKeyPair;
 import convex.core.crypto.bc.BCProvider;
 import convex.core.data.prim.CVMLong;

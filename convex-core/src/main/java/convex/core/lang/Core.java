@@ -9,8 +9,8 @@ import java.util.Map;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
-import convex.core.State;
 import convex.core.crypto.Hashing;
+import convex.core.cvm.State;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;

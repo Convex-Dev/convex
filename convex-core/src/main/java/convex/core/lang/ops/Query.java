@@ -1,6 +1,6 @@
 package convex.core.lang.ops;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;

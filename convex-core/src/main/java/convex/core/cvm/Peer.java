@@ -1,9 +1,13 @@
-package convex.core;
+package convex.core.cvm;
 
 import java.io.IOException;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
+import convex.core.Constants;
+import convex.core.ErrorCodes;
+import convex.core.Result;
+import convex.core.ResultContext;
 import convex.core.cpos.Belief;
 import convex.core.cpos.BeliefMerge;
 import convex.core.cpos.Block;

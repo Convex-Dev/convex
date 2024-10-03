@@ -2,7 +2,7 @@ package convex.core.examples;
 
 import java.util.List;
 
-import convex.core.State;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;

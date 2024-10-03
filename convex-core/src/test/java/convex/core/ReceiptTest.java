@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Receipt;
 import convex.core.data.Blob;
 import convex.core.data.RecordTest;
 import convex.core.data.Vectors;
