@@ -45,7 +45,7 @@ public class Strings {
 	public static final StringShort MISSING_PEER = StringShort.create("Missing Peer!");
 
 	public static final StringShort INSUFFICIENT_STAKE = StringShort.create("Insufficient Stake!");
-
+	
 	public static final StringShort ILLEGAL_BLOCK_SIZE = StringShort.create("Illegal Block Size!");
 
 	public static final StringShort BACKDATED_BLOCK = StringShort.create("Block too old");

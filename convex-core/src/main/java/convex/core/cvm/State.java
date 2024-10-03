@@ -15,6 +15,7 @@ import convex.core.SourceCodes;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
@@ -43,6 +44,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.AOp;
 import convex.core.lang.Context;
@@ -303,6 +305,7 @@ public class State extends ARecord {
 	 * 
 	 * @param signedBlock Signed Block to apply
 	 * @return The BlockResult from applying the given Block to this State
+	 * @throws InvalidBlockException 
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
 		Block block=signedBlock.getValue();
@@ -315,7 +318,12 @@ public class State extends ARecord {
 		}
 		
 		State state = prepareBlock(block);
-		return state.applyTransactions(block);
+		try {
+			BlockResult blockResult= state.applyTransactions(block);
+			return blockResult;
+		} catch (ValidationException e) {
+			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
+		}
 	}
 
 	/**
@@ -475,7 +483,7 @@ public class State extends ARecord {
 		return new State(accounts, peers, newGlobals, schedule);
 	}
 
-	private BlockResult applyTransactions(Block block) {
+	private BlockResult applyTransactions(Block block) throws InvalidBlockException {
 		State state = this;
 		int blockLength = block.length();
 		Result[] results = new Result[blockLength];
@@ -513,9 +521,15 @@ public class State extends ARecord {
 	 * SECURITY: Checks digital signature and correctness of account key
 	 *
 	 * @return ResultContext containing the result of the transaction
+	 * @throws InvalidBlockException 
 	 */
-	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) {
+	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws InvalidBlockException {
 		// Extract transaction, performs signature check
+		ACell maybe=signedTransaction.getValue();
+		if (!(maybe instanceof ATransaction)) {
+			throw new InvalidBlockException("Not a transaction!");
+		}
+		
 		ATransaction t=signedTransaction.getValue();
 		Address addr=t.getOrigin();
 		AccountStatus as = getAccount(addr);

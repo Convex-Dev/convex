@@ -1,10 +1,13 @@
 package convex.core;
 
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertNotError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -13,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
+import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.data.AVector;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
@@ -36,8 +40,6 @@ import convex.core.transactions.Multi;
 import convex.core.transactions.Transactions;
 import convex.core.transactions.Transfer;
 import convex.test.Samples;
-
-import static convex.test.Assertions.*;
 
 /**
  * Tests for Transactions, especially when applied in isolation to a State
@@ -233,7 +235,7 @@ public class TransactionTest extends ACVMTest {
 	}
 	
 	@Test 
-	public void testBadSequence() throws BadSignatureException {
+	public void testBadSequence() throws BadSignatureException, InvalidBlockException {
 		Invoke t1=Invoke.create(HERO, 2, "(+ 2 5)");
 		SignedData<Invoke> st = Samples.KEY_PAIR.signData(t1);
 		ResultContext rc=state().applyTransaction(st);
@@ -252,8 +254,10 @@ public class TransactionTest extends ACVMTest {
 	
 	/**
 	 * TEsts for transactions that don't get as far as code execution
+	 * @throws InvalidBlockException 
 	 */
-	@Test public void testBadSignedTransactions() {
+	@SuppressWarnings("unchecked")
+	@Test public void testBadSignedTransactions() throws InvalidBlockException {
 		State s=state();
 		AccountStatus as=s.getAccount(HERO);
 		long SEQ=as.getSequence()+1;
@@ -281,6 +285,13 @@ public class TransactionTest extends ACVMTest {
 			assertEquals(ErrorCodes.STATE,rc.getErrorCode());
 			checkNoTransactionEffects(s,rc);
 		}
+		
+		{
+			// signed something other than a transaction
+			@SuppressWarnings("rawtypes")
+			SignedData<ATransaction> st = (SignedData)HERO_KP.signData(Keywords.FOO);
+			assertThrows(InvalidBlockException.class, ()->s.applyTransaction(st));
+		}
 	}
 	
 	private void checkNoTransactionEffects(State s, ResultContext rc) {
@@ -300,7 +311,7 @@ public class TransactionTest extends ACVMTest {
 	}
 	
 	@Test 
-	public void testJuiceFail() {
+	public void testJuiceFail() throws InvalidBlockException {
 		State s=state();
 		AccountStatus as=s.getAccount(HERO);
 		long SEQ=as.getSequence()+1;
