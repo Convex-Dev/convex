@@ -1,27 +1,34 @@
 package convex.core.lang;
 
 import java.util.HashMap;
-import java.util.Set;
 
+import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Keyword;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
 
+/**
+ * Defines the format of a Record structure, as an ordered vector of keys.
+ * 
+ * Keys must be unique keywords in standard records
+ */
 public class RecordFormat {
 
 	protected final long count;
 	protected final AVector<Keyword> keys;
 	protected final HashMap<Keyword, Long> indexes = new HashMap<>();
-	protected final Set<Keyword> keySet;
+	protected final ASet<Keyword> keySet;
 
 	private RecordFormat(AVector<Keyword> keys) {
 		this.keys = keys;
 		count = keys.count();
+		keySet = Sets.create(keys);
+		if (keySet.count()!=count) throw new IllegalArgumentException("Duplicate keys in: "+keys);
+		
 		for (int i = 0; i < count; i++) {
 			indexes.put(keys.get(i), Long.valueOf(i));
 		}
-		keySet = Sets.create(keys);
 	}
 
 	public long count() {
@@ -40,7 +47,7 @@ public class RecordFormat {
 		return new RecordFormat(Vectors.create(keys));
 	}
 
-	public Set<Keyword> keySet() {
+	public ASet<Keyword> keySet() {
 		return keySet;
 	}
 
