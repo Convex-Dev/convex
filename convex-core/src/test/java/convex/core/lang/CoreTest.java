@@ -3335,6 +3335,17 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("(transfer 1)"));
 		assertArityError(step("(transfer 1 2 3)"));
 	}
+	
+	@Test
+	public void testTransferBurn() {
+		Context ctx=context();
+		long supply=ctx.getState().computeSupply();
+		long AMT=1000000;
+		
+		ctx=exec(ctx,"(transfer #0 "+AMT+")");
+		
+		assertEquals(supply-AMT,ctx.getState().computeSupply());
+	}
 
 	@Test
 	public void testStake() {

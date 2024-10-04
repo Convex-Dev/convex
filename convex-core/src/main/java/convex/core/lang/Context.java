@@ -1470,7 +1470,8 @@ public class Context {
 		}
 		AccountStatus targetAccount=accounts.get(targetIndex);
 
-		if (targetAccount.isActor()) {
+		// Special handling for an actor account other than #0 (burn address)
+		if (targetAccount.isActor()&&(!(target.longValue()==0))) {
 			// (call target amount (receive-coin source amount nil))
 			// SECURITY: actorCall must do fork to preserve this
 			Context actx=this.fork();
@@ -1479,19 +1480,18 @@ public class Context {
 
 			long sent=currentBalance-actx.getBalance(source);
 			return actx.withResult(CVMLong.create(sent));
-		} else {
-			// must be a user account
-			long oldTargetBalance=targetAccount.getBalance();
-			long newTargetBalance=oldTargetBalance+amount;
-			AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
-			accounts=accounts.assoc(targetIndex, newTargetAccount);
+		} 
+		
+		// must be a user account
+		long oldTargetBalance=targetAccount.getBalance();
+		long newTargetBalance=oldTargetBalance+amount;
+		AccountStatus newTargetAccount=targetAccount.withBalance(newTargetBalance);
+		accounts=accounts.assoc(targetIndex, newTargetAccount);
 
-			// SECURITY: new context with updated accounts
-			Context result=withChainState(chainState.withAccounts(accounts)).withResult(CVMLong.create(amount));
+		// SECURITY: new context with updated accounts
+		Context result=withChainState(chainState.withAccounts(accounts)).withResult(CVMLong.create(amount));
 
-			return result;
-		}
-
+		return result;
 	}
 
 	/**
