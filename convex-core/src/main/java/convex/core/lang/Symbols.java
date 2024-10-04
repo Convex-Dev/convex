@@ -191,6 +191,8 @@ public class Symbols {
 	public static final Symbol STAR_PARENT = intern("*parent*");
 	public static final Symbol STAR_NOP = intern("*nop*");
 	public static final Symbol STAR_MEMORY_PRICE = intern("*memory-price*");
+	public static final Symbol STAR_SIGNER = intern("*signer*");
+	public static final Symbol STAR_PEER = intern("*peer*");
 
 	public static final Symbol STAR_LANG = intern("*lang*");
 
@@ -343,10 +345,6 @@ public class Symbols {
 	public static final Symbol PROTOCOL = intern("protocol");
 	public static final Symbol CREATE = intern("create");
 
-
-
-
-	
 
 	
 	public static Symbol intern(String s) {

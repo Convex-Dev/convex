@@ -27,7 +27,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte specialCode;
 	
-	private static int NUM_SPECIALS=22;
+	private static int NUM_SPECIALS=24;
 	private static final int BASE=0;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
@@ -56,6 +56,8 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static final byte S_PARENT=BASE+19;
 	private static final byte S_NOP=BASE+20;
 	private static final byte S_MEMORY_PRICE=BASE+21;
+	private static final byte S_SIGNER=BASE+22;
+	private static final byte S_PEER=BASE+23;
 
 	static {
 		reg(S_JUICE,Symbols.STAR_JUICE);
@@ -80,6 +82,8 @@ public class Special<T extends ACell> extends AOp<T> {
 		reg(S_PARENT,Symbols.STAR_PARENT);
 		reg(S_NOP,Symbols.STAR_NOP);
 		reg(S_MEMORY_PRICE,Symbols.STAR_MEMORY_PRICE);
+		reg(S_SIGNER,Symbols.STAR_SIGNER);
+		reg(S_PEER,Symbols.STAR_PEER);
 	}
 	
 	private static byte reg(byte opCode, Symbol sym) {
@@ -132,6 +136,8 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_PARENT: ctx= ctx.withResult(ctx.getAccountStatus().getParent()); break;
 		case S_NOP: break; // unchanged context, propagates *result*
 		case S_MEMORY_PRICE: ctx=ctx.withResult(CVMDouble.create(ctx.getState().getMemoryPrice())); break ;
+		case S_SIGNER: ctx=ctx.withResult(null); break; // TODO
+		case S_PEER: ctx=ctx.withResult(null); break ; // TODO
 		
 		default:
 			throw new Error("Bad Opcode"+specialCode);
