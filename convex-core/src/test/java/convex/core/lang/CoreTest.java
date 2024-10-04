@@ -3411,13 +3411,17 @@ public class CoreTest extends ACVMTest {
 		
 		// Increase stake
 		ctx=exec(ctx,"(set-peer-stake "+KEY+" "+STK*3+")");
+		assertCVMEquals(STK*2,ctx.getResult());
 		ps=ctx.getState().getPeer(KEY);
 		assertEquals(STK*3,ps.getPeerStake());
 		assertEquals(STK*3,ps.getTotalStake());
 		assertEquals(STK*3,ps.getBalance());
 		
-		
+		// Check we can't set nonsensical stakes
 		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" 999999999999999999)"));
+		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" (+ 1 "+STK*3+" *balance*))"));
+		assertArgumentError(step(ctx,"(set-peer-stake "+KEY+" -1)"));
+		
 		assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 		
 		// Finally remove all stake

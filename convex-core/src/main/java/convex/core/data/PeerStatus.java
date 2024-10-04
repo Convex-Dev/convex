@@ -240,6 +240,8 @@ public class PeerStatus extends ARecord {
 	 * @return Value of delegated stake
 	 */
 	public PeerStatus withDelegatedStake(Address delegator, long newStake) {
+		if (newStake<0L) throw new IllegalArgumentException("Negative peer stake!");
+
 		long oldStake = getDelegatedStake(delegator);
 		if (oldStake == newStake) return this;
 
@@ -262,6 +264,8 @@ public class PeerStatus extends ARecord {
 	 * @return Updates PeerStatus
 	 */
 	public PeerStatus withPeerStake(long newStake) {
+		if (newStake<0L) throw new IllegalArgumentException("Negative peer stake!");
+
 		if (peerStake == newStake) return this;
 		long stakeChange=newStake-peerStake;
 
@@ -276,6 +280,10 @@ public class PeerStatus extends ARecord {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if (stakes==null) throw new InvalidDataException("Null stakes?",this);
+		if (balance<0L) throw new InvalidDataException("Negative balance?",this);
+		if (delegatedStake<0L) throw new InvalidDataException("Negative delegated stake?",this);
+		if (peerStake<0L) throw new InvalidDataException("Negative peer stake?",this);
+
 		stakes.validateCell();
 		if (metadata!=null) metadata.validateCell();
 	}
