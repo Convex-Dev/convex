@@ -31,6 +31,8 @@ import java.io.IOException;
 import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.Coin;
 import convex.core.Constants;
@@ -103,6 +105,7 @@ import convex.test.Samples;
  * Needs completely deterministic, fully specified behaviour if we want
  * consistent results so we need to do a lot of negative testing here.
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public class CoreTest extends ACVMTest {
 
 	protected CoreTest() throws IOException {
@@ -5125,49 +5128,7 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step("(sqrt false)"));
 	}
 
-	@Test
-	public void testSpecialKey() {
-		assertEquals(InitTest.HERO_KEYPAIR.getAccountKey(), eval("*key*"));
-	}
-	
-	@Test
-	public void testSpecialPeer() {
-		assertNull(eval("*peer*"));
-	}
 
-	@Test
-	public void testSpecialJuice() {
-		// TODO: semantics of returning juice before lookup complete is OK?
-		// seems sensible, represents "juice left at this position".
-		assertCVMEquals(0, eval(Special.forSymbol(Symbols.STAR_JUICE)));
-
-		// juice gets consumed before returning a value
-		assertCVMEquals(Juice.DO + Juice.CONSTANT, eval(comp("(do 1 *juice*)")));
-	}
-	
-	@Test
-	public void testSpecialJuiceLimit() {
-		Special<CVMLong> spec=Special.forSymbol(Symbols.STAR_JUICE_LIMIT);
-		
-		// Juice limit at start of transaction
-		assertCVMEquals(Constants.MAX_TRANSACTION_JUICE, eval(spec));
-
-		// Consuming a small amount of juice shouldn't change limit
-		Context ctx=step("1");
-		assertCVMEquals(Constants.MAX_TRANSACTION_JUICE, eval(ctx,"*juice-limit*"));
-	}
-	
-	
-	@Test
-	public void testSpecialJuicePrice() {
-		Special<?> jp=Special.forSymbol(Symbols.STAR_JUICE_PRICE);
-		assertNotNull(jp);
-		assertCVMEquals(Constants.INITIAL_JUICE_PRICE, eval(jp));
-		
-		assertCVMEquals(Constants.INITIAL_JUICE_PRICE, eval("*juice-price*"));
-		
-		assertSame(context().getState().getJuicePrice(),eval("*juice-price*"));
-	}
 
 
 

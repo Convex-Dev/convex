@@ -2,6 +2,7 @@ package convex.core.lang;
 
 import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,6 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.Constants;
 import convex.core.data.Address;
@@ -20,6 +23,7 @@ import convex.core.init.InitTest;
 import convex.core.lang.ops.Lookup;
 import convex.core.lang.ops.Special;
 
+@TestInstance(Lifecycle.PER_CLASS)
 public class SpecialTest extends ACVMTest {
 	
 
@@ -46,12 +50,63 @@ public class SpecialTest extends ACVMTest {
 		// Hero should be *origin* in initial context
 		assertEquals(InitTest.HERO, eval("*origin*"));
 		
+		// Origin should be preserved across query-as?
+		assertEquals(InitTest.HERO, eval("(query-as #8 '*origin*)"));
+
 		// *origin* MUST return original address within actor call
 		Context ctx=step("(def act (deploy `(do (defn origin ^{:callable true} [] *origin*))))");
 		assertEquals(InitTest.HERO, eval(ctx,"(call act (origin))"));
 		
 		// *origin* MUST be original address in library call
 		assertEquals(InitTest.HERO, eval(ctx,"(act/origin)"));
+	}
+	
+	@Test
+	public void testSpecialKey() {
+		assertEquals(InitTest.HERO_KEYPAIR.getAccountKey(), eval("*key*"));
+	}
+	
+	@Test
+	public void testSpecialJuice() {
+		// TODO: semantics of returning juice before lookup complete is OK?
+		// seems sensible, represents "juice left at this position".
+		assertCVMEquals(0, eval(Special.forSymbol(Symbols.STAR_JUICE)));
+
+		// juice gets consumed before returning a value
+		assertCVMEquals(Juice.DO + Juice.CONSTANT, eval(comp("(do 1 *juice*)")));
+	}
+	
+	@Test
+	public void testSpecialJuiceLimit() {
+		Special<CVMLong> spec=Special.forSymbol(Symbols.STAR_JUICE_LIMIT);
+		
+		// Juice limit at start of transaction
+		assertCVMEquals(Constants.MAX_TRANSACTION_JUICE, eval(spec));
+
+		// Consuming a small amount of juice shouldn't change limit
+		Context ctx=step("1");
+		assertCVMEquals(Constants.MAX_TRANSACTION_JUICE, eval(ctx,"*juice-limit*"));
+	}
+
+	@Test
+	public void testSpecialJuicePrice() {
+		Special<?> jp=Special.forSymbol(Symbols.STAR_JUICE_PRICE);
+		assertNotNull(jp);
+		assertCVMEquals(Constants.INITIAL_JUICE_PRICE, eval(jp));
+		
+		assertCVMEquals(Constants.INITIAL_JUICE_PRICE, eval("*juice-price*"));
+		
+		assertSame(context().getState().getJuicePrice(),eval("*juice-price*"));
+	}
+	
+	@Test
+	public void testSpecialPeer() {
+		assertNull(eval("*peer*"));
+	}
+	
+	@Test
+	public void testSpecialSigned() {
+		assertNull(eval("*signer*"));
 	}
 
 	@Test
@@ -60,8 +115,10 @@ public class SpecialTest extends ACVMTest {
 		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
 		
 		// Buy some memory
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
+		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE+1, evalL("(do (set-memory (inc *memory*)) *memory*)"));
 
+		// Sell all memory
+		assertEquals(0, evalL("(do (set-memory 0) *memory*)"));
 	}
 	
 	@Test
@@ -74,6 +131,9 @@ public class SpecialTest extends ACVMTest {
 		// Buy some memory, should increase price
 		c=exec(c,"(set-memory (+ *memory* 10))");
 		assertTrue(price<evalD(c,"*memory-price*"));
+		
+		// Check memory went down
+		assertTrue(evalL(c,"*balance*")<HERO_BALANCE);
 	}
 
 
@@ -166,8 +226,9 @@ public class SpecialTest extends ACVMTest {
 	@Test
 	public void testSpecialEdgeCases() {
 
-		// TODO: consider this
-		//assertEquals(Init.HERO,eval(Init.CORE_ADDRESS+"/*balance*"));
+		// query-as interactions with *balance*
+		assertEquals(0,evalL("(query-as #8 '*balance*)"));
+		assertEquals(HERO_BALANCE,evalL("(query-as #8 '(query-as *caller* '*balance*))"));
 
 		// Lookup in core environment of special returns the corresponding Special Op
 		assertSame(Special.get("*juice*"),eval("(lookup *juice*)"));
