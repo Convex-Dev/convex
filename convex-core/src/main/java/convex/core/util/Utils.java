@@ -1268,6 +1268,8 @@ public class Utils {
 		return fastMulDiv(a,b,c);
 	}
 	
+	private static final long LONG_HIGH_BIT=0x8000000000000000L;
+	
 	/**
 	 * Long computation of (a*b)/c. Arguments and result must be in range 0..Long.MAX_VALUE
 	 * 
@@ -1287,11 +1289,11 @@ public class Utils {
  		long ab1 = (m1<<1)|(m0>>>63);
  		if (c<=ab1) return -1;   // we know this will overflow
  		if (ab1==0) return m0/c; // fast path
-		long ab0 = (m0&~0x8000000000000000L);
+		long ab0 = (m0&~LONG_HIGH_BIT);
 
 		// d = 2^63 / c
-		long dq=-(0x8000000000000000L/c); // note we need to reverse sign
-		long dr=Long.remainderUnsigned(0x8000000000000000L, c);  // dr < c
+		long dq=-(LONG_HIGH_BIT/c); // note we need to reverse sign, since LONG_HIGH_BIT is negative
+		long dr=Long.remainderUnsigned(LONG_HIGH_BIT, c);  // dr < c
 
 		while (ab1>0) {			
 			// a * b = c*(ab1*dq) + (ab1*dr + ab0)
@@ -1301,10 +1303,10 @@ public class Utils {
 			m0=ab1*dr;
 			m1=Math.multiplyHigh(ab1, dr);
 			ab1 = (m1<<1)|(m0>>>63);
-			ab0 = (m0&~0x8000000000000000L)+ab0;  // note we add in the previous ab0
+			ab0 = (m0&~LONG_HIGH_BIT)+ab0;  // note we add in the previous ab0
 			if (ab0<0) {
 				// overflow carry
-				ab0=(ab0&~0x8000000000000000L);
+				ab0=(ab0&~LONG_HIGH_BIT);
 				ab1++;
 			}
 		}

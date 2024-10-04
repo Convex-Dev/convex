@@ -41,7 +41,10 @@ public class Economics {
 			return delta>0?Long.MAX_VALUE:Long.MIN_VALUE;
 		}
 		
-		long result=(newB-b)+1; // strict increase
+		// Ensure strict increase:
+		// - if newB was exact, this ensures a strict increase of 1
+		// - if newB was rounded down (had remainder) then this effectively rounds up
+		long result=(newB-b)+1; 
 		
 		return result;
 	}
