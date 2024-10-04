@@ -5,6 +5,7 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.ResultContext;
 import convex.core.SourceCodes;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -2082,7 +2083,7 @@ public class Context {
 		if (Utils.equals(ctx.getAddress(),ps.getController())) {
 			// OK
 		} else {
-			if (ps.getPeerStake()>=Constants.MINIMUM_EFFECTIVE_STAKE) {
+			if (ps.getPeerStake()>=CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
 				return ctx.withError(ErrorCodes.STATE,"Peer has too much stake to be evicted");
 			}
 		}

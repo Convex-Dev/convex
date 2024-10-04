@@ -133,11 +133,6 @@ public class Constants {
 	public static final int HASH_LENGTH = 32;
 
 	/**
-	 * Minimum stake for a Peer to be considered by other Peers in consensus
-	 */
-	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1000;
-
-	/**
 	 * Option for static compilation support. Set to true for static inlines on core
 	 */
 	// TODO: Should ultimately be true for production usage
@@ -163,13 +158,6 @@ public class Constants {
 	 * Default port for Convex Peers
 	 */
 	public static final int DEFAULT_PEER_PORT = 18888;
-
-	/**
-	 * Minimum milliseconds to retain a proposal before switching
-	 */
-	public static final long KEEP_PROPOSAL_TIME = 100;
-
-	public static final long INITIAL_PEER_TIMESTAMP = -1L;
 
 	public static final int MAX_BIG_INTEGER_LENGTH = 4096;
 

@@ -1,5 +1,7 @@
 package convex.core.cpos;
 
+import convex.core.Coin;
+
 public class CPoSConstants {
 
 	/**
@@ -41,6 +43,15 @@ public class CPoSConstants {
 	 * Maximum time a block can be resurrected from the past (1 min)
 	 */
 	public static final long MAX_BLOCK_BACKDATE = 60*1000;
+	public static final long INITIAL_PEER_TIMESTAMP = -1L;
+	/**
+	 * Minimum stake for a Peer to be considered by other Peers in consensus
+	 */
+	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1000;
+	/**
+	 * Minimum milliseconds to retain a proposal before switching
+	 */
+	public static final long KEEP_PROPOSAL_TIME = 100;
 
 
 }

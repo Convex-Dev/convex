@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
 import convex.core.data.ABlob;
@@ -61,7 +62,7 @@ public class StateTransitionsTest {
 	public void testAccountTransfers() throws BadSignatureException {
 		AccountKey ka=KEYPAIR_A.getAccountKey();
 		AccountKey kb=KEYPAIR_B.getAccountKey();
-		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*10;
+		long STAKE=CPoSConstants.MINIMUM_EFFECTIVE_STAKE*10;
 		AVector<AccountStatus> accounts = Vectors.of(
 				AccountStatus.create(ABAL,ka).withMemory(10000),
 				AccountStatus.create(BBAL,kb).withMemory(10000),

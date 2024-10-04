@@ -13,8 +13,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import convex.api.Convex;
-import convex.core.Constants;
 import convex.core.Result;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
@@ -40,7 +40,7 @@ public class JoinNetworkTest {
 		AccountKey peerKey=kp.getAccountKey();
 
 		// We plan to stake twice the minimum amount
-		long STAKE=Constants.MINIMUM_EFFECTIVE_STAKE*2;
+		long STAKE=CPoSConstants.MINIMUM_EFFECTIVE_STAKE*2;
 		
 		synchronized(network.SERVER) {
 			Convex heroConvex=network.CONVEX;

@@ -8,7 +8,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Function;
 
-import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
 import convex.core.data.ABlob;
@@ -151,7 +150,7 @@ public class BeliefMerge {
 		PeerStatus ps=peers.get(key);
 		if (ps==null) return false;
 		
-		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) return false;
+		if (ps.getPeerStake()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false;
 		
 		return true;
 	}
@@ -228,7 +227,7 @@ public class BeliefMerge {
 				//	shouldReplace=true;
 				//}
 				
-				long keepProposalTime=Constants.KEEP_PROPOSAL_TIME; // TODO: needs consideration, maybe randomise?
+				long keepProposalTime=CPoSConstants.KEEP_PROPOSAL_TIME; // TODO: needs consideration, maybe randomise?
 				if (getTimestamp()>myOrder.getTimestamp()+keepProposalTime) {
 					shouldReplace=true;
 				}

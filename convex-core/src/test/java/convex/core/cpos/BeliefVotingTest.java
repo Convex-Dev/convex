@@ -9,7 +9,6 @@ import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
@@ -231,7 +230,7 @@ public class BeliefVotingTest {
 			assertEquals(0,order.getConsensusPoint(2)); // No change in my consensus level 2
 
 			// After enough time, Peer should be willing to switch proposal
-			BeliefMerge mc3=BeliefMerge.create(b, kps[0], TS+1+Constants.KEEP_PROPOSAL_TIME, s);
+			BeliefMerge mc3=BeliefMerge.create(b, kps[0], TS+1+CPoSConstants.KEEP_PROPOSAL_TIME, s);
 			Belief b3=mc3.merge();
 			SignedData<Order> so3=b3.getOrders().get(keys[0]);
 			Order order3=so3.getValue();

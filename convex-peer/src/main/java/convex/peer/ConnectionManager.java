@@ -15,9 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.core.Constants;
 import convex.core.Result;
 import convex.core.cpos.Belief;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
@@ -157,7 +157,7 @@ public class ConnectionManager extends AThreadedComponent {
 			 *  withdrawn, have trivial stake or are slashed from current consideration.
 			 */
 			PeerStatus ps=s.getPeer(p);
-			if ((ps==null)||(ps.getTotalStake()<=Constants.MINIMUM_EFFECTIVE_STAKE)) {
+			if ((ps==null)||(ps.getTotalStake()<=CPoSConstants.MINIMUM_EFFECTIVE_STAKE)) {
 				closeConnection(p);
 				currentPeerCount--;
 				continue;
@@ -218,7 +218,7 @@ public class ConnectionManager extends AThreadedComponent {
 			InetSocketAddress maybeAddress=IPUtils.toInetSocketAddress(hostName.toString());
 			if (maybeAddress==null) continue;
 			long peerStake=ps.getPeerStake();
-			if (peerStake>Constants.MINIMUM_EFFECTIVE_STAKE) {
+			if (peerStake>CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
 				double t=random.nextDouble()*(accStake+peerStake);
 				if (t>=accStake) {
 					target=maybeAddress;

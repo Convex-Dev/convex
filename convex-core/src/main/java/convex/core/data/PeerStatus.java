@@ -1,6 +1,6 @@
 package convex.core.data;
 
-import convex.core.Constants;
+import convex.core.cpos.CPoSConstants;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -55,7 +55,7 @@ public class PeerStatus extends ARecord {
 	}
 
 	public static PeerStatus create(Address controller, long stake, AHashMap<ACell,ACell> metadata) {
-		return new PeerStatus(controller, stake, EMPTY_STAKES, 0L, metadata,Constants.INITIAL_PEER_TIMESTAMP,stake);
+		return new PeerStatus(controller, stake, EMPTY_STAKES, 0L, metadata,CPoSConstants.INITIAL_PEER_TIMESTAMP,stake);
 	}
 	
 	/**

@@ -12,6 +12,7 @@ import java.util.HashSet;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
@@ -103,7 +104,7 @@ public class InitTest extends ACVMTest {
 		
 		MapEntry<AccountKey, PeerStatus> psEntry=STATE.getPeers().get(0);
 		PeerStatus ps=psEntry.getValue();
-		assertEquals(Constants.INITIAL_PEER_TIMESTAMP,ps.getTimestamp());
+		assertEquals(CPoSConstants.INITIAL_PEER_TIMESTAMP,ps.getTimestamp());
 	}
 
 	@Test

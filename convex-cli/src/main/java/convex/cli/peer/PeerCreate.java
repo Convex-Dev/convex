@@ -47,7 +47,7 @@ public class PeerCreate extends APeerCommand {
 	@Override
 	public void execute() throws InterruptedException {
 
-		long peerStake = convex.core.Constants.MINIMUM_EFFECTIVE_STAKE;
+		long peerStake = convex.core.cpos.CPoSConstants.MINIMUM_EFFECTIVE_STAKE;
 
 		AKeyPair keyPair = null;
 		KeyStore keyStore;

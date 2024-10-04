@@ -340,7 +340,7 @@ public class State extends ARecord {
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
 		
 		// If peer stake is insufficient, dump it
-		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) {
+		if (ps.getPeerStake()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
 			return BlockResult.createInvalidBlock(this,block,Strings.INSUFFICIENT_STAKE);
 		}	
 		
@@ -667,7 +667,7 @@ public class State extends ARecord {
 	}
 
 	/**
-	 * Computes the weighted stake for each peer. Adds a single entry for the null
+	 * Computes the weighted effective stake for each peer. Adds a single entry for the null
 	 * key, containing the total stake
 	 *
 	 * @return Map of Stakes

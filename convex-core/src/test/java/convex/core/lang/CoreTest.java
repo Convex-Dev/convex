@@ -3403,6 +3403,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(STK,ps.getPeerStake());
 		assertEquals(STK,ps.getTotalStake());
 		assertEquals(STK,ps.getBalance());
+		assertEquals(CPoSConstants.INITIAL_PEER_TIMESTAMP,ps.getTimestamp());
 		
 		// Effective stake should be decayed to minimum, since no blocks for this peer yet
 		HashMap<AccountKey,Double> stks=ctx.getState().computeStakes();
@@ -3517,7 +3518,7 @@ public class CoreTest extends ACVMTest {
 	public void testEvictPeer() {
 		{ // create a peer then evict it
 			Context ctx=context();
-			long PEERSTAKE=2*Constants.MINIMUM_EFFECTIVE_STAKE;
+			long PEERSTAKE=2*CPoSConstants.MINIMUM_EFFECTIVE_STAKE;
 			AccountKey PK=AccountKey.fromHex("42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e");
 			ctx=exec(ctx,"(create-peer "+PK+" "+PEERSTAKE+")");
 			assertNotNull(ctx.getState().getPeer(PK));
@@ -3531,7 +3532,7 @@ public class CoreTest extends ACVMTest {
 		
 		{ // create a peer with delegated stake and evict
 			Context ctx=context();
-			long PEERSTAKE=2*Constants.MINIMUM_EFFECTIVE_STAKE;
+			long PEERSTAKE=2*CPoSConstants.MINIMUM_EFFECTIVE_STAKE;
 			long USERFUND=10000000;
 			long USERSTAKE=7000000;
 			AccountKey PK=AccountKey.fromHex("42ae93b185bd2ba64fd9b0304fec81a4d4809221a5b68de4da041b48c85bcc2e");

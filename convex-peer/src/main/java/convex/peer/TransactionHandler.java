@@ -18,6 +18,7 @@ import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Peer;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
@@ -386,7 +387,7 @@ public class TransactionHandler extends AThreadedComponent {
 		if (ps==null) return; // No peer record in consensus state?
 		
 		// No point setting this if low staked
-		if (ps.getPeerStake()<Constants.MINIMUM_EFFECTIVE_STAKE) return;
+		if (ps.getPeerStake()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return;
 		
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();

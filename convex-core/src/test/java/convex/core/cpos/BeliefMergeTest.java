@@ -65,7 +65,7 @@ public class BeliefMergeTest {
 			KEYS[i] = key; 
 			ADDRESSES[i] = address;
 			AccountStatus accStatus = AccountStatus.create((i + 1) * 1000000,key);
-			long stake=(i + 1) * 10*Constants.MINIMUM_EFFECTIVE_STAKE;
+			long stake=(i + 1) * 10*CPoSConstants.MINIMUM_EFFECTIVE_STAKE;
 			PeerStatus peerStatus = PeerStatus.create(address,stake);
 			accounts = accounts.conj(accStatus);
 			peers = peers.assoc(key, peerStatus);
