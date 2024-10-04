@@ -32,8 +32,10 @@ public class Economics {
 	public static long swapPrice(long delta,long a, long b) {
 		if ((a<=0)||(b<=0)) throw new IllegalArgumentException("Pool quantities must be positive");
 		if (delta>=a) throw new IllegalArgumentException("Trying to buy entire pool!");
+		long newA=a-delta;
+		if (newA<=0) throw new IllegalArgumentException("Trying to sell beyond maxiumum pool size!");
 		
-		long newB=Utils.mulDiv(a, b, a-delta);
+		long newB=Utils.mulDiv(a, b, newA);
 		if (newB<0) {
 			// overflow case
 			return delta>0?Long.MAX_VALUE:Long.MIN_VALUE;

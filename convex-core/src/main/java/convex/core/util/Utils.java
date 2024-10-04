@@ -1270,10 +1270,11 @@ public class Utils {
 	
 	/**
 	 * Long computation of (a*b)/c. Arguments and result must be in range 0..Long.MAX_VALUE
+	 * 
 	 * @param a First multiplicand
 	 * @param b Second multiplicand
 	 * @param c Divisor
-	 * @return Result of (a*b)/c, or negative if overflows long
+	 * @return Result of (a*b)/c, or -1 if result overflows long
 	 */
 	static long fastMulDiv(long a, long b, long c) {
 		// 128 bit multiply
@@ -1284,8 +1285,8 @@ public class Utils {
 		// we are going to do base 2^63 long division :-)
 		// a * b = ab1 * 2^63 + ab0 
  		long ab1 = (m1<<1)|(m0>>>63);
+ 		if (c<=ab1) return -1;   // we know this will overflow
  		if (ab1==0) return m0/c; // fast path
- 		if (c<=ab1) return -1; // we know this will overflow
 		long ab0 = (m0&~0x8000000000000000L);
 
 		// d = 2^63 / c
@@ -1300,7 +1301,7 @@ public class Utils {
 			m0=ab1*dr;
 			m1=Math.multiplyHigh(ab1, dr);
 			ab1 = (m1<<1)|(m0>>>63);
-			ab0 = ab0+(m0&~0x8000000000000000L);
+			ab0 = (m0&~0x8000000000000000L)+ab0;  // note we add in the previous ab0
 			if (ab0<0) {
 				// overflow carry
 				ab0=(ab0&~0x8000000000000000L);
