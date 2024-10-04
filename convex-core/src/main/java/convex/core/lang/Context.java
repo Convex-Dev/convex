@@ -16,8 +16,8 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.data.Index;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
@@ -43,6 +43,7 @@ import convex.core.lang.exception.ReturnValue;
 import convex.core.lang.exception.RollbackValue;
 import convex.core.lang.exception.TailcallValue;
 import convex.core.lang.impl.CoreFn;
+import convex.core.lang.impl.TransactionContext;
 import convex.core.util.Economics;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -141,6 +142,8 @@ public class Context {
 			return mappings.get(sym);
 		}
 	}
+	
+
 
 	/**
 	 * Immutable inner class for less-frequently changing CVM state
@@ -152,7 +155,7 @@ public class Context {
 	 */
 	protected static final class ChainState {
 		private final State state;
-		private final Address origin;
+		private final TransactionContext txContext;
 		private final Address caller;
 		private final Address address;
 		private final ACell scope;
@@ -163,9 +166,9 @@ public class Context {
 		 */
 		private final AccountStatus account;
 
-		private ChainState(State state, Address origin,Address caller, Address address,AccountStatus account, long offer,ACell scope) {
+		private ChainState(State state, TransactionContext transactionContext,Address caller, Address address,AccountStatus account, long offer,ACell scope) {
 			this.state=state;
-			this.origin=origin;
+			this.txContext=transactionContext;
 			this.caller=caller;
 			this.address=address;
 			this.account=account;
@@ -173,7 +176,7 @@ public class Context {
 			this.scope=scope;
 		}
 
-		public static ChainState create(State state, Address origin, Address caller, Address address, long offer, ACell scope) {
+		public static ChainState create(State state, TransactionContext origin, Address caller, Address address, long offer, ACell scope) {
 			AccountStatus as=state.getAccount(address);
 			if (as==null) return null;
 			return new ChainState(state,origin,caller,address,as,offer,scope);
@@ -181,12 +184,12 @@ public class Context {
 
 		public ChainState withStateOffer(State newState,long newOffer) {
 			if ((state==newState)&&(offer==newOffer)) return this;
-			return create(newState,origin,caller,address,newOffer,scope);
+			return create(newState,txContext,caller,address,newOffer,scope);
 		}
 
 		private ChainState withState(State newState) {
 			if (state==newState) return this;
-			return create(newState,origin,caller,address,offer,scope);
+			return create(newState,txContext,caller,address,offer,scope);
 		}
 
 		protected long getOffer() {
@@ -230,16 +233,25 @@ public class Context {
 
 		public ChainState withScope(ACell newScope) {
 			if (scope==newScope) return this;
-			return create(state,origin,caller,address,offer,newScope);
+			return create(state,txContext,caller,address,offer,newScope);
 		}
 
 		public AccountStatus getAccount() {
 			return account;
 		}
-
+		
+		public Address getOrigin() {
+			return txContext.origin;
+		}
+ 
 		public AccountStatus getOriginAccount() {
-			if (address.equals(origin)) return account;
-			return state.getAccount(origin);
+			Address o=getOrigin();
+			if (address.equals(o)) return account;
+			return state.getAccount(o);
+		}
+
+		public AccountKey getPeer() {
+			return txContext.getPeer();
 		}
 
 	}
@@ -264,7 +276,8 @@ public class Context {
 	}
 
 	private static <T extends ACell> Context create(State state, long juice,long juiceLimit,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
-		ChainState chainState=ChainState.create(state,origin,caller,address,offer,NULL_SCOPE);
+		TransactionContext tctx=TransactionContext.createQuery(state, origin);
+		ChainState chainState=ChainState.create(state,tctx,caller,address,offer,NULL_SCOPE);
 		if (chainState==null) throw new Error("Attempting to create context with invalid Address");
 		return create(chainState,juice,juiceLimit,localBindings,result,depth,log,comp);
 	}
@@ -1140,7 +1153,7 @@ public class Context {
 	}
 
 	public Address getOrigin() {
-		return chainState.origin;
+		return chainState.getOrigin();
 	}
 
 	/**
@@ -1346,7 +1359,7 @@ public class Context {
 	public Context queryAs(Address address, ACell form) {
 		// chainstate with the target address as origin.
 		State s=getState();
-		ChainState cs=ChainState.create(s,getOrigin(),getAddress(),address,ZERO_OFFER,NULL_SCOPE);
+		ChainState cs=ChainState.create(s,chainState.txContext,getAddress(),address,ZERO_OFFER,NULL_SCOPE);
 		if (cs==null) return withError(ErrorCodes.NOBODY,"Address does not exist: "+address);
 		Context ctx=Context.create(cs, juice,juiceLimit, EMPTY_BINDINGS, NO_RESULT, depth,log,NO_COMPILER_STATE);
 		ctx=ctx.eval(form);
@@ -2341,6 +2354,15 @@ public class Context {
 			if (expander != null) return expander;
 		}
 		return null;
+	}
+
+	/**
+	 * Gets the peer responsible for the current block
+	 * @return Peer key, or null if outside a peer created block
+	 */
+	public AccountKey getPeer() {
+		// TODO Auto-generated method stub
+		return chainState.getPeer();
 	}
 
 }

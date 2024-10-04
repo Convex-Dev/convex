@@ -5130,7 +5130,10 @@ public class CoreTest extends ACVMTest {
 		assertEquals(InitTest.HERO_KEYPAIR.getAccountKey(), eval("*key*"));
 	}
 	
-
+	@Test
+	public void testSpecialPeer() {
+		assertNull(eval("*peer*"));
+	}
 
 	@Test
 	public void testSpecialJuice() {
