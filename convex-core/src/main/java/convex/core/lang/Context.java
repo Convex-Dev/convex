@@ -2097,7 +2097,7 @@ public class Context {
 			return ctx.withError(ErrorCodes.STATE,"Cannot evict last peer");
 		}
 		
-		// Refund delegated stakes
+		// Refund delegated stakes to address in this Index. Stakes are shares, not balances!
 		Index<Address, CVMLong> stakes = ps.getStakes();
 		long ns=stakes.count();
 		for (int i=0; i<ns; i++) {

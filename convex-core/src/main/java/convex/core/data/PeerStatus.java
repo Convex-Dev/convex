@@ -91,13 +91,29 @@ public class PeerStatus extends ARecord {
 	}
 
 	/**
-	 * Gets the self-owned stake of this peer
+	 * Gets the self-owned stake of this peer, including accumulated balance
 	 *
 	 * @return Own stake, excluding delegated stake
 	 */
 	public long getPeerStake() {
 		// TODO: include rewards?
 		return peerStake;
+	}
+	
+	/**
+	 * Gets the delegated stake on this peer for the given delegator, including accumulated balance
+	 *
+	 * Returns 0 if the delegator has no stake.
+	 *
+	 * @param delegator Address of delegator
+	 * @return Value of delegated stake
+	 */
+	public long getDelegatedStake(Address delegator) {
+		// TODO: include rewards?
+
+		CVMLong a = stakes.get(delegator);
+		if (a == null) return 0;
+		return a.longValue();
 	}
 	
 	/**
@@ -212,23 +228,6 @@ public class PeerStatus extends ARecord {
 	@Override
 	public boolean isCanonical() {
 		return true;
-	}
-
-
-	/**
-	 * Gets the delegated stake on this peer for the given delegator.
-	 *
-	 * Returns 0 if the delegator has no stake.
-	 *
-	 * @param delegator Address of delegator
-	 * @return Value of delegated stake
-	 */
-	public long getDelegatedStake(Address delegator) {
-		// TODO: include rewards?
-
-		CVMLong a = stakes.get(delegator);
-		if (a == null) return 0;
-		return a.longValue();
 	}
 
 	/**
