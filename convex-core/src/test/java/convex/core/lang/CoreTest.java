@@ -28,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,7 @@ import convex.core.Constants;
 import convex.core.ErrorCodes;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
 import convex.core.data.ABlob;
@@ -57,6 +59,7 @@ import convex.core.data.List;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
+import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -3380,6 +3383,54 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step(ctx,"(stake my-peer 1000 :foo)"));
 	}
 
+	@Test
+	public void testSetPeerStake() {
+		// Not a real peer key, but we don't care because not actually running one....
+		AccountKey KEY=AccountKey.fromHex("1234567812345678123456781234567812345678123456781234567812345678");
+		long STK=1000000;
+		Context ctx=context();
+		
+		
+		assertNull(ctx.getState().getPeer(KEY));
+		assertStateError(step(ctx,"(set-peer-stake "+KEY+" "+STK+")"));
+		
+		// create peer with initial stake
+		ctx=exec(ctx,"(create-peer "+KEY+" "+STK+")");
+		
+		// Check stake has been established
+		PeerStatus ps=ctx.getState().getPeer(KEY);
+		assertEquals(ps, eval(ctx,"(get-in *state* [:peers "+KEY+"])"));
+		assertEquals(STK,ps.getPeerStake());
+		assertEquals(STK,ps.getTotalStake());
+		assertEquals(STK,ps.getBalance());
+		
+		// Effective stake should be decayed to minimum, since no blocks for this peer yet
+		HashMap<AccountKey,Double> stks=ctx.getState().computeStakes();
+		assertEquals(STK*CPoSConstants.PEER_DECAY_MINIMUM,stks.get(KEY));
+		
+		// Increase stake
+		ctx=exec(ctx,"(set-peer-stake "+KEY+" "+STK*3+")");
+		ps=ctx.getState().getPeer(KEY);
+		assertEquals(STK*3,ps.getPeerStake());
+		assertEquals(STK*3,ps.getTotalStake());
+		assertEquals(STK*3,ps.getBalance());
+		
+		
+		assertFundsError(step(ctx,"(set-peer-stake "+KEY+" 999999999999999999)"));
+		assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
+		
+		// Finally remove all stake
+		ctx=exec(ctx,"(set-peer-stake "+KEY+" 0)");
+		ps=ctx.getState().getPeer(KEY);
+		assertEquals(0,ps.getPeerStake());
+		assertEquals(0,ps.getTotalStake());
+		assertEquals(0,ps.getBalance());
+
+		assertArityError(step(ctx,"(set-peer-stake)"));
+		assertArityError(step(ctx,"(set-peer-stake "+KEY+")"));
+		assertArityError(step(ctx,"(set-peer-stake "+KEY+" :foo :bar)"));
+	}
+	
 	@Test
 	public void testSetPeerData() {
 		String newHostname = "new_hostname:1234";

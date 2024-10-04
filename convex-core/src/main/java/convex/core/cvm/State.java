@@ -487,6 +487,7 @@ public class State extends ARecord {
 		State state = this;
 		int blockLength = block.length();
 		Result[] results = new Result[blockLength];
+		long fees=0L;
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
@@ -501,6 +502,10 @@ public class State extends ARecord {
 				// record results from result context
 				results[i] = Result.fromContext(CVMLong.create(i),rc);
 				
+				// Get fees from ResultContext
+				// NOTE: Juice fees includes transaction overhead fees
+				fees+=rc.getJuiceFees();
+				
 				// state update
 				state = rc.context.getState();
 			//} catch (Exception e) {
@@ -509,8 +514,15 @@ public class State extends ARecord {
 			//	log.error(msg,e);
 			//}
 		}
+		
+		// maybe add used juice to peer fees
+		if (fees>0L) {
+			long oldFees=state.getGlobalFees().longValue();
+			long newFees=oldFees+fees;
+			state=state.withGlobalFees(CVMLong.create(newFees));
+		}
 
-		// TODO: changes for complete block?
+		// TODO: other things for complete block?
 		return BlockResult.create(state, results);
 	}
 

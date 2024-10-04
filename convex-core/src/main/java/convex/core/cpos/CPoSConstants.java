@@ -26,13 +26,21 @@ public class CPoSConstants {
 	 * Milliseconds before peer stake influence starts to decay (3 mins default)
 	 */
 	public static final double PEER_DECAY_DELAY = 3*60*1000;
+	
 	/**
-	 * Time for peer stake to decay by factor 1/e (5 mins default)
+	 * Time for peer stake to decay by factor 1/e (30 mins default)
 	 */
 	public static final double PEER_DECAY_TIME = 5*60*1000;
+	
+	/**
+	 * Minimum proportion of stake that a peer can decay to
+	 */
+	public static final double PEER_DECAY_MINIMUM = 0.001;
+	
 	/**
 	 * Maximum time a block can be resurrected from the past (1 min)
 	 */
 	public static final long MAX_BLOCK_BACKDATE = 60*1000;
+
 
 }

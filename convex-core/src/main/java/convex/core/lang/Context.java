@@ -411,13 +411,6 @@ public class Context {
 		// update Account
 		state=state.putAccount(address,account);
 
-		// maybe add used juice to peer fees
-		if (juiceFees>0L) {
-			long oldFees=state.getGlobalFees().longValue();
-			long newFees=oldFees+juiceFees;
-			state=state.withGlobalFees(CVMLong.create(newFees));
-		}
-
 		// final state update and result reporting
 		Context rctx=this.withState(state);
 		if (juiceFailure) {
@@ -2007,7 +2000,7 @@ public class Context {
 	 * @return Updated Context
 	 */
 	public Context setPeerStake(AccountKey peerKey, long newStake) {
-		return setPeerStake(peerKey,newStake);
+		return setPeerStake(peerKey,getAddress(),newStake);
 	}
 	
 	/**

@@ -50,11 +50,12 @@ public class Economics {
 	}
 
 	public static double stakeDecay(long time, long peerTime) {
+		if (peerTime<0) return CPoSConstants.PEER_DECAY_MINIMUM;
 		if (peerTime>=time) return 1.0;
 		double delay=time-peerTime;
 		delay-=CPoSConstants.PEER_DECAY_DELAY;
 		if (delay<0) return 1.0;
 		
-		return Math.max(0.001, Math.exp(-delay/CPoSConstants.PEER_DECAY_TIME));
+		return Math.max(CPoSConstants.PEER_DECAY_MINIMUM, Math.exp(-delay/CPoSConstants.PEER_DECAY_TIME));
 	}
 }

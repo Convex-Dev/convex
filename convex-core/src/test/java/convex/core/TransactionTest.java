@@ -72,9 +72,10 @@ public class TransactionTest extends ACVMTest {
 		
 		long memSize=Cells.storageSize(t1);
 		
-		State s=apply(t1);
+		ResultContext rc=state().applyTransaction(t1);
+		State s=rc.context.getState();
 		long expectedFees=(Juice.TRANSACTION+Juice.TRANSFER+Juice.TRANSACTION_PER_BYTE*memSize)*JP;
-		assertEquals(expectedFees,s.getGlobalFees().longValue());
+		assertEquals(expectedFees,rc.getJuiceFees());
 		
 		long NBAL=s.getAccount(HERO).getBalance();
 		long balanceDrop=IBAL-NBAL;

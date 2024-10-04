@@ -179,7 +179,7 @@ public class TokenomicsTest extends ACVMTest {
 
 	protected void checkFinalState(ResultContext rc, boolean memUsed) {
 		// Nothing should have gone wrong with total coin supply
-		assertEquals(Coin.MAX_SUPPLY,rc.getState().computeTotalBalance());
+		assertEquals(Coin.MAX_SUPPLY-rc.getJuiceFees(),rc.getState().computeTotalBalance());
 		
 		if (memUsed) {
 			// we expect total memory to have fallen because of memory used
