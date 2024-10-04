@@ -27,13 +27,17 @@ public class Economics {
 	 * @param a Quantity of Asset A in Pool
 	 * @param b Quantity of Asset B in Pool
 	 * @param delta Quantity of Unit A to buy (negative = sell)
-	 * @return Price of A in terms of B
+	 * @return Price of A in terms of B. Long.MAX_VALUE or Long.MIN_VALUE in case of overflow
 	 */
 	public static long swapPrice(long delta,long a, long b) {
 		if ((a<=0)||(b<=0)) throw new IllegalArgumentException("Pool quantities must be positive");
 		if (delta>=a) throw new IllegalArgumentException("Trying to buy entire pool!");
 		
 		long newB=Utils.mulDiv(a, b, a-delta);
+		if (newB<0) {
+			// overflow case
+			return delta>0?Long.MAX_VALUE:Long.MIN_VALUE;
+		}
 		
 		long result=(newB-b)+1; // strict increase
 		

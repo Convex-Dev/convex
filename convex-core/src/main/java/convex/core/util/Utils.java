@@ -1248,11 +1248,67 @@ public class Utils {
 	 * @param c Divisor
 	 * @return Result of (a*b)/c
 	 */
-	public static long mulDiv(long a, long b, long c) {
+	static long slowMulDiv(long a, long b, long c) {
 		// TODO: we want a faster version of this
 
 		BigInteger result=BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)).divide(BigInteger.valueOf(c));
 		return checkedLong(result);
+	}
+	
+	/**
+	 * Long computation of (a*b)/c. Arguments and result must be in range 0..Long.MAX_VALUE
+	 * @param a First multiplicand
+	 * @param b Second multiplicand
+	 * @param c Divisor
+	 * @return Result of (a*b)/c
+	 */
+	public static long mulDiv(long a, long b, long c) {
+		if ((a<0)||(b<0)) throw new IllegalArgumentException("Negative multiplicand!");
+		if (c<=0) throw new IllegalArgumentException("Division by non-positive number!");
+		return fastMulDiv(a,b,c);
+	}
+	
+	/**
+	 * Long computation of (a*b)/c. Arguments and result must be in range 0..Long.MAX_VALUE
+	 * @param a First multiplicand
+	 * @param b Second multiplicand
+	 * @param c Divisor
+	 * @return Result of (a*b)/c, or negative if overflows long
+	 */
+	static long fastMulDiv(long a, long b, long c) {
+		// 128 bit multiply
+		long m0=a*b;
+		long m1=Math.multiplyHigh(a, b);
+		long acc=0;
+		
+		// we are going to do base 2^63 long division :-)
+		// a * b = ab1 * 2^63 + ab0 
+ 		long ab1 = (m1<<1)|(m0>>>63);
+ 		if (ab1==0) return m0/c; // fast path
+ 		if (c<=ab1) return -1; // we know this will overflow
+		long ab0 = (m0&~0x8000000000000000L);
+
+		// d = 2^63 / c
+		long dq=-(0x8000000000000000L/c); // note we need to reverse sign
+		long dr=Long.remainderUnsigned(0x8000000000000000L, c);  // dr < c
+
+		while (ab1>0) {			
+			// a * b = c*(ab1*dq) + (ab1*dr + ab0)
+			acc+=ab1*dq;
+			
+			// so we just need to divide (ab1*dr + ab0) by c to get the rest
+			m0=ab1*dr;
+			m1=Math.multiplyHigh(ab1, dr);
+			ab1 = (m1<<1)|(m0>>>63);
+			ab0 = ab0+(m0&~0x8000000000000000L);
+			if (ab0<0) {
+				// overflow carry
+				ab0=(ab0&~0x8000000000000000L);
+				ab1++;
+			}
+		}
+		long result = acc + ab0/c;
+		return result;
 	}
 
 	private static Path homePath=null;

@@ -34,16 +34,22 @@ public class EconomicsTest {
 		assertEquals(1, Economics.swapPrice(0, 12, 1454517));
 		assertEquals(1, Economics.swapPrice(0, 100, 100));
 		
+		// Overflow casess
+		assertEquals(Long.MAX_VALUE, Economics.swapPrice(Long.MAX_VALUE-1, Long.MAX_VALUE, 10));
+		assertEquals(Long.MAX_VALUE, Economics.swapPrice(1, 10, Long.MAX_VALUE));
+		
 		// TODO: seem to be some instability issues doing things like this?
 		// assertEquals(Long.MAX_VALUE-1000000, Economics.swapPrice(Long.MAX_VALUE-1000000, Long.MAX_VALUE, 1000000));
 		
-		// Fails because (double)(Long.MAX_VALUE-1) == (double)(Long.MAX_VALUE)
-		assertThrows(ArithmeticException.class, () -> Economics.swapPrice(Long.MAX_VALUE-1, Long.MAX_VALUE, 10));
 
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 100, 100));
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 0, 100));
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(0, 0, 0));
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 100, 0));
 		assertThrows(IllegalArgumentException.class, () -> Economics.swapPrice(100, 50, 200));
+	}
+	
+	public static void main(String[] args) {
+		// A little benchmark for Economics?
 	}
 }

@@ -170,6 +170,32 @@ public class UtilsTest {
 		assertEquals(0, b.remaining());
 		assertEquals("0000000000000000000000000000000000000000000000000000000000000007", Utils.toHexString(bs));
 	}
+	
+	@Test 
+	public void testMulDiv() {
+		assertEquals(500,Utils.mulDiv(50, 10000, 1000));
+		assertEquals(10,Utils.mulDiv(11, 11, 12));
+		assertEquals(0,Utils.mulDiv(0, Long.MAX_VALUE, 6577657));
+		assertEquals(Long.MAX_VALUE,Utils.mulDiv(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE));
+		assertEquals(Long.MAX_VALUE-2,Utils.mulDiv(Long.MAX_VALUE-1, Long.MAX_VALUE-1, Long.MAX_VALUE));
+		
+		// overflow cases
+
+		
+		assertEquals(40,Utils.mulDiv(20,20,10)); 
+		
+		// overflow cases
+		assertEquals(-1,Utils.mulDiv(0x100000000L,0x100000000L,1)); 
+		assertEquals(-1,Utils.mulDiv(Long.MAX_VALUE, Long.MAX_VALUE, 1));
+		assertEquals(-1,Utils.mulDiv(Long.MAX_VALUE, Long.MAX_VALUE, Long.MAX_VALUE-1));
+
+		assertEquals(9858L,Utils.mulDiv(3384L, 8318787781460893717L, 2855572529029243059L));
+
+		assertThrows(IllegalArgumentException.class,()->Utils.mulDiv(-10,10,100)); // negative a
+		assertThrows(IllegalArgumentException.class,()->Utils.mulDiv(10,-10,100)); // negative b
+		assertThrows(IllegalArgumentException.class,()->Utils.mulDiv(10,10,-100)); // negative c
+		assertThrows(IllegalArgumentException.class,()->Utils.mulDiv(10,10,0)); // divide by zero
+	}
 
 	@Test
 	public void testToByteArray() {

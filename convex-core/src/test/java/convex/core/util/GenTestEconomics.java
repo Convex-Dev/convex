@@ -49,8 +49,11 @@ public class GenTestEconomics {
 		
 		BigInteger exact=BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)).divide(BigInteger.valueOf(c));
 		if (exact.bitLength()<=63) {
-			long d=Utils.mulDiv(a, b, c);
-			assertEquals(exact,BigInteger.valueOf(d));
+			assertTrue(exact.bitLength()<=63);
+			long expected=exact.longValue();
+			assertEquals(expected,Utils.slowMulDiv(a, b, c));
+			assertEquals(expected,Utils.fastMulDiv(a, b, c));
+			assertEquals(expected,Utils.mulDiv(a, b, c));
 		}
 	}
 
