@@ -25,4 +25,10 @@ public final class TransactionContext {
 		if (block==null) return null;
 		return block.getAccountKey();
 	}
+
+	public static TransactionContext create(State state) {
+		TransactionContext ctx=new TransactionContext();
+		ctx.initialState=state;
+		return ctx;
+	}
 }

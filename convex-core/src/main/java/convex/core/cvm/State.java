@@ -52,6 +52,7 @@ import convex.core.lang.Juice;
 import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
 import convex.core.lang.Symbols;
+import convex.core.lang.impl.TransactionContext;
 import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Economics;
@@ -318,8 +319,12 @@ public class State extends ARecord {
 		}
 		
 		State state = prepareBlock(block);
+		
+		TransactionContext tctx=TransactionContext.create(state);
+		tctx.block=signedBlock;
+		
 		try {
-			BlockResult blockResult= state.applyTransactions(block);
+			BlockResult blockResult= state.applyTransactions(block,tctx);
 			return blockResult;
 		} catch (ValidationException e) {
 			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
@@ -483,18 +488,22 @@ public class State extends ARecord {
 		return new State(accounts, peers, newGlobals, schedule);
 	}
 
-	private BlockResult applyTransactions(Block block) throws InvalidBlockException {
+	private BlockResult applyTransactions(Block block, TransactionContext tctx) throws InvalidBlockException {
 		State state = this;
 		int blockLength = block.length();
 		Result[] results = new Result[blockLength];
 		long fees=0L;
+		
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
 			// SECURITY: catch-all exception handler, needs consideration
 			//try {
 				// extract the signed transaction from the block
-				SignedData<? extends ATransaction> signed = transactions.get(i);
+				SignedData<ATransaction> signed = transactions.get(i);
+				
+				// Update transaction context
+				tctx.tx=signed;
 				
 				// execute the transaction using the *latest* state (not necessarily "this")
 				ResultContext rc = state.applyTransaction(signed);

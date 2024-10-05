@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
@@ -30,6 +32,7 @@ import convex.core.init.InitTest;
 /**
  * Tests for the State data structure
  */
+@TestInstance(Lifecycle.PER_CLASS)
 public class StateTest {
 	State INIT_STATE=InitTest.createState();
 
