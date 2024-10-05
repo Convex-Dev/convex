@@ -578,6 +578,19 @@ public class BlobsTest {
 	   assertEquals(b, Format.encodedBlob(o));
 	   assertEquals(pref.getValue(), o);
 	}
+	
+	@Test
+	public void testLongBlobDecoded() throws BadFormatException {
+		long V=0xFF1234567899L;
+		// LongBlob has custom hash implementation, we want to make sure it reads from encoding correctly
+		LongBlob l0=LongBlob.create(V);
+		Blob enc=(Blob.fromHex("F000").append(l0.getEncoding()).toFlatBlob().slice(2));
+		
+		LongBlob l1=LongBlob.create(V);
+		l1.attachEncoding(enc);
+		
+		assertEquals(l0.getHash(),l1.getHash());
+	}
 
 	/**
 	 * Generic tests for an arbitrary ABlob instance

@@ -3,7 +3,6 @@ package convex.core.data.impl;
 import org.bouncycastle.util.Arrays;
 
 import convex.core.data.ABlob;
-import convex.core.data.ADerivedBlob;
 import convex.core.data.Cells;
 
 /**

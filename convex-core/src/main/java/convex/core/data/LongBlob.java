@@ -41,9 +41,10 @@ public final class LongBlob extends ALongBlob {
 
 	
 	@Override
-	protected void updateDigest(MessageDigest digest) {
-		byte[] bs = getEncoding().getInternalArray();
-		digest.update(bs, 2, (int) LENGTH);
+	public void updateDigest(MessageDigest digest) {
+		Blob b=getEncoding();
+		byte[] bs = b.getInternalArray();
+		digest.update(bs, b.getInternalOffset()+2, (int) LENGTH);
 	}
 
 	@Override

@@ -1,8 +1,11 @@
-package convex.core.data;
+package convex.core.data.impl;
 
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 
+import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
+import convex.core.data.Blob;
 import convex.core.util.Utils;
 
 /**
@@ -51,7 +54,7 @@ public abstract class ADerivedBlob extends ABlob {
 	}
 
 	@Override
-	protected void updateDigest(MessageDigest digest) {
+	public void updateDigest(MessageDigest digest) {
 		ABlob can=getCanonical();
 		can.updateDigest(digest);
 	}

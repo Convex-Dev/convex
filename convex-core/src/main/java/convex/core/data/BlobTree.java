@@ -241,7 +241,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	protected void updateDigest(MessageDigest digest) {
+	public void updateDigest(MessageDigest digest) {
 		int n = children.length;
 		for (int i = 0; i < n; i++) {
 			getChild(i).updateDigest(digest);

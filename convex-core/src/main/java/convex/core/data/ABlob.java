@@ -148,7 +148,12 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		return Hash.wrap(digest.digest());
 	}
 
-	protected abstract void updateDigest(MessageDigest digest);
+	/**
+	 * Updates a MessageDigest with the contents of this Blob
+	 * 
+	 * @param digest MessageDigest instance
+	 */
+	public abstract void updateDigest(MessageDigest digest);
 
 	/**
 	 * Gets the byte at the specified position 
