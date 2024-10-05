@@ -32,7 +32,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
      * @param status Status for the Ref
      * @return New Direct Ref
      */
-	static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
+	public static <T extends ACell> RefDirect<T> create(T value, Hash hash, int status) {
 		int flags=status&Ref.STATUS_MASK;
 		return new RefDirect<T>(value, hash, flags);
 	}

@@ -111,9 +111,9 @@ public abstract class ADerivedBlob extends ABlob {
 	}
 
 	@Override
-	public int read(long offset, long count, ByteBuffer dest) {
+	public int toByteBuffer(long offset, long count, ByteBuffer dest) {
 		ABlob can=getCanonical();
-		return can.read(offset, count, dest);
+		return can.toByteBuffer(offset, count, dest);
 	}
 
 	@Override

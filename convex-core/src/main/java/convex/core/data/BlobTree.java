@@ -599,7 +599,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public int read(long offset, long count, ByteBuffer dest) {
+	public int toByteBuffer(long offset, long count, ByteBuffer dest) {
 		if (count<0) throw new IllegalArgumentException("Negative count");
 		if ((offset<0)||(offset+count>this.count)) throw new IndexOutOfBoundsException();
 		int result=0;
@@ -610,7 +610,7 @@ public class BlobTree extends ABlob {
 			if (offset<csize) {
 				long n=Math.min(count, csize-offset);
 				if (n>0) {
-					result+=getChild(i).read(offset,n, dest);
+					result+=getChild(i).toByteBuffer(offset,n, dest);
 				}
 				count-=n;
 				offset=0; // offset is now the start of the next child 

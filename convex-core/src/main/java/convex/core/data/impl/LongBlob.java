@@ -1,7 +1,10 @@
-package convex.core.data;
+package convex.core.data.impl;
 
 import java.security.MessageDigest;
 
+import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
+import convex.core.data.Blob;
 import convex.core.util.Utils;
 
 /**

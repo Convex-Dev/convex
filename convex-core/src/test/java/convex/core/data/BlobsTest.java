@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.ASignature;
 import convex.core.crypto.InsecureRandom;
+import convex.core.data.impl.LongBlob;
 import convex.core.data.impl.ZeroBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;

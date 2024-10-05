@@ -1,7 +1,14 @@
-package convex.core.data;
+package convex.core.data.impl;
 
 import java.nio.ByteBuffer;
 
+import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
+import convex.core.data.ACell;
+import convex.core.data.Blob;
+import convex.core.data.IRefFunction;
+import convex.core.data.Ref;
+import convex.core.data.RefDirect;
 import convex.core.data.util.BlobBuilder;
 import convex.core.util.Errors;
 import convex.core.util.Utils;
@@ -182,12 +189,12 @@ public abstract class ALongBlob extends ABlob {
 	}
 	
 	@Override
-	public int read(long offset, long count, ByteBuffer dest) {
+	public int toByteBuffer(long offset, long count, ByteBuffer dest) {
 		if ((offset==0)&&(count==LENGTH)) {
 			dest.putLong(longValue());
 			return LENGTH;
 		}
-		return toFlatBlob().read(offset,count,dest);
+		return toFlatBlob().toByteBuffer(offset,count,dest);
 	}
 
 

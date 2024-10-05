@@ -25,11 +25,11 @@ import java.util.stream.Collectors;
 
 import convex.core.data.AArrayBlob;
 import convex.core.data.ACell;
-import convex.core.data.ALongBlob;
 import convex.core.data.AObject;
 import convex.core.data.ASequence;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
+import convex.core.data.impl.ALongBlob;
 import convex.core.lang.RT;
 
 /**

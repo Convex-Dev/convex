@@ -8,7 +8,7 @@ import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
-import convex.core.data.LongBlob;
+import convex.core.data.impl.LongBlob;
 import convex.test.Samples;
 
 /**

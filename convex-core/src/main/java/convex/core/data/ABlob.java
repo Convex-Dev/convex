@@ -168,8 +168,6 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 		}
 		return byteAtUnchecked(i);
 	}
-	
-
 
 	/**
 	 * Append an additional Blob to this, creating a new Blob as needed.
@@ -330,19 +328,19 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param dest Destination byte buffer
 	 * @return Number of bytes read
 	 */
-	public int read(long offset, ByteBuffer dest) {
+	public int toByteBuffer(long offset, ByteBuffer dest) {
 		long n=Math.min(count()-offset, dest.remaining());
-		return read(offset,n,dest);
+		return toByteBuffer(offset,n,dest);
 	}
 	
 	/**
 	 * Gets bytes from this Blob into a ByteBuffer
 	 * @param offset Offset into this Blob to read from
-	 * @param count Number of bytes to read. Must be in bounds
+	 * @param count Number of bytes to read.
 	 * @param dest Destination byte buffer
 	 * @return Number of bytes read
 	 */
-	public abstract int read(long offset, long count, ByteBuffer dest);
+	public abstract int toByteBuffer(long offset, long count, ByteBuffer dest);
 
 	/**
 	 * Replaces a slice of this Blob, returning a new Blob

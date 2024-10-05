@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;

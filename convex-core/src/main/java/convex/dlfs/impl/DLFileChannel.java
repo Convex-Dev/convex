@@ -92,7 +92,7 @@ public class DLFileChannel implements SeekableByteChannel {
 			// position beyond end legal, but reads register end of file
 			if (position>=data.count()) return -1;
 			
-			int read=data.read(position,dst);
+			int read=data.toByteBuffer(position,dst);
 			position+=read;
 			return read;
 		}

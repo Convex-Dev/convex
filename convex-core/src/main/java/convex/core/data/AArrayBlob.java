@@ -216,7 +216,7 @@ public abstract class AArrayBlob extends ABlob {
 	 * Gets the internal array backing this Blob. Use with caution!
 	 * @return Byte array backing this blob
 	 */
-	public byte[] getInternalArray() {
+	public final byte[] getInternalArray() {
 		return store;
 	}
 	
@@ -224,7 +224,7 @@ public abstract class AArrayBlob extends ABlob {
 	 * Gets this offset into the internal array backing this Blob.
 	 * @return Offset into backing array
 	 */
-	public int getInternalOffset() {
+	public final int getInternalOffset() {
 		return offset;
 	}
 
@@ -366,7 +366,7 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	public int read(long offset, long count, ByteBuffer dest) {
+	public int toByteBuffer(long offset, long count, ByteBuffer dest) {
 		if (count<0) throw new IllegalArgumentException("Negative count");
 		if ((offset<0)||(offset+count>this.count)) throw new IllegalArgumentException();
 		int n=(int)count;

@@ -854,8 +854,9 @@ public class Format {
 		ArrayList<ACell> stack=new ArrayList<>();
 
 		IRefFunction func=new IRefFunction() {
+			@SuppressWarnings("rawtypes")
 			@Override
-			public Ref<?> apply(Ref<?> r) {
+			public Ref apply(Ref r) {
 				if (r.isEmbedded()) {
 					ACell cc=r.getValue();
 					if (cc==null) return r;

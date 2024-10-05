@@ -25,7 +25,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	protected long memorySize=-1;
 	
 	/**
-	 * Cached Ref. This is useful to manage persistence. Also cached Ref MUST refer to canonical value
+	 * Cached Ref. This is useful to manage persistence. Cached Ref MUST refer to a canonical value
 	 */
 	protected Ref<ACell> cachedRef=null;
 
