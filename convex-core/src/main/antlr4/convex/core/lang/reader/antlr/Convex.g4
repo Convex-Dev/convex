@@ -20,8 +20,6 @@ primary
 	| resolve
 	| atom
 	;
-	
-
 
 singleForm: form EOF;
 	

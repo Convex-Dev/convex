@@ -278,6 +278,7 @@ public class ReaderTest {
 	
 	@Test
 	public void testMapError() {
+		assertParseException(()->Reader.read("{1}"));
 		assertParseException(()->Reader.read("{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{{}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}}"));
 	}
 

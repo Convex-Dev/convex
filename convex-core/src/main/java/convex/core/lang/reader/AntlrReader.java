@@ -8,10 +8,11 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
-import org.antlr.v4.runtime.tree.ParseTreeWalker;
+import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.data.ACell;
@@ -140,8 +141,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterForms(FormsContext ctx) {
-			// We add a new ArrayList to the stack to capture values
-			pushList();
+			// Nothing to do
 		}
 
 		@Override
@@ -161,7 +161,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterList(ListContext ctx) {
-			// Nothing to do
+			pushList(); // We add a new ArrayList to the stack to capture values
 		}
 
 		@Override
@@ -172,7 +172,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterVector(VectorContext ctx) {
-			// Nothing to do
+			pushList(); // We add a new ArrayList to the stack to capture values
 		}
 
 		@Override
@@ -183,7 +183,7 @@ public class AntlrReader {
 
 		@Override
 		public void enterSet(SetContext ctx) {
-			// Nothing to do
+			pushList(); // We add a new ArrayList to the stack to capture values
 		}
 
 		@Override
@@ -194,7 +194,7 @@ public class AntlrReader {
 		
 		@Override
 		public void enterMap(MapContext ctx) {
-			// Nothing to do
+			pushList(); // We add a new ArrayList to the stack to capture values
 		}
 
 		@Override
@@ -237,7 +237,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitDoubleValue(DoubleValueContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			CVMDouble v=CVMDouble.parse(s);
 			if (v==null) throw new ParseException("Bad double format: "+s);
 			push(v);	
@@ -457,7 +457,7 @@ public class AntlrReader {
 
 		@Override
 		public void exitSpecialLiteral(SpecialLiteralContext ctx) {
-			String s=ctx.getText();
+			String s=ctx.getStop().getText();
 			ACell special=ReaderUtils.specialLiteral(s);
 			if (special==null) throw new ParseException("Invalid special literal: "+s);
 			push(special);
@@ -511,8 +511,8 @@ public class AntlrReader {
 
 		@Override
 		public void enterAllForms(AllFormsContext ctx) {
-			// Nothing	
-			
+			// Add a new list to stack to capture all forms. readAll() will pop this
+			pushList(); 
 		}
 
 		@Override
@@ -540,9 +540,6 @@ public class AntlrReader {
 		public void exitPrimary(PrimaryContext ctx) {
 			// Nothing
 		}
-
-
-
 	}
 
 	public static ACell read(String s) {
@@ -555,34 +552,66 @@ public class AntlrReader {
 	
 	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
 	
-	static ACell read(CharStream cs) {
-		try {
-			ConvexLexer lexer=new ConvexLexer(cs);
-			lexer.removeErrorListeners();
-			lexer.addErrorListener(ERROR_LISTENER);
-			CommonTokenStream tokens = new CommonTokenStream(lexer);
-			ConvexParser parser = new ConvexParser(tokens);
-			
-			// We don't need a parse tree, just want to visit everything in our listener
-			parser.setBuildParseTree(false);
-			parser.removeErrorListeners();
-			parser.getInterpreter().setPredictionMode(PredictionMode.SLL); // Seems OK for our grammar?
-			parser.addErrorListener(ERROR_LISTENER);
-			CRListener visitor=new CRListener();
-			parser.addParseListener(visitor);
-			
-			parser.singleForm();
-			// ParseTreeWalker.DEFAULT.walk(visitor, tree);
-			
-			ArrayList<ACell> top=visitor.popList();
-			if (top.size()!=1) {
-				throw new ParseException("Bad parse output: "+top);
-			}
-			
-			return top.get(0);
-		} catch (Exception e) {
-			throw new ParseException("Unexpected Parse Error",e);
+	// Recommended in https://github.com/antlr/antlr4/blob/dev/doc/listeners.md
+	static class CatchingParser extends ConvexParser {
+		protected boolean listenerExceptionOccurred = false;
+		public CatchingParser(TokenStream input) {
+			super(input);
 		}
+		
+		@Override
+		protected void triggerExitRuleEvent() {
+			if ( listenerExceptionOccurred ) return;
+			try {
+				// reverse order walk of listeners
+				for (int i = _parseListeners.size() - 1; i >= 0; i--) {
+					ParseTreeListener listener = _parseListeners.get(i);
+					_ctx.exitRule(listener);
+					listener.exitEveryRule(_ctx);
+				}
+			}
+			catch (ParseException e) {
+				// If an exception is thrown in the user's listener code, we need to bail out
+				// completely out of the parser, without executing anymore user code. We
+				// must also stop the parse otherwise other listener actions will attempt to execute
+				// almost certainly with invalid results. So, record the fact an exception occurred
+				listenerExceptionOccurred = true;
+				throw e;
+			}
+		}
+		
+	}
+	
+	static ConvexParser getParser(CharStream cs, CRListener listener) {
+		// Create lexer and paser for the CharStream
+		ConvexLexer lexer=new ConvexLexer(cs);
+		lexer.removeErrorListeners();
+		lexer.addErrorListener(ERROR_LISTENER);
+		CommonTokenStream tokens = new CommonTokenStream(lexer);
+		ConvexParser parser = new CatchingParser(tokens);
+		
+		// We don't need a parse tree, just want to visit everything in our listener
+		parser.setBuildParseTree(false);
+		parser.removeErrorListeners();
+		parser.getInterpreter().setPredictionMode(PredictionMode.SLL); // Seems OK for our grammar?
+		parser.addErrorListener(ERROR_LISTENER);
+
+		parser.addParseListener(listener);	
+		return parser;
+	}
+	
+	static ACell read(CharStream cs) {
+		CRListener listener=new CRListener();
+		ConvexParser parser=getParser(cs,listener);
+		
+		parser.singleForm();
+		
+		ArrayList<ACell> top=listener.popList();
+		if (top.size()!=1) {
+			throw new ParseException("Bad parse output: "+top);
+		}
+		
+		return top.get(0);
 	}
 	
 	public static AList<ACell> readAll(String source) {
@@ -590,12 +619,12 @@ public class AntlrReader {
 	}
 
 	static AList<ACell> readAll(CharStream cs) {
-		ParseTree tree = getParseTree(cs);
+		CRListener listener=new CRListener();
+		ConvexParser parser=getParser(cs,listener);
 		
-		CRListener visitor=new CRListener();
-		ParseTreeWalker.DEFAULT.walk(visitor, tree);
+		parser.allForms();
 		
-		ArrayList<ACell> top=visitor.popList();
+		ArrayList<ACell> top=listener.popList();
 		return Lists.create(top);
 	}
 
