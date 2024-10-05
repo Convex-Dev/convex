@@ -32,6 +32,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.text.Text;
 import convex.test.Samples;
 
 /**
@@ -243,7 +244,6 @@ public class ReaderTest {
 
 		// Multi-line String
 		assertEquals(Strings.create("\n"), Reader.read("\"\n\""));
-
 	}
 
 	@Test
@@ -412,6 +412,17 @@ public class ReaderTest {
 		doReadPrintTest("^{} 0xa89e59cc8ab9fc6a13785a37938c85b306b24663415effc01063a6e25ef52ebcd3647d3a77e0a33908a372146fdccab6");
 	}
 	
+	/**
+	 * Test cases for strings with Java escapes
+	 */
+	@Test public void testJavaEscapes() {
+		doEscapeTest("!0\\","\\410\\");
+	}
+	
+	private void doEscapeTest(String raw, String escaped) {
+		assertEquals(raw,Text.unescapeJava(escaped));
+	}
+
 	/**
 	 * Test cases that should read and print identically
 	 */

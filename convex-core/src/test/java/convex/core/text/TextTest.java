@@ -1,6 +1,7 @@
 package convex.core.text;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.text.ParseException;
 
@@ -20,6 +21,25 @@ public class TextTest {
 		checkWhiteSpace(96);
 		checkWhiteSpace(97);
 		checkWhiteSpace(100);
+	}
+	
+	@Test
+	public void testUnescapeJava() {
+		assertEquals("foo",Text.unescapeJava("foo"));
+		
+		assertEquals("\\",Text.unescapeJava("\\"));
+		
+		assertEquals("zzAzzB",Text.unescapeJava("zz\\u0041zz\\u0042"));
+		assertNull(Text.unescapeJava("\\u"));
+		assertNull(Text.unescapeJava("\\u0x0x")); // not valid unicode
+		assertNull(Text.unescapeJava("\\u012")); // not valid unicode (only 3 chars)
+		
+		// octal escapes
+		assertEquals("a%b",Text.unescapeJava("a\\45b")); 
+		assertEquals("\19",Text.unescapeJava("\\19")); 
+		assertEquals("\0\0",Text.unescapeJava("\\0\\0")); 
+		assertEquals("\1\11\111",Text.unescapeJava("\\1\\11\\111")); 
+		assertEquals("!0",Text.unescapeJava("\\410")); // Yeah, JLS has max octal value of 377. Don't ask why...
 	}
 
 	private void checkWhiteSpace(int len) {

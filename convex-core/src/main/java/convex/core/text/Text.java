@@ -10,6 +10,8 @@ import java.util.Arrays;
 import convex.core.Coin;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.util.BlobBuilder;
+import convex.core.exceptions.TODOException;
+import convex.core.util.Utils;
 
 public class Text {
 	private static final int WHITESPACE_LENGTH = 32;
@@ -191,7 +193,90 @@ public class Text {
 		Arrays.fill(cs,c);
 		return new String(cs);
 	}
+	
+	public static String escapeJava(String s) {
+		throw new TODOException();
+	}
 
+	/**
+	 * Unescapes a Java string
+	 * @param st String to unescape
+	 * @return Unescaped string, or null if not a valid Java String
+	 */
+	public static String unescapeJava(String st) {
+	    StringBuilder sb = null;
+	    int n=st.length();
 
+	    for (int i = 0; i < n; i++) {
+	    	int startPos=i;
+	        char ch = st.charAt(i);
+	        if ((ch == '\\')&&(i+1<n)) {
+	            char nextChar = st.charAt(i + 1);
+	            
+	            // Check for octal escape, consumes 1-3 octal chars greedily
+	            if (nextChar >= '0' && nextChar <= '7') {
+	                int code=Utils.octalVal(nextChar);
+	                for (int j=i+2; j<i+4; j++) {
+	                	if (j>=n) break;
+	                	int v=Utils.octalVal(st.charAt(j));
+	                	if (v<0) break; // no more octal
+	                	if (code>=32) break; // wouldn't be valid, JLS maximum octal value of 377
+	                	code=code*8+v;
+	                	i++;
+	                }
+	                ch=(char) code;
+	            } else {
+		            switch (nextChar) {
+		            case '\\':
+		                ch = '\\';
+		                break;
+		            case 'b':
+		                ch = '\b';
+		                break;
+		            case 'f':
+		                ch = '\f';
+		                break;
+		            case 'n':
+		                ch = '\n';
+		                break;
+		            case 'r':
+		                ch = '\r';
+		                break;
+		            case 't':
+		                ch = '\t';
+		                break;
+		            case '\"':
+		                ch = '\"';
+		                break;
+		            case '\'':
+		                ch = '\'';
+		                break;
+		            // Hex Unicode: u????
+		            case 'u':
+		                if (i+6 > n) {
+		                	return null; // insufficient chars for unicode
+		                }
+		                int cp=0;
+		                for (int j=0; j<4; j++) {
+		                	int v=Utils.hexVal(st.charAt(i+j+2));
+		                	if (v<0) { // not a hex value
+		                		return null;
+		                	}
+		                	cp=cp*16+Utils.hexVal(st.charAt(i+j+2));
+		                }
+		    	        if (sb==null) sb=new StringBuilder(st.substring(0, startPos));
+		                sb.append(Character.toChars(cp));
+		                i += 5; // skip extra 5 chars on top of loop increment
+		                continue;
+		            }
+	            }
+	            i++; // skip a char, since we consumed nextChar
+	        }
+	        // We are appending a single char
+	        if (sb==null) sb=new StringBuilder(st.substring(0, startPos));
+	        sb.append(ch);
+ 	    }
+	    return (sb==null)?st:sb.toString();
+	}
 
 }

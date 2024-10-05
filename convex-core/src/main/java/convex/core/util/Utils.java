@@ -286,7 +286,7 @@ public class Utils {
 	/**
 	 * Gets the value of a single hex character e.g. hexVal('c') => 12
 	 *
-	 * @param c Character representing a hex digit
+	 * @param c Character possibly representing a hex digit
 	 * @return int in the range 0..15 inclusive, or -1 if not a hex char
 	 */
 	public static int hexVal(char c) {
@@ -302,6 +302,20 @@ public class Utils {
 		if ((v >= 65) && (v <= 70)) return v - 55; 
 		
 		return -1;
+	}
+	
+	/**
+	 * Gets the value of a single octal character e.g. octalVal('6') => 6
+	 *
+	 * @param c Character possibly representing an octal digit
+	 * @return int in the range 0..7 inclusive, or -1 if not an octal char
+	 */
+	public static int octalVal(char c) {
+		int v = (int) c;
+		
+		if ((v<48)||(v>55)) return -1; // out of possible range
+		
+		return v-48;
 	}
 
 	/**

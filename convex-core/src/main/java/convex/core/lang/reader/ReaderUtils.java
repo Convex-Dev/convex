@@ -2,8 +2,6 @@ package convex.core.lang.reader;
 
 import java.util.HashMap;
 
-import org.apache.commons.text.StringEscapeUtils; // TODO: Kill dependency?
-
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
@@ -58,18 +56,7 @@ public class ReaderUtils {
 		return quotingSymbols.get(s);
 	}
 
-	/**
-	 * Unescapes a string according to Java rules
-	 * @param s String to unescape
-	 * @return Unescaped string
-	 */
-	public static String unescapeString(String s) {
-		return StringEscapeUtils.unescapeJava(s);
-	}
 
-	public static String escapeString(String s) {
-		return StringEscapeUtils.escapeJava(s);
-	}
 	
 	private static final HashMap<String,ACell> specialLiterals=Maps.hashMapOf(
 			"##NaN",CVMDouble.NaN,

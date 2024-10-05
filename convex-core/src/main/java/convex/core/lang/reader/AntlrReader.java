@@ -72,6 +72,7 @@ import convex.core.lang.reader.antlr.ConvexParser.SyntaxContext;
 import convex.core.lang.reader.antlr.ConvexParser.TagContext;
 import convex.core.lang.reader.antlr.ConvexParser.TaggedFormContext;
 import convex.core.lang.reader.antlr.ConvexParser.VectorContext;
+import convex.core.text.Text;
 import convex.core.util.Utils;
  
 public class AntlrReader {
@@ -446,7 +447,7 @@ public class AntlrReader {
 			String s=ctx.getStop().getText();
 			int n=s.length();
 			s=s.substring(1, n-1); // skip surrounding double quotes
-			s=ReaderUtils.unescapeString(s);
+			s=Text.unescapeJava(s);
 			push(Strings.create(s));
 		}
 
