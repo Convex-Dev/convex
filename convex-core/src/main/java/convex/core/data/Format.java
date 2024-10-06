@@ -294,7 +294,7 @@ public class Format {
 			result = (result << 7) | (octet & 0x7F); // shift and set next 7 lowest bits
 			bits += 7;
 		}
-		if (result<0) throw new BadFormatException("VLQ Count netative overflow");
+		if (bits>63) throw new BadFormatException("VLQ Count overflow");
 		return result;
 	}
 	
@@ -348,7 +348,7 @@ public class Format {
 		}
 
 		int result=(int)len;
-		if (result!=len) throw new BadFormatException("Format.peekMessageLength: Too many bytes in length encoding");
+		if (result!=len) throw new BadFormatException("Format.peekMessageLength: Message too long: "+len);
 		return result;
 	}
 

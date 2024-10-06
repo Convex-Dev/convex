@@ -13,25 +13,63 @@ import convex.core.util.Utils;
 
 public class FormatTest {
 
-	@Test public void testVLCEncoding() {
-		checkVLCEncoding("00",0);
-		checkVLCEncoding("01",1);
-		checkVLCEncoding("3f",63);
-		checkVLCEncoding("8040",64);
-		checkVLCEncoding("80ffffffffffffffff7f",Long.MAX_VALUE);
-		checkVLCEncoding("ff808080808080808000",Long.MIN_VALUE);
+	@Test public void testVLQEncoding() {
+		checkVLQLong("00",0);
+		checkVLQLong("01",1);
+		checkVLQLong("3f",63);
+		checkVLQLong("8040",64); // first overflow into 2 bytes
+		checkVLQLong("87ffffff7f",Integer.MAX_VALUE);
+		checkVLQLong("8880808000",Integer.MAX_VALUE+1l);
+		checkVLQLong("80ffffffffffffffff7f",Long.MAX_VALUE);
+		checkVLQLong("ff808080808080808000",Long.MIN_VALUE);
 		
-		assertBadVLCEncoding("80ffffffffffffffffff7f"); // too long
-		assertBadVLCEncoding("ff80808080808080808000"); // long negative
+		assertBadVLQLong("80ffff00ffffffffff7f"); // termination in middle
+		assertBadVLQLong("80ffffffffffffffffff7f"); // too long
+		assertBadVLQLong("ff80808080808080808000"); // long negative
+		assertBadVLQLong("017f"); // terminated by first byte
 		
-		assertBadVLCEncoding("8000"); // excess leading bytes
-		assertBadVLCEncoding("8080"); // no termination
+		assertBadVLQLong("8000"); // excess leading bytes
+		assertBadVLQLong("8080"); // no termination
 		
 		assertEquals(Format.MAX_VLQ_LONG_LENGTH,Format.getVLQLongLength(Long.MAX_VALUE));
 		assertEquals(Format.MAX_VLQ_LONG_LENGTH,Format.getVLQLongLength(Long.MIN_VALUE));
+		
+		assertThrows(ArrayIndexOutOfBoundsException.class,()->Format.readVLQLong(new byte[0], 0));
 	}
 	
-	private void assertBadVLCEncoding(String hex) {
+	@Test public void testVLQCounts() {
+		checkVLQCount("00",0);
+		checkVLQCount("01",1);
+		checkVLQCount("3f",63);
+		checkVLQCount("40",64);
+		checkVLQCount("7f",127);
+		checkVLQCount("8100",128); // first overflow into 2 bytes
+		checkVLQCount("87ffffff7f",Integer.MAX_VALUE);
+		checkVLQCount("8880808000",Integer.MAX_VALUE+1l); // a pretty number, 2^32
+		checkVLQCount("ffffffffffffffff7f",Long.MAX_VALUE); // all 63 bits set!
+
+		assertBadVLQCount("ffffffffffffffffff"); // not terminated max value
+		assertBadVLQCount("81ffffffffffffffffff"); // excess leading 1 (would overflow)
+		assertBadVLQCount("80ffffffffffffffffff7f"); // excess byte
+		assertBadVLQCount("ffff00ffffffffff7f"); // terminating byte in middle
+		assertBadVLQCount("ff"); // Not terminated
+		assertBadVLQCount("ffff"); // Not terminated
+		assertBadVLQCount("01ff"); // terminated by first byte
+
+		assertThrows(ArrayIndexOutOfBoundsException.class,()->Format.readVLQCount(new byte[0], 0));
+		
+		assertEquals(Format.MAX_VLQ_COUNT_LENGTH,Format.getVLQCountLength(Long.MAX_VALUE));
+	}
+	
+	private void assertBadVLQLong(String hex) {
+		Blob b=Blob.fromHex(hex);
+		assertThrows(BadFormatException.class,()->{
+			long val=Format.readVLQLong(b.getInternalArray(), b.getInternalOffset());
+			if (Format.getVLQLongLength(val)!=b.count()) throw new BadFormatException("Wrong length");
+		});
+	}
+	
+	private void assertBadVLQCount(String hex) {
 		Blob b=Blob.fromHex(hex);
 		assertThrows(BadFormatException.class,()->{
 			long val=Format.readVLQLong(b.getInternalArray(), b.getInternalOffset());
@@ -51,15 +89,30 @@ public class FormatTest {
 		assertEquals(n,b.count());
 	}
 
-	private void checkVLCEncoding(String hex, long a) {
-		byte[] bs=new byte[12];
+	private void checkVLQLong(String hex, long a) {
 		int blen=hex.length()/2;
+		byte[] bs=new byte[blen];
 		assertEquals(blen,Format.writeVLQLong(bs, 0, a));
 		assertEquals(blen,Format.getVLQLongLength(a));
 		checkStart(hex,bs);
 		
 		try {
 			long b = Format.readVLQLong(bs, 0);
+			assertEquals(a,b);
+		} catch (BadFormatException e) {
+			fail("Unexpected bad encoding exception: "+e);
+		}
+	}
+	
+	private void checkVLQCount(String hex, long a) {
+		int blen=hex.length()/2;
+		byte[] bs=new byte[blen];
+		assertEquals(blen,Format.writeVLQCount(bs, 0, a));
+		assertEquals(blen,Format.getVLQCountLength(a));
+		checkStart(hex,bs);
+		
+		try {
+			long b = Format.readVLQCount(bs, 0);
 			assertEquals(a,b);
 		} catch (BadFormatException e) {
 			fail("Unexpected bad encoding exception: "+e);
