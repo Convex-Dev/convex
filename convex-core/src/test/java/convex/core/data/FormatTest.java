@@ -11,6 +11,9 @@ import org.junit.jupiter.api.Test;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
+/**
+ * Tests for the Format utility class
+ */
 public class FormatTest {
 
 	@Test public void testVLQEncoding() {
