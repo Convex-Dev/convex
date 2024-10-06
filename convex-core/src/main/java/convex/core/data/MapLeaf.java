@@ -340,7 +340,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(Blob b, int pos, long count) throws BadFormatException {
-		int epos=pos+2; // Note: Tag byte plus VLC Count length which is always 1
+		int epos=pos+2; // Note: Tag byte plus VLQ Count length which is always 1
 		
 		@SuppressWarnings("unchecked")
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];

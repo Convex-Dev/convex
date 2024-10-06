@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.nio.ByteBuffer;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.exceptions.BadFormatException;
@@ -35,6 +37,18 @@ public class FormatTest {
 			long val=Format.readVLQLong(b.getInternalArray(), b.getInternalOffset());
 			if (Format.getVLQLongLength(val)!=b.count()) throw new BadFormatException("Wrong length");
 		});
+	}
+	
+	@Test public void testBigCount() throws BadFormatException {
+		int c = Integer.MAX_VALUE;
+		int n=Format.getVLQCountLength(c);
+		assertEquals(5,n);
+		ByteBuffer bb=ByteBuffer.allocate(n);
+		Format.writeVLQCount(bb, c);
+		bb.flip();
+		assertEquals(c,Format.peekMessageLength(bb));
+		Blob b=Blob.fromByteBuffer(bb);
+		assertEquals(n,b.count());
 	}
 
 	private void checkVLCEncoding(String hex, long a) {

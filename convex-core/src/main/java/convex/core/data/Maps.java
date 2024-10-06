@@ -139,7 +139,10 @@ public class Maps {
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(Blob b, int pos) throws BadFormatException {
+		// A hashmap always starts with a VLQ count after the tag
+		// We use this to distinguish the type of Map cell
 		long count = Format.readVLQCount(b,pos+1);
+		
 		if (count==0) return empty();
 		if (count <= MapLeaf.MAX_ENTRIES) {
 			if (count < 0) throw new BadFormatException("Overflowed count of map elements!");

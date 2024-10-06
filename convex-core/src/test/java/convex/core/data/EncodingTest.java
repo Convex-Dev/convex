@@ -56,7 +56,8 @@ public class EncodingTest {
 		assertEquals(2,Format.getVLQCountLength(0x80)); // roll over at 128
 		assertEquals(Format.MAX_VLQ_COUNT_LENGTH,Format.getVLQCountLength(Long.MAX_VALUE));
 		
-		assertThrows(IllegalArgumentException.class, ()->Format.getVLQCountLength(-10));
+		// technically an overflow
+		assertEquals(0,Format.getVLQCountLength(-10));
 	}
 	
 	@Test public void testVLCCount() throws BadFormatException {

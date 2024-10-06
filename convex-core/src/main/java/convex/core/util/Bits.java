@@ -42,7 +42,7 @@ public class Bits {
 	 * @return Number of leading zeros (0-32)
 	 */
 	public static int leadingZeros(int x) {
-		if (x == 0) return 32;
+		if (x == 0) return 32; // fast path if all zeros
 		int result = 0;
 		if ((x & 0xFFFF0000) == 0) {
 			result += 16;
@@ -66,9 +66,7 @@ public class Bits {
 		}
 		if ((x & 0x2) == 0) {
 			result += 1;
-		} else {
-			x >>>= 1;
-		}
+		} 
 		return result;
 	}
 
@@ -78,10 +76,9 @@ public class Bits {
 	 * @return Number of leading zeros (0-64)
 	 */
 	public static int leadingZeros(long x) {
-		int highWord = (int) (x >>> 32); // high 4 bytes, unsigned
-		if (highWord != 0) return leadingZeros(highWord);
-		int lowWord = (int) (x);
-		return 32 + leadingZeros(lowWord);
+		int z=leadingZeros((int) (x >>> 32)); // get leading zeros from high word
+		if (z<32) return z;
+		return z + leadingZeros((int) x); // add leading zeros from low word
 	}
 
 	/**
@@ -113,7 +110,7 @@ public class Bits {
 	 * A long salt value used for internal hashing. 
 	 * 
 	 * We use a local, secure random number to minimise chance of attacker engineering hash collisions
-	 * also minimise risk of multiple peers suffering such attacks at the same time
+	 * also minimise risk of multiple peers suffering hashing collisions at the same time
 	 */
 	private static final long SALT=new SecureRandom().nextLong();
 	

@@ -295,6 +295,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	public int hashCode() {
 		// note: We use a salted hash of the last bytes for blobs. 
 		// SECURITY: This is decent for small blobs, DoS risk for user generated large blobs. Be careful putting large keys in Java HashMaps.....
+		// TODO: consider salted psuedorandom selection of bytes to include in hash?
 		return Bits.hash32(longValue());
 	}
 

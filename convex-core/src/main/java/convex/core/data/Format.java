@@ -103,9 +103,7 @@ public class Format {
 	 * @return Length of VLQ encoding in bytes
 	 */
 	public static int getVLQLongLength(long x) {
-		if ((x < 64) && (x >= -64)) {
-			return 1;
-		}
+		if ((x<64)&&(x>=-64)) return 1;
 		int bitLength = Utils.bitLength(x);
 		int blen = (bitLength + 6) / 7;
 		return blen;
@@ -114,41 +112,39 @@ public class Format {
 	/**
 	 * Gets the length in bytes of VLQ count encoding for the given long value
 	 * @param x Long value to encode
-	 * @return Length of VLQ encoding
+	 * @return Length of VLQ encoding, or 0 if value is negative (overflow case)
 	 */
 	public static int getVLQCountLength(long x) {
-		if (x<0) throw new IllegalArgumentException("Negative Count");
-		if (x < 128) {
-			return 1;
-		}
+		if (x<0) return 0;
+		if (x<128) return 1;
 		int bitLength = Utils.bitLength(x)-1; // high zero not required
 		int blen = (bitLength + 6) / 7;
 		return blen;
 	}
 
 	/**
-	 * Puts a VLQ encoded long into the specified bytebuffer (with no tag)
+	 * Puts a VLQ encoded count into the specified bytebuffer (with no tag)
 	 * 
 	 * Format: 
 	 * <ul>
 	 * <li>MSB of each byte 0=last octet, 1=more octets</li>
 	 * <li>Following MSB, 7 bits of integer representation for each octet</li>
-	 * <li>Second highest bit of first byte is interpreted as the sign</li> 
 	 * </ul>
 	 * @param bb ByteBuffer to write to
 	 * @param x Value to VLQ encode
 	 * @return Updated ByteBuffer
 	 */
-	public static ByteBuffer writeVLQLong(ByteBuffer bb, long x) {
-		if ((x < 64) && (x >= -64)) {
-			// single byte, cleared high bit
-			byte single = (byte) (x & 0x7F);
+	public static ByteBuffer writeVLQCount(ByteBuffer bb, long x) {
+		if (x<128) {
+			if (x<0) throw new IllegalArgumentException("Negative count!");
+			// single byte
+			byte single = (byte) (x);
 			return bb.put(single);
 		}
-		int bitLength = Utils.bitLength(x);
-		int blen = (bitLength + 6) / 7;
+		int bitLength = 64-Bits.leadingZeros(x);
+		int blen = (bitLength + 6) / 7; // 8 bits overflows to 2 bytes etc.
 		for (int i = blen - 1; i >= 1; i--) {
-			byte single = (byte) (0x80 | (x >> (7 * i))); // 7 bits with high bit set
+			byte single = (byte) (0x80 | (x >>> (7 * i))); // 7 bits
 			bb = bb.put(single);
 		}
 		byte end = (byte) (x & 0x7F); // last 7 bits of long, high bit zero
@@ -310,7 +306,7 @@ public class Format {
 
 	/**
 	 * Peeks for a VLQ encoded message length at the start of a ByteBuffer, which
-	 * must contain at least 1 byte, maximum 2.
+	 * must contain at least 1 byte
 	 * 
 	 * Does not move the buffer position.
 	 * 
@@ -323,7 +319,7 @@ public class Format {
 		int remaining=bb.limit();
 		if (remaining==0) return -1;
 		
-		int len = bb.get(0);
+		long len = bb.get(0);
 
 		// Quick check for 1 byte message length
 		if ((len & 0x80) == 0) {
@@ -333,11 +329,11 @@ public class Format {
 						"Format.peekMessageLength: Zero message length:" + Utils.readBufferData(bb));
 			}
 
-			// 1 byte header (without high bit set)
-			return len & 0x3F;
+			// 1 byte length (without high bit set)
+			return (int)(len & 0x7F);
 		}
 		
-		// Clear high bit
+		// Clear high bits
 		len &=0x7f;
 
 		if (len==0) throw new BadFormatException("Format.peekMessageLength: Excess leading zeros");
@@ -345,13 +341,15 @@ public class Format {
 		for (int i=1; i<Format.MAX_VLQ_COUNT_LENGTH; i++) {
 			if (i>=remaining) return -1; // we are expecting more bytes, but none available yet....
 			int lsb = bb.get(i);
-			len = (len << 7) + (lsb&0x7f);
+			len = (len << 7) | (lsb&0x7f);
 			if ((lsb & 0x80) == 0) {
-				return len;
+				break;
 			}
 		}
 
-		throw new BadFormatException("Format.peekMessageLength: Too many bytes in length encoding");
+		int result=(int)len;
+		if (result!=len) throw new BadFormatException("Format.peekMessageLength: Too many bytes in length encoding");
+		return result;
 	}
 
 	/**
@@ -362,7 +360,7 @@ public class Format {
 	 * @return The ByteBuffer after writing the message length
 	 */
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
-		return writeVLQLong(bb, len);
+		return writeVLQCount(bb, len);
 	}
 	
 	/**
@@ -447,11 +445,6 @@ public class Format {
 
 		AString s = Strings.create(blob.slice(pos,pos+len));
 		return s;
-	}
-
-	public static ByteBuffer writeLength(ByteBuffer bb, int i) {
-		bb = writeVLQLong(bb, i);
-		return bb;
 	}
 	
 	/**

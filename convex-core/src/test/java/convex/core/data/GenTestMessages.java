@@ -15,10 +15,12 @@ import convex.core.exceptions.BadFormatException;
 public class GenTestMessages {
 
 	@Property
-	public void messageLengthVLC(Long a) throws BadFormatException {
-		ByteBuffer bb = ByteBuffer.allocate(Format.MAX_VLQ_LONG_LENGTH);
-		Format.writeVLQLong(bb, a);
+	public void messageLengthVLQ(Integer a) throws BadFormatException {
+		if (a<1) return;
+		ByteBuffer bb = ByteBuffer.allocate(5); // sufficient for 32 bits
+		Format.writeVLQCount(bb, a);
 		bb.flip();
-		assertEquals(bb.remaining(), Format.getVLQLongLength(a));
+		assertEquals(a,Format.peekMessageLength(bb));
+		assertEquals(bb.remaining(), Format.getVLQCountLength(a));
 	}
 }
