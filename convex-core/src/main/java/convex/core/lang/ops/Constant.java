@@ -25,7 +25,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 
 /**
  * Operation representing a constant value
@@ -131,7 +131,7 @@ public class Constant<T extends ACell> extends AOp<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
-		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 		return (Ref<R>) valueRef;
 	}
 	

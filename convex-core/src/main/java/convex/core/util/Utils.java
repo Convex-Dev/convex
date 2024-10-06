@@ -518,7 +518,7 @@ public class Utils {
 	 */
 	public static int checkedInt(long a) {
 		int i = (int) a;
-		if (a != i) throw new IllegalArgumentException(Errors.sizeOutOfRange(a));
+		if (a != i) throw new IllegalArgumentException(ErrorMessages.sizeOutOfRange(a));
 		return i;
 	}
 	
@@ -543,7 +543,7 @@ public class Utils {
 	 */
 	public static short checkedShort(long a) {
 		short s = (short) a;
-		if (s != a) throw new IllegalArgumentException(Errors.sizeOutOfRange(a));
+		if (s != a) throw new IllegalArgumentException(ErrorMessages.sizeOutOfRange(a));
 		return s;
 	}
 
@@ -556,7 +556,7 @@ public class Utils {
 	 */
 	public static byte checkedByte(long a) {
 		byte b = (byte) a;
-		if (b != a) throw new IllegalArgumentException(Errors.sizeOutOfRange(a));
+		if (b != a) throw new IllegalArgumentException(ErrorMessages.sizeOutOfRange(a));
 		return b;
 	}
 

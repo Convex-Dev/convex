@@ -8,7 +8,7 @@ import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -216,7 +216,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public ACell get(long i) {
 		if (i == 0) return getKey();
 		if (i == 1) return getValue();
-		throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -224,7 +224,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	public Ref<ACell> getElementRef(long i) {
 		if (i == 0) return (Ref<ACell>) keyRef;
 		if (i == 1) return (Ref<ACell>) valueRef;
-		throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 	}
 	
 	@SuppressWarnings("unchecked")

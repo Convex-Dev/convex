@@ -61,7 +61,7 @@ import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.CorePred;
 import convex.core.lang.impl.ICoreDef;
 import convex.core.lang.ops.Special;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -1874,7 +1874,7 @@ public class Core {
 			}
 			
 			ANumeric result = RT.plus(args);
-			if (result==null) return context.withError(Errors.INVALID_NUMERIC);
+			if (result==null) return context.withError(ErrorMessages.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1892,7 +1892,7 @@ public class Core {
 				if (context.isExceptional()) return context; // not not exceptional, might be something else
 			}
 			ANumeric result = RT.minus(args);
-			if (result==null) return context.withError(Errors.INVALID_NUMERIC);
+			if (result==null) return context.withError(ErrorMessages.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});
@@ -1910,7 +1910,7 @@ public class Core {
 			}
 
 			ANumeric result = RT.multiply(args);
-			if (result == null) return context.withError(Errors.INVALID_NUMERIC);
+			if (result == null) return context.withError(ErrorMessages.INVALID_NUMERIC);
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});

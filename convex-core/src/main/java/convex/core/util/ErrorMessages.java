@@ -15,7 +15,7 @@ import convex.core.lang.exception.ErrorValue;
  * 
  * – Satoshi Nakamoto
  */
-public class Errors {
+public class ErrorMessages {
 
 
 

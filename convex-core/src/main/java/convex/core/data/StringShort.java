@@ -6,7 +6,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -221,7 +221,7 @@ public final class StringShort extends AString {
 	@Override
 	protected void printEscaped(BlobBuilder sb, long start, long end) {
 		long n=count();
-		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
+		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(ErrorMessages.badRange(start, end));
 		for (long i=start; i<end; i++) {
 			byte b=data.byteAtUnchecked(i);
 			if (b>=0) {

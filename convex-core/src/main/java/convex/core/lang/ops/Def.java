@@ -15,7 +15,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 
 /**
  * Op that creates a definition in the current environment.
@@ -105,7 +105,7 @@ public class Def<T extends ACell> extends AOp<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public Ref<AOp<T>> getRef(int i) {
-		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 		return opRef;
 	}
 

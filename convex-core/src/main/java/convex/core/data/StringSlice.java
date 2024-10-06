@@ -3,7 +3,7 @@ package convex.core.data;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 
 /**
  * AString subclass representing a view some String data. Not canonical!
@@ -100,7 +100,7 @@ public class StringSlice extends AString {
 	@Override
 	protected void printEscaped(BlobBuilder sb, long start, long end) {
 		long n=count();
-		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
+		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(ErrorMessages.badRange(start, end));
 		source.printEscaped(sb, this.start+start, this.start+end);
 	}
 

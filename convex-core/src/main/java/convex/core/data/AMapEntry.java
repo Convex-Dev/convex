@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpecialVector<ACell> implements Map.Entry<K, V> {
@@ -47,7 +47,7 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpeci
 
 	@Override
 	public final V setValue(V value) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override

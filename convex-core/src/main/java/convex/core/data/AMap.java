@@ -12,7 +12,7 @@ import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -140,22 +140,22 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 
 	@Override
 	public final V put(K key, V value) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final V remove(Object key) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final void putAll(Map<? extends K, ? extends V> m) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final void clear() {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override

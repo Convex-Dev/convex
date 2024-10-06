@@ -6,7 +6,7 @@ import java.util.Random;
 
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -49,7 +49,7 @@ public class Blob extends AArrayBlob {
 	public static Blob create(byte[] data, int offset, int length) {
 		if (length <= 0) {
 			if (length == 0) return EMPTY;
-			throw new IllegalArgumentException(Errors.negativeLength(length));
+			throw new IllegalArgumentException(ErrorMessages.negativeLength(length));
 		}
 		byte[] store = Arrays.copyOfRange(data, offset, offset + length);
 		return wrap(store);
@@ -100,9 +100,9 @@ public class Blob extends AArrayBlob {
 	 * @return Blob wrapping the given byte array segment
 	 */
 	public static Blob wrap(byte[] data, int offset, int length) {
-		if (length < 0) throw new IllegalArgumentException(Errors.negativeLength(length));
+		if (length < 0) throw new IllegalArgumentException(ErrorMessages.negativeLength(length));
 		if ((offset < 0) || (offset + length > data.length))
-			throw new IndexOutOfBoundsException(Errors.badRange(offset, offset+length));
+			throw new IndexOutOfBoundsException(ErrorMessages.badRange(offset, offset+length));
 		if (length==0) return Blob.EMPTY;
 		Blob b= new Blob(data, offset, length);
 		

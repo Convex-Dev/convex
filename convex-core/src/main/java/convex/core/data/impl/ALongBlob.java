@@ -10,7 +10,7 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.RefDirect;
 import convex.core.data.util.BlobBuilder;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 public abstract class ALongBlob extends ABlob {
@@ -61,7 +61,7 @@ public abstract class ALongBlob extends ABlob {
 	public abstract Blob toFlatBlob();
 	
 	private static void checkIndex(long i) {
-		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 	}
 
 	@Override
@@ -92,7 +92,7 @@ public abstract class ALongBlob extends ABlob {
 	@Override
 	public final Blob getChunk(long i) {
 		if (i == 0L) return toFlatBlob();
-		throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 	}
 
 	@Override

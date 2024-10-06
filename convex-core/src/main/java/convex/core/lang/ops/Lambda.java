@@ -15,7 +15,7 @@ import convex.core.lang.Juice;
 import convex.core.lang.Ops;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -58,7 +58,7 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
 		if (i==0) return (Ref<R>) function;
-		throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 	}
 
 	@Override

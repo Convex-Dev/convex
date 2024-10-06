@@ -5,7 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.Constants;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -247,7 +247,7 @@ public class AccountKey extends AArrayBlob {
 
 	@Override
 	public Blob getChunk(long i) {
-		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 		return toFlatBlob();
 	}
 

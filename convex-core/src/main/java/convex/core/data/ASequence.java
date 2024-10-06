@@ -11,7 +11,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.SequenceSpliterator;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -84,7 +84,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	@Override
 	public final boolean addAll(int index, Collection<? extends T> c) {
 		// Convex sequences are never mutable
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	/**
@@ -171,7 +171,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	@Override
 	public T set(int index, T element) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -206,12 +206,12 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 
 	@Override
 	public final void add(int index, T element) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final T remove(int index) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 	
 	/**
@@ -268,7 +268,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 		long start = fromIndex;
 		long end = toIndex;
 		ASequence<T> result= slice(start, end);
-		if (result==null) throw new IndexOutOfBoundsException(Errors.badRange(start, end));
+		if (result==null) throw new IndexOutOfBoundsException(ErrorMessages.badRange(start, end));
 		return result;
 	}
 

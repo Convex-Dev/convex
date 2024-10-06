@@ -3,7 +3,7 @@ package convex.core.data;
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -102,7 +102,7 @@ public class Hash extends AArrayBlob {
 	 */
 	public static Hash wrap(byte[] hashBytes, int offset) {
 		if ((offset < 0) || (offset + LENGTH > hashBytes.length))
-			throw new IllegalArgumentException(Errors.badRange(offset, offset+LENGTH));
+			throw new IllegalArgumentException(ErrorMessages.badRange(offset, offset+LENGTH));
 		Hash h= new Hash(hashBytes, offset);
 		if ((offset>=2)&&(hashBytes[offset-1]==LENGTH)&&(hashBytes[offset-2]==Tag.BLOB)) {
 			h.attachEncoding(Blob.wrap(hashBytes, offset-2, LENGTH+2));
@@ -188,7 +188,7 @@ public class Hash extends AArrayBlob {
 
 	@Override
 	public Blob getChunk(long i) {
-		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 		return toFlatBlob();
 	}
 

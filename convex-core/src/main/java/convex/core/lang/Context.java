@@ -45,7 +45,7 @@ import convex.core.lang.exception.TailcallValue;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.TransactionContext;
 import convex.core.util.Economics;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -1311,7 +1311,7 @@ public class Context {
 	public Context evalAs(Address target, ACell form) {
 		Address caller=getAddress();
 		AccountStatus as=this.getAccountStatus(target);
-		if (as==null) return withError(Errors.nobody(target));
+		if (as==null) return withError(ErrorMessages.nobody(target));
 
 		// TODO should probably refactor into a checkControl function or similar
 		ACell controller=as.getController();
@@ -1463,7 +1463,7 @@ public class Context {
 
 		long currentBalance=sourceAccount.getBalance();
 		if (currentBalance<amount) {
-			return this.withFundsError(Errors.insufficientFunds(source,amount));
+			return this.withFundsError(ErrorMessages.insufficientFunds(source,amount));
 		}
 
 		long newSourceBalance=currentBalance-amount;

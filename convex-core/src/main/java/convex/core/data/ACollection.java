@@ -9,7 +9,7 @@ import java.util.NoSuchElementException;
 import java.util.function.Function;
 
 import convex.core.data.type.AType;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -93,29 +93,29 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 
 		@Override
 		public void remove() {
-			throw new UnsupportedOperationException(Errors.immutable(this));
+			throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 		}
 
 		@Override
 		public void set(T e) {
-			throw new UnsupportedOperationException(Errors.immutable(this));
+			throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 		}
 
 		@Override
 		public void add(T e) {
-			throw new UnsupportedOperationException(Errors.immutable(this));
+			throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 		}
 
 	}
 	
 	@Override
 	public final boolean add(T e) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final boolean remove(Object o) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
@@ -130,22 +130,22 @@ public abstract class ACollection<T extends ACell> extends ADataStructure<T> imp
 
 	@Override
 	public final boolean addAll(Collection<? extends T> c) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final boolean removeAll(Collection<?> c) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final boolean retainAll(Collection<?> c) {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	@Override
 	public final void clear() {
-		throw new UnsupportedOperationException(Errors.immutable(this));
+		throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 	}
 
 	/**

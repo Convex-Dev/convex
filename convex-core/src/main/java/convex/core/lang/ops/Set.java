@@ -14,7 +14,7 @@ import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Juice;
 import convex.core.lang.Ops;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 
 /**
  * Op to set a lexical value in the local execution context. i.e. `set!`
@@ -128,7 +128,7 @@ public class Set<T extends ACell> extends AOp<T> {
 	@SuppressWarnings("unchecked")
 	@Override
 	public Ref<AOp<T>> getRef(int i) {
-		if (i != 0) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 		return op;
 	}
 

@@ -9,7 +9,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -200,17 +200,17 @@ public class List<T extends ACell> extends AList<T> {
 
 		@Override
 		public void remove() {
-			throw new UnsupportedOperationException(Errors.immutable(this));
+			throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 		}
 
 		@Override
 		public void set(T e) {
-			throw new UnsupportedOperationException(Errors.immutable(this));
+			throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 		}
 
 		@Override
 		public void add(T e) {
-			throw new UnsupportedOperationException(Errors.immutable(this));
+			throw new UnsupportedOperationException(ErrorMessages.immutable(this));
 		}
 	}
 

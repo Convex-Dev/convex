@@ -9,7 +9,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Bits;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -278,7 +278,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 	
 	private static void checkIndex(long i) {
-		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(Errors.badIndex(i));
+		if ((i < 0) || (i >= LENGTH)) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
 	}
 	
 	@Override

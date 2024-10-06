@@ -4,7 +4,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.text.Text;
-import convex.core.util.Errors;
+import convex.core.util.ErrorMessages;
 
 /**
  * String implementation class wrapping a BlobTree.
@@ -135,7 +135,7 @@ public class StringTree extends AString {
 	protected void printEscaped(BlobBuilder sb, long start, long end) {
 		// TODO This could potentially be faster
 		long n=count();
-		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(Errors.badRange(start, end));
+		if ((start<0)||(start>end)||(end>n)) throw new IllegalArgumentException(ErrorMessages.badRange(start, end));
 		for (long i=start; i<end; i++) {
 			byte b=data.byteAtUnchecked(i);
 			Text.writeEscapedByte(sb,b);
