@@ -288,7 +288,7 @@ public final class CVMLong extends AInteger {
 	}
 
 	@Override
-	public long byteLength() {
+	public int byteLength() {
 		return Utils.byteLength(value);
 	}
 

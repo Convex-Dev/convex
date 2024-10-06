@@ -6,6 +6,7 @@ import convex.core.data.ABlob;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.TODOException;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for CVM Integer values
@@ -87,7 +88,7 @@ public abstract class AInteger extends ANumeric {
 	 * Number of bytes in minimal representation of this Integer. Returns 0 if and only if the integer is zero.
 	 * @return Number of bytes
 	 */
-	public abstract long byteLength();
+	public abstract int byteLength();
 
 	@Override
 	public ANumeric add(ANumeric b) {
@@ -129,12 +130,13 @@ public abstract class AInteger extends ANumeric {
 	/**
 	 * Create a canonical CVM integer representation of the given Java BigInteger
 	 * @param bi BigInteger value
-	 * @return AInteger instance
+	 * @return AInteger instance, or null if BigInteger too large or null
 	 */
 	public static AInteger create(BigInteger bi) {
-		if (bi.compareTo(CVMBigInteger.MIN_POSITIVE_BIG)>=0) return CVMBigInteger.wrap(bi);
-		if (bi.compareTo(CVMBigInteger.MIN_NEGATIVE_BIG)<=0) return CVMBigInteger.wrap(bi);
-		return CVMLong.create(bi.longValue());
+		if (bi==null) return null;
+		int len=Utils.byteLength(bi);
+		if (len<=8) return CVMLong.create(bi.longValue());
+		return CVMBigInteger.wrap(bi); // note: returns null if bigInteger is too large
 	}
 	
 	/**
@@ -149,7 +151,7 @@ public abstract class AInteger extends ANumeric {
 	/**
 	 * Create a canonical CVM integer representation of the given Java Number
 	 * @param value Long value
-	 * @return AInteger instance
+	 * @return AInteger instance, or null if too large to represent as a CVM integer
 	 */
 	public static AInteger create(Number value) {
 		if (value instanceof Long) return CVMLong.create(((Long)value).longValue());

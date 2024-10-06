@@ -1,19 +1,17 @@
 package convex.core.data.prim;
 
 import convex.core.data.ACell;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
 
+/**
+ * Abstract base class for Byte Flags
+ * 
+ * 0xb0 to 0xbf in CAD3 encoding
+ */
 public abstract class AByteFlag extends APrimitive {
 	
 	public static final int MAX_ENCODING_LENGTH = 1;
-
-	@Override
-	public int getRefCount() {
-		// Never any refs
-		return 0;
-	}
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -23,11 +21,6 @@ public abstract class AByteFlag extends APrimitive {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		// Nothing to check. Always valid
-	}
-	
-	@Override
-	public ACell updateRefs(IRefFunction func) {
-		return this;
 	}
 	
 	@Override

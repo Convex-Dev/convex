@@ -622,6 +622,18 @@ public class Utils {
 		int bits=64 - Bits.leadingZeros(ux); // bits in unsigned representation
 		return 1+(bits/8); // need space for sign bit, so add a byte whenever full
 	}
+	
+	/**
+	 * Returns the minimal number of bytes to represent the signed twos complement
+	 * value of a BigInteger
+	 *
+	 * @param x Long value
+	 * @return Number of bytes required for representation, in the range 1-8
+	 *         inclusive
+	 */
+	public static int byteLength(BigInteger bi) {
+		return bi.bitLength()/8+1;
+	}
 
 	/**
 	 * Converts an object to an int value, handling Strings and arbitrary numbers.

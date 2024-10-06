@@ -9,7 +9,6 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
-import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
@@ -34,10 +33,10 @@ public final class CVMBigInteger extends AInteger {
 	protected static final long MAX_BYTELENGTH = Constants.MAX_BIG_INTEGER_LENGTH;
 	
 	// We store the Integer as either a blob or Java BigInteger, and convert lazily on demand
-	private ABlob blob;
+	private Blob blob;
 	private BigInteger data;
 	
-	private CVMBigInteger(ABlob blob, BigInteger value) {
+	private CVMBigInteger(Blob blob, BigInteger value) {
 		this.blob=blob;
 		this.data=value;
 	}
@@ -62,7 +61,7 @@ public final class CVMBigInteger extends AInteger {
 	 * @return CVMBigInteger instance or null if not valid
 	 */
 	public static CVMBigInteger wrap(BigInteger value) {
-		if (value.bitLength()>(MAX_BYTELENGTH*8-1)) return null; // note bitLength excludes sign bit
+		if (Utils.byteLength(value)>MAX_BYTELENGTH) return null; // note bitLength excludes sign bit
 		return new CVMBigInteger(null,value);
 	}
 	
@@ -72,9 +71,9 @@ public final class CVMBigInteger extends AInteger {
 	 * @return Big Integer value or null if not valid.
 	 */
 	public static CVMBigInteger create(ABlob data) {
-		data=trimLeadingBytes(data);
 		if (data==null) return null;
-		return new CVMBigInteger(data,null);
+		data=trimLeadingBytes(data);
+		return new CVMBigInteger(data.toFlatBlob(),null);
 	}
 
 	
@@ -121,7 +120,7 @@ public final class CVMBigInteger extends AInteger {
 		return blob;
 	}
 
-	protected ABlob buildBlob() {
+	protected Blob buildBlob() {
 		return Blob.wrap(data.toByteArray());
 	}
 
@@ -201,9 +200,9 @@ public final class CVMBigInteger extends AInteger {
 	}
 	
 	@Override
-	public long byteLength() {
+	public int byteLength() {
 		// TODO: check value for zero?
-		if (blob!=null) return blob.count();
+		if (blob!=null) return Utils.checkedInt(blob.count());
 		return ((data.bitLength())/8)+1;
 	}
 
@@ -239,7 +238,8 @@ public final class CVMBigInteger extends AInteger {
 
 	@Override
 	public boolean isCanonical() {
-		return (blob().count()>8);
+		int n=byteLength();
+		return (n>8)&&(n<=MAX_BYTELENGTH);
 	}
 	
 	@Override
@@ -251,16 +251,6 @@ public final class CVMBigInteger extends AInteger {
 	public boolean isEmbedded() {
 		if (memorySize==Format.FULL_EMBEDDED_MEMORY_SIZE) return true;
 		return blob().isEmbedded();
-	}
-	
-	@Override
-	public int getRefCount() {
-		return blob().getRefCount();
-	}
-	
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		return blob().getRef(i);
 	}
 	
 	@Override

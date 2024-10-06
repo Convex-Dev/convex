@@ -18,6 +18,7 @@ import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Strings;
@@ -84,6 +85,16 @@ public class BigIntegerTest {
 		assertFalse(bi.isCanonical());
 		
 		doBigTest(bi);
+	}
+	
+	@Test public void testMemorySize() {
+		int N=1000;
+		byte[] bs=new byte[N];
+		bs[0]=40; // have a leading high byte 
+		Blob b=Blob.wrap(bs);
+		CVMBigInteger bi=CVMBigInteger.create(b);
+		assertEquals(b.getMemorySize(),bi.getMemorySize());
+		assertEquals(Cells.storageSize(b),Cells.storageSize(bi));
 	}
 	
 	@Test public void test0980Regression () {
