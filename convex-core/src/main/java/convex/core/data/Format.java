@@ -51,25 +51,26 @@ import convex.core.exceptions.Panic;
 public class Format {
 
 	/**
-	 * 8191 byte system-wide limit on the legal length of a data object encoding.
+	 * 16383 byte system-wide limit on the legal length of a data object encoding.
 	 * 
 	 * Technical reasons for this choice:
 	 * <ul>
-	 * <li>This is the max length that can be VLC encoded in a 2 byte message header. This simplifies message encoding and decoding.</li>
+	 * <li>This is the maximum length that can be VLQ encoded in a 2 byte message header. This simplifies message encoding and decoding.</li>
 	 * <li>It is big enough to include a 4096-byte Blob</li>
+	 * <li>It is small enough to fit in a UDP message</li>
 	 * </ul>
 	 */
-	public static final int LIMIT_ENCODING_LENGTH = 0x1FFF; 
+	public static final int LIMIT_ENCODING_LENGTH = 0x3FFF; 
 	
 	/**
-	 * Maximum length for a VLC encoded Long
+	 * Maximum length for a VLQ encoded Long
 	 */
-	public static final int MAX_VLC_LONG_LENGTH = 10; // 70 bits
+	public static final int MAX_VLQ_LONG_LENGTH = 10; // 70 bits
 	
 	/**
-	 * Maximum length for a VLC encoded Count
+	 * Maximum length for a VLQ encoded Count
 	 */
-	public static final int MAX_VLC_COUNT_LENGTH = 9; // 63 bits
+	public static final int MAX_VLQ_COUNT_LENGTH = 9; // 63 bits
 	
 	/**
 	 * Maximum size in bytes of an embedded value, including tag
@@ -97,11 +98,11 @@ public class Format {
 	public static final long FULL_EMBEDDED_MEMORY_SIZE = 0L;
 
 	/**
-	 * Gets the length in bytes of VLC encoding for the given long value
+	 * Gets the length in bytes of VLQ encoding for the given long value
 	 * @param x Long value to encode
-	 * @return Length of VLC encoding
+	 * @return Length of VLQ encoding in bytes
 	 */
-	public static int getVLCLength(long x) {
+	public static int getVLQLongLength(long x) {
 		if ((x < 64) && (x >= -64)) {
 			return 1;
 		}
@@ -111,11 +112,11 @@ public class Format {
 	}
 	
 	/**
-	 * Gets the length in bytes of VLC count encoding for the given long value
+	 * Gets the length in bytes of VLQ count encoding for the given long value
 	 * @param x Long value to encode
-	 * @return Length of VLC encoding
+	 * @return Length of VLQ encoding
 	 */
-	public static int getVLCCountLength(long x) {
+	public static int getVLQCountLength(long x) {
 		if (x<0) throw new IllegalArgumentException("Negative Count");
 		if (x < 128) {
 			return 1;
@@ -126,7 +127,7 @@ public class Format {
 	}
 
 	/**
-	 * Puts a VLC encoded long into the specified bytebuffer (with no tag)
+	 * Puts a VLQ encoded long into the specified bytebuffer (with no tag)
 	 * 
 	 * Format: 
 	 * <ul>
@@ -135,10 +136,10 @@ public class Format {
 	 * <li>Second highest bit of first byte is interpreted as the sign</li> 
 	 * </ul>
 	 * @param bb ByteBuffer to write to
-	 * @param x Value to VLC encode
+	 * @param x Value to VLQ encode
 	 * @return Updated ByteBuffer
 	 */
-	public static ByteBuffer writeVLCLong(ByteBuffer bb, long x) {
+	public static ByteBuffer writeVLQLong(ByteBuffer bb, long x) {
 		if ((x < 64) && (x >= -64)) {
 			// single byte, cleared high bit
 			byte single = (byte) (x & 0x7F);
@@ -167,9 +168,9 @@ public class Format {
 	 * @param bs Byte array to write to
 	 * @param pos Initial position in byte array
 	 * @param x Long value to write
-	 * @return end position in byte array after writing VLC long
+	 * @return end position in byte array after writing VLQ long
 	 */
-	public static int writeVLCLong(byte[] bs, int pos, long x) {
+	public static int writeVLQLong(byte[] bs, int pos, long x) {
 		if ((x < 64) && (x >= -64)) {
 			// single byte, cleared high bit
 			byte single = (byte) (x & 0x7F);
@@ -200,10 +201,10 @@ public class Format {
 	 * @param bs Byte array to write to
 	 * @param pos Initial position in byte array
 	 * @param x Long value to write
-	 * @return end position in byte array after writing VLC long
+	 * @return end position in byte array after writing VLQ long
 	 */
-	public static int writeVLCCount(byte[] bs, int pos, long x) {
-		if (x<0) throw new IllegalArgumentException("VLC Count cannot be negative but got: "+x);
+	public static int writeVLQCount(byte[] bs, int pos, long x) {
+		if (x<0) throw new IllegalArgumentException("VLQ Count cannot be negative but got: "+x);
 		if (x < 128) {
 			// single byte, cleared high bit
 			byte single = (byte) (x & 0x7F);
@@ -223,34 +224,34 @@ public class Format {
 	}
 
 	/**
-	 * Sign extend 7th bit (sign in a VLC byte) of a byte to all bits in a long
+	 * Sign extend 7th bit (sign in a VLQ byte) of a byte to all bits in a long
 	 * 
 	 * i.e. sign extend excluding the continuation bit:
-	 * where VLC Byte = csxxxxxx 
+	 * where VLQ Byte = csxxxxxx 
 	 * 
 	 * @param b Byte to extend
 	 * @return The sign-extended byte as a long
 	 */
-	public static long vlcSignExtend(byte b) {
+	static long signExtendVLQ(byte b) {
 		return (((long) b) << 57) >> 57;
 	}
 	
 	/**
-	 * Checks if VLC continues from given byte, i.e. if high bit is set
+	 * Checks if VLQ continues from given byte, i.e. if high bit is set
 	 * @param octet
-	 * @return True if VLC coding continues, false otherwise
+	 * @return True if VLQ coding continues, false otherwise
 	 */
-	protected static boolean vlcContinuesFrom(byte octet) {
+	static boolean vlqContinuesFrom(byte octet) {
 		return (octet & 0x80) != 0;
 	}
 	
-	public static long readVLCLong(AArrayBlob blob, int pos) throws BadFormatException {
+	public static long readVLQLong(AArrayBlob blob, int pos) throws BadFormatException {
 		byte[] data=blob.getInternalArray();
-		return readVLCLong(data,pos+blob.getInternalOffset());
+		return readVLQLong(data,pos+blob.getInternalOffset());
 	}
 
 	/**
-	 * Reads a VLC encoded long as a long from the given location in a byte
+	 * Reads a VLQ encoded long as a long from the given location in a byte
 	 * array. Assumes no tag
 	 * @param data Byte array
 	 * @param pos Position from which to read in byte array
@@ -258,13 +259,13 @@ public class Format {
 	 * @throws BadFormatException If format is invalid, or reading beyond end of
 	 *                            array
 	 */
-	public static long readVLCLong(byte[] data, int pos) throws BadFormatException {
+	public static long readVLQLong(byte[] data, int pos) throws BadFormatException {
 		byte octet = data[pos++];
-		long result = vlcSignExtend(octet); // sign extend 7th bit to 64th bit
+		long result = signExtendVLQ(octet); // sign extend 7th bit to 64th bit
 		int bits = 7;
-		while (vlcContinuesFrom(octet)) {
-			if (pos >= data.length) throw new BadFormatException("VLC encoding beyond end of array");
-			if (bits > 64) throw new BadFormatException("VLC encoding too long for long value");
+		while (vlqContinuesFrom(octet)) {
+			if (pos >= data.length) throw new BadFormatException("VLQ encoding beyond end of array");
+			if (bits > 64) throw new BadFormatException("VLQ encoding too long for long value");
 			octet = data[pos++];
 			// continue while high bit of byte set
 			result = (result << 7) | (octet & 0x7F); // shift and set next 7 lowest bits
@@ -274,7 +275,7 @@ public class Format {
 	}
 	
 	/**
-	 * Reads a VLC encoded count (non-negative integer) as a long from the given location in a byte
+	 * Reads a VLQ encoded count (non-negative integer) as a long from the given location in a byte
 	 * array. Assumes no tag
 	 * @param data Byte array
 	 * @param pos Position from which to read in byte array
@@ -282,33 +283,33 @@ public class Format {
 	 * @throws BadFormatException If format is invalid, or reading beyond end of
 	 *                            array
 	 */
-	public static long readVLCCount(byte[] data, int pos) throws BadFormatException {
+	public static long readVLQCount(byte[] data, int pos) throws BadFormatException {
 		byte octet = data[pos++];
-		if (octet==0x80) throw new BadFormatException("Superfluous leading zero on VLC count");
+		if (octet==0x80) throw new BadFormatException("Superfluous leading zero on VLQ count");
 		long result = octet&0x7f;
 		int bits = 7;
-		while (vlcContinuesFrom(octet)) {
+		while (vlqContinuesFrom(octet)) {
 			if (pos >= data.length) {
-				throw new BadFormatException("VLC encoding beyond end of array");
+				throw new BadFormatException("VLQ encoding beyond end of array");
 			}
-			if (bits > 64) throw new BadFormatException("VLC encoding too long for long value");
+			if (bits > 64) throw new BadFormatException("VLQ encoding too long for long value");
 			octet = data[pos++];
 			// continue while high bit of byte set
 			result = (result << 7) | (octet & 0x7F); // shift and set next 7 lowest bits
 			bits += 7;
 		}
-		if (result<0) throw new BadFormatException("VLC Count netative overflow");
+		if (result<0) throw new BadFormatException("VLQ Count netative overflow");
 		return result;
 	}
 	
-	public static long readVLCCount(AArrayBlob blob, int pos) throws BadFormatException {
+	public static long readVLQCount(AArrayBlob blob, int pos) throws BadFormatException {
 		byte[] data=blob.getInternalArray();
-		return readVLCCount(data,pos+blob.getInternalOffset());
+		return readVLQCount(data,pos+blob.getInternalOffset());
 	}
 
 
 	/**
-	 * Peeks for a VLC encoded message length at the start of a ByteBuffer, which
+	 * Peeks for a VLQ encoded message length at the start of a ByteBuffer, which
 	 * must contain at least 1 byte, maximum 2.
 	 * 
 	 * Does not move the buffer position.
@@ -324,21 +325,14 @@ public class Format {
 		
 		int len = bb.get(0);
 
-		// Zero message length not allowed
-		if (len == 0) {
-			throw new BadFormatException(
-					"Format.peekMessageLength: Zero message length:" + Utils.readBufferData(bb));
-		}
-		
-		if ((len & 0x40) != 0) {
-			// sign bit from top byte looks wrong!
-			String hex = Utils.toHexString((byte) len);
-			throw new BadFormatException(
-					"Format.peekMessageLength: Expected positive VLC message length, got first byte [" + hex + "]");
-		}
-		
 		// Quick check for 1 byte message length
 		if ((len & 0x80) == 0) {
+			// Zero message length not allowed
+			if (len == 0) {
+				throw new BadFormatException(
+						"Format.peekMessageLength: Zero message length:" + Utils.readBufferData(bb));
+			}
+
 			// 1 byte header (without high bit set)
 			return len & 0x3F;
 		}
@@ -346,7 +340,9 @@ public class Format {
 		// Clear high bit
 		len &=0x7f;
 
-		for (int i=1; i<Format.MAX_VLC_LONG_LENGTH; i++) {
+		if (len==0) throw new BadFormatException("Format.peekMessageLength: Excess leading zeros");
+
+		for (int i=1; i<Format.MAX_VLQ_COUNT_LENGTH; i++) {
 			if (i>=remaining) return -1; // we are expecting more bytes, but none available yet....
 			int lsb = bb.get(i);
 			len = (len << 7) + (lsb&0x7f);
@@ -359,14 +355,14 @@ public class Format {
 	}
 
 	/**
-	 * Writes a message length as a VLC encoded long
+	 * Writes a message length as a VLQ encoded long
 	 * 
 	 * @param bb  ByteBuffer with capacity available for writing
 	 * @param len Length of message to write
 	 * @return The ByteBuffer after writing the message length
 	 */
 	public static ByteBuffer writeMessageLength(ByteBuffer bb, int len) {
-		return writeVLCLong(bb, len);
+		return writeVLQLong(bb, len);
 	}
 	
 	/**
@@ -404,12 +400,12 @@ public class Format {
 	public static int writeRawUTF8String(byte[] bs, int pos, String s) {
 		if (s.length() == 0) {
 			// zero length, no string bytes
-			return writeVLCLong(bs,pos,0);
+			return writeVLQLong(bs,pos,0);
 		} 
 		
 		byte[] sBytes = Utils.toByteArray(s);
 		int n=sBytes.length;
-		pos = writeVLCLong(bs,pos, sBytes.length);
+		pos = writeVLQLong(bs,pos, sBytes.length);
 		System.arraycopy(sBytes, 0, bs, pos, n);
 		return pos+n;
 	}
@@ -454,7 +450,7 @@ public class Format {
 	}
 
 	public static ByteBuffer writeLength(ByteBuffer bb, int i) {
-		bb = writeVLCLong(bb, i);
+		bb = writeVLQLong(bb, i);
 		return bb;
 	}
 	
@@ -512,9 +508,6 @@ public class Format {
 			return fn;
 		}
 		
-		if (tag == Tag.PEER_STATUS) return PeerStatus.read(b,pos);
-		if (tag == Tag.ACCOUNT_STATUS) return AccountStatus.read(b,pos); 
-
 		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
 	}
 
@@ -663,7 +656,7 @@ public class Format {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
+	private static <T extends ARecord> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
 		if (tag == Tag.BLOCK) {
 			return (T) Block.read(b,pos);
 		}
@@ -684,6 +677,9 @@ public class Format {
 		if (tag == Tag.BLOCK_RESULT) {
 			return (T) BlockResult.read(b,pos);
 		}
+		
+		if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
+		if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
 
 		throw new BadFormatException(badTagMessage(tag));
 	}
@@ -754,8 +750,8 @@ public class Format {
 	 * @return position after writing
 	 */
 	public static int  writeHexDigits(byte[] bs, int pos, ABlob src, long start, long length) {
-		pos = Format.writeVLCLong(bs,pos, start);
-		pos = Format.writeVLCLong(bs,pos, length);
+		pos = Format.writeVLQLong(bs,pos, start);
+		pos = Format.writeVLQLong(bs,pos, length);
 		int nBytes = Utils.checkedInt((length + 1) >> 1);
 		byte[] bs2 = new byte[nBytes];
 		for (int i = 0; i < nBytes; i++) {
@@ -813,8 +809,8 @@ public class Format {
 		int pos=first.getEncodingLength();
 		AStore store=Stores.current();
 		while (pos<ml) {
-			long encLength=Format.readVLCCount(data.getInternalArray(), data.getInternalOffset()+pos);
-			pos+=Format.getVLCCountLength(encLength);
+			long encLength=Format.readVLQCount(data.getInternalArray(), data.getInternalOffset()+pos);
+			pos+=Format.getVLQCountLength(encLength);
 			Blob enc=data.slice(pos, pos+encLength);
 			ACell result=store.decode(enc);
 			// ACell result=Format.read(enc);
@@ -925,8 +921,8 @@ public class Format {
 			int ix=0;
 			AStore store=Stores.current();
 			while( ix<dataLength) {
-				long encLength=Format.readVLCCount(data,ix);
-				ix+=Format.getVLCCountLength(encLength);
+				long encLength=Format.readVLQCount(data,ix);
+				ix+=Format.getVLQCountLength(encLength);
 				
 				Blob enc=data.slice(ix, ix+encLength);
 				if (enc==null) throw new BadFormatException("Incomplete encoding");
@@ -976,7 +972,7 @@ public class Format {
 			if (!refs.contains(cr)) {
 				ACell c=cr.getValue();
 				int encLength=c.getEncodingLength();
-				int lengthFieldSize=Format.getVLCCountLength(encLength);
+				int lengthFieldSize=Format.getVLQCountLength(encLength);
 				
 				int cellLength=lengthFieldSize+encLength;
 				
@@ -999,7 +995,7 @@ public class Format {
 			int encLength=enc.size();
 			
 			// Write count then Blob encoding
-			ix=Format.writeVLCCount(msg, ix, encLength);
+			ix=Format.writeVLQCount(msg, ix, encLength);
 			ix=enc.getBytes(msg, ix);
 		}
 		if (ix!=messageLength) throw new IllegalArgumentException("Bad message length expected "+ml[0]+" but was: "+ix);
@@ -1019,7 +1015,7 @@ public class Format {
 		for (ACell a:cells) {
 			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data
 			int elen=enc.size();
-			if (ml>0) ml+=Format.getVLCCountLength(elen);
+			if (ml>0) ml+=Format.getVLQCountLength(elen);
 			ml+=elen;
 		}
 		
@@ -1028,7 +1024,7 @@ public class Format {
 		for (ACell a:cells) {
 			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data;
 			int elen=enc.size();
-			if (ix>0) ix=Format.writeVLCCount(msg,ix,elen);
+			if (ix>0) ix=Format.writeVLQCount(msg,ix,elen);
 			ix=enc.getBytes(msg, ix);
 		}
 		if (ix!=ml) throw new Panic("Bad message length expected "+ml+" but was: "+ix);
@@ -1049,7 +1045,7 @@ public class Format {
 			
 			if (i<(n-1)) {
 				// include length field
-				ml+=Format.getVLCCountLength(clen);
+				ml+=Format.getVLQCountLength(clen);
 			}
 		}
 		
@@ -1061,7 +1057,7 @@ public class Format {
 			int elen=enc.size();
 			
 			if (i<(n-1)) {
-				ix=Format.writeVLCCount(msg, ix, elen);
+				ix=Format.writeVLQCount(msg, ix, elen);
 			}
 			
 			ix=enc.getBytes(msg,ix);

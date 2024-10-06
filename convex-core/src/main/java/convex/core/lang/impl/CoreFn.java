@@ -100,7 +100,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCCount(bs, pos, code);
+		pos = Format.writeVLQCount(bs, pos, code);
 		return pos;
 	}
 	

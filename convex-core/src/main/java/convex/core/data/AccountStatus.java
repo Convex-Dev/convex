@@ -141,11 +141,11 @@ public class AccountStatus extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		int included=getInclusion();
-		pos=Format.writeVLCCount(bs, pos, included);
-		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLCCount(bs, pos,sequence);
+		pos=Format.writeVLQCount(bs, pos, included);
+		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLQCount(bs, pos,sequence);
 		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
-		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLCCount(bs,pos, balance);
-		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLCCount(bs,pos, memory);
+		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLQCount(bs,pos, balance);
+		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLQCount(bs,pos, memory);
 		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
 		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
 		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
@@ -163,12 +163,12 @@ public class AccountStatus extends ARecord {
 	 */
 	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long included=Format.readVLCCount(b, epos);
-		epos+=Format.getVLCCountLength(included);
+		long included=Format.readVLQCount(b, epos);
+		epos+=Format.getVLQCountLength(included);
 		long sequence=0;
 		if ((included&HAS_SEQUENCE)!=0) {
-			sequence=Format.readVLCCount(b, epos);
-			epos+=Format.getVLCCountLength(sequence);
+			sequence=Format.readVLQCount(b, epos);
+			epos+=Format.getVLQCountLength(sequence);
 		};
 		AccountKey publicKey=null;
 		if ((included&HAS_KEY)!=0) {
@@ -177,13 +177,13 @@ public class AccountStatus extends ARecord {
 		}
 		long balance=0;
 		if ((included&HAS_BALANCE)!=0) {
-			balance=Format.readVLCCount(b, epos);
-			epos+=Format.getVLCCountLength(balance);
+			balance=Format.readVLQCount(b, epos);
+			epos+=Format.getVLQCountLength(balance);
 		};		
 		long allowance=0;
 		if ((included&HAS_ALLOWANCE)!=0) {
-			allowance=Format.readVLCCount(b, epos);
-			epos+=Format.getVLCCountLength(allowance);
+			allowance=Format.readVLQCount(b, epos);
+			epos+=Format.getVLQCountLength(allowance);
 		};		
 		Index<Address,ACell> holdings = null;
 		if ((included&HAS_HOLDINGS)!=0) {

@@ -114,9 +114,9 @@ public class Order extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = blocks.encode(bs,pos);
 		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
-			pos = Format.writeVLCLong(bs,pos, consensusPoints[level]);
+			pos = Format.writeVLQLong(bs,pos, consensusPoints[level]);
 		}
-		pos = Format.writeVLCLong(bs,pos, timestamp);
+		pos = Format.writeVLQLong(bs,pos, timestamp);
 		return pos;
 	}
 	
@@ -144,16 +144,16 @@ public class Order extends ARecord {
 		long[] cps=new long[CPoSConstants.CONSENSUS_LEVELS];
 		long last=Long.MAX_VALUE;
 		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
-			long pp = Format.readVLCLong(b,epos);
+			long pp = Format.readVLQLong(b,epos);
 			cps[level]=pp;
-			epos+=Format.getVLCLength(pp);
+			epos+=Format.getVLQLongLength(pp);
 			if (pp>last) {
 				throw new BadFormatException("Consensus point ["+pp+"] before previous value [" + last+"] at level "+level);
 			}
 			last=pp;
 		}
-		long ts = Format.readVLCLong(b,epos); // TODO: should just be 8 bytes?
-		epos+=Format.getVLCLength(ts);
+		long ts = Format.readVLQLong(b,epos); // TODO: should just be 8 bytes?
+		epos+=Format.getVLQLongLength(ts);
 		
 		Order result=new Order(blocks, cps,ts);
 		result.attachEncoding(b.slice(pos, epos));

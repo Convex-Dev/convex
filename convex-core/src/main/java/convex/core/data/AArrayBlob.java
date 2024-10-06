@@ -132,7 +132,7 @@ public abstract class AArrayBlob extends ABlob {
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.writeVLCCount(bs, pos, count);
+		pos=Format.writeVLQCount(bs, pos, count);
 		return getBytes(bs,pos);
 	}
 

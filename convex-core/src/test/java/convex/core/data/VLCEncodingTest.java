@@ -1,4 +1,4 @@
-package convex.comms;
+package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -19,26 +19,23 @@ public class VLCEncodingTest {
 
 	@Test
 	public void testMessageLength() throws BadFormatException {
-		ByteBuffer bb = Blob.fromHex("8048").getByteBuffer();
+		ByteBuffer bb = Blob.fromHex("8123").getByteBuffer();
 		assertEquals(0, bb.position());
 		int len = Format.peekMessageLength(bb);
 
 		len = Format.peekMessageLength(bb);
 		
-		assertEquals(72, len);
-		assertEquals(2, Format.getVLCLength(len));
+		assertEquals(128+32+3, len);
+		assertEquals(2, Format.getVLQCountLength(len));
 	}
 	
 	@Test
 	public void testBadMessageLength() throws BadFormatException {
 		// Too many bytes in VLC encoding
-		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("80808080808080808080808080808080")));
-		
-		// small negative
-		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("40")));
-		
-		// bigger negative
-		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("ffff00")));
+		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("ffffffffffffffffffff")));
+
+		// Excess leading zeros
+		assertThrows(BadFormatException.class, ()->Format.peekMessageLength(Testing.messageBuffer("8000")));
 	}
 	
 	@Test
@@ -49,17 +46,12 @@ public class VLCEncodingTest {
 		// extra bytes OK (assumed to be start of message)
 		assertEquals(10,Format.peekMessageLength(Testing.messageBuffer("0affff")));
 		
-		// Smallest 2 byte overflow cases
-		assertEquals(64,Format.peekMessageLength(Testing.messageBuffer("8040")));
+		// Smallest 2 byte overflow case
 		assertEquals(128,Format.peekMessageLength(Testing.messageBuffer("8100")));
 		
 		// 3 byte cases
 		assertEquals(2*128*128,Format.peekMessageLength(Testing.messageBuffer("828000")));
 		assertEquals(3*128*128,Format.peekMessageLength(Testing.messageBuffer("838000ffff")));
-		
-		// incomplete lengths
-		assertTrue(0>Format.peekMessageLength(Testing.messageBuffer("8080"))); // Bad format?
-		assertTrue(0>Format.peekMessageLength(Testing.messageBuffer("818080"))); 
 	}
 
 	/**
@@ -68,15 +60,15 @@ public class VLCEncodingTest {
 	 * @throws BadFormatException For format error
 	 */
 	@Test
-	public void testVLCLength() throws BadFormatException {
-		assertEquals(2, Format.getVLCLength(Format.LIMIT_ENCODING_LENGTH));
-		assertEquals(3, Format.getVLCLength(Format.LIMIT_ENCODING_LENGTH + 1));
+	public void testVLQLength() throws BadFormatException {
+		assertEquals(2, Format.getVLQCountLength(Format.LIMIT_ENCODING_LENGTH));
+		assertEquals(3, Format.getVLQCountLength(Format.LIMIT_ENCODING_LENGTH + 1));
 
-		ByteBuffer bb = Blob.fromHex("BF7F").getByteBuffer();
+		ByteBuffer bb = Blob.fromHex("FF7F").getByteBuffer();
 		assertEquals(0, bb.position());
 		int len = Format.peekMessageLength(bb);
 		assertEquals(Format.LIMIT_ENCODING_LENGTH, len);
-		assertEquals(2, Format.getVLCLength(len));
+		assertEquals(2, Format.getVLQCountLength(len));
 	}
 
 //  TODO: Currently not allowing BigInteger as valid data object. May reconsider.
@@ -115,11 +107,11 @@ public class VLCEncodingTest {
 
 	@Test
 	public void testVLCSignExtend() {
-		assertEquals(0L, Format.vlcSignExtend((byte) 0x00));
-		assertEquals(-64L, Format.vlcSignExtend((byte) 0x40));
-		assertEquals(-1L, Format.vlcSignExtend((byte) 0xFF));
-		assertEquals(63, Format.vlcSignExtend((byte) 0x3F));
-		assertEquals(0L, Format.vlcSignExtend((byte) 0x80));
+		assertEquals(0L, Format.signExtendVLQ((byte) 0x00));
+		assertEquals(-64L, Format.signExtendVLQ((byte) 0x40));
+		assertEquals(-1L, Format.signExtendVLQ((byte) 0xFF));
+		assertEquals(63, Format.signExtendVLQ((byte) 0x3F));
+		assertEquals(0L, Format.signExtendVLQ((byte) 0x80));
 	}
 
 //	@Test public void testBigIntegerVLCRegression() throws BadFormatException {

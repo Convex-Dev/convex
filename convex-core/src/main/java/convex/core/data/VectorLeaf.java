@@ -250,7 +250,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			n = VectorLeaf.MAX_SIZE; // we know this must be true since zero already caught
 		}
 		
-		int rpos=pos+1+Format.getVLCCountLength(count); // skip tag and count
+		int rpos=pos+1+Format.getVLQCountLength(count); // skip tag and count
 		Ref<T>[] items = (Ref<T>[]) new Ref<?>[n];
 		for (int i = 0; i < n; i++) {
 			Ref<T> ref = Format.readRef(b,rpos);
@@ -283,7 +283,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		boolean hasPrefix = hasPrefix();
 
 		// count field
-		pos = Format.writeVLCCount(bs,pos, count);
+		pos = Format.writeVLQCount(bs,pos, count);
 
 		for (int i = 0; i < ilength; i++) {
 			pos= items[i].encode(bs,pos);
@@ -312,7 +312,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		if (encoding!=null) return encoding.size();
 		
 		// tag and count
-		int length=1+Format.getVLCCountLength(count);
+		int length=1+Format.getVLQCountLength(count);
 		int n = items.length;
 		if (prefix!=null) length+=prefix.getEncodingLength();
 		for (int i = 0; i < n; i++) {
@@ -321,7 +321,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		return length;
 	}
 	 
-	public static final int MAX_ENCODING_LENGTH = 1 + Format.MAX_VLC_COUNT_LENGTH + VectorTree.MAX_EMBEDDED_LENGTH+Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE);
+	public static final int MAX_ENCODING_LENGTH = 1 + Format.MAX_VLQ_COUNT_LENGTH + VectorTree.MAX_EMBEDDED_LENGTH+Format.MAX_EMBEDDED_LENGTH * (MAX_SIZE);
 
 	/**
 	 * Returns true if this VectorLeaf has a prefix AVector.

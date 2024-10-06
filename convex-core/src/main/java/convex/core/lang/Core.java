@@ -2972,7 +2972,7 @@ public class Core {
  	 * @throws BadFormatException In case of encoding error
  	 */
 	public static ACell read(Blob b, int pos) throws BadFormatException {
-		long code=Format.readVLCCount(b, pos+1);
+		long code=Format.readVLQCount(b, pos+1);
 		if (code <0 || code>=CODE_MAP.length) throw new BadFormatException("Core code out of range: "+code);
 		
 		ACell o = CODE_MAP[(int)code];

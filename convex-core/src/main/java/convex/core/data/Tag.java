@@ -37,7 +37,6 @@ public class Tag {
 
 	// data type tags beyond this point
 
-
 	// general purpose data structures
 	public static final byte VECTOR = (byte) 0x80;
 	public static final byte LIST = (byte) 0x81;
@@ -52,9 +51,10 @@ public class Tag {
 	public static final byte SIGNED_DATA = (byte) 0x90;
 	public static final byte SIGNED_DATA_SHORT = (byte) 0x91;
 
-
 	// Record data structures
 	public static final byte STATE = (byte) 0xA0;
+	public static final byte ACCOUNT_STATUS = (byte) 0xA1;
+	public static final byte PEER_STATUS = (byte) 0xA2;
 
 	public static final byte BELIEF = (byte) 0xAA;
 	public static final byte BLOCK = (byte) 0xAB;
@@ -68,8 +68,6 @@ public class Tag {
 
 	// Control structures
 	public static final byte COMMAND = (byte) 0xC0;
-	public static final byte ACCOUNT_STATUS = (byte) 0xC1;
-	public static final byte PEER_STATUS = (byte) 0xC2;
 
 	// Code
 	public static final byte CORE_DEF = (byte) 0xCD;

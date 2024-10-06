@@ -106,7 +106,7 @@ public final class CVMLong extends AInteger {
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 1+Format.MAX_VLC_LONG_LENGTH;
+		return 1+Format.MAX_VLQ_LONG_LENGTH;
 	}
 
 	@Override

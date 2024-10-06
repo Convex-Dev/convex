@@ -25,27 +25,27 @@ public class FormatTest {
 		assertBadVLCEncoding("8000"); // excess leading bytes
 		assertBadVLCEncoding("8080"); // no termination
 		
-		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MAX_VALUE));
-		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MIN_VALUE));
+		assertEquals(Format.MAX_VLQ_LONG_LENGTH,Format.getVLQLongLength(Long.MAX_VALUE));
+		assertEquals(Format.MAX_VLQ_LONG_LENGTH,Format.getVLQLongLength(Long.MIN_VALUE));
 	}
 	
 	private void assertBadVLCEncoding(String hex) {
 		Blob b=Blob.fromHex(hex);
 		assertThrows(BadFormatException.class,()->{
-			long val=Format.readVLCLong(b.getInternalArray(), b.getInternalOffset());
-			if (Format.getVLCLength(val)!=b.count()) throw new BadFormatException("Wrong length");
+			long val=Format.readVLQLong(b.getInternalArray(), b.getInternalOffset());
+			if (Format.getVLQLongLength(val)!=b.count()) throw new BadFormatException("Wrong length");
 		});
 	}
 
 	private void checkVLCEncoding(String hex, long a) {
 		byte[] bs=new byte[12];
 		int blen=hex.length()/2;
-		assertEquals(blen,Format.writeVLCLong(bs, 0, a));
-		assertEquals(blen,Format.getVLCLength(a));
+		assertEquals(blen,Format.writeVLQLong(bs, 0, a));
+		assertEquals(blen,Format.getVLQLongLength(a));
 		checkStart(hex,bs);
 		
 		try {
-			long b = Format.readVLCLong(bs, 0);
+			long b = Format.readVLQLong(bs, 0);
 			assertEquals(a,b);
 		} catch (BadFormatException e) {
 			fail("Unexpected bad encoding exception: "+e);

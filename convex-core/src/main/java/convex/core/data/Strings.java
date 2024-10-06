@@ -74,7 +74,7 @@ public class Strings {
 	 * @throws BadFormatException If any problem with encoding
 	 */
 	public static AString read(Blob blob, int offset) throws BadFormatException {
-		long length=Format.readVLCCount(blob,offset+1);
+		long length=Format.readVLQCount(blob,offset+1);
 		if (length<0) throw new BadFormatException("Negative string length!");
 		if (length>Integer.MAX_VALUE) throw new BadFormatException("String length too long! "+length);
 		if (length<=StringShort.MAX_LENGTH) {

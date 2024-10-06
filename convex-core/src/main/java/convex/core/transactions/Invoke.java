@@ -89,12 +89,12 @@ public class Invoke extends ATransaction {
 	 */
 	public static Invoke read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long aval=Format.readVLCCount(b,epos);
+		long aval=Format.readVLQCount(b,epos);
 		Address address=Address.create(aval);
-		epos+=Format.getVLCCountLength(aval);
+		epos+=Format.getVLQCountLength(aval);
 		
-		long sequence = Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(sequence);
+		long sequence = Format.readVLQCount(b,epos);
+		epos+=Format.getVLQCountLength(sequence);
 		
 		ACell args=Format.read(b, epos);
 		epos+=Format.getEncodingLength(args);
@@ -121,7 +121,7 @@ public class Invoke extends ATransaction {
 	public int estimatedEncodingSize() {
 		// tag (1), sequence(<12) and target (33)
 		// plus allowance for Amount
-		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLC_LONG_LENGTH;
+		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLQ_LONG_LENGTH;
 	}
 
 	@Override

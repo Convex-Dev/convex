@@ -409,7 +409,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		int ilength = children.length;
-		pos = Format.writeVLCLong(bs,pos, count); // TODO: Count instead?
+		pos = Format.writeVLQLong(bs,pos, count); // TODO: Count instead?
 		
 		bs[pos++] = (byte) shift;
 		pos = Utils.writeShort(bs, pos,mask);
@@ -442,7 +442,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	@SuppressWarnings("unchecked")
 	public static <K extends ACell, V extends ACell> MapTree<K, V> read(Blob b, int pos, long count) throws BadFormatException {
-		int epos=pos+1+Format.getVLCLength(count);
+		int epos=pos+1+Format.getVLQLongLength(count);
 		int shift=b.byteAt(epos);
 		short mask=b.shortAt(epos+1);
 		epos+=3;

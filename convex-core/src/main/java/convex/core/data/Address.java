@@ -185,10 +185,10 @@ public final class Address extends ABlobLike<CVMLong> {
 	}
 	
 	public static Address read(Blob b, int pos) throws BadFormatException {
-		long value=Format.readVLCCount(b,pos+1); // skip tag, we assume correct
+		long value=Format.readVLQCount(b,pos+1); // skip tag, we assume correct
 		Address a= Address.create(value);
 		if (a==null) throw new BadFormatException("Invalid Address: "+value);
-		int epos=pos+1+Format.getVLCCountLength(value);
+		int epos=pos+1+Format.getVLQCountLength(value);
 		a.attachEncoding(b.slice(pos, epos));
 		return a;
 	}
@@ -201,7 +201,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		return Format.writeVLCCount(bs, pos, value);
+		return Format.writeVLQCount(bs, pos, value);
 	}
 	
 	@Override
@@ -225,7 +225,7 @@ public final class Address extends ABlobLike<CVMLong> {
 	@Override
 	public int estimatedEncodingSize() {
 		// tag VLC bytes
-		return 1 + Format.MAX_VLC_COUNT_LENGTH;
+		return 1 + Format.MAX_VLQ_COUNT_LENGTH;
 	}
 
 	@Override
@@ -245,7 +245,7 @@ public final class Address extends ABlobLike<CVMLong> {
 		return Blob.wrap(bs);
 	}
 	
-	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLC_COUNT_LENGTH;
+	public static final int MAX_ENCODING_LENGTH = 1+Format.MAX_VLQ_COUNT_LENGTH;
 
 	@Override
 	public byte getTag() {

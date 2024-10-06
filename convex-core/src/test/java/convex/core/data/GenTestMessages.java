@@ -16,9 +16,9 @@ public class GenTestMessages {
 
 	@Property
 	public void messageLengthVLC(Long a) throws BadFormatException {
-		ByteBuffer bb = ByteBuffer.allocate(Format.MAX_VLC_LONG_LENGTH);
-		Format.writeVLCLong(bb, a);
+		ByteBuffer bb = ByteBuffer.allocate(Format.MAX_VLQ_LONG_LENGTH);
+		Format.writeVLQLong(bb, a);
 		bb.flip();
-		assertEquals(bb.remaining(), Format.getVLCLength(a));
+		assertEquals(bb.remaining(), Format.getVLQLongLength(a));
 	}
 }

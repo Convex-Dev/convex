@@ -63,15 +63,15 @@ public class Local<T extends ACell> extends AOp<T> {
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.writeVLCLong(bs, pos, position);
+		pos=Format.writeVLQLong(bs, pos, position);
 		return pos;
 	}
 	
 	public static <R extends ACell> Local<R> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
-		long position=Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(position);
+		long position=Format.readVLQLong(b,epos);
+		epos+=Format.getVLQLongLength(position);
 		
 		Local<R> result= create(position);
 		if (result==null) throw new BadFormatException("Can't create Local with position: "+position);

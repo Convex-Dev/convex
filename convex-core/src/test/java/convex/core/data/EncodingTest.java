@@ -38,67 +38,75 @@ import convex.test.Testing;
  
 public class EncodingTest {
 
-	@Test public void testVLCLongLength() throws BadFormatException, BufferUnderflowException {
-		assertEquals(1,Format.getVLCLength(0x0f));
-		assertEquals(1,Format.getVLCLength(0x3f));
-		assertEquals(2,Format.getVLCLength(0x40)); // roll over at 64
-		assertEquals(Format.MAX_VLC_LONG_LENGTH,Format.getVLCLength(Long.MAX_VALUE));
+	@Test public void testVLQLongLength() throws BadFormatException, BufferUnderflowException {
+		assertEquals(1,Format.getVLQLongLength(0x0f));
+		assertEquals(1,Format.getVLQLongLength(0x3f));
+		assertEquals(2,Format.getVLQLongLength(0x40)); // roll over at 64
+		assertEquals(Format.MAX_VLQ_LONG_LENGTH,Format.getVLQLongLength(Long.MAX_VALUE));
 		
-		assertEquals(1,Format.getVLCLength(-1)); // small negative numbers in one byte
-		assertEquals(1,Format.getVLCLength(-64)); 
-		assertEquals(2,Format.getVLCLength(-65)); // roll over at -65
+		assertEquals(1,Format.getVLQLongLength(-1)); // small negative numbers in one byte
+		assertEquals(1,Format.getVLQLongLength(-64)); 
+		assertEquals(2,Format.getVLQLongLength(-65)); // roll over at -65
 
 	}
 	
-	@Test public void testVLCCountLength() throws BadFormatException, BufferUnderflowException {
-		assertEquals(1,Format.getVLCCountLength(0x0f));
-		assertEquals(1,Format.getVLCCountLength(0x7f));
-		assertEquals(2,Format.getVLCCountLength(0x80)); // roll over at 128
-		assertEquals(Format.MAX_VLC_COUNT_LENGTH,Format.getVLCCountLength(Long.MAX_VALUE));
+	@Test public void testVLQCountLength() throws BadFormatException, BufferUnderflowException {
+		assertEquals(1,Format.getVLQCountLength(0x0f));
+		assertEquals(1,Format.getVLQCountLength(0x7f));
+		assertEquals(2,Format.getVLQCountLength(0x80)); // roll over at 128
+		assertEquals(Format.MAX_VLQ_COUNT_LENGTH,Format.getVLQCountLength(Long.MAX_VALUE));
 		
-		assertThrows(IllegalArgumentException.class, ()->Format.getVLCCountLength(-10));
+		assertThrows(IllegalArgumentException.class, ()->Format.getVLQCountLength(-10));
 	}
 	
 	@Test public void testVLCCount() throws BadFormatException {
-		doVLCCountTest(0);
-		doVLCCountTest(1);
-		doVLCCountTest(63);
-		doVLCCountTest(64);
-		doVLCCountTest(127);
-		doVLCCountTest(128);
-		doVLCCountTest(255);
-		doVLCCountTest(256);
-		doVLCCountTest(65535);
-		doVLCCountTest(65536);
-		doVLCCountTest(56447567);
-		doVLCCountTest(Integer.MAX_VALUE);
-		doVLCCountTest(Long.MAX_VALUE);
-		doVLCLongTest(Long.MIN_VALUE);
+		doVLQCountTest(0);
+		doVLQCountTest(1);
+		doVLQCountTest(63);
+		doVLQCountTest(64);
+		doVLQCountTest(127);
+		doVLQCountTest(128);
+		doVLQCountTest(255);
+		doVLQCountTest(256);
+		doVLQCountTest(65535);
+		doVLQCountTest(65536);
+		doVLQCountTest(56447567);
+		doVLQCountTest(Integer.MAX_VALUE);
+		doVLQCountTest(Long.MAX_VALUE);
+		doVLQLongTest(Long.MIN_VALUE);
 	}
 	
 	byte[] buf=new byte[50];
-	private void doVLCCountTest(long x) throws BadFormatException {
-		int n=Format.getVLCCountLength(x);
+	private void doVLQCountTest(long x) throws BadFormatException {
+		int n=Format.getVLQCountLength(x);
 		int offset=(int) (x%10); // variable offset, somewhat pseudorandom
 		
-		long pos=Format.writeVLCCount(buf, offset, x);
+		long pos=Format.writeVLQCount(buf, offset, x);
 		assertEquals(n+offset,pos);
 		
-		long r=Format.readVLCCount(buf, offset);
+		long r=Format.readVLQCount(buf, offset);
 		assertEquals(x,r);
 		
-		doVLCLongTest(x);
-		doVLCLongTest(-x);
+		doVLQLongTest(x);
+		doVLQLongTest(-x);
 	}
 	
-	private void doVLCLongTest(long x) throws BadFormatException {
-		int n=Format.getVLCLength(x);
+	@Test public void testOneGigabyte() throws BadFormatException {
+		long GIG=1024l*1024l*1024l;
+		Blob b=Blob.fromHex("8480808000"); // 1 bit (4) followed by 30 zeros, VLQ encoded
+		assertEquals(b.count(),Format.getVLQCountLength(GIG));
+		assertEquals(GIG,Format.readVLQCount(b, 0));
+		
+	}
+	
+	private void doVLQLongTest(long x) throws BadFormatException {
+		int n=Format.getVLQLongLength(x);
 		int offset=(int) ((x+n)&0x0f); // variable offset, somewhat pseudorandom
 		
-		long pos=Format.writeVLCLong(buf, offset, x);
+		long pos=Format.writeVLQLong(buf, offset, x);
 		assertEquals(n+offset,pos);
 		
-		long r=Format.readVLCLong(buf, offset);
+		long r=Format.readVLQLong(buf, offset);
 		assertEquals(x,r);
 	}
 	
@@ -186,25 +194,22 @@ public class EncodingTest {
 	public void testMessageLength() throws BadFormatException {
 		// empty bytebuffer, therefore no message length -> returns negative
 		ByteBuffer bb1=Blob.fromHex("").toByteBuffer();
-		assertTrue(0>Format.peekMessageLength(bb1));
-		
-		// bad first byte! Needs to carry if 0x40 or more
-		ByteBuffer bb2=Testing.messageBuffer("43");
-		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2));
+		assertEquals(-1,Format.peekMessageLength(bb1));
 		
 		// maximum message length 
-		ByteBuffer bb2a=Testing.messageBuffer("BF7F");
+		ByteBuffer bb2a=Testing.messageBuffer("FF7F");
 		assertEquals(Format.LIMIT_ENCODING_LENGTH,Format.peekMessageLength(bb2a));
 
-		// 2 byte message length with negative sign = BAD
-		ByteBuffer bb2aa=Testing.messageBuffer("C000");
-		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb2aa));
+		// 1 byte requiring continuation = incomplete length
+		ByteBuffer bb2aa=Testing.messageBuffer("ff");
+		assertEquals(-1,Format.peekMessageLength(bb2aa));
 		
 		ByteBuffer bb2b=Testing.messageBuffer("8101");
 		assertEquals(129,Format.peekMessageLength(bb2b));
 
+		// 2 byte requiring continuation = incomplete length
 		ByteBuffer bb3=Testing.messageBuffer("FFFF");
-		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb3));
+		assertEquals(-1,Format.peekMessageLength(bb3));
 	}
 	
 	@Test 
@@ -243,7 +248,7 @@ public class EncodingTest {
 		assertEquals(Maps.MAX_ENCODING_SIZE,MapTree.MAX_ENCODING_LENGTH);
 		
 		// Vectors
-		assertEquals(1+Format.MAX_VLC_COUNT_LENGTH+17*ME,VectorLeaf.MAX_ENCODING_LENGTH);
+		assertEquals(1+Format.MAX_VLQ_COUNT_LENGTH+17*ME,VectorLeaf.MAX_ENCODING_LENGTH);
 		
 		// Blobs
 		Blob maxBlob=Blob.create(new byte[Blob.CHUNK_LENGTH]);
@@ -252,7 +257,7 @@ public class EncodingTest {
 		
 		// Address
 		Address maxAddress=Address.create(Long.MAX_VALUE);
-		assertEquals(1+Format.MAX_VLC_COUNT_LENGTH,Address.MAX_ENCODING_LENGTH);
+		assertEquals(1+Format.MAX_VLQ_COUNT_LENGTH,Address.MAX_ENCODING_LENGTH);
 		assertEquals(Address.MAX_ENCODING_LENGTH,maxAddress.getEncodingLength());
 	}
 	

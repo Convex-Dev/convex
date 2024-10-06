@@ -28,7 +28,7 @@ public final class StringShort extends AString {
 	 */
 	public static final int MAX_LENGTH = Blob.CHUNK_LENGTH;
 
-	public static final int MAX_ENCODING_LENGTH = 1 + Format.getVLCLength(MAX_LENGTH) + MAX_LENGTH; // Max 4096 bytes
+	public static final int MAX_ENCODING_LENGTH = 1 + Format.getVLQLongLength(MAX_LENGTH) + MAX_LENGTH; // Max 4096 bytes
 
 	private final Blob data;
 
@@ -169,7 +169,7 @@ public final class StringShort extends AString {
 	 */
 	public static StringShort read(long length, Blob blob, int pos) {
 		int len=Utils.checkedInt(length);
-		int headerLen=1+Format.getVLCCountLength(length);
+		int headerLen=1+Format.getVLQCountLength(length);
 		int dataOffset=pos+headerLen;
 		Blob data=blob.slice(dataOffset,dataOffset+length);
 		StringShort result= new StringShort(data);

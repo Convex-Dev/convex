@@ -138,7 +138,7 @@ public class Samples {
 	
 	public static final ASignature FAKE_SIGNATURE = Ed25519Signature.wrap(new byte[Ed25519Signature.SIGNATURE_LENGTH]);
 
-	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLCCountLength(Format.MAX_EMBEDDED_LENGTH)-1);
+	public static final Blob MAX_EMBEDDED_BLOB = createTestBlob(Format.MAX_EMBEDDED_LENGTH-Format.getVLQCountLength(Format.MAX_EMBEDDED_LENGTH)-1);
 	public static final Blob NON_EMBEDDED_BLOB = createTestBlob(MAX_EMBEDDED_BLOB.count()+1);
 
 	public static final StringShort MAX_EMBEDDED_STRING= (StringShort) Strings.create("This is a string containing exactly 137 characters. This is just right for a maximum embedded string in Convex. How lucky is that, eh????");

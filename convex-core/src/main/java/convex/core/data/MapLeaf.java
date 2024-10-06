@@ -313,7 +313,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCLong(bs,pos, count);
+		pos = Format.writeVLQLong(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {
 			// Note we encode the Map Entry refs only, skipping the general vector encoding

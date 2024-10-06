@@ -47,26 +47,26 @@ public class Transfer extends ATransaction {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = super.encodeRaw(bs,pos); // origin, sequence
-		pos = Format.writeVLCCount(bs, pos, target.longValue());
-		pos = Format.writeVLCCount(bs, pos, amount);
+		pos = Format.writeVLQCount(bs, pos, target.longValue());
+		pos = Format.writeVLQCount(bs, pos, amount);
 		return pos;
 	}
 
 	public static ATransaction read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long aval=Format.readVLCCount(b,epos);
+		long aval=Format.readVLQCount(b,epos);
 		Address origin=Address.create(aval);
-		epos+=Format.getVLCCountLength(aval);
+		epos+=Format.getVLQCountLength(aval);
 		
-		long sequence = Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(sequence);
+		long sequence = Format.readVLQCount(b,epos);
+		epos+=Format.getVLQCountLength(sequence);
 		
-		long tval=Format.readVLCCount(b,epos);
+		long tval=Format.readVLQCount(b,epos);
 		Address target=Address.create(tval);
-		epos+=Format.getVLCCountLength(tval);
+		epos+=Format.getVLQCountLength(tval);
 
-		long amount = Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(amount);
+		long amount = Format.readVLQCount(b,epos);
+		epos+=Format.getVLQCountLength(amount);
 		if (!Coin.isValidAmount(amount)) throw new BadFormatException("Illegal amount in transfer: "+amount);
 		
 		Transfer result=create(origin,sequence, target, amount);
@@ -93,7 +93,7 @@ public class Transfer extends ATransaction {
 	public int estimatedEncodingSize() {
 		// tag (1), sequence(<12) and target (33)
 		// plus allowance for Amount
-		return 1 + 12 + 33 + Format.MAX_VLC_LONG_LENGTH;
+		return 1 + 12 + 33 + Format.MAX_VLQ_LONG_LENGTH;
 	}
 
 	@Override

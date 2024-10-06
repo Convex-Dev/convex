@@ -515,7 +515,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCCount(bs,pos, count);
+		pos = Format.writeVLQCount(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 
 		if (count == 1) {
@@ -569,12 +569,12 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLCCount(b,pos+1);
+		long count = Format.readVLQCount(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative count!");
 		if (count == 0) return (Index<K, V>) EMPTY;
 		
 		// index for reading
-		int epos=pos+1+Format.getVLCCountLength(count);
+		int epos=pos+1+Format.getVLQCountLength(count);
 		
 		MapEntry<K,V> me;
 		boolean hasEntry;

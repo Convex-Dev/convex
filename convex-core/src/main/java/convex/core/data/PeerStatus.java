@@ -166,16 +166,16 @@ public class PeerStatus extends ARecord {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, controller);
-		pos = Format.writeVLCLong(bs,pos, peerStake);
+		pos = Format.writeVLQLong(bs,pos, peerStake);
 		if (stakes.isEmpty()) {
 			bs[pos++]=Tag.NULL;
 		} else {
 			pos = Format.write(bs,pos, stakes);
 		}
-		pos = Format.writeVLCLong(bs,pos, delegatedStake);
+		pos = Format.writeVLQLong(bs,pos, delegatedStake);
 		pos = Format.write(bs,pos, metadata);
-		pos = Format.writeVLCLong(bs,pos, timestamp);
-		pos = Format.writeVLCCount(bs,pos, balance);
+		pos = Format.writeVLQLong(bs,pos, timestamp);
+		pos = Format.writeVLQCount(bs,pos, balance);
 		return pos;
 	}
 
@@ -192,8 +192,8 @@ public class PeerStatus extends ARecord {
 	    Address owner = Format.read(b,epos);
 	    epos+=Format.getEncodingLength(owner);
 	    
-	    long stake = Format.readVLCLong(b,epos);
-	    epos+=Format.getVLCLength(stake);
+	    long stake = Format.readVLQLong(b,epos);
+	    epos+=Format.getVLQLongLength(stake);
 	    
 		Index<Address, CVMLong> stakes = Format.read(b,epos);
 		epos+=Format.getEncodingLength(stakes);
@@ -203,17 +203,17 @@ public class PeerStatus extends ARecord {
 			throw new BadFormatException("Empty delegated stakes should be encoded as null");
 		}
 
-		long delegatedStake = Format.readVLCLong(b,epos);
-	    epos+=Format.getVLCLength(delegatedStake);
+		long delegatedStake = Format.readVLQLong(b,epos);
+	    epos+=Format.getVLQLongLength(delegatedStake);
 	    
 		AHashMap<ACell,ACell> metadata = Format.read(b,epos);
 		epos+=Format.getEncodingLength(metadata);
 		
-		long timestamp=Format.readVLCLong(b,epos);
-		epos+=Format.getVLCLength(timestamp);
+		long timestamp=Format.readVLQLong(b,epos);
+		epos+=Format.getVLQLongLength(timestamp);
 		
-		long balance=Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(balance);
+		long balance=Format.readVLQCount(b,epos);
+		epos+=Format.getVLQCountLength(balance);
 		 
 		PeerStatus result= new PeerStatus(owner, stake,stakes,delegatedStake,metadata,timestamp,balance);
 		result.attachEncoding(b.slice(pos, epos));

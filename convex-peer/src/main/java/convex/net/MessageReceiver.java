@@ -97,7 +97,7 @@ public class MessageReceiver {
 			int len = Format.peekMessageLength(buffer);
 			if (len<0) return numRead; // Not enough bytes for a message length yet
 			
-			int lengthLength = Format.getVLCLength(len);
+			int lengthLength = Format.getVLQLongLength(len);
 			int totalFrameSize=lengthLength + len;
 			
 			if (totalFrameSize>buffer.capacity()) {

@@ -249,7 +249,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLCCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
+		pos = Format.writeVLQCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
 		return encodeRefs(bs,pos);
 	}
 	

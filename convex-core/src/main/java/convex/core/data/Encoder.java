@@ -16,7 +16,7 @@ public class Encoder {
 		return Format.encodedBlob(a);
 	}
 	
-	public ACell decode (Blob encoding) throws BadFormatException {
+	public ACell decode(Blob encoding) throws BadFormatException {
 		return Format.read(encoding);
 	}
 }

@@ -64,7 +64,7 @@ public class Call extends ATransaction {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos = super.encodeRaw(bs,pos); // sequence
 		pos = Format.write(bs,pos, target);
-		pos=Format.writeVLCCount(bs,pos, offer);
+		pos=Format.writeVLQCount(bs,pos, offer);
 		pos=Format.write(bs,pos, functionName);
 		pos=Format.write(bs,pos, args);
 		return pos;
@@ -79,18 +79,18 @@ public class Call extends ATransaction {
 	 */
 	public static Call read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
-		long aval=Format.readVLCCount(b,epos);
+		long aval=Format.readVLQCount(b,epos);
 		Address origin=Address.create(aval);
-		epos+=Format.getVLCCountLength(aval);
+		epos+=Format.getVLQCountLength(aval);
 		
-		long sequence = Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(sequence);
+		long sequence = Format.readVLQCount(b,epos);
+		epos+=Format.getVLQCountLength(sequence);
 		
 		Address target=Format.read(b, epos);
 		epos+=Format.getEncodingLength(target);
 		
-		long offer=Format.readVLCCount(b,epos);
-		epos+=Format.getVLCCountLength(offer);
+		long offer=Format.readVLQCount(b,epos);
+		epos+=Format.getVLQCountLength(offer);
 		if (!Coin.isValidAmount(offer)) throw new BadFormatException("Invalid offer in Call");
 
 

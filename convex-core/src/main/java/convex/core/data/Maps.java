@@ -139,7 +139,7 @@ public class Maps {
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> AHashMap<K, V> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLCLong(b,pos+1);
+		long count = Format.readVLQLong(b,pos+1);
 		if (count==0) return empty();
 		if (count <= MapLeaf.MAX_ENTRIES) {
 			if (count < 0) throw new BadFormatException("Negative count of map elements!");
