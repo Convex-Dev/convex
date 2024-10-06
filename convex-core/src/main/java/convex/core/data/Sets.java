@@ -97,7 +97,7 @@ public class Sets {
 	}
 
 	public static <T extends ACell> ASet<T> read(Blob b, int pos) throws BadFormatException {
-		long count = Format.readVLQLong(b,pos+1);
+		long count = Format.readVLQCount(b,pos+1);
 		if (count <= SetLeaf.MAX_ELEMENTS) {
 			return SetLeaf.read(b, pos, count);
 		} else {

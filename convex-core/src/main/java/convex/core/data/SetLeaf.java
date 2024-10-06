@@ -192,7 +192,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		long n=count();
-		pos = Format.writeVLQLong(bs,pos, n);
+		pos = Format.writeVLQCount(bs,pos, n);
 
 		for (int i = 0; i < n; i++) {
 			pos = elements[i].encode(bs, pos);;
@@ -220,7 +220,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	 */
 	
 	public static <V extends ACell> SetLeaf<V> read(Blob b, int pos, long count) throws BadFormatException {
-		int headerLen=1+Format.getVLQLongLength(count);
+		int headerLen=1+1; // tag plus VLC Count length which is always 1
 		
 		int epos=pos+headerLen;
 		if (count == 0) return Sets.empty();

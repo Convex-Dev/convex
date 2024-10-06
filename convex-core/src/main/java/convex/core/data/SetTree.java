@@ -334,7 +334,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLQLong(bs,pos, count);
+		pos = Format.writeVLQCount(bs,pos, count);
 		
 		bs[pos++] = (byte) shift;
 		pos = Utils.writeShort(bs, pos,mask);
@@ -364,7 +364,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <V extends ACell> SetTree<V> read(Blob b, int pos, long count) throws BadFormatException {
-		int headerLen=1+Format.getVLQLongLength(count);
+		int headerLen=1+Format.getVLQCountLength(count);
 		int epos=pos+headerLen;
 		
 		int shift=b.byteAt(epos++);

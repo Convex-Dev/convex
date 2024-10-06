@@ -313,7 +313,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos = Format.writeVLQLong(bs,pos, count);
+		pos = Format.writeVLQCount(bs,pos, count);
 
 		for (int i = 0; i < count; i++) {
 			// Note we encode the Map Entry refs only, skipping the general vector encoding
@@ -340,7 +340,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <K extends ACell, V extends ACell> MapLeaf<K, V> read(Blob b, int pos, long count) throws BadFormatException {
-		int epos=pos+2; // Note: Tag byte plus VLC length of count which is always 1
+		int epos=pos+2; // Note: Tag byte plus VLC Count length which is always 1
 		
 		@SuppressWarnings("unchecked")
 		MapEntry<K, V>[] items = (MapEntry<K, V>[]) new MapEntry[(int) count];
