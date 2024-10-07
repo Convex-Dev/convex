@@ -309,7 +309,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	
 	@Override
 	public byte getTag() {
-		return (byte) (Tag.CHAR+(encodedCharLength(value)-1));
+		return (byte) (Tag.CHAR_BASE+(encodedCharLength(value)-1));
 	}
 
 	/**

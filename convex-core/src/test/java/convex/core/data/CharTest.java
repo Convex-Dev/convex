@@ -26,7 +26,7 @@ public class CharTest {
 		assertEquals(73728,cp);
 		CVMChar c=CVMChar.create(cp);
 		assertEquals(3,CVMChar.byteCountFromTag(c.getTag())); // number of bytes needed in CVMChar
-		assertEquals(Tag.CHAR+2,c.getTag()); // 2 extra bytes encoded in char tag
+		assertEquals(Tag.CHAR_BASE+2,c.getTag()); // 2 extra bytes encoded in char tag
 		
 		String js=c.toString();
 		assertEquals(2,js.length()); // should encode to two UTF-16 chars
@@ -58,7 +58,7 @@ public class CharTest {
 	@Test
 	public void testCharTags() {
 		CVMChar a=CVMChar.create('a');
-		assertEquals(Tag.CHAR,a.getTag());
+		assertEquals(Tag.CHAR_BASE,a.getTag());
 	}
 	
 	@Test public void testUTF16Chars() {

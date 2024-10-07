@@ -630,7 +630,7 @@ public class Format {
 		if (tag == Tag.BLOB) return Blobs.read(blob,offset);
 		if (tag == Tag.STRING) return Strings.read(blob,offset);
 		
-		if ((tag&Tag.CHAR)==Tag.CHAR) {
+		if ((tag&Tag.CHAR_MASK)==Tag.CHAR_BASE) {
 			int len=CVMChar.byteCountFromTag(tag);
 			if (len>4) throw new BadFormatException("Can't read char type with length: " + len);
 			return CVMChar.read(len, blob,offset); // skip tag byte
