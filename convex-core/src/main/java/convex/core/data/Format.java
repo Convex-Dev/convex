@@ -502,6 +502,14 @@ public class Format {
 		
 		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
 	}
+	
+
+	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
+		if (tag == Tag.CORE_DEF) return Core.read(blob, offset);
+		
+		throw new BadFormatException(badTagMessage(tag));
+
+	}
 
 	/**
 	 * Decodes a single Value from a Blob. Assumes the presence of a tag.
@@ -599,12 +607,6 @@ public class Format {
 		throw new BadFormatException(badTagMessage(tag));
 	}
 
-	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (tag == Tag.CORE_DEF) return Core.read(blob, offset);
-		
-		throw new BadFormatException(badTagMessage(tag));
-
-	}
 
 	private static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
 		if (tag==Tag.SIGNED_DATA) return SignedData.read(blob,offset,true);	

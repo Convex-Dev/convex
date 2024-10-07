@@ -47,6 +47,8 @@ public class FormatTest {
 		checkVLQCount("40",64);
 		checkVLQCount("7f",127);
 		checkVLQCount("8100",128); // first overflow into 2 bytes
+		checkVLQCount("8480808000",1024l*1024l*1024l); // 1gb example
+		checkVLQCount("9080808000",4*1024l*1024l*1024l); // 4gb example
 		checkVLQCount("87ffffff7f",Integer.MAX_VALUE);
 		checkVLQCount("8880808000",Integer.MAX_VALUE+1l); // a pretty number, 2^32
 		checkVLQCount("ffffffffffffffff7f",Long.MAX_VALUE); // all 63 bits set!
