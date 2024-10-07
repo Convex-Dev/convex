@@ -27,7 +27,6 @@ public abstract class AArrayBlob extends ABlob {
 	 * Cached hash of the Blob data. Might be null.
 	 */
 	protected Hash contentHash = null;
-
 	
 	@Override
 	public final Hash getContentHash() {
@@ -245,6 +244,21 @@ public abstract class AArrayBlob extends ABlob {
 		if (o==null) return false;
 		if (o.count()!=count) return false;
 		return o.equalsBytes(this.store, this.offset);
+	}
+	
+	/**
+	 * Equality for array Blob objects
+	 * 
+	 * Implemented by testing equality of byte data
+	 * 
+	 * @param other Blob to compare with
+	 * @return true if blobs are equal, false otherwise.
+	 */
+	public boolean equals(AArrayBlob other) {
+		if (other == this) return true;
+		if (this.count != other.count) return false;
+		if ((contentHash != null) && (other.contentHash != null) && contentHash.equals(other.contentHash)) return true;
+		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, size());
 	}
 	
 	@Override

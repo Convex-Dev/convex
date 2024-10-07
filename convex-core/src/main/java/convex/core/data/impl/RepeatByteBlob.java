@@ -1,6 +1,6 @@
 package convex.core.data.impl;
 
-import org.bouncycastle.util.Arrays;
+import java.util.Arrays;
 
 public class RepeatByteBlob extends ADerivedBlob {
 	private final byte b;

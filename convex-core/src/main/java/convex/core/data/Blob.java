@@ -139,41 +139,20 @@ public class Blob extends AArrayBlob {
 	@Override
 	public boolean equals(ABlob a) {
 		if (a==this) return true;
-		if (a instanceof Blob) return equals((Blob) a);
+		if (a instanceof AArrayBlob) return equals((AArrayBlob) a);
 		long n=count();
 		if (a.count()!=n) return false;
 		if (!(a.getType()==Types.BLOB)) return false;
 		if (n<=CHUNK_LENGTH) {
 			return a.equalsBytes(this.store, this.offset);
 		} else {
+			// this must be a non-canonical Blob
+			// we coerce encoding, since might have hash, and probably needed anyway
 			return getEncoding().equals(a.getEncoding());
 		}
 	}
 
-	public boolean equals(Blob b) {
-		if (this==b) return true;
-		if (count!=b.count) return false;
-		return Utils.arrayEquals(store, offset, b.store, b.offset, size());
-	}
 
-	/**
-	 * Equality for array Blob objects
-	 * 
-	 * Implemented by testing equality of byte data
-	 * 
-	 * @param other Blob to compare with
-	 * @return true if blobs are equal, false otherwise.
-	 */
-	public boolean equals(AArrayBlob other) {
-		if (other == this) return true;
-		if (this.count != other.count) return false;
-
-		// avoid false positives with other Blob types, especially Hash and Address
-		if (this.getType() != other.getType()) return false;
-
-		if ((contentHash != null) && (other.contentHash != null) && contentHash.equals(other.contentHash)) return true;
-		return Utils.arrayEquals(other.store, other.offset, this.store, this.offset, size());
-	}
 
 	/**
 	 * Constructs a Blob object from a hex string
