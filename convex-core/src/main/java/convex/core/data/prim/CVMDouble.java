@@ -45,7 +45,7 @@ public final class CVMDouble extends ANumeric {
 	}
 
 	/**
-	 * Creates a CVMDouble. Forces NaN to be canonical instance.
+	 * Creates a CVMDouble. Forces NaNs to be canonical instance.
 	 * @param value Double value to wrap
 	 * @return CVMDouble value
 	 */
@@ -55,14 +55,6 @@ public final class CVMDouble extends ANumeric {
 			return CVMDouble.NaN;
 		}
 		return new CVMDouble(value);
-	}
-	
-	public static CVMDouble createChecked(double value) throws BadFormatException {
-		// Need to check for non-canonical NaN values
-		if (!isValidEncoding(value)) {
-			throw new BadFormatException("Non-canonical NaN value");
-		}
-		return create(value);
 	}
 	
 	public static CVMDouble unsafeCreate(double value) {
@@ -86,7 +78,8 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public CVMDouble toDouble() {
-		return this;
+		if (!Double.isNaN(value)) return this;
+		return NaN;
 	}
 	
 	@Override
@@ -104,13 +97,14 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (!isValidEncoding(value)) throw new InvalidDataException("Non-canonical NaN value",this);
+		// always OK, though might not be CVM value
 	}
 	
-	private static boolean isValidEncoding(double value) {
-		if (Double.isNaN(value)) {
-			return Double.doubleToRawLongBits(value)==RAW_NAN_BITS;
-		}
+	protected static final boolean isStandardNaN(double value) {
+		return Double.doubleToRawLongBits(value)==RAW_NAN_BITS;
+	}
+	
+	@Override public boolean isCVMValue() {
 		return true;
 	}
 
@@ -135,7 +129,12 @@ public final class CVMDouble extends ANumeric {
 				return "##-Inf";
 			}
 		} else if (Double.isNaN(value)) {
-			return "##NaN";
+			long bits=Double.doubleToRawLongBits(value);
+			if (bits==RAW_NAN_BITS) {
+				return "##NaN";
+			} else {
+				return "#[1d"+Utils.toHexString(bits)+"]";
+			}
 		} else {
 			return Double.toString(value);
 		}
@@ -169,7 +168,6 @@ public final class CVMDouble extends ANumeric {
 		} catch (NumberFormatException e) {
 			return null;
 		}
-
 	}
 	
 	@Override
@@ -181,7 +179,7 @@ public final class CVMDouble extends ANumeric {
 		if (blob.count()<offset+1+8) throw new BadFormatException("Insufficient blob bytes to read Double");
 		long bits=Utils.readLong(blob.getInternalArray(), blob.getInternalOffset()+offset+1,8);
 		double d=Double.longBitsToDouble(bits);
-		CVMDouble result= createChecked(d);
+		CVMDouble result= unsafeCreate(d);
 		result.attachEncoding(blob.slice(offset,offset+1+8));
 		return result;
 	}
@@ -227,7 +225,7 @@ public final class CVMDouble extends ANumeric {
 
 	@Override
 	public CVMLong ensureLong() {
-		// TODO: possible conversion of some values?
+		// This is not a Long, even if it might be numerically equal to a Long
 		return null;
 	}
 

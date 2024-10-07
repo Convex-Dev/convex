@@ -175,6 +175,14 @@ public class ReaderTest {
 
 		assertParseException(()->Reader.read(" # 0 "));
 	}
+	
+	@Test
+	public void testBooleans() {
+		assertSame(CVMBool.TRUE, Reader.read("true"));
+		assertSame(CVMBool.FALSE, Reader.read(" false"));
+		assertSame(CVMBool.TRUE, Reader.read("#[B1]"));
+		assertSame(CVMBool.FALSE, Reader.read("#[b0]"));
+	}
 
 	@Test
 	public void testNumbers() {
@@ -186,6 +194,7 @@ public class ReaderTest {
 		assertCVMEquals(20.0, Reader.read("2.0e1"));
 		assertCVMEquals(0.2, Reader.read("2.0e-1"));
 		assertCVMEquals(12.0, Reader.read("12e0"));
+		
 		
 		assertParseException(() -> {
 			Reader.read("2.0e0.1234");
@@ -207,9 +216,14 @@ public class ReaderTest {
 	
 	@Test
 	public void testSpecialNumbers() {
+		assertNotEquals(CVMDouble.NaN, Reader.read("#[1d7ff8000000ffffff]"));
 		assertEquals(CVMDouble.NaN, Reader.read("##NaN"));
 		assertEquals(CVMDouble.POSITIVE_INFINITY, Reader.read("##Inf "));
 		assertEquals(CVMDouble.NEGATIVE_INFINITY, Reader.read(" ##-Inf"));
+		
+		// A non-CVM NaN
+		doReadPrintTest("#[1d7ff8000000ffffff]");
+		doReadPrintTest("##NaN");
 	}
 	
 	@Test

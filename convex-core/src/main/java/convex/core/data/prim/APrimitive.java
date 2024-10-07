@@ -23,7 +23,7 @@ public abstract  class APrimitive extends ACell {
 		return true;
 	}
 	
-	@Override public final boolean isCVMValue() {
+	@Override public boolean isCVMValue() {
 		return true;
 	}
 	

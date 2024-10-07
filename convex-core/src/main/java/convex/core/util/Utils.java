@@ -82,8 +82,8 @@ public class Utils {
 	 */
 	public static String toHexString(long x) {
 		char[] chars=new char[16];
-		for (int i = 15; i >= 0; i--) {
-			chars[i]=(toHexChar(((int) (x >> (4 * i))) & 0xF));
+		for (int i = 0; i <16; i++) {
+			chars[i]=(toHexChar(((int) (x >> (4 * (15-i)))) & 0xF));
 		}
 		return new String(chars);
 	}

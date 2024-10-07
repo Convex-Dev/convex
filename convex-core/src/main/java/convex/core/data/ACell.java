@@ -338,7 +338,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Returns true if this Cell is in a canonical representation.
+	 * Returns true if this Cell is in a canonical CAD3 representation.
 	 * 
 	 * Non-canonical objects may be used on a temporary internal basis, they should
 	 * be converted to canonical representations for general purpose use.

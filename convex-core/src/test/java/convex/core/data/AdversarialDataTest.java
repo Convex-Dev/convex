@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.Arrays;
@@ -251,12 +252,13 @@ public class AdversarialDataTest {
 	@Test
 	public void testBadDouble() {
 		// Double with invalid (non-canonical) NaN
-		invalidTest(CVMDouble.unsafeCreate(Double.longBitsToDouble(0x7ff80000ff000000L)));
-		
-		invalidEncoding(Tag.DOUBLE,"7ff80000ff000000"); // non-canonical NaN
-		invalidEncoding(Tag.DOUBLE,"fff8000000000000"); // signed NaN
-		invalidEncoding(Tag.DOUBLE,"00000000000000"); // short double
+		CVMDouble bd=CVMDouble.unsafeCreate(Double.longBitsToDouble(0x7ff80000ff000000L));
+		assertTrue(bd.isCVMValue());
+
+		invalidEncoding(Tag.DOUBLE,"00000000000000"); // too short double
+		invalidEncoding(Tag.DOUBLE,"000000000000000000"); // too long double
 	}
+	
 	
 	@Test
 	public void testBadBoolean() {

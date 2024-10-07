@@ -2016,6 +2016,9 @@ public class CoreTest extends ACVMTest {
 
 		assertCastError(step("(double :foo)"));
 		
+		// coercion of non-canonical NaNs to canonical instance
+		assertSame(CVMDouble.NaN,eval("(double #[1d7ff8000000ffffff])"));
+		
 		// Shouldn't try to cast an Address, see #431
 		assertCastError(step("(double #7)"));
 		
@@ -4173,7 +4176,10 @@ public class CoreTest extends ACVMTest {
 		assertTrue(evalB("(number? 0)"));
 		assertTrue(evalB("(number? (byte 0))"));
 		assertTrue(evalB("(number? 0.5)"));
-		assertTrue(evalB("(number? ##NaN)")); // Sane? Is numeric double type....
+		
+		// special care with NaNs
+		assertTrue(evalB("(number? ##NaN)")); 
+		assertTrue(evalB("(number? #[1d7ff8000000fffffe])")); 
 		
 		assertFalse(evalB("(number? nil)"));
 		assertFalse(evalB("(number? :foo)"));

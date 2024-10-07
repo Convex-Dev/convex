@@ -548,9 +548,11 @@ public class RT {
 	 * @return Double value, or null if not convertible
 	 */
 	public static CVMDouble castDouble(ACell a) {
-		if (a instanceof CVMDouble)
-			return (CVMDouble) a;
-
+		if (a instanceof CVMDouble) {
+			// Note coercion on non-CVM IEEE754 NaNs
+			return ((CVMDouble) a).toDouble();
+		}
+		
 		AInteger l = ensureInteger(a);
 		if (l == null)
 			return null;
