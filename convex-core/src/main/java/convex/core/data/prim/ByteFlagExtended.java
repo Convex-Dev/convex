@@ -4,6 +4,7 @@ import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
+import convex.core.lang.RT;
 
 /**
  * Class implementing the CAD3 extended byte flags `0xB2` to `0xBF`
@@ -76,10 +77,8 @@ public class ByteFlagExtended extends AByteFlag {
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
-		sb.append((byte)'#');
-		sb.append((byte)'B');
-		sb.append((byte)(tag&0xF));
-		return sb.check(limit);
+		return RT.printCAD3(sb,limit,this);
+		
 	}
 
 }

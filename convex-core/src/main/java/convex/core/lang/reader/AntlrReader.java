@@ -34,6 +34,7 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
@@ -45,6 +46,7 @@ import convex.core.lang.reader.antlr.ConvexParser.AllFormsContext;
 import convex.core.lang.reader.antlr.ConvexParser.AtomContext;
 import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
+import convex.core.lang.reader.antlr.ConvexParser.Cad3Context;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
 import convex.core.lang.reader.antlr.ConvexParser.CommentedContext;
 import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
@@ -393,6 +395,23 @@ public class AntlrReader {
 			if (b==null) throw new ParseException("Invalid Blob syntax: "+s);
 			push(b);
 		}
+		
+		@Override
+		public void enterCad3(Cad3Context ctx) {
+			// nothing to do
+		}
+
+		@Override
+		public void exitCad3(Cad3Context ctx) {
+			String s=ctx.getStop().getText();
+			Blob enc=Blob.fromHex(s.substring(2, s.length()-1));
+			try {
+				ACell cell=convex.core.data.Format.read(enc);
+				push (cell);
+			} catch (BadFormatException e) {
+				throw new ParseException("Invalid CAD3 encoding: "+e.getMessage(),e);
+			}
+		}
 
 		@Override
 		public void enterQuoted(QuotedContext ctx) {
@@ -541,6 +560,8 @@ public class AntlrReader {
 		public void exitPrimary(PrimaryContext ctx) {
 			// Nothing
 		}
+
+
 	}
 
 	public static ACell read(String s) {

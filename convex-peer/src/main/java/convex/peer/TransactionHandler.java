@@ -37,6 +37,7 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.transactions.ATransaction;
@@ -154,7 +155,6 @@ public class TransactionHandler extends AThreadedComponent {
 			}
 
 			// Persist the signed transaction. Might throw MissingDataException?
-			// If we already have the transaction persisted, will obtain signature status
 			sd=Cells.persist(sd);
 	
 			// Put on Server's transaction queue. We are OK to block here
@@ -168,6 +168,9 @@ public class TransactionHandler extends AThreadedComponent {
 		} catch (BadFormatException | IOException e) {
 			log.warn("Unhandled exception in transaction handler",e);
 			m.closeConnection();
+		} catch (MissingDataException e) {
+			m.returnResult(Result.fromException(e).withSource(SourceCodes.PEER));
+			return;
 		}
 	}
 	

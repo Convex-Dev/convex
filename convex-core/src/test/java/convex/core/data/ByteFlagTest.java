@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.AByteFlag;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
+import convex.core.lang.Reader;
 
 public class ByteFlagTest {
 
@@ -40,6 +42,13 @@ public class ByteFlagTest {
 		Blob enc=b.getEncoding();
 		assertEquals(1,enc.count());
 		assertEquals(tag,enc.byteAt(0));
+		
+		String rd="#["+enc.toHexString()+"]";
+		if (i>=2) {
+			// Printing for non-boolean byte flags
+			assertEquals(rd,RT.print(b).toString());
+		}
+		assertSame(b,Reader.read(rd));
 		
 		// should all be singletons!
 		assertSame(b,Format.read(enc));

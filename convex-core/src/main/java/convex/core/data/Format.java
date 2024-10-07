@@ -598,7 +598,7 @@ public class Format {
 		} catch (BadFormatException e) {
 			throw e;
 		} catch (IndexOutOfBoundsException e) {
-			throw new BadFormatException("Read out of blob bounds when decoding with tag 0x"+Utils.toHexString(tag));
+			throw new BadFormatException("Read out of bounds when decoding with tag 0x"+Utils.toHexString(tag));
 		} catch (MissingDataException e) {
 			throw e;
 		} catch (Exception e) {

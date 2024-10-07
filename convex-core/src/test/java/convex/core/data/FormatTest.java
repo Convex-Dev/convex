@@ -64,6 +64,8 @@ public class FormatTest {
 		assertBadVLQCount("81ffffffffffffffffff"); // excess leading 1 (would overflow)
 		assertBadVLQCount("80ffffffffffffffffff7f"); // excess byte
 		assertBadVLQCount("ffff00ffffffffff7f"); // terminating byte in middle
+		assertBadVLQCount("8000"); // Excess leading zeros
+		assertBadVLQCount("80808000"); // Excess leading zeros
 		assertBadVLQCount("ff"); // Not terminated
 		assertBadVLQCount("ffff"); // Not terminated
 		assertBadVLQCount("01ff"); // terminated by first byte

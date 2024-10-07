@@ -42,6 +42,8 @@ taggedForm: tag form;
 
 tag: HASH_TAG;
 
+cad3: CAD3;
+
 atom
   : symbol 
   | literal
@@ -60,6 +62,7 @@ literal
 	| longValue
 	| doubleValue
 	| specialLiteral
+	| cad3
 	;
    
 longValue: 
@@ -159,6 +162,9 @@ INTRINSIC_SYMBOL:
   
 HASH_TAG:
   '#' TAG_NAME;
+  
+CAD3:
+  '#[' HEX_BYTE* ']';
   
 AT_SYMBOL: 
   '@' NAME;

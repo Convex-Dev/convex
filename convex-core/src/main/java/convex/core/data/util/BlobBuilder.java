@@ -248,6 +248,17 @@ public class BlobBuilder {
 		append(Utils.toHexChar((b & 0xF0) >>> 4));
 		append(Utils.toHexChar((b & 0xF)));
 	}
+	
+	public void appendCAD3Hex(Blob encoding) {
+		byte[] arr=encoding.getInternalArray();
+		int pos=encoding.getInternalOffset();
+		int n=encoding.size();
+		for (int i=0; i<n; i++) {
+			byte b=arr[pos+i];
+			append(Utils.toHexChar((b & 0xF0) >>> 4));
+			append(Utils.toHexChar((b & 0xF)));			
+		}
+	}
 
 	/**
 	 * Append a CVM character to this Blob
@@ -312,4 +323,6 @@ public class BlobBuilder {
 		tail=null;
 		count=0;
 	}
+
+
 }

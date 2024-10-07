@@ -1872,5 +1872,13 @@ public class RT {
 		return null;
 	}
 
+	public static boolean printCAD3(BlobBuilder sb, long limit, ACell cell) {
+		sb.append((byte)'#');
+		sb.append((byte)'[');
+		sb.appendCAD3Hex(Cells.getEncoding(cell));
+		sb.append((byte)']');
+		return sb.check(limit);
+	}
+
 
 }
