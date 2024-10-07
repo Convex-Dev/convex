@@ -34,9 +34,6 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 	
 	@Override
-	protected abstract byte getTag();
-	
-	@Override
 	public int getRefCount() {
 		return values.getRefCount();
 	}

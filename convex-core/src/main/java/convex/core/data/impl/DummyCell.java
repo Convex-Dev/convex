@@ -21,7 +21,7 @@ public class DummyCell extends ACell {
 	}
 
 	@Override
-	protected byte getTag() {
+	public byte getTag() {
 		return Tag.ILLEGAL;
 	}
 

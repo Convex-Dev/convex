@@ -16,12 +16,15 @@ import java.util.Random;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.Refs.RefTreeStats;
+import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
@@ -36,6 +39,7 @@ import convex.core.transactions.Invoke;
 import convex.test.Samples;
 import convex.test.Testing;
  
+@TestInstance(Lifecycle.PER_CLASS)
 public class EncodingTest {
 
 	@Test public void testVLQLongLength() throws BadFormatException, BufferUnderflowException {
@@ -119,6 +123,12 @@ public class EncodingTest {
 		assertTrue(Format.isEmbedded(k));
 		Ref<?> r=Ref.get(o);
 		assertTrue(r.isDirect());
+	}
+	
+	@Test public void testByteFlags() throws BadFormatException {
+		assertEquals(CVMBool.TRUE,Format.read("b1"));
+		assertEquals(CVMBool.FALSE,Format.read("B0"));
+		assertEquals(AByteFlag.create(10),Format.read("bA"));
 	}
 	
 	@Test public void testEmbeddedBigInteger() throws BadFormatException {

@@ -173,11 +173,9 @@ public final class CVMDouble extends ANumeric {
 	}
 	
 	@Override
-	protected final  byte getTag() {
+	public final byte getTag() {
 		return Tag.DOUBLE;
 	}
-
-
 	
 	public static CVMDouble read(byte tag, Blob blob, int offset) throws BadFormatException {
 		if (blob.count()<offset+1+8) throw new BadFormatException("Insufficient blob bytes to read Double");

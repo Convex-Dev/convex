@@ -280,7 +280,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract boolean equals(AVector<? super T> a);
 	
 	@Override
-	protected final byte getTag() {
+	public final byte getTag() {
 		return Tag.VECTOR;
 	}
 	

@@ -390,7 +390,7 @@ public final class Result extends ARecordGeneric {
 	}
 
 	@Override
-	protected byte getTag() {
+	public byte getTag() {
 		return Tag.RESULT;
 	}
 

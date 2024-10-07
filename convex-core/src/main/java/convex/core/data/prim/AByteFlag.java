@@ -17,6 +17,15 @@ public abstract class AByteFlag extends APrimitive {
 	public int estimatedEncodingSize() {
 		return 1;
 	}
+	
+	public static AByteFlag read(byte tag) {
+		tag&=0xF;
+		switch (tag) {
+			case 0: return CVMBool.FALSE;
+			case 1: return CVMBool.TRUE;
+		}
+		return ByteFlagExtended.unsafeCreate(tag); // we assume tag is valid
+	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
@@ -38,5 +47,16 @@ public abstract class AByteFlag extends APrimitive {
 	public int encodeRaw(byte[] bs, int pos) {
 		// no raw data to encode, everything is in tag
 		return pos;
+	}
+
+	/**
+	 * Create a Byte Flag for the given value (0..15 where 0=false, 1=true .... )
+	 * @param value
+	 * @return ByteFlag instance, or null if value out of range
+	 */
+	public static AByteFlag create(long value) {
+		if (value==1) return CVMBool.TRUE;
+		if (value==0) return CVMBool.FALSE;
+		return ByteFlagExtended.create(value); // may be null
 	}
 }

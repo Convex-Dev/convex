@@ -96,16 +96,6 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @return Field value for the given key
 	 */
 	public abstract ACell get(Keyword key);
-
-	/**
-	 * Gets the tag byte for this record type. The Tag is the byte used to identify the
-	 * record in the binary encoding.
-	 * 
-	 * @return Record tag byte
-	 */
-	@Override
-	protected
-	abstract byte getTag();
 	
 	/**
 	 * Gets an array containing all values in this record, in format-defined key order.

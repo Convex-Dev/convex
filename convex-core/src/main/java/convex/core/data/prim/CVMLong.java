@@ -203,7 +203,7 @@ public final class CVMLong extends AInteger {
 	}
 	
 	@Override
-	protected final byte getTag() {
+	public final byte getTag() {
 		if (encoding!=null) {
 			return encoding.byteAt(0);
 		}

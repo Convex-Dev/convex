@@ -81,7 +81,8 @@ public final class CVMBool extends AByteFlag {
 	}
 
 	@Override
-	protected final byte getTag() {
+	public
+	final byte getTag() {
 		return (value)?Tag.TRUE:Tag.FALSE;
 	}
 

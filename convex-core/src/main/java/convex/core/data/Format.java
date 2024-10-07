@@ -15,14 +15,15 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.Order;
 import convex.core.cvm.Receipt;
 import convex.core.cvm.State;
+import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
-import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.Panic;
 import convex.core.lang.AFn;
 import convex.core.lang.AOp;
 import convex.core.lang.Core;
@@ -39,8 +40,6 @@ import convex.core.transactions.Transfer;
 import convex.core.util.Bits;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
-
-import convex.core.exceptions.Panic;
 
 /**
  * Static utility class for message format encoding
@@ -565,8 +564,6 @@ public class Format {
 
 		// Fast paths for common one-byte instances. TODO: might switch have better performance if compiled correctly into a table?
 		if (tag==Tag.NULL) return null;
-		if (tag==Tag.TRUE) return (T) CVMBool.TRUE;
-		if (tag==Tag.FALSE) return (T) CVMBool.FALSE;
 		if (tag==Tag.INTEGER) return (T) CVMLong.ZERO; 
 
 		try {
@@ -577,6 +574,8 @@ public class Format {
 			
 			if (tag == Tag.ADDRESS) return (T) Address.read(blob,offset);
 			
+			if (high == 0xB0) return (T) AByteFlag.read(tag);
+
 			if (high == 0xE0) return (T) readOp(tag,blob,offset);
 			
 			if (high == 0xC0) return (T) readCode(tag,blob,offset);

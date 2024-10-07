@@ -33,7 +33,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	}
 	
 	@Override
-	protected final byte getTag() {
+	public final byte getTag() {
 		return Tag.SET;
 	}
 	
