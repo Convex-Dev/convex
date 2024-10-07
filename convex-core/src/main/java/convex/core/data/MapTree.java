@@ -118,7 +118,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	/**
-	 * Create a MapTree with a full compliment of children.
+	 * Create a MapTree with a full complement of children.
 	 * @param <K>
 	 * @param <V>
 	 * @param newChildren
@@ -133,7 +133,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * Creates a Map with the specified child map Refs. Removes empty maps passed as
 	 * children.
 	 * 
-	 * Returns a ListMap for small maps.
+	 * Returns a MapLeaf for small maps.
 	 * 
 	 * @param children Array of Refs to child maps for each bit in mask
 	 * @param shift    Shift position (hex digit of key hashes for this map)
@@ -616,7 +616,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@SuppressWarnings("unchecked")
 	private AHashMap<K, V> mergeDifferences(MapTree<K, V> b, MergeFunction<V> func, int shift) {
-		// assume two treemaps with identical prefix and shift
+		// assume two MapTrees with identical prefix and shift
 		if (this.equals(b)) return this; // no differences to merge
 		int fullMask = mask | b.mask;
 		Ref<AHashMap<K, V>>[] newChildren = null; // going to build new full child list if needed
@@ -771,7 +771,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	protected void validateWithPrefix(String prefix) throws InvalidDataException {
 		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
 		if (shift != prefix.length()) {
-			throw new InvalidDataException("Invalid prefix [" + prefix + "] for TreeMap with shift=" + shift, this);
+			throw new InvalidDataException("Invalid prefix [" + prefix + "] for MapTree with shift=" + shift, this);
 		}
 		int bsize = children.length;
 

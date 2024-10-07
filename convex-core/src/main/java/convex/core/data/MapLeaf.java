@@ -433,12 +433,12 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	/**
-	 * Filters this ListMap to contain only key hashes with the hex digits specified
+	 * Filters this MapLeaf to contain only key hashes with the hex digits specified
 	 * in the given Mask
 	 * 
 	 * @param digitPos Position of the hex digit to filter
 	 * @param mask     Mask of digits to include
-	 * @return Filtered ListMap
+	 * @return Filtered MapLeaf
 	 */
 	public MapLeaf<K, V> filterHexDigits(int digitPos, int mask) {
 		mask = mask & 0xFFFF;
