@@ -190,10 +190,4 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 
 	@Override
 	public abstract int compareTo(ABlobLike<?> b);
-	
-	@Override public boolean isDataValue() {
-		return true;
-	}
-
-
 }

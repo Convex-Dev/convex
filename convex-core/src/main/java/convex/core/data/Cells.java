@@ -137,16 +137,6 @@ public class Cells {
 	}
 	
 	/**
-	 * Checks if a Cell is a first class value
-	 * @param a Cell to check
-	 * @return True if CVM VAlue, false otherwise
-	 */
-	public static boolean isValue(ACell a) {
-		if (a==null) return true;
-		return a.isDataValue();
-	}
-	
-	/**
 	 * Persist a cell in the current store
 	 * @param a Cell to persist
 	 * @return Cell after persisting (may be the same Cell if no change in cell hierarchy)

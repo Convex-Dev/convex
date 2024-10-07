@@ -357,7 +357,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	protected abstract ACell toCanonical();
 	
 	/**
-	 * Returns true if this cell is a first class CVM Value allowable in the CVM state
+	 * Returns true if this cell is a first class CVM Value used in the CVM state
 	 * 
 	 * Sub-structural cells that are not themselves first class values
 	 * should return false
@@ -371,17 +371,6 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @return true if the object is a CVM Value, false otherwise
 	 */
 	public abstract boolean isCVMValue();
-	
-	/**
-	 * Returns true if this cell instance is a first class value, i.e. not a component of a larger data structure
-	 * 
-	 * Sub-structural cells that are not themselves first class values should return false
-	 * 
-	 * Everything else should return true.
-	 * 
-	 * @return true if the object is a Value, false otherwise
-	 */
-	public abstract boolean isDataValue();
 
 	/**
 	 * Gets the Ref for this Cell, creating a new direct reference if necessary

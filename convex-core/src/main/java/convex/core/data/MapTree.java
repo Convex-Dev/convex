@@ -475,16 +475,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		return true;
 	}
-	
-	@Override public final boolean isCVMValue() {
-		// A MapTree is only a valid CVM value at the top level (shift == 0)
-		return (shift==0);
-	}
-	
-	@Override public final boolean isDataValue() {
-		// A MapTree is only a valid data value at the top level (shift == 0)
-		return (shift==0);
-	}
 
 	@Override
 	public int getRefCount() {
@@ -920,6 +910,11 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			items[i]=entryAt(start+i);
 		}
 		return MapLeaf.unsafeCreate(items);
+	}
+
+	@Override
+	public boolean isCVMValue() {
+		return true;
 	}
 
 

@@ -58,16 +58,8 @@ public class DummyCell extends ACell {
 	}
 
 	@Override
-	public boolean isDataValue() {
-		return false;
-	}
-
-	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		sb.append("DUMMY");
 		return sb.check(limit);
 	}
-
-
-
 }

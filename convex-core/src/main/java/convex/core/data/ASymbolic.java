@@ -29,10 +29,6 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		return true;
 	}
 	
-	@Override public final boolean isDataValue() {
-		return true;
-	}
-	
 	@Override
 	protected long calcMemorySize() {	
 		// always embedded and no child Refs, so memory size == 0

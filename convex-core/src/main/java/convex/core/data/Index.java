@@ -122,11 +122,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
-	
-	@Override
-	public boolean isDataValue() {
-		return true;
-	}
 
 	@SuppressWarnings("unchecked")
 	@Override

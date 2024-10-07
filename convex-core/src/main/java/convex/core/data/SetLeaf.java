@@ -258,10 +258,6 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
-	
-	@Override public final boolean isDataValue() {
-		return true;
-	}
 
 	private static <V extends ACell> boolean isValidOrder(Ref<V>[] entries) {
 		long count = entries.length;

@@ -389,10 +389,8 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return result;
 	}
 
-
-	
 	@Override public final boolean isCVMValue() {
-		return shift==0;
+		return true;
 	}
 
 	@Override

@@ -101,7 +101,6 @@ public class AdversarialDataTest {
 				d=SetTree.digitForIndex(i, a.getMask());
 			}
 		}
-		assertFalse(b.isCVMValue());
 		assertEquals(d,b.get(0).getHash().getHexDigit(0)); // d should be first digit of Hash
 		assertEquals(1,b.shift);
 	}

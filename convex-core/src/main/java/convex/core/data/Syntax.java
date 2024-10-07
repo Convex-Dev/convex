@@ -153,11 +153,6 @@ public final class Syntax extends ACell {
 	@Override public final boolean isCVMValue() {
 		return true;
 	}
-	
-	@Override public final boolean isDataValue() {
-		return true;
-	}
-
 
 	/**
 	 * Decodes a Syntax object from a Blob encoding
