@@ -25,7 +25,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.Panic;
 import convex.core.lang.AFn;
-import convex.core.lang.AOp;
 import convex.core.lang.Core;
 import convex.core.lang.Ops;
 import convex.core.lang.RT;
@@ -54,7 +53,7 @@ public class Format {
 	 * 
 	 * Technical reasons for this choice:
 	 * <ul>
-	 * <li>This is the maximum length that can be VLQ encoded in a 2 byte message header. This simplifies message encoding and decoding.</li>
+	 * <li>This is the maximum length that can be VLQ encoded in 2 bytes. This simplifies message encoding and decoding.</li>
 	 * <li>It is big enough to include a 4096-byte Blob</li>
 	 * <li>It is small enough to fit in a UDP message</li>
 	 * </ul>
@@ -488,7 +487,8 @@ public class Format {
 	}
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == Tag.CORE_DEF) return Core.read(b, pos);
+		if (tag == Tag.OP) return Ops.read(b, pos);
+		
 		
 		if (tag == Tag.FN_MULTI) {
 			AFn<?> fn = MultiFn.read(b,pos);
@@ -575,8 +575,6 @@ public class Format {
 			if (tag == Tag.ADDRESS) return (T) Address.read(blob,offset);
 			
 			if (high == 0xB0) return (T) AByteFlag.read(tag);
-
-			if (high == 0xE0) return (T) readOp(tag,blob,offset);
 			
 			if (high == 0xC0) return (T) readCode(tag,blob,offset);
 
@@ -586,7 +584,9 @@ public class Format {
 
 			if (high == 0xD0) return (T) readTransaction(tag, blob, offset);
 
-			if (high == 0xA0) return (T) readRecord(tag,blob,offset);
+			if (high == 0xE0) return (T) readExtension(tag, blob, offset);
+			
+ 			if (high == 0xA0) return (T) readRecord(tag,blob,offset);
 		} catch (BadFormatException e) {
 			throw e;
 		} catch (IndexOutOfBoundsException e) {
@@ -599,8 +599,11 @@ public class Format {
 		throw new BadFormatException(badTagMessage(tag));
 	}
 
-	private static <T extends ACell> AOp<T> readOp(byte tag, Blob blob, int offset) throws BadFormatException {
-		return Ops.read(blob, offset, (byte) (tag&0x0f));
+	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
+		if (tag == Tag.CORE_DEF) return Core.read(blob, offset);
+		
+		throw new BadFormatException(badTagMessage(tag));
+
 	}
 
 	private static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
@@ -624,10 +627,12 @@ public class Format {
 	}
 
 	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
-		if (tag == Tag.SYMBOL) return Symbol.read(blob,offset);
-		if (tag == Tag.KEYWORD) return Keyword.read(blob,offset);
-		if (tag == Tag.BLOB) return Blobs.read(blob,offset);
-		if (tag == Tag.STRING) return Strings.read(blob,offset);
+		switch (tag) {
+			case Tag.SYMBOL: return Symbol.read(blob,offset);
+			case Tag.KEYWORD: return Keyword.read(blob,offset);
+			case Tag.BLOB: return Blobs.read(blob,offset);
+			case Tag.STRING: return Strings.read(blob,offset);
+		} 
 		
 		if ((tag&Tag.CHAR_MASK)==Tag.CHAR_BASE) {
 			int len=CVMChar.byteCountFromTag(tag);

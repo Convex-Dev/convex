@@ -88,11 +88,11 @@ public class Tag {
 
 	// ==========================================
 	// Coded data (0xCx)
+	
+	public static final byte CODE_BASE = (byte) 0xC0;
 
-	public static final byte COMMAND = (byte) 0xC0;
-
-	// Code
-	public static final byte CORE_DEF = (byte) 0xCD;
+	// CVM Code
+	public static final byte OP = (byte) 0xC0;
 	public static final byte FN = (byte) 0xCF;
 	public static final byte FN_MULTI = (byte) 0xCB;
 	
@@ -111,8 +111,10 @@ public class Tag {
 	
 	//==========================================
 	// Extension values (0xEx)
-	
-	public static final byte OP = (byte) 0xE0;
+
+	// CVM Core definitions
+	public static final byte CORE_DEF = (byte) 0xED;
+
 
 	//===========================================
 	// Illegal / reserved for special values (0xFx)

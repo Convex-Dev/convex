@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import convex.core.data.ACell;
+import convex.core.data.ACode;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
@@ -19,7 +20,7 @@ import convex.core.data.type.Types;
  *
  * @param <T> the type of the operation return value
  */
-public abstract class AOp<T extends ACell> extends ACell {
+public abstract class AOp<T extends ACell> extends ACode {
 
 	/**
 	 * Executes this op with the given context. Must preserve depth unless an
@@ -70,6 +71,7 @@ public abstract class AOp<T extends ACell> extends ACell {
 	@Override
 	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=getTag();
+		bs[pos++]=opCode();
 		return encodeRaw(bs,pos);
 	}
 
@@ -89,7 +91,7 @@ public abstract class AOp<T extends ACell> extends ACell {
 	
 	@Override
 	public byte getTag() {
-		return (byte) (Tag.OP+opCode());
+		return Tag.OP;
 	}
 	
 	@Override

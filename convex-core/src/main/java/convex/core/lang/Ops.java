@@ -43,7 +43,7 @@ public class Ops {
 	/**
 	 * Offset of Op data from tag byte
 	 */
-	public static final int OP_DATA_OFFSET=1;
+	public static final int OP_DATA_OFFSET=2;
 
 	/**
 	 * Reads an Op from the given Blob. Assumes tag specifying an Op already read.
@@ -55,7 +55,8 @@ public class Ops {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> read(Blob b, int pos, byte opCode) throws BadFormatException {
+	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
+		byte opCode=b.byteAt(pos+1);
 		switch (opCode) {
 		case Ops.CONSTANT:
 			return Constant.read(b,pos);

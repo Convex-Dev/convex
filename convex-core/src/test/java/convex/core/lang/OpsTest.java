@@ -77,7 +77,7 @@ public class OpsTest extends ACVMTest {
 			assertNull(c2.getResult());
 			doOpTest(op);
 			
-			assertEquals(Blob.wrap(new byte[] {op.getTag(),Tag.NULL}),op.getEncoding());
+			assertEquals(Blob.wrap(new byte[] {Tag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
 		}
 		
 		{// nested constant
@@ -88,7 +88,7 @@ public class OpsTest extends ACVMTest {
 			assertEquals(Constant.nil(),c2.getResult());
 			doOpTest(op);
 			
-			assertEquals(Blob.wrap(new byte[] {op.getTag(),op.getTag(),Tag.NULL}),op.getEncoding());
+			assertEquals(Blob.wrap(new byte[] {Tag.OP,Ops.CONSTANT,Tag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
 		}
 	}
 
@@ -184,7 +184,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testSet() throws BadFormatException {
 		AOp<Address> op = Set.create(45, Constant.nil());
-		Blob expectedEncoding=Blob.fromHex("eb2de000");
+		Blob expectedEncoding=Blob.fromHex("c00b2dc00000");
 		assertEquals(expectedEncoding,op.getEncoding());
 		assertEquals(op,Format.read(expectedEncoding));
 		doOpTest(op);
