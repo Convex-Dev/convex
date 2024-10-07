@@ -16,11 +16,18 @@ import convex.core.util.Utils;
  */
 public class FormatTest {
 
-	@Test public void testVLQEncoding() {
+	@Test public void testVLQLongs() {
 		checkVLQLong("00",0);
 		checkVLQLong("01",1);
 		checkVLQLong("3f",63);
 		checkVLQLong("8040",64); // first overflow into 2 bytes
+		
+		checkVLQLong("7f",-1);
+		checkVLQLong("40",-64);
+		checkVLQLong("ff3f",-65);
+		checkVLQLong("ff00",-128);
+		checkVLQLong("fe7f",-129);
+
 		checkVLQLong("87ffffff7f",Integer.MAX_VALUE);
 		checkVLQLong("8880808000",Integer.MAX_VALUE+1l);
 		checkVLQLong("80ffffffffffffffff7f",Long.MAX_VALUE);
