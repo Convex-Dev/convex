@@ -254,9 +254,9 @@ public class EncodingTest {
 		assertEquals(ME, maxEmbedded.getEncodingLength());
 		
 		// Maps
-		assertEquals(2+16*ME,MapLeaf.MAX_ENCODING_LENGTH);
+		assertEquals(2+2*MapLeaf.MAX_ENTRIES*ME,MapLeaf.MAX_ENCODING_LENGTH);
 		// assertEquals(4+16*ME,MapTree.MAX_ENCODING_LENGTH); // TODO: recheck
-		assertEquals(Maps.MAX_ENCODING_SIZE,MapTree.MAX_ENCODING_LENGTH);
+		assertEquals(Maps.MAX_ENCODING_SIZE,Math.max(MapTree.MAX_ENCODING_LENGTH,MapLeaf.MAX_ENCODING_LENGTH));
 		
 		// Vectors
 		assertEquals(1+Format.MAX_VLQ_COUNT_LENGTH+17*ME,VectorLeaf.MAX_ENCODING_LENGTH);

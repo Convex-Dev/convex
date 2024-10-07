@@ -27,7 +27,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**
 	 * Maximum number of entries in a MapLeaf
 	 */
-	public static final int MAX_ENTRIES = 8;
+	public static final int MAX_ENTRIES = 16;
 
 	static final MapEntry<?, ?>[] EMPTY_ENTRIES = new MapEntry[0];
 
@@ -250,11 +250,11 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		System.arraycopy(entries, 0, newEntries, 0, len);
 		newEntries[len] = MapEntry.create(key, value);
 		if (len + 1 <= MAX_ENTRIES) {
-			// new size should be a ListMap
+			// new size should be a MapLeaf
 			Arrays.sort(newEntries);
 			return new MapLeaf<K, V>(newEntries);
 		} else {
-			// new Size should be a TreeMap with current shift
+			// new Size should be a MapTree with current shift
 			return MapTree.create(newEntries, shift);
 		}
 	}

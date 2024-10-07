@@ -18,6 +18,7 @@ import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
+import convex.core.data.AHashMap;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.ASet;
@@ -26,17 +27,15 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.Index;
 import convex.core.data.BlobTree;
 import convex.core.data.Blobs;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.Lists;
-import convex.core.data.MapLeaf;
-import convex.core.data.MapTree;
 import convex.core.data.Maps;
 import convex.core.data.SetLeaf;
 import convex.core.data.SetTree;
@@ -98,9 +97,9 @@ public class Samples {
 	public static final SetTree<CVMLong> INT_SET_300 = (SetTree<CVMLong>) Sets.create(INT_VECTOR_300);
 
 	
-	public static final MapLeaf<CVMLong, CVMLong> LONG_MAP_5 = createTestLongMap(5);
-	public static final MapTree<CVMLong, CVMLong> LONG_MAP_10 = createTestLongMap(10);
-	public static final MapTree<CVMLong, CVMLong> LONG_MAP_100 = createTestLongMap(100);
+	public static final AHashMap<CVMLong, CVMLong> LONG_MAP_5 = createTestLongMap(5);
+	public static final AHashMap<CVMLong, CVMLong> LONG_MAP_10 = createTestLongMap(10);
+	public static final AHashMap<CVMLong, CVMLong> LONG_MAP_100 = createTestLongMap(100);
 
 	public static final Index<ABlobLike<?>, CVMLong> INT_INDEX_7 = Index.of(Strings.EMPTY, 0, Blob.fromHex("0001"), 1,
 			Blob.fromHex("01"), 2, Blob.fromHex("010000"), 3, Blob.fromHex("010001"), 4, Blob.fromHex("ff0000"), 5,
