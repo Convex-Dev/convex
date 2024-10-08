@@ -35,11 +35,7 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	@Override
 	public abstract AHashMap<K, V> dissoc(ACell key);
 
-	protected abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value, int shift);
-
 	public abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e);
-
-	protected abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e, int shift);
 
 	/**
 	 * Merge another map into this map. Replaces existing entries if they are

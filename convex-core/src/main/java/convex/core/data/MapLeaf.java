@@ -196,11 +196,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public AHashMap<K, V> assocEntry(MapEntry<K, V> e) {
-		return assocEntry(e, 0);
-	}
-
-	@Override
-	public AHashMap<K, V> assocEntry(MapEntry<K, V> e, int shift) {
 		int len = size();
 
 		// first check for update with existing key
@@ -227,7 +222,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			return new MapLeaf<K, V>(newEntries);
 		} else {
 			// new size implies a TreeMap with the current given shift
-			return MapTree.create(newEntries, shift);
+			return MapTree.create(newEntries);
 		}
 	}
 
@@ -237,7 +232,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return assoc((K)key, (V) value, 0);
 	}
 
-	protected AHashMap<K, V> assoc(K key, V value, int shift) {
+	AHashMap<K, V> assoc(K key, V value, int shift) {
 		int len = size();
 
 		// first check for update with existing key
@@ -266,19 +261,15 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			return new MapLeaf<K, V>(newEntries);
 		} else {
 			// new Size should be a MapTree with current shift
-			return MapTree.create(newEntries, shift);
+			return MapTree.create(newEntries);
 		}
 	}
 
 	@Override
-	protected AHashMap<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
-		return assoc(keyRef.getValue(), value, shift);
+	public AHashMap<K, V> assocRef(Ref<K> keyRef, V value) {
+		return assoc(keyRef.getValue(), value);
 	}
 
-	@Override
-	public AHashMap<K, V> assocRef(Ref<K> keyRef, V value) {
-		return assocRef(keyRef, value, 0);
-	}
 
 	@Override
 	public Set<K> keySet() {

@@ -119,7 +119,7 @@ public class Maps {
 			AVector<?> v=entries.get(i);
 			@SuppressWarnings("unchecked")
 			MapEntry<K,V> e=MapEntry.convertOrNull(v); // Ensure a Map entry
-			result = result.assocEntry(e, shift);
+			result = result.assocEntry(e);
 		}
 		return result;
 	}

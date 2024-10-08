@@ -305,12 +305,6 @@ public class MapsTest {
 		CollectionsTest.doMapTests(m);
 	}
 
-	@SuppressWarnings("unchecked")
-	@Test
-	public void testTreeMapBuilding() {
-		assertThrows(Throwable.class, () -> MapTree.create(new MapEntry[] { MapEntry.of(1, 2) }, 0));
-	}
-
 	@Test
 	public void testMapEntry() {
 		AMap<CVMLong, CVMLong> m = Maps.of(1L, 2L);

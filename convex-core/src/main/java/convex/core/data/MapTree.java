@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -68,15 +69,60 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		return n;
 	}
+	
+	/**
+	 * Create MapTree with specific children at specified shift level
+	 * Children must branch at the given shift level
+	 */
+	@SafeVarargs
+	static <K extends ACell, V extends ACell> MapTree<K, V> create(int shift, AHashMap<K,V> ... children) {
+		int n=children.length;
+		Arrays.sort(children,shiftComparator(shift));
+		@SuppressWarnings("unchecked")
+		Ref<AHashMap<K,V>>[] rs=new Ref[n];
+		long count=0;
+		short mask=0;
+		for (int i=0; i<n; i++) {
+			AHashMap<K,V> child=children[i];
+			rs[i]=Ref.get(child);
+			count+=child.count;
+			int digit=child.getFirstHash().getHexDigit(shift);
+			mask|=(1<<digit);
+		}
+		if (Integer.bitCount(shift)!=n) {
+			throw new IllegalArgumentException("Children do not differ at specified digit");
+		}
+		return new MapTree<>(rs,shift,mask,count);
+	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	static Comparator<AHashMap>[] COMPARATORS=new Comparator[63];
+	
+	@SuppressWarnings("rawtypes")
+	private static Comparator<AHashMap> shiftComparator(int shift2) {
+		if (COMPARATORS[shift2]==null) {
+			COMPARATORS[shift2]=new Comparator<AHashMap>() {
+				@Override
+				public int compare(AHashMap o1, AHashMap o2) {
+					int d1= o1.getFirstHash().getHexDigit(shift2);
+					int d2= o2.getFirstHash().getHexDigit(shift2);
+					return d1-d2;
+				}
+			};
+		};
+		return COMPARATORS[shift2];
+	}
+
+	// Used to promote a MapLeaf to a MapTree
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell> MapTree<K, V> create(MapEntry<K, V>[] newEntries, int shift) {
+	static <K extends ACell, V extends ACell> MapTree<K, V> create(MapEntry<K, V>[] newEntries) {
 		int n = newEntries.length;
 		if (n <= MapLeaf.MAX_ENTRIES) {
 			throw new IllegalArgumentException(
 					"Insufficient distinct entries for TreeMap construction: " + newEntries.length);
 		}
 
+		int shift=computeShift(newEntries);
 		// construct full child array
 		Ref<AHashMap<K, V>>[] children = new Ref[FANOUT];
 		for (int i = 0; i < n; i++) {
@@ -86,7 +132,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (ref == null) {
 				children[ix] = MapLeaf.create(e).getRef();
 			} else {
-				AHashMap<K, V> newChild=ref.getValue().assocEntry(e, shift + 1);
+				AHashMap<K, V> newChild=ref.getValue().assocEntry(e);
 				children[ix] = newChild.getRef();
 			}
 		}
@@ -99,7 +145,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 * @param es Entries
 	 * @return
 	 */
-	protected int computeShift(MapEntry<K,V>[] es) {
+	protected static <K extends ACell, V extends ACell> int computeShift(MapEntry<K,V>[] es) {
 		int shift=63; // max possible
 		Hash h=es[0].getKeyHash();
 		int n=es.length;
@@ -334,20 +380,20 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public MapTree<K, V> assoc(ACell key, ACell value) {
 		K k= (K)key;
 		Ref<K> keyRef = Ref.get(k);
-		return assocRef(keyRef, (V) value, shift);
+		return assocRef(keyRef, (V) value);
 	}
 
 	@Override
 	public MapTree<K, V> assocRef(Ref<K> keyRef, V value) {
-		return assocRef(keyRef, value, shift);
-	}
-
-	@Override
-	protected MapTree<K, V> assocRef(Ref<K> keyRef, V value, int shift) {
-		if (this.shift != shift) {
-			throw new Panic("Invalid shift!");
+		Hash kh= keyRef.getHash();
+		int shift= kh.commonHexPrefixLength(getFirstHash(), this.shift);
+		if (shift<this.shift) {
+			// branch at an earlier position
+			MapLeaf<K,V> newLeaf=MapLeaf.create(MapEntry.fromRefs(keyRef, Ref.get(value)));
+			return create(shift,newLeaf,this);
 		}
-		int digit = keyRef.getHash().getHexDigit(shift);
+		
+		int digit=kh.getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) {
 			// location not present, need to insert new child
@@ -356,19 +402,21 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		} else {
 			// child exists, so assoc in new ref at lower shift level
 			AHashMap<K, V> child = children[i].getValue();
-			AHashMap<K, V> newChild = child.assocRef(keyRef, value, shift + 1);
+			AHashMap<K, V> newChild = child.assocRef(keyRef, value);
 			return replaceChild(i, newChild.getRef());
 		}
 	}
 
 	@Override
 	public AHashMap<K, V> assocEntry(MapEntry<K, V> e) {
-		assert (this.shift == 0); // should never call this on a different shift
-		return assocEntry(e, 0);
-	}
+		Hash kh= e.getKeyHash();
+		int shift= kh.commonHexPrefixLength(getFirstHash(), this.shift);
+		if (shift<this.shift) {
+			// branch at an earlier position
+			MapLeaf<K,V> newLeaf=MapLeaf.create(e);
+			return create(shift,newLeaf,this);
+		}
 
-	@Override
-	public MapTree<K, V> assocEntry(MapEntry<K, V> e, int shift) {
 		assert (this.shift == shift); // should always be correct shift
 		Ref<K> keyRef = e.getKeyRef();
 		int digit = keyRef.getHash().getHexDigit(shift);
@@ -380,7 +428,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		} else {
 			// location needs update
 			AHashMap<K, V> child = children[i].getValue();
-			AHashMap<K, V> newChild = child.assocEntry(e, shift + 1);
+			AHashMap<K, V> newChild = child.assocEntry(e);
 			if (child == newChild) return this;
 			return replaceChild(i, newChild.getRef());
 		}
@@ -606,7 +654,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
-				result = result.assocEntry(e.withValue(value), shift);
+				result = result.assocEntry(e.withValue(value));
 			}
 		}
 		return result;
@@ -693,7 +741,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (value != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
-				result = result.assocEntry(e.withValue(value), shift);
+				result = result.assocEntry(e.withValue(value));
 			}
 		}
 		return result;
