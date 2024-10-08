@@ -91,7 +91,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			int digit=child.getFirstHash().getHexDigit(shift);
 			mask|=(1<<digit);
 		}
-		if (Integer.bitCount(shift)!=n) {
+		if (Integer.bitCount(mask&0xFFFF)!=n) {
 			throw new IllegalArgumentException("Children do not differ at specified digit");
 		}
 		return new MapTree<>(rs,shift,mask,count);

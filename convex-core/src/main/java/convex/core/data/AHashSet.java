@@ -81,12 +81,12 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		AHashSet<T> result=this;
 		long n=b.count();
 		for (long i=0; i<n; i++) {
-			result=result.excludeRef(b.getElementRef(i));
+			result=result.excludeHash(b.getElementRef(i).getHash());
 		}
 		return result;
 	}
 	
-	public abstract AHashSet<T> excludeRef(Ref<?> valueRef);
+	public abstract AHashSet<T> excludeHash(Hash hash);
 	
 	public abstract AHashSet<T> includeRef(Ref<T> ref) ;
 
@@ -98,7 +98,7 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 	
 	@Override
 	public ASet<T> exclude(ACell a) {
-		return excludeRef(Ref.get(a));
+		return excludeHash(Cells.getHash(a));
 	}
 	
 	@Override
@@ -142,8 +142,6 @@ public abstract class AHashSet<T extends ACell> extends ASet<T> {
 		if (ref==null) return null;
 		return ref.getValue();
 	}
-
-	protected abstract AHashSet<T> includeRef(Ref<T> e, int i);
 	
 	/**
 	 * Tests if this Set contains a given hash

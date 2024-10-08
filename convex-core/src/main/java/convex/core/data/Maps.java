@@ -154,6 +154,10 @@ public class Maps {
 	
 	public static int MAX_ENCODING_SIZE = Math.max(MapTree.MAX_ENCODING_LENGTH, MapLeaf.MAX_ENCODING_LENGTH);
 
+	public static <K extends ACell, V extends ACell> Hash getFirstHash(AHashMap<K, V> map) {
+		return map.getFirstHash();
+	}
+
 
 
 

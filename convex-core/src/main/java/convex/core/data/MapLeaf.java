@@ -752,6 +752,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	protected Hash getFirstHash() {
+		if (count==0) return null;
 		return entries[0].getKeyHash();
 	}
 

@@ -1,5 +1,8 @@
 package convex.core.data;
 
+import java.util.Arrays;
+import java.util.Comparator;
+
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.Panic;
@@ -72,13 +75,14 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 * @return New SetTree node
 	 */
 	@SuppressWarnings("unchecked")
-	public static <V extends ACell> SetTree<V> create(Ref<V>[] elementRefs, int shift) {
+	public static <V extends ACell> SetTree<V> create(Ref<V>[] elementRefs) {
 		int n = elementRefs.length;
 		if (n <= SetLeaf.MAX_ELEMENTS) {
 			throw new IllegalArgumentException(
 					"Insufficient distinct entries for TreeMap construction: " + elementRefs.length);
 		}
 
+		int shift=computeShift(elementRefs);
 		// construct full child array
 		Ref<AHashSet<V>>[] children = new Ref[16];
 		for (int i = 0; i < n; i++) {
@@ -88,11 +92,71 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			if (ref == null) {
 				children[ix] = SetLeaf.create(e).getRef();
 			} else {
-				AHashSet<V> newChild=ref.getValue().includeRef(e,shift+1);
+				AHashSet<V> newChild=ref.getValue().includeRef(e);
 				children[ix] = newChild.getRef();
 			}
 		}
 		return (SetTree<V>) createFull(children, shift);
+	}
+	
+	/**
+	 * Create MapTree with specific children at specified shift level
+	 * Children must branch at the given shift level
+	 */
+	@SafeVarargs
+	static <V extends ACell> SetTree<V> create(int shift, AHashSet<V> ... children) {
+		int n=children.length;
+		Arrays.sort(children,shiftComparator(shift));
+		@SuppressWarnings("unchecked")
+		Ref<AHashSet<V>>[] rs=new Ref[n];
+		long count=0;
+		short mask=0;
+		for (int i=0; i<n; i++) {
+			AHashSet<V> child=children[i];
+			rs[i]=Ref.get(child);
+			count+=child.count;
+			int digit=child.getFirstHash().getHexDigit(shift);
+			mask|=(1<<digit);
+		}
+		if (Integer.bitCount(mask&0xFFFF)!=n) {
+			throw new IllegalArgumentException("Children do not differ at specified digit");
+		}
+		return new SetTree<>(rs,shift,mask,count);
+	}
+	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	static Comparator<AHashSet>[] COMPARATORS=new Comparator[64];
+	
+	@SuppressWarnings("rawtypes")
+	private static Comparator<AHashSet> shiftComparator(int shift) {
+		if (COMPARATORS[shift]==null) {
+			COMPARATORS[shift]=new Comparator<AHashSet>() {
+				@Override
+				public int compare(AHashSet o1, AHashSet o2) {
+					int d1= o1.getFirstHash().getHexDigit(shift);
+					int d2= o2.getFirstHash().getHexDigit(shift);
+					return d1-d2;
+				}
+			};
+		};
+		return COMPARATORS[shift];
+	}
+	
+	
+	/**
+	 * Computes the common shift for a vector of entries.
+	 * This is the shift at which the first split occurs, i.e length of common prefix
+	 * @param es Entries
+	 * @return
+	 */
+	protected static <V extends ACell> int computeShift(Ref<V>[] es) {
+		int shift=63; // max possible
+		Hash h=es[0].getHash();
+		int n=es.length;
+		for (int i=1; i<n; i++) {
+			shift=Math.min(shift, h.commonHexPrefixLength(es[i].getHash(),shift));
+		}
+		return shift;
 	}
 
 	/**
@@ -200,21 +264,20 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		return children[i].getValue().getRefByHash(hash);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public AHashSet<T> exclude(ACell key) {
-		return excludeRef((Ref<T>) Ref.get(key));
+		return excludeHash(Cells.getHash(key));
 	}
 
 	@Override
-	public AHashSet<T> excludeRef(Ref<?> keyRef) {
-		int digit = keyRef.getHash().getHexDigit(shift);
+	public AHashSet<T> excludeHash(Hash hash) {
+		int digit =hash.getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return this; // not present
 
 		// dissoc entry from child
 		AHashSet<T> child = children[i].getValue();
-		AHashSet<T> newChild = child.excludeRef(keyRef);
+		AHashSet<T> newChild = child.excludeHash(hash);
 		if (child == newChild) return this; // no removal, no change
 
 		AHashSet<T> result=(newChild.isEmpty())?dissocChild(i):replaceChild(i, newChild.getRef());
@@ -242,6 +305,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@SuppressWarnings("unchecked")
 	private AHashSet<T> dissocChild(int i) {
 		int bsize = children.length;
+		if (bsize==2) {
+			// can just return the remaining child
+			return children[1-i].getValue();
+		}
 		AHashSet<T> child = children[i].getValue();
 		Ref<AHashSet<T>>[] newBlocks = (Ref<AHashSet<T>>[]) new Ref<?>[bsize - 1];
 		System.arraycopy(children, 0, newBlocks, 0, i);
@@ -297,14 +364,21 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public SetTree<T> include(ACell value) {
 		Ref<T> keyRef = (Ref<T>) Ref.get(value);
-		return includeRef(keyRef, shift);
+		return includeRef(keyRef);
 	}
 
+	
 	@Override
-	protected SetTree<T> includeRef(Ref<T> e, int shift) {
-		if (this.shift != shift) {
-			throw new Error("Invalid shift!");
+	public SetTree<T> includeRef(Ref<T> e)  {
+		Hash kh= e.getHash();
+		int cshift= kh.commonHexPrefixLength(getFirstHash(), Hash.HEX_LENGTH);
+		
+		if (cshift<shift) {
+			// branch at an earlier position
+			SetLeaf<T> newLeaf=SetLeaf.create(e);
+			return create(cshift,newLeaf,this);			
 		}
+		
 		Ref<T> keyRef = e;
 		int digit = keyRef.getHash().getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
@@ -315,15 +389,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		} else {
 			// location needs update
 			AHashSet<T> child = children[i].getValue();
-			AHashSet<T> newChild = child.includeRef(e, shift + 1);
+			AHashSet<T> newChild = child.includeRef(e);
 			if (child == newChild) return this;
 			return (SetTree<T>) replaceChild(i, newChild.getRef());
 		}
-	}
-	
-	@Override
-	public AHashSet<T> includeRef(Ref<T> ref) {
-		return includeRef(ref,shift);
 	}
 
 	@Override
@@ -514,7 +583,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			if (newE != null) {
 				// include only new keys where function result is not null. Re-use existing
 				// entry if possible.
-				result = result.includeRef(newE, shift);
+				result = result.includeRef(newE);
 			}
 		}
 		return result;
@@ -575,7 +644,7 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 		Hash firstHash;
 		try {
-			firstHash=getElementRef(0).getHash();
+			firstHash=getFirstHash();
 		} catch (ClassCastException e) {
 			throw new InvalidDataException("Bad child type:" +e.getMessage(), this);
 		}
@@ -600,9 +669,8 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			
 			if (child instanceof SetTree) {
 				SetTree<T> childTree=(SetTree<T>) child;
-				int expectedShift=shift+1;
-				if (childTree.shift!=expectedShift) {
-					throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected ["+expectedShift+"]",this);
+				if (childTree.shift<=shift) {
+					throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected greater than ["+shift+"]",this);
 				}
 			}
 			
@@ -624,7 +692,10 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 
 	private boolean isValidStructure() {
 		if (count <= SetLeaf.MAX_ELEMENTS) return false;
-		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
+		int n=children.length;
+		if (n<2) return false;
+		
+		if (n != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
 			Ref<AHashSet<T>> child = children[i];
 			if (child == null) return false;
@@ -729,6 +800,15 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 			cstart=cend;
 		}
 		return result;
+	}
+
+	// Cache of first hash, we don't want to descend tree repeatedly to find this
+	private Hash firstHash;
+	
+	@Override
+	protected Hash getFirstHash() {
+		if (firstHash==null) firstHash=children[0].getValue().getFirstHash();
+		return firstHash;
 	}
 
 }

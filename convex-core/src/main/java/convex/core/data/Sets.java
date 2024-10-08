@@ -108,7 +108,7 @@ public class Sets {
 	public static <T extends ACell> AHashSet<T> createWithShift(int shift, ArrayList<Ref<T>> values) {
 		AHashSet<T> result=Sets.empty();
 		for (Ref<T> v: values) {
-			result=result.includeRef(v, shift);
+			result=result.includeRef(v);
 		}
 		return result;
 	}

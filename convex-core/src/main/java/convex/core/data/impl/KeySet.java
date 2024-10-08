@@ -7,6 +7,7 @@ import convex.core.data.AHashSet;
 import convex.core.data.ASet;
 import convex.core.data.Hash;
 import convex.core.data.MapEntry;
+import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
@@ -154,6 +155,12 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	@Override
 	public int getRefCount() {
 		throw new UnsupportedOperationException();
+	}
+
+	@Override
+	protected Hash getFirstHash() {
+		// TODO Auto-generated method stub
+		return Maps.getFirstHash(map);
 	}
 
 }

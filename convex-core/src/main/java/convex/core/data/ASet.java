@@ -52,6 +52,12 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	public abstract ASet<T> exclude(ACell a) ;
 	
 	/**
+	 * Gets the Hash of teh first element in this set
+	 * @return
+	 */
+	protected abstract Hash getFirstHash();
+	
+	/**
 	 * Updates the set to include all the given elements.
 	 * Can be used to implement union of sets
 	 * 

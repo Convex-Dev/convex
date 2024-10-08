@@ -179,8 +179,8 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	public SetLeaf<T> excludeRef(Ref<?> key) {
-		int i = seekKeyRef(key.getHash());
+	public SetLeaf<T> excludeHash(Hash hash) {
+		int i = seekKeyRef(hash);
 		if (i < 0) return this; // not found
 		return excludeAt(i);
 	}
@@ -544,12 +544,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	}
 
 	@Override
-	public AHashSet<T> includeRef(Ref<T> ref) {
-		return includeRef(ref,0);
-	}
-
-	@Override
-	protected AHashSet<T> includeRef(Ref<T> e, int shift) {
+	public AHashSet<T> includeRef(Ref<T> e) {
 		int n=elements.length;
 		Hash h=e.getHash();
 		int pos=0;
@@ -573,7 +568,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		} else {
 			// Maximum size exceeded, so need to expand to tree. 
 			// Shift required since this might not be the tree root!
-			return SetTree.create(newEntries, shift);
+			return SetTree.create(newEntries);
 		}
 	}
 
@@ -593,7 +588,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override
 	public AHashSet<T> toCanonical() {
 		if (count<=MAX_ELEMENTS) return this;
-		return SetTree.create(elements, 0);
+		return SetTree.create(elements);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -607,6 +602,12 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 		Ref<T>[] nrefs=new Ref[n];
 		System.arraycopy(elements, (int) start, nrefs, 0, n);
 		return new SetLeaf<T>(nrefs);
+	}
+
+	@Override
+	protected Hash getFirstHash() {
+		if (count==0) return null;
+		return elements[0].getHash();
 	}
 
 
