@@ -46,9 +46,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	 */
 	private final short mask;
 
-	private MapTree(Ref<AHashMap<K, V>>[] blocks, int shift, short mask, long count) {
+	private MapTree(Ref<AHashMap<K, V>>[] children, int shift, short mask, long count) {
 		super(count);
-		this.children = blocks;
+		this.children = children;
 		this.shift = shift;
 		this.mask = mask;
 	}
@@ -96,21 +96,21 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	static Comparator<AHashMap>[] COMPARATORS=new Comparator[63];
+	static Comparator<AHashMap>[] COMPARATORS=new Comparator[64];
 	
 	@SuppressWarnings("rawtypes")
-	private static Comparator<AHashMap> shiftComparator(int shift2) {
-		if (COMPARATORS[shift2]==null) {
-			COMPARATORS[shift2]=new Comparator<AHashMap>() {
+	private static Comparator<AHashMap> shiftComparator(int shift) {
+		if (COMPARATORS[shift]==null) {
+			COMPARATORS[shift]=new Comparator<AHashMap>() {
 				@Override
 				public int compare(AHashMap o1, AHashMap o2) {
-					int d1= o1.getFirstHash().getHexDigit(shift2);
-					int d2= o2.getFirstHash().getHexDigit(shift2);
+					int d1= o1.getFirstHash().getHexDigit(shift);
+					int d2= o2.getFirstHash().getHexDigit(shift);
 					return d1-d2;
 				}
 			};
 		};
-		return COMPARATORS[shift2];
+		return COMPARATORS[shift];
 	}
 
 	// Used to promote a MapLeaf to a MapTree
@@ -323,13 +323,17 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@SuppressWarnings("unchecked")
 	private AHashMap<K, V> dissocChild(int i) {
 		int bsize = children.length;
+		if (bsize==2) {
+			// just return other child!
+			return children[1-i].getValue();
+		}
 		AHashMap<K, V> child = children[i].getValue();
-		Ref<AHashMap<K, V>>[] newBlocks = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize - 1];
-		System.arraycopy(children, 0, newBlocks, 0, i);
-		System.arraycopy(children, i + 1, newBlocks, i, bsize - i - 1);
+		Ref<AHashMap<K, V>>[] newChildren = (Ref<AHashMap<K, V>>[]) new Ref<?>[bsize - 1];
+		System.arraycopy(children, 0, newChildren, 0, i);
+		System.arraycopy(children, i + 1, newChildren, i, bsize - i - 1);
 		short newMask = (short) (mask & (~(1 << digitForIndex(i, mask))));
 		long newCount = count - child.count();
-		return create(newBlocks, shift, newMask, newCount);
+		return create(newChildren, shift, newMask, newCount);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -827,16 +831,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		
-		// Perform full tree validation with prefix if this is a top level element
-		if (isCVMValue()) validateWithPrefix("");
+		// Perform child validation
+		validateWithPrefix(getFirstHash(),shift);
 	}
 
 	@Override
-	protected void validateWithPrefix(String prefix) throws InvalidDataException {
+	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
 		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
-		if (shift != prefix.length()) {
-			throw new InvalidDataException("Invalid prefix [" + prefix + "] for MapTree with shift=" + shift, this);
-		}
 		int bsize = children.length;
 
 		long childCount=0;;
@@ -855,7 +856,16 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
 						this);
 			int d = digitForIndex(i, mask);
-			child.validateWithPrefix(prefix + Utils.toHexChar(d));
+			Hash ch=child.getFirstHash();
+			if (ch.getHexDigit(shift)!=d) {
+				throw new InvalidDataException("Wrong child digit at position "+i,this);
+			}
+			if (prefix.commonHexPrefixLength(ch, Hash.HEX_LENGTH)<shift) {
+				throw new InvalidDataException("Inconsistent child at position "+i,this);
+			}
+			if (child instanceof MapLeaf) {
+				child.validateWithPrefix(ch, shift+1);
+			}
 			
 			childCount += child.count();
 		}

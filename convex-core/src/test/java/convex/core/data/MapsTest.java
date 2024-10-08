@@ -276,6 +276,15 @@ public class MapsTest {
 		assertNull(m.slice(4,3));
 	}
 	
+	@SuppressWarnings("unchecked")
+	@Test 
+	public void testBigMapChild() {
+		MapTree<CVMLong,CVMLong> bm=(MapTree<CVMLong,CVMLong>)Samples.LONG_MAP_100;
+		AHashMap<CVMLong,CVMLong> cm=(AHashMap<CVMLong, CVMLong>) bm.getRef(0).getValue();
+		doHashMapTest(cm);
+	}
+
+	
 	@Test 
 	public void testBigMapSlice() {
 
@@ -410,6 +419,7 @@ public class MapsTest {
 			MapEntry<K, V> firstEntry = m.entryAt(0);
 			K firstKey=firstEntry.getKey();
 			assertEquals(firstEntry,m.getEntryByHash(Hash.get(firstKey)));
+			assertEquals(m,m.assocEntry(firstEntry));
 			
 			// Test a smaller version of this map
 			AHashMap<K, V> smaller = m.dissoc(firstKey);

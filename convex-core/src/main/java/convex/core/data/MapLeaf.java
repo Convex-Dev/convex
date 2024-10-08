@@ -656,12 +656,12 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void validateWithPrefix(String prefix) throws InvalidDataException {
+	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
 		validate();
 		for (int i = 0; i < entries.length; i++) {
 			MapEntry<K, V> e = entries[i];
-			Hash h = e.getKeyRef().getHash();
-			if (!h.toHexString().startsWith(prefix)) {
+			Hash h = e.getKeyHash();
+			if (h.commonHexPrefixLength(prefix,shift)<shift) {
 				throw new InvalidDataException("Prefix " + prefix + " invalid for map entry: " + e + " with hash: " + h,
 						this);
 			}

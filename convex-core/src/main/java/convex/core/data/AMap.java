@@ -40,24 +40,6 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	}
 
 	/**
-	 * Gets the values from this map, in map-determined order
-	 */
-	@Override
-	public AVector<V> values() {
-		int len = size();
-		ArrayList<V> al = new ArrayList<V>(len);
-		accumulateValues(al);
-		return Vectors.create(al);
-	}
-	
-	// TODO: Review plausible alternative implementation for values()
-	//
-	//	@Override
-	//	public AVector<V> values() {
-	//		return reduceValues((v,e)->((AVector<V>)v).append(e), Vectors.empty());
-	//	}
-	
-	/**
 	 * Associates the given key with the specified value.
 	 * 
 	 * @param key Map key to associate
@@ -367,5 +349,17 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		}
 		return Vectors.wrap(keys);
 	}
+	
+	/**
+	 * Gets the values from this map, in map-determined order
+	 */
+	@Override
+	public AVector<V> values() {
+		int len = size();
+		ArrayList<V> al = new ArrayList<V>(len);
+		accumulateValues(al);
+		return Vectors.create(al);
+	}
+	
 
 }

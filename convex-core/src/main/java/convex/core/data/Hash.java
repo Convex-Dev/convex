@@ -24,6 +24,7 @@ public class Hash extends AArrayBlob {
 	 * Standard length of a Hash in bytes
 	 */
 	public static final int LENGTH = Constants.HASH_LENGTH;
+	public static final int HEX_LENGTH = LENGTH*2;
 	
 	private Hash(byte[] hashBytes, int offset) {
 		super(hashBytes, offset, LENGTH);
