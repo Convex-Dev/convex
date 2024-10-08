@@ -404,6 +404,8 @@ public class Utils {
 	 */
 	public static int compareByteArrays(byte[] a, int aOffset, byte[] b, int bOffset, int length) {
 		for (int i = 0; i < length; i++) {
+			// This is essentially the same as Byte.compareUnsigned()
+			// except we want 1 and -1 consistently
 			int ai = 0xFF & a[aOffset + i];
 			int bi = 0xFF & b[bOffset + i];
 			if (ai < bi) return -1;

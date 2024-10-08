@@ -412,6 +412,22 @@ public class BlobsTest {
 		assertTrue(Samples.MAX_EMBEDDED_BLOB.isEmbedded());
 		assertFalse(Samples.FULL_BLOB.isEmbedded());
 	}
+	
+	@Test
+	public void testHexMatch() {
+		assertEquals(3,Blob.fromHex("1234").hexMatch(Blob.fromHex("123fff")));
+		assertEquals(0,Blob.fromHex("").hexMatch(Blob.fromHex("123fff")));
+		assertEquals(0,Blob.fromHex("1234").hexMatch(Blob.fromHex("")));
+		assertEquals(6,Blob.fromHex("123456").hexMatch(Blob.fromHex("123456")));
+
+		// checking correct handling of max parameter
+		Blob b=Blob.fromHex("123456");
+		assertEquals(6,b.commonHexPrefixLength(b,1000));
+		assertEquals(5,b.commonHexPrefixLength(b,5));
+		assertEquals(3,b.commonHexPrefixLength(b,3));
+		assertEquals(2,b.commonHexPrefixLength(b,2));
+		assertEquals(0,b.commonHexPrefixLength(b,0));
+	}
 
 	@Test
 	public void testBigBlob() throws InvalidDataException, BadFormatException, IOException {

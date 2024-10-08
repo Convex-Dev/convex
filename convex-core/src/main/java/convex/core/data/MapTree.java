@@ -92,6 +92,22 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		return (MapTree<K, V>) createFull(children, shift);
 	}
+	
+	/**
+	 * Computes the common shift for a vector of entries.
+	 * This is the shift at which the first split occurs, i.e length of common prefix
+	 * @param es Entries
+	 * @return
+	 */
+	protected int computeShift(MapEntry<K,V>[] es) {
+		int shift=63; // max possible
+		Hash h=es[0].getKeyHash();
+		int n=es.length;
+		for (int i=1; i<n; i++) {
+			shift=Math.min(shift, h.commonHexPrefixLength(es[i].getKeyHash(),shift));
+		}
+		return shift;
+	}
 
 	/**
 	 * Creates a Tree map given child refs for each digit

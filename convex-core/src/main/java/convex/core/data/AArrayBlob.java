@@ -326,6 +326,9 @@ public abstract class AArrayBlob extends ABlob {
 	@Override
 	public long hexMatch(ABlobLike<?> b) {
 		if (b == this) return count() * 2;
+		if (b instanceof AArrayBlob) {
+			return commonHexPrefixLength((AArrayBlob)b,(int)count*2);
+		}
 
 		long max = Math.min(count(), b.count());
 		for (long i = 0; i < max; i++) {
@@ -334,6 +337,21 @@ public abstract class AArrayBlob extends ABlob {
 			if (ai != bi) return (i * 2) + (Utils.firstDigitMatch(ai, bi) ? 1 : 0);
 		}
 		return max * 2;
+	}
+	
+	/**
+	 * Computes the common hex prefix length with another AArrayBlob, up to max
+	 */
+	public int commonHexPrefixLength(AArrayBlob b, int max) {
+		max=Math.min(max, (int)count*2);
+		max=Math.min(max, (int)(b.count)*2);
+		int blen=(max+1)/2; // number of bytes to check
+		int ix=Arrays.mismatch(store, offset, offset+blen,b.store,b.offset,b.offset+blen);
+		if (ix<0) return max; // no difference up to max
+		byte ai = byteAtUnchecked(ix);
+		byte bi = b.byteAtUnchecked(ix);
+		if (Utils.firstDigitMatch(ai, bi)) return ix*2+1;
+		return ix*2;
 	}
 
 	@Override

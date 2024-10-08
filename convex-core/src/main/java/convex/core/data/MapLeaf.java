@@ -43,7 +43,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	/**
-	 * Creates a ListMap with the specified entries. Entries must have distinct keys
+	 * Creates a MapLeaf with the specified entries. Entries must have distinct keys
 	 * but may otherwise be specified in any order.
 	 * 
 	 * Null entries are ignored/removed.
