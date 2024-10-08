@@ -758,4 +758,9 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return new MapLeaf<K,V>(nrefs);
 	}
 
+	@Override
+	protected Hash getFirstHash() {
+		return entries[0].getKeyHash();
+	}
+
 }

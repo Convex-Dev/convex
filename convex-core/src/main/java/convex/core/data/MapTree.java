@@ -933,5 +933,14 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return true;
 	}
 
+	// Cache of first hash, we don't want to descend tree repeatedly to find this
+	private Hash firstHash;
+	
+	@Override
+	protected Hash getFirstHash() {
+		if (firstHash==null) firstHash=children[0].getValue().getFirstHash();
+		return firstHash;
+	}
+
 
 }

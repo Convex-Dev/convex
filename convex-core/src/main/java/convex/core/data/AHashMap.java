@@ -175,6 +175,12 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		return Vectors.wrap(keys);
 	}
 	
+	/**
+	 * Gets the Hash for the first entry. Useful for prefix comparisons etc.
+	 * @return
+	 */
+	protected abstract Hash getFirstHash();
+	
 	@Override
 	public HashSet<Entry<K, V>> entrySet() {
 		int len = size();
