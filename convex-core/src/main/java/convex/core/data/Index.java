@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -283,9 +284,9 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	}
 
 	@Override
-	protected void accumulateEntrySet(Set<Entry<K, V>> h) {
+	protected void accumulateEntries(Collection<Entry<K, V>> h) {
 		for (int i = 0; i < children.length; i++) {
-			children[i].getValue().accumulateEntrySet(h);
+			children[i].getValue().accumulateEntries(h);
 		}
 		if (entry != null) h.add(entry);
 	}

@@ -1,6 +1,8 @@
 package convex.core.data;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -100,11 +102,11 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public abstract MapEntry<K, V> getKeyRefEntry(Ref<ACell> ref);
 
 	/**
-	 * Accumulate all entries from this map in the given mutable Set.
+	 * Accumulate all entries from this map in the given collection
 	 * 
 	 * @param h HashSet in which to accumulate entries
 	 */
-	protected abstract void accumulateEntrySet(Set<Entry<K, V>> h);
+	protected abstract void accumulateEntries(Collection<Entry<K, V>> h);
 
 	/**
 	 * Accumulate all keys from this map in the given mutable Set.
@@ -265,6 +267,14 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	public Set<K> keySet() {
 		ASet<K> ks=reduceEntries((s,me)->s.conj(me.getKey()), (ASet<K>)(Sets.empty()));
 		return ks;
+	}
+	
+	@Override
+	public Set<Entry<K, V>> entrySet() {
+		int len = size();
+		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
+		accumulateEntries(h);
+		return h;
 	}
 	
 	/**

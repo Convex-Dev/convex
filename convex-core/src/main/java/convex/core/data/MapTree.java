@@ -1,6 +1,8 @@
 package convex.core.data;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
@@ -289,29 +291,33 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return children[i].getValue().getEntryByHash(hash);
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	public AHashMap<K, V> dissoc(ACell key) {
-		return dissocRef((Ref<K>) Ref.get(key));
+		return dissocHash(Cells.getHash(key));
 	}
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public AHashMap<K, V> dissocRef(Ref<K> keyRef) {
-		int digit = keyRef.getHash().getHexDigit(shift);
+	public AHashMap<K, V> dissocHash(Hash keyHash) {
+		int digit = keyHash.getHexDigit(shift);
 		int i = Bits.indexForDigit(digit, mask);
 		if (i < 0) return this; // not present
 
 		// dissoc entry from child
 		AHashMap<K, V> child = children[i].getValue();
-		AHashMap<K, V> newChild = child.dissocRef(keyRef);
+		AHashMap<K, V> newChild = child.dissocHash(keyHash);
 		if (child == newChild) return this; // no removal, no change
 
 		if (count - 1 == MapLeaf.MAX_ENTRIES) {
 			// reduce to a ListMap
-			HashSet<Entry<K, V>> eset = entrySet();
-			boolean removed = eset.removeIf(e -> Utils.equals(((MapEntry<K, V>) e).getKeyRef(), keyRef));
-			if (!removed) throw new Panic("Expected to remove at least one entry!");
+			ArrayList<Entry<K, V>> eset = new ArrayList<>();
+			for (int j=0; j<children.length; j++) {
+				AHashMap<K, V> c = (i==j)?newChild:children[j].getValue();
+				c.accumulateEntries(eset);
+			}
+			if (!(eset.size()==MapLeaf.MAX_ENTRIES)) {
+				throw new Panic("Expected to remove at least one entry!");
+			}
 			return MapLeaf.create(eset.toArray((MapEntry<K, V>[]) MapLeaf.EMPTY_ENTRIES));
 		} else {
 			// replace child
@@ -461,9 +467,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void accumulateEntrySet(Set<Entry<K, V>> h) {
+	protected void accumulateEntries(Collection<Entry<K, V>> h) {
 		for (Ref<AHashMap<K, V>> mr : children) {
-			mr.getValue().accumulateEntrySet(h);
+			mr.getValue().accumulateEntries(h);
 		}
 	}
 
@@ -839,6 +845,9 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	protected void validateWithPrefix(Hash prefix, int shift) throws InvalidDataException {
 		if (mask == 0) throw new InvalidDataException("TreeMap must have children!", this);
 		int bsize = children.length;
+		if (bsize<2) {
+			throw new InvalidDataException("Non-canonical MapTree with child count "+bsize,this);
+		}
 
 		long childCount=0;;
 		for (int i = 0; i < bsize; i++) {
@@ -848,7 +857,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			ACell o = children[i].getValue();
 			if (!(o instanceof AHashMap)) {
 				throw new InvalidDataException(
-						"Expected map child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
+						"Expected AHashMap child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
 			}
 			@SuppressWarnings("unchecked")
 			AHashMap<K, V> child = (AHashMap<K, V>) o;

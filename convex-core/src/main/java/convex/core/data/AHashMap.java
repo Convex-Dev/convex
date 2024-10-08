@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.util.HashSet;
-import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -20,22 +18,22 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		return Maps.empty();
 	}
 
-	/**
-	 * Dissoc given a Ref to the key value.
-	 * @param key Ref of key to remove
-	 * @return Map with specified key removed.
-	 */
-	public abstract AHashMap<K, V> dissocRef(Ref<K> key);
-
-	public abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value);
-
 	@Override
 	public abstract AHashMap<K, V> assoc(ACell key, ACell value);
+	
+	public abstract AHashMap<K, V> assocRef(Ref<K> keyRef, V value);
+
+	public abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e);
 
 	@Override
 	public abstract AHashMap<K, V> dissoc(ACell key);
-
-	public abstract AHashMap<K, V> assocEntry(MapEntry<K, V> e);
+	
+	/**
+	 * Dissoc given a Hash for the key value.
+	 * @param key Hash of key to remove
+	 * @return Map with specified key removed.
+	 */
+	public abstract AHashMap<K, V> dissocHash(Hash key);
 
 	/**
 	 * Merge another map into this map. Replaces existing entries if they are
@@ -170,14 +168,6 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 * @return
 	 */
 	protected abstract Hash getFirstHash();
-	
-	@Override
-	public HashSet<Entry<K, V>> entrySet() {
-		int len = size();
-		HashSet<Map.Entry<K, V>> h = new HashSet<Map.Entry<K, V>>(len);
-		accumulateEntrySet(h);
-		return h;
-	}
 	
 	@Override
 	public AHashMap<K,V> slice(long start) {

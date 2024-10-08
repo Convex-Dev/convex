@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -161,10 +162,10 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		return -1;
 	}
 
-	private int seekKeyRef(Ref<K> key) {
+	private int seekKeyRef(Hash keyHash) {
 		int len = size();
 		for (int i = 0; i < len; i++) {
-			if (Utils.equals(key, entries[i].getKeyRef())) return i;
+			if (Utils.equals(keyHash, entries[i].getKeyHash())) return i;
 		}
 		return -1;
 	}
@@ -178,7 +179,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	public MapLeaf<K, V> dissocRef(Ref<K> key) {
+	public MapLeaf<K, V> dissocHash(Hash key) {
 		int i = seekKeyRef(key);
 		if (i < 0) return this; // not found
 		return dissocEntry(i);
@@ -300,7 +301,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	}
 
 	@Override
-	protected void accumulateEntrySet(Set<Entry<K, V>> h) {
+	protected void accumulateEntries(Collection<Entry<K, V>> h) {
 		for (int i = 0; i < entries.length; i++) {
 			MapEntry<K, V> me = entries[i];
 			h.add(me);

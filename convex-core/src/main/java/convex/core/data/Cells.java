@@ -195,7 +195,8 @@ public class Cells {
 	 */
 	public static Hash getHash(ACell a) {
 		if (a==null) return Hash.NULL_HASH;
-		return a.getHash();
+		// this picks up a hash in the Ref if available, otherwise populates it for future use
+		return a.getRef().getHash(); 
 	}
 
 	public static Blob getEncoding(ACell a) {

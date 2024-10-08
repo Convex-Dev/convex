@@ -287,8 +287,6 @@ public class MapsTest {
 	
 	@Test 
 	public void testBigMapSlice() {
-
-		
 		AHashMap<CVMLong,CVMLong> bm=Samples.LONG_MAP_100;
 		AHashMap<CVMLong,CVMLong> bm1=bm.slice(0,18);
 		assertEquals(18,bm1.count());

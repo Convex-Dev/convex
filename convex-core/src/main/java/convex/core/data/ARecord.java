@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Collection;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -153,7 +154,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	protected void accumulateEntrySet(Set<Entry<Keyword, ACell>> h) {
+	protected void accumulateEntries(Collection<Entry<Keyword, ACell>> h) {
 		for (long i=0; i<count; i++) {
 			h.add(entryAt(i));
 		}
