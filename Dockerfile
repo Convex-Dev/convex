@@ -27,5 +27,5 @@ EXPOSE 443
 VOLUME ["/etc/ssl/certs"]
 VOLUME ["/etc/convex/keystore"]
 
-ENTRYPOINT ["java", "-jar", "convex.jar", "local", "start"]
+ENTRYPOINT ["java", "-jar", "convex.jar", "peer", "start"]
 

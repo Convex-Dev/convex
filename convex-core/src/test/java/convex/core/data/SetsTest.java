@@ -16,6 +16,9 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.test.Samples;
 
+/**
+ * Tests for general set behaviour and logic
+ */
 public class SetsTest {
 
 	@Test
@@ -23,6 +26,8 @@ public class SetsTest {
 		ASet<ACell> e = Sets.empty();
 		assertEquals(0, e.size());
 		assertFalse(e.contains(null));
+		assertSame(e,Sets.create(Vectors.empty()));
+		assertSame(e,Sets.of(1).exclude(CVMLong.ONE));
 	}
 
 	@Test
@@ -35,11 +40,15 @@ public class SetsTest {
 		assertEquals("#{1}", s.toString());
 		s = s.include(RT.cvm(2L));
 		assertEquals("#{2,1}", s.toString());
+		assertSame(s,s.exclude(null));
+		
 		s = s.exclude(RT.cvm(1L));
 		assertEquals("#{2}", s.toString());
 		s = s.exclude(RT.cvm(2L));
-		assertTrue(s.isEmpty());
-		assertSame(s, Sets.empty());
+		assertSame(Sets.empty(),s);
+		
+		s = s.exclude(RT.cvm(2L));
+		assertSame(Sets.empty(),s);
 	}
 	
 	@Test 
@@ -47,6 +56,7 @@ public class SetsTest {
 		// Set should be encoded as a map with different tag and extra value Ref(s)
 		ASet<?> s=Sets.of(123);
 		AMap<?,?> m=Maps.of(123,null);
+		// compare encodings ignoring tag
 		assertEquals(m.getEncoding().slice(1),s.getEncoding().append(Blob.SINGLE_ZERO).slice(1));
 	}
 
@@ -139,6 +149,14 @@ public class SetsTest {
 		assertSame(a, a.includeAll(Sets.of(1L, 3L)));
 	}
 	
+	@Test 
+	public void testNilMembership() {
+		ASet<CVMLong> a = Sets.of(1, 2, 3, null);
+		assertTrue(a.containsKey(null));
+		a=a.exclude(null);
+		assertEquals(3,a.size());
+	}
+	
 	@Test
 	public void testIntersection() {
 		ASet<CVMLong> a = Sets.of(1, 2, 3);
@@ -184,10 +202,16 @@ public class SetsTest {
 		ObjectsTest.doEqualityTests(s,s1.includeAll(s2).includeAll(s3));
 	}
 
+	@SuppressWarnings("unchecked")
 	@Test
 	public void testBigMerging() {
 		ASet<CVMLong> s = Sets.create(Samples.INT_VECTOR_300);
+		assertEquals(0,((SetTree<CVMLong>)s).shift);
 		SetsTest.doSetTests(s);
+		
+		SetTree<CVMLong> child=(SetTree<CVMLong>)(s.getRef(1).getValue());
+		assertEquals(1,child.shift);
+		SetsTest.doSetTests(child);
 
 		ASet<CVMLong> s2 = s.includeAll(Sets.of(1, 2, 3, 100));
 		assertEquals(s, s2);
@@ -231,6 +255,29 @@ public class SetsTest {
 		}
 		
 		doSetTests(set);
+
+		// now build the same set in hash order
+		ASet<CVMLong> set2=Sets.empty();
+		for (int i=0; i<320; i++) {
+			assertEquals(i,set2.size());
+			
+			// extend set with one new element
+			CVMLong v=set.get(i);
+			set2=set2.conj(v);
+		}
+		assertEquals(set2,set);
+		doSetTests(set); // check nothing is odd
+		
+		// now deconstruct the set in hash order
+		ASet<CVMLong> set3=set2;
+		for (int i=0; i<320; i++) {
+			assertEquals(320-i,set3.size());
+			
+			// extend set with one new element
+			CVMLong v=set.get(i);
+			set3=set3.exclude(v);
+		}
+		assertSame(Sets.EMPTY,set3);
 	}
 	
 	/**

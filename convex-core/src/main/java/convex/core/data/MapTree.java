@@ -13,6 +13,7 @@ import java.util.function.Function;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.TODOException;
+import convex.core.lang.RT;
 import convex.core.exceptions.Panic;
 import convex.core.util.Bits;
 import convex.core.util.MergeFunction;
@@ -859,8 +860,10 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 				throw new InvalidDataException(
 						"Expected AHashMap child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)), this);
 			}
-			@SuppressWarnings("unchecked")
-			AHashMap<K, V> child = (AHashMap<K, V>) o;
+			AHashMap<K, V> child = RT.ensureHashMap(o);
+			if (child==null) {
+				throw new InvalidDataException("Non-hashmap child at position "+i,this);
+			}
 			if (child.isEmpty())
 				throw new InvalidDataException("Empty child at " + prefix + Utils.toHexChar(digitForIndex(i, mask)),
 						this);

@@ -11,10 +11,13 @@ import convex.cli.CLIError;
 import convex.cli.ExitCodes;
 import convex.cli.mixins.RemotePeerMixin;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.State;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.init.Init;
 import convex.etch.EtchStore;
 import convex.peer.API;
 import convex.peer.ConfigException;
@@ -56,12 +59,18 @@ public class PeerStart extends APeerCommand {
 			description = "Port number for the peer. Default is ${DEFAULT-VALUE}. If set to 0, will choose a random port.")
 	private int port = 0;
 
-	@Option(names = { "--url" }, description = "URL for the peer to publish. If not provided, the peer will have no public URL.")
+	@Option(names = { "--url" }, 
+			description = "URL for the peer to publish. If not provided, the peer will have no public URL.")
 	private String url;
 	
 	@Option(names = { "--norest" }, description = "Disable REST srever.")
 	private boolean norest;
 	
+	@Option(names = { "--genesis" }, 
+			defaultValue = "${env:CONVEX_GENESIS_SEED}",
+			description = "Governance seed for network genesis. For testing use only.")
+	private String genesis;
+
 	@Option(names = { "--api-port" }, 
 			defaultValue = "8080",
 			description = "Port for REST API.")
@@ -115,15 +124,25 @@ public class PeerStart extends APeerCommand {
 		
 		storeMixin.ensureKeyStore();
 		try (EtchStore store = etchMixin.getEtchStore()) {
-			
-			AKeyPair peerKey=findPeerKey(store);
-			if (peerKey==null) {
-				informWarning("No --peer-key specified or inferred from Etch Store "+store);
-				showUsage();
-				return;
+			AKeyPair peerKey;
+			AKeyPair genesisKey=null;
+			if (genesis!=null&&(!genesis.isEmpty())) {
+				paranoia("Should't use Genesis Seed in strict security mode! Consider key compromised!");
+				Blob seed=Blob.parse(genesis);
+				if (seed.count()!=32) {
+					throw new CLIError("Genesis seed must be 32 byte hex blob");
+				}
+				peerKey = AKeyPair.create(seed);
+				genesisKey=peerKey;
+				informWarning("Using test genesis seed: "+seed);
+			} else {
+				peerKey=findPeerKey(store);
+				if (peerKey==null) {
+					informWarning("No --peer-key specified or inferred from Etch Store "+store);
+					showUsage();
+					return;
+				}
 			}
-			
-			inform("Preparing to start peer: "+peerKey.getAccountKey());
 
 			Address controller=Address.parse(controllerAddress);
 			if (controller==null) {
@@ -136,6 +155,12 @@ public class PeerStart extends APeerCommand {
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
+				if (genesisKey!=null) {
+					AccountKey gpk=genesisKey.getAccountKey();
+					State state=Init.createState(gpk,gpk,List.of(gpk));
+					informWarning("Greated genesis State: "+state.getHash());
+					config.put(Keywords.STATE, state);
+				}
 				Server server=API.launchPeer(config);
 				
 				if (!norest) {

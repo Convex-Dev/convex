@@ -1935,6 +1935,7 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Lists.of(2L, 1L, 3L, 4L), eval("(into '(3 4) '(1 2))"));
 
 		assertEquals(Sets.of(1L, 2L, 3L), eval("(into #{} [1 2 1 2 3])"));
+		assertEquals(Sets.of(1L, 2L, 3L), eval("(into #{} #{1 2 3})"));
 
 		// map as data structure
 		assertEquals(Maps.empty(), eval("(into {} [])"));
