@@ -4,7 +4,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 
 /**
- * Encoder for stores
+ * Encoder for CAD3 data / stores
  */
 public class Encoder {
 

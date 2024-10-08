@@ -622,7 +622,6 @@ public class Format {
 		// TODO Auto-generated method stub
 		if (tag<0x19) return CVMLong.read(tag,blob,offset);
 		if (tag == 0x19) return CVMBigInteger.read(blob,offset);
-		// Double is special, we enforce a canonical NaN
 		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
 		
 		throw new BadFormatException(badTagMessage(tag));

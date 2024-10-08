@@ -265,7 +265,7 @@ public class Cells {
 	/**
 	 * Intern a Cell permanently in memory (for JVM lifetime). 
 	 * 
-	 * SECURITY: do not do this for any generated structure from external sources. The could DoS your memory.
+	 * SECURITY: do not do this for any generated structure from external sources. Attackers could DoS your memory.
 	 * 
 	 * @param <T> Type of Cell
 	 * @param value Value to intern
