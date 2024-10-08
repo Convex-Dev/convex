@@ -20,8 +20,9 @@ import convex.core.util.Utils;
 public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	/**
 	 * Maximum number of elements in a SetLeaf
+	 * We use the same structure as a MapLeaf
 	 */
-	public static final int MAX_ELEMENTS = 16;
+	public static final int MAX_ELEMENTS = MapLeaf.MAX_ENTRIES;
 
 	private final Ref<T>[] elements;
 
@@ -96,9 +97,10 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	@Override
 	public Ref<T> getValueRef(ACell k) {
 		// Use cached hash if available
-		Hash h=(k==null)?Hash.NULL_HASH:k.cachedHash();
+		Hash h=Cells.cachedHash(k);
 		if (h!=null) return getRefByHash(h);
 
+		// linear scan if no hash for key?
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			Ref<T> e = elements[i];
@@ -114,10 +116,19 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	protected Ref<T> getRefByHash(Hash hash) {
-		int len = size();
-		for (int i = 0; i < len; i++) {
-			Ref<T> e = elements[i];
-			if (hash.equals(e.getHash())) return e;
+		int start =0;
+		int end = size();
+		while (end>start) { // binary search since we have hash
+			int mid=(end+start)/2;
+			Ref<T> e=elements[mid];
+			Hash eh=e.getHash();
+			int comp=(hash.compareTo(eh));
+			if (comp==0) return e;
+			if (comp<0) {
+				end=mid; // first half
+			} else {
+				start=mid+1; // second half
+			}
 		}
 		return null;
 	}
@@ -142,11 +153,19 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 	 * @param key
 	 * @return
 	 */
-	private int seekKeyRef(Ref<?> key) {
-		Hash h=key.getHash();
-		int len = size();
-		for (int i = 0; i < len; i++) {
-			if (h.compareTo(elements[i].getHash())==0) return i;
+	private int seekKeyRef(Hash h) {
+		int start =0;
+		int end = size();
+		while (end>start) { // binary search since we have hash
+			int mid=(end+start)/2;
+			Hash eh=elements[mid].getHash();
+			int comp=(h.compareTo(eh));
+			if (comp==0) return mid;
+			if (comp<0) {
+				end=mid; // first half
+			} else {
+				start=mid+1; // second half
+			}
 		}
 		return -1;
 	}
@@ -161,7 +180,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 
 	@Override
 	public SetLeaf<T> excludeRef(Ref<?> key) {
-		int i = seekKeyRef(key);
+		int i = seekKeyRef(key.getHash());
 		if (i < 0) return this; // not found
 		return excludeAt(i);
 	}

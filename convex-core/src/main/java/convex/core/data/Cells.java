@@ -310,4 +310,14 @@ public class Cells {
 		cell.validateCell();
 	}
 
+	/**
+	 * Gets the caches hash for a cell if available
+	 * @param k Any cell (can be null)
+	 * @return Hash of cell (value ID) or null if not cached
+	 */
+	public static Hash cachedHash(ACell k) {
+		if (k==null) return Hash.NULL_HASH;
+		return k.cachedHash();
+	}
+
 }

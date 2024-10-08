@@ -26,8 +26,9 @@ import convex.core.util.Utils;
 public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	/**
 	 * Maximum number of entries in a MapLeaf
+	 * 15 provides optimal binary search in leaf nodes
 	 */
-	public static final int MAX_ENTRIES = 16;
+	public static final int MAX_ENTRIES = 15;
 
 	static final MapEntry<?, ?>[] EMPTY_ENTRIES = new MapEntry[0];
 
@@ -112,16 +113,26 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	protected MapEntry<K, V> getEntryByHash(Hash hash) {
-		int len = size();
-		for (int i = 0; i < len; i++) {
-			MapEntry<K, V> e = entries[i];
-			if (hash.equals(e.getKeyHash())) return e;
+		int start =0;
+		int end = size();
+		while (end>start) { // binary search since we have hash
+			int mid=(end+start)/2;
+			MapEntry<K, V> e = entries[mid];
+			Hash eh=e.getKeyHash();
+			int comp=(hash.compareTo(eh));
+			if (comp==0) return e;
+			if (comp<0) {
+				end=mid; // first half
+			} else {
+				start=mid+1; // second half
+			}
 		}
 		return null;
 	}
 
 	@Override
 	public boolean containsValue(ACell value) {
+		// this always needs a linear scan
 		int len = size();
 		for (int i = 0; i < len; i++) {
 			if (Cells.equals(value, entries[i].getValue())) return true;
