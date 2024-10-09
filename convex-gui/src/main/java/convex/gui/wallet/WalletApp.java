@@ -15,6 +15,7 @@ import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.panels.HomePanel;
+import convex.gui.peer.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
@@ -44,20 +45,20 @@ public class WalletApp extends AbstractGUI {
 		
 		add(new AccountOverview(convex),"dock north");
 
-		addTab("Wallet", SymbolIcon.get(0xe850,TAB_ICON_SIZE), new TokenListPanel(convex));
+		addTab("Wallet", 0xe850, new TokenListPanel(convex));
 
-		addTab("Friends", SymbolIcon.get(0xf233,TAB_ICON_SIZE), new FriendPanel(convex));
+		addTab("Friends",0xf233, new FriendPanel(convex));
 		
-		addTab("Drive", SymbolIcon.get(0xe1db,TAB_ICON_SIZE), new DLFSPanel(DLFS.createLocal()));
+		addTab("Drive", 0xe1db, new DLFSPanel(DLFS.createLocal()));
 
+		addTab("Staking", 0xf56e, new PeerStakePanel(convex));
 
 		KeyRingPanel keyPanel=new KeyRingPanel();
-		keyPanel.setBorder(Toolkit.createDialogBorder());
-		addTab("Keys", SymbolIcon.get(0xe73c,TAB_ICON_SIZE), keyPanel);
+		addTab("Keys", 0xe73c, keyPanel);
 		
-		addTab("QR Code", SymbolIcon.get(0xf206,TAB_ICON_SIZE), new QRPanel(convex));
+		addTab("QR Code", 0xf206, new QRPanel(convex));
 		// addTab("Terminal", SymbolIcon.get(0xeb8e,TAB_ICON_SIZE), new REPLPanel(convex));
-		addTab("Settings", SymbolIcon.get(0xe8b8,TAB_ICON_SIZE), new SettingsPanel(convex));
+		addTab("Settings", 0xe8b8, new SettingsPanel(convex));
 		
 		this.add(tabs, "dock center");
 	}
@@ -72,7 +73,9 @@ public class WalletApp extends AbstractGUI {
 		}
 	}
 
-	private void addTab(String name, SymbolIcon icon, JComponent panel) {
+	private void addTab(String name, int iconCode, JComponent panel) {
+		SymbolIcon icon= SymbolIcon.get(iconCode,TAB_ICON_SIZE);
+		
 		tabs.addTab("", icon, panel);
 		
 		int i=tabs.getTabCount()-1;

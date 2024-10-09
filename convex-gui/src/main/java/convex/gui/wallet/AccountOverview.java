@@ -52,8 +52,8 @@ public class AccountOverview extends JPanel {
 		// headings
 		add(new JLabel("Name"));
 		add(new JLabel("Address"));
-		add(new JLabel("Key"));
-		add(new JLabel("Convex Coins"),"wrap");
+		add(new JLabel("Identicon"));
+		add(new JLabel("Convex Coin Balance"),"wrap");
 		//add(new JLabel("Identicon"),"wrap");
 		
 		Font bigfont=font.deriveFont(40f);

@@ -39,7 +39,6 @@ import javax.swing.LookAndFeel;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.border.Border;
-import javax.swing.border.CompoundBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.DefaultEditorKit;
@@ -341,22 +340,20 @@ public class Toolkit {
 		help.setToolTipText(helpText);
 		return help;
 	}
-
+	
 	public static JComponent makeNote(String title, String note) {
 		// JLabel ta = new JLabel("<html>"+note+"</html>"); // Alternative, but doesn't scale component height?
 		JTextArea ta = new JTextArea(note);
-		CompoundBorder b=BorderFactory.createCompoundBorder(BorderFactory.createTitledBorder(title), createEmptyBorder(10));
 		
 		// This allows the text area to shrink, for some odd reason....
 		ta.setMinimumSize(new Dimension(50,50));
 		
-		ta.setBorder(b);
 		ta.setEditable(false); // Can't edit notes
 		ta.setFocusable(false); // informational only, shouldn't focus
 		// ta.setFont(Toolkit.DEFAULT_FONT);
 		ta.setLineWrap(true); // for wrapping
 		ta.setWrapStyleWord(true); // for nice text when it wraps
-		return ta;
+		return withTitledBorder(title,ta);
 	}
 	
 	public static JComponent makeNote(String note) {

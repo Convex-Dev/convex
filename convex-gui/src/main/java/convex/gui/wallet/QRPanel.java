@@ -15,7 +15,7 @@ import net.miginfocom.swing.MigLayout;
 public class QRPanel extends JPanel {
 
 	public QRPanel(Convex convex) {
-		setLayout(new MigLayout("wrap 1, fillx","30[]30"));
+		setLayout(new MigLayout("wrap 1, fillx"));
 		
 		
 		
