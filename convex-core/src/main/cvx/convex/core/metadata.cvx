@@ -1125,11 +1125,10 @@
          :signature   [{:params [x]
                         :return Double}]}}
 
-
- stake
- {:doc {:description "Sets the stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level. Setting stake to zero removes the stake entirely."
-        :examples    [{:code "(stake trusted-peer-account-key 7000000000)"}]
-        :signature   [{:params [account-key amount]}]}}
+ set-stake
+ {:doc {:description "Sets the delegated stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level. Setting stake to zero removes the stake entirely."
+        :examples    [{:code "(set-stake trusted-peer-key 7000000000)"}]
+        :signature   [{:params [peer-key amount]}]}}
 
  str
  {:doc {:description "Coerces values into strings and concatenates them."

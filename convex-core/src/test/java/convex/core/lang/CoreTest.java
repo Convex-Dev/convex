@@ -3365,7 +3365,7 @@ public class CoreTest extends ACVMTest {
 
 		{
 			// simple case of staking 1000000 on first peer of the realm
-			Context rc=step(ctx,"(stake my-peer 1000000)");
+			Context rc=step(ctx,"(set-stake my-peer 1000000)");
 			assertNotError(rc);
 			assertEquals(PS+1000000,rc.getState().getPeer(MY_PEER).getTotalStake());
 			assertEquals(1000000,rc.getState().getPeer(MY_PEER).getDelegatedStake());
@@ -3373,21 +3373,21 @@ public class CoreTest extends ACVMTest {
 		}
 
 		// staking on an account key that isn't a peer
-		assertStateError(step(ctx,"(stake 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
+		assertStateError(step(ctx,"(set-stake 0x1234567812345678123456781234567812345678123456781234567812345678 1234)"));
 
 		// staking on an address
-		assertCastError(step(ctx,"(stake *address* 1234)"));
+		assertCastError(step(ctx,"(set-stake *address* 1234)"));
 		
 		// staking on an invalid account key (wrong length)
-		assertArgumentError(step(ctx,"(stake 0x12 1234)"));
+		assertArgumentError(step(ctx,"(set-stake 0x12 1234)"));
 
 		// bad arg types
-		assertCastError(step(ctx,"(stake :foo 1234)"));
-		assertCastError(step(ctx,"(stake my-peer :foo)"));
-		assertCastError(step(ctx,"(stake my-peer nil)"));
+		assertCastError(step(ctx,"(set-stake :foo 1234)"));
+		assertCastError(step(ctx,"(set-stake my-peer :foo)"));
+		assertCastError(step(ctx,"(set-stake my-peer nil)"));
 
-		assertArityError(step(ctx,"(stake my-peer)"));
-		assertArityError(step(ctx,"(stake my-peer 1000 :foo)"));
+		assertArityError(step(ctx,"(set-stake my-peer)"));
+		assertArityError(step(ctx,"(set-stake my-peer 1000 :foo)"));
 	}
 
 	@Test
@@ -3551,7 +3551,7 @@ public class CoreTest extends ACVMTest {
 			ctx=exec(ctx,"(def USER (deploy '(set-controller *caller*) '(defn ^:callable receive-coin [& args] (accept *offer*))))");
 			Address USER=ctx.getResult();
 			ctx=exec(ctx,"(transfer USER "+USERFUND+")");
-			ctx=exec(ctx,"(eval-as USER '(stake "+PK+" "+USERSTAKE+"))");
+			ctx=exec(ctx,"(eval-as USER '(set-stake "+PK+" "+USERSTAKE+"))");
 			assertCVMEquals(USERSTAKE,ctx.getResult());
 			assertEquals(Coin.MAX_SUPPLY,ctx.getState().computeTotalBalance());
 			assertEquals(PEERSTAKE+USERSTAKE,ctx.getState().getPeer(PK).getTotalStake());

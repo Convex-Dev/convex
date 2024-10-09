@@ -103,7 +103,7 @@ public class Symbols {
 
 	public static final Symbol ACCOUNT_Q = intern("account?");
 
-	public static final Symbol STAKE = intern("stake");
+	public static final Symbol SET_STAKE = intern("set-stake");
 	public static final Symbol CREATE_PEER = intern("create-peer");
 	public static final Symbol SET_PEER_DATA = intern("set-peer-data");
 	public static final Symbol SET_PEER_STAKE = intern("set-peer-stake");

@@ -952,7 +952,7 @@ public class Core {
 		}
 	});
 
-	public static final CoreFn<CVMLong> STAKE = reg(new CoreFn<>(Symbols.STAKE,64) {
+	public static final CoreFn<CVMLong> SET_STAKE = reg(new CoreFn<>(Symbols.SET_STAKE,64) {
 		
 		@Override
 		public  Context invoke(Context context, ACell[] args) {

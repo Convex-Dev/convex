@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update some errors thrown for failed casts
 - `set!` now allows pending definitions
 - Better handling of Peer Fees
+- Rename `stake` to `set-stake`
 
 ## [0.7.15] - 2024-09-17
 

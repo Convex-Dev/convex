@@ -33,18 +33,18 @@ public class StakingTest extends ACVMTest {
 
 		// test putting almost entire balance on stake
 		// Note: putting whole balance fails with juice error 
-		Context ctx3 = step(ctx0, "(stake " + InitTest.FIRST_PEER_KEY + " (- *balance* 1000000))");
+		Context ctx3 = step(ctx0, "(set-stake " + InitTest.FIRST_PEER_KEY + " (- *balance* 1000000))");
 		assertEquals(1000000L, ctx3.getBalance(InitTest.HERO));
 		assertEquals(HERO_BALANCE-1000000L, ctx3.getState().getPeer(InitTest.FIRST_PEER_KEY).getDelegatedStake(InitTest.HERO));
 
 		// test putting too much balance
-		assertFundsError(step(ctx0, "(stake " + InitTest.FIRST_PEER_KEY + " (inc *balance*))"));
+		assertFundsError(step(ctx0, "(set-stake " + InitTest.FIRST_PEER_KEY + " (inc *balance*))"));
 	}
 
 	@Test
 	public void testStakeReturns() {
 		Context ctx0 = context();
-		assertEquals(1000L, evalL(ctx0, "(stake " + InitTest.FIRST_PEER_KEY + " 1000)"));
+		assertEquals(1000L, evalL(ctx0, "(set-stake " + InitTest.FIRST_PEER_KEY + " 1000)"));
 	}
 
 	@Test
