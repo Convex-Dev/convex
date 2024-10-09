@@ -652,7 +652,7 @@
         :examples    [{:code "(sha256 0x1234)"}]
         :signature   [{:params [value]
                        :return Blob}]}}
-
+ 
  hash-map
  {:doc {:description "Constructs a map with the given keys and values. If a key is repeated, the last value will overwrite previous ones."
         :errors      {:ARITY "If the number of arguments is not even (key-value pairs)."}
@@ -664,7 +664,6 @@
  {:doc {:description "Constructs a Set with the given values. If a value is repeated, it will be included only once in the set."
         :examples    [{:code "(hash-set 1 2 3)"}]
         :signature   [{:params [& values]}]}}
-
 
  inc
  {:doc {:description "Increments the given Long value by 1."
@@ -685,7 +684,6 @@
         :errors      {:CAST "If the argument is not castable to Integer."}
         :examples    [{:code "(int 10)"}]
         :signature   [{:params [num]}]}}
-
 
  int?
  {:doc {:description "Returnes `true` if the argument is an Integer value, `false` otherwise."
@@ -708,7 +706,6 @@
         :signature   [{:params [strs separator]
                        :return String}]}}
 
-
  keys
  {:doc {:description "Returns a Vector of keys in the given Map, in the map defined order. Also see `values`."
         :errors      {:CAST "If the argument is not a Map."}
@@ -724,13 +721,11 @@
         :signature   [{:params [name]
                        :return Keyword}]}}
 
-
  keyword?
  {:doc {:description "Returns `true` if and only if the argument is a Keyword."
         :examples    [{:code "(keyword? :foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  last
  {:doc {:description "Returns the last element of a Countable data structure, in collection-defined order."
@@ -739,13 +734,11 @@
         :examples    [{:code "(last [1 2 3])"}]
         :signature   [{:params [coll]}]}}
 
-
  let
  {:doc      {:description "Binds local variables according to symbol-expression pairs in a binding vectors, then execute following expressions in an implicit do block."
              :examples    [{:code "(let [x 10] (* x x))"}]
              :signature   [{:params [bindings & exps]}]}
   :special true}
-
 
  list
  {:doc {:description "Creates a List containing the given arguments as elements."
@@ -753,13 +746,11 @@
         :signature   [{:params [& elements]
                        :return List}]}}
 
-
  list?
  {:doc {:description "Returns `true` if and only if the argument is a List."
         :examples    [{:code "(list? :foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  log
  {:doc {:description ["Outputs a sequence of values to the CVM log for the current account. Any valid CVM values can be logged. Returns a vector containing logged values."
@@ -768,20 +759,17 @@
         :signature   [{:params [& values]
                        :return Vector}]}}
 
-
  long
  {:doc {:description "Casts the given argument to a 64-bit Long (signed integer)."
         :errors      {:CAST "If the argument is not castable to Long."}
         :examples    [{:code "(long 10)"}]
         :signature   [{:params [num]}]}}
 
-
  long?
  {:doc {:description "Returnes `true` if the argument is a value of Long type, `false` otherwise."
         :examples    [{:code "(long? 1234)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  lookup
  {:doc      {:description "Looks up the value of a Symbol in the current execution environment, or the Account of the given Address if specified."
@@ -792,13 +780,11 @@
                            {:params [address sym]}]}
   :special true}
 
-
  lookup-meta
  {:doc {:description "Looks up metadata for a Symbol in the current execution environment, or the Account of the given Address if specified. Returns nil if not found."
         :examples    [{:code "(lookup-meta 'count)"}]
         :signature   [{:params [name]}
                       {:params [address name]}]}}
-
 
  loop
  {:doc      {:description ["Creates a loop body, binding one or more loop variables in a manner similar to `let`."
@@ -806,7 +792,6 @@
              :examples    [{:code "(loop [i 10 acc 1] (if (> i 1) (recur (dec i) (* acc i)) acc))"}]
              :signature   [{:params [bindings & body]}]}
   :special true}
-
 
  map
  {:doc {:description "Applies a Function to each element of a data structure in sequence, and returns a vector of results. Additional collections may be provided to call a function with higher arity."
@@ -855,7 +840,6 @@
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  name
  {:doc {:description "Gets the String name of an object: a Keyword, a Symbol, or a String."
         :errors      {:CAST "If the argument is not castable to a String name."}
@@ -864,7 +848,6 @@
         :signature   [{:params [named-object]
                        :return String}]}}
 
-
  next
  {:doc {:description "Returns the elements of a sequential data structure after the first element, or `nil` if no more elements remain."
         :errors      {:CAST "If the argument is not a sequential data structure."}
@@ -872,13 +855,11 @@
         :signature   [{:params [coll]
                        :return Sequence}]}}
 
-
  nil?
  {:doc {:description "Returns `true` if and only if the argument is the value `nil`."
         :examples    [{:code "(nil? nil)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  not
  {:doc {:description "Inverts a truth value. Returns `true` for `false` or `nil`, returns `false` for any other value."
@@ -887,22 +868,19 @@
         :signature   [{:params [b]
                        :return Boolean}]}}
 
-
  nth
  {:doc {:description ["Gets the nth element of a Countable data structure."
-                      "The index must be a valid integer between 0 (inclusive) and the element count of the collection (exclusive)."]
+                      "The index must be a valid integer between 0 (inclusive) and the count of the collection (exclusive)."]
         :errors      {:CAST "If the first argument is not countable data structure."
 	                  :BOUNDS "If the element index is out of range."}
         :examples    [{:code "(nth [1 2 3] 2)"}]
         :signature   [{:params [coll index]}]}}
-
 
  number?
  {:doc {:description "Returns `true` if and only if the argument is a numeric value."
         :examples    [{:code "(number? 2.3)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  pow
  {:doc {:description "Returns the first argument raised to the power of the second argument. Uses double precision maths."
@@ -928,7 +906,6 @@
   :expander true
   :special  true}
 
-
  query
  {:doc      {:description "Runs forms in query mode. When returning a result, any State changes will be rolled back as if nothing happened."
              :examples    [{:code "(query (def a 10) a)"}
@@ -941,13 +918,10 @@
         :examples    [{:code "(query-as #666 '(def a (+ 2 3)))"}]
         :signature   [{:params [address form]}]}}
 
-
  quot
  {:doc {:description "Returns the quotient of a numerator divided by a divisor. Performs truncated division (ie. rounds towards zero)."
         :examples [{:code "(quot 13 5)"}]
         :signature [{:params [num div]}]}}
-
-
 
  quote
  {:doc       {:description "Returns the quoted value of a form, without evaluating it. For example, you can quote a symbol to get the symbol itself rather than the value in the environment that it refers to."
@@ -957,43 +931,36 @@
   :expander true
   :special  true}
 
-
  recur
  {:doc      {:description "Escapes from the currently executing code and recurs at the level of the next loop or function body."
              :examples    [{:code "(recur acc (dec i))"}]
              :signature   [{:params [x y]}]}
   :special true}
 
-
  reduce
- {:doc {:description ["Efficient and convenient looping mechanism."
-                      "Reduces over a collection, calling `f` with an accumulator value and, successively each element of that collection (see example showing a summation)."
-                      "Looping can be stopped at any moment by calling `reduced`. Otherwise, all elements in the collection are processed."
-                      "If an initial accumulator value is not supplied, the initial value will be determined by calling the function on the first 0, 1 or 2 elements of the collection (however many are available)."]
+ {:doc {:description ["Reduces over a collection, calling `f` with an accumulator value and, successively each element of that collection."
+                      "Reduction can be finished by calling `reduced`. Otherwise, all elements in the collection are processed."
+                      "If accumulator is not initially supplied, the first element of the collection will be used."]
         :errors      {:CAST "If the first argument is not a function, or the final argument is not a sequential collection."}
         :examples    [{:code "(reduce (fn [acc item] (+ acc item)) 0 [1 2 3 4 5])"}]
         :signature   [{:params [f coll]}
                       {:params [f init coll]}]}}
-
 
  reduced
  {:doc {:description "Returns immediately from the enclosing `reduce` function, providing the given value as the result of the whole `reduce` operation. This can be used to terminate a reduction early, saving transaction costs."
         :examples    [{:code "(reduce (fn [acc x] (reduced :exit)) 1 [1 2 3 4 5])"}]
         :signature   [{:params [result]}]}}
 
-
  rem
  {:doc {:description "Returns the remainder of a numerator divided by a divisor, consistent with division performed by `quot`. The remainder will therefore have the same sign as the numerator."
         :examples    [{:code "(rem 13 5)"}]
         :signature   [{:params [num div]}]}}
 
-
  return
- {:doc      {:description "Escapes from the currently executing code and returns the specified value from the current function. Expressions following `return` will not be executed."
+ {:doc      {:description "Exits from the currently executing function, returning the specified value. Expressions following `return` will not be executed."
              :examples    [{:code "(do (return :finished) 42)"}]
              :signature   [{:params [value]}]}
   :special true}
-
 
  reverse
  {:doc      {:description "Reverses a sequential data structure. Lists are converted to vectors, and vice versa for efficieny reasons. Nil is treated as an empty vector."
@@ -1002,19 +969,16 @@
                             :return Sequence}]}
   :special true}
 
-
  rollback
  {:doc      {:description "Escapes from the currently executing smart contract. Rolls back any state changes, as if nothing happened during that transaction. Returns the given value."
              :examples    [{:code "(rollback :aborted)"}]
              :signature   [{:params [value]}]}
   :special true}
 
-
  schedule*
  {:doc {:description "Schedules a Op for future execution under this account. Op will not be executed until the specified timestamp. `compile` may be used to produce an Op from a normal code form."
         :examples    [{:code "(schedule* (+ *timestamp* 1000) (compile '(transfer my-friend 1000000)))"}]
         :signature   [{:params [timestamp code]}]}}
-
 
  second
  {:doc {:description "Returns the second element of a countable collection."
@@ -1023,7 +987,6 @@
         :examples    [{:code "(second [1 2 3])"}]
         :signature   [{:params [coll]}]}}
 
-
  set
  {:doc {:description "Coerces any data structure to a `Set`."
         :errors      {:CAST "If the argument is not a countable data structure."}
@@ -1031,17 +994,15 @@
         :signature   [{:params [coll]
                        :return Set}]}}
 
-
  set!
  {:doc     {:description  ["Sets a binding to the given value."
-                           "A local change will be be visible until the scope leaves the current binding form (eg. `let` binding, function body or recur)."
+                           "A local change will be be visible until the scope leaves the current binding form (e.g. `let` binding, function body or recur)."
                            "Returns the value assigned to the local binding if successful."]
             :errors       {:SYNTAX "If the symbol is not valid."
 	                       :UNDECLARED "If the symbol is not decalred."}
             :examples     [{:code "(let [a 10] (set! a 20) a)"}]
             :signature    [{:params [sym value]}]}
  :special true}
-
 
  set-controller
  {:doc {:description ["Sets the controller for the current account."
@@ -1051,19 +1012,16 @@
         :examples    [{:code "(set-controller #9)"}]
         :signature   [{:params [addr]}]}}
 
-
  set-holding
  {:doc {:description "Sets the holding value for a specified owner account address. Owner account must exist. Returns the new holding value."
         :errors      {:CAST "If the first argument is not an address."}
         :examples    [{:code "(set-holding *caller* 1000)"}]
         :signature   [{:params [owner value]}]}}
 
-
  set-key
- {:doc {:description ["Sets the public key (32-byte blob) for the current Account. May set to `nil` to turn this Account into an Actor and disable future external transactions."
-                      "WARNING: You may lose access to the Account if you do not have access to the associated private key."]
+ {:doc {:description ["Sets the public key (32-byte blob) for the current account. May set to `nil` to turn this account into an actor and disable future external transactions."
+                      "WARNING: You may lose access to the account if you do not have access to the associated private key."]
         :signature   [{:params [new-key]}]}}
-
 
  set-memory
  {:doc {:description "Sets the free memory allowance for the current account address, in number of bytes. Increases in memory allowance may cost coin balance. Decreases in memory allowance may earn a coin refund. Returns the price paid (negative for refund)."
@@ -1072,20 +1030,18 @@
  
  set-parent
  {:doc {:description ["Sets the parent for the current account."
-                      "Parent account is the account for which symbolic lookups will default."]
+                      "Parent account is the account to which symbolic lookups will default."]
         :errors      {:CAST   "If the argument is neither a valid address nor nil"
 	                  :ARGUMENT "If the parent is the current address"
                       :NOBODY "If the address does not refer to an existing account."}
         :examples    [{:code "(set-parent #8)"}]
         :signature   [{:params [addr]}]}}
 
-
  set-peer-data
- {:doc {:description "Sets metadata on a given peer. Metadata must be a map. Peer must exist, with a public account key."
+ {:doc {:description "Sets metadata on an existing peer. Metadata must be a Map."
         :errors      {:CAST "If the first argument is not a valid peer Key, or the second argument is not a hash map."}
         :examples    [{:code "(set-peer-data peer-key {:url \"my-peer.com:4242\"})"}]
         :signature   [{:params [peer map]}]}}
-
 
  set-peer-stake
  {:doc {:description "Sets the peer stake. Stake must be a `long`. Peer must exist, with a public account key."
@@ -1093,6 +1049,10 @@
         :examples    [{:code "(set-peer-data peer-key {:url \"my-peer.com:4242\"})"}]
         :signature   [{:params [peer stake]}]}}
 
+ set-stake
+ {:doc {:description "Sets the delegated stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level. Setting stake to zero removes the stake entirely."
+        :examples    [{:code "(set-stake trusted-peer-key 7000000000)"}]
+        :signature   [{:params [peer-key amount]}]}}
 
  set?
  {:doc {:description "Returns true if the argument is a set, false otherwise."
@@ -1125,17 +1085,11 @@
          :signature   [{:params [x]
                         :return Double}]}}
 
- set-stake
- {:doc {:description "Sets the delegated stake on a given peer. Peer must exist, and funds must be available to set the stake to the specified level. Setting stake to zero removes the stake entirely."
-        :examples    [{:code "(set-stake trusted-peer-key 7000000000)"}]
-        :signature   [{:params [peer-key amount]}]}}
-
  str
  {:doc {:description "Coerces values into strings and concatenates them."
         :examples    [{:code "(str \"Hello \" name)"}]
         :signature   [{:params [& args]
                        :return String}]}}
-
 
  str?
  {:doc {:description "Returns true if the argument is a string, false otherwise."
@@ -1143,13 +1097,11 @@
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  subset?
  {:doc {:description "Returns true if `set-1` is a subset of `set-2`. Both arguments must be sets, nil being considered as an empty set."
         :examples    [{:code "(subset? #{1} #{1 2 3})"}]
         :signature   [{:params [set-1 set-2]
                        :return Boolean}]}}
-
 
  symbol
  {:doc {:description "Creates a symbol from keyword, a symbol, or a string between 1 and 64 character"
@@ -1157,20 +1109,17 @@
         :signature   [{:params [name]
                        :return Symbol}]}}
 
-
  str?
  {:doc {:description "Returns true if the argument is a string, false otherwise."
         :examples    [{:code "(str? \"foo\")"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  symbol?
  {:doc {:description "Returns true if the argument is a symbol, false otherwise."
         :examples    [{:code "(symbol? 'foo)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
-
 
  syntax
  {:doc {:description "Wraps a value as a syntax object, if it is not already one. If metadata is provided, merge the metadata into the resulting syntax object."
@@ -1181,19 +1130,16 @@
                       {:params [value meta]
                        :return Syntax}]}}
 
-
  syntax?
  {:doc {:description "Returns true if the argument is a syntax object."
         :examples    [{:code "(syntax? form)"}]
         :signature   [{:params [x]
                        :return Boolean}]}}
 
-
  tailcall*
  {:doc {:description "Like `tailcall` but lower-level. Instead of a form, takes a function and then arguments separately."
          :examples   [{:code "(tailcall* + 1 2 3)"}]
          :signature  [{:params [f & args] }]}}
-
 
  transfer
  {:doc {:description "Transfers the specified amount of coins to the target `Address`. Returns the amount transferred if successful, which may be less than the amount requested if the target does not accept all."
@@ -1203,7 +1149,6 @@
         :signature   [{:params [address amount]
                        :return Long}]}}
 
-
  transfer-memory
  {:doc {:description "Transfers the specified amount of memory allowance to the target `address`. Returns the amount transferred if successful."
         :errors      {:MEMORY "If there is insufficient balance in the sender's account."}
@@ -1211,12 +1156,10 @@
         :signature   [{:params [address amount]
                        :return Long}]}}
 
-
  undef*
  {:doc {:description "Undefines a symbol, removing the mapping from the current environment if it exists. Helper function for the 'undef' macro."
         :examples    [{:code "(undef* 'a)"}]
         :signature   [{:params [sym]}]}}
-
 
  union
  {:doc {:description "Computes the union of zero or more sets. Nil is treated as an empty set when used as an input, but any result will always be a valid non-nil Set."
@@ -1228,7 +1171,6 @@
  {:doc {:description "Unwraps a value from a syntax object. If the argument is not a syntax object, returns it unchanged."
         :examples    [{:code "(unsyntax form)"}]
         :signature   [{:params [form]}]}}
-
 
  values
  {:doc {:description "Gets the values from a map. Also see `keys`."
