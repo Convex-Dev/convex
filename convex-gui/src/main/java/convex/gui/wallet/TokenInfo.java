@@ -15,6 +15,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
+/**
+ * Class representing a tradable / transferrable fungible token
+ */
 public class TokenInfo {
 	private ACell id;
 	private int decimals;

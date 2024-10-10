@@ -57,7 +57,7 @@ public class Toolkit {
 	
 	private static Logger log = LoggerFactory.getLogger(Toolkit.class.getName());
 
-	public static final double BASE_SCALE=1.3;
+	public static final double BASE_SCALE=1.25;
 	public static final float SCALE=getUIScale();
 	
 	public static final int ICON_SIZE = (int) (32*SCALE);
@@ -66,7 +66,7 @@ public class Toolkit {
 	public static final int SMALL_ICON_SIZE = (int) (16*SCALE);
 	public static final int MAIN_ICON_SIZE = (int) (72*SCALE);
 
-	public static final float DEFAULT_FONT_SIZE=13*SCALE;
+	public static final float DEFAULT_FONT_SIZE=12*SCALE;
 	
 	public static Font DEFAULT_FONT = new Font(Font.SANS_SERIF,Font.PLAIN,(int)DEFAULT_FONT_SIZE);
 	public static Font BIG_FONT = new Font(Font.SANS_SERIF, Font.BOLD, (int)(DEFAULT_FONT_SIZE*1.8));

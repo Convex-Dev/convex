@@ -15,7 +15,7 @@ import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.panels.HomePanel;
-import convex.gui.peer.PeerStakePanel;
+import convex.gui.peer.stake.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;

@@ -13,7 +13,6 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
-import javax.swing.BorderFactory;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -26,15 +25,14 @@ import javax.swing.table.TableCellRenderer;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.cvm.State;
-import convex.core.data.AArrayBlob;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
-import convex.core.util.Utils;
 import convex.gui.actor.AccountWindow;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.BalanceLabel;
-import convex.gui.components.Identicon;
+import convex.gui.components.renderer.AccountKeyRenderer;
+import convex.gui.components.renderer.CellRenderer;
 import convex.gui.models.AccountsTableModel;
 import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
@@ -48,29 +46,6 @@ public class AccountsPanel extends JPanel {
 	AccountsTableModel tableModel;
 	JTable table;
 
-	static class CellRenderer extends DefaultTableCellRenderer {
-		public CellRenderer(int alignment) {
-			super();
-			this.setHorizontalAlignment(alignment);
-		}
-
-		public void setValue(Object value) {
-			setText(Utils.toString(value));
-		}
-	}
-	
-	static class AccountKeyRenderer extends DefaultTableCellRenderer {
-		public AccountKeyRenderer() {
-			super();
-			this.setBorder(BorderFactory.createEmptyBorder(0, 3, 0, 3));
-		}
-
-		public void setValue(Object value) {
-			setText((value==null)?"":value.toString());
-			setIcon(Identicon.createIcon((AArrayBlob) value,21));
-		}
-	}
-	
 	static class BalanceRenderer extends BalanceLabel implements TableCellRenderer {
 
 		@Override
