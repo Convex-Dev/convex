@@ -6,6 +6,8 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 
 import convex.api.Convex;
+import convex.gui.components.ActionButton;
+import convex.gui.components.ActionPanel;
 
 @SuppressWarnings("serial")
 public class PeerStakePanel extends JPanel {
@@ -19,6 +21,10 @@ public class PeerStakePanel extends JPanel {
 		PeerStakeTable peerTable=new PeerStakeTable(convex); 
 		add(new JScrollPane(peerTable),BorderLayout.CENTER);
 		
+		ActionPanel ap=new ActionPanel();
+		add(ap,BorderLayout.SOUTH);
+		
+		ap.add(new ActionButton("Refresh", 0xe5d5, e->peerTable.refresh()) );
 	}
 
 }

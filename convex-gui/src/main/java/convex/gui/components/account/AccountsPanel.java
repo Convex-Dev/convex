@@ -23,13 +23,16 @@ import convex.api.ConvexLocal;
 import convex.core.cvm.State;
 import convex.core.data.AccountStatus;
 import convex.core.data.Address;
+import convex.core.lang.RT;
 import convex.gui.actor.AccountWindow;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ConvexTable;
 import convex.gui.components.renderer.AccountKeyRenderer;
+import convex.gui.components.renderer.AddressRenderer;
 import convex.gui.components.renderer.BalanceRenderer;
 import convex.gui.components.renderer.CellRenderer;
+import convex.gui.components.renderer.StringRenderer;
 import convex.gui.models.AccountsTableModel;
 import convex.gui.models.StateModel;
 import convex.gui.utils.Toolkit;
@@ -55,7 +58,7 @@ public class AccountsPanel extends JPanel {
 		});
 		
 		{	
-			CellRenderer cr=new CellRenderer(JLabel.LEFT);
+			AddressRenderer cr=new AddressRenderer();
 			cr.setToolTipText("Address of the Convex account. This is the unique ID for the account");
 			cr.setForeground(Color.WHITE);
 			table.getColumnModel().getColumn(0).setCellRenderer(cr);
@@ -63,14 +66,18 @@ public class AccountsPanel extends JPanel {
 		}
 		
 		{	
-			CellRenderer actorRenderer = new CellRenderer(JLabel.LEFT);
+			CellRenderer actorRenderer = new CellRenderer(JLabel.LEFT) {
+				@Override public void setValue(Object o) {
+					super.setValue( RT.bool(o)?"Actor":"User");
+				}
+			};
 			actorRenderer.setToolTipText("An Actor account is an autonomous agent or code library on the CVM. A User account can be controlled by a user with the correct key pair.");
 			table.getColumnModel().getColumn(1).setPreferredWidth(70);
 			table.getColumnModel().getColumn(1).setCellRenderer(actorRenderer);
 		}
 
 		{	
-			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			StringRenderer cr=new StringRenderer(JLabel.RIGHT); 
 			cr.setToolTipText("Sequence number of the account. This is the total number of user transactions executed.");
 			table.getColumnModel().getColumn(2).setCellRenderer(cr);
 			table.getColumnModel().getColumn(2).setPreferredWidth(60);
@@ -84,35 +91,33 @@ public class AccountsPanel extends JPanel {
 		}
 		
 		{	
-			CellRenderer cr=new CellRenderer(JLabel.LEFT); 
+			StringRenderer cr=new StringRenderer(JLabel.LEFT); 
 			cr.setToolTipText("Name of the account in the Convex Registry");
 			table.getColumnModel().getColumn(4).setPreferredWidth(200);
 			table.getColumnModel().getColumn(4).setCellRenderer(cr);
 		}
 		{	
-			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			StringRenderer cr=new StringRenderer(JLabel.RIGHT); 
 			cr.setToolTipText("Size of the account environment");
 			table.getColumnModel().getColumn(5).setPreferredWidth(100);
 			table.getColumnModel().getColumn(5).setCellRenderer(cr);
 		}
 		
 		{	// Memory allowance
-			CellRenderer cr=new CellRenderer(JLabel.RIGHT); 
+			StringRenderer cr=new StringRenderer(JLabel.RIGHT); 
 			cr.setToolTipText("Unused memory allowance of the account");
 			table.getColumnModel().getColumn(6).setPreferredWidth(100);
 			table.getColumnModel().getColumn(6).setCellRenderer(cr);
 		}
 		
 		{	// Account Controller
-			CellRenderer cr=new CellRenderer(JLabel.LEFT);
+			AddressRenderer cr=new AddressRenderer();
 			cr.setToolTipText("Account Controller. May recover, modify or update the controlled account.");
 			cr.setForeground(Color.WHITE);
 			table.getColumnModel().getColumn(7).setPreferredWidth(80);
 			table.getColumnModel().getColumn(7).setCellRenderer(cr);
 		}
 
-
-		
 		{	// Account public key
 			AccountKeyRenderer cr=new AccountKeyRenderer(); 
 			cr.setToolTipText("Public key of the account. Used to validate transactions from users.");

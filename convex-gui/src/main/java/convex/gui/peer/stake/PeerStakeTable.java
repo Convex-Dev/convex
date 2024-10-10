@@ -19,8 +19,8 @@ import convex.core.data.AVector;
 import convex.core.lang.Reader;
 import convex.gui.components.ConvexTable;
 import convex.gui.components.renderer.AccountKeyRenderer;
+import convex.gui.components.renderer.AddressRenderer;
 import convex.gui.components.renderer.BalanceRenderer;
-import convex.gui.components.renderer.CellRenderer;
 
 @SuppressWarnings("serial")
 public class PeerStakeTable extends ConvexTable {
@@ -47,13 +47,13 @@ public class PeerStakeTable extends ConvexTable {
 		{ // URL
 			String colName="Controller";
 			tm.addColumn(colName);
-			TableColumn col=new TableColumn(1,150,new CellRenderer(JLabel.LEFT),null);
+			TableColumn col=new TableColumn(1,150,new AddressRenderer(JLabel.LEFT),null);
 			col.setHeaderValue(colName);
 			this.getColumnModel().addColumn(col);
 		}
 		
 		{ // Stake
-			String colName="Total Stake";
+			String colName="Staked Coins";
 			tm.addColumn(colName);
 			TableColumn col=new TableColumn(2,300,new BalanceRenderer(),null);
 			col.setHeaderValue(colName);
@@ -78,11 +78,13 @@ public class PeerStakeTable extends ConvexTable {
         return false;
     }
 
-	private void refresh() {
+	void refresh() {
+		tm.setRowCount(0);
 		String cs=("(mapv (fn [[pk p]] "
 				+"[pk "
 				+" (:controller p)"
 				+" (:balance p) "
+				+" (:timestamp p) "
 				+" :FOO"
 				+"])"
 				+"(:peers *state*))");

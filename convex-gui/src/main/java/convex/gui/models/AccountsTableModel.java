@@ -52,7 +52,7 @@ public class AccountsTableModel extends BaseTableModel {
 		case 0:
 			return address.toString();
 		case 1:
-			return as.isActor()?"Actor":"User";
+			return as.isActor();
 		case 2: {
 			long seq=as.getSequence();
 			return (seq>=0)?seq:"";

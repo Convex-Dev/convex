@@ -34,7 +34,7 @@ import io.javalin.openapi.JsonSchemaResource;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
-import io.javalin.util.JavalinBindException;
+import io.javalin.util.JavalinException;
 
 public class RESTServer implements Closeable {
 	protected static final Logger log = LoggerFactory.getLogger(RESTServer.class.getName());
@@ -48,7 +48,7 @@ public class RESTServer implements Closeable {
 		this.convex = ConvexLocal.create(server, server.getPeerController(), server.getKeyPair());
 	}
 	
-	private Javalin buildApp() {
+	private Javalin buildApp(boolean useSSL) {
 		SslPlugin sslPlugin = getSSLPlugin(server.getConfig());
 		Javalin app = Javalin.create(config -> {
 			config.staticFiles.enableWebjars();
@@ -59,7 +59,7 @@ public class RESTServer implements Closeable {
 				});
 			});
 			
-			if (sslPlugin!=null) {
+			if (useSSL&&(sslPlugin!=null)) {
 				config.registerPlugin(sslPlugin);
 			}
 			
@@ -214,15 +214,15 @@ public class RESTServer implements Closeable {
 	public synchronized void start(Integer port) {
 		close();
 		try {
-			javalin=buildApp();
+			javalin=buildApp(true);
 			start(javalin,port);
-		} catch (JavalinBindException e) {
+		} catch (JavalinException e) {
 			if (port!=null) throw e; // only try again if port unspecified
 			log.warn("Specified port "+port+"already in use, chosing another at random");
 			close();
 			
 			port=0; // use random port
-			javalin=buildApp();
+			javalin=buildApp(false);
 			start(javalin,port);
 		}
 	}

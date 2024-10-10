@@ -14,4 +14,5 @@ public class CellRenderer extends DefaultTableCellRenderer {
 	public void setValue(Object value) {
 		setText(Utils.toString(value));
 	}
+	
 }
