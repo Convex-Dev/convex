@@ -3389,6 +3389,22 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step(ctx,"(set-stake my-peer)"));
 		assertArityError(step(ctx,"(set-stake my-peer 1000 :foo)"));
 	}
+	
+	@Test
+	public void testGetStake() {
+		Context ctx=step(context(),"(def my-peer 0x"+InitTest.FIRST_PEER_KEY.toHexString()+")");
+		
+		// zero for existing peer but no stake
+		assertCVMEquals(0L,eval(ctx,"(get-stake my-peer *address*)"));
+		
+		// null for non-existing peer
+		assertNull(eval(ctx,"(get-stake 0x1234567812345678123456781234567812345678123456781234567812345678 *address*)")); 
+		
+		assertCastError(step(ctx,"(get-stake my-peer :foo)"));
+
+		assertArityError(step(ctx,"(get-stake my-peer)"));
+		assertArityError(step(ctx,"(get-stake my-peer *address* :foo)"));
+	}
 
 	@Test
 	public void testSetPeerStake() {

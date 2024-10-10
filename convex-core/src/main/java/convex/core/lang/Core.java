@@ -35,6 +35,7 @@ import convex.core.data.Keywords;
 import convex.core.data.List;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
+import convex.core.data.PeerStatus;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -961,12 +962,33 @@ public class Core {
 			ABlob b=RT.ensureBlob(args[0]);
 			if (b == null) return context.withCastError(0,args, Types.BLOB);
 			AccountKey accountKey = AccountKey.create(b);
-			if (accountKey==null) return context.withArgumentError("Account Key for stake must be 32 bytes");
+			if (accountKey==null) return context.withArgumentError("Peer Key for stake must be 32 bytes");
 
 			CVMLong amount = RT.ensureLong(args[1]);
 			if (amount == null) return context.withCastError(1,args, Types.LONG);
 
 			return context.setDelegatedStake(accountKey, amount.longValue()).consumeJuice(Juice.TRANSFER);
+		}
+	});
+	
+	public static final CoreFn<CVMLong> GET_STAKE = reg(new CoreFn<>(Symbols.GET_STAKE,69) {
+		
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			if (args.length != 2) return context.withArityError(exactArityMessage(2, args.length));
+
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey==null) return context.withArgumentError("Peer Key must be 32 bytes");
+
+			Address acct = RT.ensureAddress(args[1]);
+			if (acct == null) return context.withCastError(1,args, Types.ADDRESS);
+
+			PeerStatus ps=context.getState().getPeer(accountKey);
+			CVMLong stake=(ps==null)?null:CVMLong.create(ps.getDelegatedStake(acct));
+			
+			return context.withResult(Juice.LOOKUP,stake);
 		}
 	});
 

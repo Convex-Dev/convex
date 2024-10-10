@@ -626,6 +626,12 @@
         :examples    [{:code "(get-in [[1 2] [3 4]] [1 1])"}]
         :signature   [{:params [coll keys]}
                       {:params [coll keys not-found]}]}}
+ 
+ get-stake
+ {:doc {:description "Gets the delgated stake for an account on a specific peer."
+        :errors      {:CAST "If the account is not an address."}
+        :examples    [{:code "(get-stake my-peer-key *address*)"}]
+        :signature   [{:params [peer-key addr]}]}}
 
  halt
  {:doc {:description ["Completes execution in the current context with the specified result, or null if not provided. Does not roll back any state changes made."
