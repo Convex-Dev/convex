@@ -87,12 +87,11 @@ public class WalletApp extends AbstractGUI {
 		//p.setEnabled(false);
 		JLabel label=new JLabel(); 
 		label.setHorizontalTextPosition(JLabel.CENTER);
-		label.setIconTextGap(0);
-		label.setAlignmentX(JLabel.CENTER);
 		label.setVerticalTextPosition(JLabel.BOTTOM);
+		label.setAlignmentX(JLabel.CENTER);
 		label.setToolTipText(name);
 		label.setIcon(icon);
-		label.setHorizontalAlignment(SwingConstants.LEFT);
+		label.setHorizontalAlignment(SwingConstants.CENTER);
 		//p.add(label);
 		// tabs.setTabComponentAt(tabs.getTabCount()-1, label);
 	}
@@ -113,13 +112,11 @@ public class WalletApp extends AbstractGUI {
 		Toolkit.init();
 		Convex convex=ConnectPanel.tryConnect(null,"Connect to Convex");
 		if (convex!=null) {
-			new WalletApp(convex).run();
-		} else {
-			// Quit after waiting long enough to see error message
-			Thread.sleep(Toast.DEFAULT_TIME);
-			System.exit(0);
-		}
+			WalletApp app=new WalletApp(convex);
+			app.run();
+			app.waitForClose();
+		} 
+		Thread.sleep(Toast.DEFAULT_TIME);	
+		System.exit(0);
 	}
-
-
 }

@@ -3,8 +3,6 @@ package convex.gui.components.account;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Component;
-import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
@@ -19,8 +17,6 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.table.DefaultTableCellRenderer;
-import javax.swing.table.TableCellRenderer;
 
 import convex.api.Convex;
 import convex.api.ConvexLocal;
@@ -30,8 +26,9 @@ import convex.core.data.Address;
 import convex.gui.actor.AccountWindow;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
-import convex.gui.components.BalanceLabel;
+import convex.gui.components.ConvexTable;
 import convex.gui.components.renderer.AccountKeyRenderer;
+import convex.gui.components.renderer.BalanceRenderer;
 import convex.gui.components.renderer.CellRenderer;
 import convex.gui.models.AccountsTableModel;
 import convex.gui.models.StateModel;
@@ -46,34 +43,11 @@ public class AccountsPanel extends JPanel {
 	AccountsTableModel tableModel;
 	JTable table;
 
-	static class BalanceRenderer extends BalanceLabel implements TableCellRenderer {
-
-		@Override
-		public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus,
-				int row, int column) {
-			this.setAlignmentX(RIGHT_ALIGNMENT);
-			this.setSize(table.getColumnModel().getColumn(column).getWidth(), getHeight());
-			if (value==null) {
-				setBalance(0L);
-			} else {
-				this.setBalance((Long)value);
-			}
-			return this;
-		}
-	}
-
 	public AccountsPanel(ConvexLocal convex,StateModel<State> model) {
 		setLayout(new BorderLayout());
 
-		
 		tableModel = new AccountsTableModel(model.getValue());
-		table = new JTable(tableModel);
-		
-		table.setCellSelectionEnabled(true);
-		table.setIntercellSpacing(new Dimension(1,1));
-		//table.setFont(Toolkit.SMALL_MONO_FONT);
-		//table.getTableHeader().setFont(Toolkit.SMALL_MONO_FONT);
-		((DefaultTableCellRenderer) table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.LEFT);
+		table = new ConvexTable(tableModel);
 		
 		model.addPropertyChangeListener(pc -> {
 			State newState = (State) pc.getNewValue();
