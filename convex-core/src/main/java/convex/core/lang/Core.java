@@ -991,6 +991,24 @@ public class Core {
 			return context.withResult(Juice.LOOKUP,stake);
 		}
 	});
+	
+	public static final CoreFn<CVMLong> GET_PEER_STAKE = reg(new CoreFn<>(Symbols.GET_PEER_STAKE,70) {
+		
+		@Override
+		public  Context invoke(Context context, ACell[] args) {
+			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
+
+			ABlob b=RT.ensureBlob(args[0]);
+			if (b == null) return context.withCastError(0,args, Types.BLOB);
+			AccountKey accountKey = AccountKey.create(b);
+			if (accountKey==null) return context.withArgumentError("Peer Key must be 32 bytes");
+
+			PeerStatus ps=context.getState().getPeer(accountKey);
+			CVMLong stake=(ps==null)?null:CVMLong.create(ps.getPeerStake());
+			
+			return context.withResult(Juice.LOOKUP,stake);
+		}
+	});
 
 	public static final CoreFn<CVMLong> CREATE_PEER = reg(new CoreFn<>(Symbols.CREATE_PEER,65) {
 		

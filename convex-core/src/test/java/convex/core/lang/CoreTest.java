@@ -3400,10 +3400,27 @@ public class CoreTest extends ACVMTest {
 		// null for non-existing peer
 		assertNull(eval(ctx,"(get-stake 0x1234567812345678123456781234567812345678123456781234567812345678 *address*)")); 
 		
+		assertCastError(step(ctx,"(get-stake :foo *address*)"));
 		assertCastError(step(ctx,"(get-stake my-peer :foo)"));
 
 		assertArityError(step(ctx,"(get-stake my-peer)"));
 		assertArityError(step(ctx,"(get-stake my-peer *address* :foo)"));
+	}
+	
+	@Test
+	public void testGetPeerStake() {
+		Context ctx=step(context(),"(def my-peer 0x"+InitTest.FIRST_PEER_KEY.toHexString()+")");
+		
+		// existing peer has positive stake
+		assertTrue(0L<evalL(ctx,"(get-peer-stake my-peer)"));
+		
+		// null for non-existing peer
+		assertNull(eval(ctx,"(get-peer-stake 0x1234567812345678123456781234567812345678123456781234567812345678)")); 
+
+		assertCastError(step(ctx,"(get-peer-stake :foo)"));
+		
+		assertArityError(step(ctx,"(get-peer-stake)"));
+		assertArityError(step(ctx,"(get-peer-stake my-peer *address*)"));
 	}
 
 	@Test
@@ -3413,12 +3430,16 @@ public class CoreTest extends ACVMTest {
 		long STK=1000000;
 		Context ctx=context();
 		
-		
 		assertNull(ctx.getState().getPeer(KEY));
 		assertStateError(step(ctx,"(set-peer-stake "+KEY+" "+STK+")"));
+		assertNull(eval(ctx,"(get-peer-stake "+KEY+")")); // no peer exists yet
 		
 		// create peer with initial stake
 		ctx=exec(ctx,"(create-peer "+KEY+" "+STK+")");
+		
+		assertCVMEquals(STK,eval(ctx,"(get-peer-stake "+KEY+")")); // own stake just set
+		assertCVMEquals(0,eval(ctx,"(get-stake "+KEY+" *address*)")); // no delegated stake on this peer
+
 		
 		// Check stake has been established
 		PeerStatus ps=ctx.getState().getPeer(KEY);

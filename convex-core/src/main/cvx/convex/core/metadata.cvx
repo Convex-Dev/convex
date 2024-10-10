@@ -627,6 +627,11 @@
         :signature   [{:params [coll keys]}
                       {:params [coll keys not-found]}]}}
  
+ get-peer-stake
+ {:doc {:description "Gets the peer stake for a specific peer."
+        :examples    [{:code "(get-stake my-peer-key)"}]
+        :signature   [{:params [peer-key]}]}}
+
  get-stake
  {:doc {:description "Gets the delgated stake for an account on a specific peer."
         :errors      {:CAST "If the account is not an address."}

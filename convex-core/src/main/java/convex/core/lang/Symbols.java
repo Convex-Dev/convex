@@ -109,7 +109,8 @@ public class Symbols {
 	public static final Symbol SET_PEER_STAKE = intern("set-peer-stake");
 	public static final Symbol EVICT_PEER = intern("evict-peer");
 	
-	public static final Symbol GET_STAKE = intern("get-stake");;
+	public static final Symbol GET_STAKE = intern("get-stake");
+	public static final Symbol GET_PEER_STAKE = intern("get-peer-stake");
 
 	public static final Symbol CALL = intern("call");
 	public static final Symbol CALL_STAR = intern("call*");
@@ -346,6 +347,7 @@ public class Symbols {
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
 	public static final Symbol CREATE = intern("create");
+
 
 
 
