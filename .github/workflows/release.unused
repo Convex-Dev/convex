@@ -1,0 +1,31 @@
+name: release
+
+on:
+  push:
+    tags: [ '*.*.*' ]
+
+###
+
+jobs:
+
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Prepare Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: ${{ matrix.java-version }}
+      - name: Maven dependencies cache
+        uses: actions/cache@v3
+        with:
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          path: ~/.m2
+          restore-keys: ${{ runner.os }}-m2
+      - name: Run release
+        run: mvn clean install
+        
+        # How to actually make the release??
