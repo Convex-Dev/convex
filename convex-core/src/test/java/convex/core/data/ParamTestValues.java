@@ -14,6 +14,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.cvm.AccountStatus;
+import convex.core.cvm.PeerStatus;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;

@@ -21,6 +21,7 @@ import convex.gui.components.ConvexTable;
 import convex.gui.components.renderer.AccountKeyRenderer;
 import convex.gui.components.renderer.AddressRenderer;
 import convex.gui.components.renderer.BalanceRenderer;
+import convex.gui.components.renderer.StringRenderer;
 
 @SuppressWarnings("serial")
 public class PeerStakeTable extends ConvexTable {
@@ -47,7 +48,7 @@ public class PeerStakeTable extends ConvexTable {
 		{ // URL
 			String colName="Controller";
 			tm.addColumn(colName);
-			TableColumn col=new TableColumn(1,150,new AddressRenderer(JLabel.LEFT),null);
+			TableColumn col=new TableColumn(1,80,new AddressRenderer(JLabel.LEFT),null);
 			col.setHeaderValue(colName);
 			this.getColumnModel().addColumn(col);
 		}
@@ -55,7 +56,31 @@ public class PeerStakeTable extends ConvexTable {
 		{ // Stake
 			String colName="Staked Coins";
 			tm.addColumn(colName);
-			TableColumn col=new TableColumn(2,300,new BalanceRenderer(),null);
+			TableColumn col=new TableColumn(2,100,new BalanceRenderer(),null);
+			col.setHeaderValue(colName);
+			this.getColumnModel().addColumn(col);
+		}
+		
+		{ // Timestamp
+			String colName="Timestamp";
+			tm.addColumn(colName);
+			TableColumn col=new TableColumn(3,80,new StringRenderer(),null);
+			col.setHeaderValue(colName);
+			this.getColumnModel().addColumn(col);
+		}
+		
+		{ // Stake
+			String colName="Peer Stake";
+			tm.addColumn(colName);
+			TableColumn col=new TableColumn(4,100,new BalanceRenderer(),null);
+			col.setHeaderValue(colName);
+			this.getColumnModel().addColumn(col);
+		}
+		
+		{ // Delegated Stake
+			String colName="Del. Stake";
+			tm.addColumn(colName);
+			TableColumn col=new TableColumn(5,100,new BalanceRenderer(),null);
 			col.setHeaderValue(colName);
 			this.getColumnModel().addColumn(col);
 		}
@@ -85,6 +110,8 @@ public class PeerStakeTable extends ConvexTable {
 				+" (:controller p)"
 				+" (:balance p) "
 				+" (:timestamp p) "
+				+" (get-peer-stake pk) "
+				+" (get-stake pk *address*) "
 				+" :FOO"
 				+"])"
 				+"(:peers *state*))");

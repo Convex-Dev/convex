@@ -25,6 +25,7 @@ public class PeerStakePanel extends JPanel {
 		add(ap,BorderLayout.SOUTH);
 		
 		ap.add(new ActionButton("Refresh", 0xe5d5, e->peerTable.refresh()) );
+		ap.add(new ActionButton("Set Stake...", 0xf5dc, e->peerTable.refresh()) );
 	}
 
 }

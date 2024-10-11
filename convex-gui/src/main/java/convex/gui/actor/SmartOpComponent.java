@@ -17,7 +17,7 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
-import convex.core.data.AccountStatus;
+import convex.core.cvm.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;

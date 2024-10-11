@@ -13,7 +13,6 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
@@ -42,7 +41,7 @@ public class AccountTest {
 	public void testBalance() {
 		CLTester tester;;
 		
-		AccountStatus as=SERVER.getPeer().getConsensusState().getAccount(Address.create(11));
+		convex.core.cvm.AccountStatus as=SERVER.getPeer().getConsensusState().getAccount(Address.create(11));
 		tester =  CLTester.run(
 				"account", 
 				"balance",

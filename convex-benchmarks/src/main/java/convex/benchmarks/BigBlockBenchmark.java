@@ -12,7 +12,7 @@ import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.AccountStatus;
+import convex.core.cvm.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Cells;
 import convex.core.data.SignedData;

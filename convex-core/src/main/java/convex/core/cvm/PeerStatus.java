@@ -1,11 +1,28 @@
-package convex.core.data;
+package convex.core.cvm;
 
 import convex.core.cpos.CPoSConstants;
+import convex.core.data.ACell;
+import convex.core.data.AHashMap;
+import convex.core.data.ARecord;
+import convex.core.data.AString;
+import convex.core.data.Address;
+import convex.core.data.Blob;
+import convex.core.data.Cells;
+import convex.core.data.Format;
+import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
+import convex.core.data.Index;
+import convex.core.data.Keyword;
+import convex.core.data.Keywords;
+import convex.core.data.Maps;
+import convex.core.data.Ref;
+import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
+import convex.core.util.Utils;
 
 /**
  * Class describing the on-chain state of a Peer declared on the network.
@@ -96,8 +113,10 @@ public class PeerStatus extends ARecord {
 	 * @return Own stake, excluding delegated stake
 	 */
 	public long getPeerStake() {
-		// TODO: include rewards?
-		return peerStake;
+		long totalShares=peerStake+delegatedStake;
+		if (totalShares<=0) return 0; // nobody has any stake. Negative should not be possible, just in case
+		
+		return Utils.mulDiv(balance,peerStake,totalShares);
 	}
 	
 	/**
@@ -109,11 +128,12 @@ public class PeerStatus extends ARecord {
 	 * @return Value of delegated stake
 	 */
 	public long getDelegatedStake(Address delegator) {
-		// TODO: include rewards?
-
+		if (delegatedStake<=0) return 0; // nobody has any delegated stake. Negative should not be possible, just in case
 		CVMLong a = stakes.get(delegator);
 		if (a == null) return 0;
-		return a.longValue();
+		
+		long delShares=a.longValue();
+		return Utils.mulDiv(balance-getPeerStake(),delShares,delegatedStake);
 	}
 	
 	/**

@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
@@ -17,7 +18,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
-import convex.core.data.PeerStatus;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;

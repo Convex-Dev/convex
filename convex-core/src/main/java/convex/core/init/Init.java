@@ -5,16 +5,16 @@ import java.util.List;
 
 import convex.core.Coin;
 import convex.core.Constants;
+import convex.core.cvm.AccountStatus;
+import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.AccountStatus;
 import convex.core.data.Address;
 import convex.core.data.Index;
-import convex.core.data.PeerStatus;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.Code;

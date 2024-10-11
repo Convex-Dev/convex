@@ -21,7 +21,7 @@ import javax.swing.JTable;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.cvm.State;
-import convex.core.data.AccountStatus;
+import convex.core.cvm.AccountStatus;
 import convex.core.data.Address;
 import convex.core.lang.RT;
 import convex.gui.actor.AccountWindow;
