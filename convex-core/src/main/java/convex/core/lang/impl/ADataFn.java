@@ -4,12 +4,12 @@ import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.AFn;
-import convex.core.lang.Context;
+import convex.core.lang.RT;
 
 /**
- * Abstract base class for data structure lookup functions.
+ * Abstract base wrapper class for data structure lookup functions.
  * 
- * Not a canonical object, can't exist as CVM value.
+ * Not a canonical object, essentially a wrapper for a data structure interpreted as a function
  * 
  * @param <T> Type of function return value
  */
@@ -17,37 +17,32 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 
 	@Override
 	public int estimatedEncodingSize() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public Context invoke(Context context, ACell[] args) {
-		throw new UnsupportedOperationException();
+		return getCanonical().estimatedEncodingSize();
 	}
 
 	@Override
 	public AFn<T> updateRefs(IRefFunction func) {
-		throw new UnsupportedOperationException();
+		return RT.castFunction(getCanonical().updateRefs(func));
 	}
 
 	@Override
 	public boolean hasArity(int n) {
-		throw new UnsupportedOperationException();
+		return (n==1)||(n==2);
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		throw new UnsupportedOperationException();
+		getCanonical().validateCell();;
 	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		throw new UnsupportedOperationException();
+		return getCanonical().encode(bs, pos);
 	}
 
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		throw new UnsupportedOperationException();
+		return getCanonical().encodeRaw(bs, pos);
 	}
 
 	@Override
@@ -56,22 +51,10 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	}
 	
 	@Override
-	public ACell toCanonical() {
-		throw new UnsupportedOperationException("Can't make canonical!");
-	}
-	
-	@Override
-	public boolean isCVMValue() {
-		return false;
-	}
+	public abstract ACell toCanonical();
 	
 	@Override
 	public byte getTag() {
-		throw new UnsupportedOperationException();
-	}
-
-	@Override
-	public int getRefCount() {
-		throw new UnsupportedOperationException();
+		return getCanonical().getTag();
 	}
 }

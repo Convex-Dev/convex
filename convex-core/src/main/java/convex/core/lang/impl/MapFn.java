@@ -39,4 +39,9 @@ public class MapFn<K extends ACell, T  extends ACell> extends ADataFn<T> {
 		return map.print(sb,limit);
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return map.getCanonical();
+	}
+
 }

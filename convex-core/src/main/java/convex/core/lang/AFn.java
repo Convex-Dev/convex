@@ -1,7 +1,6 @@
 package convex.core.lang;
 
 import convex.core.data.ACell;
-import convex.core.data.ACode;
 import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
@@ -15,7 +14,7 @@ import convex.core.data.type.Types;
  *
  * @param <T> Return type of functions.
  */
-public abstract class AFn<T extends ACell> extends ACode implements IFn<T> {
+public abstract class AFn<T extends ACell> extends ACVMCode implements IFn<T> {
 	
 	@Override
 	public abstract Context invoke(Context context, ACell[] args);
@@ -47,11 +46,6 @@ public abstract class AFn<T extends ACell> extends ACode implements IFn<T> {
 	 * @return true if function supports the given arity, false otherwise
 	 */
 	public abstract boolean hasArity(int arity);
-	
-	@Override 
-	public boolean isCVMValue() {
-		return true;
-	}
 	
 	@Override
 	public byte getTag() {

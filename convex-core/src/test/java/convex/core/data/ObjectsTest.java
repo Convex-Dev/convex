@@ -406,7 +406,9 @@ public class ObjectsTest {
 	private static void doRefContainerTests(ACell a) {
 		if (!a.isCanonical()) return;
 		int rc=a.getRefCount();
+	
 		assertTrue(rc>=0);
+		assertTrue(rc<=Format.MAX_REF_COUNT);
 		assertEquals(rc,Cells.refCount(a));
 		if (rc>0) {
 			long tcount = Refs.totalRefCount(a);

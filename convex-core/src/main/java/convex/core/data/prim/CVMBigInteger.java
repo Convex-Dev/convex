@@ -182,7 +182,7 @@ public final class CVMBigInteger extends AInteger {
 	}
 
 	@Override
-	protected int encodeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		ABlob b=blob();
 		return b.encodeRaw(bs, pos);
 	}

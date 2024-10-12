@@ -1,7 +1,6 @@
 package convex.core.lang;
 
 import convex.core.data.ACell;
-import convex.core.data.ACode;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
@@ -20,7 +19,7 @@ import convex.core.data.type.Types;
  *
  * @param <T> the type of the operation return value
  */
-public abstract class AOp<T extends ACell> extends ACode {
+public abstract class AOp<T extends ACell> extends ACVMCode {
 
 	/**
 	 * Executes this op with the given context. Must preserve depth unless an
@@ -50,10 +49,6 @@ public abstract class AOp<T extends ACell> extends ACode {
 	@Override
 	public ACell toCanonical() {
 		return this;
-	}
-	
-	@Override public final boolean isCVMValue() {
-		return true;
 	}
 
 	/**

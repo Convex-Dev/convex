@@ -37,7 +37,7 @@ public class DummyCell extends ACell {
 	}
 	
 	@Override
-	protected int encodeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		// Nothing to encode
 		return pos;
 	}

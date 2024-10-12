@@ -49,5 +49,10 @@ public class KeywordFn<T extends ACell> extends ADataFn<T> {
 		return key.print(sb,limit);
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return key.getCanonical();
+	}
+
 
 }

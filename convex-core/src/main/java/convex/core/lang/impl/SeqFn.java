@@ -54,4 +54,9 @@ public class SeqFn<T extends ACell> extends ADataFn<T> {
 		return seq.print(sb,limit);
 	}
 
+	@Override
+	public ACell toCanonical() {
+		return seq.getCanonical();
+	}
+
 }

@@ -39,7 +39,7 @@ public class ANonCVM extends ACell {
 	}
 
 	@Override
-	protected int encodeRaw(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		encoding.slice(1).getBytes(bs, pos);
 		return pos+encoding.size()-1;
 	}

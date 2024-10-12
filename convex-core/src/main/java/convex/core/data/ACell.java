@@ -183,7 +183,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param pos The offset into the byte array
 	 * @return New position after writing
 	 */
-	protected abstract int encodeRaw(byte[] bs, int pos);
+	public abstract int encodeRaw(byte[] bs, int pos);
 	
 	/**
 	 * Creates the encoding for this cell. Cell must be canonical, or else an error may occur.
@@ -399,11 +399,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	
 	/**
 	 * Gets the number of Refs contained within this Cell. This number is
-	 * final / immutable for any given instance and is defined by the Cell encoding rules.
+	 * final / immutable for any given instance and is defined by the Cell,s CAD3 encoding rules.
 	 * 
 	 * Contained Refs may be either external or embedded.
 	 * 
-	 * @return The number of Refs in this Cell
+	 * @return The number of Refs in this Cell (0-63)
 	 */
 	public int getRefCount() {
 		ACell canonical=getCanonical();

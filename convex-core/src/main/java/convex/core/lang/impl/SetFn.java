@@ -10,7 +10,7 @@ public class SetFn<T extends ACell> extends ADataFn<CVMBool> {
 
 	private ASet<T> set;
 
-	public SetFn(ASet<T> m) {
+	SetFn(ASet<T> m) {
 		this.set = m;
 	}
 
@@ -33,6 +33,11 @@ public class SetFn<T extends ACell> extends ADataFn<CVMBool> {
 	@Override
 	public boolean print(BlobBuilder sb,long limit) {
 		return set.print(sb,limit);
+	}
+
+	@Override
+	public ACell toCanonical() {
+		return set.getCanonical();
 	}
 
 }

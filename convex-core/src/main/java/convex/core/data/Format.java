@@ -43,10 +43,9 @@ import convex.core.util.Trees;
 import convex.core.util.Utils;
 
 /**
- * Static utility class for message format encoding
+ * Static utility class for CAD3 encoding format
  *
- * "Standards are always out of date. That's what makes them standards." - Alan
- * Bennett
+ * "Standards are always out of date. That's what makes them standards." - Alan Bennett
  */
 public class Format {
 
@@ -57,7 +56,8 @@ public class Format {
 	 * <ul>
 	 * <li>This is the maximum length that can be VLQ encoded in 2 bytes. This simplifies message encoding and decoding.</li>
 	 * <li>It is big enough to include a 4096-byte Blob</li>
-	 * <li>It is small enough to fit in a UDP message</li>
+	 * <li>It is big enough to include a Record with 63 directly referenced fields</li>
+	 * <li>It is small enough to guarantee fitting in a UDP message</li>
 	 * </ul>
 	 */
 	public static final int LIMIT_ENCODING_LENGTH = 0x3FFF; 
@@ -96,6 +96,11 @@ public class Format {
 	 * Memory size of a fully embedded value (zero)
 	 */
 	public static final long FULL_EMBEDDED_MEMORY_SIZE = 0L;
+
+	/**
+	 * Maximum number of Refs for any single Cell
+	 */
+	public static final int MAX_REF_COUNT = 63;
 
 	/**
 	 * Gets the length in bytes of VLQ encoding for the given long value
