@@ -13,7 +13,7 @@ import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
 
 /**
- * Base class for Record data types. 
+ * Base class for CVM Record data types. 
  * 
  * Records are Map-like data structures with fixed sets of Keyword keys, and optional custom behaviour.
  * 
@@ -50,7 +50,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		return this;
 	}
 
-	@Override public boolean isCVMValue() {
+	@Override final public boolean isCVMValue() {
 		return true;
 	}
 	

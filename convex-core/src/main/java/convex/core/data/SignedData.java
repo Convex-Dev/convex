@@ -323,10 +323,6 @@ public final class SignedData<T extends ACell> extends ARecord {
 		return true;
 	}
 
-	@Override public final boolean isCVMValue() {
-		return false;
-	}
-
 	@Override
 	public final int getRefCount() {
 		// Value Ref only

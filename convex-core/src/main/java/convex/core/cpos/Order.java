@@ -159,12 +159,6 @@ public class Order extends ARecord {
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
-	
-
-	@Override public final boolean isCVMValue() {
-		// Orders exist outside CVM only
-		return false;
-	}
 
 	/**
 	 * Checks if another Order is consistent with this Order.

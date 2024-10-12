@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
 import convex.core.cvm.AccountStatus;
-import convex.core.cvm.Receipt;
+import convex.core.data.impl.DummyCell;
+import convex.core.data.prim.ByteFlagExtended;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -30,8 +31,8 @@ import convex.test.Samples;
  */
 public class AdversarialDataTest {
 
-	// A value that is valid, but not a first class CVM value
-	public static final ACell NON_CVM=Receipt.create(null);
+	// A value that is valid CAD3, but not a first class CVM value
+	public static final ACell NON_CVM=ByteFlagExtended.create(15);
 	
 	// A value that is non-canonical but otherwise valid CVM value
 	public static final Blob NON_CANONICAL=Blob.createRandom(new Random(), Blob.CHUNK_LENGTH+1);
@@ -39,8 +40,14 @@ public class AdversarialDataTest {
 	// A value that is invalid 
 	public static final SetLeaf<CVMLong> NON_VALID=SetLeaf.unsafeCreate(new CVMLong[0]);
 
+	// A value that is illegal in any encoding
+	@SuppressWarnings("exports")
+	public static final DummyCell NON_LEGAL=new DummyCell();
+
+	
 	@Test public void testAssumptions() {
 		assertFalse(NON_CVM.isCVMValue());
+		assertFalse(NON_LEGAL.isCVMValue());
 		assertFalse(NON_CANONICAL.isCanonical());
 		assertThrows(InvalidDataException.class, ()->NON_VALID.validate());
 	} 

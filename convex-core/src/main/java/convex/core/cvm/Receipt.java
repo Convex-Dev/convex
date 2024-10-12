@@ -89,11 +89,6 @@ public class Receipt extends ARecord {
 		int tag=Tag.RECEIPT+(isError?Tag.RECEIPT_ERROR_MASK:0)+((log==null)?0:Tag.RECEIPT_LOG_MASK);
 		return (byte)tag;
 	}
-	
-	@Override public final boolean isCVMValue() {
-		// Receipts exist outside CVM only
-		return false;
-	}
 
 	@Override
 	public RecordFormat getFormat() {

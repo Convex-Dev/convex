@@ -8,9 +8,9 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
 /**
- * Abstract base class for Cells.
+ * Abstract base class for Cells in CAD3 data format.
  * 
- * Cells may contain Refs to other Cells, which can be tested with getRefCount()
+ * Cells may contain Refs to 0-63 child Cells, which can be tested with getRefCount()
  * 
  * All data objects intended for on-chain usage / serialisation should extend this. 
  * 
@@ -348,25 +348,24 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract boolean isCanonical();
 	
 	/**
-	 * Converts this Cell to a canonical version. Must return this Cell if already canonical, may be O(n) in size of value otherwise.
+	 * Converts this Cell to a canonical version, if not already canonical.
 	 * 
-	 * Callers should usually use getCanonical(), which caches canonical instances once created 
+	 * Must return this Cell if already canonical, may be O(n) in size of value otherwise.
+	 * 
+	 * Users should usually use getCanonical(), which caches canonical instances once created 
 	 * 
 	 * @return Canonical version of Cell
 	 */
 	protected abstract ACell toCanonical();
 	
 	/**
-	 * Returns true if this cell is a first class CVM Value used in the CVM state
+	 * Returns true if this cell is a first class CVM Value.
 	 * 
-	 * Sub-structural cells that are not themselves first class values
-	 * should return false
+	 * CAD3 Records and types that are not recognised by the CVM must return false.
 	 * 
-	 * Records and types that are not permissible on the CVM should return false.
+	 * Everything the CVM can recognise must return true.
 	 * 
-	 * Pretty much everything else should return true.
-	 * 
-	 * Note: CVM values might not be in a canonical format, e.g. temporary data structures
+	 * Note: CVM values might still not be in a canonical format, e.g. temporary data structures
 	 * 
 	 * @return true if the object is a CVM Value, false otherwise
 	 */

@@ -214,11 +214,6 @@ public final class Block extends ARecord {
 		if (!(Cells.equals(transactions, a.transactions))) return false;
 		return true;
 	}
-	
-	@Override
-	public boolean isCVMValue() {
-		return false;
-	}
 
 	@Override
 	public int getRefCount() {

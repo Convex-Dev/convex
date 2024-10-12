@@ -52,7 +52,9 @@ public class ByteFlagExtended extends AByteFlag {
 		return pos;
 	}
 
-	
+	@Override public boolean isCVMValue() {
+		return (tag==Tag.TRUE)||(tag==Tag.FALSE);
+	}
 	
 	@Override
 	public long longValue() {

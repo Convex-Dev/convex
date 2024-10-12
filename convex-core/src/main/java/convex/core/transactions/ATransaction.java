@@ -88,11 +88,6 @@ public abstract class ATransaction extends ARecord {
 		return sequence;
 	}
 	
-	@Override public final boolean isCVMValue() {
-		// Transactions exist outside CVM only
-		return false;
-	}
-	
 	@Override
 	public AType getType() {
 		return Transaction.INSTANCE;

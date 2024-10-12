@@ -838,8 +838,13 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	public void validate() throws InvalidDataException {
 		super.validate();
 		
-		// Perform child validation
-		validateWithPrefix(getFirstHash(),shift);
+		try {
+			Hash firstHash=getFirstHash();
+			// Perform child validation
+			validateWithPrefix(firstHash,shift);
+		} catch (ClassCastException e) {
+			throw new InvalidDataException("Can't get first hash of map: "+e.getMessage(),e);
+		}
 	}
 
 	@Override
