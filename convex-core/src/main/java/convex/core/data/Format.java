@@ -510,12 +510,13 @@ public class Format {
 		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
 	}
 	
-
 	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
-		if (tag == Tag.CORE_DEF) return Core.read(blob, offset);
+		// We expect a VLQ Count following the tag
+		long code=readVLQCount(blob,offset+1);
 		
-		return ExtensionValue.create(tag, readVLQCount(blob,offset+1));
-
+		if (tag == Tag.CORE_DEF) return Core.fromCode(code);
+	
+		return ExtensionValue.create(tag, code);
 	}
 
 	/**

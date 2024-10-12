@@ -406,7 +406,7 @@ public class AntlrReader {
 			String s=ctx.getStop().getText();
 			Blob enc=Blob.fromHex(s.substring(2, s.length()-1));
 			try {
-				ACell cell=convex.core.data.Format.read(enc);
+				ACell cell=convex.core.data.Format.decodeMultiCell(enc);
 				push (cell);
 			} catch (BadFormatException e) {
 				throw new ParseException("Invalid CAD3 encoding: "+e.getMessage(),e);

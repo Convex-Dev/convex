@@ -3011,8 +3011,7 @@ public class Core {
  	 * @return Singleton cell representing the Core value
  	 * @throws BadFormatException In case of encoding error
  	 */
-	public static ACell read(Blob b, int pos) throws BadFormatException {
-		long code=Format.readVLQCount(b, pos+1);
+	public static ACell fromCode(long code) throws BadFormatException {
 		if (code <0 || code>=CODE_MAP.length) throw new BadFormatException("Core code out of range: "+code);
 		
 		ACell o = CODE_MAP[(int)code];
