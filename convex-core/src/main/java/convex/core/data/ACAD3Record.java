@@ -3,6 +3,7 @@ package convex.core.data;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.util.Utils;
 
 /**
  * Abstract base class for non-CVM CAD3 Records values. These look like countable sequences to CVM code.
@@ -11,43 +12,52 @@ import convex.core.lang.RT;
  */
 public abstract class ACAD3Record extends ASequence<ACell> {
 
-	public ACAD3Record(long count) {
+	protected final byte tag;
+
+	protected ACAD3Record(byte tag,long count) {
 		super(count);
+		this.tag=tag;
 	}
-
-	@Override
-	public int estimatedEncodingSize() {
-		return encoding.size();
-	}
-
+	
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// TODO Auto-generated method stub
+		byte cat=Tag.category(tag);
+		switch (cat) {
+		case Tag.DENSE_RECORD_BASE:
+		case Tag.SPARSE_RECORD_BASE:
+		  break; // seems OK
+		default: throw new InvalidDataException("Bad tag for CAD3 Record: 0x"+Utils.toHexString(tag),this);
+		}
 	}
 
 	@Override
 	public byte getTag() {
-		return encoding.byteAt(0);
+		return tag;
 	}
 
 	@Override
 	public boolean equals(ACell a) {
 		if (a==null) return false;
-		if (a.getTag()!=getTag()) return false;
+		if (a.getTag()!=tag) return false;
 		return encoding.equals(a.getEncoding());
 	}
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		encoding.getBytes(bs, pos);
-		return pos+encoding.size();
+		bs[pos++]=tag;
+		return encodeRaw(bs,pos);
 	}
-
+	
+	// subclasses must implement getRefCount and getRef
+	
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		encoding.slice(1).getBytes(bs, pos);
-		return pos+encoding.size()-1;
-	}
+	public abstract int getRefCount();
+	
+	@Override
+	public abstract Ref<ACell> getRef(int i);
+	
+	@Override
+	public abstract ACell updateRefs(IRefFunction func);
 
 	@Override
 	public boolean isCanonical() {

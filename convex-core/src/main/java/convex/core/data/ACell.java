@@ -245,7 +245,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @return The cached blob for this cell, or null if not yet available. 
 	 */
-	public Blob cachedEncoding() {
+	public final Blob cachedEncoding() {
 		return encoding;
 	}
 

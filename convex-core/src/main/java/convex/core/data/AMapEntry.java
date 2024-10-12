@@ -52,8 +52,6 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpeci
 
 	@Override
 	public abstract boolean isCanonical();
-	
-
 
 	@Override
 	public AVector<ACell> append(ACell value) {

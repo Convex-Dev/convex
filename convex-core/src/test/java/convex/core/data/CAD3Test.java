@@ -1,17 +1,26 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.data.prim.CVMLong;
+import convex.core.lang.ACVMTest;
+import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 
-public class CAD3Test {
+import static convex.test.Assertions.*;
+
+@TestInstance(Lifecycle.PER_CLASS)
+public class CAD3Test extends ACVMTest {
 	
 	@Test public void testExtensionValues() {
 		ExtensionValue ev=ExtensionValue.create((byte) 0xe3,100);
@@ -32,6 +41,41 @@ public class CAD3Test {
 		assertSame(Vectors.empty(),Reader.read("#[8000]"));
 		assertNull(Reader.read("#[00]"));
 		assertEquals(ExtensionValue.create((byte) 0xe5, 0),Reader.read("#[e500]"));
+	}
+	
+	@Test public void testDenseRecords() {
+		AVector<ACell> v=Vectors.of(1,2,3);
+		DenseRecord dr=DenseRecord.create(0xDF,v);
+		assertEquals(Blob.fromHex("df03110111021103"),dr.getEncoding());
+
+		assertEquals(3,dr.count);
+		assertSame(v,dr.toVector());
+		assertEquals("#[df03110111021103]",dr.toString());
+		
+		ObjectsTest.doAnyValueTests(dr);
+		
+		DenseRecord ed=DenseRecord.create(0xDE,Vectors.empty());
+		assertEquals(Blob.fromHex("de00"),ed.getEncoding());
+		
+		ObjectsTest.doAnyValueTests(ed);
+	}
+	
+	/**
+	 * Tests for dense record interactions with core functions
+	 */
+	@Test public void testCoreRecords() {
+		Context ctx=context();
+		ctx=exec(ctx,"(def dr #[df03110111021103])");
+		DenseRecord dr=ctx.getResult();
+		assertNotNull(dr);
+		
+		// DenseRecord behaves like a sequence
+		assertCVMEquals(3,eval(ctx,"(count dr)"));
+		assertCVMEquals(1,eval(ctx,"(first dr)"));
+		assertCVMEquals(Vectors.of(1,2,3),eval(ctx,"(vec dr)"));
+		
+		assertFalse(evalB(ctx,"(vector? dr)"));
+		assertFalse(evalB(ctx,"(map? dr)"));
 	}
 
 }

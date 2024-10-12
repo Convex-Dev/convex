@@ -66,6 +66,8 @@ public class Tag {
 
 	// ==========================================
 	// Sparsely coded record (0xAx)
+	public static final byte SPARSE_RECORD_BASE = (byte) 0xA0;
+	
 	public static final byte STATE = (byte) 0xA0;
 	public static final byte ACCOUNT_STATUS = (byte) 0xA1;
 	public static final byte PEER_STATUS = (byte) 0xA2;
@@ -98,6 +100,8 @@ public class Tag {
 	
 	// ==========================================
 	// Densely coded record (0xDx)
+	public static final byte DENSE_RECORD_BASE = (byte) 0xD0;
+	
 	public static final byte INVOKE = (byte) 0xD0;
 	public static final byte TRANSFER = (byte) 0xD1;
 	public static final byte CALL = (byte) 0xD2;
@@ -120,6 +124,16 @@ public class Tag {
 	//===========================================
 	// Illegal / reserved for special values (0xFx)
 	public static final byte ILLEGAL = (byte) 0xFF;
+
+	
+	/**
+	 * Get the general category for a given Tag (high hex digit)
+	 * @param tag Tag Byte
+	 * @return Category e.g. 0xC0 for coded data
+	 */
+	public static byte category(int tag) {
+		return (byte) (tag&0xF0);
+	}
 
 
 

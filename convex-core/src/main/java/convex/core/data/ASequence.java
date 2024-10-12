@@ -16,6 +16,8 @@ import convex.core.util.Utils;
 
 /**
  * Abstract base class for concrete sequential data structure (immutable persistent lists and vectors etc.)
+ * 
+ * Implements standard java.util.List interface
  *
  * @param <T> Type of list elements
  */
@@ -168,8 +170,6 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 		}
 		return false;
 	}
-
-
 
 	/**
 	 * Gets the element Ref at the specified index

@@ -113,6 +113,10 @@ public class Compiler {
 			if (form instanceof AHashMap) return compileMap((AHashMap<ACell, ACell>) form, context);
 			if (form instanceof ASet) return compileSet((ASet<ACell>) form, context);
 			if (form instanceof AMap) return compileConstant( context,form);
+			if (!form.isCVMValue()) {
+				// This is probably a non-CVM CAD3 structures
+				return compileConstant(context, form);
+			}
 			return context.withCompileError("Unexpected data structure: "+form.getClass());
 		}
 		

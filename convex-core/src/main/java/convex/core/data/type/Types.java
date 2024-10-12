@@ -53,6 +53,7 @@ public class Types {
 	public static final Transaction TRANSACTION=Transaction.INSTANCE;
 	
 	public static final Countable COUNTABLE = Countable.INSTANCE;
+	public static final CAD3Type CAD3 = CAD3Type.INSTANCE;
 
 
 

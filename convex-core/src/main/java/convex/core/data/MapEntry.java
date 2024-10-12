@@ -15,8 +15,7 @@ import convex.core.util.ErrorMessages;
  * implementation class for handling entries in Convex maps, and also to support the Java Map.Entry
  * interface for compatibility and developer convenience.
  * 
- * From a CVM perspective, a MapEntry is just a regular 2 element Vector. As such, MapEntry is *not* canonical
- * and getting the canonical form of a MapEntry requires converting to a Vector
+ * From a CVM perspective, a MapEntry is just a regular 2 element Vector.
  * 
  * Contains exactly 2 elements, one for key and one for value
  * 

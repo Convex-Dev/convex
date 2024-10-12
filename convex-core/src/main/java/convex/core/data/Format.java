@@ -705,7 +705,11 @@ public class Format {
 		} else if (tag == Tag.MULTI) {
 			return (T) Multi.read(b,pos);
 		}
-		throw new BadFormatException(badTagMessage(tag));
+		
+		// Might be a generic Dense Record
+		DenseRecord dr=DenseRecord.read(tag,b,pos);
+		if (dr==null) throw new BadFormatException(badTagMessage(tag));
+		return (T) dr;
 	}
 
 	/**
