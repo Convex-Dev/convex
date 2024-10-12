@@ -17,11 +17,12 @@ public class DenseRecord extends ACAD3Record {
 		this.data=data;
 	}
 	
-	public static DenseRecord create(int tag,AVector<ACell> data) {
+	@SuppressWarnings("unchecked")
+	public static DenseRecord create(int tag,AVector<?> data) {
 		if (data==null) return null;
 		if (Tag.category(tag)!=Tag.DENSE_RECORD_BASE) return null; // not an extension value
 		
-		return new DenseRecord((byte)tag,data);
+		return new DenseRecord((byte)tag,(AVector<ACell>) data);
 	}
 	
 	@Override

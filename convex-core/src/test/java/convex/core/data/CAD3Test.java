@@ -16,6 +16,7 @@ import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 import static convex.test.Assertions.*;
 
@@ -44,20 +45,35 @@ public class CAD3Test extends ACVMTest {
 	}
 	
 	@Test public void testDenseRecords() {
-		AVector<ACell> v=Vectors.of(1,2,3);
-		DenseRecord dr=DenseRecord.create(0xDF,v);
-		assertEquals(Blob.fromHex("df03110111021103"),dr.getEncoding());
-
-		assertEquals(3,dr.count);
-		assertSame(v,dr.toVector());
-		assertEquals("#[df03110111021103]",dr.toString());
+		{ // Small vector DenseRecord
+			AVector<ACell> v=Vectors.of(1,2,3);
+			DenseRecord dr=DenseRecord.create(0xDF,v);
+			assertEquals(Blob.fromHex("df03110111021103"),dr.getEncoding());
+	
+			assertEquals(3,dr.count);
+			assertSame(v,dr.toVector());
+			assertEquals("#[df03110111021103]",dr.toString());
+			
+			ObjectsTest.doAnyValueTests(dr);
+		}
 		
-		ObjectsTest.doAnyValueTests(dr);
+		{ // Empty vector DenseRecord
+			DenseRecord ed=DenseRecord.create(0xDE,Vectors.empty());
+			assertEquals(Blob.fromHex("de00"),ed.getEncoding());
+			
+			ObjectsTest.doAnyValueTests(ed);
+		}
 		
-		DenseRecord ed=DenseRecord.create(0xDE,Vectors.empty());
-		assertEquals(Blob.fromHex("de00"),ed.getEncoding());
-		
-		ObjectsTest.doAnyValueTests(ed);
+		{ // Large vector DenseRecord
+			AVector<CVMLong> v=Samples.INT_VECTOR_300;
+			DenseRecord dr=DenseRecord.create(0xDF,v);
+			assertEquals((byte)0xdf,dr.getTag());
+			
+			assertEquals(300,dr.count());
+			assertSame(v,dr.toVector());
+			
+			ObjectsTest.doAnyValueTests(dr);
+		}
 	}
 	
 	/**
@@ -73,6 +89,7 @@ public class CAD3Test extends ACVMTest {
 		assertCVMEquals(3,eval(ctx,"(count dr)"));
 		assertCVMEquals(1,eval(ctx,"(first dr)"));
 		assertCVMEquals(Vectors.of(1,2,3),eval(ctx,"(vec dr)"));
+		assertCVMEquals(Vectors.of(1,2,3,4),eval(ctx,"(conj dr 4)"));
 		
 		assertFalse(evalB(ctx,"(vector? dr)"));
 		assertFalse(evalB(ctx,"(map? dr)"));
