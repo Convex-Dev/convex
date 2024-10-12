@@ -188,6 +188,5 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	 */
 	public abstract boolean equalsBytes(ABlob b);
 
-	@Override
-	public abstract int compareTo(ABlobLike<?> b);
+
 }

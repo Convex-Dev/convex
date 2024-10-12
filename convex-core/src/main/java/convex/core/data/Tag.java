@@ -112,9 +112,10 @@ public class Tag {
 	//==========================================
 	// Extension values (0xEx)
 
+	public static final byte EXTENSION_VALUE_BASE = (byte) 0xE0;
+
 	// CVM Core definitions
 	public static final byte CORE_DEF = (byte) 0xED;
-
 
 	//===========================================
 	// Illegal / reserved for special values (0xFx)

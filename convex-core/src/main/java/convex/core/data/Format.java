@@ -514,7 +514,7 @@ public class Format {
 	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
 		if (tag == Tag.CORE_DEF) return Core.read(blob, offset);
 		
-		throw new BadFormatException(badTagMessage(tag));
+		return ExtensionValue.create(tag, readVLQCount(blob,offset+1));
 
 	}
 

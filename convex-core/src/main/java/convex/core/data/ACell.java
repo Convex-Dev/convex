@@ -165,7 +165,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Writes this Cell's encoding to a byte array, including a tag byte which will be written first.
+	 * Writes this Cell's CAD3 encoding to a byte array, including the tag byte which will be written first.
 	 * 
 	 * Cell must be canonical, or else an error may occur.
 	 *
@@ -177,7 +177,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	public abstract int encode(byte[] bs, int pos);
 	
 	/**
-	 * Writes this Cell's encoding to a byte array, excluding the tag byte.
+	 * Writes this Cell's CAD3 encoding to a byte array, excluding the tag byte.
 	 *
 	 * @param bs A byte array to which to write the encoding
 	 * @param pos The offset into the byte array

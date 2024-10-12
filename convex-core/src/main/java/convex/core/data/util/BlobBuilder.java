@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import convex.core.data.ABlob;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMChar;
 import convex.core.util.Utils;
@@ -257,6 +258,18 @@ public class BlobBuilder {
 			byte b=arr[pos+i];
 			append(Utils.toHexChar((b & 0xF0) >>> 4));
 			append(Utils.toHexChar((b & 0xF)));			
+		}
+	}
+	
+	public void appendVLQCountHex(long value) {
+		if (value<0) throw new IllegalArgumentException("Negative VLQ Count?");
+		int n=Format.getVLQCountLength(value);
+		for (int i=0; i<n; i++) {
+			byte b=(byte) ((value>>((n-i-1)*7))&0x7f); // 128 bits from each position
+			if (i<(n-1)) {
+				b|=(byte) 0x80; // continuation bit except at end
+			}
+			appendHexByte(b);
 		}
 	}
 
