@@ -29,8 +29,8 @@ import convex.test.Samples;
  */
 public class ObjectsTest {
 	/**
-	 * Generic tests for any valid CVM Value (including null). Should pass for
-	 * *any* ACell where RT.isCVM(..) returns true and validate(...) succeeds.
+	 * Generic tests for any valid Value (including null). Should pass for
+	 * *any* non-partial cell where validate(...) succeeds.
 	 * 
 	 * @param a Value to test
 	 */

@@ -5,10 +5,15 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
 /**
- * Abstract base class for non-CVM values. These should always have an encoding
- * since the only way to create them is load from network or storage
+ * Abstract base class for non-CVM CAD3 Records values. These look like countable sequences to CVM code.
+ * 
+ * These should always have an encoding since the only way to create them is load from network or storage
  */
-public class ANonCVM extends ACell {
+public abstract class ACAD3Record extends ASequence<ACell> {
+
+	public ACAD3Record(long count) {
+		super(count);
+	}
 
 	@Override
 	public int estimatedEncodingSize() {

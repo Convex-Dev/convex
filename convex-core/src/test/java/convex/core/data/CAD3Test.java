@@ -29,6 +29,7 @@ public class CAD3Test {
 	@Test public void testReadEncodings() {
 		assertSame(Address.ZERO,Reader.read("#[2100]"));
 		assertSame(CVMLong.ZERO,Reader.read("#[10]"));
+		assertSame(Vectors.empty(),Reader.read("#[8000]"));
 		assertNull(Reader.read("#[00]"));
 		assertEquals(ExtensionValue.create((byte) 0xe5, 0),Reader.read("#[e500]"));
 	}

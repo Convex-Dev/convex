@@ -183,6 +183,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 */
 	@Override
 	public abstract boolean isCanonical();
+	
+	@Override public final boolean isCVMValue() {
+		// Vectors are always valid CVM values
+		return true;
+	}
 
 	@Override
 	public abstract AVector<T> updateRefs(IRefFunction func);

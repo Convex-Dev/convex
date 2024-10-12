@@ -110,13 +110,6 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public T get(int index) {
 		return get((long) index);
 	}
-	
-	/**
-	 * Sequences are always valid CVM values
-	 */
-	@Override public final boolean isCVMValue() {
-		return true;
-	}
 
 	@Override
 	public abstract T get(long index);

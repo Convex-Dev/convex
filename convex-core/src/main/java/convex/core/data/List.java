@@ -236,6 +236,11 @@ public class List<T extends ACell> extends AList<T> {
 		return true;
 	}
 	
+	@Override public final boolean isCVMValue() {
+		// Lists are always valid CVM values
+		return true;
+	}
+	
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
 		bb.append('(');
