@@ -52,6 +52,8 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpeci
 
 	@Override
 	public abstract boolean isCanonical();
+	
+
 
 	@Override
 	public AVector<ACell> append(ACell value) {
@@ -74,14 +76,14 @@ public abstract class AMapEntry<K extends ACell, V extends ACell> extends ASpeci
 	}
 
 	@Override
-	public long longIndexOf(Object o) {
+	public long longIndexOf(ACell o) {
 		if (Utils.equals(o,get(0))) return 0;
 		if (Utils.equals(o,get(1))) return 1;
 		return -1;
 	}
 
 	@Override
-	public long longLastIndexOf(Object o) {
+	public long longLastIndexOf(ACell o) {
 		if (Utils.equals(o,get(1))) return 1;
 		if (Utils.equals(o,get(0))) return 0;
 		return -1;

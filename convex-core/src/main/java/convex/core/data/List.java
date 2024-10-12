@@ -118,28 +118,14 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public int indexOf(Object o) {
-		int pos = data.lastIndexOf(o);
-		if (pos < 0) return -1;
-		return size() - 1 - pos;
-	}
-
-	@Override
-	public int lastIndexOf(Object o) {
-		int pos = data.indexOf(o);
-		if (pos < 0) return -1;
-		return size() - 1 - pos;
-	}
-
-	@Override
-	public long longIndexOf(Object o) {
+	public long longIndexOf(ACell o) {
 		long pos = data.longLastIndexOf(o);
 		if (pos < 0) return -1;
 		return count - 1 - pos;
 	}
 
 	@Override
-	public long longLastIndexOf(Object o) {
+	public long longLastIndexOf(ACell o) {
 		long pos = data.longIndexOf(o);
 		if (pos < 0) return -1;
 		return count - 1 - pos;

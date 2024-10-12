@@ -356,7 +356,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public long longIndexOf(Object o) {
+	public long longIndexOf(ACell o) {
 		long offset = 0;
 		for (int i = 0; i < children.length; i++) {
 			AVector<T> b = children[i].getValue();
@@ -368,7 +368,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public long longLastIndexOf(Object o) {
+	public long longLastIndexOf(ACell o) {
 		long offset = count;
 		for (int i = children.length - 1; i >= 0; i--) {
 			AVector<T> b = children[i].getValue();

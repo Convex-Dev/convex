@@ -12,7 +12,6 @@ import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
 import convex.core.util.MergeFunction;
-import convex.core.util.Utils;
 
 /**
  * Abstract base class for vectors.
@@ -158,16 +157,6 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	}
 
 	@Override
-	public final int indexOf(Object o) {
-		return Utils.checkedInt(longIndexOf(o));
-	}
-
-	@Override
-	public final int lastIndexOf(Object o) {
-		return Utils.checkedInt(longLastIndexOf(o));
-	}
-
-	@Override
 	public final ListIterator<T> listIterator(int index) {
 		return listIterator((long) index);
 	}
@@ -187,6 +176,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	@Override public final boolean isCVMValue() {
 		// Vectors are always valid CVM values
 		return true;
+	}
+	
+	@Override
+	public AVector<T> toVector() {
+		return this;
 	}
 
 	@Override

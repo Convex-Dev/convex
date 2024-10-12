@@ -203,7 +203,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public long longIndexOf(Object value) {
+	public long longIndexOf(ACell value) {
 		for (int i=0; i<count; i++) {
 			if (Utils.equals(data[start+i],value)) return i;
 		}
@@ -211,7 +211,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public long longLastIndexOf(Object value) {
+	public long longLastIndexOf(ACell value) {
 		for (int i=Utils.checkedInt(count)-1; i>=0; i--) {
 			if (Utils.equals(data[start+i],value)) return i;
 		}

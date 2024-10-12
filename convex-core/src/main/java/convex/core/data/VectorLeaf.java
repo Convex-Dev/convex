@@ -456,7 +456,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public long longIndexOf(Object o) {
+	public long longIndexOf(ACell o) {
 		if (prefix != null) {
 			long pi = prefix.getValue().longIndexOf(o);
 			if (pi >= 0L) return pi;
@@ -468,7 +468,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	public long longLastIndexOf(Object o) {
+	public long longLastIndexOf(ACell o) {
 		for (int i = items.length - 1; i >= 0; i--) {
 			if (Utils.equals(items[i].getValue(), o)) return (count - items.length + i);
 		}

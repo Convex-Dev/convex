@@ -122,9 +122,14 @@ public class ListsTest {
 
 		if (n == 0) {
 			assertSame(Lists.empty(), a);
+			
+			 // empty list shouldn't contain anything (including itself)
+			assertEquals(-1,a.indexOf(a));
+			assertEquals(-1,a.lastIndexOf(null));
 		} else {
 			T first = a.get(0);
 			assertEquals(first, a.iterator().next());
+			assertEquals(0,a.indexOf(first));
 		}
 
 		assertEquals(a, Lists.of(a.toArray()));

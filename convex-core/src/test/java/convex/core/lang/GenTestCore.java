@@ -108,10 +108,7 @@ public class GenTestCore {
 	public void testVectorFunctions(@From(VectorGen.class) AVector a) {
 		doSequenceTests(a);
 		
-		if (a.isCanonical()) {
-			// only true for regular vectors
-			assertSame(a,RT.vec(a)); 
-		}
+		assertEquals(a,RT.vec(a)); 
 		assertSame(Vectors.empty(),a.empty());
 	
 		AString foos=Strings.create("foo");

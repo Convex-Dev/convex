@@ -9,7 +9,6 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.ErrorMessages;
-import convex.core.util.Utils;
 
 /**
  * Map.Entry implementation for persistent maps. This is primarily intended as an efficient 
@@ -201,17 +200,6 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		return keyRef.equals(b.keyRef);
 	}
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public AVector<ACell> toVector() {
-		return new VectorLeaf<ACell>(new Ref[] { keyRef, valueRef });
-	}
-
-	@Override
-	public boolean contains(Object o) {
-		return (Utils.equals(o, getKey()) || Utils.equals(o, getValue()));
-	}
-
 	@Override
 	public ACell get(long i) {
 		if (i == 0) return getKey();
@@ -279,18 +267,22 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// TODO: is there really Nothing to do?
+		// Nothing to do, a map entry is always valid in itself
 	}
 
 	@Override
 	public boolean isCanonical() {
-		// TODO: probably should be canonical?
-		return false;
+		return true;
 	}
 
+	@Override
+	public AVector<ACell> toCanonical() {
+		return this;
+	}
+	
 	@SuppressWarnings("unchecked")
 	@Override
-	public VectorLeaf<ACell> toCanonical() {
+	public AVector<ACell> toVector() {
 		return new VectorLeaf<ACell>(new Ref[] { keyRef, valueRef });
 	}
 

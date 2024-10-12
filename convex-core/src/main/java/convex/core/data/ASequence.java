@@ -27,7 +27,24 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	
 	@Override
 	public boolean contains(Object o) {
-		return longIndexOf(o) >= 0;
+		if (!(o==null||(o instanceof ACell))) return false;
+		return longIndexOf((ACell)o) >= 0;
+	}
+	
+	@Override
+	public int indexOf(Object o) {
+		if (!(o==null||(o instanceof ACell))) return -1;
+		long pos =longIndexOf((ACell) o);
+		if (pos < 0) return -1;
+		return Utils.checkedInt(pos);
+	}
+
+	@Override
+	public int lastIndexOf(Object o) {
+		if (!(o==null||(o instanceof ACell))) return -1;
+		long pos =longLastIndexOf((ACell) o);
+		if (pos < 0) return -1;
+		return Utils.checkedInt(pos);
 	}
 
 	/**
@@ -37,7 +54,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param value Any value which could appear as an element of the sequence.
 	 * @return Index of the value, or -1 if not found.
 	 */
-	public abstract long longIndexOf(Object value);
+	public abstract long longIndexOf(ACell value);
 
 	/**
 	 * Gets the last long index at which the specified value appears in the the sequence.
@@ -47,7 +64,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * @param value Any value which could appear as an element of the sequence.
 	 * @return Index of the value, or -1 if not found.
 	 */
-	public abstract long longLastIndexOf(Object value);
+	public abstract long longLastIndexOf(ACell value);
 
 	@Override
 	public abstract <R extends ACell> ASequence<R> map(Function<? super T, ? extends R> mapper);
