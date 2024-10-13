@@ -81,11 +81,6 @@ public class Constants {
 	public static final long MEMORY_OVERHEAD = 64;
 
 	/**
-	 * Allowance for initial user / peer accounts
-	 */
-	public static final long INITIAL_ACCOUNT_ALLOWANCE = 10000000;
-
-	/**
 	 * Maximum supply of Convex Coins set at protocol level
 	 */
 	public static final long MAX_SUPPLY = Coin.MAX_SUPPLY;

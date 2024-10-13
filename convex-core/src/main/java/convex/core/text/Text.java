@@ -110,9 +110,10 @@ public class Text {
 		
 		String copperString=Long.toString(copper);
 		int cn=copperString.length();
-		if (cn<decimals) {
-			copperString=ZEROS_9.substring(cn,decimals)+copperString;
+		if (cn<Coin.DECIMALS) {
+			copperString=ZEROS_9.substring(cn,Coin.DECIMALS)+copperString;
 		}
+		copperString=copperString.substring(0,decimals);
 		return goldString+"."+copperString;
 	}
 

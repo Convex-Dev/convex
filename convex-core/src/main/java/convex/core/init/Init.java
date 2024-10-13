@@ -5,6 +5,7 @@ import java.util.List;
 
 import convex.core.Coin;
 import convex.core.Constants;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
@@ -244,6 +245,16 @@ public class Init {
 
 		return s;
 	}
+	
+	public static AVector<AccountStatus> addAccount(AVector<AccountStatus> accts, Address a, AccountKey key,
+			long balance) {
+		if (accts.count() != a.longValue()) throw new Error("Incorrect account address: " + a);
+		AccountStatus as = AccountStatus.create(0L, balance, key);
+		as = as.withMemory(CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE);
+		accts = accts.conj(as);
+		return accts;
+	}
+
 
 	/**
 	 * Creates the built-in static Libraries (registry, trust)
@@ -502,15 +513,6 @@ public class Init {
 		AccountStatus as = AccountStatus.createActor();
 		as=as.withEnvironment(Core.ENVIRONMENT);
 		as=as.withMetadata(Core.METADATA);
-		accts = accts.conj(as);
-		return accts;
-	}
-
-	private static AVector<AccountStatus> addAccount(AVector<AccountStatus> accts, Address a, AccountKey key,
-			long balance) {
-		if (accts.count() != a.longValue()) throw new Error("Incorrect account address: " + a);
-		AccountStatus as = AccountStatus.create(0L, balance, key);
-		as = as.withMemory(Constants.INITIAL_ACCOUNT_ALLOWANCE);
 		accts = accts.conj(as);
 		return accts;
 	}

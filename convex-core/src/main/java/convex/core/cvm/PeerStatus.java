@@ -95,12 +95,14 @@ public class PeerStatus extends ARecord {
 	}
 
 	/**
-	 * Gets the delegated stake of this peer
+	 * Gets the total delegated stake of this peer
 	 *
 	 * @return Total of delegated stake
 	 */
 	public long getDelegatedStake() {
-		return delegatedStake;
+		long totalShares=peerStake+delegatedStake;
+		if (totalShares<=0) return 0; // nobody has any stake. Negative should not be possible, just in case
+		return Utils.mulDiv(balance,delegatedStake,totalShares);
 	}
 	
 	public Index<Address,CVMLong> getStakes() {
@@ -113,10 +115,8 @@ public class PeerStatus extends ARecord {
 	 * @return Own stake, excluding delegated stake
 	 */
 	public long getPeerStake() {
-		long totalShares=peerStake+delegatedStake;
-		if (totalShares<=0) return 0; // nobody has any stake. Negative should not be possible, just in case
-		
-		return Utils.mulDiv(balance,peerStake,totalShares);
+		// Peer stake is what remains after delegated stake shares
+		return balance-getDelegatedStake();
 	}
 	
 	/**
@@ -275,6 +275,11 @@ public class PeerStatus extends ARecord {
 		return new PeerStatus(controller, peerStake, newStakes, newDelegatedStake, metadata,timestamp,balance+stakeChange);
 	}
 	
+	private PeerStatus withBalance(long newBalance) {
+		if (balance==newBalance) return this;
+		return new PeerStatus(controller, peerStake, stakes, delegatedStake, metadata,timestamp,newBalance);
+	}
+	
 	/**
 	 * Sets the Peer Stake on this peer for the given delegator.
 	 *
@@ -395,5 +400,12 @@ public class PeerStatus extends ARecord {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
+	public PeerStatus addReward(long peerFees) {
+		if (peerFees<0) throw new IllegalArgumentException("Negative fees!");
+		return withBalance(balance+peerFees);
+	}
+
+
 
 }

@@ -3226,7 +3226,7 @@ public class CoreTest extends ACVMTest {
 
 	@Test
 	public void testTransferMemory() {
-		long ALL=Constants.INITIAL_ACCOUNT_ALLOWANCE;
+		long ALL=CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE;
 		assertEquals(ALL, evalL(Symbols.STAR_MEMORY.toString()));
 
 		{

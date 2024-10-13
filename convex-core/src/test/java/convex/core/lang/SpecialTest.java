@@ -14,6 +14,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.Constants;
+import convex.core.cpos.CPoSConstants;
 import convex.core.data.Address;
 import convex.core.data.Index;
 import convex.core.data.Keywords;
@@ -112,10 +113,10 @@ public class SpecialTest extends ACVMTest {
 	@Test
 	public void testSpecialAllowance() {
 		// Should have initial allowance at start
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
+		assertEquals(CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE, evalL("*memory*"));
 		
 		// Buy some memory
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE+1, evalL("(do (set-memory (inc *memory*)) *memory*)"));
+		assertEquals(CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE+1, evalL("(do (set-memory (inc *memory*)) *memory*)"));
 
 		// Sell all memory
 		assertEquals(0, evalL("(do (set-memory 0) *memory*)"));

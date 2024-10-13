@@ -316,8 +316,10 @@ public class State extends ARecord {
 			return maybeFailed;
 		}
 		
+		// Prepare block, including scheduled transactions and time based updates
 		State state = prepareBlock(block);
 		
+		// Create TransactionContext after Block is prepared so we have correct timestamp etc.
 		TransactionContext tctx=TransactionContext.create(state);
 		tctx.block=signedBlock;
 		
@@ -476,22 +478,11 @@ public class State extends ARecord {
 		return state;
 	}
 
-	private State withSchedule(Index<ABlob, AVector<ACell>> newSchedule) {
-		if (schedule == newSchedule) return this;
-		return new State(accounts, peers, globals, newSchedule);
-	}
-
-	private State withGlobals(AVector<ACell> newGlobals) {
-		if (newGlobals == globals) return this;
-		return new State(accounts, peers, newGlobals, schedule);
-	}
-
 	private BlockResult applyTransactions(Block block, TransactionContext tctx) throws InvalidBlockException {
 		State state = this;
 		int blockLength = block.length();
 		Result[] results = new Result[blockLength];
 		long fees=0L;
-		
 
 		AVector<SignedData<ATransaction>> transactions = block.getTransactions();
 		for (int i = 0; i < blockLength; i++) {
@@ -522,17 +513,31 @@ public class State extends ARecord {
 			//}
 		}
 		
-		// maybe add used juice to peer fees
-		if (fees>0L) {
-			long oldFees=state.getGlobalFees().longValue();
-			long newFees=oldFees+fees;
-			state=state.withGlobalFees(CVMLong.create(newFees));
-		}
+		state=distributeFees(state,tctx.getPeer(),fees);
 
-		// TODO: other things for complete block?
+		// TODO: any other things for complete block?
 		return BlockResult.create(state, results);
 	}
 
+	static State distributeFees(State state, AccountKey peer, long fees) {
+		PeerStatus ps=state.getPeer(peer);
+		AccountStatus rewardPool=state.getAccount(Address.ZERO);
+		if (ps==null) {
+			// this can happen, e.g. if the peer evicted itself
+		} else {
+			// immediate fees to peer
+			long peerFees=fees/2;
+			ps=ps.addReward(peerFees);
+			fees-=peerFees;
+			state=state.withPeer(peer, ps);
+		}
+		
+		// Remaining fees burned to reward pool
+		if (fees>0) {
+			state=state.putAccount(Address.ZERO,rewardPool.withBalance(rewardPool.getBalance()+fees));
+		}		
+		return state;
+	}
 
 	/**
 	 * Applies a signed transaction to the State.
@@ -543,20 +548,16 @@ public class State extends ARecord {
 	 * @throws InvalidBlockException 
 	 */
 	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws InvalidBlockException {
-		// Extract transaction, performs signature check
-		ACell maybe=signedTransaction.getValue();
-		if (!(maybe instanceof ATransaction)) {
-			throw new InvalidBlockException("Not a transaction!");
-		}
-		
-		ATransaction t=signedTransaction.getValue();
+		// Extract transaction
+		ATransaction t=RT.ensureTransaction(signedTransaction.getValue());
+		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+signedTransaction.getHash());
+
 		Address addr=t.getOrigin();
 		AccountStatus as = getAccount(addr);
 		if (as==null) {
 			ResultContext rc=ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
 			return rc.withSource(SourceCodes.CVM);
 		} else {
-
 			// Update sequence number for target account
 			long sequence=t.getSequence();
 			long expectedSequence=as.getSequence()+1;
@@ -571,6 +572,7 @@ public class State extends ARecord {
 				return rc.withSource(SourceCodes.CVM);
 			}
 			
+			// Perform Signature check
 			boolean sigValid=signedTransaction.checkSignature(key);
 			if (!sigValid) {
 				ResultContext rc= ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
@@ -582,17 +584,6 @@ public class State extends ARecord {
 		return ctx;
 	}
 	
-	/**
-	 * Creates an initial ResultContext for a transaction
-	 * @param t
-	 * @return
-	 */
-	private ResultContext createResultContext(ATransaction t) {
-		long juicePrice=getJuicePrice().longValue();
-		ResultContext rc=new ResultContext(t,juicePrice);
-		return rc;
-	}
-
 	/**
 	 * Applies a transaction to the State.
 	 *
@@ -635,7 +626,7 @@ public class State extends ARecord {
 
 		return rc.withContext(ctx);
 	}
-
+	
 	/**
 	 * Prepares a CVM execution context and ResultContext for a transaction
 	 * @param rc ResultContext to populate
@@ -652,7 +643,6 @@ public class State extends ARecord {
 			return Context.create(this).withError(ErrorCodes.NOBODY);
 		}
 
-
 		// Create context with juice limit
 		long balance=account.getBalance();
 		long juiceLimit=Juice.calcAvailable(balance, juicePrice);
@@ -667,6 +657,18 @@ public class State extends ARecord {
 		ctx=ctx.withJuice(initialJuice);
 		return ctx;
 	}
+	
+	/**
+	 * Creates an initial ResultContext for a transaction
+	 * @param t
+	 * @return
+	 */
+	private ResultContext createResultContext(ATransaction t) {
+		long juicePrice=getJuicePrice().longValue();
+		ResultContext rc=new ResultContext(t,juicePrice);
+		return rc;
+	}
+
 
 	@Override
 	public boolean isCanonical() {
@@ -998,10 +1000,18 @@ public class State extends ARecord {
 		return FORMAT;
 	}
 
+	/**
+	 * Gets the Convex Coin value in the memory exchange pool
+	 * @return Memory pool Convex Coin amount (coppers)
+	 */
 	public CVMLong getGlobalMemoryValue() {
 		return (CVMLong)(globals.get(GLOBAL_MEMORY_CVX));
 	}
 
+	/**
+	 * Gets the amount of memory in the memory exchange pool
+	 * @return Memory in pool, in bytes
+	 */
 	public CVMLong getGlobalMemoryPool() {
 		return (CVMLong)(globals.get(GLOBAL_MEMORY_MEM));
 	}
@@ -1011,6 +1021,16 @@ public class State extends ARecord {
 		long value=getGlobalMemoryValue().longValue();
 				
 		return ((double)value)/pool;
+	}
+	
+	private State withSchedule(Index<ABlob, AVector<ACell>> newSchedule) {
+		if (schedule == newSchedule) return this;
+		return new State(accounts, peers, globals, newSchedule);
+	}
+
+	private State withGlobals(AVector<ACell> newGlobals) {
+		if (newGlobals == globals) return this;
+		return new State(accounts, peers, newGlobals, schedule);
 	}
 
 	public State updateMemoryPool(long cvx, long mem) {

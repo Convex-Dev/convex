@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.State;
@@ -85,14 +86,14 @@ public class BaseTest extends ACVMTest {
 	public void testHero() {
  		AccountStatus as=STATE.getAccount(HERO);
 		assertNotNull(as);
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
+		assertEquals(CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 	}
 	
 	@Test
 	public void testVILLAIN() {
  		AccountStatus as=STATE.getAccount(VILLAIN);
 		assertNotNull(as);
-		assertEquals(Constants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
+		assertEquals(CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE,as.getMemory());
 		assertNotEquals(HERO,VILLAIN);
 	}
 	

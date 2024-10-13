@@ -48,12 +48,14 @@ public class StateTransitionsTest {
 	final AKeyPair KEYPAIR_PEER = InitTest.FIRST_PEER_KEYPAIR;
 	final AccountKey FIRST_PEER_KEY=KEYPAIR_PEER.getAccountKey();
 
-	final Address ADDRESS_A = Address.create(0); // initial account, also Peer
-	final Address ADDRESS_B = Address.create(1); // initial account
-	final Address ADDRESS_ROBB = Address.create(2); // initial account
-	final Address ADDRESS_C = Address.create(3);
-
-	final Address ADDRESS_NIKI = Address.create(4);
+	final Address REWARD_POOL = Address.create(0); // reward pool account
+	final Address ADDRESS_A = Address.create(1); // initial account, also Peer
+	final Address ADDRESS_B = Address.create(2); // initial account
+	final Address ADDRESS_ROBB = Address.create(3); // initial account
+	
+	// extra accounts to add later
+	final Address ADDRESS_C = Address.create(4);
+	final Address ADDRESS_NIKI = Address.create(5);
 	
 	final long ABAL=100000;
 	final long BBAL=20000;
@@ -64,6 +66,7 @@ public class StateTransitionsTest {
 		AccountKey kb=KEYPAIR_B.getAccountKey();
 		long STAKE=CPoSConstants.MINIMUM_EFFECTIVE_STAKE*10;
 		AVector<AccountStatus> accounts = Vectors.of(
+				AccountStatus.create(0,null).withMemory(0),
 				AccountStatus.create(ABAL,ka).withMemory(10000),
 				AccountStatus.create(BBAL,kb).withMemory(10000),
 				AccountStatus.create(Constants.MAX_SUPPLY - STAKE - ABAL - BBAL,KEYPAIR_ROBB.getAccountKey()).withMemory(10000)
