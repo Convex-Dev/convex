@@ -16,6 +16,9 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -30,9 +33,6 @@ import convex.core.init.InitTest;
 import convex.core.lang.Juice;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
-import convex.core.transactions.Transfer;
 
 /**
  * Tests for State transition scenarios

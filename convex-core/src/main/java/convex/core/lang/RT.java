@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.function.BiFunction;
 
 import convex.core.Constants;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
@@ -52,7 +53,6 @@ import convex.core.lang.impl.KeywordFn;
 import convex.core.lang.impl.MapFn;
 import convex.core.lang.impl.SeqFn;
 import convex.core.lang.impl.SetFn;
-import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 
 /**

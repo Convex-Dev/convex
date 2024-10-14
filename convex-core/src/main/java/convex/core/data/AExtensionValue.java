@@ -6,7 +6,7 @@ import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
- * Abstract base class for 8-byte bloblike extension Values such as Address and CAD Extension Values
+ * Abstract base class for 8-byte bloblike extension Values such as Address and CAD Extension Values 0xE0 - 0xEF
  */
 public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 

@@ -13,6 +13,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.transactions.Call;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.impl.DummyCell;
 import convex.core.data.prim.ByteFlagExtended;
 import convex.core.data.prim.CVMDouble;
@@ -22,8 +24,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.lang.Ops;
 import convex.core.lang.Symbols;
-import convex.core.transactions.Call;
-import convex.core.transactions.Transfer;
 import convex.test.Samples;
 
 /**

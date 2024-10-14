@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import convex.core.Constants;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -8,7 +9,6 @@ import convex.core.data.Cells;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
-import convex.core.transactions.ATransaction;
 
 /**
  * Static class defining juice costs for executable operations.

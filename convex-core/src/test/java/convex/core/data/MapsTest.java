@@ -14,6 +14,8 @@ import java.util.function.Predicate;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -21,8 +23,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Transfer;
 import convex.core.util.Bits;
 import convex.test.Samples;
 

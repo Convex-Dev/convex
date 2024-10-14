@@ -16,6 +16,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Index;
@@ -26,7 +27,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.transactions.Invoke;
 import convex.test.Samples;
 
 public class PeerTest {

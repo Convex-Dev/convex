@@ -3,6 +3,7 @@ package convex.core.cpos;
 import java.util.Comparator;
 import java.util.List;
 
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
@@ -22,7 +23,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RecordFormat;
-import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 
 /**

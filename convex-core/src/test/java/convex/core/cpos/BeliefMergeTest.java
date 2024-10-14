@@ -18,6 +18,8 @@ import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
@@ -33,8 +35,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.text.Text;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Transfer;
 
 @Execution(value = ExecutionMode.CONCURRENT)
 public class BeliefMergeTest {

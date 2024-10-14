@@ -5,11 +5,11 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.Constants;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.Address;
 import convex.core.data.Vectors;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
-import convex.core.transactions.Transfer;
 import convex.test.Samples;
 
 public class TransactionGen extends Generator<ATransaction> {

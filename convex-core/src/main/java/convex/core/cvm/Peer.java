@@ -15,6 +15,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
@@ -33,7 +34,6 @@ import convex.core.init.Init;
 import convex.core.lang.Context;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.transactions.ATransaction;
 import convex.core.util.Utils;
 
 /**

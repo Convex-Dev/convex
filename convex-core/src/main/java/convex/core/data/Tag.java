@@ -109,6 +109,9 @@ public class Tag {
 	
 	public static final byte RECEIPT = (byte) 0xD8;
 	public static final byte RECEIPT_MASK = (byte) 0xFC; // 11111100
+	
+	
+	
 	public static final byte RECEIPT_ERROR_MASK = (byte) 0x01;
 	public static final byte RECEIPT_LOG_MASK = (byte) 0x02;
 

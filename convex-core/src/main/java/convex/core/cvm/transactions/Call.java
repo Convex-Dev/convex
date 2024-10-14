@@ -1,4 +1,4 @@
-package convex.core.transactions;
+package convex.core.cvm.transactions;
 
 import convex.core.Coin;
 import convex.core.data.ACell;

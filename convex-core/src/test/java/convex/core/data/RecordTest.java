@@ -11,12 +11,12 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
 import convex.core.lang.RecordFormat;
 import convex.core.lang.TestState;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Transfer;
 
 public class RecordTest {
 	
