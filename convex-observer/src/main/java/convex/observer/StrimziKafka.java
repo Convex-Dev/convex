@@ -18,10 +18,10 @@ import org.apache.hc.core5.http.ContentType;
 import org.json.simple.JSONValue;
 
 import convex.core.cpos.Order;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.Result;
 import convex.core.data.SignedData;
 import convex.core.lang.RT;
-import convex.core.transactions.ATransaction;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.peer.Server;

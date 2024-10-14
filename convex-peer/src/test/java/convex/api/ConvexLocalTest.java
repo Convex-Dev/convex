@@ -18,6 +18,8 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.Address;
@@ -27,8 +29,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import convex.core.lang.ops.Constant;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Invoke;
 import convex.net.Message;
 import convex.peer.TestNetwork;
 

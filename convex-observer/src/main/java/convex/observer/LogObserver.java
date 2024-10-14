@@ -7,8 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Result;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.SignedData;
-import convex.core.transactions.ATransaction;
 import convex.peer.Server;
 
 public class LogObserver {

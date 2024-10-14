@@ -6,6 +6,10 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.ResultContext;
 import convex.core.cvm.State;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Call;
+import convex.core.cvm.transactions.Invoke;
+import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keywords;
@@ -19,10 +23,6 @@ import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
 import convex.core.lang.ops.Constant;
 import convex.core.lang.ops.Lookup;
-import convex.core.transactions.ATransaction;
-import convex.core.transactions.Call;
-import convex.core.transactions.Invoke;
-import convex.core.transactions.Transfer;
 
 
 /**

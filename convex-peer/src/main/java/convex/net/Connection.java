@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.Result;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AVector;
@@ -38,7 +39,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.transactions.ATransaction;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 import convex.core.util.Shutdown;

@@ -16,6 +16,7 @@ import convex.api.Convex;
 import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
@@ -23,7 +24,6 @@ import convex.core.data.Keywords;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
-import convex.core.transactions.Invoke;
 import convex.etch.EtchStore;
 
 public class JoinNetworkTest {
