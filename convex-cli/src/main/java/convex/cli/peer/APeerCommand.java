@@ -47,8 +47,7 @@ public abstract class APeerCommand extends ACommand {
 			paranoia("You must specify a --peer-key for the peer");
 			return null;
 		} else {
-			char[] keyPass=peerKeyMixin.getKeyPassword();
-			AKeyPair result=storeMixin.loadKeyFromStore(peerPublicKey, keyPass);
+			AKeyPair result=storeMixin.loadKeyFromStore(peerPublicKey, ()->peerKeyMixin.getKeyPassword());
 			return result;
 		}
 	}
@@ -63,9 +62,7 @@ public abstract class APeerCommand extends ACommand {
 			return null;
 		}
 		
-		char[] keyPass=keyMixin.getKeyPassword();
-		
-		AKeyPair result=storeMixin.loadKeyFromStore(controllerKey, keyPass);
+		AKeyPair result=storeMixin.loadKeyFromStore(controllerKey, ()->keyMixin.getKeyPassword());
 		return result;
 	}
 }

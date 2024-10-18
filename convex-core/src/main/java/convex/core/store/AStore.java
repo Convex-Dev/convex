@@ -106,8 +106,9 @@ public abstract class AStore implements Closeable {
 		Hash h=getRootHash();
 		Ref<T> ref=refForHash(h);
 		
-		// special case, we always recognise null even if not in store
-		if ((ref==null) &&(Hash.NULL_HASH.equals(h))) {
+		// special cases:
+		// we always recognise `nil` or the zero hash `0x0000000....` even if not in store
+		if ((ref==null) &&((Hash.EMPTY_HASH.equals(h))||(Hash.NULL_HASH.equals(h)))) {
 			return (Ref<T>) Ref.NULL_VALUE;
 		}
 		return ref;

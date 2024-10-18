@@ -109,7 +109,7 @@ public abstract class AClientCommand extends ATopCommand {
 			throw new CLIError(ExitCodes.CONFIG,"Multiple key pairs found");
 		}
 		
-		keyPair=storeMixin.loadKeyFromStore(pk,keyMixin.getKeyPassword());
+		keyPair=storeMixin.loadKeyFromStore(pk,()->keyMixin.getKeyPassword());
 		if (keyPair==null) {
 			// We didn't find required keypair
 			throw new CLIError(ExitCodes.CONFIG,"Can't find keypair with public key: "+pk);

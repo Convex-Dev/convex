@@ -66,7 +66,7 @@ public class KeySign extends AKeyCommand {
 		}
 
 		String publicKey = keystorePublicKey;
-		AKeyPair keyPair = storeMixin.loadKeyFromStore(publicKey,keyMixin.getKeyPassword());
+		AKeyPair keyPair = storeMixin.loadKeyFromStore(publicKey,()->keyMixin.getKeyPassword());
 		if (keyPair==null) {
 			throw new CLIError(ExitCodes.NOUSER,"Key pair not found for requested signing key: "+keystorePublicKey);
 		}

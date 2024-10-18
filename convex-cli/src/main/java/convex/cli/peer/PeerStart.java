@@ -110,7 +110,7 @@ public class PeerStart extends APeerCommand {
 				throw new CLIError(ExitCodes.CONFIG,"Multiple peers configured in Etch store "+store+". specify which one you want with --peer-key.");
 			}
 			AccountKey peerKey=peerList.get(0);
-			AKeyPair pkp=storeMixin.loadKeyFromStore(peerKey.toHexString(), peerKeyMixin.getKeyPassword());
+			AKeyPair pkp=storeMixin.loadKeyFromStore(peerKey.toHexString(), ()->peerKeyMixin.getKeyPassword());
 			return pkp;
 		} catch (IOException e) {
 			log.debug("IO Exception trying to read etch peer list",e);
@@ -127,8 +127,12 @@ public class PeerStart extends APeerCommand {
 			AKeyPair peerKey;
 			AKeyPair genesisKey=null;
 			if (genesis!=null&&(!genesis.isEmpty())) {
+				// Using a genesis seed for testing
 				paranoia("Should't use Genesis Seed in strict security mode! Consider key compromised!");
 				Blob seed=Blob.parse(genesis);
+				if (seed==null) {
+					throw new CLIError("Genesis seed must be 32 byte hex blob");
+				}
 				if (seed.count()!=32) {
 					throw new CLIError("Genesis seed must be 32 byte hex blob");
 				}
@@ -136,6 +140,7 @@ public class PeerStart extends APeerCommand {
 				genesisKey=peerKey;
 				informWarning("Using test genesis seed: "+seed);
 			} else {
+				//
 				peerKey=findPeerKey(store);
 				if (peerKey==null) {
 					informWarning("No --peer-key specified or inferred from Etch Store "+store);

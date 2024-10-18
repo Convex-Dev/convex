@@ -8,6 +8,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.UnrecoverableKeyException;
 import java.util.Enumeration;
+import java.util.function.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -199,7 +200,7 @@ public class KeyStoreMixin extends AMixin {
 	 * @param publicKey String identifying the public key. May be a prefix
 	 * @return Keypair instance, or null if not found
 	 */
-	public AKeyPair loadKeyFromStore(String publicKey, char[] keyPassword) {
+	public AKeyPair loadKeyFromStore(String publicKey, Supplier<char[]> passFunction) {
 		if (publicKey == null)
 			return null;
 	
@@ -214,6 +215,7 @@ public class KeyStoreMixin extends AMixin {
 				String alias = aliases.nextElement();
 				if (alias.indexOf(publicKey) == 0) {
 					log.trace("found keypair " + alias);
+					char[] keyPassword=passFunction.get();
 					return PFXTools.getKeyPair(keyStore, alias, keyPassword);
 				}
 			}

@@ -79,7 +79,7 @@ public class LocalStart extends ALocalCommand {
 				String keyPrefix = values.get(index);
 				if (keyPrefix.isBlank()) continue;
 
-				AKeyPair keyPair = storeMixin.loadKeyFromStore(keyPrefix, keyMixin.getKeyPassword());
+				AKeyPair keyPair = storeMixin.loadKeyFromStore(keyPrefix, ()->keyMixin.getKeyPassword());
 				if (keyPair == null) {
 					log.warn("Unable to find public key in store: "+keyPrefix);
 				} else {

@@ -94,9 +94,9 @@ public class PFXTools {
 	 * @param alias Alias used for finding the key pair in the store
 	 * @param keyPassword Passphrase used for decrypting the key pair. Mandatory.
 	 * @return Found key pair
-	 * @throws UnrecoverableKeyException If key cannot be recovered
-	 * @throws KeyStoreException If a general key store exception occurs
-	 * @throws NoSuchAlgorithmException If crypto algorithm is not available
+	 * @throws UnrecoverableKeyException if the key cannot be recovered (e.g. the password is wrong)
+	 * @throws KeyStoreException if a general key store exception occurs
+	 * @throws NoSuchAlgorithmException if the algorithm for recovering the key cannot be found
 	 */
 	public static AKeyPair getKeyPair(KeyStore ks, String alias, char[] keyPassword) throws UnrecoverableKeyException, KeyStoreException, NoSuchAlgorithmException {
 
