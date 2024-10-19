@@ -26,4 +26,5 @@ module convex.core {
 	requires transitive org.bouncycastle.provider;
 	requires org.bouncycastle.util;
 	requires org.slf4j;
+	requires java.base;
 }
