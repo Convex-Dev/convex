@@ -9,7 +9,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.lang.RecordFormat;
 
 /**
  * Node representing a signed data object.

@@ -1,4 +1,4 @@
-package convex.core.lang;
+package convex.core.cvm;
 
 import convex.core.Coin;
 import convex.core.Constants;
@@ -6,11 +6,6 @@ import convex.core.ErrorCodes;
 import convex.core.ResultContext;
 import convex.core.SourceCodes;
 import convex.core.cpos.CPoSConstants;
-import convex.core.cvm.AOp;
-import convex.core.cvm.AccountStatus;
-import convex.core.cvm.Juice;
-import convex.core.cvm.PeerStatus;
-import convex.core.cvm.State;
 import convex.core.cvm.exception.AExceptional;
 import convex.core.cvm.exception.AThrowable;
 import convex.core.cvm.exception.ATrampoline;
@@ -38,12 +33,16 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.util.BlobBuilder;
 import convex.core.init.Init;
+import convex.core.lang.Compiler;
+import convex.core.lang.Core;
+import convex.core.lang.RT;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.TransactionContext;
 import convex.core.util.Economics;
@@ -1392,7 +1391,7 @@ public class Context {
 	 * @param newDepth New depth value
 	 * @return Updated context with new depth set
 	 */
-	Context withDepth(int newDepth) {
+	public Context withDepth(int newDepth) {
 		if (newDepth==depth) return this;
 		if ((newDepth<0)||(newDepth>Constants.MAX_DEPTH)) return withError(ErrorCodes.DEPTH,"Invalid depth: "+newDepth);
 		depth=newDepth;

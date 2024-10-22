@@ -1,10 +1,10 @@
 package convex.core.lang.impl;
 
+import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.data.ACell;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMBool;
-import convex.core.lang.Context;
 
 /**
  * Abstract base class for core predicate functions

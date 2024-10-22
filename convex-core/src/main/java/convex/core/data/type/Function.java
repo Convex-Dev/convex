@@ -1,7 +1,7 @@
 package convex.core.data.type;
 
+import convex.core.cvm.AFn;
 import convex.core.data.ACell;
-import convex.core.lang.AFn;
 import convex.core.lang.Core;
 
 /**

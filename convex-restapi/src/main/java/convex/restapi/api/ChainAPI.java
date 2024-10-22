@@ -45,7 +45,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.restapi.RESTServer;

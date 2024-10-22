@@ -9,10 +9,10 @@ import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
-import convex.core.lang.Symbols;
 
 public class ReaderUtils {
 

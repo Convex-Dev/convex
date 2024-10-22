@@ -1,12 +1,6 @@
-package convex.core.lang;
+package convex.core.data;
 
 import java.util.HashMap;
-
-import convex.core.data.ASet;
-import convex.core.data.AVector;
-import convex.core.data.Keyword;
-import convex.core.data.Sets;
-import convex.core.data.Vectors;
 
 /**
  * Defines the format of a Record structure, as an ordered vector of keys.

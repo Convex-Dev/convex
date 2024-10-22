@@ -8,13 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Context;
 import convex.core.data.ASet;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Sets;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 import convex.core.lang.TestState;
 import convex.test.Samples;
 

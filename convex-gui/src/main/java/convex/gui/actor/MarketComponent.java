@@ -20,7 +20,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
-import convex.core.lang.Context;
+import convex.core.cvm.Context;
 import convex.core.lang.RT;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;

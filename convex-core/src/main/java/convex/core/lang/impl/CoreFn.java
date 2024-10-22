@@ -1,5 +1,7 @@
 package convex.core.lang.impl;
 
+import convex.core.cvm.AFn;
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -8,8 +10,6 @@ import convex.core.data.Symbol;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.AFn;
-import convex.core.lang.Context;
 
 /**
  * Abstract base class for core language functions implemented in the Runtime

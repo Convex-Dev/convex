@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Context;
 import convex.core.data.Keywords;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;

@@ -1,19 +1,19 @@
 package convex.core.lang.impl;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
+import convex.core.data.Symbols;
 import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 
 /**
  * Value class representing a instantiated closure / lambda function.

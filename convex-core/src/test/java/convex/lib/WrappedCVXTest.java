@@ -7,13 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Context;
 import convex.core.cvm.State;
 import convex.core.data.AMap;
 import convex.core.data.Address;
 import convex.core.data.Symbol;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 import convex.core.lang.TestState;
 
 public class WrappedCVXTest extends ACVMTest {

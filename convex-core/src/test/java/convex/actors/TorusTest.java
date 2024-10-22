@@ -10,11 +10,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.Context;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.prim.CVMDouble;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.lib.AssetTester;
 

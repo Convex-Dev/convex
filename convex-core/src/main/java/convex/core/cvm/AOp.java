@@ -6,8 +6,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
-import convex.core.lang.ACVMCode;
-import convex.core.lang.Context;
 
 /**
  * Abstract base class for CVM operations

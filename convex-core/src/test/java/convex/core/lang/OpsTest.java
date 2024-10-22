@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
 import convex.core.cvm.ops.Cond;
@@ -33,6 +34,7 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;

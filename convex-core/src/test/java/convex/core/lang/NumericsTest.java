@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+import convex.core.cvm.Context;
 import convex.core.data.ObjectsTest;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.ANumeric;

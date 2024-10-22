@@ -15,12 +15,14 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.Constants;
 import convex.core.cpos.CPoSConstants;
+import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Special;
 import convex.core.data.Address;
 import convex.core.data.Index;
 import convex.core.data.Keywords;
+import convex.core.data.Symbols;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.BaseTest;
 import convex.core.init.InitTest;

@@ -15,7 +15,9 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cvm.AFn;
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.ops.Def;
 import convex.core.cvm.ops.Do;
@@ -35,6 +37,7 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;

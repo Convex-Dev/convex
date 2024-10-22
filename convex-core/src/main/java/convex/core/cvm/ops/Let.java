@@ -1,6 +1,7 @@
 package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
 import convex.core.cvm.exception.RecurValue;
@@ -13,7 +14,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
 
 /**

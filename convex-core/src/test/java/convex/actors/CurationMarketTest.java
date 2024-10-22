@@ -2,9 +2,9 @@ package convex.actors;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Context;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 
 public class CurationMarketTest extends ACVMTest {
 	

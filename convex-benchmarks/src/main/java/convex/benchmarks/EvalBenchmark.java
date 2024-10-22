@@ -5,7 +5,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.data.ACell;
-import convex.core.lang.Context;
+import convex.core.cvm.Context;
 import convex.core.lang.Reader;
 
 public class EvalBenchmark {

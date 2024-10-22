@@ -24,10 +24,9 @@ import convex.core.data.Address;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
-import convex.core.lang.AFn;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 import convex.core.lang.impl.Fn;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
@@ -71,7 +70,7 @@ public class SmartOpComponent extends BaseListComponent {
 
 		AccountStatus as = parent.getLatestState().getAccount(contract);
 
-		AFn<?> fn = as.getCallableFunction(sym);
+		convex.core.cvm.AFn<?> fn = as.getCallableFunction(sym);
 
 		// Function might be a map or set
 		AVector<ACell> params = (fn instanceof Fn) ? ((Fn<?>) fn).getParams()

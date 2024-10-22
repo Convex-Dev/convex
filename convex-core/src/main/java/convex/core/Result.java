@@ -7,6 +7,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import convex.core.cvm.Context;
 import convex.core.cvm.exception.AExceptional;
 import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ACell;
@@ -21,6 +22,7 @@ import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.RecordFormat;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
@@ -31,9 +33,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
-import convex.core.lang.RecordFormat;
 import convex.core.util.Utils;
 
 /**

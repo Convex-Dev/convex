@@ -9,13 +9,13 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.Address;
 import convex.core.data.Strings;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.lib.AssetTester;

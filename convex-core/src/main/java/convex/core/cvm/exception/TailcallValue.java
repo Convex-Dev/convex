@@ -1,10 +1,10 @@
 package convex.core.cvm.exception;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.AFn;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Vectors;
-import convex.core.lang.AFn;
 
 /**
  * Class representing a function return value.

@@ -8,6 +8,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.AFn;
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;

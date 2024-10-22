@@ -17,14 +17,14 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cvm.Context;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.Symbols;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 import convex.core.lang.Core;
-import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 public class ActorsTest extends ACVMTest {

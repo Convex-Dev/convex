@@ -16,6 +16,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
+import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
@@ -23,9 +24,7 @@ import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.AFn;
 import convex.core.lang.RT;
-import convex.core.lang.RecordFormat;
 
 /**
  * Class representing the current on-chain status of an account.

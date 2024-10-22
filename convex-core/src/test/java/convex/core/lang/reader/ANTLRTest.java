@@ -21,6 +21,7 @@ import convex.core.data.ObjectsTest;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBigInteger;
@@ -30,7 +31,6 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.Reader;
-import convex.core.lang.Symbols;
 
 public class ANTLRTest {
 	

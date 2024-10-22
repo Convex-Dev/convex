@@ -13,7 +13,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.init.Init;
-import convex.core.lang.Context;
+import convex.core.cvm.Context;
 
 public class Benchmarks {
 	

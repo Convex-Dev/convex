@@ -44,6 +44,7 @@ import convex.core.data.SetTree;
 import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.VectorLeaf;
 import convex.core.data.VectorTree;
@@ -58,7 +59,6 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 
 /**
  * Miscellaneous value objects for testing purposes

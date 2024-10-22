@@ -11,7 +11,7 @@ import convex.core.data.Address;
 import convex.core.data.MapEntry;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMDouble;
-import convex.core.lang.Context;
+import convex.core.cvm.Context;
 import convex.core.lang.Reader;
 
 @SuppressWarnings("serial")

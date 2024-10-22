@@ -3,19 +3,19 @@ package convex.core.cvm.ops;
 import java.util.HashMap;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.IRefFunction;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.Context;
-import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 /**

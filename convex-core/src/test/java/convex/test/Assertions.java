@@ -8,11 +8,11 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.function.Executable;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.Refs;
 import convex.core.data.prim.ANumeric;
 import convex.core.exceptions.ParseException;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
 
 public class Assertions {

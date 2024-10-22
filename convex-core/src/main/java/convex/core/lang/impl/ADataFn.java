@@ -1,9 +1,9 @@
 package convex.core.lang.impl;
 
+import convex.core.cvm.AFn;
 import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.AFn;
 import convex.core.lang.RT;
 
 /**

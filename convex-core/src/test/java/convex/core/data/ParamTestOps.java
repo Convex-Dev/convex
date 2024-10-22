@@ -11,6 +11,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.cvm.State;
 import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Constant;
@@ -23,7 +24,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.InitTest;
-import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
 

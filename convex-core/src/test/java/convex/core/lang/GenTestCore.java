@@ -18,6 +18,7 @@ import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.generator.java.lang.LongGenerator;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
 import convex.core.data.AList;

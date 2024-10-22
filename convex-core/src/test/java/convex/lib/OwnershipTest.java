@@ -8,9 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Context;
 import convex.core.data.Address;
 import convex.core.lang.ACVMTest;
-import convex.core.lang.Context;
 
 /**
  * Tests for asset ownership, including use of an asset as a trust monitor

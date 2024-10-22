@@ -3,10 +3,10 @@ package convex.test;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.Blob;
-import convex.core.lang.Context;
 import convex.core.lang.Reader;
 import convex.core.util.Utils;
 

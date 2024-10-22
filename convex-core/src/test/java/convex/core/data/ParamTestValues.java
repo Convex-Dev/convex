@@ -31,7 +31,6 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.Core;
 import convex.core.lang.NumericsTest;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 /**

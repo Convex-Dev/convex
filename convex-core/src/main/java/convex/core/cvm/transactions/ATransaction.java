@@ -1,12 +1,12 @@
 package convex.core.cvm.transactions;
 
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Address;
 import convex.core.data.Format;
 import convex.core.data.type.AType;
 import convex.core.data.type.Transaction;
-import convex.core.lang.Context;
 
 /**
  * Abstract base class for immutable transactions

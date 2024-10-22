@@ -2,7 +2,7 @@ package convex.core.data.type;
 
 import convex.core.data.ACell;
 import convex.core.data.Symbol;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 
 /**
  * Type that represents CVM Byte values

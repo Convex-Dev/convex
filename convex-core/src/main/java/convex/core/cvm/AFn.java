@@ -1,4 +1,4 @@
-package convex.core.lang;
+package convex.core.cvm;
 
 import convex.core.data.ACell;
 import convex.core.data.IRefFunction;

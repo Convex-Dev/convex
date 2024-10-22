@@ -12,7 +12,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.core.util.Utils;
 
 /**

@@ -6,7 +6,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.AString;
 import convex.core.data.Strings;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 import convex.test.Samples;
 
 /**

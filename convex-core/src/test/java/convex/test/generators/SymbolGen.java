@@ -7,7 +7,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.data.Symbol;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 
 /**
  * Generator for Symbol objects

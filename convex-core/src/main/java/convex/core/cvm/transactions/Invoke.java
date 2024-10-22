@@ -1,6 +1,7 @@
 package convex.core.cvm.transactions;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -9,14 +10,13 @@ import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
+import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.Context;
 import convex.core.lang.Reader;
-import convex.core.lang.RecordFormat;
 
 /**
  * Transaction class representing the Invoke of an on-chain operation.

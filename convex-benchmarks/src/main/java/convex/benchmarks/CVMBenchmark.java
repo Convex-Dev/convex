@@ -19,10 +19,10 @@ import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.init.Init;
-import convex.core.lang.Context;
+import convex.core.cvm.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 
 
 /**

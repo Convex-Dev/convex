@@ -1,7 +1,6 @@
 package convex.core.data;
 
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.RecordFormat;
 
 /**
  * Abstract base class for dense records CAD3 types 0xD0 - 0xDF

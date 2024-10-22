@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.core.text.Text;
 import convex.test.Samples;
 

@@ -9,7 +9,6 @@ import convex.core.data.Cells;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
-import convex.core.lang.Context;
 
 /**
  * Static class defining juice costs for executable operations.

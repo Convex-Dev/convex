@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Coin;
+import convex.core.cvm.Context;
 import convex.core.data.Address;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;

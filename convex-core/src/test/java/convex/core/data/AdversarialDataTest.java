@@ -23,7 +23,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
-import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 /**

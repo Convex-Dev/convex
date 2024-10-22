@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.Lists;
+import convex.core.data.Symbols;
 import convex.core.data.prim.CVMLong;
 
 public class CodeTest {

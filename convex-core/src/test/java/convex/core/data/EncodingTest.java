@@ -35,7 +35,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.test.Samples;
 import convex.test.Testing;
  

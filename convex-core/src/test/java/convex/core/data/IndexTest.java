@@ -21,7 +21,6 @@ import convex.core.data.type.Types;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 public class IndexTest {

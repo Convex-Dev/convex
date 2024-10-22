@@ -11,7 +11,7 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 
 /**
  * Benchmarks for data encoding

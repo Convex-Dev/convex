@@ -3,7 +3,7 @@ package convex.core.data.type;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.Keywords;
-import convex.core.lang.RecordFormat;
+import convex.core.data.RecordFormat;
 
 /**
  * Type that represents any CVM collection

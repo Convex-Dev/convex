@@ -15,7 +15,6 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
-import convex.core.lang.RecordFormat;
 import convex.core.lang.TestState;
 
 public class RecordTest {

@@ -7,7 +7,7 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.List;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 import picocli.CommandLine.ParentCommand;

@@ -1,10 +1,10 @@
 package convex.core.lang.impl;
 
+import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.ASet;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.util.BlobBuilder;
-import convex.core.lang.Context;
 
 public class SetFn<T extends ACell> extends ADataFn<CVMBool> {
 

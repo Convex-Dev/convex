@@ -4,8 +4,11 @@ import java.util.Map;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.cvm.AFn;
 import convex.core.cvm.AOp;
+import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Context.CompilerState;
 import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.ops.Def;
@@ -36,12 +39,12 @@ import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
+import convex.core.data.Symbols;
 import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
-import convex.core.lang.Context.CompilerState;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.MultiFn;
@@ -77,7 +80,7 @@ public class Compiler {
 	 * @param context Compilation context
 	 * @return Context with compiled op as result
 	 */
-	static Context expandCompile(ACell form, Context context) {
+	public static Context expandCompile(ACell form, Context context) {
 		// expand phase starts with initial expander
 		AFn<ACell> ex = INITIAL_EXPANDER;
 		
@@ -102,6 +105,7 @@ public class Compiler {
 	 * @return Context with compiled Op as result
 	 */
 	@SuppressWarnings("unchecked")
+	public
 	static Context compile(ACell form, Context context) {
 		if (form==null) return compileConstant(context,null);
 
@@ -153,7 +157,7 @@ public class Compiler {
 	 * @param context
 	 * @return Context with Vector of compiled ops as result
 	 */
-	static Context compileAll(ASequence<ACell> forms, Context context) {
+	public static Context compileAll(ASequence<ACell> forms, Context context) {
 		if (forms == null) return context.withResult(Vectors.empty()); // consider null as empty list
 		int n = forms.size();
 		AVector<AOp<?>> obs = Vectors.empty();

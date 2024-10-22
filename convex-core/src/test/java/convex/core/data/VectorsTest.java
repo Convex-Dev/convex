@@ -19,7 +19,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.util.VectorBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.core.lang.Symbols;
 import convex.test.Samples;
 
 /**

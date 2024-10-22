@@ -19,7 +19,7 @@ import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.Init;
-import convex.core.lang.Symbols;
+import convex.core.data.Symbols;
 import convex.java.Convex;
 import convex.java.JSON;
 import convex.peer.API;
