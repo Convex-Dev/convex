@@ -89,4 +89,11 @@ public class Ops {
 			throw new BadFormatException("Invalide OpCode: " + opCode);
 		}
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AOp<T> ensureOp(ACell a) {
+		if (a==null) return null;
+		if (a instanceof AOp) return (AOp<T>)a;
+		return null;
+	}
 }
