@@ -1,4 +1,4 @@
-package convex.core.lang.exception;
+package convex.core.cvm.exception;
 
 import java.util.ArrayList;
 import java.util.HashMap;

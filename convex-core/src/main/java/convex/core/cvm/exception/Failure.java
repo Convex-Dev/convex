@@ -1,4 +1,4 @@
-package convex.core.lang.exception;
+package convex.core.cvm.exception;
 
 import convex.core.ErrorCodes;
 import convex.core.data.ACell;

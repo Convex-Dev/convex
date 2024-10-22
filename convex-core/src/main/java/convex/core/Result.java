@@ -7,6 +7,8 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import convex.core.cvm.exception.AExceptional;
+import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AMap;
@@ -32,8 +34,6 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.RecordFormat;
-import convex.core.lang.exception.AExceptional;
-import convex.core.lang.exception.ErrorValue;
 import convex.core.util.Utils;
 
 /**

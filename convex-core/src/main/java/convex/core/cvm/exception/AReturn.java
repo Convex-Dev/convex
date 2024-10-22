@@ -1,4 +1,4 @@
-package convex.core.lang.exception;
+package convex.core.cvm.exception;
 
 /**
  * Abstract base class for exceptional returns

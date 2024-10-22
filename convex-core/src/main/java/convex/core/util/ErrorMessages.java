@@ -1,10 +1,10 @@
 package convex.core.util;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ARecord;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
-import convex.core.lang.exception.ErrorValue;
 
 /**
  * Utility class for generating appropriate error messages
