@@ -10,22 +10,22 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.cvm.AOp;
 import convex.core.cvm.State;
+import convex.core.cvm.ops.Cond;
+import convex.core.cvm.ops.Constant;
+import convex.core.cvm.ops.Def;
+import convex.core.cvm.ops.Do;
+import convex.core.cvm.ops.Invoke;
+import convex.core.cvm.ops.Lookup;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ValidationException;
 import convex.core.init.InitTest;
-import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.TestState;
-import convex.core.lang.ops.Cond;
-import convex.core.lang.ops.Constant;
-import convex.core.lang.ops.Def;
-import convex.core.lang.ops.Do;
-import convex.core.lang.ops.Invoke;
-import convex.core.lang.ops.Lookup;
 
 @RunWith(Parameterized.class)
 public class ParamTestOps {

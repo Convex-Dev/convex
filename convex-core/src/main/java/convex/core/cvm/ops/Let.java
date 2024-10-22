@@ -1,5 +1,8 @@
-package convex.core.lang.ops;
+package convex.core.cvm.ops;
 
+import convex.core.cvm.AOp;
+import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
@@ -9,10 +12,7 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.AOp;
 import convex.core.lang.Context;
-import convex.core.lang.Juice;
-import convex.core.lang.Ops;
 import convex.core.lang.RT;
 import convex.core.lang.exception.RecurValue;
 

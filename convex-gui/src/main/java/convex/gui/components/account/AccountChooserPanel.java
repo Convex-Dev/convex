@@ -10,8 +10,8 @@ import javax.swing.JPanel;
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.cvm.ops.Special;
 import convex.core.data.Address;
-import convex.core.lang.ops.Special;
 import convex.gui.components.BalanceLabel;
 import net.miginfocom.swing.MigLayout;
 

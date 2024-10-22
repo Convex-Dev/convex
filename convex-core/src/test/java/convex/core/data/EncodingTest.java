@@ -23,6 +23,7 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.Refs.RefTreeStats;
@@ -35,7 +36,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.core.lang.ops.Constant;
 import convex.test.Samples;
 import convex.test.Testing;
  

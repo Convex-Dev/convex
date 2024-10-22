@@ -1,7 +1,7 @@
-package convex.core.lang;
+package convex.core.cvm;
 
 /**
- * Constants and utility functionf for CVM log
+ * Constants and utility functions for CVM log
  * 
  * See CAD33
  */

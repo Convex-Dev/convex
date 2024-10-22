@@ -15,9 +15,9 @@ import convex.api.Convex;
 import convex.core.Coin;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.Address;
-import convex.core.lang.ops.Constant;
 import convex.peer.API;
 import convex.peer.Server;
 

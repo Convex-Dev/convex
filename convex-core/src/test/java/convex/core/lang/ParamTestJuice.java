@@ -10,6 +10,8 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 
+import convex.core.cvm.AOp;
+import convex.core.cvm.Juice;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.Blob;

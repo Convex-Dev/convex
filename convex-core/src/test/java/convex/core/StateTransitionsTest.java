@@ -14,6 +14,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Juice;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
@@ -30,7 +31,6 @@ import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
-import convex.core.lang.Juice;
 import convex.core.lang.Reader;
 import convex.core.lang.TestState;
 

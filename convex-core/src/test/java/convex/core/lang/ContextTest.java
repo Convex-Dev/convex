@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.cvm.Log;
+import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
@@ -26,7 +28,6 @@ import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.init.BaseTest;
-import convex.core.lang.ops.Special;
 
 /**
  * Tests for basic execution Context mechanics and internals

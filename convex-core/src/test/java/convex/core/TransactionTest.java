@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Juice;
 import convex.core.cvm.State;
 import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.cvm.transactions.ATransaction;
@@ -37,7 +38,6 @@ import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.lang.Juice;
 import convex.core.lang.Symbols;
 import convex.test.Samples;
 

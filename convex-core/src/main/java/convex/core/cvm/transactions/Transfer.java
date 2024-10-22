@@ -1,6 +1,7 @@
 package convex.core.cvm.transactions;
 
 import convex.core.Coin;
+import convex.core.cvm.Juice;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
@@ -14,7 +15,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Context;
-import convex.core.lang.Juice;
 import convex.core.lang.RecordFormat;
 
 /**

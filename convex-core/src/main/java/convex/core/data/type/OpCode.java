@@ -1,8 +1,8 @@
 package convex.core.data.type;
 
+import convex.core.cvm.AOp;
+import convex.core.cvm.ops.Do;
 import convex.core.data.ACell;
-import convex.core.lang.AOp;
-import convex.core.lang.ops.Do;
 
 /**
  * Type that represents CVM Long values

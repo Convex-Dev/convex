@@ -6,13 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Juice;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Context;
-import convex.core.lang.Juice;
 import convex.core.lang.Reader;
 
 import static convex.test.Assertions.*;

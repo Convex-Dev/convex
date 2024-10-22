@@ -4,6 +4,20 @@ import java.util.Map;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.cvm.AOp;
+import convex.core.cvm.Juice;
+import convex.core.cvm.ops.Cond;
+import convex.core.cvm.ops.Constant;
+import convex.core.cvm.ops.Def;
+import convex.core.cvm.ops.Do;
+import convex.core.cvm.ops.Invoke;
+import convex.core.cvm.ops.Lambda;
+import convex.core.cvm.ops.Let;
+import convex.core.cvm.ops.Local;
+import convex.core.cvm.ops.Lookup;
+import convex.core.cvm.ops.Query;
+import convex.core.cvm.ops.Special;
+import convex.core.cvm.ops.Try;
 import convex.core.data.ABlobLike;
 import convex.core.data.ACell;
 import convex.core.data.ADataStructure;
@@ -31,18 +45,6 @@ import convex.core.lang.Context.CompilerState;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.CoreFn;
 import convex.core.lang.impl.MultiFn;
-import convex.core.lang.ops.Cond;
-import convex.core.lang.ops.Constant;
-import convex.core.lang.ops.Def;
-import convex.core.lang.ops.Do;
-import convex.core.lang.ops.Invoke;
-import convex.core.lang.ops.Lambda;
-import convex.core.lang.ops.Let;
-import convex.core.lang.ops.Local;
-import convex.core.lang.ops.Lookup;
-import convex.core.lang.ops.Query;
-import convex.core.lang.ops.Special;
-import convex.core.lang.ops.Try;
 
 /**
  * Compiler class responsible for transforming forms (code as data) into an
@@ -262,7 +264,7 @@ public class Compiler {
 			}
 		} else {
 			// Otherwise must be a Local binding, so use a Set op
-			AOp<?> op=convex.core.lang.ops.Set.create(position.longValue(), exp);
+			AOp<?> op=convex.core.cvm.ops.Set.create(position.longValue(), exp);
 			return context.withResult(Juice.COMPILE_NODE,op);
 		}
 	}

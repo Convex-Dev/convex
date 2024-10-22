@@ -1,12 +1,12 @@
 package convex.core;
 
+import convex.core.cvm.Juice;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.lang.Context;
-import convex.core.lang.Juice;
 
 /**
  * Class for preparation of transaction results from the CVM

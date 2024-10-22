@@ -1,4 +1,4 @@
-package convex.core.lang;
+package convex.core.cvm;
 
 import convex.core.data.ACell;
 import convex.core.data.Format;
@@ -6,6 +6,8 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
+import convex.core.lang.ACVMCode;
+import convex.core.lang.Context;
 
 /**
  * Abstract base class for CVM operations

@@ -14,6 +14,7 @@ import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.cvm.ops.Do;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
@@ -58,7 +59,6 @@ import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
-import convex.core.lang.ops.Do;
 
 /**
  * Miscellaneous value objects for testing purposes

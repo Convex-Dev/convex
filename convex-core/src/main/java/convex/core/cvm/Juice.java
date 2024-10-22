@@ -1,4 +1,4 @@
-package convex.core.lang;
+package convex.core.cvm;
 
 import convex.core.Constants;
 import convex.core.cvm.transactions.ATransaction;
@@ -9,6 +9,7 @@ import convex.core.data.Cells;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMDouble;
+import convex.core.lang.Context;
 
 /**
  * Static class defining juice costs for executable operations.
@@ -121,7 +122,7 @@ public class Juice {
 	/**
 	 * Juice required to build a data structure. Make a bit expensive?
 	 */
-	protected static final long BUILD_DATA = 50;
+	public static final long BUILD_DATA = 50;
 
 	/**
 	 * Juice required per element changed when building a data structure. Map entries
@@ -130,10 +131,10 @@ public class Juice {
 	 * We need to be a bit harsh on this! Risk of consuming too much heap space,
 	 * might also result in multiple allocs for tree structures.
 	 */
-	protected static final long BUILD_PER_ELEMENT = 50;
+	public static final long BUILD_PER_ELEMENT = 50;
 
-	protected static final long MAP = 100;
-	protected static final long REDUCE = 100;
+	public static final long MAP = 100;
+	public static final long REDUCE = 100;
 
 	/**
 	 * Juice for general object equality comparison
@@ -186,31 +187,31 @@ public class Juice {
 	 * Fairly cheap, since mostly in fast code, but charge extra for additional
 	 * chars.
 	 */
-	protected static final long STR = SIMPLE_FN;
+	public static final long STR = SIMPLE_FN;
 
-	protected static final long ARITHMETIC = SIMPLE_FN;
+	public static final long ARITHMETIC = SIMPLE_FN;
 
-	protected static final long ADDRESS = 20;
+	public static final long ADDRESS = 20;
 
 	/**
 	 * Juice for balance core function. Some lookups required
 	 */
-	protected static final long BALANCE = 50;
+	public static final long BALANCE = 50;
 
 	/**
 	 * Juice for creation of a blob. Fairly cheap but needs per-byte cost
 	 */
-	protected static final long BLOB = 20;
-	protected static final long BUILD_PER_BYTE = 1;
+	public static final long BLOB = 20;
+	public static final long BUILD_PER_BYTE = 1;
 
 	/**
 	 * Juice for data structure get. Hash lookup possibly required.
 	 */
-	protected static final long GET = 30;
+	public static final long GET = 30;
 
-	protected static final long KEYWORD = 20;
+	public static final long KEYWORD = 20;
 
-	protected static final long SYMBOL = 20;
+	public static final long SYMBOL = 20;
 
 	/**
 	 * Juice for a transfer execution. Some account updates
@@ -240,7 +241,7 @@ public class Juice {
 	/**
 	 * Probably should be expensive?
 	 */
-	protected static final long EVAL = 500;
+	public static final long EVAL = 500;
 
 	// Juice amounts for compiler. TODO: figure out if compile / eval should be
 	// allowed on-chain

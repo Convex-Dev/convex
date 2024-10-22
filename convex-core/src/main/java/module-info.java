@@ -14,7 +14,7 @@ module convex.core {
 	exports convex.core.text;
 	exports convex.core.lang.reader;
 	exports convex.core.crypto.wallet;
-	exports convex.core.lang.ops;
+	exports convex.core.cvm.ops;
 	exports convex.core.data;
 	exports convex.core.lang;
 	exports convex.core.cvm;

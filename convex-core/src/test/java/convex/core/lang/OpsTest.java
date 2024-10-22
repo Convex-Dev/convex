@@ -11,6 +11,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.AOp;
+import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
+import convex.core.cvm.ops.Cond;
+import convex.core.cvm.ops.Constant;
+import convex.core.cvm.ops.Def;
+import convex.core.cvm.ops.Do;
+import convex.core.cvm.ops.Invoke;
+import convex.core.cvm.ops.Lambda;
+import convex.core.cvm.ops.Let;
+import convex.core.cvm.ops.Local;
+import convex.core.cvm.ops.Lookup;
+import convex.core.cvm.ops.Set;
+import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
@@ -29,17 +43,6 @@ import convex.core.init.BaseTest;
 import convex.core.init.Init;
 import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.Fn;
-import convex.core.lang.ops.Cond;
-import convex.core.lang.ops.Constant;
-import convex.core.lang.ops.Def;
-import convex.core.lang.ops.Do;
-import convex.core.lang.ops.Invoke;
-import convex.core.lang.ops.Lambda;
-import convex.core.lang.ops.Let;
-import convex.core.lang.ops.Local;
-import convex.core.lang.ops.Lookup;
-import convex.core.lang.ops.Set;
-import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
 
 /**

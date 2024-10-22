@@ -12,7 +12,9 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cvm.AOp;
 import convex.core.cvm.State;
+import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Keyword;
@@ -20,7 +22,6 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.InitTest;
-import convex.core.lang.ops.Special;
 import convex.core.util.Utils;
 
 /**

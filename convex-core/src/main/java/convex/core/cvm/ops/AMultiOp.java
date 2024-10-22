@@ -1,5 +1,6 @@
-package convex.core.lang.ops;
+package convex.core.cvm.ops;
 
+import convex.core.cvm.AOp;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
@@ -7,7 +8,6 @@ import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.AOp;
 
 /**
  * Abstract base class for Ops with multiple nested operations

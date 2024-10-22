@@ -6,6 +6,8 @@ import org.openjdk.jmh.runner.options.Options;
 
 import convex.core.ResultContext;
 import convex.core.cvm.State;
+import convex.core.cvm.ops.Constant;
+import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Invoke;
@@ -21,8 +23,6 @@ import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
 import convex.core.lang.Symbols;
-import convex.core.lang.ops.Constant;
-import convex.core.lang.ops.Lookup;
 
 
 /**
@@ -73,7 +73,7 @@ public class CVMBenchmark {
 	public void simpleCalculationStatic() {
 		State s=STATE;
 		Address addr=HERO;
-		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
+		ATransaction trans=Invoke.create(addr,1, convex.core.cvm.ops.Invoke.create(Constant.create(Core.PLUS),Constant.of(1L),Constant.of(2L)));
 		ResultContext ctx=s.applyTransaction(trans);
 		ctx.context.getResult();
 	}
@@ -82,7 +82,7 @@ public class CVMBenchmark {
 	public void simpleCalculationDynamic() {
 		State s=STATE;
 		Address addr=HERO;
-		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
+		ATransaction trans=Invoke.create(addr,1, convex.core.cvm.ops.Invoke.create(Lookup.create("+"),Constant.of(1L),Constant.of(2L)));
 		ResultContext ctx=s.applyTransaction(trans);
 		ctx.context.getResult();
 	}
@@ -109,7 +109,7 @@ public class CVMBenchmark {
 	public void defInEnvironment() {
 		State s=STATE;
 		Address addr=HERO;
-		ATransaction trans=Invoke.create(addr,1, convex.core.lang.ops.Def.create("a", Constant.of(13L)));
+		ATransaction trans=Invoke.create(addr,1, convex.core.cvm.ops.Def.create("a", Constant.of(13L)));
 		ResultContext ctx=s.applyTransaction(trans);
 		ctx.context.getResult();
 	}

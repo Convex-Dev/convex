@@ -14,6 +14,7 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.cvm.State;
+import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
@@ -22,7 +23,6 @@ import convex.core.data.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.lang.Reader;
-import convex.core.lang.ops.Constant;
 import convex.peer.API;
 import convex.peer.Server;
 

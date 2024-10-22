@@ -7,6 +7,7 @@ import java.util.Random;
 import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 
+import convex.core.cvm.AOp;
 import convex.core.data.ACell;
 import convex.core.data.Syntax;
 import convex.core.exceptions.ParseException;

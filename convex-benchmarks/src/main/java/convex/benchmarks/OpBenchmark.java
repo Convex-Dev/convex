@@ -4,13 +4,13 @@ import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.Options;
 
+import convex.core.cvm.ops.Constant;
+import convex.core.cvm.ops.Invoke;
 import convex.core.data.ACell;
-import convex.core.lang.AOp;
+import convex.core.cvm.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
-import convex.core.lang.ops.Constant;
-import convex.core.lang.ops.Invoke;
 
 public class OpBenchmark {
 	

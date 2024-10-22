@@ -1,20 +1,20 @@
-package convex.core.lang;
+package convex.core.cvm;
 
+import convex.core.cvm.ops.Cond;
+import convex.core.cvm.ops.Constant;
+import convex.core.cvm.ops.Def;
+import convex.core.cvm.ops.Do;
+import convex.core.cvm.ops.Invoke;
+import convex.core.cvm.ops.Lambda;
+import convex.core.cvm.ops.Let;
+import convex.core.cvm.ops.Local;
+import convex.core.cvm.ops.Lookup;
+import convex.core.cvm.ops.Query;
+import convex.core.cvm.ops.Set;
+import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.ops.Cond;
-import convex.core.lang.ops.Constant;
-import convex.core.lang.ops.Def;
-import convex.core.lang.ops.Do;
-import convex.core.lang.ops.Invoke;
-import convex.core.lang.ops.Lambda;
-import convex.core.lang.ops.Let;
-import convex.core.lang.ops.Local;
-import convex.core.lang.ops.Lookup;
-import convex.core.lang.ops.Query;
-import convex.core.lang.ops.Set;
-import convex.core.lang.ops.Special;
 
 /**
  * Static utility class for coded operations.

@@ -1,5 +1,6 @@
 package convex.core.lang.impl;
 
+import convex.core.cvm.AOp;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -10,7 +11,6 @@ import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.lang.AOp;
 import convex.core.lang.Context;
 import convex.core.lang.RT;
 import convex.core.lang.Symbols;
