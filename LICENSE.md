@@ -11,11 +11,11 @@ B) Ensure effective governance of economic systems and networks based on Convex 
 
 As such the license has been written based on the following principles:
 
-- It is a "weak copyleft" open source license, similar in spirit to the Eclipse Public License. Derivative Works and any Contributions must be released under the same license. However, you may link and utilise the Work from software using a different license, including use as a library commercial and proprietary software.
+- It is a "weak copyleft" open source license, similar in spirit to the Eclipse Public License. Derivative Works and any Contributions must be released under the same license. However, you may link and utilise the Work from software using a different license, including use as a library for commercial and proprietary software.
 - It is intended to support good governance of the decentralised Convex network, and therefore gives certain governance powers to a Governing Body (at time of writing the non-profit Convex Foundation). The Governing Body, in turn, is expected to use these powers to serve the interests of the whole ecosystem.
 
 
-# Definitions.
+# Definitions
 
 "Licence" shall mean the terms and conditions for use, reproduction, and distribution as defined by this document.
 
@@ -56,17 +56,17 @@ As such the license has been written based on the following principles:
 
 "Originator" shall mean the original author of the Convex software, Michael Richard Anderson, who established to Convex Foundation to further the goals of building effective decentralised economic systems.
 
-"Governance Body" shall mean the Legal Entity legally authorised by the Originator to administer governance decisions relating to the Work, which as of April 2023 is the Convex Foundation.
+"Governance Body" shall mean the Legal Entity legally authorised by the Originator to administer governance decisions relating to the Work, which as of October 2024 is the Convex Foundation.
 
 "Convex Network Governance Rules" shall mean the set of rules established and updated from time to time by the Governance Body for the secure, equitable and efficient operation of the Convex Network. The current version shall be made publicly available by the Governance Body, at time of writing [here](docs/network-governance-rules.md).
 
 # License Terms
 
-## 1. Grant of Copyright License.
+## 1. Grant of Copyright License
 
 Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable copyright license to reproduce, prepare Derivative Works of, publicly display, publicly perform, and distribute the Work and such Derivative Works in Source or Object form.
 
-## 2. Grant of Patent Licence. 
+## 2. Grant of Patent Licence
 
 Subject to the terms and conditions of this License, each Contributor hereby grants to You a perpetual, worldwide, non-exclusive, no-charge, royalty-free, irrevocable (except as stated in this section) patent license to make, have made, use, offer to sell, sell, import, and otherwise transfer the Work, where such license applies only to those patent claims licensable by such Contributor that are necessarily infringed by their Contribution(s) alone or by combination of their Contribution(s) with the Work to which such Contribution(s) was submitted. If You institute patent litigation against any entity (including a cross-claim or counterclaim in a lawsuit) alleging that the Work or a Contribution incorporated within the Work constitutes direct or contributory patent infringement, then any patent licenses granted to You under this License for that Work shall terminate as of the date such litigation is filed.
 
@@ -82,27 +82,27 @@ You may distribute the Work (or Derivative Work) under this Licence, provided th
 
 If you utilise the Work in a Decentralised Economic System, you warrant that that this system will be operated in accordance with the Convex Network Governance Rules. This term applies whether or not you have made any modifications to the Work.
 
-## 5. Submission of Contributions. 
+## 5. Submission of Contributions 
 
 Unless You explicitly state otherwise, any Contribution intentionally submitted for inclusion in the Work by You to the Licensor shall be under the terms and conditions of this Licence, without any additional terms or conditions. Notwithstanding the above, nothing herein shall supersede or modify the terms of any separate license agreement you may have executed with Licensor regarding such Contributions.
 
-## 6. Trademarks. 
+## 6. Trademarks
 
 This Licence does not grant permission to use the trade names, trademarks, service marks, or product names of the Licensor, except as required for reasonable and customary use including, but not limited to, describing the origin of the Work and reproducing the content of any NOTICE file.
 
-## 7. Disclaimer of Warranty. 
+## 7. Disclaimer of Warranty 
 
 Unless required by applicable law or agreed to in writing, Licensor provides the Work (and each Contributor provides its Contributions) on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied, including, without limitation, any warranties or conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A PARTICULAR PURPOSE. You are solely responsible for determining the appropriateness of using or redistributing the Work and assume any risks associated with Your exercise of permissions under this Licence.
 
-## 8. Limitation of Liability. 
+## 8. Limitation of Liability 
 
 In no event and under no legal theory, whether in tort (including negligence), contract, or otherwise, unless required by applicable law (such as deliberate and grossly negligent acts) or agreed to in writing, shall any Contributor be liable to You for damages, including any direct, indirect, special, incidental, or consequential damages of any character arising as a result of this License or out of the use or inability to use the Work (including but not limited to damages for loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses), even if such Contributor has been advised of the possibility of such damages.
 
-## 9. Accepting Warranty or Additional Liability. 
+## 9. Accepting Warranty or Additional Liability 
 
 While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this Licence. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
 
-## 10. Relicensing. 
+## 10. Relicensing 
 
 Contributor grants to the Governing Body a perpetual, worldwide, no-charge, royalty-free, irrevocable right to re-distribute Contributions under any license, including future revisions of this license, providing that such license is formally approved by the Governing Body. The Governing Body will ensure that this Work is always free and open source for anyone to use within the Convex ecosystem.
 
@@ -122,4 +122,4 @@ The Governing Body may, at its sole and absolute discretion, make awards of Conv
 
 # Copyright
 
-Copyright The Originator 2018-2021, Convex Foundation 2021-2023. Includes terms adapted from the Apache 2.0 License and Eclipse Public License v2.0
+Copyright The Originator 2018-2021, Convex Foundation 2021-2024. Includes terms adapted from the Apache 2.0 License and Eclipse Public License v2.0
