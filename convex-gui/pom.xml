@@ -16,7 +16,7 @@
 	
 	<properties>
 		<zxing.version>3.5.3</zxing.version>
-		<flatlaf.version>3.5.1</flatlaf.version>
+		<flatlaf.version>3.5.2</flatlaf.version>
 	</properties>
 
 	<build>
@@ -53,12 +53,6 @@
 			<groupId>com.miglayout</groupId>
 			<artifactId>miglayout-swing</artifactId>
 			<version>11.4.2</version>
-		</dependency>
-
-		<dependency>
-			<groupId>net.java.dev.jna</groupId>
-			<artifactId>jna</artifactId>
-			<version>5.14.0</version>
 		</dependency>
 
 		<dependency>
