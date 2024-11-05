@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.function.Consumer;
 
 import org.eclipse.jetty.server.ServerConnector;
 import org.slf4j.Logger;
@@ -31,6 +32,8 @@ import io.javalin.config.JavalinConfig;
 import io.javalin.http.staticfiles.Location;
 import io.javalin.openapi.JsonSchemaLoader;
 import io.javalin.openapi.JsonSchemaResource;
+import io.javalin.openapi.OpenApiInfo;
+import io.javalin.openapi.plugin.DefinitionConfiguration;
 import io.javalin.openapi.plugin.OpenApiPlugin;
 import io.javalin.openapi.plugin.redoc.ReDocPlugin;
 import io.javalin.openapi.plugin.swagger.SwaggerPlugin;
@@ -124,14 +127,15 @@ public class RESTServer implements Closeable {
 		String docsPath="openapi-plugin/openapi-default.json";
 		
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
-			
             pluginConfig
             .withDocumentationPath(docsPath)
             .withDefinitionConfiguration((version, definition) -> {
-                definition.withInfo(info -> {
-					info.setTitle("Convex REST API");
-					info.setVersion("0.7.0");
-                });
+            	DefinitionConfiguration def=definition;
+                def=def.withInfo((Consumer <OpenApiInfo>)
+                		info -> {
+							info.setTitle("Convex REST API");
+							info.setVersion("0.7.0");
+		                });
             });
 		}));
 
