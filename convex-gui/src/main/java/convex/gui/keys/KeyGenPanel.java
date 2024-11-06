@@ -238,7 +238,7 @@ public class KeyGenPanel extends JPanel {
 		add(formPanel, BorderLayout.CENTER);
 
 		{ // Mnemonic entry box
-			addLabel("Mnenomic Phrase","BIP39 Menemonic phrase. These should be random words from the BIP39 standard word list.");	
+			addLabel("Mnemonic Phrase","BIP39 Mnemonic phrase. These should be random words from the BIP39 standard word list.");	
 			mnemonicArea = makeTextArea();
 			mnemonicArea.setWrapStyleWord(true);
 			mnemonicArea.setLineWrap(true);
