@@ -14,10 +14,10 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class QRPanel extends JPanel {
 
+	QRCode qrCode;
+	
 	public QRPanel(Convex convex) {
 		setLayout(new MigLayout("wrap 1, fillx"));
-		
-		
 		
 		add(new JLabel());
 		add(Toolkit.makeNote("Use this QR code to receive payments and share your account details with others. It is safe to share publicly, and only refers to information that you have already made public on the Convex network.")
@@ -26,7 +26,8 @@ public class QRPanel extends JPanel {
 		HashMap<String,Object> rec=new HashMap<>();
 		rec.put("address", convex.getAddress().longValue());
 		String data=JSON.toPrettyString(rec);
-		add(new QRCode(data,400),"align center");
 		
+		qrCode=new QRCode(data,400);
+		add(qrCode,"align center");
 	}
 }
