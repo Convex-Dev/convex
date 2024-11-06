@@ -24,7 +24,7 @@ public class QRPanel extends JPanel {
 				,"grow");
 
 		HashMap<String,Object> rec=new HashMap<>();
-		rec.put("address", convex.getAddress());
+		rec.put("address", convex.getAddress().longValue());
 		String data=JSON.toPrettyString(rec);
 		add(new QRCode(data,400),"align center");
 		
