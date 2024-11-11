@@ -14,7 +14,11 @@ public class DropdownMenu extends BaseImageButton {
 	private JPopupMenu popupMenu;
 	 
 	public DropdownMenu(JPopupMenu popupMenu) {
-		super(SymbolIcon.get(0xe8b8,Toolkit.ICON_SIZE));
+		this(popupMenu,Toolkit.ICON_SIZE);
+	}
+	
+	public DropdownMenu(JPopupMenu popupMenu, int iconSize) {
+		super(SymbolIcon.get(0xe8b8,iconSize));
 		this.popupMenu = popupMenu;
 		// setIconTextGap(0);
 		this.addActionListener(e->{

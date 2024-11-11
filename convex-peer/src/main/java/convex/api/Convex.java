@@ -351,7 +351,11 @@ public abstract class Convex implements AutoCloseable {
 	public CompletableFuture<Address> createAccount(AccountKey publicKey) {
 		Invoke trans = Invoke.create(address, 0, Lists.of(Symbols.CREATE_ACCOUNT, publicKey));
 		CompletableFuture<Result> fr = transact(trans);
-		return fr.thenApply(r -> r.getValue());
+		return fr.thenCompose(r -> {
+			if (r.isError()) return CompletableFuture.failedFuture(new ResultException(r));
+			ACell a=r.getValue();
+			return CompletableFuture.completedFuture((Address)a);
+		});
 	}
 
 	/**
@@ -479,15 +483,21 @@ public abstract class Convex implements AutoCloseable {
 				}
 			}
 			
-			// If local, update sequence number based on latest consensus state
-			Server s=getLocalServer();
-			if (s!=null) {
-				State state=s.getPeer().getConsensusState();
-				AccountStatus as=state.getAccount(origin);
-				if (as!=null) {
-					long expected=as.getSequence()+1;
-					if (expected>seq) {
-						seq=expected;
+			
+			if (sequence!=null) {
+				// use auto-sequence value if available
+				seq=sequence+1; 
+			} else {
+				// If local, update sequence number based on latest consensus state
+				Server s=getLocalServer();
+				if (s!=null) {
+					State state=s.getPeer().getConsensusState();
+					AccountStatus as=state.getAccount(origin);
+					if (as!=null) {
+						long expected=as.getSequence()+1;
+						if (expected>seq) {
+							seq=expected;
+						}
 					}
 				}
 			}

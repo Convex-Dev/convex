@@ -4,15 +4,20 @@ import java.awt.event.ItemEvent;
 
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.ops.Special;
 import convex.core.data.Address;
+import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
+import convex.gui.components.DropdownMenu;
+import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
 /**
@@ -32,7 +37,7 @@ public class AccountChooserPanel extends JPanel {
 	public AccountChooserPanel(Convex convex) {
 		this.convex=convex;
 		
-		MigLayout layout = new MigLayout("insets 10 10 10 10");
+		MigLayout layout = new MigLayout();
 		setLayout(layout);
 
 		{
@@ -95,6 +100,45 @@ public class AccountChooserPanel extends JPanel {
 			add(mp,"dock west");
 		}
 		
+		// Settings
+		{
+			//////////////////////////////////
+			// Settings Popup menu for peer
+			JPopupMenu popupMenu = new JPopupMenu();
+
+			JMenuItem clearSeqButton = new JMenuItem("Clear sequence",Toolkit.menuIcon(0xe9d5));
+			clearSeqButton.addActionListener(e -> {
+				convex.clearSequence();
+			});
+			popupMenu.add(clearSeqButton);
+			
+			JMenuItem setSeqButton = new JMenuItem("Set sequence...",Toolkit.menuIcon(0xe6d4));
+			setSeqButton.addActionListener(e -> {
+				try {
+					long seq=convex.getSequence();
+					String s = JOptionPane.showInputDialog(this, "Current sequence number is "+seq+", so the next sequence number expected is "+(seq+1), "Enter next sequence number", JOptionPane.QUESTION_MESSAGE);
+					if (s==null) return;
+					
+					long nextSeq=Long.parseLong(s);
+					
+					convex.setNextSequence(nextSeq);
+					System.err.println("Sequence number set: "+convex.getSequence());
+				} catch (NumberFormatException e1) {
+					JOptionPane.showMessageDialog(this, "Invalid sequence number");
+				}catch (ResultException e1) {
+					e1.printStackTrace();
+				} catch (InterruptedException e1) {
+					Thread.currentThread().interrupt();
+				}
+				convex.clearSequence();
+			});
+			popupMenu.add(setSeqButton);
+
+
+			DropdownMenu dm = new DropdownMenu(popupMenu,Toolkit.SMALL_ICON_SIZE);
+			add(dm);
+		}
+		
 		// Mode selection	
 		{
 			JPanel mp=new JPanel();
@@ -111,7 +155,7 @@ public class AccountChooserPanel extends JPanel {
 			// modeCombo.addItem("Prepare...");
 			if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
 			mp.add(modeCombo);
-			add(mp,"dock east");
+			add(mp, "dock east");
 		}
 	}
 
