@@ -171,5 +171,16 @@ public class Constants {
 	 */
 	public static final int LOOKUP_DEPTH = 16;
 
+	/**
+	 * SLIP-44 Chain code for Convex CVM
+	 * 
+	 * 8 = maturity, mastery, power, and ambition
+     * 7 = knowledge and wisdom through observation, analysis, and awareness
+     * 6 = harmony, compassion, and completeness
+     * 
+     * Hex is 36c i.e. 36c = 3 * 16^2 + 6 * 16^1 + 12 * 16^0
+	 */
+	public static final int CHAIN_CODE = 876;
+
 
 }

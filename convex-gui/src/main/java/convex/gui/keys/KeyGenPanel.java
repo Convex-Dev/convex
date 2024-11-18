@@ -14,6 +14,7 @@ import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.SpinnerNumberModel;
 
+import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.Passwords;
@@ -307,7 +308,8 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			addLabel("BIP32 Path","This is the hierarchical path for key generation as defined in BIP32. 'm' just specifies the master key.");
+			int CC = Constants.CHAIN_CODE;
+			addLabel("BIP32 Path","This is the hierarchical path for key generation as defined in BIP32. 'm' specifies the master key. "+CC+" is the Convex SLIP-44 chain code.");
 			derivationArea = makeTextArea();
 
 			derivationArea.setLineWrap(true);
@@ -315,7 +317,7 @@ public class KeyGenPanel extends JPanel {
 			derivationArea.setBackground(Color.BLACK);
 
 			formPanel.add(derivationArea,TEXTAREA_CONSTRAINT);
-			derivationArea.setText("m");
+			derivationArea.setText("m/"+CC+"/0/0/0");
 			derivationArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!derivationArea.isFocusOwner()) return;
 				updatePath();

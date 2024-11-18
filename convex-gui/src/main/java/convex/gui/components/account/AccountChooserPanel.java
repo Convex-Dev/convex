@@ -13,10 +13,13 @@ import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.ops.Special;
+import convex.core.data.AccountKey;
 import convex.core.data.Address;
+import convex.core.data.Symbols;
 import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.DropdownMenu;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -50,6 +53,9 @@ public class AccountChooserPanel extends JPanel {
 			Address address=convex.getAddress();
 			addressCombo = new AddressCombo(address);
 			addressCombo.setToolTipText("Select Account for use");
+			addressCombo.addItemListener(e -> {
+				updateAddress(addressCombo.getAddress());
+			});
 			mp.add(addressCombo);
 			
 			keyCombo=KeyPairCombo.forConvex(convex);
@@ -61,34 +67,10 @@ public class AccountChooserPanel extends JPanel {
 					return;
 				};
 				AWalletEntry we=(AWalletEntry)e.getItem();
-				if (we==null) {
-					convex.setKeyPair(null);
-				} else {
-					AKeyPair kp;
-					if (we.isLocked()) {
-						String s=JOptionPane.showInputDialog(AccountChooserPanel.this,"Enter password to unlock wallet:\n"+we.getPublicKey());
-						if (s==null) {
-							return;
-						}
-						char[] pass=s.toCharArray();
-						boolean unlock=we.tryUnlock(s.toCharArray());
-						if (!unlock) {
-							return;
-						}
-						kp=we.getKeyPair();
-						we.lock(pass);
-					} else {
-						kp=we.getKeyPair();
-					}
-					convex.setKeyPair(kp);
-				}
+				setKeyPair(we);
 			});
 			mp.add(keyCombo);
 
-	
-			addressCombo.addItemListener(e -> {
-				updateAddress(addressCombo.getAddress());
-			});
 			
 			// Balance Info
 			mp.add(new JLabel("Balance: "));
@@ -165,8 +147,47 @@ public class AccountChooserPanel extends JPanel {
 	
 	public void updateAddress(Address a) {
 		convex.setAddress(a);
+		convex.query(Special.forSymbol(Symbols.STAR_KEY)).thenAcceptAsync(r-> {
+			if (r.isError()) {
+				// ignore?
+				System.err.println("Account key query failed: "+r);
+				setKeyPair(null);
+			} else {
+				AccountKey ak=AccountKey.parse(r.getValue()); // might be null, will clear key
+				AWalletEntry we=KeyRingPanel.getKeyRingEntry(ak);
+				setKeyPair(we);
+			}
+		});
 		
 		updateBalance();
+	}
+	
+	public void setKeyPair(AWalletEntry we) {
+		if (we==keyCombo.getSelectedItem()) return; // no change
+		
+		if (we==null) {
+			convex.setKeyPair(null);
+		} else {
+			AKeyPair kp;
+			if (we.isLocked()) {
+				String s=JOptionPane.showInputDialog(AccountChooserPanel.this,"Enter password to unlock wallet:\n"+we.getPublicKey());
+				if (s==null) {
+					convex.setKeyPair(null);
+					return;
+				}
+				char[] pass=s.toCharArray();
+				boolean unlock=we.tryUnlock(s.toCharArray());
+				if (!unlock) {
+					return;
+				}
+				kp=we.getKeyPair();
+				we.lock(pass);
+			} else {
+				kp=we.getKeyPair();
+			}
+			convex.setKeyPair(kp);
+		}
+		keyCombo.setSelectedItem(we);
 	}
 	
 	public void updateBalance() {
