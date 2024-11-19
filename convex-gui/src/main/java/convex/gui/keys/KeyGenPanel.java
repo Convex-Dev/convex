@@ -294,7 +294,7 @@ public class KeyGenPanel extends JPanel {
 	    }
 	
 		
-		addNote("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. Instead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
+		addNote("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. \n\nInstead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
 		
 		{
 			addLabel("SLIP-10 Master Key","SLIP-10 creates a Master Key from the BIP39 seed, which acts as the root of key generation for a heirarchical deterministic wallet.");
@@ -309,7 +309,7 @@ public class KeyGenPanel extends JPanel {
 		
 		{
 			int CC = Constants.CHAIN_CODE;
-			addLabel("BIP32 Path","This is the hierarchical path for key generation as defined in BIP32. 'm' specifies the master key. "+CC+" is the Convex SLIP-44 chain code.");
+			addLabel("BIP32 Path","This is the hierarchical path for key generation as defined in BIP32. \n - 'm' specifies the master key. \n - 44 is the purpose defined as BIP-44. \n - "+CC+" is the Convex SLIP-0044 chain code. \n - The other numbers (account, change, index) may be set at the user's discretion, but are zero by default. \n\nIf you want multiple keys for the same mnemomic, is is recommended to increment the account number. \n\nWARNING: if you change these values, you will need to retain them in order to recover the specified key.");
 			derivationArea = makeTextArea();
 
 			derivationArea.setLineWrap(true);
@@ -317,7 +317,7 @@ public class KeyGenPanel extends JPanel {
 			derivationArea.setBackground(Color.BLACK);
 
 			formPanel.add(derivationArea,TEXTAREA_CONSTRAINT);
-			derivationArea.setText("m/"+CC+"/0/0/0");
+			derivationArea.setText("m/44/"+CC+"/0/0/0");
 			derivationArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!derivationArea.isFocusOwner()) return;
 				updatePath();
@@ -325,7 +325,7 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			addLabel("SLIP-10 Ext. Priv. Key","This is the extended private key produced by SLIP-10 after applying the BIP32 derivation path. The first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed.");
+			addLabel("SLIP-10 Ext. Priv. Key","This is the extended private key produced by SLIP-10 after applying the BIP32 derivation path. \nThe first 32 bytes of the SLIP-10 extended private key are used as the Ed25519 seed.");
 			derivedKeyArea = makeTextArea();
 			derivedKeyArea.setLineWrap(true);
 			derivedKeyArea.setWrapStyleWord(false);
@@ -335,7 +335,7 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{
-			addLabel("Private Ed25519 seed","This is the Ed25519 private seed you need to sign transactions in Convex. Any 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
+			addLabel("Private Ed25519 seed","This is the Ed25519 private seed you need to sign transactions in Convex. \nAny 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
 			privateKeyArea = makeTextArea();
 			privateKeyArea.setBackground(Color.BLACK);
 
