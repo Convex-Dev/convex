@@ -114,7 +114,14 @@ public class DecimalAmountField extends JTextField {
 		super.setText(text.trim());
 	}
 
-	static AInteger parse(String text, int decimals, boolean exact) {
+	/**
+	 * Parse a string as an integer amount with the specified number of decimals
+	 * @param text String to parse
+	 * @param decimals Number of decimals in result quantity
+	 * @param exact If true, conversion will require an exact conversion
+	 * @return Integer amount, or null if not convertible
+	 */
+	public static AInteger parse(String text, int decimals, boolean exact) {
 		try {
 			text=text.trim();
 			BigDecimal dec=new BigDecimal(text);

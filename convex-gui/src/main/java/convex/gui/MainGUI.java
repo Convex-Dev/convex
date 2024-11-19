@@ -35,25 +35,25 @@ public class MainGUI extends AbstractGUI {
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.setLayout(new MigLayout("center,align center,fillx"));
 		
-		JComponent wallet=createLaunchButton("Wallet",Toolkit.WALLET_ICON,this::launchWallet);
+		JComponent wallet=createLaunchButton("Wallet",Toolkit.WALLET_ICON,this::launchWallet,"Open a Convex Wallet, connecting to any existing network");
 		actionPanel.add(wallet);
 
-		JComponent testNet=createLaunchButton("Peer Manager",Toolkit.TESTNET_ICON,this::launchTestNet);
+		JComponent testNet=createLaunchButton("Peer Manager",Toolkit.TESTNET_ICON,this::launchTestNet,"Launch a DevNet with the Peer Manager. This gives you a test network you can use freely for testing and development purposes.");
 		actionPanel.add(testNet);
 		
-		JComponent latticeFS=createLaunchButton("Lattice Filesystem",Toolkit.DLFS_ICON,this::launchDLFS);
+		JComponent latticeFS=createLaunchButton("Lattice Filesystem",Toolkit.DLFS_ICON,this::launchDLFS,"Launch a DLFS file browser. EXPERIMENTAL.");
 		actionPanel.add(latticeFS);
 
-		JComponent terminal=createLaunchButton("Client Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient);
+		JComponent terminal=createLaunchButton("Client Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient,"Open a Convex REPL terminal, connecting to any existing network");
 		actionPanel.add(terminal);
 		
-		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools);
+		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools,"Open a set of useful tools for hackers and power users.");
 		actionPanel.add(hacker);
 
-		JComponent discord=createLaunchButton("Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord);
+		JComponent discord=createLaunchButton("Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord,"Go to the Convex community Discord (opens web browser).");
 		actionPanel.add(discord);
 
-		JComponent www=createLaunchButton("convex.world",Toolkit.WWW_ICON,this::launchWebsite);
+		JComponent www=createLaunchButton("convex.world",Toolkit.WWW_ICON,this::launchWebsite,"Go to the Convex main website (opens web browser).");
 		actionPanel.add(www);
 		
 		add(actionPanel);
@@ -96,11 +96,12 @@ public class MainGUI extends AbstractGUI {
 		Toolkit.launchBrowser("https://convex.world");
 	}
 	
-	public JPanel createLaunchButton(String label, ImageIcon icon, Runnable cmd) {
+	public JPanel createLaunchButton(String label, ImageIcon icon, Runnable cmd, String tooltip) {
 		JButton butt=new JButton(icon);
 		butt.addActionListener(e->{
 			EventQueue.invokeLater(cmd);
 		});
+		butt.setToolTipText(tooltip);
 		
 		JLabel lab = new JLabel(label);
 		lab.setHorizontalAlignment(SwingConstants.CENTER);

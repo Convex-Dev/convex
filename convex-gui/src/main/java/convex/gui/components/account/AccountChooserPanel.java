@@ -63,7 +63,7 @@ public class AccountChooserPanel extends JPanel {
 			keyCombo.addItemListener(e->{
 				if (e.getStateChange()==ItemEvent.DESELECTED) {
 					// key pair was deselected and/or set to null
-					convex.setKeyPair(null);
+					setKeyPair(null);
 					return;
 				};
 				AWalletEntry we=(AWalletEntry)e.getItem();
