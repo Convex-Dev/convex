@@ -43,7 +43,7 @@ public class ConnectPanel extends JPanel {
 		{	// Peer selection
 			pan.add(new JLabel("Peer"));
 			hostField=new HostCombo();
-			hostField.setToolTipText("Connect to a Convex peer that you trust. The peer is resposible for handling transactions on your behalf.");
+			hostField.setToolTipText("Connect to a Convex peer that you trust. \nThe peer is resposible for handling transactions on your behalf.");
 			pan.add(hostField,"width 50:250:");
 			pan.add(Toolkit.makeHelp(hostField.getToolTipText()));
 		}
@@ -51,7 +51,7 @@ public class ConnectPanel extends JPanel {
 		{	// Address selection
 			pan.add(new JLabel("Address"));
 			addressField=new AddressCombo(Init.GENESIS_ADDRESS);
-			addressField.setToolTipText("Set the initial account address to use. This should be an account for which you possess the private key.");
+			addressField.setToolTipText("Set the initial account address to use. \nNormally this should be an account for which you possess the private key. \nIf you don't have the private key, you can still view the account but cannot execute transactions.");
 			pan.add(addressField,"width 50:250:");
 			pan.add(Toolkit.makeHelp(addressField.getToolTipText()));
 		}
