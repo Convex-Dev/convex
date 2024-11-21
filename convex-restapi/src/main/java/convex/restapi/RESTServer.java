@@ -54,9 +54,10 @@ public class RESTServer implements Closeable {
 	private Javalin buildApp(boolean useSSL) {
 		SslPlugin sslPlugin = getSSLPlugin(server.getConfig());
 		Javalin app = Javalin.create(config -> {
-			config.staticFiles.enableWebjars();
 			config.bundledPlugins.enableCors(cors -> {
 				cors.addRule(corsConfig -> {
+					// ?? corsConfig.allowCredentials=true;
+					
 					// replacement for enableCorsForAllOrigins()
 					corsConfig.anyHost();
 				});
@@ -86,6 +87,26 @@ public class RESTServer implements Closeable {
 			String message = "Unexpected error: " + e;
 			ctx.result(message);
 			ctx.status(500);
+		});
+		
+		app.options("/*", ctx-> {
+			ctx.status(204); // No context#
+			ctx.removeHeader("Content-type");
+			ctx.header("access-control-allow-headers", "content-type");
+			ctx.header("access-control-allow-methods", "GET,HEAD,PUT,PATCH,POST,DELETE");
+			ctx.header("access-control-allow-origin", "*");
+			ctx.header("vary","Origin, Access-Control-Request-Headers");
+		});
+		
+		// Header to every response
+		app.afterMatched(ctx->{
+			// Reflect CORS origin
+			String origin = ctx.req().getHeader("Origin");
+			if (origin!=null) {
+				ctx.header("access-control-allow-origin", "*");
+			} else {
+				ctx.header("access-control-allow-origin", "*");
+			}
 		});
 
 		addAPIRoutes(app);	
