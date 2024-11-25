@@ -40,6 +40,7 @@ public class EtchStore extends ACachedStore {
 	 */
 	private Etch target;
 
+
 	public EtchStore(Etch etch) {
 		this.etch = etch;
 		this.target = null;
@@ -304,5 +305,6 @@ public class EtchStore extends ACachedStore {
 	public String shortName() {
 		return "Etch: "+etch.getFileName();
 	}
+
 
 }

@@ -1,17 +1,9 @@
 package convex.core.data;
 
 import convex.core.exceptions.BadFormatException;
-import convex.core.store.AStore;
 
-/**
- * Encoder for CAD3 data / stores
- */
-public class Encoder {
+public class CAD3Encoder extends AEncoder<ACell> {
 
-	public static final int FORMAT_V1=1;
-	
-	protected AStore store;
-	
 	public Blob encode(ACell a) {
 		return Format.encodedBlob(a);
 	}

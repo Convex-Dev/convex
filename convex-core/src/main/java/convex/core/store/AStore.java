@@ -5,8 +5,8 @@ import java.io.IOException;
 import java.util.function.Consumer;
 
 import convex.core.data.ACell;
+import convex.core.data.AEncoder;
 import convex.core.data.Blob;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
@@ -136,11 +136,8 @@ public abstract class AStore implements Closeable {
 	 * @throws BadFormatException If cell encoding is invalid
 	 */
 	public abstract  <T extends ACell> T decode(Blob encoding) throws BadFormatException;
-
-	protected ACell decodeImpl(Blob encoding) throws BadFormatException {
-		ACell decoded=Format.read(encoding);
-		return decoded;
-	}
+	
+	public abstract AEncoder<ACell> getEncoder();
 
 	/**
 	 * checks in-memory cache for a stored Ref. Returns store-native Ref if found, null otherwise. Does not access underlying storage.
