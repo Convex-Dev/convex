@@ -85,14 +85,14 @@ public class ChainAPI extends ABaseAPI {
 		String prefix = ROUTE;
 
 		app.post(prefix + "createAccount", this::createAccount);
-		app.post(prefix + "query", this::runQuery);
+		app.post(prefix + "query", this::query);
 
 		app.post(prefix + "faucet", this::faucetRequest);
 
-		app.post(prefix + "transaction/prepare", this::runTransactionPrepare);
-		app.post(prefix + "transaction/submit", this::runTransactionSubmit);
+		app.post(prefix + "transaction/prepare", this::transactionPrepare);
+		app.post(prefix + "transaction/submit", this::transactionSubmit);
 
-		app.post(prefix + "transact", this::runTransact);
+		app.post(prefix + "transact", this::transact);
 
 		app.get(prefix + "accounts/<addr>", this::queryAccount);
 		app.get(prefix + "peers/<addr>", this::queryPeer);
@@ -367,7 +367,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST,
 			operationId = "transactionPrepare",
 			tags= {"Transactions"},
-			summary="Prepare a Convex transaction. If sucessful, will return a hash to be signed.",
+			summary="Prepare a Convex transaction. If sucessful, will return an encoding to be signed.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction preparation request",
 					content= {
@@ -397,7 +397,7 @@ public class ChainAPI extends ABaseAPI {
 							description = "Transaction service unavailable" )
 				}
 			)
-	public void runTransactionPrepare(Context ctx) throws InterruptedException, IOException {
+	public void transactionPrepare(Context ctx) throws InterruptedException, IOException {
 		Map<String, Object> req = getJSONBody(ctx);
 		Address addr = Address.parse(req.get("address"));
 		if (addr == null)
@@ -437,7 +437,7 @@ public class ChainAPI extends ABaseAPI {
 			methods = HttpMethod.POST,
 			operationId = "transact",
 			tags= {"Transactions"},
-			summary="Execute a Convex transaction. WARNING: sends Ed25519 seed over the network for peer to complete signature.",
+			summary="Execute a Convex transaction. WARNING: sends Ed25519 seed over the network for peer to complete signature. Only do this with a secure HTTPS connection to a peer that you trust.",
 			requestBody = @OpenApiRequestBody(
 					description = "Transaction execution request",
 					content= {@OpenApiContent(
@@ -479,7 +479,7 @@ public class ChainAPI extends ABaseAPI {
 							description = "Transaction service unavailable" )
 				}
 			)
-	public void runTransact(Context ctx) throws InterruptedException, IOException {
+	public void transact(Context ctx) throws InterruptedException, IOException {
 		String type=ctx.req().getContentType();
 		SignedData<ATransaction> sd;
 		
@@ -566,7 +566,7 @@ public class ChainAPI extends ABaseAPI {
 							description = "Transaction service unavailable" )
 				}
 			)
-	public void runTransactionSubmit(Context ctx) throws InterruptedException {
+	public void transactionSubmit(Context ctx) throws InterruptedException {
 		Map<String, Object> req = getJSONBody(ctx);
 
 		// Get the transaction hash
@@ -664,7 +664,7 @@ public class ChainAPI extends ABaseAPI {
 						description = "Query service unavailable" )
 			}
 		)
-	public void runQuery(Context ctx) throws InterruptedException {
+	public void query(Context ctx) throws InterruptedException {
 		Address addr;
 		ACell form;
 		String type=ctx.req().getContentType();
