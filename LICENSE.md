@@ -1,6 +1,6 @@
 # License
 
-Convex Public Licence ("CPL") v0.5
+Convex Public Licence ("CPL") v0.9
 
 # Preamble
 
@@ -52,9 +52,11 @@ As such the license has been written based on the following principles:
 
 "Public Utility Network" shall mean a network of systems managing information, communication or economic assets which is generally available for public access, e.g. via the Internet.
 
-"Convex Network" shall mean the union of all systems using the Work as part of a public utility network or operating a Decentralised Economic System. 
+"Convex Network" shall mean the union of all systems using the Work as part of a Public Utility Network or operating a Decentralised Economic System. 
 
-"Originator" shall mean the original author of the Convex software, Michael Richard Anderson, who established to Convex Foundation to further the goals of building effective decentralised economic systems.
+"Operator" shall mean any legal entity running a system using this Work, whether as part of the Convex Network or otherwise.
+
+"Originator" shall mean the original author of the Convex software, Michael Richard Anderson, who established to Convex Foundation to further the goals of building effective decentralised economic systems. For the purposes of this License, the Originator is also considered a Contributor.
 
 "Governance Body" shall mean the Legal Entity legally authorised by the Originator to administer governance decisions relating to the Work, which as of October 2024 is the Convex Foundation.
 
@@ -100,7 +102,7 @@ In no event and under no legal theory, whether in tort (including negligence), c
 
 ## 9. Accepting Warranty or Additional Liability 
 
-While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this Licence. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor, and only if You agree to indemnify, defend, and hold each Contributor harmless for any liability incurred by, or claims asserted against, such Contributor by reason of your accepting any such warranty or additional liability.
+While redistributing the Work or Derivative Works thereof, You may choose to offer, and charge a fee for, acceptance of support, warranty, indemnity, or other liability obligations and/or rights consistent with this Licence. However, in accepting such obligations, You may act only on Your own behalf and on Your sole responsibility, not on behalf of any other Contributor or Operator, and only if You agree to indemnify, defend, and hold each Contributor or Operator harmless for any liability incurred by, or claims asserted against, such Contributor or Operator by reason of your accepting any such warranty or additional liability.
 
 ## 10. Relicensing 
 
@@ -108,17 +110,19 @@ Contributor grants to the Governing Body a perpetual, worldwide, no-charge, roya
 
 ## 11. Decentralised Execution
 
-Licensee acknowledges and agrees that their use of the work (directly or indirectly) may include the execution of transactions on a public, decentralised network, and as such they agree to the following:
+Licensee acknowledges and agrees that their use of the Work (directly or indirectly) may include the execution of transactions on a public, decentralised network, and as such they agree to the following:
 
 - Transactions that they execute may be publicly visible, including any personal information contained therein.
-- Contracts may be executed according to rules defined by software code either deployed to the Network or as part of the execution environment defined within this Work. 
-- Access to or control of digital assets and other economically valuable systems may depend on cryptographic keys and signatures, and it is the responsibility of Licensee to ensure that such keys are properly secured.
+- Contracts may be executed according to rules defined by software code either deployed to the Network or as part of the execution logic encoded within this Work. 
+- Access to or control of digital assets and other economically valuable systems may depend on cryptographic keys and signatures, and it is the responsibility of Licensee to ensure that such keys are properly secured. Not your keys, not your crypto.
 
-Licensee accepts full responsibility for the consequences of executing transactions on such a network, and authorises operators of the network to carry out execution as described here. If Licensee executes transactions on behalf of a third party, it is the responsibility of Licensee to ensure that any such party agrees to these terms, and Licensee shall indemnify operators of the Convex Network against any consequences of a failure to do so. 
+Licensee accepts full responsibility for the consequences of executing transactions on such a network, and authorises Operators of the network to carry out execution as described here. 
+
+If Licensee executes transactions or facilitates such execution on behalf of a third party, it is the responsibility of Licensee to ensure that any such party agrees to these terms, and Licensee shall fully indemnify Contributors and Operators against any consequences of a failure to do so. 
 
 ## 12. Contributor Awards
 
-The Governing Body may, at its sole and absolute discretion, make awards of Convex Coins for Contributions to the Work. To be eligible for such awards, Contributor agrees to sign a Contributor Agreement which shall be made available separately from this License. 
+The Governing Body may, at its sole and absolute discretion, make awards of Convex Coins for Contributions to the Work. To be eligible for such awards, Contributor agrees to sign a Contributor Agreement which may be made available separately from this License. 
 
 # Copyright
 
