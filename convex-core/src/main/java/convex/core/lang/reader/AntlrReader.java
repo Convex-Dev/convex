@@ -20,6 +20,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AList;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.CVMEncoder;
 import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.List;
@@ -81,8 +82,14 @@ public class AntlrReader {
 	
 	static class CRListener implements ConvexListener {
 		ArrayList<ArrayList<ACell>> stack=new ArrayList<>();
+		protected CVMEncoder encoder;
 		
 		public CRListener() {
+			this (CVMEncoder.INSTANCE);
+		}
+		
+		public CRListener(CVMEncoder encoder) {
+			this.encoder=encoder;
 			stack.add(new ArrayList<>());
 		}
 		
@@ -406,7 +413,7 @@ public class AntlrReader {
 			String s=ctx.getStop().getText();
 			Blob enc=Blob.fromHex(s.substring(2, s.length()-1));
 			try {
-				ACell cell=convex.core.data.Format.decodeMultiCell(enc);
+				ACell cell=encoder.decodeMultiCell(enc);
 				push (cell);
 			} catch (BadFormatException e) {
 				throw new ParseException("Invalid CAD3 encoding: "+e.getMessage(),e);

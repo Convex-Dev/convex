@@ -494,6 +494,8 @@ public class Format {
 	}
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
+		
+		
 		if (tag == Tag.OP) return Ops.read(b, pos);
 		
 		

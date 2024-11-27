@@ -4,7 +4,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.store.AStore;
 
 /**
- * Encoder for CAD3 data / stores
+ * Abstract base class for encoders, which convert data to / from Blob instances
  */
 public abstract class AEncoder<T> {
 
@@ -20,4 +20,12 @@ public abstract class AEncoder<T> {
 	public abstract Blob encode(T a);
 	
 	public abstract T decode(Blob encoding) throws BadFormatException;
+
+	/**
+	 * Reads a value from a Blob of data
+	 * @param data Data to decode
+	 * @return Value instance
+	 * @throws BadFormatException If encoding format is invalid
+	 */
+	public abstract T decodeMultiCell(Blob enc) throws BadFormatException;
 }
