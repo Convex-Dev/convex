@@ -29,6 +29,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -406,7 +407,7 @@ public class Connection {
 		Blob enc = Format.encodeMultiCell(payload,true);
 		if (log.isTraceEnabled()) {
 			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
-					+ Format.encodedBlob(payload).toHexString());
+					+ Cells.encode(payload).toHexString());
 		}
 		boolean sent = sendBuffer(type, enc);
 		return sent;

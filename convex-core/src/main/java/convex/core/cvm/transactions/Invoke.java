@@ -97,7 +97,7 @@ public class Invoke extends ATransaction {
 		epos+=Format.getVLQCountLength(sequence);
 		
 		ACell args=Format.read(b, epos);
-		epos+=Format.getEncodingLength(args);
+		epos+=Cells.getEncodingLength(args);
 
 		Invoke result=create(address, sequence, args);
 		result.attachEncoding(b.slice(pos, epos));

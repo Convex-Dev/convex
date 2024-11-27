@@ -9,6 +9,7 @@ import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.util.BlobBuilder;
@@ -98,7 +99,7 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
 		AVector<AOp<ACell>> ops = Format.read(b,epos);
-		epos+=Format.getEncodingLength(ops);
+		epos+=Cells.getEncodingLength(ops);
 		
 		Query<T> result= create(ops);
 		result.attachEncoding(b.slice(pos, epos));

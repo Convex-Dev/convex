@@ -558,13 +558,15 @@ public class Format {
 	}
 	
 	/**
-	 * Helper method to read a value encoded as a hex string
+	 * Helper method to read a CVM value encoded as a hex string
 	 * @param <T> Type of value to read
 	 * @param hexString A valid hex String
 	 * @return Value read
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static <T extends ACell> T read(String hexString) throws BadFormatException {
+		Blob enc=Blob.fromHex(hexString);
+		if (enc==null) throw new BadFormatException("Invalid hex string");
 		return read(Blob.fromHex(hexString));
 	}
 	
@@ -715,17 +717,6 @@ public class Format {
 	}
 
 	/**
-	 * Gets the encoded Blob for an object in canonical message format
-	 * 
-	 * @param o The object to encode
-	 * @return Encoded data as a blob
-	 */
-	public static Blob encodedBlob(ACell o) {
-		if (o==null) return Blob.NULL_ENCODING;
-		return o.getEncoding();
-	}
-	
-	/**
 	 * Writes hex digits from digit position start, total length.
 	 * 
 	 * Fills final hex digit with 0 if length is odd.
@@ -750,24 +741,6 @@ public class Format {
 		}
 		System.arraycopy(bs2, 0, bs, pos, nBytes);
 		return pos+nBytes;
-	}
-
-	/**
-	 * Gets a hex String representing an object's encoding
-	 * @param cell Any cell
-	 * @return Hex String
-	 */
-	public static String encodedString(ACell cell) {
-		return encodedBlob(cell).toHexString();
-	}
-	
-	/**
-	 * Gets a hex String representing an object's encoding. Used in testing only.
-	 * @param o Any object, will be cast to appropriate CVM type
-	 * @return Hex String
-	 */
-	public static String encodedString(Object o) {
-		return encodedString(RT.cvm(o));
 	}
 
 	/**
@@ -817,7 +790,6 @@ public class Format {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T decodeMultiCell(Blob data) throws BadFormatException {
 		long ml=data.count();
-		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml<1) throw new BadFormatException("Attempt to decode from empty Blob");
 		
 		// read first cell
@@ -942,7 +914,7 @@ public class Format {
 	 * @return Blob encoding
 	 */
 	public static Blob encodeMultiCell(ACell a, boolean everything) {
-		Blob topCellEncoding=Format.encodedBlob(a);
+		Blob topCellEncoding=Cells.encode(a);
 		if (a.getRefCount()==0) return topCellEncoding;
 
 		// Add any non-embedded child cells to stack
@@ -979,7 +951,7 @@ public class Format {
 		int ix=topCellEncoding.size();
 		for (Ref<?> r: refs) {
 			ACell c=r.getValue();
-			Blob enc=Format.encodedBlob(c);
+			Blob enc=Cells.encode(c);
 			int encLength=enc.size();
 			
 			// Write count then Blob encoding
@@ -1001,7 +973,7 @@ public class Format {
 	public static Blob encodeCells(java.util.List<ACell> cells) {
 		int ml=0;
 		for (ACell a:cells) {
-			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data
+			Blob enc=Cells.encode(a); // can be null in some cases, e.g. in DATA responses signalling missing data
 			int elen=enc.size();
 			if (ml>0) ml+=Format.getVLQCountLength(elen);
 			ml+=elen;
@@ -1010,7 +982,7 @@ public class Format {
 		byte[] msg=new byte[ml];
 		int ix=0;
 		for (ACell a:cells) {
-			Blob enc=Format.encodedBlob(a); // can be null in some cases, e.g. in DATA responses signalling missing data;
+			Blob enc=Cells.encode(a); // can be null in some cases, e.g. in DATA responses signalling missing data;
 			int elen=enc.size();
 			if (ix>0) ix=Format.writeVLQCount(msg,ix,elen);
 			ix=enc.getBytes(msg, ix);
@@ -1053,11 +1025,6 @@ public class Format {
 		if (ix!=ml) throw new Panic("Bad message length expected "+ml+" but was: "+ix);
 		
 		return Blob.wrap(msg);
-	}
-
-	public static int getEncodingLength(ACell value) {
-		if (value==null) return 1;
-		return value.getEncodingLength();
 	}
 
 	/**

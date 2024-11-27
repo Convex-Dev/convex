@@ -121,10 +121,10 @@ public class SetsTest {
 	@Test 
 	public void regressionRead() throws BadFormatException {
 		ASet<CVMLong> v1=Sets.of(43);
-		Blob b1 = Format.encodedBlob(v1);
+		Blob b1 = Cells.encode(v1);
 		
 		ASet<CVMLong> v2=Format.read(b1);
-		Blob b2 = Format.encodedBlob(v2);
+		Blob b2 = Cells.encode(v2);
 		
 		assertEquals(v1, v2);
 		assertEquals(b1,b2);

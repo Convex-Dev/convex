@@ -239,19 +239,19 @@ public class State extends ARecord {
 		int epos=pos+1; // skip tag
 		AVector<AccountStatus> accounts = Format.read(b,epos);
 		if (accounts==null) throw new BadFormatException("Null accounts!");
-		epos+=Format.getEncodingLength(accounts);
+		epos+=Cells.getEncodingLength(accounts);
 
 		Index<AccountKey, PeerStatus> peers = Format.read(b,epos);
 		if (peers==null) throw new BadFormatException("Null peers!");
-		epos+=Format.getEncodingLength(peers);
+		epos+=Cells.getEncodingLength(peers);
 
 		AVector<ACell> globals = Format.read(b,epos);
 		if (globals==null) throw new BadFormatException("Null globals!");
-		epos+=Format.getEncodingLength(globals);
+		epos+=Cells.getEncodingLength(globals);
 
 		Index<ABlob, AVector<ACell>> schedule = Format.read(b,epos);
 		if (schedule==null) throw new BadFormatException("Null schedule!");
-		epos+=Format.getEncodingLength(schedule);
+		epos+=Cells.getEncodingLength(schedule);
 
 		State result=create(accounts, peers, globals, schedule);
 		result.attachEncoding(b.slice(pos,epos));

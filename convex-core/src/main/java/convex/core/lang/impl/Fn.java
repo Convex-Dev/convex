@@ -5,6 +5,7 @@ import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -136,14 +137,14 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		
 		AVector<ACell> params = Format.read(b,epos);
 		if (params==null) throw new BadFormatException("Null parameters to Fn");
-		epos+=Format.getEncodingLength(params);
+		epos+=Cells.getEncodingLength(params);
 		
 		AOp<T> body = Format.read(b,epos);
 		if (body==null) throw new BadFormatException("Null body in Fn");
-		epos+=Format.getEncodingLength(body);
+		epos+=Cells.getEncodingLength(body);
 		
 		AVector<ACell> lexicalEnv = Format.read(b,epos);
-		epos+=Format.getEncodingLength(lexicalEnv);
+		epos+=Cells.getEncodingLength(lexicalEnv);
 
 		
 		Fn<T> result = new Fn<>(params, body, lexicalEnv);

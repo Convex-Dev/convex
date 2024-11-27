@@ -68,6 +68,7 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Index;
@@ -3988,7 +3989,7 @@ public class CoreTest extends ACVMTest {
 			ACell v=Core.ENVIRONMENT.get(sym);
 			assertSame(def, v);
 
-			Blob b = Format.encodedBlob(def);
+			Blob b = Cells.encode(def);
 			assertSame(def, Format.read(b));
 
 			AHashMap<ACell,ACell> meta= Core.METADATA.get(sym);
@@ -5229,19 +5230,19 @@ public class CoreTest extends ACVMTest {
 	public void testCoreFormatRoundTrip() throws BadFormatException {
 		{ // a core function
 			ACell c = eval("count");
-			Blob b = Format.encodedBlob(c);
+			Blob b = Cells.encode(c);
 			assertSame(c, Format.read(b));
 		}
 
 		{ // a core macro
 			ACell c = eval("*initial-expander*");
-			Blob b = Format.encodedBlob(c);
+			Blob b = Cells.encode(c);
 			assertSame(c, Format.read(b));
 		}
 
 		{ // a basic lambda expression
 			ACell c = eval("(fn [x] x)");
-			Blob b = Format.encodedBlob(c);
+			Blob b = Cells.encode(c);
 			assertEquals(c, Format.read(b));
 		}
 	}

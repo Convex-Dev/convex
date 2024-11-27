@@ -7,7 +7,7 @@ import org.openjdk.jmh.runner.options.Options;
 import convex.core.crypto.Hashing;
 import convex.core.data.AArrayBlob;
 import convex.core.data.Blob;
-import convex.core.data.Format;
+import convex.core.data.Cells;
 import convex.core.data.prim.CVMLong;
 
 /**
@@ -21,7 +21,7 @@ public class HashBenchmark {
 	@Benchmark
 	public void longHash_SHA_256() {
 		CVMLong l = CVMLong.create(17L);
-		AArrayBlob d = Format.encodedBlob(l);
+		AArrayBlob d = Cells.encode(l);
 		Hashing.sha256(d.getInternalArray());
 	}
 	

@@ -8,6 +8,7 @@ import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -95,7 +96,7 @@ public class Set<T extends ACell> extends AOp<T> {
 		epos+=Format.getVLQLongLength(position);
 		
 		AOp<R> op = Format.read(b,epos);
-		epos+=Format.getEncodingLength(op);
+		epos+=Cells.getEncodingLength(op);
 		
 		Set<R> result= create(position, op);
 		result.attachEncoding(b.slice(pos, epos));

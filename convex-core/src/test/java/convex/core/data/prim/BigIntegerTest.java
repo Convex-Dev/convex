@@ -61,7 +61,7 @@ public class BigIntegerTest {
 		assertEquals(BigInteger.ZERO,bi.getBigInteger());
 		assertFalse(bi.isCanonical());
 		
-		Blob enc=Format.encodedBlob(bi);
+		Blob enc=Cells.encode(bi);
 		assertEquals(bi,Format.read(enc));
 		assertNotEquals(enc,Blobs.empty().getEncoding());
 		
@@ -105,7 +105,7 @@ public class BigIntegerTest {
 		CVMBigInteger cb=CVMBigInteger.wrap(b1);
 		Blob bb=cb.getEncoding();
 		assertNotEquals(b,bb);
-		assertNotEquals(b,Format.encodedBlob(cb));
+		assertNotEquals(b,Cells.encode(cb));
 		
 		ObjectsTest.doAnyValueTests(cb);
 	}

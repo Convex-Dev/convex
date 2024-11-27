@@ -161,7 +161,7 @@ public class Belief extends ARecord {
 		
 		Index<AccountKey, SignedData<Order>> orders = Format.read(b,epos);
 		if (orders == null) throw new BadFormatException("Null orders in Belief");
-		epos+=Format.getEncodingLength(orders);
+		epos+=Cells.getEncodingLength(orders);
 		
 		Belief result= new Belief(orders);
 		result.attachEncoding(b.slice(pos, epos));

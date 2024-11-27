@@ -158,7 +158,7 @@ public final class Block extends ARecord {
 		epos+=8;
 		
 		AVector<SignedData<ATransaction>> transactions = Format.read(b,epos);
-		epos+=Format.getEncodingLength(transactions);
+		epos+=Cells.getEncodingLength(transactions);
 		
 		Block result=Block.create(timestamp, transactions);
 		result.attachEncoding(b.slice(pos, epos));

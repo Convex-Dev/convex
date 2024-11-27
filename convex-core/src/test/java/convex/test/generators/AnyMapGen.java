@@ -8,8 +8,8 @@ import convex.core.data.ABlob;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Index;
-import convex.core.data.Format;
 import convex.core.data.Maps;
 import convex.test.Samples;
 
@@ -44,7 +44,7 @@ public class AnyMapGen extends Generator<AMap> {
 		case 5:
 			return Index.EMPTY;
 		case 6: {
-			ABlob o1 = Format.encodedBlob(gen().make(PrimitiveGen.class).generate(r, status));
+			ABlob o1 = Cells.encode(gen().make(PrimitiveGen.class).generate(r, status));
 			AString o2 = gen().make(StringGen.class).generate(r, status);
 			return Index.create(o1, o2);
 		}

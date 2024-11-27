@@ -8,6 +8,7 @@ import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -107,10 +108,10 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		
 		Symbol sym = Format.read(b,epos);
 		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
-		epos+=Format.getEncodingLength(sym);
+		epos+=Cells.getEncodingLength(sym);
 		
 		AOp<Address> address = Format.read(b,epos);
-		epos+=Format.getEncodingLength(address);
+		epos+=Cells.getEncodingLength(address);
 		
 		Lookup<T> result= create(address,sym);
 		result.attachEncoding(b.slice(pos, epos));

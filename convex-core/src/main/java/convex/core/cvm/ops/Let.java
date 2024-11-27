@@ -9,6 +9,7 @@ import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -183,9 +184,9 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
 		AVector<ACell> syms = Format.read(b,epos);
-		epos+=Format.getEncodingLength(syms);
+		epos+=Cells.getEncodingLength(syms);
 		AVector<AOp<ACell>> ops = Format.read(b,epos);
-		epos+=Format.getEncodingLength(ops);
+		epos+=Cells.getEncodingLength(ops);
 		
 		Let<T> result= create(syms, ops.toVector(),isLoop);
 		result.attachEncoding(b.slice(pos, epos));

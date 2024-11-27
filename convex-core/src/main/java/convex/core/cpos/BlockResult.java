@@ -183,11 +183,11 @@ public class BlockResult extends ARecord {
 
 		State newState=Format.read(b,epos);
 		if (newState==null) throw new BadFormatException("Null state");
-		epos+=Format.getEncodingLength(newState);
+		epos+=Cells.getEncodingLength(newState);
 		
 		AVector<Result> newResults=Format.read(b,epos);
 		if (newResults==null) throw new BadFormatException("Null results");
-		epos+=Format.getEncodingLength(newResults);
+		epos+=Cells.getEncodingLength(newResults);
 
 		BlockResult result=create(newState,newResults);
 		result.attachEncoding(b.slice(pos, epos));

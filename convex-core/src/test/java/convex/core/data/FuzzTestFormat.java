@@ -55,7 +55,7 @@ public class FuzzTestFormat {
 	
 	public static void doCellFuzzTests(ACell c)  {
 		for (int i = 0; i < 1000; i++) {
-			Blob b=Format.encodedBlob(c);
+			Blob b=Cells.encode(c);
 			try {
 				doFuzzTest(b);
 			} catch (Exception e) {
@@ -85,7 +85,7 @@ public class FuzzTestFormat {
 		// format!
 		assertTrue(Cells.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
 		
-		Blob b2 = Format.encodedBlob(v);
+		Blob b2 = Cells.encode(v);
 		assertEquals(v, Format.read(b2),
 				() -> "Expected to be able to regenerate value: " + v + " of type " + Utils.getClass(v));
 

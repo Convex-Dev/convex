@@ -57,7 +57,7 @@ public class GenTestAnyValue {
 	
 	@Property
 	public void testFuzzing(@From(ValueGen.class) ACell o) throws InvalidDataException  {
-		Blob b=Format.encodedBlob(o);
+		Blob b=Cells.encode(o);
 		FuzzTestFormat.doMutationTest(b);
 		
 		if (o instanceof ACell) {
@@ -77,12 +77,12 @@ public class GenTestAnyValue {
 		if (Cells.isEmbedded(o)) {
 			Cells.persist(o); // NOTE: may have child refs to persist
 			
-			Blob data=Format.encodedBlob(o);
+			Blob data=Cells.encode(o);
 			ACell o2=Format.read(data);
 			
 			// check round trip properties
 			assertEquals(o,o2);
-			AArrayBlob data2=Format.encodedBlob(o2);
+			AArrayBlob data2=Cells.encode(o2);
 			assertEquals(data,data2);
 			assertTrue(Cells.isEmbedded(o2));
 			
@@ -100,7 +100,7 @@ public class GenTestAnyValue {
 	
 	@Property (trials=20)
 	public void dataRoundTrip(@From(ValueGen.class) ACell o) throws BadFormatException, IOException {
-		Blob data=Format.encodedBlob(o);
+		Blob data=Cells.encode(o);
 		
 		// introduce a small offset to ensure blobs working correctly
 		data=Samples.ONE_ZERO_BYTE_DATA.append(data).slice(1).toFlatBlob();
@@ -121,7 +121,7 @@ public class GenTestAnyValue {
 		assertEquals(hash,Hash.get(o2));
 
 		// re-encoding
-		AArrayBlob data2=Format.encodedBlob(o2);
+		AArrayBlob data2=Cells.encode(o2);
 		assertEquals(data,data2);
 		
 		// simulate retrieval via hash

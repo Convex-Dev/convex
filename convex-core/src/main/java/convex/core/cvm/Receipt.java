@@ -137,13 +137,13 @@ public class Receipt extends ARecord {
 		boolean hasLog=((tag&Tag.RECEIPT_LOG_MASK)!=0);
 
 		ACell result = Format.read(b,epos);
-		epos+=Format.getEncodingLength(result);
+		epos+=Cells.getEncodingLength(result);
 
 		AVector<AVector<ACell>> log=null;
 		if (hasLog) {
 			log = Vectors.read(b, epos); 
 			if ((log==null)||(log.isEmpty())) throw new BadFormatException("Expected non-empty log");
-			epos+=Format.getEncodingLength(log);
+			epos+=Cells.getEncodingLength(log);
 		}
 		
 		Receipt receipt=new Receipt(isError,result,log);

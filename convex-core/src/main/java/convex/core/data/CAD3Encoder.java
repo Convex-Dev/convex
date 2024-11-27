@@ -5,10 +5,10 @@ import convex.core.exceptions.BadFormatException;
 /**
  * Base Encoder for CAD3 data / stores
  */
-public abstract class CAD3Encoder extends AEncoder<ACell> {
+public class CAD3Encoder extends AEncoder<ACell> {
 
 	public Blob encode(ACell a) {
-		return Format.encodedBlob(a);
+		return Cells.encode(a);
 	}
 	
 	public ACell decode(Blob encoding) throws BadFormatException {
@@ -22,5 +22,7 @@ public abstract class CAD3Encoder extends AEncoder<ACell> {
 	 * @throws BadFormatException If CAD3 encoding format is invalid
 	 */
 	@Override
-	public abstract ACell decodeMultiCell(Blob enc) throws BadFormatException;
+	public ACell decodeMultiCell(Blob enc) throws BadFormatException  {
+		return Format.decodeMultiCell(enc);
+	}
 }

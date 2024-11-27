@@ -116,7 +116,7 @@ public class EncodingTest {
 	
 	@Test public void testEmbeddedRegression() throws BadFormatException {
 		Keyword k=Keyword.create("foo");
-		Blob b=Format.encodedBlob(k);
+		Blob b=Cells.encode(k);
 		ACell o=Format.read(b);
 		assertEquals(k,o);
 		assertTrue(Cells.isEmbedded(k));
@@ -154,7 +154,7 @@ public class EncodingTest {
 	
 	@Test public void testStringRegression() throws BadFormatException {
 		StringShort s=StringShort.create("��zI�&$\\ž1�����4�E4�a8�#?$wD(�#");
-		Blob b=Format.encodedBlob(s);
+		Blob b=Cells.encode(s);
 		StringShort s2=Format.read(b);
 		assertEquals(s,s2);
 	}
@@ -164,7 +164,7 @@ public class EncodingTest {
 		List<ACell> l=List.reverse(me);
 		assertEquals(me,l.reverse()); // ensure MapEntry gets converted to canonical vector
 		
-		Blob b=Format.encodedBlob(l);
+		Blob b=Cells.encode(l);
 		List<ACell> l2=Format.read(b);
 		
 		assertEquals(l,l2);
@@ -187,7 +187,7 @@ public class EncodingTest {
 	
 	@Test public void testReadBlobData() throws BadFormatException {
 		Blob d=Blob.fromHex("cafebabe");
-		Blob edData=Format.encodedBlob(d);
+		Blob edData=Cells.encode(d);
 		AArrayBlob dd=Format.read(edData);
 		assertEquals(d,dd);
 		assertSame(edData,dd.getEncoding()); // should re-use encoded data object directly
@@ -196,7 +196,7 @@ public class EncodingTest {
 	@Test
 	public void testBadMessageTooLong() throws BadFormatException {
 		ACell o=Samples.FOO;
-		Blob data=Format.encodedBlob(o).append(Blob.fromHex("ff")).toFlatBlob();
+		Blob data=Cells.encode(o).append(Blob.fromHex("ff")).toFlatBlob();
 		assertThrows(BadFormatException.class,()->Format.read(data));
 	}
 	

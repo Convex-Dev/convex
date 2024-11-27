@@ -6,6 +6,7 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -87,7 +88,7 @@ public class Call extends ATransaction {
 		epos+=Format.getVLQCountLength(sequence);
 		
 		Address target=Format.read(b, epos);
-		epos+=Format.getEncodingLength(target);
+		epos+=Cells.getEncodingLength(target);
 		
 		long offer=Format.readVLQCount(b,epos);
 		epos+=Format.getVLQCountLength(offer);
@@ -95,10 +96,10 @@ public class Call extends ATransaction {
 
 
 		Symbol functionName=Format.read(b,epos);
-		epos+=Format.getEncodingLength(functionName);
+		epos+=Cells.getEncodingLength(functionName);
 
 		AVector<ACell> args = Format.read(b,epos);
-		epos+=Format.getEncodingLength(args);
+		epos+=Cells.getEncodingLength(args);
 
 		Call result=create(origin,sequence, target, offer, functionName,args);
 		result.attachEncoding(b.slice(pos,epos));

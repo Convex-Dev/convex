@@ -15,6 +15,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
@@ -168,7 +169,7 @@ public class Message {
 			break;
 			
 		default:
-			messageData=Format.encodedBlob(payload);
+			messageData=Cells.encode(payload);
 		}
 		
 		return messageData;

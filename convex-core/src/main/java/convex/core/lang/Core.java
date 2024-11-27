@@ -41,7 +41,6 @@ import convex.core.data.AccountKey;
 import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -1808,7 +1807,7 @@ public class Core {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 
 			ACell a = args[0];
-			Blob encoding=Format.encodedBlob(a);
+			Blob encoding=Cells.encode(a);
 			long juice=Juice.buildBlobCost(encoding.count());
 			if (!context.checkJuice(juice)) return context.withJuiceError();
 			

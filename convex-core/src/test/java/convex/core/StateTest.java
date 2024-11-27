@@ -70,7 +70,7 @@ public class StateTest {
 		// TODO: consider if cached ref in state should now have persisted status?
 		// assertTrue(s.getRef().isPersisted());
 
-		Blob b = Format.encodedBlob(s);
+		Blob b = Cells.encode(s);
 		State s2 = Format.read(b);
 		assertEquals(s, s2);
 

@@ -17,7 +17,7 @@ import convex.test.Samples;
  */
 public class EncodingSizeTest {
 	public static int size(ACell a) {
-		return Utils.checkedInt(Format.encodedBlob(a).count());
+		return Utils.checkedInt(Cells.encode(a).count());
 	}
 	
 	@Test public void testLong() {

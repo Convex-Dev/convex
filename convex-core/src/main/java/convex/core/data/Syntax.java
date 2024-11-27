@@ -168,7 +168,7 @@ public final class Syntax extends ACell {
 		
 		epos+=datum.getEncodingLength();
 		AHashMap<ACell, ACell> props = Format.read(b,epos);
-		epos+=Format.getEncodingLength(props);
+		epos+=Cells.getEncodingLength(props);
 		
 		if (props == null) {
 			props = Maps.empty(); // we encode empty props as null for efficiency

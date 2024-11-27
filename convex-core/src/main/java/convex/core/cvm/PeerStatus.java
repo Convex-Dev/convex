@@ -210,13 +210,13 @@ public class PeerStatus extends ARecord {
 	public static PeerStatus read(Blob b, int pos) throws BadFormatException{
 		int epos=pos+1; // skip tag
 	    Address owner = Format.read(b,epos);
-	    epos+=Format.getEncodingLength(owner);
+	    epos+=Cells.getEncodingLength(owner);
 	    
 	    long stake = Format.readVLQLong(b,epos);
 	    epos+=Format.getVLQLongLength(stake);
 	    
 		Index<Address, CVMLong> stakes = Format.read(b,epos);
-		epos+=Format.getEncodingLength(stakes);
+		epos+=Cells.getEncodingLength(stakes);
 		if (stakes==null) {
 			stakes=EMPTY_STAKES;
 		} else if (stakes.isEmpty()) {
@@ -227,7 +227,7 @@ public class PeerStatus extends ARecord {
 	    epos+=Format.getVLQLongLength(delegatedStake);
 	    
 		AHashMap<ACell,ACell> metadata = Format.read(b,epos);
-		epos+=Format.getEncodingLength(metadata);
+		epos+=Cells.getEncodingLength(metadata);
 		
 		long timestamp=Format.readVLQLong(b,epos);
 		epos+=Format.getVLQLongLength(timestamp);

@@ -118,6 +118,12 @@ public class FormatTest {
 		}
 	}
 	
+	@Test public void testRead() {
+		assertThrows(BadFormatException.class,()->Format.read(""));
+		assertThrows(BadFormatException.class,()->Format.read("0"));
+		assertThrows(BadFormatException.class,()->Format.read("FF"));
+	}
+	
 	private void checkVLQCount(String hex, long a) {
 		int blen=hex.length()/2;
 		byte[] bs=new byte[blen];

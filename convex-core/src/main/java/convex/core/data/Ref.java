@@ -606,7 +606,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	@Override
 	protected Blob createEncoding() {
 		if (isEmbedded()) {
-			return Format.encodedBlob(getValue());
+			return Cells.encode(getValue());
 		}
 		
 		byte[] bs=new byte[Ref.INDIRECT_ENCODING_LENGTH];	

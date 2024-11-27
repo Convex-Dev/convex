@@ -11,6 +11,7 @@ import org.junit.runners.Parameterized;
 
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.FuzzTestFormat;
 import convex.core.data.prim.CVMLong;
@@ -39,7 +40,7 @@ public class VLCParamTest {
 
 	@Test
 	public void testRoundTrip() throws BadFormatException {
-		Blob b = Format.encodedBlob(value);
+		Blob b = Cells.encode(value);
 		ACell v2 = Format.read(b);
 		assertEquals(value, v2);
 

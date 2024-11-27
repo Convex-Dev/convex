@@ -28,24 +28,24 @@ public class GenTestFormat {
 	@Property
 	public void messageRoundTrip(String str) throws BadFormatException {
 		AString s=Strings.create(str);
-		Blob b = Format.encodedBlob(s);
+		Blob b = Cells.encode(s);
 		AString s2 = Format.read(b);
 		assertEquals(s, s2);
-		assertEquals(b, Format.encodedBlob(s2));
+		assertEquals(b, Cells.encode(s2));
 
 		FuzzTestFormat.doMutationTest(b);
 	}
 
 	@Property
 	public void primitiveRoundTrip(@From(PrimitiveGen.class) ACell prim) throws BadFormatException, IOException {
-		Blob b = Format.encodedBlob(prim);
+		Blob b = Cells.encode(prim);
 		if (!Cells.isEmbedded(prim)) {
 			// persist in case large
 			Cells.persist(prim);
 		}
 		ACell o = Format.read(b);
 		assertEquals(prim, o);
-		assertEquals(b, Format.encodedBlob(o));
+		assertEquals(b, Cells.encode(o));
 
 		FuzzTestFormat.doMutationTest(b);
 	}
@@ -53,12 +53,12 @@ public class GenTestFormat {
 	@Property
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException, IOException {
 		Ref<ACell> pref = Ref.get(Cells.persist(value)); // ensure persisted
-		Blob b = Format.encodedBlob(value);
+		Blob b = Cells.encode(value);
 		ACell o = Format.read(b);
 
 		assertEquals(RT.getType(value), RT.getType(o));
 		assertEquals(value, o);
-		assertEquals(b, Format.encodedBlob(o));
+		assertEquals(b, Cells.encode(o));
 		assertEquals(pref.getValue(), o);
 
 		FuzzTestFormat.doMutationTest(b);

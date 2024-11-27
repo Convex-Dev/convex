@@ -134,14 +134,14 @@ public class VLCEncodingTest {
 	@Test
 	public void testLongVLCRegression2() throws BadFormatException {
 		CVMLong b = CVMLong.create(1496216L);
-		Blob blob = Format.encodedBlob(b);
+		Blob blob = Cells.encode(b);
 		assertEquals(b, Format.read(blob));
 	}
 
 	@Test
 	public void testLongVLCRegression() throws BadFormatException {
 		CVMLong b = RT.cvm(1234578);
-		Blob blob = Format.encodedBlob(b);
+		Blob blob = Cells.encode(b);
 		assertEquals(b, Format.read(blob));
 	}
 }

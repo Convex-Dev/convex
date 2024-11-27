@@ -228,7 +228,7 @@ public class ObjectsTest {
 	 * @param a Any Cell, might not be CVM value
 	 */
 	private static void doAnyEncodingTests(ACell a) {
-		Blob encoding = Format.encodedBlob(a);
+		Blob encoding = Cells.encode(a);
 		if (a==null) {
 			assertSame(Blob.NULL_ENCODING,encoding);
 			return;

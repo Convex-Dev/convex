@@ -18,7 +18,7 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Address;
 import convex.core.data.Blob;
-import convex.core.data.Format;
+import convex.core.data.Cells;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
@@ -302,7 +302,7 @@ public final class Result extends ARecordGeneric {
 		int epos=pos; 
 		// include tag location since we are reading raw Vector (will ignore tag)
 		AVector<ACell> v=Vectors.read(b,epos);
-		epos+=Format.getEncodingLength(v);
+		epos+=Cells.getEncodingLength(v);
 		
 		// we can't check values yet because might be missing data
 		

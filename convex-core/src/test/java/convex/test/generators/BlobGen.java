@@ -7,7 +7,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.ABlob;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
-import convex.core.data.Format;
+import convex.core.data.Cells;
 import convex.core.data.impl.LongBlob;
 import convex.test.Samples;
 
@@ -39,7 +39,7 @@ public class BlobGen extends Generator<ABlob> {
 		case 5:
 			return Samples.NON_EMBEDDED_BLOB;
 		case 6:
-			return Format.encodedBlob(Gen.PRIMITIVE.generate(r, status));
+			return Cells.encode(Gen.PRIMITIVE.generate(r, status));
 		case 7: {
 			// use a slice from a big blob
 			long length=Math.min(len, Samples.BIG_BLOB_LENGTH);

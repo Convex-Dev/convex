@@ -6,6 +6,7 @@ import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -156,7 +157,7 @@ public class Def<T extends ACell> extends AOp<T> {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
 		ACell symbol = Format.read(b,epos);
-		epos+=Format.getEncodingLength(symbol);
+		epos+=Cells.getEncodingLength(symbol);
 		
 		Ref<AOp<T>> ref = Format.readRef(b,epos);
 		if (!validKey(symbol)) throw new BadFormatException("Symbol not valid for Def op");

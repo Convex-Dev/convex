@@ -127,7 +127,7 @@ public class Cells {
 	}
 	
 	/**
-	 * Checks if a Cell is completely encoded, i.e. has not external Refs
+	 * Checks if a Cell is completely encoded, i.e. has no external Refs
 	 * @param a Cell to check
 	 * @return True if completely encoded, false otherwise
 	 */
@@ -343,6 +343,22 @@ public class Cells {
 	public static boolean isEmbedded(ACell cell) {
 		if (cell == null) return true;
 		return cell.isEmbedded();
+	}
+
+	/**
+	 * Gets the encoded Blob for an object in CAD3 format
+	 * 
+	 * @param o The object to encode
+	 * @return Encoded data as a blob
+	 */
+	public static Blob encode(ACell o) {
+		if (o==null) return Blob.NULL_ENCODING;
+		return o.getEncoding();
+	}
+
+	public static int getEncodingLength(ACell value) {
+		if (value==null) return 1;
+		return value.getEncodingLength();
 	}
 
 }
