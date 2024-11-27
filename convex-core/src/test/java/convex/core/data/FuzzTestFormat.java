@@ -83,7 +83,7 @@ public class FuzzTestFormat {
 
 		// if we manage to read the object and it is not a Ref, it must be in canonical
 		// format!
-		assertTrue(Format.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
+		assertTrue(Cells.isCanonical(v),()->"Not canonical: "+Utils.getClassName(v));
 		
 		Blob b2 = Format.encodedBlob(v);
 		assertEquals(v, Format.read(b2),

@@ -119,7 +119,7 @@ public class EncodingTest {
 		Blob b=Format.encodedBlob(k);
 		ACell o=Format.read(b);
 		assertEquals(k,o);
-		assertTrue(Format.isEmbedded(k));
+		assertTrue(Cells.isEmbedded(k));
 		Ref<?> r=Ref.get(o);
 		assertTrue(r.isDirect());
 	}
@@ -178,10 +178,10 @@ public class EncodingTest {
 	}
 	
 	@Test public void testCanonical() {
-		assertTrue(Format.isCanonical(Vectors.empty()));
-		assertTrue(Format.isCanonical(null));
-		assertTrue(Format.isCanonical(RT.cvm(1)));
-		assertTrue(Format.isCanonical(Blob.create(new byte[1000]))); // should be OK
+		assertTrue(Cells.isCanonical(Vectors.empty()));
+		assertTrue(Cells.isCanonical(null));
+		assertTrue(Cells.isCanonical(RT.cvm(1)));
+		assertTrue(Cells.isCanonical(Blob.create(new byte[1000]))); // should be OK
 		assertFalse(Blob.create(new byte[10000]).isCanonical()); // too big to be canonical	
 	}
 	

@@ -130,7 +130,7 @@ public class Invoke extends ATransaction {
 			// OK?
 			((AOp<?>) command).validateCell();
 		} else {
-			if (!Format.isCanonical(command)) throw new InvalidDataException("Non-canonical object as command?", this);
+			if (!Cells.isCanonical(command)) throw new InvalidDataException("Non-canonical object as command?", this);
 		}
 	}
 

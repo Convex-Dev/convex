@@ -99,7 +99,7 @@ public class RefDirect<T extends ACell> extends Ref<T> {
 	@Override
 	public void validate() throws InvalidDataException {
 		super.validate();
-		if (isEmbedded() != Format.isEmbedded(value)) throw new InvalidDataException("Embedded flag is wrong!", this);
+		if (isEmbedded() != Cells.isEmbedded(value)) throw new InvalidDataException("Embedded flag is wrong!", this);
 		if (value == null) {
 			if (this != Ref.NULL_VALUE) throw new InvalidDataException("Null Ref not singleton!", this);
 		}

@@ -166,7 +166,7 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 		if (hash == null) throw new InvalidDataException("Hash should never be null in soft ref", this);
 		ACell val = softRef.get();
 		boolean embedded=isEmbedded();
-		if (embedded!=Format.isEmbedded(val)) {
+		if (embedded!=Cells.isEmbedded(val)) {
 			throw new InvalidDataException("Embedded flag ["+embedded+"] inconsistent with value", this);
 		}
 	}

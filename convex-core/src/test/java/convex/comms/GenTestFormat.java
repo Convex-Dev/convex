@@ -39,7 +39,7 @@ public class GenTestFormat {
 	@Property
 	public void primitiveRoundTrip(@From(PrimitiveGen.class) ACell prim) throws BadFormatException, IOException {
 		Blob b = Format.encodedBlob(prim);
-		if (!Format.isEmbedded(prim)) {
+		if (!Cells.isEmbedded(prim)) {
 			// persist in case large
 			Cells.persist(prim);
 		}

@@ -247,7 +247,7 @@ public class ObjectsTest {
 		
 		// If length exceeds MAX_EMBEDDED_LENGTH, cannot be an embedded value
 		if (encoding.count > Format.MAX_EMBEDDED_LENGTH) {
-			assertFalse(Format.isEmbedded(a),()->"Should not be embedded: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
+			assertFalse(Cells.isEmbedded(a),()->"Should not be embedded: "+Utils.getClassName(a)+ " = "+Utils.toString(a));
 		}
 
 		try {
@@ -315,7 +315,7 @@ public class ObjectsTest {
 				long cms=childRef.getMemorySize();
 				childMem+=cms;
 			}
-			boolean embedded=Format.isEmbedded(a);
+			boolean embedded=Cells.isEmbedded(a);
 			if (embedded) {
 				assertEquals(memorySize,childMem);
 			} else {

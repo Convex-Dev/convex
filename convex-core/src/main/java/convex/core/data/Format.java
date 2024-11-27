@@ -715,30 +715,6 @@ public class Format {
 	}
 
 	/**
-	 * Returns true if the object is a canonical data object. Canonical data objects
-	 * can be used as first class decentralised data objects.
-	 * 
-	 * @param o Value to test
-	 * @return true if object is canonical, false otherwise.
-	 */
-	public static boolean isCanonical(ACell o) {
-		if (o==null) return true;
-		return o.isCanonical();
-	}
-
-	/**
-	 * Determines if an object should be embedded directly in the encoding rather
-	 * than referenced with a Ref / hash. Defined to be true for most small objects.
-	 * 
-	 * @param cell Value to test
-	 * @return true if object is embedded, false otherwise
-	 */
-	public static boolean isEmbedded(ACell cell) {
-		if (cell == null) return true;
-		return cell.isEmbedded();
-	}
-
-	/**
 	 * Gets the encoded Blob for an object in canonical message format
 	 * 
 	 * @param o The object to encode

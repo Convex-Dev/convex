@@ -74,7 +74,7 @@ public class GenTestAnyValue {
 	
 	@Property
 	public void validEmbedded(@From(ValueGen.class) ACell o) throws InvalidDataException, BadFormatException, IOException {
-		if (Format.isEmbedded(o)) {
+		if (Cells.isEmbedded(o)) {
 			Cells.persist(o); // NOTE: may have child refs to persist
 			
 			Blob data=Format.encodedBlob(o);
@@ -84,7 +84,7 @@ public class GenTestAnyValue {
 			assertEquals(o,o2);
 			AArrayBlob data2=Format.encodedBlob(o2);
 			assertEquals(data,data2);
-			assertTrue(Format.isEmbedded(o2));
+			assertTrue(Cells.isEmbedded(o2));
 			
 			// when we persist a ref to an embedded object, should be the object itself
 			Ref<ACell> ref=Ref.get(o);
@@ -113,7 +113,7 @@ public class GenTestAnyValue {
 		
 		// re-read data, should be canonical
 		ACell o2=Format.read(data);
-		assertTrue(Format.isCanonical(o2));
+		assertTrue(Cells.isCanonical(o2));
 		
 		// equality checks
 		assertEquals(o,o2);
