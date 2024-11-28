@@ -23,7 +23,7 @@ public abstract class AEncoder<T> {
 		return read(encoding,0);
 	}
 	
-	public abstract T read(Blob encoding, int offset) throws BadFormatException;
+	protected abstract T read(Blob encoding, int offset) throws BadFormatException;
 
 	/**
 	 * Reads a value from a Blob of data

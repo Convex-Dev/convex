@@ -27,8 +27,8 @@ public class CAD3Encoder extends AEncoder<ACell> {
 	}
 	
 	@Override
-	public ACell read(Blob encoding, int offset) throws BadFormatException {
-		byte tag = encoding.byteAt(offset);
+	protected ACell read(Blob encoding, int offset) throws BadFormatException {
+		byte tag = encoding.byteAtUnchecked(offset);
 		ACell result= read(tag,encoding,offset);
 		return result;
 	}
