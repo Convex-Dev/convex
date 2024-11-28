@@ -2,6 +2,7 @@ package convex.core.text;
 
 import java.math.BigInteger;
 import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
@@ -17,6 +18,13 @@ public class Text {
 	private static final int WHITESPACE_LENGTH = 32;
 	private static final String ZEROS_9 = "000000000";
 	private static String WHITESPACE_32 = "                                "; // 32 spaces
+	private static DecimalFormatSymbols symbols;
+
+	static {
+		symbols = new DecimalFormatSymbols();
+		symbols.setDecimalSeparator('.');
+		symbols.setGroupingSeparator(',');
+	}
 
 	/**
 	 * Return true if the character is an ASCII numeric digit
@@ -65,18 +73,18 @@ public class Text {
 		return rightPad(Long.toString(value), length);
 	}
 
-	static DecimalFormat balanceFormatter = new DecimalFormat("#,###");
+	static DecimalFormat balanceFormatter = new DecimalFormat("#,###", symbols);
 
 	public static String toFriendlyNumber(long value) {
 		return balanceFormatter.format(value);
 	}
 	
-	static DecimalFormat percentFormatter = new DecimalFormat("##.###%");
+	static DecimalFormat percentFormatter = new DecimalFormat("##.###%", symbols);
 	public static String toPercentString(double value) {
 		return percentFormatter.format(value);
 	}
 	
-	static DecimalFormat decimalFormatter = new DecimalFormat("#,##0.####");
+	static DecimalFormat decimalFormatter = new DecimalFormat("#,##0.####", symbols);
 	public static String toFriendlyDecimal(double value) {
 		if (!Double.isFinite(value)) return CVMDouble.create(value).toString();
 		return decimalFormatter.format(value);
