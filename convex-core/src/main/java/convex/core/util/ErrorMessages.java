@@ -19,6 +19,8 @@ public class ErrorMessages {
 
 
 
+	public static final String TODO = "Not yet implemented.";
+
 	public static String immutable(Object a) {
 		return "Object is immutable: "+a.getClass();
 	}
@@ -60,5 +62,9 @@ public class ErrorMessages {
 	}
 	
 	public static ErrorValue INVALID_NUMERIC = ErrorValue.create(ErrorCodes.ARGUMENT,"Invalid numeric result");
+
+	public static String badTagMessage(byte tag) {
+		return "Unrecognised tag byte 0x"+Utils.toHexString(tag);
+	}
 
 }

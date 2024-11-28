@@ -19,7 +19,11 @@ public abstract class AEncoder<T> {
 	 */
 	public abstract Blob encode(T a);
 	
-	public abstract T decode(Blob encoding) throws BadFormatException;
+	public T decode(Blob encoding) throws BadFormatException {
+		return read(encoding,0);
+	}
+	
+	public abstract T read(Blob encoding, int offset) throws BadFormatException;
 
 	/**
 	 * Reads a value from a Blob of data

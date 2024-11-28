@@ -39,6 +39,7 @@ import convex.core.lang.impl.MultiFn;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Bits;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Trees;
 import convex.core.util.Utils;
 
@@ -580,7 +581,7 @@ public class Format {
 	 * @throws BadFormatException If encoding is invalid for the given tag
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
+	static <T extends ACell> T read(byte tag, Blob blob, int offset) throws BadFormatException {
 
 		// Fast paths for common one-byte instances. TODO: might switch have better performance if compiled correctly into a table?
 		if (tag==Tag.NULL) return null;
@@ -616,27 +617,22 @@ public class Format {
 		} catch (Exception e) {
 			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
 		}
-		throw new BadFormatException(badTagMessage(tag));
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 
 	private static <T extends ACell> SignedData<T> readSignedData(byte tag,Blob blob, int offset) throws BadFormatException {
 		if (tag==Tag.SIGNED_DATA) return SignedData.read(blob,offset,true);	
 		if (tag==Tag.SIGNED_DATA_SHORT) return SignedData.read(blob,offset,false);	
-		throw new BadFormatException(badTagMessage(tag));
-	}
-
-	private static String badTagMessage(byte tag) {
-		return "Unrecognised tag byte 0x"+Utils.toHexString(tag);
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 	private static ANumeric readNumeric(byte tag, Blob blob, int offset) throws BadFormatException {
-		// TODO Auto-generated method stub
 		if (tag<0x19) return CVMLong.read(tag,blob,offset);
 		if (tag == 0x19) return CVMBigInteger.read(blob,offset);
 		if (tag == Tag.DOUBLE) return CVMDouble.read(tag,blob,offset);
 		
-		throw new BadFormatException(badTagMessage(tag));
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 	private static ACell readBasicObject(byte tag, Blob blob, int offset)  throws BadFormatException{
@@ -653,7 +649,7 @@ public class Format {
 			return CVMChar.read(len, blob,offset); // skip tag byte
 		}
 
-		throw new BadFormatException(badTagMessage(tag));
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 	
@@ -691,7 +687,7 @@ public class Format {
 		if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
 		if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
 
-		throw new BadFormatException(badTagMessage(tag));
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -712,7 +708,7 @@ public class Format {
 		
 		// Might be a generic Dense Record
 		DenseRecord dr=DenseRecord.read(tag,b,pos);
-		if (dr==null) throw new BadFormatException(badTagMessage(tag));
+		if (dr==null) throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 		return (T) dr;
 	}
 
