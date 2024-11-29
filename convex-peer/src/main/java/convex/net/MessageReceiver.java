@@ -12,14 +12,13 @@ import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
 import convex.net.impl.HandlerException;
-import convex.peer.Config;
 
 /**
- * Class responsible for buffered accumulation of data received over a connection.
+ * Class responsible for buffered accumulation of data received over a single connection.
  *
- * ByteBuffers received must be passed in via @receiveFromChannel
+ * Data received must be passed in via @receiveFromChannel
  *
- * Passes any successfully received objects to a specified Consumer, using the same thread on which the
+ * Passes any successfully received Messages to a specified Consumer, using the same thread on which the
  * MessageReceiver was called.
  *
  * <blockquote>
@@ -32,15 +31,16 @@ import convex.peer.Config;
  *
  */
 public class MessageReceiver {
-	// Receive buffer must be big enough at least for one max sized message plus message header
-	public static final int RECEIVE_BUFFER_SIZE = Config.RECEIVE_BUFFER_SIZE;
+	// Initial size of buffers allocated. Enough for small messages, bigger ones will get re-allocated
+	public static final int INITIAL_RECEIVE_BUFFER_SIZE = 512;
 
 	/**
 	 * Buffer for receiving partial messages. Maintained ready for writing.
 	 * 
 	 * Maybe use a direct buffer since we are copying from the socket channel? But probably doesn't make any difference.
 	 */
-	private ByteBuffer buffer = ByteBuffer.allocate(RECEIVE_BUFFER_SIZE);
+	private ByteBuffer buffer = ByteBuffer.allocate(INITIAL_RECEIVE_BUFFER_SIZE);
+;
 
 	private final Consumer<Message> action;
 	private Consumer<Message> hook=null;
@@ -73,8 +73,7 @@ public class MessageReceiver {
 	 * Will consume enough bytes from channel to handle exactly one message. Bytes
 	 * will be left unconsumed on the channel if more are available.
 	 *
-	 * This hopefully
-	 * creates sufficient backpressure on clients sending a lot of messages.
+	 * This hopefully creates sufficient backpressure on clients sending a lot of messages.
 	 *
 	 * @param chan Byte channel
 	 * @return The number of bytes read from the channel, or -1 if EOS
@@ -111,19 +110,25 @@ public class MessageReceiver {
 			// Exit if we hven't got the full message yet
 			if (buffer.position()<totalFrameSize) return numRead;
 	
-			byte mType=buffer.get(lengthLength);
-			MessageType type=MessageType.decode(mType);
-			
-			byte[] bs=new byte[len-1]; // message data length after type byte
-			buffer.get(lengthLength+1, bs, 0, len-1);
-			
-			Blob messageData=Blob.wrap(bs);
-			receiveMessage(type, messageData);
+			// At this point we know we have a full message. Wrap it as a Blob ready to receive message
+			// From this point onwards MUST NOT mutate buffer backing array
+			Blob messageData=Blob.wrap(buffer.array(),lengthLength,len);
 	
+			// check if we have more bytes
 			int receivedLimit=buffer.position();
-			buffer.position(totalFrameSize);
-			buffer.limit(receivedLimit);
-			buffer.compact();
+			if (receivedLimit>totalFrameSize) {
+				// If more bytes, need to copy into new buffer
+				int newSize=Math.max(INITIAL_RECEIVE_BUFFER_SIZE, receivedLimit-totalFrameSize);
+				ByteBuffer newBuffer = ByteBuffer.allocate(newSize);
+				buffer.position(totalFrameSize);
+				buffer.limit(receivedLimit);
+				newBuffer.put(buffer);
+				buffer=newBuffer;
+			} else {
+				// simply clear buffer and return, will be recreated on next usage
+				buffer=ByteBuffer.allocate(INITIAL_RECEIVE_BUFFER_SIZE);
+			}
+			receiveMessage(messageData);
 		}
 		return numRead;
 	}
@@ -142,7 +147,13 @@ public class MessageReceiver {
 	 * @throws BadFormatException if the message is incorrectly formatted
 	 * @throws HandlerException If the message handler throws an unexpected Exception
 	 */
-	private void receiveMessage(MessageType type, Blob encoding) throws BadFormatException, HandlerException {
+	private void receiveMessage(Blob messageData) throws BadFormatException, HandlerException {
+		if (messageData.count()<1) throw new BadFormatException("Empty message");
+		
+		byte mType=messageData.byteAtUnchecked(0);
+		MessageType type=MessageType.decode(mType);
+
+		Blob encoding=messageData.slice(1);
 		Message message = Message.create(connection, type, encoding);
 		
 		// call the receiver hook, if registered

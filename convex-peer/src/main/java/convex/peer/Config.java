@@ -10,7 +10,6 @@ import java.util.Map;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
 import convex.core.data.AString;
-import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.store.AStore;
@@ -23,11 +22,6 @@ import convex.etch.EtchStore;
  */
 public class Config {
 	
-	/**
-	 * Default size for client receive ByteBuffers.
-	 */
-	public static final int RECEIVE_BUFFER_SIZE = Format.LIMIT_ENCODING_LENGTH*10+20;
-
 	/**
 	 * Size of default server socket receive buffer
 	 */
