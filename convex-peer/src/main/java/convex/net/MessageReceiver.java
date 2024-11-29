@@ -125,7 +125,7 @@ public class MessageReceiver {
 				newBuffer.put(buffer);
 				buffer=newBuffer;
 			} else {
-				// simply clear buffer and return, will be recreated on next usage
+				// No extra bytes, so simply allocate a fresh buffer for next usage
 				buffer=ByteBuffer.allocate(INITIAL_RECEIVE_BUFFER_SIZE);
 			}
 			receiveMessage(messageData);
