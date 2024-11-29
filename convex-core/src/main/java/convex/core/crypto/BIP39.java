@@ -15,6 +15,7 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
 import convex.core.data.Blob;
+import convex.core.data.Hash;
 import convex.core.util.Utils;
 import convex.core.exceptions.Panic;
 
@@ -207,6 +208,8 @@ public class BIP39 {
 	
 	public static final int NUM_WORDS=wordlist.length;
 	
+	public static final int BITS_PER_WORD=11;
+	
 	/**
 	 * Map of words to integer values
 	 */
@@ -332,9 +335,29 @@ public class BIP39 {
 	 * @return List of words
 	 */
 	public static List<String> createWords(SecureRandom r, int n) {
+		int CS=n/3; // number of checksum bits
+		int ENT=CS*32;
+
+		byte[] bs=new byte[ENT/8]; // enough space for entropy
+		r.nextBytes(bs);
+		
+		return createWords(bs,n);
+	}
+	
+	public static List<String> createWords(byte[] entropy, int n) {
+		int CS=n/3; // number of checksum bits
+		int ENT=CS*32;
+		Hash checkHash=Hashing.sha256(entropy);
+		int checkSum=Utils.extractBits(checkHash.getBytes(), CS, 256-CS); // BIP39 checksum
+		
+		int blen=((CS+ENT)/8)+1; // enough space for entropy plus checksum
+		byte[] bs=new byte[blen];
+		System.arraycopy(entropy, 0, bs, 0, ENT/8);
+		Utils.setBits(bs, CS, (blen*8)-(ENT+CS),checkSum);
+		
 		ArrayList<String> al=new ArrayList<>(n);
 		for (int i=0; i<n; i++) {
-			int ix=r.nextInt(wordlist.length);
+			int ix=Utils.extractBits(bs, BITS_PER_WORD, (blen*8) - (i+1)*BITS_PER_WORD);
 			String word=wordlist[ix];
 			al.add(word);
 		}

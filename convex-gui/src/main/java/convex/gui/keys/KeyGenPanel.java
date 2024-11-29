@@ -91,9 +91,14 @@ public class KeyGenPanel extends JPanel {
 		String badWord=BIP39.checkWords(words);
 		
 		String warn="";
-		if (words.size()<BIP39.MIN_WORDS) {
-			warn+="Only "+words.size()+" words. ";
+		int numWords=words.size();
+		if (numWords<BIP39.MIN_WORDS) {
+			warn+="Only "+numWords+" words. ";
+		} else if ((numWords!=((numWords/3)*3)) || numWords>24) {
+			warn+="Unusual number of words ("+numWords+"). ";
+			
 		}
+		
 		if (badWord!=null) {
 			warn +="Not in standard word list: "+badWord+". ";
 		}
@@ -110,7 +115,7 @@ public class KeyGenPanel extends JPanel {
 			}
 		}
 		
-		if (s!=BIP39.normaliseFormat(s)) {
+		if (!s.equals(BIP39.normaliseFormat(s))) {
 			warn+="Not normalised! ";
 		}
 
@@ -393,6 +398,8 @@ public class KeyGenPanel extends JPanel {
 		
 		numSpinner = new JSpinner();
 		numSpinner.setModel(new SpinnerNumberModel(12, 12, 24, 3));
+		numSpinner.setEditor(new JSpinner.DefaultEditor(numSpinner));
+		numSpinner.setFocusable(false);
 		actionPanel.add(numSpinner);
 
 		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{

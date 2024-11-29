@@ -24,6 +24,30 @@ public class BIP39Test {
 	
 	
 	@Test
+	public void testFromEntropy() {
+		// Test vectors from https://github.com/trezor/python-mnemonic/blob/master/vectors.json
+		{
+			byte[] ent=Blob.fromHex("00000000000000000000000000000000").getBytes();
+			String ph=BIP39.mnemonic(BIP39.createWords(ent, 12));
+			assertEquals("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",ph);
+		}
+		
+		{
+			byte[] ent=Blob.fromHex("ffffffffffffffffffffffffffffffff").getBytes();
+			String ph=BIP39.mnemonic(BIP39.createWords(ent, 12));
+			assertEquals("zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong",ph);
+		}
+		
+		{
+			byte[] ent=Blob.fromHex("68a79eaca2324873eacc50cb9c6eca8cc68ea5d936f98787c60c7ebc74e6ce7c").getBytes();
+			String ph=BIP39.mnemonic(BIP39.createWords(ent, 24));
+			assertEquals("hamster diagram private dutch cause delay private meat slide toddler razor book happy fancy gospel tennis maple dilemma loan word shrug inflict delay length",ph);
+		}
+
+
+	}
+	
+	@Test
 	public void testSeed() throws NoSuchAlgorithmException, InvalidKeySpecException {
 		List<String> tw1=List.of("blue claw trip feature street glue element derive dentist rose daring cash".split(" "));
 		String exSeed="8212cc694344bbc4ae70505948c58194c16cd10599b2e93f0f7f638aaa108009a5707f9274fc6bdeb23bf30783d0c2c7bb556a7aa7b9064dab6df9b8c469e39c";
