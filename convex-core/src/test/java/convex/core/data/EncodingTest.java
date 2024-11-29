@@ -220,6 +220,15 @@ public class EncodingTest {
 		// 2 byte requiring continuation = incomplete length
 		ByteBuffer bb3=Testing.messageBuffer("FFFF");
 		assertEquals(-1,Format.peekMessageLength(bb3));
+		
+		// Very large message length, max integer size
+		ByteBuffer bb4=Testing.messageBuffer("87ffffff7f");
+		assertEquals(Integer.MAX_VALUE,Format.peekMessageLength(bb4));
+		
+		// Excessive message length, overflows max array size :-(
+		ByteBuffer bb5=Testing.messageBuffer("ffffffffffffffff7f");
+		assertThrows(BadFormatException.class,()->Format.peekMessageLength(bb5));
+
 	}
 	
 	@Test 

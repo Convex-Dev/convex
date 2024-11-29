@@ -319,7 +319,7 @@ public class Format {
 	 * @param bb ByteBuffer containing a message length
 	 * @return The message length, or negative if insufficient bytes
 	 * @throws BadFormatException If the ByteBuffer does not start with a valid
-	 *                            message length
+	 *                            message length, or length exceeds Integer.MAX_VALUE
 	 */
 	public static int peekMessageLength(ByteBuffer bb) throws BadFormatException {
 		int remaining=bb.limit();
