@@ -280,7 +280,7 @@ public class BIP39 {
 	 */
 	public static String checkMnemonic(String s) {
 		List<String> words=getWords(s);
-		if (words.size()<MIN_WORDS) return "Insufficient words in BIP39 mnemonic (min="+MIN_WORDS+")";
+		if (words.size()<MIN_WORDS) return "Inadqeuate number of words in BIP39 mnemonic (at least "+MIN_WORDS+" recommended)";
 		return checkWords(words);
 	}
 	

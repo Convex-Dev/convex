@@ -91,14 +91,14 @@ public class KeyGenPanel extends JPanel {
 		String badWord=BIP39.checkWords(words);
 		
 		String warn="";
-		if (words.size()<12) {
+		if (words.size()<BIP39.MIN_WORDS) {
 			warn+="Only "+words.size()+" words. ";
 		}
 		if (badWord!=null) {
 			warn +="Not in standard word list: "+badWord+". ";
 		}
 		if (p.isBlank()) {
-			warn+="Passphrase is blank!";
+			warn+="Passphrase is blank! ";
 		} else {
 			int entropy=Passwords.estimateEntropy(p);
 			if (entropy<10) {
@@ -108,6 +108,10 @@ public class KeyGenPanel extends JPanel {
 			} else if (entropy<30) {
 				warn+="Moderate passphrase. ";
 			}
+		}
+		
+		if (s!=BIP39.normaliseFormat(s)) {
+			warn+="Not normalised! ";
 		}
 
 		if (warn.isBlank()) {
@@ -388,7 +392,7 @@ public class KeyGenPanel extends JPanel {
 		actionPanel.add(btnRecreate);
 		
 		numSpinner = new JSpinner();
-		numSpinner.setModel(new SpinnerNumberModel(12, 3, 30, 1));
+		numSpinner.setModel(new SpinnerNumberModel(12, 12, 24, 3));
 		actionPanel.add(numSpinner);
 
 		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{
