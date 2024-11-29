@@ -78,7 +78,7 @@ public class BIP39Test {
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(16), 12)));
 		
 		String newGen=BIP39.createSecureMnemonic(24);
-		assertEquals(newGen,BIP39.normalise(newGen));
+		assertEquals(newGen,BIP39.normaliseFormat(newGen));
 	}
 	
 	

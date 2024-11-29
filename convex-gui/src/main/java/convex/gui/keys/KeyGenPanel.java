@@ -399,10 +399,11 @@ public class KeyGenPanel extends JPanel {
 		{ // Button to Normalise Mnemonic string
 			JButton btnNormalise = new ActionButton("Normalise Mnemonic",0xf0ff,e -> { 
 				String s=mnemonicArea.getText();
-				mnemonicArea.setText(BIP39.normalise(s));
+				String s2=BIP39.normaliseFormat(s);
+				mnemonicArea.setText(s2);
 				updateMnemonic();
 			});
-			btnNormalise.setToolTipText("Press to normalise mnemonic text according to BIP39. Removes irregular whitespace.");
+			btnNormalise.setToolTipText("Press to normalise mnemonic text according to BIP39. Removes irregular whitespace, sets characters to lowercase.");
 			actionPanel.add(btnNormalise);
 		}
 

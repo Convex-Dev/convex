@@ -207,7 +207,15 @@ public class BIP39 {
 	
 	public static final int NUM_WORDS=wordlist.length;
 	
-	private static final HashMap<String,Integer> lookup=new HashMap<>();
+	/**
+	 * Map of words to integer values
+	 */
+	private static final HashMap<String,Integer> LOOKUP=new HashMap<>();
+	
+	/**
+	 * Map of abbreviated words to full words
+	 */
+	private static final HashMap<String,String> ABBR=new HashMap<>();
 
 	public static final int SEED_LENGTH = 64;
 	
@@ -218,7 +226,11 @@ public class BIP39 {
 	
 	static {
 		for (int i=0; i<NUM_WORDS; i++) {
-			lookup.put(wordlist[i], i);
+			String word=wordlist[i];
+			LOOKUP.put(word, i);
+			
+			String abbr=word.substring(0, Math.min(4, word.length()));
+			ABBR.put(abbr, word);
 		}
 	}
 	
@@ -279,7 +291,7 @@ public class BIP39 {
 	 * @return Blob containing BIP39 seed (64 bytes)
 	 */
 	public static Blob getSeed(String mnemonic, String passphrase) {
-			mnemonic=normalise(mnemonic);
+			mnemonic=normaliseFormat(mnemonic);
 			mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
 			char[] normalisedMnemonic= mnemonic.toCharArray(); 
 			return getSeedInternal(normalisedMnemonic,passphrase);
@@ -336,7 +348,7 @@ public class BIP39 {
 	 */
 	public static List<String> getWords(String mnemonic) {
 		mnemonic=mnemonic.trim();
-		mnemonic=normalise(mnemonic);
+		mnemonic=normaliseFormat(mnemonic);
 		String[] ss=mnemonic.split(" ");
 		ArrayList<String> al=new ArrayList<>();
 		for (int i=0; i<ss.length; i++) {
@@ -350,7 +362,7 @@ public class BIP39 {
 		return al;
 	}
 
-	public static String normalise(String s) {
+	public static String normaliseFormat(String s) {
 		s=s.trim().replaceAll("\\s+"," ");
 		s=s.toLowerCase();
 		return s;
@@ -378,7 +390,7 @@ public class BIP39 {
 	 */
 	public static String checkWords(List<String> words) {
 		for (String w: words) {
-			if (!lookup.containsKey(w)) return w;
+			if (!LOOKUP.containsKey(w)) return w;
 		}
 		return null;
 	}
