@@ -13,7 +13,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.util.Utils;
 

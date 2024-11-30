@@ -15,9 +15,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
-import convex.core.data.Address;
 import convex.core.data.prim.AInteger;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.RT;

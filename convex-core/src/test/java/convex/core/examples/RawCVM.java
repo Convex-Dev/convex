@@ -2,11 +2,11 @@ package convex.core.examples;
 
 import java.util.List;
 
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.Lists;
 import convex.core.init.Init;
 import convex.core.lang.Reader;

@@ -17,7 +17,7 @@ import convex.core.crypto.PFXTools;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
 import picocli.CommandLine.Command;

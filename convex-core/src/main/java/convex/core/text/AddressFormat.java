@@ -3,7 +3,7 @@ package convex.core.text;
 import java.text.FieldPosition;
 import java.text.ParsePosition;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 
 @SuppressWarnings("serial")
 public class AddressFormat extends AFormat {

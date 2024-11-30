@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;

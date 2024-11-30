@@ -15,6 +15,7 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.Order;
 import convex.core.cvm.AFn;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Address;
 import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Receipt;

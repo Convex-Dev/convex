@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Sets;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;

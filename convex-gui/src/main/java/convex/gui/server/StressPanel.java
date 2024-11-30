@@ -37,7 +37,7 @@ import convex.core.cvm.transactions.Multi;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Strings;
 import convex.core.lang.Reader;
 import convex.core.text.Text;

@@ -10,7 +10,7 @@ import javax.swing.JPanel;
 
 import convex.api.Convex;
 import convex.core.Result;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.prim.AInteger;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionButton;

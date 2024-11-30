@@ -1,8 +1,8 @@
 package convex.core.lang;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AList;
-import convex.core.data.Address;
 import convex.core.data.List;
 import convex.core.data.Symbol;
 import convex.core.data.Symbols;

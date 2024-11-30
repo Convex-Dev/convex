@@ -21,7 +21,7 @@ import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.lang.RT;

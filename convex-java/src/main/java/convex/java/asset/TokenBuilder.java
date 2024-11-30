@@ -2,9 +2,9 @@ package convex.java.asset;
 
 import java.util.Map;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.prim.CVMLong;

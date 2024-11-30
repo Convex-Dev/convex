@@ -9,9 +9,9 @@ import java.math.BigInteger;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;

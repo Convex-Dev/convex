@@ -7,9 +7,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 import org.junit.jupiter.api.Test;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
-import convex.core.data.Address;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMChar;

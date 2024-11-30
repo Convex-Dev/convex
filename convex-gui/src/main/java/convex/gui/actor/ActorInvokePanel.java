@@ -7,7 +7,7 @@ import convex.api.Convex;
 import convex.core.cvm.State;
 import convex.core.data.ASet;
 import convex.core.cvm.AccountStatus;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Symbol;
 import convex.gui.components.ScrollyList;
 import convex.gui.components.account.AccountChooserPanel;

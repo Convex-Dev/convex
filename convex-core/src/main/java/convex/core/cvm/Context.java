@@ -24,7 +24,6 @@ import convex.core.data.ASequence;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;

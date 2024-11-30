@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Address;
 import convex.core.cvm.Ops;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Transfer;

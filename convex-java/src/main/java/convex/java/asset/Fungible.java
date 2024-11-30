@@ -2,7 +2,7 @@ package convex.java.asset;
 
 import java.util.Map;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.java.Convex;
 
 public class Fungible extends BaseAsset<Long> {

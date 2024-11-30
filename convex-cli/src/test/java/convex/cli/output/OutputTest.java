@@ -8,7 +8,7 @@ import java.io.StringWriter;
 import org.junit.jupiter.api.Test;
 
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 
 public class OutputTest {
 

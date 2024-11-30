@@ -20,7 +20,7 @@ import convex.core.data.AVector;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;

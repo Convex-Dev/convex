@@ -35,7 +35,7 @@ import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.SignedData;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;

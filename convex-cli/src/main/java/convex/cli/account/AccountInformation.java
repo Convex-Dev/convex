@@ -5,7 +5,7 @@ import convex.cli.CLIError;
 import convex.cli.ExitCodes;
 import convex.core.Result;
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.List;
 import convex.core.data.Symbols;
 import picocli.CommandLine.Command;

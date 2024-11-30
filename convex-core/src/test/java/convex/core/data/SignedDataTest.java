@@ -13,6 +13,7 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;

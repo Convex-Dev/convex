@@ -5,9 +5,9 @@ import java.util.HashMap;
 import java.util.List;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AString;
-import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 

@@ -12,8 +12,8 @@ import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.cvm.Address;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 
 public class PKCS12Wallet extends AWallet {
 	public static final String KEYSTORE_TYPE="pkcs12";

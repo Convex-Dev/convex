@@ -1,10 +1,10 @@
 package convex.core.cvm.transactions;
 
 import convex.core.Coin;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;

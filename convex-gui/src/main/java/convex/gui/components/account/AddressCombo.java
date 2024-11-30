@@ -10,7 +10,7 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.plaf.basic.BasicComboBoxEditor;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Vectors;
 import convex.core.text.AddressFormat;
 import convex.core.util.Utils;

@@ -28,7 +28,7 @@ import convex.core.crypto.wallet.KeystoreWalletEntry;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.lang.RT;
 import convex.core.data.Symbols;

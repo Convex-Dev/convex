@@ -7,7 +7,7 @@ import javax.swing.JPanel;
 
 import convex.api.Convex;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;

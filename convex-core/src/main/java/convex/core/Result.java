@@ -7,6 +7,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.exception.AExceptional;
 import convex.core.cvm.exception.ErrorValue;
@@ -16,7 +17,6 @@ import convex.core.data.AMap;
 import convex.core.data.ARecordGeneric;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Keyword;

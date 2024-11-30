@@ -15,10 +15,10 @@ import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.CVMEncoder;
 import convex.core.data.Cells;

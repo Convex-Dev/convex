@@ -13,7 +13,7 @@ import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Strings;

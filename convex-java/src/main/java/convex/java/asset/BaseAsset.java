@@ -1,6 +1,6 @@
 package convex.java.asset;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.java.Convex;
 
 /**

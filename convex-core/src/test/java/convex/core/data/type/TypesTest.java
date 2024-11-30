@@ -17,8 +17,8 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.ArgumentsProvider;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
-import convex.core.data.Address;
 import convex.core.data.ObjectsTest;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;

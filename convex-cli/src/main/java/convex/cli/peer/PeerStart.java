@@ -13,7 +13,7 @@ import convex.cli.mixins.RemotePeerMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;

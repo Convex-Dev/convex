@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.exceptions.ResultException;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;

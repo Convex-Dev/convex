@@ -13,8 +13,8 @@ import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
-import convex.core.data.Address;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;

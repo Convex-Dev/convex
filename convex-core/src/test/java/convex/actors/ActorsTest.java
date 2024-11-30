@@ -17,8 +17,8 @@ import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
-import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.data.Symbols;

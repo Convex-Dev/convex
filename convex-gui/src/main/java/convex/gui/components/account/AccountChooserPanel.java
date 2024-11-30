@@ -14,7 +14,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.ops.Special;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Symbols;
 import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;

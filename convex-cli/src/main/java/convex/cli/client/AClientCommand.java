@@ -11,7 +11,7 @@ import convex.cli.mixins.RemotePeerMixin;
 import convex.cli.mixins.KeyStoreMixin;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import picocli.CommandLine.Mixin;
 import picocli.CommandLine.Option;
 

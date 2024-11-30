@@ -1,7 +1,7 @@
 package example.asset;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.java.Convex;
 import convex.java.asset.Fungible;
 import convex.java.asset.TokenBuilder;

@@ -1,7 +1,7 @@
 package convex.cli.mixins;
 
 import convex.cli.CLIError;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import picocli.CommandLine.Option;
 
 public class AddressMixin extends AMixin {

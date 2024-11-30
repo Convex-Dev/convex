@@ -5,10 +5,10 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.Constants;
+import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
-import convex.core.data.Address;
 import convex.core.data.Vectors;
 import convex.test.Samples;
 

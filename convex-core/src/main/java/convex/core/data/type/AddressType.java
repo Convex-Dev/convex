@@ -1,7 +1,7 @@
 package convex.core.data.type;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
-import convex.core.data.Address;
 
 /**
  * Type that represents CVM Byte values

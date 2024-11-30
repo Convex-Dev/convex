@@ -19,7 +19,7 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
 import convex.core.lang.Reader;

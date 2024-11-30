@@ -7,7 +7,7 @@ import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.cvm.AccountStatus;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.MapEntry;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMDouble;

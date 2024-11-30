@@ -1,9 +1,9 @@
 package convex.core.util;
 
 import convex.core.ErrorCodes;
+import convex.core.cvm.Address;
 import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ARecord;
-import convex.core.data.Address;
 import convex.core.data.Keyword;
 
 /**

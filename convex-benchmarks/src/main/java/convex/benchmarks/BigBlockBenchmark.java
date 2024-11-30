@@ -15,7 +15,7 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Cells;
 import convex.core.data.SignedData;
 import convex.core.exceptions.BadSignatureException;

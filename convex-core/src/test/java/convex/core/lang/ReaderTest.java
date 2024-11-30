@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Index;

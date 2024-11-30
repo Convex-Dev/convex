@@ -13,11 +13,11 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.cvm.AOp;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.State;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
-import convex.core.data.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Symbols;
 import convex.core.data.prim.CVMBool;

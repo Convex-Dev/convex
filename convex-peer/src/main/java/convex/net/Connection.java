@@ -23,11 +23,11 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.Result;
+import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;

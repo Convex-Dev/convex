@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import convex.core.cvm.Address;
 import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;

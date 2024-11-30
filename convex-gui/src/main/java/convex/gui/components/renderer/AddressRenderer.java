@@ -2,7 +2,7 @@ package convex.gui.components.renderer;
 
 import javax.swing.JLabel;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.util.Utils;
 
 @SuppressWarnings("serial")

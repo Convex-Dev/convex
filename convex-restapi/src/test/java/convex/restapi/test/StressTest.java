@@ -8,7 +8,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.java.Convex;

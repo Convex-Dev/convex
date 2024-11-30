@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import org.bouncycastle.util.Arrays;
 import org.junit.jupiter.api.Test;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.Ref;

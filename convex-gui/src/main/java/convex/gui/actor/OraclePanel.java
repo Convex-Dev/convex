@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.MapEntry;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;

@@ -16,6 +16,7 @@ import org.junit.runners.Parameterized;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Address;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.ops.Invoke;

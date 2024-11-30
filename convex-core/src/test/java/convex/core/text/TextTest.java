@@ -7,7 +7,7 @@ import java.text.ParseException;
 
 import org.junit.Test;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 
 public class TextTest {
 

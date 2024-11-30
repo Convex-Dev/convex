@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.State;
@@ -27,7 +28,6 @@ import convex.core.cvm.transactions.Multi;
 import convex.core.cvm.transactions.Transactions;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Cells;
 import convex.core.data.Keywords;
 import convex.core.data.RecordTest;

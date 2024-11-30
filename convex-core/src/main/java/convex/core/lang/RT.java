@@ -9,6 +9,7 @@ import java.util.function.BiFunction;
 
 import convex.core.Constants;
 import convex.core.cvm.AFn;
+import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
 import convex.core.data.ABlobLike;
@@ -25,7 +26,6 @@ import convex.core.data.AString;
 import convex.core.data.ASymbolic;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;

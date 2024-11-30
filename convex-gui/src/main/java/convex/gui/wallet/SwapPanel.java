@@ -12,7 +12,7 @@ import javax.swing.event.DocumentListener;
 
 import convex.api.Convex;
 import convex.core.data.ACell;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.prim.AInteger;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionButton;

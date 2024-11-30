@@ -1,9 +1,9 @@
 package convex.core.data.type;
 
+import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
-import convex.core.data.Address;
 
 public class Transaction extends AStandardType<ATransaction>{
 

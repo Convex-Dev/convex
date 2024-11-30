@@ -17,12 +17,12 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
 import convex.core.ErrorCodes;
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.Log;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.Address;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import convex.cli.CLTester;
 import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.peer.API;

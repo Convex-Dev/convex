@@ -6,7 +6,7 @@ import javax.swing.text.BadLocationException;
 import javax.swing.text.Document;
 import javax.swing.text.PlainDocument;
 
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.text.Text;
 import convex.gui.utils.Toolkit;
 

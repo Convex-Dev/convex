@@ -1,7 +1,7 @@
 package convex.demo;
 
 import convex.core.crypto.AKeyPair;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.java.Convex;
 
 public class FaucetDemo {

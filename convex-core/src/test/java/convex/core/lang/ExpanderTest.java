@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.cvm.Context;
-import convex.core.data.Address;
 
 /**
  * Tests for Expander behaviour

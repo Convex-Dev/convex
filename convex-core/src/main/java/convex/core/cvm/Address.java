@@ -1,5 +1,14 @@
-package convex.core.data;
+package convex.core.cvm;
 
+import convex.core.data.ABlob;
+import convex.core.data.ABlobLike;
+import convex.core.data.ACell;
+import convex.core.data.AExtensionValue;
+import convex.core.data.AString;
+import convex.core.data.Blob;
+import convex.core.data.Format;
+import convex.core.data.Strings;
+import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;

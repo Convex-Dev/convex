@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;

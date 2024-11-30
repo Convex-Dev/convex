@@ -15,7 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.AccountKey;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.data.Keyword;
 import convex.core.data.Keywords;
 import convex.core.init.Init;

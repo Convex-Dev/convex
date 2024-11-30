@@ -22,7 +22,7 @@ import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.core.cvm.State;
 import convex.core.cvm.AccountStatus;
-import convex.core.data.Address;
+import convex.core.cvm.Address;
 import convex.core.lang.RT;
 import convex.gui.actor.AccountWindow;
 import convex.gui.components.ActionButton;
