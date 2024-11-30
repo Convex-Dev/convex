@@ -8,7 +8,7 @@ import convex.core.exceptions.InvalidDataException;
 public class ADenseRecord extends ARecord {
 	protected final AVector<ACell> values;
 	protected final RecordFormat format;
-	protected final  byte tag;
+	protected final byte tag;
 
 	protected ADenseRecord (byte tag, AVector<ACell> values, RecordFormat rf) {
 		super(values.count());

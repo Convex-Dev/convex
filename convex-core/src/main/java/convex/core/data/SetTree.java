@@ -645,48 +645,48 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 		Hash firstHash;
 		try {
 			firstHash=getFirstHash();
-		} catch (ClassCastException e) {
-			throw new InvalidDataException("Bad child type:" +e.getMessage(), this);
-		}
 		
 		int bsize = children.length;
 
 		long childCount=0;;
-		for (int i = 0; i < bsize; i++) {
-			if (children[i] == null) {
-				throw new InvalidDataException("Null child ref at index " + i,this);
-			}
-			
-			ACell o = children[i].getValue();
-			if (!(o instanceof AHashSet)) {
-				throw new InvalidDataException(
-						"Expected AHashSet child at index " + i +" but got "+Utils.getClassName(o), this);
-			}
-			@SuppressWarnings("unchecked")
-			AHashSet<T> child = (AHashSet<T>) o;
-			if (child.isEmpty())
-				throw new InvalidDataException("Empty child at index " + i,this);
-			
-			if (child instanceof SetTree) {
-				SetTree<T> childTree=(SetTree<T>) child;
-				if (childTree.shift<=shift) {
-					throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected greater than ["+shift+"]",this);
+			for (int i = 0; i < bsize; i++) {
+				if (children[i] == null) {
+					throw new InvalidDataException("Null child ref at index " + i,this);
 				}
+				
+				ACell o = children[i].getValue();
+				if (!(o instanceof AHashSet)) {
+					throw new InvalidDataException(
+							"Expected AHashSet child at index " + i +" but got "+Utils.getClassName(o), this);
+				}
+				@SuppressWarnings("unchecked")
+				AHashSet<T> child = (AHashSet<T>) o;
+				if (child.isEmpty())
+					throw new InvalidDataException("Empty child at index " + i,this);
+				
+				if (child instanceof SetTree) {
+					SetTree<T> childTree=(SetTree<T>) child;
+					if (childTree.shift<=shift) {
+						throw new InvalidDataException("Wrong child shift ["+childTree.shift+"], expected greater than ["+shift+"]",this);
+					}
+				}
+				
+				Hash childHash=child.getElementRef(0).getHash();
+				long pmatch=firstHash.hexMatch(childHash);
+				if (pmatch<shift) throw new InvalidDataException("Mismatched child hash [" + childHash +"] with this ["+firstHash+"]",
+						this);
+				
+				int d = digitForIndex(i, mask);
+				child.validateWithPrefix(firstHash ,d,position+1);
+				
+				childCount += child.count();
 			}
 			
-			Hash childHash=child.getElementRef(0).getHash();
-			long pmatch=firstHash.hexMatch(childHash);
-			if (pmatch<shift) throw new InvalidDataException("Mismatched child hash [" + childHash +"] with this ["+firstHash+"]",
-					this);
-			
-			int d = digitForIndex(i, mask);
-			child.validateWithPrefix(firstHash ,d,position+1);
-			
-			childCount += child.count();
-		}
-		
-		if (count != childCount) {
-			throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
+			if (count != childCount) {
+				throw new InvalidDataException("Bad child count, expected " + count + " but children had: " + childCount, this);
+			}
+		} catch (ClassCastException e) {
+			throw new InvalidDataException("Bad child type:" +e.getMessage(), this);
 		}
 	}
 
