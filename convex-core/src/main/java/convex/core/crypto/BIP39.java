@@ -210,6 +210,9 @@ public class BIP39 {
 	
 	public static final int BITS_PER_WORD=11;
 	
+	public static final String DEMO_PHRASE="sing bomb stay manual powder hard north mixture sausage lunch retreat desert";
+	public static final String DEMO_PASS="hello1234567890ZZ";
+	
 	/**
 	 * Map of words to integer values
 	 */
@@ -244,14 +247,7 @@ public class BIP39 {
 	 * @return Blob containing BIP39 seed (64 bytes)
 	 */
 	public static Blob getSeed(List<String> words, String passphrase) throws NoSuchAlgorithmException, InvalidKeySpecException {
-		if (passphrase==null) passphrase="";
-
-		// Normalise words and convert to char array
-		String joined=Utils.joinStrings(words, " ");
-		joined=Normalizer.normalize(joined, Normalizer.Form.NFKD);		
-		char[] pass= joined.toCharArray(); 
-		
-		return getSeedInternal(pass,passphrase);
+		return getSeed(mnemonic(words),passphrase);
 	}
 	
 	public static AKeyPair seedToKeyPair(Blob seed) {
@@ -365,7 +361,7 @@ public class BIP39 {
 	}
 
 	/**
-	 * Gets the individual words from a mnemonic String. Will trim and normalise whitespace, convert to lowercase
+	 * Gets the individual words from a mnemonic String. Will trim and normalise whitespace
 	 * @param mnemonic Mnemonic String
 	 * @return List of words
 	 */
@@ -376,9 +372,7 @@ public class BIP39 {
 		ArrayList<String> al=new ArrayList<>();
 		for (int i=0; i<ss.length; i++) {
 			String w=ss[i].trim();
-			
 			if (!w.isBlank()) {
-				w=w.toLowerCase();
 				al.add(w);
 			}
 		}
@@ -390,10 +384,33 @@ public class BIP39 {
 		s=s.toLowerCase();
 		return s;
 	}
+	
+	public static String normaliseAll(String s) {
+		// to lowercase and standard whitespace
+		s=normaliseFormat(s);
+		
+		List<String> words=getWords(s);
+		
+		int n=words.size();
+		for (int i=0; i<n; i++) {
+			String w=words.get(i);
+			if (LOOKUP.containsKey(w)) continue; // legit word, continue
+			
+			String ext=extendWord(w);
+			if (ext!=null) {
+				words.set(i, ext);
+			}
+			
+			words.set(i, w.toUpperCase()); // An unexpected word, highlight in uppercase
+		}
+		
+		String result = mnemonic(words);
+		return result;
+	}
 
 	/**
 	 * Create a mnemonic String from a list of words, separated by spaces
-	 * @param words  List of words for mnemonic
+	 * @param words List of words for mnemonic
 	 * @return Combined mnemonic string
 	 */
 	public static String mnemonic(List<String> words) {
@@ -416,6 +433,15 @@ public class BIP39 {
 			if (!LOOKUP.containsKey(w)) return w;
 		}
 		return null;
+	}
+
+	/**
+	 * Extends an abbreviated form of a BIP39 word to a full word e.g. 'SHAL' => 'shallow'
+	 * @param abbr
+	 * @return
+	 */
+	public static String extendWord(String abbr) {
+		return ABBR.get(abbr.trim().toLowerCase());
 	}
 	
 }

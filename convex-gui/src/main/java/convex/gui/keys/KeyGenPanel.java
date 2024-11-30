@@ -88,36 +88,8 @@ public class KeyGenPanel extends JPanel {
 		String s = mnemonicArea.getText();
 		String p = new String(passArea.getPassword());
 		List<String> words=BIP39.getWords(s);
-		String badWord=BIP39.checkWords(words);
-		
-		String warn="";
-		int numWords=words.size();
-		if (numWords<BIP39.MIN_WORDS) {
-			warn+="Only "+numWords+" words. ";
-		} else if ((numWords!=((numWords/3)*3)) || numWords>24) {
-			warn+="Unusual number of words ("+numWords+"). ";
-			
-		}
-		
-		if (badWord!=null) {
-			warn +="Not in standard word list: "+badWord+". ";
-		}
-		if (p.isBlank()) {
-			warn+="Passphrase is blank! ";
-		} else {
-			int entropy=Passwords.estimateEntropy(p);
-			if (entropy<10) {
-				warn+="Very weak passphrase! ";
-			} else if (entropy<20) {
-				warn+="Weak passphrase. ";
-			} else if (entropy<30) {
-				warn+="Moderate passphrase. ";
-			}
-		}
-		
-		if (!s.equals(BIP39.normaliseFormat(s))) {
-			warn+="Not normalised! ";
-		}
+
+		String warn=checkWarnings(s,p);
 
 		if (warn.isBlank()) {
 			warningArea.setForeground(Color.GREEN);
@@ -141,6 +113,50 @@ public class KeyGenPanel extends JPanel {
 		}		
 	}
 	
+	private String checkWarnings(String s, String p) {
+		String warn ="";
+
+		// Check for demo phrases
+		if (s.equals(BIP39.DEMO_PHRASE)) warn+= "Demo mnemonic (for testing only). ";
+		if (p.equals(BIP39.DEMO_PASS)) warn+= "Demo passphrase (for testing only). ";
+
+		List<String> words=BIP39.getWords(s);
+		String badWord=BIP39.checkWords(words);
+		
+		int numWords=words.size();
+		if (numWords<BIP39.MIN_WORDS) {
+			warn+="Only "+numWords+" words. ";
+		} else if ((numWords!=((numWords/3)*3)) || numWords>24) {
+			warn+="Unusual number of words ("+numWords+"). ";
+			
+		}
+		
+		if (badWord!=null) {
+			if (BIP39.extendWord(badWord)!=null) {
+				warn += "Should normalise abbreviated word: "+badWord+". ";
+			} else {
+				warn +="Not in standard word list: "+badWord+". ";
+			}
+		}
+		if (p.isBlank()) {
+			warn+="Passphrase is blank! ";
+		} else {
+			int entropy=Passwords.estimateEntropy(p);
+			if (entropy<10) {
+				warn+="Very weak passphrase! ";
+			} else if (entropy<20) {
+				warn+="Weak passphrase. ";
+			} else if (entropy<30) {
+				warn+="Moderate passphrase. ";
+			}
+		}
+		
+		if (!s.equals(BIP39.normaliseFormat(s))) {
+			warn+="Not normalised! ";
+		}
+		return warn;
+	}
+
 	private void updatePath() {
 		try {
 			String path=derivationArea.getText();
@@ -259,7 +275,7 @@ public class KeyGenPanel extends JPanel {
 		add(formPanel, BorderLayout.CENTER);
 
 		{ // Mnemonic entry box
-			addLabel("Mnemonic Phrase","BIP39 Mnemonic phrase. These should be random words from the BIP39 standard word list.");	
+			addLabel("Mnemonic Phrase","BIP39 Mnemonic phrase. These should be 12, 15, 18, 21 or 24 random words from the BIP39 standard word list.");	
 			mnemonicArea = makeTextArea();
 			mnemonicArea.setWrapStyleWord(true);
 			mnemonicArea.setLineWrap(true);
@@ -410,7 +426,7 @@ public class KeyGenPanel extends JPanel {
 		{ // Button to Normalise Mnemonic string
 			JButton btnNormalise = new ActionButton("Normalise Mnemonic",0xf0ff,e -> { 
 				String s=mnemonicArea.getText();
-				String s2=BIP39.normaliseFormat(s);
+				String s2=BIP39.normaliseAll(s);
 				mnemonicArea.setText(s2);
 				updateMnemonic();
 			});
