@@ -87,7 +87,6 @@ public class KeyGenPanel extends JPanel {
 	private void generateBIP39Seed() {
 		String s = mnemonicArea.getText();
 		String p = new String(passArea.getPassword());
-		List<String> words=BIP39.getWords(s);
 
 		String warn=checkWarnings(s,p);
 
@@ -100,7 +99,7 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		try {
-			Blob bipSeed=BIP39.getSeed(words,p);
+			Blob bipSeed=BIP39.getSeed(s, p);
 			seedArea.setText(bipSeed.toHexString());
 			deriveSeed();
 		} catch (Exception ex) {

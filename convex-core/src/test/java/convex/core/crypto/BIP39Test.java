@@ -17,34 +17,30 @@ import org.junit.jupiter.params.provider.ValueSource;
 import convex.core.data.Blob;
 
 public class BIP39Test {
-
 	@Test public void testWordList() {
 		assertEquals(2048,BIP39.wordlist.length);
 	}
-	
 	
 	@Test
 	public void testFromEntropy() {
 		// Test vectors from https://github.com/trezor/python-mnemonic/blob/master/vectors.json
 		{
 			byte[] ent=Blob.fromHex("00000000000000000000000000000000").getBytes();
-			String ph=BIP39.mnemonic(BIP39.createWords(ent, 12));
+			String ph=BIP39.mnemonic(BIP39.createWordsAddingChecksum(ent, 12));
 			assertEquals("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",ph);
 		}
 		
 		{
 			byte[] ent=Blob.fromHex("ffffffffffffffffffffffffffffffff").getBytes();
-			String ph=BIP39.mnemonic(BIP39.createWords(ent, 12));
+			String ph=BIP39.mnemonic(BIP39.createWordsAddingChecksum(ent, 12));
 			assertEquals("zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong",ph);
 		}
 		
 		{
 			byte[] ent=Blob.fromHex("68a79eaca2324873eacc50cb9c6eca8cc68ea5d936f98787c60c7ebc74e6ce7c").getBytes();
-			String ph=BIP39.mnemonic(BIP39.createWords(ent, 24));
+			String ph=BIP39.mnemonic(BIP39.createWordsAddingChecksum(ent, 24));
 			assertEquals("hamster diagram private dutch cause delay private meat slide toddler razor book happy fancy gospel tennis maple dilemma loan word shrug inflict delay length",ph);
 		}
-
-
 	}
 	
 	@Test
@@ -53,6 +49,9 @@ public class BIP39Test {
 		assertEquals("zoo",BIP39.extendWord(" zoo "));
 		assertEquals("list",BIP39.extendWord("list"));
 		assertEquals("capital",BIP39.extendWord("capi"));
+		assertNull(BIP39.extendWord(""));
+		assertNull(BIP39.extendWord("z"));
+		assertNull(BIP39.extendWord(" zo"));
 	}
 	
 	@Test
@@ -78,9 +77,10 @@ public class BIP39Test {
 		assertEquals(exSeed,seed.toHexString());
 		assertEquals(BIP39.SEED_LENGTH,seed.count());
 		
+		// Different string equals different seed
 		String s2=s1.replaceAll(" " , "  ");
 		assertNotEquals(s1,s2);
-		assertEquals(exSeed,BIP39.getSeed(s2,"").toHexString());
+		assertNotEquals(exSeed,BIP39.getSeed(s2,"").toHexString());
 	}
 	
 	@ParameterizedTest
@@ -104,8 +104,7 @@ public class BIP39Test {
 	@Test public void testNewlyGenerated() {
 		doValidStringTest(BIP39.createSecureMnemonic(3));
 		doValidStringTest(BIP39.createSecureMnemonic(15));
-		doValidStringTest("   "+BIP39.createSecureMnemonic(12));
-		doValidStringTest(BIP39.createSecureMnemonic(24)+"\t");
+		doValidStringTest(BIP39.createSecureMnemonic(24));
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(4), 3)));
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(16), 12)));
 		
@@ -116,14 +115,14 @@ public class BIP39Test {
 	
 	@Test 
 	public void testValidStrings() {
-		doValidStringTest("behind emotion squeeze"); // insufficient words
-		doValidStringTest("behinD Emotion SQUEEZE"); // insufficient words
+		doValidStringTest("behind emotion squeeze"); 
 	}
 
 	private void doValidStringTest(String m) {
 		assertNull(BIP39.checkMnemonic(m));
 		String PP="pass";
 		List<String> words=BIP39.getWords(m);
+		int n=words.size();
 		try {
 			Blob seed=BIP39.getSeed(words, PP);
 			assertEquals(BIP39.SEED_LENGTH,seed.count());
@@ -131,16 +130,19 @@ public class BIP39Test {
 			// Wrong passphrase => different seed
 			assertNotEquals(seed,BIP39.getSeed(words, "badpass"));
 			
-			// with extra whitespace is OK
-			assertEquals(seed,BIP39.getSeed(" \t  "+m, PP));
-
 			AKeyPair kp=BIP39.seedToKeyPair(seed);
 			assertNotNull(kp);
 			
 		} catch (Exception e) {
-			fail("Enexpected Exception "+e);
+			fail("Unexpected Exception "+e);
 		}
 	
+		// Tests for round trips to entropy
+		byte[] bs=BIP39.mnemonicToBytes(m);
+		List<String> rwords=BIP39.createWords(bs, n);
+		String rm=BIP39.mnemonic(rwords);
+		
+		assertEquals(m,rm);
 	}
 
 	@Test 

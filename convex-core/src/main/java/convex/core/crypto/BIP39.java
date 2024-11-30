@@ -273,14 +273,20 @@ public class BIP39 {
 	}
 	
 	/**
-	 * Tests if the string is a valid mnemonic phrase, returns null if no problem
+	 * Tests if the string is a valid BIP39 mnemonic phrase, returns null if no problem
 	 * @param s String to be tested as a mnemonic phrase
 	 * @return String containing reason that mnemonic is not valid, or null if OK
 	 */
 	public static String checkMnemonic(String s) {
 		List<String> words=getWords(s);
 		if (words.size()<MIN_WORDS) return "Inadqeuate number of words in BIP39 mnemonic (at least "+MIN_WORDS+" recommended)";
-		return checkWords(words);
+		
+		String err= checkWords(words);
+		if (err!=null) return "Not in word list: "+err;
+		
+		if (!s.equals(normaliseFormat(s))) return "String not normalised";
+		
+		return null;
 	}
 	
 	/**
@@ -290,7 +296,6 @@ public class BIP39 {
 	 * @return Blob containing BIP39 seed (64 bytes)
 	 */
 	public static Blob getSeed(String mnemonic, String passphrase) {
-			mnemonic=normaliseFormat(mnemonic);
 			mnemonic=Normalizer.normalize(mnemonic, Normalizer.Form.NFKD);		
 			char[] normalisedMnemonic= mnemonic.toCharArray(); 
 			return getSeedInternal(normalisedMnemonic,passphrase);
@@ -340,24 +345,55 @@ public class BIP39 {
 		return createWords(bs,n);
 	}
 	
-	public static List<String> createWords(byte[] entropy, int n) {
+	public static List<String> createWordsAddingChecksum(byte[] entropy, int n) {
 		int CS=n/3; // number of checksum bits
 		int ENT=CS*32;
 		Hash checkHash=Hashing.sha256(entropy);
 		int checkSum=Utils.extractBits(checkHash.getBytes(), CS, 256-CS); // BIP39 checksum
 		
-		int blen=((CS+ENT)/8)+1; // enough space for entropy plus checksum
+		int blen=((CS+ENT+7)/8); // enough space for entropy plus checksum
 		byte[] bs=new byte[blen];
 		System.arraycopy(entropy, 0, bs, 0, ENT/8);
 		Utils.setBits(bs, CS, (blen*8)-(ENT+CS),checkSum);
 		
+		return createWords(bs,n);
+	}
+	
+	public static List<String> createWords(byte[] material, int n) {
+		int mbits=material.length*8;
 		ArrayList<String> al=new ArrayList<>(n);
 		for (int i=0; i<n; i++) {
-			int ix=Utils.extractBits(bs, BITS_PER_WORD, (blen*8) - (i+1)*BITS_PER_WORD);
+			int ix=Utils.extractBits(material, BITS_PER_WORD, mbits - (i+1)*BITS_PER_WORD);
 			String word=wordlist[ix];
 			al.add(word);
 		}
 		return al;
+	}
+	
+	/**
+	 * Gets bytes containing the entropy and checksum used to create the given words
+	 * @param mnemonic
+	 * @return byte array of sufficient size, or null if not valid BIP39 words
+	 */
+	public static byte[] mnemonicToBytes(String mnemonic) {
+		List<String> words=getWords(mnemonic);
+		int n=words.size();
+		if ((n<MIN_WORDS)||(n>24)) return null;
+		
+		int CS=n/3;
+		if ((CS*3!=n)) return null; // must be a multiple of 3 for valid BIP39
+		int ENT=CS*32;
+		
+		int blen=((CS+ENT+7)/8); // enough space for entropy plus checksum
+		byte[] bs=new byte[blen];
+		
+		for (int i=0; i<n; i++) {
+			String w=words.get(i);
+			Integer ix=LOOKUP.get(w);
+			if (ix==null) return null;
+			Utils.setBits(bs, BITS_PER_WORD, (blen*8) - (i+1)*BITS_PER_WORD, ix);
+		}
+		return bs;
 	}
 
 	/**
@@ -399,6 +435,7 @@ public class BIP39 {
 			String ext=extendWord(w);
 			if (ext!=null) {
 				words.set(i, ext);
+				continue;
 			}
 			
 			words.set(i, w.toUpperCase()); // An unexpected word, highlight in uppercase
