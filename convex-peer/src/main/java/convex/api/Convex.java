@@ -527,7 +527,8 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the result of the transaction
 	 */
 	public CompletableFuture<Result> transact(String code) {
-		return transact((ACell)Reader.read(code));
+		ACell cmd=buildCodeForm(code);
+		return transact(cmd);
 	}
 	
 	/**
@@ -542,7 +543,8 @@ public abstract class Convex implements AutoCloseable {
 		if (isPreCompile()) {
 			return preCompile(code).thenCompose(r->{
 				if (r.isError()) return CompletableFuture.completedFuture(r);
-				ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, r.getValue());
+				ACell compiledCode=r.getValue();
+				ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, compiledCode);
 				return transact(trans);
 			});
 		} else {
@@ -570,7 +572,8 @@ public abstract class Convex implements AutoCloseable {
 	 * @throws InterruptedException in case of interrupt while waiting
 	 */
 	public synchronized Result transactSync(String code) throws InterruptedException {
-		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, code);
+		ACell form=buildCodeForm(code);
+		ATransaction trans = Invoke.create(getAddress(), ATransaction.UNKNOWN_SEQUENCE, form);
 		return transactSync(trans);
 	}
 
