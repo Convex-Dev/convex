@@ -1,4 +1,4 @@
-package convex.core.data;
+package convex.core.cvm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -6,7 +6,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
-import convex.core.cvm.Address;
+import convex.core.data.ACell;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.BlobsTest;
+import convex.core.data.Format;
+import convex.core.data.ObjectsTest;
+import convex.core.exceptions.BadFormatException;
+import convex.core.util.Utils;
 
 public class AddressTest {
 
@@ -25,6 +32,16 @@ public class AddressTest {
 	public void testAddress2() {
 		Address a1=Address.create(13);
 		assertEquals("#13",a1.toString());
+	}
+	
+	@Test
+	public void testEncoding() throws BadFormatException {
+		Address a= Address.create(17);
+		Blob enc=a.getEncoding();
+		assertEquals(Utils.toHexString(CVMTag.ADDRESS)+"11",enc.toHexString());
+		ACell ra=Format.read(enc);
+		assertTrue(ra instanceof Address);
+		assertEquals(a,ra);
 	}
 	
 	@Test

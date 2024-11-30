@@ -1,13 +1,13 @@
 package convex.core.lang.impl;
 
 import convex.core.cvm.AFn;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
-import convex.core.data.Tag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 
@@ -47,7 +47,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	}
 	
 	public byte getTag() {
-		return Tag.CORE_DEF;
+		return CVMTag.CORE_DEF;
 	}
 
 	protected String name() {
@@ -94,7 +94,7 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.CORE_DEF;
+		bs[pos++]=CVMTag.CORE_DEF;
 		return encodeRaw(bs,pos);
 	}
 

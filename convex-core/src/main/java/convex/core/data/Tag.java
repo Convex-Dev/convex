@@ -30,7 +30,7 @@ public class Tag {
 
 	// crypto and security primitives
 	public static final byte REF = (byte) 0x20;
-	public static final byte ADDRESS = (byte) 0x21;
+	
 
 	// =========================================
 	// Strings and Blobs (0x3x)
@@ -120,13 +120,6 @@ public class Tag {
 	// Extension values (0xEx)
 
 	public static final byte EXTENSION_VALUE_BASE = (byte) 0xE0;
-
-	// CVM Core definitions
-	public static final byte CORE_DEF = (byte) 0xED;
-	
-	// Special Ops
-	public static final byte SPECIAL_OP = (byte) 0xE5;
-
 
 	//===========================================
 	// Illegal / reserved for special values (0xFx)

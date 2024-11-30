@@ -16,6 +16,7 @@ import convex.core.cpos.Order;
 import convex.core.cvm.AFn;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Receipt;
@@ -518,7 +519,7 @@ public class Format {
 		// We expect a VLQ Count following the tag
 		long code=readVLQCount(blob,offset+1);
 		
-		if (tag == Tag.CORE_DEF) return Core.fromCode(code);
+		if (tag == CVMTag.CORE_DEF) return Core.fromCode(code);
 	
 		return ExtensionValue.create(tag, code);
 	}
@@ -594,7 +595,7 @@ public class Format {
 			
 			if (high == 0x30) return (T) readBasicObject(tag,blob,offset);
 			
-			if (tag == Tag.ADDRESS) return (T) Address.read(blob,offset);
+			if (tag == CVMTag.ADDRESS) return (T) Address.read(blob,offset);
 			
 			if (high == 0xB0) return (T) AByteFlag.read(tag);
 			

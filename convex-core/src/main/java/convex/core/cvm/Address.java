@@ -8,7 +8,6 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Strings;
-import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -191,7 +190,7 @@ public final class Address extends AExtensionValue {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.ADDRESS;
+		bs[pos++]=CVMTag.ADDRESS;
 		return encodeRaw(bs,pos);
 	}
 	
@@ -234,7 +233,7 @@ public final class Address extends AExtensionValue {
 
 	@Override
 	public byte getTag() {
-		return Tag.ADDRESS;
+		return CVMTag.ADDRESS;
 	}
 
 	@Override

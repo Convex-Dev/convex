@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
@@ -44,7 +45,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 			return readNumeric(tag,encoding,offset);
 			
 		case 2: // 0x20-0x2F : Addresses and references 
-			if (tag == Tag.ADDRESS) return Address.read(encoding,offset);
+			if (tag == CVMTag.ADDRESS) return Address.read(encoding,offset);
 			// Note: 0x20 reference is invalid as a top level encoding
 			break;
 
