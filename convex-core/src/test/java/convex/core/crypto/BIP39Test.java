@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.security.NoSuchAlgorithmException;
@@ -28,18 +29,22 @@ public class BIP39Test {
 			byte[] ent=Blob.fromHex("00000000000000000000000000000000").getBytes();
 			String ph=BIP39.mnemonic(BIP39.createWordsAddingChecksum(ent, 12));
 			assertEquals("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",ph);
+			Blob b=BIP39.getSeed(ph, "TREZOR");
+			assertEquals("c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04",b.toHexString());
 		}
 		
 		{
 			byte[] ent=Blob.fromHex("ffffffffffffffffffffffffffffffff").getBytes();
 			String ph=BIP39.mnemonic(BIP39.createWordsAddingChecksum(ent, 12));
 			assertEquals("zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo wrong",ph);
+			assertTrue(BIP39.checkSum(ph)); // should be valid checksum
 		}
 		
 		{
 			byte[] ent=Blob.fromHex("68a79eaca2324873eacc50cb9c6eca8cc68ea5d936f98787c60c7ebc74e6ce7c").getBytes();
 			String ph=BIP39.mnemonic(BIP39.createWordsAddingChecksum(ent, 24));
 			assertEquals("hamster diagram private dutch cause delay private meat slide toddler razor book happy fancy gospel tennis maple dilemma loan word shrug inflict delay length",ph);
+			doMnemonicTest(ph);
 		}
 	}
 	
@@ -102,9 +107,10 @@ public class BIP39Test {
 	}
 
 	@Test public void testNewlyGenerated() {
-		doValidStringTest(BIP39.createSecureMnemonic(3));
+		doValidStringTest(BIP39.createSecureMnemonic(12));
 		doValidStringTest(BIP39.createSecureMnemonic(15));
 		doValidStringTest(BIP39.createSecureMnemonic(24));
+		doValidStringTest(BIP39.createSecureMnemonic(3));
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(4), 3)));
 		doValidStringTest(BIP39.mnemonic(BIP39.createWords(new InsecureRandom(16), 12)));
 		
@@ -115,11 +121,15 @@ public class BIP39Test {
 	
 	@Test 
 	public void testValidStrings() {
-		doValidStringTest("behind emotion squeeze"); 
+		doValidStringTest("double liar property"); 
+		
+		// Another example from https://github.com/trezor/python-mnemonic/blob/master/vectors.json
+		doValidStringTest("legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title");
 	}
 
 	private void doValidStringTest(String m) {
-		assertNull(BIP39.checkMnemonic(m));
+		assertTrue(BIP39.checkSum(m));
+
 		String PP="pass";
 		List<String> words=BIP39.getWords(m);
 		int n=words.size();
@@ -141,6 +151,9 @@ public class BIP39Test {
 		byte[] bs=BIP39.mnemonicToBytes(m);
 		List<String> rwords=BIP39.createWords(bs, n);
 		String rm=BIP39.mnemonic(rwords);
+		
+		
+		assertNull(BIP39.checkMnemonic(m),()->"For string: "+m);
 		
 		assertEquals(m,rm);
 	}

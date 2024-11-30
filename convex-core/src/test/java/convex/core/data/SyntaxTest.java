@@ -32,6 +32,16 @@ public class SyntaxTest {
 		assertThrows(BadFormatException.class,()->Format.read("88008200"));
 	}
 	
+	@Test public void testSyntaxExamples() {
+		Syntax s1= Syntax.create(Address.create(32));
+		
+		doSyntaxTest(s1);
+	}
+	
+	private void doSyntaxTest(Syntax s) {
+		ObjectsTest.doAnyValueTests(s);
+	}
+
 	/**
 	 * A Syntax wrapped in another Syntax should not be a valid encoding
 	 * @throws BadFormatException  On format error

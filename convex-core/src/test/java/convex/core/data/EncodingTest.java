@@ -390,6 +390,9 @@ public class EncodingTest {
 		doMultiEncodingTest(Samples.NON_EMBEDDED_STRING);
 		doMultiEncodingTest(Vectors.of(1,2,3));
 		
+		doMultiEncodingTest(Syntax.create(Address.create(32)));
+
+		
 		// Two non-embedded identical children
 		AVector<ACell> v1=Vectors.of(1,Samples.NON_EMBEDDED_STRING,Samples.NON_EMBEDDED_STRING,Samples.INT_VECTOR_23);
 		doMultiEncodingTest(v1);

@@ -123,20 +123,22 @@ public class KeyGenPanel extends JPanel {
 		String badWord=BIP39.checkWords(words);
 		
 		int numWords=words.size();
-		if (numWords<BIP39.MIN_WORDS) {
+		if (numWords<12) {
 			warn+="Only "+numWords+" words. ";
 		} else if ((numWords!=((numWords/3)*3)) || numWords>24) {
 			warn+="Unusual number of words ("+numWords+"). ";
-			
-		}
-		
-		if (badWord!=null) {
+		} else if (badWord!=null) {
 			if (BIP39.extendWord(badWord)!=null) {
 				warn += "Should normalise abbreviated word: "+badWord+". ";
 			} else {
 				warn +="Not in standard word list: "+badWord+". ";
 			}
+		} else if (!s.equals(BIP39.normaliseFormat(s))) {
+			warn+="Not normalised! ";
+		} else if (!BIP39.checkSum(s)) {
+			warn+="Invalid checksum! ";		
 		}
+		
 		if (p.isBlank()) {
 			warn+="Passphrase is blank! ";
 		} else {
@@ -149,10 +151,7 @@ public class KeyGenPanel extends JPanel {
 				warn+="Moderate passphrase. ";
 			}
 		}
-		
-		if (!s.equals(BIP39.normaliseFormat(s))) {
-			warn+="Not normalised! ";
-		}
+
 		return warn;
 	}
 

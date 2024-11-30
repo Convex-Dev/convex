@@ -14,6 +14,8 @@ import java.util.List;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
+import org.bouncycastle.util.Arrays;
+
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.util.Utils;
@@ -286,8 +288,12 @@ public class BIP39 {
 		
 		if (!s.equals(normaliseFormat(s))) return "String not normalised";
 		
+		if (!checkSum(s)) return "Invalid checksum";
+		
 		return null;
 	}
+	
+
 	
 	/**
 	 * Gets a BIP39 seed given a mnemonic and passphrase
@@ -342,7 +348,7 @@ public class BIP39 {
 		byte[] bs=new byte[ENT/8]; // enough space for entropy
 		r.nextBytes(bs);
 		
-		return createWords(bs,n);
+		return createWordsAddingChecksum(bs,n);
 	}
 	
 	public static List<String> createWordsAddingChecksum(byte[] entropy, int n) {
@@ -357,6 +363,26 @@ public class BIP39 {
 		Utils.setBits(bs, CS, (blen*8)-(ENT+CS),checkSum);
 		
 		return createWords(bs,n);
+	}
+	
+	/**
+	 * Check if BIP39 checksum is correct
+	 * @param s
+	 * @return True if BIP39 checksum is valid
+	 */
+	public static boolean checkSum(String mnemonic) {
+		List<String> words=getWords(mnemonic);
+		int n=words.size();
+		byte[] bs=mnemonicToBytes(words);
+		if (bs==null) return false;
+		
+		int CS=n/3; // number of checksum bits
+		int ENT=CS*32;
+		Hash checkHash=Hashing.sha256(Arrays.copyOf(bs, ENT/8));
+		int checkSum=Utils.extractBits(checkHash.getBytes(), CS, 256-CS); // BIP39 checksum
+		
+		int storedSum=Utils.extractBits(bs, CS, (bs.length*8)-(ENT+CS));
+		return checkSum==storedSum;	
 	}
 	
 	public static List<String> createWords(byte[] material, int n) {
@@ -377,6 +403,15 @@ public class BIP39 {
 	 */
 	public static byte[] mnemonicToBytes(String mnemonic) {
 		List<String> words=getWords(mnemonic);
+		return mnemonicToBytes(words);
+	}
+	
+	/**
+	 * Gets bytes containing the entropy and checksum used to create the given words
+	 * @param mnemonic
+	 * @return byte array of sufficient size, or null if not valid BIP39 words
+	 */
+	public static byte[] mnemonicToBytes(List<String> words) {
 		int n=words.size();
 		if ((n<MIN_WORDS)||(n>24)) return null;
 		
