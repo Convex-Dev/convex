@@ -3,7 +3,6 @@ package convex.core.cvm;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -31,6 +30,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	
 	@Override
 	public MapEntry<Keyword, ACell> entryAt(long i) {
+		if ((i<0)||(i>values.count())) throw new IndexOutOfBoundsException(i);
 		return MapEntry.create(format.getKey((int)i), values.get(i));
 	}
 
@@ -52,11 +52,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	 */
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		AVector<Keyword> keys=getKeys();
-		for (Keyword key: keys) {
-			pos=Format.write(bs,pos, get(key));
-		}
-		return pos;
+		return values.encodeRaw(bs, pos);
 	}
 	
 	@Override 
