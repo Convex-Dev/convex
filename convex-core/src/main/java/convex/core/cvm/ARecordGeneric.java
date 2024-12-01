@@ -2,6 +2,7 @@ package convex.core.cvm;
 
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
@@ -60,8 +61,11 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	
 	@Override 
 	public boolean equals(ACell a) {
-		if (!(a instanceof ARecordGeneric)) return false;
-		return equals((ARecordGeneric)a);
+		if (a instanceof ARecordGeneric) {
+			return equals((ARecordGeneric)a);
+		} else {
+			return Cells.equalsGeneric(this, a);
+		}
 	}
 		
 	protected boolean equals(ARecordGeneric a) {
@@ -98,7 +102,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	 * Returns this if and only if values vector is identical.
 	 * 
 	 * @param newValues New values to use
-	 * @return Updated Record
+	 * @return Updated Record (or null if values not valid)
 	 */
 	protected abstract ARecordGeneric withValues(AVector<ACell> newValues);
 

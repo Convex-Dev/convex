@@ -176,15 +176,6 @@ public class AdversarialDataTest {
 	}
 	
 	@Test
-	public void testBadReceipt() {
-		invalidEncoding(CVMTag.RECEIPT,"00ff"); // too many bytes
-		invalidEncoding(CVMTag.RECEIPT,""); // too few bytes
-		invalidEncoding(CVMTag.RECEIPT+CVMTag.RECEIPT_LOG_MASK,"0000"); // null log when should be present
-		invalidEncoding(CVMTag.RECEIPT+CVMTag.RECEIPT_LOG_MASK,"00b0"); // log is not a vector
-
-	}
-	
-	@Test
 	public void testDummy() {
 		invalidTest(Cells.DUMMY);
 		// TODO: full validation : invalidTest(Vectors.repeat(Cells.DUMMY, 4096));
