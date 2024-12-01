@@ -9,7 +9,9 @@ import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
- * Immutable class representing an Ed25519 public key for a Convex account
+ * Immutable class representing an Ed25519 public key.
+ * 
+ * Used for verification of CAD3 Signed Data
  * 
  * AccountKey is basically the public key represented as a 256-bit blob (32 bytes)
  * 

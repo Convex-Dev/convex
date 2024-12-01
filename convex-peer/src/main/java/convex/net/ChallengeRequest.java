@@ -8,8 +8,8 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.cvm.Peer;
 import convex.core.data.ACell;
-import convex.core.data.AccountKey;
 import convex.core.data.AVector;
+import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Vectors;
 import convex.core.data.Hash;

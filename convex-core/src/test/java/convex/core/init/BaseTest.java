@@ -19,7 +19,6 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.State;
-import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
@@ -27,6 +26,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Core;
 import convex.core.data.ACell;
+import convex.core.data.AccountKey;
 import convex.core.lang.RT;
 
 /**
