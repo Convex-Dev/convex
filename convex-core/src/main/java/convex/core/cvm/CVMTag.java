@@ -30,6 +30,19 @@ public class CVMTag {
 	
 	public static final byte FALSE = (byte) 0xB0;
 	public static final byte TRUE = (byte) 0xB1;
+
+	// ==========================================
+	// Transactions
+	//
+	// Implemented as Data Records
+	
+	public static final byte INVOKE = (byte) 0xD0;
+
+	public static final byte TRANSFER = (byte) 0xD1;
+
+	public static final byte CALL = (byte) 0xD2;
+
+	public static final byte MULTI = (byte) 0xD3;
 	
 
 }

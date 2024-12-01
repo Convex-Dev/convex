@@ -4,6 +4,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.type.AType;
 import convex.core.data.type.Transaction;
@@ -114,7 +115,7 @@ public abstract class ATransaction extends ARecord {
 	
 	@Override
 	public boolean equals(ACell o) {
-		return ACell.genericEquals(this, o);
+		return Cells.equalsGeneric(this, o);
 	}
 
 }

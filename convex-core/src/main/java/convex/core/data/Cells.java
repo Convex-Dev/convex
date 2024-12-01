@@ -43,6 +43,29 @@ public class Cells {
 		if (a == null) return false; // b can't be null because of above line
 		return a.equals(b); // fall back to ACell equality
 	}
+	
+	/**
+	 * Generic Cell equality, used if better implementation not available.
+	 * @param a First cell to compare
+	 * @param b Second cell to compare
+	 * @return True if cells are equal, false otherwise
+	 */
+	public static boolean equalsGeneric(ACell a, ACell b) {
+		if (a==b) return true; // important optimisation for e.g. hashmap equality
+		if ((b==null)||(a==null)) return false; // no non-null Cell is equal to null
+		if (!(a.getTag()==b.getTag())) return false; // Different tags never equal
+		
+		// Check hashes for equality if they exist
+		Hash ha=a.cachedHash();
+		if (ha!=null) {
+			Hash hb=b.cachedHash();
+			if (hb!=null) return ha.equals(hb);
+		}
+	
+		// Else default to checking encodings
+		// We would need to get encodings anyway to compute a Hash....
+		return a.getEncoding().equals(b.getEncoding());
+	}
 
 	/**
 	 * Converts any collection object to an ACell[] array. Elements must be Cells.
@@ -360,5 +383,7 @@ public class Cells {
 		if (value==null) return 1;
 		return value.getEncodingLength();
 	}
+
+
 
 }

@@ -4,6 +4,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -14,7 +15,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
-import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -83,7 +83,7 @@ public class Multi extends ATransaction {
 	
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++] = Tag.MULTI;
+		bs[pos++] = CVMTag.MULTI;
 		return encodeRaw(bs,pos);
 	}
 	
@@ -195,7 +195,7 @@ public class Multi extends ATransaction {
 
 	@Override
 	public byte getTag() {
-		return Tag.MULTI;
+		return CVMTag.MULTI;
 	}
 
 	@Override

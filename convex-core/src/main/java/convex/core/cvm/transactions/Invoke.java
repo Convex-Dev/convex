@@ -2,6 +2,7 @@ package convex.core.cvm.transactions;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
@@ -12,7 +13,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
-import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -60,7 +60,7 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++] = Tag.INVOKE;
+		bs[pos++] = CVMTag.INVOKE;
 		return encodeRaw(bs,pos);
 	}
 	
@@ -165,7 +165,7 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public byte getTag() {
-		return Tag.INVOKE;
+		return CVMTag.INVOKE;
 	}
 
 	@Override

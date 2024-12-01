@@ -5,6 +5,7 @@ import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
@@ -387,7 +388,7 @@ public class Order extends ARecord {
 	
 	@Override
 	public boolean equals(ACell o) {
-		return ACell.genericEquals(this, o);
+		return Cells.equalsGeneric(this, o);
 	}
 
 }

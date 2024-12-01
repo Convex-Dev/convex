@@ -699,13 +699,13 @@ public class Format {
 			return (T) Receipt.read(tag,b,pos);
 		}
 
-		if (tag == Tag.INVOKE) {
+		if (tag == CVMTag.INVOKE) {
 			return (T) Invoke.read(b,pos);
-		} else if (tag == Tag.TRANSFER) {
+		} else if (tag == CVMTag.TRANSFER) {
 			return (T) Transfer.read(b,pos);
-		} else if (tag == Tag.CALL) {
+		} else if (tag == CVMTag.CALL) {
 			return (T) Call.read(b,pos);
-		} else if (tag == Tag.MULTI) {
+		} else if (tag == CVMTag.MULTI) {
 			return (T) Multi.read(b,pos);
 		}
 		

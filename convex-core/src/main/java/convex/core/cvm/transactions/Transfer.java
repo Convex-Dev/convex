@@ -2,6 +2,7 @@ package convex.core.cvm.transactions;
 
 import convex.core.Coin;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
@@ -12,7 +13,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
 import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
-import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -40,7 +40,7 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.TRANSFER;
+		bs[pos++]=CVMTag.TRANSFER;
 		return encodeRaw(bs,pos);
 	}
 
@@ -148,7 +148,7 @@ public class Transfer extends ATransaction {
 	
 	@Override
 	public byte getTag() {
-		return Tag.TRANSFER;
+		return CVMTag.TRANSFER;
 	}
 
 	@Override
