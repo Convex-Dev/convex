@@ -5,13 +5,13 @@ import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -38,7 +38,7 @@ public class Invoke extends ATransaction {
 	private static final long FORMAT_COUNT=FORMAT.count();
 
 	protected Invoke(Address address,long sequence, ACell args) {
-		super(FORMAT_COUNT,address,sequence);
+		super(CVMTag.INVOKE,FORMAT_COUNT,address,sequence);
 		this.command = args;
 	}
 
@@ -161,11 +161,6 @@ public class Invoke extends ATransaction {
 	public Invoke withOrigin(Address newAddress) {
 		if (newAddress==this.origin) return this;
 		return create(newAddress,sequence,command);
-	}
-
-	@Override
-	public byte getTag() {
-		return CVMTag.INVOKE;
 	}
 
 	@Override

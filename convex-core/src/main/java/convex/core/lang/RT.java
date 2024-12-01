@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.BiFunction;
 
 import convex.core.Constants;
 import convex.core.cvm.AFn;
@@ -1562,12 +1561,7 @@ public class RT {
 		if (!(a instanceof AMap))
 			return null;
 		AMap<ACell, R> m = (AMap<ACell, R>) a;
-		return m.reduceValues(new BiFunction<AVector<R>, R, AVector<R>>() {
-			@Override
-			public AVector<R> apply(AVector<R> t, R u) {
-				return t.conj(u);
-			}
-		}, Vectors.empty());
+		return m.values();
 	}
 
 	/**

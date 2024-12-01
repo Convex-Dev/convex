@@ -133,7 +133,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 	
-	protected ARecord readSparseRecord(byte tag, Blob encoding, int offset) throws BadFormatException {
+	protected ARecord<?,?> readSparseRecord(byte tag, Blob encoding, int offset) throws BadFormatException {
 		// TODO spare records
 		throw new BadFormatException(ErrorMessages.TODO);
 	}

@@ -4,7 +4,9 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Providers;
+import convex.core.cvm.ACVMRecord;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;
@@ -43,7 +45,7 @@ import convex.core.lang.RT;
  *
  * @param <T> The type of the signed object
  */
-public final class SignedData<T extends ACell> extends ARecord {
+public final class SignedData<T extends ACell> extends ACVMRecord {
 	// Encoded fields
 	private final AccountKey pubKey;
 	private final ASignature signature;
@@ -57,9 +59,8 @@ public final class SignedData<T extends ACell> extends ARecord {
 	//Cached fields
 	private AccountKey verifiedKey=null;
 
-
 	private SignedData(Ref<T> refToValue, AccountKey address, ASignature sig) {
-		super(FORMAT.count());
+		super(Tag.SIGNED_DATA,FORMAT.count());
 		this.valueRef = refToValue;
 		this.pubKey = address;
 		signature = sig;
@@ -375,11 +376,6 @@ public final class SignedData<T extends ACell> extends ARecord {
 	public boolean isEmbedded() {
 		return false;
 	}
-	
-	@Override
-	public byte getTag() {
-		return Tag.SIGNED_DATA;
-	}
 
 	@Override
 	public RecordFormat getFormat() {
@@ -404,5 +400,4 @@ public final class SignedData<T extends ACell> extends ARecord {
 		ASignature sig=ASignature.fromBlob(RT.ensureBlob(value.get(Keywords.SIGNATURE)));
 		return create(key,sig,ref);
 	}
-
 }

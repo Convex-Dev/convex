@@ -1,20 +1,19 @@
 package convex.core.data;
 
+import convex.core.cvm.RecordFormat;
 import convex.core.exceptions.InvalidDataException;
 
 /**
  * Abstract base class for dense records CAD3 types 0xD0 - 0xDF
  */
-public class ADenseRecord extends ARecord {
+public abstract class ADenseRecord extends ARecord<ACell,ACell> {
 	protected final AVector<ACell> values;
 	protected final RecordFormat format;
-	protected final byte tag;
 
 	protected ADenseRecord (byte tag, AVector<ACell> values, RecordFormat rf) {
-		super(values.count());
+		super(tag,values.count());
 		this.format=rf;
 		this.values=values;
-		this.tag=tag;
 	}
 	
 	@Override
@@ -30,15 +29,12 @@ public class ADenseRecord extends ARecord {
 	}
 	
 	@Override
-	public ARecord updateRefs(IRefFunction func) {
+	public ADenseRecord updateRefs(IRefFunction func) {
 		AVector<ACell> newValues=values.toVector().updateRefs(func); // ensure values are canonical via toVector
 		return withValues(newValues);
 	}
 	
-	private ARecord withValues(AVector<ACell> newValues) {
-		if (values==newValues) return this;
-		return new ADenseRecord(tag,newValues,format);
-	}
+	public abstract ADenseRecord withValues(AVector<ACell> newValues);
 
 	@Override
 	public AVector<ACell> values() {
@@ -48,11 +44,6 @@ public class ADenseRecord extends ARecord {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		values.validateCell();
-	}
-
-	@Override
-	public byte getTag() {
-		return tag;
 	}
 
 	@Override

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -53,7 +54,7 @@ public class CAD3Test extends ACVMTest {
 			assertEquals(Blob.fromHex("df03110111021103"),dr.getEncoding());
 	
 			assertEquals(3,dr.count);
-			assertSame(v,dr.toVector());
+			assertSame(v,dr.values());
 			assertEquals("#[df03110111021103]",dr.toString());
 			
 			ObjectsTest.doAnyValueTests(dr);
@@ -72,7 +73,7 @@ public class CAD3Test extends ACVMTest {
 			assertEquals((byte)0xdf,dr.getTag());
 			
 			assertEquals(300,dr.count());
-			assertSame(v,dr.toVector());
+			assertSame(v,dr.values());
 			
 			ObjectsTest.doAnyValueTests(dr);
 		}
@@ -87,14 +88,12 @@ public class CAD3Test extends ACVMTest {
 		DenseRecord dr=ctx.getResult();
 		assertNotNull(dr);
 		
-		// DenseRecord behaves like a sequence
+		// DenseRecord behaves like a map
 		assertCVMEquals(3,eval(ctx,"(count dr)"));
-		assertCVMEquals(1,eval(ctx,"(first dr)"));
-		assertCVMEquals(Vectors.of(1,2,3),eval(ctx,"(vec dr)"));
-		assertCVMEquals(Vectors.of(1,2,3,4),eval(ctx,"(conj dr 4)"));
+		assertCVMEquals(Vectors.of(1,2,3),eval(ctx,"(values dr)"));
+		assertTrue(evalB(ctx,"(map? dr)"));
 		
 		assertFalse(evalB(ctx,"(vector? dr)"));
-		assertFalse(evalB(ctx,"(map? dr)"));
 	}
 
 }

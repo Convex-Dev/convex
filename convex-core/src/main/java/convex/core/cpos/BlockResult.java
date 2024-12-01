@@ -2,10 +2,12 @@ package convex.core.cpos;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
-import convex.core.data.ARecord;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -14,9 +16,7 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
-import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -29,7 +29,7 @@ import convex.core.util.Utils;
  * either be a valid result or an error.
  *
  */
-public class BlockResult extends ARecord {
+public class BlockResult extends ACVMRecord {
 	private State state;
 	private AVector<Result> results;
 	
@@ -39,7 +39,7 @@ public class BlockResult extends ARecord {
 
 
 	private BlockResult(State state, AVector<Result> results) {
-		super(FORMAT.count());
+		super(CVMTag.BLOCK_RESULT,FORMAT.count());
 		this.state = state;
 		this.results = results;
 	}
@@ -119,11 +119,6 @@ public class BlockResult extends ARecord {
 		if (Keywords.STATE.equals(key)) return state;
 		if (Keywords.RESULTS.equals(key)) return results;
 		return null;
-	}
-
-	@Override
-	public byte getTag() {
-		return Tag.BLOCK_RESULT;
 	}
 
 	@Override
@@ -254,6 +249,7 @@ public class BlockResult extends ARecord {
 		
 		return new BlockResult(state,rs);
 	}
+
 
 
 	

@@ -6,12 +6,12 @@ import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -28,7 +28,7 @@ public class Transfer extends ATransaction {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Transfer(Address origin,long sequence, Address target, long amount) {
-		super(FORMAT.count(),origin,sequence);
+		super(CVMTag.TRANSFER,FORMAT.count(),origin,sequence);
 		this.target = target;
 		this.amount = amount;
 	}
@@ -144,11 +144,6 @@ public class Transfer extends ATransaction {
 	public Transfer withOrigin(Address newAddress) {
 		if (newAddress==this.origin) return this;
 		return create(newAddress,sequence,target,amount);
-	}
-	
-	@Override
-	public byte getTag() {
-		return CVMTag.TRANSFER;
 	}
 
 	@Override

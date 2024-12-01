@@ -13,13 +13,13 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
 import convex.core.cpos.Order;
+import convex.core.cvm.ACVMRecord;
 import convex.core.cvm.AFn;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
-import convex.core.cvm.Receipt;
 import convex.core.cvm.State;
 import convex.core.cvm.Syntax;
 import convex.core.cvm.transactions.Call;
@@ -665,40 +665,36 @@ public class Format {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	@SuppressWarnings("unchecked")
-	private static <T extends ARecord> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == Tag.BLOCK) {
+	private static <T extends ACVMRecord> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
+		if (tag == CVMTag.BLOCK) {
 			return (T) Block.read(b,pos);
 		}
-		if (tag == Tag.STATE) {
+		if (tag == CVMTag.STATE) {
 			return (T) State.read(b,pos);
 		}
-		if (tag == Tag.ORDER) {
+		if (tag == CVMTag.ORDER) {
 			return (T) Order.read(b,pos);
 		}
-		if (tag == Tag.BELIEF) {
+		if (tag == CVMTag.BELIEF) {
 			return (T) Belief.read(b,pos);
 		}
 		
-		if (tag == Tag.RESULT) {
+		if (tag == CVMTag.RESULT) {
 			return (T) Result.read(b,pos);
 		}
 		
-		if (tag == Tag.BLOCK_RESULT) {
+		if (tag == CVMTag.BLOCK_RESULT) {
 			return (T) BlockResult.read(b,pos);
 		}
 		
-		if (tag == Tag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
-		if (tag == Tag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
+		if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
+		if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
 
 		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
-		if ((byte)(tag & Tag.RECEIPT_MASK) == Tag.RECEIPT) {
-			return (T) Receipt.read(tag,b,pos);
-		}
-
 		if (tag == CVMTag.INVOKE) {
 			return (T) Invoke.read(b,pos);
 		} else if (tag == CVMTag.TRANSFER) {

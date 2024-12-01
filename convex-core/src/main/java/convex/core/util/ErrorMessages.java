@@ -37,7 +37,7 @@ public class ErrorMessages {
 		return "Insufficient funds in account ["+source+"] required="+amount;
 	}
 
-	public static String unknownKey(Keyword key, ARecord record) {
+	public static String unknownKey(Keyword key, ARecord<?,?> record) {
 		return "Unknown key ["+key+"] for record type: "+record.getClass();
 	}
 

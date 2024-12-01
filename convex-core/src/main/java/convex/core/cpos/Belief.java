@@ -6,9 +6,11 @@ import java.util.HashMap;
 
 import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
-import convex.core.data.ARecord;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -18,10 +20,8 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Tag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
@@ -39,7 +39,7 @@ import convex.core.lang.RT;
  * audiences is bloody hard. There's nothing to relate it to." – Satoshi
  * Nakamoto
  */
-public class Belief extends ARecord {
+public class Belief extends ACVMRecord {
 
 	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS);
 	
@@ -55,7 +55,7 @@ public class Belief extends ARecord {
 	// private final long timeStamp;
 
 	Belief(Index<AccountKey,SignedData<Order>> orders) {
-		super(BELIEF_FORMAT.count());
+		super(CVMTag.BELIEF,BELIEF_FORMAT.count());
 		this.orders = orders;
 	}
 
@@ -176,12 +176,6 @@ public class Belief extends ARecord {
 	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.write(bs,pos, orders);
 		return pos;
-	}
-
-
-	@Override
-	public byte getTag() {
-		return Tag.BELIEF;
 	}
 
 	/**
@@ -315,9 +309,5 @@ public class Belief extends ARecord {
 		Belief newBelief=this.withOrders(newOrders);
 		return newBelief;
 	}
-
-
-
-
 
 }

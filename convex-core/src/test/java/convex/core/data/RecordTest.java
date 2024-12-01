@@ -11,6 +11,7 @@ import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.cvm.Address;
+import convex.core.cvm.RecordFormat;
 import convex.core.cvm.State;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
@@ -55,12 +56,12 @@ public class RecordTest {
 		doRecordTests(s);
 	}
 
-	public static void doRecordTests(ARecord r) {
+	public static void doRecordTests(ARecord<?,?> r) {
 		RecordFormat format=r.getFormat();
 		AVector<Keyword> keys=format.getKeys();
 		int n=(int) keys.count();
 
-		AVector<ACell> vals=r.values();
+		AVector<?> vals=r.values();
 		assertEquals(n,vals.size());
 		VectorsTest.doVectorTests(vals);
 
@@ -72,7 +73,7 @@ public class RecordTest {
 			vs[i]=v;
 
 			// entry based access by key
-			MapEntry<Keyword,ACell> me0=r.getEntry(k);
+			MapEntry<?,?> me0=r.getEntry(k);
 			assertEquals(k,me0.getKey());
 			assertEquals(v,me0.getValue());
 
@@ -83,7 +84,7 @@ public class RecordTest {
 			assertEquals(v,vals.get(i));
 
 			// indexed entry-wise access
-			MapEntry<Keyword,ACell> me=r.entryAt(i);
+			MapEntry<?,?> me=r.entryAt(i);
 			assertEquals(k,me.getKey());
 			assertEquals(v,me.getValue());
 		}

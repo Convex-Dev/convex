@@ -1,22 +1,22 @@
 package convex.core.data;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
 /**
- * Abstract base class for non-CVM CAD3 Records values. These look like countable sequences to CVM code.
+ * Abstract base class for non-CVM CAD3 Records values. 
+ * 
+ * These look like maps of longs to values in CVM code.
  * 
  * These should always have an encoding since the only way to create them is load from network or storage
  */
-public abstract class ACAD3Record extends ASequence<ACell> {
-
-	protected final byte tag;
+public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 
 	protected ACAD3Record(byte tag,long count) {
-		super(count);
-		this.tag=tag;
+		super(tag,count);
 	}
 	
 	@Override
@@ -30,10 +30,6 @@ public abstract class ACAD3Record extends ASequence<ACell> {
 		}
 	}
 
-	@Override
-	public byte getTag() {
-		return tag;
-	}
 
 	@Override
 	public boolean equals(ACell a) {
@@ -66,7 +62,7 @@ public abstract class ACAD3Record extends ASequence<ACell> {
 	}
 
 	@Override
-	protected ACell toCanonical() {
+	protected ARecord<CVMLong,ACell> toCanonical() {
 		return this;
 	}
 

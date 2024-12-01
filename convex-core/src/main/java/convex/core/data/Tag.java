@@ -65,15 +65,7 @@ public class Tag {
 	// Sparsely coded record (0xAx)
 	public static final byte SPARSE_RECORD_BASE = (byte) 0xA0;
 	
-	public static final byte STATE = (byte) 0xA0;
-	public static final byte ACCOUNT_STATUS = (byte) 0xA1;
-	public static final byte PEER_STATUS = (byte) 0xA2;
-
-	public static final byte BELIEF = (byte) 0xAA;
-	public static final byte BLOCK = (byte) 0xAB;
-	public static final byte ORDER = (byte) 0xAC;
-	public static final byte RESULT = (byte)0xAD; // transaction result
-	public static final byte BLOCK_RESULT = (byte) 0xAE;
+	
 
 	//=========================
 	// Byte Flags (0xBx)
@@ -97,11 +89,7 @@ public class Tag {
 	// Densely coded record (0xDx)
 	public static final byte DENSE_RECORD_BASE = (byte) 0xD0;
 	
-	public static final byte RECEIPT = (byte) 0xD8;
-	public static final byte RECEIPT_MASK = (byte) 0xFC; // 11111100
 	
-	public static final byte RECEIPT_ERROR_MASK = (byte) 0x01;
-	public static final byte RECEIPT_LOG_MASK = (byte) 0x02;
 
 	
 	//==========================================

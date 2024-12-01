@@ -177,10 +177,10 @@ public class AdversarialDataTest {
 	
 	@Test
 	public void testBadReceipt() {
-		invalidEncoding(Tag.RECEIPT,"00ff"); // too many bytes
-		invalidEncoding(Tag.RECEIPT,""); // too few bytes
-		invalidEncoding(Tag.RECEIPT+Tag.RECEIPT_LOG_MASK,"0000"); // null log when should be present
-		invalidEncoding(Tag.RECEIPT+Tag.RECEIPT_LOG_MASK,"00b0"); // log is not a vector
+		invalidEncoding(CVMTag.RECEIPT,"00ff"); // too many bytes
+		invalidEncoding(CVMTag.RECEIPT,""); // too few bytes
+		invalidEncoding(CVMTag.RECEIPT+CVMTag.RECEIPT_LOG_MASK,"0000"); // null log when should be present
+		invalidEncoding(CVMTag.RECEIPT+CVMTag.RECEIPT_LOG_MASK,"00b0"); // log is not a vector
 
 	}
 	
@@ -278,9 +278,9 @@ public class AdversarialDataTest {
 	
 	@Test
 	public void testBadBlock() {
-		invalidEncoding(Tag.BLOCK,""); // no data!
-		invalidEncoding(Tag.BLOCK,"1234567812345678"); // timestamp only
-		invalidEncoding(Tag.BLOCK,"12345678123456788100"); // list instead of vector
+		invalidEncoding(CVMTag.BLOCK,""); // no data!
+		invalidEncoding(CVMTag.BLOCK,"1234567812345678"); // timestamp only
+		invalidEncoding(CVMTag.BLOCK,"12345678123456788100"); // list instead of vector
 
 	}
 	

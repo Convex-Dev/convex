@@ -7,13 +7,13 @@ import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -67,7 +67,7 @@ public class Multi extends ATransaction {
 
 	
 	protected Multi(Address origin, long sequence, int mode, Ref<AVector<ATransaction>> txs) {
-		super(FORMAT.count(), origin, sequence);
+		super(CVMTag.MULTI,FORMAT.count(), origin, sequence);
 		this.mode=mode;
 		this.txs=txs;
 	}
@@ -191,11 +191,6 @@ public class Multi extends ATransaction {
 	public ATransaction withOrigin(Address newAddress) {
 		if (newAddress==origin) return this;
 		return new Multi(newAddress,sequence,mode,txs);
-	}
-
-	@Override
-	public byte getTag() {
-		return CVMTag.MULTI;
 	}
 
 	@Override

@@ -4,6 +4,7 @@ import java.util.Collection;
 
 import org.bouncycastle.util.Arrays;
 
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -155,6 +156,16 @@ public class Vectors {
 		} else {
 			return VectorTree.read(count,b,pos);
 		}
+	}
+
+	/**
+	 * Create a Vector which represents a range of integers from start to end
+	 * @param count
+	 * @return
+	 */
+	public static AVector<CVMLong> range(long start, long end) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 }

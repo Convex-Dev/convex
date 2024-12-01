@@ -3,10 +3,12 @@ package convex.core.cpos;
 import java.util.Comparator;
 import java.util.List;
 
+import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
-import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -15,10 +17,8 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -36,7 +36,7 @@ import convex.core.util.Utils;
  * than any established style or system." - Bruce Lee
  *
  */
-public final class Block extends ARecord {
+public final class Block extends ACVMRecord {
 	private final long timestamp;
 	private final AVector<SignedData<ATransaction>> transactions;
 
@@ -55,7 +55,7 @@ public final class Block extends ARecord {
 	};
 
 	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions) {
-		super(FORMAT.count());
+		super(CVMTag.BLOCK,FORMAT.count());
 		this.timestamp = timestamp;
 		this.transactions = transactions;
 	}
@@ -180,11 +180,6 @@ public final class Block extends ARecord {
 	}
 
 	@Override
-	public byte getTag() {
-		return Tag.BLOCK;
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		transactions.validateCell();
 	}
@@ -228,7 +223,5 @@ public final class Block extends ARecord {
 	@Override
 	public RecordFormat getFormat() {
 		return FORMAT;
-	}
-
-	
+	}	
 }

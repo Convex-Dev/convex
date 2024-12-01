@@ -4,7 +4,6 @@ import convex.core.Coin;
 import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.ARecord;
 import convex.core.data.ASet;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -14,11 +13,9 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
-import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -32,7 +29,7 @@ import convex.core.lang.RT;
  * "People said I should accept the world. Bullshit! I don't accept the world."
  * - Richard Stallman
  */
-public class AccountStatus extends ARecord {
+public class AccountStatus extends ACVMRecord {
 	private final long sequence;
 	private final long balance;
 	private final long memory;
@@ -75,7 +72,7 @@ public class AccountStatus extends ARecord {
 			ACell controller,
 			AHashMap<Symbol, ACell> environment, 
 			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, Address parent) {
-		super(FORMAT.count());
+		super(CVMTag.ACCOUNT_STATUS,FORMAT.count());
 		this.sequence = sequence;
 		this.publicKey = publicKey;
 		this.balance = balance;
@@ -134,7 +131,7 @@ public class AccountStatus extends ARecord {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.ACCOUNT_STATUS;
+		bs[pos++]=CVMTag.ACCOUNT_STATUS;
 		return encodeRaw(bs,pos);
 	}
 	
@@ -432,11 +429,6 @@ public class AccountStatus extends ARecord {
 		if (Keywords.PARENT.equals(key)) return parent;
 		
 		return null;
-	}
-
-	@Override
-	public byte getTag() {
-		return Tag.ACCOUNT_STATUS;
 	}
 
 	@Override

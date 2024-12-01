@@ -20,7 +20,6 @@ import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
@@ -31,12 +30,10 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
-import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
@@ -62,7 +59,7 @@ import convex.core.util.Utils;
  * "State. You're doing it wrong" - Rich Hickey
  *
  */
-public class State extends ARecord {
+public class State extends ACVMRecord {
 	public static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
 	public static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
 
@@ -108,7 +105,7 @@ public class State extends ARecord {
 
 	private State(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
 			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
-		super(FORMAT.count());
+		super(CVMTag.STATE,FORMAT.count());
 		this.accounts = accounts;
 		this.peers = peers;
 		this.globals = globals;
@@ -761,11 +758,6 @@ public class State extends ARecord {
 	public State withPeers(Index<AccountKey, PeerStatus> newPeers) {
 		if (peers == newPeers) return this;
 		return create(accounts, newPeers, globals, schedule);
-	}
-
-	@Override
-	public byte getTag() {
-		return Tag.STATE;
 	}
 
 	/**

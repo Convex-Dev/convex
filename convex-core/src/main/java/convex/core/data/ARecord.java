@@ -6,6 +6,7 @@ import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 
 import convex.core.cpos.Block;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -19,13 +20,22 @@ import convex.core.lang.RT;
  * Ordering of fields is defined by the Record's RecordFormat
  *
  */
-public abstract class ARecord extends AMap<Keyword,ACell> {
+public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V> {
 
 	// TODO: need a better default value?
-	public static final ARecord DEFAULT_VALUE=Block.create(0, Vectors.empty());
+	public static final ARecord<Keyword,ACell> DEFAULT_VALUE=Block.create(0, Vectors.empty());
 
-	protected ARecord(long n) {
+	protected final byte tag;
+
+	protected ARecord(byte tag, long n) {
 		super(n);
+		this.tag=tag;
+	}
+	
+	
+	@Override
+	public final byte getTag() {
+		return tag;
 	}
 	
 	public AType getType() {
@@ -44,13 +54,9 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 	
 	@Override
-	protected ARecord toCanonical() {
+	protected ARecord<K,V> toCanonical() {
 		// Should already be canonical
 		return this;
-	}
-
-	@Override final public boolean isCVMValue() {
-		return true;
 	}
 	
 	/**
@@ -59,9 +65,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @return Vector of Keywords
 	 */
 	@Override
-	public final AVector<Keyword> getKeys() {
-		return getFormat().getKeys();
-	}
+	public abstract AVector<K> getKeys();
 	
 	/**
 	 * Gets a vector of values for this Record, in format-determined order
@@ -69,7 +73,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @return Vector of Values
 	 */
 	@Override
-	public AVector<ACell> values() {
+	public AVector<V> values() {
 		int n=size();
 		ACell[] os=new ACell[n];
 		RecordFormat format=getFormat();
@@ -85,10 +89,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * @return Field value for the given key
 	 */
 	@Override
-	public final ACell get(ACell key) {
-		if (key instanceof Keyword) return get((Keyword)key);
-		return null;
-	}
+	public abstract V get(ACell key);
 	
 	/**
 	 * Gets the record field content for a given key, or null if not found.
@@ -122,72 +123,65 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	public java.util.Set<Keyword> keySet() {
-		return getFormat().keySet();
-	}
+	public abstract java.util.Set<K> keySet();
 
 	@Override
-	public Set<Entry<Keyword, ACell>> entrySet() {
+	public Set<Entry<K, V>> entrySet() {
 		return toHashMap().entrySet();
 	}
 
 	@Override
-	public AMap<Keyword, ACell> assoc(ACell key, ACell value) {
+	public AMap<K, V> assoc(ACell key, ACell value) {
 		return toHashMap().assoc(key, value);
 	}
 	
-	public AMap<Keyword, ACell> dissoc(Keyword key) {
+	public AMap<K, V> dissoc(Keyword key) {
 		if (!containsKey(key)) return this;
 		return toHashMap().dissoc(key);
 	}
 
 	@Override
-	public final AMap<Keyword, ACell> dissoc(ACell key) {
+	public final AMap<K, V> dissoc(ACell key) {
 		if (!containsKey(key)) return this;
 		return toHashMap().dissoc(key);
 	}
 
 	@Override
-	public MapEntry<Keyword, ACell> getKeyRefEntry(Ref<ACell> keyRef) {
+	public MapEntry<K, V> getKeyRefEntry(Ref<ACell> keyRef) {
 		return getEntry(keyRef.getValue());
 	}
 
 	@Override
-	protected void accumulateEntries(Collection<Entry<Keyword, ACell>> h) {
+	protected void accumulateEntries(Collection<Entry<K, V>> h) {
 		for (long i=0; i<count; i++) {
 			h.add(entryAt(i));
 		}
 	}
 
 	@Override
-	protected void accumulateKeySet(Set<Keyword> h) {
-		AVector<Keyword> keys=getFormat().getKeys();
+	protected void accumulateKeySet(Set<K> h) {
+		AVector<K> keys=getKeys();
 		for (long i=0; i<count; i++) {
 			h.add(keys.get(i));
 		}
 	}
 
 	@Override
-	protected void accumulateValues(java.util.List<ACell> al) {
+	protected void accumulateValues(java.util.List<V> al) {
 		toHashMap().accumulateValues(al);
 	}
 
 	@Override
-	public void forEach(BiConsumer<? super Keyword, ? super ACell> action) {
+	public void forEach(BiConsumer<? super K, ? super V> action) {
 		throw new UnsupportedOperationException();
 	}
 
 	@Override
-	public AMap<Keyword,ACell> assocEntry(MapEntry<Keyword, ACell> e) {
+	public AMap<K,V> assocEntry(MapEntry<K, V> e) {
 		return assoc(e.getKey(),e.getValue());
 	}
 
-	@Override
-	public MapEntry<Keyword, ACell> entryAt(long i) {
-		if ((i<0)||(i>=count)) throw new IndexOutOfBoundsException("Index:"+i);
-		Keyword k=getFormat().getKeys().get(i);
-		return getEntry(k);
-	}
+
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
@@ -213,22 +207,24 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 		return sb.check(limit);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
-	public MapEntry<Keyword, ACell> getEntry(ACell k) {
-		ACell v=get(k);
+	public MapEntry<K, V> getEntry(ACell k) {
+		V v=get(k);
 		if ((v==null)&&!containsKey(k)) return null; //if null, need to check if key exists
-		return MapEntry.create((Keyword)k,v);
+		return MapEntry.create((K)k,v);
 	}
 	
+	@SuppressWarnings("unchecked")
 	@Override
-	public ACell get(ACell key, ACell notFound) {
-		ACell v=get(key);
-		if ((v==null)&&!containsKey(key)) return notFound; //if null, need to check if key exists
+	public V get(ACell key, ACell notFound) {
+		V v=get(key);
+		if ((v==null)&&!containsKey(key)) return (V) notFound; //if null, need to check if key exists
 		return v;
 	}
 
 	@Override
-	public <R> R reduceValues(BiFunction<? super R, ? super ACell, ? extends R> func, R initial) {
+	public <R> R reduceValues(BiFunction<? super R, ? super V, ? extends R> func, R initial) {
 		for (int i=0; i<count; i++) {
 			initial=func.apply(initial, entryAt(i).getValue());
 		}
@@ -236,7 +232,7 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}	
 
 	@Override
-	public <R> R reduceEntries(BiFunction<? super R, MapEntry<Keyword, ACell>, ? extends R> func, R initial) {
+	public <R> R reduceEntries(BiFunction<? super R, MapEntry<K,V>, ? extends R> func, R initial) {
 		for (int i=0; i<count; i++) {
 			initial=func.apply(initial, entryAt(i));
 		}
@@ -247,8 +243,8 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	 * Converts this record to a HashMap
 	 * @return HashMap instance
 	 */
-	protected AHashMap<Keyword,ACell> toHashMap() {
-		AHashMap<Keyword,ACell> m=Maps.empty();
+	protected AHashMap<K,V> toHashMap() {
+		AHashMap<K,V> m=Maps.empty();
 		for (int i=0; i<count; i++) {
 			m=m.assocEntry(entryAt(i));
 		}
@@ -256,12 +252,12 @@ public abstract class ARecord extends AMap<Keyword,ACell> {
 	}
 
 	@Override
-	protected MapEntry<Keyword, ACell> getEntryByHash(Hash hash) {
+	protected MapEntry<K, V> getEntryByHash(Hash hash) {
 		return toHashMap().getEntryByHash(hash);
 	}
 
 	@Override
-	public AHashMap<Keyword, ACell> empty() {
+	public AMap<K, V> empty() {
 		// coerce to AHashMap since we are removing all keys
 		return Maps.empty();
 	}

@@ -3,7 +3,6 @@ package convex.core.cvm;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
-import convex.core.data.ARecord;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
@@ -13,7 +12,6 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Tag;
 import convex.core.data.prim.CVMLong;
@@ -29,7 +27,7 @@ import convex.core.util.Utils;
  * connections / client requests
  *
  */ 
-public class PeerStatus extends ARecord {
+public class PeerStatus extends ACVMRecord {
 
 	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.CONTROLLER, Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
 			Keywords.METADATA, Keywords.TIMESTAMP,Keywords.BALANCE};
@@ -55,7 +53,7 @@ public class PeerStatus extends ARecord {
 	private final AHashMap<ACell,ACell> metadata;
 
 	private PeerStatus(Address controller, long stake, Index<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata, long timestamp, long balance) {
-		super(FORMAT.count());
+		super(CVMTag.PEER_STATUS,FORMAT.count());
         this.controller = controller;
 		this.peerStake = stake;
 		this.delegatedStake = delegatedStake;
@@ -177,7 +175,7 @@ public class PeerStatus extends ARecord {
 
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=Tag.PEER_STATUS;
+		bs[pos++]=CVMTag.PEER_STATUS;
 		return encodeRaw(bs,pos);
 	}
 
@@ -325,11 +323,6 @@ public class PeerStatus extends ARecord {
 	}
 
 	@Override
-	public byte getTag() {
-		return Tag.PEER_STATUS;
-	}
-
-	@Override
 	public PeerStatus updateRefs(IRefFunction func) {
 		Index<Address, CVMLong> newStakes = Ref.updateRefs(stakes, func);
 		AHashMap<ACell,ACell> newMeta = Ref.updateRefs(metadata, func);
@@ -403,7 +396,5 @@ public class PeerStatus extends ARecord {
 		if (peerFees<0) throw new IllegalArgumentException("Negative fees!");
 		return withBalance(balance+peerFees);
 	}
-
-
 
 }

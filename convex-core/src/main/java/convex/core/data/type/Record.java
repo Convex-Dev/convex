@@ -1,13 +1,14 @@
 package convex.core.data.type;
 
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
-import convex.core.data.RecordFormat;
 
 /**
  * Type that represents any CVM collection
  */
+@SuppressWarnings("rawtypes")
 public class Record extends AStandardType<ARecord> {
 
 	public static final Record INSTANCE = new Record();

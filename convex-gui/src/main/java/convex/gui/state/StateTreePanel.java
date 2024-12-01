@@ -14,6 +14,7 @@ import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreePath;
 
+import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.ACountable;
 import convex.core.data.ADataStructure;
@@ -21,8 +22,6 @@ import convex.core.data.AMap;
 import convex.core.data.ARecord;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.cvm.Address;
-import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
@@ -86,7 +85,7 @@ public class StateTreePanel extends JPanel {
 
 			if (a instanceof ARecord) {
 				ARecord r = (ARecord) a;
-				for (Keyword k : r.getKeys()) {
+				for (ACell k : (AVector<?>)r.getKeys()) {
 					ACell c = r.get(k);
 					add(new Node(k + " = " + getString(c), c));
 				}

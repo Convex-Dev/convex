@@ -3,21 +3,14 @@ package convex.core.data;
 /**
  * Base class for sparse records, implementing CAD3 tags 0xA0-0xAF
  */
-public abstract class ASparseRecord extends ARecord {
+public abstract class ASparseRecord extends ARecord<ACell,ACell> {
 
-	protected final byte tag;
 	protected final long inclusion;
 
 	protected ASparseRecord(byte tag, long mask) {
-		super(Long.bitCount(mask));
-		this.tag=tag;
+		super(tag,Long.bitCount(mask));
 		this.inclusion=mask;
 		if (mask<0) throw new IllegalArgumentException("Negative mask");
-	}
-	
-	@Override
-	public final byte getTag() {
-		return tag;
 	}
 
 	@Override

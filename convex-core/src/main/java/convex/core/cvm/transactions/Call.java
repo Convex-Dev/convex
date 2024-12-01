@@ -5,6 +5,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -12,7 +13,6 @@ import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.prim.CVMLong;
@@ -39,7 +39,7 @@ public class Call extends ATransaction {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
-		super(FORMAT.count(),address,sequence);
+		super(CVMTag.CALL,FORMAT.count(),address,sequence);
 		this.target=target;
 		this.functionName=functionName;
 		this.offer=offer;
@@ -152,11 +152,6 @@ public class Call extends ATransaction {
 	}
 
 	@Override
-	public byte getTag() {
-		return CVMTag.CALL;
-	}
-
-	@Override
 	public ACell get(Keyword key) {
 		if (Keywords.CALL.equals(key)) return args.cons(functionName);
 		if (Keywords.OFFER.equals(key)) return CVMLong.create(offer);
@@ -171,5 +166,6 @@ public class Call extends ATransaction {
 	public RecordFormat getFormat() {
 		return FORMAT;
 	}
+
 
 }

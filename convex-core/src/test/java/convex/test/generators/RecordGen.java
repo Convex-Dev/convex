@@ -14,6 +14,7 @@ import convex.core.lang.TestState;
  * Generator for records, will be CVM Values
  *
  */
+@SuppressWarnings("rawtypes")
 public class RecordGen extends Generator<ARecord> {
 	public RecordGen() {
 		super(ARecord.class);

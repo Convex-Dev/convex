@@ -1,9 +1,9 @@
 package convex.core.data;
 
-import java.util.ListIterator;
-import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.Set;
 
+import convex.core.cvm.RecordFormat;
+import convex.core.data.prim.CVMLong;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.exceptions.BadFormatException;
@@ -49,116 +49,8 @@ public class DenseRecord extends ACAD3Record {
 	}
 
 	@Override
-	public ListIterator<ACell> listIterator() {
-		return data.listIterator();
-	}
-
-	@Override
-	public ListIterator<ACell> listIterator(int index) {
-		return data.listIterator(index);
-	}
-
-	@Override
-	public long longIndexOf(ACell value) {
-		return data.longIndexOf(value);
-	}
-
-	@Override
-	public long longLastIndexOf(ACell value) {
-		return data.longLastIndexOf(value);
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public <R extends ACell> ASequence<R> map(Function<? super ACell, ? extends R> mapper) {
-		AVector<ACell> rdata=data.map(mapper);
-		return (ASequence<R>) rdata;
-	}
-
-	@Override
-	public void forEach(Consumer<? super ACell> action) {
-		data.forEach(action);
-	}
-
-	@Override
-	public void visitElementRefs(Consumer<Ref<ACell>> f) {
-		data.visitElementRefs(f);
-	}
-
-	@Override
-	public ASequence<ACell> concat(ASequence<? extends ACell> vals) {
-		return data.concat(vals);
-	}
-
-	@Override
-	public ASequence<ACell> next() {
-		return data.next();
-	}
-
-	@Override
-	public ASequence<ACell> empty() {
-		return Vectors.empty();
-	}
-
-	@Override
-	public ACell get(long index) {
-		return data.get(index);
-	}
-
-	@Override
-	public Ref<ACell> getElementRef(long index) {
-		return data.getElementRef(index);
-	}
-
-	@Override
-	public ASequence<ACell> assoc(long i, ACell value) {
-		AVector<ACell> newData=data.assoc(i, value);
-		return newData;
-	}
-
-	@Override
-	public ASequence<ACell> conj(ACell value) {
-		return data.conj(value);
-	}
-
-	@Override
-	public ASequence<ACell> slice(long start, long end) {
-		return data.slice(start,end);
-	}
-
-	@Override
-	public AList<ACell> cons(ACell x) {
-		return data.cons(x);
-	}
-
-	@Override
-	public AVector<ACell> subVector(long start, long length) {
-		return data.subVector(start, length);
-	}
-
-	@Override
-	protected ListIterator<ACell> listIterator(long l) {
-		return data.listIterator(l);
-	}
-
-	@Override
-	public ASequence<ACell> reverse() {
-		return data.reverse();
-	}
-
-	@Override
 	public AType getType() {
 		return Types.CAD3;
-	}
-
-	@Override
-	public AVector<ACell> toVector() {
-		return data;
-	}
-
-	@Override
-	protected <R> void copyToArray(R[] arr, int offset) {
-		data.copyToArray(arr, offset);
 	}
 
 	@Override
@@ -178,6 +70,47 @@ public class DenseRecord extends ACAD3Record {
 		DenseRecord dr= new DenseRecord(tag,newData);
 		dr.attachEncoding(getEncoding());
 		return dr;
+	}
+
+	@Override
+	public AVector<ACell> values() {
+		return data;
+	}
+	
+	@Override
+	public ACell get(Keyword key) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public RecordFormat getFormat() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public MapEntry<CVMLong, ACell> entryAt(long i) {
+		if ((i<0)||(i>=count)) return null;
+		return MapEntry.create(CVMLong.create(i), data.get(i));
+	}
+
+	@Override
+	public AVector<CVMLong> getKeys() {
+		// TODO Auto-generated method stub
+		return Vectors.range(0,count);
+	}
+
+	@Override
+	public Set<CVMLong> keySet() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ACell get(ACell key) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 
 

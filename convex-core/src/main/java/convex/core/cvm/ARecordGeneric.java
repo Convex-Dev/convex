@@ -1,5 +1,13 @@
-package convex.core.data;
+package convex.core.cvm;
 
+import convex.core.data.ACell;
+import convex.core.data.AVector;
+import convex.core.data.Format;
+import convex.core.data.Hash;
+import convex.core.data.IRefFunction;
+import convex.core.data.Keyword;
+import convex.core.data.MapEntry;
+import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
 
 /**
@@ -7,14 +15,14 @@ import convex.core.exceptions.InvalidDataException;
  * 
  * Generic records are backed by a Vector of values
  */
-public abstract class ARecordGeneric extends ARecord {
+public abstract class ARecordGeneric extends ACVMRecord {
 
 	protected AVector<ACell> values;
 	
 	protected final RecordFormat format;
 	
-	protected ARecordGeneric(RecordFormat format, AVector<ACell> values) {
-		super(format.count());
+	protected ARecordGeneric(byte tag,RecordFormat format, AVector<ACell> values) {
+		super(tag,format.count());
 		if (values.count()!=format.count()) throw new IllegalArgumentException("Wrong number of field values for record: "+values.count());
 		this.format=format;
 		this.values=values;
@@ -74,7 +82,7 @@ public abstract class ARecordGeneric extends ARecord {
 	}
 
 	@Override
-	public ARecord updateRefs(IRefFunction func) {
+	public ARecordGeneric updateRefs(IRefFunction func) {
 		AVector<ACell> newValues=values.toVector().updateRefs(func); // ensure values are canonical via toVector
 		return withValues(newValues);
 	}
@@ -92,7 +100,7 @@ public abstract class ARecordGeneric extends ARecord {
 	 * @param newValues New values to use
 	 * @return Updated Record
 	 */
-	protected abstract ARecord withValues(AVector<ACell> newValues);
+	protected abstract ARecordGeneric withValues(AVector<ACell> newValues);
 
 	@Override
 	public void validateCell() throws InvalidDataException {

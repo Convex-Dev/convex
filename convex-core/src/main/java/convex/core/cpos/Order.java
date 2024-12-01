@@ -1,18 +1,18 @@
 package convex.core.cpos;
 
+import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
+import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
-import convex.core.data.ARecord;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Tag;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -33,7 +33,7 @@ import convex.core.exceptions.InvalidDataException;
  * An Ordering is immutable.
  * 
  */
-public class Order extends ARecord {
+public class Order extends ACVMRecord {
 	/**
 	 * Ref to Blocks Vector. We use Ref to assist de-duplication, since many Orders
 	 * likely to share same Blocks value
@@ -57,7 +57,7 @@ public class Order extends ARecord {
 	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[CPoSConstants.CONSENSUS_LEVELS];
 
 	private Order(Ref<AVector<SignedData<Block>>> blocks, long[] consensusPoints, long timestamp) {
-		super(FORMAT.count());
+		super(CVMTag.ORDER,FORMAT.count());
 		this.blocks = blocks;
 		this.consensusPoints=consensusPoints;
 		this.timestamp = timestamp;
@@ -102,7 +102,7 @@ public class Order extends ARecord {
 	}
 
 	private byte getRecordTag() {
-		return Tag.ORDER;
+		return CVMTag.ORDER;
 	}
 	
 	@Override
@@ -341,11 +341,6 @@ public class Order extends ARecord {
 		if (i==0) return (Ref<R>) blocks;
 		throw new IndexOutOfBoundsException(i);
 	}
-	
-	@Override
-	public byte getTag() {
-		return Tag.ORDER;
-	}
 
 	@Override
 	public ACell get(Keyword key) {
@@ -390,5 +385,4 @@ public class Order extends ARecord {
 	public boolean equals(ACell o) {
 		return Cells.equalsGeneric(this, o);
 	}
-
 }

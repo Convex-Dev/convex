@@ -1,9 +1,9 @@
 package convex.core.cvm.transactions;
 
+import convex.core.cvm.ACVMRecord;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
-import convex.core.data.ARecord;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.type.AType;
@@ -20,7 +20,7 @@ import convex.core.data.type.Transaction;
  * indicating a code error or system integrity issue.
  *
  */
-public abstract class ATransaction extends ARecord {
+public abstract class ATransaction extends ACVMRecord {
 	
 	/**
 	 * Sequence number for transactions where required sequence is currently unknown
@@ -30,8 +30,8 @@ public abstract class ATransaction extends ARecord {
 	protected final Address origin;
 	protected final long sequence;
 
-	protected ATransaction(long count,Address origin, long sequence) {
-		super(count);
+	protected ATransaction(byte tag,long count,Address origin, long sequence) {
+		super(tag,count);
 		if (origin==null) throw new IllegalArgumentException("Null Origin Address for transaction");
 		this.origin=origin;
 		this.sequence = sequence;
