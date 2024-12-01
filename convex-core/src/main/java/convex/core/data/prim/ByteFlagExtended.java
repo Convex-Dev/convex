@@ -15,7 +15,7 @@ public class ByteFlagExtended extends AByteFlag {
 	private static final ByteFlagExtended[] cache = new ByteFlagExtended[16];
 	
 	static {
-		for (int i=2; i<16;i++) {
+		for (int i=0; i<16;i++) {
 			byte tag=(byte)(Tag.BYTE_FLAG_BASE+i);
 			cache[i] = Cells.intern(new ByteFlagExtended(tag));
 		}
@@ -75,7 +75,7 @@ public class ByteFlagExtended extends AByteFlag {
 	@Override
 	public boolean equals(ACell a) {
 		if (a==null) return false;
-		return tag==a.getTag();
+		return tag==a.getTag(); // equivalent to comparing full encoding
 	}
 
 	@Override

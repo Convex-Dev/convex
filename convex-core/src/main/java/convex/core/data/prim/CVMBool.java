@@ -103,8 +103,9 @@ public final class CVMBool extends AByteFlag {
 	}
 	
 	@Override public boolean equals(ACell a) {
-		// Can compare on identity, since only two canonical instances
-		return this==a;
+		if (a==null) return false;
+		if (this==a) return true;
+		return getTag()==a.getTag(); // equivalent to comparing full encoding
 	}
 
 	public Blob toBlob() {
