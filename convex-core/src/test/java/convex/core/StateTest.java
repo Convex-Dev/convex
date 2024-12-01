@@ -39,8 +39,11 @@ public class StateTest {
 	@Test
 	public void testEmptyState() {
 		State s = State.EMPTY;
+		assertSame(s,s.updateRefs(rf->rf));
+		
 		AVector<AccountStatus> accts = s.getAccounts();
 		assertEquals(0, accts.count());
+
 
 		RecordTest.doRecordTests(s);
 	}

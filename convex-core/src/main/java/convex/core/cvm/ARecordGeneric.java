@@ -46,6 +46,12 @@ public abstract class ARecordGeneric extends ACVMRecord {
 		return values.getRefCount();
 	}
 	
+	@Override
+	public int encode(byte[] bs, int pos) {
+		bs[pos++]=tag;
+		return encodeRaw(bs,pos);
+	}
+	
 	/**
 	 * Writes the raw fields of this record in declared order
 	 * @param bs Array to write to
@@ -83,7 +89,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 
 	@Override
 	public ARecordGeneric updateRefs(IRefFunction func) {
-		AVector<ACell> newValues=values.toVector().updateRefs(func); // ensure values are canonical via toVector
+		AVector<ACell> newValues=values.updateRefs(func); // ensure values are canonical via toVector
 		return withValues(newValues);
 	}
 	

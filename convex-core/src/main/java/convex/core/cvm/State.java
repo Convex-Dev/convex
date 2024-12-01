@@ -24,13 +24,10 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
@@ -59,7 +56,7 @@ import convex.core.util.Utils;
  * "State. You're doing it wrong" - Rich Hickey
  *
  */
-public class State extends ACVMRecord {
+public class State extends ARecordGeneric {
 	public static final Index<ABlob, AVector<ACell>> EMPTY_SCHEDULE = Index.none();
 	public static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
 
@@ -67,6 +64,8 @@ public class State extends ACVMRecord {
 			Keywords.GLOBALS, Keywords.SCHEDULE };
 
 	private static final RecordFormat FORMAT = RecordFormat.of(STATE_KEYS);
+	
+	private static final long FIELD_COUNT=FORMAT.count();
 
 	/**
 	 * Symbols for global values in :globals Vector
@@ -85,7 +84,7 @@ public class State extends ACVMRecord {
 	public static final int GLOBAL_JUICE_PRICE=2;
 	public static final int GLOBAL_MEMORY_MEM=3;
 	public static final int GLOBAL_MEMORY_CVX=4;
-	public static final int GLOBAL_PROTOCOL=5; // TODO: move to actor
+	public static final int GLOBAL_PROTOCOL=5; // TODO: move to actor?
 
 	/**
 	 * An empty State
@@ -94,83 +93,27 @@ public class State extends ACVMRecord {
 
 	private static final Logger log = LoggerFactory.getLogger(State.class.getName());
 
-
-	// Note: we are embedding these directly in the State cell.
-	// TODO: check we aren't at risk of hitting max encoding size limits
-
-	private final AVector<AccountStatus> accounts;
-	private final Index<AccountKey, PeerStatus> peers;
-	private final AVector<ACell> globals;
-	private final Index<ABlob, AVector<ACell>> schedule;
-
 	private State(AVector<AccountStatus> accounts, Index<AccountKey, PeerStatus> peers,
 			AVector<ACell> globals, Index<ABlob, AVector<ACell>> schedule) {
-		super(CVMTag.STATE,FORMAT.count());
-		this.accounts = accounts;
-		this.peers = peers;
-		this.globals = globals;
-		this.schedule = schedule;
+		super(CVMTag.STATE,FORMAT,Vectors.of(accounts,peers,globals,schedule).toVector());
+	}
+	
+	public State(AVector<ACell> values) {
+		super(CVMTag.STATE,FORMAT,values.toVector());
+	}
+
+	static State create(AVector<ACell> values) {
+		if (values.count()!=FIELD_COUNT) return null;
+		return new State(values);
 	}
 
 	@Override
 	public ACell get(Keyword k) {
-		if (Keywords.ACCOUNTS.equals(k)) return accounts;
-		if (Keywords.PEERS.equals(k)) return peers;
-		if (Keywords.GLOBALS.equals(k)) return globals;
-		if (Keywords.SCHEDULE.equals(k)) return schedule;
+		if (Keywords.ACCOUNTS.equals(k)) return getAccounts();
+		if (Keywords.PEERS.equals(k)) return getPeers();
+		if (Keywords.GLOBALS.equals(k)) return getGlobals();
+		if (Keywords.SCHEDULE.equals(k)) return getSchedule();
 		return null;
-	}
-
-	@Override
-	public int getRefCount() {
-		int rc=accounts.getRefCount();
-		rc+=peers.getRefCount();
-		rc+=globals.getRefCount();
-		rc+=schedule.getRefCount();
-		return rc;
-	}
-
-	public <R extends ACell> Ref<R> getRef(int i) {
-		if (i<0) throw new IndexOutOfBoundsException(i);
-
-		{
-			int c=accounts.getRefCount();
-			if (i<c) return accounts.getRef(i);
-			i-=c;
-		}
-
-		{
-			int c=peers.getRefCount();
-			if (i<c) return peers.getRef(i);
-			i-=c;
-		}
-
-		{
-			int c=globals.getRefCount();
-			if (i<c) return globals.getRef(i);
-			i-=c;
-		}
-
-		{
-			int c=schedule.getRefCount();
-			if (i<c) return schedule.getRef(i);
-			i-=c;
-		}
-
-		throw new IndexOutOfBoundsException(i);
-	}
-
-	@Override
-	public State updateRefs(IRefFunction func) {
-		AVector<AccountStatus> newAccounts = accounts.updateRefs(func);
-		Index<AccountKey, PeerStatus> newPeers = peers.updateRefs(func);
-		AVector<ACell> newGlobals = globals.updateRefs(func);
-		Index<ABlob, AVector<ACell>> newSchedule = schedule.updateRefs(func);
-		if ((accounts == newAccounts) && (peers == newPeers) && (globals == newGlobals)
-				&& (schedule == newSchedule)) {
-			return this;
-		}
-		return new State(newAccounts, newPeers, newGlobals, newSchedule);
 	}
 
 	/**
@@ -187,38 +130,13 @@ public class State extends ACVMRecord {
 	}
 
 	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getTag();
-		return encodeRaw(bs,pos);
-	}
-
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = accounts.encode(bs,pos);
-		pos = peers.encode(bs,pos);
-		pos = globals.encode(bs,pos);
-		pos = schedule.encode(bs,pos);
-		return pos;
-	}
-
-	@Override
 	public int getEncodingLength() {
-		int length=1;
-		length+=accounts.getEncodingLength();
-		length+=peers.getEncodingLength();
-		length+=globals.getEncodingLength();
-		length+=schedule.getEncodingLength();
-		return length;
+		return values.getEncodingLength();
 	}
 
 	@Override
 	public int estimatedEncodingSize() {
-		int est=1;
-		est+=accounts.estimatedEncodingSize();
-		est+=peers.estimatedEncodingSize();
-		est+=globals.estimatedEncodingSize();
-		est+=schedule.estimatedEncodingSize();
-		return est;
+		return values.estimatedEncodingSize();
 	}
 
 	/**
@@ -230,24 +148,13 @@ public class State extends ACVMRecord {
 	 * @throws BadFormatException If a State could not be read
 	 */
 	public static State read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		AVector<AccountStatus> accounts = Format.read(b,epos);
-		if (accounts==null) throw new BadFormatException("Null accounts!");
-		epos+=Cells.getEncodingLength(accounts);
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
+		State result=create(values);
+		
+		if (result==null) throw new BadFormatException("Bad format for CVM global state");
 
-		Index<AccountKey, PeerStatus> peers = Format.read(b,epos);
-		if (peers==null) throw new BadFormatException("Null peers!");
-		epos+=Cells.getEncodingLength(peers);
-
-		AVector<ACell> globals = Format.read(b,epos);
-		if (globals==null) throw new BadFormatException("Null globals!");
-		epos+=Cells.getEncodingLength(globals);
-
-		Index<ABlob, AVector<ACell>> schedule = Format.read(b,epos);
-		if (schedule==null) throw new BadFormatException("Null schedule!");
-		epos+=Cells.getEncodingLength(schedule);
-
-		State result=create(accounts, peers, globals, schedule);
+		values.attachEncoding(null);
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
@@ -256,8 +163,9 @@ public class State extends ACVMRecord {
 	 * Get all Accounts in this State
 	 * @return Vector of Accounts
 	 */
+	@SuppressWarnings("unchecked")
 	public AVector<AccountStatus> getAccounts() {
-		return accounts;
+		return (AVector<AccountStatus>) values.get(0);
 	}
 
 	/**
@@ -265,8 +173,9 @@ public class State extends ACVMRecord {
 	 *
 	 * @return A map of addresses to PeerStatus records
 	 */
+	@SuppressWarnings("unchecked")
 	public Index<AccountKey, PeerStatus> getPeers() {
-		return peers;
+		return(Index<AccountKey, PeerStatus>) values.get(1);
 	}
 
 	/**
@@ -330,7 +239,7 @@ public class State extends ACVMRecord {
 	public BlockResult checkBlock(SignedData<Block> signedBlock) {
 		Block block=signedBlock.getValue();
 		AccountKey peerKey=signedBlock.getAccountKey();
-		PeerStatus ps=peers.get(peerKey);
+		PeerStatus ps=getPeers().get(peerKey);
 		
 		// If no current peer for this block, dump it
 		if (ps==null) return BlockResult.createInvalidBlock(this,block,Strings.MISSING_PEER);
@@ -381,7 +290,7 @@ public class State extends ACVMRecord {
 	 */
 	public State applyTimeUpdate(long newTimestamp) {
 		State state = this;
-		AVector<ACell> glbs = state.globals;
+		AVector<ACell> glbs = state.getGlobals();
 		long oldTimestamp=((CVMLong)glbs.get(GLOBAL_TIMESTAMP)).longValue();
 		
 		// Exit if no time elapsed
@@ -411,7 +320,7 @@ public class State extends ACVMRecord {
 	@SuppressWarnings("unchecked")
 	public State applyScheduledTransactions() {
 		long tcount = 0;
-		Index<ABlob, AVector<ACell>> sched = this.schedule;
+		Index<ABlob, AVector<ACell>> sched = this.getSchedule();
 		CVMLong timestamp = this.getTimestamp();
 
 		// ArrayList to accumulate the transactions to apply. Null until we need it
@@ -673,9 +582,9 @@ public class State extends ACVMRecord {
 	 * @return Map of Stakes
 	 */
 	public HashMap<AccountKey, Double> computeStakes() {
-		HashMap<AccountKey, Double> hm = new HashMap<>(peers.size());
+		HashMap<AccountKey, Double> hm = new HashMap<>(getPeers().size());
 		long timeStamp=this.getTimestamp().longValue();
-		Double totalStake = peers.reduceEntries((acc, e) -> {
+		Double totalStake = getPeers().reduceEntries((acc, e) -> {
 			PeerStatus ps=e.getValue();
 			double stake = (double) (ps.getTotalStake());
 			
@@ -696,8 +605,8 @@ public class State extends ACVMRecord {
 	 * @return Updated State
 	 */
 	public State withAccounts(AVector<AccountStatus> newAccounts) {
-		if (newAccounts == accounts) return this;
-		return create(newAccounts, peers,globals, schedule);
+		if (newAccounts == getAccounts()) return this;
+		return create(values.assoc(0, newAccounts));
 	}
 
 	/**
@@ -710,11 +619,12 @@ public class State extends ACVMRecord {
 	 */
 	public State putAccount(Address address, AccountStatus accountStatus) {
 		long ix=address.longValue();
-		long n=accounts.count();
+		long n=getAccounts().count();
 		if (ix>n) {
 			throw new IndexOutOfBoundsException("Trying to add an account beyond accounts array at position: "+ix);
 		}
-
+		
+		AVector<AccountStatus> accounts=getAccounts();
 		AVector<AccountStatus> newAccounts;
 		if (ix==n) {
 			// adding a new account in next position
@@ -734,8 +644,9 @@ public class State extends ACVMRecord {
 	 */
 	public AccountStatus getAccount(Address target) {
 		long ix=target.longValue();
-		if ((ix<0)||(ix>=accounts.count())) return null;
-		return accounts.get(ix);
+		AVector<AccountStatus> accts=getAccounts();
+		if ((ix<0)||(ix>=accts.count())) return null;
+		return accts.get(ix);
 	}
 
 	/**
@@ -756,8 +667,8 @@ public class State extends ACVMRecord {
 	 * @return Updated State
 	 */
 	public State withPeers(Index<AccountKey, PeerStatus> newPeers) {
-		if (peers == newPeers) return this;
-		return create(accounts, newPeers, globals, schedule);
+		if (getPeers() == newPeers) return this;
+		return create(values.assoc(1,newPeers));
 	}
 
 	/**
@@ -768,7 +679,7 @@ public class State extends ACVMRecord {
 	 */
 	public State addActor() {
 		AccountStatus as = AccountStatus.createActor();
-		AVector<AccountStatus> newAccounts = accounts.conj(as);
+		AVector<AccountStatus> newAccounts = getAccounts().conj(as);
 		return withAccounts(newAccounts);
 	}
 
@@ -780,8 +691,8 @@ public class State extends ACVMRecord {
 	 * @return The total value of all funds
 	 */
 	public long computeTotalBalance() {
-		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
-		total += peers.reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
+		long total = getAccounts().reduce((Long acc,AccountStatus as) -> acc + as.getBalance(), (Long)0L);
+		total += getPeers().reduceValues((Long acc, PeerStatus ps) -> acc + ps.getBalance(), 0L);
 		total += getGlobalFees().longValue();
 		total += getGlobalMemoryValue().longValue();
 		return total;
@@ -795,7 +706,7 @@ public class State extends ACVMRecord {
 	public long computeSupply() {
 		long supply=Constants.MAX_SUPPLY;
 		for (int i=0; i<Init.NUM_GOVERNANCE_ACCOUNTS; i++) {
-			supply-=accounts.get(i).getBalance();
+			supply-=getAccounts().get(i).getBalance();
 		}
 		return supply;
 	}
@@ -806,7 +717,7 @@ public class State extends ACVMRecord {
 	 * @return The total amount of CVM memory available
 	 */
 	public long computeTotalMemory() {
-		long total = accounts.reduce((Long acc,AccountStatus as) -> acc + as.getMemory(), (Long)0L);
+		long total = getAccounts().reduce((Long acc,AccountStatus as) -> acc + as.getMemory(), (Long)0L);
 		total+=getGlobalMemoryPool().longValue();
 		return total;
 	}
@@ -818,10 +729,7 @@ public class State extends ACVMRecord {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		accounts.validateCell();
-		peers.validateCell();
-		globals.validateCell();
-		schedule.validateCell();
+		// nothing to do?
 	}
 
 	/**
@@ -830,7 +738,7 @@ public class State extends ACVMRecord {
 	 * @return The timestamp from this state.
 	 */
 	public CVMLong getTimestamp() {
-		return (CVMLong) globals.get(GLOBAL_TIMESTAMP);
+		return (CVMLong) getGlobals().get(GLOBAL_TIMESTAMP);
 	}
 
 	/**
@@ -839,7 +747,7 @@ public class State extends ACVMRecord {
 	 * @return Juice Price
 	 */
 	public CVMLong getJuicePrice() {
-		return (CVMLong) globals.get(GLOBAL_JUICE_PRICE);
+		return (CVMLong) getGlobals().get(GLOBAL_JUICE_PRICE);
 	}
 
 	/**
@@ -855,13 +763,13 @@ public class State extends ACVMRecord {
 		AVector<ACell> v = Vectors.of(address, op);
 
 		LongBlob key = LongBlob.create(time);
-		AVector<ACell> list = schedule.get(key);
+		AVector<ACell> list = getSchedule().get(key);
 		if (list == null) {
 			list = Vectors.of(v);
 		} else {
 			list = list.append(v);
 		}
-		Index<ABlob, AVector<ACell>> newSchedule = schedule.assoc(key, list);
+		Index<ABlob, AVector<ACell>> newSchedule = getSchedule().assoc(key, list);
 
 		return this.withSchedule(newSchedule);
 	}
@@ -871,8 +779,9 @@ public class State extends ACVMRecord {
 	 *
 	 * @return The schedule data structure.
 	 */
+	@SuppressWarnings("unchecked")
 	public Index<ABlob, AVector<ACell>> getSchedule() {
-		return schedule;
+		return (Index<ABlob, AVector<ACell>>) values.get(3);
 	}
 
 	/**
@@ -880,7 +789,7 @@ public class State extends ACVMRecord {
 	 * @return Global Fees
 	 */
 	public CVMLong getGlobalFees() {
-		return (CVMLong) globals.get(GLOBAL_FEES);
+		return (CVMLong) getGlobals().get(GLOBAL_FEES);
 	}
 
 	/**
@@ -889,7 +798,7 @@ public class State extends ACVMRecord {
 	 * @return Updated State
 	 */
 	public State withGlobalFees(CVMLong newFees) {
-		return withGlobals(globals.assoc(GLOBAL_FEES,newFees));
+		return withGlobals(getGlobals().assoc(GLOBAL_FEES,newFees));
 	}
 
 
@@ -912,7 +821,7 @@ public class State extends ACVMRecord {
 	 * @return Updated state
 	 */
 	public State withPeer(AccountKey peerKey, PeerStatus updatedPeer) {
-		return withPeers(peers.assoc(peerKey, updatedPeer));
+		return withPeers(getPeers().assoc(peerKey, updatedPeer));
 	}
 
 	/**
@@ -922,7 +831,7 @@ public class State extends ACVMRecord {
 	 * @return Next address available
 	 */
 	public Address nextAddress() {
-		return Address.create(accounts.count());
+		return Address.create(getAccounts().count());
 	}
 
 	/**
@@ -940,8 +849,9 @@ public class State extends ACVMRecord {
 	 *
 	 * @return Vector of global values
 	 */
+	@SuppressWarnings("unchecked")
 	public AVector<ACell> getGlobals() {
-		return globals;
+		return (AVector<ACell>) values.get(2);		
 	}
 
 	/**
@@ -950,14 +860,17 @@ public class State extends ACVMRecord {
 	 * @return Updated State
 	 */
 	public State withTimestamp(long timestamp) {
-		return withGlobals(globals.assoc(GLOBAL_TIMESTAMP, CVMLong.create(timestamp)));
+		return withGlobals(getGlobals().assoc(GLOBAL_TIMESTAMP, CVMLong.create(timestamp)));
 	}
 	
 	@Override 
 	public boolean equals(ACell a) {
-		if (!(a instanceof State)) return false;
-		State as=(State)a;
-		return equals(as);
+		if (a instanceof State) {
+			State as=(State)a;
+			return equals(as);
+		} else {
+			return Cells.equalsGeneric(this, a);
+		}
 	}
 	
 	/**
@@ -968,17 +881,14 @@ public class State extends ACVMRecord {
 	public boolean equals(State a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
 		if (a == null) return false;
+		
+		// fast check on cached hash
 		Hash h=this.cachedHash();
 		if (h!=null) {
 			Hash ha=a.cachedHash();
 			if (ha!=null) return Cells.equals(h, ha);
 		}
-		
-		if (!(Cells.equals(accounts, a.accounts))) return false;
-		if (!(Cells.equals(globals, a.globals))) return false;
-		if (!(Cells.equals(peers, a.peers))) return false;
-		if (!(Cells.equals(schedule, a.schedule))) return false;
-		return true;
+		return values.equals(a.values);
 	}
 
 	@Override
@@ -991,7 +901,7 @@ public class State extends ACVMRecord {
 	 * @return Memory pool Convex Coin amount (coppers)
 	 */
 	public CVMLong getGlobalMemoryValue() {
-		return (CVMLong)(globals.get(GLOBAL_MEMORY_CVX));
+		return (CVMLong)(getGlobals().get(GLOBAL_MEMORY_CVX));
 	}
 
 	/**
@@ -999,7 +909,7 @@ public class State extends ACVMRecord {
 	 * @return Memory in pool, in bytes
 	 */
 	public CVMLong getGlobalMemoryPool() {
-		return (CVMLong)(globals.get(GLOBAL_MEMORY_MEM));
+		return (CVMLong)(getGlobals().get(GLOBAL_MEMORY_MEM));
 	}
 	
 	public double getMemoryPrice() {
@@ -1010,17 +920,17 @@ public class State extends ACVMRecord {
 	}
 	
 	private State withSchedule(Index<ABlob, AVector<ACell>> newSchedule) {
-		if (schedule == newSchedule) return this;
-		return new State(accounts, peers, globals, newSchedule);
+		if (getSchedule() == newSchedule) return this;
+		return new State(values.assoc(3, newSchedule));
 	}
 
 	private State withGlobals(AVector<ACell> newGlobals) {
-		if (newGlobals == globals) return this;
-		return new State(accounts, peers, newGlobals, schedule);
+		if (newGlobals == getGlobals()) return this;
+		return new State(values.assoc(2, newGlobals));
 	}
 
 	public State updateMemoryPool(long cvx, long mem) {
-		AVector<ACell> r=globals;
+		AVector<ACell> r=getGlobals();
 		r=r.assoc(GLOBAL_MEMORY_CVX, CVMLong.create(cvx));
 		r=r.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(mem));
 		return withGlobals(r);
@@ -1028,7 +938,7 @@ public class State extends ACVMRecord {
 
 	public boolean hasAccount(Address address) {
 		long av=address.longValue();
-		return (av>=0) &&(av<accounts.count());
+		return (av>=0) &&(av<getAccounts().count());
 	}
 
 	public static AVector<State> statesAsOfRange(AVector<State> states, CVMLong timestamp, long interval, int count) {
@@ -1046,6 +956,14 @@ public class State extends ACVMRecord {
 	public static State stateAsOf(AVector<State> states, CVMLong timestamp) {
 		return Utils.binarySearchLeftmost(states, State::getTimestamp, Comparator.comparingLong(CVMLong::longValue), timestamp);
 	}
+
+	@Override
+	protected State withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return create(newValues);
+	}
+
+
 
 
 

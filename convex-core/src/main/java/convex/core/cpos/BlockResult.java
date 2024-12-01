@@ -123,7 +123,7 @@ public class BlockResult extends ACVMRecord {
 
 	@Override
 	public BlockResult updateRefs(IRefFunction func) {
-		State newState=state.updateRefs(func);
+		State newState=(State)state.updateRefs(func);
 		AVector<Result> newResults=results.updateRefs(func);
 		return create(newState,newResults);
 	}
