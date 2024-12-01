@@ -39,6 +39,13 @@ public class CAD3Test extends ACVMTest {
 		assertSame(Core.VECTOR,Reader.read("#["+Utils.toHexString(CVMTag.CORE_DEF)+"01]"));
 	}
 	
+	@Test public void testAddressExtension() {
+		Address a=Address.create(127);
+		ExtensionValue e=ExtensionValue.create((byte) CVMTag.ADDRESS, 127);
+		assertEquals(a,e);
+		assertEquals(e,a);
+	}
+	
 	@Test public void testReadEncodings() {
 		assertSame(Address.ZERO,Reader.read("#[EA00]"));
 		assertSame(CVMLong.ZERO,Reader.read("#[10]"));
