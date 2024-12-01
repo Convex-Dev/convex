@@ -122,7 +122,7 @@ public final class CVMLong extends AInteger {
 	}
 	
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		int numBytes=Format.getLongLength(value);
 		return encodeRaw(bs,pos,numBytes);
 	}

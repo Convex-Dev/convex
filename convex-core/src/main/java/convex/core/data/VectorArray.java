@@ -193,8 +193,8 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		return toVector().encodeAfterOpcode(bs, pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		return toVector().encodeRaw(bs, pos);
 	}
 
 	@Override

@@ -107,8 +107,8 @@ public final class StringShort extends AString {
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		return data.encodeAfterOpcode(bs, pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		return data.encodeRaw(bs, pos);
 	}
 
 	@Override

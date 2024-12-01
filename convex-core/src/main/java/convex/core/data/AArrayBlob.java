@@ -130,7 +130,7 @@ public abstract class AArrayBlob extends ABlob {
 	 * Encodes this Blob, excluding tag byte (will include count)
 	 */
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.writeVLQCount(bs, pos, count);
 		return getBytes(bs,pos);
 	}

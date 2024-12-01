@@ -102,11 +102,11 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.FN_MULTI;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = fns.encode(bs,pos);
 		return pos;
 	}

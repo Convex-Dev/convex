@@ -477,12 +477,12 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.MAP;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		int ilength = children.length;
 		pos = Format.writeVLQCount(bs,pos, count); 
 		

@@ -41,12 +41,12 @@ public class Transfer extends ATransaction {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.TRANSFER;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		pos = super.encodeAfterOpcode(bs,pos); // origin, sequence
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = super.encodeRaw(bs,pos); // origin, sequence
 		pos = Format.writeVLQCount(bs, pos, target.longValue());
 		pos = Format.writeVLQCount(bs, pos, amount);
 		return pos;

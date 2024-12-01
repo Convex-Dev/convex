@@ -398,11 +398,11 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.SET;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLQCount(bs,pos, count);
 		
 		bs[pos++] = (byte) shift;

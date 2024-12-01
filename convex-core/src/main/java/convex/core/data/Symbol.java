@@ -124,11 +124,11 @@ public final class Symbol extends ASymbolic {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.SYMBOL;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=(byte)(name.count());
 		return name.writeRawData(bs, pos);
 	}

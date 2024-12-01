@@ -108,11 +108,11 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.FN;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = params.encode(bs,pos);
 		pos = body.encode(bs,pos);
 		pos = lexicalEnv.encode(bs,pos);

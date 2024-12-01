@@ -190,11 +190,11 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	public int encode(byte[] bs, int pos) {
 		byte tag=Tag.SIGNED_DATA;
 		bs[pos++]=tag;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = pubKey.getBytes(bs,pos);
 		pos = signature.getBytes(bs, pos);
 		pos = valueRef.encode(bs,pos);

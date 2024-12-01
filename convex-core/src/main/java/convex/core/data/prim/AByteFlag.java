@@ -44,7 +44,7 @@ public abstract class AByteFlag extends APrimitive {
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		// no raw data to encode, everything is in tag
 		return pos;
 	}

@@ -49,7 +49,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	/**
@@ -57,8 +57,8 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	 * @param bs Array to write to
 	 */
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		return values.encodeAfterOpcode(bs, pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		return values.encodeRaw(bs, pos);
 	}
 	
 	@Override 

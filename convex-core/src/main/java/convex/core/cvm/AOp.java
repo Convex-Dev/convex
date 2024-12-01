@@ -65,6 +65,7 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 		return encodeRaw(bs,pos);
 	}
 	
+	@Override	
 	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=opCode();
 		return encodeAfterOpcode(bs,pos);
@@ -78,7 +79,7 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	 * @param pos Position to write in byte array
 	 * @return The updated position
 	 */
-	@Override
+
 	public abstract int encodeAfterOpcode(byte[] bs, int pos);
 	
 	@Override

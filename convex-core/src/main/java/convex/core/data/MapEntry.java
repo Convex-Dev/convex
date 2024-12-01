@@ -224,7 +224,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	/**
@@ -235,7 +235,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	 * @return Updated position after writing
 	 */
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLQCount(bs,pos, 2); // Size of 2, to match VectorLeaf encoding
 		return encodeRefs(bs,pos);
 	}

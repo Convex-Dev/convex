@@ -215,13 +215,13 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.STRING;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	/**
 	 * Encode the data of this String. Assumes tag already written
 	 */
-	public abstract int encodeAfterOpcode(byte [] bs, int pos);
+	public abstract int encodeRaw(byte [] bs, int pos);
 	
 	/**
 	 * Write the raw UTF-8 data of this String to a byte array.

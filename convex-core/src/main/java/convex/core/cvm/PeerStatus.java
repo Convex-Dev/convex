@@ -176,11 +176,11 @@ public class PeerStatus extends ACVMRecord {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.PEER_STATUS;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, controller);
 		pos = Format.writeVLQLong(bs,pos, peerStake);
 		if (stakes.isEmpty()) {

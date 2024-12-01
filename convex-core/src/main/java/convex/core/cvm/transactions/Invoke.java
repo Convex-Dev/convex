@@ -61,12 +61,12 @@ public class Invoke extends ATransaction {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++] = CVMTag.INVOKE;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		pos = super.encodeAfterOpcode(bs,pos); // origin, sequence
+	public int encodeRaw(byte[] bs, int pos) {
+		pos = super.encodeRaw(bs,pos); // origin, sequence
 		pos = Format.write(bs,pos, command);
 		return pos;
 	}

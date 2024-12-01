@@ -137,7 +137,7 @@ public class KeySet<K extends ACell, V extends ACell> extends ADerivedSet<K,K,V>
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		throw new UnsupportedOperationException();
 	}
 

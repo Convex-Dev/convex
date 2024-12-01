@@ -95,11 +95,11 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.CORE_DEF;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = Format.writeVLQCount(bs, pos, code);
 		return pos;
 	}

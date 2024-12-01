@@ -286,7 +286,7 @@ public final class Result extends ARecordGeneric {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.RESULT;
-		pos=values.encodeAfterOpcode(bs,pos);
+		pos=values.encodeRaw(bs,pos);
 		return pos;
 	}
 	

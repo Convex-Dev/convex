@@ -70,7 +70,7 @@ public final class LongBlob extends ALongBlob {
 	}
 	
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=((byte) 8);
 		Utils.writeLong(bs, pos, value);
 		return pos+8;

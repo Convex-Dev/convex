@@ -93,9 +93,9 @@ public abstract class ADerivedBlob extends ABlob {
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		ABlob can=getCanonical();
-		return can.encodeAfterOpcode(bs,pos);
+		return can.encodeRaw(bs,pos);
 	}
 
 	@Override

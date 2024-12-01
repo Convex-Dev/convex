@@ -41,8 +41,8 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		return getCanonical().encodeAfterOpcode(bs, pos);
+	public int encodeRaw(byte[] bs, int pos) {
+		return getCanonical().encodeRaw(bs, pos);
 	}
 
 	@Override

@@ -16,11 +16,11 @@ public abstract class ASparseRecord extends ARecord<ACell,ACell> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		long n=count();
 		pos=Format.writeVLQCount(bs, pos, n);
 		for (int i=0; i<n; i++) {

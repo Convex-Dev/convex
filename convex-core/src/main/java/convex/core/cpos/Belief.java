@@ -148,7 +148,7 @@ public class Belief extends ACVMRecord {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getTag();
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	@Override
@@ -173,7 +173,7 @@ public class Belief extends ACVMRecord {
 	 * @param bs Array to write to
 	 */
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.write(bs,pos, orders);
 		return pos;
 	}

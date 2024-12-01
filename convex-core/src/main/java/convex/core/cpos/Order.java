@@ -108,11 +108,11 @@ public class Order extends ACVMRecord {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getRecordTag();
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		pos = blocks.encode(bs,pos);
 		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
 			pos = Format.writeVLQLong(bs,pos, consensusPoints[level]);

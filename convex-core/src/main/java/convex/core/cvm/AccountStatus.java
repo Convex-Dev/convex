@@ -132,7 +132,7 @@ public class AccountStatus extends ACVMRecord {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.ACCOUNT_STATUS;
-		return encodeAfterOpcode(bs,pos);
+		return encodeRaw(bs,pos);
 	}
 	
 	private int getInclusion() {
@@ -151,7 +151,7 @@ public class AccountStatus extends ACVMRecord {
 	}
 
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public int encodeRaw(byte[] bs, int pos) {
 		int included=getInclusion();
 		pos=Format.writeVLQCount(bs, pos, included);
 		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLQCount(bs, pos,sequence);
