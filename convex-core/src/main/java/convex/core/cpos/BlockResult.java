@@ -2,6 +2,7 @@ package convex.core.cpos;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
@@ -13,7 +14,6 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.Tag;

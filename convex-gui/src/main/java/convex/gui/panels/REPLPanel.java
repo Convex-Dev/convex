@@ -41,7 +41,7 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.data.Symbols;
+import convex.core.cvm.Symbols;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;

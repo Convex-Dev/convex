@@ -4,10 +4,10 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.cvm.Symbols;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
 import convex.core.data.Symbol;
-import convex.core.data.Symbols;
 
 /**
  * Generator for Symbol objects

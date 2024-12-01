@@ -16,7 +16,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.BIP39;
 import convex.core.crypto.PFXTools;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
+import convex.core.cvm.Keywords;
 import convex.core.util.Utils;
 import convex.peer.API;
 import convex.peer.ConfigException;

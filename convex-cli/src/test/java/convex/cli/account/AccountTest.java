@@ -15,7 +15,7 @@ import convex.cli.ExitCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
+import convex.core.cvm.Keywords;
 import convex.peer.API;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;

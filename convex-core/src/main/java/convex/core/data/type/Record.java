@@ -1,8 +1,8 @@
 package convex.core.data.type;
 
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
-import convex.core.data.Keywords;
 import convex.core.data.RecordFormat;
 
 /**

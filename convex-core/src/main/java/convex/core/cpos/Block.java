@@ -3,6 +3,7 @@ package convex.core.cpos;
 import java.util.Comparator;
 import java.util.List;
 
+import convex.core.cvm.Keywords;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
@@ -14,7 +15,6 @@ import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.RecordFormat;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;

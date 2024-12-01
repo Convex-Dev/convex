@@ -8,12 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.RecordTest;
 import convex.core.data.Vectors;

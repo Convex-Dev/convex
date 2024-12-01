@@ -20,6 +20,7 @@ import convex.core.ErrorCodes;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.cvm.Log;
+import convex.core.cvm.Symbols;
 import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -27,7 +28,6 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
-import convex.core.data.Symbols;
 import convex.core.data.Vectors;
 import convex.core.init.BaseTest;
 

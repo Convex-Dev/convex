@@ -12,10 +12,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.etch.EtchStore;
 
 public class ConfigTest {

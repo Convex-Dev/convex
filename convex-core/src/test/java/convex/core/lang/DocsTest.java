@@ -7,10 +7,10 @@ import java.util.Map.Entry;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Context;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
-import convex.core.data.Keywords;
 import convex.core.data.Symbol;
 
 public class DocsTest extends ACVMTest {

@@ -11,6 +11,7 @@ import java.util.HashSet;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.cvm.Symbols;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.text.Text;

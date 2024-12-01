@@ -9,9 +9,9 @@ import java.util.Map;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
+import convex.core.cvm.Keywords;
 import convex.core.data.AString;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.store.AStore;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;

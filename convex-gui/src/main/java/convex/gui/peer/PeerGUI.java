@@ -30,7 +30,7 @@ import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.data.AccountKey;
 import convex.core.cvm.Address;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
+import convex.core.cvm.Keywords;
 import convex.core.init.Init;
 import convex.core.store.AStore;
 import convex.core.store.Stores;

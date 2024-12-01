@@ -1,8 +1,8 @@
 package convex.core.data.type;
 
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 
 /**
  * Type that represents CVM Byte values

@@ -14,7 +14,7 @@ import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.cvm.Address;
-import convex.core.data.Keywords;
+import convex.core.cvm.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
@@ -22,7 +22,7 @@ import convex.core.init.Init;
 import convex.core.cvm.Context;
 import convex.core.lang.Core;
 import convex.core.lang.Reader;
-import convex.core.data.Symbols;
+import convex.core.cvm.Symbols;
 
 
 /**

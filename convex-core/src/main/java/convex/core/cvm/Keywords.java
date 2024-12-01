@@ -1,4 +1,6 @@
-package convex.core.data;
+package convex.core.cvm;
+
+import convex.core.data.Keyword;
 
 /**
  * Static intenral Keyword values for configuration maps, records etc.

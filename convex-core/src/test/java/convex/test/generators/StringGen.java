@@ -4,9 +4,9 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.cvm.Symbols;
 import convex.core.data.AString;
 import convex.core.data.Strings;
-import convex.core.data.Symbols;
 import convex.test.Samples;
 
 /**

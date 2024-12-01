@@ -22,7 +22,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;

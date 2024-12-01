@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.PeerStatus;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;

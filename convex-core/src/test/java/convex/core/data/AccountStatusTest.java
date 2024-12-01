@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
+import convex.core.cvm.Symbols;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;

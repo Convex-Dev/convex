@@ -6,6 +6,7 @@ import java.util.HashMap;
 
 import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.ARecord;
 import convex.core.data.AccountKey;
@@ -16,7 +17,6 @@ import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.MapEntry;
 import convex.core.data.RecordFormat;
 import convex.core.data.Ref;

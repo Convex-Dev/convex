@@ -4,6 +4,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.crypto.Providers;
+import convex.core.cvm.Keywords;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.BadSignatureException;

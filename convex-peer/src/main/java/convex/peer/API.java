@@ -10,12 +10,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
 import convex.core.data.Lists;
 import convex.core.init.Init;
 import convex.core.lang.RT;

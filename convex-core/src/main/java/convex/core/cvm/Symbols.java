@@ -1,4 +1,8 @@
-package convex.core.data;
+package convex.core.cvm;
+
+import convex.core.data.AString;
+import convex.core.data.Strings;
+import convex.core.data.Symbol;
 
 /**
  * Static class for Symbol constants.

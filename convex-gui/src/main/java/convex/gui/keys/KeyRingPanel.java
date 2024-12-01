@@ -31,7 +31,7 @@ import convex.core.data.AccountKey;
 import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.lang.RT;
-import convex.core.data.Symbols;
+import convex.core.cvm.Symbols;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;

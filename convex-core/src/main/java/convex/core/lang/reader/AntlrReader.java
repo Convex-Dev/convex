@@ -17,6 +17,7 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMEncoder;
+import convex.core.cvm.Symbols;
 import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
@@ -30,7 +31,6 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
-import convex.core.data.Symbols;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;

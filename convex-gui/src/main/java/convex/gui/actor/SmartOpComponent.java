@@ -26,7 +26,7 @@ import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.data.Symbols;
+import convex.core.cvm.Symbols;
 import convex.core.lang.impl.Fn;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;

@@ -8,6 +8,7 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Symbols;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;

@@ -16,7 +16,7 @@ import convex.core.data.AccountKey;
 import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.data.Keyword;
-import convex.core.data.Keywords;
+import convex.core.cvm.Keywords;
 import convex.core.init.Init;
 import convex.etch.EtchStore;
 import convex.peer.API;
