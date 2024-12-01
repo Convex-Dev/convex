@@ -631,6 +631,11 @@ public class Server implements Closeable {
 			AMap<ACell,ACell> newRootData = currentRootData.assoc(rootKey, peerData);
 
 			newRootData=store.setRootData(newRootData).getValue();
+			
+			// ensure specific values are persisted, might be needed for lookup
+			store.storeTopRef(peer.getGenesisState().getRef(), Ref.PERSISTED, null);
+			store.storeTopRef(peer.getBelief().getRef(), Ref.PERSISTED, null);
+			
 			peerData=(AMap<Keyword, ACell>) newRootData.get(rootKey);
 			log.debug( "Stored peer data with hash: {}", peerData.getHash().toHexString());
 			return Peer.fromData(getKeyPair(), peerData);
