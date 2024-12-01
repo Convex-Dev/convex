@@ -84,7 +84,7 @@ public class OpsTest extends ACVMTest {
 			assertNull(c2.getResult());
 			doOpTest(op);
 			
-			assertEquals(Blob.wrap(new byte[] {Tag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
+			assertEquals(Blob.wrap(new byte[] {CVMTag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
 		}
 		
 		{// nested constant
@@ -95,7 +95,7 @@ public class OpsTest extends ACVMTest {
 			assertEquals(Constant.nil(),c2.getResult());
 			doOpTest(op);
 			
-			assertEquals(Blob.wrap(new byte[] {Tag.OP,Ops.CONSTANT,Tag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
+			assertEquals(Blob.wrap(new byte[] {CVMTag.OP,Ops.CONSTANT,CVMTag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
 		}
 	}
 

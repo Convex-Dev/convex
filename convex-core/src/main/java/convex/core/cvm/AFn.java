@@ -3,7 +3,6 @@ package convex.core.cvm;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.IRefFunction;
-import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
@@ -50,7 +49,7 @@ public abstract class AFn<T extends ACell> extends ACVMCode implements IFn<T> {
 	
 	@Override
 	public byte getTag() {
-		return Tag.FN;
+		return CVMTag.FN;
 	}
 	
 	

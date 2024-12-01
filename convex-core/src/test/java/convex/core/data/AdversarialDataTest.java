@@ -163,7 +163,7 @@ public class AdversarialDataTest {
 	}
 	
 	@Test public void testBadConstant() {
-		invalidEncoding(Tag.OP+Ops.CONSTANT,"");
+		invalidEncoding(CVMTag.OP+Ops.CONSTANT,"");
 	}
 	
 	@Test public void testBadSymbols() {

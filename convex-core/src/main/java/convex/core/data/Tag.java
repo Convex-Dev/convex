@@ -65,8 +65,6 @@ public class Tag {
 	// Sparsely coded record (0xAx)
 	public static final byte SPARSE_RECORD_BASE = (byte) 0xA0;
 	
-	
-
 	//=========================
 	// Byte Flags (0xBx)
 
@@ -78,11 +76,6 @@ public class Tag {
 	
 	public static final byte CODE_BASE = (byte) 0xC0;
 
-	// CVM Code
-	public static final byte OP = (byte) 0xC0;
-	public static final byte FN = (byte) 0xCF;
-	public static final byte FN_MULTI = (byte) 0xCB;
-	
 	// ==========================================
 	// Densely coded record (0xDx)
 	public static final byte DENSE_RECORD_BASE = (byte) 0xD0;

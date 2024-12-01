@@ -502,15 +502,15 @@ public class Format {
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
 		
 		
-		if (tag == Tag.OP) return Ops.read(b, pos);
+		if (tag == CVMTag.OP) return Ops.read(b, pos);
 		
 		
-		if (tag == Tag.FN_MULTI) {
+		if (tag == CVMTag.FN_MULTI) {
 			AFn<?> fn = MultiFn.read(b,pos);
 			return fn;
 		}
 
-		if (tag == Tag.FN) {
+		if (tag == CVMTag.FN) {
 			AFn<?> fn = Fn.read(b,pos);
 			return fn;
 		}

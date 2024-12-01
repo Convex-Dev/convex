@@ -12,7 +12,6 @@ public class CVMTag {
 	 */
 	public static final byte ADDRESS = (byte) 0xEA;
 	
-
 	public static final byte SYNTAX = (byte) 0x88;
 
 	// ==========================================
@@ -73,6 +72,15 @@ public class CVMTag {
 	 *  CVM Core definitions
 	 */
 	public static final byte CORE_DEF = (byte) 0xED;
+
+
+	// CVM Code
+	public static final byte OP = (byte) 0xC0;
+
+
+	public static final byte FN = (byte) 0xCF;
+
+	public static final byte FN_MULTI = (byte) 0xCB;
 
 
 

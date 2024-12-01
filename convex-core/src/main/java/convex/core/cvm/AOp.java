@@ -4,7 +4,6 @@ import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
-import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 
@@ -87,7 +86,7 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	
 	@Override
 	public byte getTag() {
-		return Tag.OP;
+		return CVMTag.OP;
 	}
 	
 	@Override
