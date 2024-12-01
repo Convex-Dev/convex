@@ -242,12 +242,12 @@ public class List<T extends ACell> extends AList<T> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.LIST;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = data.encodeRaw(bs,pos);
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		pos = data.encodeAfterOpcode(bs,pos);
 		return pos;
 	}
 	

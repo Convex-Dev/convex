@@ -62,7 +62,7 @@ public class Local<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos=Format.writeVLQLong(bs, pos, position);
 		return pos;
 	}

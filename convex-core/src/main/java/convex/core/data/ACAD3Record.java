@@ -41,7 +41,7 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 	
 	// subclasses must implement getRefCount and getRef

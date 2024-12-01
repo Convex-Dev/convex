@@ -311,7 +311,7 @@ public class BlobTree extends ABlob {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos = Format.writeVLQCount(bs,pos, count);
 		int n = children.length;
 		for (int i = 0; i < n; i++) {

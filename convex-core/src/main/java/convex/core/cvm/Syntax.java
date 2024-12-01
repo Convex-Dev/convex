@@ -199,11 +199,11 @@ public final class Syntax extends ACell {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.SYNTAX;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos=datumRef.encode(bs,pos);
 		// encode empty props as null for efficiency
 		if (meta.isEmpty()) {

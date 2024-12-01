@@ -135,7 +135,7 @@ public class Def<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, symbol);
 		pos = opRef.encode(bs,pos);
 		return pos;

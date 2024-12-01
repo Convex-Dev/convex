@@ -217,12 +217,12 @@ public class Blob extends AArrayBlob {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		if (count > CHUNK_LENGTH) {
 			// We aren't canonical, so need to encode canonical representation
-			return getCanonical().encodeRaw(bs, pos);
+			return getCanonical().encodeAfterOpcode(bs, pos);
 		} else {
-			pos=super.encodeRaw(bs,pos);
+			pos=super.encodeAfterOpcode(bs,pos);
 			return pos;
 		}
 	}

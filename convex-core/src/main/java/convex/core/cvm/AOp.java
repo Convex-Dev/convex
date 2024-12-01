@@ -62,8 +62,12 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	@Override
 	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=getTag();
-		bs[pos++]=opCode();
 		return encodeRaw(bs,pos);
+	}
+	
+	public int encodeRaw(byte[] bs, int pos) {
+		bs[pos++]=opCode();
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	/**
@@ -75,7 +79,7 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	 * @return The updated position
 	 */
 	@Override
-	public abstract int encodeRaw(byte[] bs, int pos);
+	public abstract int encodeAfterOpcode(byte[] bs, int pos);
 	
 	@Override
 	public abstract AOp<T> updateRefs(IRefFunction func);

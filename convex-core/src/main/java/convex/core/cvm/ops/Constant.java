@@ -98,7 +98,7 @@ public class Constant<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos = valueRef.encode(bs,pos);
 		return pos;
 	}

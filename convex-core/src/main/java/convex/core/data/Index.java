@@ -506,11 +506,11 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.INDEX;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos = Format.writeVLQCount(bs,pos, count);
 		if (count == 0) return pos; // nothing more to know... this must be the empty singleton
 

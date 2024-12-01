@@ -166,7 +166,8 @@ public class OpsTest extends ACVMTest {
 		Context c = context();
 
 		AOp<Address> op = Special.forSymbol(Symbols.STAR_ADDRESS);
-		assertEquals(op,Special.forSymbol(Symbol.create("*address*"))); // double check lookup in hash map
+		AOp<Address> op2 = Special.forSymbol(Symbol.create("*address*"));
+		assertEquals(op,op2); // double check lookup in hash map
 
 		Context c2 = c.execute(op);
 		assertEquals(c2.getAddress(), c2.getResult());

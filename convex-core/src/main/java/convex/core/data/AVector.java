@@ -284,7 +284,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	}
 	
 	@Override
-	public abstract int encodeRaw(byte[] bs, int pos);
+	public abstract int encodeAfterOpcode(byte[] bs, int pos);
 
 	/**
 	 * Gets an element Ref from this vector, assuming bounds already checked

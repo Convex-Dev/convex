@@ -84,12 +84,12 @@ public class Multi extends ATransaction {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++] = CVMTag.MULTI;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 	
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // origin, sequence
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		pos = super.encodeAfterOpcode(bs,pos); // origin, sequence
 		pos = Format.writeVLQCount(bs,pos, mode);
 		pos = txs.encode(bs, pos);
 		return pos;

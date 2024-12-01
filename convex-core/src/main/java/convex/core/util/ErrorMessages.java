@@ -20,6 +20,7 @@ public class ErrorMessages {
 
 
 	public static final String TODO = "Not yet implemented.";
+	public static final String UNREACHABLE = "Should be unreachable";
 
 	public static String immutable(Object a) {
 		return "Object is immutable: "+a.getClass();

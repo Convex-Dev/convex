@@ -44,7 +44,7 @@ public abstract class ATransaction extends ACVMRecord {
 	public abstract int encode(byte[] bs, int pos);
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos = Format.writeVLQCount(bs,pos, origin.longValue());
 		pos = Format.writeVLQCount(bs,pos, sequence);
 		return pos;

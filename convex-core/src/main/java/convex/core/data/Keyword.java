@@ -130,11 +130,11 @@ public final class Keyword extends ASymbolic {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.KEYWORD;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		bs[pos++]=(byte)(name.count());
 		return name.writeRawData(bs, pos);
 	}

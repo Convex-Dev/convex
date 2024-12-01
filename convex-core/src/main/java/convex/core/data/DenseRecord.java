@@ -31,8 +31,8 @@ public class DenseRecord extends ACAD3Record {
 	}
 	
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		return data.encodeRaw(bs, pos);
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		return data.encodeAfterOpcode(bs, pos);
 	}
 	
 	public static DenseRecord read(byte tag, Blob b, int pos) throws BadFormatException {

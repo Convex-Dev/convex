@@ -279,7 +279,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	@Override
 	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.BLOB;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 	
 	/**
@@ -289,7 +289,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	 * @param pos The offset into the byte array
 	 * @return New position after writing
 	 */
-	public abstract int encodeRaw(byte[] bs, int pos);
+	public abstract int encodeAfterOpcode(byte[] bs, int pos);
 	
 	@Override
 	public int hashCode() {

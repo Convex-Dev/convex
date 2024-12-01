@@ -111,11 +111,11 @@ public final class CVMDouble extends ANumeric {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.DOUBLE;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		long doubleBits=Double.doubleToRawLongBits(value); // note same as doubleToLongBits assuming we are valid and canonical
 		return Utils.writeLong(bs,pos,doubleBits);
 	}

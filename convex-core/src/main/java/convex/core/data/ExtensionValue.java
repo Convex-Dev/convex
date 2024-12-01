@@ -78,11 +78,11 @@ public class ExtensionValue extends AExtensionValue {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos=Format.writeVLQCount(bs, pos, value);
 		return pos;
 	}

@@ -46,8 +46,8 @@ public class StringTree extends AString {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		return data.encodeRaw(bs, pos);
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		return data.encodeAfterOpcode(bs, pos);
 	}
 	
 	@Override

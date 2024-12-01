@@ -188,11 +188,11 @@ public final class Address extends AExtensionValue {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=CVMTag.ADDRESS;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 	
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		return Format.writeVLQCount(bs, pos, value);
 	}
 	

@@ -80,7 +80,7 @@ public class Lambda<T extends ACell> extends AOp<AClosure<T>> {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos=function.encode(bs, pos);
 		return pos;
 	}

@@ -89,7 +89,7 @@ public class Lookup<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos= symbol.encode(bs, pos);
 		pos= Format.write(bs,pos, address); // might be null
 		return pos;

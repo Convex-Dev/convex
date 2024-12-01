@@ -58,12 +58,12 @@ public class Call extends ATransaction {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++] = CVMTag.CALL;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // sequence
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		pos = super.encodeAfterOpcode(bs,pos); // sequence
 		pos = Format.write(bs,pos, target);
 		pos=Format.writeVLQCount(bs,pos, offer);
 		pos=Format.write(bs,pos, functionName);

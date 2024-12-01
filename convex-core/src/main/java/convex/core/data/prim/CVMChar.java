@@ -227,7 +227,7 @@ public final class CVMChar extends APrimitive implements Comparable<CVMChar> {
 	}
 	
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("Encoding requires a length in bytes");
 	}
 

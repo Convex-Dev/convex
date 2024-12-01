@@ -22,6 +22,7 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.Syntax;
+import convex.core.cvm.ops.Special;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Multi;
@@ -521,7 +522,14 @@ public class Format {
 		long code=readVLQCount(blob,offset+1);
 		
 		if (tag == CVMTag.CORE_DEF) return Core.fromCode(code);
-	
+
+		if ((tag == CVMTag.OP_SPECIAL)&&(code<Special.NUM_SPECIALS)) {
+			Special<?> spec= Special.create((int)code);
+			if (spec!=null) {
+				return spec;
+			}
+		}
+
 		return ExtensionValue.create(tag, code);
 	}
 

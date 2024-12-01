@@ -6,10 +6,6 @@ package convex.core.cvm;
 public class CVMTag {
 
 	
-	/**
-	 *  Special Ops
-	 */
-	public static final byte SPECIAL_OP = (byte) 0xE5;
 
 	/**
 	 * Tag for Convex Address type
@@ -63,6 +59,15 @@ public class CVMTag {
 	public static final byte RESULT = (byte)0xAD; // transaction result
 
 	public static final byte BLOCK_RESULT = (byte) 0xAE;
+	
+	// ===============================================
+	// CVM Ops
+	
+	/**
+	 *  Special Ops as extension value
+	 */
+	public static final byte OP_SPECIAL = (byte) 0xE5;
+
 	
 
 }

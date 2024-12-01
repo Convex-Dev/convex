@@ -59,12 +59,12 @@ public abstract class ADenseRecord extends ARecord<ACell,ACell> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		return values.encodeRaw(bs, pos);
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		return values.encodeAfterOpcode(bs, pos);
 	}
 
 }

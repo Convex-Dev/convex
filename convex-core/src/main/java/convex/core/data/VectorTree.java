@@ -166,11 +166,11 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	@Override
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=Tag.VECTOR;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos= Format.writeVLQCount(bs,pos, count);
 
 		int n = children.length;

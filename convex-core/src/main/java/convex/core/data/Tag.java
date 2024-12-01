@@ -73,8 +73,6 @@ public class Tag {
 	public static final byte BYTE_FLAG_BASE = (byte) 0xB0;
 	public static final byte BYTE_FLAG_MASK = (byte) 0xF0;
 
-	
-
 	// ==========================================
 	// Coded data (0xCx)
 	
@@ -88,9 +86,6 @@ public class Tag {
 	// ==========================================
 	// Densely coded record (0xDx)
 	public static final byte DENSE_RECORD_BASE = (byte) 0xD0;
-	
-	
-
 	
 	//==========================================
 	// Extension values (0xEx)

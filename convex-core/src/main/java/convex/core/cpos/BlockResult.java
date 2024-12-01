@@ -151,11 +151,11 @@ public class BlockResult extends ACVMRecord {
 	public int encode(byte[] bs, int pos) {
 		bs[pos++]=getTag();
 		// generic record writeRaw, handles all fields in declared order
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 	
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos=state.encode(bs,pos);
 		pos=results.encode(bs,pos);
 		return pos;

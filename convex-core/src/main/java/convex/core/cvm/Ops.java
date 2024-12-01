@@ -11,7 +11,6 @@ import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
-import convex.core.cvm.ops.Special;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
@@ -82,8 +81,6 @@ public class Ops {
 			return Local.read(b,pos);
 		case Ops.SET:
 			return Set.read(b,pos);
-		case Ops.SPECIAL:
-			return Special.read(b,pos);
 
 		default:
 			throw new BadFormatException("Invalide OpCode: " + opCode);

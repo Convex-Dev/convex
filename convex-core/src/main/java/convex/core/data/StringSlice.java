@@ -40,7 +40,7 @@ public class StringSlice extends AString {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		throw new UnsupportedOperationException("Can't encode StringSlice");
 	}
 	

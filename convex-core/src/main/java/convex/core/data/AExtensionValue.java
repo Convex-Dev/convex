@@ -97,7 +97,7 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 	@Override
 	public boolean equals(ACell a) {
 		if (a instanceof AExtensionValue) return equals((AExtensionValue) a);
-		return false;
+		return Cells.equalsGeneric(this, a);
 	}
 	
 	protected boolean equals(AExtensionValue a) {

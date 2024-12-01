@@ -162,9 +162,9 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		pos = Format.write(bs,pos, symbols);
-		return super.encodeRaw(bs,pos); // AMultiOp superclass writeRaw
+		return super.encodeAfterOpcode(bs,pos); // AMultiOp superclass writeRaw
 	}
 	
 	@Override 

@@ -178,13 +178,13 @@ public final class CVMBigInteger extends AInteger {
 			return getCanonical().encode(bs, pos);
 		}
 		bs[pos++]=Tag.BIG_INTEGER;
-		return encodeRaw(bs,pos);
+		return encodeAfterOpcode(bs,pos);
 	}
 
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
 		ABlob b=blob();
-		return b.encodeRaw(bs, pos);
+		return b.encodeAfterOpcode(bs, pos);
 	}
 
 	@Override

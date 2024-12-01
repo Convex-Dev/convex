@@ -158,7 +158,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * @param pos The offset into the byte array
 	 * @return New position after writing
 	 */
-	public abstract int encodeRaw(byte[] bs, int pos);
+	public abstract int encodeAfterOpcode(byte[] bs, int pos);
 	
 	/**
 	 * Creates the encoding for this cell. Cell must be canonical, or else an error may occur.
