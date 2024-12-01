@@ -88,6 +88,14 @@ public class CAD3Test extends ACVMTest {
 		}
 	}
 	
+	@Test public void testCodedValues() {
+		CodedValue vc=CodedValue.create(0xc9,CVMLong.ONE,null);
+		
+		assertEquals(vc,Reader.read("#[c9110100]"));
+		
+		ObjectsTest.doAnyValueTests(vc);
+	}
+	
 	/**
 	 * Tests for dense record interactions with core functions
 	 */

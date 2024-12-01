@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import convex.core.data.util.BlobBuilder;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
 public class CodedValue extends ACell {
@@ -13,6 +14,11 @@ public class CodedValue extends ACell {
 		this.tag=tag;
 		codeRef=code;
 		valueRef=value;
+	}
+	
+	public static CodedValue create(int tag, ACell code, ACell value) {
+		
+		return new CodedValue((byte)tag,Ref.get(code),Ref.get(value));
 	}
 	
 	@Override
@@ -28,6 +34,20 @@ public class CodedValue extends ACell {
 	@Override
 	public byte getTag() {
 		return tag;
+	}
+	
+	@Override 
+	public int getRefCount() {
+		return 2;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public <R extends ACell> Ref<R> getRef(int i) {
+		switch (i) {
+			case 0: return (Ref<R>) codeRef;
+			case 1: return (Ref<R>) valueRef;
+		}
+		throw new IndexOutOfBoundsException(i);
 	}
 
 	@Override
@@ -63,6 +83,15 @@ public class CodedValue extends ACell {
 	public boolean isCVMValue() {
 		return false;
 	}
+	
+	@SuppressWarnings("unchecked")
+	public CodedValue updateRefs(IRefFunction func) {
+		Ref<ACell> nc=func.apply(codeRef);
+		Ref<ACell> nv=func.apply(valueRef);
+		if ((nc==codeRef)&&(nv==valueRef)) return this;
+		
+		return new CodedValue(tag,nc,nv);
+	}
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
@@ -72,6 +101,19 @@ public class CodedValue extends ACell {
 		return sb.check(limit);
 	}
 
-
-
+	public static ACell read(byte tag, Blob b, int pos) throws BadFormatException {
+		int epos=pos+1; // skip tag
+		
+		Ref<ACell> cref=Format.readRef(b, epos);
+		epos+=cref.getEncodingLength();
+		
+		Ref<ACell> vref=Format.readRef(b, epos);
+		epos+=vref.getEncodingLength();
+		
+		CodedValue result=new  CodedValue(tag,cref,vref);
+		if (tag==b.byteAtUnchecked(pos)) {
+			result.attachEncoding(b.slice(pos,epos));
+		}
+		return result;
+	}
 }

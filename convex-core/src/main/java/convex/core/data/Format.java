@@ -515,7 +515,7 @@ public class Format {
 			return fn;
 		}
 		
-		throw new BadFormatException("Can't read Op with tag byte: " + Utils.toHexString(tag));
+		return CodedValue.read(tag,b,pos);
 	}
 	
 	private static ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
