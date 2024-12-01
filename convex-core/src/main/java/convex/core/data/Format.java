@@ -22,6 +22,7 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.Syntax;
+import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Special;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Invoke;
@@ -529,6 +530,12 @@ public class Format {
 				return spec;
 			}
 		}
+		
+		if (tag == CVMTag.OP_LOCAL) {
+			Local<?> loc=Local.create(code);
+			return loc;
+		}
+
 
 		return ExtensionValue.create(tag, code);
 	}

@@ -68,6 +68,10 @@ public class CVMTag {
 	 */
 	public static final byte OP_SPECIAL = (byte) 0xE5;
 
-	
+	/**
+	 * Local is extension value, position on local stack
+	 */
+	public static final byte OP_LOCAL = (byte) 0xE6;
+
 
 }

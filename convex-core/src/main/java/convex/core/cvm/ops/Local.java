@@ -2,6 +2,7 @@ package convex.core.cvm.ops;
 
 import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
@@ -13,6 +14,7 @@ import convex.core.data.IRefFunction;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.ErrorMessages;
 
 /**
  * Op to look up a local value from the lexical environment
@@ -60,23 +62,21 @@ public class Local<T extends ACell> extends AOp<T> {
 	public byte opCode() {
 		return Ops.LOCAL;
 	}
-
+	
 	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
+	public byte getTag() {
+		return CVMTag.OP_LOCAL;
+	}
+	
+	@Override
+	public int encodeRaw(byte[] bs, int pos) {
 		pos=Format.writeVLQLong(bs, pos, position);
 		return pos;
 	}
-	
-	public static <R extends ACell> Local<R> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
-		long position=Format.readVLQLong(b,epos);
-		epos+=Format.getVLQLongLength(position);
-		
-		Local<R> result= create(position);
-		if (result==null) throw new BadFormatException("Can't create Local with position: "+position);
-		result.attachEncoding(b.slice(pos, epos));
-		return result;
+	@Override
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		throw new Error(ErrorMessages.UNREACHABLE);
 	}
 
 	@Override

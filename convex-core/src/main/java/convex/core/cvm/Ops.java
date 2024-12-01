@@ -7,7 +7,6 @@ import convex.core.cvm.ops.Do;
 import convex.core.cvm.ops.Invoke;
 import convex.core.cvm.ops.Lambda;
 import convex.core.cvm.ops.Let;
-import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
@@ -77,8 +76,6 @@ public class Ops {
 			return Query.read(b,pos);
 		case Ops.LOOP:
 			return Let.read(b,pos,true);
-		case Ops.LOCAL:
-			return Local.read(b,pos);
 		case Ops.SET:
 			return Set.read(b,pos);
 

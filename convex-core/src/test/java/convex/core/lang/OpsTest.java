@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
@@ -33,6 +34,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.ExtensionValue;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
@@ -308,6 +310,8 @@ public class OpsTest extends ACVMTest {
 		
 		// Negative local index should be invalid
 		assertNull(Local.create(-1));
+		
+		assertEquals(Local.create(16567),ExtensionValue.create(CVMTag.OP_LOCAL,16567));
 
 		doOpTest(op);
 	}

@@ -14,6 +14,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.Core;
@@ -49,6 +50,7 @@ public class CAD3Test extends ACVMTest {
 	@Test public void testReadEncodings() {
 		assertSame(Address.ZERO,Reader.read("#[EA00]"));
 		assertSame(CVMLong.ZERO,Reader.read("#[10]"));
+		assertEquals(CVMBool.TRUE,Reader.read("#[b1]"));
 		assertSame(Vectors.empty(),Reader.read("#[8000]"));
 		assertNull(Reader.read("#[00]"));
 		assertEquals(ExtensionValue.create((byte) 0xe5, 0),Reader.read("#[e500]"));
