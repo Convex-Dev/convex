@@ -24,6 +24,7 @@ import convex.core.cpos.Block;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
+import convex.core.cvm.Syntax;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;

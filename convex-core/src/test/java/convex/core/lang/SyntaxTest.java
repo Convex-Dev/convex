@@ -4,8 +4,8 @@ import static convex.test.Assertions.assertCVMEquals;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Syntax;
 import convex.core.data.ObjectsTest;
-import convex.core.data.Syntax;
 
 public class SyntaxTest {
 

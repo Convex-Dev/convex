@@ -2,6 +2,7 @@ package convex.core.data;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
+import convex.core.cvm.Syntax;
 import convex.core.data.prim.AByteFlag;
 import convex.core.data.prim.ANumeric;
 import convex.core.data.prim.CVMBigInteger;
@@ -115,7 +116,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 		if (tag == Tag.MAP) return Maps.read(b,pos);
 
-		if (tag == Tag.SYNTAX) return Syntax.read(b,pos);
+		if (tag == CVMTag.SYNTAX) return Syntax.read(b,pos);
 		
 		if (tag == Tag.SET) return Sets.read(b,pos);
 

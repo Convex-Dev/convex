@@ -1,7 +1,7 @@
 package convex.core.data.type;
 
+import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
-import convex.core.data.Syntax;
 
 /**
  * Type that represents CVM Syntax Object values

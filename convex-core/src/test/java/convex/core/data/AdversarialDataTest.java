@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Result;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Ops;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Transfer;
@@ -269,8 +270,8 @@ public class AdversarialDataTest {
 	
 	@Test
 	public void testBadBoolean() {
-		invalidEncoding(Tag.TRUE,"12"); // excess byte
-		invalidEncoding(Tag.FALSE,"00"); // excess byte
+		invalidEncoding(CVMTag.TRUE,"12"); // excess byte
+		invalidEncoding(CVMTag.FALSE,"00"); // excess byte
 	}
 	
 	@Test

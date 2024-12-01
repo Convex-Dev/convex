@@ -4,8 +4,8 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
-import convex.core.data.Syntax;
 
 /**
  * Generator for arbitrary CVM values

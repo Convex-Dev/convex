@@ -2,6 +2,7 @@ package convex.core.data;
 
 import convex.core.Constants;
 import convex.core.crypto.Hashing;
+import convex.core.cvm.CVMTag;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
@@ -41,8 +42,8 @@ public class Hash extends AArrayBlob {
 	 * for efficiency
 	 */
 	public static final Hash NULL_HASH = Hashing.sha3(new byte[] { Tag.NULL });
-	public static final Hash TRUE_HASH = Hashing.sha3(new byte[] { Tag.TRUE });
-	public static final Hash FALSE_HASH = Hashing.sha3(new byte[] { Tag.FALSE });
+	public static final Hash TRUE_HASH = Hashing.sha3(new byte[] { CVMTag.TRUE });
+	public static final Hash FALSE_HASH = Hashing.sha3(new byte[] { CVMTag.FALSE });
 	public static final Hash EMPTY_HASH = Hashing.sha3(new byte[0]);
 
 

@@ -28,7 +28,6 @@ public class Tag {
     // =========================================
 	// Reference types (0x2x)
 
-	// crypto and security primitives
 	public static final byte REF = (byte) 0x20;
 	
 
@@ -57,8 +56,6 @@ public class Tag {
 
 	public static final byte INDEX = (byte) 0x84;
 
-	public static final byte SYNTAX = (byte) 0x88;
-	
 	// ==========================================
 	// Cryptographic Structures (0x9x)
 	public static final byte SIGNED_DATA = (byte) 0x90;
@@ -84,9 +81,7 @@ public class Tag {
 	public static final byte BYTE_FLAG_BASE = (byte) 0xB0;
 	public static final byte BYTE_FLAG_MASK = (byte) 0xF0;
 
-	// Booleans
-	public static final byte FALSE = (byte) 0xB0;
-	public static final byte TRUE = (byte) 0xB1;
+	
 
 	// ==========================================
 	// Coded data (0xCx)

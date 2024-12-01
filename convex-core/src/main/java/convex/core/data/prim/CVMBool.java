@@ -1,11 +1,11 @@
 package convex.core.data.prim;
 
+import convex.core.cvm.CVMTag;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Strings;
-import convex.core.data.Tag;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -61,7 +61,7 @@ public final class CVMBool extends AByteFlag {
 	
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=value?Tag.TRUE:Tag.FALSE;
+		bs[pos++]=value?CVMTag.TRUE:CVMTag.FALSE;
 		return pos;
 	}
 
@@ -83,7 +83,7 @@ public final class CVMBool extends AByteFlag {
 	@Override
 	public
 	final byte getTag() {
-		return (value)?Tag.TRUE:Tag.FALSE;
+		return (value)?CVMTag.TRUE:CVMTag.FALSE;
 	}
 
 	public static ACell parse(String text) {

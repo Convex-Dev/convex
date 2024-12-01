@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.CVMTag;
 import convex.core.data.prim.AByteFlag;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -24,7 +25,7 @@ public class ByteFlagTest {
 	public void testInavlidValues() {
 		assertNull(AByteFlag.create(-1));
 		assertNull(AByteFlag.create(16));
-		assertNull(AByteFlag.create(Tag.TRUE)); // we expect 1, not 0xb1 !
+		assertNull(AByteFlag.create(CVMTag.TRUE)); // we expect 1, not 0xb1 !
 		
 		// sneaky checks where the low byte is 0
 		assertNull(AByteFlag.create(0x100000000l)); 	

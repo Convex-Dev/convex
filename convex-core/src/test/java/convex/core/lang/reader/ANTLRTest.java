@@ -10,6 +10,7 @@ import java.math.BigInteger;
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
+import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.Blob;
@@ -22,7 +23,6 @@ import convex.core.data.Sets;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Symbols;
-import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;

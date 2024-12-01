@@ -6,11 +6,11 @@ import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
+import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Lists;
 import convex.core.data.Symbol;
-import convex.core.data.Syntax;
 import convex.core.data.Vectors;
 import convex.core.lang.Core;
 import convex.core.lang.RT;

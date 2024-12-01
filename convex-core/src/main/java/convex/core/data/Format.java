@@ -21,6 +21,7 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.Receipt;
 import convex.core.cvm.State;
+import convex.core.cvm.Syntax;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Multi;
@@ -485,7 +486,7 @@ public class Format {
 
 		if (tag == Tag.MAP) return (T) Maps.read(b,pos);
 
-		if (tag == Tag.SYNTAX) return (T) Syntax.read(b,pos);
+		if (tag == CVMTag.SYNTAX) return (T) Syntax.read(b,pos);
 		
 		if (tag == Tag.SET) return (T) Sets.read(b,pos);
 

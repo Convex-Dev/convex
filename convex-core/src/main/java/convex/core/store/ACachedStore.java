@@ -1,9 +1,9 @@
 package convex.core.store;
 
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.ACell;
 import convex.core.data.AEncoder;
 import convex.core.data.Blob;
-import convex.core.data.CVMEncoder;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;

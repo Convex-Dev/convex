@@ -2,9 +2,9 @@ package convex.core.lang;
 
 import java.io.IOException;
 
+import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.AList;
-import convex.core.data.Syntax;
 import convex.core.lang.reader.AntlrReader;
 import convex.core.util.Utils;
 

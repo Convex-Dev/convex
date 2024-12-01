@@ -1,5 +1,6 @@
 package convex.core.data.prim;
 
+import convex.core.cvm.CVMTag;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Tag;
@@ -53,7 +54,7 @@ public class ByteFlagExtended extends AByteFlag {
 	}
 
 	@Override public boolean isCVMValue() {
-		return (tag==Tag.TRUE)||(tag==Tag.FALSE);
+		return (tag==CVMTag.TRUE)||(tag==CVMTag.FALSE);
 	}
 	
 	@Override

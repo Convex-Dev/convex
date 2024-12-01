@@ -1,7 +1,10 @@
-package convex.core.data;
+package convex.core.cvm;
 
-import convex.core.cvm.Address;
-import convex.core.cvm.CVMTag;
+import convex.core.data.ACell;
+import convex.core.data.Blob;
+import convex.core.data.CAD3Encoder;
+import convex.core.data.ExtensionValue;
+import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.Core;
 
