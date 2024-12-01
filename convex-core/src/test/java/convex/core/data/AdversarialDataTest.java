@@ -21,7 +21,7 @@ import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.impl.DummyCell;
-import convex.core.data.prim.ByteFlagExtended;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -35,7 +35,7 @@ import convex.test.Samples;
 public class AdversarialDataTest {
 
 	// A value that is valid CAD3, but not a first class CVM value
-	public static final ACell NON_CVM=ByteFlagExtended.create(15);
+	public static final ACell NON_CVM=ByteFlag.create(15);
 	
 	// A value that is non-canonical but otherwise valid CVM value
 	public static final Blob NON_CANONICAL=Blob.createRandom(new Random(), Blob.CHUNK_LENGTH+1);

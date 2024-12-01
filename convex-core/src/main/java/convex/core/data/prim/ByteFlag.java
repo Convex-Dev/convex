@@ -10,14 +10,14 @@ import convex.core.lang.RT;
 /**
  * Class implementing the CAD3 extended byte flags `0xB2` to `0xBF`
  */
-public class ByteFlagExtended extends AByteFlag {
+public class ByteFlag extends AByteFlag {
 
-	private static final ByteFlagExtended[] cache = new ByteFlagExtended[16];
+	private static final ByteFlag[] cache = new ByteFlag[16];
 	
 	static {
 		for (int i=0; i<16;i++) {
 			byte tag=(byte)(Tag.BYTE_FLAG_BASE+i);
-			cache[i] = Cells.intern(new ByteFlagExtended(tag));
+			cache[i] = Cells.intern(new ByteFlag(tag));
 		}
 	}
 	
@@ -27,22 +27,22 @@ public class ByteFlagExtended extends AByteFlag {
 	 * Private constructor, to enforce singleton instances
 	 * @param tag
 	 */
-	private ByteFlagExtended(byte tag) {
+	private ByteFlag(byte tag) {
 		this.tag=tag;
 	}
 
 	/**
-	 * Creates an extended byte flag for the given value 2-15
+	 * Creates an extended byte flag for the given value 0-15
 	 * @param value
 	 * @return
 	 */
-	public static ByteFlagExtended create(long value) {
+	public static ByteFlag create(long value) {
 		int m=(int)(value&0xf);
 		if (m!=value) return null; // out of range
 		return unsafeCreate(m);
 	}
 	
-	static ByteFlagExtended unsafeCreate(int value) {
+	static ByteFlag unsafeCreate(int value) {
 		return cache[value];
 	}
 

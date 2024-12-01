@@ -12,10 +12,6 @@ public class CVMTag {
 	 */
 	public static final byte ADDRESS = (byte) 0xEA;
 	
-	/**
-	 *  CVM Core definitions
-	 */
-	public static final byte CORE_DEF = (byte) 0xED;
 
 	public static final byte SYNTAX = (byte) 0x88;
 
@@ -61,7 +57,7 @@ public class CVMTag {
 	public static final byte BLOCK_RESULT = (byte) 0xAE;
 	
 	// ===============================================
-	// CVM Ops
+	// CVM Ops and Code
 	
 	/**
 	 *  Special Ops as extension value
@@ -72,6 +68,12 @@ public class CVMTag {
 	 * Local is extension value, position on local stack
 	 */
 	public static final byte OP_LOCAL = (byte) 0xE6;
+	
+	/**
+	 *  CVM Core definitions
+	 */
+	public static final byte CORE_DEF = (byte) 0xED;
+
 
 
 }

@@ -903,6 +903,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		if (shift<0) throw new InvalidDataException("Negaitive shift!", this);
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
 	}
 

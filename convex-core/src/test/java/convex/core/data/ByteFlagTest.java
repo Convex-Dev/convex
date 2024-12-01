@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.CVMTag;
 import convex.core.data.prim.AByteFlag;
-import convex.core.data.prim.ByteFlagExtended;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
@@ -36,8 +36,8 @@ public class ByteFlagTest {
 	}
 	
 	@Test public void testBooleans() {
-		ByteFlagExtended bf=ByteFlagExtended.create(0);
-		ByteFlagExtended bt=ByteFlagExtended.create(1);
+		ByteFlag bf=ByteFlag.create(0);
+		ByteFlag bt=ByteFlag.create(1);
 		
 		assertNotSame(bf,CVMBool.FALSE);
 		assertEquals(bf,CVMBool.FALSE);

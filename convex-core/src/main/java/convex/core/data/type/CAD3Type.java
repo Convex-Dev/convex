@@ -2,7 +2,7 @@ package convex.core.data.type;
 
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
-import convex.core.data.prim.ByteFlagExtended;
+import convex.core.data.prim.ByteFlag;
 
 /**
  * Type for CAD3 Values not recognised by CVM
@@ -29,7 +29,7 @@ public class CAD3Type extends AType {
 
 	@Override
 	public ACell defaultValue() {
-		return ByteFlagExtended.create(15);
+		return ByteFlag.create(15);
 	}
 
 	@Override

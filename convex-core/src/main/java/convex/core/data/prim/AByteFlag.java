@@ -24,7 +24,7 @@ public abstract class AByteFlag extends APrimitive {
 			case 0: return CVMBool.FALSE;
 			case 1: return CVMBool.TRUE;
 		}
-		return ByteFlagExtended.unsafeCreate(tag); // we assume tag is valid
+		return ByteFlag.unsafeCreate(tag); // we assume tag is valid
 	}
 
 	@Override
@@ -57,6 +57,6 @@ public abstract class AByteFlag extends APrimitive {
 	public static AByteFlag create(long value) {
 		if (value==1) return CVMBool.TRUE;
 		if (value==0) return CVMBool.FALSE;
-		return ByteFlagExtended.create(value); // may be null
+		return ByteFlag.create(value); // may be null
 	}
 }

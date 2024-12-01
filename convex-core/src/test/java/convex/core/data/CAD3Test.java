@@ -14,6 +14,7 @@ import org.junit.jupiter.api.TestInstance.Lifecycle;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
@@ -47,6 +48,14 @@ public class CAD3Test extends ACVMTest {
 		assertEquals(e,a);
 	}
 	
+	@Test public void testByteFlags() {
+		ByteFlag bf=ByteFlag.create(2);
+		assertEquals(bf,Reader.read("#[b2]"));
+		ObjectsTest.doAnyValueTests(bf);
+
+	}
+
+	
 	@Test public void testReadEncodings() {
 		assertSame(Address.ZERO,Reader.read("#[EA00]"));
 		assertSame(CVMLong.ZERO,Reader.read("#[10]"));
@@ -64,8 +73,12 @@ public class CAD3Test extends ACVMTest {
 	
 			assertEquals(3,dr.count);
 			assertSame(v,dr.values());
-			assertEquals("#[df03110111021103]",dr.toString());
-			
+			String ds="#[df03110111021103]";
+			assertEquals(ds,dr.toString());
+			assertEquals(dr,Reader.read(ds));
+
+			assertTrue(dr.isCompletelyEncoded());
+
 			ObjectsTest.doAnyValueTests(dr);
 		}
 		
@@ -80,6 +93,7 @@ public class CAD3Test extends ACVMTest {
 			AVector<CVMLong> v=Samples.INT_VECTOR_300;
 			DenseRecord dr=DenseRecord.create(0xDF,v);
 			assertEquals((byte)0xdf,dr.getTag());
+			assertFalse(dr.isCompletelyEncoded());
 			
 			assertEquals(300,dr.count());
 			assertSame(v,dr.values());
