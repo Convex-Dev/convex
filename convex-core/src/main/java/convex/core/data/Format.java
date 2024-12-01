@@ -606,7 +606,7 @@ public class Format {
 			
 			if (high == 0x90) return (T) readSignedData(tag,blob, offset); 
 
-			if (high == 0xD0) return (T) readTransaction(tag, blob, offset);
+			if (high == 0xD0) return (T) readDenseRecord(tag, blob, offset);
 
 			if (high == 0xE0) return (T) readExtension(tag, blob, offset);
 			
@@ -669,9 +669,6 @@ public class Format {
 		if (tag == CVMTag.BLOCK) {
 			return (T) Block.read(b,pos);
 		}
-		if (tag == CVMTag.STATE) {
-			return (T) State.read(b,pos);
-		}
 		if (tag == CVMTag.ORDER) {
 			return (T) Order.read(b,pos);
 		}
@@ -694,7 +691,7 @@ public class Format {
 	}
 
 	@SuppressWarnings("unchecked")
-	private static <T extends ACell> T readTransaction(byte tag, Blob b, int pos) throws BadFormatException {
+	private static <T extends ACell> T readDenseRecord(byte tag, Blob b, int pos) throws BadFormatException {
 		if (tag == CVMTag.INVOKE) {
 			return (T) Invoke.read(b,pos);
 		} else if (tag == CVMTag.TRANSFER) {
@@ -703,6 +700,10 @@ public class Format {
 			return (T) Call.read(b,pos);
 		} else if (tag == CVMTag.MULTI) {
 			return (T) Multi.read(b,pos);
+		}
+		
+		if (tag == CVMTag.STATE) {
+			return (T) State.read(b,pos);
 		}
 		
 		// Might be a generic Dense Record

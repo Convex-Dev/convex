@@ -28,4 +28,12 @@ public class CVMEncoder extends CAD3Encoder {
 		
 		return ExtensionValue.create(tag, code);
 	}
+	
+	protected ACell readDenseRecord(byte tag, Blob encoding, int offset) throws BadFormatException {
+		switch (tag) {
+		case CVMTag.STATE:
+			return State.read(encoding, offset);
+		}
+		return super.read(tag, encoding,offset);
+	}
 }
