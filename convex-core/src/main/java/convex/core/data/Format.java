@@ -681,43 +681,46 @@ public class Format {
 
 	@SuppressWarnings("unchecked")
 	private static <T extends ACell> T readDenseRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == CVMTag.INVOKE) {
-			return (T) Invoke.read(b,pos);
-		} else if (tag == CVMTag.TRANSFER) {
-			return (T) Transfer.read(b,pos);
-		} else if (tag == CVMTag.CALL) {
-			return (T) Call.read(b,pos);
-		} else if (tag == CVMTag.MULTI) {
-			return (T) Multi.read(b,pos);
+		try {
+			if (tag == CVMTag.INVOKE) {
+				return (T) Invoke.read(b,pos);
+			} else if (tag == CVMTag.TRANSFER) {
+				return (T) Transfer.read(b,pos);
+			} else if (tag == CVMTag.CALL) {
+				return (T) Call.read(b,pos);
+			} else if (tag == CVMTag.MULTI) {
+				return (T) Multi.read(b,pos);
+			}
+			
+			if (tag == CVMTag.STATE) {
+				return (T) State.read(b,pos);
+			}
+			
+			if (tag == CVMTag.BELIEF) {
+				return (T) Belief.read(b,pos);
+			}
+			
+			if (tag == CVMTag.BLOCK) {
+				return (T) Block.read(b,pos);
+			}
+			
+			if (tag == CVMTag.RESULT) {
+				return (T) Result.read(b,pos);
+			}
+			
+			if (tag == CVMTag.ORDER) {
+				return (T) Order.read(b,pos);
+			}
+			
+			if (tag == CVMTag.BLOCK_RESULT) {
+				return (T) BlockResult.read(b,pos);
+			}
+			
+			if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
+			if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
+		} catch (Exception e) {
+			// something failed, might be generic DenseRecord
 		}
-		
-		if (tag == CVMTag.STATE) {
-			return (T) State.read(b,pos);
-		}
-		
-		if (tag == CVMTag.BELIEF) {
-			return (T) Belief.read(b,pos);
-		}
-		
-		if (tag == CVMTag.BLOCK) {
-			return (T) Block.read(b,pos);
-		}
-		
-		if (tag == CVMTag.RESULT) {
-			return (T) Result.read(b,pos);
-		}
-		
-		if (tag == CVMTag.ORDER) {
-			return (T) Order.read(b,pos);
-		}
-		
-		if (tag == CVMTag.BLOCK_RESULT) {
-			return (T) BlockResult.read(b,pos);
-		}
-		
-		if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
-		if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
-
 		
 		// Might be a generic Dense Record
 		DenseRecord dr=DenseRecord.read(tag,b,pos);

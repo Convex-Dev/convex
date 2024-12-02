@@ -57,7 +57,7 @@ public class BlocksTest {
 		ATransaction t = Transfer.create(InitTest.HERO,0, InitTest.VILLAIN, 1000);
 		Block b1 = Block.create(ts, Vectors.of(t,t,t));
 
-		assertEquals(3,b1.getRefCount());
+		assertEquals(2,b1.getRefCount());
 
 	}
 }

@@ -3,26 +3,24 @@ package convex.core.cpos;
 import java.util.Comparator;
 import java.util.List;
 
-import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -36,12 +34,13 @@ import convex.core.util.Utils;
  * than any established style or system." - Bruce Lee
  *
  */
-public final class Block extends ACVMRecord {
-	private final long timestamp;
-	private final AVector<SignedData<ATransaction>> transactions;
+public final class Block extends ARecordGeneric {
 
 	private static final Keyword[] BLOCK_KEYS = new Keyword[] { Keywords.TIMESTAMP, Keywords.TRANSACTIONS};
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCK_KEYS);
+
+	private final long timestamp;
+	private AVector<SignedData<ATransaction>> transactions;
 
 	/**
 	 * Comparator to sort blocks by timestamp
@@ -55,9 +54,14 @@ public final class Block extends ACVMRecord {
 	};
 
 	private Block(long timestamp, AVector<SignedData<ATransaction>> transactions) {
-		super(CVMTag.BLOCK,FORMAT.count());
+		super(CVMTag.BLOCK,FORMAT,Vectors.create(CVMLong.create(timestamp),transactions));
 		this.timestamp = timestamp;
 		this.transactions = transactions;
+	}
+
+	public Block(AVector<ACell> values) {
+		super(CVMTag.BLOCK,FORMAT,values);
+		this.timestamp=RT.ensureLong(values.get(0)).longValue();
 	}
 
 	@Override
@@ -65,15 +69,6 @@ public final class Block extends ACVMRecord {
 		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
 		if (Keywords.TRANSACTIONS.equals(k)) return transactions;
 		return null;
-	}
-
-	@Override
-	public Block updateRefs(IRefFunction func) {
-		AVector<SignedData<ATransaction>> newTransactions = transactions.updateRefs(func);
-		if (this.transactions == newTransactions) {
-			return this;
-		}
-		return new Block(timestamp, newTransactions);
 	}
 
 	/**
@@ -117,7 +112,7 @@ public final class Block extends ACVMRecord {
 	 */
 	@SafeVarargs
 	public static Block of(long timestamp, SignedData<ATransaction>... transactions) {
-		return new Block(timestamp, Vectors.of((Object[])transactions));
+		return new Block(timestamp, Vectors.create(transactions));
 	}
 
 	/**
@@ -126,26 +121,14 @@ public final class Block extends ACVMRecord {
 	 * @return Number of transactions on this block
 	 */
 	public int length() {
-		return Utils.checkedInt(transactions.count());
-	}
-	
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getTag();
-		// generic record writeRaw, handles all fields in declared order
-		return encodeRaw(bs,pos);
+		return Utils.checkedInt(getTransactions().count());
 	}
 
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = Utils.writeLong(bs,pos, timestamp);
-		pos = Format.write(bs, pos, transactions);
-		return pos;
-	}
 	
 	@Override
 	public int estimatedEncodingSize() {
-		return 10+transactions.estimatedEncodingSize()+AccountKey.LENGTH;
+		// allow for embedded transaction, timestamp always small
+		return 160;
 	}
 	
 	/**
@@ -153,15 +136,13 @@ public final class Block extends ACVMRecord {
 	 * @throws BadFormatException In event of encoding error
 	 */
 	public static Block read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		long timestamp = b.longAt(epos);
-		epos+=8;
-		
-		AVector<SignedData<ATransaction>> transactions = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(transactions);
-		
-		Block result=Block.create(timestamp, transactions);
-		result.attachEncoding(b.slice(pos, epos));
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
+
+		if (values.count()!=BLOCK_KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
+
+		Block result=new Block(values);
+		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
 
@@ -170,18 +151,18 @@ public final class Block extends ACVMRecord {
 	 * @return Vector of transactions
 	 */
 	public AVector<SignedData<ATransaction>> getTransactions() {
+		if (transactions==null) transactions=RT.ensureVector(values.get(1));
 		return transactions;
 	}
 
 	@Override
 	public boolean isCanonical() {
-		if (!transactions.isCanonical()) return false;
 		return true;
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		transactions.validateCell();
+		// nothing to do
 	}
 	
 	@Override 
@@ -206,22 +187,13 @@ public final class Block extends ACVMRecord {
 			if (ha!=null) return Cells.equals(h, ha);
 		}
 		
-		if (!(Cells.equals(transactions, a.transactions))) return false;
+		if (!(Cells.equals(values, a.values))) return false;
 		return true;
 	}
 
 	@Override
-	public int getRefCount() {
-		return transactions.getRefCount();
-	}
-	
-	@Override 
-	public <R extends ACell> Ref<R> getRef(int i) {
-		return transactions.getRef(i);
-	}
-
-	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new Block(values);
 	}	
 }
