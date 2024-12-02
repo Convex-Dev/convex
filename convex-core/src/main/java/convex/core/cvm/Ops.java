@@ -1,8 +1,6 @@
 package convex.core.cvm;
 
-import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Constant;
-import convex.core.cvm.ops.Invoke;
 import convex.core.cvm.ops.Lambda;
 import convex.core.cvm.ops.Let;
 import convex.core.cvm.ops.Lookup;
@@ -21,8 +19,6 @@ import convex.core.exceptions.BadFormatException;
  */
 public class Ops {
 	public static final byte CONSTANT = 0;
-	public static final byte INVOKE = 1;
-	public static final byte COND = 2;
 	public static final byte TRY = 3;
 	public static final byte LET = 4;
 	public static final byte LOOP = 5;
@@ -58,10 +54,6 @@ public class Ops {
 		switch (opCode) {
 		case CVMTag.OPCODE_CONSTANT:
 			return Constant.read(b,pos);
-		case Ops.INVOKE:
-			return Invoke.read(b,pos);
-		case Ops.COND:
-			return Cond.read(b,pos);
 		case Ops.TRY:
 			return Try.read(b,pos);
 		case Ops.LOOKUP:

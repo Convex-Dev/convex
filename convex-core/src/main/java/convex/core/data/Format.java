@@ -23,6 +23,7 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.Syntax;
+import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Def;
 import convex.core.cvm.ops.Do;
 import convex.core.cvm.ops.Local;
@@ -723,7 +724,15 @@ public class Format {
 			if (tag == CVMTag.OP_DO) {
 				return (T) Do.read(b,pos);
 			}
+			
+			if (tag == CVMTag.OP_COND) {
+				return (T) Cond.read(b,pos);
+			}
 
+			if (tag == CVMTag.OP_INVOKE) {
+				 // Note name clash with transaction type
+				return (T) convex.core.cvm.ops.Invoke.read(b,pos);
+			}
 			
 			if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
 			if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
