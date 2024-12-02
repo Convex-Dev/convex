@@ -45,6 +45,8 @@ public class Belief extends ARecordGeneric {
 
 	/**
 	 * The latest view of signed Orders held by other Peers
+	 * 
+	 * Initially null, field will be loaded on demand
 	 */
 	private Index<AccountKey,SignedData<Order>> orders;
 
