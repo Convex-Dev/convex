@@ -135,21 +135,6 @@ public class AccountStatus extends ACVMRecord {
 		return encodeRaw(bs,pos);
 	}
 	
-	private int getInclusion() {
-		int included=0;
-		if (sequence!=0L) included|=HAS_SEQUENCE;
-		if (publicKey!=null) included|=HAS_KEY;
-		if (balance!=0L) included|=HAS_BALANCE;
-		if (memory!=0L) included|=HAS_ALLOWANCE;
-		if (holdings!=null) included|=HAS_HOLDINGS;
-		if (controller!=null) included|=HAS_CONTROLLER;
-		if (environment!=null) included|=HAS_ENVIRONMENT;
-		if (metadata!=null) included|=HAS_METADATA;
-		if (parent!=null) included|=HAS_PARENT;
-		return included;
-		
-	}
-
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
 		int included=getInclusion();
@@ -165,6 +150,23 @@ public class AccountStatus extends ACVMRecord {
 		if ((included&HAS_PARENT)!=0) pos = Format.write(bs,pos, parent);
 		return pos;
 	}
+	
+	private int getInclusion() {
+		int included=0;
+		if (sequence!=0L) included|=HAS_SEQUENCE;
+		if (publicKey!=null) included|=HAS_KEY;
+		if (balance!=0L) included|=HAS_BALANCE;
+		if (memory!=0L) included|=HAS_ALLOWANCE;
+		if (holdings!=null) included|=HAS_HOLDINGS;
+		if (controller!=null) included|=HAS_CONTROLLER;
+		if (environment!=null) included|=HAS_ENVIRONMENT;
+		if (metadata!=null) included|=HAS_METADATA;
+		if (parent!=null) included|=HAS_PARENT;
+		return included;
+		
+	}
+
+
 	
 	/**
 	 * Decode AccountStatus from Blob

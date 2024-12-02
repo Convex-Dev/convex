@@ -39,8 +39,6 @@ public class PeerStatus extends ACVMRecord {
     private final Address controller;
 	private final long peerStake;
 	private final long delegatedStake;
-	private final long timestamp;
-	private final long balance;
 
 	/**
 	 * Map of delegated stakes. Never null internally, but empty map encoded as null.
@@ -51,6 +49,10 @@ public class PeerStatus extends ACVMRecord {
 	 * Metadata for the Peer. Can be null internally, which is interpreted as an empty Map.
 	 */
 	private final AHashMap<ACell,ACell> metadata;
+	
+	private final long timestamp;
+	private final long balance;
+
 
 	private PeerStatus(Address controller, long stake, Index<Address, CVMLong> stakes, long delegatedStake, AHashMap<ACell,ACell> metadata, long timestamp, long balance) {
 		super(CVMTag.PEER_STATUS,FORMAT.count());
@@ -72,9 +74,9 @@ public class PeerStatus extends ACVMRecord {
 	}
 	
 	/**
-	 * Gets the total stake shares for this peer
+	 * Gets the total stake shares for this peer (excluding accumulated balance)
 	 *
-	 * @return Total stake, including own stake + delegated stake
+	 * @return Total stake shares, including own stake + delegated stake
 	 */
 	public long getTotalStake() {
 		// TODO: include rewards?
@@ -91,7 +93,7 @@ public class PeerStatus extends ACVMRecord {
 	}
 
 	/**
-	 * Gets the total delegated stake of this peer
+	 * Gets the total delegated stake of this peer 
 	 *
 	 * @return Total of delegated stake
 	 */

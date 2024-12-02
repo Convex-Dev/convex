@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.IOException;
 
 import convex.core.Constants;
+import convex.core.cvm.CVMEncoder;
 import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -73,8 +74,34 @@ public class ObjectsTest {
 		doPrintTests(a);
 		doBranchTests(a);
 		doMemorySizeTests(a);
+		doCAD3Tests(a);
 	}
 	
+	
+	private static final CAD3Encoder CAD3_ENCODER=new CAD3Encoder();
+	private static final CVMEncoder CVM_ENCODER=new CVMEncoder();
+	
+	private static void doCAD3Tests(ACell a) {
+		Blob enc=Format.encodeMultiCell(a, true);
+		try {
+			ACell cad=CAD3_ENCODER.decodeMultiCell(enc);
+			assertEquals(a,cad);	
+			assertEquals(cad,a);	
+			
+			// First byte should be tag of top level cell
+			assertEquals(a.getTag(),enc.byteAt(0));
+			
+			ACell cvm=CVM_ENCODER.decodeMultiCell(enc);
+			assertEquals(a,cvm);
+			assertEquals(cvm,a);
+			
+			// re-ecoding should be same result
+			assertEquals(enc,Format.encodeMultiCell(cvm, true));
+		} catch (BadFormatException e) {
+			fail(e);
+		}
+	}
+
 	private static void doBranchTests(ACell a) {
 		int bc=a.getBranchCount();
 		assertTrue(bc>=0);
