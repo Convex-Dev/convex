@@ -29,10 +29,12 @@ import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Special;
+import convex.core.cvm.ops.Try;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.DenseRecord;
 import convex.core.data.ExtensionValue;
 import convex.core.data.Format;
 import convex.core.data.ObjectsTest;
@@ -149,7 +151,7 @@ public class OpsTest extends ACVMTest {
 	}
 
 	@Test
-	public void testDo() {
+	public void testDo() throws BadFormatException {
 		Context c = context();
 
 		AOp<AString> op = Do.create(Def.create("foo", Constant.createString("bar")), Lookup.create("foo"));
@@ -158,9 +160,29 @@ public class OpsTest extends ACVMTest {
 		long expectedJuice = INITIAL_JUICE - (Juice.CONSTANT + Juice.DEF + Juice.LOOKUP_DYNAMIC + Juice.DO);
 		assertEquals(expectedJuice, c2.getJuiceAvailable());
 		assertEquals("bar", c2.getResult().toString());
+		
+		Blob enc=op.getEncoding();
+		
+		assertEquals(CVMTag.OP_DO,op.getTag());
+		assertEquals(op,DenseRecord.read(CVMTag.OP_DO, enc,0));
+
+		ObjectsTest.doCAD3Tests(op);
+		
+		doOpTest(op);
+	}
+	
+	@Test
+	public void testTry() throws BadFormatException {
+		AOp<CVMLong> op = Try.create(Invoke.create(Constant.of(CVMLong.ZERO)), Constant.of(CVMLong.ONE));
+
+		Context c = context();
+		Context c2 = c.execute(op);
+		assertFalse(c2.isExceptional());
+		assertEquals(CVMLong.ONE,c2.getResult());
 
 		doOpTest(op);
 	}
+
 
 	@Test
 	public void testSpecial() {

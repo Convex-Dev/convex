@@ -68,7 +68,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	protected Let<T> recreate(ASequence<AOp<ACell>> newOps) {
+	protected Let<T> recreate(AVector<AOp<ACell>> newOps) {
 		return recreate(newOps, symbols);
 	}
 

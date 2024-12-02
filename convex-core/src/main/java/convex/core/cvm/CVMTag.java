@@ -50,6 +50,8 @@ public class CVMTag {
 
 	public static final byte PEER_STATUS = (byte) 0xD9;
 
+	// Some ops in here
+	
 	public static final byte RESULT = (byte)0xDD; // transaction result
 
 	public static final byte BLOCK_RESULT = (byte) 0xDE;
@@ -81,7 +83,10 @@ public class CVMTag {
 	
 	public static final byte OP_DEF = (byte) 0xCD;
 	
-	
+	public static final byte OP_DO = (byte)0xDA; // (do ...)
+	public static final byte OP_INVOKE = (byte)0xDB; // (...)   - function Invoke
+	public static final byte OP_COND = (byte)0xDB; // (cond ...)
+
 
 	public static final byte FN = (byte) 0xCF;
 

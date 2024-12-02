@@ -59,7 +59,7 @@ public class Invoke<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	protected Invoke<T> recreate(ASequence<AOp<ACell>> newOps) {
+	protected Invoke<T> recreate(AVector<AOp<ACell>> newOps) {
 		if (ops == newOps) return this;
 		return create(newOps);
 	}

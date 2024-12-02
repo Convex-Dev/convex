@@ -81,7 +81,7 @@ public class ObjectsTest {
 	private static final CAD3Encoder CAD3_ENCODER=new CAD3Encoder();
 	private static final CVMEncoder CVM_ENCODER=new CVMEncoder();
 	
-	private static void doCAD3Tests(ACell a) {
+	public static void doCAD3Tests(ACell a) {
 		Blob enc=Format.encodeMultiCell(a, true);
 		try {
 			ACell cad=CAD3_ENCODER.decodeMultiCell(enc);

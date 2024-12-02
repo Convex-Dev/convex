@@ -1,15 +1,14 @@
 package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Vectors;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -23,24 +22,18 @@ import convex.core.exceptions.BadFormatException;
  *
  * @param <T> Result type of Do Op
  */
-public class Do<T extends ACell> extends AMultiOp<T> {
+public class Do<T extends ACell> extends AFlatMultiOp<T> {
 
 	public static final Do<?> EMPTY = Do.create();
 
 	protected Do(AVector<AOp<ACell>> ops) {
-		super(ops);
+		super(CVMTag.OP_DO,ops);
 	}
 
 	public static <T extends ACell> Do<T> create(AOp<?>... ops) {
 		return new Do<T>(Vectors.create(ops));
 	}
-
-	@Override
-	protected Do<T> recreate(ASequence<AOp<ACell>> newOps) {
-		if (ops == newOps) return this;
-		return new Do<T>(newOps.toVector());
-	}
-
+	
 	public static <T extends ACell> Do<T> create(ASequence<AOp<ACell>> ops) {
 		return new Do<T>(ops.toVector());
 	}
@@ -73,12 +66,7 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 		bb.append(')');
 		return bb.check(limit);
 	}
-
-	@Override
-	public byte opCode() {
-		return Ops.DO;
-	}
-
+	
 	/**
 	 * Decodes a Do op from a Blob encoding
 	 * 
@@ -89,13 +77,21 @@ public class Do<T extends ACell> extends AMultiOp<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <T extends ACell> Do<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+		int epos=pos;
 
-		AVector<AOp<ACell>> ops = Format.read(b,epos);
+		AVector<AOp<ACell>> ops = Vectors.read(b, epos);
 		epos+=Cells.getEncodingLength(ops);
 		
 		Do<T> result=create(ops);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
+
+	@Override
+	protected AFlatMultiOp<T> recreate(AVector<AOp<ACell>> newOps) {
+		if (newOps==ops) return this; 
+		return new Do<T>(newOps);
+	}
+
+
 }

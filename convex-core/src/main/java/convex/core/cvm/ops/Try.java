@@ -33,7 +33,7 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	protected Try<T> recreate(ASequence<AOp<ACell>> newOps) {
+	protected Try<T> recreate(AVector<AOp<ACell>> newOps) {
 		if (ops == newOps) return this;
 		return new Try<T>(newOps.toVector());
 	}
@@ -88,7 +88,7 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 
 	@Override
 	public byte opCode() {
-		return Ops.DO;
+		return Ops.TRY;
 	}
 
 	/**

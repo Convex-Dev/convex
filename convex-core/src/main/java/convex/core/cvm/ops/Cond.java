@@ -45,7 +45,7 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 	}
 	
 	@Override
-	protected Cond<T> recreate(ASequence<AOp<ACell>> newOps) {
+	protected Cond<T> recreate(AVector<AOp<ACell>> newOps) {
 		if (ops==newOps) return this;
 		return new Cond<T>(newOps.toVector());
 	}
@@ -120,7 +120,7 @@ public class Cond<T extends ACell> extends AMultiOp<T> {
 
 	@Override
 	public Cond<T> updateRefs(IRefFunction func)  {
-		ASequence<AOp<ACell>> newOps= ops.updateRefs(func);
+		AVector<AOp<ACell>> newOps= ops.updateRefs(func);
 		return recreate(newOps);
 	}
 

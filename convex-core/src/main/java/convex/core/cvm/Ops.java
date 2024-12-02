@@ -2,13 +2,13 @@ package convex.core.cvm;
 
 import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Constant;
-import convex.core.cvm.ops.Do;
 import convex.core.cvm.ops.Invoke;
 import convex.core.cvm.ops.Lambda;
 import convex.core.cvm.ops.Let;
 import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
+import convex.core.cvm.ops.Try;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
@@ -23,7 +23,7 @@ public class Ops {
 	public static final byte CONSTANT = 0;
 	public static final byte INVOKE = 1;
 	public static final byte COND = 2;
-	public static final byte DO = 3;
+	public static final byte TRY = 3;
 	public static final byte LET = 4;
 	public static final byte LOOP = 5;
 	public static final byte DEF = 6;
@@ -62,8 +62,8 @@ public class Ops {
 			return Invoke.read(b,pos);
 		case Ops.COND:
 			return Cond.read(b,pos);
-		case Ops.DO:
-			return Do.read(b,pos);
+		case Ops.TRY:
+			return Try.read(b,pos);
 		case Ops.LOOKUP:
 			return Lookup.read(b,pos);
 		case Ops.LAMBDA:
@@ -78,7 +78,7 @@ public class Ops {
 			return Set.read(b,pos);
 
 		default:
-			throw new BadFormatException("Invalide OpCode: " + opCode);
+			throw new BadFormatException("Invalide OpCode: " + opCode + " with tag "+tag);
 		}
 	}
 	

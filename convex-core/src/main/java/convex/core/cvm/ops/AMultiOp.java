@@ -2,7 +2,6 @@ package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
 import convex.core.data.ACell;
-import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
@@ -30,7 +29,7 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	 * @param newOps
 	 * @return
 	 */
-	protected abstract AMultiOp<T> recreate(ASequence<AOp<ACell>> newOps);
+	protected abstract AMultiOp<T> recreate(AVector<AOp<ACell>> newOps);
 
 	@Override
 	public int encodeAfterOpcode(byte[] bs, int pos) {
@@ -45,7 +44,7 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 
 	@Override
 	public AMultiOp<T> updateRefs(IRefFunction func) {
-		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
+		AVector<AOp<ACell>> newOps = ops.updateRefs(func);
 		return recreate(newOps);
 	}
 

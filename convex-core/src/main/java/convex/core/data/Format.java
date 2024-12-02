@@ -24,6 +24,7 @@ import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.Syntax;
 import convex.core.cvm.ops.Def;
+import convex.core.cvm.ops.Do;
 import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Special;
 import convex.core.cvm.transactions.Call;
@@ -718,6 +719,11 @@ public class Format {
 			if (tag == CVMTag.BLOCK_RESULT) {
 				return (T) BlockResult.read(b,pos);
 			}
+			
+			if (tag == CVMTag.OP_DO) {
+				return (T) Do.read(b,pos);
+			}
+
 			
 			if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
 			if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 

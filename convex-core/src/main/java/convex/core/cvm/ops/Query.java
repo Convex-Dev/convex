@@ -35,7 +35,7 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 	}
 
 	@Override
-	protected Query<T> recreate(ASequence<AOp<ACell>> newOps) {
+	protected Query<T> recreate(AVector<AOp<ACell>> newOps) {
 		if (ops == newOps) return this;
 		return new Query<T>(newOps.toVector());
 	}
