@@ -4544,6 +4544,9 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2L,evalL("(do (defn f ([] 4) ([a] 1 2)) (f 3))"));
 
 		assertArityError(step("(do (defn f ([] nil)) (f 3))"));
+		
+		// Check multi-fns capture lexical env
+		assertEquals(Vectors.of(2,1,2),eval("(do (def a 1) (let [a 2 f (fn ([] a) ([b] (+ a b)))] [a *address*/a (f)]))"));
 	}
 
 	@Test

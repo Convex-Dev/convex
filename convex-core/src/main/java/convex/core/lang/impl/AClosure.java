@@ -20,6 +20,12 @@ public abstract class AClosure<T extends ACell> extends AFn<T> {
 		this.lexicalEnv=lexicalEnv;
 	}
 	
+	@Override
+	public int encode(byte[] bs, int pos) {
+		bs[pos++]=getTag();
+		return encodeRaw(bs,pos);
+	}
+	
 	/**
 	 * Produces an copy of this closure with the specified environment
 	 * 

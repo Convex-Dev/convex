@@ -98,11 +98,10 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		if (num<=0) throw new InvalidDataException("MultiFn must contain at least one function",this);
 		fns.validateCell();
 	}
-
+	
 	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=CVMTag.FN_MULTI;
-		return encodeRaw(bs,pos);
+	public byte getTag() {
+		return CVMTag.FN_MULTI;
 	}
 
 	@Override
@@ -110,7 +109,6 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		pos = fns.encode(bs,pos);
 		return pos;
 	}
-	
 
 	/**
 	 * Decodes a MultiFn instance from a Blob encoding
