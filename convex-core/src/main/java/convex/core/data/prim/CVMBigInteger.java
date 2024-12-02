@@ -76,7 +76,6 @@ public final class CVMBigInteger extends AInteger {
 		if (data==null) return null; // might be invalid after trimming
 		return new CVMBigInteger(data.toFlatBlob(),null);
 	}
-
 	
 	private static Blob trimLeadingBytes(ABlob data) {
 		long n=data.count();

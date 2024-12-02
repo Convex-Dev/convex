@@ -39,13 +39,14 @@ public class CVMTag {
 	//
 	// Global State
 
+	public static final byte BELIEF = (byte) 0xD4;
+	
 	public static final byte STATE = (byte) 0xD5;
 
 	public static final byte ACCOUNT_STATUS = (byte) 0xA1;
 
 	public static final byte PEER_STATUS = (byte) 0xA2;
 
-	public static final byte BELIEF = (byte) 0xAA;
 
 	public static final byte BLOCK = (byte) 0xAB;
 

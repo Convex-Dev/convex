@@ -7,7 +7,6 @@ import convex.core.data.AString;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.Hash;
 import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
@@ -354,20 +353,7 @@ public class PeerStatus extends ACVMRecord {
 	 */
 	public boolean equals(PeerStatus a) {
 		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return Cells.equals(h, ha);
-		}
-		
-		if (peerStake!=a.peerStake) return false;
-		if (delegatedStake!=a.delegatedStake) return false;
-		if (balance!=a.balance) return false;
-		if (!(Cells.equals(stakes, a.stakes))) return false;
-		if (!(Cells.equals(metadata, a.metadata))) return false;
-		if (!(Cells.equals(controller, a.controller))) return false;
-		return true;
+		return Cells.equalsGeneric(a, a);
 	}
 
 	@Override

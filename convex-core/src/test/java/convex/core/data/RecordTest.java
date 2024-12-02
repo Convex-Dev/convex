@@ -31,8 +31,10 @@ public class RecordTest {
 	@Test
 	public void testBelief() {
 		Belief b=Belief.createSingleOrder(InitTest.FIRST_PEER_KEYPAIR);
-		assertEquals(b.getRefCount(),b.getOrders().getRefCount());
 		doRecordTests(b);
+		
+		Belief be=Belief.initial();
+		doRecordTests(be);
 	}
 	
 	@Test

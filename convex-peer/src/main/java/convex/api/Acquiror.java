@@ -146,7 +146,7 @@ public class Acquiror {
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt(); // set interrupt flag since an interruption has occurred	
 				f.completeExceptionally(e);
-			} catch (BadFormatException | IOException t) {
+			} catch (NullPointerException |BadFormatException | IOException t) {
 				log.warn("UNEXPECTED acquire fail: ",t);
 				f.completeExceptionally(t);
 			}

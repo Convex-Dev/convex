@@ -865,4 +865,15 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		return (R) result;
 	}
 
+	public HashMap<K, V> toHashMap() {
+		int n=size();
+		HashMap<K, V> hm=new HashMap<>(n);
+		for (int i=0; i<n; i++) {
+			MapEntry<K, V> entry=entryAt(i);
+			K key=entry.getKey();
+			hm.put(key, entry.getValue());
+		}
+		return hm;
+	}
+
 }

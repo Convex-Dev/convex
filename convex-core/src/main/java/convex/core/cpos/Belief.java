@@ -4,26 +4,22 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 
-import convex.core.Constants;
 import convex.core.crypto.AKeyPair;
-import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
-import convex.core.data.MapEntry;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
 /**
@@ -39,7 +35,7 @@ import convex.core.lang.RT;
  * audiences is bloody hard. There's nothing to relate it to." – Satoshi
  * Nakamoto
  */
-public class Belief extends ACVMRecord {
+public class Belief extends ARecordGeneric {
 
 	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS);
 	
@@ -50,28 +46,22 @@ public class Belief extends ACVMRecord {
 	/**
 	 * The latest view of signed Orders held by other Peers
 	 */
-	private final Index<AccountKey,SignedData<Order>> orders;
+	private Index<AccountKey,SignedData<Order>> orders;
 
 	// private final long timeStamp;
 
 	Belief(Index<AccountKey,SignedData<Order>> orders) {
-		super(CVMTag.BELIEF,BELIEF_FORMAT.count());
-		this.orders = orders;
+		super(CVMTag.BELIEF,BELIEF_FORMAT,Vectors.create(orders));
+	}
+
+	public Belief(AVector<ACell> newValues) {
+		super(CVMTag.BELIEF,BELIEF_FORMAT,newValues);
 	}
 
 	@Override
 	public ACell get(Keyword k) {
-		if (Keywords.ORDERS.equals(k)) return orders;
+		if (Keywords.ORDERS.equals(k)) return getOrders();
 		return null;
-	}
-
-	@Override
-	public Belief updateRefs(IRefFunction func) {
-		Index<AccountKey, SignedData<Order>> newOrders = orders.updateRefs(func);
-		if (this.orders == newOrders) {
-			return this;
-		}
-		return new Belief(newOrders);
 	}
 
 	/**
@@ -92,10 +82,19 @@ public class Belief extends ACVMRecord {
 		Index<AccountKey, SignedData<Order>> orders=Index.of(kp.getAccountKey(),kp.signData(order));
 		return create(orders);
 	}
-
-
-	private static Belief create(Index<AccountKey, SignedData<Order>> orders, long timestamp) {
-		return new Belief(orders);
+	
+	/**
+	 * Creates a Belief from source data , usually an Index of Peer key -> Signed Orders
+	 * @param source
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public static Belief fromOrders(ACell source) {
+		source=RT.cvm(source);
+		if (source instanceof Index) {
+			return create((Index<AccountKey, SignedData<Order>>)source);
+		}
+		return null;
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -113,8 +112,8 @@ public class Belief extends ACVMRecord {
 		return new Belief(orders);
 	}
 
-	private static Belief create(Index<AccountKey, SignedData<Order>> orders) {
-		return create(orders, Constants.INITIAL_TIMESTAMP);
+	public static Belief create(Index<AccountKey, SignedData<Order>> orders) {
+		return new Belief(orders);
 	}
 
 	/**
@@ -129,9 +128,6 @@ public class Belief extends ACVMRecord {
 		return create(Index.of(address, order));
 	}
 
-
-
-
 	/**
 	 * Updates this Belief with a new set of Chains for each peer address
 	 * 
@@ -139,45 +135,23 @@ public class Belief extends ACVMRecord {
 	 * @return The updated belief, or the same Belief if no change.
 	 */
 	public Belief withOrders(Index<AccountKey, SignedData<Order>> newOrders) {
-		if (newOrders == orders) return this;
+		if (newOrders == getOrders()) return this;
 		return Belief.create(newOrders);
 	}
 	
-
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getTag();
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+orders.estimatedEncodingSize()+12;
-	}
-	
 	public static Belief read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		Index<AccountKey, SignedData<Order>> orders = Format.read(b,epos);
-		if (orders == null) throw new BadFormatException("Null orders in Belief");
-		epos+=Cells.getEncodingLength(orders);
-		
-		Belief result= new Belief(orders);
-		result.attachEncoding(b.slice(pos, epos));
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
+
+		if (values.count()!=1) throw new BadFormatException("Wrong number of values for Belief");
+
+		Belief result=new Belief(values);
+
+		values.attachEncoding(null);
+		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
 	
-	/**
-	 * Encodes this Belief
-	 * @param bs Array to write to
-	 */
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.write(bs,pos, orders);
-		return pos;
-	}
-
 	/**
 	 * Gets the current Order for a given Address within this Belief.
 	 * 
@@ -185,7 +159,7 @@ public class Belief extends ACVMRecord {
 	 * @return The chain for the peer within this Belief, or null if noy found.
 	 */
 	public Order getOrder(AccountKey address) {
-		SignedData<Order> sc = orders.get(address);
+		SignedData<Order> sc = getOrders().get(address);
 		if (sc == null) return null;
 		return sc.getValue();
 	}
@@ -194,14 +168,10 @@ public class Belief extends ACVMRecord {
 	 * Get the map of orders for this Belief
 	 * @return Orders map
 	 */
+	@SuppressWarnings("unchecked")
 	public Index<AccountKey, SignedData<Order>> getOrders() {
+		if (orders==null) orders=(Index<AccountKey, SignedData<Order>>) values.get(0);
 		return orders;
-	}
-
-	@Override
-	public void validateCell() throws InvalidDataException {
-		if (orders == null) throw new InvalidDataException("Null orders", this);
-		orders.validateCell();
 	}
 	
 	@Override 
@@ -225,18 +195,8 @@ public class Belief extends ACVMRecord {
 			if (ha!=null) return Cells.equals(h, ha);
 		}
 
-		if (!orders.equals(a.orders)) return false;
+		if (!getOrders().equals(a.getOrders())) return false;
 		return true;
-	}
-
-	@Override
-	public int getRefCount() {
-		return orders.getRefCount();
-	}
-	
-	@Override 
-	public <R extends ACell> Ref<R> getRef(int i) {
-		return orders.getRef(i);
 	}
 
 	/**
@@ -244,14 +204,7 @@ public class Belief extends ACVMRecord {
 	 * @return HashMap of current orders
 	 */
 	public HashMap<AccountKey, SignedData<Order>> getOrdersHashMap() {
-		int n=orders.size();
-		HashMap<AccountKey, SignedData<Order>> hm=new HashMap<>(n);
-		for (int i=0; i<n; i++) {
-			MapEntry<AccountKey, SignedData<Order>> entry=orders.entryAt(i);
-			AccountKey key=RT.ensureAccountKey(entry.getKey());
-			hm.put(key, entry.getValue());
-		}
-		return hm;
+		return getOrders().toHashMap();
 	}
 
 	@Override
@@ -309,5 +262,14 @@ public class Belief extends ACVMRecord {
 		Belief newBelief=this.withOrders(newOrders);
 		return newBelief;
 	}
+
+	@SuppressWarnings("unchecked")
+	@Override
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new Belief((Index<AccountKey, SignedData<Order>>) newValues.get(0));
+	}
+
+
 
 }

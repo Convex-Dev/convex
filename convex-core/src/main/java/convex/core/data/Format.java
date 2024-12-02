@@ -687,9 +687,6 @@ public class Format {
 		if (tag == CVMTag.ORDER) {
 			return (T) Order.read(b,pos);
 		}
-		if (tag == CVMTag.BELIEF) {
-			return (T) Belief.read(b,pos);
-		}
 		
 		if (tag == CVMTag.RESULT) {
 			return (T) Result.read(b,pos);
@@ -719,6 +716,10 @@ public class Format {
 		
 		if (tag == CVMTag.STATE) {
 			return (T) State.read(b,pos);
+		}
+		
+		if (tag == CVMTag.BELIEF) {
+			return (T) Belief.read(b,pos);
 		}
 		
 		// Might be a generic Dense Record
