@@ -60,7 +60,7 @@ public class AccountsTableModel extends BaseTableModel {
 		case 3:
 			return as.getBalance();
 		case 4: {
-			ACell o = as.getHoldings().get(Init.REGISTRY_ADDRESS);
+			ACell o = as.getHolding(Init.REGISTRY_ADDRESS);
 			if (o == null) return "";
 			if (!(o instanceof AMap)) return "<Invalid registration, not a map!>";
 			AMap<Keyword, ACell> a = (AMap<Keyword, ACell>) o;

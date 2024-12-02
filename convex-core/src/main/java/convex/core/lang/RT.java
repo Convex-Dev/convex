@@ -29,6 +29,7 @@ import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.IAssociative;
+import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
 import convex.core.data.MapEntry;
@@ -1611,6 +1612,13 @@ public class RT {
 			return (AHashMap<K, V>) a;
 		return null;
 	}
+	
+	@SuppressWarnings("unchecked")
+	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> ensureIndex(ACell a) {
+		if (a instanceof Index)
+			return (Index<K, V>) a;
+		return null;
+	}
 
 	/**
 	 * Implicitly casts the argument to a Blob
@@ -1876,6 +1884,8 @@ public class RT {
 		sb.append((byte)']');
 		return sb.check(limit);
 	}
+
+
 
 
 }

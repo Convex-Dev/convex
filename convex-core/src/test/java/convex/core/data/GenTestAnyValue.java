@@ -61,8 +61,9 @@ public class GenTestAnyValue {
 		FuzzTestFormat.doMutationTest(b);
 		
 		if (o instanceof ACell) {
-			// break all the refs! This should still pass validateCell(), since it woun't change structure.
+			// break all the refs! This should still pass validateCell(), since it won't change structure.
 			ACell c=((ACell)o).updateRefs(r->{ 
+				if (r.isEmbedded()) return r;
 				byte[] badBytes=r.getHash().getBytes();
 				Utils.writeInt(badBytes, 28,12255);
 				Hash badHash=Hash.wrap(badBytes);

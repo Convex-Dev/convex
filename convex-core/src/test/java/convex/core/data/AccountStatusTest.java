@@ -35,9 +35,11 @@ public class AccountStatusTest {
 	}
 	
 	@Test public void testFull() throws BadFormatException, InvalidDataException {
+		Address HADDER=Address.create(127);
+		
 		AccountStatus as=AccountStatus.create(10, 1000, Samples.ACCOUNT_KEY);
 		as=as.withMemory(10000);
-		as=as.withHolding(Address.create(127), Symbols.FOO);
+		as=as.withHolding(HADDER, Symbols.FOO);
 		as=as.withEnvironment(Maps.of(Symbols.FOO,CVMLong.ONE));
 		as=as.withMetadata(Maps.of(Symbols.FOO,Maps.empty()));
 		as=as.withController(Address.create(1546746));
@@ -49,7 +51,7 @@ public class AccountStatusTest {
 		assertEquals(10,as.getSequence());
 		assertEquals(1000,as.getBalance());
 		assertEquals(10000,as.getMemory());
-		assertEquals(Symbols.FOO,as.getHoldings().get(Address.create(127)));
+		assertEquals(Symbols.FOO,as.getHolding(HADDER));
 		assertEquals(CVMLong.ONE,as.getEnvironmentValue(Symbols.FOO));
 		assertEquals(Maps.empty(),as.getMetadata().get(Symbols.FOO));
 		assertEquals(Address.create(1546746),as.getController());

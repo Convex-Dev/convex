@@ -202,7 +202,7 @@ public class Context {
 		 * @return
 		 */
 		private AHashMap<Symbol, ACell> getEnvironment() {
-			return account.getEnvironment();
+			return RT.ensureHashMap(account.getEnvironment());
 		}
 
 		private ChainState withEnvironment(AHashMap<Symbol, ACell> newEnvironment)  {
@@ -225,7 +225,7 @@ public class Context {
 		}
 
 		public AHashMap<Symbol, AHashMap<ACell, ACell>> getMetadata() {
-			return account.getMetadata();
+			return RT.ensureHashMap(account.getMetadata());
 		}
 
 		public ChainState withScope(ACell newScope) {
@@ -584,8 +584,8 @@ public class Context {
 			AccountStatus as=getAccountStatus(address);
 			if (as==null) return null;
 			AHashMap<Symbol, ACell> env=as.getEnvironment();
-			if (env.containsKey(sym)) {
-				return as.getMetadata().get(sym,Maps.empty());
+			if ((env!=null)&&env.containsKey(sym)) {
+				return as.getMetadata(sym);
 			}
 			
 			// go to parent
@@ -609,8 +609,7 @@ public class Context {
 			AccountStatus as=getAccountStatus(addr);
 			if (as==null) return null;
 			
-			AHashMap<Symbol, ACell> env=as.getEnvironment();
-			MapEntry<Symbol, ACell> entry = env.getEntry(sym);
+			MapEntry<Symbol, ACell> entry=as.getEnvironmentEntry(sym);
 			if (entry!=null) {
 				return addr;
 			}
@@ -678,8 +677,11 @@ public class Context {
 		for (int i=0; i<Constants.LOOKUP_DEPTH; i++) {
 			if (as==null) return Core.ENVIRONMENT.getEntry(sym);
 
-			MapEntry<Symbol,ACell> result=as.getEnvironment().getEntry(sym);
-			if (result!=null) return result;
+			AHashMap<Symbol, ACell> env = as.getEnvironment();
+			if (env!=null) {
+				MapEntry<Symbol,ACell> result=env.getEntry(sym);
+				if (result!=null) return result;
+			}
 			
 			Address parent=getParentAddress(as);
 			as=getAccountStatus(parent); // if not found, will be null
@@ -708,7 +710,9 @@ public class Context {
 	public Index<Address,ACell> getHoldings() {
 		AccountStatus as=getAccountStatus(getAddress());
 		if (as==null) return null;
-		return as.getHoldings();
+		Index<Address, ACell> hodls = as.getHoldings();
+		if (hodls==null) hodls=AccountStatus.EMPTY_HOLDINGS;
+		return hodls;
 	}
 
 	/**
@@ -1678,7 +1682,7 @@ public class Context {
 		AFn<?> fn = as.getCallableFunction(sym);
 
 		if (fn == null) {
-			if (!as.getEnvironment().containsKey(sym)) {
+			if (as.getEnvironmentEntry(sym)==null) {
 				return this.withError(ErrorCodes.STATE, "Account " + targetAddress + " does not define Symbol: " + sym);						
 			}
 			return this.withError(ErrorCodes.STATE, "Value defined in account " + targetAddress + " is not a callable function: " + sym);
@@ -2361,5 +2365,7 @@ public class Context {
 		// TODO Auto-generated method stub
 		return chainState.getPeer();
 	}
+
+
 
 }

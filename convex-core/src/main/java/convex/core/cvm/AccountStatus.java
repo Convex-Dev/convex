@@ -5,17 +5,18 @@ import convex.core.Constants;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.ASet;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
+import convex.core.data.MapEntry;
 import convex.core.data.Maps;
-import convex.core.data.Ref;
 import convex.core.data.Sets;
 import convex.core.data.Symbol;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
@@ -29,15 +30,15 @@ import convex.core.lang.RT;
  * "People said I should accept the world. Bullshit! I don't accept the world."
  * - Richard Stallman
  */
-public class AccountStatus extends ACVMRecord {
+public class AccountStatus extends ARecordGeneric {
 	private final long sequence;
+	private final AccountKey publicKey;
 	private final long balance;
 	private final long memory;
-	private final AHashMap<Symbol, ACell> environment;
-	private final AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
-	private final Index<Address, ACell> holdings;
-	private final ACell controller;
-	private final AccountKey publicKey;
+	private Index<Address, ACell> holdings;
+	private ACell controller;
+	private AHashMap<Symbol, ACell> environment;
+	private AHashMap<Symbol, AHashMap<ACell,ACell>> metadata;
 	private final Address parent;
 	
 	// Sequence of fields in account. 
@@ -48,23 +49,10 @@ public class AccountStatus extends ACVMRecord {
 			Keywords.PARENT
 			};
 	
-	private static final Index<Address, ACell> EMPTY_HOLDINGS = Index.none();
+	protected static final Index<Address, ACell> EMPTY_HOLDINGS = Index.none();
 
 
 	private static final RecordFormat FORMAT = RecordFormat.of(ACCOUNT_KEYS);
-	
-	// Inclusion flags for each field
-	private static final int HAS_SEQUENCE=1<<FORMAT.indexFor(Keywords.SEQUENCE);
-	private static final int HAS_KEY=1<<FORMAT.indexFor(Keywords.KEY);
-	private static final int HAS_BALANCE=1<<FORMAT.indexFor(Keywords.BALANCE);
-	private static final int HAS_ALLOWANCE=1<<FORMAT.indexFor(Keywords.ALLOWANCE);
-	private static final int HAS_HOLDINGS=1<<FORMAT.indexFor(Keywords.HOLDINGS);
-	private static final int HAS_CONTROLLER=1<<FORMAT.indexFor(Keywords.CONTROLLER);
-	private static final int HAS_ENVIRONMENT=1<<FORMAT.indexFor(Keywords.ENVIRONMENT);
-	private static final int HAS_METADATA=1<<FORMAT.indexFor(Keywords.METADATA);
-	private static final int HAS_PARENT=1<<FORMAT.indexFor(Keywords.PARENT);
-	
-	protected static final int INCLUSION_MASK=0x01ff;
 
 	private AccountStatus(long sequence, AccountKey publicKey, long balance,
 			long memory, 
@@ -72,7 +60,7 @@ public class AccountStatus extends ACVMRecord {
 			ACell controller,
 			AHashMap<Symbol, ACell> environment, 
 			AHashMap<Symbol, AHashMap<ACell,ACell>> metadata, Address parent) {
-		super(CVMTag.ACCOUNT_STATUS,FORMAT.count());
+		super(CVMTag.ACCOUNT_STATUS,FORMAT,Vectors.create(CVMLong.create(sequence),publicKey,CVMLong.create(balance),CVMLong.create(memory),holdings,controller,environment,metadata,parent));
 		this.sequence = sequence;
 		this.publicKey = publicKey;
 		this.balance = balance;
@@ -84,6 +72,15 @@ public class AccountStatus extends ACVMRecord {
 		this.parent=parent;
 	}
 	
+	public AccountStatus(AVector<ACell> values) {
+		super(CVMTag.ACCOUNT_STATUS,FORMAT,values);
+		this.sequence = RT.ensureLong(values.get(0)).longValue();
+		this.publicKey = RT.ensureAccountKey(values.get(1));
+		this.balance = RT.ensureLong(values.get(2)).longValue();;
+		this.memory = RT.ensureLong(values.get(3)).longValue();;
+		this.parent = RT.ensureAddress(values.get(8));
+	}
+
 	/**
 	 * Create a regular account, with the specified balance and zero memory allowance
 	 * 
@@ -128,45 +125,6 @@ public class AccountStatus extends ACVMRecord {
 	public long getBalance() {
 		return balance;
 	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=CVMTag.ACCOUNT_STATUS;
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		int included=getInclusion();
-		pos=Format.writeVLQCount(bs, pos, included);
-		if ((included&HAS_SEQUENCE)!=0) pos = Format.writeVLQCount(bs, pos,sequence);
-		if ((included&HAS_KEY)!=0) pos = publicKey.getBytes(bs, pos);
-		if ((included&HAS_BALANCE)!=0) pos = Format.writeVLQCount(bs,pos, balance);
-		if ((included&HAS_ALLOWANCE)!=0) pos = Format.writeVLQCount(bs,pos, memory);
-		if ((included&HAS_HOLDINGS)!=0) pos = Format.write(bs,pos, holdings);
-		if ((included&HAS_CONTROLLER)!=0) pos = Format.write(bs,pos, controller);
-		if ((included&HAS_ENVIRONMENT)!=0) pos = Format.write(bs,pos, environment);
-		if ((included&HAS_METADATA)!=0) pos = Format.write(bs,pos, metadata);
-		if ((included&HAS_PARENT)!=0) pos = Format.write(bs,pos, parent);
-		return pos;
-	}
-	
-	private int getInclusion() {
-		int included=0;
-		if (sequence!=0L) included|=HAS_SEQUENCE;
-		if (publicKey!=null) included|=HAS_KEY;
-		if (balance!=0L) included|=HAS_BALANCE;
-		if (memory!=0L) included|=HAS_ALLOWANCE;
-		if (holdings!=null) included|=HAS_HOLDINGS;
-		if (controller!=null) included|=HAS_CONTROLLER;
-		if (environment!=null) included|=HAS_ENVIRONMENT;
-		if (metadata!=null) included|=HAS_METADATA;
-		if (parent!=null) included|=HAS_PARENT;
-		return included;
-		
-	}
-
-
 	
 	/**
 	 * Decode AccountStatus from Blob
@@ -176,61 +134,10 @@ public class AccountStatus extends ACVMRecord {
 	 * @throws BadFormatException in case of any encoding error
 	 */
 	public static AccountStatus read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		long included=Format.readVLQCount(b, epos);
-		epos+=Format.getVLQCountLength(included);
-		long sequence=0;
-		if ((included&HAS_SEQUENCE)!=0) {
-			sequence=Format.readVLQCount(b, epos);
-			epos+=Format.getVLQCountLength(sequence);
-		};
-		AccountKey publicKey=null;
-		if ((included&HAS_KEY)!=0) {
-			publicKey=AccountKey.readRaw(b, epos);
-			epos+=AccountKey.LENGTH;
-		}
-		long balance=0;
-		if ((included&HAS_BALANCE)!=0) {
-			balance=Format.readVLQCount(b, epos);
-			epos+=Format.getVLQCountLength(balance);
-		};		
-		long allowance=0;
-		if ((included&HAS_ALLOWANCE)!=0) {
-			allowance=Format.readVLQCount(b, epos);
-			epos+=Format.getVLQCountLength(allowance);
-		};		
-		Index<Address,ACell> holdings = null;
-		if ((included&HAS_HOLDINGS)!=0) {
-			holdings=Format.read(b, epos);
-			epos+=holdings.getEncodingLength();
-		};		
-		Address controller=null;
-		if ((included&HAS_CONTROLLER)!=0) {
-			controller=Format.read(b, epos);
-			epos+=controller.getEncodingLength();
-		}
-		AHashMap<Symbol, ACell> environment = null;
-		if ((included&HAS_ENVIRONMENT)!=0) {
-			environment=Format.read(b, epos);
-			epos+=environment.getEncodingLength();
-		};		
-		AHashMap<Symbol, AHashMap<ACell,ACell>> metadata = null;
-		if ((included&HAS_METADATA)!=0) {
-			metadata=Format.read(b, epos);
-			epos+=metadata.getEncodingLength();
-		};		
-		Address parent = null;
-		if ((included&HAS_PARENT)!=0) {
-			parent=Format.read(b, epos);
-			epos+=parent.getEncodingLength();
-		};		
-
-		AccountStatus result= new AccountStatus(sequence, publicKey, balance, allowance,holdings,controller,environment,metadata,parent);
-		int shouldBeIncluded=result.getInclusion();
-		if (included!=shouldBeIncluded) {
-			// TODO: double check this catches all encoding violations
-			throw new BadFormatException("Bad inclusion: "+included+ " should be: "+shouldBeIncluded);
-		}
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
+		
+		AccountStatus result=new AccountStatus(values);
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
@@ -253,63 +160,58 @@ public class AccountStatus extends ACVMRecord {
 		return publicKey==null;
 	}
 
-	/**
-	 * Get the controller for this Account
-	 * @return Controller Address, or null if there is no controller
-	 */
-	public ACell getController() {
-		return controller;
-	}
-
-	public AccountStatus withBalance(long newBalance) {
-		if (balance==newBalance) return this;
-		return new AccountStatus(sequence, publicKey, newBalance, memory,holdings,controller,environment,metadata,parent);
-	}
-	
-
 	public AccountStatus withAccountKey(AccountKey newKey) {
 		if (newKey==publicKey) return this;
-		return new AccountStatus(sequence, newKey, balance, memory,holdings,controller,environment,metadata,parent);
+		return new AccountStatus(values.assoc(1,newKey));
 	}
 	
+	public AccountStatus withBalance(long newBalance) {
+		if (balance==newBalance) return this;
+		return new AccountStatus(values.assoc(2,CVMLong.create(newBalance)));
+	}
+
 	public AccountStatus withMemory(long newMemory) {
 		if (memory==newMemory) return this;
-		return new AccountStatus(sequence, publicKey, balance, newMemory,holdings,controller,environment,metadata,parent);
+		return new AccountStatus(values.assoc(3,CVMLong.create(newMemory)));
 	}
 	
 	public AccountStatus withBalances(long newBalance, long newAllowance) {
 		if ((balance==newBalance)&&(memory==newAllowance)) return this;
-		return new AccountStatus(sequence, publicKey, newBalance, newAllowance,holdings,controller,environment,metadata,parent);
+		AVector<ACell> nv=values;
+		nv=nv.assoc(2, CVMLong.create(newBalance));
+		nv=nv.assoc(3, CVMLong.create(newAllowance));
+		return new AccountStatus(nv);
+	}
+
+	private AccountStatus withHoldings(Index<Address, ACell> newHoldings) {
+		if (getHoldings()==newHoldings) return this;
+		return new AccountStatus(values.assoc(4, newHoldings));
+	}
+	
+	public AccountStatus withController(ACell newController) {
+		if (getController()==newController) return this;
+		return new AccountStatus(values.assoc(5, newController));
 	}
 
 	public AccountStatus withEnvironment(AHashMap<Symbol, ACell> newEnvironment) {
-		if ((newEnvironment!=null)&&newEnvironment.isEmpty()) newEnvironment=null;
-		if (environment==newEnvironment) return this;
-		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,newEnvironment,metadata,parent);
+		if (getEnvironment()==newEnvironment) return this;
+		return new AccountStatus(values.assoc(6, newEnvironment));
 	}
 	
 	public AccountStatus withMetadata(AHashMap<Symbol, AHashMap<ACell, ACell>> newMeta) {
-		if ((newMeta!=null)&&newMeta.isEmpty()) newMeta=null;
-		if (metadata==newMeta) return this;
-		return new AccountStatus(sequence, publicKey, balance,memory,holdings,controller,environment,newMeta,parent);
-	}
-	
-	private AccountStatus withHoldings(Index<Address, ACell> newHoldings) {
-		if ((newHoldings!=null)&&newHoldings.isEmpty()) newHoldings=null;
-		if (holdings==newHoldings) return this;
-		return new AccountStatus(sequence, publicKey, balance, memory,newHoldings,controller,environment,metadata,parent);
+		if (getMetadata()==newMeta) return this;
+		return new AccountStatus(values.assoc(7, newMeta));
 	}
 	
 	public AccountStatus withParent(Address newParent) {
 		if (parent==newParent) return this;
-		return new AccountStatus(sequence, publicKey, balance, memory,holdings,controller,environment,metadata,newParent);
+		return new AccountStatus(values.assoc(8,newParent));
 	}
 	
 	@Override 
 	public boolean equals(ACell o) {
-		if(!(o instanceof AccountStatus)) return false;
-		AccountStatus as=(AccountStatus)o;
-		return equals(as);
+		if (o instanceof AccountStatus) return equals((AccountStatus)o);
+		return Cells.equalsGeneric(this, o);
 	}
 	
 	/**
@@ -324,26 +226,11 @@ public class AccountStatus extends ACVMRecord {
 		if (balance!=a.balance) return false;
 		if (sequence!=a.sequence) return false;
 		if (memory!=a.memory) return false;
-		if (!(Cells.equals(publicKey, a.publicKey))) return false;
-		if (!(Cells.equals(controller, a.controller))) return false;
-		if (!(Cells.equals(holdings, a.holdings))) return false;
-		if (!(Cells.equals(metadata, a.metadata))) return false;
-		if (!(Cells.equals(environment, a.environment))) return false;
-		if (!(Cells.equals(parent, a.parent))) return false;
-		return true;
+		return (Cells.equals(values, a.values));
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (environment != null) {
-			if (environment.isEmpty()) throw new InvalidDataException("Account should not have empty map as environment",this);
-			environment.validateCell();
-		}
-		if (holdings != null) {
-			if (holdings.isEmpty()) throw new InvalidDataException("Account should not have empty map as holdings",this);
-			holdings.validateCell();
-		}
-		
 		if (!Coin.isValidAmount(balance)) throw new InvalidDataException("Illegal balance: "+balance,this);
 	}
 
@@ -356,67 +243,33 @@ public class AccountStatus extends ACVMRecord {
 	 */
 	@SuppressWarnings("unchecked")
 	public <R extends ACell> R getEnvironmentValue(Symbol symbol) {
-		if (environment == null) return null;
-		ACell value = environment.get(symbol);
+		AHashMap<Symbol, ACell> env = getEnvironment();
+		if (env == null) return null;
+		ACell value = env.get(symbol);
 		return (R) value;
 	}
 
-	/**
-	 * Gets the holdings for this account. Will always be a non-null map.
-	 * @return Holdings map for this account
-	 */
-	public Index<Address, ACell> getHoldings() {
-		Index<Address, ACell> result=holdings;
-		if (result==null) return EMPTY_HOLDINGS;
-		return result;
-	}
+
 	
 	public ACell getHolding(Address addr) {
-		if (holdings==null) return null;
-		return holdings.get(addr);
+		Index<Address, ACell> hodls=getHoldings();
+		if (hodls==null) return null;
+		return hodls.get(addr);
 	}
 	
 	public AccountStatus withHolding(Address addr,ACell value) {
 		Index<Address, ACell> hodls=getHoldings();
-		if (value==null) { 
+		if (hodls==null) {
+			hodls=(value==null)?null:Index.of(addr,value);
+		} else if (value==null) { 
 			hodls=hodls.dissoc(addr);
-		} else if (hodls==null) {
-			hodls=Index.of(addr,value);
+			if (hodls.isEmpty()) hodls=null;
 		} else {
 			hodls=hodls.assoc(addr, value);
 		}
 		return withHoldings(hodls);
 	}
 	
-	public AccountStatus withController(ACell newController) {
-		if (controller==newController) return this;
-		return new AccountStatus(sequence, publicKey, balance, memory,holdings,newController,environment,metadata,parent);
-	}
-
-	@Override
-	public int getRefCount() {
-		int rc=(environment==null)?0:environment.getRefCount();
-		rc+=(metadata==null)?0:metadata.getRefCount();
-		rc+=(holdings==null)?0:holdings.getRefCount();
-		return rc;
-	}
-	
-	public <R extends ACell> Ref<R> getRef(int i) {
-		if (i<0) throw new IndexOutOfBoundsException(i);
-		
-		int ec=(environment==null)?0:environment.getRefCount();
-		if (i<ec) return environment.getRef(i);
-		i-=ec;
-		
-		int mc=(metadata==null)?0:metadata.getRefCount();
-		if (i<mc) return metadata.getRef(i);
-		i-=mc;
-
-		int hc=(holdings==null)?0:holdings.getRefCount();
-		if (i<hc) return holdings.getRef(i);
-		
-		throw new IndexOutOfBoundsException(i);
-	}
 
 	@Override
 	public ACell get(Keyword key) {
@@ -425,25 +278,12 @@ public class AccountStatus extends ACVMRecord {
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);
 		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
-		if (Keywords.CONTROLLER.equals(key)) return controller;
+		if (Keywords.CONTROLLER.equals(key)) return getController();
 		if (Keywords.ENVIRONMENT.equals(key)) return getEnvironment();
 		if (Keywords.METADATA.equals(key)) return getMetadata();
 		if (Keywords.PARENT.equals(key)) return parent;
 		
 		return null;
-	}
-
-	@Override
-	public AccountStatus updateRefs(IRefFunction func) {
-		AHashMap<Symbol, ACell> newEnv=Ref.updateRefs(environment, func);
-		AHashMap<Symbol, AHashMap<ACell,ACell>> newMeta=Ref.updateRefs(metadata, func);
-		Index<Address, ACell> newHoldings=Ref.updateRefs(holdings, func);
-		
-		if ((newEnv==environment)&&(newMeta==metadata)&&(newHoldings==holdings)) {
-			return this;
-		}
-		
-		return new AccountStatus(sequence,publicKey,balance,memory,newHoldings,controller,newEnv,newMeta,parent);
 	}
 
 	/**
@@ -469,7 +309,10 @@ public class AccountStatus extends ACVMRecord {
 	 * @return Updated account record
 	 */
 	public AccountStatus addBalanceAndSequence(long delta) {
-		return new AccountStatus(sequence+1,publicKey,balance+delta,memory,holdings,controller,environment,metadata,parent);
+		AVector<ACell> nv=values;
+		nv=nv.assoc(0,CVMLong.create(sequence+1));
+		nv=nv.assoc(2,CVMLong.create(balance+delta));
+		return new AccountStatus(nv);
 	}
 
 	/**
@@ -487,23 +330,50 @@ public class AccountStatus extends ACVMRecord {
 	public Address getParent() {
 		return parent;
 	}
-
+	
 	/**
-	 * Gets the Metadata map for this Account
-	 * @return Metadata map (never null, but may be empty)
+	 * Gets the holdings for this account. Will always be a non-null map.
+	 * @return Holdings map for this account
 	 */
-	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
-		if (metadata==null) return Maps.empty();
-		return metadata;
+	public Index<Address, ACell> getHoldings() {
+		if (holdings==null) {
+			holdings=RT.ensureIndex(values.get(4));
+			// if (holdings==null) holdings=EMPTY_HOLDINGS;
+		}
+		return holdings;
+	}
+	
+	/**
+	 * Get the controller for this Account
+	 * @return Controller Address, or null if there is no controller
+	 */
+	public ACell getController() {
+		if (controller==null) controller=values.get(5);
+		return controller;
 	}
 	
 	/**
 	 * Gets the Environment for this account. Defaults to the an empty map if no Environment has been created.
 	 * @return Environment map for this Account
 	 */
+	@SuppressWarnings("unchecked")
 	public AHashMap<Symbol, ACell> getEnvironment() {
-		if (environment==null) return Maps.empty();
+		if (environment==null) {
+			environment=(AHashMap<Symbol, ACell>)values.get(6);
+		}
 		return environment;
+	}
+
+	/**
+	 * Gets the Metadata map for this Account
+	 * @return Metadata map (never null, but may be empty)
+	 */
+	@SuppressWarnings("unchecked")
+	public AHashMap<Symbol,AHashMap<ACell,ACell>> getMetadata() {
+		if (metadata==null) {
+			metadata=(AHashMap<Symbol,AHashMap<ACell,ACell>>)(values.get(7));
+		}
+		return metadata;
 	}
 
 	/**
@@ -543,7 +413,39 @@ public class AccountStatus extends ACVMRecord {
 	}
 
 	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new AccountStatus(newValues);
 	}
+
+	/**
+	 * Gets metadata for a Symbol. 
+	 * @param sym Symbol to get metadata for
+	 * @return Metadata map. Returns empty map if symbol not defined or no metadata set
+	 */
+	public AHashMap<ACell, ACell> getMetadata(Symbol sym) {
+		AHashMap<Symbol, AHashMap<ACell, ACell>> meta = getMetadata();
+		if (meta==null) return Maps.empty();
+		return meta.get(sym,Maps.empty());
+	}
+
+	/**
+	 * Gets environment entry for a given symbol
+	 * @param sym
+	 * @return Environment entry, or null if not defined in this account
+	 */
+	public MapEntry<Symbol, ACell> getEnvironmentEntry(Symbol sym) {
+		AHashMap<Symbol, ACell> env = getEnvironment();
+		if (env==null) return null;
+		MapEntry<Symbol, ACell> entry = env.getEntry(sym);
+		return entry;
+	}
+	
+	public ACell getHoldings(Address addr) {
+		Index<Address, ACell> hodls = getHoldings();
+		if (hodls==null) return null;
+		return hodls.get(addr);
+	}
+
+
 }

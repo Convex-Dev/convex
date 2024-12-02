@@ -150,11 +150,9 @@ public class State extends ARecordGeneric {
 	public static State read(Blob b, int pos) throws BadFormatException {
 		AVector<ACell> values=Vectors.read(b, pos);
 		int epos=pos+values.getEncodingLength();
-		State result=create(values);
 		
+		State result=create(values);
 		if (result==null) throw new BadFormatException("Bad format for CVM global state");
-
-		values.attachEncoding(null);
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}

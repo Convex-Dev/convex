@@ -5190,7 +5190,7 @@ public class CoreTest extends ACVMTest {
 		ctx=exec(ctx,"(def NOONE (address 7777777))");
 
 		// Basic empty holding should match empty Index in account record. See #131
-		assertTrue(evalB("(= *holdings* (:holdings (account *address*)) (index))"));
+		assertTrue(evalB("(= *holdings* (index))"));
 
 		// initial holding behaviour
 		assertNull(eval(ctx,"(get-holding VILLAIN)"));
@@ -5218,8 +5218,10 @@ public class CoreTest extends ACVMTest {
 		}
 
 		{ // test null assign
-			Context c2 = step(ctx,"(set-holding VILLAIN nil)");
-			assertFalse(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));
+			Context c2 = exec(ctx,"(set-holding VILLAIN nil)");
+			assertNull(eval(c2,"(get-holding VILLAIN)"));
+			AccountStatus vas=c2.getAccountStatus(VILLAIN);
+			assertNull(vas.getHoldings(HERO));
 		}
 	}
 

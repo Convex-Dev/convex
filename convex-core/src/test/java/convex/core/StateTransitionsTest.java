@@ -28,7 +28,9 @@ import convex.core.data.AccountKey;
 import convex.core.data.Index;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.init.InitTest;
 import convex.core.lang.Reader;
@@ -315,6 +317,16 @@ public class StateTransitionsTest {
 			s=newState;
 		}
 	}
+	
+	@Test public void testDefTransaction() {
+		State s = TestState.STATE;
+		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(def a 1)"));
+		ResultContext rc=s.applyTransaction(t1);
+		assertFalse(rc.isError());
+		State s2=rc.getState();
+		AccountStatus as=s2.getAccount(InitTest.HERO);
+		assertEquals(CVMLong.ONE,as.getEnvironmentValue(Symbol.create("a")));
+	}
 
 	@Test
 	public void testMemoryAccounting() throws BadSignatureException {
@@ -332,6 +344,8 @@ public class StateTransitionsTest {
 		assertNull(br.getErrorCode(0),br.getResult(0).toString());
 
 		s = br.getState();
+		AccountStatus as=s.getAccount(InitTest.HERO);
+		assertEquals(CVMLong.ONE,as.getEnvironmentValue(Symbol.create("a")));
 
 		// should have increased memory size for account
 		long newMem=s.getMemorySize();

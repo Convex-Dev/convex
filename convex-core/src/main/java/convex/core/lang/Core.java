@@ -1270,7 +1270,7 @@ public class Core {
 			Index<Address,ACell> holdings=as.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account
-			ACell result=holdings.get(context.getAddress());
+			ACell result=(holdings==null)?null:holdings.get(context.getAddress());
 
 			return context.withResult(Juice.LOOKUP, result);
 		}
