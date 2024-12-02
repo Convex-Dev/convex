@@ -50,7 +50,6 @@ public class CVMTag {
 
 	public static final byte PEER_STATUS = (byte) 0xD9;
 
-
 	public static final byte RESULT = (byte)0xDD; // transaction result
 
 	public static final byte BLOCK_RESULT = (byte) 0xDE;

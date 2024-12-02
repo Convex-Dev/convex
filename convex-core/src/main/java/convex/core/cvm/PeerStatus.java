@@ -27,22 +27,31 @@ import convex.core.util.Utils;
  *
  */ 
 public class PeerStatus extends ACVMRecord {
-
 	private static final Keyword[] PEER_KEYS = new Keyword[] { Keywords.CONTROLLER, Keywords.STAKE, Keywords.STAKES,Keywords.DELEGATED_STAKE,
 			Keywords.METADATA, Keywords.TIMESTAMP,Keywords.BALANCE};
-
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
-	
 	private static final Index<Address, CVMLong> EMPTY_STAKES = Index.none();
 
+	
+	/**
+	 * Per controller address
+	 */
     private final Address controller;
+    
+    /**
+     * Peer state share
+     */
 	private final long peerStake;
-	private final long delegatedStake;
 
 	/**
-	 * Map of delegated stakes. Never null internally, but empty map encoded as null.
+	 * Map of delegated stake shares. Never null internally, but empty map encoded as null.
 	 */
 	private final Index<Address, CVMLong> stakes;
+
+	/**
+	 * Total of delegated stake shares
+	 */
+	private final long delegatedStake;
 
 	/**
 	 * Metadata for the Peer. Can be null internally, which is interpreted as an empty Map.
@@ -50,6 +59,7 @@ public class PeerStatus extends ACVMRecord {
 	private final AHashMap<ACell,ACell> metadata;
 	
 	private final long timestamp;
+	
 	private final long balance;
 
 
@@ -75,15 +85,14 @@ public class PeerStatus extends ACVMRecord {
 	/**
 	 * Gets the total stake shares for this peer (excluding accumulated balance)
 	 *
-	 * @return Total stake shares, including own stake + delegated stake
+	 * @return Total stake shares, including own stake + delegated stake shares
 	 */
 	public long getTotalStake() {
-		// TODO: include rewards?
 		return peerStake + delegatedStake;
 	}
 	
     /**
-	 * Gets the Convex Coin balance for this Peer. Owned jointly by peer and delegators
+	 * Gets the Convex Coin balance for this Peer. Owned jointly by peer and delegators according to shares
 	 *
 	 * @return The total Convex Coin balance of this peer
 	 */
@@ -151,7 +160,6 @@ public class PeerStatus extends ACVMRecord {
 		return controller;
 	}
 	
-
 
 	/**
 	 * Gets the String representation of the hostname set for the current Peer status, 
