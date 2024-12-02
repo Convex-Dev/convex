@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.PeerStatus;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
@@ -14,6 +16,8 @@ public class PeerStatusTest {
 	
 	@Test public void testEmpty() {
 		PeerStatus ps=PeerStatus.create(null, 0);
+		
+		assertEquals(CVMLong.ZERO,ps.get(Keywords.DELEGATED_STAKE));
 		doPeerStatusTest(ps);
 	}
 	

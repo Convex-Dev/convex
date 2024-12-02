@@ -265,12 +265,12 @@ public class PeerStatus extends ARecordGeneric {
 		if (peerStake == newStake) return this;
 		long stakeChange=newStake-peerStake;
 
-		return new PeerStatus(controller, newStake, stakes, delegatedStake, metadata,timestamp,balance+stakeChange);
+		return new PeerStatus(controller, newStake, getStakes(), delegatedStake, getMetadata(),timestamp,balance+stakeChange);
 	}
 
 	public PeerStatus withPeerData(AHashMap<ACell,ACell> newMeta) {
 		if (metadata==newMeta) return this;	
-		return new PeerStatus(controller, peerStake, stakes, delegatedStake, newMeta,timestamp,balance);
+		return new PeerStatus(controller, peerStake, getStakes(), delegatedStake, newMeta,timestamp,balance);
     }
 
 	@Override
@@ -283,12 +283,12 @@ public class PeerStatus extends ARecordGeneric {
 	@Override
 	public ACell get(Keyword key) {
 		if (Keywords.CONTROLLER.equals(key)) return controller;
-		if (Keywords.STAKE.equals(key)) return CVMLong.create(peerStake);
+		if (Keywords.STAKE.equals(key)) return values.get(1);
 		if (Keywords.STAKES.equals(key)) return getStakes();
-		if (Keywords.DELEGATED_STAKE.equals(key)) return CVMLong.create(delegatedStake);
+		if (Keywords.DELEGATED_STAKE.equals(key)) return values.get(3);
 		if (Keywords.METADATA.equals(key)) return getMetadata();
-		if (Keywords.TIMESTAMP.equals(key)) return CVMLong.create(timestamp);
-		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
+		if (Keywords.TIMESTAMP.equals(key)) return values.get(5);
+		if (Keywords.BALANCE.equals(key)) return values.get(6);
 
 		return null;
 	}
