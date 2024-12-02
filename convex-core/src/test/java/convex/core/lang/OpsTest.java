@@ -16,7 +16,6 @@ import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.Syntax;
 import convex.core.cvm.ops.Cond;
@@ -84,7 +83,7 @@ public class OpsTest extends ACVMTest {
 			assertNull(c2.getResult());
 			doOpTest(op);
 			
-			assertEquals(Blob.wrap(new byte[] {CVMTag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
+			assertEquals(Blob.wrap(new byte[] {CVMTag.OP_CODED,CVMTag.OPCODE_CONSTANT,Tag.NULL}),op.getEncoding());
 		}
 		
 		{// nested constant
@@ -95,7 +94,7 @@ public class OpsTest extends ACVMTest {
 			assertEquals(Constant.nil(),c2.getResult());
 			doOpTest(op);
 			
-			assertEquals(Blob.wrap(new byte[] {CVMTag.OP,Ops.CONSTANT,CVMTag.OP,Ops.CONSTANT,Tag.NULL}),op.getEncoding());
+			assertEquals(Blob.wrap(new byte[] {CVMTag.OP_CODED,CVMTag.OPCODE_CONSTANT,CVMTag.OP_CODED,CVMTag.OPCODE_CONSTANT,Tag.NULL}),op.getEncoding());
 		}
 	}
 
@@ -192,7 +191,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testSet() throws BadFormatException {
 		AOp<Address> op = Set.create(45, Constant.nil());
-		Blob expectedEncoding=Blob.fromHex("c00b2dc00000");
+		Blob expectedEncoding=Blob.fromHex("c00b2dc0b000");
 		assertEquals(expectedEncoding,op.getEncoding());
 		assertEquals(op,Format.read(expectedEncoding));
 		doOpTest(op);

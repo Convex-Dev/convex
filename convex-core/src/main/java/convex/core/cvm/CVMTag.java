@@ -72,13 +72,21 @@ public class CVMTag {
 	 */
 	public static final byte CORE_DEF = (byte) 0xED;
 
-
-	// CVM Code
-	public static final byte OP = (byte) 0xC0;
+    // ==========================================
+	// CVM Ops
+	
+	// General ops with byte flag
+	public static final byte OP_CODED = (byte) 0xC0;
+	public static final byte OPCODE_CONSTANT = (byte) 0xB0;
+	
+	public static final byte OP_DEF = (byte) 0xCD;
+	
+	
 
 	public static final byte FN = (byte) 0xCF;
 
 	public static final byte FN_MULTI = (byte) 0xCB;
+	
 
 
 

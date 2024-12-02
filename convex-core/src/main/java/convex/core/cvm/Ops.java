@@ -2,7 +2,6 @@ package convex.core.cvm;
 
 import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Constant;
-import convex.core.cvm.ops.Def;
 import convex.core.cvm.ops.Do;
 import convex.core.cvm.ops.Invoke;
 import convex.core.cvm.ops.Lambda;
@@ -45,6 +44,7 @@ public class Ops {
 
 	/**
 	 * Reads an Op from the given Blob. Assumes tag specifying an Op already read.
+	 * @param tag 
 	 * 
 	 * @param <T> The return type of the Op
 	 * @param b Blob to read from
@@ -53,17 +53,15 @@ public class Ops {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> read(Blob b, int pos) throws BadFormatException {
+	public static <T extends ACell> AOp<T> read(byte tag, Blob b, int pos) throws BadFormatException {
 		byte opCode=b.byteAt(pos+1);
 		switch (opCode) {
-		case Ops.CONSTANT:
+		case CVMTag.OPCODE_CONSTANT:
 			return Constant.read(b,pos);
 		case Ops.INVOKE:
 			return Invoke.read(b,pos);
 		case Ops.COND:
 			return Cond.read(b,pos);
-		case Ops.DEF:
-			return Def.read(b,pos);
 		case Ops.DO:
 			return Do.read(b,pos);
 		case Ops.LOOKUP:

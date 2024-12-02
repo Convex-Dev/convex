@@ -27,7 +27,7 @@ public class ByteFlag extends AByteFlag {
 	 * Private constructor, to enforce singleton instances
 	 * @param tag
 	 */
-	private ByteFlag(byte tag) {
+	public ByteFlag(byte tag) {
 		this.tag=tag;
 	}
 
@@ -40,6 +40,11 @@ public class ByteFlag extends AByteFlag {
 		int m=(int)(value&0xf);
 		if (m!=value) return null; // out of range
 		return unsafeCreate(m);
+	}
+	
+	public static ACell forTag(byte tag) {
+		if ((tag & 0xF0)!=Tag.BYTE_FLAG_BASE) return null;
+		return new ByteFlag(tag);
 	}
 	
 	static ByteFlag unsafeCreate(int value) {
@@ -83,5 +88,7 @@ public class ByteFlag extends AByteFlag {
 		return RT.printCAD3(sb,limit,this);
 		
 	}
+
+
 
 }

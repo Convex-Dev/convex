@@ -1,6 +1,7 @@
 package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
@@ -12,7 +13,6 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.List;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
@@ -20,12 +20,11 @@ import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.VectorLeaf;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.ErrorMessages;
 
 /**
  * Operation representing a constant value
@@ -34,7 +33,9 @@ import convex.core.util.ErrorMessages;
  *
  * @param <T> Type of constant value
  */
-public class Constant<T extends ACell> extends AOp<T> {
+public class Constant<T extends ACell> extends ACodedOp<T,ACell,T> {
+
+	private static final Ref<ACell> OPCODE = new ByteFlag(CVMTag.OPCODE_CONSTANT).getRef();
 
 	public static final Constant<?> NULL = new Constant<>(Ref.NULL_VALUE);
 	public static final Constant<CVMBool> TRUE = new Constant<>(Ref.TRUE_VALUE);
@@ -53,11 +54,10 @@ public class Constant<T extends ACell> extends AOp<T> {
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static final Constant<ASet<?>> EMPTY_SET = new Constant(Sets.EMPTY_REF);
-
-	private final Ref<T> valueRef;
+	
 
 	private Constant(Ref<T> valueRef) {
-		this.valueRef = valueRef;
+		super(CVMTag.OP_CODED,OPCODE,valueRef);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -89,18 +89,12 @@ public class Constant<T extends ACell> extends AOp<T> {
 
 	@Override
 	public Context execute(Context context) {
-		return context.withResult(Juice.CONSTANT, valueRef.getValue());
+		return context.withResult(Juice.CONSTANT, value.getValue());
 	}
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
-		return RT.print(sb,valueRef.getValue(),limit);
-	}
-
-	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		pos = valueRef.encode(bs,pos);
-		return pos;
+		return RT.print(sb,value.getValue(),limit);
 	}
 	
 	@Override
@@ -123,28 +117,8 @@ public class Constant<T extends ACell> extends AOp<T> {
 		return Ops.CONSTANT;
 	}
 
-	@Override
-	public int getRefCount() {
-		return 1;
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		if (i != 0) throw new IndexOutOfBoundsException(ErrorMessages.badIndex(i));
-		return (Ref<R>) valueRef;
-	}
-	
 	public T getValue() {
-		return valueRef.getValue();
-	}
-
-	@Override
-	public Constant<T> updateRefs(IRefFunction func) {
-		@SuppressWarnings("unchecked")
-		Ref<T> newRef = (Ref<T>) func.apply(valueRef);
-		if (valueRef == newRef) return this;
-		return createFromRef(newRef);
+		return value.getValue();
 	}
 
 	@SuppressWarnings("unchecked")
@@ -153,9 +127,12 @@ public class Constant<T extends ACell> extends AOp<T> {
 	}
 
 	@Override
-	public void validateCell() throws InvalidDataException {
-		if (valueRef == null) throw new InvalidDataException("Missing contant value ref!", this);
+	protected Constant<T> rebuild(Ref<ACell> newCode, Ref<T> newValue) {
+		if (value==newValue) return this;
+		return new Constant<T>(newValue);
 	}
+
+
 
 
 

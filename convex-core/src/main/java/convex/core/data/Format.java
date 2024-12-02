@@ -23,6 +23,7 @@ import convex.core.cvm.Ops;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.cvm.Syntax;
+import convex.core.cvm.ops.Def;
 import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Special;
 import convex.core.cvm.transactions.Call;
@@ -497,9 +498,11 @@ public class Format {
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
 		
+		if (tag == CVMTag.OP_DEF) {
+			return Def.read(b, pos);
+		}
 		
-		if (tag == CVMTag.OP) return Ops.read(b, pos);
-		
+		if (tag == CVMTag.OP_CODED) return Ops.read(tag,b, pos); 
 		
 		if (tag == CVMTag.FN_MULTI) {
 			AFn<?> fn = MultiFn.read(b,pos);

@@ -6,15 +6,16 @@ import convex.core.data.ACell;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.ErrorMessages;
 
 public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell> extends AOp<T> {
 
 	@Override
 	public abstract Context execute(Context context);
 
-	private final byte tag;
-	private final Ref<C> code;
-	private final Ref<V> value;
+	protected final byte tag;
+	protected final Ref<C> code;
+	protected final Ref<V> value;
 	
 	protected ACodedOp(byte tag, Ref<C> code, Ref<V> value) {
 		this.tag=tag;
@@ -36,13 +37,29 @@ public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell
 	}
 	
 	@Override
-	public int getRefCount() {
+	public int encodeAfterOpcode(byte[] bs, int pos) {
+		throw new Error(ErrorMessages.UNREACHABLE);
+	}
+	
+	@Override
+	public final int getRefCount() {
 		return 2;
+	}
+	
+
+	@SuppressWarnings("unchecked")
+	@Override
+	public Ref<?> getRef(int i) {
+		switch(i) {
+		case 0: return code;
+		case 1: return value;
+		}
+		throw new IndexOutOfBoundsException(i);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public AOp<T> updateRefs(IRefFunction func) {
+	public final AOp<T> updateRefs(IRefFunction func) {
 		Ref<C> nc=func.apply(code);
 		Ref<V> nv=func.apply(value);
 		return rebuild(nc,nv);

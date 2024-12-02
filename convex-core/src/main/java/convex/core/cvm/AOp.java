@@ -79,14 +79,14 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	 * @return The updated position
 	 */
 
-	public abstract int encodeAfterOpcode(byte[] bs, int pos);
+	protected abstract int encodeAfterOpcode(byte[] bs, int pos);
 	
 	@Override
 	public abstract AOp<T> updateRefs(IRefFunction func);
 	
 	@Override
 	public byte getTag() {
-		return CVMTag.OP;
+		return CVMTag.OP_CODED;
 	}
 	
 	@Override
