@@ -83,8 +83,8 @@ public class CAD3Test extends ACVMTest {
 		}
 		
 		{ // Empty vector DenseRecord
-			DenseRecord ed=DenseRecord.create(0xDE,Vectors.empty());
-			assertEquals(Blob.fromHex("de00"),ed.getEncoding());
+			DenseRecord ed=DenseRecord.create(0xDF,Vectors.empty());
+			assertEquals(Blob.fromHex("df00"),ed.getEncoding());
 			
 			ObjectsTest.doAnyValueTests(ed);
 		}

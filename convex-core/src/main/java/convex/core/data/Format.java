@@ -675,26 +675,7 @@ public class Format {
 	 * @return New decoded instance
 	 * @throws BadFormatException In the event of any encoding error
 	 */
-	@SuppressWarnings("unchecked")
 	private static <T extends ACVMRecord> T readRecord(byte tag, Blob b, int pos) throws BadFormatException {
-		if (tag == CVMTag.BLOCK) {
-			return (T) Block.read(b,pos);
-		}
-		if (tag == CVMTag.ORDER) {
-			return (T) Order.read(b,pos);
-		}
-		
-		if (tag == CVMTag.RESULT) {
-			return (T) Result.read(b,pos);
-		}
-		
-		if (tag == CVMTag.BLOCK_RESULT) {
-			return (T) BlockResult.read(b,pos);
-		}
-		
-		if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
-		if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
-
 		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
 	}
 
@@ -717,6 +698,26 @@ public class Format {
 		if (tag == CVMTag.BELIEF) {
 			return (T) Belief.read(b,pos);
 		}
+		
+		if (tag == CVMTag.BLOCK) {
+			return (T) Block.read(b,pos);
+		}
+		
+		if (tag == CVMTag.RESULT) {
+			return (T) Result.read(b,pos);
+		}
+		
+		if (tag == CVMTag.ORDER) {
+			return (T) Order.read(b,pos);
+		}
+		
+		if (tag == CVMTag.BLOCK_RESULT) {
+			return (T) BlockResult.read(b,pos);
+		}
+		
+		if (tag == CVMTag.PEER_STATUS) return (T) PeerStatus.read(b,pos);
+		if (tag == CVMTag.ACCOUNT_STATUS) return (T) AccountStatus.read(b,pos); 
+
 		
 		// Might be a generic Dense Record
 		DenseRecord dr=DenseRecord.read(tag,b,pos);

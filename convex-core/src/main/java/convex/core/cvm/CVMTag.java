@@ -42,18 +42,18 @@ public class CVMTag {
 	
 	public static final byte STATE = (byte) 0xD5;
 
-	public static final byte ACCOUNT_STATUS = (byte) 0xA1;
+	public static final byte BLOCK = (byte) 0xD6;
+	
+	public static final byte ORDER = (byte) 0xD7;
 
-	public static final byte PEER_STATUS = (byte) 0xA2;
+	public static final byte ACCOUNT_STATUS = (byte) 0xD8;
+
+	public static final byte PEER_STATUS = (byte) 0xD9;
 
 
-	public static final byte BLOCK = (byte) 0xAB;
+	public static final byte RESULT = (byte)0xDD; // transaction result
 
-	public static final byte ORDER = (byte) 0xAC;
-
-	public static final byte RESULT = (byte)0xAD; // transaction result
-
-	public static final byte BLOCK_RESULT = (byte) 0xAE;
+	public static final byte BLOCK_RESULT = (byte) 0xDE;
 	
 	// ===============================================
 	// CVM Ops and Code
