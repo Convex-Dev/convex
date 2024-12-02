@@ -891,11 +891,6 @@ public class State extends ARecordGeneric {
 		return values.equals(a.values);
 	}
 
-	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
-	}
-
 	/**
 	 * Gets the Convex Coin value in the memory exchange pool
 	 * @return Memory pool Convex Coin amount (coppers)

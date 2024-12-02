@@ -1,22 +1,24 @@
 package convex.core.cvm.transactions;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Reader;
+import convex.core.util.ErrorMessages;
 
 /**
  * Transaction class representing the Invoke of an on-chain operation.
@@ -31,20 +33,24 @@ import convex.core.lang.Reader;
  * performed outside the CVM which not provide a parser internally.
  */
 public class Invoke extends ATransaction {
-	protected final ACell command;
+	protected ACell command;
 
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,Keywords.COMMAND};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 	private static final long FORMAT_COUNT=FORMAT.count();
 
-	protected Invoke(Address address,long sequence, ACell args) {
-		super(CVMTag.INVOKE,FORMAT_COUNT,address,sequence);
-		this.command = args;
+	protected Invoke(Address origin,long sequence, ACell command) {
+		super(CVMTag.INVOKE,FORMAT,Vectors.create(origin,CVMLong.create(sequence),command));
+		this.command = command;
+	}
+	
+	protected Invoke(AVector<ACell> values) {
+		super(CVMTag.INVOKE,FORMAT,values);
 	}
 
-	public static Invoke create(Address address,long sequence, ACell command) {
+	public static Invoke create(Address origin,long sequence, ACell command) {
 		if (sequence<0) throw new IllegalArgumentException("Illegal sequence number: "+sequence);
-		return new Invoke(address,sequence, command);
+		return new Invoke(origin,sequence, command);
 	}
 	
 	/**
@@ -57,25 +63,13 @@ public class Invoke extends ATransaction {
 	public static Invoke create(Address address,long sequence, String command) {
 		return create(address,sequence, Reader.read(command));
 	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++] = CVMTag.INVOKE;
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // origin, sequence
-		pos = Format.write(bs,pos, command);
-		return pos;
-	}
 	
 	/**
 	 * Get the command for this transaction, as code.
 	 * @return Command object.
 	 */
-	public Object getCommand() {
+	public ACell getCommand() {
+		if (command==null) command=values.get(2);
 		return command;
 	}
 
@@ -88,31 +82,25 @@ public class Invoke extends ATransaction {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static Invoke read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		long aval=Format.readVLQCount(b,epos);
-		Address address=Address.create(aval);
-		epos+=Format.getVLQCountLength(aval);
-		
-		long sequence = Format.readVLQCount(b,epos);
-		epos+=Format.getVLQCountLength(sequence);
-		
-		ACell args=Format.read(b, epos);
-		epos+=Cells.getEncodingLength(args);
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
 
-		Invoke result=create(address, sequence, args);
-		result.attachEncoding(b.slice(pos, epos));
+		if (values.count()!=FORMAT_COUNT) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
+
+		Invoke result=new Invoke(values);
+		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
 
 	@Override
 	public Context apply(final Context context) {
 		Context ctx=context;
-		
+		ACell cmd=getCommand();
 		// Run command
-		if (command instanceof AOp) {
-			ctx = ctx.run((AOp<?>) command);
+		if (cmd instanceof AOp) {
+			ctx = ctx.run((AOp<?>) cmd);
 		} else {
-			ctx = ctx.run(command);
+			ctx = ctx.run(cmd);
 		}
 		return ctx;
 	}
@@ -135,23 +123,6 @@ public class Invoke extends ATransaction {
 	}
 
 	@Override
-	public int getRefCount() {
-		return Cells.refCount(command);
-	}
-
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		return Cells.getRef(command, i);
-	}
-
-	@Override
-	public Invoke updateRefs(IRefFunction func) {
-		ACell newCommand = Ref.update(command, func);
-		if (newCommand == command) return this;
-		return Invoke.create(origin,getSequence(), newCommand);
-	}
-	
-	@Override
 	public Invoke withSequence(long newSequence) {
 		if (newSequence==this.sequence) return this;
 		return create(origin,newSequence,command);
@@ -165,16 +136,14 @@ public class Invoke extends ATransaction {
 
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.COMMAND.equals(key)) return command;
-		if (Keywords.ORIGIN.equals(key)) return origin;
-		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
-
-		return null;
+		if (Keywords.COMMAND.equals(key)) return getCommand();
+		return super.get(key); // covers origin and sequence
 	}
 
 	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new Invoke(values);
 	}
 
 }

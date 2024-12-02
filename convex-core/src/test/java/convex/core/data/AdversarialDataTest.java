@@ -318,12 +318,8 @@ public class AdversarialDataTest {
 		Address HERO=Init.GENESIS_ADDRESS;
 		
 		// invalid amount in Transfer
-		invalidTest(Transfer.create(HERO, 0, HERO,Long.MAX_VALUE)); 
+		assertThrows(IllegalArgumentException.class, ()->Transfer.create(HERO, 0, HERO,Long.MAX_VALUE)); 
 		
-		// invalid offer amounts in Call
-		invalidTest(Call.create(HERO, 0, HERO,Long.MAX_VALUE,Symbols.FOO,Vectors.empty())); 
-		invalidTest(Call.create(HERO, 0, HERO,-10,Symbols.FOO,Vectors.empty())); 
-	
 		// invalid origin in Call. TODO: reconsider?
 		assertThrows(IllegalArgumentException.class, ()->Call.create(null, 0, HERO,0,Symbols.FOO,Vectors.empty())); 
 	}

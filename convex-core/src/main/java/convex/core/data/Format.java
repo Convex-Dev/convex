@@ -12,6 +12,7 @@ import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
 import convex.core.cpos.BlockResult;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.cvm.ACVMRecord;
 import convex.core.cvm.AFn;
@@ -92,11 +93,6 @@ public class Format {
 	 * Maximum length in bytes of a Ref encoding (may be an embedded data object)
 	 */
 	public static final int MAX_REF_LENGTH = Math.max(Ref.INDIRECT_ENCODING_LENGTH, MAX_EMBEDDED_LENGTH);
-
-	/**
-	 * Maximum allowed encoded message length in bytes
-	 */
-	public static final long MAX_MESSAGE_LENGTH = 20000000;
 
 	/**
 	 * Memory size of a fully embedded value (zero)
@@ -773,7 +769,7 @@ public class Format {
 	 */
 	public static ACell[] decodeCells(Blob data) throws BadFormatException {
 		long ml=data.count();
-		if (ml>Format.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
+		if (ml>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+ml);
 		if (ml==0) return Cells.EMPTY_ARRAY;
 		
 		ArrayList<ACell> cells=new ArrayList<>();
@@ -949,7 +945,7 @@ public class Format {
 				int cellLength=lengthFieldSize+encLength;
 				
 				int newLength=ml[0]+cellLength;
-				if (newLength>Format.MAX_MESSAGE_LENGTH) return;
+				if (newLength>CPoSConstants.MAX_MESSAGE_LENGTH) return;
 				ml[0]=newLength;
 				refs.add(cr);
 				if (everything) Cells.visitBranchRefs(c, addToStackFunc);

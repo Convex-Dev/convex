@@ -1,6 +1,7 @@
 package convex.core.cvm.transactions;
 
 import convex.core.Coin;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -8,14 +9,16 @@ import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
+import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.util.ErrorMessages;
 
 /**
  * Transaction class representing a coin Transfer from one account to another
@@ -28,49 +31,30 @@ public class Transfer extends ATransaction {
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	protected Transfer(Address origin,long sequence, Address target, long amount) {
-		super(CVMTag.TRANSFER,FORMAT.count(),origin,sequence);
+		super(CVMTag.TRANSFER,FORMAT,Vectors.create(origin,CVMLong.create(sequence),target,CVMLong.create(amount)));
 		this.target = target;
 		this.amount = amount;
 	}
+	
+	protected Transfer(AVector<ACell> values) {
+		super(CVMTag.TRANSFER,FORMAT,values);
+		this.target = RT.ensureAddress(values.get(2));
+		this.amount = RT.ensureLong(values.get(3)).longValue();
+	}
 
 	public static Transfer create(Address origin,long sequence, Address target, long amount) {
+		if (!Coin.isValidAmount(amount)) throw new IllegalArgumentException(ErrorMessages.BAD_AMOUNT);
 		return new Transfer(origin,sequence, target, amount);
 	}
 
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=CVMTag.TRANSFER;
-		return encodeRaw(bs,pos);
-	}
-
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // origin, sequence
-		pos = Format.writeVLQCount(bs, pos, target.longValue());
-		pos = Format.writeVLQCount(bs, pos, amount);
-		return pos;
-	}
-
 	public static ATransaction read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		long aval=Format.readVLQCount(b,epos);
-		Address origin=Address.create(aval);
-		epos+=Format.getVLQCountLength(aval);
-		
-		long sequence = Format.readVLQCount(b,epos);
-		epos+=Format.getVLQCountLength(sequence);
-		
-		long tval=Format.readVLQCount(b,epos);
-		Address target=Address.create(tval);
-		epos+=Format.getVLQCountLength(tval);
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
 
-		long amount = Format.readVLQCount(b,epos);
-		epos+=Format.getVLQCountLength(amount);
-		if (!Coin.isValidAmount(amount)) throw new BadFormatException("Illegal amount in transfer: "+amount);
-		
-		Transfer result=create(origin,sequence, target, amount);
-		result.attachEncoding(b.slice(pos, epos));
+		if (values.count()!=KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
+
+		Transfer result=new Transfer(values);
+		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
 
@@ -117,22 +101,6 @@ public class Transfer extends ATransaction {
 	public long getAmount() {
 		return amount;
 	}
-
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		throw new IndexOutOfBoundsException(i);
-	}
-
-	@Override
-	public ACell updateRefs(IRefFunction func) {
-		return this;
-	}
-	
-	@Override
-	public int getRefCount() {
-		// No Refs
-		return 0;
-	}
 	
 	@Override
 	public Transfer withSequence(long newSequence) {
@@ -148,17 +116,14 @@ public class Transfer extends ATransaction {
 
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.AMOUNT.equals(key)) return CVMLong.create(amount);
-		if (Keywords.ORIGIN.equals(key)) return origin;
-		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
-		if (Keywords.TARGET.equals(key)) return target;
-
-		return null;
+		if (Keywords.TARGET.equals(key)) return RT.ensureAddress(values.get(2));
+		if (Keywords.AMOUNT.equals(key)) return RT.ensureLong(values.get(3));
+		return super.get(key); // covers origin and sequence
 	}
 
 	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new Transfer(newValues);
 	}
-
 }

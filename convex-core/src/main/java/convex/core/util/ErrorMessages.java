@@ -21,6 +21,8 @@ public class ErrorMessages {
 
 	public static final String TODO = "Not yet implemented.";
 	public static final String UNREACHABLE = "Should be unreachable";
+	public static final String RECORD_VALUE_NUMBER = "Wrong number of record values";
+	public static final String BAD_AMOUNT = "Illegal Convex Coin amount";
 
 	public static String immutable(Object a) {
 		return "Object is immutable: "+a.getClass();

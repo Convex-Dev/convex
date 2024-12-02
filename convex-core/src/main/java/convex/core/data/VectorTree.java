@@ -226,7 +226,8 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		}
 
 		VectorTree<T> result= new VectorTree<T>(items, count);
-		result.attachEncoding(b.slice(pos, rpos));
+		// Attach encoding only if "real"
+		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
 		return result;
 	}
 

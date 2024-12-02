@@ -266,7 +266,8 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		}
 
 		VectorLeaf<T> result=new VectorLeaf<T>(items, pfx, count);
-		result.attachEncoding(b.slice(pos, rpos));
+		// Attach encoding only if "real"
+		if (b.byteAtUnchecked(pos)==Tag.VECTOR) result.attachEncoding(b.slice(pos, rpos));
 		return result;
 	}
 

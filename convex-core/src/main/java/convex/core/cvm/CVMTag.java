@@ -11,7 +11,6 @@ public class CVMTag {
 	 * Tag for Convex Address type
 	 */
 	public static final byte ADDRESS = (byte) 0xEA;
-	
 	public static final byte SYNTAX = (byte) 0x88;
 
 	// ==========================================
@@ -77,7 +76,6 @@ public class CVMTag {
 
 	// CVM Code
 	public static final byte OP = (byte) 0xC0;
-
 
 	public static final byte FN = (byte) 0xCF;
 

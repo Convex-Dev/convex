@@ -56,6 +56,11 @@ public class CPoSConstants {
 	 * Memory allowance for genesis user / peer accounts
 	 */
 	public static final long INITIAL_ACCOUNT_ALLOWANCE = 1000000;
+	
+	/**
+	 * Maximum allowed encoded peer message length in bytes (50mb)
+	 */
+	public static final long MAX_MESSAGE_LENGTH = 50000000;
 
 
 }

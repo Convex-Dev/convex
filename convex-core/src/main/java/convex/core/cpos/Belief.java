@@ -148,8 +148,6 @@ public class Belief extends ARecordGeneric {
 		if (values.count()!=1) throw new BadFormatException("Wrong number of values for Belief");
 
 		Belief result=new Belief(values);
-
-		values.attachEncoding(null);
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
@@ -207,11 +205,6 @@ public class Belief extends ARecordGeneric {
 	 */
 	public HashMap<AccountKey, SignedData<Order>> getOrdersHashMap() {
 		return getOrders().toHashMap();
-	}
-
-	@Override
-	public RecordFormat getFormat() {
-		return BELIEF_FORMAT;
 	}
 
 	/**

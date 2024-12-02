@@ -42,12 +42,22 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	}
 	
 	@Override
-	public int getRefCount() {
+	public final RecordFormat getFormat() {
+		return format;
+	}
+
+	@Override
+	public final int getRefCount() {
 		return values.getRefCount();
 	}
 	
 	@Override
-	public int encode(byte[] bs, int pos) {
+	public int estimatedEncodingSize() {
+		return values.estimatedEncodingSize();
+	}
+	
+	@Override
+	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=tag;
 		return encodeRaw(bs,pos);
 	}
@@ -57,7 +67,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	 * @param bs Array to write to
 	 */
 	@Override
-	public int encodeRaw(byte[] bs, int pos) {
+	public final int encodeRaw(byte[] bs, int pos) {
 		return values.encodeRaw(bs, pos);
 	}
 	
@@ -83,13 +93,14 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	}
 	
 	@Override
-	public <R extends ACell> Ref<R> getRef(int index) {
+	public final <R extends ACell> Ref<R> getRef(int index) {
 		return values.getRef(index);
 	}
 
 	@Override
-	public ARecordGeneric updateRefs(IRefFunction func) {
+	public final ARecordGeneric updateRefs(IRefFunction func) {
 		AVector<ACell> newValues=values.updateRefs(func); // ensure values are canonical via toVector
+		if (newValues==values) return this;
 		return withValues(newValues);
 	}
 	

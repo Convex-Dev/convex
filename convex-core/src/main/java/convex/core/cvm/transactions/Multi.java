@@ -2,6 +2,7 @@ package convex.core.cvm.transactions;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
@@ -11,14 +12,14 @@ import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.util.ErrorMessages;
+import convex.core.util.Utils;
 
 /**
  * The Multi class enables multiple child transactions to be grouped into a single 
@@ -32,9 +33,9 @@ import convex.core.exceptions.InvalidDataException;
  */
 public class Multi extends ATransaction {
 
-	protected Ref<AVector<ATransaction>> txs;
+	protected AVector<ATransaction> txs;
 
-	private int mode;
+	private final int mode;
 	
 	/**
 	 * Mode to execute and report all transactions, regardless of outcome. 
@@ -61,59 +62,38 @@ public class Multi extends ATransaction {
 	public static final int MODE_UNTIL=3; 
 
 
-	
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,Keywords.MODE,Keywords.TXS};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	
-	protected Multi(Address origin, long sequence, int mode, Ref<AVector<ATransaction>> txs) {
-		super(CVMTag.MULTI,FORMAT.count(), origin, sequence);
+	protected Multi(Address origin, long sequence, int mode, AVector<ATransaction> txs) {
+		super(CVMTag.MULTI,FORMAT, Vectors.create(origin,CVMLong.create(sequence),CVMLong.create(mode),txs));
 		this.mode=mode;
 		this.txs=txs;
 	}
 	
+	protected Multi(AVector<ACell> values) {
+		super(CVMTag.MULTI,FORMAT, values);
+		this.mode=Utils.checkedInt(RT.ensureLong(values.get(2)).longValue());
+		if (!isValidMode(mode)) throw new IllegalArgumentException("Bad mode");
+	}
+
 	public static Multi create(Address origin, long sequence, int mode, ATransaction... txs) {
 		AVector<ATransaction> v= Vectors.create(txs);
-		return new Multi(origin,sequence,mode,v.getRef());
+		return new Multi(origin,sequence,mode,v);
 	}
 
 	public int getMode() {
 		return mode;
 	}
-	
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++] = CVMTag.MULTI;
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // origin, sequence
-		pos = Format.writeVLQCount(bs,pos, mode);
-		pos = txs.encode(bs, pos);
-		return pos;
-	}
-	
 
 	public static Multi read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		
-		long aval=Format.readVLQCount(b,epos);
-		Address origin=Address.create(aval);
-		epos+=Format.getVLQCountLength(aval);
-		
-		long sequence = Format.readVLQCount(b,epos);
-		epos+=Format.getVLQCountLength(sequence);
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
 
-		long mode = Format.readVLQCount(b,epos);
-		if (!isValidMode(mode)) throw new BadFormatException("Invalid Multi transaction mode: "+mode);
-		epos+=Format.getVLQCountLength(mode);
-		
-		Ref<AVector<ATransaction>> txs=Format.readRef(b, epos);
-		epos+=txs.getEncodingLength();
-		
-		Multi result=new Multi(origin,sequence,(int)mode,txs);
+		if (values.count()!=KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
+
+		Multi result=new Multi(values);
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
@@ -122,17 +102,14 @@ public class Multi extends ATransaction {
 		return (mode>=MODE_ANY)&&(mode<=MODE_UNTIL);
 	}
 
-	@Override
-	public int estimatedEncodingSize() {
-		return 30+Format.MAX_EMBEDDED_LENGTH;
-	}
+
 
 	@Override
 	public Context apply(Context ctx) {
 		// save initial context, we might need this for rollback
 		Context ictx=ctx.fork(); 
 		
-		AVector<ATransaction> ts=txs.getValue();
+		AVector<ATransaction> ts=getTransactions();
 		// Context<?> initialContext=ctx.fork();
 		long n=ts.count();
 		AVector<Result> rs=Vectors.empty();
@@ -161,6 +138,13 @@ public class Multi extends ATransaction {
 			rctx=ctx.withResult(rs);
 		}
 		return rctx;
+	}
+
+	private AVector<ATransaction> getTransactions() {
+		if (txs==null) {
+			txs=RT.ensureVector(values.get(3));
+		}
+		return txs;
 	}
 
 	private Context applySubTransaction(Context ctx, ATransaction t) {
@@ -201,37 +185,15 @@ public class Multi extends ATransaction {
 	
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.ORIGIN.equals(key)) return origin;
-		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
 		if (Keywords.MODE.equals(key)) return CVMLong.create(mode);
-		if (Keywords.TXS.equals(key)) return txs.getValue();
-		return null;
+		if (Keywords.TXS.equals(key)) return getTransactions();
+		return super.get(key); // covers origin and sequence
 	}
 
 	@Override
-	public int getRefCount() {
-		// Always just one Ref
-		return 1;
-	}
-	
-	@SuppressWarnings("unchecked")
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		if (i==0) return (Ref<R>) txs;
-		throw new IndexOutOfBoundsException(i);
-	}
-	
-	@SuppressWarnings("unchecked")
-	@Override
-	public Multi updateRefs(IRefFunction func) {
-		Ref<AVector<ATransaction>> ntxs=(Ref<AVector<ATransaction>>) func.apply(txs);
-		if (ntxs==txs) return this;
-		return new Multi(origin,sequence,mode,ntxs);
-	}
-
-	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new Multi(values);
 	}
 
 

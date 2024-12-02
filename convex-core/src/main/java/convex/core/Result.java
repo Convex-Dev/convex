@@ -283,13 +283,6 @@ public final class Result extends ARecordGeneric {
 		return null;
 	}
 	
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=CVMTag.RESULT;
-		pos=values.encodeRaw(bs,pos);
-		return pos;
-	}
-	
 	/**
 	 * Reads a Result from a Blob encoding. Assumes tag byte already checked.
 	 * 
@@ -306,10 +299,8 @@ public final class Result extends ARecordGeneric {
 		
 		// we can't check values yet because might be missing data
 		
-		Blob enc=v.getEncoding();
 		Result r=buildFromVector(v);
-		v.attachEncoding(null); // This is an invalid encoding for vector, see above
-		r.attachEncoding(enc);
+		r.attachEncoding(b.slice(pos, epos));
 		return r;
 	}
 
@@ -387,11 +378,6 @@ public final class Result extends ARecordGeneric {
 	 */
 	public Result withID(ACell id) {
 		return withValues(values.assoc(ID_POS, id));
-	}
-
-	@Override
-	public RecordFormat getFormat() {
-		return RESULT_FORMAT;
 	}
 
 	/**

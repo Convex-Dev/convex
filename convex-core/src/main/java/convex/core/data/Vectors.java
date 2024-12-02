@@ -138,7 +138,9 @@ public class Vectors {
 	}
 
 	/**
-	 * Reads a Vector for the specified Blob. Assumes Tag byte already checked.
+	 * Reads a Vector for the specified Blob. 
+	 * 
+	 * Assumes Tag byte already checked, attaches encoding iff tag is Tag.VECTOR.
 	 * 
 	 * Distinguishes between child types according to count.
 	 * 
@@ -151,11 +153,14 @@ public class Vectors {
 	public static <T extends ACell> AVector<T> read(Blob b, int pos) throws BadFormatException {
 		long count = Format.readVLQCount(b,pos+1);
 		if (count < 0) throw new BadFormatException("Negative length");
+		
+		AVector<T> result;
 		if (VectorLeaf.isValidCount(count)) {
-			return VectorLeaf.read(count,b,pos);
+			result= VectorLeaf.read(count,b,pos);
 		} else {
-			return VectorTree.read(count,b,pos);
+			result= VectorTree.read(count,b,pos);
 		}
+		return result;
 	}
 
 	/**

@@ -1,6 +1,7 @@
 package convex.core.cvm.transactions;
 
 import convex.core.Coin;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
@@ -9,15 +10,14 @@ import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
-import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
 import convex.core.data.Symbol;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.util.ErrorMessages;
 
 /**
  * Transaction representing a Call to an Actor.
@@ -30,46 +30,43 @@ import convex.core.exceptions.InvalidDataException;
 public class Call extends ATransaction {
 	public static final long DEFAULT_OFFER = 0;
 
-	protected final Address target;
+	protected final ACell target;
 	protected final long offer;
 	protected final Symbol functionName;
-	protected final AVector<ACell> args;
+	protected AVector<ACell> args;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,  Keywords.TARGET , Keywords.OFFER,Keywords.CALL };
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,  Keywords.TARGET , Keywords.OFFER,Keywords.CALL, Keywords.ARGS };
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
-	protected Call(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
-		super(CVMTag.CALL,FORMAT.count(),address,sequence);
+	protected Call(AVector<ACell> values) {
+		super(CVMTag.CALL,FORMAT,values);
+		this.target=values.get(2);
+		this.offer=RT.ensureLong(values.get(3)).longValue();
+		this.functionName=RT.ensureSymbol(values.get(4));
+		// no need to set args, will be pulled on demand
+	}
+	
+	protected Call(Address origin, long sequence, ACell target, long offer,Symbol functionName,AVector<ACell> args) {
+		super(CVMTag.CALL,FORMAT,Vectors.create(origin,CVMLong.create(sequence),target, CVMLong.create(offer),functionName,args));
 		this.target=target;
 		this.functionName=functionName;
 		this.offer=offer;
 		this.args=args;
 	}
 	
-	public static Call create(Address address, long sequence, Address target, long offer,Symbol functionName,AVector<ACell> args) {
+	public static Call create(Address address, long sequence, ACell target, long offer,Symbol functionName,AVector<ACell> args) {
 		return new Call(address,sequence,target,offer,functionName,args);
 	}
 
 	
-	public static Call create(Address address, long sequence, Address target, Symbol functionName,AVector<ACell> args) {
+	public static Call create(Address address, long sequence, ACell target, Symbol functionName,AVector<ACell> args) {
 		return create(address,sequence,target,DEFAULT_OFFER,functionName,args);
 	}
 	
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++] = CVMTag.CALL;
-		return encodeRaw(bs,pos);
+	public static Call create(AVector<ACell> values) {
+		return new Call(values);
 	}
 
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = super.encodeRaw(bs,pos); // sequence
-		pos = Format.write(bs,pos, target);
-		pos=Format.writeVLQCount(bs,pos, offer);
-		pos=Format.write(bs,pos, functionName);
-		pos=Format.write(bs,pos, args);
-		return pos;
-	}
 	
 	/**
 	 * Reads a Call Transaction from a Blob encoding
@@ -79,29 +76,12 @@ public class Call extends ATransaction {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static Call read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		long aval=Format.readVLQCount(b,epos);
-		Address origin=Address.create(aval);
-		epos+=Format.getVLQCountLength(aval);
-		
-		long sequence = Format.readVLQCount(b,epos);
-		epos+=Format.getVLQCountLength(sequence);
-		
-		Address target=Format.read(b, epos);
-		epos+=Cells.getEncodingLength(target);
-		
-		long offer=Format.readVLQCount(b,epos);
-		epos+=Format.getVLQCountLength(offer);
-		if (!Coin.isValidAmount(offer)) throw new BadFormatException("Invalid offer in Call");
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
 
+		if (values.count()!=KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
 
-		Symbol functionName=Format.read(b,epos);
-		epos+=Cells.getEncodingLength(functionName);
-
-		AVector<ACell> args = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(args);
-
-		Call result=create(origin,sequence, target, offer, functionName,args);
+		Call result=new Call(values);
 		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
@@ -121,23 +101,6 @@ public class Call extends ATransaction {
 		if (!Coin.isValidAmount(offer)) throw new InvalidDataException("Invalid offer",this);
 		target.validateCell();
 	}
-	
-	@Override
-	public int getRefCount() {
-		return args.getRefCount();
-	}
-	
-	@Override
-	public <T extends ACell> Ref<T> getRef(int i) {
-		return args.getRef(i);
-	}
-
-	@Override
-	public Call updateRefs(IRefFunction func) {
-		AVector<ACell> newArgs=args.updateRefs(func);
-		if (args==newArgs) return this;
-		return new Call(origin,sequence,target,offer,functionName,newArgs);
-	}
 
 	@Override
 	public Call withSequence(long newSequence) {
@@ -153,18 +116,24 @@ public class Call extends ATransaction {
 
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.CALL.equals(key)) return args.cons(functionName);
-		if (Keywords.OFFER.equals(key)) return CVMLong.create(offer);
-		if (Keywords.ORIGIN.equals(key)) return origin;
-		if (Keywords.SEQUENCE.equals(key)) return CVMLong.create(sequence);
+		if (Keywords.CALL.equals(key)) return functionName;
+		if (Keywords.OFFER.equals(key)) return values.get(3);
 		if (Keywords.TARGET.equals(key)) return target;
+		if (Keywords.ARGS.equals(key)) return getArgs();
+		return super.get(key); // covers origin and sequence
+	}
 
-		return null;
+	private ACell getArgs() {
+		if (args==null) {
+			args=RT.ensureVector(values.get(5));
+		}
+		return args;
 	}
 
 	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new Call(values);
 	}
 
 

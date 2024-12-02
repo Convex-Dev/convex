@@ -195,8 +195,8 @@ public class EtchStoreTest {
 			assertEquals(Ref.UNKNOWN,rt.getStatus());
 
 			assertEquals(3,Cells.refCount(t1));
-			assertEquals(0,Cells.refCount(t2));
-			assertEquals(15,Refs.totalRefCount(belief));
+			assertEquals(4,Cells.refCount(t2));
+			assertEquals(22,Refs.totalRefCount(belief));
 
 
 			Consumer<Ref<ACell>> noveltyHandler=r-> {
