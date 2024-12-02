@@ -2,7 +2,7 @@ package convex.core.cpos;
 
 import convex.core.ErrorCodes;
 import convex.core.Result;
-import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
@@ -12,14 +12,13 @@ import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
 import convex.core.data.Hash;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
+import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
 /**
@@ -29,19 +28,21 @@ import convex.core.util.Utils;
  * either be a valid result or an error.
  *
  */
-public class BlockResult extends ACVMRecord {
+public class BlockResult extends ARecordGeneric {
 	private State state;
 	private AVector<Result> results;
 	
 	private static final Keyword[] BLOCKRESULT_KEYS = new Keyword[] { Keywords.STATE, Keywords.RESULTS};
-
 	private static final RecordFormat FORMAT = RecordFormat.of(BLOCKRESULT_KEYS);
 
-
 	private BlockResult(State state, AVector<Result> results) {
-		super(CVMTag.BLOCK_RESULT,FORMAT.count());
+		super(CVMTag.BLOCK_RESULT,FORMAT,Vectors.create(state,results));
 		this.state = state;
 		this.results = results;
+	}
+
+	public BlockResult(AVector<ACell> values) {
+		super(CVMTag.BLOCK_RESULT,FORMAT,values);
 	}
 
 	/**
@@ -51,12 +52,7 @@ public class BlockResult extends ACVMRecord {
 	 * @return BlockResult instance
 	 */
 	public static BlockResult create(State state, Result[] results) {
-		int n=results.length;
-		Object[] rs=new Object[n];
-		for (int i=0; i<n; i++) {
-			rs[i]=results[i];
-		}
-		return new BlockResult(state, Vectors.of(rs));
+		return new BlockResult(state, Vectors.create(results));
 	}
 	
 	/**
@@ -74,6 +70,7 @@ public class BlockResult extends ACVMRecord {
 	 * @return State after Block is executed
 	 */
 	public State getState() {
+		if (state==null) state=(State)values.get(0);
 		return state;
 	}
 
@@ -82,6 +79,7 @@ public class BlockResult extends ACVMRecord {
 	 * @return Vector of Results
 	 */
 	public AVector<Result> getResults() {
+		if (results==null) results=RT.ensureVector(values.get(1));
 		return results;
 	}
 	
@@ -100,6 +98,7 @@ public class BlockResult extends ACVMRecord {
 	 * @return Result at specified index for the current Block, or null if not available
 	 */
 	public Result getResult(long i) {
+		AVector<Result> results=getResults();
 		if ((i<0)||(i>=results.count())) return null;
 		return results.get(i);
 	}
@@ -122,16 +121,8 @@ public class BlockResult extends ACVMRecord {
 	}
 
 	@Override
-	public BlockResult updateRefs(IRefFunction func) {
-		State newState=(State)state.updateRefs(func);
-		AVector<Result> newResults=results.updateRefs(func);
-		return create(newState,newResults);
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
 		// TODO Auto-generated method stub
-		
 	}
 	
 	@Override
@@ -142,28 +133,9 @@ public class BlockResult extends ACVMRecord {
 		
 		long n=results.count();
 		for (long i=0; i<n; i++) {
-			Object r=results.get(i);
+			ACell r=results.get(i);
 			if (!(r instanceof Result)) throw new InvalidDataException("Not a Result at position "+i+" - found "+Utils.getClassName(r),this);
 		}
-	}
-
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getTag();
-		// generic record writeRaw, handles all fields in declared order
-		return encodeRaw(bs,pos);
-	}
-	
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos=state.encode(bs,pos);
-		pos=results.encode(bs,pos);
-		return pos;
-	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+state.estimatedEncodingSize()+results.estimatedEncodingSize();
 	}
 
 	/**
@@ -174,27 +146,21 @@ public class BlockResult extends ACVMRecord {
 	 * @throws BadFormatException If encoding format has errors
 	 */
 	public static BlockResult read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
+		AVector<ACell> values=Vectors.read(b, pos);
+		int epos=pos+values.getEncodingLength();
 
-		State newState=Format.read(b,epos);
-		if (newState==null) throw new BadFormatException("Null state");
-		epos+=Cells.getEncodingLength(newState);
-		
-		AVector<Result> newResults=Format.read(b,epos);
-		if (newResults==null) throw new BadFormatException("Null results");
-		epos+=Cells.getEncodingLength(newResults);
+		if (values.count()!=BLOCKRESULT_KEYS.length) throw new BadFormatException(ErrorMessages.RECORD_VALUE_NUMBER);
 
-		BlockResult result=create(newState,newResults);
-		result.attachEncoding(b.slice(pos, epos));
+		BlockResult result=new BlockResult(values);
+		result.attachEncoding(b.slice(pos,epos));
 		return result;
 	}
 
 	
 	@Override 
 	public boolean equals(ACell a) {
-		if (!(a instanceof BlockResult)) return false;
-		BlockResult as=(BlockResult)a;
-		return equals(as);
+		if (a instanceof BlockResult)return equals((BlockResult)a);
+		return Cells.equalsGeneric(this,a);
 	}
 	
 	/**
@@ -216,26 +182,6 @@ public class BlockResult extends ACVMRecord {
 		return true;
 	}
 
-	@Override
-	public int getRefCount() {
-		return state.getRefCount()+results.getRefCount();
-	}
-	
-	@Override 
-	public <R extends ACell> Ref<R> getRef(int i) {
-		int sc=Cells.refCount(state);
-		if (i<sc) {
-			return state.getRef(i);
-		} else {
-			return results.getRef(i-sc);
-		}
-	}
-
-	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
-	}
-
 	/**
 	 * Creates a BlockResult for an invalid Block (i.e. no peer)
 	 * @param state State at time of creation
@@ -248,6 +194,12 @@ public class BlockResult extends ACVMRecord {
 		AVector<Result> rs=Vectors.repeat(r, block.getTransactions().size());
 		
 		return new BlockResult(state,rs);
+	}
+
+	@Override
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		if (values==newValues) return this;
+		return new BlockResult(newValues);
 	}
 
 
