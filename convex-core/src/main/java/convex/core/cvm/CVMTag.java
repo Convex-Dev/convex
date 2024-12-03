@@ -80,6 +80,7 @@ public class CVMTag {
 	// General ops with byte flag
 	public static final byte OP_CODED = (byte) 0xC0;
 	public static final byte OPCODE_CONSTANT = (byte) 0xB0;
+	public static final byte OPCODE_LAMBDA = (byte) 0xBF;
 	
 	public static final byte OP_DEF = (byte) 0xCD;
 	

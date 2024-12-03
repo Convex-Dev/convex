@@ -58,7 +58,7 @@ public class Ops {
 			return Try.read(b,pos);
 		case Ops.LOOKUP:
 			return Lookup.read(b,pos);
-		case Ops.LAMBDA:
+		case CVMTag.OPCODE_LAMBDA:
 			return (AOp<T>) Lambda.read(b,pos);
 		case Ops.LET:
 			return Let.read(b,pos,false);
