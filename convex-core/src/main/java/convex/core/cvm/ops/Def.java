@@ -4,7 +4,6 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
@@ -98,11 +97,6 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 		if (!RT.print(sb, value.getValue(),limit)) return false;
 		sb.append(')');
 		return sb.check(limit);
-	}
-
-	@Override
-	public byte opCode() {
-		return Ops.DEF;
 	}
 
 	@Override

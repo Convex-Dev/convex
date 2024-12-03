@@ -147,11 +147,6 @@ public class Special<T extends ACell> extends AOp<T> {
 		}
 		return ctx.consumeJuice(Juice.SPECIAL);
 	}
-
-	@Override
-	public byte opCode() {
-		return Ops.SPECIAL;
-	}
 	
 	@Override
 	public byte getTag() {

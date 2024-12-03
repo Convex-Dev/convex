@@ -5,7 +5,6 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Format;
@@ -54,11 +53,6 @@ public class Local<T extends ACell> extends AOp<T> {
 		}
 		T result = (T)env.get(position);
 		return ctx.withResult(Juice.LOOKUP,result);
-	}
-
-	@Override
-	public byte opCode() {
-		return Ops.LOCAL;
 	}
 	
 	@Override

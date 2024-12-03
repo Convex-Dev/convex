@@ -51,13 +51,6 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 		return this;
 	}
 
-	/**
-	 * Returns the opcode for this op
-	 * 
-	 * @return Opcode as a byte
-	 */
-	public abstract byte opCode();
-
 	@Override
 	public final int encode(byte[] bs, int pos) {
 		bs[pos++]=getTag();
@@ -68,6 +61,10 @@ public abstract class AOp<T extends ACell> extends ACVMCode {
 	public int encodeRaw(byte[] bs, int pos) {
 		bs[pos++]=opCode();
 		return encodeAfterOpcode(bs,pos);
+	}
+
+	protected byte opCode() {
+		return 0;
 	}
 
 	/**

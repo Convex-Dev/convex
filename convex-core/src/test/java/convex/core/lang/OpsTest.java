@@ -213,7 +213,7 @@ public class OpsTest extends ACVMTest {
 	@Test
 	public void testSet() throws BadFormatException {
 		AOp<Address> op = Set.create(45, Constant.nil());
-		Blob expectedEncoding=Blob.fromHex("c00b2dc0b000");
+		Blob expectedEncoding=Blob.fromHex("c0112dc0b000");
 		assertEquals(expectedEncoding,op.getEncoding());
 		assertEquals(op,Format.read(expectedEncoding));
 		doOpTest(op);

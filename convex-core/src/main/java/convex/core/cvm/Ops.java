@@ -22,14 +22,10 @@ public class Ops {
 	public static final byte TRY = 3;
 	public static final byte LET = 4;
 	public static final byte LOOP = 5;
-	public static final byte DEF = 6;
 	public static final byte LOOKUP = 7;
 	public static final byte LAMBDA = 8;
 	public static final byte QUERY = 9;
-	public static final byte LOCAL=10;
-	public static final byte SET = 11;
 	
-	public static final byte SPECIAL = 15;
 	// public static final byte CALL = 9;
 	// public static final byte RETURN = 10;
 
@@ -59,14 +55,16 @@ public class Ops {
 		case Ops.LOOKUP:
 			return Lookup.read(b,pos);
 		case CVMTag.OPCODE_LAMBDA:
-			return (AOp<T>) Lambda.read(b,pos);
+			return (AOp<T>) Lambda.read(b,pos); 
 		case Ops.LET:
 			return Let.read(b,pos,false);
 		case Ops.QUERY:
 			return Query.read(b,pos);
 		case Ops.LOOP:
 			return Let.read(b,pos,true);
-		case Ops.SET:
+		
+		// These tags mean we must have a Long integer, which resolves to a Set operation
+		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18:
 			return Set.read(b,pos);
 
 		default:
