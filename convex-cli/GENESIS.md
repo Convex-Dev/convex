@@ -40,3 +40,26 @@ alias convex="java -jar ~/convex.jar"
 ### Upload keystore
 
 
+
+
+### Managing with screen
+
+Start screen session
+
+```
+screen
+```
+
+Run peer
+
+```
+convex peer start
+```
+
+Detach with Ctrl-a + Ctrl-d 
+
+Back to screen with:
+
+```
+screen -r
+```

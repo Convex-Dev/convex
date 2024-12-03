@@ -53,10 +53,15 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		AVector<AClosure<T>> fns=getFunctions();
 		for (long i=0; i<num; i++) {
 			if (i>0) bb.append(' ');
-			bb.append('(');
 			AClosure<?> fn=Fn.ensureFunction(fns.get(i));
-			if (!fn.printInternal(bb,limit)) return false;;
-			bb.append(')');
+			if (fn==null) {
+				bb.append("nil");
+				if (!bb.check(limit)) return false;
+			} else {
+				bb.append('(');
+				if (!fn.printInternal(bb,limit)) return false;
+				bb.append(')');
+			}
 		}
 		return bb.check(limit);
 	}
