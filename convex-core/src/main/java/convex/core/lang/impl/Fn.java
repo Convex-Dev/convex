@@ -146,7 +146,6 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		AVector<ACell> lexicalEnv = Format.read(b,epos);
 		epos+=Cells.getEncodingLength(lexicalEnv);
 
-		
 		Fn<T> result = new Fn<>(params, body, lexicalEnv);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;

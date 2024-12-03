@@ -48,7 +48,6 @@ public class Ops {
 		case CVMTag.OPCODE_QUERY:
 			return Query.read(b,pos);
 
-		
 		// These tags mean we must have a Long integer, which resolves to a local Set operation
 		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18:
 			return Set.read(b,pos);

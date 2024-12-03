@@ -45,7 +45,6 @@ public class AdversarialDataTest {
 	@SuppressWarnings("exports")
 	public static final DummyCell NON_LEGAL=new DummyCell();
 
-	
 	@Test public void testAssumptions() {
 		assertFalse(NON_CVM.isCVMValue());
 		assertFalse(NON_LEGAL.isCVMValue());
