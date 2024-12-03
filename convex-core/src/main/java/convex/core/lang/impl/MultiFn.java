@@ -1,38 +1,34 @@
 package convex.core.lang.impl;
 
-import convex.core.cvm.AFn;
-import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
-import convex.core.data.Ref;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 
+/**
+ * Function with multiple function bodies of possible varying arities
+ * @param <T>
+ */
 public class MultiFn<T extends ACell> extends AClosure<T> {
 
-	private final AVector<AClosure<T>> fns;
 	private final int num;
 	
-	private MultiFn(AVector<AClosure<T>> fns, AVector<ACell> env) {
-		super(env);
-		this.fns=fns;
+	@SuppressWarnings("unchecked")
+	private MultiFn(AVector<?> fns) {
+		super((AVector<ACell>) fns);
 		this.num=fns.size();
 	}
 	
-	private MultiFn(AVector<AClosure<T>> fns) {
-		this(fns,Context.EMPTY_BINDINGS);
+	@SuppressWarnings("unchecked")
+	public static <R extends ACell> MultiFn<R> create(AVector<?> data) {
+		return new MultiFn<R>((AVector<AClosure<R>>) data);
 	}
-	
 
-	public static <R extends ACell> MultiFn<R> create(AVector<AClosure<R>> fns) {
-		return new MultiFn<>(fns);
-	}
 	
 	@Override
 	public boolean isCanonical() {
@@ -54,19 +50,29 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	
 	@Override
 	public boolean printInternal(BlobBuilder bb, long limit) {
+		AVector<AClosure<T>> fns=getFunctions();
 		for (long i=0; i<num; i++) {
 			if (i>0) bb.append(' ');
 			bb.append('(');
-			if (!fns.get(i).printInternal(bb,limit)) return false;;
+			AClosure<?> fn=Fn.ensureFunction(fns.get(i));
+			if (!fn.printInternal(bb,limit)) return false;;
 			bb.append(')');
 		}
 		return bb.check(limit);
 	}
 
+	@SuppressWarnings("unchecked")
+	private AVector<AClosure<T>> getFunctions() {
+		// TODO Auto-generated method stub
+		return (AVector<AClosure<T>>)(AVector<?>)data;
+	}
+
 	@Override
 	public Context invoke(Context context, ACell[] args) {
+		AVector<AClosure<T>> fns=getFunctions();
 		for (int i=0; i<num; i++) {
-			AClosure<T> fn=fns.get(i);
+			AClosure<T> fn=Fn.ensureFunction(fns.get(i));
+			if (fn==null) continue;
 			if (fn.supportsArgs(args)) {
 				return fn.invoke( context, args);
 			}
@@ -77,8 +83,10 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	
 	@Override
 	public boolean hasArity(int n) {
+		AVector<AClosure<T>> fns=getFunctions();
 		for (int i=0; i<num; i++) {
-			AFn<T> fn=fns.get(i);
+			AClosure<T> fn=Fn.ensureFunction(fns.get(i));
+			if (fn==null) continue;
 			if (fn.hasArity(n)) {
 				return true;
 			}
@@ -87,27 +95,8 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 	}
 
 	@Override
-	public AFn<T> updateRefs(IRefFunction func) {
-		AVector<AClosure<T>> newFns=fns.updateRefs(func);
-		if (fns==newFns) return this;
-		return new MultiFn<T>(newFns);
-	}
-
-	@Override
 	public void validateCell() throws InvalidDataException {
-		if (num<=0) throw new InvalidDataException("MultiFn must contain at least one function",this);
-		fns.validateCell();
-	}
-	
-	@Override
-	public byte getTag() {
-		return CVMTag.FN_MULTI;
-	}
-
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = fns.encode(bs,pos);
-		return pos;
+		// nothing to do?
 	}
 
 	/**
@@ -130,31 +119,22 @@ public class MultiFn<T extends ACell> extends AClosure<T> {
 		return result;
 	}
 
-	
-
-	@Override
-	public int estimatedEncodingSize() {
-		return fns.estimatedEncodingSize()+1;
-	}
-
-	@Override
-	public int getRefCount() {
-		return fns.getRefCount();
-	}
-	
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		return fns.getRef(i);
-	}
-
-
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	public <F extends AClosure<T>> F withEnvironment(AVector<ACell> env) {
-		// TODO: Can make environment update more efficient?
-		if (env==this.lexicalEnv) return (F) this;
-		return (F) new MultiFn(fns.map(fn->fn.withEnvironment(env)),env);
+		return (F) new MultiFn(data.map(a->{
+			AClosure<T> fn=Fn.ensureFunction(a);
+			if (fn==null) return null;
+			return fn.withEnvironment(env);
+		}));
 	}
+
+	@Override
+	protected MultiFn<T> recreate(AVector<ACell> newData) {
+		if (data==newData) return this;
+		return new MultiFn<>(newData);
+	}
+
 
 
 

@@ -96,8 +96,11 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.init.BaseTest;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
+import convex.core.lang.impl.AClosure;
 import convex.core.lang.impl.CorePred;
+import convex.core.lang.impl.Fn;
 import convex.core.lang.impl.ICoreDef;
+import convex.core.lang.impl.MultiFn;
 import convex.test.Samples;
 
 /**
@@ -4269,6 +4272,36 @@ public class CoreTest extends ACVMTest {
 		assertArityError(step("((fn [[a b]] :OK) [1])"));
 		assertCastError(step("((fn [[a b]] :OK) :foobar)"));
 
+		// Test expected Fn
+		{
+			ACell a=eval("(fn [])");
+			AClosure<?> fn = Fn.ensureFunction(a);
+			assertNotNull(fn);
+			assertTrue(fn.supportsArgs(Cells.EMPTY_ARRAY));
+			assertTrue(fn instanceof Fn);
+		}
+		
+		// Test expected MultiFnFn
+		{
+			ACell a=eval("(fn ([]) ([a]))");
+			AClosure<?> fn = Fn.ensureFunction(a);
+			assertNotNull(fn);
+			assertTrue(fn.hasArity(0));
+			assertTrue(fn.hasArity(1));
+			assertFalse(fn.hasArity(2));
+			assertTrue(fn instanceof MultiFn);
+		}
+
+		
+		// Test lexical env
+		{
+			ACell a=eval("(let [a 1] (fn [] a))");
+			Fn<?> fn = (Fn<?>) Fn.ensureFunction(a);
+			assertNotNull(fn);
+			assertEquals(Vectors.of(1),fn.getLexicalEnvironment());
+		}
+
+		
 		// Bad fn forms
 		assertArityError(step("(fn)"));
 		assertSyntaxError(step("(fn 1)"));

@@ -55,6 +55,14 @@ public class CVMTag {
 	public static final byte BLOCK_RESULT = (byte) 0xDE;
 	
 	// ===============================================
+	// CVM Functions
+	//
+	// Implemented as dense record, 
+	
+	public static final byte FN = (byte) 0xDF;
+	public static final byte FN_NORMAL = (byte) 0xB0; // first byte flag in record defines sub-type
+
+	// ===============================================
 	// CVM Ops and Code
 	
 	/**
@@ -93,9 +101,6 @@ public class CVMTag {
 	public static final byte OP_COND = (byte)0xDC;   // (cond ...)
 
 
-	public static final byte FN = (byte) 0xCF;
-
-	public static final byte FN_MULTI = (byte) 0xCB;
 	
 
 

@@ -237,10 +237,10 @@ public class ObjectsTest {
 		}
 	}
 
-
 	private static void doCellEncodingTest(ACell a) {
 		Blob enc=a.getEncoding();
 		EncodingTest.checkCodingSize(a);
+		long n=enc.count();
 		
 		// Re=read on encoding
 		ACell b;
@@ -251,7 +251,11 @@ public class ObjectsTest {
 			return;
 		}
 		assertEquals(a,b);
+		assertEquals(b,a);
 		assertEquals(enc,b.getEncoding()); // Encoding should be the same
+		
+		// Truncated encoding is never valid
+		assertThrows(BadFormatException.class,()->Format.read(enc.slice(0,n-1)));
 		
 		// Tag must equal first byte of encoding
 		assertEquals(a.getTag(),enc.byteAt(0));

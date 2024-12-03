@@ -30,7 +30,7 @@ public class DataStructuresTest extends ACVMTest {
 	public void testRefCounts() {
 		assertEquals(1, Refs.totalRefCount(Vectors.empty()));
 		assertEquals(3, Refs.totalRefCount(Vectors.of(1, 2)));
-		assertEquals(2, Refs.totalRefCount(eval("(fn [a] a)"))); // 1 Ref in params [symbol] plus root
+		assertEquals(6, Refs.totalRefCount(eval("(fn [a] a)"))); // 4 Ref in fn 1 in param
 		assertEquals(7, Refs.totalRefCount(eval("[[1 2] [3 4]]"))); // 6 vector element Refs plus root
 
 		assertEquals(7, Refs.uniqueRefCount(eval("[[1 2] [3 4]]"))); // 6 vector element Refs plus root

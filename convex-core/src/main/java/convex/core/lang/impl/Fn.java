@@ -1,19 +1,19 @@
 package convex.core.lang.impl;
 
+import convex.core.cvm.AFn;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
+import convex.core.cvm.Ops;
 import convex.core.cvm.Symbols;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
-import convex.core.data.Ref;
+import convex.core.data.Vectors;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
 /**
@@ -21,45 +21,61 @@ import convex.core.lang.RT;
  * 
  * Includes the following information:
  * <ol>
- * <li>Parameters of the function, as a vector of Syntax objects</li>
- * <li>Body of the function, as a compiled operation</li>
- * <li>captured lexical bindings at time of creation.</li>
+ * <li>0 = >Byte flag representing a simple function closure (0xB0) 
+ * <li>1 = Parameters of the function, as a vector of Syntax objects</li>
+ * <li>2 = captured lexical bindings at time of creation. (can be null for empty)</li>
+ * <li>3 = Body of the function, as a compiled operation</li>
  * </ol>
  * 
  * @param <T> Return type of function
  */
 public class Fn<T extends ACell> extends AClosure<T> {
-
-	// note: embedding these fields directly for efficiency rather than going by
-	// Refs.
-
-	private final AVector<ACell> params;
-	private final AOp<T> body;
+	
+	private static final ByteFlag CODE=new ByteFlag(CVMTag.FN_NORMAL);
 	
 	private Long variadic=null;
-
-	private Fn(AVector<ACell> params, AOp<T> body, AVector<ACell> lexicalEnv) {
-		super(lexicalEnv);
-		this.params = params;
-		this.body = body;
+	
+	private Fn(AVector<ACell> data) {
+		super(data);
 	}
 	
 	public static <T extends ACell, I> Fn<T> create(AVector<ACell> params, AOp<T> body) {
-		AVector<ACell> binds = Context.EMPTY_BINDINGS;
-		return new Fn<T>(params, body, binds);
+		AVector<ACell> data=Vectors.create(CODE,params,null,body);
+		return new Fn<T>(data);
 	}
+	
+	public static <T extends ACell, I> Fn<T> create(AVector<ACell> data) throws BadFormatException {
+		if (data.count()!=4) throw new BadFormatException("Invalid function data length");
+		if (!data.getRef(0).isEmbedded()) throw new BadFormatException("Non-embedded Fn type");
+		return new Fn<T>(data);
+	}
+	
+	@Override
+	protected AFn<T> recreate(AVector<ACell> newData) {
+		return new Fn<>(newData);
+	}
+
+
 	
 	@SuppressWarnings("unchecked")
 	@Override
 	public <F extends AClosure<T>> F withEnvironment(AVector<ACell> env) {
-		if (this.lexicalEnv==env) return (F) this;
-		return (F) new Fn<T>(params, body, env);
+		if (this.getLexicalEnvironment()==env) return (F) this;
+		return (F) new Fn<T>(data.assoc(2, env));
 	}
 	
+	public AVector<ACell> getLexicalEnvironment() {
+		AVector<ACell> env= RT.ensureVector(data.get(2));
+		if (env==null) {
+			env=EMPTY_BINDINGS;
+		}
+		return env;
+	}
+
 	@Override
 	public boolean hasArity(int n) {
 		long var=checkVariadic();
-		long pc=params.count();
+		long pc=getParams().count();
 		if (var>=0) return n>=(pc-2); // n must be at least number of params excluding [& more]
 		return (n==pc);
 	}
@@ -71,6 +87,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	 */
 	private Long checkVariadic() {
 		if (variadic!=null) return variadic;
+		AVector<ACell> params=getParams();
 		long pc=params.count();
 		for (int i=0; i<pc-1; i++) {
 			ACell param=params.get(i);
@@ -89,12 +106,12 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		final AVector<ACell> savedBindings = context.getLocalBindings();
 
 		// update to correct lexical environment, then bind function parameters
-		context = context.withLocalBindings(lexicalEnv);
+		context = context.withLocalBindings(getLexicalEnvironment());
 
-		Context boundContext = context.updateBindings(params, args);
+		Context boundContext = context.updateBindings(getParams(), args);
 		if (boundContext.isExceptional()) return boundContext.withLocalBindings(savedBindings);
 
-		Context ctx = boundContext.execute(body);
+		Context ctx = boundContext.execute(getBody());
 
 		// return with restored bindings
 		return ctx.withLocalBindings(savedBindings);
@@ -105,24 +122,6 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		return true;
 	}
 
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=CVMTag.FN;
-		return encodeRaw(bs,pos);
-	}
-
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = params.encode(bs,pos);
-		pos = body.encode(bs,pos);
-		pos = lexicalEnv.encode(bs,pos);
-		return pos;
-	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return 1+params.estimatedEncodingSize()+body.estimatedEncodingSize()+lexicalEnv.estimatedEncodingSize();
-	}
 
 	/**
 	 * Decodes a function instance from a Blob encoding.
@@ -132,25 +131,24 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	 * @return New decoded instance
 	 * @throws BadFormatException In the event of any encoding error
 	 */
-	public static <T extends ACell> Fn<T> read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
+	public static <T extends ACell> AClosure<T> read(Blob b, int pos) throws BadFormatException {
 		
-		AVector<ACell> params = Format.read(b,epos);
-		if (params==null) throw new BadFormatException("Null parameters to Fn");
-		epos+=Cells.getEncodingLength(params);
+		AVector<ACell> data = Vectors.read(b,pos);
+		long n=data.count();
+		if (n==0) throw new BadFormatException("Empty record in Fn");
 		
-		AOp<T> body = Format.read(b,epos);
-		if (body==null) throw new BadFormatException("Null body in Fn");
-		epos+=Cells.getEncodingLength(body);
+		byte type=b.byteAtUnchecked(pos+1+Format.getVLQCountLength(n)); // byte after tag can indicate normal function type
 		
-		AVector<ACell> lexicalEnv = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(lexicalEnv);
-
-		Fn<T> result = new Fn<>(params, body, lexicalEnv);
+		AClosure<T> result;
+		switch (type) {
+			case CVMTag.FN_NORMAL: result= Fn.create(data); break;
+			default: result= MultiFn.create(data); break;
+		}
+		
+		int epos=pos+data.getEncodingLength();
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
-
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
@@ -164,6 +162,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	public boolean printInternal(BlobBuilder sb, long limit) {
 		// Custom param printing, avoid printing Syntax metadata for now
 		sb.append('[');
+		AVector<ACell> params=getParams();
 		long size = params.count();
 		for (long i = 0; i < size; i++) {
 			if (i > 0) sb.append(' ');
@@ -172,7 +171,7 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		sb.append(']');
 
 		sb.append(' ');
-		return body.print(sb,limit);
+		return getBody().print(sb,limit);
 	}
 
 	/**
@@ -181,43 +180,13 @@ public class Fn<T extends ACell> extends AClosure<T> {
 	 * @return A binding vector describing the parameters for this function
 	 */
 	public AVector<ACell> getParams() {
-		return params;
+		AVector<ACell> result=RT.ensureVector(data.get(1));
+		return result;
 	}
 
 	public AOp<T> getBody() {
-		return body;
-	}
-
-	@Override
-	public int getRefCount() {
-		return params.getRefCount() + body.getRefCount() + lexicalEnv.getRefCount();
-	}
-
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		int pc = params.getRefCount();
-		if (i < pc) return params.getRef(i);
-		i -= pc;
-		int bc = body.getRefCount();
-		if (i < bc) return body.getRef(i);
-		i -= bc;
-		return lexicalEnv.getRef(i);
-	}
-
-	@Override
-	public Fn<T> updateRefs(IRefFunction func) {
-		AVector<ACell> newParams = params.updateRefs(func);
-		AOp<T> newBody = body.updateRefs(func);
-		AVector<ACell> newLexicalEnv = lexicalEnv.updateRefs(func);
-		if ((params == newParams) && (body == newBody) && (lexicalEnv == newLexicalEnv)) return this;
-		return new Fn<>(newParams, newBody, newLexicalEnv);
-	}
-
-	@Override
-	public void validateCell() throws InvalidDataException {
-		params.validateCell();
-		body.validateCell();
-		lexicalEnv.validateCell();
+		AOp<T> result=Ops.ensureOp(data.get(3));
+		return result;
 	}
 
 	@Override
@@ -225,9 +194,11 @@ public class Fn<T extends ACell> extends AClosure<T> {
 		return this;
 	}
 
-
-
-	
-
-
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AClosure<T> ensureFunction(ACell a) {
+		if (a instanceof AClosure) {
+			return (AClosure<T>)a;
+		}
+		return null;
+	}
 }

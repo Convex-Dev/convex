@@ -42,7 +42,7 @@ public class ByteFlag extends AByteFlag {
 		return unsafeCreate(m);
 	}
 	
-	public static ACell forTag(byte tag) {
+	public static ByteFlag forTag(byte tag) {
 		if ((tag & 0xF0)!=Tag.BYTE_FLAG_BASE) return null;
 		return new ByteFlag(tag);
 	}

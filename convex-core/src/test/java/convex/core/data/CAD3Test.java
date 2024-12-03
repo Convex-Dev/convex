@@ -115,7 +115,7 @@ public class CAD3Test extends ACVMTest {
 	 */
 	@Test public void testCoreRecords() {
 		Context ctx=context();
-		ctx=exec(ctx,"(def dr #[df03110111021103])");
+		ctx=exec(ctx,"(def dr #[d603110111021103])"); // would be a Block, but too many elements
 		DenseRecord dr=ctx.getResult();
 		assertNotNull(dr);
 		

@@ -15,7 +15,6 @@ import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
 import convex.core.cvm.ACVMRecord;
-import convex.core.cvm.AFn;
 import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
@@ -46,7 +45,6 @@ import convex.core.exceptions.Panic;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.impl.Fn;
-import convex.core.lang.impl.MultiFn;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Bits;
@@ -517,16 +515,6 @@ public class Format {
 			if (tag == CVMTag.OP_LOOP) {
 				return Let.read(b,pos,true);
 			}
-			
-			if (tag == CVMTag.FN_MULTI) {
-				AFn<?> fn = MultiFn.read(b,pos);
-				return fn;
-			}
-	
-			if (tag == CVMTag.FN) {
-				AFn<?> fn = Fn.read(b,pos);
-				return fn;
-			}
 		} catch (Exception e) {
 			// something went wrong, fall through to reading a generic coded value
 		}
@@ -710,6 +698,10 @@ public class Format {
 				return (T) Call.read(b,pos);
 			} else if (tag == CVMTag.MULTI) {
 				return (T) Multi.read(b,pos);
+			}
+			
+			if (tag == CVMTag.FN) {
+				return (T) Fn.read(b,pos);
 			}
 			
 			if (tag == CVMTag.STATE) {
