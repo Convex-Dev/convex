@@ -3,14 +3,12 @@ package convex.core.cvm.ops;
 import convex.core.ErrorCodes;
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.util.BlobBuilder;
@@ -28,17 +26,13 @@ import convex.core.lang.RT;
  *
  * @param <T> Result type of Op
  */
-public class Lookup<T extends ACell> extends AOp<T> {
-	private final AOp<Address> address;
-	private final Symbol symbol;
-
-	private Lookup(AOp<Address> address,Symbol symbol) {
-		this.address=address;
-		this.symbol = symbol;
+public class Lookup<T extends ACell> extends ACodedOp<T,AOp<Address>,Symbol> {
+	private Lookup(Ref<AOp<Address>> address,Ref<Symbol> symbol) {
+		super (CVMTag.OP_LOOKUP,address,symbol);
 	}
 
 	public static <T extends ACell> Lookup<T> create(AOp<Address> address, Symbol form) {
-		return new Lookup<T>(address,form);
+		return new Lookup<T>(Ref.get(address),form.getRef());
 	}
 	
 	public static <T extends ACell> Lookup<T> create(AOp<Address> address, String name) {
@@ -61,6 +55,7 @@ public class Lookup<T extends ACell> extends AOp<T> {
 	public Context execute(Context context) {
 		Context rctx=context;
 		Address namespaceAddress=null;
+		AOp<Address> address=code.getValue();
 		if (address!=null) {
 			rctx=rctx.execute(address);
 			if (rctx.isExceptional()) return rctx;
@@ -71,28 +66,19 @@ public class Lookup<T extends ACell> extends AOp<T> {
 		
 		// Do a dynamic lookup, with address if specified or address from current context otherwise
 		namespaceAddress=(address==null)?context.getAddress():namespaceAddress;
+		Symbol symbol=value.getValue();
 		return rctx.lookupDynamic(namespaceAddress,symbol).consumeJuice(Juice.LOOKUP_DYNAMIC);
 	}
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
+		AOp<Address> address=code.getValue();
 		if (address!=null) {
 			if (!address.print(bb,limit)) return false;
 			bb.append('/');
 		}
+		Symbol symbol=value.getValue();
 		return symbol.print(bb,limit);
-	}
-
-	@Override
-	public byte opCode() {
-		return Ops.LOOKUP;
-	}
-
-	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		pos= symbol.encode(bs, pos);
-		pos= Format.write(bs,pos, address); // might be null
-		return pos;
 	}
 
 	/**
@@ -104,48 +90,34 @@ public class Lookup<T extends ACell> extends AOp<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <T extends ACell> Lookup<T> read(Blob b,int pos) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+		int epos=pos+1; // skip tag to get to data
 		
-		Symbol sym = Format.read(b,epos);
-		if (sym==null) throw new BadFormatException("Lookup symbol cannot be null");
-		epos+=Cells.getEncodingLength(sym);
+		Ref<AOp<Address>> addr=Format.readRef(b, epos);
+		epos+=addr.getEncodingLength();
 		
-		AOp<Address> address = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(address);
+		Ref<Symbol> sym=Format.readRef(b, epos);
+		epos+=sym.getEncodingLength();
 		
-		Lookup<T> result= create(address,sym);
+		Lookup<T> result= new Lookup<T>(addr,sym);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
 
-	@Override
-	public int getRefCount() {
-		if (address==null) return 0;
-		return address.getRefCount();
-	}
 
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		if (address==null) throw new IndexOutOfBoundsException();
-		return address.getRef(i);
-	}
-
-	@Override
-	public Lookup<T> updateRefs(IRefFunction func) {
-		if (address==null) return this;
-		AOp<Address> newAddress=address.updateRefs(func);
-		if (address==newAddress) return this;
-		return create(newAddress,symbol);
-	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (address!=null) address.validateCell();
-		symbol.validateCell();
+		// TODO: any checks?
 	}
 
 	public AOp<Address> getAddress() {
-		return address;
+		return code.getValue();
+	}
+
+	@Override
+	protected AOp<T> rebuild(Ref<AOp<Address>> newCode, Ref<Symbol> newValue) {
+		if ((code==newCode)&&(value==newValue)) return this;
+		return new Lookup<T>(newCode,newValue);
 	}
 
 

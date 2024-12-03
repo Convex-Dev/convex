@@ -5,11 +5,9 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
@@ -77,15 +75,15 @@ public class Set<T extends ACell> extends ACodedOp<T,CVMLong,AOp<T>> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <R extends ACell> Set<R> read(Blob b, int pos) throws BadFormatException{
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+		int epos=pos+1; // skip tag to get to data
 		
-		long position = Format.readVLQLong(b,epos);
-		epos+=Format.getVLQLongLength(position);
+		Ref<CVMLong> index=Format.readRef(b, epos);
+		epos+=index.getEncodingLength();
 		
-		AOp<R> op = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(op);
+		Ref<AOp<R>> op=Format.readRef(b, epos);
+		epos+=op.getEncodingLength();
 		
-		Set<R> result= create(position, op);
+		Set<R> result= new Set<R>(index,op);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}

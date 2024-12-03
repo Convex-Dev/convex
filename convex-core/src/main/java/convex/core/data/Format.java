@@ -27,6 +27,7 @@ import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Def;
 import convex.core.cvm.ops.Do;
 import convex.core.cvm.ops.Local;
+import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Special;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Invoke;
@@ -499,21 +500,26 @@ public class Format {
 	}
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
-		
-		if (tag == CVMTag.OP_DEF) {
-			return Def.read(b, pos);
-		}
-		
-		if (tag == CVMTag.OP_CODED) return Ops.read(tag,b, pos); 
-		
-		if (tag == CVMTag.FN_MULTI) {
-			AFn<?> fn = MultiFn.read(b,pos);
-			return fn;
-		}
-
-		if (tag == CVMTag.FN) {
-			AFn<?> fn = Fn.read(b,pos);
-			return fn;
+		try {
+			if (tag == CVMTag.OP_CODED) return Ops.read(tag,b, pos); 
+			
+			if (tag == CVMTag.OP_LOOKUP) return Lookup.read(b,pos);
+			
+			if (tag == CVMTag.OP_DEF) {
+				return Def.read(b, pos);
+			}
+			
+			if (tag == CVMTag.FN_MULTI) {
+				AFn<?> fn = MultiFn.read(b,pos);
+				return fn;
+			}
+	
+			if (tag == CVMTag.FN) {
+				AFn<?> fn = Fn.read(b,pos);
+				return fn;
+			}
+		} catch (Exception e) {
+			// something went wrong, fall through to reading a generic coded value
 		}
 		
 		return CodedValue.read(tag,b,pos);

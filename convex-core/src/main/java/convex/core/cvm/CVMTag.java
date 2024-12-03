@@ -77,11 +77,14 @@ public class CVMTag {
     // ==========================================
 	// CVM Ops
 	
-	// General ops with byte flag
+	// General ops with a single byte flag
 	public static final byte OP_CODED = (byte) 0xC0;
 	public static final byte OPCODE_CONSTANT = (byte) 0xB0;
+	public static final byte OPCODE_LOOKUP = (byte) 0xB1;
 	public static final byte OPCODE_LAMBDA = (byte) 0xBF;
-	
+
+	public static final byte OP_LOOKUP = (byte) 0xC1;
+
 	public static final byte OP_DEF = (byte) 0xCD;
 	
 	public static final byte OP_DO = (byte)0xDA; // (do ...)

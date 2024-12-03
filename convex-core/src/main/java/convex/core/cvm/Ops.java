@@ -3,7 +3,6 @@ package convex.core.cvm;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.ops.Lambda;
 import convex.core.cvm.ops.Let;
-import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Try;
@@ -22,7 +21,6 @@ public class Ops {
 	public static final byte TRY = 3;
 	public static final byte LET = 4;
 	public static final byte LOOP = 5;
-	public static final byte LOOKUP = 7;
 	public static final byte LAMBDA = 8;
 	public static final byte QUERY = 9;
 	
@@ -52,8 +50,6 @@ public class Ops {
 			return Constant.read(b,pos);
 		case Ops.TRY:
 			return Try.read(b,pos);
-		case Ops.LOOKUP:
-			return Lookup.read(b,pos);
 		case CVMTag.OPCODE_LAMBDA:
 			return (AOp<T>) Lambda.read(b,pos); 
 		case Ops.LET:
