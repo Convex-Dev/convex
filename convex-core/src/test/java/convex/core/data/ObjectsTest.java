@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.io.IOException;
 
 import convex.core.Constants;
+import convex.core.crypto.Hashing;
 import convex.core.cvm.CVMEncoder;
 import convex.core.data.Refs.RefTreeStats;
 import convex.core.data.util.BlobBuilder;
@@ -82,8 +83,8 @@ public class ObjectsTest {
 	private static final CVMEncoder CVM_ENCODER=new CVMEncoder();
 	
 	public static void doCAD3Tests(ACell a) {
-		Blob enc=Format.encodeMultiCell(a, true);
 		try {
+			Blob enc=Format.encodeMultiCell(a, true);
 			ACell cad=CAD3_ENCODER.decodeMultiCell(enc);
 			assertEquals(a,cad);	
 			assertEquals(cad,a);	
@@ -97,6 +98,18 @@ public class ObjectsTest {
 			
 			// re-ecoding should be same result
 			assertEquals(enc,Format.encodeMultiCell(cvm, true));
+		} catch (BadFormatException e) {
+			fail(e);
+		}
+		
+		try {
+			Blob encoding=a.getEncoding();
+			ACell b=Format.read(encoding);
+			assertEquals(b.getHash(),Hashing.sha3(encoding.getBytes()));
+			assertEquals(a,b);
+			
+			b.attachEncoding(null);
+			assertEquals(encoding,b.getEncoding());
 		} catch (BadFormatException e) {
 			fail(e);
 		}

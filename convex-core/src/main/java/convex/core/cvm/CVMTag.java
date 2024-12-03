@@ -85,7 +85,7 @@ public class CVMTag {
 	
 	public static final byte OP_DO = (byte)0xDA; // (do ...)
 	public static final byte OP_INVOKE = (byte)0xDB; // (...)   - function Invoke
-	public static final byte OP_COND = (byte)0xDB; // (cond ...)
+	public static final byte OP_COND = (byte)0xDC; // (cond ...)
 
 
 	public static final byte FN = (byte) 0xCF;

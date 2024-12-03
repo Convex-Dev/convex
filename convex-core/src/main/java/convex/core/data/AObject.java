@@ -56,8 +56,12 @@ public abstract class AObject {
 	 * @return A Blob representing this value in encoded form
 	 */
 	public Blob getEncoding() {
-		if (encoding==null) encoding=createEncoding();
-		return encoding;
+		Blob result=encoding;
+		if (result==null) {
+			result=createEncoding();
+			encoding=result;
+		}
+		return result;
 	}
 	
 	/**

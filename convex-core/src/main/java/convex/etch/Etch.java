@@ -750,7 +750,7 @@ public class Etch {
 		try {
 			Hash hash=Hash.wrap(key);
 			T cell=store.decode(encoding);
-			cell.getEncoding().attachContentHash(hash);
+			encoding.attachContentHash(hash);
 
 			if (memorySize>0) {
 				// need to attach memory size for cell
