@@ -52,11 +52,6 @@ public class Lambda<T extends ACell> extends ACodedOp<T,ACell,AClosure<T>> {
 	public boolean print(BlobBuilder sb, long limit)  {
 		return value.getValue().print(sb,limit);
 	}
-
-	@Override
-	public byte opCode() {
-		return Ops.LAMBDA;
-	}
 	
 	public static <T extends ACell> Lambda<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data

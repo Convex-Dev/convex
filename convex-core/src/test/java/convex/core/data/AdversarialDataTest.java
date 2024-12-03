@@ -15,7 +15,6 @@ import convex.core.Result;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
-import convex.core.cvm.Ops;
 import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.Call;
 import convex.core.cvm.transactions.Transfer;
@@ -162,7 +161,8 @@ public class AdversarialDataTest {
 	}
 	
 	@Test public void testBadConstant() {
-		invalidEncoding(CVMTag.OP_CODED+Ops.CONSTANT,"");
+		invalidEncoding(CVMTag.OP_CODED+CVMTag.OPCODE_CONSTANT,"");
+		invalidEncoding(CVMTag.OP_CODED+CVMTag.OPCODE_CONSTANT+Tag.ILLEGAL,"");
 	}
 	
 	@Test public void testBadSymbols() {

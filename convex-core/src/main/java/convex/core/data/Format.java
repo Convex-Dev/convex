@@ -26,6 +26,7 @@ import convex.core.cvm.Syntax;
 import convex.core.cvm.ops.Cond;
 import convex.core.cvm.ops.Def;
 import convex.core.cvm.ops.Do;
+import convex.core.cvm.ops.Let;
 import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Lookup;
 import convex.core.cvm.ops.Special;
@@ -501,12 +502,20 @@ public class Format {
 
 	private static ACell readCode(byte tag, Blob b, int pos) throws BadFormatException {
 		try {
-			if (tag == CVMTag.OP_CODED) return Ops.read(tag,b, pos); 
+			if (tag == CVMTag.OP_CODED) return Ops.readCodedOp(tag,b, pos); 
 			
 			if (tag == CVMTag.OP_LOOKUP) return Lookup.read(b,pos);
 			
 			if (tag == CVMTag.OP_DEF) {
 				return Def.read(b, pos);
+			}
+			
+			if (tag == CVMTag.OP_LET) {
+				return Let.read(b,pos,false);
+			}
+		    
+			if (tag == CVMTag.OP_LOOP) {
+				return Let.read(b,pos,true);
 			}
 			
 			if (tag == CVMTag.FN_MULTI) {

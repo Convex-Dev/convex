@@ -2,7 +2,6 @@ package convex.core.cvm;
 
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.ops.Lambda;
-import convex.core.cvm.ops.Let;
 import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Try;
@@ -17,18 +16,10 @@ import convex.core.exceptions.BadFormatException;
  * effectively considered as "bytecode" for the decentralised state machine.
  */
 public class Ops {
-	public static final byte CONSTANT = 0;
-	public static final byte TRY = 3;
-	public static final byte LET = 4;
-	public static final byte LOOP = 5;
-	public static final byte LAMBDA = 8;
-	public static final byte QUERY = 9;
-	
-	// public static final byte CALL = 9;
-	// public static final byte RETURN = 10;
+
 
 	/**
-	 * Offset of Op data from tag byte
+	 * Offset of Op value from tag byte in coded op
 	 */
 	public static final int OP_DATA_OFFSET=2;
 
@@ -43,8 +34,10 @@ public class Ops {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> read(byte tag, Blob b, int pos) throws BadFormatException {
+	public static <T extends ACell> AOp<T> readCodedOp(byte tag, Blob b, int pos) throws BadFormatException {
+		// Read the byte containing the flag directly
 		byte opCode=b.byteAt(pos+1);
+		
 		switch (opCode) {
 		case CVMTag.OPCODE_CONSTANT:
 			return Constant.read(b,pos);
@@ -52,19 +45,16 @@ public class Ops {
 			return Try.read(b,pos);
 		case CVMTag.OPCODE_LAMBDA:
 			return (AOp<T>) Lambda.read(b,pos); 
-		case Ops.LET:
-			return Let.read(b,pos,false);
 		case CVMTag.OPCODE_QUERY:
 			return Query.read(b,pos);
-		case Ops.LOOP:
-			return Let.read(b,pos,true);
+
 		
-		// These tags mean we must have a Long integer, which resolves to a Set operation
+		// These tags mean we must have a Long integer, which resolves to a local Set operation
 		case 0x10: case 0x11: case 0x12: case 0x13: case 0x14: case 0x15: case 0x16: case 0x17: case 0x18:
 			return Set.read(b,pos);
 
 		default:
-			throw new BadFormatException("Invalide OpCode: " + opCode + " with tag "+tag);
+			throw new BadFormatException("Invalide OpCode: " + opCode);
 		}
 	}
 	

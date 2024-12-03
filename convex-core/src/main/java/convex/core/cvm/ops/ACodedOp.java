@@ -46,6 +46,10 @@ public abstract class ACodedOp<T extends ACell, C extends ACell, V extends ACell
 		return 2;
 	}
 	
+	@Override 
+	public int estimatedEncodingSize() {
+		return 1+code.estimatedEncodingSize()+value.estimatedEncodingSize();
+	}
 
 	@SuppressWarnings("unchecked")
 	@Override

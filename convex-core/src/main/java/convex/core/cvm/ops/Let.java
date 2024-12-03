@@ -4,15 +4,11 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
-import convex.core.cvm.Ops;
 import convex.core.cvm.exception.RecurValue;
 import convex.core.data.ACell;
-import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
@@ -27,55 +23,22 @@ import convex.core.lang.RT;
  *
  * @param <T> Result type of Op
  */
-public class Let<T extends ACell> extends AMultiOp<T> {
+public class Let<T extends ACell> extends ACodedOp<T,AVector<ACell>,AVector<AOp<ACell>>> {
 
-	/**
-	 * Vector of binding forms. Can be destructuring forms
-	 */
-	protected final AVector<ACell> symbols;
-
-	protected final int bindingCount;
 	protected final boolean isLoop;
 
-	protected Let(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
-		super(CVMTag.OP_CODED,ops);
-		symbols = syms;
-		bindingCount = syms.size();
-		this.isLoop = isLoop;
+	protected Let(byte tag,Ref<AVector<ACell>> syms, Ref<AVector<AOp<ACell>>> ops) {
+		super(tag,syms,ops);
+		this.isLoop = tag==CVMTag.OP_LOOP;
 	}
 
 	public static <T extends ACell> Let<T> create(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
-		return new Let<T>(syms, ops, isLoop);
+		return new Let<T>(isLoop?CVMTag.OP_LOOP:CVMTag.OP_LET, syms.getRef(),ops.getRef());
 	}
 
-	@Override
-	public Let<T> updateRefs(IRefFunction func) {
-		ASequence<AOp<ACell>> newOps = ops.updateRefs(func);
-		AVector<ACell> newSymbols = symbols.updateRefs(func);
-
-		return recreate(newOps, newSymbols);
-	}
-
-	@Override
-	public int getRefCount() {
-		return super.getRefCount() + symbols.getRefCount();
-	}
-
-	@Override
-	public final <R extends ACell> Ref<R> getRef(int i) {
-		int n = super.getRefCount();
-		if (i < n) return super.getRef(i);
-		return symbols.getRef(i - n);
-	}
-
-	@Override
-	protected Let<T> recreate(AVector<AOp<ACell>> newOps) {
-		return recreate(newOps, symbols);
-	}
-
-	protected Let<T> recreate(ASequence<AOp<ACell>> newOps, AVector<ACell> newSymbols) {
-		if ((ops == newOps) && (symbols == newSymbols)) return this;
-		return new Let<T>(newSymbols, newOps.toVector(), isLoop);
+	protected Let<T> rebuild(Ref<AVector<ACell>> newSymbols, Ref<AVector<AOp<ACell>>> newOps) {
+		if ((code == newSymbols) && (value == newOps)) return this;
+		return new Let<T>(tag,newSymbols,newOps);
 	}
 
 	@Override
@@ -83,6 +46,9 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		Context ctx = context.consumeJuice(Juice.LET);
 		if (ctx.isExceptional()) return ctx;
 
+		AVector<ACell> symbols=code.getValue();
+		int bindingCount=symbols.size();
+		AVector<AOp<ACell>> ops=value.getValue();
 		AVector<ACell> savedEnv = ctx.getLocalBindings();
 		
 		// execute each operation for bound values in turn
@@ -99,7 +65,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		ctx = executeBody(ctx);
 		if (isLoop&&ctx.isExceptional()) {
 			// check for recur if this Let form is a loop
-			// other exceptionals we can just let slip
+			// other exceptional we can just let slip
 			Object o = ctx.getExceptional();
 			while (o instanceof RecurValue) {
 				RecurValue rv = (RecurValue) o;
@@ -125,7 +91,10 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	}
 
 	public Context executeBody(Context ctx) {
+		AVector<AOp<ACell>> ops=value.getValue();
 		int end = ops.size();
+		int bindingCount=code.getValue().size(); // number of binding symbols
+
 		if (bindingCount == end) return ctx.withResult(null);
 		for (int i = bindingCount; i < end; i++) {
 			ctx = ctx.execute(ops.get(i));
@@ -138,6 +107,9 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
+		AVector<AOp<ACell>> ops=value.getValue();
+		AVector<ACell> symbols=code.getValue();
+		int bindingCount=symbols.size();
 		bb.append(isLoop ? "(loop [" : "(let [");
 		int len = ops.size();
 		for (int i = 0; i < bindingCount; i++) {
@@ -156,23 +128,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 		bb.append(')');
 		return bb.check(limit);
 	}
-
-	@Override
-	public byte opCode() {
-		return (isLoop)?Ops.LOOP:Ops.LET;
-	}
-
-	@Override
-	public int encodeAfterOpcode(byte[] bs, int pos) {
-		pos = Format.write(bs,pos, symbols);
-		return super.encodeAfterOpcode(bs,pos); // AMultiOp superclass writeRaw
-	}
 	
-	@Override 
-	public int estimatedEncodingSize() {
-		return super.estimatedEncodingSize()+symbols.estimatedEncodingSize();
-	}
-
 	/**
 	 * Read a Let Op from a Blob encoding
 	 * @param b Blob to read from
@@ -182,14 +138,17 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static <T extends ACell> Let<T> read(Blob b, int pos, boolean isLoop) throws BadFormatException {
-		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
+		int epos=pos+1; // skip tag 
 
-		AVector<ACell> syms = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(syms);
-		AVector<AOp<ACell>> ops = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(ops);
+		byte tag=isLoop?CVMTag.OP_LOOP:CVMTag.OP_LET;
 		
-		Let<T> result= create(syms, ops.toVector(),isLoop);
+		Ref<AVector<ACell>> syms = Format.readRef(b,epos);
+		epos+=syms.getEncodingLength();
+		
+		Ref<AVector<AOp<ACell>>> ops = Format.readRef(b,epos);
+		epos+=ops.getEncodingLength();
+		
+		Let<T> result= new Let<>(tag,syms,ops);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}

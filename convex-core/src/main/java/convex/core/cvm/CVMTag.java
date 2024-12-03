@@ -5,8 +5,6 @@ package convex.core.cvm;
  */
 public class CVMTag {
 
-	
-
 	/**
 	 * Tag for Convex Address type
 	 */
@@ -85,6 +83,8 @@ public class CVMTag {
 	public static final byte OPCODE_LAMBDA = (byte) 0xBF;   // Be a Function!
 
 	public static final byte OP_LOOKUP = (byte) 0xC1;
+	public static final byte OP_LET = (byte) 0xC2;
+	public static final byte OP_LOOP = (byte) 0xC3;
 
 	public static final byte OP_DEF = (byte) 0xCD;
 	

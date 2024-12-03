@@ -112,11 +112,6 @@ public class Constant<T extends ACell> extends ACodedOp<T,ACell,T> {
 		return result;
 	}
 
-	@Override
-	public byte opCode() {
-		return Ops.CONSTANT;
-	}
-
 	public T getValue() {
 		return value.getValue();
 	}
