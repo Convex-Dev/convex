@@ -18,13 +18,17 @@ import convex.core.cvm.Address;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.AccountKey;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.MapEntry;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.ACVMTest;
+import convex.core.lang.Core;
 
 /**
  * Tests for Init functionality
@@ -113,6 +117,16 @@ public class InitTest extends ACVMTest {
 		CVMLong cvx=STATE.getGlobalMemoryValue();
 		assertEquals(Constants.INITIAL_MEMORY_POOL,mem.longValue());
 		assertEquals(Constants.INITIAL_MEMORY_POOL*Constants.INITIAL_MEMORY_PRICE,cvx.longValue());
+	}
+	
+	@Test
+	public void testInitEncoding() throws BadFormatException {
+		Blob b=Format.encodeMultiCell(STATE, true);
+		
+		State s=Format.decodeMultiCell(b);
+		assertEquals(STATE,s);
+		assertEquals(STATE.getAccount(Core.CORE_ADDRESS),s.getAccount(Core.CORE_ADDRESS));
+		assertEquals(STATE.getAccount(29),s.getAccount(29));
 	}
 	
 	@Test

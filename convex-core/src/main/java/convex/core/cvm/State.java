@@ -642,6 +642,10 @@ public class State extends ARecordGeneric {
 	 */
 	public AccountStatus getAccount(Address target) {
 		long ix=target.longValue();
+		return getAccount(ix);
+	}
+	
+	public AccountStatus getAccount(long ix) {
 		AVector<AccountStatus> accts=getAccounts();
 		if ((ix<0)||(ix>=accts.count())) return null;
 		return accts.get(ix);
@@ -725,11 +729,6 @@ public class State extends ARecordGeneric {
 		super.validate();
 	}
 
-	@Override
-	public void validateCell() throws InvalidDataException {
-		// nothing to do?
-	}
-
 	/**
 	 * Gets the current global timestamp from this state.
 	 *
@@ -737,6 +736,11 @@ public class State extends ARecordGeneric {
 	 */
 	public CVMLong getTimestamp() {
 		return (CVMLong) getGlobals().get(GLOBAL_TIMESTAMP);
+	}
+
+	@Override
+	public void validateCell() throws InvalidDataException {
+		// nothing to do?
 	}
 
 	/**
@@ -955,6 +959,8 @@ public class State extends ARecordGeneric {
 		if (values==newValues) return this;
 		return create(newValues);
 	}
+
+
 
 
 
