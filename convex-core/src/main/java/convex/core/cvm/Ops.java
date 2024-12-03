@@ -48,13 +48,13 @@ public class Ops {
 		switch (opCode) {
 		case CVMTag.OPCODE_CONSTANT:
 			return Constant.read(b,pos);
-		case Ops.TRY:
+		case CVMTag.OPCODE_TRY:
 			return Try.read(b,pos);
 		case CVMTag.OPCODE_LAMBDA:
 			return (AOp<T>) Lambda.read(b,pos); 
 		case Ops.LET:
 			return Let.read(b,pos,false);
-		case Ops.QUERY:
+		case CVMTag.OPCODE_QUERY:
 			return Query.read(b,pos);
 		case Ops.LOOP:
 			return Let.read(b,pos,true);

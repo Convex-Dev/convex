@@ -1,6 +1,7 @@
 package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
@@ -37,7 +38,7 @@ public class Let<T extends ACell> extends AMultiOp<T> {
 	protected final boolean isLoop;
 
 	protected Let(AVector<ACell> syms, AVector<AOp<ACell>> ops, boolean isLoop) {
-		super(ops);
+		super(CVMTag.OP_CODED,ops);
 		symbols = syms;
 		bindingCount = syms.size();
 		this.isLoop = isLoop;

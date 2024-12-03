@@ -17,9 +17,10 @@ import convex.core.exceptions.InvalidDataException;
  */
 public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 	protected final AVector<AOp<ACell>> ops;
-
-	protected AMultiOp(AVector<AOp<ACell>> ops) {
-		// TODO: need to think about bounds on number of child ops?
+	protected final byte tag;
+	
+	protected AMultiOp(byte tag,AVector<AOp<ACell>> ops) {
+		this.tag=tag;
 		this.ops = ops;
 	}
 

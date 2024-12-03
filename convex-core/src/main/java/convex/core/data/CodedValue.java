@@ -101,7 +101,7 @@ public class CodedValue extends ACell {
 		return sb.check(limit);
 	}
 
-	public static ACell read(byte tag, Blob b, int pos) throws BadFormatException {
+	public static CodedValue read(byte tag, Blob b, int pos) throws BadFormatException {
 		int epos=pos+1; // skip tag
 		
 		Ref<ACell> cref=Format.readRef(b, epos);

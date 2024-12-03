@@ -1,6 +1,7 @@
 package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
@@ -9,9 +10,10 @@ import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
+import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 
@@ -24,29 +26,36 @@ import convex.core.exceptions.BadFormatException;
  *
  * @param <T> Result type of Op
  */
-public class Query<T extends ACell> extends AMultiOp<T> {
+public class Query<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> {
 
-	protected Query(AVector<AOp<ACell>> ops) {
-		super(ops);
+	private static final Ref<ACell> CODE=new ByteFlag(CVMTag.OPCODE_QUERY).getRef();
+
+	protected Query(Ref<ACell> code,Ref<AVector<AOp<ACell>>> ops) {
+		super(CVMTag.OP_CODED,code,ops);
+	}
+
+	protected Query(Ref<AVector<AOp<ACell>>> ops) {
+		this(CODE,ops);
 	}
 
 	public static <T extends ACell> Query<T> create(AOp<?>... ops) {
-		return new Query<T>(Vectors.create(ops));
+		return new Query<T>(Vectors.create(ops).getRef());
 	}
 
 	@Override
-	protected Query<T> recreate(AVector<AOp<ACell>> newOps) {
-		if (ops == newOps) return this;
-		return new Query<T>(newOps.toVector());
+	protected Query<T> rebuild(Ref<ACell> newCode,Ref<AVector<AOp<ACell>>> newOps) {
+		if ((code == newCode)&&(value==newOps)) return this;
+		return new Query<T>(newCode,newOps);
 	}
 
 	public static <T extends ACell> Query<T> create(ASequence<AOp<ACell>> ops) {
-		return new Query<T>(ops.toVector());
+		return new Query<T>(ops.toVector().getRef());
 	}
 
 	@Override
 	public Context execute(Context context) {
 		State savedState=context.getState();
+		AVector<AOp<ACell>> ops=value.getValue();
 		
 		int n = ops.size();
 		if (n == 0) return context.withResult(Juice.QUERY,  null); // need cast to avoid bindings overload
@@ -72,6 +81,7 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
+		AVector<AOp<ACell>> ops=value.getValue();
 		bb.append("(query");
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
@@ -80,11 +90,6 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 		}
 		bb.append(')');
 		return bb.check(limit);
-	}
-
-	@Override
-	public byte opCode() {
-		return Ops.QUERY;
 	}
 
 	/**
@@ -98,10 +103,10 @@ public class Query<T extends ACell> extends AMultiOp<T> {
 	public static <T extends ACell> Query<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
-		AVector<AOp<ACell>> ops = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(ops);
+		Ref<AVector<AOp<ACell>>> ops = Format.readRef(b,epos);
+		epos+=ops.getEncodingLength();
 		
-		Query<T> result= create(ops);
+		Query<T> result= new Query<>(CODE,ops);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}

@@ -7,24 +7,19 @@ import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.util.ErrorMessages;
 
+/**
+ * Abstract base class for ops encoded as dense records of ops
+ * @param <T>
+ */
 public abstract class AFlatMultiOp<T extends ACell> extends AMultiOp<T> {
 
-	protected final byte tag;
-	
 	protected AFlatMultiOp(byte tag, AVector<AOp<ACell>> ops) {
-		super(ops);
-		this.tag=tag;
+		super(tag,ops);
 	}
 
 	@Override
 	public byte getTag() {
 		return tag;
-	}
-	
-	@Override
-	public byte opCode() {
-		// TODO remove from hierarchy
-		throw new Error(ErrorMessages.UNREACHABLE);
 	}
 	
 	@Override	

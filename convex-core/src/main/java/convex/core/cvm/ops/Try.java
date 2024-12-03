@@ -1,6 +1,7 @@
 package convex.core.cvm.ops;
 
 import convex.core.cvm.AOp;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
 import convex.core.cvm.Ops;
@@ -9,9 +10,10 @@ import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
+import convex.core.data.Ref;
 import convex.core.data.Vectors;
+import convex.core.data.prim.ByteFlag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 
@@ -20,30 +22,39 @@ import convex.core.exceptions.BadFormatException;
  *
  * @param <T> Result type of Try Op
  */
-public class Try<T extends ACell> extends AMultiOp<T> {
+public class Try<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>> {
 
+	private static final Ref<ACell> CODE=new ByteFlag(CVMTag.OPCODE_TRY).getRef();
+	
 	public static final Try<?> EMPTY = Try.create();
 
-	protected Try(AVector<AOp<ACell>> ops) {
-		super(ops);
+	protected Try(Ref<ACell> code,Ref<AVector<AOp<ACell>>> ops) {
+		super(CVMTag.OP_CODED,code,ops);
+	}
+	
+	protected Try(Ref<AVector<AOp<ACell>>> ops) {
+		this(CODE,ops);
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <T extends ACell> Try<T> create(AOp<?>... ops) {
-		return new Try<T>(Vectors.create(ops));
+		if (ops.length==0) return (Try<T>) EMPTY;
+		return new Try<T>(Vectors.create(ops).getRef());
 	}
 
 	@Override
-	protected Try<T> recreate(AVector<AOp<ACell>> newOps) {
-		if (ops == newOps) return this;
-		return new Try<T>(newOps.toVector());
+	protected Try<T> rebuild(Ref<ACell> newCode,Ref<AVector<AOp<ACell>>> newOps) {
+		if ((code == newCode)&&(value==newOps)) return this;
+		return new Try<T>(newCode,newOps);
 	}
 
 	public static <T extends ACell> Try<T> create(ASequence<AOp<ACell>> ops) {
-		return new Try<T>(ops.toVector());
+		return new Try<T>(ops.toVector().getRef());
 	}
 
 	@Override
 	public Context execute(Context context) {
+		AVector<AOp<ACell>> ops=value.getValue();
 		int n = ops.size();
 		if (n == 0) return context.withResult(Juice.TRY,  null);
 
@@ -76,6 +87,7 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 
 	@Override
 	public boolean print(BlobBuilder bb, long limit) {
+		AVector<AOp<ACell>> ops=value.getValue();
 		bb.append("(try");
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
@@ -84,11 +96,6 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 		}
 		bb.append(')');
 		return bb.check(limit);
-	}
-
-	@Override
-	public byte opCode() {
-		return Ops.TRY;
 	}
 
 	/**
@@ -103,10 +110,10 @@ public class Try<T extends ACell> extends AMultiOp<T> {
 	public static <T extends ACell> Try<T> read(Blob b, int pos) throws BadFormatException {
 		int epos=pos+Ops.OP_DATA_OFFSET; // skip tag and opcode to get to data
 
-		AVector<AOp<ACell>> ops = Format.read(b,epos);
-		epos+=Cells.getEncodingLength(ops);
+		Ref<AVector<AOp<ACell>>> ops = Format.readRef(b,epos);
+		epos+=ops.getEncodingLength();
 		
-		Try<T> result=create(ops);
+		Try<T> result=new Try<>(CODE,ops);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}

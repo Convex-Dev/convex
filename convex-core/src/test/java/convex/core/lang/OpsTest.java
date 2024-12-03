@@ -27,6 +27,7 @@ import convex.core.cvm.ops.Lambda;
 import convex.core.cvm.ops.Let;
 import convex.core.cvm.ops.Local;
 import convex.core.cvm.ops.Lookup;
+import convex.core.cvm.ops.Query;
 import convex.core.cvm.ops.Set;
 import convex.core.cvm.ops.Special;
 import convex.core.cvm.ops.Try;
@@ -34,6 +35,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.Blob;
+import convex.core.data.CodedValue;
 import convex.core.data.DenseRecord;
 import convex.core.data.ExtensionValue;
 import convex.core.data.Format;
@@ -182,6 +184,26 @@ public class OpsTest extends ACVMTest {
 
 		doOpTest(op);
 	}
+	
+	@Test
+	public void testQuery() throws BadFormatException {
+		Query<CVMLong> op = Query.create(Def.create(Symbols.FOO, Constant.of(CVMLong.ONE)));
+
+		Context c = context();
+		Context c2 = c.execute(op);
+		assertFalse(c2.isExceptional());
+		assertEquals(CVMLong.ONE,c2.getResult());
+
+		assertFalse(c2.getEnvironment().containsKey(Symbols.FOO));
+		
+		Blob enc=op.getEncoding();
+		CodedValue cv=CodedValue.read(op.getTag(), enc, 0);
+		assertEquals(op,cv);
+		assertEquals(op.getRefCount(),cv.getRefCount());
+		
+		doOpTest(op);
+	}
+
 
 
 	@Test
