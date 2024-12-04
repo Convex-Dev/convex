@@ -7,7 +7,7 @@ import javax.swing.JComboBox;
 public class HostCombo extends JComboBox<String> {
 
 	
-	private static String[] defaultHosts= {"localhost:18888","convex.world"};
+	private static String[] defaultHosts= {"peer.convex.live:18888","localhost:18888"};
 	private static DefaultComboBoxModel<String> model=new DefaultComboBoxModel<>(defaultHosts) {
 		
 	};
