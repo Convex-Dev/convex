@@ -53,7 +53,7 @@ public class MainGUI extends AbstractGUI {
 		JComponent discord=createLaunchButton("Discord",Toolkit.ECOSYSTEM_ICON,this::launchDiscord,"Go to the Convex community Discord (opens web browser).");
 		actionPanel.add(discord);
 
-		JComponent www=createLaunchButton("convex.world",Toolkit.WWW_ICON,this::launchWebsite,"Go to the Convex main website (opens web browser).");
+		JComponent www=createLaunchButton("Documentation",Toolkit.WWW_ICON,this::launchWebsite,"Go to the Convex docs website (opens web browser).");
 		actionPanel.add(www);
 		
 		add(actionPanel);
@@ -93,7 +93,7 @@ public class MainGUI extends AbstractGUI {
 	}
 	
 	public void launchWebsite() {
-		Toolkit.launchBrowser("https://convex.world");
+		Toolkit.launchBrowser("https://docs.convex.world");
 	}
 	
 	public JPanel createLaunchButton(String label, ImageIcon icon, Runnable cmd, String tooltip) {
@@ -104,6 +104,7 @@ public class MainGUI extends AbstractGUI {
 		butt.setToolTipText(tooltip);
 		
 		JLabel lab = new JLabel(label);
+		lab.setFont(Toolkit.BUTTON_FONT);
 		lab.setHorizontalAlignment(SwingConstants.CENTER);
 		
 		JPanel panel=new JPanel();
