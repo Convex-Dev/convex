@@ -118,6 +118,28 @@ public class BIP39Test {
 		assertEquals(newGen,BIP39.normaliseFormat(newGen));
 	}
 	
+	@Test
+	public void testDerivePath() {
+		// Ed25199 Test vector 2 from : https://github.com/satoshilabs/slips/blob/master/slip-0010.md
+		Blob seed = Blob.fromHex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542");	
+		{
+			Blob priv=SLIP10.deriveKeyPair(seed, "m").getSeed();
+			assertEquals(priv,SLIP10.deriveKeyPair(seed, new int[0]).getSeed());
+			assertEquals("171cb88b1b3c1db25add599712e36245d75bc65a1a5c9e18d76f9f2b1eab4012",priv.toHexString());
+		}
+		
+		{
+			Blob priv=SLIP10.deriveKeyPair(seed, "m/0").getSeed();
+			assertEquals("1559eb2bbec5790b0c65d8693e4d0875b1747f4970ae8b650486ed7470845635",priv.toHexString());
+		}
+		
+		{
+			Blob priv=SLIP10.deriveKeyPair(seed, "m/0/2147483647/1/2147483646/2").getSeed();
+			assertEquals("551d333177df541ad876a60ea71f00447931c0a9da16f227c11ea080d7391b8d",priv.toHexString());
+		}
+
+
+	}
 	
 	@Test 
 	public void testValidStrings() {

@@ -515,5 +515,26 @@ public class BIP39 {
 	public static String extendWord(String abbr) {
 		return ABBR.get(abbr.trim().toLowerCase());
 	}
+
+	public static int[] parsePath(String path) {
+		try {
+			String[] es=path.split("/");
+			if (!"m".equals(es[0])) throw new Exception("<Bad derivation path, must start with 'm'>");
+			
+			int n=es.length-1;
+			int[] proposedPath=new int[n];
+			for (int i=0; i<n; i++) {
+				try {
+					Integer ix= Integer.parseInt(es[i+1]);
+					proposedPath[i]=ix;
+				} catch (NumberFormatException e) {
+					throw new Exception("<Bad derivation path, should be integer indexes 'm/44/888/1/0/123' >");
+				}
+			}
+			return proposedPath;
+		} catch (Exception ex) {
+			return null;
+		}
+	}
 	
 }

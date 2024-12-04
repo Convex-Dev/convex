@@ -179,5 +179,10 @@ public class Constants {
 	 */
 	public static final int CHAIN_CODE = 864;
 
+	/**
+	 * Default derivation path for Convex keys
+	 */
+	public static final String DEFAULT_BIP39_PATH = "m/44/"+CHAIN_CODE+"/0/0/0";
+
 
 }

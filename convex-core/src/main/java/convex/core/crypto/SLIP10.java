@@ -86,5 +86,10 @@ public class SLIP10 {
 		return kp;
 	}
 	
+	public static AKeyPair deriveKeyPair(Blob bip39seed, String path) {
+		return deriveKeyPair(bip39seed,BIP39.parsePath(path));
+	}
+
+	
 	
 }
