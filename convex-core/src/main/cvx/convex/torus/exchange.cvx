@@ -46,46 +46,47 @@
       (def token-balance 0)
       
       (defn -qc
-    		  ^{:doc {:description "Quantity check."}
-    		    :private? true}
     		  [q]
     		  (cond (int? q) q              ;; base case, quantity should always be an integer
     				(nil? q) 0 
     		        (fail :ARGUMENT "Invalid token quantity")))
 
+      ;; Add liquidity expects an amount of tokens, and and offer of Convex Coins
       (defn add-liquidity
     		  ^{:callable true}
         [amount]
         (let [;; Amount of tokens deposited.
               amount (-qc amount)
      
-              ;; Price of token in CVX (double), nil if no current liquidity.
+              ;; Price of token in CVM (double), nil if no current liquidity.
               price (price)
-              initial-cvx-balance *balance*
-     
+              initial-cvm-balance *balance*
+              
+              ;; calculate initial liquidity
+              liquidity (sqrt (* (double initial-cvm-balance) token-balance))
+              has-liquidity (> liquidity 0)
+    
               ;; Amount of CVX required (all if initial deposit). Note Long range required
-              cvx (core/accept (if price 
-                                        (long (* price amount))
-                                        *offer*))
+              cvm (core/accept (if has-liquidity
+                                  (long (* price amount))
+                                  *offer*))
               ;; Ensures tokens are transferred from caller to market actor.
               _ (asset/accept *caller* token amount)
               
               ;; Compute new total balances for actor
-              new-token-balance   (+ token-balance amount)
-              
+              new-token-balance (+ token-balance amount)
+              new-liquidity (sqrt (* (double *balance*) new-token-balance))
+                           
               ;; Compute number of new shares for depositor = increase in liquidity (%) * current total shares.
               ;; If no current liquidity just initialise with the geometric mean of amounts deposited.
-              delta (if (> supply 0)
-                      (let [;; Initial size of liquidity pool (geometric mean).
-                            liquidity  (sqrt (* (double initial-cvx-balance) token-balance))
-                            new-liquidity (sqrt (* (double *balance*) new-token-balance))]
-                        (int (* (- new-liquidity liquidity) (/ supply liquidity))))
-                      (int (sqrt (* (double amount) cvx))))]
+              delta (if has-liquidity
+                      (int (* (- new-liquidity liquidity) (/ supply liquidity)))
+                      (int new-liquidity))]
             		   
         ;; Perform updates to reflect new holdings of liquidity pool shares and total token balance (all longs)
         (set-holding *caller* (+ delta (or (get-holding *caller*) 0)))
-        (def supply (+ supply delta)) ;; Note Supply set up by fungible/build-token
-        (def token-balance new-token-balance)
+        (set! supply (+ supply delta)) ;; Note Supply set up by fungible/build-token
+        (set! token-balance new-token-balance)
         delta))
 
 
@@ -188,13 +189,13 @@
 
       (defn price
         ^{:callable true}
-        ;; Price is CVX amount per token, or nil if there are no tokens in liquidity pool.
+        ;; Price is CVM amount per token, or nil if there are no tokens in liquidity pool.
         []
-
-        (when (> token-balance
-                 0)
-          (/ (double *balance*)
-             token-balance)))
+        (let [tok token-balance
+              cvm *balance*] 
+          (cond (and (> tok 0) (> cvm 0))
+            (/ cvm
+               tok))))
 
 
       (defn sell-cvx
@@ -296,18 +297,17 @@
               shares       (-qc shares)
               ;; Shares of holder.
               own-holding  (or (get-holding *caller*) 0)
-              _            (assert (<= 0
-                                       shares
-                                       own-holding))
+              
+              ;; Check withrawal amount is valid
+              _            (assert (<= 0 shares own-holding))
+              
               proportion   (if (> supply
                                   0)
                              (/ (double shares)
                                 supply)
                              0.0)
-              coin-refund  (int (* proportion
-                                    *balance*))
-              token-refund (int (* proportion
-                                    token-balance))]
+              coin-refund  (int (* proportion *balance*))
+              token-refund (int (* proportion token-balance))]
              ;; SECURITY:
              ;; 1. Update balances then transfer coins first. Risk of re-entrancy attack if transfers are made while
              ;;    this actor is in an inconsistent state so we MUST do accounting first.
@@ -330,8 +330,6 @@
                                  *caller*
                                  token-refund)
               shares)))])
-
-
 
 (defn create-market
 
@@ -383,7 +381,7 @@
   ([token token-amount]
     (if-let [p (price token)]
       (recur token token-amount (inc (int (* p token-amount))))
-      (fail "No liquidity to set market price yet")))
+      (fail "No liquidity")))
 
   ([token token-amount cvx-amount]
 	  (let [market (create-market token)]
@@ -400,7 +398,7 @@
   [of-token amount with-token]
 
   (let [market     (or (get-market of-token)
-                       (fail (str "Torus: market does not exist for token: " of-token)))
+                       (fail :STATE (str "No Torus market for token: " of-token)))
         cvx-amount (or (call market (buy-tokens-quote amount))
                        (fail :LIQUIDITY "No liquidity available to buy token"))
         sold       (buy-cvx with-token cvx-amount)]
@@ -410,7 +408,7 @@
 
 
 (defn buy-cvx
-  ^{:doc {:description "Buy and amount of CVX using a given token."
+  ^{:doc {:description "Buy CVM using a given token."
           :signature   [{:params [token amount]}]}}
 
   [token amount]
@@ -475,8 +473,6 @@
      (/ price.cvx
         price.currency))))
 
-
-
 (defn sell
   ^{:doc {:description "Sells a given amount of a fungible token in exchange for another token"
           :signature   [{:params [of-token amount with-token]}]}}
@@ -485,8 +481,6 @@
 
   (let [cvx-amount (sell-tokens of-token amount)]
     (sell-cvx with-token cvx-amount)))
-
-
 
 (defn sell-cvx
   ^{:doc {:description "Sell an amount of CVX for a given token."
@@ -498,8 +492,6 @@
     (call market
           amount
           (sell-cvx amount))))
-
-
 
 (defn sell-quote
   ^{:doc {:description "Get a quote for selling an amount of a token, in CVX or optional swap token."
@@ -527,7 +519,6 @@
     ;; Offer the amount of tokens being sold.
     (asset/offer market [token amount])
     (call market (sell-tokens amount))))
-
 
 (defn withdraw-liquidity
   ^{:doc {:description "Withdraw an amount of liquidity for a token."

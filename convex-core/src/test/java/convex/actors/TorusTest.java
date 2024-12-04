@@ -14,6 +14,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.AVector;
 import convex.core.data.prim.CVMDouble;
+import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.RT;
 import convex.lib.AssetTester;
@@ -198,6 +199,44 @@ public class TorusTest extends ACVMTest {
 		});
 	}
 
+	@Test public void testLiquidityZeroTokens() {
+		Context ctx=context();
+		ctx= exec(ctx,"(def BROK (deploy (@convex.fungible/build-token {:supply 1000000})))");
+		
+		ctx= exec(ctx,"(def BM (call torus (create-market BROK)))");
+		assertNull(eval(ctx,"(torus/price BROK)"));
+		
+		ctx= exec(ctx,"(torus/add-liquidity BROK 0 1000)");
+		assertEquals(CVMLong.ZERO,ctx.getResult());
+		assertNull(eval(ctx,"(torus/price BROK)"));
+
+		ctx= exec(ctx,"(torus/add-liquidity BROK 1000 1000)");
+		assertEquals(CVMDouble.create(2.0),eval(ctx,"(torus/price BROK)"));
+		
+		CVMLong E_SHARES=CVMLong.create(1414); // 1000 * sqrt(2)
+		assertEquals(E_SHARES,eval(ctx,"(asset/balance BM *address*)"));
+	}
+	
+	@Test public void testLiquidityZeroCVM() {
+		// Bug fix for #517, thanks Ash!
+		Context ctx=context();
+		ctx= exec(ctx,"(def BROK (deploy (@convex.fungible/build-token {:supply 1000000})))");
+		
+		ctx= exec(ctx,"(def BM (call torus (create-market BROK)))");
+		assertNull(eval(ctx,"(torus/price BROK)"));
+		
+		ctx= exec(ctx,"(torus/add-liquidity BROK 1000 0)");
+		assertEquals(CVMLong.ZERO,ctx.getResult());
+		assertNull(eval(ctx,"(torus/price BROK)"));
+
+		ctx= exec(ctx,"(torus/add-liquidity BROK 0 1000)");
+		CVMLong E_SHARES=CVMLong.create(1000);
+		assertEquals(E_SHARES,ctx.getResult());
+		assertEquals(CVMDouble.ONE,eval(ctx,"(torus/price BROK)"));
+		assertEquals(E_SHARES,eval(ctx,"(asset/balance BM *address*)"));
+
+	}
+	
 	@Test public void testTorusAPI() {
 		Context ctx=context();
 
