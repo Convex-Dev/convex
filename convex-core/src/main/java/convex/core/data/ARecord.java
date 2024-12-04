@@ -34,7 +34,7 @@ public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V>
 	
 	
 	@Override
-	public final byte getTag() {
+	public byte getTag() {
 		return tag;
 	}
 	

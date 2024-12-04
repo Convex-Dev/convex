@@ -100,14 +100,10 @@ public class Order extends ACVMRecord {
 	public static Order create() {
 		return new Order(Vectors.empty().getRef(), EMPTY_CONSENSUS_ARRAY,0);
 	}
-
-	private byte getRecordTag() {
-		return CVMTag.ORDER;
-	}
 	
 	@Override
 	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getRecordTag();
+		bs[pos++]=getTag();
 		return encodeRaw(bs,pos);
 	}
 
