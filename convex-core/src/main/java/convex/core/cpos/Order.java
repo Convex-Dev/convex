@@ -51,16 +51,16 @@ public class Order extends ACVMRecord {
 	 */
 	private final long timestamp;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT , Keywords.TIMESTAMP};
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.TIMESTAMP,Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT };
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
 
 	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[CPoSConstants.CONSENSUS_LEVELS];
 
 	private Order(Ref<AVector<SignedData<Block>>> blocks, long[] consensusPoints, long timestamp) {
 		super(CVMTag.ORDER,FORMAT.count());
-		this.blocks = blocks;
-		this.consensusPoints=consensusPoints;
 		this.timestamp = timestamp;
+		this.consensusPoints=consensusPoints;
+		this.blocks = blocks;
 	}
 
 	/**
