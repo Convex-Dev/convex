@@ -299,7 +299,7 @@
               own-holding  (or (get-holding *caller*) 0)
               
               ;; Check withrawal amount is valid
-              _            (assert (<= 0 shares own-holding))
+              _            (or (<= 0 shares own-holding) (fail :FUNDS "Insufficient shares"))
               
               proportion   (if (> supply
                                   0)
@@ -311,24 +311,21 @@
              ;; SECURITY:
              ;; 1. Update balances then transfer coins first. Risk of re-entrancy attack if transfers are made while
              ;;    this actor is in an inconsistent state so we MUST do accounting first.
-             (def token-balance
+             (set! token-balance
                   (- token-balance
                      token-refund))
-             (set-holding *caller*
-                          (- own-holding
-                             shares))
-             (def supply
-                  (- supply
-                     shares))
-              ;; 2. Transfer back coins. Be aware caller might do *anything* in transfer callbacks!
-              (transfer *caller*
-                        coin-refund)
-              ;; 3. Finally transfer asset. We've accounted this already, so safe 
-              ;; TODO. Decide which of these is best
-              ;;(asset/transfer *caller* [token token-refund] :withdraw)
-              (fungible/transfer token
-                                 *caller*
-                                 token-refund)
+             
+             (set-holding *caller* (- own-holding shares))
+             
+             (set! supply (- supply shares))
+             
+             ;; 2. Transfer back coins. Be aware caller might do *anything* in transfer callbacks!
+             (transfer *caller* coin-refund)
+             
+             ;; 3. Finally transfer asset. Done accounting for this already, so safe 
+             ;; TODO. Decide which of these is best
+             ;;(asset/transfer *caller* [token token-refund] :withdraw)
+             (fungible/transfer token *caller* token-refund)
               shares)))])
 
 (defn create-market
@@ -483,7 +480,7 @@
     (sell-cvx with-token cvx-amount)))
 
 (defn sell-cvx
-  ^{:doc {:description "Sell an amount of CVX for a given token."
+  ^{:doc {:description "Sell an amount of CVM for a given token."
           :signature   [{:params [token amount]}]}}
   [token amount]
   (let [market (or (get-market token)
@@ -494,7 +491,7 @@
           (sell-cvx amount))))
 
 (defn sell-quote
-  ^{:doc {:description "Get a quote for selling an amount of a token, in CVX or optional swap token."
+  ^{:doc {:description "Get a quote for selling an amount of a token, in CVM or optional swap token."
           :signature   [{:params [of-token amount]}
                         {:params [of-token amount with-token]}]}}
   ([of-token amount]
@@ -510,7 +507,7 @@
              (sell-cvx-quote cvx-amount))))))
 
 (defn sell-tokens
-  ^{:doc {:description "Sell an amount of tokens at current CVX price"
+  ^{:doc {:description "Sell tokens at current CVX price"
           :signature   [{:params [token amount]}]}}
   [token amount]
   (let [market (or (get-market token)
@@ -521,7 +518,7 @@
     (call market (sell-tokens amount))))
 
 (defn withdraw-liquidity
-  ^{:doc {:description "Withdraw an amount of liquidity for a token."
+  ^{:doc {:description "Withdraw liquidity for a token."
           :signature   [{:params [token shares]}]}}
   [token shares]
   (let [market (or (get-market token)

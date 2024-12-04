@@ -109,6 +109,9 @@ public class FuzzTestFormat {
 			/* also OK */
 		} catch (MissingDataException e) {
 			/* also OK */
+		} catch (Exception e) {
+			System.err.println("Fuzz test bad blob: "+b);
+			throw e;
 		}
 	}
 }

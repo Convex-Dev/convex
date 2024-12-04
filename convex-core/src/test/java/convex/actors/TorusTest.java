@@ -217,6 +217,19 @@ public class TorusTest extends ACVMTest {
 		assertEquals(E_SHARES,eval(ctx,"(asset/balance BM *address*)"));
 	}
 	
+	@Test public void testBadWithdraw() {
+		Context ctx=context();
+		ctx= exec(ctx,"(def TOK (deploy (@convex.fungible/build-token {:supply 10000})))");
+		ctx= exec(ctx,"(def TM (torus/get-market TOK))");
+		
+		CVMLong E_SHARES=CVMLong.create(10000);
+		ctx= exec(ctx,"(torus/add-liquidity TOK 5000 20000)");
+		assertEquals(E_SHARES,ctx.getResult());
+		assertEquals(RT.cvm(4.0),eval(ctx,"(torus/price TOK)"));
+		
+		assertFundsError(step(ctx,"(torus/withdraw-liquidity TOK 10001)"));
+	}
+	
 	@Test public void testLiquidityZeroCVM() {
 		// Bug fix for #517, thanks Ash!
 		Context ctx=context();
@@ -235,6 +248,12 @@ public class TorusTest extends ACVMTest {
 		assertEquals(CVMDouble.ONE,eval(ctx,"(torus/price BROK)"));
 		assertEquals(E_SHARES,eval(ctx,"(asset/balance BM *address*)"));
 
+		// check withdrawing all shares
+		ctx= exec(ctx,"(torus/withdraw-liquidity BROK "+E_SHARES+")");
+		assertNull(eval(ctx,"(torus/price BROK)"));
+		assertEquals(CVMLong.ZERO,eval(ctx,"(asset/balance BM *address*)"));
+		assertEquals(CVMLong.ZERO,eval(ctx,"(asset/balance BROK BM)"));
+		assertEquals(CVMLong.ZERO,eval(ctx,"(balance BM)"));
 	}
 	
 	@Test public void testTorusAPI() {
