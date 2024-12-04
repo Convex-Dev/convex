@@ -31,6 +31,7 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -384,5 +385,13 @@ public class Toolkit {
 	public static <E> void scrollToBottom(JScrollPane scrollPane) {
 		JScrollBar bar = scrollPane.getVerticalScrollBar();
 		bar.setValue(bar.getMaximum());
+	}
+
+	public static void showMessge(Component parent, Object message) {
+		JOptionPane.showMessageDialog(parent, message);
+	}
+
+	public static void showErrorMessage(Component parent, String attemptFailure,Exception e) {
+		JOptionPane.showMessageDialog(parent, attemptFailure+ "\n"+e.getMessage());
 	}
 }

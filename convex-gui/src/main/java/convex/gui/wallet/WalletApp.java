@@ -14,6 +14,7 @@ import convex.gui.components.ConnectPanel;
 import convex.gui.components.Toast;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.panels.HomePanel;
 import convex.gui.peer.stake.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
@@ -68,7 +69,12 @@ public class WalletApp extends AbstractGUI {
 		if (convex.getKeyPair()==null) {
 			AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
 			if (we!=null) {
+				if (we.isLocked()) {
+					UnlockWalletDialog.offerUnlock(homePanel, we);
+				}
 				convex.setKeyPair(we.getKeyPair());
+			} else {
+				Toolkit.showMessge(this, "The key for this account is not in your key ring.\n\nWallet opened in read-only mode: transactions will fail.");
 			}
 		}
 	}

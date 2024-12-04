@@ -1,6 +1,8 @@
 package convex.gui.keys;
 
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.event.ActionEvent;
 import java.io.File;
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -12,8 +14,10 @@ import java.util.concurrent.CompletableFuture;
 
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.filechooser.*; 
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,13 +115,54 @@ public class KeyRingPanel extends JPanel {
 		btnImportSeed.setToolTipText("Import a key pair using an Ed25519 seed");
 		toolBar.add(btnImportSeed);
 		
+		// Import seed button
+		JButton btnLoadKeys = new ActionButton("Load Keys....",0xe890,this::loadStore);
+		btnLoadKeys.setToolTipText("Load keys from a Keystore file");
+		toolBar.add(btnLoadKeys);
+
+		
 		
 		add(toolBar, "dock south");
 
 	}
 
+	
+	private void loadStore(ActionEvent e) {
+    	try {
+    		File f=chooseKeyStore(this);
+	    	if (f==null) return;
+			if (f.exists()) {
+				KeyStore ks=PFXTools.loadStore(f, null);
+				int num=loadKeys(ks,"Loaded from "+f.getCanonicalPath());
+				Toolkit.showMessge(this,num+" new keys imported.");
+			}
+		} catch (IOException | GeneralSecurityException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	}
+	
 	/**
-	 * Load keys from a file. Returns number of keys loaded, or -1 if file could not be opened 
+	 * Shows dialog to choose a key store
+	 * @param parent
+	 * @return
+	 */
+	private static File chooseKeyStore(Component parent) {
+		JFileChooser chooser = new JFileChooser();
+	    FileNameExtensionFilter filter = new FileNameExtensionFilter("PKCS #12 Keystore", "p12", "pfx");
+	    chooser.setFileFilter(filter);
+	    File defaultDir=FileUtils.getFile(Constants.DEFAULT_KEYSTORE_FILENAME);
+	    if (defaultDir.isDirectory()) {
+		    chooser.setCurrentDirectory(defaultDir);
+	    }
+	    int returnVal = chooser.showOpenDialog(parent);
+	    if(returnVal != JFileChooser.APPROVE_OPTION) return null;
+	    File f=chooser.getSelectedFile();
+		return f;
+	}
+	
+	/**
+	 * Load keys from a File. Returns number of keys loaded, or -1 if file could not be opened 
 	 * @param f
 	 * @return
 	 */
@@ -125,7 +170,7 @@ public class KeyRingPanel extends JPanel {
 		if (!f.exists()) return -1;
 		try {
 			KeyStore ks=PFXTools.loadStore(f, null);
-			return loadKeys(ks, f.getCanonicalPath());
+			return loadKeys(ks, "Default KeyStore: "+f.getCanonicalPath());
 		} catch (IOException e) {
 			log.debug("Can't load key store: "+e.getMessage());
 			return -1;
@@ -136,15 +181,19 @@ public class KeyRingPanel extends JPanel {
 	}
 
 	private static int loadKeys(KeyStore keyStore, String source) throws KeyStoreException {
-		int n=0;
+		int numImports=0;
 		Enumeration<String> aliases = keyStore.aliases();
 		while (aliases.hasMoreElements()) {
 			String alias = aliases.nextElement();
 			AWalletEntry we=KeystoreWalletEntry.create(keyStore, alias, source);
-			listModel.addElement(we);
-			n++;
+			we.tryUnlock(null); // if empty password, unlock by default
+			AWalletEntry existing=getKeyRingEntry(we.getPublicKey());
+			if (existing==null) {
+				listModel.addElement(we);
+				numImports++;
+			}
 		}
-		return n;
+		return numImports;
 	}
 
 	public static DefaultListModel<AWalletEntry> getListModel() {
@@ -187,5 +236,46 @@ public class KeyRingPanel extends JPanel {
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Save a key to a store, prompting as necessary
+	 * @param parent
+	 * @param walletEntry Wallet entry to save
+	 * @return True if saved successfully, false otherwise
+	 */
+	public static boolean saveKey(Component parent, AWalletEntry walletEntry) {
+		boolean locked=walletEntry.isLocked();
+		try {
+			File f=chooseKeyStore(parent);
+			if (f==null) return false;
+			KeyStore ks;
+			if (f.exists()) {
+				ks=PFXTools.loadStore(f, null);
+			} else {
+				ks=PFXTools.createStore(f, null);
+			}
+			String s=JOptionPane.showInputDialog(parent,"Enter key encryption password");
+			if (s==null) return false;
+
+			if (locked) {
+				boolean unlock=walletEntry.tryUnlock(s.toCharArray());
+				if (!unlock) {
+					Toolkit.showMessge(parent, "Could not unlock key with this password");
+					return false;
+				}
+			}
+			PFXTools.setKeyPair(ks, walletEntry.getKeyPair(), s.toCharArray());
+			
+			// Lock wallet entry again
+			
+			PFXTools.saveStore(ks, f, null);
+			return true;
+		} catch (Exception e) {
+			Toolkit.showErrorMessage(parent,"Failed to save to KeyStore",e);
+			return false;
+		} finally {
+			if (locked) walletEntry.lock();			
+		}
 	}
 }

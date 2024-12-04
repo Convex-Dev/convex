@@ -1,6 +1,7 @@
 package convex.gui.keys;
 
 import java.awt.Color;
+import java.awt.event.ActionEvent;
 
 import javax.swing.Icon;
 import javax.swing.JButton;
@@ -92,43 +93,59 @@ public class WalletComponent extends BaseListComponent {
 		});
 		
 		// Menu Button
-		JPopupMenu menu=new JPopupMenu();
-		//JMenuItem m1=new JMenuItem("Edit...");
-		//menu.add(m1);
-		JMenuItem m2=new JMenuItem("Show seed...");
-		m2.addActionListener(e-> {
-			AKeyPair kp=walletEntry.getKeyPair();
-			if (kp!=null) {
-				JPanel panel=new JPanel();
-				panel.setLayout(new MigLayout("wrap 1","[200]"));
-				panel.add(new Identicon(kp.getAccountKey(),Toolkit.IDENTICON_SIZE_LARGE),"align center");
-				
-				panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString()))); 
-				panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
-				panel.setBorder(Toolkit.createDialogBorder());
-				JOptionPane.showMessageDialog(WalletComponent.this, panel,"Ed25519 Private Seed",JOptionPane.INFORMATION_MESSAGE);
-			} else {
-				JOptionPane.showMessageDialog(WalletComponent.this, "Keypair is locked, cannot access seed","Warning",JOptionPane.WARNING_MESSAGE);
-			}
-		});
-		menu.add(m2);
-		JMenuItem m3=new JMenuItem("Remove...");
-		m3.addActionListener(e-> {
-			int confirm =JOptionPane.showConfirmDialog(WalletComponent.this, "Are you sure you want to delete this keypair from your keyring?","Confirm Delete",JOptionPane.WARNING_MESSAGE);
-			if (confirm==JOptionPane.OK_OPTION) {
-				KeyRingPanel.getListModel().removeElement(walletEntry);
-			}
-		});
-		menu.add(m3);
+		{
+			JPopupMenu menu=new JPopupMenu();
+			//JMenuItem m1=new JMenuItem("Edit...");
+			//menu.add(m1);
+			JMenuItem m2=new JMenuItem("Show seed...");
+			m2.addActionListener(this::showSeed);
+			menu.add(m2);
+			
+			JMenuItem m3=new JMenuItem("Remove...");
+			m3.addActionListener(e-> {
+				int confirm =JOptionPane.showConfirmDialog(WalletComponent.this, "Are you sure you want to delete this keypair from your keyring?","Confirm Delete",JOptionPane.WARNING_MESSAGE);
+				if (confirm==JOptionPane.OK_OPTION) {
+					KeyRingPanel.getListModel().removeElement(walletEntry);
+				}
+			});
+			menu.add(m3);
+			
+			JMenuItem m4=new JMenuItem("Save to KeyStore...");
+			m4.addActionListener(e-> {
+				KeyRingPanel.saveKey(this,walletEntry);
+			});
+			menu.add(m4);
 
-		DropdownMenu menuButton=new DropdownMenu(menu); 
-		menuButton.setToolTipText("Settings and special actions for this key");
-		buttons.add(menuButton);
+	
+			DropdownMenu menuButton=new DropdownMenu(menu); 
+			menuButton.setToolTipText("Settings and special actions for this key");
+			buttons.add(menuButton);
+		}
 		
 		// panel of buttons on right
 		add(buttons,"dock east"); // add to MigLayout
 		
 		doUpdate();
+	}
+
+
+	private void showSeed(ActionEvent e) {
+		if (walletEntry.isLocked()) {
+			if (!UnlockWalletDialog.offerUnlock(this,walletEntry)) return;;
+		}
+		
+		AKeyPair kp=walletEntry.getKeyPair();
+		if (kp!=null) {
+			JPanel panel=new JPanel();
+			panel.setLayout(new MigLayout("wrap 1","[200]"));
+			panel.add(new Identicon(kp.getAccountKey(),Toolkit.IDENTICON_SIZE_LARGE),"align center");
+			
+			panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString()))); 
+			panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
+			panel.setBorder(Toolkit.createDialogBorder());
+		} else {
+			JOptionPane.showMessageDialog(WalletComponent.this, "Keypair is locked, cannot access seed","Warning",JOptionPane.WARNING_MESSAGE);
+		}
 	}
 
 

@@ -19,6 +19,7 @@ import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.init.Init;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
 import convex.net.IPUtils;
@@ -79,8 +80,17 @@ public class ConnectPanel extends JPanel {
 	    		HostCombo.registerGoodConnection(target);
 	    		
 	    		AWalletEntry we=KeyRingPanel.findWalletEntry(convex);
-	    		if ((we!=null)&&!we.isLocked()) {
-	    			convex.setKeyPair(we.getKeyPair());
+	    		if ((we!=null)) {
+	    			if (!we.isLocked()) {
+	    				convex.setKeyPair(we.getKeyPair());
+	    			} else {
+	    				boolean unlock=UnlockWalletDialog.offerUnlock(parent,we);
+	    				if (unlock) {
+	    					convex.setKeyPair(we.getKeyPair());
+	    				} else {
+	    					JOptionPane.showMessageDialog(parent, "Wallet not unlocked. In read-only mode.");
+	    				}
+	    			}
 	    		}
 	    		return convex;
 	    	} catch (ConnectException e) {
