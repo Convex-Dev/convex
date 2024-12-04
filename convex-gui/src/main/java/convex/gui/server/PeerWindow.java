@@ -13,8 +13,8 @@ import org.slf4j.LoggerFactory;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.gui.components.AbstractGUI;
-import convex.gui.panels.REPLPanel;
 import convex.gui.peer.PeerComponent;
+import convex.gui.repl.REPLPanel;
 import convex.peer.Server;
 import net.miginfocom.swing.MigLayout;
 

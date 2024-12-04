@@ -21,7 +21,6 @@ import convex.core.cvm.Address;
 import convex.core.cvm.PeerStatus;
 import convex.core.text.Text;
 import convex.etch.EtchStore;
-import convex.gui.client.ConvexClient;
 import convex.gui.components.BaseImageButton;
 import convex.gui.components.BaseListComponent;
 import convex.gui.components.CodeLabel;
@@ -29,6 +28,7 @@ import convex.gui.components.DropdownMenu;
 import convex.gui.components.Identicon;
 import convex.gui.etch.EtchWindow;
 import convex.gui.models.StateModel;
+import convex.gui.repl.REPLClient;
 import convex.gui.server.PeerWindow;
 import convex.gui.state.StateExplorer;
 import convex.gui.utils.Toolkit;
@@ -189,7 +189,7 @@ public class PeerComponent extends BaseListComponent {
 			Address addr=peer.getAddress();
 			AKeyPair kp=peer.getKeyPair();;
 			convex.setAddress(addr,kp);
-			new ConvexClient(convex).run();
+			new REPLClient(convex).run();
 		} catch (IOException | TimeoutException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

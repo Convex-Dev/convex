@@ -11,13 +11,13 @@ import javax.swing.JPanel;
 import javax.swing.SwingConstants;
 
 import convex.api.Convex;
-import convex.gui.client.ConvexClient;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.ConnectPanel;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.panels.HomePanel;
 import convex.gui.peer.PeerLaunchDialog;
+import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
 import convex.gui.wallet.WalletApp;
@@ -82,7 +82,7 @@ public class MainGUI extends AbstractGUI {
 	public void launchTerminalClient() {
 	    Convex convex=ConnectPanel.tryConnect(this);
 	    if (convex!=null) {
-	    	new ConvexClient(convex).run();
+	    	new REPLClient(convex).run();
 	    }
 	}
 	

@@ -20,6 +20,7 @@ import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.DropdownMenu;
 import convex.gui.keys.KeyRingPanel;
+import convex.gui.keys.UnlockWalletDialog;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -163,31 +164,25 @@ public class AccountChooserPanel extends JPanel {
 	}
 	
 	public void setKeyPair(AWalletEntry we) {
-		if (we==keyCombo.getSelectedItem()) return; // no change
-		
 		if (we==null) {
 			convex.setKeyPair(null);
 		} else {
 			AKeyPair kp;
 			if (we.isLocked()) {
-				String s=JOptionPane.showInputDialog(AccountChooserPanel.this,"Enter password to unlock wallet:\n"+we.getPublicKey());
-				if (s==null) {
-					convex.setKeyPair(null);
-					return;
-				}
-				char[] pass=s.toCharArray();
-				boolean unlock=we.tryUnlock(s.toCharArray());
+				boolean unlock=UnlockWalletDialog.offerUnlock(this, we);
 				if (!unlock) {
+					convex.setKeyPair(null);
+					keyCombo.setSelectedItem(null);
 					return;
 				}
+
 				kp=we.getKeyPair();
-				we.lock(pass);
+				we.lock();
 			} else {
 				kp=we.getKeyPair();
 			}
 			convex.setKeyPair(kp);
 		}
-		keyCombo.setSelectedItem(we);
 	}
 	
 	public void updateBalance() {

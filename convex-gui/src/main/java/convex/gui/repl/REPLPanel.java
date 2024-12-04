@@ -1,4 +1,4 @@
-package convex.gui.panels;
+package convex.gui.repl;
 		
 import java.awt.Color;
 import java.awt.Font;

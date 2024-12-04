@@ -15,9 +15,9 @@ import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.InvalidDataException;
 import convex.dlfs.DLFileSystem;
-import convex.gui.client.ConvexClient;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
+import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
 import convex.peer.PeerException;
@@ -94,7 +94,7 @@ public class GUITest {
 	public void testClientTools() {
 		GUITest.assumeGUI();
 		
-		ConvexClient client=new ConvexClient(CONVEX);
+		REPLClient client=new REPLClient(CONVEX);
 		assertNotNull(client.tabs);
 	}
 }

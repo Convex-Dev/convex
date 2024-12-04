@@ -3,9 +3,9 @@ package convex.gui.wallet;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
-import convex.gui.client.ConvexClient;
 import convex.gui.components.ActionButton;
 import convex.gui.components.account.AccountChooserPanel;
+import convex.gui.repl.REPLClient;
 import convex.gui.utils.Toolkit;
 import net.miginfocom.swing.MigLayout;
 
@@ -23,7 +23,7 @@ public class SettingsPanel extends JPanel {
 		add(Toolkit.withTitledBorder("Account Selection", chooser));
 		
 		ActionButton replButton=new ActionButton("Terminal REPL", 0xeb8e, e->{
-			new ConvexClient(convex).run();
+			new REPLClient(convex).run();
 		});
 		JPanel toolPanel=new JPanel();
 		toolPanel.add(replButton);

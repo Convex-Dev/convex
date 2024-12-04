@@ -75,7 +75,6 @@ public class KeystoreWalletEntry extends AWalletEntry {
 		} catch (GeneralSecurityException e) {
 			return false;
 		}
-		
 	}
 	
 	@Override

@@ -81,7 +81,6 @@ public class UnlockWalletDialog extends JDialog {
 		btnCancel.addActionListener(e -> close());
 		mainPanel.add(buttonPanel, "dock south");
 
-
 		Action closeAction = new AbstractAction() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
@@ -103,7 +102,7 @@ public class UnlockWalletDialog extends JDialog {
 	}
 
 	/**
-	 * Shows a dialog to ask the user to unlock a wallet
+	 * Shows a dialog to ask the user to unlock a wallet entry
 	 * @param parent Parent component
 	 * @param walletEntry Wallet Entry to consider
 	 * @return True if unlocked, false otherwise
