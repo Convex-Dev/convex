@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
@@ -63,7 +64,7 @@ public class REPLClient extends AbstractGUI {
 	 * @param convex Convex client instance
 	 */
 	public REPLClient(Convex convex) {
-		super ("Convex Client");
+		super ("Convex Terminal");
 		setLayout(new BorderLayout());
 		replPanel=new REPLPanel(convex);
 		this.add(tabs, BorderLayout.CENTER);
@@ -86,7 +87,8 @@ public class REPLClient extends AbstractGUI {
 				if (we.isLocked()) {
 					UnlockWalletDialog.offerUnlock(this, we);
 				}
-				convex.setKeyPair(we.getKeyPair());
+				AKeyPair kp=we.getKeyPair();
+				convex.setKeyPair(kp);
 			} else {
 				Toolkit.showMessge(this, "The key for this account is not in your key ring.\n\nTerminal opened in Query mode.");
 			}
