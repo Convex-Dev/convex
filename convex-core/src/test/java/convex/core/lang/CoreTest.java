@@ -4970,7 +4970,7 @@ public class CoreTest extends ACVMTest {
 	
 	@Test
 	public void testExpand_1() {
-		assertEquals(read("(let [v# 1] (cond v# v# (or 2 3)))"), eval("(expand-1 '(or 1 2 3))"));
+		assertEquals(read("(cond 1 *result* (or 2 3))"), eval("(expand-1 '(or 1 2 3))"));
 	}
 
 	@Test

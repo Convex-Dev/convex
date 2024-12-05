@@ -264,11 +264,10 @@
     (cond
       (== n 0) true
       (== n 1) (first exprs)
-      :else    `(let [v# ~(first exprs)]
-                  (cond v#
+      :else    `(cond ~(first exprs)
                     ~(cons 'and
                            (next exprs))
-                    v#)))))
+                    *result*))))
 
 (defmacro or
   ^{:doc {:description ["Executes expressions in sequence, returning the first truthy value, or the last value if all were falsey (false or nil)."
@@ -281,12 +280,11 @@
     (cond
       (== n 0) nil
       (== n 1) (first exprs)
-      :else    `(let [v# ~(first exprs)]
-                  (cond
-                    v#
-                    v#
+      :else    `(cond
+                	~(first exprs)
+                    *result*
                     ~(cons 'or
-                           (next exprs)))))))
+                           (next exprs))))))
 
 ;;;;;;;;;; `cond` variants
 
