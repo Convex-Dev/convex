@@ -53,7 +53,8 @@ public class ConnectPanel extends JPanel {
 		
 		{	// Address selection
 			pan.add(new JLabel("Address"));
-			addressField=new AddressCombo(getSuggestedAddress());
+			addressField=new AddressCombo();
+			addressField.setSelectedItem(getSuggestedAddress());
 			addressField.setToolTipText("Set the initial account address to use. \nNormally this should be an account for which you possess the private key. \nIf you don't have the private key, you can still view the account but cannot execute transactions.");
 			pan.add(addressField,"width 50:250:");
 			pan.add(Toolkit.makeHelp(addressField.getToolTipText()));

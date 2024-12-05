@@ -52,7 +52,8 @@ public class AccountChooserPanel extends JPanel {
 			mp.add(new JLabel("Account:"));
 	
 			Address address=convex.getAddress();
-			addressCombo = new AddressCombo(address);
+			addressCombo = new AddressCombo();
+			addressCombo.setSelectedItem(address);
 			addressCombo.setToolTipText("Select Account for use");
 			addressCombo.addItemListener(e -> {
 				updateAddress(addressCombo.getAddress());
@@ -68,7 +69,9 @@ public class AccountChooserPanel extends JPanel {
 					return;
 				};
 				AWalletEntry we=(AWalletEntry)e.getItem();
-				setKeyPair(we);
+				if (we!=keyCombo.getWalletEntry()) {
+					setKeyPair(we);
+				}
 			});
 			mp.add(keyCombo);
 
@@ -135,6 +138,8 @@ public class AccountChooserPanel extends JPanel {
 			modeCombo.addItem("Transact");
 			modeCombo.addItem("Query");
 			modeCombo.addItem("Prepare");
+			
+			modeCombo.setFocusable(false);
 			// modeCombo.addItem("Prepare...");
 			if (convex.getKeyPair()==null) modeCombo.setSelectedItem("Query");
 			mp.add(modeCombo);
@@ -182,6 +187,7 @@ public class AccountChooserPanel extends JPanel {
 				kp=we.getKeyPair();
 			}
 			convex.setKeyPair(kp);
+			keyCombo.setSelectedItem(kp);
 		}
 	}
 	

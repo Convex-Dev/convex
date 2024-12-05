@@ -20,6 +20,10 @@ public class DropdownMenu extends BaseImageButton {
 	public DropdownMenu(JPopupMenu popupMenu, int iconSize) {
 		super(SymbolIcon.get(0xe8b8,iconSize));
 		this.popupMenu = popupMenu;
+		
+		// Menu shouldn't steal focus
+		this.setFocusable(false);
+		
 		// setIconTextGap(0);
 		this.addActionListener(e->{
 			popupMenu.show(DropdownMenu.this, 0, DropdownMenu.this.getHeight());

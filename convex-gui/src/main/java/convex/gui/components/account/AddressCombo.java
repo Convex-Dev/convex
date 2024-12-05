@@ -2,6 +2,7 @@ package convex.gui.components.account;
 
 import java.awt.event.FocusAdapter;
 import java.util.Collection;
+import java.util.TreeSet;
 
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JComboBox;
@@ -20,6 +21,8 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class AddressCombo extends JComboBox<Address> {
 	private static Address PROTOTYPE=Address.create(100000);
+	
+	private static TreeSet<Address> usedAddresses=new TreeSet<>();
 	
 	private class AddressEditor extends BasicComboBoxEditor {	
 		@Override 
@@ -56,13 +59,14 @@ public class AddressCombo extends JComboBox<Address> {
 			Address address=(Address) getSelectedItem();
 			if ((address!=null)&&(model.getIndexOf(address)<0)) {
 				model.addElement(address);
+				usedAddresses.add(address);
 			}
 			Toolkit.relinquishFocus(AddressCombo.this);
 		});
 	}
 
 	public AddressCombo() {
-		this(new DefaultComboBoxModel<Address>());
+		this(usedAddresses);
 	}
 	
 	public AddressCombo(Address... addresses) {

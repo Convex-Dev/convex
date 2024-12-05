@@ -115,6 +115,8 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	public KeyPairCombo(ComboBoxModel<AWalletEntry> model) {
 		this.setModel(model);
 		this.setRenderer(new KeyPairRenderer());
+		
+		this.setFocusable(false);
 	}
 	
 	public AWalletEntry getPrototypeDisplayValue() {
