@@ -17,7 +17,7 @@ import convex.core.exceptions.InvalidDataException;
  */
 public abstract class ARecordGeneric extends ACVMRecord {
 
-	protected AVector<ACell> values;
+	protected final AVector<ACell> values;
 	
 	protected final RecordFormat format;
 	

@@ -49,7 +49,8 @@ public class RecordTest {
 
 	@Test
 	public void testOrder() {
-		doRecordTests(Order.create());
+		Order order=Order.create();
+		doRecordTests(order);
 	}
 
 	@Test

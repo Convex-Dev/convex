@@ -1,6 +1,6 @@
 package convex.core.cpos;
 
-import convex.core.cvm.ACVMRecord;
+import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.RecordFormat;
@@ -8,15 +8,13 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
-import convex.core.data.Format;
-import convex.core.data.IRefFunction;
 import convex.core.data.Keyword;
-import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.lang.RT;
 
 /**
  * Class representing an Ordering of transactions, along with the consensus position.
@@ -33,12 +31,12 @@ import convex.core.exceptions.InvalidDataException;
  * An Ordering is immutable.
  * 
  */
-public class Order extends ACVMRecord {
-	/**
-	 * Ref to Blocks Vector. We use Ref to assist de-duplication, since many Orders
-	 * likely to share same Blocks value
-	 */
-	private final Ref<AVector<SignedData<Block>>> blocks;
+public class Order extends ARecordGeneric {
+	private static final Keyword[] KEYS = new Keyword[] { Keywords.TIMESTAMP,Keywords.CONSENSUS, Keywords.BLOCKS};
+	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+	private static final int IX_TIMESTAMP = 0;
+	private static final int IX_CONSENSUS = 1;
+	private static final int IX_BLOCKS = 2;
 
 	/**
 	 * Array of consensus points for each consensus level. The first element (block count)
@@ -47,20 +45,23 @@ public class Order extends ACVMRecord {
 	private final long [] consensusPoints;
 	
 	/**
-	 * Timestamp of this Order
+	 * Timestamp of this Order, i.e. the timestamp of the peer at the time it was created
 	 */
 	private final long timestamp;
 
-	private static final Keyword[] KEYS = new Keyword[] { Keywords.TIMESTAMP,Keywords.BLOCKS, Keywords.CONSENSUS_POINT, Keywords.PROPOSAL_POINT };
-	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
-
 	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[CPoSConstants.CONSENSUS_LEVELS];
 
-	private Order(Ref<AVector<SignedData<Block>>> blocks, long[] consensusPoints, long timestamp) {
-		super(CVMTag.ORDER,FORMAT.count());
+	@SuppressWarnings("unchecked")
+	private Order(AVector<ACell> values) {
+		super(CVMTag.ORDER,FORMAT,values);
+		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
+		this.consensusPoints = RT.toLongArray((AVector<ACell>)values.get(IX_CONSENSUS));
+	}
+	
+	private Order(AVector<SignedData<Block>> blocks, long[] consensusPoints, long timestamp) {
+		super(CVMTag.ORDER,FORMAT,Vectors.create(CVMLong.create(timestamp),Vectors.createLongs(consensusPoints),blocks));
 		this.timestamp = timestamp;
 		this.consensusPoints=consensusPoints;
-		this.blocks = blocks;
 	}
 
 	/**
@@ -70,9 +71,9 @@ public class Order extends ACVMRecord {
 	 * @param consensusPoint Consensus Point
 	 * @return New Order instance
 	 */
-	private static Order create(Ref<AVector<SignedData<Block>>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
+	private static Order create(AVector<SignedData<Block>> blocks, long proposalPoint, long consensusPoint, long timestamp) {
 		long[] consensusPoints=new long[CPoSConstants.CONSENSUS_LEVELS];
-		consensusPoints[0] = blocks.getValue().count();
+		consensusPoints[0] = blocks.count();
 		consensusPoints[1] = proposalPoint;
 		consensusPoints[2] = consensusPoint;
 
@@ -89,7 +90,7 @@ public class Order extends ACVMRecord {
 	 */
 	@SuppressWarnings("unchecked")
 	public static Order create(long proposalPoint, long consensusPoint, SignedData<Block>... blocks ) {
-		return create(Vectors.of((Object[])blocks).getRef(), proposalPoint, consensusPoint,0);
+		return create(Vectors.create(blocks), proposalPoint, consensusPoint,0);
 	}
 	
 	/**
@@ -98,28 +99,7 @@ public class Order extends ACVMRecord {
 	 * @return New Order instance
 	 */
 	public static Order create() {
-		return new Order(Vectors.empty().getRef(), EMPTY_CONSENSUS_ARRAY,0);
-	}
-	
-	@Override
-	public int encode(byte[] bs, int pos) {
-		bs[pos++]=getTag();
-		return encodeRaw(bs,pos);
-	}
-
-	@Override
-	public int encodeRaw(byte[] bs, int pos) {
-		pos = blocks.encode(bs,pos);
-		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
-			pos = Format.writeVLQLong(bs,pos, consensusPoints[level]);
-		}
-		pos = Format.writeVLQLong(bs,pos, timestamp);
-		return pos;
-	}
-	
-	@Override
-	public int estimatedEncodingSize() {
-		return blocks.estimatedEncodingSize()+30; // blocks plus enough size for points
+		return new Order(Vectors.empty(), EMPTY_CONSENSUS_ARRAY,0);
 	}
 
 	/**
@@ -131,28 +111,10 @@ public class Order extends ACVMRecord {
 	 * @throws BadFormatException In the event of any encoding error
 	 */
 	public static Order read(Blob b, int pos) throws BadFormatException {
-		int epos=pos+1; // skip tag
-		Ref<AVector<SignedData<Block>>> blocks = Format.readRef(b,epos);
-		if (blocks==null) {
-			throw new BadFormatException("Null blocks in Order!");
-		}
-		epos+=blocks.getEncodingLength();
+		AVector<ACell> values = Vectors.read(b, pos);
+		long epos=pos+values.getEncodingLength();
 		
-		long[] cps=new long[CPoSConstants.CONSENSUS_LEVELS];
-		long last=Long.MAX_VALUE;
-		for (int level=1; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
-			long pp = Format.readVLQLong(b,epos);
-			cps[level]=pp;
-			epos+=Format.getVLQLongLength(pp);
-			if (pp>last) {
-				throw new BadFormatException("Consensus point ["+pp+"] before previous value [" + last+"] at level "+level);
-			}
-			last=pp;
-		}
-		long ts = Format.readVLQLong(b,epos); // TODO: should just be 8 bytes?
-		epos+=Format.getVLQLongLength(ts);
-		
-		Order result=new Order(blocks, cps,ts);
+		Order result=new Order(values);
 		result.attachEncoding(b.slice(pos, epos));
 		return result;
 	}
@@ -174,8 +136,6 @@ public class Order extends ACVMRecord {
 		long commonPrefix = getBlocks().commonPrefixLength(bc.getBlocks());
 		return commonPrefix >= getConsensusPoint();
 	}
-
-
 	
 	/**
 	 * Gets the Consensus Point of this Order for the specified level
@@ -183,13 +143,11 @@ public class Order extends ACVMRecord {
 	 * @return Consensus Point
 	 */
 	public long getConsensusPoint(int level) {
-		if (level==0) return blocks.getValue().count();
 		return consensusPoints[level];
 	}
 	
 	public long[] getConsensusPoints() {
 		long[] result=consensusPoints.clone();
-		result[0]=getBlockCount();
 		return result;
 	}
 
@@ -221,8 +179,9 @@ public class Order extends ACVMRecord {
 	 * Gets the Blocks in this Order
 	 * @return Vector of Blocks
 	 */
+	@SuppressWarnings("unchecked")
 	public AVector<SignedData<Block>> getBlocks() {
-		return blocks.getValue();
+		return (AVector<SignedData<Block>>) values.get(IX_BLOCKS);
 	}
 
 	/**
@@ -251,14 +210,25 @@ public class Order extends ACVMRecord {
 	 * @return Updated Order, or the same order if unchanged
 	 */
 	public Order withBlocks(AVector<SignedData<Block>> newBlocks) {
-		if (blocks.getValue() == newBlocks) return this;
+		if (getBlocks() == newBlocks) return this;
 		
 		// Update proposal point and consensus point if necessary to ensure consistency
 		long nblocks=newBlocks.count();
-		long newProposalPoint = Math.min(nblocks, getProposalPoint());
-		long newConsensusPoint = Math.min(nblocks, getConsensusPoint());
 		
-		return create(newBlocks.getRef(), newProposalPoint, newConsensusPoint, timestamp);
+		AVector<ACell> newValues=values.assoc(IX_BLOCKS, newBlocks);
+		
+		// update consensus points if required
+		int n=consensusPoints.length;
+		if ((nblocks!=consensusPoints[0])||(nblocks<consensusPoints[n-1])) {
+			long[] nc=consensusPoints.clone();
+			for (int i=1; i<n; i++) {
+				nc[i]=Math.min(nc[i],nblocks);
+			}
+			nc[0]=nblocks;
+			newValues=newValues.assoc(IX_CONSENSUS, Vectors.createLongs(nc));
+		}
+		
+		return new Order(newValues);
 	}
 	
 	/**
@@ -268,7 +238,7 @@ public class Order extends ACVMRecord {
 	 */
 	public Order withTimestamp(long newTimestamp) {
 		if (timestamp == newTimestamp) return this;
-		return new Order(blocks, consensusPoints, newTimestamp);
+		return new Order(values.assoc(IX_TIMESTAMP, CVMLong.create(newTimestamp)));
 	}
 	
 	/**
@@ -279,12 +249,10 @@ public class Order extends ACVMRecord {
 	 * @return Updated Order, or this Order instance if no change.
 	 */
 	public Order withConsensusPoint(int level,long newPosition) {
-		if (level==0) return this; // TODO: sane or not?
 		if (consensusPoints[level]==newPosition) return this;
 		long[] cps=consensusPoints.clone();
-		cps[0]=getBlockCount();
 		cps[level]=newPosition;
-		return new Order(blocks,cps,timestamp);
+		return new Order(values.assoc(IX_CONSENSUS,Vectors.createLongs(cps)));
 	}
 	
 	/**
@@ -296,7 +264,7 @@ public class Order extends ACVMRecord {
 	public Order withConsensusPoints(long[] newPositions) {
 		long[] cps=newPositions.clone();
 		cps[0]=getBlockCount();
-		return new Order(blocks,cps,timestamp);
+		return new Order(values.assoc(IX_CONSENSUS,Vectors.createLongs(cps)));
 	}
 
 	/**
@@ -312,13 +280,9 @@ public class Order extends ACVMRecord {
 	 * @return Updated order with zeroed consensus positions
 	 */
 	public Order withoutConsenus() {
-		return new Order(blocks, EMPTY_CONSENSUS_ARRAY,timestamp);
-	}
-
-	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		blocks.validate();
+		long[] nc=new long[CPoSConstants.CONSENSUS_LEVELS];
+		nc[0]=getBlocks().count();
+		return new Order(values.assoc(IX_CONSENSUS, Vectors.createLongs(nc)));
 	}
 
 	@Override
@@ -327,35 +291,11 @@ public class Order extends ACVMRecord {
 	}
 
 	@Override
-	public int getRefCount() {
-		return 1;
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public <R extends ACell> Ref<R> getRef(int i) {
-		if (i==0) return (Ref<R>) blocks;
-		throw new IndexOutOfBoundsException(i);
-	}
-
-	@Override
 	public ACell get(Keyword key) {
+		if (Keywords.TIMESTAMP.equals(key)) return values.get(IX_TIMESTAMP);
+		if (Keywords.CONSENSUS.equals(key)) return values.get(IX_CONSENSUS);
 		if (Keywords.BLOCKS.equals(key)) return getBlocks();
-		if (Keywords.CONSENSUS_POINT.equals(key)) return CVMLong.create(getConsensusPoint());
-		if (Keywords.PROPOSAL_POINT.equals(key)) return CVMLong.create(getProposalPoint());
-		if (Keywords.TIMESTAMP.equals(key)) return CVMLong.create(timestamp);
-
 		return null;
-	}
-
-	@SuppressWarnings("unchecked")
-	@Override
-	public Order updateRefs(IRefFunction func) {
-		Ref<AVector<SignedData<Block>>> newBlocks = (Ref<AVector<SignedData<Block>>>) func.apply(blocks);
-		if (blocks == newBlocks) {
-			return this;
-		}
-		return new Order(newBlocks, consensusPoints, timestamp);
 	}
 
 	/**
@@ -368,17 +308,24 @@ public class Order extends ACVMRecord {
 		for (int i=1; i<CPoSConstants.CONSENSUS_LEVELS; i++) {
 			if (this.getConsensusPoint(i)!=b.getConsensusPoint(i)) return false;			
 		}
-		if (!this.blocks.equals(b.blocks)) return false;
+		if (!this.getBlocks().equals(b.getBlocks())) return false;
 		return true;
 	}
 
 	@Override
-	public RecordFormat getFormat() {
-		return FORMAT;
+	public boolean equals(ACell o) {
+		if (o instanceof Order) return equals((Order)o);
+		return Cells.equalsGeneric(this, o);
 	}
 	
+	public boolean equals(Order o) {
+		if (o==null) return false;
+		return values.equals(o.values);
+	}
+
+
 	@Override
-	public boolean equals(ACell o) {
-		return Cells.equalsGeneric(this, o);
+	protected ARecordGeneric withValues(AVector<ACell> newValues) {
+		return new Order(values);
 	}
 }

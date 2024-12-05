@@ -184,9 +184,18 @@ public class BeliefMergeTest {
 		// propose a new block by peer 1, after 200ms
 		long newTimestamp1 = b1.getTimestamp() + 200;
 		b1 = b1.updateTimestamp(newTimestamp1);
-		assertEquals(0, b1.getPeerOrder().getBlocks().size());
-		Peer b1a = b1.proposeBlock(Block.of(newTimestamp1)); // empty block, just with timestamp
-		assertEquals(1, b1a.getPeerOrder().getBlocks().size());
+		{ // test peer order
+			assertEquals(0, b1.getPeerOrder().getBlocks().size());
+		}
+		Block newBlock=Block.of(newTimestamp1);
+		Peer b1a = b1.proposeBlock(newBlock); // empty block, just with timestamp
+		{ //
+			Order order=b1a.getPeerOrder();
+			assertEquals(1, order.getBlocks().size());
+			assertEquals(1, order.getConsensusPoint(0));
+			assertEquals(0, order.getConsensusPoint(1));
+			assertEquals(0, order.getConsensusPoint(2));
+		}
 
 		// merge updated belief, new proposed block should be included
 		Peer bm2 = b0.mergeBeliefs(b1a.getBelief());

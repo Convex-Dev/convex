@@ -67,6 +67,7 @@ public class BlocksTest {
 		assertEquals(enc,dr.getEncoding());
 		assertEquals(b1,dr);
 		
+		RecordTest.doRecordTests(b1);
 		
 	}
 	
@@ -77,6 +78,9 @@ public class BlocksTest {
 		Block b1 = Block.create(ts, Vectors.of(t,t,t));
 
 		assertEquals(2,b1.getRefCount());
+		
+		// TODO: should fail structural validation because txs not signed
+		// assertThrows(InvalidDataException.class,()->b1.validate());
 
 	}
 }

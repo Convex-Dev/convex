@@ -160,6 +160,12 @@ public class VectorsTest {
 		}
 		assertEquals(300L, lv.count());
 	}
+	
+	@Test
+	public void testCreateLongs() {
+		assertEquals(Vectors.of(1,2,3),Vectors.createLongs(new long[] {1,2,3}));
+		assertEquals(Vectors.of(1,2,3),Vectors.createLongs(1,2,3));
+	}
 
 	@Test
 	public void testBigMatch() {

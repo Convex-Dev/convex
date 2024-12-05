@@ -1885,6 +1885,15 @@ public class RT {
 		return sb.check(limit);
 	}
 
+	public static long[] toLongArray(AVector<?> v) {
+		int n=v.size();
+		long[] result=new long[n];
+		for (int i=0; i<n; i++) {
+			result[i]=RT.ensureLong(v.get(i)).longValue();
+		}
+		return result;
+	}
+
 
 
 

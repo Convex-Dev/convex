@@ -6,6 +6,7 @@ import org.bouncycastle.util.Arrays;
 
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
 
@@ -169,8 +170,16 @@ public class Vectors {
 	 * @return
 	 */
 	public static AVector<CVMLong> range(long start, long end) {
-		// TODO Auto-generated method stub
-		return null;
+		throw new TODOException();
+	}
+
+	public static AVector<CVMLong> createLongs(long... values) {
+		int n=values.length;
+		ACell[] longs=new ACell[n];
+		for (int i=0; i<n; i++) {
+			longs[i]=CVMLong.create(values[i]);
+		}
+		return Vectors.create(longs);
 	}
 
 }
