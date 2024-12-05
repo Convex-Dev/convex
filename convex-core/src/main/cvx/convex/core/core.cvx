@@ -248,8 +248,6 @@
      syms)
   nil)
 
-
-
 ;;;;;;;;;; Logic Operations
 
 (defmacro and
@@ -306,9 +304,10 @@
   ^{:doc {:description "Similar to `if`, but the test expression in bound to a symbol so that it can be accessed in the `expr-true` branch."
           :examples    [{:code "(if-let [addr (some-function)] (transfer addr 1000) (fail \"Address missing\"))"}]
           :signature   [{:params [[sym exp] expr-true expr-false]}]}}
-  [[sym exp] & branches]
-  `(let [~sym ~exp]
-     ~(cons 'if sym branches)))
+  ([[sym exp] expr-true]
+    `(cond ~exp (let [~sym *result*] ~expr-true)))
+  ([[sym exp] expr-true expr-false]
+	`(cond ~exp (let [~sym *result*] ~expr-true) ~expr-false)))
 
 (defmacro when
   ^{:doc {:description "Executes body expressions in an implicit `do` block if and only if the `test` expression evaluates to a truthy value (anything but false or nil)."
@@ -326,11 +325,8 @@
           :examples    [{:code "(when-let [addr (some-function)] (transfer addr 1000))"}]
           :signature   [{:params [[sym exp] & body]}]}}
   [[sym exp] & body]
-  (let [dobody (cons 'let [sym 'test#]
-                     body)]
-    `(let [test# ~exp]
-       (cond test#
-         ~dobody))))
+  `(cond ~exp (let [~sym *result*] ~(cons 'do body
+		  ))))
 
 (defmacro when-not
    ^{:doc {:description "Like `when` but the opposite: body is executed only if the result is false or nil."
