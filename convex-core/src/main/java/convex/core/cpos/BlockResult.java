@@ -183,7 +183,7 @@ public class BlockResult extends ARecordGeneric {
 	}
 
 	/**
-	 * Creates a BlockResult for an invalid Block (i.e. no peer)
+	 * Creates a BlockResult for an invalid Block (e.g. no peer in Global State)
 	 * @param state State at time of creation
 	 * @param block Invalid block
 	 * @param message Message to report to clients

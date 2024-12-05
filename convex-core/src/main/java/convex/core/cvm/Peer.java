@@ -604,7 +604,7 @@ public class Peer {
 		}
 		
 		result=result.updateBelief(newBelief);
-		result=result.updateState();
+		// result=result.updateState();
 		return result;
 	}
 

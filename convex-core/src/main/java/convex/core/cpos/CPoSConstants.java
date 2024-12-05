@@ -40,10 +40,15 @@ public class CPoSConstants {
 	public static final double PEER_DECAY_MINIMUM = 0.001;
 	
 	/**
-	 * Maximum time a block can be resurrected from the past (1 min)
+	 * Maximum time a block can be resurrected from the past (15 min)
 	 */
-	public static final long MAX_BLOCK_BACKDATE = 60*1000;
+	public static final long MAX_BLOCK_BACKDATE = 15*60*1000;
+	
+	/**
+	 * Initial timestamp for a Peer before it has any blocks
+	 */
 	public static final long INITIAL_PEER_TIMESTAMP = -1L;
+	
 	/**
 	 * Minimum stake for a Peer to be considered by other Peers in consensus
 	 */

@@ -122,11 +122,14 @@ public class InitTest extends ACVMTest {
 	@Test
 	public void testInitEncoding() throws BadFormatException {
 		Blob b=Format.encodeMultiCell(STATE, true);
-		
 		State s=Format.decodeMultiCell(b);
 		assertEquals(STATE,s);
 		assertEquals(STATE.getAccount(Core.CORE_ADDRESS),s.getAccount(Core.CORE_ADDRESS));
 		assertEquals(STATE.getAccount(29),s.getAccount(29));
+		
+		HashSet<Hash> hs=new HashSet<>();
+		s.getRef().findMissing(hs, 100);
+		assertTrue(hs.isEmpty());
 	}
 	
 	@Test
@@ -148,12 +151,7 @@ public class InitTest extends ACVMTest {
 		//	c[1]=v;
 		//});
 		//assertEquals(0L,s1s.persisted);
-		
 		assertSame(s1s.root,sr);
-		
-		HashSet<Hash> hs=new HashSet<>();
-		sr.findMissing(hs, 100);
-		assertTrue(hs.isEmpty());
 	}
 
 }

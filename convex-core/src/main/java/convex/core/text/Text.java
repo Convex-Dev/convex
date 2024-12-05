@@ -54,7 +54,10 @@ public class Text {
 	public static String leftPad(String s, int length) {
 		if (s == null) s = "";
 		int spaces = length - s.length();
-		if (spaces < 0) throw new IllegalArgumentException("String [" + s + "] too long for pad length: " + length);
+		if (spaces < 0) {
+			return s.substring(0,length);
+			// throw new IllegalArgumentException("String [" + s + "] too long for pad length: " + length);
+		}
 		return whiteSpace(spaces) + s;
 	}
 

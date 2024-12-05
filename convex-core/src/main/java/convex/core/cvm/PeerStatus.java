@@ -54,8 +54,20 @@ public class PeerStatus extends ARecordGeneric {
 	 */
 	private AHashMap<ACell,ACell> metadata;
 	
+	/**
+	 * Timestamp of the latest block executed by the Peer
+	 * 
+	 * Maintain invariants:
+	 *  PeerStatus time 
+	 *  <= State timestamp (timestamp of last block of any peer, or INITIAL_TIMESTAMP)
+	 *  <= peer timestamp (latest time recorded in Peer processing)
+	 *  <= current time
+	 */
 	private final long timestamp;
 	
+	/**
+	 * Convex coin balance of the peer, including accumulated rewards
+	 */
 	private final long balance;
 
 
@@ -251,6 +263,11 @@ public class PeerStatus extends ARecordGeneric {
 		return new PeerStatus(values.assoc(6,CVMLong.create(newBalance)));
 	}
 	
+	private PeerStatus withTimestamp(CVMLong newTimestamp) {
+		if (timestamp==newTimestamp.longValue()) return this;
+		return new PeerStatus(values.assoc(5,newTimestamp));
+	}
+	
 	/**
 	 * Sets the Peer Stake on this peer for the given delegator.
 	 *
@@ -272,6 +289,8 @@ public class PeerStatus extends ARecordGeneric {
 		if (metadata==newMeta) return this;	
 		return new PeerStatus(controller, peerStake, getStakes(), delegatedStake, newMeta,timestamp,balance);
     }
+	
+
 
 	@Override
 	public void validateCell() throws InvalidDataException {
@@ -324,5 +343,21 @@ public class PeerStatus extends ARecordGeneric {
 		if (values==newValues) return this;
 		return new PeerStatus(newValues);
 	}
+
+	public PeerStatus distributeBlockReward(State state, long peerFees) {
+		PeerStatus ps=addReward(peerFees);
+		long oldTime=ps.getTimestamp();
+		
+		// Maybe bump timestamp
+		CVMLong timestamp=state.getTimestamp();
+		long newTime=timestamp.longValue();
+		if (oldTime<newTime) {
+			ps=ps.withTimestamp(timestamp);
+		}
+		
+		return ps;
+	}
+
+	
 
 }

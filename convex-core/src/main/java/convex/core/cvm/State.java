@@ -299,15 +299,17 @@ public class State extends ARecordGeneric {
 		glbs=glbs.assoc(GLOBAL_TIMESTAMP,CVMLong.create(newTimestamp));
 		
 		// Grow memory pool if required
-		long memAdditions=(newTimestamp/Constants.MEMORY_POOL_GROWTH_INTERVAL)-(oldTimestamp/Constants.MEMORY_POOL_GROWTH_INTERVAL);
-		if (memAdditions>0) {
-			long mem=((CVMLong)glbs.get(GLOBAL_MEMORY_MEM)).longValue();
-			long add=memAdditions*Constants.MEMORY_POOL_GROWTH;
-			if (add>0) {
-				long  newMem=mem+add;
-				glbs=glbs.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(newMem));
-			} else {
-				throw new Error("Bad memory additions?");
+		{
+			long memAdditions=(newTimestamp/Constants.MEMORY_POOL_GROWTH_INTERVAL)-(oldTimestamp/Constants.MEMORY_POOL_GROWTH_INTERVAL);
+			if (memAdditions>0) {
+				long mem=((CVMLong)glbs.get(GLOBAL_MEMORY_MEM)).longValue();
+				long add=memAdditions*Constants.MEMORY_POOL_GROWTH;
+				if (add>0) {
+					long  newMem=mem+add;
+					glbs=glbs.assoc(GLOBAL_MEMORY_MEM, CVMLong.create(newMem));
+				} else {
+					throw new Error("Bad memory additions?");
+				}
 			}
 		}
 		
@@ -425,7 +427,7 @@ public class State extends ARecordGeneric {
 		} else {
 			// immediate fees to peer
 			long peerFees=fees/2;
-			ps=ps.addReward(peerFees);
+			ps=ps.distributeBlockReward(state,peerFees);
 			fees-=peerFees;
 			state=state.withPeer(peer, ps);
 		}

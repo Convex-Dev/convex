@@ -19,7 +19,8 @@ public class Constants {
 	/**
 	 * Initial timestamp for new States
 	 */
-	public static final long INITIAL_TIMESTAMP = Instant.parse("2020-02-02T00:20:20.0202Z").toEpochMilli();
+	public static final long INITIAL_TIMESTAMP = Instant.parse("2020-12-06T05:08:13.0864Z").toEpochMilli();
+	// public static final long INITIAL_TIMESTAMP = Instant.parse("2024-12-06T05:08:13.0864Z").toEpochMilli();
 
 	/**
 	 * Juice price in the initial Genesis State
