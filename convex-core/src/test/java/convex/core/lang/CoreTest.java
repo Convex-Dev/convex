@@ -2886,6 +2886,7 @@ public class CoreTest extends ACVMTest {
 		Context ctx=context();
 		CVMLong supply=eval("(coin-supply)");
 		assertTrue(supply.longValue()>ctx.getBalance());
+		assertTrue(supply.longValue()==ctx.getState().computeSupply());
 	}
 
 	@Test
