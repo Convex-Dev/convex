@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
 import convex.core.crypto.wallet.AWalletEntry;
+import convex.core.cvm.Address;
 import convex.core.init.Init;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.keys.KeyRingPanel;
@@ -33,7 +34,8 @@ public class ConnectPanel extends JPanel {
 	
 	private static final Logger log = LoggerFactory.getLogger(ConnectPanel.class.getName());
 
-
+	private static Address lastAddress=null;
+	
 	private HostCombo hostField;
 	private AddressCombo addressField;
 
@@ -51,12 +53,17 @@ public class ConnectPanel extends JPanel {
 		
 		{	// Address selection
 			pan.add(new JLabel("Address"));
-			addressField=new AddressCombo(Init.GENESIS_ADDRESS);
+			addressField=new AddressCombo(getSuggestedAddress());
 			addressField.setToolTipText("Set the initial account address to use. \nNormally this should be an account for which you possess the private key. \nIf you don't have the private key, you can still view the account but cannot execute transactions.");
 			pan.add(addressField,"width 50:250:");
 			pan.add(Toolkit.makeHelp(addressField.getToolTipText()));
 		}
 
+	}
+
+	private static Address getSuggestedAddress() {
+		if (lastAddress!=null) return lastAddress;
+		return Init.GENESIS_ADDRESS;
 	}
 
 	public static Convex tryConnect(JComponent parent) {
@@ -70,12 +77,14 @@ public class ConnectPanel extends JPanel {
 	               prompt, JOptionPane.OK_CANCEL_OPTION,JOptionPane.QUESTION_MESSAGE,SymbolIcon.get(0xea77,Toolkit.ICON_SIZE));
 
 		if (result == JOptionPane.OK_OPTION) {
+			Address addr=pan.addressField.getAddress();
+			lastAddress=addr;
 	    	try {
 	    		String target=pan.hostField.getText();
 	    		InetSocketAddress sa=IPUtils.toInetSocketAddress(target);
 	    		log.info("Attempting connect to: "+sa);
 	    		Convex convex=Convex.connect(sa);
-	    		convex.setAddress(pan.addressField.getAddress());
+	    		convex.setAddress(addr);
 	    		
 	    		HostCombo.registerGoodConnection(target);
 	    		
