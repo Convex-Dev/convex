@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.Constants;
 import convex.core.cpos.Block;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.exceptions.BadFormatException;
@@ -17,7 +18,7 @@ public class BlocksTest {
 
 	@Test
 	public void testEquality() throws BadFormatException {
-		long ts = System.currentTimeMillis();
+		long ts = Constants.INITIAL_TIMESTAMP;
 		Block b1 = Block.create(ts, Vectors.empty());
 		Block b2 = Block.create(ts, Vectors.empty());
 
@@ -49,6 +50,24 @@ public class BlocksTest {
 
 		RecordTest.doRecordTests(b);
 
+	}
+	
+	@Test
+	public void testBlockEncoding() throws BadFormatException {
+		long ts = Constants.INITIAL_TIMESTAMP;
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+
+		ATransaction t = Transfer.create(InitTest.HERO,0, InitTest.VILLAIN, 1000);
+		SignedData<ATransaction> st = kp.signData(t);
+		Block b1 = Block.of(ts, st);
+		
+		
+		Blob enc=b1.getEncoding();
+		DenseRecord dr=DenseRecord.read(CVMTag.BLOCK,enc, 0);
+		assertEquals(enc,dr.getEncoding());
+		assertEquals(b1,dr);
+		
+		
 	}
 	
 	@Test 

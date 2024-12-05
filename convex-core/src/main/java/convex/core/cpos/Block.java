@@ -167,8 +167,8 @@ public final class Block extends ARecordGeneric {
 	
 	@Override 
 	public boolean equals(ACell a) {
-		if (!(a instanceof Block)) return false;
-		return equals((Block)a);
+		if (a instanceof Block) return equals((Block)a);
+		return Cells.equalsGeneric(this, a);
 	}
 	
 	/**
