@@ -50,8 +50,10 @@ public class FuzzTestFormat {
 	}
 	
 	@Test 
-	public void fuzzExamples()  {
+	public void fuzzExamples() throws BadFormatException  {
 		doCellFuzzTests(Symbols.FOO);
+		
+		doFuzzTest(Blob.fromHex("31080000000000000034"));
 	}
 	
 	public static void doCellFuzzTests(ACell c)  {
@@ -99,10 +101,11 @@ public class FuzzTestFormat {
 	}
 
 	public static void doMutationTest(Blob b) {
+		byte[] bs = b.getBytes();
+		bs[r.nextInt(bs.length)] += (byte) r.nextInt(255);
+		Blob fuzzed=Blob.wrap(bs);
 		try {
-			byte[] bs = b.getBytes();
-			bs[r.nextInt(bs.length)] += (byte) r.nextInt(255);
-			doFuzzTest(Blob.wrap(bs));
+			doFuzzTest(fuzzed);
 		} catch (BadFormatException e) {
 			/* OK */
 		} catch (BufferUnderflowException e) {

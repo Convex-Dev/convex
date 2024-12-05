@@ -733,7 +733,7 @@
 	        :examples    [{:code "(coin-supply)"}]
 	        :signature   [{:params []}]}}
 	([]
-	  (loop [i 0
+	  (loop [i 1
 	         supply 1000000000000000000]
 		(cond (>= i 8)
 		  supply
