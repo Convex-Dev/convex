@@ -194,8 +194,7 @@
         (let [tok token-balance
               cvm *balance*] 
           (cond (and (> tok 0) (> cvm 0))
-            (/ cvm
-               tok))))
+            (/ cvm tok))))
 
 
       (defn sell-cvx
@@ -299,7 +298,9 @@
               own-holding  (or (get-holding *caller*) 0)
               
               ;; Check withrawal amount is valid
-              _            (or (<= 0 shares own-holding) (fail :FUNDS "Insufficient shares"))
+              _            (cond 
+            		         (> shares own-holding) (fail :FUNDS "Insufficient shares")
+            		         (< shares 0) (fail :ARGUMENT "Negative withdrawal"))
               
               proportion   (if (> supply
                                   0)
@@ -449,7 +450,7 @@
 
 
 (defn price
-  ^{:doc {:description "Gets the current price for a token, in CVX or an optional given currency. Returns nil if a market with liquidity does not exist."
+  ^{:doc {:description "Gets the current price for a token, in CVM or an optional given currency. Returns nil if a market with liquidity does not exist."
           :examples  [{:code "(price USD)"}
                       {:code "(price GBP USD)"}]
           :signature [{:params [token]}
@@ -507,7 +508,7 @@
              (sell-cvx-quote cvx-amount))))))
 
 (defn sell-tokens
-  ^{:doc {:description "Sell tokens at current CVX price"
+  ^{:doc {:description "Sell tokens at current CVM price"
           :signature   [{:params [token amount]}]}}
   [token amount]
   (let [market (or (get-market token)

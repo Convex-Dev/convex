@@ -68,7 +68,7 @@ public class FuzzTestFormat {
 	private static void doFuzzTest(Blob b) throws BadFormatException {
 		ACell v;
 		try {
-			v = Format.read(b);
+			v = Format.read(b,0);
 		} catch (ArrayIndexOutOfBoundsException e) {
 			System.out.println("Badd fuzzed read: "+b);
 			throw e;

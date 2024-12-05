@@ -228,6 +228,7 @@ public class TorusTest extends ACVMTest {
 		assertEquals(RT.cvm(4.0),eval(ctx,"(torus/price TOK)"));
 		
 		assertFundsError(step(ctx,"(torus/withdraw-liquidity TOK 10001)"));
+		assertArgumentError(step(ctx,"(torus/withdraw-liquidity TOK -100)"));
 	}
 	
 	@Test public void testLiquidityZeroCVM() {
