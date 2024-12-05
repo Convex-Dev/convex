@@ -347,6 +347,7 @@ public class BlobTree extends ABlob {
 		int rpos=pos+headerLength; // ref position
 		for (int i = 0; i < numChildren; i++) {
 			Ref<ABlob> ref = Format.readRef(src,rpos);
+			if (ref==Ref.NULL_VALUE) throw new BadFormatException("Null BlobTree child");
 			children[i] = ref;
 			rpos+=ref.getEncodingLength();
 		}

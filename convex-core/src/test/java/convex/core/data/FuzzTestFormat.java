@@ -1,19 +1,21 @@
 package convex.core.data;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.nio.BufferUnderflowException;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Symbols;
+import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.util.Utils;
+import convex.test.Samples;
 
 /**
  * Fuzz testing for data formats.
@@ -27,12 +29,12 @@ public class FuzzTestFormat {
 
 	@Test
 	public void fuzzTest() {
-		// create lots of blobs, see what is readable
+		// create lots of random blobs, see what is readable
 
 		for (int i = 0; i < NUM_FUZZ; i++) {
 			long stime = System.currentTimeMillis();
 			r.setSeed(i * 1007);
-			Blob b = Blob.createRandom(r, 100);
+			Blob b = Blob.createRandom(r, 200);
 			try {
 				doFuzzTest(b);
 				doMutationTest(b);
@@ -52,15 +54,25 @@ public class FuzzTestFormat {
 	@Test 
 	public void fuzzExamples() throws BadFormatException  {
 		doCellFuzzTests(Symbols.FOO);
+		doCellFuzzTests(Samples.INT_VECTOR_10);
+		doCellFuzzTests(CVMDouble.POSITIVE_INFINITY);
 		
-		doFuzzTest(Blob.fromHex("31080000000000000034"));
+	}
+	
+	@Test
+	public void regressionExamples() {
+		// Interpreted as BlobTree will nil children (count 0xff00 = 32640)
+		assertThrows(BadFormatException.class,()->doFuzzTest(Blob.fromHex("31ff0000000000000034"))); 
+		
+		// Interpreted as VectorTree with 768 elements
+		assertThrows(BadFormatException.class,()->doFuzzTest(Blob.fromHex("80860000000000000034"))); 
 	}
 	
 	public static void doCellFuzzTests(ACell c)  {
 		for (int i = 0; i < 1000; i++) {
 			Blob b=Cells.encode(c);
 			try {
-				doFuzzTest(b);
+				doMutationTest(b);
 			} catch (Exception e) {
 				throw Utils.sneakyThrow(e);
 			}
@@ -72,16 +84,19 @@ public class FuzzTestFormat {
 		try {
 			v = Format.read(b,0);
 		} catch (ArrayIndexOutOfBoundsException e) {
-			System.out.println("Badd fuzzed read: "+b);
-			throw e;
+			// We read past buffer, so basically OK up to that point
+			// Try again with bigger buffer!
+			if (b.count()>0) doFuzzTest(b.append(b).toFlatBlob());
+			return;
 		}
 		
-
 		// If we have read the object, check that we can validate as a cell, at minimum
 		try {
 			RT.validate(v);
 		} catch (InvalidDataException e) {
 			throw new BadFormatException("Validation failed",e);
+		} catch (MissingDataException e) {
+			throw new BadFormatException("Validation due to missing data",e);
 		}
 
 		// if we manage to read the object and it is not a Ref, it must be in canonical
@@ -97,7 +112,6 @@ public class FuzzTestFormat {
 		if (r.nextDouble() < 0.8) {
 			doMutationTest(b2);
 		}
-
 	}
 
 	public static void doMutationTest(Blob b) {
@@ -108,12 +122,8 @@ public class FuzzTestFormat {
 			doFuzzTest(fuzzed);
 		} catch (BadFormatException e) {
 			/* OK */
-		} catch (BufferUnderflowException e) {
-			/* also OK */
-		} catch (MissingDataException e) {
-			/* also OK */
 		} catch (Exception e) {
-			System.err.println("Fuzz test bad blob: "+b);
+			System.err.println("Fuzz test bad blob: "+fuzzed);
 			throw e;
 		}
 	}

@@ -106,8 +106,8 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
 		sb.append('[');
-		int size = size();
-		for (int i = 0; i < size; i++) {
+		long size = count();
+		for (long i = 0; i < size; i++) {
 			if (i > 0) sb.append(' ');
 			if (!RT.print(sb,get(i),limit)) return false;
 		}
