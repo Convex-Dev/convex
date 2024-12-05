@@ -131,7 +131,7 @@ public class WalletComponent extends BaseListComponent {
 
 	private void showSeed(ActionEvent e) {
 		if (walletEntry.isLocked()) {
-			if (!UnlockWalletDialog.offerUnlock(this,walletEntry)) return;;
+			if (!UnlockWalletDialog.offerUnlock(this,walletEntry)) return;
 		}
 		
 		AKeyPair kp=walletEntry.getKeyPair();
@@ -143,6 +143,7 @@ public class WalletComponent extends BaseListComponent {
 			panel.add(Toolkit.withTitledBorder("Ed25519 Private Seed",new CodeLabel(kp.getSeed().toString()))); 
 			panel.add(Toolkit.makeNote("WARNING: keep this private, it can be used to control your account(s)"),"grow");
 			panel.setBorder(Toolkit.createDialogBorder());
+			JOptionPane.showMessageDialog(WalletComponent.this, panel,"Ed25519 Private Seed",JOptionPane.INFORMATION_MESSAGE);
 		} else {
 			JOptionPane.showMessageDialog(WalletComponent.this, "Keypair is locked, cannot access seed","Warning",JOptionPane.WARNING_MESSAGE);
 		}
