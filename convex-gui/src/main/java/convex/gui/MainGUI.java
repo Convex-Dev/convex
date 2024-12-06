@@ -30,7 +30,7 @@ public class MainGUI extends AbstractGUI {
 		MigLayout layout=new MigLayout("wrap 1","[fill]");
 		setLayout(layout);
 		
-		add(new HomePanel());
+		add(new HomePanel(),"dock center");
 		
 		ActionPanel actionPanel=new ActionPanel();
 		actionPanel.setLayout(new MigLayout("center,align center,fillx"));
@@ -44,7 +44,7 @@ public class MainGUI extends AbstractGUI {
 		JComponent latticeFS=createLaunchButton("Lattice Filesystem",Toolkit.DLFS_ICON,this::launchDLFS,"Launch a DLFS file browser. EXPERIMENTAL.");
 		actionPanel.add(latticeFS);
 
-		JComponent terminal=createLaunchButton("Client Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient,"Open a Convex REPL terminal, connecting to any existing network");
+		JComponent terminal=createLaunchButton("Terminal",Toolkit.TERMINAL_ICON,this::launchTerminalClient,"Open a Convex REPL terminal, connecting to any existing network");
 		actionPanel.add(terminal);
 		
 		JComponent hacker=createLaunchButton("Hacker Tools",Toolkit.HACKER_ICON,this::launchTools,"Open a set of useful tools for hackers and power users.");
@@ -56,7 +56,7 @@ public class MainGUI extends AbstractGUI {
 		JComponent www=createLaunchButton("Documentation",Toolkit.WWW_ICON,this::launchWebsite,"Go to the Convex docs website (opens web browser).");
 		actionPanel.add(www);
 		
-		add(actionPanel);
+		add(actionPanel,"dock south");
 	}
 	
 	public void launchDLFS() {

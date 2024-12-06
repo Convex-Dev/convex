@@ -36,7 +36,7 @@
 		<hc.version>5.4.1</hc.version>
 		<convex.version>${project.version}</convex.version>
 		<!--Freeze this for reproducible builds. -->
-		<project.build.outputTimestamp>2024-09-17T11:18:52Z</project.build.outputTimestamp>
+		<project.build.outputTimestamp>2024-12-06T13:13:13Z</project.build.outputTimestamp>
 		<argLine>
 			--add-opens=java.base/java.util=ALL-UNNAMED
 		</argLine>

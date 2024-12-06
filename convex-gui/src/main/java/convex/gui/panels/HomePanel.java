@@ -22,9 +22,9 @@ public class HomePanel extends JPanel {
 		JLabel lblWelome = new JLabel("Welcome to Convex");
 		lblWelome.setFont(new Font("Monospaced", Font.PLAIN, 24));
 		lblWelome.setHorizontalAlignment(SwingConstants.CENTER);
-		add(lblWelome,"dock north");
+		// add(lblWelome,"dock north");
 
-		add(new WorldPanel(),"align center");
+		add(new WorldPanel(),"dock center");
 	}
 
 }

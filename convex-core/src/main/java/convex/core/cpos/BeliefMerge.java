@@ -356,7 +356,7 @@ public class BeliefMerge {
 			double winningVote = Double.NEGATIVE_INFINITY;
 			for (Map.Entry<SignedData<Block>, HashMap<AVector<SignedData<Block>>, Double>> me : blockVotes.entrySet()) {
 				HashMap<AVector<SignedData<Block>>, Double> agreedChains = me.getValue();
-				double blockVote = computeVote(agreedChains);
+				double blockVote = computeTotalVote(agreedChains);
 				if ((winningResult==null)||(blockVote > winningVote)) {
 					winningVote = blockVote;
 					winningResult = me;
@@ -521,7 +521,7 @@ public class BeliefMerge {
 	 * @param m   A map of values to votes
 	 * @return The total voting stake
 	 */
-	public static <V> double computeVote(HashMap<V, Double> m) {
+	public static <V> double computeTotalVote(HashMap<V, Double> m) {
 		double result = 0.0;
 		for (Map.Entry<V, Double> me : m.entrySet()) {
 			result += me.getValue();

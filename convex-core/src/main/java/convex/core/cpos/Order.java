@@ -221,10 +221,10 @@ public class Order extends ARecordGeneric {
 		int n=consensusPoints.length;
 		if ((nblocks!=consensusPoints[0])||(nblocks<consensusPoints[n-1])) {
 			long[] nc=consensusPoints.clone();
-			for (int i=1; i<n; i++) {
-				nc[i]=Math.min(nc[i],nblocks);
-			}
 			nc[0]=nblocks;
+			for (int i=1; i<n; i++) {
+				nc[i]=Math.min(nc[i],nc[i-1]);
+			}
 			newValues=newValues.assoc(IX_CONSENSUS, Vectors.createLongs(nc));
 		}
 		

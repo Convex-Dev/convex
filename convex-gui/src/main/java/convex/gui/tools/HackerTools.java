@@ -2,7 +2,6 @@ package convex.gui.tools;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
-import java.awt.GridLayout;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JFrame;

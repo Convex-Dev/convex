@@ -42,8 +42,8 @@ public class BeliefVotingTest {
 	
 	@Test
 	public void testComputeVote() {
-		assertEquals(100.0, BeliefMerge.computeVote(Maps.hashMapOf(1, 50.0, 0, 50.0)), 0.000001);
-		assertEquals(0.0, BeliefMerge.computeVote(Maps.hashMapOf()), 0.000001);
+		assertEquals(100.0, BeliefMerge.computeTotalVote(Maps.hashMapOf(1, 50.0, 0, 50.0)), 0.000001);
+		assertEquals(0.0, BeliefMerge.computeTotalVote(Maps.hashMapOf()), 0.000001);
 	}
 	
 	@Test
