@@ -36,7 +36,6 @@ import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
-import convex.core.exceptions.ValidationException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.lang.impl.TransactionContext;
@@ -205,26 +204,28 @@ public class State extends ARecordGeneric {
 	 * @throws InvalidBlockException 
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
-		Block block=signedBlock.getValue();
-		Counters.applyBlock++;
-
-		// First check the Block passes pre-conditions for application
-		BlockResult maybeFailed=checkBlock(signedBlock);
-		if (maybeFailed!=null) {
-			return maybeFailed;
-		}
-		
-		// Prepare block, including scheduled transactions and time based updates
-		State state = prepareBlock(block);
-		
-		// Create TransactionContext after Block is prepared so we have correct timestamp etc.
-		TransactionContext tctx=TransactionContext.create(state);
-		tctx.block=signedBlock;
-		
+		Block block=null;
 		try {
+			block=signedBlock.getValue();
+			Counters.applyBlock++;
+	
+			// First check the Block passes pre-conditions for application
+			BlockResult maybeFailed=checkBlock(signedBlock);
+			if (maybeFailed!=null) {
+				return maybeFailed;
+			}
+			
+			// Prepare block, including scheduled transactions and time based updates
+			State state = prepareBlock(block);
+			
+			// Create TransactionContext after Block is prepared so we have correct timestamp etc.
+			TransactionContext tctx=TransactionContext.create(state);
+			tctx.block=signedBlock;
+		
 			BlockResult blockResult= state.applyTransactions(block,tctx);
 			return blockResult;
-		} catch (ValidationException e) {
+		} catch (Exception e) {
+			// Invalid block, so no state upadtes
 			return BlockResult.createInvalidBlock(this,block,Strings.create(e.getMessage()));
 		}
 	}

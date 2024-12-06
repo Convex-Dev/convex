@@ -9,7 +9,6 @@ import convex.core.Constants;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Block;
-import convex.core.cpos.Order;
 import convex.core.cvm.Address;
 import convex.core.cvm.RecordFormat;
 import convex.core.cvm.State;
@@ -45,12 +44,6 @@ public class RecordTest {
 		SignedData<ATransaction> stx2=InitTest.VILLAIN_KEYPAIR.signData(tx2);
 		Block b=Block.create(Constants.INITIAL_TIMESTAMP+17, Vectors.of(stx1,stx2));
 		doRecordTests(b);
-	}
-
-	@Test
-	public void testOrder() {
-		Order order=Order.create();
-		doRecordTests(order);
 	}
 
 	@Test

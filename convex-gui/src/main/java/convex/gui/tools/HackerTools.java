@@ -2,6 +2,7 @@ package convex.gui.tools;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.util.concurrent.TimeoutException;
 
 import javax.swing.JFrame;
@@ -64,6 +65,9 @@ public class HackerTools extends AbstractGUI {
 	public HackerTools() {
 		super ("Hacker Tools");
 		setLayout(new BorderLayout());
+		
+		// tabs.setLayout(new MigLayout("","[fill]"));
+		
 		keyGenPanel = new KeyGenPanel(null);
 		messagePanel = new MessageFormatPanel();
 		this.add(tabs, BorderLayout.CENTER);
@@ -72,6 +76,7 @@ public class HackerTools extends AbstractGUI {
 		tabs.add("KeyRing", new KeyRingPanel());
 		tabs.add("Encoding", messagePanel);
 		tabs.add("Data Lattice", dataPanel);
+		tabs.add("System Info", new SystemInfoPanel());
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		

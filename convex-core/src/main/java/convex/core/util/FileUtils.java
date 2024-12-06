@@ -8,6 +8,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import convex.core.data.Blob;
+
 /**
  * Generic file handling utilities. Used in CLI etc.
  */
@@ -33,6 +35,14 @@ public class FileUtils {
 			result = Files.readString(path, StandardCharsets.UTF_8);
 		}
 		return result;
+	}
+	
+	public static Blob loadFileAsBlob(Path file) throws IOException {
+		return Blob.wrap(Files.readAllBytes(file));
+	}
+
+	public static byte[] loadFileAsBytes(Path file) throws IOException {
+		return Files.readAllBytes(file);
 	}
 
 	/**
@@ -75,5 +85,8 @@ public class FileUtils {
 			return new File(path);
 		}
 	}
+
+
+
 
 }

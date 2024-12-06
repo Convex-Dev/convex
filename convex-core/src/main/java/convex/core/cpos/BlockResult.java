@@ -191,7 +191,12 @@ public class BlockResult extends ARecordGeneric {
 	 */
 	public static BlockResult createInvalidBlock(State state, Block block, AString message) {
 		Result r=Result.create(null, message,ErrorCodes.PEER);
-		AVector<Result> rs=Vectors.repeat(r, block.getTransactions().size());
+		AVector<Result> rs;
+		if (block==null) {
+			rs=null;
+		} else {
+			rs=Vectors.repeat(r, block.getTransactions().size());
+		}
 		
 		return new BlockResult(state,rs);
 	}
