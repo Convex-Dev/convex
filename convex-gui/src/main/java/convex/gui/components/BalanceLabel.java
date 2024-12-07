@@ -44,8 +44,8 @@ public class BalanceLabel extends BaseTextPane {
 
 	public static final Color GOLD=new Color(255,255,0);
 	public static final Color SILVER=new Color(200,200,230);
-	public static final Color BRONZE=new Color(180,120,60);
-	public static final Color COPPER=new Color(150,80,30);
+	public static final Color BRONZE=new Color(200,120,60);
+	public static final Color COPPER=new Color(150,100,30);
 	
 	protected int decimals=9;
 	private Color balanceColour=GOLD;

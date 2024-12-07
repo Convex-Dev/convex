@@ -16,6 +16,7 @@ import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.Token;
 
 import convex.core.lang.reader.AntlrReader;
+import convex.gui.components.BalanceLabel;
 
 /**
  * Tools for highlighting Convex Lisp code in Swing
@@ -31,6 +32,12 @@ public class CVXHighlighter {
 	static AttributeSet SYMBOL = NORMAL;
 	static AttributeSet NUMBER = sc.addAttribute(BASE, StyleConstants.Foreground, Color.ORANGE);
 
+	static AttributeSet GOLD = sc.addAttribute(BASE, StyleConstants.Foreground, BalanceLabel.GOLD);
+	static AttributeSet SILVER = sc.addAttribute(BASE, StyleConstants.Foreground, BalanceLabel.SILVER);
+	static AttributeSet BRONZE = sc.addAttribute(BASE, StyleConstants.Foreground, BalanceLabel.BRONZE);
+	static AttributeSet COPPER = sc.addAttribute(BASE, StyleConstants.Foreground, BalanceLabel.COPPER);
+
+	
 	private static final AttributeSet[] PARENS = new AttributeSet[10];
 	
 	static {
@@ -110,8 +117,21 @@ public class CVXHighlighter {
 
 						default: {
 							if (Character.isDigit(c)) {
-								aset=NUMBER; break;
+								aset=NUMBER; 
 							}
+							if (tlen>3) try {
+								// Might be worth formatting as a quantity
+								String fullNum=d.getText(tstart,tlen);
+								Long.parseLong(fullNum);
+								if (tlen>9) d.setCharacterAttributes(tstart, tlen-9, GOLD, true);
+								if (tlen>6) d.setCharacterAttributes(tstart+Math.max(0, tlen-9), Math.min(3, tlen-6), SILVER, true);
+								if (tlen>3) d.setCharacterAttributes(tstart+Math.max(0, tlen-6), Math.min(3, tlen-3), BRONZE, false);
+								d.setCharacterAttributes(tstart+tlen-3, tlen, COPPER, false);
+								continue;
+							} catch (NumberFormatException e) {
+								// OK
+							}
+							break;
 						}
 					}
 					
