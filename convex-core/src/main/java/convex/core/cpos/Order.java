@@ -206,6 +206,7 @@ public class Order extends ARecordGeneric {
 
 	/**
 	 * Updates blocks in this Order. Returns the same Order if the blocks are identical.
+	 * Constrains consensus points as required to remain valid
 	 * @param newBlocks New blocks to use
 	 * @return Updated Order, or the same order if unchanged
 	 */
@@ -305,7 +306,7 @@ public class Order extends ARecordGeneric {
 	 */
 	public boolean consensusEquals(Order b) {
 		if (b==null) return false; // definitely not equal
-		for (int i=1; i<CPoSConstants.CONSENSUS_LEVELS; i++) {
+		for (int i=0; i<CPoSConstants.CONSENSUS_LEVELS; i++) {
 			if (this.getConsensusPoint(i)!=b.getConsensusPoint(i)) return false;			
 		}
 		if (!this.getBlocks().equals(b.getBlocks())) return false;
