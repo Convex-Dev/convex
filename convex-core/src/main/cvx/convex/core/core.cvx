@@ -67,7 +67,11 @@
     	(cond found ss nil) ;; end of loop
     	)))))
 
-;; Quasiquote expand function, returns nil if no change (i.e. a pure quotable form), otherwise a generator for the form
+;; Quasiquote expand function.abstract
+;;
+;; Returns:
+;; - `nil` if no change (i.e. a pure quotable form), 
+;; - otherwise a generator for the form
 (def quasiquote* (fn [form depth]
   (cond
 	;; first catch [] () {} #{} and nil, which dont expand
@@ -138,9 +142,6 @@
 
     ;; Nothing special possible, so just return nil to signal no change  
     nil)))
-
-;; Test expansion
-`[1 ~(inc 2)]
 
 ;;;;;;;;;; Expanders, creating macros and defining functions
 
@@ -499,28 +500,23 @@
                           (quote ~(nth sym
                                        2))))))
 
-
-
 (defmacro dotimes
 
-  ^{:doc {:description ["Repeats execution of the body `count` times, binding the specified symbol from 0 to `(- count 1)` on successive iterations."
-                        "Always Returns nil."]
+  ^{:doc {:description ["Repeats execution of the body `count` times, binding the specified symbol from 0 to `(- count 1)` on successive iterations."]
           :examples    [{:code "(dotimes [i 10] (transfer *address* 10))"}]
           :signature   [{:params [[sym count] & body]}]}}
 
   [[sym count] & body]
 
-  (let [n   (long count)]
+  (let [n (int count)]
 	(or (symbol? (unsyntax sym))
 		(fail :CAST "`dotimes` requires a symbol for loop binding"))
     `(loop [~sym 0]
-       (if (< ~sym
-              ~n)
+       (cond (< ~sym ~n)
          (do
            ~(cons do
                   body)
-           (recur (inc ~sym)))
-         nil))))
+           (recur (inc ~sym)))))))
 
 
 
