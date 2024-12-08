@@ -39,16 +39,16 @@ public class Order extends ARecordGeneric {
 	private static final int IX_BLOCKS = 2;
 
 	/**
+	 * Timestamp of this Order, i.e. the timestamp of the peer at the time it was created
+	 */
+	private final long timestamp;
+	
+	/**
 	 * Array of consensus points for each consensus level. The first element (block count)
 	 * is ignored.
 	 */
 	private final long [] consensusPoints;
 	
-	/**
-	 * Timestamp of this Order, i.e. the timestamp of the peer at the time it was created
-	 */
-	private final long timestamp;
-
 	private static final long[] EMPTY_CONSENSUS_ARRAY = new long[CPoSConstants.CONSENSUS_LEVELS];
 
 	@SuppressWarnings("unchecked")

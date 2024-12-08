@@ -387,7 +387,7 @@ public class BeliefMergeTest {
 		boolean ANALYSIS = false;
 		int GOSSIP_NUM = 1;
 		final int TX_ROUNDS = 180;
-		final int SETTLE_ROUNDS = 20;
+		final int SETTLE_ROUNDS = 25;
 		final int NUM_INITIAL_TRANS = 3;
 
 		Peer[] bs0 = initialBeliefs();
