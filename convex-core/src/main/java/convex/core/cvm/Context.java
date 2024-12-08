@@ -2175,10 +2175,9 @@ public class Context {
 	 * @return Updated context
 	 */
 	public Context setHolding(Address targetAddress, ACell value) {
-		AccountStatus as=getAccountStatus(targetAddress);
-		if (as==null) return withError(ErrorCodes.NOBODY,"Can't set set holding for non-existent account "+targetAddress);
-		as=as.withHolding(getAddress(), value);
-		return withAccountStatus(targetAddress,as);
+		AccountStatus as=getAccountStatus();
+		as=as.withHolding(targetAddress, value);
+		return withAccountStatus(getAddress(),as);
 	}
 
 	/**

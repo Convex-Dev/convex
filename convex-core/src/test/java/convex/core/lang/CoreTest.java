@@ -5241,8 +5241,8 @@ public class CoreTest extends ACVMTest {
 		// OK to set holding for a real owner account
 	    assertEquals(100L,evalL(ctx,"(set-holding VILLAIN 100)"));
 
-		// error to set holding for a non-existent owner account
-		assertNobodyError(step(ctx,"(set-holding NOONE 200)"));
+		// OK to set holding for a non-existent owner account
+		assertCVMEquals(200,eval(ctx,"(set-holding NOONE 200)"));
 
 		// trying to set holding for the wrong type
 		assertCastError(step(ctx,"(set-holding :foo 300)"));
@@ -5251,15 +5251,23 @@ public class CoreTest extends ACVMTest {
 			Context c2 = step(ctx,"(set-holding VILLAIN 123)");
 			assertEquals(123L,evalL(c2,"(get-holding VILLAIN)"));
 
-			assertTrue(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));
-			assertCVMEquals(123L,c2.getAccountStatus(VILLAIN).getHolding(HERO));
+			assertFalse(c2.getAccountStatus(VILLAIN).getHoldings().containsKey(HERO));
+			assertCVMEquals(123L,c2.getAccountStatus(HERO).getHolding(VILLAIN));
 		}
 
 		{ // test null assign
 			Context c2 = exec(ctx,"(set-holding VILLAIN nil)");
 			assertNull(eval(c2,"(get-holding VILLAIN)"));
 			AccountStatus vas=c2.getAccountStatus(VILLAIN);
-			assertNull(vas.getHoldings(HERO));
+			assertNull(vas.getHolding(HERO));
+		}
+		
+		{ // test setting back to nil
+			Context c2 = exec(ctx,"(set-holding VILLAIN 1)");
+			assertTrue(evalB(c2,"(= *holdings* (index VILLAIN 1))"));
+			c2 = exec(ctx,"(set-holding VILLAIN nil)");
+			assertTrue(evalB(c2,"(= *holdings* (index))"));
+			assertNull(eval(c2,"(get-holding VILLAIN)"));
 		}
 	}
 

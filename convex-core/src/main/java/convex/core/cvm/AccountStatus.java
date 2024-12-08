@@ -258,14 +258,12 @@ public class AccountStatus extends ARecordGeneric {
 		return (R) value;
 	}
 
-
-	
 	public ACell getHolding(Address addr) {
 		Index<Address, ACell> hodls=getHoldings();
 		if (hodls==null) return null;
 		return hodls.get(addr);
 	}
-	
+
 	public AccountStatus withHolding(Address addr,ACell value) {
 		Index<Address, ACell> hodls=getHoldings();
 		if (hodls==null) {
@@ -278,7 +276,6 @@ public class AccountStatus extends ARecordGeneric {
 		}
 		return withHoldings(hodls);
 	}
-	
 
 	@Override
 	public ACell get(Keyword key) {
@@ -286,7 +283,7 @@ public class AccountStatus extends ARecordGeneric {
 		if (Keywords.KEY.equals(key)) return publicKey;
 		if (Keywords.BALANCE.equals(key)) return CVMLong.create(balance);
 		if (Keywords.ALLOWANCE.equals(key)) return CVMLong.create(memory);
-		if (Keywords.HOLDINGS.equals(key)) return getHoldings();
+		if (Keywords.HOLDINGS.equals(key)) return values.get(IX_HOLDINGS);
 		if (Keywords.CONTROLLER.equals(key)) return getController();
 		if (Keywords.ENVIRONMENT.equals(key)) return getEnvironment();
 		if (Keywords.METADATA.equals(key)) return getMetadata();
@@ -349,6 +346,7 @@ public class AccountStatus extends ARecordGeneric {
 			holdings=RT.ensureIndex(values.get(IX_HOLDINGS));
 			// if (holdings==null) holdings=EMPTY_HOLDINGS;
 		}
+		if (holdings==null) return EMPTY_HOLDINGS;
 		return holdings;
 	}
 	
@@ -450,11 +448,7 @@ public class AccountStatus extends ARecordGeneric {
 		return entry;
 	}
 	
-	public ACell getHoldings(Address addr) {
-		Index<Address, ACell> hodls = getHoldings();
-		if (hodls==null) return null;
-		return hodls.get(addr);
-	}
+
 
 
 }

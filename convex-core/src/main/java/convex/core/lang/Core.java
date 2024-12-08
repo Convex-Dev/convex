@@ -1263,14 +1263,11 @@ public class Core {
 
 			Address address=RT.ensureAddress(args[0]);
 			if (address == null) return context.withCastError(args[0], Types.ADDRESS);
-
-			AccountStatus as=context.getAccountStatus(address);
-			if (as==null) return context.withResult(Juice.LOOKUP, null);
 			
-			Index<Address,ACell> holdings=as.getHoldings();
+			Index<Address,ACell> holdings=context.getHoldings();
 
 			// we get the target accounts holdings for the currently executing account
-			ACell result=(holdings==null)?null:holdings.get(context.getAddress());
+			ACell result=(holdings==null)?null:holdings.get(address);
 
 			return context.withResult(Juice.LOOKUP, result);
 		}
