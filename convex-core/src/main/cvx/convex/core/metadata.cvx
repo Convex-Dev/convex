@@ -1024,7 +1024,7 @@
         :signature   [{:params [addr]}]}}
 
  set-holding
- {:doc {:description "Sets the holding value for a specified owner account address. Owner account must exist. Returns the new holding value."
+ {:doc {:description "Sets the holding value for a specified address. Returns the new holding value."
         :errors      {:CAST "If the first argument is not an address."}
         :examples    [{:code "(set-holding *caller* 1000)"}]
         :signature   [{:params [owner value]}]}}
