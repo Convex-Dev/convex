@@ -951,6 +951,8 @@ public class Format {
 	 * @return Blob encoding
 	 */
 	public static Blob encodeMultiCell(ACell a, boolean everything) {
+		if (a==null) return Blob.NULL_ENCODING;
+		
 		Blob topCellEncoding=Cells.encode(a);
 		if (a.getRefCount()==0) return topCellEncoding;
 
@@ -974,7 +976,10 @@ public class Format {
 				int cellLength=lengthFieldSize+encLength;
 				
 				int newLength=ml[0]+cellLength;
-				if (newLength>CPoSConstants.MAX_MESSAGE_LENGTH) return;
+				if (newLength>CPoSConstants.MAX_MESSAGE_LENGTH) {
+					System.err.println("Exceeded max message length when encoding");
+					return;
+				}
 				ml[0]=newLength;
 				refs.add(cr);
 				if (everything) Cells.visitBranchRefs(c, addToStackFunc);

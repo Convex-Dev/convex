@@ -29,7 +29,11 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 		default: throw new InvalidDataException("Bad tag for CAD3 Record: 0x"+Utils.toHexString(tag),this);
 		}
 	}
-
+	
+	@Override
+	protected void validateStructure() throws InvalidDataException {
+		// Nothing to do, any child refs are valid
+	}
 
 	@Override
 	public boolean equals(ACell a) {

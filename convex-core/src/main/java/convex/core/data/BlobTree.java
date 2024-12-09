@@ -432,21 +432,24 @@ public class BlobTree extends ABlob {
 		int child = Utils.checkedInt(chunkIndex >> shift);
 		return getChild(child).getChunk(chunkIndex - child * childSize);
 	}
-
+	
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
+	public void validateCell() throws InvalidDataException {
 		int n = children.length;
 		if ((n < 2) | (n > FANOUT)) throw new InvalidDataException("Illegal number of BlobTree children: " + n, this);
+	}
+	
+	@Override
+	public void validateStructure() throws InvalidDataException {
 		long clen = childLength();
 		long total = 0;
+		int n = children.length;
 		
 		// We need to validate and check the lengths of all child notes. Note that only the last child can
 		// be shorted than the defined childLength() for this shift level.
 		for (int i = 0; i < n; i++) {
 			ABlob child;
 			child = getChild(i);
-			child.validate();
 			
 			long cl = child.count();
 			total += cl;
@@ -477,11 +480,6 @@ public class BlobTree extends ABlob {
 		return true;
 	}
 
-	@Override
-	public void validateCell() throws InvalidDataException {
-		int n = children.length;
-		if ((n < 2) | (n > FANOUT)) throw new InvalidDataException("Illegal number of BlobTree children: " + n, this);
-	}
 	
 	@Override
 	public long hexMatch(ABlobLike<?> b) {

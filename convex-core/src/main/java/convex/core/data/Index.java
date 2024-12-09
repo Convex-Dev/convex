@@ -630,54 +630,6 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 		throw new UnsupportedOperationException();
 	}
 
-	@SuppressWarnings("unchecked")
-	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
-		
-		if ((depth<0)||(depth>MAX_DEPTH)) throw new InvalidDataException("Invalid index depth",this);
-		
-		if (entry!=null) {
-			ABlobLike<K> k=RT.ensureBlobLike(entry.getKey());
-			if (k==null) throw new InvalidDataException("Invalid entry key type: "+Utils.getClassName(entry.getKey()),this);
-			if (depth!=effectiveLength(k)) throw new InvalidDataException("Entry at inconsistent depth",this);
-		}
-		
-		ABlobLike<?> prefix=getPrefix();
-		if (depth>effectiveLength(prefix)) throw new InvalidDataException("depth longer than common prefix",this);
-
-		long ecount = (entry == null) ? 0 : 1;
-		int n = children.length;
-		for (int i = 0; i < n; i++) {
-			ACell o = children[i].getValue();
-			if (!(o instanceof Index))
-				throw new InvalidDataException("Illegal Index child type: " + Utils.getClass(o), this);
-			Index<K, V> c = (Index<K, V>) o;
-			
-			long ccount=c.count();
-			if (ccount==0) {
-				throw new InvalidDataException("Child "+i+" should not be empty! At depth "+depth,this);
-			}
-			
-			if (c.getDepth() <= getDepth()) {
-				throw new InvalidDataException("Child must have greater depth than parent", this);
-			}
-			
-			ABlobLike<?> childPrefix=c.getPrefix();
-			long ml=prefix.hexMatch(childPrefix, 0, depth);
-			if (ml<depth) throw new InvalidDataException("Child does not have matching common prefix", this);
-
-			c.validate();
-			
-			// check child has correct digit for mask position
-			int digit=childPrefix.getHexDigit(depth);
-			if (i!=Bits.indexForDigit(digit, mask)) throw new InvalidDataException("Child does not have correct digit", this);
-
-			ecount += ccount;
-		}
-
-		if (count != ecount) throw new InvalidDataException("Bad entry count: " + ecount + " expected: " + count, this);
-	}
 
 	private static long effectiveLength(ABlobLike<?> prefix) {
 		return Math.min(MAX_DEPTH, prefix.hexLength());
@@ -728,6 +680,54 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 					"Index with no entry and count=" + count + " must have two or more children", this);
 		}
 	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public void validate() throws InvalidDataException {
+		super.validate();
+		
+		if ((depth<0)||(depth>MAX_DEPTH)) throw new InvalidDataException("Invalid index depth",this);
+		
+		if (entry!=null) {
+			ABlobLike<K> k=RT.ensureBlobLike(entry.getKey());
+			if (k==null) throw new InvalidDataException("Invalid entry key type: "+Utils.getClassName(entry.getKey()),this);
+			if (depth!=effectiveLength(k)) throw new InvalidDataException("Entry at inconsistent depth",this);
+		}
+		
+		ABlobLike<?> prefix=getPrefix();
+		if (depth>effectiveLength(prefix)) throw new InvalidDataException("depth longer than common prefix",this);
+
+		long ecount = (entry == null) ? 0 : 1;
+		int n = children.length;
+		for (int i = 0; i < n; i++) {
+			ACell o = children[i].getValue();
+			if (!(o instanceof Index))
+				throw new InvalidDataException("Illegal Index child type: " + Utils.getClass(o), this);
+			Index<K, V> c = (Index<K, V>) o;
+			
+			long ccount=c.count();
+			if (ccount==0) {
+				throw new InvalidDataException("Child "+i+" should not be empty! At depth "+depth,this);
+			}
+			
+			if (c.getDepth() <= getDepth()) {
+				throw new InvalidDataException("Child must have greater depth than parent", this);
+			}
+			
+			ABlobLike<?> childPrefix=c.getPrefix();
+			long ml=prefix.hexMatch(childPrefix, 0, depth);
+			if (ml<depth) throw new InvalidDataException("Child does not have matching common prefix", this);
+			
+			// check child has correct digit for mask position
+			int digit=childPrefix.getHexDigit(depth);
+			if (i!=Bits.indexForDigit(digit, mask)) throw new InvalidDataException("Child does not have correct digit", this);
+
+			ecount += ccount;
+		}
+
+		if (count != ecount) throw new InvalidDataException("Bad entry count: " + ecount + " expected: " + count, this);
+	}
+
 
 	@SuppressWarnings("unchecked")
 	@Override

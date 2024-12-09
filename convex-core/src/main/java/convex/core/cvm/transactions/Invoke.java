@@ -10,13 +10,11 @@ import convex.core.cvm.RecordFormat;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Keyword;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.Reader;
 import convex.core.util.ErrorMessages;
 
@@ -110,16 +108,6 @@ public class Invoke extends ATransaction {
 		// tag (1), sequence(<12) and target (33)
 		// plus allowance for Amount
 		return 1 + 12 + Format.MAX_EMBEDDED_LENGTH + Format.MAX_VLQ_LONG_LENGTH;
-	}
-
-	@Override
-	public void validateCell() throws InvalidDataException {
-		if (command instanceof AOp) {
-			// OK?
-			((AOp<?>) command).validateCell();
-		} else {
-			if (!Cells.isCanonical(command)) throw new InvalidDataException("Non-canonical object as command?", this);
-		}
 	}
 
 	@Override

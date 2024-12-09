@@ -30,6 +30,11 @@ public class CodedValue extends ACell {
 	public void validateCell() throws InvalidDataException {
 		// Nothing to do
 	}
+	
+	@Override
+	protected void validateStructure() throws InvalidDataException {
+		// Nothing to do, any child refs are valid
+	}
 
 	@Override
 	public byte getTag() {
@@ -116,4 +121,6 @@ public class CodedValue extends ACell {
 		}
 		return result;
 	}
+
+
 }

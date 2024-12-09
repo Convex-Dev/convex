@@ -272,7 +272,7 @@ public abstract class ABlob extends ABlobLike<CVMLong>  {
 	}
 
 	@Override
-	public void validateCell() throws InvalidDataException {
+	protected void validateCell() throws InvalidDataException {
 		if (count() < 0) throw new InvalidDataException("Negative blob length", this);
 	}
 

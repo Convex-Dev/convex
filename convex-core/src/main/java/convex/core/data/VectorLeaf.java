@@ -716,7 +716,6 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	public void validateCell() throws InvalidDataException {
 		if ((count > 0) && (items.length == 0)) throw new InvalidDataException("Should be items present!", this);
-		if (!isCanonical()) throw new InvalidDataException("Not a canonical VectorLeaf!", this);
 	}
 
 

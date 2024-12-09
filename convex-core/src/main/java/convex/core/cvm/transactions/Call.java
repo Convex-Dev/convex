@@ -98,8 +98,8 @@ public class Call extends ATransaction {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		super.validateCell();
 		if (!Coin.isValidAmount(offer)) throw new InvalidDataException("Invalid offer",this);
-		target.validateCell();
 	}
 
 	@Override

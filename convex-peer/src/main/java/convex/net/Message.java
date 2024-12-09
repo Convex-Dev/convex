@@ -169,7 +169,7 @@ public class Message {
 			break;
 			
 		default:
-			messageData=Cells.encode(payload);
+			messageData=Format.encodeMultiCell(payload,true);
 		}
 		
 		return messageData;

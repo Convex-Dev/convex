@@ -332,6 +332,7 @@ public class Cells {
 		Ref<?> ref=cell.getRef();
 		if (ref.isValidated()) return;
 		cell.validateCell();
+		cell.validateStructure();
 	}
 
 	/**
@@ -382,6 +383,11 @@ public class Cells {
 	public static int getEncodingLength(ACell value) {
 		if (value==null) return 1;
 		return value.getEncodingLength();
+	}
+
+	public static void validateCell(ACell a) throws InvalidDataException {
+		if (a==null) return;
+		a.validateCell();
 	}
 
 

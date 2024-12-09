@@ -671,13 +671,20 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	public AVector<T> next() {
 		return slice(1L, count);
 	}
+	
+	@Override
+	protected void validateCell() throws InvalidDataException {
+		if (!isPacked()) throw new InvalidDataException("Non packed VectorTree size", this);
+		int blen = children.length;
+		if (blen < 2) throw new InvalidDataException("Insufficient children", this);
+		if (count <= childSize()*(blen-1)) throw new InvalidDataException("Impossible low count", this);
+	}
 
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
+	protected void validateStructure() throws InvalidDataException {
+		super.validateStructure();
 		long c = 0;
 		int blen = children.length;
-		if (blen < 2) throw new InvalidDataException("Insufficient children: " + blen, this);
 		if (count < MINIMUM_SIZE) throw new InvalidDataException("Insufficient elements: " + blen, this);
 		long bsize = childSize();
 		for (int i = 0; i < blen; i++) {
@@ -686,7 +693,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			@SuppressWarnings("unchecked")
 			AVector<T> b=(AVector<T>)ch;
 			
-			b.validate();
 			long expectedChildSize=childSize(count,i);	
 			if (expectedChildSize != b.count()) {
 				throw new InvalidDataException("Expected block size: " + bsize + " for blocks[" + i + "] but was: "
@@ -698,14 +704,6 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		if (c != count) {
 			throw new InvalidDataException("Expected count: " + count + " but sum of child sizes was: " + c, this);
 		}
-	}
-
-	@Override
-	public void validateCell() throws InvalidDataException {
-		if (!isPacked()) throw new InvalidDataException("Non packed VectorTree size", this);
-		int blen = children.length;
-		if (blen < 2) throw new InvalidDataException("Insufficient children", this);
-		if (count <= childSize()*(blen-1)) throw new InvalidDataException("Impossible low count", this);
 	}
 
 	@Override

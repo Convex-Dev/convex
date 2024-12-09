@@ -274,6 +274,11 @@ public class AdversarialDataTest {
 	}
 	
 	@Test
+	public void testBadSet() {
+		invalidEncoding("83851d3ff0000000000000");
+	}
+	
+	@Test
 	public void testBadAccountStatus() {
 		// TODO: what should happen here?
 		//invalidTest(AccountStatus.create(-100, null));
@@ -296,6 +301,7 @@ public class AdversarialDataTest {
 		invalidEncoding("3d110000"); // just beyond maximum code point
 		invalidEncoding("3f0fffffff"); // way beyond max code point
 		invalidEncoding("3fffffffff"); // way beyond max code point, also negative int
+		
 	}
 	
 	protected void invalidEncoding(int tag, String more) {

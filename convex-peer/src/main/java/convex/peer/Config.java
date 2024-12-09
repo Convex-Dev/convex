@@ -88,7 +88,7 @@ public class Config {
 	/**
 	 * Size of incoming Belief queue
 	 */
-	public static final int BELIEF_QUEUE_SIZE = 200;
+	public static final int BELIEF_QUEUE_SIZE = 500;
 
 	/**
 	 * Checks if the config specifies a valid store

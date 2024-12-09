@@ -79,6 +79,12 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	public abstract void validateCell() throws InvalidDataException;
 	
 	@Override
+	public void validateStructure() throws InvalidDataException {
+		// nothing to do by default, covered by validateCell in general
+	}
+
+	
+	@Override
 	public byte byteAt(long i) {
 		// TODO Auto-generated method stub
 		return toBlob().byteAt(i);

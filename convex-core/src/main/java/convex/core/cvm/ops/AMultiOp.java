@@ -3,6 +3,7 @@ package convex.core.cvm.ops;
 import convex.core.cvm.AOp;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
@@ -62,6 +63,6 @@ public abstract class AMultiOp<T extends ACell> extends AOp<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		ops.validateCell();
+		Cells.validateCell(ops);
 	}
 }

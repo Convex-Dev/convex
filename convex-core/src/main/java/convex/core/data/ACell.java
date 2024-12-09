@@ -35,7 +35,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Validates the local structure and invariants of this cell. Called by validate() super implementation.
+	 * Validates the local structure and invariants of this cell.
 	 * 
 	 * Should validate directly contained data, but should not validate all other structure of this cell. 
 	 * 
@@ -43,7 +43,19 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @throws InvalidDataException  If the Cell is invalid
 	 */
-	public abstract void validateCell() throws InvalidDataException;
+	protected abstract void validateCell() throws InvalidDataException;
+	
+	/**
+	 * Validates the structure and invariants of this cell.
+	 * 
+	 * May visit child refs. Should complete in O(1) time.
+	 * 
+	 * @throws InvalidDataException  If the Cell is invalid
+	 */
+	protected void validateStructure() throws InvalidDataException {
+		// nothing by default
+	}
+
 	
 	/**
 	 * Hash of data Encoding of this cell, equivalent to the Value ID. Calling this method

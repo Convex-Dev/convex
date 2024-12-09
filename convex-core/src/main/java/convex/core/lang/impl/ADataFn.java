@@ -32,7 +32,7 @@ public abstract class ADataFn<T extends ACell> extends AFn<T> {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		getCanonical().validateCell();;
+		// nothing to do?
 	}
 
 	@Override

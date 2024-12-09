@@ -880,6 +880,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			if (prefix.commonHexPrefixLength(ch, Hash.HEX_LENGTH)<shift) {
 				throw new InvalidDataException("Inconsistent child at position "+i,this);
 			}
+			// TODO: remove recursion here?
 			if (child instanceof MapLeaf) {
 				child.validateWithPrefix(ch, shift+1);
 			}
@@ -892,18 +893,23 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 	}
 
+	/**
+	 * Check for top level structural integrity. Does not traverse branch refs.
+	 * @return
+	 */
 	private boolean isValidStructure() {
+		if (shift<0) return false;
 		if (count <= MapLeaf.MAX_ENTRIES) return false;
 		if (children.length != Integer.bitCount(mask & 0xFFFF)) return false;
 		for (int i = 0; i < children.length; i++) {
-			if (children[i] == null) return false;
+			Ref<AHashMap<K,V>> cref=children[i];
+			if (cref == null) return false;
 		}
 		return true;
 	}
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		if (shift<0) throw new InvalidDataException("Negaitive shift!", this);
 		if (!isValidStructure()) throw new InvalidDataException("Bad structure", this);
 	}
 

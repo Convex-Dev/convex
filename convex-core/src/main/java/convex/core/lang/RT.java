@@ -1507,20 +1507,6 @@ public class RT {
 	}
 
 	/**
-	 * Validate a Cell.
-	 * 
-	 * @param o Object to validate
-	 * @throws InvalidDataException For any validation failure
-	 */
-	public static void validateCell(ACell o) throws InvalidDataException {
-		if (o == null)
-			return;
-		if (o instanceof ACell) {
-			((ACell) o).validateCell();
-		}
-	}
-
-	/**
 	 * Associates a key position with a given value in an associative data structure
 	 * 
 	 * @param coll  Any associative data structure

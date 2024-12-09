@@ -232,12 +232,12 @@ public final class Syntax extends ACell {
 	public void validateCell() throws InvalidDataException {
 		if (datumRef == null) throw new InvalidDataException("null datum ref", this);
 		if (meta == null) throw new InvalidDataException("null metadata", this);
-		meta.validateCell();
+		Cells.validateCell(meta);;
 	}
 	
 	@Override
-	public void validate() throws InvalidDataException {
-		super.validate();
+	public void validateStructure() throws InvalidDataException {
+		super.validateStructure();
 		ACell datum=datumRef.getValue();
 		if (datum!=null) {
 			if (datum instanceof Syntax) {

@@ -120,8 +120,8 @@ public abstract class ARecordGeneric extends ACVMRecord {
 	protected abstract ARecordGeneric withValues(AVector<ACell> newValues);
 
 	@Override
-	public void validateCell() throws InvalidDataException {
-		values.validateCell();
+	protected void validateCell() throws InvalidDataException {
+		Cells.validateCell(values);
 	}
 
 }

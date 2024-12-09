@@ -125,7 +125,6 @@ public class Server implements Closeable {
 	/**
 	 * Configuration
 	 */
-
 	private final HashMap<Keyword, Object> config;
 
 	/**
@@ -496,7 +495,7 @@ public class Server implements Closeable {
 	}
 
 	/**
-	 * Adds an event to the inbound server event queue. May block.
+	 * Adds an event to the inbound server event queue.
 	 * @param event Signed event to add to inbound event queue
 	 * @return True if Belief was successfullly queued, false otherwise
 	 */
