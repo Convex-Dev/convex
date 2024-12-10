@@ -28,7 +28,7 @@ import convex.core.init.Init;
 import convex.test.Samples;
 
 /**
- * Tests for adversarial data, i.e. data that should b=not be accepted by correct peers / clients
+ * Tests for adversarial data, i.e. data that should not be accepted by correct peers / clients
  */
 public class AdversarialDataTest {
 
