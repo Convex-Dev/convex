@@ -20,6 +20,7 @@ import convex.core.data.Keyword;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
+import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
 
 /**
@@ -38,6 +39,8 @@ import convex.core.lang.RT;
 public class Belief extends ARecordGeneric {
 
 	private static final RecordFormat BELIEF_FORMAT = RecordFormat.of(Keywords.ORDERS);
+	
+	private static final long IX_ORDERS=BELIEF_FORMAT.indexFor(Keywords.ORDERS);
 	
 	// Constants
 	private static final Index<AccountKey, SignedData<Order>> EMPTY_ORDERS = Index.none();
@@ -229,6 +232,14 @@ public class Belief extends ARecordGeneric {
 			}
 		}
 		return result;
+	}
+	
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		super.validateStructure();
+		if (!(values.get(IX_ORDERS)  instanceof Index)) {
+			throw new InvalidDataException("Orders should be an Index",this);
+		}
 	}
 
 	/**

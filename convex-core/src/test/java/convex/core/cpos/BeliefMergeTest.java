@@ -131,6 +131,7 @@ public class BeliefMergeTest {
 			ps=ps.mergeBeliefs(sources); // belief merge step
 			ps=ps.updateState(); // state update
 			result[i] = ps; 
+			Cells.validate(ps.getPeerOrder());
 		}
 		result=updateTimestamps(result);
 		return result;

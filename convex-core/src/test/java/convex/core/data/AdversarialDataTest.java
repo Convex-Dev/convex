@@ -12,6 +12,7 @@ import java.util.Random;
 import org.junit.jupiter.api.Test;
 
 import convex.core.Result;
+import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
@@ -273,6 +274,11 @@ public class AdversarialDataTest {
 
 	}
 	
+	@Test 
+	public void testBadBelief() {
+		invalidEncoding(CVMTag.BELIEF,"d401b6"); // Byteflag instead of Index
+	}
+	
 	@Test
 	public void testBadSet() {
 		invalidEncoding("83851d3ff0000000000000");
@@ -280,8 +286,7 @@ public class AdversarialDataTest {
 	
 	@Test
 	public void testBadAccountStatus() {
-		// TODO: what should happen here?
-		//invalidTest(AccountStatus.create(-100, null));
+		invalidTest(AccountStatus.createUnsafe(-100, 0,null));
 	}
 	
 	@Test
@@ -329,6 +334,7 @@ public class AdversarialDataTest {
 		assertThrows(IllegalArgumentException.class, ()->Call.create(null, 0, HERO,0,Symbols.FOO,Vectors.empty())); 
 	}
 
+	// Asset that a Cell is invalid
 	private void invalidTest(ACell b) {
 		assertThrows(InvalidDataException.class, ()->b.validate());
 		doEncodingTest(b);
@@ -351,12 +357,11 @@ public class AdversarialDataTest {
 			// not a readable format, so probably not dangerous
 			return;
 		} catch (InvalidDataException e) {
-			fail("Failed to validate after re-reading?",e);
+			if (c.isCompletelyEncoded()) {
+				// Shouldn't validate
+				assertThrows(InvalidDataException.class, ()->b.validate());
+			}
 		}
 		
-		if (c.isCompletelyEncoded()) {
-			// Shouldn't validate
-			assertThrows(InvalidDataException.class, ()->b.validate());
-		}
 	}
 }

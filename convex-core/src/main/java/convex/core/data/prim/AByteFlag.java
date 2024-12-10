@@ -29,7 +29,10 @@ public abstract class AByteFlag extends APrimitive {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// Nothing to check. Always valid
+		byte tag=getTag();
+		if ((tag&0xf0)!=0xb0) {
+			throw new InvalidDataException("Illegal byte flag tag: "+tag,this);
+		}
 	}
 	
 	@Override

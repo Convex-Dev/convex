@@ -253,6 +253,12 @@ public class Order extends ARecordGeneric {
 		if (consensusPoints[level]==newPosition) return this;
 		long[] cps=consensusPoints.clone();
 		cps[level]=newPosition;
+		switch (level) {
+			case 0: throw new IllegalArgumentException("Can't change number of blocks");
+			default: if (cps[level-1]<newPosition) {
+				throw new IllegalArgumentException("Can't set consensus level byond previous level");
+			}
+		}
 		return new Order(values.assoc(IX_CONSENSUS,Vectors.createLongs(cps)));
 	}
 	
@@ -288,7 +294,29 @@ public class Order extends ARecordGeneric {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		super.validateCell();
+		if (!values.getRef(IX_CONSENSUS).isEmbedded()) {
+			throw new InvalidDataException("Consensus values should be embedded",this);
+		}
 
+	}
+	
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		super.validateStructure();
+		long [] cps=getConsensusPoints();
+		if (cps[0]!=getBlockCount()) {
+			throw new InvalidDataException("Mimatch of block count with conesnsus points",this);
+		}
+		int n=cps.length;
+		if (cps[n-1]<0) {
+			throw new InvalidDataException("Negative final consensus point",this);
+		}
+		for (int i=1; i<n; i++) {
+			if (cps[i]>cps[i-1]) {
+				throw new InvalidDataException("Consensus points not in expected order: "+cps,this);
+			}
+		}
 	}
 
 	@Override

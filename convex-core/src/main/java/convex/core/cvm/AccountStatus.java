@@ -81,7 +81,7 @@ public class AccountStatus extends ARecordGeneric {
 		this.parent=parent;
 	}
 	
-	public AccountStatus(AVector<ACell> values) {
+	private AccountStatus(AVector<ACell> values) {
 		super(CVMTag.ACCOUNT_STATUS,FORMAT,values);
 		this.sequence = RT.ensureLong(values.get(IX_SEQUENCE)).longValue();
 		this.publicKey = RT.ensureAccountKey(values.get(IX_KEY));
@@ -99,6 +99,12 @@ public class AccountStatus extends ARecordGeneric {
 	 * @return New AccountStatus
 	 */
 	public static AccountStatus create(long sequence, long balance, AccountKey key) {
+		if (sequence<0) throw new IllegalArgumentException("negative sequence");
+		if (balance<0) throw new IllegalArgumentException("negative balance");
+		return new AccountStatus(sequence, key, balance, 0L,null,null,null,null,null);
+	}
+	
+	public static AccountStatus createUnsafe(long sequence, long balance, AccountKey key) {
 		return new AccountStatus(sequence, key, balance, 0L,null,null,null,null,null);
 	}
 
@@ -240,6 +246,7 @@ public class AccountStatus extends ARecordGeneric {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
+		if (sequence<0) throw new InvalidDataException("Neagitive sequence: "+sequence,this);
 		if (!Coin.isValidAmount(balance)) throw new InvalidDataException("Illegal balance: "+balance,this);
 	}
 
