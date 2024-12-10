@@ -26,6 +26,7 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Cells;
 import convex.core.data.EncodingTest;
+import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.RecordTest;
 import convex.core.data.SignedData;
@@ -453,6 +454,9 @@ public class BeliefMergeTest {
 		AVector<AccountStatus> accounts = finalState.getAccounts();
 		if (ANALYSIS) printAccounts(accounts);
 		// final state checks
+		
+		assertEquals(Hash.fromHex("5e16756d0e3b5ab5ac4a6649858b165b41d19de6277fab0e30c2ff3e0460065e"),finalState.getHash());
+
 		
 		int expectedTxCount=NUM_PEERS * (NUM_INITIAL_TRANS+TX_ROUNDS);
 		assertEquals(expectedTxCount, bs4[PROPOSER].getOrder(RKEY).getConsensusPoint()); 

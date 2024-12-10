@@ -947,14 +947,13 @@ public class Format {
 	 * cell first, following cells in arbitrary order.
 	 * 
 	 * @param a Cell to Encode
-	 * @param everything If true, traverse the entire Cell tree
+	 * @param everything If true, attempt to traverse the entire Cell tree
 	 * @return Blob encoding
 	 */
 	public static Blob encodeMultiCell(ACell a, boolean everything) {
 		if (a==null) return Blob.NULL_ENCODING;
+		if (a.getRefCount()==0) return a.getEncoding();
 		
-		Blob topCellEncoding=Cells.encode(a);
-		if (a.getRefCount()==0) return topCellEncoding;
 
 		// Add any non-embedded child cells to stack
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
@@ -962,9 +961,16 @@ public class Format {
 		Cells.visitBranchRefs(a, addToStackFunc);
 		if (cells.isEmpty()) {
 			// single cell only
-			return topCellEncoding;
+			return a.getEncoding();
 		}
+		return encodeMultiCell(a,cells,everything);
+	}
 
+	private static Blob encodeMultiCell(ACell a, ArrayList<Ref<?>> cells, boolean everything) {
+		Blob topCellEncoding=Cells.encode(a);
+		Consumer<Ref<?>> addToStackFunc=r->{cells.add(r);};
+		
+		// Visit refs in stack to add to message, accumulating message size required
 		int[] ml=new int[] {topCellEncoding.size()}; // Array mutation trick for accumulator. Ugly but works....
 		HashSet<Ref<?>> refs=new HashSet<>();
 		Trees.visitStack(cells, cr->{
@@ -1003,6 +1009,31 @@ public class Format {
 		if (ix!=messageLength) throw new IllegalArgumentException("Bad message length expected "+ml[0]+" but was: "+ix);
 		
 		return Blob.wrap(msg);
+	}
+	
+	/**
+	 * Encode a Vector of cells down to the encodings of each vector element
+	 * @param v
+	 * @return
+	 */
+	public static Blob encodeDataVector(AVector<?> v) {
+		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
+		v.visitAllChildren(vc->{
+			Ref<?> r=vc.getRef();
+			if (!r.isEmbedded()) {
+				// only add non-embedded children
+				cells.add(r);
+			};
+		}
+		);
+		v.visitElementRefs(r->{
+			if (!r.isEmbedded()) {
+				// only add non-embedded children
+				cells.add(r);
+			};
+		});
+		
+		return encodeMultiCell(v,cells,false);
 	}
 	
 	
@@ -1109,6 +1140,8 @@ public class Format {
 		if (value>0) return 8-((Bits.leadingZeros(value)-1)/8);
 		return 8-((Bits.leadingOnes(value)-1)/8);
 	}
+
+
 
 
 

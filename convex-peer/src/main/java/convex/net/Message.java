@@ -10,6 +10,7 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -132,14 +133,7 @@ public class Message {
 		// detect actual message data for null payload :-)
 		if ((messageData.count()==1)&&(messageData.byteAt(0)==Tag.NULL)) return null;
 		
-		switch(type) {
-		case MessageType.DATA:
-			ACell[] cells=Format.decodeCells(messageData);
-			payload=Vectors.create(cells);
-			break;
-		default:
-			payload=Format.decodeMultiCell(messageData);
-		}
+		payload=Format.decodeMultiCell(messageData);
 		
 		return (T) payload;
 	}
@@ -164,7 +158,7 @@ public class Message {
 		case MessageType.DATA:
 			@SuppressWarnings("unchecked") 
 			AVector<ACell> v=(AVector<ACell>) payload;
-			messageData=Format.encodeCells(v);		 
+			messageData=Format.encodeDataVector(v);		 
 			break;
 			
 		default:
@@ -349,8 +343,13 @@ public class Message {
 		if ((v == null)||(v.isEmpty())) {
 			throw new BadFormatException("Invalid data request payload");
 		};
+		if (v.count()>CPoSConstants.MISSING_LIMIT+1) {
+			throw new BadFormatException("Too many elements in Missing data request");
+		}
 		//System.out.println("DATA REQ:"+ v);
-		long n=v.count();
+		int n=v.size();
+		ACell[] vals=new ACell[n];
+		vals[0]=v.get(0);
 		for (int i=1; i<n; i++) {
 			Hash h=RT.ensureHash(v.get(i));
 			if (h==null) {
@@ -360,15 +359,15 @@ public class Message {
 			Ref<?> r = store.refForHash(h);
 			if (r != null) {
 				ACell data = r.getValue();
-				v=v.assoc(i, data);
+				vals[i]=data;
 			} else {
 				// signal we don't have this data
-				v=v.assoc(i, null);
+				vals[i]=null;;
 			}
 		}
 		//System.out.println("DATA RESP:"+ v);
 		// Create response. Will have null return connection
-		Message resp=create(MessageType.DATA,v);
+		Message resp=create(MessageType.DATA,Vectors.create(vals));
 		return resp;
 	}
 

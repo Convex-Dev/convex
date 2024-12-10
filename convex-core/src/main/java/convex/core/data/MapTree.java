@@ -843,7 +843,7 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 			// Perform child validation
 			validateWithPrefix(firstHash,shift);
 		} catch (ClassCastException e) {
-			throw new InvalidDataException("Can't get first hash of map: "+e.getMessage(),e);
+			throw new InvalidDataException("Can't get first hash of map: "+e.getMessage(),this,e);
 		}
 	}
 

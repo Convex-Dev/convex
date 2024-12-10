@@ -331,8 +331,12 @@ public class Cells {
 		if (cell==null) return; // OK, this is the null value
 		Ref<?> ref=cell.getRef();
 		if (ref.isValidated()) return;
-		cell.validateCell();
-		cell.validateStructure();
+		try {
+			cell.validateCell();
+			cell.validateStructure();
+		} catch (ClassCastException | NullPointerException e) {
+			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
+		}
 	}
 
 	/**

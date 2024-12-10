@@ -20,6 +20,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.util.VectorBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.utils.VisitCounter;
 import convex.test.Samples;
 
 /**
@@ -387,6 +388,13 @@ public class VectorsTest {
 		assertEquals(10, Samples.INT_VECTOR_10.commonPrefixLength(Samples.INT_VECTOR_23));
 		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256));
 		assertEquals(256, Samples.INT_VECTOR_300.commonPrefixLength(Samples.INT_VECTOR_256.append(RT.cvm(17L))));
+	}
+	
+	@Test public void testVisitors() {
+		VisitCounter<AVector<CVMLong>> vc=new VisitCounter<>();
+		Samples.INT_VECTOR_300.visitAllChildren(vc);
+		
+		assertEquals(16+1+3,vc.count); // 16*(16) + 1 *(256) + 2 *(16) + 1 *(32) [== whole prefix]
 	}
 	
 	@Test

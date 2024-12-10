@@ -10,6 +10,12 @@ package convex.core.exceptions;
 public class InvalidDataException extends ValidationException {
 	private final Object data;
 
+	public InvalidDataException(String message, Object data, Throwable cause) {
+		super(message,cause);
+		this.data = data;
+	}
+
+	
 	public InvalidDataException(String message, Object data) {
 		super(message);
 		this.data = data;

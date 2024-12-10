@@ -729,5 +729,12 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 		return (count <= VectorLeaf.MAX_SIZE) || ((count & 0x0F) != 0);
 	}
 
+	@Override
+	protected void visitAllChildren(Consumer<AVector<T>> visitor) {
+		if (hasPrefix()) {
+			prefix.getValue().visitAllChildren(visitor);
+		}
+	}
+
 
 }

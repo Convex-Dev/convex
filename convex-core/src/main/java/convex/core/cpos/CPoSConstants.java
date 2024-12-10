@@ -66,6 +66,11 @@ public class CPoSConstants {
 	 * Maximum allowed encoded peer message length in bytes (50mb)
 	 */
 	public static final long MAX_MESSAGE_LENGTH = 50000000;
+	
+	/**
+	 * Maximum allowed number of missing hashes in missing data request
+	 */
+	public static final long MISSING_LIMIT = 256;
 
 
 }

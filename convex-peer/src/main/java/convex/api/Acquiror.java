@@ -10,6 +10,7 @@ import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.cpos.CPoSConstants;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
@@ -72,7 +73,7 @@ public class Acquiror {
 				HashSet<Hash> missingSet = new HashSet<>();
 
 				// Loop until future is complete or cancelled
-				long LIMIT=100; // limit of missing data elements to query at any time
+				long LIMIT=CPoSConstants.MISSING_LIMIT; // limit of missing data elements to query at any time
 				while (!f.isDone()) {
 					Ref<T> ref = store.refForHash(hash);
 					missingSet.clear();
@@ -88,14 +89,18 @@ public class Acquiror {
 							return;
 						}
 						ref.findMissing(missingSet,LIMIT);
+						if (missingSet.isEmpty()) {
+							f.complete(ref.getValue());
+							return;
+						}					
 					}
-					
 					CVMLong id=CVMLong.create(source.connection.getNextID());
 					Message dataRequest=Message.createDataRequest(id, missingSet.toArray(Utils.EMPTY_HASHES));
 					CompletableFuture<Message> cf=new CompletableFuture<Message>();
 					synchronized (source.awaiting) {
 						boolean sent=source.connection.sendMessage(dataRequest);
 						if (!sent) {
+							log.warn("Unable to send data acquisition request");
 							continue;
 						}
 						cf=cf.orTimeout(ACQUIRE_LOOP_TIMEOUT,TimeUnit.MILLISECONDS);

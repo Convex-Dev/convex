@@ -142,7 +142,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	protected Ref<T> getElementRefUnsafe(long i) {
 		long bSize = 1L << shift; // size of a fully packed block
 		int b = (int) (i >> shift);
-		return children[b].getValue().getElementRef(i - b * bSize);
+		return children[b].getValue().getElementRefUnsafe(i - b * bSize);
 	}
 
 	@SuppressWarnings("unchecked")
@@ -596,11 +596,11 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			return commonPrefixLengthAligned(b);
 		} else if (cs < bcs) {
 			// b is longer
-			AVector<T> bChild = b.children[0].getValue();
+			AVector<T> bChild = b.getChild(0);
 			return commonPrefixLength(bChild);
 		} else {
 			// this is longer
-			AVector<T> child = children[0].getValue();
+			AVector<T> child = getChild(0);
 			return child.commonPrefixLength(b);
 		}
 	}
@@ -619,18 +619,22 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		long cs = childSize();
 		long result = 0;
 		for (int i = 0; i < n; i++) {
-			long cpl = children[i].getValue().commonPrefixLength(b.children[i].getValue());
+			long cpl = getChild(i).commonPrefixLength(b.children[i].getValue());
 			if (cpl < cs) return result + cpl;
 			result += cs; // we have validated cs elements as equal
 		}
 		return result;
+	}
+	
+	public AVector<T> getChild(int i) {
+		return children[i].getValue();
 	}
 
 	@Override
 	public VectorLeaf<T> getChunk(long offset) {
 		long cs = childSize();
 		int ix = (int) (offset / cs);
-		AVector<T> child = children[ix].getValue();
+		AVector<T> child = getChild(ix);
 		long cOffset = offset - (ix * cs);
 		if (cs == VectorLeaf.MAX_SIZE) {
 			if (cOffset != 0) throw new IndexOutOfBoundsException("Index: " + offset);
@@ -688,7 +692,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 		if (count < MINIMUM_SIZE) throw new InvalidDataException("Insufficient elements: " + blen, this);
 		long bsize = childSize();
 		for (int i = 0; i < blen; i++) {
-			ACell ch = children[i].getValue();
+			ACell ch = getChild(i);
 			if (!(ch instanceof AVector)) throw new InvalidDataException("Child "+i+" is not a vector!",this);
 			@SuppressWarnings("unchecked")
 			AVector<T> b=(AVector<T>)ch;
@@ -730,6 +734,16 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			if (!children[i].equals(b.children[i])) return false;
 		}
 		return true;
+	}
+
+	@Override
+	protected void visitAllChildren(Consumer<AVector<T>> visitor) {
+		int n=children.length;
+		for (int i=0; i<n; i++) {
+			AVector<T> child=getChild(i);
+			child.visitAllChildren(visitor);
+			visitor.accept(child);
+		}
 	}
 
 }

@@ -4,6 +4,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -292,4 +293,10 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 * @return Element Ref
 	 */
 	protected abstract Ref<T> getElementRefUnsafe(long i);
+
+	/**
+	 * Visits all canonical child vectors recursively in bottom up order
+	 * @param visitor
+	 */
+	protected abstract void visitAllChildren(Consumer<AVector<T>> visitor);
 }

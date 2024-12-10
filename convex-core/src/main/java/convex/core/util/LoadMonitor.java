@@ -38,6 +38,11 @@ public class LoadMonitor {
 		return lm.load;
 	}
 	
+	public static double getLoad() {
+		return getLoad(Thread.currentThread());
+	}
+
+	
 	/**
 	 * Signals start of load for current Thread
 	 */

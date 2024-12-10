@@ -13,6 +13,7 @@ import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
 import convex.net.Message;
@@ -55,10 +56,34 @@ public class QueryHandler extends AThreadedComponent {
 			handleQuery(m);
 			break;
 		case REQUEST_DATA:
-			server.handleDataRequest(m);
+			handleDataRequest(m);
 			break;
 		default:
 			log.warn("Unexpected Message type on query queue: "+type);
+		}
+	}
+	
+	/**
+	 * Respond to a request for missing data, on a best-efforts basis. Requests for
+	 * missing data we do not hold are ignored.
+	 *
+	 * @param m
+	 * @throws BadFormatException
+	 */
+	protected void handleDataRequest(Message m)  {
+		// payload for a missing data request should be a valid Hash
+		try {
+			Message response=m.makeDataResponse(server.getStore());
+			boolean sent = m.returnMessage(response);
+			if (!sent) {
+				log.info("Can't send data request response due to full buffer");
+			} else {
+				// log.info("Missing data request handled. Load = "+LoadMonitor.getLoad());
+			}
+		} catch (BadFormatException e) {
+			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
+		} catch (RuntimeException e) {
+			log.warn("Unable to deliver missing data due to exception:", e);
 		}
 	}
 	

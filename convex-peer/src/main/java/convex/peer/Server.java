@@ -426,27 +426,7 @@ public class Server implements Closeable {
 		}
 	}
 
-	/**
-	 * Respond to a request for missing data, on a best-efforts basis. Requests for
-	 * missing data we do not hold are ignored.
-	 *
-	 * @param m
-	 * @throws BadFormatException
-	 */
-	protected void handleDataRequest(Message m)  {
-		// payload for a missing data request should be a valid Hash
-		try {
-			Message response=m.makeDataResponse(store);
-			boolean sent = m.returnMessage(response);
-			if (!sent) {
-				log.trace("Can't send data request response due to full buffer");
-			}
-		} catch (BadFormatException e) {
-			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
-		} catch (RuntimeException e) {
-			log.warn("Unable to deliver missing data due to exception:", e);
-		}
-	}
+
 
 	protected void processTransact(Message m) {
 		boolean queued=transactionHandler.offerTransaction(m);
@@ -569,7 +549,6 @@ public class Server implements Closeable {
 			payload = m.getPayload();
 			Counters.peerDataReceived++;
 			
-			// Note: partial messages are handled in Connection now
 			Ref<?> r = Ref.get(payload);
 			if (r.isEmbedded()) {
 				log.warn("DATA with embedded value: "+payload);
