@@ -32,7 +32,7 @@ public class MessageTest {
 		Message mr=Message.create(enc);
 		AVector<ACell> v=mr.getPayload();
 		
-		assertEquals(b,v.get(1));
+		assertEquals(b,v.get(2));
 		Cells.persist(b);
 		
 		Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
@@ -43,9 +43,9 @@ public class MessageTest {
 	
 	@Test public void testLostMissingResponse() throws BadFormatException, IOException {
 		Message md=Message.createDataRequest(CVMLong.ONE, BAD_HASH);
-		assertEquals(Vectors.of(1,BAD_HASH),md.getPayload());
+		assertEquals(Vectors.of(MessageTag.DATA_QUERY,1,BAD_HASH),md.getPayload());
 		
 		Message mdr=md.makeDataResponse(Stores.current());
-		assertEquals(Vectors.of(1,null),mdr.getPayload());
+		assertEquals(Vectors.of(MessageTag.DATA_RESPONSE,1,null),mdr.getPayload());
 	}
 }

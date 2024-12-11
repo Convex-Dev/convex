@@ -24,7 +24,7 @@ public enum MessageType {
 	 * A message relaying data.
 	 * 
 	 * Payload is a vector:
-	 * - [id value1 value2 .....]
+	 * - [:DR id value1 value2 .....]
 	 *
 	 * Data is presented "as-is", and may be: 
 	 * - the result of a missing data request
@@ -49,7 +49,7 @@ public enum MessageType {
 	 * peers. Peers under load may ignore data requests.
 	 *
 	 * Payload is a Vector containing ID plus one or more hashes 
-	 * i.e [id hash1 hash2 ......]
+	 * i.e [:DQ id hash1 hash2 ......]
 	 * 
 	 * Receiver should respond with a DATA message if the specified data is
 	 * available in their store, and they are willing to fulfil the request

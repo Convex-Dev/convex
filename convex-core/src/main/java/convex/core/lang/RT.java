@@ -1414,6 +1414,17 @@ public class RT {
 		Keyword k = Keyword.create(name);
 		return k;
 	}
+	
+	/**
+	 * Casts to a Keyword
+	 * @param a
+	 * @return
+	 */
+	public static Keyword ensureKeyword(ACell a) {
+		if (a instanceof Keyword)
+			return (Keyword) a;
+		return null;
+	}
 
 	/**
 	 * Ensures the argument is a Symbol.
@@ -1879,6 +1890,8 @@ public class RT {
 		}
 		return result;
 	}
+
+
 
 
 

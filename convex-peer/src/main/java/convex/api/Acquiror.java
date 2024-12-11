@@ -112,7 +112,7 @@ public class Acquiror {
 						if (resp.getType()==MessageType.DATA) {
 							log.trace("Got acquire response: {} ",resp);
 							AVector<ACell> v=resp.getPayload();
-							for (int i=1; i<v.count(); i++) {
+							for (int i=2; i<v.count(); i++) {
 								ACell val=v.get(i);
 								if (val==null) {
 									AVector<ACell> reqv=dataRequest.getPayload();

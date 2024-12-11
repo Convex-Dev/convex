@@ -17,6 +17,7 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -74,20 +75,22 @@ public class Message {
 
 	public static Message createDataResponse(ACell id, ACell... cells) {
 		int n=cells.length;
-		ACell[] cs=new ACell[n+1];
-		cs[0]=id;
+		ACell[] cs=new ACell[n+2];
+		cs[0]=MessageTag.DATA_RESPONSE;
+		cs[1]=id;
 		for (int i=0; i<n; i++) {
-			cs[i+1]=cells[i];
+			cs[i+2]=cells[i];
 		}
 		return create(MessageType.DATA,Vectors.create(cs));
 	}
 	
 	public static Message createDataRequest(ACell id, Hash... hashes) {
 		int n=hashes.length;
-		ACell[] cs=new ACell[n+1];
-		cs[0]=id;
+		ACell[] cs=new ACell[n+2];
+		cs[0]=MessageTag.DATA_QUERY;
+		cs[1]=id;
 		for (int i=0; i<n; i++) {
-			cs[i+1]=hashes[i];
+			cs[i+2]=hashes[i];
 		}
 		return create(MessageType.REQUEST_DATA,Vectors.create(cs));
 	}
@@ -172,6 +175,15 @@ public class Message {
 		try {
 			ACell payload=getPayload();
 			if (payload instanceof Result) return MessageType.RESULT;
+			
+			if (payload instanceof AVector) {
+				Keyword mt=RT.ensureKeyword(((AVector<?>)payload).get(0));
+				if (mt==null) return MessageType.UNKNOWN;
+				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
+				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
+				if (MessageTag.DATA_QUERY.equals(mt)) return MessageType.REQUEST_DATA;
+				if (MessageTag.DATA_RESPONSE.equals(mt)) return MessageType.DATA;
+			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
 		}
@@ -221,14 +233,11 @@ public class Message {
 				// Status ID is the single value
 				case STATUS: return (getPayload());
 				
+				case REQUEST_DATA:
 				case DATA: {
-					ACell o=getPayload();
-					if (o instanceof AVector) {
-						AVector<?> v = (AVector<?>)o; 
-						if (v.count()==0) return null;
-						// first element might be ID, otherwise null
-						return RT.ensureLong(v.get(0));
-					}
+					AVector<?> v=RT.ensureVector(getPayload());
+					if (v.count()<2) return null;
+					return RT.ensureLong(v.get(1));
 				}
 	
 				default: return null;
@@ -334,14 +343,15 @@ public class Message {
 		if ((v == null)||(v.isEmpty())) {
 			throw new BadFormatException("Invalid data request payload");
 		};
-		if (v.count()>CPoSConstants.MISSING_LIMIT+1) {
+		if (v.count()>CPoSConstants.MISSING_LIMIT+2) {
 			throw new BadFormatException("Too many elements in Missing data request");
 		}
 		//System.out.println("DATA REQ:"+ v);
 		int n=v.size();
 		ACell[] vals=new ACell[n];
-		vals[0]=v.get(0);
-		for (int i=1; i<n; i++) {
+		vals[0]=MessageTag.DATA_RESPONSE;
+		vals[1]=v.get(1);
+		for (int i=2; i<n; i++) {
 			Hash h=RT.ensureHash(v.get(i));
 			if (h==null) {
 				throw new BadFormatException("Invalid data request hash");

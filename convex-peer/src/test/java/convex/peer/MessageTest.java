@@ -46,7 +46,7 @@ public class MessageTest {
 		assertEquals(r,m.makeDataResponse(Stores.current()));
 		
 		AVector<ACell> v=r.getPayload();
-		assertEquals(CVMLong.ONE,v.get(0));
-		assertEquals(b,v.get(1));
+		assertEquals(CVMLong.ONE,v.get(1));
+		assertEquals(b,v.get(2));
 	}
 }
