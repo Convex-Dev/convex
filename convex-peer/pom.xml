@@ -39,6 +39,12 @@
 			<artifactId>slf4j-api</artifactId>
 			<version>${slf4j.version}</version>
 		</dependency>
+		<dependency>
+ 			<groupId>io.netty</groupId>
+ 			<artifactId>netty-all</artifactId>
+ 			<version>4.1.115.Final</version>
+  		 	<scope>compile</scope>
+ 		</dependency>
 
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
