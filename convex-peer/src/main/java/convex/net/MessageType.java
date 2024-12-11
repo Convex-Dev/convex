@@ -24,7 +24,7 @@ public enum MessageType {
 	 * A message relaying data.
 	 * 
 	 * Payload is a vector:
-	 * - [id content]
+	 * - [id value1 value2 .....]
 	 *
 	 * Data is presented "as-is", and may be: 
 	 * - the result of a missing data request
@@ -79,7 +79,7 @@ public enum MessageType {
 	 * Message containing the Result for a corresponding COMMAND, QUERY or TRANSACT
 	 * message.
 	 *
-	 * Payload is: [id result error-code]
+	 * Payload is: Result
 	 *
 	 * Where:
 	 * - Result is the result of the request, or the message if an error occurred

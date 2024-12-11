@@ -12,6 +12,7 @@ import convex.core.Constants;
 import convex.core.data.Strings;
 import convex.core.util.Shutdown;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -41,6 +42,8 @@ public class NettyServer extends AServer {
 		m.returnMessage(Message.createResult(m.getID(), Strings.create("Received"), null));
 		System.err.println(m);
 	};
+
+	private Channel channel;
 
 	public NettyServer(Integer port) {
 		setPort(port);
@@ -86,8 +89,7 @@ public class NettyServer extends AServer {
    		System.out.println("Server started on port: "+getPort());
    	   
         // Wait until the server socket is closed.
-        f.channel().closeFuture().sync();
-
+   		this.channel=f.channel();
     }
 	
 	protected Consumer<Message> getReceiveAction() {
@@ -97,18 +99,24 @@ public class NettyServer extends AServer {
 	public static void main(String... args) throws Exception {
 		try (NettyServer server=new NettyServer(8000)) {
 			server.launch();
+			
+			server.waitForClose();
 		}
 	}
 
 	@Override
 	public void close() {
-		// TODO Auto-generated method stub
-		
+		if (channel!=null) {
+			channel.close();
+		}
+	}
+	
+	public void waitForClose() throws InterruptedException {
+		channel.closeFuture().sync();
 	}
 
 	@Override
 	public InetSocketAddress getHostAddress() {
-		// TODO Auto-generated method stub
-		return null;
+		return (InetSocketAddress) channel.localAddress();
 	}
 }

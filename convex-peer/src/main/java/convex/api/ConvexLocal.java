@@ -73,14 +73,14 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		return makeMessageFuture(MessageType.STATUS,CVMLong.create(makeID()));
+		return makeMessageFuture(MessageType.STATUS,CVMLong.create(getNextID()));
 	}
 	
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		
 		maybeUpdateSequence(signed);
-		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
+		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(getNextID(),signed));
 		return r;
 	}
 
@@ -92,14 +92,10 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) {
-		return makeMessageFuture(Message.createQuery(makeID(),query,address));
+		return makeMessageFuture(Message.createQuery(getNextID(),query,address));
 	}
 	
-	private long idCounter=0;
-	
-	private long makeID() {
-		return idCounter++;
-	}
+
 
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
 		Message ml=Message.create(type,payload);

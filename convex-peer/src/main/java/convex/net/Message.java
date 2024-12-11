@@ -138,7 +138,7 @@ public class Message {
 		
 		// default to single cell encoding
 		// TODO: alternative depths for different types
-		switch (type) {
+		switch (getType()) {
 		case MessageType.RESULT:
 		case MessageType.QUERY:
 		case MessageType.TRANSACT:
@@ -210,7 +210,7 @@ public class Message {
 	 */
 	public ACell getID()  {
 		try {
-			switch (type) {
+			switch (getType()) {
 				// Query and transact use a vector [ID ...]
 				case QUERY:
 				case TRANSACT: return ((AVector<?>)getPayload()).get(0);

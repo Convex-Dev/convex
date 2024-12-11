@@ -3,6 +3,7 @@ package convex.api;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -203,6 +204,12 @@ public abstract class Convex implements AutoCloseable {
 		ConvexRemote convex = new ConvexRemote(address, keyPair);
 		convex.connectToPeer(peerAddress, store);
 		return convex;
+	}
+	
+	protected long idCounter=0;
+	
+	protected long getNextID() {
+		return idCounter++;
 	}
 
 	/**

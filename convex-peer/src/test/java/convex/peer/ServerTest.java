@@ -34,7 +34,6 @@ import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
-import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
@@ -43,7 +42,6 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.net.Connection;
 
 /**
  * Tests for a fresh standalone server cluster instance
@@ -233,11 +231,4 @@ public class ServerTest {
 			assertTrue(s instanceof State);
 		}
 	}
-
-	public long checkSent(Connection pc,SignedData<ATransaction> st) throws IOException {
-		long x=pc.sendTransaction(st);
-		assertTrue(x>=0);
-		return x;
-	}
-
 }
