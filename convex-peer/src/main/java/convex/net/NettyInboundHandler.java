@@ -1,6 +1,7 @@
 package convex.net;
 
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,8 +21,12 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
 	
 	private final Consumer<Message> receiveAction;
 
-	public NettyInboundHandler(Consumer<Message> receiveAction) {
+
+	private Predicate<Message> returnAction;
+
+	public NettyInboundHandler(Consumer<Message> receiveAction, Predicate<Message> returnAction)  {
 		this.receiveAction=receiveAction;
+		this.returnAction=returnAction;
 	}
 
     @Override
@@ -50,6 +55,10 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
     		byte[] dst=new byte[mlen];
     		buf.readBytes(dst);
     		Message m=Message.create(Blob.wrap(dst));
+    		
+    		// Set a return handler (can be null)
+    		m.returnHandler=returnAction;
+    		
     		if (receiveAction!=null) {
     			receiveAction.accept(m);
     		} else {

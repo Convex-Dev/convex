@@ -2,11 +2,13 @@ package convex.net;
 
 import java.net.InetSocketAddress;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.data.Strings;
 import convex.core.util.Shutdown;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
@@ -36,6 +38,7 @@ public class NettyServer {
 	
 	private Integer port;
 	private Consumer<Message> receiveAction=m->{
+		m.returnMessage(Message.createResult(null, Strings.create("Received"), null));
 		System.err.println(m);
 	};
 
@@ -52,7 +55,12 @@ public class NettyServer {
          .childHandler(new ChannelInitializer<SocketChannel>() {
              @Override
              public void initChannel(SocketChannel ch) throws Exception {
-                 ch.pipeline().addLast(new NettyInboundHandler(getReceiveAction()),new NettyOutboundHandler());
+            	 Predicate<Message> returnHandler=m->{
+            		 ch.writeAndFlush(m);
+            		 return true;
+            	 };
+            	 NettyInboundHandler inbound=new NettyInboundHandler(getReceiveAction(),returnHandler);
+                 ch.pipeline().addLast(inbound,new NettyOutboundHandler());
              }
          })
          .option(ChannelOption.SO_BACKLOG, 128) // Backlog of incoming connection requests         

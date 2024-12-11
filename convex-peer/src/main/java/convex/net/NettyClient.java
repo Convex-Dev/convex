@@ -80,7 +80,8 @@ public class NettyClient {
 		ChannelFuture f = b.connect(sa).sync(); // (5)
 
 		Channel chan = f.channel();
-		f.channel().pipeline().addLast(new NettyOutboundHandler(),new NettyInboundHandler(receiveAction));
+		NettyInboundHandler inbound=new NettyInboundHandler(receiveAction,null);
+		f.channel().pipeline().addLast(inbound,new NettyOutboundHandler());
 
 		NettyClient client = new NettyClient(chan);
 		return client;
@@ -91,9 +92,11 @@ public class NettyClient {
 	}
 
 	public static void main(String... args) throws Exception {
-		NettyClient client = connect(new InetSocketAddress("localhost", 8000),null);
+		NettyClient client = connect(new InetSocketAddress("localhost", 8000),m->{
+			System.err.println("Client received:" + m);
+		});
 
-		client.send(Message.create(MessageType.QUERY,Vectors.of(1,2,3))).sync();
+		client.send(Message.create(MessageType.QUERY,Vectors.of(1,2,3,4))).sync();
 	}
 
 }
