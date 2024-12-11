@@ -1,6 +1,5 @@
 package convex.net;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -37,7 +36,7 @@ import convex.peer.Server;
  * receive queue is full (thereby applying back-pressure to clients)
  *
  */
-public class NIOServer implements Closeable {
+public class NIOServer extends AServer {
 	public static final int DEFAULT_PORT = 18888;
 
 	private static final Logger log = LoggerFactory.getLogger(NIOServer.class.getName());
@@ -54,8 +53,6 @@ public class NIOServer implements Closeable {
 
 	private final Server server;
 	
-	
-
 	private NIOServer(Server server) {
 		this.server = server;
 	}
@@ -77,38 +74,41 @@ public class NIOServer implements Closeable {
 	 * @param port Port to use. If 0 or null, a default port will be used, with fallback to a random port
 	 * @throws IOException in case of IO problem
 	 */
-	public void launch(String bindAddress, Integer port) throws IOException {
+	public void launch() throws IOException {
 		ssc = ServerSocketChannel.open();
 
 		// Set receive buffer size
 		ssc.socket().setReceiveBufferSize(Config.SOCKET_SERVER_BUFFER_SIZE);
 		ssc.socket().setReuseAddress(true);
 
-		bindAddress = (bindAddress == null) ? "::" : bindAddress;
+		String bindAddress = "::";
 		
 		// Bind to a port
-		InetSocketAddress bindSA;	
-		if (port == null) {
-			port = 0;
-		}
-		if (port==0) {
-			try {
-				bindSA = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
-				ssc.bind(bindSA);
-			} catch (IOException e) {
-				// try again with random port
-				bindSA = new InetSocketAddress(bindAddress, 0);
+		{
+			InetSocketAddress bindSA;	
+			Integer port=getPort();
+			if (port == null) {
+				port = 0;
+			}
+			if (port<=0) {
+				try {
+					bindSA = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
+					ssc.bind(bindSA);
+				} catch (IOException e) {
+					// try again with random port
+					bindSA = new InetSocketAddress(bindAddress, 0);
+					ssc.bind(bindSA);
+				}
+			} else {
+				bindSA = new InetSocketAddress(bindAddress, port);
 				ssc.bind(bindSA);
 			}
-		} else {
-			bindSA = new InetSocketAddress(bindAddress, port);
-			ssc.bind(bindSA);
+			
+			// Find out which port we actually bound to
+			bindSA = (InetSocketAddress) ssc.getLocalAddress();
+			setPort(ssc.socket().getLocalPort());
 		}
 		
-		// Find out which port we actually bound to
-		bindSA = (InetSocketAddress) ssc.getLocalAddress();
-		port = ssc.socket().getLocalPort();
-
 		// change to bnon-blocking mode
 		ssc.configureBlocking(false);
 
@@ -120,10 +120,10 @@ public class NIOServer implements Closeable {
 		// set running status now, so that loops don't terminate
 		running = true;
 
-		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + port);
+		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + getPort());
 		selectorThread.setDaemon(true); // daemon thread so it doesn't stop shutdown
 		selectorThread.start();
-		log.debug("NIO server started on port {}", port);
+		log.debug("NIO server started on port {}", getPort());
 	}
 	
 	long lastConnectionPrune=0;
@@ -210,12 +210,8 @@ public class NIOServer implements Closeable {
 		}
 	};
 
-	/**
-	 * Gets the port that this server instance is listening on.
-	 * 
-	 * @return Port number, or 0 if a server socket is not bound.
-	 */
-	public int getPort() {
+	@Override
+	public Integer getPort() {
 		if (ssc == null)
 			return 0;
 		ServerSocket socket = ssc.socket();

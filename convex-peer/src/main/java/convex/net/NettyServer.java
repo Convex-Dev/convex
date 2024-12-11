@@ -1,5 +1,6 @@
 package convex.net;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -19,7 +20,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
-public class NettyServer {
+public class NettyServer extends AServer {
 
 	static final Logger log = LoggerFactory.getLogger(NettyServer.class.getName());
 
@@ -36,17 +37,16 @@ public class NettyServer {
 		return bossGroup;
 	}
 	
-	private Integer port;
 	private Consumer<Message> receiveAction=m->{
 		m.returnMessage(Message.createResult(m.getID(), Strings.create("Received"), null));
 		System.err.println(m);
 	};
 
 	public NettyServer(Integer port) {
-		this.port=port;
+		setPort(port);
 	}
 	
-	public void run() throws Exception {
+	public void launch() throws IOException,InterruptedException {
         EventLoopGroup bossGroup = NettyServer.getEventLoopGroup(); 
         EventLoopGroup workerGroup = NettyClient.getEventLoopGroup();
         ServerBootstrap b = new ServerBootstrap(); 
@@ -67,6 +67,7 @@ public class NettyServer {
          .childOption(ChannelOption.SO_KEEPALIVE, true); 
 
         ChannelFuture f=null;
+        Integer port=getPort();
         if (port==null) try {
         	f = b.bind(Constants.DEFAULT_PEER_PORT).sync(); 
         	port=Constants.DEFAULT_PEER_PORT;
@@ -77,8 +78,10 @@ public class NettyServer {
         
         if (f==null) {
         	f = b.bind(port).sync(); 
+        	
+        	// Check local port
         	InetSocketAddress localAddress=(InetSocketAddress) f.channel().localAddress();
-        	port=localAddress.getPort();
+        	setPort(localAddress.getPort());
         }
    		System.out.println("Server started on port: "+getPort());
    	   
@@ -90,14 +93,22 @@ public class NettyServer {
 	protected Consumer<Message> getReceiveAction() {
 		return receiveAction;
 	}
-
 	
 	public static void main(String... args) throws Exception {
-		NettyServer server=new NettyServer(8000);
-		server.run();
+		try (NettyServer server=new NettyServer(8000)) {
+			server.launch();
+		}
 	}
 
-	private Integer getPort() {
-		return port;
+	@Override
+	public void close() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public InetSocketAddress getHostAddress() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

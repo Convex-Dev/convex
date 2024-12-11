@@ -48,6 +48,7 @@ import convex.core.store.Stores;
 import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
+import convex.net.AServer;
 import convex.net.Message;
 import convex.net.MessageType;
 import convex.net.NIOServer;
@@ -130,13 +131,15 @@ public class Server implements Closeable {
 	/**
 	 * NIO Server instance
 	 */
-	private NIOServer nio = NIOServer.create(this);
+	private AServer nio;
 
 	private Server(HashMap<Keyword, Object> config) throws ConfigException {
 		this.config = config;
 		
 		// Critical to ensure we have the store set up before anything else. Stuff might break badly otherwise!
 		this.store = Config.ensureStore(config);
+		
+		this.nio= NIOServer.create(this);
 	}
 
 	// This doesn't actually do anything useful? Do we need this?
@@ -334,7 +337,8 @@ public class Server implements Closeable {
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
 
-			nio.launch((String)config.get(Keywords.BIND_ADDRESS), port);
+			nio.setPort(port);
+			nio.launch();
 			port = nio.getPort(); // Get the actual port (may be auto-allocated)
 
 			// set running status now, so that loops don't immediately terminate
