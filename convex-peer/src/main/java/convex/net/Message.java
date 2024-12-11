@@ -11,6 +11,7 @@ import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Address;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
@@ -223,10 +224,7 @@ public class Message {
 	 */
 	public ACell getID()  {
 		try {
-			switch (getType()) {
-				// Query and transact use a vector [ID ...]
-				case TRANSACT: return ((AVector<?>)getPayload()).get(0);
-	
+			switch (getType()) {	
 				// Result is a special record type
 				case RESULT: return ((Result)getPayload()).getID();
 	
@@ -234,6 +232,7 @@ public class Message {
 				case STATUS: return (getPayload());
 				
 				// ID in position 1
+				case TRANSACT: 
 				case QUERY:
 				case REQUEST_DATA:
 				case DATA: {
@@ -258,10 +257,7 @@ public class Message {
 	@SuppressWarnings("unchecked")
 	public Message withID(ACell id) {
 		try {
-			switch (type) {
-				// Query and transact use a vector [ID ...]
-				case TRANSACT: 
-					return Message.create(type, ((AVector<ACell>)getPayload()).assoc(0, id));
+			switch (getType()) {
 	
 				// Result is a special record type
 				case RESULT: 
@@ -271,12 +267,15 @@ public class Message {
 				case STATUS: 
 					return Message.create(type, id);
 				
+				// Query and transact use a vector [ID ...]
+				case TRANSACT: 
 				case QUERY:
+				case REQUEST_DATA:
 				case DATA: {
 					ACell o=getPayload();
 					if (o instanceof AVector) {
 						AVector<ACell> v = (AVector<ACell>)o; 
-						if (v.count()==0) return null;
+						if (v.count()<2) return null;
 						// first element assumed to be ID
 						return Message.create(type, v.assoc(1, id));
 					}
@@ -417,6 +416,11 @@ public class Message {
 	public static Message createQuery(long id, ACell code, Address address) {
 		AVector<?> v=Vectors.create(MessageTag.QUERY,CVMLong.create(id),code,address);
 		return create(MessageType.QUERY,v);
+	}
+
+	public static Message createTransaction(long id, SignedData<ATransaction> signed) {
+		AVector<?> v=Vectors.create(MessageTag.TRANSACT,CVMLong.create(id),signed);
+		return create(MessageType.TRANSACT,v);
 	}
 
 

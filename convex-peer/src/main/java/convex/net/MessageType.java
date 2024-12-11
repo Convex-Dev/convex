@@ -59,7 +59,7 @@ public enum MessageType {
 	/**
 	 * A request to perform the specified query and return results.
 	 *
-	 * Payload is: [id form address?]
+	 * Payload is: [:Q id form address?]
 	 *
 	 * Receiver may may determine policies regarding whether to accept or reject
 	 * queries, typically receiver will want to authenticate the sender and ensure
@@ -71,7 +71,7 @@ public enum MessageType {
 	 * A message requesting a transaction be accepted by the receiving peer and
 	 * included in the next available block.
 	 *
-	 * Payload is: [id signed-data]
+	 * Payload is: [:TX id signed-data]
 	 */
 	TRANSACT(7),
 

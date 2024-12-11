@@ -19,7 +19,6 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
@@ -80,7 +79,7 @@ public class ConvexLocal extends Convex {
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		
 		maybeUpdateSequence(signed);
-		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(getNextID(),signed));
+		CompletableFuture<Result> r= makeMessageFuture(Message.createTransaction(getNextID(),signed));
 		return r;
 	}
 

@@ -7,7 +7,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-import java.io.IOException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -145,7 +144,7 @@ public class TransactionHandler extends AThreadedComponent {
 			// Transaction is a vector [id , signed-object]
 			AVector<ACell> v = m.getPayload();
 			@SuppressWarnings("unchecked")
-			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(1);
+			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
 			
 			// Check our transaction is valid and we want to process it
 			Result error=checkTransaction(sd);
@@ -153,9 +152,6 @@ public class TransactionHandler extends AThreadedComponent {
 				m.returnResult(error.withSource(SourceCodes.PEER));
 				return;
 			}
-
-			// Persist the signed transaction. Might throw MissingDataException?
-			sd=Cells.persist(sd);
 	
 			// Put on Server's transaction queue. We are OK to block here
 			LoadMonitor.down();
@@ -165,7 +161,7 @@ public class TransactionHandler extends AThreadedComponent {
 			this.clientTransactionCount++;
 			
 			registerInterest(sd.getHash(), m);		
-		} catch (BadFormatException | IOException e) {
+		} catch (BadFormatException e) {
 			log.warn("Unhandled exception in transaction handler",e);
 			m.closeConnection();
 		} catch (MissingDataException e) {

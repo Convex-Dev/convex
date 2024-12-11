@@ -387,7 +387,7 @@ public class Connection {
 	 */
 	public long sendTransaction(SignedData<ATransaction> signed) throws IOException {
 		long id = getNextID();
-		AVector<ACell> v = Vectors.of(id, signed);
+		AVector<ACell> v = Vectors.of(MessageTag.TRANSACT,id, signed);
 		boolean sent = sendObject(MessageType.TRANSACT, v);
 		return (sent) ? id : -1;
 	}
