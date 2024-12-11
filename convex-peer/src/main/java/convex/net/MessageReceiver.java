@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ReadableByteChannel;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,17 +45,18 @@ public class MessageReceiver {
 
 	private final Consumer<Message> action;
 	private Consumer<Message> hook=null;
-	private final Connection connection;
+	private final Predicate<Message> returnHandler;
 
 	private long receivedMessageCount = 0;
 
 	private static final Logger log = LoggerFactory.getLogger(MessageReceiver.class.getName());
 
-	public MessageReceiver(Consumer<Message> receiveAction, Connection pc) {
+	public MessageReceiver(Consumer<Message> receiveAction, Predicate<Message> returnHandler) {
 		this.action = receiveAction;
-		this.connection = pc;
+		this.returnHandler = returnHandler;
 	}
 	
+
 	/**
 	 * Get the number of messages received in total by this Receiver
 	 * @return Count of messages received
@@ -154,7 +156,7 @@ public class MessageReceiver {
 		MessageType type=MessageType.decode(mType);
 
 		Blob encoding=messageData.slice(1);
-		Message message = Message.create(connection, type, encoding);
+		Message message = Message.create(returnHandler, type, encoding);
 		
 		// call the receiver hook, if registered
 		maybeCallHook(message);

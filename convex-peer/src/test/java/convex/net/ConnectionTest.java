@@ -31,7 +31,7 @@ public class ConnectionTest {
 			synchronized (received) {
 				received.add(a);
 			}
-		}, conn);
+		}, null);
 		
 		Thread receiveThread=new Thread(()-> {
 			while (!Thread.currentThread().isInterrupted()) {

@@ -18,6 +18,8 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,7 +100,15 @@ public class Connection {
 	private Connection(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
 			AccountKey trustedPeerKey) {
 		this.channel = channel;
-		receiver = new MessageReceiver(receiveAction, this);
+		Predicate<Message> handler=t -> {
+			try {
+				return sendMessage(t);
+			} catch (IOException e) {
+				return false;
+			}
+		};
+		
+		receiver = new MessageReceiver(receiveAction, handler);
 		sender = new MessageSender(channel);
 		this.store = store;
 		this.lastActivity=Utils.getCurrentTimestamp();
