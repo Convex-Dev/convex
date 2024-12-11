@@ -5,6 +5,7 @@ import convex.core.data.Format;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
@@ -17,11 +18,17 @@ class NettyOutboundHandler extends ChannelOutboundHandlerAdapter {
         
         int mlen=Utils.checkedInt(data.count());
         int headLen=Format.getVLQCountLength(mlen);
-        int frameLen=headLen+mlen;
-        ByteBuf encoded = ctx.alloc().buffer(frameLen);
-        writeVLQCount(encoded,mlen);
-        encoded.writeBytes(data.getInternalArray(), data.getInternalOffset(), mlen);
-        ctx.writeAndFlush(encoded);
+
+        // Buffer for header
+        ByteBuf headBuf = ctx.alloc().buffer(headLen);
+        writeVLQCount(headBuf,mlen);
+        
+        // Buffer for message data
+       ByteBuf encodedBuf=Unpooled.wrappedBuffer(data.getInternalArray(), data.getInternalOffset(), mlen);
+       
+       // Write the buffers
+       ctx.write(headBuf);
+       ctx.writeAndFlush(encodedBuf);
     }
 	
 	public static void writeVLQCount(ByteBuf bb, long x) {

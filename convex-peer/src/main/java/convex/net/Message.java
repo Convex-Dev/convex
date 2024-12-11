@@ -23,7 +23,6 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -326,7 +325,7 @@ public class Message {
 		return create(MessageType.RESULT,res);
 	}
 
-	public static Message createResult(CVMLong id, ACell value, ACell error) {
+	public static Message createResult(ACell id, ACell value, ACell error) {
 		Result r=Result.create(id, value,error);
 		return createResult(r);
 	}

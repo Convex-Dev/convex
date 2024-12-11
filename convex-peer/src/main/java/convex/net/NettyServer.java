@@ -38,7 +38,7 @@ public class NettyServer {
 	
 	private Integer port;
 	private Consumer<Message> receiveAction=m->{
-		m.returnMessage(Message.createResult(null, Strings.create("Received"), null));
+		m.returnMessage(Message.createResult(m.getID(), Strings.create("Received"), null));
 		System.err.println(m);
 	};
 
