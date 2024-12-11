@@ -12,7 +12,6 @@ import convex.core.SourceCodes;
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
@@ -91,11 +90,11 @@ public class QueryHandler extends AThreadedComponent {
 		try {
 			// query is a vector [id , form, address?]
 			AVector<ACell> v= m.getPayload();
-			CVMLong id = (CVMLong) v.get(0);
-			ACell form = v.get(1);
+			ACell id = v.get(1);
+			ACell form = v.get(2);
 	
 			// extract the Address, might be null
-			Address address = RT.ensureAddress(v.get(2));
+			Address address = RT.ensureAddress(v.get(3));
 	
 			log.debug( "Processing query: {} with address: {}" , form, address);
 			// log.log(LEVEL_MESSAGE, "Processing query: " + form + " with address: " +

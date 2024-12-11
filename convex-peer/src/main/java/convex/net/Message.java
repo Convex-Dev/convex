@@ -23,6 +23,7 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Tag;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
@@ -224,7 +225,6 @@ public class Message {
 		try {
 			switch (getType()) {
 				// Query and transact use a vector [ID ...]
-				case QUERY:
 				case TRANSACT: return ((AVector<?>)getPayload()).get(0);
 	
 				// Result is a special record type
@@ -233,6 +233,8 @@ public class Message {
 				// Status ID is the single value
 				case STATUS: return (getPayload());
 				
+				// ID in position 1
+				case QUERY:
 				case REQUEST_DATA:
 				case DATA: {
 					AVector<?> v=RT.ensureVector(getPayload());
@@ -258,7 +260,6 @@ public class Message {
 		try {
 			switch (type) {
 				// Query and transact use a vector [ID ...]
-				case QUERY:
 				case TRANSACT: 
 					return Message.create(type, ((AVector<ACell>)getPayload()).assoc(0, id));
 	
@@ -270,13 +271,14 @@ public class Message {
 				case STATUS: 
 					return Message.create(type, id);
 				
+				case QUERY:
 				case DATA: {
 					ACell o=getPayload();
 					if (o instanceof AVector) {
 						AVector<ACell> v = (AVector<ACell>)o; 
 						if (v.count()==0) return null;
 						// first element assumed to be ID
-						return Message.create(type, v.assoc(0, id));
+						return Message.create(type, v.assoc(1, id));
 					}
 				}
 	
@@ -413,7 +415,8 @@ public class Message {
 	}
 	
 	public static Message createQuery(long id, ACell code, Address address) {
-		return create(MessageType.QUERY,Vectors.of(id,code,address));
+		AVector<?> v=Vectors.create(MessageTag.QUERY,CVMLong.create(id),code,address);
+		return create(MessageType.QUERY,v);
 	}
 
 

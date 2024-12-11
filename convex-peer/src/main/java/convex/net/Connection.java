@@ -315,7 +315,7 @@ public class Connection {
 	public long sendQuery(ACell form, Address address) throws IOException {
 		AStore temp = Stores.current();
 		long id = ++idCounter;
-		AVector<ACell> v = Vectors.of(id, form, address);
+		AVector<ACell> v = Vectors.of(MessageTag.QUERY,id, form, address);
 		boolean sent = sendObject(MessageType.QUERY, v);
 		return sent ? id : -1;
 	}

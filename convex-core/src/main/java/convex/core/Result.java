@@ -320,7 +320,7 @@ public final class Result extends ARecordGeneric {
 	 * @return New Result instance
 	 */
 
-	public static Result fromContext(CVMLong id,ResultContext rc) {
+	public static Result fromContext(ACell id,ResultContext rc) {
 		Context ctx=rc.context;
 		Object result=ctx.getValue();
 		ACell errorCode=null;
