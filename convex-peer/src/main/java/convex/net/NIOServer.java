@@ -14,6 +14,7 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +53,8 @@ public class NIOServer implements Closeable {
 	private boolean running = false;
 
 	private final Server server;
+	
+	
 
 	private NIOServer(Server server) {
 		this.server = server;
@@ -261,7 +264,11 @@ public class NIOServer implements Closeable {
 	}
 
 	private Connection createClientConnection(SocketChannel sc) throws IOException {
-		return Connection.create(sc, server.getReceiveAction(), server.getStore(), null);
+		return Connection.create(sc, getReceiveAction(), server.getStore(), null);
+	}
+
+	protected Consumer<Message> getReceiveAction() {
+		return server.getReceiveAction();
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {
