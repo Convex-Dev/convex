@@ -8,6 +8,7 @@ import java.util.concurrent.TimeoutException;
 import convex.api.Convex;
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.net.IPUtils;
 import picocli.CommandLine.Option;
 
 public class RemotePeerMixin extends AMixin {
@@ -30,7 +31,7 @@ public class RemotePeerMixin extends AMixin {
 	public Convex connect()  {
 		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
 		if (hostname==null) hostname=convex.cli.Constants.HOSTNAME_PEER;
-		InetSocketAddress sa=new InetSocketAddress(hostname,port);
+		InetSocketAddress sa=IPUtils.parseAddress(hostname,port);
 		try {
 			Convex c;
 			c=Convex.connect(sa);
