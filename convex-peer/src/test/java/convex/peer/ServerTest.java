@@ -80,7 +80,6 @@ public class ServerTest {
 
 		r=convex.transactSync("(do (transfer "+user+" 100000) *balance*)");
 		assertEquals("10000000",r.getValue().toString());
-
 	}
 
 	@Test

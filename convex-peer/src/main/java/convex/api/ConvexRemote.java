@@ -20,6 +20,7 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.TODOException;
@@ -36,7 +37,7 @@ public class ConvexRemote extends Convex {
 	 */
 	protected Connection connection;
 	
-	private static final Logger log = LoggerFactory.getLogger(ConvexRemote.class.getName());
+	protected static final Logger log = LoggerFactory.getLogger(ConvexRemote.class.getName());
 	
 
 	protected InetSocketAddress remoteAddress;
@@ -107,97 +108,50 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
-		long id = -1;
-		long wait=10;
-		
-		// loop until request is queued. We need this for backpressure
-		while (true) {
-			if (connection.isClosed()) return closedResult;
-			
-			try {
-				synchronized (awaiting) {
-					id = connection.sendTransaction(signed);
-					if (id>=0) {
-						// Store future for completion by result message
-						maybeUpdateSequence(signed);
-						CompletableFuture<Result> cf = awaitResult(CVMLong.create(id),timeout);
-						log.trace("Sent transaction with message ID: {} awaiting count = {}", id, awaiting.size());
-						return cf;
-					} 
-				}
-				
-				Thread.sleep(wait);
-				wait+=1+wait/3; // slow exponential backoff
-			} catch (InterruptedException e) {
-				// we honour the interruption, but return a failed result
-				Result r=Result.fromException(e);
-				return CompletableFuture.completedFuture(r);
-			} catch (IOException e) {
-				Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
-				return CompletableFuture.completedFuture(r);
-			}
-		}
+		Message m=Message.createTransaction(getNextID(), signed);
+		return message(m);
 	}
-
-	private static CompletableFuture<Result> closedResult=CompletableFuture.completedFuture(Result.error(ErrorCodes.CLOSED, "Transaction interrupted before sending").withSource(SourceCodes.COMM));
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address)  {
-		long wait=10;
-		
-		// loop until request is queued. We need this for backpressure
-		while (true) {
-			if (connection.isClosed()) return closedResult;
-			
-			// If we can't send yet, block briefly and try again
-			try {
-				synchronized (awaiting) {
-					long id = connection.sendQuery(query, address);
-					if(id>=0) {
-						CompletableFuture<Result> cf= awaitResult(CVMLong.create(id),timeout);
-						return cf;
-					}
+		Message m=Message.createQuery(getNextID(), query,address);
+		return message(m);
+	}
+	
+	@Override
+	public CompletableFuture<Result> messageRaw(Blob message) {
+		throw new TODOException();
+	}
+	
+	@Override
+	public CompletableFuture<Result> message(Message m) {
+		ACell id=m.getID();
+		try {
+			synchronized (awaiting) {
+				if (connection==null) return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
+				boolean sent = connection.sendMessage(m);
+				if (!sent) {
+					return CompletableFuture.completedFuture(Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM));
 				}
-
-				Thread.sleep(wait);
-				wait+=1+wait/3; // slow exponential backoff
-			} catch (InterruptedException e) {
-				// This handles interrupts correctly, returning a failed result
-				Result r= Result.fromException(e);
-				return CompletableFuture.completedFuture(r);
-			} catch (IOException e) {
-				Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
-				return CompletableFuture.completedFuture(r);
+	
+				if (id!=null) {
+					CompletableFuture<Result> cf = awaitResult(id,timeout).thenApply(msg->msg.toResult());
+					return cf;
+				} else {
+					Result r=Result.create(id, Strings.SENT);
+					return CompletableFuture.completedFuture(r);
+				}
 			}
+		} catch (Exception e) {
+			Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
+			return CompletableFuture.completedFuture(r);
 		}
-	}
-	
-	@Override
-	public CompletableFuture<Result> message(Blob message) {
-		throw new TODOException();
-	}
-	
-	@Override
-	public CompletableFuture<Result> message(Message message) {
-		throw new TODOException();
 	}
 	
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		try {
-			synchronized (awaiting) {
-				long id = connection.sendStatusRequest();
-				if (id < 0) {
-					return CompletableFuture.completedFuture(Result.error(ErrorCodes.LOAD, "Full buffer, can't send status request").withSource(SourceCodes.COMM));
-				}
-	
-				CompletableFuture<Result> cf = awaitResult(CVMLong.create(id),timeout);
-				return cf;
-			}
-		} catch (IOException e) {
-			Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);
-			return CompletableFuture.completedFuture(r);
-		}
+		Message m=Message.createStatusRequest(getNextID());
+		return message(m);
 	}
 	
 	@Override
@@ -215,7 +169,7 @@ public class ConvexRemote extends Convex {
 			}
 
 			// Store future for completion by result message
-			return awaitResult(CVMLong.create(id),timeout);
+			return awaitResult(CVMLong.create(id),timeout).thenApply(msg->msg.toResult());
 		}
 	}
 	

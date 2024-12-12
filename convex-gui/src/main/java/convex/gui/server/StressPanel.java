@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 
@@ -214,6 +215,9 @@ public class StressPanel extends JPanel {
 					running=repeatCheckBox.isSelected();
 					if (running) Thread.sleep(((Integer)(repeatTimeSpinner.getValue()))*1000);
 				};
+			} catch (ExecutionException e) {
+				log.info("Stress test worker terminated",e);
+				resultArea.setText("Test Error: "+e);
 			} catch (Exception e) {
 				log.warn("Stress test worker terminated unexpectedly",e);
 				resultArea.setText("Test Error: "+e);

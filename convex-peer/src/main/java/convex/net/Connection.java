@@ -290,48 +290,7 @@ public class Connection {
 	 */
 	public boolean sendData(Blob data) throws IOException {
 		log.trace("Sending data: {}", data);
-		return sendBuffer(MessageType.DATA, data);
-	}
-
-	/**
-	 * Sends a QUERY Message on this connection with a null Address
-	 *
-	 * @param form A data object representing the query form
-	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException If IO error occurs
-	 */
-	public long sendQuery(ACell form) throws IOException {
-		return sendQuery(form, null);
-	}
-
-	/**
-	 * Sends a QUERY Message on this connection.
-	 *
-	 * @param form    A data object representing the query source form
-	 * @param address The address with which to run the query, which may be null
-	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException If IO error occurs
-	 */
-	public long sendQuery(ACell form, Address address) throws IOException {
-		AStore temp = Stores.current();
-		long id = ++idCounter;
-		AVector<ACell> v = Vectors.of(MessageTag.QUERY,id, form, address);
-		boolean sent = sendObject(MessageType.QUERY, v);
-		return sent ? id : -1;
-	}
-
-	/**
-	 * Sends a STATUS Request Message on this connection.
-	 *
-	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException If IO error occurs
-	 */
-	public long sendStatusRequest() throws IOException {
-		AStore temp = Stores.current();
-		long id = ++idCounter;
-		CVMLong idPayload = CVMLong.create(id);
-		boolean sent=sendObject(MessageType.STATUS, idPayload);
-		return sent? id:-1;
+		return sendBuffer(data);
 	}
 
 	/**
@@ -348,7 +307,7 @@ public class Connection {
 		AStore temp = Stores.current();
 		try {
 			long id = ++idCounter;
-			boolean sent = sendObject(MessageType.CHALLENGE, challenge);
+			boolean sent = sendObject(challenge);
 			return (sent) ? id : -1;
 		} finally {
 			Stores.setCurrent(temp);
@@ -368,28 +327,11 @@ public class Connection {
 		AStore temp = Stores.current();
 		try {
 			long id = ++idCounter;
-			boolean sent = sendObject(MessageType.RESPONSE, response);
+			boolean sent = sendObject(response);
 			return (sent) ? id : -1;
 		} finally {
 			Stores.setCurrent(temp);
 		}
-	}
-
-	/**
-	 * Sends a transaction if possible, returning the message ID (greater than zero)
-	 * if successful.
-	 *
-	 * Returns -1 if the message could not be sent because of a full buffer.
-	 *
-	 * @param signed Signed transaction
-	 * @return Message ID of the transaction request, or -1 if send buffer is full.
-	 * @throws IOException In the event of an IO error, e.g. closed connection
-	 */
-	public long sendTransaction(SignedData<ATransaction> signed) throws IOException {
-		long id = getNextID();
-		AVector<ACell> v = Vectors.of(MessageTag.TRANSACT,id, signed);
-		boolean sent = sendObject(MessageType.TRANSACT, v);
-		return (sent) ? id : -1;
 	}
 
 	/**
@@ -400,7 +342,7 @@ public class Connection {
 	 * @throws IOException If IO error occurs while sending
 	 */
 	public boolean sendMessage(Message msg) throws IOException  {
-		return sendBuffer(msg.getType(),msg.getMessageData());
+		return sendBuffer(msg.getMessageData());
 	}
 
 	/**
@@ -411,15 +353,15 @@ public class Connection {
 	 * @return true if message queued successfully, false otherwise
 	 * @throws IOException If IO error occurs
 	 */
-	private boolean sendObject(MessageType type, ACell payload) throws IOException {
+	private boolean sendObject(ACell payload) throws IOException {
 		Counters.sendCount++;
 
 		Blob enc = Format.encodeMultiCell(payload,true);
 		if (log.isTraceEnabled()) {
-			log.trace("Sending message: " + type + " :: " + payload + " to " + getRemoteAddress() + " format: "
+			log.trace("Sending message: " + payload + " to " + getRemoteAddress() + " format: "
 					+ Cells.encode(payload).toHexString());
 		}
-		boolean sent = sendBuffer(type, enc);
+		boolean sent = sendBuffer(enc);
 		return sent;
 	}
 
@@ -431,14 +373,14 @@ public class Connection {
 	 * @return true if message sent, false otherwise
 	 * @throws IOException
 	 */
-	private boolean sendBuffer(MessageType type, Blob data) throws IOException {
+	private boolean sendBuffer(Blob data) throws IOException {
 		// synchronise on sender
 		synchronized (sender) {
 			if (!sender.canSendMessage()) return false;
 			int dataLength = Utils.checkedInt(data.count());
 			
-			// Total message length field is one byte for message code + encoded object length
-			int messageLength = dataLength + 1;
+			// Total message length field is encoded object length
+			int messageLength = dataLength;
 			boolean sent;
 			int headerLength;
 			// ensure frameBuf is clear and ready for writing
@@ -446,7 +388,6 @@ public class Connection {
 
 			// write message header (length plus message code)
 			Format.writeMessageLength(frameBuf, messageLength);
-			frameBuf.put(type.getMessageCode());
 			headerLength = frameBuf.position();
 
 			// now write message
@@ -473,12 +414,12 @@ public class Connection {
 				}
 
 				if (log.isTraceEnabled()) {
-					log.trace("Sent message " + type + " of length: " + dataLength + " Connection ID: "
+					log.trace("Sent message of length: " + dataLength + " Connection ID: "
 							+ System.identityHashCode(this));
 				}
 			} else {
-				log.warn("sendBuffer failed with message {} of length: {} Connection ID: {}"
-							, type, dataLength, System.identityHashCode(this));
+				log.warn("sendBuffer failed with message of length: {} Connection ID: {}"
+							, dataLength, System.identityHashCode(this));
 			}
 			return sent;
 		}

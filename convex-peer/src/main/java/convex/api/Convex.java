@@ -122,7 +122,11 @@ public abstract class Convex implements AutoCloseable {
 				CompletableFuture<Message> cf = (id==null)?null:awaiting.remove(id);
 				if (cf != null) {
 					// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-					if (cf.complete(m)) return;
+					boolean didComplete = cf.complete(m);
+					if (!didComplete) {
+						log.warn("Messafe return future already completed with value: "+cf.join());
+					}
+					return;
 				} 
 			}
 			
@@ -734,7 +738,7 @@ public abstract class Convex implements AutoCloseable {
 	 * @param message Raw message data
 	 * @return A Future for the result of the query
 	 */
-	public abstract CompletableFuture<Result> message(Blob message);
+	public abstract CompletableFuture<Result> messageRaw(Blob message);
 	
 	/**
 	 * Submits a Message to the Convex network, returning a Future for any Result
@@ -807,13 +811,13 @@ public abstract class Convex implements AutoCloseable {
 	public abstract CompletableFuture<Result> requestStatus();
 
 	/**
-	 * Method to start waiting for a complete result. Must be called with lock on
+	 * Method to start waiting for a return Message. Must be called with lock on
 	 * `awaiting` map to prevent risk of missing results before it is called.
 	 * 
 	 * @param id ID of result message to await
 	 * @return
 	 */
-	protected CompletableFuture<Result> awaitResult(ACell id, long timeout) {
+	protected CompletableFuture<Message> awaitResult(ACell id, long timeout) {
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
@@ -834,7 +838,7 @@ public abstract class Convex implements AutoCloseable {
 			return r;
 		});
 		awaiting.put(id, cf);
-		return cr;
+		return cf;
 	}
 
 	/**

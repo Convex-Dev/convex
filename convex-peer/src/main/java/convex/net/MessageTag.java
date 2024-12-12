@@ -7,10 +7,11 @@ import convex.core.data.Keyword;
  */
 public class MessageTag {
 
-	public static Keyword QUERY=Keyword.intern("Q");
-	public static Keyword TRANSACT=Keyword.intern("TX");
+	public static final Keyword STATUS_REQUEST = Keyword.intern("SR");
+	public static final Keyword QUERY=Keyword.intern("Q");
+	public static final Keyword TRANSACT=Keyword.intern("TX");
 	
-	public static Keyword DATA_QUERY=Keyword.intern("DQ");
-	public static Keyword DATA_RESPONSE=Keyword.intern("DR");
+	public static final Keyword DATA_QUERY=Keyword.intern("DQ");
+	public static final Keyword DATA_RESPONSE=Keyword.intern("DR");
 
 }

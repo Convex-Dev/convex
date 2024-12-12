@@ -152,11 +152,7 @@ public class MessageReceiver {
 	private void receiveMessage(Blob messageData) throws BadFormatException, HandlerException {
 		if (messageData.count()<1) throw new BadFormatException("Empty message");
 		
-		byte mType=messageData.byteAtUnchecked(0);
-		MessageType type=MessageType.decode(mType);
-
-		Blob encoding=messageData.slice(1);
-		Message message = Message.create(returnHandler, type, encoding);
+		Message message = Message.create(returnHandler, null, messageData);
 		
 		// call the receiver hook, if registered
 		maybeCallHook(message);

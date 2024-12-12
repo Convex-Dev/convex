@@ -114,8 +114,16 @@ public class ConnectionManager extends AThreadedComponent {
 			try (Convex convex = Convex.connect(c.getRemoteAddress())) {
 				// use requestStatusSync to auto acquire hash of the status instead of the value
 				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
+				if (result.isError()) {
+					log.warn("Failure requesting status from convex: "+result);
+					return;		
+				}
+				
 				AVector<ACell> status = result.getValue();
-
+				if (status==null) {
+					log.warn("Dubious status response message: "+result);
+					return;
+				}
 				Hash h=RT.ensureHash(status.get(0));
 
 				Belief sb=(Belief) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
@@ -592,7 +600,7 @@ public class ConnectionManager extends AThreadedComponent {
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
 			if (result.isError()) {
-				log.info("Bad status message from remote Peer");
+				log.info("Bad status message from remote Peer: "+result);
 				return null;
 			}
 			
@@ -674,7 +682,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
 		if (log.isDebugEnabled()) {
-			String message= "Missing data "+e.getMissingHash();
+			String message= "Missing data alert "+e.getMissingHash();
 			log.debug(message);
 		}
 		

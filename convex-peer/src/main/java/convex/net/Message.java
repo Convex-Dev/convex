@@ -1,5 +1,6 @@
 package convex.net;
 
+import java.io.IOException;
 import java.util.function.Predicate;
 
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AString;
@@ -144,12 +146,6 @@ public class Message {
 		// default to single cell encoding
 		// TODO: alternative depths for different types
 		switch (getType()) {
-		case MessageType.RESULT:
-		case MessageType.QUERY:
-		case MessageType.TRANSACT:
-		case MessageType.REQUEST_DATA:
-		   messageData=Format.encodeMultiCell(payload,true);
-		   break;
 		   
 		case MessageType.DATA:
 			@SuppressWarnings("unchecked") 
@@ -174,13 +170,25 @@ public class Message {
 	}
 
 	private MessageType inferType() {
+		if (hasData()) {
+			// These can be inferred directly from top encoding tag
+			byte tag=messageData.byteAt(0);
+			if (tag==CVMTag.BELIEF) return MessageType.BELIEF;
+			if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order>
+			if (tag==CVMTag.RESULT) return MessageType.RESULT;
+		}
+		
 		try {
 			ACell payload=getPayload();
 			if (payload instanceof Result) return MessageType.RESULT;
+
+			if (payload instanceof Belief) return MessageType.BELIEF;
+			if (payload instanceof SignedData) return MessageType.BELIEF;
 			
 			if (payload instanceof AVector) {
 				Keyword mt=RT.ensureKeyword(((AVector<?>)payload).get(0));
 				if (mt==null) return MessageType.UNKNOWN;
+				if (MessageTag.STATUS_REQUEST.equals(mt)) return MessageType.STATUS;
 				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
 				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
 				if (MessageTag.DATA_QUERY.equals(mt)) return MessageType.REQUEST_DATA;
@@ -188,6 +196,11 @@ public class Message {
 			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
+			try {
+				log.info("Can't infer message type with object "+Utils.getClassName(getPayload()),e);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
 		}
 		
 		return MessageType.UNKNOWN;
@@ -201,7 +214,7 @@ public class Message {
 			if (ps==null) return ("<BIG MESSAGE "+RT.count(getMessageData())+" TYPE ["+getType()+"]>");
 			return ps.toString();
 		} catch (MissingDataException e) {
-			return "<PARTIAL MESSAGE [" + getType() + "] MISSING "+e.getMissingHash()+">";
+			return "<PARTIAL MESSAGE [" + getType() + "] MISSING "+e.getMissingHash()+" ENC "+getMessageData().toHexString(16)+">";
 		} catch (BadFormatException e) {
 			return "<CORRUPTED MESSAGE ["+getType()+"]>: "+e.getMessage();
 		}
@@ -227,11 +240,9 @@ public class Message {
 			switch (getType()) {	
 				// Result is a special record type
 				case RESULT: return ((Result)getPayload()).getID();
-	
-				// Status ID is the single value
-				case STATUS: return (getPayload());
-				
+					
 				// ID in position 1
+				case STATUS:
 				case TRANSACT: 
 				case QUERY:
 				case REQUEST_DATA:
@@ -262,12 +273,9 @@ public class Message {
 				// Result is a special record type
 				case RESULT: 
 					return Message.create(type, ((Result)getPayload()).withID(id));
-	
-				// Status ID is the single value
+					
+				// Using a vector [key ID ...]
 				case STATUS: 
-					return Message.create(type, id);
-				
-				// Query and transact use a vector [ID ...]
 				case TRANSACT: 
 				case QUERY:
 				case REQUEST_DATA:
@@ -319,6 +327,10 @@ public class Message {
 		return handler.test(m);
 	}
 
+	/**
+	 * Return true if there is encoded message data
+	 * @return
+	 */
 	public boolean hasData() {
 		return messageData!=null;
 	}
@@ -380,6 +392,11 @@ public class Message {
 			case MessageType.RESULT: 
 				Result result=getPayload();
 				return result;
+				
+			case MessageType.DATA: 
+				// Wrap data responses in a successful Result
+				return Result.create(getID(), getPayload(), null);
+				
 			default:
 				return Result.create(getID(), Strings.create("Unexpected message type for Result: "+type), ErrorCodes.UNEXPECTED);
 			}
@@ -421,6 +438,30 @@ public class Message {
 	public static Message createTransaction(long id, SignedData<ATransaction> signed) {
 		AVector<?> v=Vectors.create(MessageTag.TRANSACT,CVMLong.create(id),signed);
 		return create(MessageType.TRANSACT,v);
+	}
+	
+	/**
+	 * Sends a STATUS Request Message on this connection.
+	 *
+	 * @return The ID of the message sent, or -1 if send buffer is full.
+	 * @throws IOException If IO error occurs
+	 */
+	public static Message createStatusRequest(long id) {
+		CVMLong idPayload = CVMLong.create(id);
+		AVector<?> v=Vectors.create(MessageTag.STATUS_REQUEST,idPayload);
+		return create(MessageType.STATUS,v);
+	}
+
+	/**
+	 * Return the Hash of the Message payload
+	 * @return Hash, or null if message format is invalid
+	 */
+	public Hash getHash() {
+		try {
+			return getPayload().getHash();
+		} catch (BadFormatException e) {
+			return null;
+		}
 	}
 
 

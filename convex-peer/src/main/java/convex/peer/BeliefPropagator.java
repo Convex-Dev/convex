@@ -110,11 +110,14 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	/**
-	 * Queues a Belief Message for broadcast
+	 * Queues a Belief Message for processing
 	 * @param beliefMessage Belief Message to queue
 	 * @return True if Belief is queued successfully
 	 */
 	public synchronized boolean queueBelief(Message beliefMessage) {
+		if (log.isTraceEnabled()) {
+			log.trace("Belief queued "+server.getPort()+" : "+beliefMessage.getHash());
+		}
 		return beliefQueue.offer(beliefMessage);
 	}
 	
@@ -364,6 +367,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 				}
 			} catch (MissingDataException e) {
+				log.info("Missing data in Belief message "+m.getHash());
 				server.getConnectionManager().alertMissing(m,e,null);
 			}
 		} catch (ClassCastException | BadFormatException e) {

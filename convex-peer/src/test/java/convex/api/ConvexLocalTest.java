@@ -75,7 +75,7 @@ public class ConvexLocalTest {
 			Message m=Message.createQuery(675678567,"*balance*",ADDRESS);
 			// ABlob data=Blob.wrap(new byte[] {MessageType.QUERY.getMessageCode()}).append(m.getMessageData());
 			ABlob data=m.getMessageData();
-			Result r = convex.message(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
+			Result r = convex.messageRaw(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
 			assertNotNull(r);
 		}
 	}

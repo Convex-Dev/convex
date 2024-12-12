@@ -35,7 +35,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				break;
 			}
 			default: {
-				log.error("Message type ignored: ", type);
+				log.error("Message type ignored type: {} value: {}", type, m);
 			}
 		}
 	}

@@ -426,7 +426,8 @@ public final class Result extends ARecordGeneric {
 	// Note interrupts are always caused by CLIENT from a local perspective
 	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!")).withSource(SourceCodes.CLIENT);
 	private static final Result MISSING_RESULT=Result.error(ErrorCodes.MISSING,Strings.create("Missing Data!")).withSource(SourceCodes.CLIENT);
-	
+	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
+
 	/**
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
 	 * @return Result instance representing an interruption

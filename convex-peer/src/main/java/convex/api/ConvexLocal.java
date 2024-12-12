@@ -19,7 +19,6 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
 import convex.core.util.ThreadUtils;
@@ -72,7 +71,7 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		return makeMessageFuture(MessageType.STATUS,CVMLong.create(getNextID()));
+		return makeMessageFuture(Message.createStatusRequest(getNextID()));
 	}
 	
 	@Override
@@ -176,7 +175,7 @@ public class ConvexLocal extends Convex {
 	}
 
 	@Override
-	public CompletableFuture<Result> message(Blob rawData) {
+	public CompletableFuture<Result> messageRaw(Blob rawData) {
 		try {
 			Message m=Message.create(rawData);
 			return message(m);
