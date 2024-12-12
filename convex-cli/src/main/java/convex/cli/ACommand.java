@@ -120,6 +120,8 @@ public abstract class ACommand implements Runnable {
 	}
 	
 	public char[] readPassword(String prompt) {
+		if (!isInteractive()) throw new CLIError("Can't prompt for password in non-interactive mode: "+prompt);
+		
 		// For some reason using this stops CTRL-C from being subsequently handled :-(
 		Console c = System.console();
 		if (c == null) {

@@ -129,4 +129,20 @@ public class IPUtils {
 		
 		System.out.println(tryGetIP());
 	}
+
+	/**
+	 * Parses a socket address
+	 * @param hostname Hostname or "host:port" string
+	 * @param port Port to use (null implies default peer port)
+	 * @return Socket address or null if failed to parse
+	 */
+	public static InetSocketAddress parseAddress(String hostname, Integer port) {
+		InetSocketAddress sa=toInetSocketAddress(hostname);
+		if (sa!=null) {
+			if ((port==null)||(sa.getPort()==port)) return sa;
+			hostname=sa.getHostName(); 
+		}
+		if (port==null) port=Constants.DEFAULT_PEER_PORT;
+		return new InetSocketAddress(hostname,port);
+	}
 }

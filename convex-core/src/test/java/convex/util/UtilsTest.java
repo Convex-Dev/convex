@@ -319,6 +319,7 @@ public class UtilsTest {
 		);
 	}
 	
+	
 	@Test
 	public void testBinarySearch() {
 		AVector<CVMLong> v = Vectors.of(1,2,2,4);
