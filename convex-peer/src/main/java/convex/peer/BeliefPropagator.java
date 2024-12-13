@@ -357,6 +357,7 @@ public class BeliefPropagator extends AThreadedComponent {
 						orders.put(key, so);
 						changed=true;
 					} catch (MissingDataException e) {
+						// Something missing in received Belief
 						server.getConnectionManager().alertMissing(m,e,key);
 					} catch (IOException e) {
 						// This is pretty bad, probably we lost the store?
