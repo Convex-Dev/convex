@@ -32,6 +32,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
+import convex.core.text.PrintUtils;
 import convex.core.util.Utils;
 
 /**
@@ -150,6 +151,10 @@ public class Message {
 		case MessageType.DATA:
 			@SuppressWarnings("unchecked") 
 			AVector<ACell> v=(AVector<ACell>) payload;
+			//if (v.count()>16) {
+			//	// System.out.println("Big data vector: " +v.count());
+			//}
+			
 			messageData=Format.encodeDataVector(v);		 
 			break;
 			
@@ -197,7 +202,9 @@ public class Message {
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
 			try {
-				log.info("Can't infer message type with object "+Utils.getClassName(getPayload()),e);
+				ACell payload=getPayload();
+				System.out.println(PrintUtils.printRefTree(payload.getRef()));
+				log.info("Can't infer message type with object "+Utils.getClassName(payload),e);
 			} catch (Exception ex) {
 				ex.printStackTrace();
 			}
@@ -255,7 +262,33 @@ public class Message {
 				default: return null;
 			}
 		} catch (Exception e) {
-			// defensive coding
+			log.warn("Unexpected error getting ID",e);
+			return null;
+		}
+	}
+	
+	/**
+	 * Gets the request ID for this message, assuming it is a request expecting a response
+	 * @return
+	 */
+	public ACell getRequestID() {
+		try {
+			switch (getType()) {	
+			
+				// ID in position 1
+				case STATUS:
+				case TRANSACT: 
+				case QUERY:
+				case REQUEST_DATA:{
+					AVector<?> v=RT.ensureVector(getPayload());
+					if (v.count()<2) return null;
+					return RT.ensureLong(v.get(1));
+				}
+	
+				default: return null;
+			}
+		} catch (Exception e) {
+			log.warn("Unexpected error getting request ID",e);
 			return null;
 		}
 	}
@@ -463,6 +496,7 @@ public class Message {
 			return null;
 		}
 	}
+
 
 
 }

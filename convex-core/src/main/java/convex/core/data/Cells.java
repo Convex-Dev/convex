@@ -9,6 +9,7 @@ import convex.core.Result;
 import convex.core.data.impl.DummyCell;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ParseException;
+import convex.core.exceptions.TODOException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -345,7 +346,9 @@ public class Cells {
 	 * @param cell
 	 */
 	public static void markValidated(ACell cell) {
+		
 		cell.getRef().mergeFlags(Ref.VALIDATED);
+		throw new TODOException("Probably not safe?");
 	}
 
 	/**

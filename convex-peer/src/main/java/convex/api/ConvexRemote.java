@@ -53,14 +53,14 @@ public class ConvexRemote extends Convex {
 	
 	protected void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
 		remoteAddress=peerAddress;
-		setConnection(Connection.connect(peerAddress, messageHandler, store));
+		setConnection(Connection.connect(peerAddress, returnMessageHandler, store));
 	}
 	
 	public void reconnect() throws IOException, TimeoutException {
 		Connection curr=connection;
 		AStore store=(curr==null)?Stores.current():curr.getStore();
 		close();
-		setConnection(Connection.connect(remoteAddress, messageHandler, store));
+		setConnection(Connection.connect(remoteAddress, returnMessageHandler, store));
 	}
 
 	/**
@@ -125,7 +125,7 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> message(Message m) {
-		ACell id=m.getID();
+		ACell id=m.getRequestID();
 		try {
 			synchronized (awaiting) {
 				if (connection==null) return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);

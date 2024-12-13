@@ -732,9 +732,9 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 	@Override
 	protected void visitAllChildren(Consumer<AVector<T>> visitor) {
 		if (hasPrefix()) {
-			prefix.getValue().visitAllChildren(visitor);
+			AVector<T> child=prefix.getValue();
+			child.visitAllChildren(visitor);
+			visitor.accept(child);
 		}
 	}
-
-
 }

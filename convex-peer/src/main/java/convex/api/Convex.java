@@ -99,47 +99,30 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
 
+	private Consumer<Message> delegatedHandler=null;
+
 	/**
 	 * Result Consumer for messages received back from a client connection
 	 */
-	protected final Consumer<Message> messageHandler = new ResultConsumer() {
-		@Override
-		protected synchronized void handleResult(ACell id, Result v) {
-			ACell ec=v.getErrorCode();
-			
-			if ((ec!=null)&&(!SourceCodes.CODE.equals(v.getSource()))) {
-				// if our result didn't result in user code execution
-				// then we probably have a wrong sequence number now. Kill the stored value.
-				sequence = null;
-			}
+	protected final Consumer<Message> returnMessageHandler = m-> {
+		// Check if we are waiting for a Result with this ID for this connection
+		synchronized (awaiting) {
+			ACell id=m.getID();
+			CompletableFuture<Message> cf = (id==null)?null:awaiting.remove(id);
+			if (cf != null) {
+				// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
+				boolean didComplete = cf.complete(m);
+				if (!didComplete) {
+					log.warn("Messafe return future already completed with value: "+cf.join());
+				}
+				return;
+			} 
 		}
-
-		@Override
-		public void accept(Message m) {
-			// Check if we are waiting for a Result with this ID for this connection
-			synchronized (awaiting) {
-				ACell id=m.getID();
-				CompletableFuture<Message> cf = (id==null)?null:awaiting.remove(id);
-				if (cf != null) {
-					// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-					boolean didComplete = cf.complete(m);
-					if (!didComplete) {
-						log.warn("Messafe return future already completed with value: "+cf.join());
-					}
-					return;
-				} 
-			}
-			
-			if (delegatedHandler!=null) {
-				delegatedHandler.accept(m);
-			} else {
-				// default handling
-				super.accept(m);
-			}
-		}
+		
+		if (delegatedHandler!=null) {
+			delegatedHandler.accept(m);
+		} 
 	};
-	
-	private Consumer<Message> delegatedHandler=null;
 
 
 	protected Convex(Address address, AKeyPair keyPair) {
@@ -744,7 +727,7 @@ public abstract class Convex implements AutoCloseable {
 	 * Submits a Message to the Convex network, returning a Future for any Result
 	 *
 	 * @param message Message data
-	 * @return A Future for the result of the query
+	 * @return A Future for the result of the query. May just be "Sent" if no other result expected.
 	 */
 	public abstract CompletableFuture<Result> message(Message message);
 
