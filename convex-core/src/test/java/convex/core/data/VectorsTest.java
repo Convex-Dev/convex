@@ -392,9 +392,10 @@ public class VectorsTest {
 	
 	@Test public void testVisitors() {
 		VisitCounter<AVector<CVMLong>> vc=new VisitCounter<>();
-		Samples.INT_VECTOR_300.visitAllChildren(vc);
+		AVector<CVMLong> v=Samples.INT_VECTOR_300;
+		v.visitAllChildren(vc);
 		
-		assertEquals(16+1+3,vc.count); // 16*(16) + 1 *(256) + 2 *(16) + 1 *(32) [== whole prefix]
+		assertEquals(16+1+2+1+1,vc.count); // 16 (16) + 1 (256) + 2 (16) + 1 (32) + 1 [== whole prefix]
 	}
 	
 	@Test
