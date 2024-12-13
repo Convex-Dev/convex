@@ -334,9 +334,18 @@ public class Cells {
 		try {
 			cell.validateCell();
 			cell.validateStructure();
+			// Cells.markValidated(cell);
 		} catch (ClassCastException | NullPointerException e) {
 			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
 		}
+	}
+
+	/**
+	 * Marks a cell as being validated
+	 * @param cell
+	 */
+	public static void markValidated(ACell cell) {
+		cell.getRef().mergeFlags(Ref.VALIDATED);
 	}
 
 	/**

@@ -694,6 +694,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		int flagsPart=((a|b)&~STATUS_MASK);
 		return statusPart|flagsPart;
 	}
+	
+	protected int mergeFlags(int flags) {
+		int newFlags=mergeFlags(this.flags,flags);
+		setFlags(newFlags);
+		return newFlags;
+	}
 
 	/**
 	 * Ensures this Ref is canonical
@@ -733,4 +739,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public boolean isValidated() {
 		return getStatus()>=VALIDATED;
 	}
+
+
 }

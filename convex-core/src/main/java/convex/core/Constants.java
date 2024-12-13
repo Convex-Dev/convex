@@ -161,7 +161,7 @@ public class Constants {
 	 * Flag to omit filling in stack traces on validation exceptions. This helps
 	 * performance against DoS attacks
 	 */
-	public static final boolean OMIT_VALIDATION_STACKTRACES = true;
+	public static final boolean OMIT_VALIDATION_STACKTRACES = false;
 
 	public static final int PBE_ITERATIONS = 100000;
 	

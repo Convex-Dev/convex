@@ -15,10 +15,13 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Format;
+import convex.core.data.Ref;
 import convex.core.data.Refs;
+import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.text.PrintUtils;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
@@ -107,12 +110,14 @@ public class MessageFormatPanel extends JPanel {
 		if (!messageArea.isFocusOwner()) return; // prevent mutual recursion
 		String data = "";
 		String msg = messageArea.getText();
+		Blob b=null;
+		ACell o=null;
 		try {
-			Blob b = Blob.parse(Utils.stripWhiteSpace(msg));
+			b = Blob.parse(Utils.stripWhiteSpace(msg));
 			if (b==null) {
 				data = "Invalid hex";
 			} else {
-				ACell o = Format.decodeMultiCell(b);
+				o = Format.decodeMultiCell(b);
 				data = Utils.print(o);
 				updateHashLabel(o,b);
 			}
@@ -122,6 +127,11 @@ public class MessageFormatPanel extends JPanel {
 		} catch (Exception e) {
 			data = "Message decoding failed: "+e.getMessage();
 			clearHashLabel();
+			
+			if (e instanceof MissingDataException) {
+				String refTree=PrintUtils.printRefTree(Ref.get(o));
+				data=data+"\n\n"+refTree;
+			}
 		}
 		dataArea.setText(data);
 	}

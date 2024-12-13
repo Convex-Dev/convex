@@ -37,6 +37,8 @@ public class Order extends ARecordGeneric {
 	private static final int IX_TIMESTAMP = 0;
 	private static final int IX_CONSENSUS = 1;
 	private static final int IX_BLOCKS = 2;
+	
+	private static final long NUM_FIELDS=FORMAT.count();
 
 	/**
 	 * Timestamp of this Order, i.e. the timestamp of the peer at the time it was created
@@ -58,7 +60,7 @@ public class Order extends ARecordGeneric {
 		this.consensusPoints = RT.toLongArray((AVector<ACell>)values.get(IX_CONSENSUS));
 	}
 	
-	private Order(AVector<SignedData<Block>> blocks, long[] consensusPoints, long timestamp) {
+	private Order(long timestamp, long[] consensusPoints, AVector<SignedData<Block>> blocks) {
 		super(CVMTag.ORDER,FORMAT,Vectors.create(CVMLong.create(timestamp),Vectors.createLongs(consensusPoints),blocks));
 		this.timestamp = timestamp;
 		this.consensusPoints=consensusPoints;
@@ -77,7 +79,7 @@ public class Order extends ARecordGeneric {
 		consensusPoints[1] = proposalPoint;
 		consensusPoints[2] = consensusPoint;
 
-		return new Order(blocks, consensusPoints,timestamp);
+		return new Order(timestamp, consensusPoints,blocks);
 	}
 
 	/**
@@ -99,7 +101,7 @@ public class Order extends ARecordGeneric {
 	 * @return New Order instance
 	 */
 	public static Order create() {
-		return new Order(Vectors.empty(), EMPTY_CONSENSUS_ARRAY,0);
+		return new Order(0, EMPTY_CONSENSUS_ARRAY,Vectors.empty());
 	}
 
 	/**
@@ -112,6 +114,7 @@ public class Order extends ARecordGeneric {
 	 */
 	public static Order read(Blob b, int pos) throws BadFormatException {
 		AVector<ACell> values = Vectors.read(b, pos);
+		if (values.count()!=NUM_FIELDS) throw new BadFormatException("Wrong number of Order fields");
 		long epos=pos+values.getEncodingLength();
 		
 		Order result=new Order(values);

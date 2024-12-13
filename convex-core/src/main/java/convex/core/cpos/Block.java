@@ -3,6 +3,7 @@ package convex.core.cpos;
 import java.util.Comparator;
 import java.util.List;
 
+import convex.core.Constants;
 import convex.core.cvm.ARecordGeneric;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Keywords;
@@ -41,6 +42,11 @@ public final class Block extends ARecordGeneric {
 
 	private final long timestamp;
 	private AVector<SignedData<ATransaction>> transactions;
+	
+	private static final int IX_TIMESTAMP= 0;
+	private static final int IX_TRANSACTIONS = 1;
+
+	private static final long NUM_FIELDS = FORMAT.count();
 
 	/**
 	 * Comparator to sort blocks by timestamp
@@ -59,15 +65,16 @@ public final class Block extends ARecordGeneric {
 		this.transactions = transactions;
 	}
 
-	public Block(AVector<ACell> values) {
+	private Block(AVector<ACell> values) {
 		super(CVMTag.BLOCK,FORMAT,values);
-		this.timestamp=RT.ensureLong(values.get(0)).longValue();
+		this.timestamp=RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
+		
 	}
 
 	@Override
 	public ACell get(Keyword k) {
 		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
-		if (Keywords.TRANSACTIONS.equals(k)) return transactions;
+		if (Keywords.TRANSACTIONS.equals(k)) return getTransactions();
 		return null;
 	}
 
@@ -151,7 +158,7 @@ public final class Block extends ARecordGeneric {
 	 * @return Vector of transactions
 	 */
 	public AVector<SignedData<ATransaction>> getTransactions() {
-		if (transactions==null) transactions=RT.ensureVector(values.get(1));
+		if (transactions==null) transactions=RT.ensureVector(values.get(IX_TRANSACTIONS));
 		return transactions;
 	}
 
@@ -162,7 +169,18 @@ public final class Block extends ARecordGeneric {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// nothing to do
+		if (values.count()!=NUM_FIELDS) throw new InvalidDataException("Wrong field count",this);
+	}
+	
+	@Override
+	public void validateStructure() throws InvalidDataException {
+		AVector<SignedData<ATransaction>> txs=getTransactions();
+		if (txs==null) throw new InvalidDataException("No transactions",this);
+		if (txs.count()>Constants.MAX_TRANSACTIONS_PER_BLOCK) {
+			throw new InvalidDataException("Too many transactions: "+txs.count(),this);
+		}
+		// We don't validate individual transactions here
+		// This gets enforced latter when transactions are applied
 	}
 	
 	@Override 
