@@ -333,7 +333,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @param hash The hash value for this Ref to refer to
 	 * @return Ref for the specific hash.
 	 */
-	public static <T extends ACell> RefSoft<T> forHash(Hash hash) {
+	public static <T extends ACell> Ref<T> forHash(Hash hash) {
 		return RefSoft.createForHash(hash);
 	}
 	

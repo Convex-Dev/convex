@@ -114,7 +114,7 @@ public class EtchStore extends ACachedStore {
 	@Override
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
-			Ref<ACell> existing = (Ref<ACell>) refCache.getCell(hash);
+			Ref<ACell> existing = checkCache(hash);
 			if (existing != null)
 				return (Ref<T>) existing;
 

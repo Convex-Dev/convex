@@ -81,9 +81,9 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	 * 
 	 * @param <T>  Type of value
 	 * @param hash Hash ID of value.
-	 * @return New RefSoft instance
+	 * @return New RefSoft instance, or cached Refsoft from current store
 	 */
-	public static <T extends ACell> RefSoft<T> createForHash(Hash hash) {
+	public static <T extends ACell> Ref<T> createForHash(Hash hash) {
 		return new RefSoft<T>(Stores.current(),hash);
 	}
 
@@ -91,6 +91,8 @@ public class RefSoft<T extends ACell> extends Ref<T> {
 	public T getValue() {
 		T result = softRef.get();
 		if (result == null) {
+			if (store==null) throw new MissingDataException(null,hash);
+			
 			Ref<T> storeRef = store.refForHash(hash);
 			if (storeRef == null) {
 				throw new MissingDataException(store,hash);

@@ -24,7 +24,7 @@ public class MissingDataException extends FastRuntimeException {
 	}
 
 	public String getMessage() {
-		return "Missing hash:" + hash + " in store " + store.toString();
+		return "Missing hash:" + hash + ((store==null)?" (null store)": "in store " + store.toString());
 	}
 
 	/**
