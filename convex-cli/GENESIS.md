@@ -1,10 +1,8 @@
 # Genesis Setup
 
-This doc describes that standard genesis process for a new convex network
+This doc describes the standard genesis process for a new convex network
 
- 
-
-
+For a new Server on Google Cloud
 
 ```
 Linux genesis-peer 6.1.0-27-cloud-amd64 #1 SMP PREEMPT_DYNAMIC Debian 6.1.115-1 (2024-11-01) x86_64
@@ -24,7 +22,7 @@ permitted by applicable law.
 ```
 sudo apt update
 wget https://download.oracle.com/java/23/latest/jdk-23_linux-x64_bin.deb
-sudo dpkg -i jdk-21_linux-x64_bin.deb
+sudo dpkg -i jdk-23_linux-x64_bin.deb
 ```
 
 ### Set up Convex
@@ -63,3 +61,5 @@ Back to screen with:
 ```
 screen -r
 ```
+
+### Adding a second peer
