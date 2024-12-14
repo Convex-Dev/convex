@@ -101,22 +101,23 @@ public class Acquiror {
 					CompletableFuture<Result> cf=source.message(dataRequest);
 					try {
 						Result resp=cf.get();
-						if (!resp.isError()) {
-							log.trace("Got acquire response: {} ",resp);
-							AVector<ACell> v=RT.ensureVector(resp.getValue());
-							if (v==null) throw new BadFormatException("Expected Vector in data result");
-							for (int i=2; i<v.count(); i++) {
-								ACell val=v.get(i);
-								if (val==null) {
-									AVector<ACell> reqv=dataRequest.getPayload();
-									f.completeExceptionally(new MissingDataException(store,RT.ensureHash(reqv.get(i))));
-									continue;
-								}
-								Cells.store(v.get(i), store);
-							}
-						} else {
+						if (resp.isError()) {
 							f.completeExceptionally(new ResultException(resp));
-							log.warn("Failed to request missing data: "+resp);
+							log.info("Failed to request missing data: "+resp);
+						}
+						
+						AVector<ACell> v=RT.ensureVector(resp.getValue());
+						if (v==null) throw new BadFormatException("Expected Vector in data result");
+						for (int i=0; i<v.count(); i++) {
+							ACell val=v.get(i);
+							if (val==null) {
+								// null vector element implies missing at other end
+								AVector<ACell> reqv=dataRequest.getPayload();
+								Hash expectedHash=RT.ensureHash(reqv.get(i+2));
+								f.completeExceptionally(new MissingDataException(store,expectedHash));
+								continue;
+							}
+							Cells.store(val, store);
 						}
 					} catch (ExecutionException e) {
 						if (e.getCause() instanceof TimeoutException) {

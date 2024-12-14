@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
+import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Strings;
 import convex.core.util.Shutdown;
 import io.netty.bootstrap.ServerBootstrap;
@@ -39,8 +41,12 @@ public class NettyServer extends AServer {
 	}
 	
 	private Consumer<Message> receiveAction=m->{
-		m.returnMessage(Message.createResult(m.getID(), Strings.create("Received"), null));
-		System.err.println(m);
+		try {
+			ACell payload=m.getPayload();
+			m.returnMessage(Message.createResult(m.getID(), Strings.create("Received payload with hash: "+Cells.getHash(payload)), null));
+		} catch (Exception e) {
+			log.warn("Unexpected exception handling message receipt",e);
+		}
 	};
 
 	private Channel channel;

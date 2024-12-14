@@ -105,18 +105,25 @@ public abstract class Convex implements AutoCloseable {
 	 * Result Consumer for messages received back from a client connection
 	 */
 	protected final Consumer<Message> returnMessageHandler = m-> {
-		// Check if we are waiting for a Result with this ID for this connection
-		synchronized (awaiting) {
-			ACell id=m.getID();
-			CompletableFuture<Message> cf = (id==null)?null:awaiting.remove(id);
-			if (cf != null) {
-				// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-				boolean didComplete = cf.complete(m);
-				if (!didComplete) {
-					log.warn("Messafe return future already completed with value: "+cf.join());
+		ACell id=m.getResultID();
+		
+		if (id!=null) {
+			// Check if we are waiting for a Result with this ID for this connection
+			synchronized (awaiting) {
+				try {
+					CompletableFuture<Message> cf = awaiting.get(id);
+					if (cf != null) {
+						// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
+						boolean didComplete = cf.complete(m);
+						if (!didComplete) {
+							log.warn("Messafe return future already completed with value: "+cf.join());
+						}
+						awaiting.remove(id);
+					} 
+				} catch (Exception e) {
+					log.warn("Unexpected error completing result",e);
 				}
-				return;
-			} 
+			}
 		}
 		
 		if (delegatedHandler!=null) {

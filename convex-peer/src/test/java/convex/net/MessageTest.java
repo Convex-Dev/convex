@@ -2,6 +2,7 @@ package convex.net;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,12 +27,14 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.ObjectsTest;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
+import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
 
 public class MessageTest {
@@ -43,15 +46,15 @@ public class MessageTest {
 		Blob b=Blobs.createRandom(400);
 		
 		Message mq=Message.createDataResponse(CVMLong.ONE, b);
-		assertEquals(MessageType.DATA,mq.getType());
+		assertEquals(MessageType.RESULT,mq.getType());
 		doMessageTest(mq);
 		
 		Blob enc=mq.getMessageData();
 		
 		Message mr=Message.create(enc);
-		AVector<ACell> v=mr.getPayload();
+		AVector<ACell> v=mr.toResult().getValue();
 		
-		assertEquals(b,v.get(2));
+		assertEquals(b,v.get(0));
 		Cells.persist(b);
 		
 		Message md=Message.createDataRequest(CVMLong.ONE, b.getHash());
@@ -89,7 +92,7 @@ public class MessageTest {
 		assertEquals(Vectors.of(MessageTag.DATA_QUERY,1,BAD_HASH),md.getPayload());
 		
 		Message mdr=md.makeDataResponse(Stores.current());
-		assertEquals(Vectors.of(MessageTag.DATA_RESPONSE,1,null),mdr.getPayload());
+		assertEquals(Result.create(CVMLong.ONE, Vectors.of(Cells.NIL)),mdr.getPayload());
 	}
 	
 	@Test
@@ -129,9 +132,12 @@ public class MessageTest {
 		
 		assertEquals(r,m.makeDataResponse(Stores.current()));
 		
-		AVector<ACell> v=r.getPayload();
-		assertEquals(CVMLong.ONE,v.get(1));
-		assertEquals(b,v.get(2));
+		// Check Result
+		Result res=r.toResult();
+		assertEquals(CVMLong.ONE,res.getID());
+		
+		AVector<ACell> v=res.getValue();
+		assertEquals(b,v.get(0));
 		doMessageTest(m);
 		doMessageTest(r);
 	}
@@ -149,10 +155,24 @@ public class MessageTest {
 	 */
 	public void doMessageTest(Message m) {
 		MessageType type=m.getType();
+		assertNotNull(type);
+		
 		ACell id=m.getID();
+		ACell reqID=m.getRequestID();
+		ACell resultID=m.getResultID();
+		if (reqID!=null) {
+			assertNull(resultID); // should be both a request and a result
+			assertEquals(id,reqID);
+		}
+		
+		if (resultID!=null) {
+			assertEquals(MessageType.RESULT,type);
+			assertNull(reqID);
+			assertEquals(id,resultID);
+		}
+		
 		try {
 			ACell payload=m.getPayload();
-			assertNotNull(type);
 			
 			Blob data=m.getMessageData();
 			assertTrue(data.count()>0);
@@ -163,8 +183,10 @@ public class MessageTest {
 			assertEquals(type,m2.getType());
 			assertEquals(id,m2.getID());
 			assertEquals(payload,m2.getPayload());
+			
+			ObjectsTest.doAnyValueTests(payload);
 		} catch (BadFormatException e) {
-			fail("BAd format: "+m,e);
+			fail("Bad format: "+m,e);
 		}
 	}
 }

@@ -407,6 +407,8 @@ public class Server implements Closeable {
 				processQuery(m);
 				break;
 			case RESULT:
+				// We aren't expecting results here (on an inbound connection)
+				log.debug("unexpected Result received");
 				break;
 			case TRANSACT:
 				processTransact(m);
@@ -418,13 +420,14 @@ public class Server implements Closeable {
 				processStatus(m);
 				break;
 			default:
-				Result r=Result.create(m.getID(), Strings.create("Bad Message Type: "+type), ErrorCodes.ARGUMENT);
-				m.returnResult(r);
+				log.info("Unregognised message: "+m);
 				break;
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
 			log.trace("Missing data: {} in message of type {}" , missingHash,type);
+		} catch (Exception e) {
+			log.warn("Unexpected error processing peer message",e);
 		} finally {
 			Stores.setCurrent(tempStore);
 		}

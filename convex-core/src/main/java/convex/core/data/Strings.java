@@ -64,7 +64,7 @@ public class Strings {
 
 	public static final StringShort LONG_MIN_VALUE = StringShort.create("-9223372036854775808");
 
-	public static final StringShort SENT = StringShort.create("Sent sucessfully");
+	public static final StringShort SENT = StringShort.create("Sent");
 
 	public static final StringShort FULL_BUFFER = StringShort.create("Buffer full");
 

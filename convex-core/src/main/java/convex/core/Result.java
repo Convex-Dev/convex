@@ -533,6 +533,11 @@ public final class Result extends ARecordGeneric {
 		return Result.create(id, value, errorCode);
 	}
 
+	public static ACell peekResultID(Blob messageData, int i) throws BadFormatException {
+		Result r=Result.read(messageData, i);
+		return r.getID();
+	}
+
 
 
 }

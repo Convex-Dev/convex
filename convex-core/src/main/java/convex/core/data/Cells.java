@@ -32,6 +32,8 @@ public class Cells {
 
 	public static final ACell DUMMY = new DummyCell();
 
+	public static final ACell NIL = null;
+
 	/**
 	 * Equality method allowing for nulls
 	 *

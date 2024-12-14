@@ -79,14 +79,7 @@ public class Message {
 	}
 
 	public static Message createDataResponse(ACell id, ACell... cells) {
-		int n=cells.length;
-		ACell[] cs=new ACell[n+2];
-		cs[0]=MessageTag.DATA_RESPONSE;
-		cs[1]=id;
-		for (int i=0; i<n; i++) {
-			cs[i+2]=cells[i];
-		}
-		return create(MessageType.DATA,Vectors.create(cs));
+		return create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
 	}
 	
 	public static Message createDataRequest(ACell id, Hash... hashes) {
@@ -179,7 +172,7 @@ public class Message {
 			// These can be inferred directly from top encoding tag
 			byte tag=messageData.byteAt(0);
 			if (tag==CVMTag.BELIEF) return MessageType.BELIEF;
-			if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order>
+			if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order> or similar
 			if (tag==CVMTag.RESULT) return MessageType.RESULT;
 		}
 		
@@ -197,7 +190,6 @@ public class Message {
 				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
 				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
 				if (MessageTag.DATA_QUERY.equals(mt)) return MessageType.REQUEST_DATA;
-				if (MessageTag.DATA_RESPONSE.equals(mt)) return MessageType.DATA;
 			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
@@ -243,27 +235,12 @@ public class Message {
 	 * @return Message ID, or null if the message does not have a message ID
 	 */
 	public ACell getID()  {
-		try {
-			switch (getType()) {	
-				// Result is a special record type
-				case RESULT: return ((Result)getPayload()).getID();
-					
-				// ID in position 1
-				case STATUS:
-				case TRANSACT: 
-				case QUERY:
-				case REQUEST_DATA:
-				case DATA: {
-					AVector<?> v=RT.ensureVector(getPayload());
-					if (v.count()<2) return null;
-					return RT.ensureLong(v.get(1));
-				}
-	
-				default: return null;
-			}
-		} catch (Exception e) {
-			log.warn("Unexpected error getting ID",e);
-			return null;
+		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
+		switch (getType()) {	
+			// Result is a special record type
+			case RESULT: return getResultID();
+
+			default: return getRequestID();
 		}
 	}
 	
@@ -272,6 +249,7 @@ public class Message {
 	 * @return
 	 */
 	public ACell getRequestID() {
+		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
 		try {
 			switch (getType()) {	
 			
@@ -291,6 +269,36 @@ public class Message {
 			log.warn("Unexpected error getting request ID",e);
 			return null;
 		}
+	}
+	
+	/**
+	 * Gets the result ID for this message, assuming it is a Result
+	 * 
+	 * This needs to work even if the payload is not yet decoded, for message routing (possibly with a different store)
+	 * 
+	 * @return
+	 */
+	public ACell getResultID() {
+		if (payload!=null) {
+			if (payload instanceof Result) {
+				return ((Result)payload).getID();
+			}
+			return null;
+		}
+		
+		if (hasData()) try {
+			// Check tag is a Result
+			byte tag=messageData.byteAt(0);
+			if (tag!=CVMTag.RESULT) return null;
+			
+			// Peek at Result ID without loading whole payload
+			return Result.peekResultID(messageData,0);
+		} catch (Exception e) {
+			log.warn("Unexpected error getting result ID: "+e.getMessage());
+			return null;
+		}
+		
+		return null;
 	}
 	
 	/**
@@ -385,20 +393,24 @@ public class Message {
 	}
 
 	public Message makeDataResponse(AStore store) throws BadFormatException {
+		final int HEADER_OFFSET=2; // offset of hashes in request vector
+		
 		AVector<ACell> v = RT.ensureVector(getPayload());
 		if ((v == null)||(v.isEmpty())) {
 			throw new BadFormatException("Invalid data request payload");
 		};
-		if (v.count()>CPoSConstants.MISSING_LIMIT+2) {
+		if (v.count()>CPoSConstants.MISSING_LIMIT+HEADER_OFFSET) {
 			throw new BadFormatException("Too many elements in Missing data request");
 		}
+		
+		ACell id=v.get(1); // location of ID in request record
 		//System.out.println("DATA REQ:"+ v);
-		int n=v.size();
+		
+		int n=v.size()-HEADER_OFFSET; // number of values requested (ignore header elements)
+		
 		ACell[] vals=new ACell[n];
-		vals[0]=MessageTag.DATA_RESPONSE;
-		vals[1]=v.get(1);
-		for (int i=2; i<n; i++) {
-			Hash h=RT.ensureHash(v.get(i));
+		for (int i=0; i<n; i++) {
+			Hash h=RT.ensureHash(v.get(i+HEADER_OFFSET));
 			if (h==null) {
 				throw new BadFormatException("Invalid data request hash");
 			}
@@ -409,12 +421,12 @@ public class Message {
 				vals[i]=data;
 			} else {
 				// signal we don't have this data
-				vals[i]=null;;
+				vals[i]=null;
 			}
 		}
 		//System.out.println("DATA RESP:"+ v);
 		// Create response. Will have null return connection
-		Message resp=create(MessageType.DATA,Vectors.create(vals));
+		Message resp=createDataResponse(id,vals);
 		return resp;
 	}
 
