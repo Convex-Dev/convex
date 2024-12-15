@@ -23,8 +23,8 @@ public enum MessageType {
 	/**
 	 * A message relaying data.
 	 * 
-	 * Payload is a vector:
-	 * - [:DR id value1 value2 .....]
+	 * Payload is a Result:
+	 * - Result
 	 *
 	 * Data is presented "as-is", and may be: 
 	 * - the result of a missing data request
@@ -49,12 +49,12 @@ public enum MessageType {
 	 * peers. Peers under load may ignore data requests.
 	 *
 	 * Payload is a Vector containing ID plus one or more hashes 
-	 * i.e [:DQ id hash1 hash2 ......]
+	 * i.e [:DR id hash1 hash2 ......]
 	 * 
 	 * Receiver should respond with a DATA message if the specified data is
 	 * available in their store, and they are willing to fulfil the request
 	 */
-	REQUEST_DATA(5),
+	DATA_REQUEST(5),
 
 	/**
 	 * A request to perform the specified query and return results.
@@ -145,7 +145,7 @@ public enum MessageType {
 		case 4:
 			return COMMAND;
 		case 5:
-			return REQUEST_DATA;
+			return DATA_REQUEST;
 		case 6:
 			return QUERY;
 		case 7:

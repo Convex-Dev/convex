@@ -1,4 +1,4 @@
-package convex.net;
+package convex.net.impl.netty;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -13,6 +13,8 @@ import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Strings;
 import convex.core.util.Shutdown;
+import convex.net.AServer;
+import convex.net.Message;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;

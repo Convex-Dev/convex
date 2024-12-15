@@ -966,14 +966,14 @@ public class Format {
 		return encodeMultiCell(a,cells,everything);
 	}
 
-	private static Blob encodeMultiCell(ACell a, ArrayList<Ref<?>> cells, boolean everything) {
-		Blob topCellEncoding=Cells.encode(a);
-		Consumer<Ref<?>> addToStackFunc=r->{cells.add(r);};
+	private static Blob encodeMultiCell(ACell topCell, ArrayList<Ref<?>> branches, boolean everything) {
+		Blob topCellEncoding=Cells.encode(topCell);
+		Consumer<Ref<?>> addToStackFunc=r->{branches.add(r);};
 		
 		// Visit refs in stack to add to message, accumulating message size required
 		int[] ml=new int[] {topCellEncoding.size()}; // Array mutation trick for accumulator. Ugly but works....
 		HashSet<Ref<?>> refs=new HashSet<>();
-		Trees.visitStack(cells, cr->{
+		Trees.visitStack(branches, cr->{
 			if (!refs.contains(cr)) {
 				ACell c=cr.getValue();
 				int encLength=c.getEncodingLength();
@@ -1016,8 +1016,17 @@ public class Format {
 	 * @param v
 	 * @return
 	 */
-	public static Blob encodeDataVector(AVector<?> v) {
+	public static Blob encodeDataResult(Result result) {
+		AVector<?> v=RT.ensureVector(result.getValue());
+		if (v==null) throw new IllegalArgumentException("Data result must contain a vector value");
+		
 		ArrayList<Ref<?>> cells=new ArrayList<Ref<?>>();
+		
+		// Add the top level vector as a branch iff it is not embedded in the Result
+		if (!v.isEmbedded()) {
+			cells.add(v.getRef());
+		}
+		
 		v.visitAllChildren(vc->{
 			Ref<?> r=vc.getRef();
 			if (!r.isEmbedded()) {
@@ -1033,7 +1042,8 @@ public class Format {
 			};
 		});
 		
-		return encodeMultiCell(v,cells,false);
+		// Note false to prevent traversing all extra branches
+		return encodeMultiCell(result,cells,false);
 	}
 	
 	

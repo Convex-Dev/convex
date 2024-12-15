@@ -400,7 +400,7 @@ public class Server implements Closeable {
 			case DATA:
 				processData(m);
 				break;
-			case REQUEST_DATA:
+			case DATA_REQUEST:
 				processQuery(m); // goes on Query handler
 				break;
 			case QUERY:
@@ -420,7 +420,7 @@ public class Server implements Closeable {
 				processStatus(m);
 				break;
 			default:
-				log.info("Unregognised message: "+m);
+				log.info("Unrecognised message: "+m);
 				break;
 			}
 		} catch (MissingDataException e) {

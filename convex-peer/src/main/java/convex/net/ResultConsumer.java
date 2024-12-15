@@ -26,7 +26,7 @@ public abstract class ResultConsumer implements Consumer<Message> {
 				handleDataProvided(m);
 				break;
 			}
-			case REQUEST_DATA: {
+			case DATA_REQUEST: {
 				handleDataRequest(m);
 				break;
 			}

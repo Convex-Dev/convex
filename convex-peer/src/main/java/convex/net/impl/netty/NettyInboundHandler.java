@@ -1,4 +1,4 @@
-package convex.net;
+package convex.net.impl.netty;
 
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
+import convex.net.Message;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -54,10 +55,9 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
     		
     		byte[] dst=new byte[mlen];
     		buf.readBytes(dst);
-    		Message m=Message.create(Blob.wrap(dst));
     		
-    		// Set a return handler (can be null)
-    		m.returnHandler=returnAction;
+    		// Create message with return action, unknown type and Blob data
+    		Message m=Message.create(returnAction,null,Blob.wrap(dst));
     		
     		if (receiveAction!=null) {
     			receiveAction.accept(m);

@@ -70,7 +70,7 @@ public class CPoSConstants {
 	/**
 	 * Maximum allowed number of missing hashes in missing data request
 	 * 
-	 * 2 header values short of 256
+	 * (2 header values short of 256, so that request vector is 2 levels at max size)
 	 */
 	public static final int MISSING_LIMIT = 254;
 

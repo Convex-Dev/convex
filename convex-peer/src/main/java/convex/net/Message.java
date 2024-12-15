@@ -49,6 +49,8 @@ public class Message {
 	
 	protected static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
+	private static final Message BYE_MESSAGE = Message.create(MessageType.GOODBYE,Vectors.create(MessageTag.BYE));
+
 	protected ACell payload;
 	protected Blob messageData; // encoding of payload (possibly multi-cell)
 	protected MessageType type;
@@ -79,18 +81,22 @@ public class Message {
 	}
 
 	public static Message createDataResponse(ACell id, ACell... cells) {
-		return create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
+		// This is a bit special because we don't want to have a full payload.
+		Result result= Result.create(id,Vectors.create(cells));
+		Message m = create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
+		m.messageData=Format.encodeDataResult(result);		
+		return m;
 	}
 	
 	public static Message createDataRequest(ACell id, Hash... hashes) {
 		int n=hashes.length;
 		ACell[] cs=new ACell[n+2];
-		cs[0]=MessageTag.DATA_QUERY;
+		cs[0]=MessageTag.DATA_REQUEST;
 		cs[1]=id;
 		for (int i=0; i<n; i++) {
 			cs[i+2]=hashes[i];
 		}
-		return create(MessageType.REQUEST_DATA,Vectors.create(cs));
+		return create(MessageType.DATA_REQUEST,Vectors.create(cs));
 	}
 
 	public static Message createBelief(Belief belief) {
@@ -114,7 +120,7 @@ public class Message {
 	}
 
 	public static Message createGoodBye() {
-		return create(MessageType.GOODBYE, null);
+		return BYE_MESSAGE;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -136,25 +142,7 @@ public class Message {
 	 */
 	public Blob getMessageData() {
 		if (messageData!=null) return messageData;
-		
-		// default to single cell encoding
-		// TODO: alternative depths for different types
-		switch (getType()) {
-		   
-		case MessageType.DATA:
-			@SuppressWarnings("unchecked") 
-			AVector<ACell> v=(AVector<ACell>) payload;
-			//if (v.count()>16) {
-			//	// System.out.println("Big data vector: " +v.count());
-			//}
-			
-			messageData=Format.encodeDataVector(v);		 
-			break;
-			
-		default:
-			messageData=Format.encodeMultiCell(payload,true);
-		}
-		
+		messageData=Format.encodeMultiCell(payload,true);
 		return messageData;
 	}
 
@@ -189,7 +177,7 @@ public class Message {
 				if (MessageTag.STATUS_REQUEST.equals(mt)) return MessageType.STATUS;
 				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
 				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
-				if (MessageTag.DATA_QUERY.equals(mt)) return MessageType.REQUEST_DATA;
+				if (MessageTag.DATA_REQUEST.equals(mt)) return MessageType.DATA_REQUEST;
 			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
@@ -257,7 +245,7 @@ public class Message {
 				case STATUS:
 				case TRANSACT: 
 				case QUERY:
-				case REQUEST_DATA:{
+				case DATA_REQUEST:{
 					AVector<?> v=RT.ensureVector(getPayload());
 					if (v.count()<2) return null;
 					return RT.ensureLong(v.get(1));
@@ -319,8 +307,7 @@ public class Message {
 				case STATUS: 
 				case TRANSACT: 
 				case QUERY:
-				case REQUEST_DATA:
-				case DATA: {
+				case DATA_REQUEST: {
 					ACell o=getPayload();
 					if (o instanceof AVector) {
 						AVector<ACell> v = (AVector<ACell>)o; 

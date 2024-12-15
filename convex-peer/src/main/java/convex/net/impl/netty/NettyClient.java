@@ -1,4 +1,4 @@
-package convex.net;
+package convex.net.impl.netty;
 
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -6,6 +6,8 @@ import java.util.function.Consumer;
 
 import convex.core.data.Vectors;
 import convex.core.util.Shutdown;
+import convex.net.Message;
+import convex.net.MessageType;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -75,7 +77,7 @@ public class NettyClient {
 		}
 	}
 
-	protected static NettyClient connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
+	public static NettyClient connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
 		Bootstrap b = getClientBootstrap();
 		ChannelFuture f = b.connect(sa).sync(); // (5)
 

@@ -54,7 +54,7 @@ public class QueryHandler extends AThreadedComponent {
 		case QUERY:
 			handleQuery(m);
 			break;
-		case REQUEST_DATA:
+		case DATA_REQUEST:
 			handleDataRequest(m);
 			break;
 		default:

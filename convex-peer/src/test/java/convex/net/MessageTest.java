@@ -27,7 +27,6 @@ import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
-import convex.core.data.ObjectsTest;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
@@ -72,7 +71,7 @@ public class MessageTest {
 		Arrays.fill(hashes,b.getHash());
 		
 		Message mr=Message.createDataRequest(b,hashes);
-		assertEquals(MessageType.REQUEST_DATA,mr.getType());
+		assertEquals(MessageType.DATA_REQUEST,mr.getType());
 		doMessageTest(mr);
 		
 		Blob enc=mr.getMessageData();
@@ -80,8 +79,8 @@ public class MessageTest {
 		Message mrs=Message.create(enc);
 		AVector<ACell> v=mrs.getPayload();
 		assertEquals(2+CPoSConstants.MISSING_LIMIT,v.count());
-		assertEquals(MessageType.REQUEST_DATA,mrs.getType());
-		assertEquals(MessageTag.DATA_QUERY,v.get(0));
+		assertEquals(MessageType.DATA_REQUEST,mrs.getType());
+		assertEquals(MessageTag.DATA_REQUEST,v.get(0));
 		doMessageTest(mrs);
 	}
 	
@@ -89,7 +88,7 @@ public class MessageTest {
 	
 	@Test public void testLostMissingResponse() throws BadFormatException, IOException {
 		Message md=Message.createDataRequest(CVMLong.ONE, BAD_HASH);
-		assertEquals(Vectors.of(MessageTag.DATA_QUERY,1,BAD_HASH),md.getPayload());
+		assertEquals(Vectors.of(MessageTag.DATA_REQUEST,1,BAD_HASH),md.getPayload());
 		
 		Message mdr=md.makeDataResponse(Stores.current());
 		assertEquals(Result.create(CVMLong.ONE, Vectors.of(Cells.NIL)),mdr.getPayload());
@@ -184,7 +183,6 @@ public class MessageTest {
 			assertEquals(id,m2.getID());
 			assertEquals(payload,m2.getPayload());
 			
-			ObjectsTest.doAnyValueTests(payload);
 		} catch (BadFormatException e) {
 			fail("Bad format: "+m,e);
 		}

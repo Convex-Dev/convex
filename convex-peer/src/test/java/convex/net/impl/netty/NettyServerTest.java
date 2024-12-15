@@ -1,16 +1,19 @@
-package convex.net;
+package convex.net.impl.netty;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.cvm.Address;
+import convex.core.lang.RT;
+import convex.net.Message;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class NettyServerTest {
@@ -24,14 +27,15 @@ public class NettyServerTest {
 			InetSocketAddress addr=server.getHostAddress();
 			assertEquals(port,addr.getPort());
 			
-			ArrayList<Message> rec=new ArrayList<>();
+			CompletableFuture<Message> rec=new CompletableFuture<>();
 			NettyClient client=NettyClient.connect(addr, m->{
-				rec.add(m);
+				rec.complete(m);
 			});
 			
 			client.send(Message.createQuery(10, "*address*", Address.create(17)));
 			
-			// assertEquals(1,rec.size());
+			Message m=rec.join();
+			assertEquals(RT.cvm(10),m.getResultID());
 		}
 	}
 }

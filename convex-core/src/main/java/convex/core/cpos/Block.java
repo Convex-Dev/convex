@@ -73,7 +73,7 @@ public final class Block extends ARecordGeneric {
 
 	@Override
 	public ACell get(Keyword k) {
-		if (Keywords.TIMESTAMP.equals(k)) return CVMLong.create(timestamp);
+		if (Keywords.TIMESTAMP.equals(k)) return values.get(IX_TIMESTAMP);
 		if (Keywords.TRANSACTIONS.equals(k)) return getTransactions();
 		return null;
 	}
