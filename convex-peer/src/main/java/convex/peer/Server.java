@@ -51,7 +51,7 @@ import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.Message;
 import convex.net.MessageType;
-import convex.net.NIOServer;
+import convex.net.impl.nio.NIOServer;
 
 
 /**

@@ -12,6 +12,7 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.impl.HandlerException;
+import convex.net.impl.nio.Connection;
 
 /**
  * Tests for the low level Connection class

@@ -21,14 +21,13 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.net.Connection;
 import convex.net.Message;
+import convex.net.impl.nio.Connection;
 import convex.peer.Server;
 
 public class ConvexRemote extends Convex {
@@ -156,21 +155,8 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> requestChallenge(SignedData<ACell> data) {
-		synchronized (awaiting) {
-			long id;
-			try {
-				id = connection.sendChallenge(data);
-			} catch (IOException e) {
-				return CompletableFuture.completedFuture(Result.error(ErrorCodes.IO, "Error requesting challenge"));
-			}
-			if (id < 0) {
-				// TODO: too fragile?
-				return CompletableFuture.completedFuture(Result.error(ErrorCodes.IO, "Full buffer while requesting challenge"));
-			}
-
-			// Store future for completion by result message
-			return awaitResult(CVMLong.create(id),timeout).thenApply(msg->msg.toResult());
-		}
+		Message m=Message.createChallenge(data);
+		return message(m);
 	}
 	
 	@Override

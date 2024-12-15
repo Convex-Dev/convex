@@ -176,6 +176,7 @@ public class Message {
 				if (mt==null) return MessageType.UNKNOWN;
 				if (MessageTag.STATUS_REQUEST.equals(mt)) return MessageType.STATUS;
 				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
+				if (MessageTag.BYE.equals(mt)) return MessageType.GOODBYE;
 				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
 				if (MessageTag.DATA_REQUEST.equals(mt)) return MessageType.DATA_REQUEST;
 			}

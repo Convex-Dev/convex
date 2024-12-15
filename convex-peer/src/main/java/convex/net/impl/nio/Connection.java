@@ -1,4 +1,4 @@
-package convex.net;
+package convex.net.impl.nio;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -45,6 +45,10 @@ import convex.core.store.Stores;
 import convex.core.util.Counters;
 import convex.core.util.Utils;
 import convex.core.util.Shutdown;
+import convex.net.AConnection;
+import convex.net.Message;
+import convex.net.MessageReceiver;
+import convex.net.MessageSender;
 import convex.net.impl.HandlerException;
 import convex.peer.Config;
 
@@ -67,7 +71,7 @@ import convex.peer.Config;
  * </p>
  */
 @SuppressWarnings("unused")
-public class Connection {
+public class Connection extends AConnection {
 
 	final ByteChannel channel;
 
@@ -236,12 +240,7 @@ public class Connection {
 		receiver.setHook(hook);
 	}
 
-	/**
-	 * Returns the remote SocketAddress associated with this connection, or null if
-	 * not available
-	 *
-	 * @return An InetSocketAddress if associated, otherwise null
-	 */
+	@Override
 	public InetSocketAddress getRemoteAddress() {
 		if (!(channel instanceof SocketChannel))
 			return null;
@@ -334,13 +333,7 @@ public class Connection {
 		}
 	}
 
-	/**
-	 * Sends a message over this connection
-	 *
-	 * @param msg Message to send
-	 * @return true if message buffered successfully, false if failed due to full buffer
-	 * @throws IOException If IO error occurs while sending
-	 */
+	@Override
 	public boolean sendMessage(Message msg) throws IOException  {
 		return sendBuffer(msg.getMessageData());
 	}
@@ -427,6 +420,7 @@ public class Connection {
 
 	}
 
+	@Override
 	public synchronized void close() {
 		SocketChannel chan = (SocketChannel) channel;
 		if (chan != null) {
@@ -443,11 +437,7 @@ public class Connection {
 		close();
 	}
 
-	/**
-	 * Checks if this connection is closed (i.e. the underlying channel is closed)
-	 *
-	 * @return true if the channel is closed, false otherwise.
-	 */
+	@Override
 	public boolean isClosed() {
 		return !channel.isOpen();
 	}
@@ -644,10 +634,6 @@ public class Connection {
 
 	public void setTrustedPeerKey(AccountKey value) {
 		trustedPeerKey = value;
-	}
-
-	public boolean isTrusted() {
-		return trustedPeerKey != null;
 	}
 
 	public long getLastActivity() {

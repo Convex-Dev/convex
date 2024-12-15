@@ -34,10 +34,11 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
+import convex.net.AConnection;
 import convex.net.ChallengeRequest;
-import convex.net.Connection;
 import convex.net.IPUtils;
 import convex.net.Message;
+import convex.net.impl.nio.Connection;
 
 /**
  * Class for managing the outbound Peer connections from a Peer Server.
@@ -78,7 +79,7 @@ public class ConnectionManager extends AThreadedComponent {
 	/**
 	 * Map of current connections.
 	 */
-	private final HashMap<AccountKey,Connection> connections = new HashMap<>();
+	private final HashMap<AccountKey,AConnection> connections = new HashMap<>();
 
 	/**
 	 * The list of outgoing challenges that are being made to remote peers
@@ -99,7 +100,7 @@ public class ConnectionManager extends AThreadedComponent {
 			long lastConsensus = server.getPeer().getConsensusState().getTimestamp().longValue();
 			if (lastConsensus + pollDelay >= Utils.getCurrentTimestamp()) return;
 
-			ArrayList<Connection> conns = new ArrayList<>(connections.values());
+			ArrayList<AConnection> conns = new ArrayList<>(connections.values());
 			if (conns.size() == 0) {
 				// Nothing to do
 				return;
@@ -107,7 +108,7 @@ public class ConnectionManager extends AThreadedComponent {
 			
 			// TODO: probably shouldn't make a new connection?
 			// Maybe use Convex instance instead of Connection?
-			Connection c = conns.get(random.nextInt(conns.size()));
+			AConnection c = conns.get(random.nextInt(conns.size()));
 
 			if (c.isClosed()) return;
 			;
@@ -151,7 +152,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 		AccountKey[] peers = connections.keySet().toArray(new AccountKey[currentPeerCount]);
 		for (AccountKey p: peers) {
-			Connection conn=connections.get(p);
+			AConnection conn=connections.get(p);
 
 			// Remove closed connections. No point keeping these
 			if ((conn==null)||(conn.isClosed())) {
@@ -272,7 +273,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 *
 	 */
 	public void closeConnection(AccountKey peerKey) {
-		Connection conn=connections.get(peerKey);
+		AConnection conn=connections.get(peerKey);
 		if (conn!=null) {
 			conn.close();
 			connections.remove(peerKey);
@@ -283,7 +284,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 * Close all outgoing connections from this Peer
 	 */
 	public void closeAllConnections() {
-		for (Connection conn:connections.values()) {
+		for (AConnection conn:connections.values()) {
 			if (conn!=null) conn.close();
 		}
 		connections.clear();
@@ -294,7 +295,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 *
 	 * @return Set of connections
 	 */
-	public HashMap<AccountKey,Connection> getConnections() {
+	public HashMap<AccountKey,AConnection> getConnections() {
 		return connections;
 	}
 
@@ -315,7 +316,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 *
 	 * @return Connection instance, or null if not found
 	 */
-	public Connection getConnection(AccountKey peerKey) {
+	public AConnection getConnection(AccountKey peerKey) {
 		if (!connections.containsKey(peerKey)) return null;
 		return connections.get(peerKey);
 	}
@@ -326,21 +327,6 @@ public class ConnectionManager extends AThreadedComponent {
 	 */
 	public int getConnectionCount() {
 		return connections.size();
-	}
-
-	/**
-	 * Returns the number of trusted connections
-	 * @return Number of trusted connections
-	 *
-	 */
-	public int getTrustedConnectionCount() {
-		int result = 0;
-		for (Connection connection : connections.values()) {
-			if (connection.isTrusted()) {
-				result ++;
-			}
-		}
-		return result;
 	}
 
 	public void processChallenge(Message m, Peer thisPeer) {
@@ -487,9 +473,9 @@ public class ConnectionManager extends AThreadedComponent {
 			// remove from list incase this fails, we can generate another challenge
 			challengeList.remove(fromPeer);
 
-			Connection connection = getConnection(fromPeer);
+			AConnection connection = getConnection(fromPeer);
 			if (connection != null) {
-				connection.setTrustedPeerKey(fromPeer);
+				connection.setTrustedKey(fromPeer);
 			}
 
 			// return the trusted peer key
@@ -506,7 +492,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param thisPeer Source peer that the challenge is issued from
 	 *
 	 */
-	public void requestChallenge(AccountKey toPeerKey, Connection connection, Peer thisPeer) {
+	public void requestChallenge(AccountKey toPeerKey, AConnection connection, Peer thisPeer) {
 		synchronized(challengeList) {
 			if (connection.isTrusted()) {
 				return;
@@ -521,7 +507,7 @@ public class ConnectionManager extends AThreadedComponent {
 				challengeList.remove(toPeerKey);
 			}
 			ChallengeRequest request = ChallengeRequest.create(toPeerKey);
-			if (request.send(connection, thisPeer)>=0) {
+			if (request.send(connection, thisPeer)) {
 				challengeList.put(toPeerKey, request);
 			} else {
 				// TODO: check OK to do nothing and send later?
@@ -537,17 +523,17 @@ public class ConnectionManager extends AThreadedComponent {
 	 *
 	 */
 	public void broadcast(Message msg) throws InterruptedException {
-		HashMap<AccountKey,Connection> hm=getCurrentConnections();
+		HashMap<AccountKey,AConnection> hm=getCurrentConnections();
 		
 		long start=Utils.getCurrentTimestamp();
 		while ((!hm.isEmpty())&&(start+BROADCAST_TIMEOUT>Utils.getCurrentTimestamp())) {
-			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
+			ArrayList<Map.Entry<AccountKey,AConnection>> left=new ArrayList<>(hm.entrySet());
 			
 			// Shuffle order for sending
 			Utils.shuffle(left);
 			
-			for (Map.Entry<AccountKey,Connection> me: left) {
-				Connection pc=me.getValue();
+			for (Map.Entry<AccountKey,AConnection> me: left) {
+				AConnection pc=me.getValue();
 				boolean sent;
 				try {
 					sent = pc.sendMessage(msg);
@@ -573,15 +559,15 @@ public class ConnectionManager extends AThreadedComponent {
 		}
 		
 		if ((!hm.isEmpty())&&server.isLive()) {
-			ArrayList<Map.Entry<AccountKey,Connection>> left=new ArrayList<>(hm.entrySet());
-			Map.Entry<AccountKey,Connection> drop=left.get(random.nextInt(left.size()));
+			ArrayList<Map.Entry<AccountKey,AConnection>> left=new ArrayList<>(hm.entrySet());
+			Map.Entry<AccountKey,AConnection> drop=left.get(random.nextInt(left.size()));
 			AccountKey dropKey=drop.getKey();
 			closeConnection(dropKey);
 			log.warn("Unable to send broadcast to "+hm.size()+" peers, dropped one connection to: "+dropKey);
 		}
 	}
 
-	private HashMap<AccountKey, Connection> getCurrentConnections() {
+	private HashMap<AccountKey, AConnection> getCurrentConnections() {
 		synchronized(connections) {
 			return new HashMap<>(connections);
 		}
@@ -593,8 +579,8 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @return new Connection, or null if attempt fails
 	 * @throws InterruptedException 
 	 */
-	public Connection connectToPeer(InetSocketAddress hostAddress) throws InterruptedException {
-		Connection newConn = null;
+	public AConnection connectToPeer(InetSocketAddress hostAddress) throws InterruptedException {
+		AConnection newConn = null;
 		try {
 			// Use temp client connection to query status
 			Convex convex=Convex.connect(hostAddress);
@@ -611,7 +597,7 @@ public class ConnectionManager extends AThreadedComponent {
 			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
 			if (peerKey==null) return null;
 
-			Connection existing=connections.get(peerKey);
+			AConnection existing=connections.get(peerKey);
 			if ((existing!=null)&&!existing.isClosed()) return existing;
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages

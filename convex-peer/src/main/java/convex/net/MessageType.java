@@ -107,8 +107,8 @@ public enum MessageType {
 	 * Communication of an intention to shutdown the connection. This is optional
 	 * 
 	 * Payload can be:
-	 * - nil for no reason
-	 * - A human readable string as a reason
+	 * - [:BYE] for generic close
+	 * - [:BYE message] for close with a reason
 	 */
 	GOODBYE(11),
 

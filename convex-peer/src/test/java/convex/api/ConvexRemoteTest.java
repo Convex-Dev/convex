@@ -32,9 +32,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.net.Connection;
 import convex.net.Message;
 import convex.net.MessageType;
+import convex.net.impl.nio.Connection;
 import convex.peer.TestNetwork;
 
 /**

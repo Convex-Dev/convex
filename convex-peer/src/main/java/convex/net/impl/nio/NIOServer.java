@@ -1,4 +1,4 @@
-package convex.net;
+package convex.net.impl.nio;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -22,6 +22,8 @@ import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
+import convex.net.AServer;
+import convex.net.Message;
 import convex.net.impl.HandlerException;
 import convex.peer.Config;
 import convex.peer.Server;

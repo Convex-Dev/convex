@@ -731,13 +731,12 @@ public abstract class Convex implements AutoCloseable {
 	public abstract CompletableFuture<Result> messageRaw(Blob message);
 	
 	/**
-	 * Submits a Message to the Convex network, returning a Future for any Result
+	 * Submits a Message to the connected peer, returning a Future for any Result
 	 *
 	 * @param message Message data
-	 * @return A Future for the result of the query. May just be "Sent" if no other result expected.
+	 * @return A Future for the Result of the query. May just be "Sent" if no other result expected, or an immediate error if sending failed.
 	 */
 	public abstract CompletableFuture<Result> message(Message message);
-
 	
 	/**
 	 * Attempts to resolve a CNS name
