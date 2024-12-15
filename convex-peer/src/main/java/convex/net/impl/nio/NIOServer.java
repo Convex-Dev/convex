@@ -262,7 +262,7 @@ public class NIOServer extends AServer {
 	}
 
 	private Connection createClientConnection(SocketChannel sc) throws IOException {
-		return Connection.create(sc, getReceiveAction(), server.getStore(), null);
+		return Connection.create(sc, getReceiveAction(), null);
 	}
 
 	protected Consumer<Message> getReceiveAction() {

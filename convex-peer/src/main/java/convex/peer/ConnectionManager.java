@@ -601,7 +601,7 @@ public class ConnectionManager extends AThreadedComponent {
 			if ((existing!=null)&&!existing.isClosed()) return existing;
 			synchronized(connections) {
 				// reopen with connection to the peer and handle server messages
-				newConn = Connection.connect(hostAddress, server.receiveAction, server.getStore(), null,Config.SOCKET_PEER_BUFFER_SIZE,Config.SOCKET_PEER_BUFFER_SIZE);
+				newConn = Connection.connect(hostAddress, server.receiveAction, null,Config.SOCKET_PEER_BUFFER_SIZE,Config.SOCKET_PEER_BUFFER_SIZE);
 				connections.put(peerKey, newConn);
 			}
 		} catch (IOException | TimeoutException e) {

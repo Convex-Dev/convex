@@ -178,25 +178,9 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
 			throws IOException, TimeoutException {
-		return Convex.connect(peerAddress, address, keyPair, Stores.current());
-	}
-
-	/**
-	 * Create a Convex client by connecting to the specified Peer using the given
-	 * key pair and using a given store
-	 *
-	 * @param peerAddress Address of Peer
-	 * @param address     Address of Account to use for Client
-	 * @param keyPair     Key pair to use for client transactions
-	 * @param store       Store to use for this connection
-	 * @return New Convex client instance
-	 * @throws IOException      If connection fails due to IO error
-	 * @throws TimeoutException If connection attempt times out
-	 */
-	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store)
-			throws IOException, TimeoutException {
-		ConvexRemote convex = new ConvexRemote(address, keyPair);
-		convex.connectToPeer(peerAddress, store);
+		ConvexRemote convex = ConvexRemote.connect(peerAddress);
+		convex.setAddress(address);
+		convex.setKeyPair(keyPair);
 		return convex;
 	}
 	

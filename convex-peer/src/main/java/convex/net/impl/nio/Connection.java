@@ -124,7 +124,7 @@ public class Connection extends AConnection {
 	 * @return New Connection instance
 	 * @throws IOException If IO error occurs
 	 */
-	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
+	public static Connection create(ByteChannel channel, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey) throws IOException {
 		// Needed in case server has incoming connections but no outbound?
 		ensureSelectorLoop(); 
@@ -144,9 +144,9 @@ public class Connection extends AConnection {
 	 * @throws TimeoutException If connection cannot be established within an
 	 *                          acceptable time (~5s)
 	 */
-	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction, AStore store)
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction)
 			throws IOException, TimeoutException {
-		return connect(socketAddress, receiveAction, store, null);
+		return connect(socketAddress, receiveAction, null);
 	}
 	
 	/**
@@ -163,9 +163,9 @@ public class Connection extends AConnection {
 	 * @throws TimeoutException If the connection cannot be established within the
 	 *                          timeout period
 	 */
-	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction, AStore store,
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey) throws IOException, TimeoutException {	
-		return connect(socketAddress,receiveAction,store,trustedPeerKey,Config.SOCKET_SEND_BUFFER_SIZE,Config.SOCKET_RECEIVE_BUFFER_SIZE);
+		return connect(socketAddress,receiveAction,trustedPeerKey,Config.SOCKET_SEND_BUFFER_SIZE,Config.SOCKET_RECEIVE_BUFFER_SIZE);
 	}
 
 	/**
@@ -184,12 +184,10 @@ public class Connection extends AConnection {
 	 * @throws TimeoutException If the connection cannot be established within the
 	 *                          timeout period
 	 */
-	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction, AStore store,
+	public static Connection connect(InetSocketAddress socketAddress, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey, int sendBufferSize, int receiveBufferSize) throws IOException, TimeoutException {
 		ensureSelectorLoop();
 		
-		if (store == null)
-			throw new Error("Connection requires a store");
 		SocketChannel clientChannel = SocketChannel.open();
 		clientChannel.configureBlocking(false);
 		clientChannel.socket().setReceiveBufferSize(receiveBufferSize);
@@ -215,7 +213,7 @@ public class Connection extends AConnection {
 			}
 		}
 
-		Connection pc = create(clientChannel, receiveAction, store, trustedPeerKey);
+		Connection pc = create(clientChannel, receiveAction, trustedPeerKey);
 		pc.startClientListening();
 		log.trace("Connect succeeded for host: {}", socketAddress);
 		return pc;

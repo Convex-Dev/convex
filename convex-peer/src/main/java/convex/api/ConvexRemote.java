@@ -53,15 +53,20 @@ public class ConvexRemote extends Convex {
 		super(address, keyPair);
 	}
 	
-	protected void connectToPeer(InetSocketAddress peerAddress, AStore store) throws IOException, TimeoutException {
+	protected void connectToPeer(InetSocketAddress peerAddress) throws IOException, TimeoutException {
 		remoteAddress=peerAddress;
-		setConnection(Connection.connect(peerAddress, returnMessageHandler, store));
+		setConnection(Connection.connect(peerAddress, returnMessageHandler));
+	}
+	
+	public static ConvexRemote connect(InetSocketAddress peerAddress) throws IOException, TimeoutException {
+		ConvexRemote convex=new ConvexRemote(null,null);
+		convex.connectToPeer(peerAddress);
+		return convex;
 	}
 	
 	public void reconnect() throws IOException, TimeoutException {
-		AStore store=Stores.current();
 		close();
-		setConnection(Connection.connect(remoteAddress, returnMessageHandler, store));
+		setConnection(Connection.connect(remoteAddress, returnMessageHandler));
 	}
 
 	/**
