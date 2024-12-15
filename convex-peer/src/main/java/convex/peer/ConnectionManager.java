@@ -667,6 +667,9 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param peerKey Peer key which triggered missing data
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
+		AConnection conn=getConnection(peerKey);
+		if (conn==null) return; // No outbound connection to this peer, so just ignore
+		
 		if (log.isDebugEnabled()) {
 			String message= "Missing data alert "+e.getMissingHash();
 			log.debug(message);

@@ -88,7 +88,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * Check if the propagator wants the latest Belief for rebroadcast
 	 * @return True is rebroadcast is due
 	 */
-	public boolean isRebroadcastDue() {
+	boolean isRebroadcastDue() {
 		return (lastBroadcastTime+BELIEF_REBROADCAST_DELAY)<Utils.getCurrentTimestamp();
 	}
 
@@ -323,6 +323,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> orders, Message m) {
 		boolean changed=false;
 		AccountKey myKey=server.getPeerKey();
+		
 		try {
 			// Add to map of new Beliefs received for each Peer
 			beliefReceivedCount++;			
@@ -338,6 +339,8 @@ public class BeliefPropagator extends AThreadedComponent {
 						if (orders.containsKey(key)) {
 							Order newOrder=so.getValue();
 							Order oldOrder=orders.get(key).getValue();
+							
+				
 							boolean replace=BeliefMerge.compareOrders(oldOrder, newOrder);
 							if (!replace) continue;
 						} 
@@ -350,6 +353,7 @@ public class BeliefPropagator extends AThreadedComponent {
 							server.getConnectionManager().alertBadMessage(m,"Bad Order Signature!!");
 							break;
 						};
+						
 						
 						// Ensure we can persist newly received Order
 						so=Cells.persist(so);
@@ -368,7 +372,7 @@ public class BeliefPropagator extends AThreadedComponent {
 					}
 				}
 			} catch (MissingDataException e) {
-				log.info("Missing data in Belief message "+m.getHash());
+				log.debug("Missing data in Belief message "+m.getHash());
 				server.getConnectionManager().alertMissing(m,e,null);
 			}
 		} catch (ClassCastException | BadFormatException e) {
