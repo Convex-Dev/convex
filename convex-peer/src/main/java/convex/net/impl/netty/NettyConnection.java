@@ -1,11 +1,13 @@
 package convex.net.impl.netty;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.function.Consumer;
 
 import convex.core.data.Vectors;
 import convex.core.util.Shutdown;
+import convex.net.AConnection;
 import convex.net.Message;
 import convex.net.MessageType;
 import convex.peer.Config;
@@ -19,7 +21,7 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
-public class NettyClient {
+public class NettyConnection extends AConnection {
 
 	/**
 	 * Static client connection worker
@@ -30,7 +32,7 @@ public class NettyClient {
 
 	private Channel channel;
 
-	private NettyClient(Channel channel) {
+	private NettyConnection(Channel channel) {
 		this.channel = channel;
 	}
 
@@ -38,7 +40,7 @@ public class NettyClient {
 		if (workerGroup != null)
 			return workerGroup;
 
-		synchronized (NettyClient.class) {
+		synchronized (NettyConnection.class) {
 			if (workerGroup != null)
 				return workerGroup;
 			workerGroup = new NioEventLoopGroup();
@@ -56,7 +58,7 @@ public class NettyClient {
 		if (clientBootstrap != null)
 			return clientBootstrap;
 
-		synchronized (NettyClient.class) {
+		synchronized (NettyConnection.class) {
 			if (clientBootstrap != null)
 				return clientBootstrap;
 			Bootstrap b = new Bootstrap();
@@ -77,7 +79,7 @@ public class NettyClient {
 		}
 	}
 
-	public static NettyClient connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
 		Bootstrap b = getClientBootstrap();
 		ChannelFuture f = b.connect(sa).sync(); // (5)
 
@@ -85,7 +87,7 @@ public class NettyClient {
 		NettyInboundHandler inbound=new NettyInboundHandler(receiveAction,null);
 		f.channel().pipeline().addLast(inbound,new NettyOutboundHandler());
 
-		NettyClient client = new NettyClient(chan);
+		NettyConnection client = new NettyConnection(chan);
 		return client;
 	}
 
@@ -94,11 +96,43 @@ public class NettyClient {
 	}
 
 	public static void main(String... args) throws Exception {
-		NettyClient client = connect(new InetSocketAddress("localhost", 8000),m->{
+		NettyConnection client = connect(new InetSocketAddress("localhost", 8000),m->{
 			System.err.println("Client received:" + m);
 		});
 
 		client.send(Message.create(MessageType.QUERY,Vectors.of(1,2,3,4))).sync();
 	}
+
+	@Override
+	public boolean sendMessage(Message m) throws IOException {
+		ChannelFuture cf=send(m);
+		try {
+			cf.await();
+			return cf.isSuccess();
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			return false;
+		}
+	}
+
+	@Override
+	public InetSocketAddress getRemoteAddress() {
+		if (channel==null) return null;
+		return (InetSocketAddress) channel.remoteAddress();
+	}
+
+	@Override
+	public boolean isClosed() {
+		if (channel==null) return true;
+		return !channel.isOpen();
+	}
+
+	@Override
+	public void close() {
+		if (channel!=null) {
+			channel.close();
+			channel=null;
+		}
+ 	}
 
 }

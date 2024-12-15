@@ -28,7 +28,7 @@ public class NettyServerTest {
 			assertEquals(port,addr.getPort());
 			
 			CompletableFuture<Message> rec=new CompletableFuture<>();
-			NettyClient client=NettyClient.connect(addr, m->{
+			NettyConnection client=NettyConnection.connect(addr, m->{
 				rec.complete(m);
 			});
 			

@@ -59,7 +59,7 @@ public class NettyServer extends AServer {
 	
 	public void launch() throws IOException,InterruptedException {
         EventLoopGroup bossGroup = NettyServer.getEventLoopGroup(); 
-        EventLoopGroup workerGroup = NettyClient.getEventLoopGroup();
+        EventLoopGroup workerGroup = NettyConnection.getEventLoopGroup();
         ServerBootstrap b = new ServerBootstrap(); 
         b.group(bossGroup, workerGroup)
          .channel(NioServerSocketChannel.class) 
