@@ -86,12 +86,6 @@ public class Connection extends AConnection {
 	private long lastActivity;
 
 	/**
-	 * Store to use for this connection. Required for responding to incoming
-	 * messages.
-	 */
-	private final AStore store;
-
-	/**
 	 * If trusted, the Account Key of the remote peer.
 	 */
 	private AccountKey trustedPeerKey;
@@ -101,7 +95,7 @@ public class Connection extends AConnection {
 	private final MessageReceiver receiver;
 	private final MessageSender sender;
 
-	private Connection(ByteChannel channel, Consumer<Message> receiveAction, AStore store,
+	private Connection(ByteChannel channel, Consumer<Message> receiveAction,
 			AccountKey trustedPeerKey) {
 		this.channel = channel;
 		Predicate<Message> handler=t -> {
@@ -114,7 +108,6 @@ public class Connection extends AConnection {
 		
 		receiver = new MessageReceiver(receiveAction, handler);
 		sender = new MessageSender(channel);
-		this.store = store;
 		this.lastActivity=Utils.getCurrentTimestamp();
 		this.trustedPeerKey = trustedPeerKey;
 	}
@@ -136,7 +129,7 @@ public class Connection extends AConnection {
 		// Needed in case server has incoming connections but no outbound?
 		ensureSelectorLoop(); 
 	
-		return new Connection(channel, receiveAction, store, trustedPeerKey);
+		return new Connection(channel, receiveAction, trustedPeerKey);
 	}
 
 	/**
@@ -250,14 +243,6 @@ public class Connection extends AConnection {
 			// anything fails, we have no address
 			return null;
 		}
-	}
-	
-	/**
-	 * Gets the store associated with this Connection
-	 * @return Store instance
-	 */
-	public AStore getStore() {
-		return store;
 	}
 
 	/**
@@ -576,20 +561,14 @@ public class Connection extends AConnection {
 	 */
 	public int handleChannelRecieve() throws IOException, BadFormatException, HandlerException {
 		AStore savedStore = Stores.current();
-		try {
-			// set the current store for handling incoming messages
-			Stores.setCurrent(store);
-			int recd= receiver.receiveFromChannel(channel);
-			int total =recd;
-			while (recd>0) {
-				recd=receiver.receiveFromChannel(channel);
-				total+=recd;
-			}
-			if (recd>0) lastActivity=System.currentTimeMillis();
-			return total;
-		} finally {
-			Stores.setCurrent(savedStore);
+		int recd= receiver.receiveFromChannel(channel);
+		int total =recd;
+		while (recd>0) {
+			recd=receiver.receiveFromChannel(channel);
+			total+=recd;
 		}
+		if (recd>0) lastActivity=System.currentTimeMillis();
+		return total;
 	}
 
 	/**

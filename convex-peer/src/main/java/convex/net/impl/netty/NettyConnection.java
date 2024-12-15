@@ -32,8 +32,11 @@ public class NettyConnection extends AConnection {
 
 	private Channel channel;
 
-	private NettyConnection(Channel channel) {
+	private NettyInboundHandler inboundHandler;
+
+	private NettyConnection(Channel channel, NettyInboundHandler inbound) {
 		this.channel = channel;
+		this.inboundHandler=inbound;
 	}
 
 	protected static EventLoopGroup getEventLoopGroup() {
@@ -87,7 +90,7 @@ public class NettyConnection extends AConnection {
 		NettyInboundHandler inbound=new NettyInboundHandler(receiveAction,null);
 		f.channel().pipeline().addLast(inbound,new NettyOutboundHandler());
 
-		NettyConnection client = new NettyConnection(chan);
+		NettyConnection client = new NettyConnection(chan,inbound);
 		return client;
 	}
 
@@ -134,5 +137,10 @@ public class NettyConnection extends AConnection {
 			channel=null;
 		}
  	}
+
+	@Override
+	public long getReceivedCount() {
+		return inboundHandler.getReceivedCount();
+	}
 
 }

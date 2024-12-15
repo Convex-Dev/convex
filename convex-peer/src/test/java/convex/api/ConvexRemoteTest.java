@@ -32,9 +32,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.net.AConnection;
 import convex.net.Message;
 import convex.net.MessageType;
-import convex.net.impl.nio.Connection;
 import convex.peer.TestNetwork;
 
 /**
@@ -73,7 +73,7 @@ public class ConvexRemoteTest {
 	@Test
 	public void testBadQueryMessage() throws IOException, TimeoutException {
 		ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
-		Connection conn=convex.connection;
+		AConnection conn=convex.connection;
 		conn.sendMessage(Message.create(MessageType.QUERY, Blobs.empty()));
 	}
 
@@ -167,7 +167,7 @@ public class ConvexRemoteTest {
 	public void testReceivedCount() throws IOException, TimeoutException, InterruptedException, ResultException {
 		synchronized (network.SERVER) {
 			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			Connection conn=convex.connection;
+			AConnection conn=convex.connection;
 
 			long seq=convex.getSequence();
 			assertEquals(1,conn.getReceivedCount());

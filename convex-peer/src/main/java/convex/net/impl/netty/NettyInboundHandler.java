@@ -25,6 +25,9 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
 
 	private Predicate<Message> returnAction;
 
+
+	private long receivedCount=0;
+
 	public NettyInboundHandler(Consumer<Message> receiveAction, Predicate<Message> returnAction)  {
 		this.receiveAction=receiveAction;
 		this.returnAction=returnAction;
@@ -58,6 +61,7 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
     		
     		// Create message with return action, unknown type and Blob data
     		Message m=Message.create(returnAction,null,Blob.wrap(dst));
+    		receivedCount++;
     		
     		if (receiveAction!=null) {
     			receiveAction.accept(m);
@@ -78,4 +82,8 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
 		NettyServer.log.info("Closed Netty channel due to: "+cause.getMessage(),cause);
         ctx.close();
     }
+
+	public long getReceivedCount() {
+		return receivedCount;
+	}
 }

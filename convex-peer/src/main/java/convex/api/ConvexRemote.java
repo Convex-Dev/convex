@@ -26,6 +26,7 @@ import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
+import convex.net.AConnection;
 import convex.net.Message;
 import convex.net.impl.nio.Connection;
 import convex.peer.Server;
@@ -34,7 +35,7 @@ public class ConvexRemote extends Convex {
 	/**
 	 * Current Connection to a Peer, may be null or a closed connection.
 	 */
-	protected Connection connection;
+	protected AConnection connection;
 	
 	protected static final Logger log = LoggerFactory.getLogger(ConvexRemote.class.getName());
 	
@@ -43,7 +44,9 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public InetSocketAddress getHostAddress() {
-		return remoteAddress;
+		AConnection conn=connection;
+		if (conn==null) return null;
+		return conn.getRemoteAddress();
 	}
 
 	protected ConvexRemote(Address address, AKeyPair keyPair) {
@@ -56,8 +59,7 @@ public class ConvexRemote extends Convex {
 	}
 	
 	public void reconnect() throws IOException, TimeoutException {
-		Connection curr=connection;
-		AStore store=(curr==null)?Stores.current():curr.getStore();
+		AStore store=Stores.current();
 		close();
 		setConnection(Connection.connect(remoteAddress, returnMessageHandler, store));
 	}
@@ -68,7 +70,7 @@ public class ConvexRemote extends Convex {
 	 * @param conn Connection value to use
 	 */
 	protected void setConnection(Connection conn) {
-		Connection curr=this.connection;
+		AConnection curr=this.connection;
 		if (curr == conn) return;
 		if (curr!=null) close();
 		this.connection = conn;
@@ -80,7 +82,7 @@ public class ConvexRemote extends Convex {
 	 * @return true if connected, false otherwise
 	 */
 	public boolean isConnected() {
-		Connection c = this.connection;
+		AConnection c = this.connection;
 		return (c != null) && (!c.isClosed());
 	}
 	
@@ -170,7 +172,7 @@ public class ConvexRemote extends Convex {
 	 * Disconnects the client from the network, closing the underlying connection.
 	 */
 	public synchronized void close() {
-		Connection c = this.connection;
+		AConnection c = this.connection;
 		if (c != null) {
 			c.close();
 		}

@@ -48,4 +48,6 @@ public abstract class AConnection {
 
 	public abstract void close();
 
+	public abstract long getReceivedCount();
+
 }
