@@ -101,7 +101,7 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testBalanceQuery() throws IOException, TimeoutException, ResultException {
+	public void testBalanceQuery() throws IOException, TimeoutException, ResultException, InterruptedException {
 		Convex convex=Convex.connect(network.SERVER.getHostAddress(),network.VILLAIN,network.VILLAIN_KEYPAIR);
 
 		// test the connection is still working

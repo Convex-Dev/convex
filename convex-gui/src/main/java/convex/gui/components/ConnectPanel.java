@@ -109,7 +109,10 @@ public class ConnectPanel extends JPanel {
 	    	} catch (TimeoutException | IOException e) {
 	    		Toast.display(parent, e.getMessage(), Color.RED);
 	    		e.printStackTrace();
-	    	}
+	    	} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				e.printStackTrace();
+			}
 	    } else {
 	    	log.info("Connect cancelled by user");
 	    }

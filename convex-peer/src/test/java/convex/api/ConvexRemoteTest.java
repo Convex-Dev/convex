@@ -58,7 +58,7 @@ public class ConvexRemoteTest {
 	}
 
 	@Test
-	public void testConnection() throws IOException, TimeoutException {
+	public void testConnection() throws IOException, TimeoutException, InterruptedException {
 		synchronized (network.SERVER) {
 			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
 			assertTrue(convex.isConnected());
@@ -71,7 +71,7 @@ public class ConvexRemoteTest {
 	}
 	
 	@Test
-	public void testBadQueryMessage() throws IOException, TimeoutException {
+	public void testBadQueryMessage() throws IOException, TimeoutException, InterruptedException {
 		ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
 		AConnection conn=convex.connection;
 		conn.sendMessage(Message.create(MessageType.QUERY, Blobs.empty()));

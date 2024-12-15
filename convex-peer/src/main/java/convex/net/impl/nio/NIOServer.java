@@ -274,7 +274,7 @@ public class NIOServer extends AServer {
 		// log.info("Connection read from: "+sc.getRemoteAddress()+" with key:"+key);
 		Connection conn = ensureConnection(key);
 		if (conn == null)
-			throw new IOException("No Connection in selecion key");
+			throw new IOException("No Connection in selection key");
 		try {
 			int n = conn.handleChannelRecieve();
 			if (n < 0) {

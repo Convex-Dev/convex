@@ -1,8 +1,6 @@
 package convex.gui.peer;
 
-import java.io.IOException;
 import java.util.Objects;
-import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
@@ -12,13 +10,13 @@ import javax.swing.JPopupMenu;
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
-import convex.core.cvm.Peer;
-import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
+import convex.core.cvm.Peer;
+import convex.core.cvm.PeerStatus;
+import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AccountKey;
-import convex.core.cvm.Address;
-import convex.core.cvm.PeerStatus;
 import convex.core.text.Text;
 import convex.etch.EtchStore;
 import convex.gui.components.BaseImageButton;
@@ -190,7 +188,7 @@ public class PeerComponent extends BaseListComponent {
 			AKeyPair kp=peer.getKeyPair();;
 			convex.setAddress(addr,kp);
 			new REPLClient(convex).run();
-		} catch (IOException | TimeoutException e) {
+		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}

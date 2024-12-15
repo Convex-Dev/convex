@@ -356,7 +356,7 @@ public class StressPanel extends JPanel {
 			}
 		}
 
-		protected void connectClients(AVector<Address> clientAddresses) throws IOException, TimeoutException {
+		protected void connectClients(AVector<Address> clientAddresses) throws IOException, TimeoutException, InterruptedException {
 			for (int i=0; i<clientCount; i++) {
 				AKeyPair kp=kps.get(i);
 				Address clientAddr = clientAddresses.get(i);

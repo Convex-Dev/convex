@@ -84,7 +84,7 @@ public class NettyConnection extends AConnection {
 
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
 		Bootstrap b = getClientBootstrap();
-		ChannelFuture f = b.connect(sa).sync(); // (5)
+		ChannelFuture f = b.connect(sa).sync(); 
 
 		Channel chan = f.channel();
 		NettyInboundHandler inbound=new NettyInboundHandler(receiveAction,null);

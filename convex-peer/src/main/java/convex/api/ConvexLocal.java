@@ -39,6 +39,10 @@ public class ConvexLocal extends Convex {
 		this.preCompile=true; // pre-compile by default if local peer
 	}
 	
+	public static ConvexLocal create(Server server) {
+		return new ConvexLocal(server, null,null);
+	}
+	
 	public static ConvexLocal create(Server server, Address address, AKeyPair keyPair) {
 		return new ConvexLocal(server, address,keyPair);
 	}

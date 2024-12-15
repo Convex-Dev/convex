@@ -602,15 +602,7 @@ public class Connection extends AConnection {
 
 	@Override
 	public String toString() {
-		return "PeerConnection: " + channel;
-	}
-
-	public AccountKey getTrustedPeerKey() {
-		return trustedPeerKey;
-	}
-
-	public void setTrustedPeerKey(AccountKey value) {
-		trustedPeerKey = value;
+		return "NIO Connection: " + channel;
 	}
 
 	public long getLastActivity() {

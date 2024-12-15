@@ -31,6 +31,10 @@ import convex.net.Message;
 import convex.net.impl.nio.Connection;
 import convex.peer.Server;
 
+/**
+ * Convex client API implementation for peers accessed over a network connection using the Convex binary peer protocol
+ * 
+ */
 public class ConvexRemote extends Convex {
 	/**
 	 * Current Connection to a Peer, may be null or a closed connection.
@@ -53,12 +57,13 @@ public class ConvexRemote extends Convex {
 		super(address, keyPair);
 	}
 	
-	protected void connectToPeer(InetSocketAddress peerAddress) throws IOException, TimeoutException {
+	protected void connectToPeer(InetSocketAddress peerAddress) throws IOException, TimeoutException, InterruptedException {
 		remoteAddress=peerAddress;
 		setConnection(Connection.connect(peerAddress, returnMessageHandler));
+		// setConnection(NettyConnection.connect(peerAddress, returnMessageHandler));
 	}
 	
-	public static ConvexRemote connect(InetSocketAddress peerAddress) throws IOException, TimeoutException {
+	public static ConvexRemote connect(InetSocketAddress peerAddress) throws IOException, TimeoutException, InterruptedException {
 		ConvexRemote convex=new ConvexRemote(null,null);
 		convex.connectToPeer(peerAddress);
 		return convex;
@@ -74,7 +79,7 @@ public class ConvexRemote extends Convex {
 	 *
 	 * @param conn Connection value to use
 	 */
-	protected void setConnection(Connection conn) {
+	protected void setConnection(AConnection conn) {
 		AConnection curr=this.connection;
 		if (curr == conn) return;
 		if (curr!=null) close();
@@ -89,14 +94,6 @@ public class ConvexRemote extends Convex {
 	public boolean isConnected() {
 		AConnection c = this.connection;
 		return (c != null) && (!c.isClosed());
-	}
-	
-	/**
-	 * Close without affecting the underlying connection (will be unlinked but not closed)
-	 */
-	public void closeButMaintainConnection() {
-		this.connection = null;
-		close();
 	}
 	
 	@Override

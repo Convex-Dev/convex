@@ -52,11 +52,13 @@ import convex.peer.Config;
 import convex.peer.Server;
 
 /**
- * Class representing a client API to the Convex network.
+ * Class providing a client API to the Convex network.
  *
- * An instance of the type Convex represents a stateful client connection to the
+ * An instance of the type Convex manages a stateful client connection to the
  * Convex network that can issue transactions both synchronously and
- * asynchronously. This can be used by both peers and JVM-based clients.
+ * asynchronously via a peer. 
+ * 
+ * This can be used by both peers and JVM-based clients.
  *
  * "I'm doing a (free) operating system (just a hobby, won't be big and
  * professional like gnu)" - Linus Torvalds
@@ -100,6 +102,12 @@ public abstract class Convex implements AutoCloseable {
 	protected HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
 
 	private Consumer<Message> delegatedHandler=null;
+	
+	/**
+	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result
+	 */
+	protected long idCounter=0;
+
 
 	/**
 	 * Result Consumer for messages received back from a client connection
@@ -141,8 +149,9 @@ public abstract class Convex implements AutoCloseable {
 	 * Attempts best possible connection
 	 * @throws TimeoutException 
 	 * @throws IOException 
+	 * @throws InterruptedException 
 	 */
-	public static Convex connect(Object host) throws IOException, TimeoutException {
+	public static Convex connect(Object host) throws IOException, TimeoutException, InterruptedException {
 		if (host instanceof Convex) return (Convex)host;
 		if (host instanceof Convex) return connect((Server)host);
 		
@@ -160,8 +169,9 @@ public abstract class Convex implements AutoCloseable {
 	 * @return New Convex client instance
 	 * @throws IOException      If IO Error occurs
 	 * @throws TimeoutException If connection attempt times out
+	 * @throws InterruptedException 
 	 */
-	public static ConvexRemote connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
+	public static ConvexRemote connect(InetSocketAddress hostAddress) throws IOException, TimeoutException, InterruptedException {
 		return connect(hostAddress, (Address) null, (AKeyPair) null);
 	}
 
@@ -175,16 +185,15 @@ public abstract class Convex implements AutoCloseable {
 	 * @return New Convex client instance
 	 * @throws IOException      If connection fails due to IO error
 	 * @throws TimeoutException If connection attempt times out
+	 * @throws InterruptedException 
 	 */
 	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
-			throws IOException, TimeoutException {
+			throws IOException, TimeoutException, InterruptedException {
 		ConvexRemote convex = ConvexRemote.connect(peerAddress);
 		convex.setAddress(address);
 		convex.setKeyPair(keyPair);
 		return convex;
 	}
-	
-	protected long idCounter=0;
 	
 	protected long getNextID() {
 		return idCounter++;
@@ -1007,7 +1016,8 @@ public abstract class Convex implements AutoCloseable {
 	 * @return New Client Connection
 	 */
 	public static ConvexLocal connect(Server server) {
-		return ConvexLocal.create(server, null, null);
+		ConvexLocal convex= ConvexLocal.create(server, null, null);
+		return convex;
 	}
 
 	/**

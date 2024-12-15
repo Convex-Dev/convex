@@ -244,8 +244,9 @@ public class PeerGUI extends AbstractGUI {
 	 * @return Convex connection instance
 	 * @throws IOException If IO error occurs during connection attempt
 	 * @throws TimeoutException If attempt to connect times out
+	 * @throws InterruptedException 
 	 */
-	public Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException {
+	public Convex makeConnection(Address address,AKeyPair kp) throws IOException, TimeoutException, InterruptedException {
 		InetSocketAddress host = getDefaultConvex().getHostAddress();
 		return Convex.connect(host,address, kp);
 	}
@@ -271,7 +272,7 @@ public class PeerGUI extends AbstractGUI {
 		return Convex.connect(getPrimaryServer(),contract,null);
 	}
 
-	public Convex connectClient(Address address, AKeyPair keyPair) throws IOException, TimeoutException {
+	public Convex connectClient(Address address, AKeyPair keyPair) throws IOException, TimeoutException, InterruptedException {
 			return makeConnection(address,keyPair);
 	}
 	
