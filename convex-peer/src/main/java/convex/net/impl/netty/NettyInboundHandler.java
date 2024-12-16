@@ -46,7 +46,7 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
     			int bm=(b&0x7f); // new bits for length
     			if ((i==0)&&(bm==0)) throw new BadFormatException("Zero leading bits in message length");
     			mlen=(mlen<<7)+bm;
-    			if (mlen>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long");
+    			if (mlen>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+mlen);
     			if ((b&0x80)==0) break;
     		}
     		

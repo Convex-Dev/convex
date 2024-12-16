@@ -560,6 +560,8 @@ public class BeliefMerge {
 			// new Order is more recent, so switch to this
 			return true;
 		} else {
+			// timestamps are the same
+			
 			// Don't replace if equal
 			if (oldOrder.equals(newOrder)) return false;
 			
@@ -569,8 +571,8 @@ public class BeliefMerge {
 			for (int level=0; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
 				if (newOrder.getConsensusPoint(level)>oldOrder.getConsensusPoint(level)) return true;
 			}
+			return false;
 		}
-		return false;
 	}
 	
 	/**

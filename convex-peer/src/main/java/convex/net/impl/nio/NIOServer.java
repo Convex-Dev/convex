@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.Message;
-import convex.net.impl.HandlerException;
 import convex.peer.Config;
 import convex.peer.Server;
 
@@ -53,10 +53,18 @@ public class NIOServer extends AServer {
 
 	private boolean running = false;
 
-	private final Server server;
+	private final Consumer<Message> receiveAction;
+
+	private final AStore store;
 	
-	private NIOServer(Server server) {
-		this.server = server;
+	protected NIOServer(AStore store, Consumer<Message> receiveAction) {
+		this.store=store;
+		this.receiveAction=receiveAction;
+	}
+	
+	
+	private AStore getStore() {
+		return store;
 	}
 
 	/**
@@ -66,7 +74,7 @@ public class NIOServer extends AServer {
 	 * @return New NIOServer instance
 	 */
 	public static NIOServer create(Server server) {
-		return new NIOServer(server);
+		return new NIOServer(server.getStore(),server.getReceiveAction());
 	}
 
 	/**
@@ -138,7 +146,7 @@ public class NIOServer extends AServer {
 		@Override
 		public void run() {
 			// Use the store configured for the owning server.
-			Stores.setCurrent(server.getStore());
+			Stores.setCurrent(getStore());
 			try {
 				// loop unless we are interrupted
 				while (running && !Thread.currentThread().isInterrupted()) {
@@ -181,8 +189,8 @@ public class NIOServer extends AServer {
 					// keys.clear();
 				}
 				
-			} catch (IOException e) {
-				log.error("Unexpected IO Exception, terminating selector loop: ", e);
+			} catch (Exception e) {
+				log.error("Unexpected Exception, terminating selector loop: ", e);
 			} finally {
 				try {
 					// close all client channels
@@ -210,7 +218,10 @@ public class NIOServer extends AServer {
 			}
 			log.debug("Selector loop ended on port: " + getPort());
 		}
+
+
 	};
+
 
 	@Override
 	public Integer getPort() {
@@ -266,7 +277,7 @@ public class NIOServer extends AServer {
 	}
 
 	protected Consumer<Message> getReceiveAction() {
-		return server.getReceiveAction();
+		return receiveAction;
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {
@@ -291,7 +302,7 @@ public class NIOServer extends AServer {
 					e.getMessage());
 			// TODO: blacklist peer?
 			key.cancel();
-		} catch (HandlerException e) {
+		} catch (Exception e) {
 			log.warn("Unexpected exception in receive handler", e.getCause());
 			key.cancel();
 		}

@@ -142,7 +142,14 @@ public class Message {
 	 */
 	public Blob getMessageData() {
 		if (messageData!=null) return messageData;
-		messageData=Format.encodeMultiCell(payload,true);
+		MessageType type=getType();
+		switch (type) {
+			case MessageType.BELIEF:
+				// throw new Error("Received belief message should already have partial data encoding");
+			default:
+				messageData=Format.encodeMultiCell(payload,true);
+		
+		}
 		return messageData;
 	}
 
@@ -238,7 +245,7 @@ public class Message {
 	 * @return
 	 */
 	public ACell getRequestID() {
-		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
+		// if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
 		try {
 			switch (getType()) {	
 			

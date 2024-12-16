@@ -536,7 +536,7 @@ public class Connection extends AConnection {
 			log.trace("Channel closed from: {}", conn.getRemoteAddress());
 			key.cancel();
 		} catch (BadFormatException e) {
-			log.debug("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
+			log.info("Cancelled connection to Peer: Bad data format from: " + conn.getRemoteAddress() + " "
 					+ e.getMessage());
 			key.cancel();
 		} catch (HandlerException e) {

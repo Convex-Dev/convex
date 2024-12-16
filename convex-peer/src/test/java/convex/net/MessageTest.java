@@ -16,6 +16,8 @@ import java.util.Random;
 
 import org.junit.jupiter.api.*;
 
+import convex.core.cpos.Order;
+
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Symbols;
@@ -34,6 +36,8 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.core.store.Stores;
 import convex.core.Result;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
 import convex.core.cpos.CPoSConstants;
 
 public class MessageTest {
@@ -62,6 +66,32 @@ public class MessageTest {
 		Message mdr=md.makeDataResponse(Stores.current());
 		assertEquals(mq,mdr);
 		doMessageTest(mdr);
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Test public void testBeliefMessage() throws BadFormatException {
+		long TS=120;
+		Block b=Block.of(TS);
+		
+		Belief belief=Belief.create(KP, Order.create(0,0,KP.signData(b)));
+		
+		Message m=Message.createBelief(belief);
+	
+		assertNull(m.getRequestID());
+		assertEquals(MessageType.BELIEF,m.getType());
+		
+		Blob enc=m.getMessageData();
+		
+		ACell b2=Format.decodeMultiCell(enc);
+		assertEquals(belief.getHash(),b2.getHash());
+		
+		Message m2=Message.create(enc);
+		assertNull(m.getResultID());
+
+		assertEquals(MessageType.BELIEF,m2.getType());
+		assertEquals(belief,m2.getPayload());
+		
+		
 	}
 	
 	@Test public void testBigMissingResponse() throws BadFormatException, IOException {

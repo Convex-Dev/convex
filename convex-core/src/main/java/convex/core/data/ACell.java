@@ -207,7 +207,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	@Override
 	public String toString() {
-		return print().toString();
+		try {
+			return print().toString();
+		} catch (Exception e) {
+			return Utils.getClassName(e)+ " Print failed: "+e.getMessage();
+		}
 	}
 	
 	/**

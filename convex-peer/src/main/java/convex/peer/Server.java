@@ -38,19 +38,18 @@ import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
-import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.core.util.Counters;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
 import convex.net.Message;
 import convex.net.MessageType;
+import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
 
 
@@ -139,7 +138,12 @@ public class Server implements Closeable {
 		// Critical to ensure we have the store set up before anything else. Stuff might break badly otherwise!
 		this.store = Config.ensureStore(config);
 		
-		this.nio= NIOServer.create(this);
+		if (Config.USE_NETTY_SERVER) {
+			this.nio=NettyServer.create(this);
+		} else {
+			this.nio= NIOServer.create(this);
+		}
+		
 	}
 
 	// This doesn't actually do anything useful? Do we need this?
@@ -242,7 +246,9 @@ public class Server implements Closeable {
 			}
 			log.info("Retrieved Peer Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 	
-			convex.close();
+			// Add the new connection since it seems good
+			getConnectionManager().addConnection(remoteKey,convex);
+			
 			SignedData<Order> peerOrder=belF.getOrders().get(remoteKey);
 			if (peerOrder!=null) {
 				SignedData<Order> newOrder=keyPair.signData(peerOrder.getValue());
@@ -376,11 +382,12 @@ public class Server implements Closeable {
 	 * 
 	 * SECURITY: Should anticipate malicious messages
 	 *
-	 * Runs on receiver thread, so we want to offload to a queue ASAP
+	 * Runs on receiver thread, so we want to offload to a queue ASAP, never block
 	 *
 	 * @param m
 	 */
 	protected void processMessage(Message m) {
+		// log.info("Message received: "+m.getMessageData());
 		AStore tempStore=Stores.current();
 		try {
 			Stores.setCurrent(this.store);
@@ -396,9 +403,6 @@ public class Server implements Closeable {
 				processResponse(m);
 				break;
 			case COMMAND:
-				break;
-			case DATA:
-				processData(m);
 				break;
 			case DATA_REQUEST:
 				processQuery(m); // goes on Query handler
@@ -425,7 +429,7 @@ public class Server implements Closeable {
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
-			log.trace("Missing data: {} in message", missingHash);
+			log.info("Missing data: {} in message", missingHash);
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
 		} finally {
@@ -549,26 +553,6 @@ public class Server implements Closeable {
 			m.returnResult(r);
 		} 
 	}
-	
-	private void processData(Message m) {
-		ACell payload;
-		try {
-			payload = m.getPayload();
-			Counters.peerDataReceived++;
-			
-			Ref<?> r = Ref.get(payload);
-			if (r.isEmbedded()) {
-				log.warn("DATA with embedded value: "+payload);
-				return;
-			}
-			r = r.persistShallow();
-		} catch (BadFormatException | IOException e) {
-			log.debug("Error processing data: "+e.getMessage());
-			m.closeConnection();
-			return;
-		}
-
-	}
 
 	/**
 	 * Process an incoming message that represents a Belief
@@ -585,7 +569,7 @@ public class Server implements Closeable {
 	 * Gets the port that this Server is currently accepting connections on
 	 * @return Port number
 	 */
-	public int getPort() {
+	public Integer getPort() {
 		return nio.getPort();
 	}
 

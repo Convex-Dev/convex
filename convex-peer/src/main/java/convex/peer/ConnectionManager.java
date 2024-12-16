@@ -8,8 +8,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.*;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +39,6 @@ import convex.net.AConnection;
 import convex.net.ChallengeRequest;
 import convex.net.IPUtils;
 import convex.net.Message;
-import convex.net.impl.nio.Connection;
 
 /**
  * Class for managing the outbound Peer connections from a Peer Server.
@@ -72,14 +72,9 @@ public class ConnectionManager extends AThreadedComponent {
 	static final long POLL_ACQUIRE_TIMEOUT_MILLIS = 12000;
 
 	/**
-	 * Timeout for a regular Belief delta broadcast
-	 */
-	private static final long BROADCAST_TIMEOUT = 1000;
-
-	/**
 	 * Map of current connections.
 	 */
-	private final HashMap<AccountKey,AConnection> connections = new HashMap<>();
+	private final HashMap<AccountKey,Convex> connections = new HashMap<>();
 
 	/**
 	 * The list of outgoing challenges that are being made to remote peers
@@ -94,13 +89,13 @@ public class ConnectionManager extends AThreadedComponent {
 	 * Celled by the connection manager to ensure we are tracking latest Beliefs on the network
 	 * @throws InterruptedException 
 	 */
-	private void pollBelief() throws InterruptedException {
+	private void maybePollBelief() throws InterruptedException {
 		try {
 			// Poll only if no recent consensus updates
 			long lastConsensus = server.getPeer().getConsensusState().getTimestamp().longValue();
 			if (lastConsensus + pollDelay >= Utils.getCurrentTimestamp()) return;
 
-			ArrayList<AConnection> conns = new ArrayList<>(connections.values());
+			ArrayList<Convex> conns = new ArrayList<>(connections.values());
 			if (conns.size() == 0) {
 				// Nothing to do
 				return;
@@ -108,30 +103,33 @@ public class ConnectionManager extends AThreadedComponent {
 			
 			// TODO: probably shouldn't make a new connection?
 			// Maybe use Convex instance instead of Connection?
-			AConnection c = conns.get(random.nextInt(conns.size()));
+			Convex c = conns.get(random.nextInt(conns.size()));
 
-			if (c.isClosed()) return;
-			;
-			try (Convex convex = Convex.connect(c.getRemoteAddress())) {
-				// use requestStatusSync to auto acquire hash of the status instead of the value
-				Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
-				if (result.isError()) {
-					log.warn("Failure requesting status from convex: "+result);
-					return;		
-				}
-				
-				AVector<ACell> status = result.getValue();
-				if (status==null) {
-					log.warn("Dubious status response message: "+result);
-					return;
-				}
-				Hash h=RT.ensureHash(status.get(0));
+			if (!c.isConnected()) {
+				log.warn("Attempted to poll from closed connection");
+				return;
+			}
 
-				Belief sb=(Belief) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
+			Convex convex = c;
+			
+			// use requestStatusSync to auto acquire hash of the status instead of the value
+			Result result=convex.requestStatusSync(POLL_TIMEOUT_MILLIS);
+			if (result.isError()) {
+				log.warn("Failure requesting status during polling: "+result);
+				return;		
+			}
+			
+			AVector<ACell> status = result.getValue();
+			if (status==null) {
+				log.warn("Dubious status response message: "+result);
+				return;
+			}
+			Hash h=RT.ensureHash(status.get(0));
 
-				server.queueBelief(Message.createBelief(sb));
-			} 
-		} catch (RuntimeException | TimeoutException | ExecutionException | IOException t) {
+			Belief sb=(Belief) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
+
+			server.queueBelief(Message.createBelief(sb));
+		} catch (Exception t) {
 			if (server.isLive()) {
 				log.warn("Belief Polling failed: {}",t.getClass().toString()+" : "+t.getMessage());
 			}
@@ -152,11 +150,9 @@ public class ConnectionManager extends AThreadedComponent {
 
 		AccountKey[] peers = connections.keySet().toArray(new AccountKey[currentPeerCount]);
 		for (AccountKey p: peers) {
-			AConnection conn=connections.get(p);
-
-			// Remove closed connections. No point keeping these
-			if ((conn==null)||(conn.isClosed())) {
-				closeConnection(p);
+			Convex conn=getConnection(p);
+			if (conn==null) {
+				// Must have lost this connection
 				currentPeerCount--;
 				continue;
 			}
@@ -167,7 +163,7 @@ public class ConnectionManager extends AThreadedComponent {
 			 */
 			PeerStatus ps=s.getPeer(p);
 			if ((ps==null)||(ps.getTotalStake()<=CPoSConstants.MINIMUM_EFFECTIVE_STAKE)) {
-				closeConnection(p);
+				closeConnection(p,"Insufficient stake");
 				currentPeerCount--;
 				continue;
 			}
@@ -185,7 +181,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 					double dropRate=millisSinceLastUpdate/(double)Config.PEER_CONNECTION_DROP_TIME;
 					if (random.nextDouble()<(dropRate*(1.0-keepChance))) {
-						closeConnection(p);
+						closeConnection(p,"Dropping minor peers");
 						currentPeerCount--;
 						continue;
 					}
@@ -194,7 +190,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 			// send request for a trusted peer connection if necessary
 			// TODO: need to find out why the response message is not being received by the peers
-			requestChallenge(p, conn, server.getPeer());
+			// requestChallenge(p, conn, server.getPeer());
 		}
 
 		// refresh peers list
@@ -272,9 +268,10 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param peerKey Peer key linked to the connection to close and remove.
 	 *
 	 */
-	public void closeConnection(AccountKey peerKey) {
-		AConnection conn=connections.get(peerKey);
+	public void closeConnection(AccountKey peerKey,String reason) {
+		Convex conn=connections.get(peerKey);
 		if (conn!=null) {
+			log.info("Removed peer connection to "+peerKey+ " Reason="+reason);	
 			conn.close();
 			connections.remove(peerKey);
 		}
@@ -284,8 +281,8 @@ public class ConnectionManager extends AThreadedComponent {
 	 * Close all outgoing connections from this Peer
 	 */
 	public void closeAllConnections() {
-		for (AConnection conn:connections.values()) {
-			if (conn!=null) conn.close();
+		for (AccountKey peerKey:connections.keySet()) {
+			closeConnection(peerKey,"Closing all connections");
 		}
 		connections.clear();
 	}
@@ -295,7 +292,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 *
 	 * @return Set of connections
 	 */
-	public HashMap<AccountKey,AConnection> getConnections() {
+	public HashMap<AccountKey,Convex> getConnections() {
 		return connections;
 	}
 
@@ -316,9 +313,16 @@ public class ConnectionManager extends AThreadedComponent {
 	 *
 	 * @return Connection instance, or null if not found
 	 */
-	public AConnection getConnection(AccountKey peerKey) {
-		if (!connections.containsKey(peerKey)) return null;
-		return connections.get(peerKey);
+	public Convex getConnection(AccountKey peerKey) {
+		Convex c=connections.get(peerKey);
+		if (c==null) return null;
+		
+		if (!c.isConnected()) {
+			closeConnection(peerKey,"Removing already closed connection");
+			return null;
+		}
+		
+		return c;
 	}
 
 	/**
@@ -473,9 +477,9 @@ public class ConnectionManager extends AThreadedComponent {
 			// remove from list incase this fails, we can generate another challenge
 			challengeList.remove(fromPeer);
 
-			AConnection connection = getConnection(fromPeer);
+			Convex connection = getConnection(fromPeer);
 			if (connection != null) {
-				connection.setTrustedKey(fromPeer);
+				// connection.setTrustedKey(fromPeer);
 			}
 
 			// return the trusted peer key
@@ -522,55 +526,54 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @throws InterruptedException If broadcast is interrupted
 	 *
 	 */
-	public void broadcast(Message msg) throws InterruptedException {
-		HashMap<AccountKey,AConnection> hm=getCurrentConnections();
+	public void broadcast(Message msg) {
+		HashMap<AccountKey,Convex> hm=getCurrentConnections();
 		
-		long start=Utils.getCurrentTimestamp();
-		while ((!hm.isEmpty())&&(start+BROADCAST_TIMEOUT>Utils.getCurrentTimestamp())) {
-			ArrayList<Map.Entry<AccountKey,AConnection>> left=new ArrayList<>(hm.entrySet());
+		if (hm.isEmpty()) {
+			log.debug("No connections to broadcast to from "+server.getPeerKey());
+			return;
+		}
+		
+		ArrayList<Map.Entry<AccountKey,Convex>> left=new ArrayList<>(hm.entrySet());
 			
-			// Shuffle order for sending
-			Utils.shuffle(left);
+		// Shuffle order for sending
+		Utils.shuffle(left);
 			
-			for (Map.Entry<AccountKey,AConnection> me: left) {
-				AConnection pc=me.getValue();
-				boolean sent;
-				try {
-					sent = pc.sendMessage(msg);
-				} catch (IOException e) {
-					// Something went wrong, lose this connection
-					closeConnection(me.getKey());
-					sent=false;
-				}
-				if (sent) {
-					hm.remove(me.getKey());	
-				} else {
-					// log.warn("Broadcast failed!");
+		for (Map.Entry<AccountKey,Convex> me: left) {
+			Convex pc=me.getValue();
+			CompletableFuture<Result> sent=pc.message(msg);
+			if (sent.isDone()) {
+				Result r=sent.join();
+				if (r.isError()) {
+					// log.warn("Immediate error broadcasting: "+r);
 				}
 			}
-			
-			// terminate loop if everything is successfully sent
-			if (hm.isEmpty()) break;
-			
-			// Avoid a busy wait if buffers are full and still have things to send		
-			LoadMonitor.down();
-			Thread.sleep(10);
-			LoadMonitor.up();
 		}
 		
-		if ((!hm.isEmpty())&&server.isLive()) {
-			ArrayList<Map.Entry<AccountKey,AConnection>> left=new ArrayList<>(hm.entrySet());
-			Map.Entry<AccountKey,AConnection> drop=left.get(random.nextInt(left.size()));
-			AccountKey dropKey=drop.getKey();
-			closeConnection(dropKey);
-			log.warn("Unable to send broadcast to "+hm.size()+" peers, dropped one connection to: "+dropKey);
-		}
+// If we couldn't broadcast to everyone, we are probably overloaded. drop a random connection
+//		if ((!hm.isEmpty())&&server.isLive()) {
+//			ArrayList<Map.Entry<AccountKey,Convex>> left=new ArrayList<>(hm.entrySet());
+//			Map.Entry<AccountKey,Convex> drop=left.get(random.nextInt(left.size()));
+//			AccountKey dropKey=drop.getKey();
+//			closeConnection(dropKey);
+//			log.warn("Unable to send broadcast to "+hm.size()+" peers, dropped one connection to: "+dropKey+ "remaining = "+getConnectionCount());
+//		}
 	}
 
-	private HashMap<AccountKey, AConnection> getCurrentConnections() {
-		synchronized(connections) {
-			return new HashMap<>(connections);
+	/**
+	 * Gets a new hashmap of connection which are currently live
+	 * @return
+	 */
+	private synchronized HashMap<AccountKey, Convex> getCurrentConnections() {
+		HashMap<AccountKey, Convex> liveConnections=new HashMap<>();
+		for (Map.Entry<AccountKey,Convex> me: connections.entrySet()) {
+			AccountKey peerKey=me.getKey();
+			Convex c=me.getValue();
+			if ((c!=null)&&(c.isConnected())) {
+				liveConnections.put(peerKey,c);
+			} 
 		}
+		return liveConnections;
 	}
 
 	/**
@@ -579,39 +582,47 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @return new Connection, or null if attempt fails
 	 * @throws InterruptedException 
 	 */
-	public AConnection connectToPeer(InetSocketAddress hostAddress) throws InterruptedException {
-		AConnection newConn = null;
+	public Convex connectToPeer(InetSocketAddress hostAddress) throws InterruptedException {
 		try {
-			// Use temp client connection to query status
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
 			if (result.isError()) {
 				log.info("Bad status message from remote Peer: "+result);
+				convex.close();
 				return null;
+			} else {
+				log.debug("Got status from peer: "+result);
 			}
 			
 			AVector<ACell> status = result.getValue();
 			// close the temp connection to Convex API
-			convex.close();
 			
 			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
 			if (peerKey==null) return null;
 
-			AConnection existing=connections.get(peerKey);
-			if ((existing!=null)&&!existing.isClosed()) return existing;
-			synchronized(connections) {
-				// reopen with connection to the peer and handle server messages
-				newConn = Connection.connect(hostAddress, server.receiveAction, null,Config.SOCKET_PEER_BUFFER_SIZE,Config.SOCKET_PEER_BUFFER_SIZE);
-				connections.put(peerKey, newConn);
+			Convex existing=getConnection(peerKey);
+			if ((existing!=null)&&existing.isConnected()) {
+				log.info("Trying to connect with existing connection");
+				convex.close();
+				return existing;
+			} else {
+				addConnection(peerKey, convex);
 			}
+			return convex;
 		} catch (IOException | TimeoutException e) {
-			// ignore any errors from the peer connections
+			log.warn("Error connecting to peer: ",e);
 			return null;
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);
 			return null;
 		}
-		return newConn;
+	}
+
+	public synchronized void addConnection(AccountKey peerKey, Convex convex) {
+		synchronized(connections) {
+			log.info("Connected to Peer: "+peerKey+ " at "+convex.getHostAddress());
+			connections.put(peerKey, convex);
+		}
 	}
 
 	@Override
@@ -620,9 +631,6 @@ public class ConnectionManager extends AThreadedComponent {
 		try {
 			Message msg = Message.createGoodBye();
 			broadcast(msg);
-		} catch (InterruptedException e ) {
-			// maintain interrupt status
-			Thread.currentThread().interrupt();
 		} finally {
 			super.close();
 		}
@@ -642,7 +650,7 @@ public class ConnectionManager extends AThreadedComponent {
 		Thread.sleep(ConnectionManager.SERVER_CONNECTION_PAUSE);
 		LoadMonitor.up();
 		maintainConnections();
-		pollBelief();
+		maybePollBelief();
 	}
 
 	@Override
@@ -667,7 +675,7 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param peerKey Peer key which triggered missing data
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
-		AConnection conn=getConnection(peerKey);
+		Convex conn=getConnection(peerKey);
 		if (conn==null) return; // No outbound connection to this peer, so just ignore
 		
 		if (log.isDebugEnabled()) {

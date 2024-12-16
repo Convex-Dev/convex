@@ -52,9 +52,7 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public InetSocketAddress getHostAddress() {
-		AConnection conn=connection;
-		if (conn==null) return null;
-		return conn.getRemoteAddress();
+		return remoteAddress;
 	}
 
 	protected ConvexRemote(Address address, AKeyPair keyPair) {
@@ -183,7 +181,7 @@ public class ConvexRemote extends Convex {
 	 */
 	protected void setConnection(AConnection conn) {
 		AConnection curr=this.connection;
-		if (curr == conn) return;
+		if (curr == conn) return; // no change
 		if (curr!=null) close();
 		this.connection = conn;
 	}
@@ -230,11 +228,16 @@ public class ConvexRemote extends Convex {
 	
 	@Override
 	public CompletableFuture<Result> message(Message m) {
+		AConnection conn=connection;
+		if (conn==null) {
+			return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
+		}
+		
 		ACell id=m.getRequestID();
 		try {
 			if (id==null) {
 				// Not expecting any return message, so just report sending
-				boolean sent = connection.sendMessage(m);
+				boolean sent = conn.sendMessage(m);
 				if (!sent) {
 					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				}
@@ -242,8 +245,7 @@ public class ConvexRemote extends Convex {
 			}
 			
 			synchronized (awaiting) {
-				if (connection==null) return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
-				boolean sent = connection.sendMessage(m);
+				boolean sent = conn.sendMessage(m);
 				if (!sent) {
 					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				}
@@ -283,6 +285,7 @@ public class ConvexRemote extends Convex {
 	public synchronized void close() {
 		AConnection c = this.connection;
 		if (c != null) {
+			// log.info("Connection closed",new Exception());
 			c.close();
 		}
 		connection = null;

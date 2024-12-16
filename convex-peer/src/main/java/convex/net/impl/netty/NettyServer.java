@@ -15,6 +15,7 @@ import convex.core.data.Strings;
 import convex.core.util.Shutdown;
 import convex.net.AServer;
 import convex.net.Message;
+import convex.peer.Server;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -57,6 +58,14 @@ public class NettyServer extends AServer {
 		setPort(port);
 	}
 	
+
+	public static NettyServer create(Server server) {
+		NettyServer ns=new NettyServer(null);
+		ns.receiveAction=server.getReceiveAction();
+		return ns;
+	}
+	
+	
 	public void launch() throws IOException,InterruptedException {
         EventLoopGroup bossGroup = NettyServer.getEventLoopGroup(); 
         EventLoopGroup workerGroup = NettyConnection.getEventLoopGroup();
@@ -89,14 +98,12 @@ public class NettyServer extends AServer {
         
         if (f==null) {
         	f = b.bind(port).sync(); 
-        	
-        	// Check local port
-        	InetSocketAddress localAddress=(InetSocketAddress) f.channel().localAddress();
-        	setPort(localAddress.getPort());
         }
-   		System.out.println("Server started on port: "+getPort());
+    	// Check local port    	
+        InetSocketAddress localAddress=(InetSocketAddress) f.channel().localAddress();
+    	setPort(localAddress.getPort());
+  		log.info("Netty Server started on port: "+getPort());
    	   
-        // Wait until the server socket is closed.
    		this.channel=f.channel();
     }
 	
@@ -127,4 +134,5 @@ public class NettyServer extends AServer {
 	public InetSocketAddress getHostAddress() {
 		return (InetSocketAddress) channel.localAddress();
 	}
+
 }

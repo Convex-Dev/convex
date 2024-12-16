@@ -26,6 +26,7 @@ import convex.core.data.Format;
 import convex.core.data.Index;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
@@ -132,39 +133,31 @@ public class BeliefPropagator extends AThreadedComponent {
 		// Wait for some new Beliefs to accumulate up to a given time
 		Belief incomingBelief = awaitBelief();
 		
-		// Try belief update
+		// Try belief update. Returns true if peer's Order changed (and therefore needs immediate broadcast)
 		boolean updated= maybeUpdateBelief(incomingBelief);
 		
 		if (updated) {
-			// Trigger CVM update before broadcast
-			// This can potentially help latency on transaction result reporting etc.
-			server.updateBelief(belief);
-			
-			// After an update, we want to make sure we have another update
-			// This means awaitBeliefs returns immediately next time so we check we have converged
-			// If Belief Queue is empty then queue our belief again
-			// Otherwise we are fine
-			if (beliefQueue.isEmpty()) {
-				Message trigger=Message.createBelief(belief);
-				queueBelief(trigger);
+			if (log.isDebugEnabled()) {
+				log.debug("Belief updated cps="+Vectors.createLongs(belief.getOrder(server.getPeerKey()).getConsensusPoints()));
 			}
+			
+			maybeBroadcast(updated);
+			
+			// Persist Belief in all cases, just without announcing
+			// This is mainly in case we get missing data / sync requests for the Belief
+			// This is super cheap if already persisted, so no problem
+			try {
+				belief=Cells.persist(belief);
+			} catch (IOException e) {
+				throw Utils.sneakyThrow(e);
+			}
+			
+			/* Update Belief after persistence. We want to be using
+			 * Latest persisted version as much as possible
+			 */
+			server.updateBelief(belief);
+
 		}
-		
-		maybeBroadcast(updated);
-		
-		// Persist Belief in all cases, just without announcing
-		// This is mainly in case we get missing data / sync requests for the Belief
-		// This is super cheap if already persisted, so no problem
-		try {
-			belief=Cells.persist(belief);
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
-		
-		/* Update Belief again after persistence. We want to be using
-		 * Latest persisted version as much as possible
-		 */
-		server.updateBelief(belief);
 	}
 
 
@@ -180,13 +173,14 @@ public class BeliefPropagator extends AThreadedComponent {
 				} else {
 					msg=createQuickUpdateMessage();
 				}
-			} catch (IOException e) {
-				log.warn("IO Error attempting to create broadcast message",e);
+			} catch (Exception e) {
+				log.warn("Error attempting to create broadcast message",e);
 			}
 			
 			// Actually broadcast the message to outbound connected Peers
 			if (msg!=null) {
-				doBroadcast(msg);
+				server.manager.broadcast(msg);
+				beliefBroadcastCount++;
 			} else {
 				log.warn("null message in BeliefPropagator!");
 			}
@@ -309,7 +303,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		beliefMessages.add(firstEvent);
 		beliefQueue.drainTo(beliefMessages); 
 		
-		log.debug("Belief Messages received: "+beliefMessages.size());
+		if (log.isDebugEnabled()) {
+			log.debug("Belief Messages received: "+beliefMessages.size());
+		}
 		
 		// Build a Map of current Orders. We compare incoming Orders to this
 		// So that we can identify new information
@@ -323,6 +319,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		if (!anyOrderChanged) return null;
 		
 		Belief newBelief= Belief.create(newOrders);
+		// log.info("New Belief received");
 		return newBelief;
 	}
 	
@@ -341,6 +338,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			beliefReceivedCount++;			
 			try {
 				ACell payload=m.getPayload();
+				// log.info("Merging Belief message: "+Cells.getHash(payload));
 				Collection<SignedData<Order>> a = Belief.extractOrders(payload);
 				for (SignedData<Order> so:a ) {
 					AccountKey key=so.getAccountKey();
@@ -401,11 +399,6 @@ public class BeliefPropagator extends AThreadedComponent {
 			obs.accept(so);
 		}
 	}
-
-	private void doBroadcast(Message msg) throws InterruptedException {
-		server.manager.broadcast(msg);
-		beliefBroadcastCount++;
-	}
 	
 	private Message createFullUpdateMessage() throws IOException {
 		ArrayList<ACell> novelty=new ArrayList<>();
@@ -423,7 +416,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		belief=Cells.announce(belief, noveltyHandler);
 		lastFullBroadcastBelief=belief;
 
-		Message msg = createBelief(belief, novelty);
+		Message msg = createPartialBelief(belief, novelty);
 		long messageSize=msg.getMessageData().count();
 		if (messageSize>=CPoSConstants.MAX_MESSAGE_LENGTH*0.95) {
 			log.warn("Long Belief Delta message: "+messageSize);
@@ -455,7 +448,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		orders=orders.assoc(key, order);
 		belief=belief.withOrders(orders);
 
-		Message msg = createBelief(order, novelty);
+		Message msg = createPartialBelief(order, novelty);
 		long messageSize=msg.getMessageData().count();
 		if (messageSize>=CPoSConstants.MAX_MESSAGE_LENGTH*0.95) {
 			log.warn("Long Belief Delta message: "+messageSize);
@@ -469,17 +462,17 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * @param belief Belief top level Cell to encode
 	 * @return Message instance
 	 */
-	private static Message createBelief(ACell payload, List<ACell> novelty) {
+	private static Message createPartialBelief(ACell payload, List<ACell> novelty) {
 		int n=novelty.size();
 		if (n==0) {
 			//log.warn("No novelty in Belief");
-			novelty.add(n, payload);
+			novelty.add(payload);
 		} else if (!payload.equals(novelty.get(n-1))) {
 			//log.warn("Last element not Belief out of "+novelty.size());
-			novelty.add(n, payload);
+			novelty.add(payload);
 		}
 		Blob data=Format.encodeDelta(novelty);
-		return Message.create(MessageType.BELIEF,null,data);
+		return Message.create(MessageType.BELIEF,payload,data);
 	}
 
 	private Belief lastFullBroadcastBelief;

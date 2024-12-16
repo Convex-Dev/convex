@@ -58,7 +58,7 @@ public class TransactionHandler extends AThreadedComponent {
 	/**
 	 * Default minimum delay between proposing own transactions as a peer
 	 */
-	private static final long OWN_BLOCK_DELAY=2000;
+	private static final long OWN_BLOCK_DELAY=10000;
 
 	/**
 	 * Default minimum delay between proposing a block as a peer
@@ -321,7 +321,7 @@ public class TransactionHandler extends AThreadedComponent {
 		// TODO: smaller block if too many transactions?
 		Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
 		newTransactions.clear();
-		lastBlockPublishedTime=Utils.getCurrentTimestamp();
+		lastBlockPublishedTime=timestamp;
 		SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 		return signedBlock;
 	}

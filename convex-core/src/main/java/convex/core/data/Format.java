@@ -922,7 +922,9 @@ public class Format {
 				ix+=Format.getVLQCountLength(encLength);
 				
 				Blob enc=data.slice(ix, ix+encLength);
-				if (enc==null) throw new BadFormatException("Incomplete encoding");
+				if (enc==null) {
+					throw new BadFormatException("Incomplete encoding");
+				}
 				Hash h=enc.getContentHash();
 				
 				// Check store for Ref - avoids duplicate objects in many cases

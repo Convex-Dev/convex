@@ -81,7 +81,7 @@ public class QueryHandler extends AThreadedComponent {
 			}
 		} catch (BadFormatException e) {
 			log.warn("Unable to deliver missing data due badly formatted DATA_REQUEST: {}", m);
-		} catch (RuntimeException e) {
+		} catch (Exception e) {
 			log.warn("Unable to deliver missing data due to exception:", e);
 		}
 	}

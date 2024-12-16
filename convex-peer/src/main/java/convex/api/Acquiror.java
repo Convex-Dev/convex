@@ -102,10 +102,11 @@ public class Acquiror {
 						if (resp.isError()) {
 							f.completeExceptionally(new ResultException(resp));
 							log.info("Failed to request missing data: "+resp);
+							return;
 						}
 						
 						AVector<ACell> v=RT.ensureVector(resp.getValue());
-						if (v==null) throw new BadFormatException("Expected Vector in data result");
+						if (v==null) throw new BadFormatException("Expected Vector in data result for id "+id+" but was: "+resp);
 						for (int i=0; i<v.count(); i++) {
 							ACell val=v.get(i);
 							if (val==null) {
