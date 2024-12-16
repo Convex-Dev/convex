@@ -461,6 +461,7 @@ public class Init {
 						+ "(import convex.fungible :as fun) "
 						+ "(deploy "
 						  + "'(call *registry* (register "+metaString+"))"
+						  + "'(set-controller #2)"
 						  + "(fun/build-token {:supply " + supply + " :decimals "+decimals+"})"
 						  +")"
 					+ ")"));

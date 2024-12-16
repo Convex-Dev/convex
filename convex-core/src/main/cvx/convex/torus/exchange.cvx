@@ -8,6 +8,7 @@
 
 ;;;;;;;;;; Imports
 
+(set-controller #2)
 
 (import convex.asset    :as asset)
 (import convex.fungible :as fungible)
@@ -44,6 +45,8 @@
       (def token ~token)
       (def torus ~torus)
       (def token-balance 0)
+      
+      (set-controller torus)
       
       (defn -qc
     		  [q]
