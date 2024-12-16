@@ -455,8 +455,7 @@ public class BeliefMergeTest {
 		if (ANALYSIS) printAccounts(accounts);
 		// final state checks
 		
-		assertEquals(Hash.fromHex("5e16756d0e3b5ab5ac4a6649858b165b41d19de6277fab0e30c2ff3e0460065e"),finalState.getHash());
-
+		assertEquals(Hash.fromHex("95915ffa2d983b763cb504a92cbc5d31622b5f01d4943ecda91d1efd1d5f0214"),finalState.getHash());
 		
 		int expectedTxCount=NUM_PEERS * (NUM_INITIAL_TRANS+TX_ROUNDS);
 		assertEquals(expectedTxCount, bs4[PROPOSER].getOrder(RKEY).getConsensusPoint()); 
