@@ -290,7 +290,9 @@ public class BeliefPropagator extends AThreadedComponent {
 	}
 	
 	/**
-	 * Await an incoming Belief for belief merge / potential update
+	 * Await incoming Belief for all incoming belief merges / potential update. This merges multiple incoming beliefs into a single Belief
+	 * which compacts the number of incoming orders for the upcoming Belief Merge
+	 * 
 	 * @return Incoming Belief, or null if nothing arrived within time window 
 	 * @throws InterruptedException
 	 */
@@ -303,10 +305,15 @@ public class BeliefPropagator extends AThreadedComponent {
 		LoadMonitor.up();
 		if (firstEvent==null) return null; // nothing arrived
 		
+		// Drain queue of all incoming Beliefs
 		beliefMessages.add(firstEvent);
 		beliefQueue.drainTo(beliefMessages); 
+		
+		log.debug("Belief Messages received: "+beliefMessages.size());
+		
+		// Build a Map of current Orders. We compare incoming Orders to this
+		// So that we can identify new information
 		HashMap<AccountKey,SignedData<Order>> newOrders=belief.getOrdersHashMap();
-		// log.info("Merging Beliefs: "+allBeliefs.size());
 		
 		boolean anyOrderChanged=false;
 		for (Message m: beliefMessages) {
@@ -319,7 +326,12 @@ public class BeliefPropagator extends AThreadedComponent {
 		return newBelief;
 	}
 	
-
+	/**
+	 * Merge a single Belief message into a map of accumulated latest Orders
+	 * @param orders
+	 * @param m
+	 * @return true if there was any updated order Order, false otherwise
+	 */
 	protected boolean mergeBeliefMessage(HashMap<AccountKey, SignedData<Order>> orders, Message m) {
 		boolean changed=false;
 		AccountKey myKey=server.getPeerKey();
@@ -361,13 +373,14 @@ public class BeliefPropagator extends AThreadedComponent {
 						orders.put(key, so);
 						changed=true;
 					} catch (MissingDataException e) {
-						// Something missing in received Belief
+						// Something missing in received Belief. This is expected for
+						// Partial Belief update messages
 						server.getConnectionManager().alertMissing(m,e,key);
 					} catch (IOException e) {
 						// This is pretty bad, probably we lost the store?
 						// We certainly can't propagate the newly received order
 						// throw new Error(e);
-						log.warn("IO exception tryin to merge Order",e);
+						log.warn("IO exception trying to merge Order",e);
 						return changed;
 					}
 				}

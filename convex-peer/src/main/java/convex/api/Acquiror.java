@@ -22,7 +22,6 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.Message;
@@ -68,9 +67,8 @@ public class Acquiror {
 			return f;
 		}
 		log.trace("Trying to acquire remotely: {}",hash);
-				
-		ThreadUtils.runVirtual(()-> {
-			Stores.setCurrent(store); // use store for calling thread
+	
+		ThreadUtils.runWithStore(store,()-> {
 			try {
 				HashSet<Hash> missingSet = new HashSet<>();
 
