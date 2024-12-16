@@ -131,9 +131,13 @@ public class Strings {
 		return create(o.toString());
 	}
 
-	
 	public static <T extends AString> T intern(T value) {
 		return Cells.intern(value);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends AString> T intern(String value) {
+		return (T) intern(create(value));
 	}
 	
 	public static AString create(CVMChar c) {

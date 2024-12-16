@@ -127,6 +127,29 @@ public class ConvexLocal extends Convex {
 			return true;
 		};
 	}
+	
+	@Override
+	public CompletableFuture<Result> messageRaw(Blob rawData) {
+		try {
+			Message m=Message.create(rawData);
+			return message(m);
+		} catch (Exception e) {
+			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
+		}
+	}
+
+	@Override
+	public CompletableFuture<Result> message(Message message) {
+		ACell id=message.getRequestID();
+		if (id==null) {
+			// directly forward message to 
+			server.getReceiveAction().accept(message);
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+			
+		// We are expecting a return message, so build a completable future for it	
+		return makeMessageFuture(message);
+	}
 
 	@Override
 	public void close() {
@@ -178,19 +201,6 @@ public class ConvexLocal extends Convex {
 		return server.getPeer().getConsensusState().getBalance(address);
 	}
 
-	@Override
-	public CompletableFuture<Result> messageRaw(Blob rawData) {
-		try {
-			Message m=Message.create(rawData);
-			return message(m);
-		} catch (Exception e) {
-			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
-		}
-	}
 
-	@Override
-	public CompletableFuture<Result> message(Message message) {
-		return makeMessageFuture(message);
-	}
 
 }

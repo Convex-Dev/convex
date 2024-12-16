@@ -129,6 +129,10 @@ public final class Result extends ARecordGeneric {
 		return error(errorCode,message,null);
 	}
 	
+	public static Result value(ACell value) {
+		return create(null,value);
+	}
+	
 	public static Result error(Keyword errorCode, String message) {
 		return error(errorCode,Strings.create(message),null);
 	}
@@ -427,7 +431,9 @@ public final class Result extends ARecordGeneric {
 	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!")).withSource(SourceCodes.CLIENT);
 	private static final Result MISSING_RESULT=Result.error(ErrorCodes.MISSING,Strings.create("Missing Data!")).withSource(SourceCodes.CLIENT);
 	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
+	public static final Result SENT_MESSAGE = Result.value(Strings.intern("Sent"));
 
+	
 	/**
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
 	 * @return Result instance representing an interruption
@@ -436,6 +442,8 @@ public final class Result extends ARecordGeneric {
 		Thread.currentThread().interrupt();
 		return INTERRUPTED_RESULT;
 	}
+
+
 
 	/**
 	 * Converts this result to a JSON representation. WARNING: some information may be lost because JSON is a terrible format.
@@ -461,6 +469,7 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	private static final StringShort RESULT_TAG=StringShort.create("#Result");
+	
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
