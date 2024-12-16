@@ -2,8 +2,11 @@ package convex.api;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +23,6 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.core.exceptions.ResultException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
@@ -88,6 +90,85 @@ public class ConvexRemote extends Convex {
 		convex.setConnection(Connection.connect(sa, convex.returnMessageHandler));
 		return convex;
 	}
+	
+	/**
+	 * Map of results awaiting completion.
+	 */
+	private HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
+
+	/**
+	 * Method to start waiting for a return Message. 
+	 * 
+	 * Must be called with lock on
+	 * `awaiting` map to prevent risk of missing results before it is called.
+	 * 
+	 * @param resultID ID of result message to await
+	 * @return
+	 */
+	private CompletableFuture<Result> awaitResult(ACell resultID, long timeout) {
+		if (resultID==null) throw new IllegalArgumentException("Non-null return ID required");
+		
+		// Save store from the sending thread. We want to decode the Result on this store!
+		AStore awaitingStore=Stores.current();
+		
+		CompletableFuture<Message> cf = new CompletableFuture<Message>();
+		if (timeout>0) {
+			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
+		}
+		CompletableFuture<Result> cr=cf.handle((m,e)->{
+			Stores.setCurrent(awaitingStore);
+			
+			// clear sequence if something went wrong. It is probably invalid now....
+			if (e!=null) {
+				sequence=null;
+				return Result.fromException(e);
+			}
+			
+			// Ensure we set the right store while handling this result
+			// We don't need to restore it because the return message handler does that for us
+			Result r=m.toResult();
+			if (r.getErrorCode()!=null) {
+				sequence=null;
+			}
+			return r;
+		});
+		awaiting.put(resultID, cf);
+		return cr;
+	}
+
+	/**
+	 * Result handler for Messages received back from a remote connection
+	 */
+	protected final Consumer<Message> returnMessageHandler = m-> {
+		ACell id=m.getResultID();
+		
+		if (id!=null) {
+			// Check if we are waiting for a Result with this ID for this connection
+			synchronized (awaiting) {
+				// We save and restore the Store, since completing the future might change it
+				AStore savedStore=Stores.current();
+				try {
+					CompletableFuture<Message> cf = awaiting.get(id);
+					if (cf != null) {
+						// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
+						boolean didComplete = cf.complete(m);
+						if (!didComplete) {
+							log.warn("Message return future already completed with value: "+cf.join());
+						}
+						awaiting.remove(id);
+					} 
+				} catch (Exception e) {
+					log.warn("Unexpected error completing result",e);
+				} finally {
+					Stores.setCurrent(savedStore);
+				}
+				
+			}
+		} else {
+			// Ignore the message, we are a client side connection so not interested.
+		}
+	};
+	
 
 	
 	public synchronized void reconnect() throws IOException, TimeoutException, InterruptedException {
@@ -151,20 +232,25 @@ public class ConvexRemote extends Convex {
 	public CompletableFuture<Result> message(Message m) {
 		ACell id=m.getRequestID();
 		try {
+			if (id==null) {
+				// Not expecting any return message, so just report sending
+				boolean sent = connection.sendMessage(m);
+				if (!sent) {
+					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
+				}
+				return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+			}
+			
 			synchronized (awaiting) {
 				if (connection==null) return CompletableFuture.completedFuture(Result.CLOSED_CONNECTION);
 				boolean sent = connection.sendMessage(m);
 				if (!sent) {
-					return CompletableFuture.completedFuture(Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM));
+					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				}
 	
-				if (id!=null) {
-					CompletableFuture<Result> cf = awaitResult(id,timeout).thenApply(msg->msg.toResult());
-					return cf;
-				} else {
-					Result r=Result.create(id, Strings.SENT);
-					return CompletableFuture.completedFuture(r);
-				}
+				// Make sure we call this while synchronised on awaiting map
+				CompletableFuture<Result> cf = awaitResult(id,timeout);
+				return cf;
 			}
 		} catch (Exception e) {
 			Result r=Result.fromException(e).withInfo(Keywords.SOURCE,SourceCodes.COMM);

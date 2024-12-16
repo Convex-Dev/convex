@@ -96,49 +96,11 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected Long sequence = null;
 
-	/**
-	 * Map of results awaiting completion.
-	 */
-	protected HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
-
-	private Consumer<Message> delegatedHandler=null;
 	
 	/**
 	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result
 	 */
 	protected long idCounter=0;
-
-
-	/**
-	 * Result Consumer for messages received back from a client connection
-	 */
-	protected final Consumer<Message> returnMessageHandler = m-> {
-		ACell id=m.getResultID();
-		
-		if (id!=null) {
-			// Check if we are waiting for a Result with this ID for this connection
-			synchronized (awaiting) {
-				try {
-					CompletableFuture<Message> cf = awaiting.get(id);
-					if (cf != null) {
-						// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-						boolean didComplete = cf.complete(m);
-						if (!didComplete) {
-							log.warn("Messafe return future already completed with value: "+cf.join());
-						}
-						awaiting.remove(id);
-					} 
-				} catch (Exception e) {
-					log.warn("Unexpected error completing result",e);
-				}
-			}
-		}
-		
-		if (delegatedHandler!=null) {
-			delegatedHandler.accept(m);
-		} 
-	};
-
 
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
@@ -232,15 +194,6 @@ public abstract class Convex implements AutoCloseable {
 
 	public void setNextSequence(long nextSequence) {
 		this.sequence = nextSequence - 1L;
-	}
-
-	/**
-	 * Sets a handler for messages that are received but not otherwise processed (transaction/query results will
-	 * be relayed instead to the appropriate handler )
-	 * @param handler Handler for received messaged
-	 */
-	public void setHandler(Consumer<Message> handler) {
-		this.delegatedHandler = handler;
 	}
 
 	/**
@@ -791,37 +744,6 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the result of the requestStatus
 	 */
 	public abstract CompletableFuture<Result> requestStatus();
-
-	/**
-	 * Method to start waiting for a return Message. Must be called with lock on
-	 * `awaiting` map to prevent risk of missing results before it is called.
-	 * 
-	 * @param id ID of result message to await
-	 * @return
-	 */
-	protected CompletableFuture<Message> awaitResult(ACell id, long timeout) {
-		CompletableFuture<Message> cf = new CompletableFuture<Message>();
-		if (timeout>0) {
-			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
-		}
-		CompletableFuture<Result> cr=cf.handle((m,e)->{
-			synchronized(awaiting) {
-				awaiting.remove(id);
-			}
-			// clear sequence if something went wrong. It is probably invalid now....
-			if (e!=null) {
-				sequence=null;
-				return Result.fromException(e);
-			}
-			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
-			}
-			return r;
-		});
-		awaiting.put(id, cf);
-		return cf;
-	}
 
 	/**
 	 * Request a challenge. This is request is made by any peer that needs to find

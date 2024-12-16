@@ -21,6 +21,7 @@ import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.net.Message;
 import convex.net.MessageType;
@@ -118,13 +119,21 @@ public class ConvexLocal extends Convex {
 	}
 
 	private Predicate<Message> makeResultHandler(CompletableFuture<Result> cf) {
+		AStore senderStore=Stores.current();
 		return m->{
-			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
+			// Protect message reading in sender store
+			AStore savedStore=Stores.current();
+			try {
+				Stores.setCurrent(senderStore);
+				Result r=m.toResult();
+				if (r.getErrorCode()!=null) {
+					sequence=null;
+				}
+				cf.complete(r);
+				return true;
+			} finally {
+				Stores.setCurrent(savedStore);
 			}
-			cf.complete(r);
-			return true;
 		};
 	}
 	
@@ -142,7 +151,7 @@ public class ConvexLocal extends Convex {
 	public CompletableFuture<Result> message(Message message) {
 		ACell id=message.getRequestID();
 		if (id==null) {
-			// directly forward message to 
+			// directly forward message to Server
 			server.getReceiveAction().accept(message);
 			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 		}

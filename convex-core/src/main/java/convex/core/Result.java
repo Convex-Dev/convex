@@ -432,6 +432,8 @@ public final class Result extends ARecordGeneric {
 	private static final Result MISSING_RESULT=Result.error(ErrorCodes.MISSING,Strings.create("Missing Data!")).withSource(SourceCodes.CLIENT);
 	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
 	public static final Result SENT_MESSAGE = Result.value(Strings.intern("Sent"));
+	public static final Result FULL_CLIENT_BUFFER = Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM);
+
 
 	
 	/**
