@@ -428,9 +428,7 @@ public class BeliefMerge {
 		HashSet<SignedData<Block>> newBlocks = new HashSet<>();
 		newBlocks.addAll(newBlocksOrdered);
 
-		// exclude new blocks already in the base Order
-		// TODO: what about blocks already in consensus?
-		// Probably need to check last block time from Peer
+		// exclude new blocks already in the base consensus Order
 		long scanStart=Math.min(blocks.count(), consensusPoint);
 		Iterator<SignedData<Block>> it = blocks.listIterator(scanStart);
 		while (it.hasNext()) {
@@ -483,7 +481,8 @@ public class BeliefMerge {
 				// in order to sort by length of matched proposals
 				long blockMatch = proposedBlocks.commonPrefixLength(c.getBlocks());
 
-				long minPrevious = Math.min(winnningOrder.getConsensusPoint(level-1), c.getConsensusPoint(level-1));
+				int prevLevel=level-1;
+				long minPrevious = Math.min(winnningOrder.getConsensusPoint(prevLevel), c.getConsensusPoint(prevLevel));
 
 				// Match length is how many blocks agree with winning order at previous consensus level
 				long match = Math.min(blockMatch, minPrevious);
@@ -566,15 +565,10 @@ public class BeliefMerge {
 			
 			// This probably shouldn't happen if peers are sticking to timestamps
 			// But we compare anyway
-			// Prefer advanced consensus
-			for (int level=CPoSConstants.CONSENSUS_LEVELS-1; level>=1; level--) {
+			// Prefer more blocks / advanced consensus
+			for (int level=0; level<CPoSConstants.CONSENSUS_LEVELS; level++) {
 				if (newOrder.getConsensusPoint(level)>oldOrder.getConsensusPoint(level)) return true;
 			}
-			
-			// Finally prefer more blocks
-			AVector<SignedData<Block>> abs=oldOrder.getBlocks();
-			AVector<SignedData<Block>> bbs=newOrder.getBlocks();
-			if(abs.count()<bbs.count()) return true;
 		}
 		return false;
 	}

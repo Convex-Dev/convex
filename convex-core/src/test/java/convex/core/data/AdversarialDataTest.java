@@ -278,6 +278,12 @@ public class AdversarialDataTest {
 		invalidEncoding(CVMTag.BELIEF,"d401b6"); // Byteflag instead of Index
 	}
 	
+	@Test 
+	public void testBadBlobs() throws BadFormatException {
+		invalidEncoding("828041000000000000");
+		assertEquals(CVMLong.create(0x8041000000000000l),Format.read("188041000000000000"));
+	}
+	
 	@Test
 	public void testBadSet() {
 		invalidEncoding("83851d3ff0000000000000");

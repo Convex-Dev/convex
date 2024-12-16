@@ -338,7 +338,7 @@ public class Cells {
 			cell.validateCell();
 			cell.validateStructure();
 			// Cells.markValidated(cell);
-		} catch (ClassCastException | NullPointerException e) {
+		} catch (Exception e) {
 			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
 		}
 	}

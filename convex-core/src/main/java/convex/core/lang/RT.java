@@ -1507,7 +1507,7 @@ public class RT {
 		if (o == null)
 			return;
 		if (o instanceof ACell) {
-			((ACell) o).validate();
+			Cells.validate((ACell) o);
 		} else if (o instanceof Ref) {
 			((Ref<?>) o).validate();
 		} else {
