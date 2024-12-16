@@ -95,6 +95,11 @@ public class InitTest extends ACVMTest {
 		assertEquals(Init.REGISTRY_ADDRESS, eval("(resolve convex.registry)"));
 		assertEquals(Init.TRUST_ADDRESS, eval("(resolve convex.trust)"));
 	}
+	
+	@Test
+	public void testNames() {
+		assertEquals("Convex Core Library",evalS("(:name (call *registry* (lookup #8)))"));
+	}
 
 	@Test
 	public void testInitState() throws InvalidDataException {

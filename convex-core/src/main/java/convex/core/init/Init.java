@@ -62,6 +62,7 @@ public class Init {
 	
 	// First user of Protonet, i.e. @mikera
 	public static final Address FIRST_USER_ADDRESS = Address.create(13);
+	private static final AccountKey FIRST_USER_KEY = AccountKey.fromHex("89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac");
 
 	// Constants
 	private static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
@@ -71,6 +72,7 @@ public class Init {
 	 * Number of coins issued at genesis (one million)
 	 */
 	private static final long GENESIS_COINS=1000000*Coin.GOLD;
+
 
 
 	/**
@@ -209,6 +211,9 @@ public class Init {
 			}
 			assert(userFunds == 0L);
 		}
+		
+		// Initial user account
+		accts=addAccount(accts,Address.create(accts.count()),FIRST_USER_KEY,0);
 
 		// Finally add initial peers
 
@@ -391,14 +396,6 @@ public class Init {
 		
 		s=ctx.getState();
 		return s;
-	}
-
-	public static Address calcPeerAddress(int userCount, int index) {
-		return Address.create(GENESIS_ADDRESS.longValue() + userCount + index);
-	}
-
-	public static Address calcUserAddress(int index) {
-		return Address.create(GENESIS_ADDRESS.longValue() + index);
 	}
 	
 	private static State doActorDeploy(State s, String resource) {
