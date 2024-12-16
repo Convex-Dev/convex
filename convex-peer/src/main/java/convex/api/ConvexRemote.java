@@ -28,7 +28,9 @@ import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.net.AConnection;
 import convex.net.Message;
+import convex.net.impl.netty.NettyConnection;
 import convex.net.impl.nio.Connection;
+import convex.peer.Config;
 import convex.peer.Server;
 
 /**
@@ -59,7 +61,11 @@ public class ConvexRemote extends Convex {
 	
 	protected void connectToPeer(InetSocketAddress peerAddress) throws IOException, TimeoutException, InterruptedException {
 		remoteAddress=peerAddress;
-		setConnection(Connection.connect(peerAddress, returnMessageHandler));
+		if (Config.USE_NETTY_CLIENT) {
+			setConnection(NettyConnection.connect(peerAddress, returnMessageHandler));
+		} else {
+			setConnection(Connection.connect(peerAddress, returnMessageHandler));
+		}
 		// setConnection(NettyConnection.connect(peerAddress, returnMessageHandler));
 	}
 	
@@ -69,9 +75,24 @@ public class ConvexRemote extends Convex {
 		return convex;
 	}
 	
-	public void reconnect() throws IOException, TimeoutException {
+	public static ConvexRemote connectNetty(InetSocketAddress sa) throws InterruptedException {
+		ConvexRemote convex=new ConvexRemote(null,null);
+		convex.remoteAddress=sa;
+		convex.setConnection(NettyConnection.connect(sa, convex.returnMessageHandler));
+		return convex;
+	}
+	
+	public static ConvexRemote connectNIO(InetSocketAddress sa) throws InterruptedException, IOException, TimeoutException {
+		ConvexRemote convex=new ConvexRemote(null,null);
+		convex.remoteAddress=sa;
+		convex.setConnection(Connection.connect(sa, convex.returnMessageHandler));
+		return convex;
+	}
+
+	
+	public synchronized void reconnect() throws IOException, TimeoutException, InterruptedException {
 		close();
-		setConnection(Connection.connect(remoteAddress, returnMessageHandler));
+		connectToPeer(remoteAddress);
 	}
 
 	/**
@@ -191,6 +212,8 @@ public class ConvexRemote extends Convex {
 	public Server getLocalServer() {
 		return null;
 	}
+
+
 
 
 }

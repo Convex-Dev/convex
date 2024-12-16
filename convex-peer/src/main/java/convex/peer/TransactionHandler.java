@@ -53,7 +53,7 @@ import convex.net.Message;
  */
 public class TransactionHandler extends AThreadedComponent {
 	
-	static final Logger log = LoggerFactory.getLogger(BeliefPropagator.class.getName());
+	static final Logger log = LoggerFactory.getLogger(TransactionHandler.class.getName());
 	
 	/**
 	 * Default minimum delay between proposing own transactions as a peer

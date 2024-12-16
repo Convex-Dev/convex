@@ -14,6 +14,7 @@ import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.cvm.Address;
 import convex.core.lang.RT;
@@ -41,10 +42,17 @@ public class NettyServerTest {
 			Message m=rec.join();
 			assertEquals(RT.cvm(10),m.getResultID());
 			
-			Convex convex=Convex.connect(addr);
-			Result r=convex.query(":hello").join();
-			assertFalse(r.isError());
+			{ // Regular client
+				Convex convex=Convex.connect(addr);
+				Result r=convex.query(":hello").join();
+				assertFalse(r.isError());
+			}
 			
+			{ // Netty client
+				Convex convex=ConvexRemote.connectNetty(addr);
+				Result r=convex.query(":hello").join();
+				assertFalse(r.isError());
+			}
 		}
 	}
 }

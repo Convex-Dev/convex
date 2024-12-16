@@ -23,15 +23,20 @@ class NettyOutboundHandler extends ChannelOutboundHandlerAdapter {
         // Buffer for header
         ByteBuf headBuf = ctx.alloc().buffer(headLen);
         writeVLQCount(headBuf,mlen);
-        
-        // Buffer for message data
-       ByteBuf encodedBuf=Unpooled.wrappedBuffer(data.getInternalArray(), data.getInternalOffset(), mlen);
-       
-       // Write the buffers
-       ctx.write(headBuf);
-       ctx.writeAndFlush(encodedBuf);
+
+		// Buffer for message data
+		ByteBuf encodedBuf = Unpooled.wrappedBuffer(data.getInternalArray(), data.getInternalOffset(), mlen);
+
+		// Write the buffers, flushing at the end of the message
+		ctx.write(headBuf);
+		ctx.writeAndFlush(encodedBuf);
     }
 	
+	/**
+	 * Helper function for writing message length
+	 * @param bb
+	 * @param x
+	 */
 	public static void writeVLQCount(ByteBuf bb, long x) {
 		if (x<128) {
 			if (x<0) throw new IllegalArgumentException("Negative count!");

@@ -1,6 +1,5 @@
 package convex.net.impl.netty;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.function.Consumer;
@@ -84,7 +83,7 @@ public class NettyConnection extends AConnection {
 
 	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
 		Bootstrap b = getClientBootstrap();
-		ChannelFuture f = b.connect(sa).sync(); 
+		ChannelFuture f = b.connect(sa).sync(); // (5)
 
 		Channel chan = f.channel();
 		NettyInboundHandler inbound=new NettyInboundHandler(receiveAction,null);
@@ -107,15 +106,11 @@ public class NettyConnection extends AConnection {
 	}
 
 	@Override
-	public boolean sendMessage(Message m) throws IOException {
+	public boolean sendMessage(Message m)  {
+		// Note: never call await here as might block the IO thread
+		@SuppressWarnings("unused")
 		ChannelFuture cf=send(m);
-		try {
-			cf.await();
-			return cf.isSuccess();
-		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			return false;
-		}
+		return true;
 	}
 
 	@Override

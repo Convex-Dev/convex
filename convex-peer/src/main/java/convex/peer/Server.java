@@ -381,10 +381,10 @@ public class Server implements Closeable {
 	 * @param m
 	 */
 	protected void processMessage(Message m) {
-		MessageType type = m.getType();
 		AStore tempStore=Stores.current();
 		try {
 			Stores.setCurrent(this.store);
+			MessageType type = m.getType();
 			switch (type) {
 			case BELIEF:
 				processBelief(m);
@@ -425,7 +425,7 @@ public class Server implements Closeable {
 			}
 		} catch (MissingDataException e) {
 			Hash missingHash = e.getMissingHash();
-			log.trace("Missing data: {} in message of type {}" , missingHash,type);
+			log.trace("Missing data: {} in message", missingHash);
 		} catch (Exception e) {
 			log.warn("Unexpected error processing peer message",e);
 		} finally {

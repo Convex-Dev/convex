@@ -41,6 +41,16 @@ public class Config {
 	 * Size of default client socket send buffer
 	 */
 	public static final int SOCKET_SEND_BUFFER_SIZE = 2*65536;
+	
+	/**
+	 * Flag to use Netty client connections
+	 */
+	public static final boolean USE_NETTY_CLIENT = false;
+
+	/**
+	 * Flag to use Netty server implementation
+	 */
+	public static final boolean USE_NETTY_SERVER = false;
 
 	/**
 	 * Delay before rebroadcasting Belief if not in consensus
