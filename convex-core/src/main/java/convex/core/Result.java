@@ -390,7 +390,9 @@ public final class Result extends ARecordGeneric {
 	 * @return Result instance representing the exception (will be an error)
 	 */
 	public static Result fromException(Throwable e) {
-		if (e==null) return Result.error(ErrorCodes.EXCEPTION,Strings.NIL);
+		if (e==null) {
+			return Result.error(ErrorCodes.EXCEPTION,Strings.NIL);
+		}
 		if (e instanceof TimeoutException) {
 			String msg=e.getMessage();
 			return Result.error(ErrorCodes.TIMEOUT,Strings.create(msg));
@@ -433,6 +435,7 @@ public final class Result extends ARecordGeneric {
 	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
 	public static final Result SENT_MESSAGE = Result.value(Strings.intern("Sent"));
 	public static final Result FULL_CLIENT_BUFFER = Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM);
+	public static final Result BAD_FORMAT = Result.error(ErrorCodes.FORMAT, "Bad format");
 
 
 	

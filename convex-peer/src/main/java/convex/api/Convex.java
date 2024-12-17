@@ -815,7 +815,7 @@ public abstract class Convex implements AutoCloseable {
 		try {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (ExecutionException | TimeoutException e) {
-			return Result.fromException(e.getCause());
+			return Result.fromException(e);
 		} finally {
 			cf.cancel(true);
 		}

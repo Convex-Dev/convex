@@ -45,12 +45,12 @@ public class Config {
 	/**
 	 * Flag to use Netty client connections
 	 */
-	public static final boolean USE_NETTY_CLIENT = false;
+	public static final boolean USE_NETTY_CLIENT = true;
 
 	/**
 	 * Flag to use Netty server implementation
 	 */
-	public static final boolean USE_NETTY_SERVER = false;
+	public static final boolean USE_NETTY_SERVER = true;
 
 	/**
 	 * Delay before rebroadcasting Belief if not in consensus

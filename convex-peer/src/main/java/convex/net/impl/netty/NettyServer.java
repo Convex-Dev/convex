@@ -10,8 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.data.ACell;
-import convex.core.data.Cells;
-import convex.core.data.Strings;
 import convex.core.util.Shutdown;
 import convex.net.AServer;
 import convex.net.Message;
@@ -46,7 +44,7 @@ public class NettyServer extends AServer {
 	private Consumer<Message> receiveAction=m->{
 		try {
 			ACell payload=m.getPayload();
-			m.returnMessage(Message.createResult(m.getID(), Strings.create("Received payload with hash: "+Cells.getHash(payload)), null));
+			m.returnMessage(Message.createResult(m.getRequestID(), payload, null));
 		} catch (Exception e) {
 			log.warn("Unexpected exception handling message receipt",e);
 		}
@@ -102,7 +100,7 @@ public class NettyServer extends AServer {
     	// Check local port    	
         InetSocketAddress localAddress=(InetSocketAddress) f.channel().localAddress();
     	setPort(localAddress.getPort());
-  		log.info("Netty Server started on port: "+getPort());
+  		log.debug("Netty Server started on port: "+getPort());
    	   
    		this.channel=f.channel();
     }
@@ -133,6 +131,11 @@ public class NettyServer extends AServer {
 	@Override
 	public InetSocketAddress getHostAddress() {
 		return (InetSocketAddress) channel.localAddress();
+	}
+
+
+	public void setReceiveAction(Consumer<Message> handler) {
+		receiveAction=handler;
 	}
 
 }

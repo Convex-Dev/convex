@@ -620,7 +620,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 	public synchronized void addConnection(AccountKey peerKey, Convex convex) {
 		synchronized(connections) {
-			log.info("Connected to Peer: "+peerKey+ " at "+convex.getHostAddress());
+			log.debug("Connected to Peer: "+peerKey+ " at "+convex.getHostAddress());
 			connections.put(peerKey, convex);
 		}
 	}

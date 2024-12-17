@@ -114,6 +114,13 @@ public class ConvexRemote extends Convex {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
 		CompletableFuture<Result> cr=cf.handle((m,e)->{
+			synchronized(awaiting) {
+				// no longer want to wait for this result 
+				// either we go a result back, or the future failed 
+				awaiting.remove(resultID);
+			}
+			
+			// Set the store. Likely to be needed by anyone waiting on the future
 			Stores.setCurrent(awaitingStore);
 			
 			// clear sequence if something went wrong. It is probably invalid now....

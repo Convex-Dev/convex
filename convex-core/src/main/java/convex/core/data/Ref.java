@@ -365,7 +365,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public static <T extends ACell> Ref<T> readRaw(Blob b, int pos) throws BadFormatException {
 		Hash h = Hash.wrap(b,pos);
-		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref as position: "+pos);
+		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref at position: "+pos);
 		Ref<T> ref=Ref.forHash(h);
 		ref=ref.markEmbedded(false);
 		return ref;

@@ -126,7 +126,7 @@ public class TransactionHandler extends AThreadedComponent {
 				return Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
 			}
 			Peer p=server.getPeer();
-			State s=server.getPeer().getConsensusState();
+			State s=p.getConsensusState();
 			PeerStatus ps=s.getPeers().get(p.getPeerKey());
 			if (ps==null) {
 				return Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
@@ -140,6 +140,7 @@ public class TransactionHandler extends AThreadedComponent {
 	protected void processMessage(Message m) throws InterruptedException {
 		try {
 			this.receivedTransactionCount++;
+			log.info("Got TX message: "+m);
 			
 			// Transaction is a vector [id , signed-object]
 			AVector<ACell> v = m.getPayload();
@@ -256,7 +257,7 @@ public class TransactionHandler extends AThreadedComponent {
 			Message m = interests.get(h);
 			if (m != null) {
 				ACell id = m.getID();
-				log.trace("Returning transaction result ID {}", id);
+				log.info("Returning transaction result ID {}", id);
 				Result res = null;
 				
 				try {
@@ -449,9 +450,16 @@ public class TransactionHandler extends AThreadedComponent {
 			LoadMonitor.up();
 			if (m==null) return;
 			
+			LoadMonitor.down();
+			// Brief pause in case more transactions are coming in
+			Thread.sleep(1);
+			LoadMonitor.up();
+
+			
 			// We have at least one transaction to handle, drain queue to get the rest
 			messages.add(m);
 			txMessageQueue.drainTo(messages);
+			log.info("Transaction Messages received: "+messages.size());
 			
 			// Process transaction messages
 			// This might block if we aren't generating blocks fast enough

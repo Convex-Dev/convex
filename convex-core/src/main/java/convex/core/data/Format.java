@@ -639,7 +639,7 @@ public class Format {
 		} catch (Exception e) {
 			throw new BadFormatException("Unexpected Exception when decoding ("+tag+"): "+e.getMessage(), e);
 		}
-		throw new BadFormatException(ErrorMessages.badTagMessage(tag));
+		throw new BadFormatException(ErrorMessages.badTagMessage(tag,blob,offset));
 	}
 
 

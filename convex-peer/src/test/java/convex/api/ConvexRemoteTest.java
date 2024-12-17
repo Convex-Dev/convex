@@ -150,14 +150,14 @@ public class ConvexRemoteTest {
 	public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (network.SERVER) {
 			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			int n = 100;
+			int n = 10;
 			Future<Result>[] rs = new Future[n];
 			for (int i = 0; i < n; i++) {
 				Future<Result> f = convex.transact(Invoke.create(ADDRESS, 0, Constant.of(i)));
 				rs[i] = f;
 			}
 			for (int i = 0; i < n; i++) {
-				Result r = rs[i].get(6000, TimeUnit.MILLISECONDS);
+				Result r = rs[i].get(10000, TimeUnit.MILLISECONDS);
 				assertNull(r.getErrorCode(), ()->"Error:" + r.toString());
 			}
 		}

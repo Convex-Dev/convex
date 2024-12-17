@@ -128,10 +128,13 @@ public class ServerTest {
 			Convex convex=network.getClient();
 	
 			Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
+			assertTrue(f.get().getValue() instanceof CVMLong);
+			
 			convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
 	
+			assertFalse(f2.isError(),()->"Bad query result: "+f2);
 			assertEquals(convex.getAddress(),f2.getValue());
-			assertTrue(f.get().getValue() instanceof CVMLong);
+			
 			
 			// Note difference by argument type. `nil` code can make a valid transaction
 			assertThrows(IllegalArgumentException.class,()->convex.transact((ATransaction)null));

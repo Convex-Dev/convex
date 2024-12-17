@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
@@ -17,8 +18,15 @@ import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
+import convex.core.data.AVector;
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
+import convex.core.data.Vectors;
+import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
 import convex.net.Message;
+import convex.net.MessageTag;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class NettyServerTest {
@@ -44,8 +52,12 @@ public class NettyServerTest {
 			
 			{ // Regular client
 				Convex convex=Convex.connect(addr);
-				Result r=convex.query(":hello").join();
+				Result r=convex.query(Keywords.FOO).join();
 				assertFalse(r.isError());
+				AVector<?> v= RT.ensureVector(r.getValue());
+				
+				AVector<?> expected=Vectors.of(MessageTag.QUERY,0,Keywords.FOO,null);
+				assertEquals(expected,v);
 			}
 			
 			{ // Netty client
@@ -53,6 +65,41 @@ public class NettyServerTest {
 				Result r=convex.query(":hello").join();
 				assertFalse(r.isError());
 			}
+		}
+	}
+	
+	@Test public void testBigMessage() throws IOException, InterruptedException, TimeoutException {
+		try (NettyServer server = new NettyServer(0)) {
+			server.launch();
+			server.setReceiveAction(m->{
+				try {
+					Result r=Result.create(m.getRequestID(), m.getPayload(), null);
+					m.returnResult(r);
+				} catch (BadFormatException e) {
+					m.returnResult(Result.BAD_FORMAT);
+				}
+			});
+			Integer port=server.getPort();
+			
+			assertNotNull(port);
+			InetSocketAddress socketAddr=server.getHostAddress();
+			assertEquals(port,socketAddr.getPort());
+			
+			ArrayBlockingQueue<Message> queue=new ArrayBlockingQueue<>(100);
+		
+			NettyConnection client=NettyConnection.connect(socketAddr, m->{
+				queue.add(m);
+			});
+			
+			Blob blob=Blobs.createRandom(100000).toFlatBlob();
+			
+			Message mq=Message.createQuery(10, blob, Address.create(17));
+			client.send(mq);
+			
+			Message m=queue.take();
+			assertEquals(RT.cvm(10),m.getResultID());
+			
+
 		}
 	}
 }

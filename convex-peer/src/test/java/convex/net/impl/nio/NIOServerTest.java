@@ -33,7 +33,7 @@ public class NIOServerTest {
 			s.launch();
 			InetSocketAddress sa=s.getHostAddress();
 			
-			Convex c=ConvexRemote.connectNetty(sa);
+			Convex c=ConvexRemote.connectNIO(sa);
 			assertTrue(c.isConnected());
 			
 			c.query(Keywords.FOO);

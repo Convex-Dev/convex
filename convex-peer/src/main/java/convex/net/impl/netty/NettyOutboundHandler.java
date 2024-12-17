@@ -19,6 +19,9 @@ class NettyOutboundHandler extends ChannelOutboundHandlerAdapter {
         
         int mlen=Utils.checkedInt(data.count());
         int headLen=Format.getVLQCountLength(mlen);
+        if (headLen<=0) {
+        	throw new Error("Trying to write an empty message length "+mlen);
+        }
 
         // Buffer for header
         ByteBuf headBuf = ctx.alloc().buffer(headLen);
