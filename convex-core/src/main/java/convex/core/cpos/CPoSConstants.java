@@ -73,6 +73,11 @@ public class CPoSConstants {
 	 * (2 header values short of 256, so that request vector is 2 levels at max size)
 	 */
 	public static final int MISSING_LIMIT = 254;
+	
+	/**
+	 * Milliseconds time between blocks for a peer to collect maximum rewards (10 mins)
+	 */
+	public static final long MAX_REWARD_TIME = 10*60*1000;
 
 
 }

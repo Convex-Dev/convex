@@ -62,7 +62,7 @@ public class Init {
 	
 	// First user of Protonet, i.e. @mikera
 	public static final Address FIRST_USER_ADDRESS = Address.create(13);
-	private static final AccountKey FIRST_USER_KEY = AccountKey.fromHex("89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac");
+	public static final AccountKey FIRST_USER_KEY = AccountKey.fromHex("89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac");
 
 	// Constants
 	private static final Index<AccountKey, PeerStatus> EMPTY_PEERS = Index.none();
@@ -73,6 +73,7 @@ public class Init {
 	 */
 	private static final long GENESIS_COINS=1000000*Coin.GOLD;
 
+	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("aE9C747a9730D63Fc16BcccEBd12B5dD4c8fBe1328e9a953025e8C02164Ed5E6");
 
 
 	/**
@@ -212,7 +213,7 @@ public class Init {
 			assert(userFunds == 0L);
 		}
 		
-		// Initial user account
+		// Initial user account, follows genesis peer controller(s)
 		accts=addAccount(accts,Address.create(accts.count()),FIRST_USER_KEY,0);
 
 		// Finally add initial peers
@@ -239,6 +240,10 @@ public class Init {
 		s = s.withAccounts(accts);
 		// Add peers to the State
 		s = s.withPeers(peers);
+		
+		s = register(s, GENESIS_ADDRESS, "Genesis User", "User account for genesis");
+		s = register(s, GENESIS_PEER_ADDRESS, "Genesis Peer", "Genesis peer contrroller account");
+
 
 		{ // Test total funds after creating user / peer accounts
 			long total = s.computeTotalBalance();
@@ -277,14 +282,14 @@ public class Init {
 		{ // Register core library now that registry exists
 			Context ctx = Context.create(s, INIT_ADDRESS);						             
 			s = ctx.getState();
-			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core utilities accessible by default in any account.");
+			s = register(s, CORE_ADDRESS, "Convex Core Library", "Core library accessible by default in any account");
 			
-			s = register(s, FOUNDATION_ADDRESS, "Foundation Governance", "Master network governance account.");
-			s = register(s, RESERVE_ADDRESS, "Foundation Reserve", "Unreleased Foundation coin reserve.");
-			s = register(s, UNRELEASED_ADDRESS, "Release Curve Reserve", "Release curve unreleased coins.");
-			s = register(s, DISTRIBUTION_ADDRESS, "Release Curve Pre-Distribution", "Release curve coins for future distribution.");
-			s = register(s, GOVERNANCE_ADDRESS, "Network Governance", "Network governance account.");
-			s = register(s, ADMIN_ADDRESS, "Network Admin", "Network admin accouns.");
+			s = register(s, FOUNDATION_ADDRESS, "Foundation Governance", "Master network governance account");
+			s = register(s, RESERVE_ADDRESS, "Foundation Reserve", "Unreleased Foundation coin reserve");
+			s = register(s, UNRELEASED_ADDRESS, "Release Curve Reserve", "Release curve unreleased coins");
+			s = register(s, DISTRIBUTION_ADDRESS, "Release Curve Pre-Distribution", "Release curve coins for future distribution");
+			s = register(s, GOVERNANCE_ADDRESS, "Network Governance", "Network governance account");
+			s = register(s, ADMIN_ADDRESS, "Network Admin", "Network admin accouns");
 		}
 
 		return s;
@@ -295,7 +300,7 @@ public class Init {
 	}
 	
 	public static State createState(AccountKey genesisKey,List<AccountKey> peerKeys) {
-		return createState(genesisKey,genesisKey,peerKeys);
+		return createState(DEFAULT_GOV_KEY,genesisKey,peerKeys);
 	}
 	
 	public static State createState(AccountKey governanceKey, AccountKey genesisKey,List<AccountKey> peerKeys) {

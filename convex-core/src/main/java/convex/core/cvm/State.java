@@ -423,19 +423,31 @@ public class State extends ARecordGeneric {
 	static State distributeFees(State state, AccountKey peer, long fees) {
 		PeerStatus ps=state.getPeer(peer);
 		AccountStatus rewardPool=state.getAccount(Address.ZERO);
+		long poolBalance=rewardPool.getBalance();
+		
+		long timeStamp=state.getTimestamp().longValue();
+		long timeReward=0;
+		
 		if (ps==null) {
 			// this can happen, e.g. if the peer evicted itself
 		} else {
 			// immediate fees to peer
 			long peerFees=fees/2;
-			ps=ps.distributeBlockReward(state,peerFees);
 			fees-=peerFees;
+			
+			long oldTimestamp=ps.getTimestamp();
+			long elapsed=Math.max(0, Math.min(timeStamp-oldTimestamp, CPoSConstants.MAX_REWARD_TIME));
+			timeReward=Math.max(0, Math.min(0, elapsed)); // TODO: update with reward calc
+			
+			ps=ps.distributeBlockReward(state,peerFees+timeReward); // this also increases timestamp
+
 			state=state.withPeer(peer, ps);
+			
 		}
 		
 		// Remaining fees burned to reward pool
 		if (fees>0) {
-			state=state.putAccount(Address.ZERO,rewardPool.withBalance(rewardPool.getBalance()+fees));
+			state=state.putAccount(Address.ZERO,rewardPool.withBalance(poolBalance+fees-timeReward));
 		}		
 		return state;
 	}
