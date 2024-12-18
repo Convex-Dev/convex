@@ -60,10 +60,14 @@ public class Multi extends ATransaction {
 	 * Transactions beyond the first failure will not be attempted.
 	 */
 	public static final int MODE_UNTIL=3; 
-
+	
 
 	private static final Keyword[] KEYS = new Keyword[] { Keywords.ORIGIN, Keywords.SEQUENCE,Keywords.MODE,Keywords.TXS};
 	private static final RecordFormat FORMAT = RecordFormat.of(KEYS);
+
+	// Record key indexes
+	protected static final int IX_MODE=2;
+	protected static final int IX_TXS=3;
 
 	
 	protected Multi(Address origin, long sequence, int mode, AVector<ATransaction> txs) {
@@ -74,7 +78,7 @@ public class Multi extends ATransaction {
 	
 	protected Multi(AVector<ACell> values) {
 		super(CVMTag.MULTI,FORMAT, values);
-		this.mode=Utils.checkedInt(RT.ensureLong(values.get(2)).longValue());
+		this.mode=Utils.checkedInt(RT.ensureLong(values.get(IX_MODE)).longValue());
 		if (!isValidMode(mode)) throw new IllegalArgumentException("Bad mode");
 	}
 
@@ -142,7 +146,7 @@ public class Multi extends ATransaction {
 
 	private AVector<ATransaction> getTransactions() {
 		if (txs==null) {
-			txs=RT.ensureVector(values.get(3));
+			txs=RT.ensureVector(values.get(IX_TXS));
 		}
 		return txs;
 	}
@@ -179,13 +183,12 @@ public class Multi extends ATransaction {
 
 	@Override
 	public void validateCell() throws InvalidDataException {
-		// TODO Auto-generated method stub
 		if ((mode<MODE_ANY)||(mode>MODE_UNTIL)) throw new InvalidDataException("Illegal mode: "+mode,this);
 	}
 	
 	@Override
 	public ACell get(Keyword key) {
-		if (Keywords.MODE.equals(key)) return CVMLong.create(mode);
+		if (Keywords.MODE.equals(key)) return values.get(IX_MODE);
 		if (Keywords.TXS.equals(key)) return getTransactions();
 		return super.get(key); // covers origin and sequence
 	}
