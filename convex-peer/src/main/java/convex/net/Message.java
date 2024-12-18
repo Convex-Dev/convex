@@ -340,13 +340,18 @@ public class Message {
 	 * 
 	 * @param res Result record
 	 * @return True if reported successfully, false otherwise
+	 * @throws IllegalStateException if original message did not specify a return ID
 	 */
 	public boolean returnResult(Result res) {
-		ACell id=getID();
-		if (id!=null) res=res.withID(id);
-	
-		Message msg=Message.createResult(res);
-		return returnMessage(msg);
+		ACell id=getRequestID(); // what was the request ID of original message?
+		if (id!=null) {
+			// Make sure Result has correct result ID
+			res=res.withID(id);
+			Message msg=Message.createResult(res);
+			return returnMessage(msg);
+		} else {
+			throw new IllegalStateException("Trying to return result with no original request ID");
+		}
 	}
 	
 	/**

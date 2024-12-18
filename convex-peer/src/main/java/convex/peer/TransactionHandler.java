@@ -141,7 +141,7 @@ public class TransactionHandler extends AThreadedComponent {
 	protected void processMessage(Message m) throws InterruptedException {
 		try {
 			this.receivedTransactionCount++;
-			log.info("Got TX message: "+m);
+			// log.info("Got TX message: "+m);
 			
 			// Transaction is a vector [id , signed-object]
 			AVector<ACell> v = m.getPayload();
@@ -257,8 +257,8 @@ public class TransactionHandler extends AThreadedComponent {
 			Hash h = t.getHash();
 			Message m = interests.get(h);
 			if (m != null) {
-				ACell id = m.getID();
-				log.info("Returning transaction result ID {}", id);
+				// ACell id = m.getID();
+				// log.info("Returning transaction result ID {}", id);
 				Result res = null;
 				
 				try {

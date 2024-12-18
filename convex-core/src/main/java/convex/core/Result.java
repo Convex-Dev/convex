@@ -381,6 +381,7 @@ public final class Result extends ARecordGeneric {
 	 * @return Updated Result
 	 */
 	public Result withID(ACell id) {
+		if (Cells.equals(id, getID())) return this;
 		return withValues(values.assoc(ID_POS, id));
 	}
 

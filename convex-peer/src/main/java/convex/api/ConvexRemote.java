@@ -256,7 +256,8 @@ public class ConvexRemote extends Convex {
 			synchronized (awaiting) {
 				boolean sent = conn.sendMessage(m);				
 				if (sent) {
-					log.info("Sent message: "+m);
+					// All OK
+					// log.info("Sent message: "+m);
 				} else {
 					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				}
