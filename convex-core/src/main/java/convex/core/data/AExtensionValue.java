@@ -11,7 +11,7 @@ import convex.core.util.Utils;
 public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 
 	/**
-	 * Length of an Address in bytes (when considered as a Blob)
+	 * Length of an extension value in bytes (when considered as a Blob)
 	 */
 	protected static final int BYTE_LENGTH = 8;
 
@@ -86,6 +86,11 @@ public abstract class AExtensionValue extends ABlobLike<CVMLong> {
 	public AExtensionValue empty() {
 		// There is no empty extension value
 		return null;
+	}
+	
+	@Override
+	public boolean isEmbedded() {
+		return true;
 	}
 	
 	@Override
