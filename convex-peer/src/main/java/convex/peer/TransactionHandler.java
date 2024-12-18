@@ -109,17 +109,6 @@ public class TransactionHandler extends AThreadedComponent {
 		interests.put(signedTransactionHash, m);
 	}
 	
-	private void processMessages() throws InterruptedException {
-		Result problem=checkPeerState();
-		for (Message msg: messages) {
-			if (problem==null) {
-				processMessage(msg);
-			} else {
-				msg.returnResult(problem);
-			}
-		}
-	}
-	
 	private Result checkPeerState() {
 		try {
 			if (!server.isLive()) {
@@ -137,6 +126,18 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 
+	
+	private void processMessages() throws InterruptedException {
+		Result problem=checkPeerState();
+		for (Message msg: messages) {
+			if (problem==null) {
+				processMessage(msg);
+			} else {
+				msg.returnResult(problem);
+			}
+		}
+	}
+	
 	protected void processMessage(Message m) throws InterruptedException {
 		try {
 			this.receivedTransactionCount++;
@@ -297,11 +298,13 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 	
 	/**
+	 * Gets the next Block for publication, or null if nothing to publish
 	 * Checks for pending transactions, and if found propose them as a new Block.
 	 *
 	 * @return New signed Block, or null if nothing to publish yet
 	 */
-	protected SignedData<Block> maybeGenerateBlock(Peer peer) {
+	protected SignedData<Block> maybeGenerateBlock() {
+		Peer peer=server.getPeer();
 		long timestamp=Utils.getCurrentTimestamp();
 
 		if (!readyToPublish(peer)) return null;
@@ -321,19 +324,20 @@ public class TransactionHandler extends AThreadedComponent {
 		
 		// TODO: smaller block if too many transactions?
 		Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
+		SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
+		
+		try {
+			Cells.persist(signedBlock);
+		} catch (Exception e) {
+			log.warn("Exception preparing new block",e);
+			return null;
+		}
+		
 		newTransactions.clear();
 		lastBlockPublishedTime=timestamp;
-		SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 		return signedBlock;
 	}
 	
-	/**
-	 * Gets the next Block for publication, or null if not yet ready
-	 * @return New Block, or null if not yet produced
-	 */
-	public SignedData<Block> maybeGetBlock() {
-		return maybeGenerateBlock(server.getPeer());
-	}
 	
 	/**
 	 * Checks if the Peer is ready to publish a Block
@@ -459,7 +463,7 @@ public class TransactionHandler extends AThreadedComponent {
 			// We have at least one transaction to handle, drain queue to get the rest
 			messages.add(m);
 			txMessageQueue.drainTo(messages);
-			log.info("Transaction Messages received: "+messages.size());
+			// log.info("Transaction Messages received: "+messages.size());
 			
 			// Process transaction messages
 			// This might block if we aren't generating blocks fast enough

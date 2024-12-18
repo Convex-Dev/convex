@@ -571,7 +571,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			Ref<AVector<T>> newChild = (Ref<AVector<T>>) func.apply(current);
 			
 			if (newChild!=current) {
-				if (children==newChildren) newChildren=children.clone();
+				if (children==newChildren) newChildren=newChildren.clone();
 				newChildren[i] = newChild;
 			}
 		}

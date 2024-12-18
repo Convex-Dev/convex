@@ -24,15 +24,17 @@ class NettyOutboundHandler extends ChannelOutboundHandlerAdapter {
         }
 
         // Buffer for header
-        ByteBuf headBuf = ctx.alloc().buffer(headLen);
-        writeVLQCount(headBuf,mlen);
+        byte[] headBytes=new byte[headLen];
+        Format.writeVLQCount(headBytes, 0, mlen);
+        ByteBuf headBuf = Unpooled.wrappedBuffer(headBytes,0,headLen);
 
 		// Buffer for message data
 		ByteBuf encodedBuf = Unpooled.wrappedBuffer(data.getInternalArray(), data.getInternalOffset(), mlen);
 
 		// Write the buffers, flushing at the end of the message
 		ctx.write(headBuf);
-		ctx.writeAndFlush(encodedBuf);
+		ctx.write(encodedBuf);
+		ctx.flush();
     }
 	
 	/**

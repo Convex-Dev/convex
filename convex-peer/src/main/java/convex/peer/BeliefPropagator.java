@@ -165,25 +165,27 @@ public class BeliefPropagator extends AThreadedComponent {
 		long ts=Utils.getCurrentTimestamp();
 		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
 			lastBroadcastTime=ts;
-			Message msg=null;
 			try {
+				Message msg=null;
 				if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
 					msg=createFullUpdateMessage();
 					lastFullBroadcastTime=ts;
 				} else {
 					msg=createQuickUpdateMessage();
 				}
+				
+				if (msg!=null) {
+					server.manager.broadcast(msg);
+					beliefBroadcastCount++;
+				} else {
+					log.warn("Failed to create broadcast message in BeliefPropagator!");
+				}
+				
 			} catch (Exception e) {
 				log.warn("Error attempting to create broadcast message",e);
 			}
 			
 			// Actually broadcast the message to outbound connected Peers
-			if (msg!=null) {
-				server.manager.broadcast(msg);
-				beliefBroadcastCount++;
-			} else {
-				log.warn("null message in BeliefPropagator!");
-			}
 		}
 	}
 	
@@ -212,7 +214,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean updated = maybeMergeBeliefs(newBelief);
 		
 		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
-		SignedData<Block> signedBlock= server.transactionHandler.maybeGetBlock(); 
+		SignedData<Block> signedBlock= server.transactionHandler.maybeGenerateBlock(); 
 		boolean published=false;
 		if (signedBlock!=null) {
 			belief=belief.proposeBlock(server.getKeyPair(),signedBlock);

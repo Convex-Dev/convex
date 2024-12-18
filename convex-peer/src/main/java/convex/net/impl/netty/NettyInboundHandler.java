@@ -49,8 +49,9 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) { 
     	try {
        		ByteBuf buf=(ByteBuf)msg;
-       		int mlen=0;
+       		int mlen;
        	    if (messageBuf==null) {
+       	    	mlen=0;
     			int lb=lenBuf.writerIndex(); // number of bytes written to lenBuf already
     			int i=0;
     			int newBytes=buf.readableBytes();
@@ -66,15 +67,16 @@ class NettyInboundHandler extends ChannelInboundHandlerAdapter {
     					newBytes--;
     				}
     				
-        			int bm=(b&0x7f); // new bits for length
-        			if ((i==0)&&(bm==0)) {
+        			if ((i==0)&&(b==0x80)) {
         				byte[] bytes=new byte[newBytes];
         				bytes[0]=b;
         				buf.readBytes(bytes, 1, newBytes-1);
         				Blob tmp=Blob.wrap(bytes);
         				throw new BadFormatException("Zero leading bits in message length, content: "+tmp);
         			}
-        			mlen=(mlen<<7)+bm;
+        			
+           			int bm=(b&0x7f); // new bits for length
+           		    mlen=(mlen<<7)+bm;
         			if (mlen>CPoSConstants.MAX_MESSAGE_LENGTH) throw new BadFormatException("Message too long: "+mlen);
         			if ((b&0x80)==0) {
         				// we have a complete message length

@@ -110,6 +110,8 @@ public class ConvexRemote extends Convex {
 		AStore awaitingStore=Stores.current();
 		
 		CompletableFuture<Message> cf = new CompletableFuture<Message>();
+		awaiting.put(resultID, cf);
+		
 		if (timeout>0) {
 			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
 		}
@@ -121,6 +123,7 @@ public class ConvexRemote extends Convex {
 			}
 			
 			// Set the store. Likely to be needed by anyone waiting on the future
+			// We don't need to restore it because the return message handler does that for us
 			Stores.setCurrent(awaitingStore);
 			
 			// clear sequence if something went wrong. It is probably invalid now....
@@ -129,15 +132,12 @@ public class ConvexRemote extends Convex {
 				return Result.fromException(e);
 			}
 			
-			// Ensure we set the right store while handling this result
-			// We don't need to restore it because the return message handler does that for us
 			Result r=m.toResult();
 			if (r.getErrorCode()!=null) {
 				sequence=null;
 			}
 			return r;
 		});
-		awaiting.put(resultID, cf);
 		return cr;
 	}
 
@@ -217,7 +217,7 @@ public class ConvexRemote extends Convex {
 	}
 	
 	@Override
-	public synchronized CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
+	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		Message m=Message.createTransaction(getNextID(), signed);
 		return message(m);
 	}
@@ -245,15 +245,19 @@ public class ConvexRemote extends Convex {
 			if (id==null) {
 				// Not expecting any return message, so just report sending
 				boolean sent = conn.sendMessage(m);
-				if (!sent) {
+				if (sent) {
+					// log.info("Sent message: "+m);
+				} else {
 					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				}
 				return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
 			}
 			
 			synchronized (awaiting) {
-				boolean sent = conn.sendMessage(m);
-				if (!sent) {
+				boolean sent = conn.sendMessage(m);				
+				if (sent) {
+					log.info("Sent message: "+m);
+				} else {
 					return CompletableFuture.completedFuture(Result.FULL_CLIENT_BUFFER);
 				}
 	
