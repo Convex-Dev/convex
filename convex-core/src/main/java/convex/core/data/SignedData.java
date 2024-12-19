@@ -320,11 +320,6 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	}
 
 	@Override
-	public boolean isCanonical() {
-		return true;
-	}
-
-	@Override
 	public final int getRefCount() {
 		// Value Ref only
 		return 1;

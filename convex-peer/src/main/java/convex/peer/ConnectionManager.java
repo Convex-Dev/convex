@@ -675,16 +675,21 @@ public class ConnectionManager extends AThreadedComponent {
 	 * @param peerKey Peer key which triggered missing data
 	 */
 	public void alertMissing(Message m, MissingDataException e, AccountKey peerKey) {
-		Convex conn=getConnection(peerKey);
-		if (conn==null) return; // No outbound connection to this peer, so just ignore
-		
-		if (log.isDebugEnabled()) {
-			String message= "Missing data alert "+e.getMissingHash();
-			log.debug(message);
+		try {
+			Convex conn=getConnection(peerKey);
+			if (conn==null) return; // No outbound connection to this peer, so just ignore
+			
+			if (log.isDebugEnabled()) {
+				String message= "Missing data alert "+e.getMissingHash();
+				// String s=PrintUtils.printRefTree(m.getPayload().getRef());
+				// System.out.println(s);
+				log.info(message);
+			}
+			
+			// TODO: possibly fire off request to specific Peer? Unclear if this improves things generally, but might avoid polling
+		} catch (Exception ex) {
+			log.warn("Unexpected error responding to missing data",ex);
 		}
-		
-		// TODO: possibly fire off request to specific Peer? Unclear if this improves things generally, but might avoid polling
-		
 	}
 
 }

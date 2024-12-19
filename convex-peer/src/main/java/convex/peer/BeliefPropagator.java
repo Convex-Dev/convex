@@ -47,7 +47,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	/**
 	 * Wait period for beliefs received in each iteration of Server Belief Merge loop.
 	 */
-	private static final long AWAIT_BELIEFS_PAUSE = 60L;
+	private static final long AWAIT_BELIEFS_PAUSE = 30L;
 
 	
 	public static final int BELIEF_REBROADCAST_DELAY=300;
@@ -253,6 +253,7 @@ public class BeliefPropagator extends AThreadedComponent {
 	 * @return True if Peer Belief Order was changed, false otherwise.
 	 */
 	protected boolean maybeMergeBeliefs(Belief... newBeliefs) {
+		if ((newBeliefs==null)||(newBeliefs.length==0)) return false;
 		try {
 			long ts=Utils.getCurrentTimestamp();
 			AKeyPair kp=server.getKeyPair();
