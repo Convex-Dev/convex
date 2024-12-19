@@ -2,7 +2,6 @@ package convex.peer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -298,12 +297,12 @@ public class TransactionHandler extends AThreadedComponent {
 	}
 	
 	/**
-	 * Gets the next Block for publication, or null if nothing to publish
-	 * Checks for pending transactions, and if found propose them as a new Block.
+	 * Gets the next Blocks for publication, or null if nothing to publish
+	 * Checks for pending transactions, and if found propose them as new Block(s).
 	 *
 	 * @return New signed Block, or null if nothing to publish yet
 	 */
-	protected SignedData<Block> maybeGenerateBlock() {
+	protected SignedData<Block>[] maybeGenerateBlocks() {
 		Peer peer=server.getPeer();
 		long timestamp=Utils.getCurrentTimestamp();
 
@@ -317,25 +316,35 @@ public class TransactionHandler extends AThreadedComponent {
 		maybeGetOwnTransactions(peer);
 			
 		// possibly have client transactions to publish
-		transactionQueue.drainTo(newTransactions,Constants.MAX_TRANSACTIONS_PER_BLOCK);
+		transactionQueue.drainTo(newTransactions);
 
-		int n = newTransactions.size();
-		if (n == 0) return null;
+		if (newTransactions.isEmpty()) return null;
 		
-		// TODO: smaller block if too many transactions?
-		Block block = Block.create(timestamp, (List<SignedData<ATransaction>>) newTransactions);
-		SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
+		int ntrans=newTransactions.size();
+		int bsize=Constants.MAX_TRANSACTIONS_PER_BLOCK;
+		int nblocks=((ntrans-1)/bsize)+1;
 		
-		try {
-			Cells.persist(signedBlock);
-		} catch (Exception e) {
-			log.warn("Exception preparing new block",e);
-			return null;
+		@SuppressWarnings("unchecked")
+		SignedData<Block>[] signedBlocks=new SignedData[nblocks];
+		
+		for (int i=0; i<nblocks; i++) {
+		
+			int start=i*bsize;
+			int end=Math.min(ntrans, (i+1)*bsize);
+			Block block = Block.create(timestamp, newTransactions.subList(start, end));
+			SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
+			
+			try {
+				Cells.persist(signedBlock);
+			} catch (Exception e) {
+				log.warn("Exception preparing new block",e);
+				return null;
+			}
+			signedBlocks[i]=signedBlock;		
 		}
-		
 		newTransactions.clear();
 		lastBlockPublishedTime=timestamp;
-		return signedBlock;
+		return signedBlocks;
 	}
 	
 	

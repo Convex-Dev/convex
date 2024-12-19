@@ -133,7 +133,9 @@ public class BeliefPropagator extends AThreadedComponent {
 		// Wait for some new Beliefs to accumulate up to a given time
 		Belief incomingBelief = awaitBelief();
 		
-		// Try belief update. Returns true if peer's Order changed (and therefore needs immediate broadcast)
+		// Try belief update. 
+		// Might include new blocks published by the peer
+		// Returns true if peer's Order changed (and therefore needs immediate broadcast)
 		boolean updated= maybeUpdateBelief(incomingBelief);
 		
 		if (updated) {
@@ -143,7 +145,7 @@ public class BeliefPropagator extends AThreadedComponent {
 			
 			maybeBroadcast(updated);
 			
-			// Persist Belief in all cases, just without announcing
+			// Persist Belief in all cases, even if we didn't announce
 			// This is mainly in case we get missing data / sync requests for the Belief
 			// This is super cheap if already persisted, so no problem
 			try {
@@ -214,15 +216,15 @@ public class BeliefPropagator extends AThreadedComponent {
 		boolean updated = maybeMergeBeliefs(newBelief);
 		
 		// publish new Block if needed. Guaranteed to change Belief / Order if this happens
-		SignedData<Block> signedBlock= server.transactionHandler.maybeGenerateBlock(); 
 		boolean published=false;
-		if (signedBlock!=null) {
-			belief=belief.proposeBlock(server.getKeyPair(),signedBlock);
-			if (log.isDebugEnabled()) {
-				Block bl=signedBlock.getValue();
-				log.debug("Block proposed: {} tx(s), size={}, hash={}", bl.getTransactions().count(), signedBlock.getMemorySize(),signedBlock.getHash());
-			}
+		SignedData<Block>[] signedBlocks= server.transactionHandler.maybeGenerateBlocks(); 
+		if (signedBlocks!=null) {
+			belief=belief.proposeBlock(server.getKeyPair(),signedBlocks);
 			published=true;
+			
+			if (log.isDebugEnabled()) {
+				log.debug("Blocks proposed: "+Vectors.of((Object[])signedBlocks).map(sb->sb.getHash()));
+			}
 		}
 		
 		// Return true iff we published a new Block or updated our own Order

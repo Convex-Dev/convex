@@ -593,6 +593,7 @@ public class Peer {
 	public Peer proposeBlock(Block block) {
 		
 		SignedData<Block> signedBlock=sign(block);
+		@SuppressWarnings("unchecked")
 		Belief newBelief=belief.proposeBlock(keyPair, signedBlock);
 		
 		Peer result=this;

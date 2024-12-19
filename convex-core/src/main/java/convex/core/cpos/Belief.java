@@ -237,7 +237,7 @@ public class Belief extends ARecordGeneric {
 	@Override
 	public void validateStructure() throws InvalidDataException {
 		super.validateStructure();
-		if (!(values.get(IX_ORDERS)  instanceof Index)) {
+		if (!(values.get(IX_ORDERS) instanceof Index)) {
 			throw new InvalidDataException("Orders should be an Index",this);
 		}
 	}
@@ -248,20 +248,25 @@ public class Belief extends ARecordGeneric {
 	 * @param signedBlock Signed Block of transactions
 	 * @return Updated Belief with new Order
 	 */
-	public Belief proposeBlock(AKeyPair kp, SignedData<Block> signedBlock) {
+	@SuppressWarnings("unchecked")
+	public Belief proposeBlock(AKeyPair kp, SignedData<Block>... signedBlocks) {
 		AccountKey peerKey=kp.getAccountKey();
 		Index<AccountKey, SignedData<Order>> orders = getOrders();
 
 		SignedData<Order> mySO=orders.get(peerKey);
 		Order myOrder;
 		if (mySO==null) {
-			myOrder=Order.create();
+			throw new IllegalStateException("Trying to propose block without a current ordering for peer "+peerKey);
 		} else {
 			myOrder=mySO.getValue();
 		}
 
 		// Create new order with signed Block
-		Order newOrder = myOrder.append(signedBlock);
+		Order newOrder = myOrder;
+		int n=signedBlocks.length;
+		for (int i=0; i<n; i++) {
+			newOrder=newOrder.append(signedBlocks[i]);
+		}
 		SignedData<Order> newSignedOrder = kp.signData(newOrder);
 		
 		Index<AccountKey, SignedData<Order>> newOrders = orders.assoc(peerKey, newSignedOrder);
