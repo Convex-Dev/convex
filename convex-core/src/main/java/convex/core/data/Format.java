@@ -526,7 +526,10 @@ public class Format {
 		// We expect a VLQ Count following the tag
 		long code=readVLQCount(blob,offset+1);
 		
-		if (tag == CVMTag.CORE_DEF) return Core.fromCode(code);
+		if (tag == CVMTag.CORE_DEF) {
+			ACell cc=Core.fromCode(code);
+			if (cc!=null) return cc;
+		}
 
 		if ((tag == CVMTag.OP_SPECIAL)&&(code<Special.NUM_SPECIALS)) {
 			Special<?> spec= Special.create((int)code);

@@ -52,7 +52,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @throws InvalidDataException  If the Cell is invalid
 	 */
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
 		// nothing by default
 	}
 

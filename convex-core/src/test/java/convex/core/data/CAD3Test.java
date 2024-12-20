@@ -63,6 +63,9 @@ public class CAD3Test extends ACVMTest {
 		assertSame(Vectors.empty(),Reader.read("#[8000]"));
 		assertNull(Reader.read("#[00]"));
 		assertEquals(ExtensionValue.create((byte) 0xe5, 0),Reader.read("#[e500]"));
+		
+		assertEquals(Core.QUOTE,Reader.read("#[ed00]"));
+		assertEquals(ExtensionValue.create(CVMTag.CORE_DEF,1280),Reader.read("#[ed8a00]"));
 	}
 	
 	@Test public void testDenseRecords() {

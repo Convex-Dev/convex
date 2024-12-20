@@ -416,7 +416,7 @@ public class TransactionHandler extends AThreadedComponent {
 		
 		// Try to set hostname if not correctly set
 		trySetHostname:
-		if (!Utils.equals(desiredHostname, currentHostname)) {
+		if ((desiredHostname!=null)&&!Utils.equals(desiredHostname, currentHostname)) {
 			log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
 			Address address=ps.getController();
 			if (address==null) break trySetHostname;
@@ -426,11 +426,7 @@ public class TransactionHandler extends AThreadedComponent {
 			if (!Cells.equals(peerKey, as.getAccountKey())) break trySetHostname;
 
 			String code;
-			if (desiredHostname==null) {
-				code = String.format("(set-peer-data %s {:url nil})", peerKey);
-			} else {
-				code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
-			}
+			code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
 			ACell message = Reader.read(code);
 			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
 			newTransactions.add(p.getKeyPair().signData(transaction));

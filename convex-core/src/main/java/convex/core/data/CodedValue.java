@@ -32,7 +32,7 @@ public class CodedValue extends ACell {
 	}
 	
 	@Override
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
 		// Nothing to do, any child refs are valid
 	}
 

@@ -685,7 +685,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
 		super.validateStructure();
 		long c = 0;
 		int blen = children.length;

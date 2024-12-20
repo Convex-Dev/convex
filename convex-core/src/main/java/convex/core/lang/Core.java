@@ -3009,14 +3009,12 @@ public class Core {
  	 * Read a Core definition from an encoding
  	 * @param b Blob containing encoding
  	 * @param pos Position to read Core code function
- 	 * @return Singleton cell representing the Core value
- 	 * @throws BadFormatException In case of encoding error
+ 	 * @return Singleton cell representing the Core value, or null if not defined
  	 */
 	public static ACell fromCode(long code) throws BadFormatException {
-		if (code <0 || code>=CODE_MAP.length) throw new BadFormatException("Core code out of range: "+code);
+		if (code <0 || code>=CODE_MAP.length) return null;
 		
 		ACell o = CODE_MAP[(int)code];
-		if (o == null) throw new BadFormatException("Core code definition not found: " + code);
 		return o;
 	}
 	

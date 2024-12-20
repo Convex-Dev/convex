@@ -244,6 +244,7 @@ public final class Syntax extends ACell {
 				throw new InvalidDataException("Cannot double-wrap a Syntax value",this);
 			}
 		}
+		meta.validateStructure();
 	}
 
 	@Override
