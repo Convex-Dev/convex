@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
@@ -73,6 +75,19 @@ public class SyntaxTest {
 		assertEquals(RT.cvm(1L),(CVMLong)s3.getValue());
 		assertEquals(Maps.of(1,2,3,7),s3.getMeta());
 		
+	}
+	
+	@Test public void testSytaxEncode() throws BadFormatException, IOException {
+		
+		Syntax s=Reader.read("^{} {#1 -9223372036854775808}");
+		Blob b=s.getEncoding();
+		Syntax s2=Format.read(b);
+		
+		assertEquals(s,s2);
+		
+		Ref<Syntax> pref=Cells.persist(s).getRef();
+		assertEquals(s,pref.getValue());
+
 	}
 	
 	@Test public void testSyntaxPrintRegression() {
