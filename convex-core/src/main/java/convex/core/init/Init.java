@@ -1,6 +1,7 @@
 package convex.core.init;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import convex.core.Coin;
@@ -334,29 +335,40 @@ public class Init {
 
 	private static State addStandardLibraries(State s) {
 		s = doActorDeploy(s, "/convex/asset/fungible.cvx");
-		s = doActorDeploy(s, "/convex/lab/trusted-oracle/actor.cvx");
-		s = doActorDeploy(s, "/convex/lab/oracle.cvx");
 		s = doActorDeploy(s, "/convex/asset/asset.cvx");
 		s = doActorDeploy(s, "/convex/torus/exchange.cvx");
 		s = doActorDeploy(s, "/convex/asset/nft/simple.cvx");
 		s = doActorDeploy(s, "/convex/asset/nft/basic.cvx");
-		s = doActorDeploy(s, "/convex/asset/nft/tokens.cvx");
 		s = doActorDeploy(s, "/convex/asset/box/actor.cvx");
 		s = doActorDeploy(s, "/convex/asset/box.cvx");
 		s = doActorDeploy(s, "/convex/asset/multi-token.cvx");
-		s = doActorDeploy(s, "/convex/asset/share.cvx");
-		s = doActorDeploy(s, "/convex/asset/market/trade.cvx");
 		s = doActorDeploy(s, "/convex/asset/wrap/convex.cvx");
-		s = doActorDeploy(s, "/convex/lab/play.cvx");
-		s = doActorDeploy(s, "/convex/lab/did.cvx");
-		s = doActorDeploy(s, "/convex/lab/curation-market.cvx");
 		s = doActorDeploy(s, "/convex/trust/ownership-monitor.cvx");
 		s = doActorDeploy(s, "/convex/trust/delegate.cvx");
 		s = doActorDeploy(s, "/convex/trust/whitelist.cvx");
 		s = doActorDeploy(s, "/convex/trust/monitors.cvx");
 		s = doActorDeploy(s, "/convex/trust/governance.cvx");
-		s = doActorDeploy(s, "/convex/asset/spatial.cvx");
 		// s = doActorDeploy(s, "convex/user.cvx");
+		return s;
+	}
+	
+	/**
+	 * Add extra libraries for testing purposes, not part of official genesis
+	 * @param peerKeys
+	 * @return
+	 */
+	public static State createTestState(ArrayList<AccountKey> peerKeys) {
+		State s=createState(peerKeys);
+		s = doActorDeploy(s, "/convex/asset/nft/tokens.cvx");
+		s = doActorDeploy(s, "/convex/lab/play.cvx");
+		s = doActorDeploy(s, "/convex/lab/did.cvx");
+		s = doActorDeploy(s, "/convex/lab/curation-market.cvx");
+		s = doActorDeploy(s, "/convex/lab/trusted-oracle/actor.cvx");
+		s = doActorDeploy(s, "/convex/lab/oracle.cvx");
+		s = doActorDeploy(s, "/convex/asset/share.cvx");
+		s = doActorDeploy(s, "/convex/asset/market/trade.cvx");
+		s = doActorDeploy(s, "/convex/asset/spatial.cvx");
+
 		return s;
 	}
 	
@@ -519,6 +531,7 @@ public class Init {
 		accts = accts.conj(as);
 		return accts;
 	}
+
 
 
 }

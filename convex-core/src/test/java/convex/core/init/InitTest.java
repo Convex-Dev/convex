@@ -60,7 +60,7 @@ public class InitTest extends ACVMTest {
 
 	public static State createState() {
 		try {
-			return Init.createState(PEER_KEYS);
+			return Init.createTestState(PEER_KEYS);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw e;
