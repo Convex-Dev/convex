@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `evict-peer` core function to remove old / understaked peers
 - Automatic distribution of rewards to peers / delegated stakers
 - Generalised CAD3 data support
+- Logging for fungible token transfer events
 
 ### Changed
 

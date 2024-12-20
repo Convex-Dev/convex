@@ -3031,6 +3031,16 @@ public class CoreTest extends ACVMTest {
 		assertEquals(Sets.of(Symbols.FOO,Symbols.BAR),ctx.getAccountStatus(actor).getCallableFunctions());
 	}
 	
+	@Test
+	public void testCallSelfWithOffer() {
+		Context ctx = step("(defn foo ^{:callable true} [] (accept *offer*))");
+		long bal=ctx.getBalance();
+		
+		assertEquals(10000,evalL(ctx, "(call *address* 10000 (foo))")); // self-call
+		assertEquals(bal,evalL(ctx, "(do (call *address* 10000 (foo)) *balance*)")); // self-call
+
+	}
+	
 	@Test 
 	public void testCallables() {
 		assertSame(Sets.empty(),context().getAccountStatus().getCallableFunctions());
