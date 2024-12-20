@@ -73,6 +73,12 @@
               :examples    [{:code "*key*"}]}
    :special true}
   
+  *location*
+  {:doc      {:description "Returns the [block-index transaction-index] location of the current transaction."
+              :examples    [{:code "*location*"}]}
+   :special true}
+
+  
   *memory*
   {:doc      {:description "Returns the current memory allowance for this account. May be zero - in which case any new memory allocations will be charged at the current memory exchange pool price."
               :examples    [{:code "*memory*"}]}
@@ -104,6 +110,12 @@
   {:doc      {:description "Returns the parent of the current account. Determines the default location for symbolic lookup."
               :examples    [{:code "*parent*"}]}
    :special true}
+  
+  *peer*
+  {:doc      {:description "Returns the peer responsible for the current Block, or null if outside a block (e.g. query)."
+              :examples    [{:code "*peer*"}]}
+   :special true}
+
 
   *result*
   {:doc      {:description "Returns the result of the last CVM operation executed. Can be used, in some cases, to access the value of the previous expression. Will be nil for new transactions, or at the start of an actor call."
@@ -114,6 +126,12 @@
   {:doc      {:description "Returns the sequence number for the current transaction. The sequence number is the number of transactions executed on this account *including* the current transaction / query. The next valid transction must increment *sequence* by one."
               :examples    [{:code "*sequence*"}]}
    :special true}
+  
+  *signer*
+  {:doc      {:description "Returns the public key used to sign the current transaction."
+              :examples    [{:code "*signer*"}]}
+   :special true}
+
 
   *state*
   {:doc      {:description "Returns the current CVM state record. This is a large object, and should normally only be used temporarily to look up relevant values."

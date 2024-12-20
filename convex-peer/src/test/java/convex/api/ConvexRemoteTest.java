@@ -22,9 +22,11 @@ import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.Ed25519Signature;
 import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
 import convex.core.cvm.ops.Constant;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
+import convex.core.data.AVector;
 import convex.core.data.Blobs;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
@@ -89,6 +91,21 @@ public class ConvexRemoteTest {
 			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("*address*")), 5000);
 			assertNull(r.getErrorCode(), "Error:" + r.toString());
 			assertEquals(ADDRESS, r.getValue());
+		}
+	}
+	
+	@Test
+	public void testTranscationContext() throws IOException, TimeoutException, InterruptedException {
+		synchronized (network.SERVER) {
+			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
+			Result r = convex.transactSync(Invoke.create(ADDRESS, 0, Reader.read("[*peer* *signer* *location*]")), 5000);
+			assertNull(r.getErrorCode());
+			
+			AVector<?> v=r.getValue();
+			
+			assertEquals(network.SERVER.getPeerKey(), v.get(0));
+			assertEquals(KEYPAIR.getAccountKey(), v.get(1));
+			assertEquals(r.getInfo().get(Keywords.LOC), v.get(2));
 		}
 	}
 

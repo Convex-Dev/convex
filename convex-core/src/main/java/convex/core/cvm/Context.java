@@ -17,6 +17,7 @@ import convex.core.cvm.exception.ReducedValue;
 import convex.core.cvm.exception.ReturnValue;
 import convex.core.cvm.exception.RollbackValue;
 import convex.core.cvm.exception.TailcallValue;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AList;
@@ -29,6 +30,7 @@ import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
+import convex.core.data.SignedData;
 import convex.core.data.Strings;
 import convex.core.data.Symbol;
 import convex.core.data.Vectors;
@@ -2395,6 +2397,12 @@ public class Context {
 	public AVector<CVMLong> getLocation() {
 	
 		return chainState.txContext.getLocation();
+	}
+
+	public AccountKey getSigner() {
+		SignedData<ATransaction> sd=chainState.getTransactionContext().tx;
+		if (sd==null) return null;
+		return sd.getAccountKey();
 	}
 
 

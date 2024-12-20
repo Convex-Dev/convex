@@ -141,9 +141,9 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_PARENT: ctx= ctx.withResult(ctx.getAccountStatus().getParent()); break;
 		case S_NOP: break; // unchanged context, propagates *result*
 		case S_MEMORY_PRICE: ctx=ctx.withResult(CVMDouble.create(ctx.getState().getMemoryPrice())); break ;
-		case S_SIGNER: ctx=ctx.withResult(null); break; // TODO
-		case S_PEER: ctx=ctx.withResult(ctx.getPeer()); break ; // TODO
-		case S_LOCATION: ctx=ctx.withResult(ctx.getLocation()); break ; // TODO
+		case S_SIGNER: ctx=ctx.withResult(ctx.getSigner()); break;
+		case S_PEER: ctx=ctx.withResult(ctx.getPeer()); break ; 
+		case S_LOCATION: ctx=ctx.withResult(ctx.getLocation()); break ; 
 		
 		default:
 			throw new Error("Bad Opcode"+specialCode);
