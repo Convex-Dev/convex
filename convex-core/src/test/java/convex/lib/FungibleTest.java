@@ -1,6 +1,11 @@
 package convex.lib;
 
-import static convex.test.Assertions.*;
+import static convex.test.Assertions.assertArgumentError;
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertFundsError;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertStateError;
+import static convex.test.Assertions.assertTrustError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -15,6 +20,7 @@ import convex.core.data.AMap;
 import convex.core.data.Symbol;
 import convex.core.init.InitTest;
 import convex.core.lang.ACVMTest;
+import convex.core.lang.RT;
 import convex.core.lang.TestState;
 
 public class FungibleTest extends ACVMTest {
@@ -108,8 +114,6 @@ public class FungibleTest extends ACVMTest {
 		assertTrue(ctx.getAccountStatus(token)!=null);
 		ctx=exec(ctx,"(def token (address "+token+"))");
 
-		// GEnric tests
-		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
 
 		// check our balance is positive as initial holder
 		long bal=evalL(ctx,"(fungible/balance token *address*)");
@@ -117,9 +121,12 @@ public class FungibleTest extends ACVMTest {
 
 		// transfer to the Villain scenario
 		{
-			Context tctx=step(ctx,"(fungible/transfer token "+VILLAIN+" 100)");
+			String code="(fungible/transfer token "+VILLAIN+" 100)";
+			Context tctx=step(ctx,code);
 			assertEquals(bal-100,evalL(tctx,"(fungible/balance token *address*)"));
 			assertEquals(100,evalL(tctx,"(fungible/balance token "+VILLAIN+")"));
+			
+			assertEquals(eval(ctx,"[(address token) (scope token) *location* [\"TR\" *address* "+VILLAIN+" 100 "+(bal-100)+" 100 nil]]"),tctx.lastLog());
 		}
 
 		// acceptable transfers
@@ -129,6 +136,26 @@ public class FungibleTest extends ACVMTest {
 		// bad transfers
 		assertArgumentError(step(ctx,"(fungible/transfer token *address* -1)"));
 		assertFundsError(step(ctx,"(fungible/transfer token *address* "+(bal+1)+")"));
+		
+		// GEnric tests
+		AssetTester.doFungibleTests(ctx,token,ctx.getAddress());
+
+	}
+	
+	@Test public void testTransferLog() {  
+		Context ctx = context();
+		ctx=exec(ctx,"(def token (deploy (fungible/build-token {:supply 1000000})))");
+		Address token = (Address) ctx.getResult();
+		assertTrue(ctx.getAccountStatus(token)!=null);
+		ctx=exec(ctx,"(def token (address "+token+"))");
+		
+		long BAL=evalL(ctx,"(asset/balance token)");
+		
+		String cmd="(asset/transfer *address* [token " + BAL + "])";
+		ctx = exec(ctx, cmd);
+		assertEquals(eval(ctx,"[(address token) (scope token) *location* [\"TR\" *address* *address* "+BAL+" "+BAL+" "+BAL+" nil]]"),ctx.lastLog());
+		assertEquals(BAL, RT.ensureLong(ctx.getResult()).longValue());
+		assertEquals(BAL, evalL(ctx, "(asset/balance token *address*)"));
 	}
 
 	@Test public void testMint() {
@@ -152,6 +179,7 @@ public class FungibleTest extends ACVMTest {
 		// Mint up to max and back down to zero
 		{
 			Context c=exec(ctx,"(fungible/mint token 900)");
+			assertEquals(eval(ctx,"[\"MINT\" *address* 900 1000]"),c.lastLog().getLast());
 			assertEquals(1000L,evalL(c,"(fungible/balance token *address*)"));
 
 			c=exec(c,"(fungible/mint token -900)");

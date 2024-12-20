@@ -333,7 +333,8 @@ public class Peer {
 	 * @return The Context containing the transaction results.
 	 */
 	public ResultContext executeDetached(ATransaction transaction) {
-		ResultContext ctx=getConsensusState().applyTransaction(transaction);
+		State s=getConsensusState();
+		ResultContext ctx=getConsensusState().applyTransaction(transaction,TransactionContext.create(s));
 		return ctx;
 	}
 

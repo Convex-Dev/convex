@@ -42,8 +42,12 @@
            (cond (> amount bal) (fail :FUNDS "Burn amount not available" ))
            
            ;; do updates to balance and supply
-           (set-holding *caller* (- bal amount))
-           (set! supply (- supply amount))))
+           (let [new-supply (- supply amount)]
+        		 (log "MINT" *caller* (- amount) new-supply)
+        		 (set-holding *caller* (- bal amount))
+                 (set! supply new-supply)
+                 )
+           ))
 
        (defn mint
          ^{:callable true}
@@ -57,8 +61,11 @@
            ;; New supply must be in valid range.
            ~(if max-supply `(when-not (<= 0 new-supply max-supply) (fail :STATE "Mint exceeds max supply")))
            
+           (log "MINT" *caller* amount new-supply)
            (set-holding *caller* new-bal)
-           (set! supply new-supply))))))
+           (set! supply new-supply)
+           
+        		 )))))
 
 (defn build-token 
   ^{:doc {:description ["Creates deployable code for a new fungible token which follows the interface described in `convex.asset`."
@@ -164,10 +171,17 @@
            (cond (> amount bal) (fail :FUNDS "insufficent token balance")) 
            
            ;; Need this in case of self-transfers.
-           (when (= *caller* addr) (return amount))
+           (when (= *caller* addr) 
+        	   (log "TR" *caller* addr amount bal bal data)   
+        	   (return amount)) 
+         
            
-           (set-holding *caller* (- bal amount))
-           (set-holding addr (+ tbal amount))))
+           (let [nsb (- bal amount)
+                 nrb (+ tbal amount)]
+               (log "TR" *caller* addr amount nsb nrb data)
+	           (set-holding *caller* nsb)
+	           (set-holding addr nrb))
+	       ))
 
        (defn get-offer
          ^{:callable true}

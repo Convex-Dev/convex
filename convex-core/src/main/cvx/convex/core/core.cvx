@@ -730,3 +730,13 @@
 		(cond (>= i 8)
 		  supply
 		  (recur (inc i) (- supply (balance (address i))))))))
+ 
+ (defn scope
+		 ^{:doc {:description "Gets the scope from a callable value, or nil if undefined"
+		        :examples    [{:code "(scope [#29 :foo])"}]
+		        :signature   [{:params [a]}]}}
+   [a]
+   (cond
+	 (address? a) nil
+	 (not (callable? a)) nil
+     (nth a 1)))

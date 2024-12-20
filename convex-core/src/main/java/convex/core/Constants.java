@@ -97,7 +97,7 @@ public class Constants {
 	public static final AVector<ACell> INITIAL_GLOBALS = Vectors.of(
 			Constants.INITIAL_TIMESTAMP, Constants.INITIAL_FEES,
 			Constants.INITIAL_JUICE_PRICE, Constants.INITIAL_MEMORY_POOL,
-			Constants.INITIAL_MEMORY_POOL * Constants.INITIAL_MEMORY_PRICE);
+			Constants.INITIAL_MEMORY_POOL * Constants.INITIAL_MEMORY_PRICE, -1L);
 
 	/**
 	 * Maximum length of a symbolic name in bytes (keywords and symbols)

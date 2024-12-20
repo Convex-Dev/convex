@@ -38,7 +38,6 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
-import convex.core.lang.impl.TransactionContext;
 import convex.core.util.Counters;
 import convex.core.util.Economics;
 import convex.core.util.Utils;
@@ -75,6 +74,7 @@ public class State extends ARecordGeneric {
 			Symbols.JUICE_PRICE, 
 			Symbols.MEMORY, 
 			Symbols.MEMORY_VALUE,
+			Symbols.BLOCK,
 			Symbols.PROTOCOL);
 
 	// Indexes for globals in :globals Vector
@@ -83,7 +83,8 @@ public class State extends ARecordGeneric {
 	public static final int GLOBAL_JUICE_PRICE=2;
 	public static final int GLOBAL_MEMORY_MEM=3;
 	public static final int GLOBAL_MEMORY_CVX=4;
-	public static final int GLOBAL_PROTOCOL=5; // TODO: move to actor?
+	public static final int GLOBAL_BLOCK=5; 
+	public static final int GLOBAL_PROTOCOL=6; // TODO: move to actor?
 
 	/**
 	 * An empty State
@@ -273,6 +274,9 @@ public class State extends ARecordGeneric {
 	 */
 	private State prepareBlock(Block b) {
 		State state = this;
+		AVector<ACell> globals=state.getGlobals();
+		long blockNum=getBlockNumber();
+		state = state.withGlobals(globals.assoc(GLOBAL_BLOCK,CVMLong.create(blockNum+1)));
 		state = state.applyTimeUpdate(b.getTimeStamp());
 		state = state.applyScheduledTransactions();
 		return state;
@@ -394,9 +398,10 @@ public class State extends ARecordGeneric {
 				
 				// Update transaction context
 				tctx.tx=signed;
+				tctx.txNumber=i;
 				
 				// execute the transaction using the *latest* state (not necessarily "this")
-				ResultContext rc = state.applyTransaction(signed);
+				ResultContext rc = state.applyTransaction(signed,tctx);
 
 				// record results from result context
 				results[i] = Result.fromContext(CVMLong.create(i),rc);
@@ -456,16 +461,19 @@ public class State extends ARecordGeneric {
 	 * Applies a signed transaction to the State.
 	 *
 	 * SECURITY: Checks digital signature and correctness of account key
+	 * @param tctx 
 	 *
 	 * @return ResultContext containing the result of the transaction
 	 * @throws InvalidBlockException 
 	 */
-	public ResultContext applyTransaction(SignedData<? extends ATransaction> signedTransaction) throws InvalidBlockException {
+	public ResultContext applyTransaction(SignedData<ATransaction> t2, TransactionContext tctx) throws InvalidBlockException {
 		// Extract transaction
-		ATransaction t=RT.ensureTransaction(signedTransaction.getValue());
-		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+signedTransaction.getHash());
+		ATransaction t=RT.ensureTransaction(t2.getValue());
+		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+t2.getHash());
 
 		Address addr=t.getOrigin();
+		tctx.origin=addr;
+		
 		AccountStatus as = getAccount(addr);
 		if (as==null) {
 			ResultContext rc=ResultContext.error(this,ErrorCodes.NOBODY,"Transaction for non-existent Account: "+addr);
@@ -486,14 +494,14 @@ public class State extends ARecordGeneric {
 			}
 			
 			// Perform Signature check
-			boolean sigValid=signedTransaction.checkSignature(key);
+			boolean sigValid=t2.checkSignature(key);
 			if (!sigValid) {
 				ResultContext rc= ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 				return rc.withSource(SourceCodes.CVM);
 			}
 		}
 
-		ResultContext ctx=applyTransaction(t);
+		ResultContext ctx=applyTransaction(t,tctx);
 		return ctx;
 	}
 	
@@ -512,11 +520,12 @@ public class State extends ARecordGeneric {
 	 * @param t Transaction to apply
 	 * @return Context containing the updated chain State (may be exceptional)
 	 */
-	public ResultContext applyTransaction(ATransaction t) {
+	public ResultContext applyTransaction(ATransaction t, TransactionContext tctx) {
 		ResultContext rc=createResultContext(t);
 		
 		// Create prepared context 
-		Context ctx = prepareTransaction(rc);
+		Context ctx = prepareTransaction(rc,tctx);
+		
 		if (!ctx.isExceptional()) {
 			State preparedState=ctx.getState();
 
@@ -541,14 +550,25 @@ public class State extends ARecordGeneric {
 	}
 	
 	/**
-	 * Prepares a CVM execution context and ResultContext for a transaction
-	 * @param rc ResultContext to populate
+	 * Apply a transaction in a detached transaction context, mainly for test / query
+	 * @param t Transaction
 	 * @return
 	 */
-	private Context prepareTransaction(ResultContext rc) {
+	public ResultContext applyTransaction(ATransaction t) {
+		return applyTransaction(t,TransactionContext.create(this));
+	}
+	
+	/**
+	 * Prepares a CVM execution context and ResultContext for a transaction
+	 * @param rc ResultContext to populate
+	 * @param tctx 
+	 * @return
+	 */
+	private Context prepareTransaction(ResultContext rc, TransactionContext tctx) {
 		ATransaction t=rc.tx;
 		long juicePrice=rc.juicePrice;
 		Address origin = t.getOrigin();
+		tctx.origin=origin;
 		
 		// Pre-transaction state updates (persisted even if transaction fails)
 		AccountStatus account = getAccount(origin);
@@ -568,6 +588,7 @@ public class State extends ARecordGeneric {
 		// Create context ready to execute, with at least some available juice
 		Context ctx = Context.create(this, origin, juiceLimit);
 		ctx=ctx.withJuice(initialJuice);
+		ctx=ctx.withTransactionContext(tctx);
 		return ctx;
 	}
 	
@@ -974,6 +995,12 @@ public class State extends ARecordGeneric {
 		if (values==newValues) return this;
 		return create(newValues);
 	}
+
+	public long getBlockNumber() {
+		
+		return RT.ensureLong(getGlobals().get(GLOBAL_BLOCK)).longValue();
+	}
+
 
 
 

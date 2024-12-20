@@ -196,6 +196,8 @@ public class Symbols {
 	public static final Symbol STAR_MEMORY_PRICE = intern("*memory-price*");
 	public static final Symbol STAR_SIGNER = intern("*signer*");
 	public static final Symbol STAR_PEER = intern("*peer*");
+	public static final Symbol STAR_LOCATION = intern("*location*");
+
 
 	public static final Symbol STAR_LANG = intern("*lang*");
 
@@ -347,6 +349,7 @@ public class Symbols {
 	public static final Symbol MEMORY_VALUE = intern("memory-value");
 	public static final Symbol PROTOCOL = intern("protocol");
 	public static final Symbol CREATE = intern("create");
+	public static final Symbol BLOCK = intern("block");
 
 
 

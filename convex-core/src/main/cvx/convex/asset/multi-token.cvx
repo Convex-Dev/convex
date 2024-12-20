@@ -88,9 +88,15 @@
      ;; Need this check in case of self-transfers.
      (when (= *caller*
               addr)
+       (log "TR" addr addr amount bal bal data)
        (return amount))
-     (-set-balance *caller* id (- bal amount))
-     (-set-balance addr id (+ tbal amount))))
+     
+     (let [nsb (- bal amount)
+           nrb (+ tbal amount)]
+         (log "TR" *caller* addr amount nsb nrb data)
+         (-set-balance *caller* id nsb)
+         (-set-balance addr id nrb))
+     ))
 
 (defn balance
    ^{:callable true}

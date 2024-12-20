@@ -147,17 +147,21 @@ public class AssetTester extends ACVMTest {
 		}
 
 		// transfer all to self, should not affect balance
-		ctx = step(ctx, "(asset/transfer *address* [token " + BAL + "])");
-		assertEquals(BAL, RT.jvm(ctx.getResult()));
-		assertEquals(BAL, evalL(ctx, "(asset/balance token *address*)"));
+		{  
+			String cmd="(asset/transfer *address* [token " + BAL + "])";
+			ctx = exec(ctx, cmd);
+			assertEquals(eval(ctx,"[(address token) (scope token) *location* [\"TR\" *address* *address* "+BAL+" "+BAL+" "+BAL+" nil]]"),ctx.lastLog());
+			assertEquals(BAL, RT.jvm(ctx.getResult()));
+			assertEquals(BAL, evalL(ctx, "(asset/balance token *address*)"));
+		}
 		
 		// transfer nothing to self, should not affect balance
-		ctx = step(ctx, "(asset/transfer *address* [token nil])");
+		ctx = exec(ctx, "(asset/transfer *address* [token nil])");
 		assertEquals(0L, (long) RT.jvm(ctx.getResult()));
 		assertEquals(BAL, evalL(ctx, "(asset/balance token *address*)"));
 
 		// set a zero offer
-		ctx = step(ctx, "(asset/offer *address* [token 0])");
+		ctx = exec(ctx, "(asset/offer *address* [token 0])");
 		assertCVMEquals(0, ctx.getResult());
 		assertCVMEquals(0, eval(ctx, "(asset/get-offer token *address* *address*)"));
 		
@@ -167,7 +171,7 @@ public class AssetTester extends ACVMTest {
 
 
 		// set a non-zero offer
-		ctx = step(ctx, "(asset/offer *address* token 666)");
+		ctx = exec(ctx, "(asset/offer *address* token 666)");
 		assertCVMEquals(666, eval(ctx, "(asset/get-offer token *address* *address*)"));
 
 		// nil offer sets to zero

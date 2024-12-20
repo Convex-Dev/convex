@@ -1192,6 +1192,11 @@ public class RT {
 	public static Address castAddress(ACell a) {
 		if (a instanceof Address)
 			return (Address) a;
+		if (a instanceof AVector) {
+			AVector<?> v=RT.ensureVector(a);
+			if (v.count()==0) return null;
+			return ensureAddress(v.get(0));
+		}
 		if (a instanceof ABlob)
 			return Address.create((ABlob) a);
 		CVMLong value = RT.ensureLong(a);

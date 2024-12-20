@@ -769,6 +769,29 @@ public class CoreTest extends ACVMTest {
 		assertEquals(2,log.count()); // should be two entries now
 		assertEquals(v0,log.get(0).get(Log.P_VALUES));
 		assertEquals(v1,log.get(1).get(Log.P_VALUES));
+			
+		{
+			// logs work inside deploys
+			Context ctx=step("(deploy '(log :foo))");
+			Address addr=ctx.getResult();
+			assertEquals(eval("["+addr+" nil *location* [:foo]]"),ctx.lastLog());
+		}
+		
+		{
+			// logs get rolled back
+			Context ctx=step(context(),"(log :foo)");
+			ctx=step(ctx,"(query (log bar))"); // should get rolled back
+			assertEquals(eval("[*address* nil *location* [:foo]]"),ctx.lastLog());
+		}
+		
+		{
+			// logs work inside calls
+			Context ctx=context();
+			ctx=exec(ctx,"(def addr (deploy '(defn foo ^:callable [] (log :foo))))");
+			Address addr=ctx.getResult();
+			ctx=exec(ctx,"(call addr (foo))");
+			assertEquals(eval("["+addr+" nil *location* [:foo]]"),ctx.lastLog());
+		}
 	}
 
 
@@ -1246,6 +1269,9 @@ public class CoreTest extends ACVMTest {
 		// cast errors for bad indexes
 		assertCastError(step("(nth [] :foo)"));
 		assertCastError(step("(nth [] nil)"));
+		
+		assertNull(eval("(nth [1 nil] 1)"));
+
 
 		// cast errors for non-countable objects
 		assertCastError(step("(nth 12 13)"));
@@ -4934,7 +4960,7 @@ public class CoreTest extends ACVMTest {
 	@Test
 	public void testScheduleExecution() throws BadSignatureException {
 		long expectedTS = INITIAL.getTimestamp().longValue() + 1000;
-		Context ctx = step("(schedule (+ *timestamp* 1000) (def a 2))");
+		Context ctx = exec(context(),"(schedule (+ *timestamp* 1000) (def a 2))");
 		assertCVMEquals(expectedTS, ctx.getResult());
 		State s = ctx.getState();
 		Index<ABlob, AVector<ACell>> sched = s.getSchedule();
@@ -5131,6 +5157,17 @@ public class CoreTest extends ACVMTest {
 		assertCastError(step(ctx, "(callable? nil :foo)"));
 		assertCastError(step(ctx, "(callable? caddr nil)"));
 		assertCastError(step(ctx, "(callable? caddr 1)"));
+	}
+	
+	@Test
+	public void testScope() {
+		assertEquals(Keywords.FOO,eval("(scope [#17 :foo])"));
+		assertNull(eval("(scope #11)"));
+		assertNull(eval("(scope [#11 nil])"));
+		assertNull(eval("(scope true)"));
+		
+		assertArityError(step("(scope)"));
+		assertArityError(step("(scope)"));
 	}
 
 	@Test

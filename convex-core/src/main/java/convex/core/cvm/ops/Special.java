@@ -30,7 +30,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	private final byte specialCode;
 	
-	public static final int NUM_SPECIALS=24;
+	public static final int NUM_SPECIALS=25;
 	private static final int BASE=0;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
@@ -61,6 +61,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private static final byte S_MEMORY_PRICE=BASE+21;
 	private static final byte S_SIGNER=BASE+22;
 	private static final byte S_PEER=BASE+23;
+	private static final byte S_LOCATION=BASE+24;
 
 	static {
 		reg(S_JUICE,Symbols.STAR_JUICE);
@@ -87,6 +88,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		reg(S_MEMORY_PRICE,Symbols.STAR_MEMORY_PRICE);
 		reg(S_SIGNER,Symbols.STAR_SIGNER);
 		reg(S_PEER,Symbols.STAR_PEER);
+		reg(S_LOCATION,Symbols.STAR_LOCATION);
 	}
 	
 	private static byte reg(byte opCode, Symbol sym) {
@@ -141,6 +143,7 @@ public class Special<T extends ACell> extends AOp<T> {
 		case S_MEMORY_PRICE: ctx=ctx.withResult(CVMDouble.create(ctx.getState().getMemoryPrice())); break ;
 		case S_SIGNER: ctx=ctx.withResult(null); break; // TODO
 		case S_PEER: ctx=ctx.withResult(ctx.getPeer()); break ; // TODO
+		case S_LOCATION: ctx=ctx.withResult(ctx.getLocation()); break ; // TODO
 		
 		default:
 			throw new Error("Bad Opcode"+specialCode);

@@ -106,6 +106,7 @@ public final class Address extends AExtensionValue {
 	}
 
 	public final boolean equals(Address o) {
+		if (o==null) return false;
 		return value==o.value;
 	}
 

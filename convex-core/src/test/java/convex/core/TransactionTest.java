@@ -22,6 +22,7 @@ import convex.core.cvm.Juice;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.State;
 import convex.core.cvm.Symbols;
+import convex.core.cvm.TransactionContext;
 import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Call;
@@ -238,8 +239,8 @@ public class TransactionTest extends ACVMTest {
 	@Test 
 	public void testBadSequence() throws BadSignatureException, InvalidBlockException {
 		Invoke t1=Invoke.create(HERO, 2, "(+ 2 5)");
-		SignedData<Invoke> st = Samples.KEY_PAIR.signData(t1);
-		ResultContext rc=state().applyTransaction(st);
+		SignedData<ATransaction> st = Samples.KEY_PAIR.signData(t1);
+		ResultContext rc=state().applyTransaction(st,TransactionContext.create(state()));
 		Context ctx=rc.context;
 		assertEquals(ErrorCodes.SEQUENCE,ctx.getError().getCode());
 		
@@ -262,27 +263,28 @@ public class TransactionTest extends ACVMTest {
 		State s=state();
 		AccountStatus as=s.getAccount(HERO);
 		long SEQ=as.getSequence()+1;
+		TransactionContext tctx=TransactionContext.create(s);
 		
 		{ // wrong sequence
-			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(HERO, SEQ+1,Keywords.FOO)));
+			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(HERO, SEQ+1,Keywords.FOO)),tctx);
 			assertEquals(ErrorCodes.SEQUENCE,rc.getErrorCode());
 			checkNoTransactionEffects(s,rc);
 		}
 
 		{ // non-existent account
-			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.create(777777), SEQ,Keywords.FOO)));
+			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.create(777777), SEQ,Keywords.FOO)),tctx);
 			assertEquals(ErrorCodes.NOBODY,rc.getErrorCode());
 			checkNoTransactionEffects(s,rc);
 		}
 		
 		{ // wrong key 
-			ResultContext rc=s.applyTransaction(VILLAIN_KP.signData(Invoke.create(HERO, SEQ,Keywords.FOO)));
+			ResultContext rc=s.applyTransaction(VILLAIN_KP.signData(Invoke.create(HERO, SEQ,Keywords.FOO)),tctx);
 			assertEquals(ErrorCodes.SIGNATURE,rc.getErrorCode());
 			checkNoTransactionEffects(s,rc);
 		}
 		
 		{ // account without public key
-			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.ZERO, SEQ,Keywords.FOO)));
+			ResultContext rc=s.applyTransaction(HERO_KP.signData(Invoke.create(Address.ZERO, SEQ,Keywords.FOO)),tctx);
 			assertEquals(ErrorCodes.STATE,rc.getErrorCode());
 			checkNoTransactionEffects(s,rc);
 		}
@@ -291,7 +293,7 @@ public class TransactionTest extends ACVMTest {
 			// signed something other than a transaction
 			@SuppressWarnings("rawtypes")
 			SignedData<ATransaction> st = (SignedData)HERO_KP.signData(Keywords.FOO);
-			assertThrows(InvalidBlockException.class, ()->s.applyTransaction(st));
+			assertThrows(InvalidBlockException.class, ()->s.applyTransaction(st,tctx));
 		}
 	}
 	
@@ -317,7 +319,7 @@ public class TransactionTest extends ACVMTest {
 		AccountStatus as=s.getAccount(HERO);
 		long SEQ=as.getSequence()+1;
 		SignedData<ATransaction> st=HERO_KP.signData(Invoke.create(HERO, SEQ,"(loop [] (def a 2) (recur))"));
-		ResultContext rc=s.applyTransaction(st);
+		ResultContext rc=s.applyTransaction(st,TransactionContext.create(s));
 		assertEquals(ErrorCodes.JUICE,rc.getErrorCode());
 		assertEquals(SourceCodes.CVM,rc.getSource());
 		assertSame(st.getValue(),rc.tx);

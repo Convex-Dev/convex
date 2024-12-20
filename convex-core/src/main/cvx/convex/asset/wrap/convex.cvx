@@ -49,11 +49,17 @@
      (cond (< amount 0) (fail :ARGUMENT "negative transfer"))
      (cond (> amount bal) (fail :FUNDS "insufficent token balance")) 
 
-     ;; Need this check in case of self-transfers.
-     (when (= *caller* addr)
-       (return amount))
-     (-set-balance *caller* (- bal amount))
-     (-set-balance addr (+ tbal amount))))
+     ;; Need this in case of self-transfers.
+     (when (= *caller* addr) 
+  	   (log "TR" *caller* addr amount bal bal data)   
+  	   (return amount)) 
+   
+     (let [nsb (- bal amount)
+           nrb (+ tbal amount)]
+         (log "TR" *caller* addr amount nsb nrb data)
+         (-set-balance *caller* (- bal amount))
+         (-set-balance addr (+ tbal amount)))
+     ))
 
 
 ;;;;; Wrap and unwrap
@@ -139,6 +145,7 @@
             noff (- off quantity)
             nos (cond (<= noff 0) (dissoc os receiver) (assoc os receiver noff))
             nrec [nbal nos]]
+            		
         ;; Update offer and balance of sender
         (set-holding sender nrec) 
         ;; Add accepted quantity adeed to receiver

@@ -40,7 +40,6 @@ import convex.core.lang.Compiler;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
 import convex.core.lang.impl.CoreFn;
-import convex.core.lang.impl.TransactionContext;
 import convex.core.util.Economics;
 import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
@@ -104,7 +103,7 @@ public class Context {
 	private ChainState chainState;
 
 	/**
-	 * Local log is an ordered [vector of [address caller scope location [values ...] ] entries
+	 * Local log is an ordered [vector of [address scope location [values ...] ] entries
 	 * See CAD33 for details
 	 */
 	private AVector<AVector<ACell>> log;
@@ -173,10 +172,10 @@ public class Context {
 			this.scope=scope;
 		}
 
-		public static ChainState create(State state, TransactionContext origin, Address caller, Address address, long offer, ACell scope) {
+		public static ChainState create(State state, TransactionContext tContext, Address caller, Address address, long offer, ACell scope) {
 			AccountStatus as=state.getAccount(address);
 			if (as==null) return null;
-			return new ChainState(state,origin,caller,address,as,offer,scope);
+			return new ChainState(state,tContext,caller,address,as,offer,scope);
 		}
 
 		public ChainState withStateOffer(State newState,long newOffer) {
@@ -238,7 +237,7 @@ public class Context {
 		}
 		
 		public Address getOrigin() {
-			return txContext.origin;
+			return txContext.getOrigin();
 		}
  
 		public AccountStatus getOriginAccount() {
@@ -249,6 +248,15 @@ public class Context {
 
 		public AccountKey getPeer() {
 			return txContext.getPeer();
+		}
+
+		public ChainState withTransactionContext(TransactionContext tctx) {
+			if (txContext==tctx) return this;
+			return create(state,tctx,caller,address,offer,scope);
+		}
+
+		public TransactionContext getTransactionContext() {
+			return txContext;
 		}
 
 	}
@@ -272,8 +280,7 @@ public class Context {
 		return ctx;
 	}
 
-	private static <T extends ACell> Context create(State state, long juice,long juiceLimit,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
-		TransactionContext tctx=TransactionContext.createQuery(state, origin);
+	private static <T extends ACell> Context create(State state, TransactionContext tctx,long juice,long juiceLimit,AVector<ACell> localBindings, T result, int depth, Address origin,Address caller, Address address, long offer, AVector<AVector<ACell>> log, CompilerState comp) {
 		ChainState chainState=ChainState.create(state,tctx,caller,address,offer,NULL_SCOPE);
 		if (chainState==null) throw new Error("Attempting to create context with invalid Address");
 		return create(chainState,juice,juiceLimit,localBindings,result,depth,log,comp);
@@ -302,8 +309,7 @@ public class Context {
 	 * @return Fake context
 	 */
 	public static Context create(State state, Address origin) {
-		if (origin==null) throw new IllegalArgumentException("Null address!");
-		return create(state,0,Constants.MAX_TRANSACTION_JUICE,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin, ZERO_OFFER, DEFAULT_LOG,null);
+		return create(state,origin,Constants.MAX_TRANSACTION_JUICE);
 	}
 
 	/**
@@ -318,13 +324,15 @@ public class Context {
 	 * @return Initial execution context with reserved juice.
 	 */
 	public static Context create(State state, Address origin,long juiceLimit) {
+		if (origin==null) throw new IllegalArgumentException("Null address!");
+		TransactionContext tctx=TransactionContext.create(state);
+		tctx.origin=origin;
 		AccountStatus as=state.getAccount(origin);
 		if (as==null) {
 			// no account
 			return Context.create(state).withError(ErrorCodes.NOBODY);
 		}
-
-		return create(state,0,juiceLimit,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
+		return create(state,tctx,0,juiceLimit,EMPTY_BINDINGS,NO_RESULT,ZERO_DEPTH,origin,null,origin,INITIAL_JUICE,DEFAULT_LOG,null);
 	}
 
 
@@ -1344,7 +1352,7 @@ public class Context {
 		if (!canControl) return ctx.withError(ErrorCodes.TRUST,"Cannot control address: "+target);
 
 		// SECURITY: eval with a context switch
-		final Context exContext=Context.create(ctx.getState(), ctx.juice,juiceLimit, EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),caller, target,ZERO_OFFER,ctx.log,NO_COMPILER_STATE);
+		final Context exContext=Context.create(ctx.getState(),getTransactionContext(), ctx.juice,juiceLimit, EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),caller, target,ZERO_OFFER,ctx.log,NO_COMPILER_STATE);
 
 		final Context rContext=exContext.eval(form);
 		// SECURITY: must handle results as if returning from an actor call
@@ -1715,11 +1723,15 @@ public class Context {
 	 * @return
 	 */
 	private Context forkActorCall(State state, Address target, long offer, ACell scope) {
-		Context fctx=Context.create(state, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), target,offer, log,NO_COMPILER_STATE);
+		Context fctx=Context.create(state, getTransactionContext(),juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), target,offer, log,NO_COMPILER_STATE);
 		if (scope!=null) {
 			fctx.chainState=fctx.chainState.withScope(scope);
 		}
 		return fctx;
+	}
+
+	private TransactionContext getTransactionContext() {
+		return chainState.getTransactionContext();
 	}
 
 	/**
@@ -1821,7 +1833,7 @@ public class Context {
 		State stateSetup=initialState.addActor();
 
 		// Deployment execution context with forked context and incremented depth
-		Context ctx=Context.create(stateSetup, juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), address,ZERO_OFFER,log,NO_COMPILER_STATE);
+		Context ctx=Context.create(stateSetup, getTransactionContext(), juice, juiceLimit,EMPTY_BINDINGS, NO_RESULT, depth+1, getOrigin(),getAddress(), address,ZERO_OFFER,log,NO_COMPILER_STATE);
 		for (int i=0; i <n; i++) {
 			ctx=ctx.eval(code[i]);
 			if (ctx.isExceptional()) break;
@@ -2247,7 +2259,8 @@ public class Context {
 		if (log==null) {
 			log=Vectors.empty();
 		}
-		AVector<ACell> entry = Vectors.of(addr,scope,null,values);
+		AVector<CVMLong> location=getLocation();
+		AVector<ACell> entry = Vectors.of(addr,scope,location,values);
 		log=log.conj(entry);
 
 		this.log=log;
@@ -2361,8 +2374,27 @@ public class Context {
 	 * @return Peer key, or null if outside a peer created block
 	 */
 	public AccountKey getPeer() {
-		// TODO Auto-generated method stub
 		return chainState.getPeer();
+	}
+
+	/**
+	 * Gets the most recent log entry, or null if not available.
+	 * @return
+	 */
+	public AVector<ACell> lastLog() {
+		AVector<AVector<ACell>> log=getLog();
+		long n=log.count();
+		if (n==0) return null;
+		return log.get(n-1);
+	}
+
+	public Context withTransactionContext(TransactionContext tctx) {
+		return withChainState(chainState.withTransactionContext(tctx));
+	}
+
+	public AVector<CVMLong> getLocation() {
+	
+		return chainState.txContext.getLocation();
 	}
 
 

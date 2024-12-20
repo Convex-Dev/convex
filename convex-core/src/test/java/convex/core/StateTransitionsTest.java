@@ -18,6 +18,8 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Juice;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
+import convex.core.cvm.TransactionContext;
+import convex.core.cvm.impl.InvalidBlockException;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.cvm.transactions.Transfer;
@@ -238,6 +240,27 @@ public class StateTransitionsTest {
 		}
 
 	}
+	
+	@Test
+	public void testBlockNumbering() throws BadSignatureException {
+		State s = TestState.STATE;
+		
+		assertEquals(-1,s.getBlockNumber());
+		
+		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(log :foo)"));
+		ATransaction t2 = Invoke.create(InitTest.HERO,2,Reader.read("(log :bar)"));
+		AKeyPair kp = InitTest.HERO_KEYPAIR;
+		Block b1 = Block.of(s.getTimestamp().longValue(), kp.signData(t1), kp.signData(t2));
+		SignedData<Block> sb=KEYPAIR_PEER.signData(b1);
+		BlockResult br=s.applyBlock(sb);
+		assertEquals(0,br.getState().getBlockNumber());
+		
+		assertEquals(Vectors.of(0,0),br.getResult(0).getLog().get(0).get(2));
+		assertEquals(Vectors.of(0,1),br.getResult(1).getLog().get(0).get(2));
+
+		s = br.getState();
+
+	}
 
 	@Test
 	public void testDeploys() throws BadSignatureException {
@@ -318,10 +341,10 @@ public class StateTransitionsTest {
 		}
 	}
 	
-	@Test public void testDefTransaction() {
+	@Test public void testDefTransaction() throws InvalidBlockException {
 		State s = TestState.STATE;
 		ATransaction t1 = Invoke.create(InitTest.HERO,1,Reader.read("(def a 1)"));
-		ResultContext rc=s.applyTransaction(t1);
+		ResultContext rc=s.applyTransaction(t1,TransactionContext.create(s));
 		assertFalse(rc.isError());
 		State s2=rc.getState();
 		AccountStatus as=s2.getAccount(InitTest.HERO);
