@@ -306,7 +306,7 @@ public class TransactionHandler extends AThreadedComponent {
 		Peer peer=server.getPeer();
 		long timestamp=Utils.getCurrentTimestamp();
 
-		if (!readyToPublish(peer)) return null;
+		if (!peer.isReadyToPublish()) return null;
 		
 		long minBlockTime=getMinBlockTime();
 		
@@ -346,18 +346,13 @@ public class TransactionHandler extends AThreadedComponent {
 		lastBlockPublishedTime=timestamp;
 		return signedBlocks;
 	}
-	
-	
-	/**
-	 * Checks if the Peer is ready to publish a Block
-	 * @param peer Current Peer instance
-	 * @return true if ready to publish, false otherwise
-	 */
-	private boolean readyToPublish(Peer peer) {
-		return true;
-	}
 
 	Long minBlockTime=null;
+	
+	/** 
+	 * Get the minimum time between proposing blocks. Default 10ms. 
+	 * @return
+	 */
 	private long getMinBlockTime() {
 		if (minBlockTime==null) {
 			HashMap<Keyword, Object> config = server.getConfig();

@@ -394,6 +394,7 @@ public abstract class Convex implements AutoCloseable {
 				if (compResult.isError()) throw new ResultException(compResult);
 				code=compResult.getValue();
 			}
+			if (address==null) throw new ResultException(Result.error(ErrorCodes.STATE,"No origin address for transaction"));
 			transaction=Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, code);
 		}
 		return prepareTransaction(transaction);

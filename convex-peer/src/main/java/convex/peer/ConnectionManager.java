@@ -162,7 +162,7 @@ public class ConnectionManager extends AThreadedComponent {
 			 *  withdrawn, have trivial stake or are slashed from current consideration.
 			 */
 			PeerStatus ps=s.getPeer(p);
-			if ((ps==null)||(ps.getTotalStake()<=CPoSConstants.MINIMUM_EFFECTIVE_STAKE)) {
+			if ((ps==null)||(ps.getBalance()<=CPoSConstants.MINIMUM_EFFECTIVE_STAKE)) {
 				closeConnection(p,"Insufficient stake");
 				currentPeerCount--;
 				continue;
@@ -281,7 +281,8 @@ public class ConnectionManager extends AThreadedComponent {
 	 * Close all outgoing connections from this Peer
 	 */
 	public void closeAllConnections() {
-		for (AccountKey peerKey:connections.keySet()) {
+		HashMap<AccountKey, Convex> conns=new HashMap<>(getConnections());
+		for (AccountKey peerKey:conns.keySet()) {
 			closeConnection(peerKey,"Closing all connections");
 		}
 		connections.clear();

@@ -37,7 +37,7 @@ public class GUITest {
 	static {
 		try {
 			Toolkit.init();
-			manager=new PeerGUI(3,AKeyPair.generate());
+			manager=PeerGUI.create(3,AKeyPair.generate());
 			SERVER=manager.getPrimaryServer();
 			CONVEX=Convex.connect(SERVER);
 		} catch (HeadlessException e) {
@@ -56,7 +56,7 @@ public class GUITest {
 		assumeTrue(manager!=null);
 		assumeFalse(GraphicsEnvironment.isHeadless());
 	}
-	
+
 	/**
 	 * Manager is the root panel of the GUI. A lot of other stuff is built in its
 	 * constructor.

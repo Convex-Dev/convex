@@ -50,7 +50,7 @@ public class CPoSConstants {
 	public static final long INITIAL_PEER_TIMESTAMP = -1L;
 	
 	/**
-	 * Minimum stake for a Peer to be considered by other Peers in consensus
+	 * Minimum stake balance for a Peer to be considered by other Peers in consensus
 	 */
 	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1000;
 	/**

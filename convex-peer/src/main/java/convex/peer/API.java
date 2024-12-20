@@ -47,7 +47,7 @@ public class API {
 	 * <li>:store (optional, AStore or String filename) - AStore instance. Defaults to the configured global store
 	 * <li>:keystore (optional, Keystore or string filename) - Keystore instance. Read only, used for key lookup if necessary.
 	 * <li>:storepass (optional, string) - Integrity password for keystore. If omitted, no integrity check is performed
-	 * <li>:source (optional, String) - URL for Peer to replicate initial State/Belief from.
+	 * <li>:source (optional, String or Socket Address) - URL for Peer to replicate initial State/Belief from.
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.

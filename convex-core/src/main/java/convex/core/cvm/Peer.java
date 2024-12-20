@@ -662,4 +662,15 @@ public class Peer {
 	public State getGenesisState() {
 		return genesis;
 	}
+
+	/**
+	 * Checks if the Peer is ready to publish a Block. Requires sufficient stake
+	 * @return true if ready to publish, false otherwise
+	 */
+	public boolean isReadyToPublish() {
+		PeerStatus ps=state.getPeer(peerKey);
+		if (ps==null) return false;
+		if (ps.getBalance()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false;
+		return true;
+	}
 }
