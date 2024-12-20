@@ -4,10 +4,11 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased 
+## [0.8.0] - 2024-12-20 - PROTONET
 
 ### Added
 
+- New Netty Server implementation
 - Better CNS functionality
 - Support for tagged forms in Convex Reader
 - `dissoc-in`, `update` and `update-in` core functions
@@ -19,13 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Class hierarchy refactoring for `convex.core.cpos`
-- More GUI updates
+- Class hierarchy refactoring
+- Many GUI updates
 - Reader performance enhancements
 - Booleans no longer cast to the Integers 0 / 1
 - Update some errors thrown for failed casts
 - `set!` now allows pending definitions
 - Better internal handling of peer fees
+- Better `and` and `or` macros
 - Rename `stake` to `set-stake`
 
 ## [0.7.15] - 2024-09-17
