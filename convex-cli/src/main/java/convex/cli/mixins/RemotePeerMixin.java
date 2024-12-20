@@ -43,6 +43,9 @@ public class RemotePeerMixin extends AMixin {
 			throw new CLIError("Timeout while attempting to connect to peer: "+hostname,e);
 		} catch (IOException e) {
 			throw new CLIError("IO Error: "+e.getMessage(),e);
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
+			throw new CLIError("Connection interrupted",e);
 		}
 	}
 

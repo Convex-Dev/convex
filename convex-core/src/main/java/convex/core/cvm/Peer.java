@@ -593,6 +593,7 @@ public class Peer {
 	public Peer proposeBlock(Block block) {
 		
 		SignedData<Block> signedBlock=sign(block);
+		@SuppressWarnings("unchecked")
 		Belief newBelief=belief.proposeBlock(keyPair, signedBlock);
 		
 		Peer result=this;
@@ -660,5 +661,19 @@ public class Peer {
 	 */
 	public State getGenesisState() {
 		return genesis;
+	}
+
+	/**
+	 * Checks if the Peer is ready to publish a Block. Requires sufficient stake
+	 * @return true if ready to publish, false otherwise
+	 */
+	public boolean isReadyToPublish() {
+		// If we are the only peer, always allow publishing
+		if (state.getPeers().count()<=1) return true;
+		
+		PeerStatus ps=state.getPeer(peerKey);
+		if (ps==null) return false;
+		if (ps.getBalance()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false; 
+		return true;
 	}
 }

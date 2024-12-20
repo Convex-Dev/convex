@@ -4,6 +4,7 @@ import convex.core.ErrorCodes;
 import convex.core.cvm.Address;
 import convex.core.cvm.exception.ErrorValue;
 import convex.core.data.ARecord;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 
 /**
@@ -68,6 +69,10 @@ public class ErrorMessages {
 
 	public static String badTagMessage(byte tag) {
 		return "Unrecognised tag byte 0x"+Utils.toHexString(tag);
+	}
+
+	public static String badTagMessage(byte tag, Blob blob, int offset) {
+		return badTagMessage(tag)+" starting "+blob.slice(offset).toHexString(16);
 	}
 
 }

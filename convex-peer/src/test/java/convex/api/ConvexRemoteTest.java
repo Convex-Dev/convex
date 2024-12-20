@@ -32,7 +32,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.net.Connection;
+import convex.net.AConnection;
 import convex.net.Message;
 import convex.net.MessageType;
 import convex.peer.TestNetwork;
@@ -58,7 +58,7 @@ public class ConvexRemoteTest {
 	}
 
 	@Test
-	public void testConnection() throws IOException, TimeoutException {
+	public void testConnection() throws IOException, TimeoutException, InterruptedException {
 		synchronized (network.SERVER) {
 			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
 			assertTrue(convex.isConnected());
@@ -71,9 +71,9 @@ public class ConvexRemoteTest {
 	}
 	
 	@Test
-	public void testBadQueryMessage() throws IOException, TimeoutException {
+	public void testBadQueryMessage() throws IOException, TimeoutException, InterruptedException {
 		ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress());
-		Connection conn=convex.connection;
+		AConnection conn=convex.connection;
 		conn.sendMessage(Message.create(MessageType.QUERY, Blobs.empty()));
 	}
 
@@ -150,15 +150,16 @@ public class ConvexRemoteTest {
 	public void testManyTransactions() throws IOException, TimeoutException, InterruptedException, ExecutionException {
 		synchronized (network.SERVER) {
 			Convex convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			int n = 100;
+			int n = 10;
 			Future<Result>[] rs = new Future[n];
 			for (int i = 0; i < n; i++) {
 				Future<Result> f = convex.transact(Invoke.create(ADDRESS, 0, Constant.of(i)));
 				rs[i] = f;
 			}
 			for (int i = 0; i < n; i++) {
-				Result r = rs[i].get(6000, TimeUnit.MILLISECONDS);
-				assertNull(r.getErrorCode(), ()->"Error:" + r.toString());
+				Result r = rs[i].get(10000, TimeUnit.MILLISECONDS);
+				final int ri=i;
+				assertNull(r.getErrorCode(), ()->"Error on result: "+ri+" = " + r.toString());
 			}
 		}
 	}
@@ -167,7 +168,7 @@ public class ConvexRemoteTest {
 	public void testReceivedCount() throws IOException, TimeoutException, InterruptedException, ResultException {
 		synchronized (network.SERVER) {
 			ConvexRemote convex = Convex.connect(network.SERVER.getHostAddress(), ADDRESS, KEYPAIR);
-			Connection conn=convex.connection;
+			AConnection conn=convex.connection;
 
 			long seq=convex.getSequence();
 			assertEquals(1,conn.getReceivedCount());

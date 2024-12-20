@@ -124,7 +124,7 @@ public abstract class ARecordGeneric extends ACVMRecord {
 		Cells.validateCell(values);
 	}
 	
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
 		super.validateStructure();
 		if (values.count()!=format.count()) {
 			throw new InvalidDataException("Expected "+format.count()+ "Record values but was: "+values.count(),this);

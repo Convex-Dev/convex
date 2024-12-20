@@ -29,6 +29,8 @@ public class PeerStatus extends ARecordGeneric {
 	private static final RecordFormat FORMAT = RecordFormat.of(PEER_KEYS);
 	private static final Index<Address, CVMLong> EMPTY_STAKES = Index.none();
 
+	private final int IX_TIMESTAMP=5;
+	
 	/**
 	 * Per controller address
 	 */
@@ -87,7 +89,7 @@ public class PeerStatus extends ARecordGeneric {
 		this.controller = RT.ensureAddress(values.get(0));
 		this.peerStake = RT.ensureLong(values.get(1)).longValue();
 		this.delegatedStake = RT.ensureLong(values.get(3)).longValue();
-		this.timestamp = RT.ensureLong(values.get(5)).longValue();
+		this.timestamp = RT.ensureLong(values.get(IX_TIMESTAMP)).longValue();
 		this.balance = RT.ensureLong(values.get(6)).longValue();
 	}
 
@@ -263,9 +265,9 @@ public class PeerStatus extends ARecordGeneric {
 		return new PeerStatus(values.assoc(6,CVMLong.create(newBalance)));
 	}
 	
-	private PeerStatus withTimestamp(CVMLong newTimestamp) {
-		if (timestamp==newTimestamp.longValue()) return this;
-		return new PeerStatus(values.assoc(5,newTimestamp));
+	private PeerStatus withTimestamp(long newTimestamp) {
+		if (timestamp==newTimestamp) return this;
+		return new PeerStatus(values.assoc(IX_TIMESTAMP,CVMLong.create(newTimestamp)));
 	}
 	
 	/**
@@ -352,7 +354,7 @@ public class PeerStatus extends ARecordGeneric {
 		CVMLong timestamp=state.getTimestamp();
 		long newTime=timestamp.longValue();
 		if (oldTime<newTime) {
-			ps=ps.withTimestamp(timestamp);
+			ps=ps.withTimestamp(newTime);
 		}
 		
 		return ps;

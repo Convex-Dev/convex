@@ -64,6 +64,10 @@ public class Strings {
 
 	public static final StringShort LONG_MIN_VALUE = StringShort.create("-9223372036854775808");
 
+	public static final StringShort SENT = StringShort.create("Sent");
+
+	public static final StringShort FULL_BUFFER = StringShort.create("Buffer full");
+
 
 	/**
 	 * Reads a String from a Blob encoding.
@@ -127,9 +131,13 @@ public class Strings {
 		return create(o.toString());
 	}
 
-	
 	public static <T extends AString> T intern(T value) {
 		return Cells.intern(value);
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <T extends AString> T intern(String value) {
+		return (T) intern(create(value));
 	}
 	
 	public static AString create(CVMChar c) {

@@ -3,6 +3,7 @@ package convex.api;
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.HashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -51,11 +52,13 @@ import convex.peer.Config;
 import convex.peer.Server;
 
 /**
- * Class representing a client API to the Convex network.
+ * Class providing a client API to the Convex network.
  *
- * An instance of the type Convex represents a stateful client connection to the
+ * An instance of the type Convex manages a stateful client connection to the
  * Convex network that can issue transactions both synchronously and
- * asynchronously. This can be used by both peers and JVM-based clients.
+ * asynchronously via a peer. 
+ * 
+ * This can be used by both peers and JVM-based clients.
  *
  * "I'm doing a (free) operating system (just a hobby, won't be big and
  * professional like gnu)" - Linus Torvalds
@@ -93,49 +96,11 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	protected Long sequence = null;
 
-	/**
-	 * Map of results awaiting completion.
-	 */
-	protected HashMap<ACell, CompletableFuture<Message>> awaiting = new HashMap<>();
-
-	/**
-	 * Result Consumer for messages received back from a client connection
-	 */
-	protected final Consumer<Message> messageHandler = new ResultConsumer() {
-		@Override
-		protected synchronized void handleResult(ACell id, Result v) {
-			ACell ec=v.getErrorCode();
-			
-			if ((ec!=null)&&(!SourceCodes.CODE.equals(v.getSource()))) {
-				// if our result didn't result in user code execution
-				// then we probably have a wrong sequence number now. Kill the stored value.
-				sequence = null;
-			}
-		}
-
-		@Override
-		public void accept(Message m) {
-			// Check if we are waiting for a Result with this ID for this connection
-			synchronized (awaiting) {
-				ACell id=m.getID();
-				CompletableFuture<Message> cf = (id==null)?null:awaiting.remove(id);
-				if (cf != null) {
-					// log.info("Return message received for message ID: {} with type: {} "+m.toString(), id,m.getType());
-					if (cf.complete(m)) return;
-				} 
-			}
-			
-			if (delegatedHandler!=null) {
-				delegatedHandler.accept(m);
-			} else {
-				// default handling
-				super.accept(m);
-			}
-		}
-	};
 	
-	private Consumer<Message> delegatedHandler=null;
-
+	/**
+	 * Counter for outgoing message IDs. Used to give an ID to requests that expect a Result
+	 */
+	protected long idCounter=0;
 
 	protected Convex(Address address, AKeyPair keyPair) {
 		this.keyPair = keyPair;
@@ -146,8 +111,9 @@ public abstract class Convex implements AutoCloseable {
 	 * Attempts best possible connection
 	 * @throws TimeoutException 
 	 * @throws IOException 
+	 * @throws InterruptedException 
 	 */
-	public static Convex connect(Object host) throws IOException, TimeoutException {
+	public static Convex connect(Object host) throws IOException, TimeoutException, InterruptedException {
 		if (host instanceof Convex) return (Convex)host;
 		if (host instanceof Convex) return connect((Server)host);
 		
@@ -165,8 +131,9 @@ public abstract class Convex implements AutoCloseable {
 	 * @return New Convex client instance
 	 * @throws IOException      If IO Error occurs
 	 * @throws TimeoutException If connection attempt times out
+	 * @throws InterruptedException 
 	 */
-	public static ConvexRemote connect(InetSocketAddress hostAddress) throws IOException, TimeoutException {
+	public static ConvexRemote connect(InetSocketAddress hostAddress) throws IOException, TimeoutException, InterruptedException {
 		return connect(hostAddress, (Address) null, (AKeyPair) null);
 	}
 
@@ -180,29 +147,18 @@ public abstract class Convex implements AutoCloseable {
 	 * @return New Convex client instance
 	 * @throws IOException      If connection fails due to IO error
 	 * @throws TimeoutException If connection attempt times out
+	 * @throws InterruptedException 
 	 */
 	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair)
-			throws IOException, TimeoutException {
-		return Convex.connect(peerAddress, address, keyPair, Stores.current());
-	}
-
-	/**
-	 * Create a Convex client by connecting to the specified Peer using the given
-	 * key pair and using a given store
-	 *
-	 * @param peerAddress Address of Peer
-	 * @param address     Address of Account to use for Client
-	 * @param keyPair     Key pair to use for client transactions
-	 * @param store       Store to use for this connection
-	 * @return New Convex client instance
-	 * @throws IOException      If connection fails due to IO error
-	 * @throws TimeoutException If connection attempt times out
-	 */
-	public static ConvexRemote connect(InetSocketAddress peerAddress, Address address, AKeyPair keyPair, AStore store)
-			throws IOException, TimeoutException {
-		ConvexRemote convex = new ConvexRemote(address, keyPair);
-		convex.connectToPeer(peerAddress, store);
+			throws IOException, TimeoutException, InterruptedException {
+		ConvexRemote convex = ConvexRemote.connect(peerAddress);
+		convex.setAddress(address);
+		convex.setKeyPair(keyPair);
 		return convex;
+	}
+	
+	protected long getNextID() {
+		return idCounter++;
 	}
 
 	/**
@@ -238,15 +194,6 @@ public abstract class Convex implements AutoCloseable {
 
 	public void setNextSequence(long nextSequence) {
 		this.sequence = nextSequence - 1L;
-	}
-
-	/**
-	 * Sets a handler for messages that are received but not otherwise processed (transaction/query results will
-	 * be relayed instead to the appropriate handler )
-	 * @param handler Handler for received messaged
-	 */
-	public void setHandler(Consumer<Message> handler) {
-		this.delegatedHandler = handler;
 	}
 
 	/**
@@ -447,6 +394,7 @@ public abstract class Convex implements AutoCloseable {
 				if (compResult.isError()) throw new ResultException(compResult);
 				code=compResult.getValue();
 			}
+			if (address==null) throw new ResultException(Result.error(ErrorCodes.STATE,"No origin address for transaction"));
 			transaction=Invoke.create(address, ATransaction.UNKNOWN_SEQUENCE, code);
 		}
 		return prepareTransaction(transaction);
@@ -727,16 +675,15 @@ public abstract class Convex implements AutoCloseable {
 	 * @param message Raw message data
 	 * @return A Future for the result of the query
 	 */
-	public abstract CompletableFuture<Result> message(Blob message);
+	public abstract CompletableFuture<Result> messageRaw(Blob message);
 	
 	/**
-	 * Submits a Message to the Convex network, returning a Future for any Result
+	 * Submits a Message to the connected peer, returning a Future for any Result
 	 *
 	 * @param message Message data
-	 * @return A Future for the result of the query
+	 * @return A Future for the Result of the query. May just be "Sent" if no other result expected, or an immediate error if sending failed.
 	 */
 	public abstract CompletableFuture<Result> message(Message message);
-
 	
 	/**
 	 * Attempts to resolve a CNS name
@@ -798,37 +745,6 @@ public abstract class Convex implements AutoCloseable {
 	 * @return A Future for the result of the requestStatus
 	 */
 	public abstract CompletableFuture<Result> requestStatus();
-
-	/**
-	 * Method to start waiting for a complete result. Must be called with lock on
-	 * `awaiting` map to prevent risk of missing results before it is called.
-	 * 
-	 * @param id ID of result message to await
-	 * @return
-	 */
-	protected CompletableFuture<Result> awaitResult(ACell id, long timeout) {
-		CompletableFuture<Message> cf = new CompletableFuture<Message>();
-		if (timeout>0) {
-			cf=cf.orTimeout(timeout, TimeUnit.MILLISECONDS);
-		}
-		CompletableFuture<Result> cr=cf.handle((m,e)->{
-			synchronized(awaiting) {
-				awaiting.remove(id);
-			}
-			// clear sequence if something went wrong. It is probably invalid now....
-			if (e!=null) {
-				sequence=null;
-				return Result.fromException(e);
-			}
-			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
-			}
-			return r;
-		});
-		awaiting.put(id, cf);
-		return cr;
-	}
 
 	/**
 	 * Request a challenge. This is request is made by any peer that needs to find
@@ -900,7 +816,7 @@ public abstract class Convex implements AutoCloseable {
 		try {
 			result = cf.get(timeoutMillis, TimeUnit.MILLISECONDS);
 		} catch (ExecutionException | TimeoutException e) {
-			return Result.fromException(e.getCause());
+			return Result.fromException(e);
 		} finally {
 			cf.cancel(true);
 		}
@@ -1023,7 +939,8 @@ public abstract class Convex implements AutoCloseable {
 	 * @return New Client Connection
 	 */
 	public static ConvexLocal connect(Server server) {
-		return ConvexLocal.create(server, null, null);
+		ConvexLocal convex= ConvexLocal.create(server, null, null);
+		return convex;
 	}
 
 	/**

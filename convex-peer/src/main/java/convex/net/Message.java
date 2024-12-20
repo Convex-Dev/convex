@@ -12,12 +12,15 @@ import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
 import convex.core.cpos.CPoSConstants;
 import convex.core.cvm.Address;
+import convex.core.cvm.CVMTag;
+import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Format;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.data.Strings;
@@ -29,6 +32,7 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
+import convex.core.text.PrintUtils;
 import convex.core.util.Utils;
 
 /**
@@ -45,6 +49,8 @@ public class Message {
 	
 	protected static final Logger log = LoggerFactory.getLogger(Message.class.getName());
 
+	private static final Message BYE_MESSAGE = Message.create(MessageType.GOODBYE,Vectors.create(MessageTag.BYE));
+
 	protected ACell payload;
 	protected Blob messageData; // encoding of payload (possibly multi-cell)
 	protected MessageType type;
@@ -57,14 +63,7 @@ public class Message {
 		this.returnHandler=handler;
 	}
 
-	public static Message create(Connection conn, MessageType type, Blob data) {
-		Predicate<Message> handler=t -> {
-			try {
-				return conn.sendMessage(t);
-			} catch (IOException e) {
-				return false;
-			}
-		};
+	public static Message create(Predicate<Message> handler, MessageType type, Blob data) {
 		return new Message(type, null,data,handler);
 	}
 	
@@ -82,23 +81,22 @@ public class Message {
 	}
 
 	public static Message createDataResponse(ACell id, ACell... cells) {
-		int n=cells.length;
-		ACell[] cs=new ACell[n+1];
-		cs[0]=id;
-		for (int i=0; i<n; i++) {
-			cs[i+1]=cells[i];
-		}
-		return create(MessageType.DATA,Vectors.create(cs));
+		// This is a bit special because we don't want to have a full payload.
+		Result result= Result.create(id,Vectors.create(cells));
+		Message m = create(MessageType.RESULT,Result.create(id,Vectors.create(cells)));
+		m.messageData=Format.encodeDataResult(result);		
+		return m;
 	}
 	
 	public static Message createDataRequest(ACell id, Hash... hashes) {
 		int n=hashes.length;
-		ACell[] cs=new ACell[n+1];
-		cs[0]=id;
+		ACell[] cs=new ACell[n+2];
+		cs[0]=MessageTag.DATA_REQUEST;
+		cs[1]=id;
 		for (int i=0; i<n; i++) {
-			cs[i+1]=hashes[i];
+			cs[i+2]=hashes[i];
 		}
-		return create(MessageType.REQUEST_DATA,Vectors.create(cs));
+		return create(MessageType.DATA_REQUEST,Vectors.create(cs));
 	}
 
 	public static Message createBelief(Belief belief) {
@@ -122,7 +120,7 @@ public class Message {
 	}
 
 	public static Message createGoodBye() {
-		return create(MessageType.GOODBYE, null);
+		return BYE_MESSAGE;
 	}
 
 	@SuppressWarnings("unchecked")
@@ -144,27 +142,14 @@ public class Message {
 	 */
 	public Blob getMessageData() {
 		if (messageData!=null) return messageData;
-		
-		// default to single cell encoding
-		// TODO: alternative depths for different types
+		MessageType type=getType();
 		switch (type) {
-		case MessageType.RESULT:
-		case MessageType.QUERY:
-		case MessageType.TRANSACT:
-		case MessageType.REQUEST_DATA:
-		   messageData=Format.encodeMultiCell(payload,true);
-		   break;
-		   
-		case MessageType.DATA:
-			@SuppressWarnings("unchecked") 
-			AVector<ACell> v=(AVector<ACell>) payload;
-			messageData=Format.encodeDataVector(v);		 
-			break;
-			
-		default:
-			messageData=Format.encodeMultiCell(payload,true);
-		}
+			case MessageType.BELIEF:
+				// throw new Error("Received belief message should already have partial data encoding");
+			default:
+				messageData=Format.encodeMultiCell(payload,true);
 		
+		}
 		return messageData;
 	}
 
@@ -178,11 +163,39 @@ public class Message {
 	}
 
 	private MessageType inferType() {
+		if (hasData()) {
+			// These can be inferred directly from top encoding tag
+			byte tag=messageData.byteAt(0);
+			if (tag==CVMTag.BELIEF) return MessageType.BELIEF;
+			if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order> or similar
+			if (tag==CVMTag.RESULT) return MessageType.RESULT;
+		}
+		
 		try {
 			ACell payload=getPayload();
 			if (payload instanceof Result) return MessageType.RESULT;
+
+			if (payload instanceof Belief) return MessageType.BELIEF;
+			if (payload instanceof SignedData) return MessageType.BELIEF;
+			
+			if (payload instanceof AVector) {
+				Keyword mt=RT.ensureKeyword(((AVector<?>)payload).get(0));
+				if (mt==null) return MessageType.UNKNOWN;
+				if (MessageTag.STATUS_REQUEST.equals(mt)) return MessageType.STATUS;
+				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
+				if (MessageTag.BYE.equals(mt)) return MessageType.GOODBYE;
+				if (MessageTag.TRANSACT.equals(mt)) return MessageType.TRANSACT;
+				if (MessageTag.DATA_REQUEST.equals(mt)) return MessageType.DATA_REQUEST;
+			}
 		} catch (Exception e) {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
+			try {
+				ACell payload=getPayload();
+				System.out.println(PrintUtils.printRefTree(payload.getRef()));
+				log.info("Can't infer message type with object "+Utils.getClassName(payload),e);
+			} catch (Exception ex) {
+				ex.printStackTrace();
+			}
 		}
 		
 		return MessageType.UNKNOWN;
@@ -196,7 +209,7 @@ public class Message {
 			if (ps==null) return ("<BIG MESSAGE "+RT.count(getMessageData())+" TYPE ["+getType()+"]>");
 			return ps.toString();
 		} catch (MissingDataException e) {
-			return "<PARTIAL MESSAGE [" + getType() + "] MISSING "+e.getMissingHash()+">";
+			return "<PARTIAL MESSAGE [" + getType() + "] MISSING "+e.getMissingHash()+" ENC "+getMessageData().toHexString(16)+">";
 		} catch (BadFormatException e) {
 			return "<CORRUPTED MESSAGE ["+getType()+"]>: "+e.getMessage();
 		}
@@ -218,34 +231,70 @@ public class Message {
 	 * @return Message ID, or null if the message does not have a message ID
 	 */
 	public ACell getID()  {
+		if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
+		switch (getType()) {	
+			// Result is a special record type
+			case RESULT: return getResultID();
+
+			default: return getRequestID();
+		}
+	}
+	
+	/**
+	 * Gets the request ID for this message, assuming it is a request expecting a response
+	 * @return
+	 */
+	public ACell getRequestID() {
+		// if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
 		try {
-			switch (type) {
-				// Query and transact use a vector [ID ...]
+			switch (getType()) {	
+			
+				// ID in position 1
+				case STATUS:
+				case TRANSACT: 
 				case QUERY:
-				case TRANSACT: return ((AVector<?>)getPayload()).get(0);
-	
-				// Result is a special record type
-				case RESULT: return ((Result)getPayload()).getID();
-	
-				// Status ID is the single value
-				case STATUS: return (getPayload());
-				
-				case DATA: {
-					ACell o=getPayload();
-					if (o instanceof AVector) {
-						AVector<?> v = (AVector<?>)o; 
-						if (v.count()==0) return null;
-						// first element might be ID, otherwise null
-						return RT.ensureLong(v.get(0));
-					}
+				case DATA_REQUEST:{
+					AVector<?> v=RT.ensureVector(getPayload());
+					if (v.count()<2) return null;
+					return RT.ensureLong(v.get(1));
 				}
 	
 				default: return null;
 			}
 		} catch (Exception e) {
-			// defensive coding
+			log.warn("Unexpected error getting request ID",e);
 			return null;
 		}
+	}
+	
+	/**
+	 * Gets the result ID for this message, assuming it is a Result
+	 * 
+	 * This needs to work even if the payload is not yet decoded, for message routing (possibly with a different store)
+	 * 
+	 * @return
+	 */
+	public ACell getResultID() {
+		if (payload!=null) {
+			if (payload instanceof Result) {
+				return ((Result)payload).getID();
+			}
+			return null;
+		}
+		
+		if (hasData()) try {
+			// Check tag is a Result
+			byte tag=messageData.byteAt(0);
+			if (tag!=CVMTag.RESULT) return null;
+			
+			// Peek at Result ID without loading whole payload
+			return Result.peekResultID(messageData,0);
+		} catch (Exception e) {
+			log.warn("Unexpected error getting result ID: "+e.getMessage());
+			return null;
+		}
+		
+		return null;
 	}
 	
 	/**
@@ -256,27 +305,23 @@ public class Message {
 	@SuppressWarnings("unchecked")
 	public Message withID(ACell id) {
 		try {
-			switch (type) {
-				// Query and transact use a vector [ID ...]
-				case QUERY:
-				case TRANSACT: 
-					return Message.create(type, ((AVector<ACell>)getPayload()).assoc(0, id));
+			switch (getType()) {
 	
 				// Result is a special record type
 				case RESULT: 
 					return Message.create(type, ((Result)getPayload()).withID(id));
-	
-				// Status ID is the single value
+					
+				// Using a vector [key ID ...]
 				case STATUS: 
-					return Message.create(type, id);
-				
-				case DATA: {
+				case TRANSACT: 
+				case QUERY:
+				case DATA_REQUEST: {
 					ACell o=getPayload();
 					if (o instanceof AVector) {
 						AVector<ACell> v = (AVector<ACell>)o; 
-						if (v.count()==0) return null;
+						if (v.count()<2) return null;
 						// first element assumed to be ID
-						return Message.create(type, v.assoc(0, id));
+						return Message.create(type, v.assoc(1, id));
 					}
 				}
 	
@@ -295,13 +340,18 @@ public class Message {
 	 * 
 	 * @param res Result record
 	 * @return True if reported successfully, false otherwise
+	 * @throws IllegalStateException if original message did not specify a return ID
 	 */
 	public boolean returnResult(Result res) {
-		ACell id=getID();
-		if (id!=null) res=res.withID(id);
-	
-		Message msg=Message.createResult(res);
-		return returnMessage(msg);
+		ACell id=getRequestID(); // what was the request ID of original message?
+		if (id!=null) {
+			// Make sure Result has correct result ID
+			res=res.withID(id);
+			Message msg=Message.createResult(res);
+			return returnMessage(msg);
+		} else {
+			throw new IllegalStateException("Trying to return result with no original request ID");
+		}
 	}
 	
 	/**
@@ -318,6 +368,10 @@ public class Message {
 		return handler.test(m);
 	}
 
+	/**
+	 * Return true if there is encoded message data
+	 * @return
+	 */
 	public boolean hasData() {
 		return messageData!=null;
 	}
@@ -326,7 +380,7 @@ public class Message {
 		return create(MessageType.RESULT,res);
 	}
 
-	public static Message createResult(CVMLong id, ACell value, ACell error) {
+	public static Message createResult(ACell id, ACell value, ACell error) {
 		Result r=Result.create(id, value,error);
 		return createResult(r);
 	}
@@ -339,19 +393,24 @@ public class Message {
 	}
 
 	public Message makeDataResponse(AStore store) throws BadFormatException {
+		final int HEADER_OFFSET=2; // offset of hashes in request vector
+		
 		AVector<ACell> v = RT.ensureVector(getPayload());
 		if ((v == null)||(v.isEmpty())) {
 			throw new BadFormatException("Invalid data request payload");
 		};
-		if (v.count()>CPoSConstants.MISSING_LIMIT+1) {
+		if (v.count()>CPoSConstants.MISSING_LIMIT+HEADER_OFFSET) {
 			throw new BadFormatException("Too many elements in Missing data request");
 		}
+		
+		ACell id=v.get(1); // location of ID in request record
 		//System.out.println("DATA REQ:"+ v);
-		int n=v.size();
+		
+		int n=v.size()-HEADER_OFFSET; // number of values requested (ignore header elements)
+		
 		ACell[] vals=new ACell[n];
-		vals[0]=v.get(0);
-		for (int i=1; i<n; i++) {
-			Hash h=RT.ensureHash(v.get(i));
+		for (int i=0; i<n; i++) {
+			Hash h=RT.ensureHash(v.get(i+HEADER_OFFSET));
 			if (h==null) {
 				throw new BadFormatException("Invalid data request hash");
 			}
@@ -362,12 +421,12 @@ public class Message {
 				vals[i]=data;
 			} else {
 				// signal we don't have this data
-				vals[i]=null;;
+				vals[i]=null;
 			}
 		}
 		//System.out.println("DATA RESP:"+ v);
 		// Create response. Will have null return connection
-		Message resp=create(MessageType.DATA,Vectors.create(vals));
+		Message resp=createDataResponse(id,vals);
 		return resp;
 	}
 
@@ -378,6 +437,11 @@ public class Message {
 			case MessageType.RESULT: 
 				Result result=getPayload();
 				return result;
+				
+			case MessageType.DATA: 
+				// Wrap data responses in a successful Result
+				return Result.create(getID(), getPayload(), null);
+				
 			default:
 				return Result.create(getID(), Strings.create("Unexpected message type for Result: "+type), ErrorCodes.UNEXPECTED);
 			}
@@ -412,8 +476,39 @@ public class Message {
 	}
 	
 	public static Message createQuery(long id, ACell code, Address address) {
-		return create(MessageType.QUERY,Vectors.of(id,code,address));
+		AVector<?> v=Vectors.create(MessageTag.QUERY,CVMLong.create(id),code,address);
+		return create(MessageType.QUERY,v);
 	}
+
+	public static Message createTransaction(long id, SignedData<ATransaction> signed) {
+		AVector<?> v=Vectors.create(MessageTag.TRANSACT,CVMLong.create(id),signed);
+		return create(MessageType.TRANSACT,v);
+	}
+	
+	/**
+	 * Sends a STATUS Request Message on this connection.
+	 *
+	 * @return The ID of the message sent, or -1 if send buffer is full.
+	 * @throws IOException If IO error occurs
+	 */
+	public static Message createStatusRequest(long id) {
+		CVMLong idPayload = CVMLong.create(id);
+		AVector<?> v=Vectors.create(MessageTag.STATUS_REQUEST,idPayload);
+		return create(MessageType.STATUS,v);
+	}
+
+	/**
+	 * Return the Hash of the Message payload
+	 * @return Hash, or null if message format is invalid
+	 */
+	public Hash getHash() {
+		try {
+			return getPayload().getHash();
+		} catch (BadFormatException e) {
+			return null;
+		}
+	}
+
 
 
 }

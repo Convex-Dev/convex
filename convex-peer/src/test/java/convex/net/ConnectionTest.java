@@ -9,9 +9,9 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
-import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.impl.HandlerException;
+import convex.net.impl.nio.Connection;
 
 /**
  * Tests for the low level Connection class
@@ -23,7 +23,7 @@ public class ConnectionTest {
 		final ArrayList<Message> received = new ArrayList<>();
 
 		MemoryByteChannel chan = MemoryByteChannel.create(100);
-		Connection conn=Connection.create(chan, null, Stores.current(), null);
+		Connection conn=Connection.create(chan, null, null);
 
 		// create a custom PeerConnection and MessageReceiver for testing
 		// null Queue OK, we aren't queueing with our custom receive action
@@ -31,7 +31,7 @@ public class ConnectionTest {
 			synchronized (received) {
 				received.add(a);
 			}
-		}, conn);
+		}, null);
 		
 		Thread receiveThread=new Thread(()-> {
 			while (!Thread.currentThread().isInterrupted()) {

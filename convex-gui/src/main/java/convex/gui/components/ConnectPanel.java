@@ -1,10 +1,7 @@
 package convex.gui.components;
 
 import java.awt.Color;
-import java.io.IOException;
-import java.net.ConnectException;
 import java.net.InetSocketAddress;
-import java.util.concurrent.TimeoutException;
 
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -15,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.api.ConvexRemote;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.init.Init;
@@ -84,7 +82,7 @@ public class ConnectPanel extends JPanel {
 	    		String target=pan.hostField.getText();
 	    		InetSocketAddress sa=IPUtils.toInetSocketAddress(target);
 	    		log.info("Attempting connect to: "+sa);
-	    		Convex convex=Convex.connect(sa);
+	    		Convex convex=ConvexRemote.connectNetty(sa);
 	    		convex.setAddress(addr);
 	    		
 	    		HostCombo.registerGoodConnection(target);
@@ -103,13 +101,13 @@ public class ConnectPanel extends JPanel {
 	    			}
 	    		}
 	    		return convex;
-	    	} catch (ConnectException e) {
-				log.info("Failed to connect");
+	    	}  catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				e.printStackTrace();
+			} catch (Exception e) {
+				log.info("Failed to connect",e);
 	    		Toast.display(parent, e.getMessage(), Color.RED);
-	    	} catch (TimeoutException | IOException e) {
-	    		Toast.display(parent, e.getMessage(), Color.RED);
-	    		e.printStackTrace();
-	    	}
+	    	} 
 	    } else {
 	    	log.info("Connect cancelled by user");
 	    }

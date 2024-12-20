@@ -3,6 +3,7 @@ package convex.net;
 import java.io.IOException;
 import java.security.SecureRandom;
 import java.util.concurrent.TimeUnit;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,9 +12,9 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.Vectors;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
+import convex.core.data.Vectors;
 
 public class ChallengeRequest {
 
@@ -46,9 +47,9 @@ public class ChallengeRequest {
 	 * Sends out a single challenge to the remote peer.
 	 * @param connection Connection
 	 * @param peer This Peer
-	 * @return ID of message sent, or negative value if sending fails
+	 * @return Boolean true if sending succeeded
 	 */
-	public long send(Connection connection, Peer peer) {
+	public boolean send(AConnection connection, Peer peer) {
 		AVector<ACell> values = null;
 		try {
 			SecureRandom random = new SecureRandom();
@@ -61,12 +62,13 @@ public class ChallengeRequest {
 			values = Vectors.of(token, peer.getNetworkID(), peerKey);
 			SignedData<ACell> challenge = peer.sign(values);
 			sendHash = challenge.getHash();
-			return connection.sendChallenge(challenge);
+			Message m=Message.createChallenge(challenge);
+			return connection.sendMessage(m);
 		} catch (IOException e) {
 			log.warn("Cannot send challenge to remote peer at {}", connection.getRemoteAddress());
 			values = null;
 		}
-		return -1;
+		return false;
 	}
 
 	public AccountKey getPeerKey() {

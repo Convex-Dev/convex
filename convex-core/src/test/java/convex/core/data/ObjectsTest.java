@@ -45,8 +45,8 @@ public class ObjectsTest {
 			fail(e);
 		}
 		Ref<ACell> r = Ref.get(a);
-		assertEquals(h,r.getHash());
 		assertSame(a, r.getValue()); // shouldn't get GC'd because we have a strong reference
+		assertEquals(h,r.getHash());
 
 		doAnyEncodingTests(a);
 		doCellTests(a);

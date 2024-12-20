@@ -4,12 +4,12 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.Result;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
@@ -19,13 +19,12 @@ import convex.core.data.Ref;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
-import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
 import convex.net.Message;
-import convex.net.MessageType;
 
 /**
  * Utility class for acquiring data remotely
@@ -33,7 +32,9 @@ import convex.net.MessageType;
 public class Acquiror {
 	
 	private static final Logger log = LoggerFactory.getLogger(Acquiror.class.getName());
-	private static final int ACQUIRE_LOOP_TIMEOUT=2000; 
+	
+	// Probably don't need this, can time out the future
+	// private static final int ACQUIRE_LOOP_TIMEOUT=2000; 
 
 
 	private Hash hash;
@@ -66,9 +67,8 @@ public class Acquiror {
 			return f;
 		}
 		log.trace("Trying to acquire remotely: {}",hash);
-				
-		ThreadUtils.runVirtual(()-> {
-			Stores.setCurrent(store); // use store for calling thread
+	
+		ThreadUtils.runWithStore(store,()-> {
 			try {
 				HashSet<Hash> missingSet = new HashSet<>();
 
@@ -94,35 +94,29 @@ public class Acquiror {
 							return;
 						}					
 					}
-					CVMLong id=CVMLong.create(source.connection.getNextID());
+					CVMLong id=CVMLong.create(source.getNextID());
 					Message dataRequest=Message.createDataRequest(id, missingSet.toArray(Utils.EMPTY_HASHES));
-					CompletableFuture<Message> cf=new CompletableFuture<Message>();
-					synchronized (source.awaiting) {
-						boolean sent=source.connection.sendMessage(dataRequest);
-						if (!sent) {
-							log.warn("Unable to send data acquisition request");
-							continue;
-						}
-						cf=cf.orTimeout(ACQUIRE_LOOP_TIMEOUT,TimeUnit.MILLISECONDS);
-						// Store future for completion by result message
-						source.awaiting.put(id,cf);	
-					}
+					CompletableFuture<Result> cf=source.message(dataRequest);
 					try {
-						Message resp=cf.get();
-						if (resp.getType()==MessageType.DATA) {
-							log.trace("Got acquire response: {} ",resp);
-							AVector<ACell> v=resp.getPayload();
-							for (int i=1; i<v.count(); i++) {
-								ACell val=v.get(i);
-								if (val==null) {
-									AVector<ACell> reqv=dataRequest.getPayload();
-									f.completeExceptionally(new MissingDataException(store,RT.ensureHash(reqv.get(i))));
-									continue;
-								}
-								Cells.store(v.get(i), store);
+						Result resp=cf.get();
+						if (resp.isError()) {
+							f.completeExceptionally(new ResultException(resp));
+							log.info("Failed to request missing data: "+resp);
+							return;
+						}
+						
+						AVector<ACell> v=RT.ensureVector(resp.getValue());
+						if (v==null) throw new BadFormatException("Expected Vector in data result for id "+id+" but was: "+resp);
+						for (int i=0; i<v.count(); i++) {
+							ACell val=v.get(i);
+							if (val==null) {
+								// null vector element implies missing at other end
+								AVector<ACell> reqv=dataRequest.getPayload();
+								Hash expectedHash=RT.ensureHash(reqv.get(i+2));
+								f.completeExceptionally(new MissingDataException(store,expectedHash));
+								continue;
 							}
-						} else {
-							log.warn("Unexpected data response type: "+resp.getType());
+							Cells.store(val, store);
 						}
 					} catch (ExecutionException e) {
 						if (e.getCause() instanceof TimeoutException) {

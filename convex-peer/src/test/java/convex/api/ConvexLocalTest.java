@@ -2,8 +2,8 @@ package convex.api;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -75,8 +75,9 @@ public class ConvexLocalTest {
 			Message m=Message.createQuery(675678567,"*balance*",ADDRESS);
 			// ABlob data=Blob.wrap(new byte[] {MessageType.QUERY.getMessageCode()}).append(m.getMessageData());
 			ABlob data=m.getMessageData();
-			Result r = convex.message(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
-			assertNotNull(r);
+			Result r = convex.messageRaw(data.toFlatBlob()).get(5000,TimeUnit.MILLISECONDS);
+			assertFalse(r.isError());
+			assertTrue(r.getValue() instanceof CVMLong);
 		}
 	}
 

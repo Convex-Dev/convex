@@ -50,7 +50,7 @@ public class CPoSConstants {
 	public static final long INITIAL_PEER_TIMESTAMP = -1L;
 	
 	/**
-	 * Minimum stake for a Peer to be considered by other Peers in consensus
+	 * Minimum stake balance for a Peer to be considered by other Peers in consensus
 	 */
 	public static final long MINIMUM_EFFECTIVE_STAKE = Coin.GOLD * 1000;
 	/**
@@ -69,8 +69,15 @@ public class CPoSConstants {
 	
 	/**
 	 * Maximum allowed number of missing hashes in missing data request
+	 * 
+	 * (2 header values short of 256, so that request vector is 2 levels at max size)
 	 */
-	public static final long MISSING_LIMIT = 256;
+	public static final int MISSING_LIMIT = 254;
+	
+	/**
+	 * Milliseconds time between blocks for a peer to collect maximum rewards (10 mins)
+	 */
+	public static final long MAX_REWARD_TIME = 10*60*1000;
 
 
 }

@@ -33,12 +33,15 @@ public abstract class ATransaction extends ARecordGeneric {
 	
 	protected final Address origin;
 	protected final long sequence;
+	
+	protected static final int IX_ORIGIN=0;
+	protected static final int IX_SEQUENCE=1;
 
 	protected ATransaction(byte tag,RecordFormat format, AVector<ACell> values) {
 		super(tag,format,values);
-		this.origin=RT.ensureAddress(values.get(0));
+		this.origin=RT.ensureAddress(values.get(IX_ORIGIN));
 		if (origin==null) throw new IllegalArgumentException("Null Origin Address for transaction");
-		this.sequence = RT.ensureLong(values.get(1)).longValue();
+		this.sequence = RT.ensureLong(values.get(IX_SEQUENCE)).longValue();
 	}
 
 	/**
@@ -85,7 +88,7 @@ public abstract class ATransaction extends ARecordGeneric {
 	@Override
 	public ACell get(Keyword key) {
 		if (Keywords.ORIGIN.equals(key)) return origin;
-		if (Keywords.SEQUENCE.equals(key)) return values.get(1);
+		if (Keywords.SEQUENCE.equals(key)) return values.get(IX_SEQUENCE);
 		return null;
 	}
 	

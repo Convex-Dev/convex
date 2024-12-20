@@ -34,7 +34,6 @@ import convex.core.data.Hash;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
-import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadSignatureException;
 import convex.core.exceptions.ResultException;
@@ -43,7 +42,6 @@ import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
-import convex.net.Connection;
 
 /**
  * Tests for a fresh standalone server cluster instance
@@ -82,7 +80,6 @@ public class ServerTest {
 
 		r=convex.transactSync("(do (transfer "+user+" 100000) *balance*)");
 		assertEquals("10000000",r.getValue().toString());
-
 	}
 
 	@Test
@@ -104,7 +101,7 @@ public class ServerTest {
 	}
 
 	@Test
-	public void testBalanceQuery() throws IOException, TimeoutException, ResultException {
+	public void testBalanceQuery() throws IOException, TimeoutException, ResultException, InterruptedException {
 		Convex convex=Convex.connect(network.SERVER.getHostAddress(),network.VILLAIN,network.VILLAIN_KEYPAIR);
 
 		// test the connection is still working
@@ -131,10 +128,13 @@ public class ServerTest {
 			Convex convex=network.getClient();
 	
 			Future<convex.core.Result> f=convex.query(Symbols.STAR_BALANCE);
+			assertTrue(f.get().getValue() instanceof CVMLong);
+			
 			convex.core.Result f2=convex.querySync(Symbols.STAR_ADDRESS);
 	
+			assertFalse(f2.isError(),()->"Bad query result: "+f2);
 			assertEquals(convex.getAddress(),f2.getValue());
-			assertTrue(f.get().getValue() instanceof CVMLong);
+			
 			
 			// Note difference by argument type. `nil` code can make a valid transaction
 			assertThrows(IllegalArgumentException.class,()->convex.transact((ATransaction)null));
@@ -233,11 +233,4 @@ public class ServerTest {
 			assertTrue(s instanceof State);
 		}
 	}
-
-	public long checkSent(Connection pc,SignedData<ATransaction> st) throws IOException {
-		long x=pc.sendTransaction(st);
-		assertTrue(x>=0);
-		return x;
-	}
-
 }

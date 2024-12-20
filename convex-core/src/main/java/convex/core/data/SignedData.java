@@ -320,11 +320,6 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 	}
 
 	@Override
-	public boolean isCanonical() {
-		return true;
-	}
-
-	@Override
 	public final int getRefCount() {
 		// Value Ref only
 		return 1;
@@ -365,16 +360,6 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 
 	public Ref<T> getValueRef() {
 		return valueRef;
-	}
-	
-	/**
-	 * SignedData is not embedded. 
-	 * main reason: We always want to persist in store to cache verification status
-	 *
-	 * @return Always false
-	 */
-	public boolean isEmbedded() {
-		return false;
 	}
 
 	@Override

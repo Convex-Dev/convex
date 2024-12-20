@@ -171,7 +171,6 @@ public class REPLPanel extends JPanel {
 		output.setFont(OUTPUT_FONT);
 		//outputArea.setForeground(Color.GREEN);
 		output.setBackground(new Color(10,10,10));
-		output.setFocusable(false);
 		output.setToolTipText("Output from transaction execution");
 		//DefaultCaret caret = (DefaultCaret)(outputArea.getCaret());
 		//caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);

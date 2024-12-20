@@ -52,7 +52,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 * 
 	 * @throws InvalidDataException  If the Cell is invalid
 	 */
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
 		// nothing by default
 	}
 
@@ -207,7 +207,11 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	 */
 	@Override
 	public String toString() {
-		return print().toString();
+		try {
+			return print().toString();
+		} catch (Exception e) {
+			return Utils.getClassName(e)+ " Print failed: "+e.getMessage();
+		}
 	}
 	
 	/**
@@ -399,7 +403,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Gets the number of Branches referenced from this Cell. This number is
+	 * Gets the number of non-embedded Branches referenced from this Cell. This number is
 	 * final / immutable for any given instance and is defined by the Cell encoding rules.
 	 * 
 	 * @return The number of Branches from this Cell
@@ -422,8 +426,7 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	}
 	
 	/**
-	 * Gets the number of Branches referenced from this Cell. This number is
-	 * final / immutable for any given instance and is defined by the Cell encoding rules.
+	 * Gets a non-embedded Branch referenced from this Cell. 
 	 * 
 	 * @return The Ref for the branch, or null if an invalid index
 	 */

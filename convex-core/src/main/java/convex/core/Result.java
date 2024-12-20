@@ -129,6 +129,10 @@ public final class Result extends ARecordGeneric {
 		return error(errorCode,message,null);
 	}
 	
+	public static Result value(ACell value) {
+		return create(null,value);
+	}
+	
 	public static Result error(Keyword errorCode, String message) {
 		return error(errorCode,Strings.create(message),null);
 	}
@@ -320,7 +324,7 @@ public final class Result extends ARecordGeneric {
 	 * @return New Result instance
 	 */
 
-	public static Result fromContext(CVMLong id,ResultContext rc) {
+	public static Result fromContext(ACell id,ResultContext rc) {
 		Context ctx=rc.context;
 		Object result=ctx.getValue();
 		ACell errorCode=null;
@@ -377,6 +381,7 @@ public final class Result extends ARecordGeneric {
 	 * @return Updated Result
 	 */
 	public Result withID(ACell id) {
+		if (Cells.equals(id, getID())) return this;
 		return withValues(values.assoc(ID_POS, id));
 	}
 
@@ -386,7 +391,9 @@ public final class Result extends ARecordGeneric {
 	 * @return Result instance representing the exception (will be an error)
 	 */
 	public static Result fromException(Throwable e) {
-		if (e==null) return Result.error(ErrorCodes.EXCEPTION,Strings.NIL);
+		if (e==null) {
+			return Result.error(ErrorCodes.EXCEPTION,Strings.NIL);
+		}
 		if (e instanceof TimeoutException) {
 			String msg=e.getMessage();
 			return Result.error(ErrorCodes.TIMEOUT,Strings.create(msg));
@@ -426,6 +433,12 @@ public final class Result extends ARecordGeneric {
 	// Note interrupts are always caused by CLIENT from a local perspective
 	private static final Result INTERRUPTED_RESULT=Result.error(ErrorCodes.INTERRUPTED,Strings.create("Interrupted!")).withSource(SourceCodes.CLIENT);
 	private static final Result MISSING_RESULT=Result.error(ErrorCodes.MISSING,Strings.create("Missing Data!")).withSource(SourceCodes.CLIENT);
+	public static final Result CLOSED_CONNECTION = Result.error(ErrorCodes.CONNECT,Strings.create("Connection Closed")).withSource(SourceCodes.COMM);
+	public static final Result SENT_MESSAGE = Result.value(Strings.intern("Sent"));
+	public static final Result FULL_CLIENT_BUFFER = Result.error(ErrorCodes.LOAD, Strings.FULL_BUFFER).withSource(SourceCodes.COMM);
+	public static final Result BAD_FORMAT = Result.error(ErrorCodes.FORMAT, "Bad format");
+
+
 	
 	/**
 	 * Returns a Result representing a thread interrupt, AND sets the interrupt status on the current thread
@@ -435,6 +448,8 @@ public final class Result extends ARecordGeneric {
 		Thread.currentThread().interrupt();
 		return INTERRUPTED_RESULT;
 	}
+
+
 
 	/**
 	 * Converts this result to a JSON representation. WARNING: some information may be lost because JSON is a terrible format.
@@ -460,6 +475,7 @@ public final class Result extends ARecordGeneric {
 	}
 	
 	private static final StringShort RESULT_TAG=StringShort.create("#Result");
+	
 	
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
@@ -530,6 +546,11 @@ public final class Result extends ARecordGeneric {
 		}
 		
 		return Result.create(id, value, errorCode);
+	}
+
+	public static ACell peekResultID(Blob messageData, int i) throws BadFormatException {
+		Result r=Result.read(messageData, i);
+		return r.getID();
 	}
 
 

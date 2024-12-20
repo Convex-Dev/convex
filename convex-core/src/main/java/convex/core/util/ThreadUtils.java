@@ -16,6 +16,9 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.store.AStore;
+import convex.core.store.Stores;
+
 /**
  * Utilities for threading and concurrency
  */
@@ -114,6 +117,17 @@ public class ThreadUtils {
 	 */
 	public static void runVirtual(Runnable task) {
 		getVirtualExecutor().execute(task);
+	}
+
+	public static void runWithStore(AStore store, Runnable func) {
+		runVirtual(()-> {
+			AStore saved=Stores.current();
+			try {
+				func.run();
+			} finally {
+				Stores.setCurrent(saved);
+			}
+		});
 	}
 
 }

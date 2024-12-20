@@ -333,7 +333,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 * @param hash The hash value for this Ref to refer to
 	 * @return Ref for the specific hash.
 	 */
-	public static <T extends ACell> RefSoft<T> forHash(Hash hash) {
+	public static <T extends ACell> Ref<T> forHash(Hash hash) {
 		return RefSoft.createForHash(hash);
 	}
 	
@@ -365,7 +365,7 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	 */
 	public static <T extends ACell> Ref<T> readRaw(Blob b, int pos) throws BadFormatException {
 		Hash h = Hash.wrap(b,pos);
-		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref as position: "+pos);
+		if (h==null) throw new BadFormatException("Insufficient bytes to read Ref at position: "+pos);
 		Ref<T> ref=Ref.forHash(h);
 		ref=ref.markEmbedded(false);
 		return ref;
@@ -694,6 +694,12 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 		int flagsPart=((a|b)&~STATUS_MASK);
 		return statusPart|flagsPart;
 	}
+	
+	protected int mergeFlags(int flags) {
+		int newFlags=mergeFlags(this.flags,flags);
+		setFlags(newFlags);
+		return newFlags;
+	}
 
 	/**
 	 * Ensures this Ref is canonical
@@ -733,4 +739,6 @@ public abstract class Ref<T extends ACell> extends AObject implements Comparable
 	public boolean isValidated() {
 		return getStatus()>=VALIDATED;
 	}
+
+
 }

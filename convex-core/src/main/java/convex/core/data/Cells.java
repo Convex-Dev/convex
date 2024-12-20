@@ -9,6 +9,7 @@ import convex.core.Result;
 import convex.core.data.impl.DummyCell;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ParseException;
+import convex.core.exceptions.TODOException;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -30,6 +31,8 @@ public class Cells {
 	public static final int MAX_BRANCH_COUNT = 68;
 
 	public static final ACell DUMMY = new DummyCell();
+
+	public static final ACell NIL = null;
 
 	/**
 	 * Equality method allowing for nulls
@@ -334,9 +337,20 @@ public class Cells {
 		try {
 			cell.validateCell();
 			cell.validateStructure();
-		} catch (ClassCastException | NullPointerException e) {
+			// Cells.markValidated(cell);
+		} catch (Exception e) {
 			throw new InvalidDataException("Invalid due to failure "+e.getMessage(),cell);
 		}
+	}
+
+	/**
+	 * Marks a cell as being validated
+	 * @param cell
+	 */
+	public static void markValidated(ACell cell) {
+		
+		cell.getRef().mergeFlags(Ref.VALIDATED);
+		throw new TODOException("Probably not safe?");
 	}
 
 	/**

@@ -1,6 +1,5 @@
-package convex.net;
+package convex.net.impl.nio;
 
-import java.io.Closeable;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
@@ -14,15 +13,18 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
+import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
-import convex.net.impl.HandlerException;
+import convex.net.AServer;
+import convex.net.Message;
 import convex.peer.Config;
 import convex.peer.Server;
 
@@ -36,7 +38,7 @@ import convex.peer.Server;
  * receive queue is full (thereby applying back-pressure to clients)
  *
  */
-public class NIOServer implements Closeable {
+public class NIOServer extends AServer {
 	public static final int DEFAULT_PORT = 18888;
 
 	private static final Logger log = LoggerFactory.getLogger(NIOServer.class.getName());
@@ -51,10 +53,18 @@ public class NIOServer implements Closeable {
 
 	private boolean running = false;
 
-	private final Server server;
+	private final Consumer<Message> receiveAction;
 
-	private NIOServer(Server server) {
-		this.server = server;
+	private final AStore store;
+	
+	protected NIOServer(AStore store, Consumer<Message> receiveAction) {
+		this.store=store;
+		this.receiveAction=receiveAction;
+	}
+	
+	
+	private AStore getStore() {
+		return store;
 	}
 
 	/**
@@ -64,7 +74,7 @@ public class NIOServer implements Closeable {
 	 * @return New NIOServer instance
 	 */
 	public static NIOServer create(Server server) {
-		return new NIOServer(server);
+		return new NIOServer(server.getStore(),server.getReceiveAction());
 	}
 
 	/**
@@ -74,38 +84,41 @@ public class NIOServer implements Closeable {
 	 * @param port Port to use. If 0 or null, a default port will be used, with fallback to a random port
 	 * @throws IOException in case of IO problem
 	 */
-	public void launch(String bindAddress, Integer port) throws IOException {
+	public void launch() throws IOException {
 		ssc = ServerSocketChannel.open();
 
 		// Set receive buffer size
 		ssc.socket().setReceiveBufferSize(Config.SOCKET_SERVER_BUFFER_SIZE);
 		ssc.socket().setReuseAddress(true);
 
-		bindAddress = (bindAddress == null) ? "::" : bindAddress;
+		String bindAddress = "::";
 		
 		// Bind to a port
-		InetSocketAddress bindSA;	
-		if (port == null) {
-			port = 0;
-		}
-		if (port==0) {
-			try {
-				bindSA = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
-				ssc.bind(bindSA);
-			} catch (IOException e) {
-				// try again with random port
-				bindSA = new InetSocketAddress(bindAddress, 0);
+		{
+			InetSocketAddress bindSA;	
+			Integer port=getPort();
+			if (port == null) {
+				port = 0;
+			}
+			if (port<=0) {
+				try {
+					bindSA = new InetSocketAddress(bindAddress, Constants.DEFAULT_PEER_PORT);
+					ssc.bind(bindSA);
+				} catch (IOException e) {
+					// try again with random port
+					bindSA = new InetSocketAddress(bindAddress, 0);
+					ssc.bind(bindSA);
+				}
+			} else {
+				bindSA = new InetSocketAddress(bindAddress, port);
 				ssc.bind(bindSA);
 			}
-		} else {
-			bindSA = new InetSocketAddress(bindAddress, port);
-			ssc.bind(bindSA);
+			
+			// Find out which port we actually bound to
+			bindSA = (InetSocketAddress) ssc.getLocalAddress();
+			setPort(ssc.socket().getLocalPort());
 		}
 		
-		// Find out which port we actually bound to
-		bindSA = (InetSocketAddress) ssc.getLocalAddress();
-		port = ssc.socket().getLocalPort();
-
 		// change to bnon-blocking mode
 		ssc.configureBlocking(false);
 
@@ -117,10 +130,10 @@ public class NIOServer implements Closeable {
 		// set running status now, so that loops don't terminate
 		running = true;
 
-		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + port);
+		Thread selectorThread = new Thread(selectorLoop, "NIO Server loop on port: " + getPort());
 		selectorThread.setDaemon(true); // daemon thread so it doesn't stop shutdown
 		selectorThread.start();
-		log.debug("NIO server started on port {}", port);
+		log.debug("NIO server started on port {}", getPort());
 	}
 	
 	long lastConnectionPrune=0;
@@ -133,7 +146,7 @@ public class NIOServer implements Closeable {
 		@Override
 		public void run() {
 			// Use the store configured for the owning server.
-			Stores.setCurrent(server.getStore());
+			Stores.setCurrent(getStore());
 			try {
 				// loop unless we are interrupted
 				while (running && !Thread.currentThread().isInterrupted()) {
@@ -176,8 +189,8 @@ public class NIOServer implements Closeable {
 					// keys.clear();
 				}
 				
-			} catch (IOException e) {
-				log.error("Unexpected IO Exception, terminating selector loop: ", e);
+			} catch (Exception e) {
+				log.error("Unexpected Exception, terminating selector loop: ", e);
 			} finally {
 				try {
 					// close all client channels
@@ -205,14 +218,13 @@ public class NIOServer implements Closeable {
 			}
 			log.debug("Selector loop ended on port: " + getPort());
 		}
+
+
 	};
 
-	/**
-	 * Gets the port that this server instance is listening on.
-	 * 
-	 * @return Port number, or 0 if a server socket is not bound.
-	 */
-	public int getPort() {
+
+	@Override
+	public Integer getPort() {
 		if (ssc == null)
 			return 0;
 		ServerSocket socket = ssc.socket();
@@ -261,7 +273,11 @@ public class NIOServer implements Closeable {
 	}
 
 	private Connection createClientConnection(SocketChannel sc) throws IOException {
-		return Connection.create(sc, server.getReceiveAction(), server.getStore(), null);
+		return Connection.create(sc, getReceiveAction(), null);
+	}
+
+	protected Consumer<Message> getReceiveAction() {
+		return receiveAction;
 	}
 
 	protected void selectRead(SelectionKey key) throws IOException {
@@ -269,7 +285,7 @@ public class NIOServer implements Closeable {
 		// log.info("Connection read from: "+sc.getRemoteAddress()+" with key:"+key);
 		Connection conn = ensureConnection(key);
 		if (conn == null)
-			throw new IOException("No Connection in selecion key");
+			throw new IOException("No Connection in selection key");
 		try {
 			int n = conn.handleChannelRecieve();
 			if (n < 0) {
@@ -286,7 +302,7 @@ public class NIOServer implements Closeable {
 					e.getMessage());
 			// TODO: blacklist peer?
 			key.cancel();
-		} catch (HandlerException e) {
+		} catch (Exception e) {
 			log.warn("Unexpected exception in receive handler", e.getCause());
 			key.cancel();
 		}

@@ -19,10 +19,9 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Vectors;
-import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.MissingDataException;
 import convex.core.store.AStore;
+import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
 import convex.net.Message;
 import convex.net.MessageType;
@@ -39,6 +38,10 @@ public class ConvexLocal extends Convex {
 		super(address, keyPair);
 		this.server=server;
 		this.preCompile=true; // pre-compile by default if local peer
+	}
+	
+	public static ConvexLocal create(Server server) {
+		return new ConvexLocal(server, null,null);
 	}
 	
 	public static ConvexLocal create(Server server, Address address, AKeyPair keyPair) {
@@ -73,14 +76,14 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> requestStatus() {
-		return makeMessageFuture(MessageType.STATUS,CVMLong.create(makeID()));
+		return makeMessageFuture(Message.createStatusRequest(getNextID()));
 	}
 	
 	@Override
 	public CompletableFuture<Result> transact(SignedData<ATransaction> signed) {
 		
 		maybeUpdateSequence(signed);
-		CompletableFuture<Result> r= makeMessageFuture(MessageType.TRANSACT,Vectors.of(makeID(),signed));
+		CompletableFuture<Result> r= makeMessageFuture(Message.createTransaction(getNextID(),signed));
 		return r;
 	}
 
@@ -92,14 +95,10 @@ public class ConvexLocal extends Convex {
 
 	@Override
 	public CompletableFuture<Result> query(ACell query, Address address) {
-		return makeMessageFuture(Message.createQuery(makeID(),query,address));
+		return makeMessageFuture(Message.createQuery(getNextID(),query,address));
 	}
 	
-	private long idCounter=0;
-	
-	private long makeID() {
-		return idCounter++;
-	}
+
 
 	private CompletableFuture<Result> makeMessageFuture(MessageType type, ACell payload) {
 		Message ml=Message.create(type,payload);
@@ -120,14 +119,45 @@ public class ConvexLocal extends Convex {
 	}
 
 	private Predicate<Message> makeResultHandler(CompletableFuture<Result> cf) {
+		AStore senderStore=Stores.current();
 		return m->{
-			Result r=m.toResult();
-			if (r.getErrorCode()!=null) {
-				sequence=null;
+			// Protect message reading in sender store
+			AStore savedStore=Stores.current();
+			try {
+				Stores.setCurrent(senderStore);
+				Result r=m.toResult();
+				if (r.getErrorCode()!=null) {
+					sequence=null;
+				}
+				cf.complete(r);
+				return true;
+			} finally {
+				Stores.setCurrent(savedStore);
 			}
-			cf.complete(r);
-			return true;
 		};
+	}
+	
+	@Override
+	public CompletableFuture<Result> messageRaw(Blob rawData) {
+		try {
+			Message m=Message.create(rawData);
+			return message(m);
+		} catch (Exception e) {
+			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
+		}
+	}
+
+	@Override
+	public CompletableFuture<Result> message(Message message) {
+		ACell id=message.getRequestID();
+		if (id==null) {
+			// directly forward message to Server
+			server.getReceiveAction().accept(message);
+			return CompletableFuture.completedFuture(Result.SENT_MESSAGE);
+		}
+			
+		// We are expecting a return message, so build a completable future for it	
+		return makeMessageFuture(message);
 	}
 
 	@Override
@@ -180,19 +210,6 @@ public class ConvexLocal extends Convex {
 		return server.getPeer().getConsensusState().getBalance(address);
 	}
 
-	@Override
-	public CompletableFuture<Result> message(Blob rawData) {
-		try {
-			Message m=Message.create(rawData);
-			return message(m);
-		} catch (Exception e) {
-			return CompletableFuture.completedFuture(Result.fromException(e).withSource(SourceCodes.CLIENT));
-		}
-	}
 
-	@Override
-	public CompletableFuture<Result> message(Message message) {
-		return makeMessageFuture(message);
-	}
 
 }

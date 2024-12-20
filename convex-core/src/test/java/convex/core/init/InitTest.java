@@ -60,7 +60,7 @@ public class InitTest extends ACVMTest {
 
 	public static State createState() {
 		try {
-			return Init.createState(PEER_KEYS);
+			return Init.createTestState(PEER_KEYS);
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw e;
@@ -94,6 +94,11 @@ public class InitTest extends ACVMTest {
 		assertEquals(Init.CORE_ADDRESS, eval("(resolve convex.core)"));
 		assertEquals(Init.REGISTRY_ADDRESS, eval("(resolve convex.registry)"));
 		assertEquals(Init.TRUST_ADDRESS, eval("(resolve convex.trust)"));
+	}
+	
+	@Test
+	public void testNames() {
+		assertEquals("Convex Core Library",evalS("(:name (call *registry* (lookup #8)))"));
 	}
 
 	@Test

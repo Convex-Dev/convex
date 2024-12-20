@@ -1,7 +1,10 @@
 package convex.core.store;
 
 import java.io.IOException;
+import java.util.concurrent.Callable;
 
+import convex.core.util.UnsafeRunnable;
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
 
 public class Stores {
@@ -72,5 +75,29 @@ public class Stores {
 	public static void setGlobalStore(EtchStore store) {
 		if (store==null) throw new IllegalArgumentException("Cannot set global store to null)");
 		globalStore=store;
+	}
+
+	public static void runWithMemoryStore(UnsafeRunnable r) {
+		AStore saved=Stores.current();
+		try {
+			Stores.setCurrent(new MemoryStore());
+			r.run();
+		} catch (Exception e) {
+			throw Utils.sneakyThrow(e);
+		} finally {
+			Stores.setCurrent(saved);
+		}
+	}
+	
+	public static <V> V runWithMemoryStore(Callable<V> r) {
+		AStore saved=Stores.current();
+		try {
+			Stores.setCurrent(new MemoryStore());
+			return r.call();
+		} catch (Exception e) {
+			throw Utils.sneakyThrow(e);
+		} finally {
+			Stores.setCurrent(saved);
+		}
 	}
 }

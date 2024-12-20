@@ -370,7 +370,8 @@ public abstract class AArrayBlob extends ABlob {
 	}
 	
 	@Override
-	protected void validateStructure() {
+	public void validateStructure() throws InvalidDataException {
+		super.validateStructure();
 		// nothing to do by default
 	}
 

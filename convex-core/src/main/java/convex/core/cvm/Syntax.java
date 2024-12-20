@@ -243,8 +243,8 @@ public final class Syntax extends ACell {
 			if (datum instanceof Syntax) {
 				throw new InvalidDataException("Cannot double-wrap a Syntax value",this);
 			}
-			if (!datum.isCVMValue()) throw new InvalidDataException("Syntax can only wrap CVM values",this);
 		}
+		meta.validateStructure();
 	}
 
 	@Override

@@ -23,8 +23,8 @@ public enum MessageType {
 	/**
 	 * A message relaying data.
 	 * 
-	 * Payload is a vector:
-	 * - [id content]
+	 * Payload is a Result:
+	 * - Result
 	 *
 	 * Data is presented "as-is", and may be: 
 	 * - the result of a missing data request
@@ -49,17 +49,17 @@ public enum MessageType {
 	 * peers. Peers under load may ignore data requests.
 	 *
 	 * Payload is a Vector containing ID plus one or more hashes 
-	 * i.e [id hash1 hash2 ......]
+	 * i.e [:DR id hash1 hash2 ......]
 	 * 
 	 * Receiver should respond with a DATA message if the specified data is
 	 * available in their store, and they are willing to fulfil the request
 	 */
-	REQUEST_DATA(5),
+	DATA_REQUEST(5),
 
 	/**
 	 * A request to perform the specified query and return results.
 	 *
-	 * Payload is: [id form address?]
+	 * Payload is: [:Q id form address?]
 	 *
 	 * Receiver may may determine policies regarding whether to accept or reject
 	 * queries, typically receiver will want to authenticate the sender and ensure
@@ -71,7 +71,7 @@ public enum MessageType {
 	 * A message requesting a transaction be accepted by the receiving peer and
 	 * included in the next available block.
 	 *
-	 * Payload is: [id signed-data]
+	 * Payload is: [:TX id signed-data]
 	 */
 	TRANSACT(7),
 
@@ -79,7 +79,7 @@ public enum MessageType {
 	 * Message containing the Result for a corresponding COMMAND, QUERY or TRANSACT
 	 * message.
 	 *
-	 * Payload is: [id result error-code]
+	 * Payload is: Result
 	 *
 	 * Where:
 	 * - Result is the result of the request, or the message if an error occurred
@@ -107,8 +107,8 @@ public enum MessageType {
 	 * Communication of an intention to shutdown the connection. This is optional
 	 * 
 	 * Payload can be:
-	 * - nil for no reason
-	 * - A human readable string as a reason
+	 * - [:BYE] for generic close
+	 * - [:BYE message] for close with a reason
 	 */
 	GOODBYE(11),
 
@@ -145,7 +145,7 @@ public enum MessageType {
 		case 4:
 			return COMMAND;
 		case 5:
-			return REQUEST_DATA;
+			return DATA_REQUEST;
 		case 6:
 			return QUERY;
 		case 7:

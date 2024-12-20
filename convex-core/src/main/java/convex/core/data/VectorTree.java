@@ -571,7 +571,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			Ref<AVector<T>> newChild = (Ref<AVector<T>>) func.apply(current);
 			
 			if (newChild!=current) {
-				if (children==newChildren) newChildren=children.clone();
+				if (children==newChildren) newChildren=newChildren.clone();
 				newChildren[i] = newChild;
 			}
 		}
@@ -685,7 +685,7 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 	}
 
 	@Override
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
 		super.validateStructure();
 		long c = 0;
 		int blen = children.length;

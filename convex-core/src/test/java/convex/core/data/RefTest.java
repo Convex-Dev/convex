@@ -26,6 +26,7 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.Core;
 import convex.core.lang.RT;
+import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.test.Samples;
 
@@ -377,11 +378,8 @@ public class RefTest {
 		assertTrue(ref.isInternal(),()->"Not internal ref: "+a+" of type "+Utils.getClass(a));
 		assertSame(a,ref.getValue());
 		
-		try {
-			assertSame(a,Cells.persist(a));
-		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
-		}
+		Stores.runWithMemoryStore(()->assertSame(a,Cells.persist(a)));
+		
 	}
 
 	@Test
@@ -397,7 +395,7 @@ public class RefTest {
 	@Test 
 	public void testReadRefSoft() throws BadFormatException {
 		Hash h=Hash.wrap(Blobs.createRandom(32));
-		RefSoft<?> ref=RefSoft.createForHash(h);
+		Ref<?> ref=RefSoft.createForHash(h);
 		ref.markEmbedded(false); // needed to ensure indirect encoding is assumed
 		Blob b=ref.getEncoding();
 		assertEquals(Ref.INDIRECT_ENCODING_LENGTH,b.count());

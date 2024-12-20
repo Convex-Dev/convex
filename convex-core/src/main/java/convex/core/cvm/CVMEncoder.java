@@ -23,7 +23,10 @@ public class CVMEncoder extends CAD3Encoder {
 	protected ACell readExtension(byte tag, Blob blob, int offset) throws BadFormatException {
 		// We expect a VLQ Count following the tag
 		long code=Format.readVLQCount(blob,offset+1);
-		if (tag == CVMTag.CORE_DEF) return Core.fromCode(code);
+		if (tag == CVMTag.CORE_DEF) {
+			ACell cc=Core.fromCode(code);
+			if (cc!=null) return cc;
+		}
 		if (tag == CVMTag.ADDRESS) return Address.create(code);
 		
 		return ExtensionValue.create(tag, code);

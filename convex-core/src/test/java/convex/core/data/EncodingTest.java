@@ -335,7 +335,6 @@ public class EncodingTest {
 		ABlob bigBlob=Blob.createRandom(new Random(123), 10000).toCanonical();
 		Invoke trans=Invoke.create(Address.create(607), 6976, Vectors.of(1,bigBlob,2,bigBlob));
 		SignedData<ATransaction> strans=Samples.KEY_PAIR.signData(trans);
-		assertFalse(strans.isEmbedded());
 		AVector<?> v=Vectors.of(strans);
 		
 		Blob enc=Format.encodeMultiCell(v,true);

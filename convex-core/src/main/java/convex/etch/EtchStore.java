@@ -2,6 +2,7 @@ package convex.etch;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.util.function.Consumer;
 
 import org.slf4j.Logger;
@@ -113,7 +114,7 @@ public class EtchStore extends ACachedStore {
 	@Override
 	public <T extends ACell> Ref<T> refForHash(Hash hash) {
 		try {
-			Ref<ACell> existing = (Ref<ACell>) refCache.getCell(hash);
+			Ref<ACell> existing = checkCache(hash);
 			if (existing != null)
 				return (Ref<T>) existing;
 
@@ -121,8 +122,12 @@ public class EtchStore extends ACachedStore {
 				return (Ref<T>) Ref.NULL_VALUE;
 			existing = readStoreRef(hash);
 			return (Ref<T>) existing;
+		} catch (ClosedChannelException e) {
+			log.debug("Etch store closed during refForHAsh lookup");
+			return null;
 		} catch (IOException e) {
-			throw Utils.sneakyThrow(e);
+			log.warn("IO Error in Etch store: "+e);
+			return null;
 		}
 	}
 

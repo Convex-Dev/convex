@@ -31,7 +31,8 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 	}
 	
 	@Override
-	protected void validateStructure() throws InvalidDataException {
+	public void validateStructure() throws InvalidDataException {
+		super.validateStructure();
 		// Nothing to do, any child refs are valid
 	}
 

@@ -150,7 +150,7 @@ public class ConvexHTTP extends convex.api.Convex {
 	}
 	
 	@Override
-	public CompletableFuture<Result> message(Blob message) {
+	public CompletableFuture<Result> messageRaw(Blob message) {
 		throw new TODOException();
 	}
 	

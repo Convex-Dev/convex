@@ -41,6 +41,16 @@ public class Config {
 	 * Size of default client socket send buffer
 	 */
 	public static final int SOCKET_SEND_BUFFER_SIZE = 2*65536;
+	
+	/**
+	 * Flag to use Netty client connections
+	 */
+	public static final boolean USE_NETTY_CLIENT = true;
+
+	/**
+	 * Flag to use Netty server implementation
+	 */
+	public static final boolean USE_NETTY_SERVER = true;
 
 	/**
 	 * Delay before rebroadcasting Belief if not in consensus
@@ -88,7 +98,7 @@ public class Config {
 	/**
 	 * Size of incoming Belief queue
 	 */
-	public static final int BELIEF_QUEUE_SIZE = 500;
+	public static final int BELIEF_QUEUE_SIZE = 200;
 
 	/**
 	 * Checks if the config specifies a valid store

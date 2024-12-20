@@ -151,8 +151,8 @@ public class BeliefVotingTest {
 			SignedData<Order> o1=or(1, TS, 0,0,A,B);
 			SignedData<Order> o2=or(2, TS, 0,0,B);
 			SignedData<Order> o3=or(3, TS, 0,0,B,A);
-			SignedData<Order> o4=or(4, TS, 0,0,B,A,C,G); 
-			SignedData<Order> o5=or(5, TS, 0,0,B,A,E,F,D); // should win, hash based?
+			SignedData<Order> o4=or(4, TS, 0,0,B,A,C,G); // should win, hash based?
+			SignedData<Order> o5=or(5, TS, 0,0,B,A,E,F,D); 
 			
 			Belief b=Belief.create(o0,o1,o2,o3,o4,o5);
 			BeliefMerge mc=BeliefMerge.create(b, kps[0], TS, s);
@@ -161,11 +161,13 @@ public class BeliefVotingTest {
 			Order order=so.getValue();
 			assertEquals(7,order.getBlockCount());
 			assertEquals(B,order.getBlock(0));
-			assertEquals(F,order.getBlock(3));
+			assertEquals(G,order.getBlock(3));
 			assertEquals(0,order.getProposalPoint()); // 66.66..% just short of proposal threshold
 			assertEquals(0,order.getConsensusPoint());
 			// Note C,G not in winning Order so sorted by timestamp order
-			assertEquals(Vectors.of(B,A,E,F,D,C,G),order.getBlocks());
+			
+			assertEquals(Vectors.of(2,1,3,7,4,5,6),order.getBlocks().map(sb->CVMLong.create(sb.getValue().getTimeStamp())));
+			assertEquals(Vectors.of(B,A,C,G,D,E,F),order.getBlocks());
 		}
 		
 		{
@@ -183,10 +185,9 @@ public class BeliefVotingTest {
 			Order order=so.getValue();
 			assertEquals(7,order.getBlockCount());
 			assertEquals(B,order.getBlock(0));
-			assertEquals(F,order.getBlock(3));
 			assertEquals(1,order.getConsensusPoint(1)); // Enough for proposal
 			assertEquals(0,order.getConsensusPoint(2));
-			assertEquals(Vectors.of(B,A,E,F,G,C,D),order.getBlocks());
+			assertEquals(Vectors.of(B,A,C,D,E,F,G),order.getBlocks());
 		}
 		
 		{

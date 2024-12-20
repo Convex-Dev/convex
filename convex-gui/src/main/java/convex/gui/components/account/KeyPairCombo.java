@@ -1,6 +1,7 @@
 package convex.gui.components.account;
 
 import java.awt.Component;
+import java.util.NoSuchElementException;
 
 import javax.swing.ComboBoxModel;
 import javax.swing.DefaultListModel;
@@ -152,6 +153,16 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	public static KeyPairCombo forConvex(Convex convex) {
 		AKeyPair kp=convex.getKeyPair();
 		return create(kp);
+	}
+	
+	public static KeyPairCombo create() {
+		KeyPairModel model=new KeyPairModel();
+		try {
+			model.setSelectedItem(model.underlying.firstElement());
+		} catch (NoSuchElementException e) {
+			// ignore
+		}
+		return new KeyPairCombo(model);
 	}
 
 	public static KeyPairCombo create(AKeyPair kp) {
