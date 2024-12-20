@@ -21,6 +21,7 @@ import convex.core.data.impl.LongBlob;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.type.Types;
+import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.InitTest;
 import convex.core.lang.RT;
@@ -131,6 +132,13 @@ public class IndexTest {
 			assertFalse(m.containsKey(lb), "Index: " + lb.toHexString());
 		}
 		assertSame(Index.none(), m);
+	}
+	
+	@Test public void testIndexEncode() throws BadFormatException {
+		Index<ABlob, CVMLong> m = Index.of(Address.ZERO,Samples.IPSUM);
+		
+		Blob enc=m.getEncoding();
+		assertEquals(m,Format.read(enc));
 	}
 
 	@Test

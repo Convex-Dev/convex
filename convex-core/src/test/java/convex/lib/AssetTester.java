@@ -133,6 +133,7 @@ public class AssetTester extends ACVMTest {
 			assertStateError(step(ctxx, "(asset/accept *address* [token (inc (div BAL 2))])"));
 			ctxx = step(ctxx, "(asset/accept *address* token (div BAL 2))");
 			assertCVMEquals(BAL / 2, ctxx.getResult());
+			assertStateError(step(ctxx, "(asset/accept *address* [token 1])")); // should fail, no offer left
 			assertCVMEquals(BAL, evalL(ctxx, "(asset/balance token)"));
 
 			// Offer / accept of more than balance should fail with :FUNDS

@@ -7,8 +7,11 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
+
 import org.junit.jupiter.api.Test;
 
+import convex.core.cvm.Address;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -49,6 +52,17 @@ public class SetsTest {
 		
 		s = s.exclude(RT.cvm(2L));
 		assertSame(Sets.empty(),s);
+	}
+	
+	@Test public void testSetEncodeRegression() throws BadFormatException, IOException {
+		// This failed once in generative tests, checking just in case
+		ASet<ACell> s = Sets.of(Address.ZERO,Samples.IPSUM);
+		Ref<ACell> pref = Ref.get(Cells.persist(s)); // ensure persisted
+		
+		Blob enc=s.getEncoding();
+		assertEquals(s,Format.read(enc));
+		
+		assertEquals(s,pref.getValue());
 	}
 	
 	@Test 
