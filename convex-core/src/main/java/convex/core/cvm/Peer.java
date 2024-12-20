@@ -668,9 +668,12 @@ public class Peer {
 	 * @return true if ready to publish, false otherwise
 	 */
 	public boolean isReadyToPublish() {
+		// If we are the only peer, always allow publishing
+		if (state.getPeers().count()<=1) return true;
+		
 		PeerStatus ps=state.getPeer(peerKey);
 		if (ps==null) return false;
-		if (ps.getBalance()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false;
+		if (ps.getBalance()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false; 
 		return true;
 	}
 }

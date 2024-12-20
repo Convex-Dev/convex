@@ -204,7 +204,7 @@ public class ConnectionManager extends AThreadedComponent {
 
 	private void tryRandomConnect(State s) throws InterruptedException {
 		// Connect to a random peer with host address by stake
-		// SECURITY: stake weighted connection is important to avoid bad peers
+		// SECURITY: stake weighted connection is important to avoid bad / irrelevant peers
 		// influencing the connection pool
 
 		Set<AccountKey> potentialPeers=s.getPeers().keySet();
@@ -219,9 +219,10 @@ public class ConnectionManager extends AThreadedComponent {
 			PeerStatus ps=s.getPeers().get(peerKey);
 			if (ps==null) continue; // skip
 			AString hostName=ps.getHostname();
-			if (hostName==null) continue;
+			if (hostName==null) continue; // don't now where to connect to!
 			InetSocketAddress maybeAddress=IPUtils.toInetSocketAddress(hostName.toString());
 			if (maybeAddress==null) continue;
+			
 			long peerStake=ps.getPeerStake();
 			if (peerStake>CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
 				double t=random.nextDouble()*(accStake+peerStake);

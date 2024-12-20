@@ -108,17 +108,25 @@ public class TransactionHandler extends AThreadedComponent {
 		interests.put(signedTransactionHash, m);
 	}
 	
+	private static final Result ERR_NOT_LIVE=Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
+	private static final Result ERR_NOT_REGISTERED=Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
+	private static final Result ERR_NOT_STAKED=Result.error(ErrorCodes.STATE, Strings.create("Peer not sufficiently staked to publish transactions")).withSource(SourceCodes.PEER);
+	
 	private Result checkPeerState() {
 		try {
 			if (!server.isLive()) {
-				return Result.error(ErrorCodes.STATE, Strings.create("Server is not live")).withSource(SourceCodes.PEER);
+				return ERR_NOT_LIVE;
 			}
 			Peer p=server.getPeer();
 			State s=p.getConsensusState();
 			PeerStatus ps=s.getPeers().get(p.getPeerKey());
 			if (ps==null) {
-				return Result.error(ErrorCodes.STATE, Strings.create("Peer not registered in global state")).withSource(SourceCodes.PEER);
+				return ERR_NOT_REGISTERED;
 			}
+			if (ps.getBalance()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) {
+				return ERR_NOT_STAKED;
+			}
+
 			return null;
 		} catch (Exception e) {
 			return Result.error(ErrorCodes.STATE, Strings.create("Peer problem: "+e.getMessage())).withSource(SourceCodes.PEER);
@@ -393,14 +401,14 @@ public class TransactionHandler extends AThreadedComponent {
 
 		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
 		if (!Utils.bool(server.getConfig().get(Keywords.AUTO_MANAGE))) return;
+		
+		// No point publishing if low staked etc.
+		if (!p.isReadyToPublish()) return;
 
 		State s=p.getConsensusState();
 		AccountKey peerKey=p.getPeerKey();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return; // No peer record in consensus state?
-		
-		// No point setting this if low staked
-		if (ps.getPeerStake()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return;
 		
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();
