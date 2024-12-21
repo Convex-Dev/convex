@@ -37,6 +37,7 @@ public class Keywords {
 	public static final Keyword CIPHERTEXT = Keyword.intern("ciphertext");
 	public static final Keyword GLOBALS = Keyword.intern("globals");
 	public static final Keyword SCHEDULE = Keyword.intern("schedule");
+	public static final Keyword BLOCK = Keyword.intern("block");
 
 	public static final Keyword NAME = Keyword.intern("name");
 

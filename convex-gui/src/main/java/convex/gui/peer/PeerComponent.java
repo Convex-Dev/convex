@@ -185,7 +185,13 @@ public class PeerComponent extends BaseListComponent {
 		try {
 			Convex convex = ConvexRemote.connect(peer.getHostAddress());
 			Address addr=peer.getAddress();
-			AKeyPair kp=peer.getKeyPair();;
+			AKeyPair kp=null;
+			
+			Server s=peer.getLocalServer();
+			if (s!=null) {
+				kp=s.getControllerKey();
+			}
+			
 			convex.setAddress(addr,kp);
 			new REPLClient(convex).run();
 		} catch (Exception e) {

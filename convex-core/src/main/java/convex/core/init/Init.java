@@ -74,7 +74,7 @@ public class Init {
 	 */
 	private static final long GENESIS_COINS=1000000*Coin.GOLD;
 
-	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("aE9C747a9730D63Fc16BcccEBd12B5dD4c8fBe1328e9a953025e8C02164Ed5E6");
+	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d");
 
 
 	/**
@@ -199,14 +199,14 @@ public class Init {
 			
 			// Genesis user gets half of all user funds
 			long genFunds = userFunds/2;
-			accts = addAccount(accts, GENESIS_ADDRESS, peerKeys.get(0), genFunds);
+			accts = addAccount(accts, GENESIS_ADDRESS, genesisKey, genFunds);
 			userFunds -= genFunds;
 			
 			// One Peer account for each  specified key (including initial genesis user)
 			for (int i = 0; i < keyCount; i++) {
 				Address address = Address.create(accts.count());
 				assert(address.longValue() == accts.count());
-				AccountKey key = peerKeys.get(i);
+				AccountKey key = (i==0)?genesisKey:peerKeys.get(i);
 				long userBalance = userFunds / (keyCount-i);
 				accts = addAccount(accts, address, key, userBalance);
 				userFunds -= userBalance;
@@ -243,7 +243,7 @@ public class Init {
 		s = s.withPeers(peers);
 		
 		s = register(s, GENESIS_ADDRESS, "Genesis User", "User account for genesis");
-		s = register(s, GENESIS_PEER_ADDRESS, "Genesis Peer", "Genesis peer contrroller account");
+		s = register(s, GENESIS_PEER_ADDRESS, "Genesis Controller", "Genesis peer controller account");
 
 
 		{ // Test total funds after creating user / peer accounts

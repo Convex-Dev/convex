@@ -114,20 +114,24 @@ public class PeerGUI extends AbstractGUI {
 		for (int i=0; i<peerCount; i++) {
 			KEYPAIRS.add(AKeyPair.generate());
 		}
-		KEYPAIRS.set(0, genesisKey);
+
+        HotWalletEntry gwe = HotWalletEntry.create(genesisKey,"Genesis key pair (temp)");
+		KeyRingPanel.addWalletEntry(gwe);
+
+		AccountKey genPK=genesisKey.getAccountKey();
 		
 		PEERKEYS=KEYPAIRS.stream().map(kp->kp.getAccountKey()).collect(Collectors.toList());
-		State genesisState=Init.createState(PEERKEYS);
+		State genesisState=Init.createState(genPK,genPK,PEERKEYS);
 
 		try {
 			DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
 			List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
 			for (Server server: serverList) {
-				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getKeyPair());
+				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getControllerKey()); 
 				peerList.addElement(convex);
 				
 				// initial wallet list
-		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair");
+		        HotWalletEntry we = HotWalletEntry.create(server.getKeyPair(),"Peer key pair (temp)");
 				KeyRingPanel.addWalletEntry(we);
 			}
 			return peerList;

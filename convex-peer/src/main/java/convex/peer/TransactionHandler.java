@@ -398,6 +398,7 @@ public class TransactionHandler extends AThreadedComponent {
 
 		// If we already posted own transaction recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
+		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
 		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
 		if (!Utils.bool(server.getConfig().get(Keywords.AUTO_MANAGE))) return;
@@ -417,20 +418,20 @@ public class TransactionHandler extends AThreadedComponent {
 		// Try to set hostname if not correctly set
 		trySetHostname:
 		if ((desiredHostname!=null)&&!Utils.equals(desiredHostname, currentHostname)) {
-			log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
 			Address address=ps.getController();
 			if (address==null) break trySetHostname;
 			AccountStatus as=s.getAccount(address);
 			if (as==null) break trySetHostname;
 			// if we haven't got the controller key, just skip this
 			if (!Cells.equals(peerKey, as.getAccountKey())) break trySetHostname;
+			
+			log.info("Trying to update own hostname from: {} to {}",currentHostname,desiredHostname);
 
 			String code;
 			code = String.format("(set-peer-data %s {:url \"%s\"})", peerKey, desiredHostname);
 			ACell message = Reader.read(code);
 			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
 			newTransactions.add(p.getKeyPair().signData(transaction));
-			lastOwnTransactionTimestamp=ts; // mark this timestamp
 		}
 	}
 

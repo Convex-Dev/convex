@@ -22,6 +22,7 @@ import convex.core.SourceCodes;
 import convex.core.cpos.Belief;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.AccountStatus;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Peer;
@@ -30,6 +31,7 @@ import convex.core.data.ACell;
 import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
+import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
@@ -681,6 +683,24 @@ public class Server implements Closeable {
 		if (kp == null) return null;
 		return kp.getAccountKey();
 	}
+	
+	/**
+	 * Gets the peer controller key for the Server, if available
+	 *
+	 * @return Keypair for controller
+	 */
+
+	public AKeyPair getControllerKey() {
+		AKeyPair kp = getKeyPair();
+		if (kp == null) return null;
+		try {
+			AccountStatus as=getPeer().getConsensusState().getAccount(getPeerController());
+			if (Cells.equals(as.getAccountKey(), kp.getAccountKey())) return kp;
+		} catch (Exception e) {
+			log.warn("Unexpected exception trying to get contreoller key",e);
+		}
+		return null;
+	}
 
 	/**
 	 * Gets the Store configured for this Server. A server must consistently use the
@@ -794,4 +814,6 @@ public class Server implements Closeable {
 			Thread.sleep(400);
 		}
 	}
+
+
 }

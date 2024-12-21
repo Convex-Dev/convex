@@ -41,7 +41,7 @@ alias convex="java -jar ~/convex.jar"
 ### Critical public keys:
 
 Genesis/Admin Key: `0xc1d3b0104d55ddf7680181a46e93422e49e2ea9298e37794860f1ef1128427f7`
-Governance key: `0xaE9C747a9730D63Fc16BcccEBd12B5dD4c8fBe1328e9a953025e8C02164Ed5E6`
+Governance key: `0x12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d`
 mikera key: `0x89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac`
 
 
@@ -53,10 +53,16 @@ Start screen session
 screen
 ```
 
+Generate peer
+
+```
+convex peer genesis --key=0xc1 --peer-key=0xd6 --governance-key=0x12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d
+```
+
 Run peer
 
 ```
-convex peer start
+convex peer start --url "peer.convex.live:18888" --peer-key 0xd6 --key 0xc1
 ```
 
 Detach with Ctrl-a + Ctrl-d 
