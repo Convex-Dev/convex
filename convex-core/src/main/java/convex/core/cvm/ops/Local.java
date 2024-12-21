@@ -49,7 +49,7 @@ public class Local<T extends ACell> extends AOp<T> {
 		AVector<ACell> env=ctx.getLocalBindings();
 		long ec=env.count();
 		if ((position<0)||(position>=ec)) {
-			return ctx.withError(ErrorCodes.BOUNDS,"Bad position for Local: "+position);
+			return ctx.withError(ErrorCodes.BOUNDS,"Bad position for Local: "+position).consumeJuice(Juice.LOOKUP);
 		}
 		T result = (T)env.get(position);
 		return ctx.withResult(Juice.LOOKUP,result);

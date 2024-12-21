@@ -5,6 +5,7 @@ import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.Constants;
+import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Call;
@@ -49,10 +50,14 @@ public class TransactionGen extends Generator<ATransaction> {
 			int mode=r.nextInt(Multi.MODE_ANY, Multi.MODE_UNTIL);
 			return Multi.create(origin, seq, mode, txs);
 		}
+		
+		case 3: 
+			AOp<?> op=Gen.OP.generate(r, status);
+			return Invoke.create(origin,seq,op);
 
 		default:
-			AVector<?> args=Gen.VECTOR.generate(r, status);
-			return Invoke.create(origin,seq, args);
+			ACell form=Gen.FORM.generate(r, status);
+			return Invoke.create(origin,seq, form);
 		}
 	}
 }

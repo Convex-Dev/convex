@@ -29,7 +29,7 @@ public class OpsGen extends Generator<AOp> {
 		switch (r.nextInt(8)) {
 			case 0: {
 				// flat multi-ops supporting any ops as children
-				int n=(int) Math.sqrt(r.nextInt(size));
+				int n=(int) (Math.sqrt(r.nextInt(1+size)));
 				AOp[] ops=new AOp[n];
 				for (int i=0; i<n; i++) {
 					ops[i]=Gen.OP.generate(r,status);

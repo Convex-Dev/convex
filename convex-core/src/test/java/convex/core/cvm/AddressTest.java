@@ -2,7 +2,11 @@ package convex.core.cvm;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
@@ -10,8 +14,11 @@ import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.BlobsTest;
+import convex.core.data.Cells;
 import convex.core.data.Format;
+import convex.core.data.Hash;
 import convex.core.data.ObjectsTest;
+import convex.core.data.Ref;
 import convex.core.exceptions.BadFormatException;
 import convex.core.util.Utils;
 
@@ -49,6 +56,22 @@ public class AddressTest {
 		assertEquals("#1",Address.parse("#1").toString());
 		assertEquals("#2",Address.parse("2").toString());
 		assertEquals("#16",Address.parse("0x0000000000000010").toString());
+	}
+	
+	@Test
+	public void doHashTest() {
+		Address a=Address.ZERO;
+		Hash h=Hash.get(a);
+		
+		try {
+			a=Cells.persist(a);
+		} catch (IOException e) {
+			fail(e);
+		}
+		Ref<ACell> r = Ref.get(a);
+		assertSame(a, r.getValue()); // shouldn't get GC'd because we have a strong reference
+		assertEquals(h,r.getHash());
+
 	}
 	
 	@Test
