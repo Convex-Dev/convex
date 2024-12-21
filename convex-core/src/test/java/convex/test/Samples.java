@@ -76,6 +76,7 @@ public class Samples {
 	public static final AccountKey ZERO_ACCOUNTKEY = AccountKey.dummy("0");
 	
 	public static final AKeyPair KEY_PAIR=AKeyPair.createSeeded(13371337L);
+	public static final AKeyPair[] KEY_PAIRS=new AKeyPair[100];
 	public static final AccountKey ACCOUNT_KEY = KEY_PAIR.getAccountKey();
 	
 	public static final ASignature BAD_SIGNATURE = Ed25519Signature.wrap(Blobs.createRandom(64).getBytes());
@@ -177,6 +178,10 @@ public class Samples {
 			CVMBigInteger b=CVMBigInteger.create(blob);
 			MIN_BIGINT=b;
 			MAX_BIGINT=(CVMBigInteger) b.inc().negate();
+		}
+		
+		for (int i=0; i<KEY_PAIRS.length; i++) {
+			KEY_PAIRS[i]=AKeyPair.createSeeded(4536456+i*56857678l);
 		}
 	}
 	
