@@ -481,7 +481,7 @@ public class Server implements Closeable {
 
 	/**
 	 * Gets the Peer controller Address
-	 * @return Peer controller Address
+	 * @return Peer controller Address, or null if peer is not registered
 	 */
 	public Address getPeerController() {
 		return getPeer().getController();

@@ -1,6 +1,7 @@
 package convex.gui.components;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.net.InetSocketAddress;
 
 import javax.swing.JComponent;
@@ -16,6 +17,7 @@ import convex.api.ConvexRemote;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.init.Init;
+import convex.core.lang.RT;
 import convex.gui.components.account.AddressCombo;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.keys.UnlockWalletDialog;
@@ -112,5 +114,23 @@ public class ConnectPanel extends JPanel {
 	    	log.info("Connect cancelled by user");
 	    }
 		return null;
+	}
+
+	public static void showConnectionInfo(Component parent,Convex convex) {
+		StringBuilder sb=new StringBuilder();
+		if (convex instanceof ConvexRemote) {
+			sb.append("Remote host: " + convex.getHostAddress() + "\n");
+		}
+		try {
+			sb.append("Sequence:    " + convex.getSequence() + "\n");
+		} catch (Exception e1) {
+			log.info("Failed to get sequence number");
+		}
+		sb.append("Account:     " + RT.print(convex.getAddress()) + "\n");
+		sb.append("Public Key:  " + RT.toString(convex.getAccountKey()) + "\n");
+		sb.append("Connected:   " + convex.isConnected()+"\n");
+
+		String infoString = sb.toString();
+		JOptionPane.showMessageDialog(parent, infoString);
 	}
 }

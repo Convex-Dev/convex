@@ -33,19 +33,19 @@ public class PeerWindow extends AbstractGUI {
 
 	JTabbedPane tabbedPane = new JTabbedPane(JTabbedPane.TOP);
 
-	public PeerWindow(ConvexLocal peer) {
-		super("Peer Control Panel - " + peer.toString());
-		this.peer = peer;
+	public PeerWindow(ConvexLocal convex) {
+		super("Peer Control Panel - " + convex.toString());
+		this.peer = convex;
 		this.setPreferredSize(new Dimension(1200,1000));
 
 		setLayout(new MigLayout());
 		add(tabbedPane, "dock center");
 		
-		Server server=peer.getLocalServer();
+		Server server=convex.getLocalServer();
 		if (server!=null) {
 			try {
 				// Convex convex = Convex.connect(server.getHostAddress(), server.getPeerController(),server.getKeyPair());
-				tabbedPane.addTab("REPL", null, new REPLPanel(peer), null);
+				tabbedPane.addTab("REPL", null, new REPLPanel(convex), null);
 			} catch (Exception t) {
 				String msg=("Failed to connect to Peer: "+t);
 				t.printStackTrace();
@@ -55,10 +55,10 @@ public class PeerWindow extends AbstractGUI {
 			}
 			tabbedPane.addTab("Observation", null, new JScrollPane(new ObserverPanel(server)), null);
 		}
-		tabbedPane.addTab("Stress", null, new StressPanel(peer), null);
-		tabbedPane.addTab("Info", null, new PeerInfoPanel(peer), null);
+		tabbedPane.addTab("Stress", null, new StressPanel(convex), null);
+		tabbedPane.addTab("Info", null, new PeerInfoPanel(convex), null);
 
-		PeerComponent pcom = new PeerComponent(peer);
+		PeerComponent pcom = new PeerComponent(convex);
 		add(pcom, "dock north");
 	}
 

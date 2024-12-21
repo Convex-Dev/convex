@@ -12,7 +12,6 @@ import java.util.concurrent.TimeoutException;
 
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
-import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
@@ -27,26 +26,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
-import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Address;
+import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.data.ACell;
 import convex.core.data.AList;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.core.cvm.Address;
 import convex.core.data.SignedData;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.cvm.Symbols;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.BaseTextPane;
 import convex.gui.components.CodePane;
+import convex.gui.components.ConnectPanel;
 import convex.gui.components.account.AccountChooserPanel;
 import convex.gui.utils.CVXHighlighter;
 import convex.gui.utils.Toolkit;
@@ -211,21 +210,7 @@ public class REPLPanel extends JPanel {
 		actionPanel.add(btnClear);
 
 		btnInfo = new ActionButton("Connection Info",0xe88e,e -> {
-			StringBuilder sb=new StringBuilder();
-			if (convex instanceof ConvexRemote) {
-				sb.append("Remote host: " + convex.getHostAddress() + "\n");
-			}
-			try {
-				sb.append("Sequence:    " + convex.getSequence() + "\n");
-			} catch (Exception e1) {
-				log.info("Failed to get sequence number");
-			}
-			sb.append("Account:     " + RT.print(convex.getAddress()) + "\n");
-			sb.append("Public Key:  " + RT.toString(convex.getAccountKey()) + "\n");
-			sb.append("Connected:   " + convex.isConnected()+"\n");
-
-			String infoString = sb.toString();
-			JOptionPane.showMessageDialog(this, infoString);
+			ConnectPanel.showConnectionInfo(REPLPanel.this,convex);
 		});
 		actionPanel.setToolTipText("Show diagnostic information for the Convex connection");
 		actionPanel.add(btnInfo);

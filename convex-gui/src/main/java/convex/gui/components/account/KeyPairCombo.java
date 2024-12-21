@@ -146,7 +146,7 @@ public class KeyPairCombo extends JComboBox<AWalletEntry> {
 	}
 
 	public AWalletEntry getWalletEntry() {
-		Object a = getSelectedItem();
+		Object a = getModel().getSelectedItem();
 		return (AWalletEntry)a;
 	}
 

@@ -7,10 +7,14 @@ import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.api.ConvexLocal;
 import convex.api.ConvexRemote;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
@@ -25,6 +29,7 @@ import convex.gui.components.CodeLabel;
 import convex.gui.components.DropdownMenu;
 import convex.gui.components.Identicon;
 import convex.gui.etch.EtchWindow;
+import convex.gui.keys.KeyRingPanel;
 import convex.gui.models.StateModel;
 import convex.gui.repl.REPLClient;
 import convex.gui.server.PeerWindow;
@@ -40,10 +45,29 @@ public class PeerComponent extends BaseListComponent {
 
 	public ConvexLocal convex;
 	CodeLabel description;
+	
+	private static final Logger log = LoggerFactory.getLogger(PeerComponent.class.getName());
+
 
 	public void launchPeerWindow(ConvexLocal peer) {
-		PeerWindow pw = new PeerWindow(peer);
+		Server server=peer.getLocalServer();
+		ConvexLocal newConvex=connectLocalControllerWallet(server);
+		PeerWindow pw = new PeerWindow(newConvex);
 		pw.run();
+	}
+
+	private ConvexLocal connectLocalControllerWallet(Server server) {
+		AKeyPair kp=null;
+		Address controller=server.getPeerController();
+		if (controller!=null) try {
+			AccountKey key=server.getPeer().getConsensusState().getAccount(controller).getAccountKey();
+			AWalletEntry we=KeyRingPanel.getKeyRingEntry(key);
+			kp=we.getKeyPair();
+		} catch (Exception e) {
+			log.warn("Error getting controller details",e);
+		}
+		ConvexLocal convex=ConvexLocal.connect(server,controller,kp);
+		return convex;
 	}
 
 	public void launchEtchWindow(ConvexLocal peer) {
@@ -139,7 +163,7 @@ public class PeerComponent extends BaseListComponent {
 		
 		JMenuItem walletButton = new JMenuItem("Open controller Wallet",Toolkit.menuIcon(0xe850));
 		walletButton.addActionListener(e -> {
-			new WalletApp(convex).run();
+			new WalletApp(connectLocalControllerWallet(server)).run();
 		});
 		popupMenu.add(walletButton);
 
