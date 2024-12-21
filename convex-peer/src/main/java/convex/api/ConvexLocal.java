@@ -3,7 +3,6 @@ package convex.api;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 import convex.core.ErrorCodes;

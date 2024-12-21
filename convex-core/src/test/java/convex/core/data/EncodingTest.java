@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,6 +39,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
+import convex.core.lang.Reader;
 import convex.test.Samples;
 import convex.test.Testing;
  
@@ -160,6 +162,24 @@ public class EncodingTest {
 		Blob b=Cells.encode(s);
 		StringShort s2=Format.read(b);
 		assertEquals(s,s2);
+	}
+	
+	@Test 
+	public void testOpRegression() throws InvalidDataException, BadFormatException {
+		// Note a Syntax in the fist position of cond op
+		String s="#[dc038811170030810954686973206973206120737472696e6720636f6e7461696e696e672065786163746c792031333720636861726163746572732e2054686973206973206a75737420726967687420666f722061206d6178696d756d20656d62656464656420737472696e6720696e20436f6e7665782e20486f77206c75636b7920697320746861742c2065683f3f3f3f3003666f6f]";
+		ACell a=Reader.read(s);
+		
+		// Should b invalid
+		assertThrows(InvalidDataException.class,()->Cells.validate(a));
+		
+		// Should still print
+		String p=RT.print(a).toString(); 
+		assertNotNull(p);
+		
+		// Should read, since error is in validation not CAD3 encoding
+		Blob enc=a.getEncoding();
+		assertEquals(a,Format.read(enc));
 	}
 	
 	@Test public void testListRegression() throws BadFormatException {

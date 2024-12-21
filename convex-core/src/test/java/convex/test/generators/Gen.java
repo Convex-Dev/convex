@@ -43,4 +43,6 @@ public class Gen {
 	public static final BooleanGen BOOLEAN = new BooleanGen();
 
 	public static final ByteFlagGen BYTE_FLAG = new ByteFlagGen();
+	
+	public static final DenseRecordGen DENSE_RECORD = new DenseRecordGen();
 }

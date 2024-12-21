@@ -41,9 +41,10 @@ public class RecordGen extends Generator<ARecord> {
 			ATransaction tx=Gen.TRANSACTION.generate(r,status);
 			return tx;
 			}
+		case 4: return State.EMPTY;
 
 		default:{
-			return State.EMPTY;
+			return Gen.DENSE_RECORD.generate(r, status);
 			}
 		}
 	}

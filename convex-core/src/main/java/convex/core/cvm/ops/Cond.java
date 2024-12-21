@@ -85,7 +85,7 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 		int len=ops.size();
 		for (int i=0; i<len; i++) {
 			sb.append(' ');
-			if (!ops.get(i).print(sb,limit)) return false;
+			if (!RT.print(sb, ops.get(i), limit)) return false;
 		}
 		sb.append(')');
 		return sb.check(limit);
