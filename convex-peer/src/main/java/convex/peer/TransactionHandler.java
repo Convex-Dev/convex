@@ -398,7 +398,6 @@ public class TransactionHandler extends AThreadedComponent {
 
 		// If we already posted own transaction recently, don't try again
 		if (ts<(lastOwnTransactionTimestamp+OWN_BLOCK_DELAY)) return;
-		lastOwnTransactionTimestamp=ts; // mark this timestamp
 
 		// NOTE: beyond this point we only execute stuff when AUTO_MANAGE is set
 		if (!Utils.bool(server.getConfig().get(Keywords.AUTO_MANAGE))) return;
@@ -410,7 +409,8 @@ public class TransactionHandler extends AThreadedComponent {
 		AccountKey peerKey=p.getPeerKey();
 		PeerStatus ps=s.getPeer(peerKey);
 		if (ps==null) return; // No peer record in consensus state?
-		
+
+
 		AString chn=ps.getHostname();
 		String currentHostname=(chn==null)?null:chn.toString();
 		String desiredHostname=server.getHostname(); // Intended hostname
@@ -432,6 +432,7 @@ public class TransactionHandler extends AThreadedComponent {
 			ACell message = Reader.read(code);
 			ATransaction transaction = Invoke.create(address, as.getSequence()+1, message);
 			newTransactions.add(p.getKeyPair().signData(transaction));
+			lastOwnTransactionTimestamp=ts; // mark this timestamp
 		}
 	}
 

@@ -1,8 +1,10 @@
 package convex.java;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
 import org.apache.hc.client5.http.async.methods.SimpleHttpResponse;
@@ -180,6 +182,11 @@ public class ConvexHTTP extends convex.api.Convex {
 			}
 		}
 		return new InetSocketAddress(uri.getHost(),port);
+	}
+
+	@Override
+	public void reconnect() throws IOException, TimeoutException, InterruptedException {
+		// Nothing to do?	
 	}
 
 }

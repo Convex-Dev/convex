@@ -3,6 +3,7 @@ package convex.api;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
 
 import convex.core.ErrorCodes;
@@ -208,6 +209,11 @@ public class ConvexLocal extends Convex {
 	@Override
 	public Long getBalance() {
 		return server.getPeer().getConsensusState().getBalance(address);
+	}
+
+	@Override
+	public void reconnect()  {
+		// Always connected, basically
 	}
 
 

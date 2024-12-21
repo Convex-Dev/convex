@@ -9,13 +9,16 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import convex.api.Convex;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
-import convex.core.cvm.ops.Special;
-import convex.core.data.AccountKey;
 import convex.core.cvm.Address;
 import convex.core.cvm.Symbols;
+import convex.core.cvm.ops.Special;
+import convex.core.data.AccountKey;
 import convex.core.exceptions.ResultException;
 import convex.gui.components.BalanceLabel;
 import convex.gui.components.DropdownMenu;
@@ -29,6 +32,9 @@ import net.miginfocom.swing.MigLayout;
  */
 @SuppressWarnings("serial")
 public class AccountChooserPanel extends JPanel {
+	
+	private static final Logger log = LoggerFactory.getLogger(AccountChooserPanel.class.getName());
+
 
 	private JComboBox<String> modeCombo;
 	public final AddressCombo addressCombo;
@@ -119,6 +125,17 @@ public class AccountChooserPanel extends JPanel {
 				convex.clearSequence();
 			});
 			popupMenu.add(setSeqButton);
+			
+			JMenuItem reconnectButton = new JMenuItem("Reconnect",Toolkit.menuIcon(0xe9d5));
+			reconnectButton.addActionListener(e -> {
+				try {
+					convex.reconnect();
+				} catch (Exception ex) {
+					log.info("Reconnect failed",ex);
+				}
+			});
+			popupMenu.add(reconnectButton);
+
 
 
 			DropdownMenu dm = new DropdownMenu(popupMenu,Toolkit.SMALL_ICON_SIZE);
@@ -169,6 +186,7 @@ public class AccountChooserPanel extends JPanel {
 	}
 	
 	public void setKeyPair(AWalletEntry we) {
+		System.err.println("Setting wallet entry:" +we);
 		if (we==null) {
 			convex.setKeyPair(null);
 		} else {

@@ -1027,4 +1027,6 @@ public abstract class Convex implements AutoCloseable {
 		this.sequence=null;
 	}
 
+	public abstract void reconnect() throws IOException, TimeoutException, InterruptedException;
+
 }

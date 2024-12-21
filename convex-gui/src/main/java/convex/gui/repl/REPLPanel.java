@@ -335,7 +335,7 @@ public class REPLPanel extends JPanel {
 				output.append(" TIMEOUT waiting for result\n",Color.RED);
 			} catch (IllegalStateException t) {
 				// General errors we understand
-				output.append(" ERROR: ",Color.RED);
+				output.append(" EXCEPTION: ",Color.RED);
 				output.append(t.getMessage() + "\n"); 
 			} catch (Exception t) {
 				// Something bad.....
