@@ -113,7 +113,7 @@ public class AdversarialDataTest {
 		assertEquals(1,b.shift);
 	}
 	
-	@Test public void testBadSetLeafs() {
+	@Test public void testBadSetLeafs() throws InvalidDataException {
 		CVMLong a=CVMLong.ZERO;
 		CVMLong b=CVMLong.ONE;
 		if (a.getHash().compareTo(b.getHash())>0) {
@@ -138,8 +138,7 @@ public class AdversarialDataTest {
 		invalidTest(Sets.of(NON_VALID));
 		
 		// Inserting non-CVM values into existing valid sets
-		invalidTest(Sets.of(1,2,3,4).include(NON_CVM));
-		invalidTest(Samples.LONG_SET_100.conj(NON_CVM));
+		Cells.validate(Sets.of(1,2,3,4).include(NON_CVM));
 	}
 	
 	@Test public void testBadKeywords() {

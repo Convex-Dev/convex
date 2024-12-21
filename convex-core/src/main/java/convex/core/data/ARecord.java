@@ -73,15 +73,7 @@ public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V>
 	 * @return Vector of Values
 	 */
 	@Override
-	public AVector<V> values() {
-		int n=size();
-		ACell[] os=new ACell[n];
-		RecordFormat format=getFormat();
-		for (int i=0; i<n; i++) {
-			os[i]=get(format.getKey(i));
-		}
-		return Vectors.wrap(os);
-	}
+	public abstract AVector<V> values();
 	
 	/**
 	 * Gets the record field content for a given key, or null if not found.
@@ -103,18 +95,14 @@ public abstract class ARecord<K extends ACell,V extends ACell> extends AMap<K,V>
 	 * @return Array of Values in this record
 	 */
 	public ACell[] getValuesArray() {
-		int n=size();
-		ACell[] result=new ACell[n];
-		AVector<Keyword> keys=getFormat().getKeys();
-		for (int i=0; i<n; i++) {
-			result[i]=get(keys.get(i));
-		}
-		return result;
+		return values().toCellArray();
 	}
 	
 	@Override
 	public boolean containsKey(ACell key) {
-		return getFormat().containsKey(key);
+		RecordFormat format=getFormat();
+		if (format==null) return false;
+		return format.containsKey(key);
 	}
 
 	@Override

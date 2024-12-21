@@ -31,7 +31,7 @@ public class Special<T extends ACell> extends AOp<T> {
 	private final byte specialCode;
 	
 	public static final int NUM_SPECIALS=25;
-	private static final int BASE=0;
+	public static final int BASE=0;
 	private static final int LIMIT=BASE+NUM_SPECIALS;
 	public static final Symbol[] SYMBOLS=new Symbol[NUM_SPECIALS];
 	private static final Special<?>[] specials=new Special[NUM_SPECIALS];

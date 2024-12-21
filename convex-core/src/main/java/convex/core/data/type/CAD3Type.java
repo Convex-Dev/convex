@@ -1,6 +1,5 @@
 package convex.core.data.type;
 
-import convex.core.cvm.Address;
 import convex.core.data.ACell;
 import convex.core.data.prim.ByteFlag;
 
@@ -19,12 +18,12 @@ public class CAD3Type extends AType {
 	
 	@Override
 	public boolean check(ACell value) {
-		return value instanceof Address;
+		return true;
 	}
 	
 	@Override
 	public String toString () {
-		return "Address";
+		return "CAD3";
 	}
 
 	@Override
@@ -33,9 +32,8 @@ public class CAD3Type extends AType {
 	}
 
 	@Override
-	public Address implicitCast(ACell a) {
-		if (a instanceof Address) return (Address)a;
-		return null;
+	public ACell implicitCast(ACell a) {
+		return a;
 	}
 
 	@Override

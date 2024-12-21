@@ -27,7 +27,7 @@ public class TransactionGen extends Generator<ATransaction> {
 		
 		Address origin = Address.create(r.nextInt(1+size));
 		Address dst = Address.create(r.nextInt(1+size));
-		long seq = r.nextInt(size);
+		long seq = r.nextInt(1+size);
 		
 		switch (r.nextInt(10)) {
 		case 0: {

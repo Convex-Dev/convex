@@ -385,4 +385,10 @@ public final class SignedData<T extends ACell> extends ACVMRecord {
 		ASignature sig=ASignature.fromBlob(RT.ensureBlob(value.get(Keywords.SIGNATURE)));
 		return create(key,sig,ref);
 	}
+
+	@Override
+	public AVector<ACell> values() {
+		// TODO Auto-generated method stub
+		return Vectors.create(pubKey,signature,valueRef.getValue());
+	}
 }

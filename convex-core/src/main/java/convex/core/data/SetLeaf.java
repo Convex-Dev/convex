@@ -477,9 +477,7 @@ public class SetLeaf<T extends ACell> extends AHashSet<T> {
 				}
 			}
 			e.validate();
-			
-			T value=e.getValue();
-			if(!Cells.isCVM(value)) throw new InvalidDataException("Non-CVM value in Set",this);
+
 		}
 	}
 

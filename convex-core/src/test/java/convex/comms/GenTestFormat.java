@@ -19,7 +19,6 @@ import convex.core.data.FuzzTestFormat;
 import convex.core.data.Ref;
 import convex.core.data.Strings;
 import convex.core.exceptions.BadFormatException;
-import convex.core.lang.RT;
 import convex.test.generators.PrimitiveGen;
 import convex.test.generators.ValueGen;
 
@@ -56,7 +55,6 @@ public class GenTestFormat {
 		Blob b = Cells.encode(value);
 		ACell o = Format.read(b);
 
-		assertEquals(RT.getType(value), RT.getType(o));
 		assertEquals(value, o);
 		assertEquals(b, Cells.encode(o));
 		assertEquals(pref.getValue(), o);
