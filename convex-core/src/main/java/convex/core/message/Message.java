@@ -32,7 +32,6 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.store.AStore;
-import convex.core.text.PrintUtils;
 import convex.core.util.Utils;
 
 /**

@@ -46,14 +46,9 @@ public final class Address extends AExtensionValue {
 	 * The maximum possible Address
 	 */
 	public static final Address MAX_VALUE = Address.create(Long.MAX_VALUE);
-	
-	/**
-	 * 64-bit address value
-	 */
-	private long value;
 
 	private Address(long value) {
-		this.value=value;
+		super(value);
 	}
 	
 	/**
@@ -263,11 +258,6 @@ public final class Address extends AExtensionValue {
 	public final int getBytes(byte[] bs, int pos) {
 		pos=Utils.writeLong(bs, pos, value);
 		return pos;
-	}
-
-	@Override
-	public long longValue() {
-		return value;
 	}
 
 	@Override

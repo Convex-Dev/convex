@@ -47,4 +47,6 @@ public class Gen {
 	public static final DenseRecordGen DENSE_RECORD = new DenseRecordGen();
 
 	public static final OpGen OP = new OpGen();
+
+	public static final ExtensionValueGen EXTENSION_VALUE = new ExtensionValueGen();
 }

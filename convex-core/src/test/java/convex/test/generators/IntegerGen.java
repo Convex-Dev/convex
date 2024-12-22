@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ABlob;
@@ -14,7 +13,7 @@ import convex.core.lang.RT;
  * Generator for arbitrary numeric values
  *
  */
-public class IntegerGen extends Generator<AInteger> {
+public class IntegerGen extends AGenerator<AInteger> {
 	public IntegerGen() {
 		super(AInteger.class);
 	}
@@ -34,7 +33,6 @@ public class IntegerGen extends Generator<AInteger> {
 			// fallthorugh if null
 		default:
 			return Gen.LONG.generate(r, status);
-
 		}
 	}
 }

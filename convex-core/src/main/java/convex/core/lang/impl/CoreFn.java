@@ -4,12 +4,14 @@ import convex.core.cvm.AFn;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
+import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.Ref;
 import convex.core.data.Symbol;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
 
 /**
  * Abstract base class for core language functions implemented in the Runtime
@@ -111,6 +113,12 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	}
 	
 	@Override
+	public final int hashCode() {
+		// This is needed to match hash behaviour of extension values
+		return Bits.hash32(code);
+	}
+	
+	@Override
 	public <R extends ACell> Ref<R> getRef(int i) {
 		throw new IndexOutOfBoundsException("Bad ref index: "+i);
 	}
@@ -145,7 +153,8 @@ public abstract class CoreFn<T extends ACell> extends AFn<T> implements ICoreDef
 	@Override 
 	public boolean equals(ACell o) {
 		// This is OK since these are guaranteed to be singleton instances!
-		return o==this;
+		if (o instanceof CoreFn) return o==this;
+		return Cells.equalsGeneric(this, o);
 	}
 	
 	@Override

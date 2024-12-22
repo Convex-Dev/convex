@@ -11,6 +11,7 @@ import convex.core.data.Format;
 import convex.core.data.IRefFunction;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
 import convex.core.util.ErrorMessages;
 
 /**
@@ -62,7 +63,7 @@ public class Local<T extends ACell> extends AOp<T> {
 	
 	@Override
 	public int encodeRaw(byte[] bs, int pos) {
-		pos=Format.writeVLQLong(bs, pos, position);
+		pos=Format.writeVLQCount(bs, pos, position);
 		return pos;
 	}
 
@@ -82,6 +83,13 @@ public class Local<T extends ACell> extends AOp<T> {
 			throw new InvalidDataException("Invalid Local position "+position, this);
 		}
 	}
+	
+	@Override
+	public final int hashCode() {
+		// Needed for hashCode equivalence with extension values
+		return Bits.hash32(position);
+	}
+
 
 	@Override
 	public int getRefCount() {

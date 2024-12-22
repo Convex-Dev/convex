@@ -1,6 +1,5 @@
 package convex.test.generators;
 
-import com.pholser.junit.quickcheck.generator.ComponentizedGenerator;
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
@@ -10,7 +9,7 @@ import convex.core.data.ACollection;
 /**
  * Generator for arbitrary collections
  */
-public class CollectionGen extends ComponentizedGenerator<ACollection<ACell>> {
+public class CollectionGen extends AGenerator<ACollection<ACell>> {
 	@SuppressWarnings("rawtypes")
 	private static final Class cls = (Class) ACollection.class;
 

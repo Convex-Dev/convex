@@ -118,8 +118,8 @@ public class GenTestAnyValue {
 		
 		// equality checks
 		assertEquals(o,o2);
-		if (o!=null) assertEquals(o.hashCode(),o2.hashCode());
 		assertEquals(hash,Hash.get(o2));
+		if (o!=null) assertEquals(o.hashCode(),o2.hashCode());
 
 		// re-encoding
 		AArrayBlob data2=Cells.encode(o2);

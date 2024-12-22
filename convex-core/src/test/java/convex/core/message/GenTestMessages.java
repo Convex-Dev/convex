@@ -1,4 +1,4 @@
-package convex.core.data;
+package convex.core.message;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -11,9 +11,10 @@ import com.pholser.junit.quickcheck.From;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
+import convex.core.data.ACell;
+import convex.core.data.Blob;
+import convex.core.data.Format;
 import convex.core.exceptions.BadFormatException;
-import convex.core.message.Message;
-import convex.core.message.MessageType;
 import convex.test.generators.ValueGen;
 
 @RunWith(JUnitQuickcheck.class)
@@ -29,8 +30,11 @@ public class GenTestMessages {
 		assertEquals(bb.remaining(), Format.getVLQCountLength(a));
 	}
 	
+	// @When(seed = -1436059931257127601l)
+	// @From(ValueGen.class)
 	@Property
 	public void testCAD3Message(@From(ValueGen.class) ACell a) throws BadFormatException {
+		// Any CAD3 object should encode as a complete message
 		Message m=Message.create(null,a);
 		
 		MessageType mtype=m.getType();

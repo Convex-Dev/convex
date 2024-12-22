@@ -1,4 +1,4 @@
-package convex.net;
+package convex.core.message;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -9,15 +9,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
-import convex.core.data.Format;
-
 import java.util.Arrays;
 import java.util.Random;
 
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.Test;
 
+import convex.core.Result;
+import convex.core.cpos.Belief;
+import convex.core.cpos.Block;
+import convex.core.cpos.CPoSConstants;
 import convex.core.cpos.Order;
-
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.Address;
 import convex.core.cvm.Symbols;
@@ -28,20 +29,15 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
+import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.core.message.Message;
-import convex.core.message.MessageTag;
-import convex.core.message.MessageType;
+import convex.core.lang.Reader;
 import convex.core.store.Stores;
-import convex.core.Result;
-import convex.core.cpos.Belief;
-import convex.core.cpos.Block;
-import convex.core.cpos.CPoSConstants;
 
 public class MessageTest {
 	static Hash BAD_HASH=Hash.EMPTY_HASH;
@@ -178,6 +174,12 @@ public class MessageTest {
 	public void testStatusMessage() {
 		Message m=Message.createStatusRequest(2);
 		assertEquals(RT.cvm(2),m.getID());
+		doMessageTest(m);
+	}
+	
+	@Test public void testCoreDefExtension() throws BadFormatException {
+		// This was a regression at one point where Local was badly re-encoded
+		Message m=Message.create(null,Reader.read("#[e645]"));
 		doMessageTest(m);
 	}
 	

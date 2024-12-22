@@ -1,5 +1,9 @@
 package convex.test.generators;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
@@ -7,6 +11,7 @@ import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AVector;
+import convex.core.data.Cells;
 import convex.core.data.Maps;
 import convex.test.Samples;
 
@@ -45,4 +50,21 @@ public class HashMapGen extends Generator<AHashMap> {
     		}
     	}
     }
+    
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<AHashMap> doShrink(SourceOfRandomness r, AHashMap m) {
+		long n=m.count();
+		if (n==0) return Collections.EMPTY_LIST;
+		if (n==1) return Collections.singletonList(Maps.empty());
+		ArrayList<AHashMap> al=new ArrayList<>();
+		
+		for (int i=0; i<n; i++) {
+			al.add(m.dissoc(m.entryAt(i).getKey()));
+		}
+		
+		Collections.sort(al,Cells.countComparator);
+		
+		return al;
+	}
 }

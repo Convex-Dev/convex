@@ -18,6 +18,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.util.Bits;
 import convex.core.util.ErrorMessages;
 import convex.core.util.Utils;
 
@@ -205,6 +206,12 @@ public class Special<T extends ACell> extends AOp<T> {
 	
 	public static <R extends ACell> Special<R> get(String string) {
 		return forSymbol(Symbol.create(string));
+	}
+	
+	@Override
+	public final int hashCode() {
+		// Needed for hashCode equivalence with extension values
+		return Bits.hash32((long)specialCode);
 	}
 
 

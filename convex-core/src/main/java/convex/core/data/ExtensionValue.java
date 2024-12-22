@@ -3,17 +3,15 @@ package convex.core.data;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.lang.RT;
-import convex.core.util.Bits;
 import convex.core.util.Utils;
 
 public class ExtensionValue extends AExtensionValue {
 
 	protected final byte tag;
-	protected final long value;
 	
 	protected ExtensionValue(byte tag,long value) {
+		super(value);
 		this.tag=tag;
-		this.value=value;
 	}
 	
 	/**
@@ -37,10 +35,6 @@ public class ExtensionValue extends AExtensionValue {
 		}
 	}
 	
-	@Override
-	public int hashCode() {
-		return Bits.hash32(value);
-	}
 
 	@Override
 	public final byte byteAt(long i) {
@@ -59,10 +53,6 @@ public class ExtensionValue extends AExtensionValue {
 		return pos;
 	}
 	
-	@Override
-	public long longValue() {
-		return value;
-	}
 
 	@Override
 	public byte getTag() {
