@@ -2009,7 +2009,14 @@ public class Core {
 		public  Context invoke(Context context, ACell[] args) {
 			if (args.length != 1) return context.withArityError(exactArityMessage(1, args.length));
 			APrimitive result = RT.abs(args[0]);
-			if (result == null) return context.withCastError(RT.findNonNumeric(args),args, Types.NUMBER);
+			if (result == null) {
+				int badVal=RT.findNonNumeric(args);
+				if (badVal<0) {
+					// this can happen for the minimum big integer value only
+					return context.withError(ErrorMessages.INVALID_NUMERIC);
+				}
+				return context.withCastError(badVal,args, Types.NUMBER);
+			}
 			return context.withResult(Juice.ARITHMETIC, result);
 		}
 	});

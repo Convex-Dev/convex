@@ -3,7 +3,6 @@ package convex.test.generators;
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
-import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 
 /**
@@ -47,7 +46,7 @@ public class ValueGen extends AGenerator<ACell> {
 		case 13:
 			return Gen.RECORD.generate(r, status);
 		case 14:
-			return Syntax.create(generate(r, status));
+			return Gen.SYNTAX.generate(r, status);
 		case 15:
 			return Gen.EXTENSION_VALUE.generate(r, status);
 		case 16:

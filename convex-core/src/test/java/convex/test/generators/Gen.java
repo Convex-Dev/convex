@@ -51,4 +51,6 @@ public class Gen {
 	public static final ExtensionValueGen EXTENSION_VALUE = new ExtensionValueGen();
 
 	public static final CodedValueGen CODED_VALUE = new CodedValueGen();
+	
+	public static final SyntaxGen SYNTAX = new SyntaxGen();
 }

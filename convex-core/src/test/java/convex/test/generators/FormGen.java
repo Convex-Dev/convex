@@ -25,12 +25,13 @@ public class FormGen extends Generator<ACell> {
 
 	@Override
 	public ACell generate(SourceOfRandomness r, GenerationStatus status) {
-		int type = r.nextInt(8);
+		int type = r.nextInt(12);
 		switch (type) {
 		case 0:
 			return null;
 
 		case 1:
+			// Empty syntax with a nested form
 			return Syntax.create(generate(r, status));
 
 		case 2:
@@ -42,13 +43,10 @@ public class FormGen extends Generator<ACell> {
 			return Gen.NUMERIC.generate(r, status);
 
 		case 5: {
-			// random form containing core symbol at head
+			// List of random forms
 			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
-			AHashMap<Symbol, ACell> env = Core.ENVIRONMENT;
-			int n = (int) env.count();
-			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
-			return RT.cons(sym, Lists.create(subForms));
-		}
+			return Lists.create(subForms);
+		}	
 
 		case 6: {
 			// random core symbol
@@ -63,9 +61,22 @@ public class FormGen extends Generator<ACell> {
 			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
 			return Vectors.create(subForms);
 		}
-
-		default:
-			throw new Error("Unexpected type: " + type);
+		
+		case 8: {
+			return Gen.SYNTAX.generate(r, status);
 		}
+
+		case 9:
+			return Gen.VALUE.generate(r, status);
+			
+		default: {
+			// random form containing core symbol at head
+			List<ACell> subForms = this.times(r.nextInt(4)).generate(r, status);
+			AHashMap<Symbol, ACell> env = Core.ENVIRONMENT;
+			int n = (int) env.count();
+			Symbol sym = env.entryAt(r.nextInt(n)).getKey();
+			return RT.cons(sym, Lists.create(subForms));
+		}
+		}	
 	}
 }
