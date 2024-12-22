@@ -4,6 +4,7 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
@@ -59,7 +60,7 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 		if (ctx.isExceptional()) return (Context) ctx;
 		
 		for (int i=0; i<(n-1); i+=2) {
-			AOp<ACell> testOp=ops.get(i);
+			AOp<ACell> testOp=Ops.castOp(ops.get(i));
 			ctx=ctx.execute(testOp);
 			
 			// bail out from exceptional result in test
@@ -67,7 +68,7 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 			
 			ACell test=ctx.getResult();
 			if (RT.bool(test)) {
-				return ctx.execute(ops.get(i+1));
+				return ctx.execute(Ops.castOp(ops.get(i+1)));
 			}
 		}
 		if ((n&1)==0) {
@@ -75,7 +76,7 @@ public class Cond<T extends ACell> extends AFlatMultiOp<T> {
 			return ctx.withResult((T)null);
 		} else {
 			// default value
-			return ctx.execute(ops.get(n-1));
+			return ctx.execute(Ops.castOp(ops.get(n-1)));
 		}
 	}
 	

@@ -16,6 +16,7 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.ByteFlag;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 
 /**
  * Op for executing a sequence of child operations in order in query mode (no state changes)
@@ -66,12 +67,10 @@ public class Query<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>
 		AVector<ACell> savedBindings=context.getLocalBindings();
 
 		// execute each operation in turn
-		// TODO: early return
 		for (int i = 0; i < n; i++) {
-			AOp<?> op = ops.get(i);
+			AOp<?> op = Ops.castOp(ops.get(i));
 			ctx = ctx.execute(op);
 			if (ctx.isExceptional()) break;
-
 		}
 		// restore state unconditionally.
 		ctx=ctx.withState(savedState);
@@ -86,7 +85,7 @@ public class Query<T extends ACell> extends ACodedOp<T,ACell,AVector<AOp<ACell>>
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
 			bb.append(' ');
-			if (!ops.get(i).print(bb,limit)) return false;
+			if (!RT.print(bb,ops.get(i),limit)) return false;
 		}
 		bb.append(')');
 		return bb.check(limit);

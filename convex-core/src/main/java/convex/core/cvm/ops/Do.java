@@ -4,6 +4,7 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
@@ -12,6 +13,7 @@ import convex.core.data.Cells;
 import convex.core.data.Vectors;
 import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.BadFormatException;
+import convex.core.lang.RT;
 
 /**
  * Op for executing a sequence of child operations in order
@@ -48,7 +50,7 @@ public class Do<T extends ACell> extends AFlatMultiOp<T> {
 		
 		// execute each operation in turn
 		for (int i = 0; i < n; i++) {
-			AOp<?> op = ops.get(i);
+			AOp<?> op = Ops.castOp(ops.get(i));
 			ctx = ctx.execute(op);
 			if (ctx.isExceptional()) break;
 		}
@@ -61,7 +63,7 @@ public class Do<T extends ACell> extends AFlatMultiOp<T> {
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
 			bb.append(' ');
-			if (!ops.get(i).print(bb,limit)) return false;
+			if (!RT.print(bb,ops.get(i),limit)) return false;
 		}
 		bb.append(')');
 		return bb.check(limit);

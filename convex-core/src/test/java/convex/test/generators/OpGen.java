@@ -17,8 +17,8 @@ import convex.core.cvm.ops.Special;
  * Generator for plausible forms
  */
 @SuppressWarnings("rawtypes")
-public class OpsGen extends Generator<AOp> {
-	public OpsGen() {
+public class OpGen extends Generator<AOp> {
+	public OpGen() {
 		super(AOp.class);
 	}
 

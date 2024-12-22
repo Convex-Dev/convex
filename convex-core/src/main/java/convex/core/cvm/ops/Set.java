@@ -5,6 +5,7 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
@@ -56,7 +57,7 @@ public class Set<T extends ACell> extends ACodedOp<T,CVMLong,AOp<T>> {
 			return ctx.withError(ErrorCodes.BOUNDS, "Bad position for set!: " + position);
 		}
 
-		ctx = ctx.execute(value.getValue());
+		ctx = ctx.execute(Ops.castOp(value.getValue()));
 		if (ctx.isExceptional()) return ctx;
 		ACell value = ctx.getResult();
 
@@ -100,7 +101,8 @@ public class Set<T extends ACell> extends ACodedOp<T,CVMLong,AOp<T>> {
 		sb.append("(set! %");
 		sb.append(Long.toString(position));
 		sb.append(' ');
-		if (!value.getValue().print(sb, limit)) return false;
+		AOp<?> op=Ops.castOp(value.getValue());
+		if (!op.print(sb, limit)) return false;
 		sb.append(')');
 		return sb.check(limit);
 	}

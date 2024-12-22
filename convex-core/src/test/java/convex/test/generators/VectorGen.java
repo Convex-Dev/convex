@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import com.pholser.junit.quickcheck.generator.ComponentizedGenerator;
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
@@ -19,7 +18,7 @@ import convex.test.Samples;
  *
  */
 @SuppressWarnings("rawtypes")
-public class VectorGen extends ComponentizedGenerator<AVector> {
+public class VectorGen extends AGenerator<AVector> {
 	public VectorGen() {
 		super(AVector.class);
 	}

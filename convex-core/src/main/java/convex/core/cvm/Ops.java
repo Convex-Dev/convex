@@ -63,4 +63,16 @@ public class Ops {
 		if (a instanceof AOp) return (AOp<T>)a;
 		return null;
 	}
+
+	/**
+	 * Cast any value to an Op. Returns value as a Constant op if not an Op
+	 * @param aOp
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> AOp<T> castOp(AOp<?> a) {
+		if (a==null) return Constant.nil();
+		if (!(a instanceof AOp)) return (AOp<T>) Constant.create(a);
+		return (AOp<T>)a;
+	}
 }

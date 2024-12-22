@@ -39,6 +39,7 @@ import convex.core.data.CodedValue;
 import convex.core.data.DenseRecord;
 import convex.core.data.ExtensionValue;
 import convex.core.data.Format;
+import convex.core.data.List;
 import convex.core.data.ObjectsTest;
 import convex.core.data.Symbol;
 import convex.core.data.Tag;
@@ -203,8 +204,14 @@ public class OpsTest extends ACVMTest {
 		
 		doOpTest(op);
 	}
-
-
+	
+	@Test
+	public void testBadQuery() {
+		// query with a null op
+		Query<CVMLong> op=Reader.read("#[c0bb800100]");
+		Context c = context();
+		c=step(c,op);
+	}
 
 	@Test
 	public void testSpecial() {
@@ -376,10 +383,10 @@ public class OpsTest extends ACVMTest {
 	}
 	
 	@Test
-	public void testBadInvokeOp() {
+	public void testEnptyInvokeOp() {
 		Context c = context();
 		c=step(c,"(eval #[db00])"); // Dense record that looks like an Invoke op with no values
-		assertEquals(DenseRecord.create(0xdb, Vectors.empty()),c.getResult());
+		assertEquals(List.EMPTY,c.getResult());
 	}
 
 	@Test

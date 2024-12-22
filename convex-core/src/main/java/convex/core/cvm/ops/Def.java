@@ -4,6 +4,7 @@ import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
 import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
@@ -62,7 +63,7 @@ public class Def<T extends ACell> extends ACodedOp<T,ACell,AOp<T>> {
 
 	@Override
 	public Context execute(Context ctx) {
-		AOp<T> op = this.value.getValue();
+		AOp<T> op = Ops.ensureOp(this.value.getValue()); // note: may be null for declare with no value
 		ACell symbol=code.getValue();
 		
 		ACell result;

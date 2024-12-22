@@ -4,11 +4,14 @@ import convex.core.cvm.AFn;
 import convex.core.cvm.AOp;
 import convex.core.cvm.CVMTag;
 import convex.core.cvm.Context;
+import convex.core.cvm.Juice;
+import convex.core.cvm.Ops;
 import convex.core.data.ACell;
 import convex.core.data.ASequence;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Cells;
+import convex.core.data.Lists;
 import convex.core.data.Vectors;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -30,7 +33,6 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 	}
 
 	public static <T extends ACell> Invoke<T> create(ASequence<AOp<ACell>> ops) {
-		if (ops.count()==0) return null;
 		AVector<AOp<ACell>> vops = ops.toVector();
 		return new Invoke<T>(vops);
 	}
@@ -75,8 +77,13 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 
 	@Override
 	public Context execute(Context context) {
+		long n=ops.count();
+		if (n==0) {
+			return context.withResult(Juice.APPLY, Lists.empty());
+		}
+		
 		// execute first op to obtain function value
-		AOp<?> fnOp=ops.get(0);
+		AOp<?> fnOp=Ops.castOp(ops.get(0));
 		Context ctx = context.execute(fnOp);
 		if (ctx.isExceptional()) return ctx;
 
@@ -92,7 +99,7 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		ACell[] args = new ACell[arity];
 		for (int i = 0; i < arity; i++) {
 			// Compute the op for each argument in order
-			AOp<?> argOp=ops.get(i + 1);
+			AOp<?> argOp=Ops.castOp(ops.get(i + 1));
 			ctx = ctx.execute(argOp);
 			if (ctx.isExceptional()) return ctx;
 
@@ -119,7 +126,8 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 		int len = ops.size();
 		for (int i = 0; i < len; i++) {
 			if (i > 0) bb.append(' ');
-			if (!ops.get(i).print(bb,limit)) return false;
+			AOp<?> op=Ops.castOp(ops.get(i));
+			if (!op.print(bb,limit)) return false;
 		}
 		bb.append(')');
 		return bb.check(limit);

@@ -46,5 +46,5 @@ public class Gen {
 	
 	public static final DenseRecordGen DENSE_RECORD = new DenseRecordGen();
 
-	public static final OpsGen OP = new OpsGen();
+	public static final OpGen OP = new OpGen();
 }

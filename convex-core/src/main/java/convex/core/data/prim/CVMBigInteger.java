@@ -189,11 +189,12 @@ public final class CVMBigInteger extends AInteger {
 
 	@Override
 	public boolean print(BlobBuilder sb, long limit) {
+		long space=limit-sb.count();
 		long blen=byteLength();
-		if (blen>limit*2) return false;
+		if (blen>space*2) return false; // defintely too long, since each byte is at least 2 chars
 		AString s=Strings.create(big().toString());
-		if (s.count()>limit) {
-			sb.append(s.slice(0, limit));
+		if (s.count()>space) {
+			sb.append(s.slice(0, space));
 			return false;
 		}
 		sb.append(s);

@@ -14,14 +14,14 @@ import convex.core.data.ACell;
 import convex.core.init.InitTest;
 import convex.core.lang.OpsTest;
 import convex.test.generators.FormGen;
-import convex.test.generators.OpsGen;
+import convex.test.generators.OpGen;
 
 @RunWith(JUnitQuickcheck.class)
 public class GenTestOps {
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Property
-	public void testOpExecution(@From(OpsGen.class) AOp op) {
+	public void testOpExecution(@From(OpGen.class) AOp op) {
 		// A context should be able to execute any valid Op without throwing
 		Context c=Context.create(InitTest.STATE);
 		long initialJuice=c.getJuiceUsed();
