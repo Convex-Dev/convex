@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import java.util.Collection;
+import java.util.Comparator;
 
 import org.bouncycastle.util.Arrays;
 
@@ -22,6 +23,11 @@ public class Vectors {
 	protected static final int BITMASK = CHUNK_SIZE - 1; // 15
 	
 	public static final int MAX_ENCODING_LENGTH = Math.max(VectorLeaf.MAX_ENCODING_LENGTH,VectorTree.MAX_ENCODING_LENGTH);
+
+	@SuppressWarnings("rawtypes")
+	public static final Comparator<AVector> lengthComparator = (a,b)->{
+		return Utils.checkedInt(a.count()-b.count());
+	};
 
 	/**
 	 * Creates a canonical AVector with the given elements

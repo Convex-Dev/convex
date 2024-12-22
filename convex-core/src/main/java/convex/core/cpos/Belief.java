@@ -179,9 +179,8 @@ public class Belief extends ARecordGeneric {
 	
 	@Override 
 	public boolean equals(ACell a) {
-		if (!(a instanceof Belief)) return false;
-		Belief as=(Belief)a;
-		return equals(as);
+		if (a instanceof Belief) return equals((Belief)a);
+		return super.equals(a);
 	}
 	
 	/**

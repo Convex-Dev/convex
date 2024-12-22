@@ -40,7 +40,7 @@ public abstract class ACAD3Record extends ARecord<CVMLong,ACell> {
 	public boolean equals(ACell a) {
 		if (a==null) return false;
 		if (a.getTag()!=tag) return false;
-		return encoding.equals(a.getEncoding());
+		return getEncoding().equals(a.getEncoding());
 	}
 
 	@Override

@@ -11,7 +11,7 @@ import convex.core.data.MapEntry;
 /**
  * Generator for arbitrary collections
  */
-public class DataStructureGen extends Generator<ADataStructure<ACell>> {
+public class DataStructureGen extends AGenerator<ADataStructure<ACell>> {
 	@SuppressWarnings("rawtypes")
 	private static final Class cls = (Class) ADataStructure.class;
 

@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Arrays;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.function.BiFunction;
@@ -293,6 +294,16 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	@Override
 	public Ref<ACell> getRef(int i) {
 		return getCanonical().getRef(i);
+	}
+
+	@Override
+	public AVector<T> dissocAt(long i) {
+		int n=(int)count;
+		if ((i<0)||(i>=n)) return null;
+		ACell[] cells=Arrays.copyOf(data, n-1);
+		System.arraycopy(data, (int)(i+1), cells, (int)i, (int)(n-i-1));
+		
+		return wrap(cells);
 	}
 
 

@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.Constants;
@@ -18,7 +17,7 @@ import convex.core.lang.TestState;
  *
  */
 @SuppressWarnings("rawtypes")
-public class AnyRecordGen extends Generator<ARecord> {
+public class AnyRecordGen extends AGenerator<ARecord> {
 	public AnyRecordGen() {
 		super(ARecord.class);
 	}

@@ -61,6 +61,13 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	 */
 	@Override
 	public abstract T get(long i);
+	
+	/**
+	 * Remove an element at the specified position in a vector. WARNING: likely to be O(n)
+	 * @param i
+	 * @return Shortened Vector, or null if position was invalid
+	 */
+	public abstract AVector<T> dissocAt(long i);
 
 	/**
 	 * Appends a ListVector chunk to this vector. This vector must contain a whole

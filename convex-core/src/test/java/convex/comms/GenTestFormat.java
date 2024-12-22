@@ -53,12 +53,19 @@ public class GenTestFormat {
 	public void dataRoundTrip(@From(ValueGen.class) ACell value) throws BadFormatException, IOException {
 		Ref<ACell> pref = Ref.get(Cells.persist(value)); // ensure persisted
 		Blob b = Cells.encode(value);
-		ACell o = Format.read(b);
+		try {
+			ACell o = Format.read(b);
+			
+			assertEquals(value, o);
+			assertEquals(b, Cells.encode(o));
+			assertEquals(pref.getValue(), o);
 
-		assertEquals(value, o);
-		assertEquals(b, Cells.encode(o));
-		assertEquals(pref.getValue(), o);
+			FuzzTestFormat.doMutationTest(b);
+		} catch (BadFormatException e) {
+			System.err.println("Bad format in GenTestFromat: "+b);
+			throw e;
+		}
 
-		FuzzTestFormat.doMutationTest(b);
+
 	}
 }

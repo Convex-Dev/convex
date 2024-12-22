@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.CVMDouble;
@@ -10,7 +9,7 @@ import convex.core.data.prim.CVMDouble;
  * Generator for arbitrary numeric values
  *
  */
-public class DoubleGen extends Generator<CVMDouble> {
+public class DoubleGen extends AGenerator<CVMDouble> {
 	private static final CVMDouble[] ODDITIES = new CVMDouble[] {CVMDouble.NaN, CVMDouble.NEGATIVE_INFINITY, CVMDouble.NEGATIVE_ZERO, CVMDouble.POSITIVE_INFINITY};
 
 	public DoubleGen() {

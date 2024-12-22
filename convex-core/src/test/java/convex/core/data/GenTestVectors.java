@@ -41,4 +41,31 @@ public class GenTestVectors {
 			assertEquals(a.get(cp - 1), b.get(cp - 1));
 		}
 	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@Property
+	public void testElementProperties(@From(VectorGen.class) AVector a,long index) {
+		long n=a.count();
+		if (n==0) return; // skip for empty vector
+		
+		
+		long i=Math.abs(Math.floorMod(index, n));
+		
+		// Get the element
+		ACell e=a.get(i);
+		ObjectsTest.doAnyValueTests(e);
+		
+		// dissoc the specified element
+		AVector d=a.dissocAt(i);
+		assertEquals(n-1,d.count());
+		if (i<n-1) {
+			assertEquals(d.get(i),a.get(i+1));
+			assertEquals(d.get(n-2),a.get(n-1));
+		}
+		VectorsTest.doVectorTests(d);
+		
+		// check element ref
+		assertEquals(a.getElementRef(i),Ref.get(e));
+	}
+
 }

@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.CVMBool;
@@ -11,7 +10,7 @@ import convex.core.data.prim.CVMBool;
 /**
  * Generator for booleans
  */
-public class BooleanGen extends Generator<CVMBool> {
+public class BooleanGen extends AGenerator<CVMBool> {
 	public BooleanGen() {
 		super(CVMBool.class);
 	}

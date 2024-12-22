@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ABlob;
@@ -15,7 +14,7 @@ import convex.test.Samples;
  * Generator for binary Blobs
  *
  */
-public class BlobGen extends Generator<ABlob> {
+public class BlobGen extends AGenerator<ABlob> {
 	public BlobGen() {
 		super(ABlob.class);
 	}

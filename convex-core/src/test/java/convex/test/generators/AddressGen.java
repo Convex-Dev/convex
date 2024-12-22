@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.cvm.Address;
@@ -9,7 +8,7 @@ import convex.core.cvm.Address;
 /**
  * Generator for arbitrary Addresses
  */
-public class AddressGen extends Generator<Address> {
+public class AddressGen extends AGenerator<Address> {
 	
 	public AddressGen() {
 		super(Address.class);

@@ -290,4 +290,11 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 		// nothing to visit
 	}
 
+	@Override
+	public AVector<ACell> dissocAt(long i) {
+		if (i==0) return Vectors.create(get(1));
+		if (i==1) return Vectors.create(get(0));
+		return null;
+	}
+
 }

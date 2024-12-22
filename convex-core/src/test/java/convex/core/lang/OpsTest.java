@@ -374,6 +374,13 @@ public class OpsTest extends ACVMTest {
 
 		doOpTest(lam);
 	}
+	
+	@Test
+	public void testBadInvokeOp() {
+		Context c = context();
+		c=step(c,"(eval #[db00])"); // Dense record that looks like an Invoke op with no values
+		assertEquals(DenseRecord.create(0xdb, Vectors.empty()),c.getResult());
+	}
 
 	@Test
 	public void testLambdaString() {
@@ -387,9 +394,9 @@ public class OpsTest extends ACVMTest {
 		assertThrows(BadFormatException.class,()->Format.read(enc));
 	}
 
-	public <T extends ACell> void doOpTest(AOp<T> op) {
+	public static <T extends ACell> void doOpTest(AOp<T> op) {
 		// Executing any Op should not throw
-		context().execute(op);
+		TestState.CONTEXT.fork().execute(op);
 
 		try {
 			op.validate();

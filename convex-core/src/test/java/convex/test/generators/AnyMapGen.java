@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.ABlob;
@@ -18,7 +17,7 @@ import convex.test.Samples;
  *
  */
 @SuppressWarnings("rawtypes")
-public class AnyMapGen extends Generator<AMap> {
+public class AnyMapGen extends AGenerator<AMap> {
 	public AnyMapGen() {
 		super(AMap.class);
 	}

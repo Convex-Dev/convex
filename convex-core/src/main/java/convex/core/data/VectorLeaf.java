@@ -1,5 +1,6 @@
 package convex.core.data;
 
+import java.util.Arrays;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.function.BiFunction;
@@ -437,6 +438,10 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	}
 
+	/**
+	 * Get the length of the prefix vector, will be 0 if no prefix
+	 * @return
+	 */
 	public long prefixLength() {
 		return count - items.length;
 	}
@@ -736,5 +741,25 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 			child.visitAllChildren(visitor);
 			visitor.accept(child);
 		}
+	}
+
+	@Override
+	public AVector<T> dissocAt(long i) {
+		if ((i<0)||(i>=count)) return null;
+		long pl=prefixLength();
+		if (i >= pl) {
+			int cn=items.length;
+			if (cn==1) {
+				// Just return prefix, or empty vector if no prefix
+				return (pl==0)?Vectors.empty():prefix.getValue();
+			}
+			
+			int ci=(int)(i-pl);
+			Ref<T>[] newItems=Arrays.copyOf(items, cn-1);
+			System.arraycopy(items, ci+1, newItems, ci, cn-ci-1);
+			
+			return new VectorLeaf<T>(newItems,prefix,count-1);
+		}
+		return slice(0,i).concat(slice(i+1,count));
 	}
 }

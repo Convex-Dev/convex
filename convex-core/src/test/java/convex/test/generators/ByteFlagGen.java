@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.AByteFlag;
@@ -11,7 +10,7 @@ import convex.core.data.prim.ByteFlag;
  * Generator for CAD3 byte flags
  *
  */
-public class ByteFlagGen extends Generator<AByteFlag> {
+public class ByteFlagGen extends AGenerator<AByteFlag> {
 	public ByteFlagGen() {
 		super(AByteFlag.class);
 	}

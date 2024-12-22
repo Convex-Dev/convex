@@ -1,7 +1,6 @@
 package convex.test.generators;
 
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
-import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
 import convex.core.data.prim.CVMChar;
@@ -9,7 +8,7 @@ import convex.core.data.prim.CVMChar;
 /**
  * Generator for primitive data values
  */
-public class CharGen extends Generator<CVMChar> {
+public class CharGen extends AGenerator<CVMChar> {
 	public final static CharGen INSTANCE = new CharGen();
 
 	// public final Generator<Byte> BYTE = gen().type(byte.class);

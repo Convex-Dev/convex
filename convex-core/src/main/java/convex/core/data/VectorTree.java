@@ -745,5 +745,11 @@ public class VectorTree<T extends ACell> extends AVector<T> {
 			visitor.accept(child);
 		}
 	}
+	
+	@Override
+	public AVector<T> dissocAt(long i) {
+		if ((i<0)||(i>=count)) return null;
+		return slice(0,i).concat(slice(i+1,count));
+	}
 
 }

@@ -30,6 +30,7 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 	}
 
 	public static <T extends ACell> Invoke<T> create(ASequence<AOp<ACell>> ops) {
+		if (ops.count()==0) return null;
 		AVector<AOp<ACell>> vops = ops.toVector();
 		return new Invoke<T>(vops);
 	}
