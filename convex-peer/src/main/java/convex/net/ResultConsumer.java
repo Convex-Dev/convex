@@ -9,6 +9,8 @@ import convex.core.Result;
 import convex.core.data.ACell;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.Stores;
 
 /**

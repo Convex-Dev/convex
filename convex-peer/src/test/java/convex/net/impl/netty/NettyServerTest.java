@@ -25,8 +25,8 @@ import convex.core.data.Blobs;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
-import convex.net.Message;
-import convex.net.MessageTag;
+import convex.core.message.Message;
+import convex.core.message.MessageTag;
 
 @TestInstance(Lifecycle.PER_CLASS)
 public class NettyServerTest {

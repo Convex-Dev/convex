@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
+import convex.core.message.Message;
 import convex.core.util.Utils;
 import convex.net.impl.HandlerException;
 import convex.net.impl.nio.Connection;

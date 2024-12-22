@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import convex.core.cpos.CPoSConstants;
 import convex.core.data.Blob;
 import convex.core.exceptions.BadFormatException;
-import convex.net.Message;
+import convex.core.message.Message;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;

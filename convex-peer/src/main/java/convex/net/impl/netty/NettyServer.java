@@ -10,9 +10,9 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.data.ACell;
+import convex.core.message.Message;
 import convex.core.util.Shutdown;
 import convex.net.AServer;
-import convex.net.Message;
 import convex.peer.Server;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;

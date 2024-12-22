@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 
 import convex.core.data.AccountKey;
+import convex.core.message.Message;
 
 public abstract class AConnection {
 

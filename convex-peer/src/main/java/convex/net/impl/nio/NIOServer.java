@@ -20,11 +20,11 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.Constants;
 import convex.core.exceptions.BadFormatException;
+import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.AServer;
-import convex.net.Message;
 import convex.peer.Config;
 import convex.peer.Server;
 

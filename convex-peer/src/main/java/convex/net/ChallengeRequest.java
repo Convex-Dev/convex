@@ -15,6 +15,7 @@ import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
+import convex.core.message.Message;
 
 public class ChallengeRequest {
 

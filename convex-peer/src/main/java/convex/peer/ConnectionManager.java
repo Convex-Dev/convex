@@ -33,12 +33,12 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
+import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
 import convex.net.AConnection;
 import convex.net.ChallengeRequest;
 import convex.net.IPUtils;
-import convex.net.Message;
 
 /**
  * Class for managing the outbound Peer connections from a Peer Server.

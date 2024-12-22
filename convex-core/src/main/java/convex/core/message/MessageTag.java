@@ -1,4 +1,4 @@
-package convex.net;
+package convex.core.message;
 
 import convex.core.data.Keyword;
 

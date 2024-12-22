@@ -5,10 +5,10 @@ import java.net.SocketAddress;
 import java.util.function.Consumer;
 
 import convex.core.data.Vectors;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.util.Shutdown;
 import convex.net.AConnection;
-import convex.net.Message;
-import convex.net.MessageType;
 import convex.peer.Config;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;

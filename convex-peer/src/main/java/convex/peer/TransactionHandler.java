@@ -40,9 +40,9 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.Message;
 
 /**
  * Server component for handling client transactions and producing Blocks

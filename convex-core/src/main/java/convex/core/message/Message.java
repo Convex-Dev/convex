@@ -1,4 +1,4 @@
-package convex.net;
+package convex.core.message;
 
 import java.io.IOException;
 import java.util.function.Predicate;
@@ -163,23 +163,26 @@ public class Message {
 	}
 
 	private MessageType inferType() {
+		byte tag;
 		if (hasData()) {
 			// These can be inferred directly from top encoding tag
-			byte tag=messageData.byteAt(0);
-			if (tag==CVMTag.BELIEF) return MessageType.BELIEF;
-			if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order> or similar
-			if (tag==CVMTag.RESULT) return MessageType.RESULT;
+			tag=messageData.byteAt(0);
+		} else {
+			if (payload==null) return MessageType.UNKNOWN;
+			tag=payload.getTag();
 		}
+		
+		// Check tag first for special types
+		if (tag==CVMTag.BELIEF) return MessageType.BELIEF;
+		if (tag==Tag.SIGNED_DATA) return MessageType.BELIEF; // i.e. a SignedData<Order> or similar
+		if (tag==CVMTag.RESULT) return MessageType.RESULT;
 		
 		try {
 			ACell payload=getPayload();
-			if (payload instanceof Result) return MessageType.RESULT;
-
-			if (payload instanceof Belief) return MessageType.BELIEF;
-			if (payload instanceof SignedData) return MessageType.BELIEF;
-			
 			if (payload instanceof AVector) {
-				Keyword mt=RT.ensureKeyword(((AVector<?>)payload).get(0));
+				AVector<?> v=(AVector<?>)payload;
+				if (v.count()==0) return MessageType.UNKNOWN;
+				Keyword mt=RT.ensureKeyword(v.get(0));
 				if (mt==null) return MessageType.UNKNOWN;
 				if (MessageTag.STATUS_REQUEST.equals(mt)) return MessageType.STATUS;
 				if (MessageTag.QUERY.equals(mt)) return MessageType.QUERY;
@@ -191,7 +194,7 @@ public class Message {
 			// default fall-through to UNKNOWN. We don't know what it is supposed to be!
 			try {
 				ACell payload=getPayload();
-				System.out.println(PrintUtils.printRefTree(payload.getRef()));
+				// System.out.println(PrintUtils.printRefTree(payload.getRef()));
 				log.info("Can't infer message type with object "+Utils.getClassName(payload),e);
 			} catch (Exception ex) {
 				ex.printStackTrace();

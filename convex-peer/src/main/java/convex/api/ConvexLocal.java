@@ -20,11 +20,11 @@ import convex.core.data.Hash;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.ThreadUtils;
-import convex.net.Message;
-import convex.net.MessageType;
 import convex.peer.Server;
 
 /**

@@ -34,9 +34,9 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.net.AConnection;
-import convex.net.Message;
-import convex.net.MessageType;
 import convex.peer.TestNetwork;
 
 /**

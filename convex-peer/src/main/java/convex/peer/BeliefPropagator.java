@@ -30,10 +30,10 @@ import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
 import convex.core.util.Utils;
-import convex.net.Message;
-import convex.net.MessageType;
 
 /**
  * Component class to handle propagation of new Beliefs from a Peer

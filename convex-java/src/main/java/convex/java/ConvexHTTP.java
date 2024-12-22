@@ -32,9 +32,9 @@ import convex.core.exceptions.ParseException;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
+import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.Utils;
-import convex.net.Message;
 
 public class ConvexHTTP extends convex.api.Convex {
 	

@@ -29,7 +29,7 @@ import convex.core.data.SignedData;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.Reader;
-import convex.net.Message;
+import convex.core.message.Message;
 import convex.peer.TestNetwork;
 
 /**

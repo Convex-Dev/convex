@@ -18,8 +18,8 @@ import convex.api.ConvexRemote;
 import convex.core.Result;
 import convex.core.cpos.Belief;
 import convex.core.cvm.Keywords;
+import convex.core.message.Message;
 import convex.core.store.Stores;
-import convex.net.Message;
 
 public class NIOServerTest {
 

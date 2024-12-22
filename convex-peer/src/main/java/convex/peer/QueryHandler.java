@@ -14,9 +14,9 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.exceptions.BadFormatException;
 import convex.core.lang.RT;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.util.LoadMonitor;
-import convex.net.Message;
-import convex.net.MessageType;
 
 public class QueryHandler extends AThreadedComponent {
 

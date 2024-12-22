@@ -2,9 +2,9 @@ package convex.net.impl.netty;
 
 import convex.core.data.Blob;
 import convex.core.data.Format;
+import convex.core.message.Message;
 import convex.core.util.Bits;
 import convex.core.util.Utils;
-import convex.net.Message;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;

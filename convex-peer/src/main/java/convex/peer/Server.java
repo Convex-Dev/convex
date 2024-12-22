@@ -44,13 +44,13 @@ import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.init.Init;
 import convex.core.lang.RT;
+import convex.core.message.Message;
+import convex.core.message.MessageType;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Shutdown;
 import convex.core.util.Utils;
 import convex.net.AServer;
-import convex.net.Message;
-import convex.net.MessageType;
 import convex.net.impl.netty.NettyServer;
 import convex.net.impl.nio.NIOServer;
 

@@ -21,10 +21,10 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
+import convex.core.message.Message;
 import convex.core.store.AStore;
 import convex.core.util.ThreadUtils;
 import convex.core.util.Utils;
-import convex.net.Message;
 
 /**
  * Utility class for acquiring data remotely
