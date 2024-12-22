@@ -9,7 +9,7 @@ import convex.core.data.ADataStructure;
 import convex.core.data.MapEntry;
 
 /**
- * Generator for arbitrary collections
+ * Generator for arbitrary CAD3 data structures
  */
 public class DataStructureGen extends AGenerator<ADataStructure<ACell>> {
 	@SuppressWarnings("rawtypes")

@@ -8,6 +8,7 @@ import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 
 import convex.core.Constants;
 import convex.core.data.prim.CVMBool;
@@ -67,6 +68,10 @@ public class Strings {
 	public static final StringShort SENT = StringShort.create("Sent");
 
 	public static final StringShort FULL_BUFFER = StringShort.create("Buffer full");
+
+	public static final Comparator<AString> lengthComparator = (a,b)->{
+		return Long.signum(a.count()-b.count());
+	};
 
 
 	/**

@@ -3,6 +3,7 @@ package convex.core.data;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.function.Consumer;
 
 import convex.core.Result;
@@ -10,6 +11,7 @@ import convex.core.data.impl.DummyCell;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.exceptions.ParseException;
 import convex.core.exceptions.TODOException;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -33,6 +35,17 @@ public class Cells {
 	public static final ACell DUMMY = new DummyCell();
 
 	public static final ACell NIL = null;
+	
+	public static final Comparator<ACell> countComparator = (a,b)->{
+		Long ca=RT.count(a);
+		Long cb=RT.count(b);
+		
+		// Uncountable values considered "smaller" than any countable value
+		if (ca==null) return (cb==null)?0:-1;
+		if (cb==null) return 1;
+		
+		return Long.signum(ca-cb);
+	};
 
 	/**
 	 * Equality method allowing for nulls

@@ -1,5 +1,9 @@
 package convex.test.generators;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.generator.Generator;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
@@ -41,5 +45,22 @@ public class StringGen extends Generator<AString> {
        		    return BASE.slice(start,end);
     		}
     	}
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<AString> doShrink(SourceOfRandomness r, AString s) {
+		long n=s.count();
+		if (n==0) return Collections.EMPTY_LIST;
+		if (n==1) return Collections.singletonList(Strings.EMPTY);
+		ArrayList<AString> al=new ArrayList<>();
+		
+		al.add(s.slice(0, n/2)); // first half
+		al.add(s.slice(n/2, n)); // second half
+		al.add(s.slice(n/3, (2*n)/3)); // middle 3rd
+		al.add(s.slice(0, n-1)); // all except last char
+		
+		Collections.sort(al,Strings.lengthComparator);
+		return al;
 	}
 }

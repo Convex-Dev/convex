@@ -100,9 +100,4 @@ public class VectorGen extends AGenerator<AVector> {
 		}
 		return al;
 	}
-	
-	
-    @Override public int numberOfNeededComponents() {
-        return 1;
-    }
 }

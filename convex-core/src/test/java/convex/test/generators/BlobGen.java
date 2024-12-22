@@ -1,5 +1,9 @@
 package convex.test.generators;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import com.pholser.junit.quickcheck.generator.GenerationStatus;
 import com.pholser.junit.quickcheck.random.SourceOfRandomness;
 
@@ -49,5 +53,23 @@ public class BlobGen extends AGenerator<ABlob> {
 		default:
 			return Blobs.createRandom(r.toJDKRandom(), len);
 		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public List<ABlob> doShrink(SourceOfRandomness r, ABlob s) {
+		long n=s.count();
+		if (n==0) return Collections.EMPTY_LIST;
+		if (n==1) return Collections.singletonList(Blobs.empty());
+		ArrayList<ABlob> al=new ArrayList<>();
+		
+		al.add(s.slice(0, n/2)); // first half
+		al.add(s.slice(n/2, n)); // second half
+		if (n>2) {
+			al.add(s.slice(n/3, (2*n)/3)); // middle 3rd
+			al.add(s.slice(0, n-1)); // all except last char
+		}
+		Collections.sort(al,Cells.countComparator);
+		return al;
 	}
 }
