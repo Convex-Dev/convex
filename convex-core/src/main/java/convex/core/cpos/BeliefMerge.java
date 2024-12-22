@@ -82,7 +82,7 @@ public class BeliefMerge {
 
 		// update my belief with the resulting Orders
 		if (initialBelief.getOrders() == resultOrders) return initialBelief;
-		final Belief result = new Belief(resultOrders);
+		final Belief result = Belief.create(resultOrders);
 		return result;
 	}
 	

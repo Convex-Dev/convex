@@ -52,6 +52,8 @@ public class ValueGen extends AGenerator<ACell> {
 			return Gen.EXTENSION_VALUE.generate(r, status);
 		case 16:
 			return Gen.CHAR.generate(r, status);
+		case 17:
+			return Gen.CODED_VALUE.generate(r, status);
 
 		default:
 			return Gen.LONG.generate(r, status);

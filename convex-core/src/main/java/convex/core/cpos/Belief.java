@@ -55,11 +55,11 @@ public class Belief extends ARecordGeneric {
 
 	// private final long timeStamp;
 
-	Belief(Index<AccountKey,SignedData<Order>> orders) {
+	private Belief(Index<AccountKey,SignedData<Order>> orders) {
 		super(CVMTag.BELIEF,BELIEF_FORMAT,Vectors.create(orders));
 	}
 
-	public Belief(AVector<ACell> newValues) {
+	private Belief(AVector<ACell> newValues) {
 		super(CVMTag.BELIEF,BELIEF_FORMAT,newValues);
 	}
 
@@ -273,13 +273,10 @@ public class Belief extends ARecordGeneric {
 		return newBelief;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	protected ARecordGeneric withValues(AVector<ACell> newValues) {
 		if (values==newValues) return this;
-		return new Belief((Index<AccountKey, SignedData<Order>>) newValues.get(0));
+		return new Belief(newValues);
 	}
-
-
 
 }

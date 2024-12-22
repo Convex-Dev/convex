@@ -49,4 +49,6 @@ public class Gen {
 	public static final OpGen OP = new OpGen();
 
 	public static final ExtensionValueGen EXTENSION_VALUE = new ExtensionValueGen();
+
+	public static final CodedValueGen CODED_VALUE = new CodedValueGen();
 }
