@@ -300,16 +300,12 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	public AVector<T> dissocAt(long i) {
 		int n=(int)count;
 		if ((i<0)||(i>=n)) return null;
+		if (i==0) return slice(1,count);
+		if (i==n-1) return slice(0,i);
+		
 		ACell[] cells=Arrays.copyOf(data, n-1);
 		System.arraycopy(data, (int)(i+1), cells, (int)i, (int)(n-i-1));
 		
 		return wrap(cells);
 	}
-
-
-
-
-
-
-
 }

@@ -85,7 +85,7 @@ public class DenseRecord extends ACAD3Record {
 
 	@Override
 	public RecordFormat getFormat() {
-		// TODO Auto-generated method stub
+		// No format defined for dense records
 		return null;
 	}
 
@@ -97,19 +97,17 @@ public class DenseRecord extends ACAD3Record {
 
 	@Override
 	public AVector<CVMLong> getKeys() {
-		// TODO Auto-generated method stub
-		return Vectors.range(0,count);
-	}
-
-	@Override
-	public Set<CVMLong> keySet() {
-		// TODO Auto-generated method stub
+		// TODO: allow range access in DenseRecords?
 		return null;
 	}
 
 	@Override
+	public Set<CVMLong> keySet() {
+		return Sets.empty();
+	}
+
+	@Override
 	public ACell get(ACell key) {
-		// TODO Auto-generated method stub
 		return null;
 	}
 

@@ -124,7 +124,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	}
 
 	@Override
-	public T get(int index) {
+	public final T get(int index) {
 		return get((long) index);
 	}
 
@@ -144,6 +144,14 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 			result = result.concat(seq);
 		}
 		return result;
+	}
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	protected <R> void copyToArray(R[] arr, int offset) {
+		for (int i=0; i<count; i++) {
+			arr[offset+i]=(R) get(i);
+		}
 	}
 
 	@Override
