@@ -84,16 +84,6 @@ public class BeliefPropagator extends AThreadedComponent {
 		super(server);
 	}
 	
-	
-	/**
-	 * Check if the propagator wants the latest Belief for rebroadcast
-	 * @return True is rebroadcast is due
-	 */
-	boolean isRebroadcastDue() {
-		return (lastBroadcastTime+BELIEF_REBROADCAST_DELAY)<Utils.getCurrentTimestamp();
-	}
-
-	
 	/**
 	 * Time of last belief broadcast
 	 */
@@ -143,42 +133,48 @@ public class BeliefPropagator extends AThreadedComponent {
 				log.debug("Belief updated cps="+Vectors.createLongs(belief.getOrder(server.getPeerKey()).getConsensusPoints()));
 			}
 			
-			maybeBroadcast(updated);
-			
-			// Persist Belief in all cases, even if we didn't announce
-			// This is mainly in case we get missing data / sync requests for the Belief
-			// This is super cheap if already persisted, so no problem
-			try {
-				belief=Cells.persist(belief);
-			} catch (IOException e) {
-				throw Utils.sneakyThrow(e);
-			}
-			
-			/* Update Belief after persistence. We want to be using
-			 * Latest persisted version as much as possible
-			 */
-			server.updateBelief(belief);
 
 		}
+		
+		maybeBroadcast(updated);
+		
+		// Persist Belief in all cases, even if we didn't announce
+		// This is mainly in case we get missing data / sync requests for the Belief
+		// This is super cheap if already persisted, so no problem in general for each loop
+		try {
+			belief=Cells.persist(belief);
+		} catch (IOException e) {
+			throw Utils.sneakyThrow(e);
+		}
+		
+		/* Update Belief after persistence. We want to be using
+		 * Latest persisted version as much as possible
+		 */
+		server.updateBelief(belief);
+
 	}
 
 
-	protected void maybeBroadcast(boolean updated) throws InterruptedException {
+	protected boolean maybeBroadcast(boolean updated) throws InterruptedException {
 		long ts=Utils.getCurrentTimestamp();
 		if (updated||(ts>lastBroadcastTime+BELIEF_REBROADCAST_DELAY)) {
 			lastBroadcastTime=ts;
 			try {
 				Message msg=null;
-				if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
-					msg=createFullUpdateMessage();
-					lastFullBroadcastTime=ts;
-				} else {
-					msg=createQuickUpdateMessage();
-				}
+				msg=createFullUpdateMessage();
+				lastFullBroadcastTime=ts;
+//				if (ts>lastFullBroadcastTime+BELIEF_FULL_BROADCAST_DELAY) {
+//					msg=createFullUpdateMessage();
+//					lastFullBroadcastTime=ts;
+//				} else {
+//					msg=createQuickUpdateMessage();
+//				}
 				
 				if (msg!=null) {
+					// Actually broadcast the message to outbound connected Peers
 					server.manager.broadcast(msg);
 					beliefBroadcastCount++;
+					return true;
 				} else {
 					log.warn("Failed to create broadcast message in BeliefPropagator!");
 				}
@@ -187,8 +183,9 @@ public class BeliefPropagator extends AThreadedComponent {
 				log.warn("Error attempting to create broadcast message",e);
 			}
 			
-			// Actually broadcast the message to outbound connected Peers
+			
 		}
+		return false;
 	}
 	
 	@Override public void start() {
@@ -405,7 +402,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		}
 	}
 	
-	private Message createFullUpdateMessage() throws IOException {
+	protected Message createFullUpdateMessage() throws IOException {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast
@@ -429,7 +426,7 @@ public class BeliefPropagator extends AThreadedComponent {
 		return msg;
 	}
 	
-	private Message createQuickUpdateMessage() throws IOException {
+	protected Message createQuickUpdateMessage() throws IOException {
 		ArrayList<ACell> novelty=new ArrayList<>();
 		
 		// At this point we know something updated our belief, so we want to rebroadcast

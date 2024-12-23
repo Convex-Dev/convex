@@ -150,7 +150,7 @@ public class TransactionHandler extends AThreadedComponent {
 			this.receivedTransactionCount++;
 			// log.info("Got TX message: "+m);
 			
-			// Transaction is a vector [id , signed-object]
+			// Transaction is a vector [:TX, id , signed-tx]
 			AVector<ACell> v = m.getPayload();
 			@SuppressWarnings("unchecked")
 			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
@@ -343,7 +343,7 @@ public class TransactionHandler extends AThreadedComponent {
 			SignedData<Block> signedBlock=peer.getKeyPair().signData(block);
 			
 			try {
-				Cells.persist(signedBlock);
+				signedBlock=Cells.persist(signedBlock);
 			} catch (Exception e) {
 				log.warn("Exception preparing new block",e);
 				return null;
