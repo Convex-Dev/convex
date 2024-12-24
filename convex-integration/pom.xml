@@ -14,7 +14,7 @@
 	<parent>
 		<groupId>world.convex</groupId>
 		<artifactId>convex</artifactId>
-		<version>0.7.16-SNAPSHOT</version>
+		<version>0.8.0</version>
 	</parent>
 
 	<build>

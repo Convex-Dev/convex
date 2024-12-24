@@ -27,7 +27,7 @@ Remember to test headless (i.e. no GUI) e.g. with CI server.
 First set the version number for the new version to be released
 
 ```
-mvn versions:set -DnewVersion='0.7.3'
+mvn versions:set -DnewVersion='0.8.0' -DartifactId=*  -DgroupId=*
 ```
 
 ### Update CHANGELOG

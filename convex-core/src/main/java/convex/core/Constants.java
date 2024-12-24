@@ -19,7 +19,7 @@ public class Constants {
 	/**
 	 * Initial timestamp for new States
 	 */
-	public static final long INITIAL_TIMESTAMP = Instant.parse("2024-12-20T02:21:42.0200Z").toEpochMilli();
+	public static final long INITIAL_TIMESTAMP = Instant.parse("2024-12-24T16:00:00.0000Z").toEpochMilli();
 	// public static final long INITIAL_TIMESTAMP = Instant.parse("2024-12-06T05:08:13.0864Z").toEpochMilli();
 
 	/**
