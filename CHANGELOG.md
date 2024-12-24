@@ -4,7 +4,7 @@ Notable changes to Convex core modules will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.8.0] - 2024-12-20 - PROTONET
+## [0.8.0] - 2024-12-24 - PROTONET
 
 ### Added
 
@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `dissoc-in`, `update` and `update-in` core functions
 - `switch` conditional macro
 - Tagged values in Reader (e.g. `#Index {}`)
-- `evict-peer` core function to remove old / understaked peers
+- `evict-peer` core function to remove old / under-staked peers
 - Automatic distribution of rewards to peers / delegated stakers
 - Generalised CAD3 data support
 - Logging for fungible token transfer events

@@ -346,13 +346,11 @@ public class PeerStatus extends ARecordGeneric {
 		return new PeerStatus(newValues);
 	}
 
-	public PeerStatus distributeBlockReward(State state, long peerFees) {
+	public PeerStatus distributeBlockReward(State state, long peerFees, long newTime) {
 		PeerStatus ps=addReward(peerFees);
 		long oldTime=ps.getTimestamp();
 		
 		// Maybe bump timestamp
-		CVMLong timestamp=state.getTimestamp();
-		long newTime=timestamp.longValue();
 		if (oldTime<newTime) {
 			ps=ps.withTimestamp(newTime);
 		}

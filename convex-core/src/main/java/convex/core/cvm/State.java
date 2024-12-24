@@ -419,18 +419,18 @@ public class State extends ARecordGeneric {
 			//}
 		}
 		
-		state=distributeFees(state,tctx.getPeer(),fees);
+		state=distributeFees(state,tctx.getPeer(),fees, block);
 
 		// TODO: any other things for complete block?
 		return BlockResult.create(state, results);
 	}
 
-	static State distributeFees(State state, AccountKey peer, long fees) {
+	static State distributeFees(State state, AccountKey peer, long fees, Block block) {
 		PeerStatus ps=state.getPeer(peer);
 		AccountStatus rewardPool=state.getAccount(Address.ZERO);
 		long poolBalance=rewardPool.getBalance();
 		
-		long timeStamp=state.getTimestamp().longValue();
+		long timeStamp=block.getTimeStamp();
 		long timeReward=0;
 		
 		if (ps==null) {
@@ -444,7 +444,7 @@ public class State extends ARecordGeneric {
 			long elapsed=Math.max(0, Math.min(timeStamp-oldTimestamp, CPoSConstants.MAX_REWARD_TIME));
 			timeReward=Math.max(0, Math.min(0, elapsed)); // TODO: update with reward calc
 			
-			ps=ps.distributeBlockReward(state,peerFees+timeReward); // this also increases timestamp
+			ps=ps.distributeBlockReward(state,peerFees+timeReward,timeStamp); // this also increases timestamp
 
 			state=state.withPeer(peer, ps);
 			
