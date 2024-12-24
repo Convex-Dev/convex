@@ -66,7 +66,10 @@ public class ServerListPanel extends JPanel {
 		JPanel toolBar = new ActionPanel();
 		add(toolBar, BorderLayout.SOUTH);
 
-		ActionButton btnLaunch = new ActionButton("Launch!",0xeb9b,e -> manager.launchExtraPeer());
+		ActionButton btnLaunch = new ActionButton("Launch!",0xeb9b,e -> {
+			ConvexLocal convex=manager.getDefaultConvex();
+			manager.launchExtraPeer(convex);
+		});
 		btnLaunch.setToolTipText("Launch an extra peer for the network. Allocates some stake from genesis account");
 		toolBar.add(btnLaunch);
 

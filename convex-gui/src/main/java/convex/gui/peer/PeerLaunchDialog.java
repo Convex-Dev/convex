@@ -15,6 +15,8 @@ import javax.swing.SpinnerNumberModel;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
+import convex.core.util.FileUtils;
+import convex.gui.components.FilePicker;
 import convex.gui.components.HostCombo;
 import convex.gui.components.Toast;
 import convex.gui.components.account.KeyPairCombo;
@@ -73,6 +75,12 @@ public class PeerLaunchDialog {
 		joinPanel.add(peerKeyField);
 		joinPanel.add(Toolkit.makeHelp("Select peer key for the new peer."));
 		
+		joinPanel.add(new JLabel("Etch Store:   "));
+		FilePicker filePicker=new FilePicker(FileUtils.getFile("~/.convex/etch.db").getAbsolutePath());
+		joinPanel.add(filePicker);
+		joinPanel.add(Toolkit.makeHelp("Select Etch database file for peer operation."));
+
+		
 		JTabbedPane tabs=new JTabbedPane();
 		tabs.add(testNetPanel,"Local Testnet");
 		tabs.add(joinPanel,"Join Network");
@@ -98,7 +106,7 @@ public class PeerLaunchDialog {
 		    		}
 		    		
 		       		AKeyPair kp=we.getKeyPair();
-		    		PeerGUI.launchPeerGUI(numPeers, kp,false);
+		    		PeerGUI.launchPeerGUI(numPeers, kp);
 		    	} else if (tabs.getSelectedComponent()==joinPanel) {
 		    		String host=hostField.getText();
 		    		InetSocketAddress sa=IPUtils.toInetSocketAddress(host);

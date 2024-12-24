@@ -328,7 +328,9 @@ public class Server implements Closeable {
 	 * Launch the Peer Server, including all main server threads
 	 * @throws InterruptedException 
 	 */
-	public void launch() throws LaunchException, InterruptedException {
+	public synchronized void launch() throws LaunchException, InterruptedException {
+		if (isRunning) return; // in case of double launch
+		isRunning=true;
 		AStore savedStore=Stores.current();
 		try {
 			Stores.setCurrent(store);
@@ -740,7 +742,7 @@ public class Server implements Closeable {
 	/**
 	 * Flag for a running server. Setting to false will terminate server threads.
 	 */
-	private volatile boolean isRunning = true;
+	private volatile boolean isRunning = false;
 	
 	/**
 	 * Flag for a live server. Live Server has synced with at least one other peer

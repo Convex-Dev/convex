@@ -77,12 +77,12 @@ public class PeerGUI extends AbstractGUI {
 		// call to set up Look and Feel
 		Toolkit.init();
 		
-		PeerGUI gui=launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate(),true);
+		PeerGUI gui=launchPeerGUI(DEFAULT_NUM_PEERS, AKeyPair.generate());
 		gui.waitForClose();
 		System.exit(0);
 	}
 
-	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesisKey, boolean topLevel) throws InterruptedException, PeerException {
+	public static PeerGUI launchPeerGUI(int peerNum, AKeyPair genesisKey) throws InterruptedException, PeerException {
 		PeerGUI manager = create(peerNum,genesisKey);
 		manager.run();
 		return manager;
@@ -95,6 +95,17 @@ public class PeerGUI extends AbstractGUI {
 		config.put(Keywords.KEYPAIR,we.getKeyPair());
 		config.put(Keywords.SOURCE,sa);
 		Server server=API.launchPeer(config);
+		ConvexLocal convex=ConvexLocal.connect(server);
+		peerList.addElement(convex);
+		PeerGUI manager =  new PeerGUI(peerList);
+		manager.run();
+		return manager;		
+	}
+	
+	public static PeerGUI launchPeerGUI(Server server) throws InterruptedException, PeerException {
+		DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
+
+		server.launch();
 		ConvexLocal convex=ConvexLocal.connect(server);
 		peerList.addElement(convex);
 		PeerGUI manager =  new PeerGUI(peerList);
@@ -127,7 +138,16 @@ public class PeerGUI extends AbstractGUI {
 			DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
 			List<Server> serverList = API.launchLocalPeers(KEYPAIRS,genesisState);
 			for (Server server: serverList) {
-				ConvexLocal convex=Convex.connect(server, server.getPeerController(), server.getControllerKey()); 
+				Address controller=server.getPeerController();
+				AKeyPair kp=server.getControllerKey();
+				ConvexLocal convex=Convex.connect(server, controller, kp); 
+				
+				if (kp==null) {
+					// Try to find alternative controller key in key ring if available
+					kp=KeyRingPanel.findWalletEntry(convex).getKeyPair();
+					convex.setKeyPair(kp);
+				}
+				
 				peerList.addElement(convex);
 				
 				// initial wallet list
@@ -314,7 +334,7 @@ public class PeerGUI extends AbstractGUI {
 			ConvexLocal c= peerList.get(i);
 			if (c.getLocalServer().isLive()) return c;
 		}
-		throw new IllegalStateException("No live peers!");
+		throw new IllegalStateException("No live peers we control!");
 	}
 	
 	public Convex getClientConvex(Address contract) {
@@ -384,20 +404,20 @@ public class PeerGUI extends AbstractGUI {
 	}
 
 
-	public void launchExtraPeer() {
+	public void launchExtraPeer(ConvexLocal source) {
 		AKeyPair kp=AKeyPair.generate();
 		
 		try {
-			Server base=getPrimaryServer();
-			ConvexLocal convex=getDefaultConvex();
-			Address a= convex.createAccountSync(kp.getAccountKey());
-			long amt=convex.getBalance()/10;
-			convex.transferSync(a, amt);
+			Server base=source.getLocalServer();
+
+			Address a= source.createAccountSync(kp.getAccountKey());
+			long amt=source.getBalance()/10;
+			source.transferSync(a, amt);
 			
 			KeyRingPanel.addWalletEntry(HotWalletEntry.create(kp,"Generated peer key"));
 			
 			// Set up Peer in base server
-			convex=Convex.connect(base, a, kp);
+			ConvexLocal convex=Convex.connect(base, a, kp);
 			AccountKey key=kp.getAccountKey();
 			Result rcr=convex.transactSync("(create-peer "+key+" "+amt/2+")");
 			if (rcr.isError()) {
