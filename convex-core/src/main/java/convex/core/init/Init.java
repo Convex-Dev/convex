@@ -76,6 +76,9 @@ public class Init {
 
 	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d");
 
+	private static final long RESERVED_USER_LIMIT = 64;
+	private static final long RESERVED_ACTOR_LIMIT = 128;
+
 
 	/**
 	 * Creates the base genesis state (before deployment of standard libraries and actors). This is the minimum state required for Convex operation.
@@ -216,6 +219,11 @@ public class Init {
 		
 		// Initial user account, follows genesis peer controller(s)
 		accts=addAccount(accts,Address.create(accts.count()),FIRST_USER_KEY,0);
+		
+		// Reserve user accounts in base state
+		while(accts.count()<RESERVED_USER_LIMIT) {
+			accts=addAccount(accts,Address.create(accts.count()),genesisKey,0);
+		}
 
 		// Finally add initial peers
 
@@ -236,6 +244,8 @@ public class Init {
 			}
 			assert(peerFunds == 0L);
 		}
+		
+
 		
 		// Add the new accounts to the State
 		s = s.withAccounts(accts);
@@ -261,7 +271,16 @@ public class Init {
 			long balance) {
 		if (accts.count() != a.longValue()) throw new Error("Incorrect account address: " + a);
 		AccountStatus as = AccountStatus.create(0L, balance, key);
+		as=as.withController(ADMIN_ADDRESS);
 		as = as.withMemory(CPoSConstants.INITIAL_ACCOUNT_ALLOWANCE);
+		accts = accts.conj(as);
+		return accts;
+	}
+	
+	public static AVector<AccountStatus> addReservedActorAccount(AVector<AccountStatus> accts, Address a) {
+		if (accts.count() != a.longValue()) throw new Error("Incorrect account address: " + a);
+		AccountStatus as = AccountStatus.create(0L, 0L, null);
+		as=as.withController(ADMIN_ADDRESS);
 		accts = accts.conj(as);
 		return accts;
 	}
@@ -308,6 +327,9 @@ public class Init {
 		State s=createBaseState(governanceKey, genesisKey, peerKeys);
 		
 		s = addStandardLibraries(s);
+		
+		s=addReservedAccounts(s);
+		
 		s = addTestingCurrencies(s);
 		s = addCNSExtraTree(s);
 
@@ -316,6 +338,16 @@ public class Init {
 		if (finalTotal != Constants.MAX_SUPPLY)
 			throw new Error("Bad total funds in init state amount: " + finalTotal);
 
+		return s;
+	}
+
+	private static State addReservedAccounts(State s) {
+		AVector<AccountStatus> accts = s.getAccounts();
+		while(accts.count()<RESERVED_ACTOR_LIMIT) {
+			accts=addReservedActorAccount(accts,Address.create(accts.count()));
+		}
+
+		s = s.withAccounts(accts);
 		return s;
 	}
 

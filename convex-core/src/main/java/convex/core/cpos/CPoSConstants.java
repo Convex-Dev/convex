@@ -57,10 +57,11 @@ public class CPoSConstants {
 	 * Minimum milliseconds to retain a proposal before switching
 	 */
 	public static final long KEEP_PROPOSAL_TIME = 100;
+	
 	/**
 	 * Memory allowance for genesis user / peer accounts
 	 */
-	public static final long INITIAL_ACCOUNT_ALLOWANCE = 1000000;
+	public static final long INITIAL_ACCOUNT_ALLOWANCE = 10000;
 	
 	/**
 	 * Maximum allowed encoded peer message length in bytes (50mb)
