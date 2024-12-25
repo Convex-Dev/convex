@@ -19,6 +19,7 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.JSplitPane;
@@ -30,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.core.Networks;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.ATransaction;
@@ -38,6 +40,7 @@ import convex.core.cvm.transactions.Multi;
 import convex.core.cvm.transactions.Transfer;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
+import convex.core.data.Hash;
 import convex.core.cvm.Address;
 import convex.core.data.Strings;
 import convex.core.lang.Reader;
@@ -83,6 +86,12 @@ public class StressPanel extends JPanel {
 		btnRun = new JButton("Run Test");
 		actionPanel.add(btnRun);
 		btnRun.addActionListener(e -> {
+			Hash network=peerView.getLocalServer().getPeer().getGenesisHash();
+			if (network.equals(Networks.PRONONET_GENESIS)) {
+				int confirm=JOptionPane.showConfirmDialog(this, "This is the live network. Running a stress test is likley to be expensive! Are you really sure you want to do this?", "Run test on Live network?", JOptionPane.WARNING_MESSAGE);
+				if (confirm!=JOptionPane.OK_OPTION) return;
+			}
+			
 			btnRun.setEnabled(false);
 			Address address=peerConvex.getAddress();
 			AKeyPair kp=peerConvex.getKeyPair();
@@ -238,7 +247,7 @@ public class StressPanel extends JPanel {
 		
 			// Generate client accounts
 			StringBuilder cmdsb=new StringBuilder();
-			cmdsb.append("(let [f (fn [k] (let [a (create-account k)] (transfer a 1000000000) a))] ");
+			cmdsb.append("(let [f (fn [k] (let [a (deploy `(do (set-key ~k) (set-controller #13))] (transfer a 1000000000) a))] ");
 			cmdsb.append("  (mapv f [");
 			for (int i=0; i<clientCount; i++) {
 				AKeyPair kp=AKeyPair.generate();

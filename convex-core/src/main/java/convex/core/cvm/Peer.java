@@ -677,4 +677,12 @@ public class Peer {
 		if (ps.getBalance()<CPoSConstants.MINIMUM_EFFECTIVE_STAKE) return false; 
 		return true;
 	}
+
+	/**
+	 * Gets the genesis state hash for this peer
+	 * @return
+	 */
+	public Hash getGenesisHash() {
+		return getGenesisState().getHash();
+	}
 }
