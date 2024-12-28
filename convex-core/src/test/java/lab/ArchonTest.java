@@ -13,6 +13,7 @@ import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
+import convex.core.data.ASet;
 import convex.core.data.AString;
 import convex.core.data.Strings;
 import convex.core.lang.ACVMTest;
@@ -69,5 +70,25 @@ public class ArchonTest extends ACVMTest  {
 		Context ctx=context();
 		ctx=exec(ctx,"(asset/transfer "+VILLAIN+" [archon #{0x0123}])");
 		AssetTester.doAssetTests(ctx, ARCHON, HERO, VILLAIN);
+	}
+	
+	@Test public void testPeaceSetup() {
+		Context ctx=context();
+		
+		String patch="(let [vs [:I :believe :that :unarmed :truth :and :unconditional :love :will \r\n"
+		+ "		:have  :the :final :word :in :reality :This :is :why :right :temporarily \r\n"
+		+ "		:defeated :is-1 :stronger :than :evil :triumphant :I-1 :believe-1 :that-1 :even \r\n"
+		+ "		:amid :todays :mortar :bursts :and-1 :whining :bullets :there :is-2 :still :hope \r\n"
+		+ "		:for :a :brighter :tomorrow :I-2 :believe-2 :that-2 :wounded :justice :lying\r\n"
+		+ "		:prostrate :on :the-1 :blood-flowing :streets :of :our :nations :can :be :lifted \r\n"
+		+ "		:from :this :dust :of :shame :to :reign :supreme :among :the-2 :children :of :men \r\n"
+		+ "		:I-3 :have :the-3 :audacity :to :believe-3 :that-3 :peoples :everywhere :can :have\r\n"
+		+ "		:three :meals :a :day :for-1 :their :bodies :education :and-2 :culture :for-2 \r\n"
+		+ "		:their-1 :minds :dignity :bar1 :bar2 :bar3 :bar4 :bar5 :bar6 :bar7]\r\n"
+		+ "      vset (into #{} vs)]\r\n"
+		+ "     vset)";
+		
+		ctx=exec(ctx,patch);
+		assertTrue(ctx.getResult() instanceof ASet);
 	}
 }

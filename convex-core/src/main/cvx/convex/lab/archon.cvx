@@ -56,19 +56,22 @@
 ;; These functions provide full CAD19 asset functionality
 ;;
 
-;; Quanity check
+;; Quanity check, enforces use as a set
 (defn -qc
 	  [q]
 	  (cond 
 	    (set? q) q              ;; base case, quantity should always be a Set
-		(valid-id? q) #{q}      ;; we allow a blob ID to be used as a quanitity if valid
+		(valid-id? q) #{q}      ;; we allow an ID to be used as a quanitity if valid
         (nil? q) #{}
         (fail :ARGUMENT "Invalid NFT quantity")))
 
 (defn -direct-transfer
   ^{:private? true}
   ;; Used internally by [[accept]] and [[direct-transfer]].
-  [sender receiver quantity]
+ ([sender receiver quqnitity]
+   (recur sender receiver quanity nil))
+   
+ ([sender receiver quantity data]
   (let [q (-qc quantity)
         receiver             (address receiver)
         sender-balance       (or (get-holding sender)
@@ -81,7 +84,10 @@
         new-receiver-balance (union receiver-balance q)]
     (set-holding sender new-sender-balance)
     (set-holding receiver new-receiver-balance)
-    quantity))
+    (for [tok q]
+      (log "NTR" sender receiver tok data))
+    
+    quantity)))
 
 
 (defn accept
@@ -124,7 +130,8 @@
   [receiver quantity data]
   (-direct-transfer *caller*
                     receiver
-                    quantity))
+                    quantity
+                    data))
 
 (defn offer
   ^{:callable true}

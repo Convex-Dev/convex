@@ -75,7 +75,9 @@ public class Init {
 	private static final long GENESIS_COINS=1000000*Coin.GOLD;
 
 	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d");
-
+	public static final AccountKey DEFAULT_GENESIS_KEY = AccountKey.fromHex("c1d3b0104d55ddf7680181a46e93422e49e2ea9298e37794860f1ef1128427f7");
+	public static final AccountKey FIRST_PEER_KEY = AccountKey.fromHex("d6ef2d429b73ef1c78d9e46d87feb9d9535a991b8102099f54ed243f1e557d42");
+	
 	private static final long RESERVED_USER_LIMIT = 64;
 	private static final long RESERVED_ACTOR_LIMIT = 128;
 

@@ -42,6 +42,7 @@ alias convex="java -jar ~/convex.jar"
 
 Genesis/Admin Key: `0xc1d3b0104d55ddf7680181a46e93422e49e2ea9298e37794860f1ef1128427f7`
 Governance key: `0x12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d`
+Genesis Peer key: `0x12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d`
 mikera key: `0x89b5142678bfef7a2245af5ae5b9ab1e10c282b375fa297c5aaeccc48ac97cac`
 
 
