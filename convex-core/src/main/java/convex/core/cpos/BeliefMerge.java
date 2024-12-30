@@ -207,7 +207,7 @@ public class BeliefMerge {
 		// winning chain should have same consensus as my initial chain
 		Order winningOrder = myOrder.withBlocks(winningBlocks);
 
-		final Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
+		Order consensusOrder = updateConsensus(winningOrder,stakedOrders, totalStake);
 
 		Index<AccountKey, SignedData<Order>> resultOrders = filteredOrders;
 		if (!consensusOrder.consensusEquals(myOrder)) {

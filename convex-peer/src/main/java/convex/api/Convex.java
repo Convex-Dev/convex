@@ -47,7 +47,6 @@ import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
 import convex.net.IPUtils;
-import convex.net.ResultConsumer;
 import convex.peer.Config;
 import convex.peer.Server;
 

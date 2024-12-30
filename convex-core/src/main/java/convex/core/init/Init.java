@@ -1,7 +1,6 @@
 package convex.core.init;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import convex.core.Coin;
@@ -391,7 +390,7 @@ public class Init {
 	 * @param peerKeys
 	 * @return
 	 */
-	public static State createTestState(ArrayList<AccountKey> peerKeys) {
+	public static State createTestState(List<AccountKey> peerKeys) {
 		State s=createState(peerKeys);
 		s = doActorDeploy(s, "/convex/asset/nft/tokens.cvx");
 		s = doActorDeploy(s, "/convex/lab/play.cvx");

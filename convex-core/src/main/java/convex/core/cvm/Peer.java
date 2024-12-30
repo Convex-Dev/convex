@@ -25,10 +25,12 @@ import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.init.Init;
+import convex.core.lang.RT;
 import convex.core.store.AStore;
 import convex.core.store.Stores;
 import convex.core.util.Utils;
@@ -607,6 +609,45 @@ public class Peer {
 		result=result.updateBelief(newBelief);
 		// result=result.updateState();
 		return result;
+	}
+	
+	public Result checkTransaction(SignedData<ATransaction> sd) {
+
+		// TODO: throttle?
+		ATransaction tx=RT.ensureTransaction(sd.getValue());
+		
+		// System.out.println("transact: "+v);
+		if (tx==null) {
+			return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
+		}
+		
+		State s=getConsensusState();
+		AccountStatus as=s.getAccount(tx.getOrigin());
+		if (as==null) {
+			return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
+		}
+		
+		if (tx.getSequence()<=as.getSequence()) {
+			return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
+		}
+		
+		AccountKey expectedKey=as.getAccountKey();
+		if (expectedKey==null) {
+			return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
+		}
+		
+		AccountKey pubKey=sd.getAccountKey();
+		if (!expectedKey.equals(pubKey)) {
+			return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
+		}
+		
+		if (!sd.checkSignature()) {
+			// SECURITY: Client tried to send a badly signed transaction!
+			return Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
+		}
+
+		// All checks passed OK!
+		return null;
 	}
 
 	/**

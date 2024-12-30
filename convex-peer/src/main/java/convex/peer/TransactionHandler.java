@@ -38,7 +38,6 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.MissingDataException;
-import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.message.Message;
 import convex.core.util.LoadMonitor;
@@ -156,7 +155,7 @@ public class TransactionHandler extends AThreadedComponent {
 			SignedData<ATransaction> sd = (SignedData<ATransaction>) v.get(2);
 			
 			// Check our transaction is valid and we want to process it
-			Result error=checkTransaction(sd);
+			Result error=server.getPeer().checkTransaction(sd);
 			if (error!=null) {
 				m.returnResult(error.withSource(SourceCodes.PEER));
 				return;
@@ -179,44 +178,7 @@ public class TransactionHandler extends AThreadedComponent {
 		}
 	}
 	
-	private Result checkTransaction(SignedData<ATransaction> sd) {
 
-		// TODO: throttle?
-		ATransaction tx=RT.ensureTransaction(sd.getValue());
-		
-		// System.out.println("transact: "+v);
-		if (tx==null) {
-			return Result.error(ErrorCodes.FORMAT,Strings.BAD_FORMAT);
-		}
-		
-		State s=server.getPeer().getConsensusState();
-		AccountStatus as=s.getAccount(tx.getOrigin());
-		if (as==null) {
-			return Result.error(ErrorCodes.NOBODY, Strings.NO_SUCH_ACCOUNT);
-		}
-		
-		if (tx.getSequence()<=as.getSequence()) {
-			return Result.error(ErrorCodes.SEQUENCE, Strings.OLD_SEQUENCE);
-		}
-		
-		AccountKey expectedKey=as.getAccountKey();
-		if (expectedKey==null) {
-			return Result.error(ErrorCodes.STATE, Strings.NO_TX_FOR_ACTOR);
-		}
-		
-		AccountKey pubKey=sd.getAccountKey();
-		if (!expectedKey.equals(pubKey)) {
-			return Result.error(ErrorCodes.SIGNATURE, Strings.WRONG_KEY );
-		}
-		
-		if (!sd.checkSignature()) {
-			// SECURITY: Client tried to send a badly signed transaction!
-			return Result.error(ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
-		}
-
-		// All checks passed OK!
-		return null;
-	}
 	
 	/**
 	 * Sets a request observer, which will be called whenever the Peer
