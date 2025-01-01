@@ -80,8 +80,9 @@ public class Vectors {
 	 * @return New vector wrapping the specified elements
 	 */
 	public static <T extends ACell> AVector<T> wrap(ACell[] elements) {
-		if (elements.length==0) return empty();
-		return VectorArray.wrap(elements);
+		int n=elements.length;
+		if (n==0) return empty();
+		return VectorArray.wrap(elements,0,n);
 	}
 
 	/**

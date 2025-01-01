@@ -34,6 +34,12 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	public static <T extends ACell> VectorArray<T> wrap(ACell[] arr) {
 		return new VectorArray<T>(arr,0,arr.length);
 	}
+	
+	public static <T extends ACell> VectorArray<T> wrap(ACell[] elements, long start, long end) {
+		long n=end-start;
+		if (n<0) throw new IllegalArgumentException("end before start index");
+		return new VectorArray<T>(elements,start,n);
+	}
 
 	public static <T extends ACell> VectorArray<T> of(Object ... os) {
 		int n=os.length;
@@ -308,4 +314,6 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 		
 		return wrap(cells);
 	}
+
+
 }

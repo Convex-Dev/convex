@@ -1059,7 +1059,8 @@ public class Context {
 		if (bindingForm instanceof Symbol) {
 			Symbol sym=(Symbol)bindingForm;
 			if (sym.equals(Symbols.UNDERSCORE)) return ctx;
-			// TODO: confirm must be an ACell at this point?
+			// args must be an ACell at this point, since we must have descended at least one level of binding from a 
+			// function invocation on ACell[]
 			return withLocalBindings(localBindings.conj((ACell)args));
 		} else if (bindingForm instanceof AVector) {
 			AVector<ACell> v=(AVector<ACell>)bindingForm;
@@ -1083,7 +1084,7 @@ public class Context {
 					// bind variadic form at position i+1 to all args except nLeft
 					long consumeCount=(argCount-i)-nLeft;
 					if (consumeCount<0) return ctx.withArityError("Insufficient arguments to allow variadic binding");
-					AVector<ACell> rest=RT.vec(args).slice(i,i+consumeCount); // TODO: cost of this?
+					AVector<ACell> rest=RT.vec(args,i,i+consumeCount);
 					ctx= ctx.updateBindings(v.get(i+1), rest);
 					if(ctx.isExceptional()) return ctx;
 
