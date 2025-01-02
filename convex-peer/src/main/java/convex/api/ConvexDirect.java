@@ -5,6 +5,7 @@ import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
 
+import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.ResultContext;
 import convex.core.cpos.Block;
@@ -67,11 +68,16 @@ public class ConvexDirect extends Convex {
 			p=p.updateTimestamp(ts);
 			p=p.proposeBlock(block);
 			p=p.mergeBeliefs();
+			p=p.mergeBeliefs();
+			p=p.mergeBeliefs();
 			p=p.updateState();
-			long blockNum=p.getPeerOrder().count()-1;
+			long blockNum=p.getPeerOrder().getBlockCount()-1;
 			peer=p;
 			
 			Result result= p.getResult(blockNum, 0);
+			if (result==null) {
+				result=Result.error(ErrorCodes.UNEXPECTED, "No result available?");
+			}
 			return CompletableFuture.completedFuture(result.withID(id));
 		} catch (Exception e) {
 			return CompletableFuture.completedFuture(Result.fromException(e));

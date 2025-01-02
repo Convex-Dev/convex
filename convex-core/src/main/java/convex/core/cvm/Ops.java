@@ -70,7 +70,7 @@ public class Ops {
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	public static <T extends ACell> AOp<T> castOp(AOp<?> a) {
+	public static <T extends ACell> AOp<T> castOp(ACell a) {
 		if (a==null) return Constant.nil();
 		if (a instanceof AOp) {
 			return (AOp<T>)a;

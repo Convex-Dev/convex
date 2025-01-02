@@ -14,13 +14,11 @@ import convex.core.cvm.Address;
 import convex.core.cvm.State;
 import convex.core.data.prim.CVMLong;
 import convex.core.init.Init;
-import convex.core.init.InitTest;
-import convex.core.lang.ACVMTest;
 
 /**
  * Tests for Convex Direct client
  */
-public class ConvexDirectTest extends ACVMTest {
+public class ConvexDirectTest {
 	static final AKeyPair peerKey=AKeyPair.createSeeded(5675675);
 
 	@Test public void testSetup() throws InterruptedException {
@@ -29,12 +27,12 @@ public class ConvexDirectTest extends ACVMTest {
 		Address addr=convex.getAddress();
 		
 		assertTrue(convex.isConnected());
-		assertEquals(InitTest.FIRST_PEER_ADDRESS,addr);
+		assertEquals(Init.GENESIS_PEER_ADDRESS,addr);
 		
 		assertEquals(addr,convex.query("*address*").join().getValue());
 		
 		Result r=convex.transactSync("(+ 1 2)");
-		assertFalse(r.isError(),()->"Expected ed error: "+r);
+		assertFalse(r.isError(),()->"Expected no error but got: "+r);
 		assertEquals(CVMLong.create(3),r.getValue());
 	}
 }
