@@ -348,7 +348,7 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{
-			addLabel("Private Ed25519 seed","This is the Ed25519 private seed you need to sign transactions in Convex. \nAny 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.");
+			addLabel("Private Ed25519 seed","This is the Ed25519 private seed you need to sign transactions in Convex. \nAny 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.",true);
 			privateKeyArea = makeTextArea();
 			privateKeyArea.setBackground(Color.BLACK);
 
@@ -361,7 +361,7 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{
-			addLabel("Ed25519 Public Key","This is the Ed25519 public key, which can be shared publicly and may be used as the account key for a Convex account.");
+			addLabel("Ed25519 Public Key","This is the Ed25519 public key, which can be shared publicly and may be used as the account key for a Convex account.",true);
 			publicKeyArea = makeTextArea();
 			publicKeyArea.setEditable(false);
 			publicKeyArea.setRows(1);
@@ -424,6 +424,16 @@ public class KeyGenPanel extends JPanel {
 	
 	}
 
+	private void addLabel(String labelText,String helpText, boolean bold) {
+		JLabel lblMnemonic = new JLabel(labelText);
+		if (bold) {
+			lblMnemonic.setFont(lblMnemonic.getFont().deriveFont(Font.BOLD));
+		}
+		
+		formPanel.add(lblMnemonic);
+		formPanel.add(Toolkit.makeHelp(helpText));
+	}
+
 	private void addNote(String s) {
 		JComponent ta = Toolkit.makeNote("NOTE",s);
 		formPanel.add(ta,NOTE_CONSTRAINT);
@@ -444,9 +454,7 @@ public class KeyGenPanel extends JPanel {
 	 * @param string
 	 */
 	private void addLabel(String labelText,String helpText) {
-		JLabel lblMnemonic = new JLabel(labelText);
-		formPanel.add(lblMnemonic);
-		formPanel.add(Toolkit.makeHelp(helpText));
+		addLabel(labelText,helpText,false);
 	}
 
 

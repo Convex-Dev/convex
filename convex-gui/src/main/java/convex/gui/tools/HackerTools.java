@@ -79,7 +79,7 @@ public class HackerTools extends AbstractGUI {
 		
 		// walletPanel.addWalletEntry(WalletEntry.create(convex.getAddress(), convex.getKeyPair()));
 		
-		this.setPreferredSize(new Dimension(1000,800));
+		this.setPreferredSize(new Dimension(1024,768));
 	}
 
 	public void switchPanel(String title) {

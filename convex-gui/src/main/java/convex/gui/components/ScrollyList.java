@@ -61,10 +61,14 @@ public class ScrollyList<E> extends JScrollPane {
 	 */
 	private static class ScrollablePanel extends JPanel implements Scrollable {
 
+		private static final int MAX_PREFERRED_HEIGHT=800;
+		
 		@Override
 		public Dimension getPreferredScrollableViewportSize() {
 			Dimension d = getPreferredSize();
-			if (d.getHeight()>VIEWPORT_HEIGHT) {
+			int h=d.height;
+			if (h>VIEWPORT_HEIGHT) {
+				h=Math.min(h, MAX_PREFERRED_HEIGHT);
 				d=new Dimension(d.width,VIEWPORT_HEIGHT);
 			}
 			return d;
