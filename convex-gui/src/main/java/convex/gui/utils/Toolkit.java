@@ -32,6 +32,8 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
 import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
@@ -52,6 +54,7 @@ import com.formdev.flatlaf.intellijthemes.materialthemeuilite.FlatMaterialOceani
 import com.formdev.flatlaf.util.SystemInfo;
 
 import convex.core.util.Utils;
+import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
 public class Toolkit {
@@ -339,6 +342,11 @@ public class Toolkit {
 	public static JComponent makeHelp(String helpText) {
 		JLabel help=new JLabel(SymbolIcon.get(0xe887,Toolkit.SMALL_ICON_SIZE));
 		help.setToolTipText(helpText);
+		help.addMouseListener(new MouseAdapter() {
+			public void mousePressed(MouseEvent e) {
+				JOptionPane.showMessageDialog(help, helpText,"Help Tips",JOptionPane.INFORMATION_MESSAGE);
+			}
+		});
 		return help;
 	}
 	
@@ -393,6 +401,29 @@ public class Toolkit {
 
 	public static void showErrorMessage(Component parent, String attemptFailure,Exception e) {
 		JOptionPane.showMessageDialog(parent, attemptFailure+ "\n"+e.getMessage());
+	}
+
+	public static Component wrapPasswordField(JPasswordField passArea) {
+		char ec=passArea.getEchoChar();
+		JPanel panel=new JPanel();
+		JLabel eye=new JLabel(SymbolIcon.get(0xe8f4));
+		eye.addMouseListener(new MouseAdapter() {
+			public void mouseClicked(MouseEvent e) {
+				char c=passArea.getEchoChar();
+				if (c==0) {
+					eye.setIcon(SymbolIcon.get(0xe8f4));
+					passArea.setEchoChar(ec);
+				} else {
+					eye.setIcon(SymbolIcon.get(0xe8f5));
+					passArea.setEchoChar((char)0);
+				}
+			}
+		});
+		panel.setBorder(null);
+		panel.setLayout(new MigLayout());
+		panel.add(passArea,"dock center");
+		panel.add(eye,"dock east");
+		return panel;
 	}
 
 }

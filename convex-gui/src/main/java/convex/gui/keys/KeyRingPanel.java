@@ -129,12 +129,12 @@ public class KeyRingPanel extends JPanel {
 	
 	private void loadStore(ActionEvent e) {
     	try {
-    		File f=chooseKeyStore(this);
+    		File f=chooseKeyStore(this,"Load");
 	    	if (f==null) return;
 			if (f.exists()) {
 				KeyStore ks=PFXTools.loadStore(f, null);
 				int num=loadKeys(ks,"Loaded from "+f.getCanonicalPath());
-				Toolkit.showMessge(this,num+" new keys imported.");
+				Toolkit.showMessge(this,num+" new keys loaded.");
 			}
 		} catch (IOException | GeneralSecurityException e1) {
 			// TODO Auto-generated catch block
@@ -147,15 +147,17 @@ public class KeyRingPanel extends JPanel {
 	 * @param parent
 	 * @return
 	 */
-	private static File chooseKeyStore(Component parent) {
+	private static File chooseKeyStore(Component parent,String action) {
 		JFileChooser chooser = new JFileChooser();
 	    FileNameExtensionFilter filter = new FileNameExtensionFilter("PKCS #12 Keystore", "p12", "pfx");
 	    chooser.setFileFilter(filter);
 	    File defaultDir=FileUtils.getFile(Constants.DEFAULT_KEYSTORE_FILENAME);
 	    if (defaultDir.isDirectory()) {
 		    chooser.setCurrentDirectory(defaultDir);
+	    } else {
+	    	chooser.setCurrentDirectory(defaultDir.getParentFile());
 	    }
-	    int returnVal = chooser.showOpenDialog(parent);
+	    int returnVal = chooser.showDialog(parent,action);
 	    if(returnVal != JFileChooser.APPROVE_OPTION) return null;
 	    File f=chooser.getSelectedFile();
 		return f;
@@ -247,7 +249,7 @@ public class KeyRingPanel extends JPanel {
 	public static boolean saveKey(Component parent, AWalletEntry walletEntry) {
 		boolean locked=walletEntry.isLocked();
 		try {
-			File f=chooseKeyStore(parent);
+			File f=chooseKeyStore(parent,"Save Key");
 			if (f==null) return false;
 			KeyStore ks;
 			if (f.exists()) {

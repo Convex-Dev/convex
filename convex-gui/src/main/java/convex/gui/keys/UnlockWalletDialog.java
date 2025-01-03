@@ -63,8 +63,8 @@ public class UnlockWalletDialog extends JDialog {
 
 		passwordField = new JPasswordField();
 		passwordField.setFont(new Font("Monospaced", Font.BOLD, 13));
-		passwordField.setColumns(20);
-		passPanel.add(passwordField);
+		passwordField.setColumns(40);
+		passPanel.add(Toolkit.wrapPasswordField(passwordField));
 		mainPanel.add(passPanel);
 
 

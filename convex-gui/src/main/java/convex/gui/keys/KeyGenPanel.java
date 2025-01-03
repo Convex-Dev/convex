@@ -1,6 +1,5 @@
 package convex.gui.keys;
 
-import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Font;
 import java.util.List;
@@ -35,7 +34,7 @@ import net.miginfocom.swing.MigLayout;
 @SuppressWarnings("serial")
 public class KeyGenPanel extends JPanel {
 
-	private static final String NOTE_CONSTRAINT = "align 50%,span,width 100:600:1000";
+	private static final String NOTE_CONSTRAINT = "align 25%,span,width 100:800:1000";
 	private static final String TEXTAREA_CONSTRAINT = "grow,width 10:500:800";
 	JTextArea mnemonicArea;
 	JPasswordField passArea;
@@ -56,6 +55,9 @@ public class KeyGenPanel extends JPanel {
 	JPanel formPanel;
 	
 	static Font HEX_FONT=Toolkit.MONO_FONT;
+	
+	static final int CC = Constants.CHAIN_CODE;
+	static final String DEAFULT_BIP32_PATH="m/44/"+CC+"/0/0/0";
 
 	/** 
 	 * Format a hex string in blocks for digits
@@ -131,7 +133,7 @@ public class KeyGenPanel extends JPanel {
 			if (BIP39.extendWord(badWord)!=null) {
 				warn += "Should normalise abbreviated word: "+badWord+". ";
 			} else {
-				warn +="Not in standard word list: "+badWord+". ";
+				warn +="Not in standard word list: "+badWord.toUpperCase()+". ";
 			}
 		} else if (!s.equals(BIP39.normaliseFormat(s))) {
 			warn+="Not normalised! ";
@@ -242,17 +244,19 @@ public class KeyGenPanel extends JPanel {
 	 * @param manager GUI manager root component
 	 */
 	public KeyGenPanel(PeerGUI manager) {
-		setLayout(new BorderLayout());
+		setLayout(new MigLayout());
 
 		// Main Key generation form
 		
 		formPanel = new JPanel();
 		// formPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
 		formPanel.setLayout(new MigLayout("wrap 3","[][40]10[grow,fill]",""));
-		add(formPanel, BorderLayout.CENTER);
+		add(formPanel, "dock center");
+		
+		addNote("Seed Phrase","Press 'Generate' to create a Mnemonic seed phrase (normally 12 words) or enter words you have already created elsewhere. You should also use a good passphrase. Keep a safe backup." );;
 
 		{ // Mnemonic entry box
-			addLabel("Mnemonic Phrase","BIP39 Mnemonic phrase. These should be 12, 15, 18, 21 or 24 random words from the BIP39 standard word list.");	
+			addLabel("Mnemonic Phrase","BIP39 Mnemonic phrase. These should be 12, 15, 18, 21 or 24 random words from the BIP39 standard word list.\n\nKeep a secure offline backup of this along with the passphrase so that you can re-generate your key pairs if required. If you are serious about your key security, engraving on metal plates and locking in a safe is a reasonable idea.");	
 			mnemonicArea = makeTextArea();
 			mnemonicArea.setWrapStyleWord(true);
 			mnemonicArea.setLineWrap(true);
@@ -269,28 +273,13 @@ public class KeyGenPanel extends JPanel {
 		}
 
 		{ // Passphrase entry box
-			addLabel("Passphrase","BIP39 secret passphrase. This acts as a secret 'extra word' to generate the BIP39 seed alongside the mnemonic. Strong passphrase recommended.");	
+			addLabel("Passphrase","BIP39 secret passphrase. This acts as a secret 'extra word' to generate the BIP39 seed alongside the mnemonic. Strong passphrase recommended.\n\nYou can leave this blank, but then anyone with access to the mnemonic words can easily re-create and use your keys.");	
 			passArea = new JPasswordField();
-			passArea.setBackground(Color.BLACK);
-			formPanel.add(passArea,"grow,width 10:300:400");
+			passArea.setBackground(Color.BLACK); 
+			formPanel.add(Toolkit.wrapPasswordField(passArea));
 			passArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!passArea.isFocusOwner()) return;
 				updatePass();
-			}));
-		}
-		
-		{
-			addLabel("BIP39 Seed","This is the BIP39 seed generated from the mnemonic and passphrase. You can also enter this directly.");
-			seedArea = makeTextArea();
-			seedArea.setRows(2);
-			seedArea.setLineWrap(true);
-			seedArea.setWrapStyleWord(false);
-			seedArea.setBackground(Color.BLACK);
-			formPanel.add(seedArea,TEXTAREA_CONSTRAINT);
-			seedArea.setText("(mnemonic not ready)");
-			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
-				if (!seedArea.isFocusOwner()) return;
-				updateSeed();
 			}));
 		}
 		
@@ -305,9 +294,27 @@ public class KeyGenPanel extends JPanel {
 			warningArea.setToolTipText("This is a quick heuristic check of mnemonic and passphrase.\nHeeding any warnings is advised, but you can ignore them if you know what you are doing (or don't care).");
 			formPanel.add(warningArea,TEXTAREA_CONSTRAINT);			
 	    }
+
+		addNote("Key Derivation","Below are the BIP39 / SLIP-10 key derivation steps. You can usually ignore these, but they are available in case you want to verify or modify the key derivation steps.");
+
+	    
+	    {
+			addLabel("BIP39 Seed","This is the BIP39 seed generated from the mnemonic and passphrase. You can also enter this directly.");
+			seedArea = makeTextArea();
+			seedArea.setRows(2);
+			seedArea.setLineWrap(true);
+			seedArea.setWrapStyleWord(false);
+			seedArea.setBackground(Color.BLACK);
+			formPanel.add(seedArea,TEXTAREA_CONSTRAINT);
+			seedArea.setText("(mnemonic not ready)");
+			seedArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
+				if (!seedArea.isFocusOwner()) return;
+				updateSeed();
+			}));
+		}
+		
 	
 		
-		addNote("Once the BIP39 seed is generated, we use SLIP-10 to create a derivation path to an Ed25519 private key. \n\nInstead of a BIP39 seed, you can also use another good secret source of random entropy, e.g. SLIP-0039.");
 		
 		{
 			addLabel("SLIP-10 Master Key","SLIP-10 creates a Master Key from the BIP39 seed, which acts as the root of key generation for a heirarchical deterministic wallet.");
@@ -321,7 +328,6 @@ public class KeyGenPanel extends JPanel {
 		}
 		
 		{
-			int CC = Constants.CHAIN_CODE;
 			addLabel("BIP32 Path","This is the hierarchical path for key generation as defined in BIP32. \n - 'm' specifies the master key. \n - 44 is the purpose defined as BIP-44. \n - "+CC+" is the Convex SLIP-0044 chain code. \n - The other numbers (account, change, index) may be set at the user's discretion, but are zero by default. \n\nIf you want multiple keys for the same mnemomic, is is recommended to increment the account number. \n\nWARNING: if you change these values, you will need to retain them in order to recover the specified key.");
 			derivationArea = makeTextArea();
 
@@ -330,7 +336,7 @@ public class KeyGenPanel extends JPanel {
 			derivationArea.setBackground(Color.BLACK);
 
 			formPanel.add(derivationArea,TEXTAREA_CONSTRAINT);
-			derivationArea.setText("m/44/"+CC+"/0/0/0");
+			derivationArea.setText(DEAFULT_BIP32_PATH);
 			derivationArea.getDocument().addDocumentListener(Toolkit.createDocumentListener(() -> {
 				if (!derivationArea.isFocusOwner()) return;
 				updatePath();
@@ -346,6 +352,9 @@ public class KeyGenPanel extends JPanel {
 			formPanel.add(derivedKeyArea,TEXTAREA_CONSTRAINT);
 			derivedKeyArea.setText("(not ready)");
 		}
+		
+		addNote("Ed5519 Key Pair","Below is the Ed25519 Key Pair that is actually used by Convex. You can safely share the public key and Identicon image. Keep the private seed secret!");
+
 
 		{
 			addLabel("Private Ed25519 seed","This is the Ed25519 private seed you need to sign transactions in Convex. \nAny 32-byte hex value will work: you can enter this directly if you obtained a good secret random seed from another source.",true);
@@ -373,13 +382,13 @@ public class KeyGenPanel extends JPanel {
 		identicon=new Identicon(null,Toolkit.IDENTICON_SIZE_LARGE);
 		// identicon.setBorder(null);
 		addLabel("Identicon","This is a visual representation of the public key. It can be used to visually identify different keys.");
-		formPanel.add(identicon,"grow 0");
+		formPanel.add(identicon, "growx 0");
 
 		////////////////////////////////////////////////////////////////
 		// Action panel with buttons 
 		
 		JPanel actionPanel = new ActionPanel();
-		add(actionPanel, BorderLayout.SOUTH);
+		add(actionPanel, "dock south");
 
 		JButton btnRecreate = new ActionButton("Generate",0xe5d5,e -> {
 			Integer wc=(Integer) numSpinner.getValue();
@@ -395,10 +404,10 @@ public class KeyGenPanel extends JPanel {
 		numSpinner.setFocusable(false);
 		actionPanel.add(numSpinner);
 
-		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{
-			
-		});
-		actionPanel.add(btnNewButton);
+//		JButton btnNewButton = new ActionButton("Export...",0xebbe,e->{
+//			
+//		});
+//		actionPanel.add(btnNewButton);
 		
 		{ // Button to Normalise Mnemonic string
 			JButton btnNormalise = new ActionButton("Normalise Mnemonic",0xf0ff,e -> { 
@@ -407,7 +416,7 @@ public class KeyGenPanel extends JPanel {
 				mnemonicArea.setText(s2);
 				updateMnemonic();
 			});
-			btnNormalise.setToolTipText("Press to normalise mnemonic text according to BIP39. Removes irregular whitespace, sets characters to lowercase.");
+			btnNormalise.setToolTipText("Press to normalise mnemonic text according to BIP39. Removes irregular whitespace, sets characters to lowercase, highlights faulty words.");
 			actionPanel.add(btnNormalise);
 		}
 
@@ -434,8 +443,8 @@ public class KeyGenPanel extends JPanel {
 		formPanel.add(Toolkit.makeHelp(helpText));
 	}
 
-	private void addNote(String s) {
-		JComponent ta = Toolkit.makeNote("NOTE",s);
+	private void addNote(String title,String s) {
+		JComponent ta = Toolkit.makeNote(title,s);
 		formPanel.add(ta,NOTE_CONSTRAINT);
 	}
 
