@@ -74,4 +74,54 @@ Back to screen with:
 screen -r
 ```
 
+### nginx setup
+
+```
+sudo apt install nginx
+```
+
+Configuration file:
+
+```
+
+```
+
+
+### For Let's Encrypt certificates
+
+Certbot dependencies
+
+```
+sudo apt install python3 python3-venv libaugeas0
+sudo python3 -m venv /opt/certbot/
+sudo /opt/certbot/bin/pip install --upgrade pip
+```
+
+Run certbot:
+
+```
+sudo certbot certonly --standalone
+
+```
+cp 
+Results:
+
+```
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/peer.convex.live/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/peer.convex.live/privkey.pem
+```
+
+Copy and rename files:
+
+```
+mkdir ~/.convex/ssl
+sudo cp /etc/letsencrypt/live/peer.convex.live/fullchain.pem ~/.convex/ssl
+sudo cp /etc/letsencrypt/live/peer.convex.live/privkey.pem ~/.convex/ssl
+sudo chown -R $USER ~/.convex/ssl 
+mv ~/.convex/ssl/fullchain.pem ~/.convex/ssl/certificate.pem
+mv ~/.convex/ssl/privkey.pem ~/.convex/ssl/private.pem
+```
+
+
 ### Adding a second peer
