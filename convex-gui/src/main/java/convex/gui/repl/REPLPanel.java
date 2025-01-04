@@ -176,6 +176,10 @@ public class REPLPanel extends JPanel {
 		outputScrollPane=wrapScrollPane(output);
 		splitPane.setLeftComponent(outputScrollPane);
 
+		
+		/// Input panel
+		JPanel inputPanel=new JPanel();
+		inputPanel.setLayout(new MigLayout());
 		input = new CodePane();
 		input.setFont(INPUT_FONT);
 		input.getDocument().addDocumentListener(inputListener);
@@ -183,8 +187,15 @@ public class REPLPanel extends JPanel {
 		input.setToolTipText("Input commands here (Press Enter at the end of input to send)");
 		inputScrollPane=wrapScrollPane(input);
 		//inputArea.setForeground(Color.GREEN);
+		inputPanel.add(inputScrollPane,"dock center");
 
-		splitPane.setRightComponent(inputScrollPane);
+		JPanel historyPanel=new JPanel();
+		historyPanel.setLayout(new MigLayout("wrap 1"));
+		historyPanel.add(ActionButton.build(0xe316, e->scrollHistory(-1),"Previous command in history"));
+		historyPanel.add(ActionButton.build(0xe313, e->scrollHistory(1),"Next command in history"));
+		inputPanel.add(historyPanel,"dock east");
+		
+		splitPane.setRightComponent(inputPanel);
 		
 		// stop CTRL+arrow losing focus
 		setFocusTraversalKeysEnabled(false);
@@ -198,7 +209,7 @@ public class REPLPanel extends JPanel {
 			sendMessage(input.getText());
 			input.requestFocus();
 		});
-		actionPanel.setToolTipText("Run the current command from the input pane");
+		btnRun.setToolTipText("Run the current command from the input pane");
 		actionPanel.add(btnRun);
 		
 		btnClear = new ActionButton("Clear",0xe9d5,e -> {
@@ -212,7 +223,7 @@ public class REPLPanel extends JPanel {
 		btnInfo = new ActionButton("Connection Info",0xe88e,e -> {
 			ConnectPanel.showConnectionInfo(REPLPanel.this,convex);
 		});
-		actionPanel.setToolTipText("Show diagnostic information for the Convex connection");
+		btnInfo.setToolTipText("Show diagnostic information for the Convex connection");
 		actionPanel.add(btnInfo);
 		
 		btnTX=new JCheckBox("Show transaction");
@@ -377,24 +388,11 @@ public class REPLPanel extends JPanel {
 			int code = e.getKeyCode();
 			// CTRL or Shift plus arrow scrolls through history
 			if (e.isControlDown()||e.isShiftDown()) {
-				int hSize=history.size();
 				if (code==KeyEvent.VK_UP) {
-
-					if (historyPosition>0) {
-						if (historyPosition==hSize) {
-							// store current in history
-							String s=input.getText();
-							history.add(s);
-						}
-						historyPosition--;
-						setInput(history.get(historyPosition));
-					}
+					scrollHistory(-1);
 					e.consume(); // mark event consumed
 				} else if (code==KeyEvent.VK_DOWN) {
-					if (historyPosition<hSize-1) {
-						historyPosition++;
-						setInput(history.get(historyPosition));
-					}
+					scrollHistory(1);
 					e.consume(); // mark event consumed
 				}
 			}
@@ -425,6 +423,26 @@ public class REPLPanel extends JPanel {
 		@Override
 		public void keyReleased(KeyEvent e) {
 			
+		}
+	}
+
+	public void scrollHistory(int scroll) {
+		int hSize=history.size();
+		if (scroll<0) {
+			if (historyPosition>0) {
+				if (historyPosition==hSize) {
+					// store current in history
+					String s=input.getText();
+					history.add(s);
+				}
+				historyPosition=Math.max(0, historyPosition+scroll);
+				setInput(history.get(historyPosition));
+			}
+		} else if (scroll>0) {
+			if (historyPosition<hSize-1) {
+				historyPosition=Math.min(hSize-1, historyPosition+scroll);
+				setInput(history.get(historyPosition));
+			}
 		}
 	}
 
