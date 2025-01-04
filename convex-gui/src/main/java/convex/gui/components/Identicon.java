@@ -7,6 +7,7 @@ import java.util.WeakHashMap;
 import javax.swing.ImageIcon;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.border.BevelBorder;
 
@@ -94,7 +95,13 @@ public class Identicon extends JLabel {
 		setBorder(new BevelBorder(BevelBorder.RAISED, null, null, null, null));
 		
 		Toolkit.addPopupMenu(this,new JPopupMenu() {
-			
+			{
+				JMenuItem closeButton = new JMenuItem("Copy Public Key",Toolkit.menuIcon(0xe14d));
+				closeButton.addActionListener(e -> {
+					Toolkit.copyToClipboard(a.toString());
+				});
+				add(closeButton);
+			}
 		});
 	}
 

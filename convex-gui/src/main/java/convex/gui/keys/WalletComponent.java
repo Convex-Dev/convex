@@ -97,20 +97,29 @@ public class WalletComponent extends BaseListComponent {
 			JPopupMenu menu=new JPopupMenu();
 			//JMenuItem m1=new JMenuItem("Edit...");
 			//menu.add(m1);
-			JMenuItem m2=new JMenuItem("Show seed...");
+			JMenuItem m2=new JMenuItem("Show seed...",Toolkit.menuIcon(0xe8f4));
 			m2.addActionListener(this::showSeed);
 			menu.add(m2);
 			
-			JMenuItem m3=new JMenuItem("Remove...");
+			JMenuItem m3=new JMenuItem("Remove...",Toolkit.menuIcon(0xe872));
 			m3.addActionListener(e-> {
-				int confirm =JOptionPane.showConfirmDialog(WalletComponent.this, "Are you sure you want to delete this keypair from your keyring?","Confirm Delete",JOptionPane.WARNING_MESSAGE);
-				if (confirm==JOptionPane.OK_OPTION) {
+				boolean shouldDelete=false;
+				if (walletEntry.getSource().contains("KeyStore")) {
+					// Already saved, so safe to delete from memory
+					shouldDelete=true;
+				} else {
+					int confirm =JOptionPane.showConfirmDialog(WalletComponent.this, "Are you sure you want to delete this keypair from your keyring before saving it?","Confirm Delete",JOptionPane.WARNING_MESSAGE);
+					if (confirm==JOptionPane.OK_OPTION) {
+						shouldDelete=true;
+					}
+				}
+				if (shouldDelete) {
 					KeyRingPanel.getListModel().removeElement(walletEntry);
 				}
 			});
 			menu.add(m3);
 			
-			JMenuItem m4=new JMenuItem("Save to KeyStore...");
+			JMenuItem m4=new JMenuItem("Save to KeyStore...",Toolkit.menuIcon(0xe161));
 			m4.addActionListener(e-> {
 				KeyRingPanel.saveKey(this,walletEntry);
 			});
