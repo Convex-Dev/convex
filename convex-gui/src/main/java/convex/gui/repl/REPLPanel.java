@@ -190,7 +190,7 @@ public class REPLPanel extends JPanel {
 		inputPanel.add(inputScrollPane,"dock center");
 
 		JPanel historyPanel=new JPanel();
-		historyPanel.setLayout(new MigLayout("wrap 1"));
+		historyPanel.setLayout(new MigLayout("wrap 1,aligny center"));
 		historyPanel.add(ActionButton.build(0xe316, e->scrollHistory(-1),"Previous command in history"));
 		historyPanel.add(ActionButton.build(0xe313, e->scrollHistory(1),"Next command in history"));
 		inputPanel.add(historyPanel,"dock east");
