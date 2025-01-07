@@ -112,7 +112,7 @@ public class AccountsPanel extends JPanel {
 		
 		{	// Account Controller
 			AddressRenderer cr=new AddressRenderer();
-			cr.setToolTipText("Account Controller. May recover, modify or update the controlled account.");
+			cr.setToolTipText("Account Controller. The controller may recover, modify or update the controlled account.\n\nIf set to 'nil', there is no way to recover the account without the correct private key, or if the account has existing actor code that enables recover/upgrade.");
 			cr.setForeground(Color.WHITE);
 			table.getColumnModel().getColumn(7).setPreferredWidth(80);
 			table.getColumnModel().getColumn(7).setCellRenderer(cr);
@@ -120,7 +120,7 @@ public class AccountsPanel extends JPanel {
 
 		{	// Account public key
 			AccountKeyRenderer cr=new AccountKeyRenderer(); 
-			cr.setToolTipText("Public key of the account. Used to validate transactions from users.");
+			cr.setToolTipText("Ed25519 Public key of the account. Used to validate transactions from users.\n\nIf not set, then the account is an actor and can only be controlled/modified with on-chain code.");
 			table.getColumnModel().getColumn(8).setPreferredWidth(150);
 			table.getColumnModel().getColumn(8).setCellRenderer(cr);
 		}
