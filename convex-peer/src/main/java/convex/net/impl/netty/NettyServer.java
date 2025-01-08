@@ -87,7 +87,8 @@ public class NettyServer extends AServer {
         ChannelFuture f=null;
         Integer port=getPort();
         if (port==null) try {
-        	f = b.bind(Constants.DEFAULT_PEER_PORT).sync(); 
+        	InetSocketAddress bindAddress=new InetSocketAddress("::",Constants.DEFAULT_PEER_PORT); 
+        	f = b.bind(bindAddress).sync(); 
         	port=Constants.DEFAULT_PEER_PORT;
         } catch (Exception e) {
         	// failed so try with random port
@@ -95,7 +96,8 @@ public class NettyServer extends AServer {
     	}
         
         if (f==null) {
-        	f = b.bind(port).sync(); 
+        	InetSocketAddress bindAddress=new InetSocketAddress("::",port); 
+        	f = b.bind(bindAddress).sync(); 
         }
     	// Check local port    	
         InetSocketAddress localAddress=(InetSocketAddress) f.channel().localAddress();

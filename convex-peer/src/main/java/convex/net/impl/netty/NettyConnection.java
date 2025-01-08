@@ -105,12 +105,12 @@ public class NettyConnection extends AConnection {
 		client.send(Message.create(MessageType.QUERY,Vectors.of(1,2,3,4))).sync();
 	}
 
+	@SuppressWarnings("unused")
 	@Override
 	public boolean sendMessage(Message m)  {
 		if (!channel.isActive()) return false;
 		
-		// Note: never call await here as might block the IO thread
-		@SuppressWarnings("unused")
+		// Note: never call await/sync here as might block the IO thread
 		ChannelFuture cf=channel.writeAndFlush(m);
 		// cf.syncUninterruptibly();
 		return true;

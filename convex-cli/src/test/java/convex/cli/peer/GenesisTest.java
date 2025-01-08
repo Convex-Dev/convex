@@ -23,9 +23,10 @@ import convex.peer.ConfigException;
 import convex.peer.LaunchException;
 import convex.peer.Server;
 
+
 public class GenesisTest {
-	private static final char[] KEYSTORE_PASSWORD = "genesisStorePassword".toCharArray();
-	private static final char[] KEY_PASSWORD = "genesisKeyPassword".toCharArray();
+	private static final char[] KEYSTORE_PASSWORD = "localStorePassword".toCharArray();
+	private static final char[] KEY_PASSWORD = "localKeyPassword".toCharArray();
 
 	private static final File TEMP_FILE;
 	private static final File TEMP_ETCH;
@@ -38,8 +39,8 @@ public class GenesisTest {
 	
 	static {
 		try {
-			TEMP_FILE=Helpers.createTempFile("tempGenesisKeystore", ".pfx");
-			TEMP_ETCH=Helpers.createTempFile("tempEtxhDatabase", ".db");
+			TEMP_FILE=Helpers.createTempFile("tempLocalKeystore", ".pfx");
+			TEMP_ETCH=Helpers.createTempFile("tempEtchDatabase", ".db");
 			PFXTools.createStore(TEMP_FILE, KEYSTORE_PASSWORD);
 			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
 		} catch (Exception t) {

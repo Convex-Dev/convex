@@ -114,7 +114,7 @@ public abstract class Convex implements AutoCloseable {
 	 */
 	public static Convex connect(Object host) throws IOException, TimeoutException, InterruptedException {
 		if (host instanceof Convex) return (Convex)host;
-		if (host instanceof Convex) return connect((Server)host);
+		if (host instanceof Server) return connect((Server)host);
 		
 		InetSocketAddress sa=IPUtils.toInetSocketAddress(host);
 		if (sa==null) {
@@ -730,11 +730,24 @@ public abstract class Convex implements AutoCloseable {
 	 *
 	 * @param timeoutMillis Milliseconds to wait for request timeout
 	 * @return Status Vector from target Peer
+	 * @throws InterruptedException 
 	 *
 	 */
-	public Result requestStatusSync(long timeoutMillis) {
+	public Result requestStatusSync(long timeoutMillis) throws InterruptedException {
 		CompletableFuture<Result> statusFuture = requestStatus();
-		return statusFuture.join();
+		try {
+			return statusFuture.get(timeoutMillis,TimeUnit.MILLISECONDS);
+		} catch (TimeoutException|ExecutionException e) {
+			return Result.fromException(e);
+		}
+	}
+	
+	public Result requestStatusSync() throws InterruptedException {
+		return requestStatusSync(getTimeout());
+	}
+
+	protected long getTimeout() {
+		return timeout;
 	}
 
 	/**
@@ -1027,5 +1040,7 @@ public abstract class Convex implements AutoCloseable {
 	}
 
 	public abstract void reconnect() throws IOException, TimeoutException, InterruptedException;
+
+
 
 }
