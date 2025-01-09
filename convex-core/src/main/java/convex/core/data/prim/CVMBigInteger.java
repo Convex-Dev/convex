@@ -327,16 +327,14 @@ public final class CVMBigInteger extends AInteger {
 		
 		BigInteger bi=big();
 		bi=bi.add(a.big());
-		if (bi==null) return null;
-		return CVMBigInteger.wrap(bi).toCanonical();
+		return AInteger.create(bi);
 	}
 	
 	@Override
 	public AInteger sub(AInteger b) {
 		BigInteger bi=big();
 		bi=bi.subtract(b.big());
-		if (bi==null) return null;
-		return CVMBigInteger.wrap(bi).toCanonical();
+		return AInteger.create(bi);
 	}
 	
 	@Override
