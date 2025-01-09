@@ -663,7 +663,7 @@ public class Utils {
 	/**
 	 * Gets a resource as a String.
 	 *
-	 * @param path Path to resource, e.g "actors/token.con"
+	 * @param path Path to resource, e.g "/actors/token.cvx"
 	 * @return String content of resource file
 	 * @throws IOException If an IO error occurs
 	 */

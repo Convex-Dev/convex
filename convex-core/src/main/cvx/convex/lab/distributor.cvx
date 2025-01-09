@@ -1,0 +1,39 @@
+`convex.lab.distributor
+
+(import convex.trust :as trust)
+
+;; Alocator, has ability to allocate coins for distribution
+(def allocator *caller*)
+
+;; Distributor, can distribute from allocated coins only (small bucket)
+(def distributor *caller*)
+
+;; Controller, has ability to control actor, including assigning allocator or distributor
+(set-controller *caller*)
+
+(declare available-coins)
+(def available-coins 0)
+
+;; Set the amount of available coins. Only a trusted allocator can do this
+(defn ^:callable set-available [amount]
+  (cond 
+    (> amount *balance*) 
+      (fail :STATE "Insufficient balance")
+	(trust/trusted? allocator *caller* :set-available amount)
+	  (set! available-coins amount)))
+
+;; Distribute coins coins. Only a trusted distributor can do this
+(defn ^:callable distribute [receiver amount]
+  (cond
+    (not (int? amount)) 
+      (fail :ARGUMENT "amount must be an integer")
+	(not (trust/trusted? distributor *caller* :distribute amount))
+	  (fail :TRUST "Not authorised to distribute")
+	(> amount available-coins)
+	  (fail :FUNDS "Insufficient available coins")
+	  (do 
+		 (set! available-coins (- available-coins amount))
+		 (transfer receiver amount))))
+
+(defn ^:callable receive-coin [_ _ _]
+  (accept *offer*))
