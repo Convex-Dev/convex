@@ -15,26 +15,38 @@
 
 ;; Set the amount of available coins. Only a trusted allocator can do this
 (defn ^:callable set-available [amount]
-  (when (> amount *balance*) 
-    (fail :STATE "Insufficient balance"))
+  (if (not (trust/trusted? allocator *caller* :set-available amount))
+	(fail :TRUST "Not authorised as allocator"))
   
-  (when-not (trust/trusted? allocator *caller* :set-available amount)
-    (fail :TRUST "Not authorised as allocator"))
+  (if (< amount 0) 
+	(fail :ARGUMENT "Negative amount!"))
   
-  (set! available-coins amount))
+  (set! available-coins (int amount)))
 
-;; Distribute coins coins. Only a trusted distributor can do this
+;; Distribute coins. Only a trusted distributor can do this
 (defn ^:callable distribute [receiver amount]
-  (cond
-    (not (int? amount)) 
-      (fail :ARGUMENT "amount must be an integer")
-	(not (trust/trusted? distributor *caller* :distribute amount))
-	  (fail :TRUST "Not authorised to distribute")
-	(> amount available-coins)
-	  (fail :FUNDS "Insufficient available coins")
-	  (do 
-		 (set! available-coins (- available-coins amount))
-		 (transfer receiver amount))))
+  (if (not (int? amount))
+	(fail :ARGUMENT "amount must be an integer"))
+  
+  (if (not (trust/trusted? distributor *caller* :distribute amount))
+	(fail :TRUST "Not authorised to distribute")) 
+  
+  (if (> amount available-coins)
+    (fail :FUNDS "Insufficient available coins"))
+  
+  ;; Every check passed, so:
+  ;; 1. reduce available coins (Effect)
+  ;; 2. Make an external transfer (interaction)
+  (do 
+    (set! available-coins (- available-coins amount))
+    (transfer receiver amount)))
 
 (defn ^:callable receive-coin [_ _ _]
   (accept *offer*))
+
+(defn ^:callable withdraw [amount]
+  (if (not (trust/trusted? allocator *caller* :withdraw amount))
+    (fail :TRUST "Not authorised to withdraw"))
+  
+  ;; Transfer the withdrawn amount back to the caller
+  (transfer *caller* amount))

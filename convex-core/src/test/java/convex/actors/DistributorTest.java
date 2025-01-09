@@ -41,13 +41,11 @@ public class DistributorTest extends ACVMTest {
 		assertArgumentError(step(c,"(call DIST (distribute *address* nil))"));
 		assertArgumentError(step(c,"(call DIST (distribute *address* -1))"));
 		assertCastError(step(c,"(call DIST (distribute :foo 0))"));
-		
-		// initially no actor balance, so can't set available coins greater than 0
-		assertStateError(step(c,"(call DIST (set-available 1))"));
 
 		// zero distribution is OK
 		c=exec(c,"(call DIST (distribute *address* 0))");
 
+		assertTrustError(step(c,"(query-as #0 `(call ~DIST (set-available 1000)))"));
 	}
 	
 	@Test public void testDistributuion() {
@@ -69,5 +67,19 @@ public class DistributorTest extends ACVMTest {
 		assertEquals(2700000L,evalL(c,"(balance DIST)"));
 		assertEquals(700000L,evalL(c,"DIST/available-coins"));
 
+	}
+	
+	@Test public void testWithdraw() {
+		Context c=context();
+
+		// set available coins works after transferring in some coins
+		c=exec(c,"(transfer DIST 3000000)");
+		assertEquals(3000000L,evalL(c,"(balance DIST)"));
+
+		c=exec(c,"(call DIST (withdraw 1000000))");
+		assertEquals(2000000L,evalL(c,"(balance DIST)"));
+		
+		// withdraw more than is left = :FUNDS error
+		assertFundsError(step(c,"(call DIST (withdraw 2000001))"));
 	}
 }
