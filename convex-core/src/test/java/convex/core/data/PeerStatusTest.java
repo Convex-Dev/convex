@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.TestInstance.Lifecycle;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
@@ -12,6 +14,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.InvalidDataException;
 import convex.core.util.Utils;
 
+@TestInstance(Lifecycle.PER_CLASS)
 public class PeerStatusTest {
 	
 	@Test public void testEmpty() {

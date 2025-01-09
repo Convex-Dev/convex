@@ -130,6 +130,7 @@ public abstract class AKeyPair {
 	 * @return A new key pair using the given seed
 	 */
 	public static AKeyPair create(Blob ed25519seed) {
+		if (ed25519seed.count()!=SEED_LENGTH) throw new IllegalArgumentException("seed must 32 bytes");
 		return Providers.generate(ed25519seed);
 	}
 
@@ -310,6 +311,17 @@ public abstract class AKeyPair {
 		} catch (IOException e) {
 			throw new BadFormatException("Can't get public key from bytes",e);
 		} 
+	}
+
+	/**
+	 * Create a key pair from a hex string seed. Strips whitespace and leading 0x if needed.
+	 * @param seed Hex string containing 32 byte Ed25519 seed
+	 * @return
+	 */
+	public static AKeyPair create(String seed) {
+		Blob b=Blob.parse(seed);
+		if (b==null) throw new IllegalArgumentException("seed must be a valid Blob");
+		return create(b);
 	}
 
 }

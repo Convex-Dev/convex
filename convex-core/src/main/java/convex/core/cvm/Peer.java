@@ -108,7 +108,7 @@ public class Peer {
 	 */
 	private final AVector<BlockResult> blockResults;
 
-	private Peer(AKeyPair kp, Belief belief, Order consensusOrder, long pos, State state, State genesis, long history, AVector<BlockResult> results,
+	private Peer(AKeyPair kp, Belief belief, Order consensusOrder, long statePos, State state, State genesis, long history, AVector<BlockResult> results,
 			long timeStamp) {
 		this.keyPair = kp;
 		this.peerKey = kp.getAccountKey();
@@ -118,14 +118,14 @@ public class Peer {
 		this.timestamp = timeStamp;
 		
 		this.consensusOrder=consensusOrder;
-		this.statePosition=pos;
+		this.statePosition=statePos;
 		
 		this.historyPosition=history;
 		this.blockResults = results;
 	}
 
 	/**
-	 * Constructs a Peer instance from persisted PEer Data
+	 * Constructs a Peer instance from persisted Peer Data
 	 * @param keyPair Key Pair for Peer
 	 * @param peerData Peer data map
 	 * @return New Peer instance
@@ -134,8 +134,8 @@ public class Peer {
 	public static Peer fromData(AKeyPair keyPair,AMap<Keyword, ACell> peerData)  {
 		Belief belief=(Belief) peerData.get(Keywords.BELIEF);
 		AVector<BlockResult> results=(AVector<BlockResult>) peerData.get(Keywords.RESULTS);
-		State state=(State) peerData.get(Keywords.STATE);
 		State genesis=(State) peerData.get(Keywords.GENESIS);
+		State state=(State) peerData.get(Keywords.STATE);
 		long pos=((CVMLong) peerData.get(Keywords.POSITION)).longValue();
 		Order co=((Order) peerData.get(Keywords.ORDER));
 		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();

@@ -8,7 +8,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import convex.core.data.ACell;
 import convex.core.data.Blob;
+import convex.core.exceptions.BadFormatException;
+import convex.core.message.Message;
 
 /**
  * Generic file handling utilities. Used in CLI etc.
@@ -43,6 +46,21 @@ public class FileUtils {
 
 	public static byte[] loadFileAsBytes(Path file) throws IOException {
 		return Files.readAllBytes(file);
+	}
+	
+	public static <T extends ACell> T loadCAD3(Path file) throws IOException, BadFormatException {
+		Blob b=loadFileAsBlob(file);
+		return Message.create(b).getPayload();
+	}
+	
+	public static void writeCAD3(Path file,ACell value) throws IOException {
+		Message m=Message.create(null, value);
+		Blob b=m.getMessageData();
+		byte[] bs=b.getInternalArray();
+		if (bs.length!=b.count()) {
+			bs=b.getBytes();
+		}
+		Files.write(file,bs);
 	}
 
 	/**
