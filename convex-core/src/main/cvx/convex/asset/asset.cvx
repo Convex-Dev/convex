@@ -180,7 +180,7 @@
 (defn create 
 		^{:doc {:description ["Creates a scoped sub-asset given an actor address."
 		                      "Return value will be a scoped asset path to the new sub-asset."]
-		 :examples    [{:code "(creater factory-address)"}]
+		 :examples    [{:code "(create factory-address)"}]
 		 :signature   [{:params [addr]}]}}
 	([addr]
 	  (let [scope (call addr (create))]
