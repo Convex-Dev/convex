@@ -1,26 +1,27 @@
 `convex.lab.distributor
 
+;; Import the convex.trust library, so we can use CAD22 trust monitors
 (import convex.trust :as trust)
 
-;; Alocator, has ability to allocate coins for distribution
+;; Allocator, has ability to allocate coins for distribution
 (def allocator *caller*)
 
 ;; Distributor, can distribute from allocated coins only (small bucket)
 (def distributor *caller*)
 
-;; Controller, has ability to control actor, including assigning allocator or distributor
-(set-controller *caller*)
-
+;; The amount of coins available for distribution currently
 (declare available-coins)
 (def available-coins 0)
 
 ;; Set the amount of available coins. Only a trusted allocator can do this
 (defn ^:callable set-available [amount]
-  (cond 
-    (> amount *balance*) 
-      (fail :STATE "Insufficient balance")
-	(trust/trusted? allocator *caller* :set-available amount)
-	  (set! available-coins amount)))
+  (when (> amount *balance*) 
+    (fail :STATE "Insufficient balance"))
+  
+  (when-not (trust/trusted? allocator *caller* :set-available amount)
+    (fail :TRUST "Not authorised as allocator"))
+  
+  (set! available-coins amount))
 
 ;; Distribute coins coins. Only a trusted distributor can do this
 (defn ^:callable distribute [receiver amount]
