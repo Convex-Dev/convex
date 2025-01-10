@@ -60,7 +60,7 @@ public class PeerStart extends APeerCommand {
 	private int port = 0;
 
 	@Option(names = { "--url" }, 
-			description = "URL for the peer to publish. If not provided, the peer will have no public URL.")
+			description = "URL for the peer to set for other peers to use.")
 	private String url;
 	
 	@Option(names = { "--norest" }, description = "Disable REST srever.")
@@ -160,6 +160,7 @@ public class PeerStart extends APeerCommand {
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
+				config.put(Keywords.URL, url);
 				if (genesisKey!=null) {
 					AccountKey gpk=genesisKey.getAccountKey();
 					State state=Init.createState(gpk,gpk,List.of(gpk));
@@ -169,7 +170,7 @@ public class PeerStart extends APeerCommand {
 				Server server=API.launchPeer(config);
 				
 				if (!norest) {
-					restServer=RESTServer.create(server); 
+					restServer=RESTServer.create(server);
 					restServer.start(apiport);
 				}
 				

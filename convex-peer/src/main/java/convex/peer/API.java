@@ -51,7 +51,7 @@ public class API {
 	 * <li>:state (optional, State) - Genesis state. Defaults to a fresh genesis state for the Peer if neither :source nor :state is specified
 	 * <li>:restore (optional, Boolean) - Boolean Flag to restore from existing store. Default to true
 	 * <li>:persist (optional, Boolean) - Boolean flag to determine if peer state should be persisted in store at server close. Default true.
-	 * <li>:url (optional, String) - public URL for server. If provided, peer will set its public on-chain address based on this, and the bind-address to 0.0.0.0.
+	 * <li>:url (optional, String) - public URL for server. If provided, peer will set its public on-chain address based on this.
 	 * <li>:auto-manage (optional Boolean) - set to true for peer to auto-manage own account. Defaults to true.
      * <li>:bind-address (optional String) - IP address of the ethernet device to bind too.
 	 * </ul>
