@@ -28,4 +28,5 @@ module convex.core {
 	requires org.bouncycastle.util;
 	requires org.slf4j;
 	requires java.base;
+	requires java.desktop;
 }

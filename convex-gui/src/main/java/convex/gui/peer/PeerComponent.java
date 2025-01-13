@@ -1,9 +1,13 @@
 package convex.gui.peer;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Objects;
 
 import javax.swing.JButton;
+import javax.swing.JFileChooser;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 
@@ -20,8 +24,12 @@ import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AccountKey;
+import convex.core.data.Keyword;
 import convex.core.text.Text;
+import convex.core.util.FileUtils;
+import convex.core.util.Utils;
 import convex.etch.EtchStore;
 import convex.gui.components.BaseImageButton;
 import convex.gui.components.BaseListComponent;
@@ -166,6 +174,15 @@ public class PeerComponent extends BaseListComponent {
 			new WalletApp(connectLocalControllerWallet(server)).run();
 		});
 		popupMenu.add(walletButton);
+		
+		JMenuItem saveButton = new JMenuItem("Save Peer Data...",Toolkit.menuIcon(0xe161));
+		saveButton.addActionListener(e -> savePeerData(this.convex));
+		popupMenu.add(saveButton);
+
+		JMenuItem loadButton = new JMenuItem("Load Peer Data...",Toolkit.menuIcon(0xeaf3));
+		loadButton.addActionListener(e -> loadPeerData(this.convex));
+		popupMenu.add(loadButton);
+
 
 
 		DropdownMenu dm = new DropdownMenu(popupMenu);
@@ -191,6 +208,32 @@ public class PeerComponent extends BaseListComponent {
 		
 		// Final stuff
 		updateDescription();
+	}
+
+	private void loadPeerData(ConvexLocal convex) {
+		JFileChooser chooser=Toolkit.createCAD3Chooser(null);
+		int result=chooser.showOpenDialog(this);
+		if (result==JFileChooser.APPROVE_OPTION) {
+			System.out.println("Loading: "+chooser.getSelectedFile());
+		}
+	}
+
+	private void savePeerData(ConvexLocal convex)  {
+		Peer p=convex.getLocalServer().getPeer();
+		AMap<Keyword, ACell> data = p.toData();
+		
+		String fileName="peer-data-"+p.getPeerKey().toHexString(8)+"-"+Utils.timeString()+".cad3";
+		JFileChooser chooser=Toolkit.createCAD3Chooser(fileName);
+
+		int result=chooser.showSaveDialog(this);
+		if (result==JFileChooser.APPROVE_OPTION) {
+			Path path =chooser.getSelectedFile().toPath();
+			try {
+				FileUtils.writeCAD3(path, data);
+			} catch (IOException e) {
+				JOptionPane.showMessageDialog(this, "Peer data save failed:\n "+e,"Save Error",JOptionPane.ERROR_MESSAGE);
+			}
+		}
 	}
 
 	protected void updateDescription() {

@@ -12,6 +12,9 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1360,6 +1363,15 @@ public class Utils {
 		String v= Utils.class.getPackage().getImplementationVersion();
 		if (v==null) v="Unlabelled SNAPSHOT";
 		return v;
+	}
+
+	public static String timeString() {
+		return timeString(Instant.now());
+	}
+
+	private static String timeString(Instant timeStamp) {
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneId.from(ZoneOffset.UTC));
+		return formatter.format(timeStamp);
 	}
 
 
