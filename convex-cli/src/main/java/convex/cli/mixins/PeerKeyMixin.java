@@ -3,6 +3,7 @@ package convex.cli.mixins;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import convex.core.data.AccountKey;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
@@ -58,4 +59,12 @@ public class PeerKeyMixin extends AMixin {
 		}
 		return keypass;
 	}
+	
+	public AccountKey getAcountKey() {
+		String ks=getPublicKey();
+		AccountKey result= AccountKey.parse(ks);
+		return result;
+	}
+	
+	
 }

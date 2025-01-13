@@ -2,11 +2,14 @@ package convex.cli.mixins;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.List;
 
 import convex.cli.CLIError;
 import convex.cli.Constants;
+import convex.core.data.AccountKey;
 import convex.core.util.FileUtils;
 import convex.etch.EtchStore;
+import convex.peer.API;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ScopeType;
 
@@ -45,5 +48,16 @@ public class EtchMixin extends AMixin {
 	
 	public EtchStore getEtchStore() {
 		return getEtchStore(etchStoreFilename);
+	}
+
+	public List<AccountKey> getPeerList() {
+		EtchStore etchStore=getEtchStore();
+		
+		try {
+			List<AccountKey> keys=API.listPeers(getEtchStore());
+			return keys;
+		} catch (IOException e) {
+			throw new CLIError("Unable to list peers in store: "+etchStore);
+		}
 	}
 }

@@ -20,6 +20,7 @@ import picocli.CommandLine.ScopeType;
 		PeerCreate.class,
 		PeerStart.class,
 		PeerList.class,
+		PeerBackup.class,
 		PeerGenesis.class,
 		Help.class
 	},

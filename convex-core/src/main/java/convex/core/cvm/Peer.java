@@ -229,16 +229,6 @@ public class Peer {
 		Peer peer=Peer.fromData(keyPair,peerData);
 		return peer;
 	}
-	
-	/**
-	 * Like {@link #getPeerData(AStore, ACell)} but uses a null root key.
-	 * @param store store from which to load Peer data
-	 * @return Peer data map
-	 * @throws IOException In case of IOException
-	 */
-	public static AMap<Keyword, ACell> getPeerData(AStore store) throws IOException {
-		return getPeerData(store, null);
-	}
 
 	/**
 	 * Gets Peer Data from a Store.

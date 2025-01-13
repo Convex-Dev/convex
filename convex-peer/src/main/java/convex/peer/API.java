@@ -194,10 +194,10 @@ public class API {
 	/**
 	 * Gets the list of peers registered in the given Etch Store
 	 * @param store Store from which to read peers
-	 * @return null if peer list not present
+	 * @return A new ArrayList of keys, or null if peer list not present
 	 * @throws IOException in case of IO error reading peers from store
 	 */
-	public static List<AccountKey> listPeers(AStore store) throws IOException {
+	public static ArrayList<AccountKey> listPeers(AStore store) throws IOException {
 		AMap<ACell,ACell> data=store.getRootData();
 		ArrayList<AccountKey> results=new ArrayList<>();
 		if (data==null) return results;
