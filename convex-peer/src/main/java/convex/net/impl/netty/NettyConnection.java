@@ -1,8 +1,12 @@
 package convex.net.impl.netty;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.util.function.Consumer;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import convex.core.data.Vectors;
 import convex.core.message.Message;
@@ -22,6 +26,8 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 
 public class NettyConnection extends AConnection {
 
+	static final Logger log = LoggerFactory.getLogger(NettyConnection.class.getName());
+	
 	/**
 	 * Static client connection worker
 	 */
@@ -80,10 +86,15 @@ public class NettyConnection extends AConnection {
 			return clientBootstrap;
 		}
 	}
-
-	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException {
+	
+	public static NettyConnection connect(SocketAddress sa, Consumer<Message> receiveAction) throws InterruptedException, IOException {
 		Bootstrap b = getClientBootstrap();
-		ChannelFuture f = b.connect(sa).sync(); // (5)
+		ChannelFuture f = b.connect(sa);
+		f.await(); // Wait until done
+		
+		if (!f.isSuccess()) {
+			throw new IOException("Failed to connect to peer",f.cause());
+		}
 
 		Channel chan = f.channel();
 		NettyInboundHandler inbound=new NettyInboundHandler(receiveAction,null);

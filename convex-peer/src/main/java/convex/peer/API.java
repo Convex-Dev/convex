@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -176,16 +177,20 @@ public class API {
 
 		genesisServer.setHostname("localhost:"+genesisServer.getPort());
 
-		for (int i = 1; i < count; i++) {
-			Server server=serverList.get(i);
-
-			// Join each additional Server to the Peer #0
-			ConnectionManager cm=server.getConnectionManager();
-			cm.connectToPeer(genesisServer.getHostAddress());
-
-			// Join server #0 to this server
-			genesisServer.getConnectionManager().connectToPeer(server.getHostAddress());
-			server.setHostname("localhost:"+server.getPort());
+		try {
+			for (int i = 1; i < count; i++) {
+				Server server=serverList.get(i);
+	
+				// Join each additional Server to the Peer #0
+				ConnectionManager cm=server.getConnectionManager();
+				cm.connectToPeer(genesisServer.getHostAddress());
+	
+				// Join server #0 to this server
+				genesisServer.getConnectionManager().connectToPeer(server.getHostAddress());
+				server.setHostname("localhost:"+server.getPort());
+			}
+		} catch (IOException|TimeoutException e) {
+			throw new LaunchException("Error setting up peer connections",e);
 		}
 
 		return serverList;

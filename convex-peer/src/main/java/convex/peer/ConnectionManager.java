@@ -235,9 +235,10 @@ public class ConnectionManager extends AThreadedComponent {
 
 		if (target!=null) {
 			// Try to connect to Peer. If it fails, no worry, will retry another peer next time
-			boolean success=connectToPeer(target) != null;
-			if (!success) {
-				log.warn("Failed to connect to Peer at "+target);
+			try {
+				connectToPeer(target);
+			} catch (IOException|TimeoutException e) {
+				log.debug("Failed to connect to Peer at "+target,e);
 			}
 		}
 	}
@@ -581,10 +582,12 @@ public class ConnectionManager extends AThreadedComponent {
 	/**
 	 * Connects explicitly to a Peer at the given host address
 	 * @param hostAddress Address to connect to
-	 * @return new Connection, or null if attempt fails
+	 * @return new Convex connection, or null if attempt fails
 	 * @throws InterruptedException 
+	 * @throws TimeoutException 
+	 * @throws IOException 
 	 */
-	public Convex connectToPeer(InetSocketAddress hostAddress) throws InterruptedException {
+	public Convex connectToPeer(InetSocketAddress hostAddress) throws InterruptedException, IOException, TimeoutException {
 		try {
 			Convex convex=Convex.connect(hostAddress);
 			Result result = convex.requestStatusSync(Config.DEFAULT_CLIENT_TIMEOUT);
@@ -611,9 +614,6 @@ public class ConnectionManager extends AThreadedComponent {
 				addConnection(peerKey, convex);
 			}
 			return convex;
-		} catch (IOException | TimeoutException e) {
-			log.warn("Error connecting to peer: ",e);
-			return null;
 		} catch (UnresolvedAddressException e) {
 			log.info("Unable to resolve host address: "+hostAddress);
 			return null;

@@ -75,7 +75,7 @@ public class ConvexRemote extends Convex {
 		return convex;
 	}
 	
-	public static ConvexRemote connectNetty(InetSocketAddress sa) throws InterruptedException {
+	public static ConvexRemote connectNetty(InetSocketAddress sa) throws InterruptedException, IOException {
 		ConvexRemote convex=new ConvexRemote(null,null);
 		convex.remoteAddress=sa;
 		convex.setConnection(NettyConnection.connect(sa, convex.returnMessageHandler));
