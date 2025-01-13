@@ -34,7 +34,7 @@ class NettyInboundHandler extends ByteToMessageDecoder {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) { // (4)
         // Close the connection when an exception is raised.
-		log.info("Closed Netty channel due to: "+cause.getMessage(),cause);
+		log.debug("Closed Netty channel due to: "+cause.getMessage(),cause);
         ctx.close();
     }
 

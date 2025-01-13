@@ -287,6 +287,17 @@ public class RESTServer implements Closeable {
 		return server.getConfig();
 	}
 	
+	/**
+	 * Gets the base URL to use for external links. May be null
+	 * @return
+	 */
+	public String getBaseURL() {
+		Object o= server.getConfig().get(Keywords.BASE_URL);
+		if (o instanceof String) return (String)o;
+		return null;
+	}
+
+	
 	public static void main(String[] args) throws InterruptedException, ConfigException, LaunchException {
 		HashMap<Keyword,Object> config=new HashMap<>();
 		config.put(Keywords.KEYPAIR, AKeyPair.generate());

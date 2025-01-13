@@ -63,6 +63,11 @@ public class PeerStart extends APeerCommand {
 			description = "URL for the peer to set for other peers to use.")
 	private String url;
 	
+	@Option(names = { "--base-url" }, 
+			description = "Base URL for REST API / web access.")
+	private String baseURL;
+
+	
 	@Option(names = { "--norest" }, description = "Disable REST srever.")
 	private boolean norest;
 	
@@ -161,6 +166,7 @@ public class PeerStart extends APeerCommand {
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
 				config.put(Keywords.URL, url);
+				config.put(Keywords.BASE_URL, baseURL);
 				if (genesisKey!=null) {
 					AccountKey gpk=genesisKey.getAccountKey();
 					State state=Init.createState(gpk,gpk,List.of(gpk));

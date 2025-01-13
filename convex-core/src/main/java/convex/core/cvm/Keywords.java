@@ -61,7 +61,8 @@ public class Keywords {
 
 	public static final Keyword BIND_ADDRESS = Keyword.intern("bind-address");
 	public static final Keyword URL = Keyword.intern("url");
-
+	public static final Keyword BASE_URL = Keyword.intern("base-url");
+	
 	// Account record keys
 	public static final Keyword SEQUENCE = Keyword.intern("sequence");
 	public static final Keyword KEY = Keyword.intern("key");
@@ -145,6 +146,7 @@ public class Keywords {
 	
 	// Commond trust keys
 	public static final Keyword CONTROL = Keyword.intern("control");
+
 
 
 
