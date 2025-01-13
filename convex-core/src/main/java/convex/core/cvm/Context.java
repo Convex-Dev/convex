@@ -2159,20 +2159,17 @@ public class Context {
 
 		// get the callers account and account status
 		Address address = getAddress();
-		AccountStatus as = getAccountStatus(address);
 
-		AccountKey ak = as.getAccountKey();
-		if (ak == null) return withError(ErrorCodes.STATE,"The account signing this transaction must have a public key");
-		PeerStatus ps=s.getPeer(ak);
-		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for this account and account key: "+ak.toChecksumHex());
-		if (!ps.getController().equals(address)) return withError(ErrorCodes.STATE,"Current address "+address+" is not the controller of this peer account");
+		PeerStatus ps=s.getPeer(peerKey);
+		if (ps==null) return withError(ErrorCodes.STATE,"Peer does not exist for key: "+peerKey);
+		if (!Utils.equals(ps.getController(),address)) return withError(ErrorCodes.STATE,"Current address "+address+" is not the controller of this peer account");
 
 		Hash lastStateHash = s.getHash();
 		// TODO: should use complete Map
 		// at the moment only :url is used in the data map
 		AHashMap<ACell,ACell> newMeta=data;
 		PeerStatus updatedPeer=ps.withPeerData(newMeta);
-		s=s.withPeer(ak, updatedPeer); // adjust peer
+		s=s.withPeer(peerKey, updatedPeer); // adjust peer
 		
 		// if no change just return the current context
 		if (lastStateHash.equals(s.getHash())){
