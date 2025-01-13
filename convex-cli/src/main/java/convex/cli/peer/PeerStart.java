@@ -170,7 +170,7 @@ public class PeerStart extends APeerCommand {
 				if (genesisKey!=null) {
 					AccountKey gpk=genesisKey.getAccountKey();
 					State state=Init.createState(gpk,gpk,List.of(gpk));
-					informWarning("Greated genesis State: "+state.getHash());
+					informWarning("Created genesis State: "+state.getHash());
 					config.put(Keywords.STATE, state);
 				}
 				Server server=API.launchPeer(config);

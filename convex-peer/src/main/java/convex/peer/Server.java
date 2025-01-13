@@ -817,5 +817,11 @@ public class Server implements Closeable {
 		}
 	}
 
+	public static Server fromPeerData(AKeyPair kp, AMap<Keyword,ACell> peerData) throws LaunchException, ConfigException, InterruptedException {
+		HashMap<Keyword, Object> config=new HashMap<>();
+		config.put(Keywords.KEYPAIR, kp);
+		return API.launchPeer(config);
+	}
+
 
 }

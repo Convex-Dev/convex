@@ -20,7 +20,7 @@ import picocli.CommandLine.Option;
 		description = "Backup stored data for a peer")
 public class PeerBackup extends APeerCommand {
 	
-	@Option(names = { "--output-file" }, 
+	@Option(names = { "--output-file","-o" }, 
 			description = "Output file for peer CAD3 data. Defaults to timestamped CAD3 file.")
 	private String outFile;
 
@@ -60,6 +60,7 @@ public class PeerBackup extends APeerCommand {
 			}
 		}
 		
+		// Load the peer data from store
 		AMap<Keyword,ACell> peerData;
 		try {
 			peerData=convex.core.cvm.Peer.getPeerData(etchMixin.getEtchStore(), k);
@@ -70,6 +71,7 @@ public class PeerBackup extends APeerCommand {
 			throw new CLIError("Unable to access peers data",e);
 		}
 		
+		// Write peer data to specified target file
 		if (outFile==null) {
 			outFile="peer-backup-"+k.toHexString(8)+"-"+Utils.timeString()+".cad3";
 		}
