@@ -140,6 +140,10 @@ public class Peer {
 		Order co=((Order) peerData.get(Keywords.ORDER));
 		long hpos=((CVMLong) peerData.get(Keywords.HISTORY)).longValue();
 		long timestamp=((CVMLong) peerData.get(Keywords.TIMESTAMP)).longValue();
+		// This gets inferred from keypair, caller might want to check it is correct though!
+		// AccountKey key=AccountKey.parse(peerData.get(Keywords.KEY));
+		
+		
 		return new Peer(keyPair,belief,co,pos,state,genesis,hpos,results,timestamp);
 	}
 
@@ -155,6 +159,7 @@ public class Peer {
 			Keywords.RESULTS,blockResults,
 			Keywords.POSITION,CVMLong.create(statePosition),
 			Keywords.STATE,state,
+			Keywords.KEY,peerKey,
 			Keywords.GENESIS,genesis,
 			Keywords.TIMESTAMP,timestamp
 		);
