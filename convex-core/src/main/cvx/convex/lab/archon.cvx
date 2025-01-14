@@ -6,9 +6,9 @@
 
 ;;;;;;;;;; Governance
 ;; We set a controller with upgrade and access rights. This can be removed / modified later
-;; Use the current controller, or the geneses peer account #12 if unspecified
+;; Use the current controller, or the trusted user account #13 if unspecified
 
-(define guv (or *controller* #12))
+(define guv (or *controller* #13)) 
 (set-controller guv)
 
 ;;;;;;;;;; Values
