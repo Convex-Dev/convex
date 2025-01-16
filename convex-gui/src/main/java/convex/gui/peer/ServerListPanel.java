@@ -20,6 +20,7 @@ import convex.api.ConvexRemote;
 import convex.core.Coin;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.TODOException;
+import convex.core.init.Init;
 import convex.core.util.Utils;
 import convex.gui.components.ActionButton;
 import convex.gui.components.ActionPanel;
@@ -70,7 +71,11 @@ public class ServerListPanel extends JPanel {
 			ConvexLocal convex=manager.getDefaultConvex();
 			manager.launchExtraPeer(convex);
 		});
-		btnLaunch.setToolTipText("Launch an extra peer for the network. Allocates some stake from genesis account");
+		btnLaunch.setToolTipText("Launch an extra peer when running a local network. Allocates some stake from genesis peer controller account.");
+		if (!Init.GENESIS_PEER_ADDRESS.equals (manager.getDefaultConvex().getAddress())) {
+			// Disable if we are not the genesis peer
+			btnLaunch.setEnabled(false);
+		}
 		toolBar.add(btnLaunch);
 
 // TODO: We probably want to restore this, but semantics not obvious
