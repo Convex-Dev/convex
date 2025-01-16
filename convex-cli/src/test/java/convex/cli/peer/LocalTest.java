@@ -10,6 +10,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
@@ -25,10 +28,10 @@ import convex.cli.CLTester;
 import convex.cli.ExitCodes;
 import convex.cli.Helpers;
 import convex.core.Result;
+import convex.core.crypto.AKeyPair;
 import convex.core.crypto.PFXTools;
-import java.util.List;
-import java.util.Scanner;
-
+import convex.core.data.Blob;
+import convex.core.data.Blobs;
 import convex.core.util.Utils;
 import convex.peer.ConfigException;
 import convex.peer.LaunchException;
@@ -39,7 +42,6 @@ public class LocalTest {
 	private static final char[] KEY_PASSWORD = "localKeyPassword".toCharArray();
 
 	static final File TEMP_FILE;
-	static final File TEMP_ETCH;
 	private static final String KEYSTORE_FILENAME;
 
 	private static final int TEST_PORT = 28888; // avoid clash with something on 18888
@@ -51,7 +53,7 @@ public class LocalTest {
 	static {
 		try {
 			TEMP_FILE = Helpers.createTempFile("tempLocalKeystore", ".pfx");
-			TEMP_ETCH = Helpers.createTempFile("tempLocalEtchDatabase", ".db");
+			
 			PFXTools.createStore(TEMP_FILE, KEYSTORE_PASSWORD);
 			KEYSTORE_FILENAME = TEMP_FILE.getCanonicalPath();
 		} catch (Exception t) {
@@ -111,20 +113,40 @@ public class LocalTest {
 			}
 			return;
 		});
+		checker.setDaemon(true);
 		checker.start();
-		checker.join(5000);
+		checker.join(10000);
 		assertTrue(process.isAlive());
 	}
 
-	@AfterAll
-	public static void tearDown() {
-		process.destroy();
-		try {
-			process.waitFor(3000, TimeUnit.MILLISECONDS);
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+	
+	@Test
+	public void testSync() throws IOException, TimeoutException, InterruptedException, ExecutionException {
+		Blob seed=Blobs.createRandom(32);
+		AKeyPair nkp=AKeyPair.create(seed);
+		int SYNCED_PORT=TEST_PORT+1;
+		
+		CLTester newKeyTester = CLTester.run("key", "import", "--type", "seed", "--storepass",
+				new String(KEYSTORE_PASSWORD), "--keystore", KEYSTORE_FILENAME, "--keypass", new String(KEY_PASSWORD),
+				"--text", seed.toString(), "--passphrase", bipPassphrase,"-v0");
+		newKeyTester.assertExitCode(ExitCodes.SUCCESS);
+		
+		CLTester syncTester =  CLTester.runAsync(
+				"peer", 
+				"start",
+				"--peer-key",nkp.getAccountKey().toHexString(),
+				"--storepass", new String(KEYSTORE_PASSWORD), 
+				"--keystore", KEYSTORE_FILENAME, 
+				"--etch=temp",
+				"--norest",
+				"--peer-keypass",new String(KEY_PASSWORD),
+				"--host", "localhost",
+				"--port",Integer.toString(TEST_PORT),
+				"--peer-port",Integer.toString(SYNCED_PORT)
+			);
+		syncTester.waitForStart(5000);
+		syncTester.interrupt();
+		syncTester.assertExitCode(ExitCodes.INTERRUPT);
 	}
 
 	@Test
@@ -151,4 +173,17 @@ public class LocalTest {
 //		);
 //		tester.assertExitCode(ExitCodes.SUCCESS);
 	}
+	
+	@AfterAll
+	public static void tearDown() {
+		process.destroy();
+		try {
+			process.waitFor(5000, TimeUnit.MILLISECONDS);
+			assertFalse(process.isAlive());
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
 }

@@ -133,7 +133,7 @@ public class IPUtils {
 	/**
 	 * Parses a socket address
 	 * @param hostname Hostname or "host:port" string
-	 * @param port Port to use (null implies default peer port)
+	 * @param port Port to use (null implies default peer port, or whatever specified in hostname)
 	 * @return Socket address or null if failed to parse
 	 */
 	public static InetSocketAddress parseAddress(String hostname, Integer port) {

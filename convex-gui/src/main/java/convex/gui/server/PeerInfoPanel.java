@@ -91,7 +91,7 @@ public class PeerInfoPanel extends JPanel {
 			sb.append("Store:                " + s.getStore() + "\n");
 			sb.append("\n");
 	
-			sb.append(s.getStatusVector()+"\n");
+			sb.append(s.getStatusData()+"\n");
 			sb.append("\n");
 			
 			sb.append("Transactions:\n");

@@ -93,7 +93,7 @@ public class NettyConnection extends AConnection {
 		f.await(); // Wait until done
 		
 		if (!f.isSuccess()) {
-			throw new IOException("Failed to connect to peer",f.cause());
+			throw new IOException("Failed to connect to peer at "+sa,f.cause());
 		}
 
 		Channel chan = f.channel();

@@ -199,16 +199,18 @@ public class Server implements Closeable {
 					log.info("Restored Peer with root data hash: {}",store.getRootHash());
 					return peer;
 				}
-			}
+			} 
+			// No sync or restored state, so use passed state
 			State genesisState = (State) config.get(Keywords.STATE);
 			if (genesisState!=null) {
-				log.debug("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
+				log.info("Defaulting to standard Peer startup with genesis state: "+genesisState.getHash());
 			} else {
 				AccountKey peerKey=keyPair.getAccountKey();
 				genesisState=Init.createState(List.of(peerKey));
-				log.debug("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
+				log.info("Created new genesis state: "+genesisState.getHash()+ " with initial peer: "+peerKey);
 			}
 			return Peer.createGenesisPeer(keyPair,genesisState);
+
 		} catch (IOException e) {
 			throw new LaunchException("IO Exception while establishing peer",e);
 		}
@@ -501,7 +503,7 @@ public class Server implements Closeable {
 	
 	protected void processStatus(Message m) {
 		// We can ignore payload
-		AVector<ACell> reply = getStatusVector();
+		AVector<ACell> reply = getStatusData();
 		Result r=Result.create(m.getID(), reply);
 		m.returnResult(r);
 	}
@@ -519,7 +521,7 @@ public class Server implements Closeable {
 	 * 8 = consensus point vector
 	 * @return Status vector
 	 */
-	public AVector<ACell> getStatusVector() {
+	public AVector<ACell> getStatusData() {
 		Peer peer=getPeer();
 		Belief belief=peer.getBelief();
 		
@@ -646,7 +648,7 @@ public class Server implements Closeable {
 			try {
 				persistPeerData();
 			} catch (IOException e) {
-				log.warn("Unable to persist Peer data: ",e);
+				log.warn("Unable to persist Peer data in "+store,e);
 			}
 		}
 
@@ -813,7 +815,7 @@ public class Server implements Closeable {
 
 	public void waitForShutdown() throws InterruptedException {
 		while (isRunning()&&!Thread.currentThread().isInterrupted()) {
-			Thread.sleep(400);
+			Thread.sleep(1000);
 		}
 	}
 

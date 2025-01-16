@@ -29,7 +29,6 @@ public class Constants {
 
 	public static final String DEFAULT_PEER_HOSTNAME = "localhost";
 
-	
 	public static final int DEFAULT_VERBOSE_LEVEL = 2;
 
 }

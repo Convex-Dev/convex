@@ -3,6 +3,7 @@ package convex.cli;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +52,7 @@ import picocli.CommandLine.ScopeType;
 public class Main extends ACommand {
 	private static Logger log = LoggerFactory.getLogger(Main.class);
 
-	public CommandLine commandLine;
+	public final CommandLine commandLine;
 	
 	public Main() {
 		commandLine= new CommandLine(this);
@@ -80,6 +81,8 @@ public class Main extends ACommand {
 			defaultValue = "${env:CONVEX_VERBOSE_LEVEL:-"+Constants.DEFAULT_VERBOSE_LEVEL+"}", 
 			description = "Specify verbosity level. Use -v0 to suppress user output, -v5 for all log output. Default: ${DEFAULT-VALUE}") 
 	private Integer verbose;
+
+	public final CompletableFuture<String> startupFuture=new CompletableFuture<>();
 
 	@Override
 	public void execute() {
@@ -137,9 +140,9 @@ public class Main extends ACommand {
 			int result = commandLine.execute(args);
 			return result;
 		} finally {
+			startupFuture.complete("Ended without starting");
 			commandLine.getOut().flush();
 			commandLine.getErr().flush();
-
 		}
 	}
 
@@ -192,6 +195,8 @@ public class Main extends ACommand {
 					err.println("Underlying cause: ");
 					cause.printStackTrace(err);
 				}
+			} else if (ex instanceof InterruptedException)  {
+				informError("Process interrupted");
 			} else if (ex.getClass().getSimpleName().equals("UserInterruptException")) {
 				informError("Operation cancelled by user");
 				if (verbose>=3) {
@@ -260,6 +265,10 @@ public class Main extends ACommand {
 	public Main cli() {
 		// We are the top level command!
 		return this;
+	}
+
+	public void notifyStartup() {
+		startupFuture.complete("Started");
 	}
 
 

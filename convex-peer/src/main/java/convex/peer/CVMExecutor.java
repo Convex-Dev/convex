@@ -46,12 +46,7 @@ public class CVMExecutor extends AThreadedComponent {
 				Peer updatedPeer=peer.updateState();
 				if (updatedPeer!=peer) {
 					peer=updatedPeer;
-					try {
-						persistPeerData();
-					} catch (IOException e) {
-						log.debug("IO Exception ("+e.getMessage()+") while persisting peer data",e);
-						throw new InterruptedException("IO Exception while persisting peer data");
-					}
+					persistPeerData();
 					maybeCallHook(peer);
 				}
 			}
@@ -61,7 +56,7 @@ public class CVMExecutor extends AThreadedComponent {
 			// This is some fatal failure
 			log.error("Fatal exception encountered in CVM Executor",e);
 			server.close();
-		}
+		} 
 	}
 	
 	public void syncPeer(Server base) {

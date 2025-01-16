@@ -35,14 +35,20 @@ public class EtchMixin extends AMixin {
 			throw new CLIError(
 					"No Etch store file specified. Maybe include --etch option or set environment variable CONVEX_ETCH_FILE ?");
 		}
-
-		File etchFile = FileUtils.getFile(fileName);
-
+		
+		File etchFile=null;
 		try {
+			if ("temp".equals(fileName)) {
+				etch = EtchStore.createTemp("tempCLIStore");
+				return etch;
+			}
+	
+			etchFile = FileUtils.getFile(fileName);
+
 			etch = EtchStore.create(etchFile);
 			return etch;
 		} catch (IOException e) {
-			throw new CLIError("Unable to load Etch store at: " + etchFile + " cause: " + e.getMessage());
+			throw new CLIError("Unable to load Etch store at: " + fileName+ " due to "+e,e);
 		}
 	}
 	

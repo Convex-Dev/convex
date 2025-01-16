@@ -59,6 +59,7 @@ public class ClientTest {
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR, kp);
 			config.put(Keywords.STORE, store);
+			config.put(Keywords.STORE, store);
 			Server s=API.launchPeer(config);
 			String port=Integer.toString(s.getPort());
 		

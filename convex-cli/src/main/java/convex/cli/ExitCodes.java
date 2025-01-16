@@ -71,11 +71,22 @@ public class ExitCodes {
 	 * Something was not configured properly
 	 */
 	public static final int CONFIG = 78;
+	
+	/**
+	 * Interrupt with graceful shutdown fromn interrupt
+	 * Posix standard exit code 128 + 2 (SIGINT)
+	 */
+	public static final int INTERRUPT = 130;
+
 
 
 	public static int getExitCode(Throwable t) {
 		if (t instanceof CLIError) {
 			return ((CLIError)t).getExitCode();
+		}
+		
+		if (t instanceof InterruptedException) {
+			return ExitCodes.INTERRUPT;
 		}
 		
 		// TODO Possible to have more specific errors?

@@ -126,6 +126,7 @@ public class PeerStart extends APeerCommand {
 
 	@Override
 	public void execute() throws InterruptedException {
+		Server server=null;
 		
 		storeMixin.ensureKeyStore();
 		try (EtchStore store = etchMixin.getEtchStore()) {
@@ -165,7 +166,9 @@ public class PeerStart extends APeerCommand {
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
+				config.put(Keywords.SOURCE, peerMixin.getSpecifiedSource());
 				config.put(Keywords.URL, url);
+				config.put(Keywords.PORT, port);
 				config.put(Keywords.BASE_URL, baseURL);
 				if (genesisKey!=null) {
 					AccountKey gpk=genesisKey.getAccountKey();
@@ -173,7 +176,7 @@ public class PeerStart extends APeerCommand {
 					informWarning("Created genesis State: "+state.getHash());
 					config.put(Keywords.STATE, state);
 				}
-				Server server=API.launchPeer(config);
+				server=API.launchPeer(config);
 				
 				if (!norest) {
 					restServer=RESTServer.create(server);
@@ -181,14 +184,18 @@ public class PeerStart extends APeerCommand {
 				}
 				
 				informSuccess("Peer started");
+				cli().notifyStartup();
 				server.waitForShutdown();
+				inform("Peer shutdown completed");
 			} catch (ConfigException t) {
 				throw new CLIError(ExitCodes.CONFIG,"Error in peer configuration: "+t.getMessage(),t);
 			} catch (LaunchException e) {
 				throw new CLIError("Error launching peer: "+e.getMessage(),e);
 			} finally {
 				if (restServer!=null) restServer.close();
-				inform("Peer shutdown completed");
+				if (server!=null) {
+					server.close();
+				}
 			}
 		}
 	}

@@ -132,18 +132,20 @@ public class BeliefPropagator extends AThreadedComponent {
 			if (log.isDebugEnabled()) {
 				log.debug("Belief updated cps="+Vectors.createLongs(belief.getOrder(server.getPeerKey()).getConsensusPoints()));
 			}
-			
-
 		}
 		
-		maybeBroadcast(updated);
-		
-		// Persist Belief in all cases, even if we didn't announce
-		// This is mainly in case we get missing data / sync requests for the Belief
-		// This is super cheap if already persisted, so no problem in general for each loop
+	
 		try {
+			// Do the broadcast
+			maybeBroadcast(updated);
+			
+			// Persist Belief in all cases, even if we didn't announce
+			// This is mainly in case we get missing data / sync requests for the Belief
+			// This is super cheap if already persisted, so no problem in general for each loop
 			belief=Cells.persist(belief);
 		} catch (IOException e) {
+			// We might get an error while shutting down, can ignore this
+			if (!server.isLive()) return;
 			throw Utils.sneakyThrow(e);
 		}
 		
@@ -180,10 +182,10 @@ public class BeliefPropagator extends AThreadedComponent {
 				}
 				
 			} catch (Exception e) {
-				log.warn("Error attempting to create broadcast message",e);
+				if (server.isLive()) {
+					log.warn("Error attempting to create broadcast message",e);
+				}
 			}
-			
-			
 		}
 		return false;
 	}

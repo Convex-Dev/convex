@@ -68,7 +68,7 @@ public class PeerBackup extends APeerCommand {
 				throw new CLIError("No peer data found for key: "+k);
 			}
 		} catch (Exception e) {
-			throw new CLIError("Unable to access peers data",e);
+			throw new CLIError("Unable to access peer data",e);
 		}
 		
 		// Write peer data to specified target file

@@ -43,8 +43,7 @@ public abstract class ACommand implements Runnable {
 		try {
 			execute();
 		} catch (InterruptedException e) {
-			Thread.currentThread().interrupt();
-			throw new CLIError(ExitCodes.TEMPFAIL,"Command interrupted");
+			throw new CLIError(ExitCodes.INTERRUPT,"Command interrupted");
 		}
 	}
 	
