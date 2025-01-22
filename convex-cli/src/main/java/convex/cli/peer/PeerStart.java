@@ -1,6 +1,7 @@
 package convex.cli.peer;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 
@@ -163,14 +164,20 @@ public class PeerStart extends APeerCommand {
 
 			RESTServer restServer=null;
 			try {
+				InetSocketAddress remoteSource=peerMixin.getSpecifiedSource();
+				
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
-				config.put(Keywords.SOURCE, peerMixin.getSpecifiedSource());
+				config.put(Keywords.SOURCE, remoteSource);
 				config.put(Keywords.URL, url);
 				config.put(Keywords.PORT, port);
 				config.put(Keywords.BASE_URL, baseURL);
 				if (genesisKey!=null) {
+					if (remoteSource!=null) {
+						throw new CLIError("--genesis option should not be used when syncing with remote source");
+					}
+					
 					AccountKey gpk=genesisKey.getAccountKey();
 					State state=Init.createState(gpk,gpk,List.of(gpk));
 					informWarning("Created genesis State: "+state.getHash());
