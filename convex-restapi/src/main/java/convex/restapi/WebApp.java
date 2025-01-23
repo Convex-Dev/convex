@@ -34,7 +34,7 @@ public class WebApp {
 		DomContent content= html(
 				makeHeader("Convex Peer Server"),
 				body(
-					h1("Convex Peer Server"),
+					h1("Convex Peer"),
 					aside(makeLinks()).withStyle("float: right"),
 					p("Version: "+Utils.getVersion()),
 					p("This is the default page for a Convex Peer Server running the REST API")
@@ -46,8 +46,11 @@ public class WebApp {
 	}
 	
 	protected void missingPage(Context ctx) { 
-		DomContent content= html(
-				makeHeader("404: Not Found"),
+		String type=ctx.header("Accept");
+		if (type.contains("html")) {
+			ctx.header("Content-Type", "text/html");	
+			DomContent content= html(
+				makeHeader("404: Not Found: "+ctx.path()),
 				body(
 					h1("404: not found: "+ctx.path()),
 					p("This is not the page you are looking for."),
@@ -56,12 +59,15 @@ public class WebApp {
 					
 				)
 			);
-		ctx.result(content.render());
-		ctx.header("Content-Type", "text/html");
+			ctx.result(content.render());
+		} else {
+			ctx.result("404 Not found: "+ctx.path());
+		}
 		ctx.status(404);
 	}
 
 	static final List<String[]> LINKS = List.of(
+		sa("Convex Documentation: ","Convex Docs" ,"https://docs.convex.world"),
 		sa("Open API documentation for this peer: ","Swagger API" ,"/swagger"),
 		sa("General information at the ","Convex Website", "https://convex.world"),
 		sa("Chat with the community at the ","Convex Discord Server", "https://discord.com/invite/xfYGq4CT7v"),
@@ -94,6 +100,6 @@ public class WebApp {
 		app.get("/", this::indexPage);
 		app.get("/404.html", this::missingPage);
 		
-		// app.error(404, this::missingPage);
+		app.error(404, this::missingPage);
 	}
 }

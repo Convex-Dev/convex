@@ -25,6 +25,7 @@ import convex.peer.Server;
 import convex.restapi.api.ChainAPI;
 import convex.restapi.api.DLAPI;
 import convex.restapi.api.DepAPI;
+import convex.restapi.api.ExplorerAPI;
 import convex.restapi.api.PeerAdminAPI;
 import io.javalin.Javalin;
 import io.javalin.community.ssl.SslPlugin;
@@ -80,6 +81,8 @@ public class RESTServer implements Closeable {
 				staticFiles.skipFileFunction = req -> false; // you can use this to skip certain files in the dir, based
 																// on the HttpServletRequest
 			});
+			
+			config.useVirtualThreads=true;
 		});
 
 		app.exception(Exception.class, (e, ctx) -> {
@@ -177,6 +180,7 @@ public class RESTServer implements Closeable {
 	protected DLAPI dlAPI;
 	protected WebApp webApp;
 	protected PeerAdminAPI peerAPI;
+	protected ExplorerAPI explorerAPI;
 
 	private void addAPIRoutes(Javalin app) {
 		chainAPI = new ChainAPI(this);
@@ -194,6 +198,8 @@ public class RESTServer implements Closeable {
 		dlAPI = new DLAPI(this);
 		dlAPI.addRoutes(app);
 
+		explorerAPI = new ExplorerAPI(this);
+		explorerAPI.addRoutes(app);
 	}
 
 	/**

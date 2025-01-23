@@ -1,7 +1,10 @@
 package convex.restapi.api;
 
+import java.util.Collections;
+import java.util.Enumeration;
 import java.util.Map;
 
+import convex.api.ContentTypes;
 import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.Format;
@@ -73,6 +76,24 @@ public abstract class ABaseAPI {
 		}
 	}
 	
+	protected String calcResponseContentType(Context ctx) {
+		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
+		String type=ContentTypes.JSON;
+		// TODO: look at quality weights perhaps
+		if (accepts!=null) {
+			for (String a:Collections.list(accepts)) {
+				if (a.contains(ContentTypes.CVX_RAW)) {
+					type=ContentTypes.CVX_RAW;
+					break;
+				}
+				if (a.contains(ContentTypes.CVX)) {
+					type=ContentTypes.CVX;
+				}
+			}
+		}
+		return type;
+	}
+	
 	/**
 	 * Gets a generic JSON response for an error message
 	 * @param string
@@ -87,6 +108,6 @@ public abstract class ABaseAPI {
 	 * @param app Javalin instance to add routes to
 	 * @param baseURL Base URL for routes e.g. "/service-name/api"
 	 */
-	protected abstract void addRoutes(Javalin app);
+	abstract void addRoutes(Javalin app);
 
 }

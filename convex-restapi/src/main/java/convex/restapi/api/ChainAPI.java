@@ -697,19 +697,7 @@ public class ChainAPI extends ABaseAPI {
 		int status=statusForResult(r);
 		ctx.status(status);
 		
-		Enumeration<String> accepts=ctx.req().getHeaders("Accept");
-		String type=ContentTypes.JSON;
-		if (accepts!=null) {
-			for (String a:Collections.list(accepts)) {
-				if (a.contains(ContentTypes.CVX_RAW)) {
-					type=ContentTypes.CVX_RAW;
-					break;
-				}
-				if (a.contains(ContentTypes.CVX)) {
-					type=ContentTypes.CVX;
-				}
-			}
-		}
+		String type = calcResponseContentType(ctx);
 		
 		if (type.equals(ContentTypes.JSON)) {
 			ctx.contentType(ContentTypes.JSON);
