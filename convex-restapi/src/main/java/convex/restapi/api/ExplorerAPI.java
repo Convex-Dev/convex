@@ -1,18 +1,6 @@
 package convex.restapi.api;
 
-import static j2html.TagCreator.body;
-import static j2html.TagCreator.code;
-import static j2html.TagCreator.each;
-import static j2html.TagCreator.head;
-import static j2html.TagCreator.html;
-import static j2html.TagCreator.link;
-import static j2html.TagCreator.table;
-import static j2html.TagCreator.tbody;
-import static j2html.TagCreator.td;
-import static j2html.TagCreator.th;
-import static j2html.TagCreator.thead;
-import static j2html.TagCreator.title;
-import static j2html.TagCreator.tr;
+import static j2html.TagCreator.*;
 
 import java.util.ArrayList;
 
@@ -45,6 +33,7 @@ public class ExplorerAPI extends ABaseAPI {
 	@Override
 	public void addRoutes(Javalin app) {
 		String prefix = ROUTE;
+		app.get(prefix, this::showExplorer);
 		app.get(prefix+"blocks", this::showBlocks);
 		app.get(prefix+"states", this::showStates);
 	}
@@ -56,6 +45,31 @@ public class ExplorerAPI extends ABaseAPI {
 		);
 	}
 	
+	/**
+	 * Produce a table of states
+	 * @param ctx
+	 */
+	public void showExplorer(Context ctx) {
+		DomContent result=html(
+				makeHeader("Peer Explorer"),
+				body(
+					h1("Convex Explorer"),
+					article(
+						h4("Useful links: "),
+						p(a("Consensus Blocks").withHref(ROUTE+"blocks")),
+						p(a("States").withHref(ROUTE+"states"))
+					)
+				)
+			);
+		
+		ctx.result(result.render());
+		ctx.contentType("text/html");
+	}
+	
+	/**
+	 * Produce a table of states
+	 * @param ctx
+	 */
 	public void showStates(Context ctx) {
 		Server s=restServer.getServer();
 		
@@ -77,7 +91,7 @@ public class ExplorerAPI extends ABaseAPI {
 		}
 
 		DomContent result=html(
-				makeHeader("States2"),
+				makeHeader("States"),
 				body(
 					table(
 						thead(tr(th("Position"),th("Hash"))),
@@ -92,6 +106,10 @@ public class ExplorerAPI extends ABaseAPI {
 		ctx.contentType("text/html");
 	}
 	
+	/**
+	 * Produce a table of blocks
+	 * @param ctx
+	 */
 	public void showBlocks(Context ctx) {
 		Server s=restServer.getServer();
 		

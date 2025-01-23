@@ -37,7 +37,9 @@ public class WebApp {
 					h1("Convex Peer"),
 					aside(makeLinks()).withStyle("float: right"),
 					p("Version: "+Utils.getVersion()),
-					p("This is the default page for a Convex Peer Server running the REST API")
+					p(a("Explorer").withHref("explorer")),
+
+					p("This is the default web page for a Convex Peer Server running the REST API")
 				)
 			);
 		ctx.result(content.render());
