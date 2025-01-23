@@ -514,7 +514,10 @@ public class Server implements Closeable {
 	
 	protected void processStatus(Message m) {
 		// We can ignore payload
-		ACell reply = getStatusMap();
+		ACell reply = getStatusData();
+		
+		// TODO for 0.9.0 ACell reply = getStatusMap();
+		
 		Result r=Result.create(m.getID(), reply);
 		m.returnResult(r);
 	}
