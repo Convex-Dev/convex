@@ -224,14 +224,20 @@ public class Server implements Closeable {
 			
 			// Sync status and genesis state
 			Result result = convex.requestStatusSync(timeout);
-			AVector<ACell> status = result.getValue();
-			if (status == null || status.count()!=Config.STATUS_COUNT) {
-				throw new Error("Bad status message from remote Peer");
+			AMap<Keyword,ACell> status = API.ensureStatusMap(result.getValue());
+			if ((result.isError()) || status == null) {
+				throw new LaunchException("Bad status message from remote Peer: "+result);
 			}
-			Hash beliefHash=RT.ensureHash(status.get(0));
-			AccountKey remoteKey=RT.ensureAccountKey(status.get(3));
-			Hash genesisHash=RT.ensureHash(status.get(2));
-			Hash stateHash=RT.ensureHash(status.get(4));
+			
+			Hash beliefHash=RT.ensureHash(status.get(Keywords.BELIEF));
+			AccountKey remotePeerKey=RT.ensureAccountKey(Keywords.PEER);
+			Hash genesisHash=RT.ensureHash(status.get(Keywords.GENESIS));
+			Hash stateHash=RT.ensureHash(Keywords.STATE);
+			
+			if (genesisHash==null) {
+				throw new LaunchException("Remote peer did not provide genesis hash");
+			}
+			
 			log.debug("Attempting to sync remote state: "+stateHash + " on network: "+genesisHash);
 			State genF=(State) convex.acquire(genesisHash).get(timeout,TimeUnit.MILLISECONDS);
 			log.debug("Retrieved Genesis State: "+genesisHash);
@@ -251,14 +257,19 @@ public class Server implements Closeable {
 			log.info("Retrieved Peer Belief: "+beliefHash+ " with memory size: "+belF.getMemorySize());
 	
 			// Add the new connection since it seems good
-			getConnectionManager().addConnection(remoteKey,convex);
+			getConnectionManager().addConnection(remotePeerKey,convex);
 			
-			SignedData<Order> peerOrder=belF.getOrders().get(remoteKey);
+			SignedData<Order> peerOrder=belF.getOrders().get(remotePeerKey);
+
+			
 			if (peerOrder!=null) {
+				// We got an order from remote peer, so assume correct
 				SignedData<Order> newOrder=keyPair.signData(peerOrder.getValue());
 				belF=belF.withOrders(belF.getOrders().assoc(keyPair.getAccountKey(),newOrder));
 			} else {
-				throw new LaunchException("Remote peer Belief missing it's own Order? Who to trust?");
+				// No order, so start with an empty Ordering
+				SignedData<Order> newOrder=keyPair.signData(Order.create());
+				belF=belF.withOrders(belF.getOrders().assoc(keyPair.getAccountKey(),newOrder));
 			}
 			// System.out.println(Lists.of(peerOrder.getValue().getConsensusPoints()));
 
@@ -503,7 +514,7 @@ public class Server implements Closeable {
 	
 	protected void processStatus(Message m) {
 		// We can ignore payload
-		AVector<ACell> reply = getStatusData();
+		ACell reply = getStatusMap();
 		Result r=Result.create(m.getID(), reply);
 		m.returnResult(r);
 	}
@@ -542,6 +553,12 @@ public class Server implements Closeable {
 		AVector<ACell> reply=Vectors.of(beliefHash,stateHash,genesisHash,peerKey,consensusHash, cp,pp,op,cps);
 		assert(reply.count()==Config.STATUS_COUNT);
 		return reply;
+	}
+	
+	public static final AVector<Keyword> sTATUS_KEYS=Vectors.create(Keywords.BELIEF,Keywords.STATES,Keywords.GENESIS);
+	
+	public AMap<Keyword,ACell> getStatusMap() {
+		return Maps.zipMap(API.STATUS_KEYS,getStatusData());
 	}
 
 	private void processChallenge(Message m) {

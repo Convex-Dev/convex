@@ -15,9 +15,12 @@ import convex.core.cvm.Keywords;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.Lists;
+import convex.core.data.Maps;
+import convex.core.data.Vectors;
 import convex.core.init.Init;
 import convex.core.lang.RT;
 import convex.core.store.AStore;
@@ -216,4 +219,33 @@ public class API {
 		
 		return results;
 	}
+	
+	public static final AVector<Keyword> STATUS_KEYS=Vectors.create(
+		Keywords.BELIEF,
+		Keywords.STATES,
+		Keywords.GENESIS,
+		Keywords.PEER,
+		Keywords.STATE,
+		Keywords.CONSENSUS_POINT,
+		Keywords.PROPOSAL_POINT,
+		Keywords.BLOCK_POINT,
+		Keywords.CONSENSUS);
+
+	/**
+	 * Converts a status map or value vector to a status map
+	 * @param statusValue
+	 * @return
+	 */
+	@SuppressWarnings("unchecked")
+	public static AMap<Keyword, ACell> ensureStatusMap(ACell statusValue) {
+		AMap<Keyword, ACell> result=RT.ensureHashMap(statusValue);
+		if (result!=null) return result;
+		
+		if (statusValue instanceof AVector) {
+			result=Maps.zipMap(API.STATUS_KEYS, (AVector<ACell>)statusValue);
+		}
+		return result;
+	}
+	
+
 }

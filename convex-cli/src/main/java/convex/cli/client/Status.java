@@ -4,11 +4,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import convex.api.Convex;
+import convex.cli.CLIError;
 import convex.cli.output.RecordOutput;
 import convex.core.Result;
+import convex.core.cvm.Keywords;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
+import convex.core.data.Keyword;
+import convex.peer.API;
 import picocli.CommandLine.Command;
 
 /**
@@ -25,29 +30,28 @@ public class Status extends AClientCommand {
 
 	protected static final Logger log = LoggerFactory.getLogger(Status.class);
 
-	@SuppressWarnings("unchecked")
 	@Override 
 	public void execute() {
 		Convex convex = clientConnect();
 		Result result;
 		result = convex.requestStatus().join();
 
-		AVector<ACell> resultVector = (AVector<ACell>) result.getValue();
-		ABlob stateHash = (ABlob) resultVector.get(1);
+		AMap<Keyword,ACell> status = API.ensureStatusMap(result.getValue());
+		
+		if (status==null) {
+			throw new CLIError(convex.toString()+" did not return a valid status, was : "+result);
+		}
 		// Hash hash = Hash.wrap(stateHash.getBytes());
 
 		//AVector<AccountStatus> accountList = state.getAccounts();
 		//Index<AccountKey, PeerStatus> peerList = state.getPeers();
 
 		RecordOutput output=new RecordOutput();
-		output.addField("State hash", stateHash.toString());
-		//output.addField("Timestamp",state.getTimeStamp().toString());
-		//output.addField("Timestamp value", Text.dateFormat(state.getTimeStamp().longValue()));
-		//output.addField("Global Fees", Text.toFriendlyBalance(state.getGlobalFees().longValue()));
-		//output.addField("Juice Price", Text.toFriendlyBalance(state.getJuicePrice().longValue()));
-		//output.addField("Total Funds", Text.toFriendlyBalance(state.computeTotalFunds()));
-		//output.addField("Number of accounts", accountList.size());
-		//output.addField("Number of peers", peerList.size());
+		int n=API.STATUS_KEYS.size();
+		for (int i=0; i<n; i++) {
+			Keyword k=API.STATUS_KEYS.get(i);
+			output.addField(k, status.get(k));
+		}
 		mainParent.printRecord(output);
 	}
 

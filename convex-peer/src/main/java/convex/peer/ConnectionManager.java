@@ -24,10 +24,13 @@ import convex.core.cvm.Peer;
 import convex.core.cvm.PeerStatus;
 import convex.core.cvm.State;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
+import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;
@@ -119,12 +122,12 @@ public class ConnectionManager extends AThreadedComponent {
 				return;		
 			}
 			
-			AVector<ACell> status = result.getValue();
+			AMap<Keyword,ACell> status = API.ensureStatusMap(result.getValue());
 			if (status==null) {
 				log.warn("Dubious status response message: "+result);
 				return;
 			}
-			Hash h=RT.ensureHash(status.get(0));
+			Hash h=RT.ensureHash(status.get(Keywords.BELIEF));
 
 			Belief sb=(Belief) convex.acquire(h).get(POLL_ACQUIRE_TIMEOUT_MILLIS,TimeUnit.MILLISECONDS);
 
@@ -599,10 +602,12 @@ public class ConnectionManager extends AThreadedComponent {
 				log.debug("Got status from peer: "+result);
 			}
 			
-			AVector<ACell> status = result.getValue();
+			ACell statusValue=result.getValue();
+			
+			AMap<Keyword,ACell> status = API.ensureStatusMap(statusValue);
 			// close the temp connection to Convex API
 			
-			AccountKey peerKey =RT.ensureAccountKey(status.get(3));
+			AccountKey peerKey =RT.ensureAccountKey(status.get(Keywords.PEER));
 			if (peerKey==null) return null;
 
 			Convex existing=getConnection(peerKey);
@@ -619,6 +624,8 @@ public class ConnectionManager extends AThreadedComponent {
 			return null;
 		}
 	}
+
+
 
 	public synchronized void addConnection(AccountKey peerKey, Convex convex) {
 		synchronized(connections) {

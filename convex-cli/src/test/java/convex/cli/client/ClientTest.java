@@ -1,6 +1,7 @@
 package convex.cli.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -59,7 +60,6 @@ public class ClientTest {
 			HashMap<Keyword,Object> config=new HashMap<>();
 			config.put(Keywords.KEYPAIR, kp);
 			config.put(Keywords.STORE, store);
-			config.put(Keywords.STORE, store);
 			Server s=API.launchPeer(config);
 			String port=Integer.toString(s.getPort());
 		
@@ -70,6 +70,7 @@ public class ClientTest {
 					"--port",port
 				);
 			tester.assertExitCode(ExitCodes.SUCCESS);
+			assertTrue(tester.getOutput().contains(Keywords.GENESIS.toString()));
 			
 			tester=  CLTester.run(
 					"query", "-a", "#11",

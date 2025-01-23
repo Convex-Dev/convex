@@ -144,6 +144,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public MapEntry<K, V> getEntry(K key) {
+		if (key==null) return null;
 		long kl = key.hexLength();
 		long pl = depth;
 		if (kl < pl) return null; // key is too short to start with current prefix

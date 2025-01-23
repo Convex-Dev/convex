@@ -29,8 +29,10 @@ import convex.core.cvm.Symbols;
 import convex.core.cvm.transactions.ATransaction;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Hash;
+import convex.core.data.Keyword;
 import convex.core.data.Maps;
 import convex.core.data.Ref;
 import convex.core.data.Refs;
@@ -175,8 +177,8 @@ public class ServerTest {
 			Future<Result> statusFuture=convex.requestStatus();
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
 			assertFalse(status.isError());
-			AVector<?> v=status.getValue();
-			Hash h=RT.ensureHash(v.get(0));
+			AMap<Keyword,ACell> v=API.ensureStatusMap(status.getValue());
+			Hash h=RT.ensureHash(v.get(Keywords.BELIEF));
 			
 			AStore peerStore=network.SERVER.getStore();
 			Ref<?> pr=peerStore.refForHash(h);
@@ -201,8 +203,9 @@ public class ServerTest {
 			Future<Result> statusFuture=convex.requestStatus();
 			Result status=statusFuture.get(10000,TimeUnit.MILLISECONDS);
 			assertFalse(status.isError());
-			AVector<?> v=status.getValue();
-			Hash h=RT.ensureHash(v.get(0));
+			assertFalse(status.isError());
+			AMap<Keyword,ACell> v=API.ensureStatusMap(status.getValue());
+			Hash h=RT.ensureHash(v.get(Keywords.BELIEF));
 
 			Future<Belief> acquiror=convex.acquire(h);
 			Belief ab=acquiror.get(10000,TimeUnit.MILLISECONDS);

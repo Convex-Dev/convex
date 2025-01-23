@@ -130,6 +130,8 @@ public class Keywords {
 	public static final Keyword CONSENSUS_POINT = Keyword.intern("consensus-point");
 	public static final Keyword CONSENSUS = Keyword.intern("consensus");
 	public static final Keyword PROPOSAL_POINT = Keyword.intern("proposal-point");
+	public static final Keyword BLOCK_POINT = Keyword.intern("block-point");
+
 
 	public static final Keyword ROOT_KEY = Keyword.intern("root-key");
 	public static final Keyword POSITION = Keyword.intern("position");

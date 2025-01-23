@@ -49,7 +49,7 @@ public class WebApp {
 	
 	protected void missingPage(Context ctx) { 
 		String type=ctx.header("Accept");
-		if (type.contains("html")) {
+		if ((type!=null)&&type.contains("html")) {
 			ctx.header("Content-Type", "text/html");	
 			DomContent content= html(
 				makeHeader("404: Not Found: "+ctx.path()),

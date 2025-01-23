@@ -158,6 +158,15 @@ public class Maps {
 		return map.getFirstHash();
 	}
 
+	public static <K extends ACell, V extends ACell> AMap<K, V> zipMap(AVector<K> keys, AVector<V> values) {
+		AMap<K, V> result=empty();
+		long n=Math.min(keys.count(),  values.count());
+		for (long i=0; i<n; i++) {
+			result=result.assoc(keys.get(i), values.get(i));
+		}
+		return result;
+	}
+
 
 
 
