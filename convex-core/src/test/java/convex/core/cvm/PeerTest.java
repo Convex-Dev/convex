@@ -21,8 +21,11 @@ import convex.core.exceptions.BadFormatException;
 import convex.core.init.Init;
 import convex.core.util.FileUtils;
 
+import convex.core.cpos.CPoSConstants;
+
 @TestInstance(Lifecycle.PER_CLASS)
 public class PeerTest {
+
 	public static String seed="1a44bbe097e38d2ba90e9426e9b1ab0ec12444a25e4d23b77fd121da728737f2";
 	
 	static AKeyPair KP=AKeyPair.create(seed);
@@ -54,5 +57,11 @@ public class PeerTest {
 		
 		Peer p4=Peer.fromData(KP, data2);
 		assertEquals(p.getBelief(),p4.getBelief());
+	}
+	
+	@Test
+	public void testPeerStatus() {
+		PeerStatus ps=PeerStatus.create(Address.ZERO, CPoSConstants.MINIMUM_EFFECTIVE_STAKE);
+		
 	}
 }
