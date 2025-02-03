@@ -212,7 +212,7 @@ public class Server implements Closeable {
 			return Peer.createGenesisPeer(keyPair,genesisState);
 
 		} catch (IOException e) {
-			throw new LaunchException("IO Exception while establishing peer",e);
+			throw new LaunchException("IO Exception while establishing peer: "+e,e);
 		}
 	}
 
