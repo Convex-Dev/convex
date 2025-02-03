@@ -15,6 +15,7 @@ import convex.restapi.RESTServer;
 import io.javalin.Javalin;
 import io.javalin.http.BadRequestResponse;
 import io.javalin.http.Context;
+import io.javalin.http.InternalServerErrorResponse;
 import j2html.tags.DomContent;
 
 /**
@@ -164,8 +165,10 @@ public class ExplorerAPI extends ABaseAPI {
 
 			range[0]=offset;
 			range[1]=Math.min(ns, offset+limit);
+		} catch (BadRequestResponse e) {
+			throw e;
 		} catch (Exception e) {
-			throw new BadRequestResponse("Invalid query parameter");
+			throw new InternalServerErrorResponse("Error handling query parameter: "+e);
 		}
 		return range;
 	}
