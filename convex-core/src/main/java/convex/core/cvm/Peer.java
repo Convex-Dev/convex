@@ -751,5 +751,9 @@ public class Peer {
 		return historyPosition;
 	}
 
+	public AVector<BlockResult> getBlockResults() {
+		return blockResults;
+	}
+
 
 }

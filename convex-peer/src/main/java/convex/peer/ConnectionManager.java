@@ -30,7 +30,6 @@ import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.data.Maps;
 import convex.core.data.SignedData;
 import convex.core.data.Vectors;
 import convex.core.exceptions.BadFormatException;

@@ -18,6 +18,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
+import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Keyword;
 import convex.core.data.ObjectsTest;
@@ -27,6 +28,7 @@ import convex.core.init.Init;
 import convex.core.util.FileUtils;
 import convex.core.util.Utils;
 import convex.core.cpos.Block;
+import convex.core.cpos.BlockResult;
 import convex.core.cpos.CPoSConstants;
 
 @TestInstance(Lifecycle.PER_CLASS)
@@ -129,7 +131,11 @@ public class PeerTest {
 		
 		long sp=pt.getStatePosition();
 		long hp=pt.getHistoryPosition();
+		
 		assertTrue(sp>=hp);
+		
+		AVector<BlockResult> results=pt.getBlockResults();
+		assertEquals(sp-hp,results.count());
 	}
 
 	@Test
