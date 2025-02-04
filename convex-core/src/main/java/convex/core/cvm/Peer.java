@@ -520,6 +520,31 @@ public class Peer {
 		}
 		return new Peer(keyPair, belief, myOrder,stateIndex,s, genesis, historyPosition,newResults, timestamp);
 	}
+	
+	public Peer recalcState(long pos) {
+		Peer result=truncateState(pos);
+		result=result.updateState();
+		return result;
+	}
+
+	public Peer truncateState(long pos) {
+		if (pos>=statePosition) return this;
+		
+		AVector<BlockResult> newResults=blockResults;
+		State newState=state;
+		long newHistory=historyPosition;
+		if (pos>historyPosition) {
+			// within existing history
+			newState=blockResults.get(pos-historyPosition-1).getState();
+			newResults=newResults.slice(0, pos-historyPosition);
+		} else {
+			// recalculate from beginning
+			newResults=Vectors.empty();
+			newState=genesis;
+			pos=0;
+		}
+		return new Peer(keyPair, belief, consensusOrder, pos, newState, genesis, newHistory, newResults, timestamp);
+	}
 
 	private void validateSignatures(State s, AVector<SignedData<Block>> blocks, long start, long end) {
 		Consumer<SignedData<ATransaction>> transactionValidator=st->{
@@ -721,4 +746,10 @@ public class Peer {
 	public Hash getGenesisHash() {
 		return getGenesisState().getHash();
 	}
+
+	public long getHistoryPosition() {
+		return historyPosition;
+	}
+
+
 }

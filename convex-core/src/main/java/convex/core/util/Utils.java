@@ -33,6 +33,7 @@ import convex.core.data.ASequence;
 import convex.core.data.Blob;
 import convex.core.data.Hash;
 import convex.core.data.impl.ALongBlob;
+import convex.core.data.prim.AInteger;
 import convex.core.lang.RT;
 
 /**
@@ -651,13 +652,56 @@ public class Utils {
 	public static int toInt(Object v) {
 		if (v instanceof Integer) return (Integer) v;
 		if (v instanceof String) {
-			return Integer.parseInt((String) v);
+			try {
+				return Integer.parseInt((String) v);
+			} catch (NumberFormatException e) {
+				throw new IllegalArgumentException("String cannot be converted to an integer");
+			}
+		}
+		if (v instanceof ACell) {
+			AInteger cv=AInteger.parse(v);
+			if (cv==null) throw new IllegalArgumentException("Cell not a integer numeric value: " + v);
+			Integer result=(int)cv.longValue();
+			if (result.longValue()==cv.doubleValue()) return result;
+			throw new IllegalArgumentException("CVM numeric value not in Java Integer range");
 		}
 		if (v instanceof Number) {
 			Number number = (Number) v;
 			int value = (int) number.longValue();
 			// following is safe, because double can represent any int
 			if (value != number.doubleValue()) throw new IllegalArgumentException("Cannot coerce to int without loss:");
+			return value;
+		}
+		throw new IllegalArgumentException("Can't convert to int: " + v);
+	}
+	
+	/**
+	 * Converts an object to a Long value, handling Strings and arbitrary numbers.
+	 *
+	 * @param v An object representing a valid int value
+	 * @return The converted int value of the object
+	 * @throws IllegalArgumentException If the argument cannot be converted to an
+	 *                                  int
+	 */
+	public static long toLong(Object v) {
+		if (v instanceof Long) return (Integer) v;
+		if (v instanceof String) {
+			try {
+				return Long.parseLong((String) v);
+			} catch (NumberFormatException e) {
+				throw new IllegalArgumentException("String cannot be converted to a Long");
+			}
+		}
+		if (v instanceof ACell) {
+			AInteger cv=AInteger.parse(v);
+			if (cv==null) throw new IllegalArgumentException("Cell not a integer numeric value: " + v);
+			return cv.longValue();
+		}
+		if (v instanceof Number) {
+			Number number = (Number) v;
+			long value = number.longValue();
+			// following is safe, because double can represent any int
+			if (value != number.doubleValue()) throw new IllegalArgumentException("Cannot coerce to long without loss:");
 			return value;
 		}
 		throw new IllegalArgumentException("Can't convert to int: " + v);
@@ -1373,6 +1417,7 @@ public class Utils {
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").withZone(ZoneId.from(ZoneOffset.UTC));
 		return formatter.format(timeStamp);
 	}
+
 
 
 

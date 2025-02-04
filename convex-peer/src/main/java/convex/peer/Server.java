@@ -356,6 +356,13 @@ public class Server implements Closeable {
 			executor.persistPeerData();
 
 			HashMap<Keyword, Object> config = getConfig();
+			
+			if (config.containsKey(Keywords.RECALC)) try {
+				Long pos=Utils.toLong(config.get(Keywords.RECALC));
+				executor.recalcState(pos);
+			} catch (Exception e) {
+				throw new LaunchException("Launch failed to recalculate state: "+e,e);
+			}
 
 			Object p = config.get(Keywords.PORT);
 			Integer port = (p == null) ? null : Utils.toInt(p);
@@ -370,6 +377,8 @@ public class Server implements Closeable {
 			// Close server on shutdown, should be before Etch stores in priority
 			Shutdown.addHook(Shutdown.SERVER, ()->close());
 			
+			
+			
 			// Start threaded components
 			manager.start();
 			queryHandler.start();
@@ -381,9 +390,9 @@ public class Server implements Closeable {
 			goLive();
 			log.info( "Peer server started on port "+nio.getPort()+" with peer key: {}",getPeerKey());
 		} catch (ConfigException e) {
-			throw new LaunchException("Launch failed due to config problem",e);
+			throw new LaunchException("Launch failed due to config problem: "+e,e);
 		} catch (IOException e) {
-			throw new LaunchException("Launch failed due to IO Error",e);
+			throw new LaunchException("Launch failed due to IO Error: "+e,e);
 		} finally {
 			Stores.setCurrent(savedStore);
 		}

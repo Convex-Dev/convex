@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 
 import convex.core.cpos.Belief;
 import convex.core.cvm.Peer;
+import convex.core.exceptions.TODOException;
 import convex.core.util.LatestUpdateQueue;
 import convex.core.util.LoadMonitor;
 
@@ -61,7 +62,12 @@ public class CVMExecutor extends AThreadedComponent {
 	
 	public void syncPeer(Server base) {
 		// TODO Auto-generated method stub
-		
+		throw new TODOException();
+	}
+	
+	public synchronized void recalcState(long pos) {
+		// TODO Auto-generated method stub
+		peer=peer.recalcState(pos);
 	}
 	
 	public synchronized void persistPeerData() throws IOException {
@@ -96,6 +102,8 @@ public class CVMExecutor extends AThreadedComponent {
 	public void setUpdateHook(Consumer<Peer> hook) {
 		updateHook=hook;
 	}
+
+
 
 
 
