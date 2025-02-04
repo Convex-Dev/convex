@@ -72,6 +72,9 @@ public class PeerStart extends APeerCommand {
 	@Option(names = { "--norest" }, description = "Disable REST srever.")
 	private boolean norest;
 	
+	@Option(names = { "--recalc" }, description = "Recalculate state from the specified block position onwards.")
+	private Integer recalc;
+	
 	@Option(names = { "--genesis" }, 
 			defaultValue = "${env:CONVEX_GENESIS_SEED}",
 			description = "Governance seed for network genesis. For testing use only.")
@@ -172,6 +175,8 @@ public class PeerStart extends APeerCommand {
 				config.put(Keywords.SOURCE, remoteSource);
 				config.put(Keywords.URL, url);
 				config.put(Keywords.PORT, port);
+				if (recalc!=null) config.put(Keywords.RECALC, recalc);
+
 				config.put(Keywords.BASE_URL, baseURL);
 				if (genesisKey!=null) {
 					if (remoteSource!=null) {

@@ -357,9 +357,13 @@ public class Server implements Closeable {
 
 			HashMap<Keyword, Object> config = getConfig();
 			
+			
 			if (config.containsKey(Keywords.RECALC)) try {
-				Long pos=Utils.toLong(config.get(Keywords.RECALC));
-				executor.recalcState(pos);
+				Object o=config.get(Keywords.RECALC);
+				if (o!=null) {
+					Long pos=Utils.toLong(o);
+					executor.recalcState(pos);
+				}
 			} catch (Exception e) {
 				throw new LaunchException("Launch failed to recalculate state: "+e,e);
 			}
