@@ -3,6 +3,7 @@ package convex.cli.peer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -22,6 +23,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
 
+import com.beust.jcommander.Strings;
+
 import convex.api.Convex;
 import convex.api.ConvexRemote;
 import convex.cli.CLTester;
@@ -29,7 +32,9 @@ import convex.cli.ExitCodes;
 import convex.cli.Helpers;
 import convex.core.Result;
 import convex.core.crypto.AKeyPair;
+import convex.core.crypto.BIP39;
 import convex.core.crypto.PFXTools;
+import convex.core.crypto.SLIP10;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.util.Utils;
@@ -71,6 +76,9 @@ public class LocalTest {
 		importTester.assertExitCode(ExitCodes.SUCCESS);
 		assertEquals(expectedKey, importTester.getOutput().trim());
 
+		Blob MASTER_KEY=BIP39.getSeed(bip39, bipPassphrase);
+		AKeyPair GENESIS_KP=SLIP10.deriveKeyPair(MASTER_KEY);
+		assertEquals(expectedKey,GENESIS_KP.getAccountKey().toHexString());
 		
 		String javaHome = System.getProperty("java.home");
 		String javaCmd = javaHome + File.separator + "bin" + File.separator + "java";
@@ -99,12 +107,15 @@ public class LocalTest {
 		ProcessBuilder builder = new ProcessBuilder(cmd);
 		process = builder.start();
 
+		ArrayList<String> outputList=new ArrayList<>();
+		
 		// We need to wait until the peer started message is seen
 		Thread checker = new Thread(() -> {
 			try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
 				try (Scanner s = new Scanner(reader)) {
 					while (true) {
 						String output = s.nextLine();
+						outputList.add(output);
 						// System.err.println(output);
 						if (output.contains("Started: 1")) break;
 					}
@@ -116,7 +127,11 @@ public class LocalTest {
 		checker.setDaemon(true);
 		checker.start();
 		checker.join(10000);
-		assertTrue(process.isAlive());
+		if (process.isAlive()) {
+			
+		} else {
+			fail("Local network did note start, with output:\n"+Strings.join("\n", outputList));
+		}
 	}
 
 	

@@ -189,8 +189,13 @@ public class Server implements Closeable {
 					throw new LaunchException("Timeout trying to connect to remote peer");
 				} catch (IllegalArgumentException e) {
 					throw new LaunchException("Bad :SOURCE for peer launch",e);
+				} catch (Exception e ) {
+					// something else failed, probably an IOException
+					throw new LaunchException("Failed to sync with remote peer host at: "+source,e);
 				}
-			} else if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
+			} 
+			
+			if (Utils.bool(getConfig().get(Keywords.RESTORE))) {
 				ACell rk=RT.cvm(config.get(Keywords.ROOT_KEY));
 				if (rk==null) rk=keyPair.getAccountKey();
 	
@@ -200,6 +205,7 @@ public class Server implements Closeable {
 					return peer;
 				}
 			} 
+			
 			// No sync or restored state, so use passed state
 			State genesisState = (State) config.get(Keywords.STATE);
 			if (genesisState!=null) {

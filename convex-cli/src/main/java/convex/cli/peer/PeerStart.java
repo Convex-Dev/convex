@@ -172,9 +172,15 @@ public class PeerStart extends APeerCommand {
 				HashMap<Keyword,Object> config=new HashMap<>();
 				config.put(Keywords.KEYPAIR, peerKey);
 				config.put(Keywords.STORE, store);
-				config.put(Keywords.SOURCE, remoteSource);
 				config.put(Keywords.URL, url);
 				config.put(Keywords.PORT, port);
+				
+				if (remoteSource!=null) {
+					config.put(Keywords.SOURCE, remoteSource); // if remote source to sync with is specified
+				} else {
+					// if no remote host to sync with, assume we want to restore existing peer
+					config.put(Keywords.RESTORE,true);
+				}
 				if (recalc!=null) config.put(Keywords.RECALC, recalc);
 
 				config.put(Keywords.BASE_URL, baseURL);

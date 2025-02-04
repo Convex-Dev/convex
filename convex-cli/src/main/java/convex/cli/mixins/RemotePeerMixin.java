@@ -19,8 +19,8 @@ public class RemotePeerMixin extends AMixin {
 	private Integer port;
 
 	@Option(names={"--host"},
-		defaultValue="${env:CONVEX_HOST:-"+Constants.DEFAULT_PEER_HOSTNAME+"}",
-		description="Hostname for remote peer connection. Can specify with CONVEX_HOST. Defaulting to: ${DEFAULT-VALUE}")
+		defaultValue="${env:CONVEX_HOST}",
+		description="Hostname for remote peer connection. Can specify with CONVEX_HOST, or use \"none\" to disable.")
 	private String hostname;
 
 	/**
@@ -48,8 +48,8 @@ public class RemotePeerMixin extends AMixin {
 	}
 	
 	public InetSocketAddress getSocketAddress() {
-		if (port==null) port=convex.core.Constants.DEFAULT_PEER_PORT;
-		if (hostname==null) hostname=convex.cli.Constants.DEFAULT_PEER_HOSTNAME;
+		int port= (this.port!=null) ?this.port:convex.core.Constants.DEFAULT_PEER_PORT;
+		String hostname=(this.hostname!=null)?this.hostname:convex.cli.Constants.DEFAULT_PEER_HOSTNAME;
 		InetSocketAddress sa=IPUtils.parseAddress(hostname,port);
 		return sa;
 	}
@@ -60,6 +60,7 @@ public class RemotePeerMixin extends AMixin {
 	 */
 	public InetSocketAddress getSpecifiedSource() {
 		if (hostname==null) return null;
+		if (hostname.trim().equalsIgnoreCase("none")) return null;
 		return getSocketAddress();
 	}
 
