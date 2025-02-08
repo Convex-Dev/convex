@@ -88,11 +88,19 @@ public class PeerGUI extends AbstractGUI {
 		return manager;
 	}
 	
-	public static PeerGUI launchPeerGUI(InetSocketAddress sa, AWalletEntry we) throws InterruptedException, PeerException {
+	/**
+	 * LAunch a peer, joining an existing network
+	 * @param sa Socket address of source peer to sync with
+	 * @param kp Key pair for new peer
+	 * @return
+	 * @throws InterruptedException
+	 * @throws PeerException
+	 */
+	public static PeerGUI launchPeerGUI(InetSocketAddress sa, AKeyPair kp) throws InterruptedException, PeerException {
 		DefaultListModel<ConvexLocal> peerList=new DefaultListModel<>();
 		
 		HashMap<Keyword, Object> config=new HashMap<>();
-		config.put(Keywords.KEYPAIR,we.getKeyPair());
+		config.put(Keywords.KEYPAIR,kp);
 		config.put(Keywords.SOURCE,sa);
 		Server server=API.launchPeer(config);
 		ConvexLocal convex=ConvexLocal.connect(server);

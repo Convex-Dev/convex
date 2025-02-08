@@ -59,6 +59,7 @@ public class MessageFormatPanel extends JPanel {
 
 		dataArea = new CodePane();
 		dataArea.setToolTipText("Enter data objects here");
+		dataArea.setEditable(true);
 		dataArea.setMaxColumns(128);
 		dataArea.setFont(Toolkit.MONO_FONT);
 		// dataArea.setLineWrap(true);

@@ -126,8 +126,15 @@ public class PeerLaunchDialog {
 		    		
 		    		AWalletEntry we=peerKeyField.getWalletEntry();
 		    		if (we==null) throw new IllegalArgumentException("No peer key selected");
+		    		if (we.isLocked()) {
+						boolean unlocked= UnlockWalletDialog.offerUnlock(parent,we);
+						if (!unlocked) {
+							Toast.display(parent, "Launch cancelled: Locked peer key", Color.RED);
+							return;
+						}			    		
+		    		}
 		    		
-		    		PeerGUI.launchPeerGUI(sa,we);
+		    		PeerGUI.launchPeerGUI(sa,we.getKeyPair());
 		    	} else if (selected==loadPanel) {
 		    		File f=backupPicker.getFile();
 		    		AKeyPair kp=null; // TODO;
