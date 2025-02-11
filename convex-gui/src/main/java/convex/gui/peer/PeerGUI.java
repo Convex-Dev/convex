@@ -24,7 +24,6 @@ import convex.api.ConvexLocal;
 import convex.core.Result;
 import convex.core.cpos.Order;
 import convex.core.crypto.AKeyPair;
-import convex.core.crypto.wallet.AWalletEntry;
 import convex.core.crypto.wallet.HotWalletEntry;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
