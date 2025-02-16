@@ -106,7 +106,8 @@ public class RT {
 		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check==CVMBool.TRUE) return check;
+		if (check == CVMBool.TRUE)
+			return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
@@ -121,7 +122,8 @@ public class RT {
 		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check==CVMBool.TRUE) return check;
+		if (check == CVMBool.TRUE)
+			return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MIN_VALUE);
 			if (comp == null)
@@ -136,7 +138,8 @@ public class RT {
 		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check==CVMBool.TRUE) return check;
+		if (check == CVMBool.TRUE)
+			return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MIN_VALUE);
 			if (comp == null)
@@ -151,7 +154,8 @@ public class RT {
 		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check==CVMBool.TRUE) return check;
+		if (check == CVMBool.TRUE)
+			return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
@@ -166,7 +170,8 @@ public class RT {
 		CVMBool check = checkShortCompare(values);
 		if (check == null)
 			return null;
-		if (check==CVMBool.TRUE) return check;
+		if (check == CVMBool.TRUE)
+			return check;
 		for (int i = 0; i < values.length - 1; i++) {
 			Long comp = RT.compare(values[i], values[i + 1], Long.MAX_VALUE);
 			if (comp == null)
@@ -176,68 +181,81 @@ public class RT {
 		}
 		return CVMBool.TRUE;
 	}
-	
+
 	/**
 	 * Gets the minimum of a set of numeric values
+	 * 
 	 * @param values Arguments for which to compute minimum value
 	 * @return minimum value, or null if any argument is non-numeric
 	 */
 	public static ACell min(ACell[] values) {
-		ACell acc=values[0];
-		if (!isNumber(acc)) return null;
+		ACell acc = values[0];
+		if (!isNumber(acc))
+			return null;
 		for (int i = 1; i < values.length; i++) {
-			ACell next=values[i];
-			acc=min(acc,next);
+			ACell next = values[i];
+			acc = min(acc, next);
 		}
 		return acc;
 	}
-	
+
 	/**
 	 * Gets the minimum of two numeric values
+	 * 
 	 * @param a First value
 	 * @param b Second value
 	 * @return minimum value, or null if any argument is non-numeric
 	 */
 	public static ACell min(ACell a, ACell b) {
-		if (a==null) return null;
-		Long comp=RT.compare(a, b, Long.MIN_VALUE);
-		if (comp==null) return null; // bailout on non-numerics
-		if (Long.MIN_VALUE==comp) return CVMDouble.NaN;
-		if (comp>0) return b;
+		if (a == null)
+			return null;
+		Long comp = RT.compare(a, b, Long.MIN_VALUE);
+		if (comp == null)
+			return null; // bailout on non-numerics
+		if (Long.MIN_VALUE == comp)
+			return CVMDouble.NaN;
+		if (comp > 0)
+			return b;
 		return a;
 	}
-	
+
 	/**
 	 * Gets the minimum of a set of numeric values
+	 * 
 	 * @param values Arguments for which to compute minimum value
 	 * @return minimum value, or null if any argument is non-numeric
 	 */
 	public static ACell max(ACell[] values) {
-		ACell acc=values[0];
-		if (!isNumber(acc)) return null;
+		ACell acc = values[0];
+		if (!isNumber(acc))
+			return null;
 		for (int i = 1; i < values.length; i++) {
-			ACell next=values[i];
-			acc=max(acc,next);
+			ACell next = values[i];
+			acc = max(acc, next);
 		}
 		return acc;
 	}
-	
+
 	/**
 	 * Gets the minimum of two numeric values
+	 * 
 	 * @param a First value
 	 * @param b Second value
 	 * @return minimum value, or null if any argument is non-numeric
 	 */
 	public static ACell max(ACell a, ACell b) {
-		if (a==null) return null;
-		Long comp=RT.compare(a, b, Long.MIN_VALUE);
-		if (comp==null) return null; // bailout on non-numerics
-		if (Long.MIN_VALUE==comp) return CVMDouble.NaN;
-		if (comp<0) return b;
+		if (a == null)
+			return null;
+		Long comp = RT.compare(a, b, Long.MIN_VALUE);
+		if (comp == null)
+			return null; // bailout on non-numerics
+		if (Long.MIN_VALUE == comp)
+			return CVMDouble.NaN;
+		if (comp < 0)
+			return b;
 		return a;
 	}
-	
-	
+
 	/**
 	 * Get the target common numeric type for a given set of arguments. - Integers
 	 * upcast to Long - Anything else upcasts to Double
@@ -289,39 +307,43 @@ public class RT {
 	}
 
 	public static ANumeric plus(ACell[] args) {
-		int n=args.length;
-		if (n==0) return CVMLong.ZERO;
+		int n = args.length;
+		if (n == 0)
+			return CVMLong.ZERO;
 		ANumeric result = RT.ensureNumber(args[0]);
 		for (int i = 1; i < args.length; i++) {
-			result =result.add(RT.ensureNumber(args[i]));
-			if (result==null) return null;
+			result = result.add(RT.ensureNumber(args[i]));
+			if (result == null)
+				return null;
 		}
 		return result;
 	}
 
 	public static ANumeric minus(ACell[] args) {
 		int n = args.length;
-		if (n==0) return CVMLong.ZERO;
+		if (n == 0)
+			return CVMLong.ZERO;
 
 		ANumeric result = RT.ensureNumber(args[0]);
-		if (n==1) return result.negate();
+		if (n == 1)
+			return result.negate();
 		for (int i = 1; i < n; i++) {
-			ANumeric b=RT.ensureNumber(args[i]);
-			result =result.sub(b);
+			ANumeric b = RT.ensureNumber(args[i]);
+			result = result.sub(b);
 		}
 		return result;
 	}
 
 	public static ANumeric multiply(ACell... args) {
 		int n = args.length;
-		if (n==0) return CVMLong.ONE;
+		if (n == 0)
+			return CVMLong.ONE;
 		ANumeric result = RT.ensureNumber(args[0]);
 		for (int i = 1; i < args.length; i++) {
-			result =result.multiply(RT.ensureNumber(args[i]));
+			result = result.multiply(RT.ensureNumber(args[i]));
 		}
 		return result;
 	}
-
 
 	public static CVMDouble divide(ACell[] args) {
 		int n = args.length;
@@ -421,7 +443,7 @@ public class RT {
 	public static long splitmix64Update(long seed) {
 		return seed + 0x9e3779b97f4a7c15l;
 	}
-	
+
 	/**
 	 * Compute a SplitMix64 value for a given seed. Component for splittabe PRNG
 	 * 
@@ -437,16 +459,17 @@ public class RT {
 		return x ^ (x >>> 31);
 	}
 
-
 	/**
-	 * Converts a long value, treated as unsigned, to a double. Useful for randomness
+	 * Converts a long value, treated as unsigned, to a double. Useful for
+	 * randomness
+	 * 
 	 * @param a Long value, treated as unsigned
 	 * @return Double value of long
 	 */
 	public static double doubleFromUnsignedLong(long a) {
 		if (a >= 0) {
 			return (double) a;
-		} else {	
+		} else {
 			// For logic in signed case, see Guava's UnsignedLong.doubleValue()
 			return (double) ((a >>> 1) | (a & 1)) * 2.0;
 		}
@@ -485,8 +508,8 @@ public class RT {
 	 * @param a        First numeric value
 	 * @param b        Second numeric value
 	 * @param nanValue Value to return in case of a NaN result
-	 * @return -1 if a is smaller, 1 if a is larger, 0 if a
-	 *         equals b, null if either value non-numeric, NaN if either value is NaN
+	 * @return -1 if a is smaller, 1 if a is larger, 0 if a equals b, null if either
+	 *         value non-numeric, NaN if either value is NaN
 	 */
 	public static Long compare(ACell a, ACell b, Long nanValue) {
 		Class<?> ca = numericType(a);
@@ -497,12 +520,14 @@ public class RT {
 			return null;
 
 		if ((ca == Long.class) && (cb == Long.class))
-			return (long)((AInteger)a).compareTo((AInteger)b);
+			return (long) ((AInteger) a).compareTo((AInteger) b);
 
 		double da = doubleValue(a);
-		if (Double.isNaN(da)) return nanValue;
+		if (Double.isNaN(da))
+			return nanValue;
 		double db = doubleValue(b);
-		if (Double.isNaN(db)) return nanValue;
+		if (Double.isNaN(db))
+			return nanValue;
 		if (da == db)
 			return 0L;
 		if (da < db)
@@ -533,7 +558,7 @@ public class RT {
 	}
 
 	/**
-	 * Tests if a Value is a valid numerical value type. 
+	 * Tests if a Value is a valid numerical value type.
 	 * 
 	 * Note: Returns false for null, but true for NaN
 	 * 
@@ -555,7 +580,7 @@ public class RT {
 			// Note coercion on non-CVM IEEE754 NaNs
 			return ((CVMDouble) a).toDouble();
 		}
-		
+
 		AInteger l = ensureInteger(a);
 		if (l == null)
 			return null;
@@ -592,10 +617,11 @@ public class RT {
 		}
 
 		if (a instanceof APrimitive) {
-			if (a instanceof CVMBool) return null; // disallow boolean -> long cast
+			if (a instanceof CVMBool)
+				return null; // disallow boolean -> long cast
 			return CVMLong.create(((APrimitive) a).longValue());
 		}
-		
+
 		if (a instanceof Address) {
 			long lv = ((Address) a).longValue();
 			return CVMLong.create(lv);
@@ -613,7 +639,7 @@ public class RT {
 	 * Ensures the argument is a CVM Integer within Long range.
 	 * 
 	 * @param a Value to cast
-	 * @return CVMLong value, or null if not convertible / within long range. 
+	 * @return CVMLong value, or null if not convertible / within long range.
 	 */
 	public static CVMLong ensureLong(ACell a) {
 		if (a instanceof CVMLong)
@@ -624,7 +650,7 @@ public class RT {
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Converts a numerical value to a CVM Integer. Doubles and floats will be
 	 * converted if possible.
@@ -671,10 +697,11 @@ public class RT {
 	 */
 	public static CVMLong castByte(ACell a) {
 		if (a instanceof ABlob) {
-			ABlob b=(ABlob) a;
-			long n=b.count();
-			if (n==0) return CVMLong.ZERO;
-			return b.get(n-1);
+			ABlob b = (ABlob) a;
+			long n = b.count();
+			if (n == 0)
+				return CVMLong.ZERO;
+			return b.get(n - 1);
 		}
 		AInteger l = ensureInteger(a);
 		if (l == null)
@@ -689,10 +716,11 @@ public class RT {
 	}
 
 	/**
-	 * Converts any data structure to a vector. May wrap a Java array in VectorArray, so
-	 * the object must be treated as immutable in order for this to be safe.
+	 * Converts any data structure to a vector. May wrap a Java array in
+	 * VectorArray, so the object must be treated as immutable in order for this to
+	 * be safe.
 	 * 
-	 * @param o Object to attempt to convert to a Vector. 
+	 * @param o Object to attempt to convert to a Vector.
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
@@ -703,10 +731,10 @@ public class RT {
 			return castVector((ACell) o);
 
 		if (o instanceof ACell[]) {
-			ACell[] arr = (ACell[])o;
-			//return Vectors.create(arr);
+			ACell[] arr = (ACell[]) o;
+			// return Vectors.create(arr);
 			// TODO: this should be faster?
-			return Vectors.wrap(arr); 
+			return Vectors.wrap(arr);
 		}
 
 		if (o instanceof java.util.List)
@@ -714,23 +742,24 @@ public class RT {
 
 		return null;
 	}
-	
+
 	/**
-	 * Converts any data structure to a vector. May wrap a Java array in VectorArray, so
-	 * the object must be treated as immutable in order for this to be safe.
+	 * Converts any data structure to a vector. May wrap a Java array in
+	 * VectorArray, so the object must be treated as immutable in order for this to
+	 * be safe.
 	 * 
-	 * @param o Object to attempt to convert to a Vector. 
+	 * @param o     Object to attempt to convert to a Vector.
 	 * @param start start index to slice
-	 * @param end index to slice
+	 * @end end index to slice
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AVector<T> vec(Object o, long start, long end) {
 		if (o instanceof ACell[]) {
-			ACell[] arr = (ACell[])o;
-			return VectorArray.wrap(arr,start,end); 
+			ACell[] arr = (ACell[]) o;
+			return VectorArray.wrap(arr, start, end);
 		}
-		
+
 		return (AVector<T>) vec(o).slice(start, end);
 	}
 
@@ -744,11 +773,11 @@ public class RT {
 	public static <T extends ACell> AVector<T> castVector(ACell o) {
 		if (o == null)
 			return Vectors.empty();
-		
+
 		// Fast path for existing CVM collections
 		if (o instanceof ACollection)
 			return vec((ACollection<T>) o);
-		
+
 		if (o instanceof ACountable) {
 			ACountable<T> ds = (ACountable<T>) o;
 			long n = ds.count();
@@ -842,7 +871,7 @@ public class RT {
 			return (ASequence<T>) o;
 		return null;
 	}
-	
+
 	/**
 	 * Ensures argument is a Vector data structure.
 	 * 
@@ -889,7 +918,7 @@ public class RT {
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> T nth(Object o, long i) {
 		if (o instanceof ACountable)
-			return ((ACountable<T>)o).get(i);
+			return ((ACountable<T>) o).get(i);
 
 		try {
 			if (o.getClass().isArray()) {
@@ -922,7 +951,8 @@ public class RT {
 	}
 
 	/**
-	 * Gets the count of objects in a collection for destructuring (may be data structure or Java Array)
+	 * Gets the count of objects in a collection for destructuring (may be data
+	 * structure or Java Array)
 	 * 
 	 * @param o An Object representing a collection of items to be counted
 	 * @return The count of elements in the collection, or null if not countable
@@ -953,7 +983,7 @@ public class RT {
 
 		if (a instanceof ACountable)
 			return ((ACountable<?>) a).count();
-		
+
 		return null;
 	}
 
@@ -971,66 +1001,73 @@ public class RT {
 	 */
 	public static AString str(ACell[] args) {
 		// TODO: execution cost limits??
-		int n=args.length;
-		AString[] strs=new AString[n];
-		for (int i=0; i<n; i++) {
+		int n = args.length;
+		AString[] strs = new AString[n];
+		for (int i = 0; i < n; i++) {
 			AString s = RT.str(args[i]);
-			strs[i]=s;
+			strs[i] = s;
 		}
 		return Strings.appendAll(strs);
 	}
-	
+
 	/**
 	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes
-	 * @param bb BlobBuilder instance
-	 * @param a Cell to print (may be nil)
+	 * 
+	 * @param bb    BlobBuilder instance
+	 * @param a     Cell to print (may be nil)
 	 * @param limit Limit of printing
-	 * @return True if within limit, false if exceeded (output may still be partially written to BlobBuilder)
+	 * @return True if within limit, false if exceeded (output may still be
+	 *         partially written to BlobBuilder)
 	 */
 	public static boolean print(BlobBuilder bb, ACell a, long limit) {
-		if (a==null) {
+		if (a == null) {
 			bb.append(Strings.NIL);
 			return bb.check(limit);
 		} else {
 			return a.print(bb, limit);
 		}
 	}
-	
+
 	/**
-	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes
-	 * WARNING: May return null
-	 * @param a Cell to print (may be nil)
+	 * Prints a cell to a BlobBuilder, up to a specified limit of bytes WARNING: May
+	 * return null
+	 * 
+	 * @param a     Cell to print (may be nil)
 	 * @param limit Limit of printing in bytes
 	 * @return Printed String, or null if limit exceeded
 	 */
 	public static AString print(ACell a, long limit) {
-		if (a==null) {
-			return (limit>=3)?Strings.NIL:null;
+		if (a == null) {
+			return (limit >= 3) ? Strings.NIL : null;
 		}
-		BlobBuilder bb=new BlobBuilder();
-		if (!print(bb,a,limit)) return null;
+		BlobBuilder bb = new BlobBuilder();
+		if (!print(bb, a, limit))
+			return null;
 		return bb.getCVMString();
 	}
-	
+
 	/**
-	 * Prints a value to a String as long as the result fits within a given print limit.
-	 * WARNING: May return null
+	 * Prints a value to a String as long as the result fits within a given print
+	 * limit. WARNING: May return null
+	 * 
 	 * @param a Cell value to print
 	 * @return Printed String, or null if print limit exceeded
 	 */
 	public static AString print(ACell a) {
-		return print(a,Constants.PRINT_LIMIT);
+		return print(a, Constants.PRINT_LIMIT);
 	}
-	
+
 	/**
 	 * Prints a value after converting to appropriate CVM type
+	 * 
 	 * @param o Any value to print
 	 * @return Printed representation of object, or null if print limit exceeded
 	 */
 	public static AString print(Object o) {
-		ACell cell=cvm(o);
+		ACell cell = cvm(o);
 		return print(cell);
 	}
+
 	/**
 	 * Converts a value to a CVM String representation. Required to work for all
 	 * valid Cells.
@@ -1046,32 +1083,36 @@ public class RT {
 			return (AString) a;
 		}
 
-		if (a.getType()==Types.BLOB) {
-			return Strings.create(((ABlob)a).toHexString());
+		if (a.getType() == Types.BLOB) {
+			return Strings.create(((ABlob) a).toHexString());
 		}
 		// TODO: Needs optimisation? toCVMString? print limit?
 		AString s = Strings.create(a.toString());
 		return s;
 	}
-	
+
 	/**
 	 * Converts a value to a Java String representation
+	 * 
 	 * @param a Any CVM value
 	 * @return Java String representation. May be "nil".
 	 */
 	public static String toString(ACell a) {
-		return toString(a,Constants.PRINT_LIMIT);
+		return toString(a, Constants.PRINT_LIMIT);
 	}
-	
+
 	/**
 	 * Converts a value to a Java String representation
-	 * @param a Any CVM value
+	 * 
+	 * @param a     Any CVM value
 	 * @param limit Limit of string printing
-	 * @return Java String representation. May be "nil". May include message if print limit exceeded
+	 * @return Java String representation. May be "nil". May include message if
+	 *         print limit exceeded
 	 */
 	public static String toString(ACell a, long limit) {
-		AString s=RT.print(a,limit);
-		if (s==null) return Constants.PRINT_EXCEEDED_STRING;
+		AString s = RT.print(a, limit);
+		if (s == null)
+			return Constants.PRINT_EXCEEDED_STRING;
 		return s.toString();
 	}
 
@@ -1215,8 +1256,9 @@ public class RT {
 		if (a instanceof Address)
 			return (Address) a;
 		if (a instanceof AVector) {
-			AVector<?> v=RT.ensureVector(a);
-			if (v.count()==0) return null;
+			AVector<?> v = RT.ensureVector(a);
+			if (v.count() == 0)
+				return null;
 			return ensureAddress(v.get(0));
 		}
 		if (a instanceof ABlob)
@@ -1295,19 +1337,19 @@ public class RT {
 	 */
 	public static ABlob castBlob(ACell a) {
 		if (a instanceof AString)
-			return Blobs.fromHex((AString)a);
+			return Blobs.fromHex((AString) a);
 
 		// handle address, hash, blob instances
 		if (a instanceof ABlobLike)
-			return ((ABlobLike<?>)a).toBlob();
-		
+			return ((ABlobLike<?>) a).toBlob();
+
 		if (a instanceof AInteger)
-			return ((AInteger)a).toBlob();
+			return ((AInteger) a).toBlob();
 		if (a instanceof CVMChar)
-			return ((CVMChar)a).toUTFBlob();
-		
+			return ((CVMChar) a).toUTFBlob();
+
 		if (a instanceof CVMBool)
-			return ((CVMBool)a).toBlob();
+			return ((CVMBool) a).toBlob();
 		return null;
 	}
 
@@ -1322,7 +1364,7 @@ public class RT {
 	 * 
 	 */
 	@SuppressWarnings("unchecked")
-	public static <K extends ACell, V extends ACell, R extends AMap<K,V>> R ensureMap(ACell a) {
+	public static <K extends ACell, V extends ACell, R extends AMap<K, V>> R ensureMap(ACell a) {
 		if (a == null)
 			return (R) Maps.empty();
 		if (a instanceof AMap)
@@ -1369,22 +1411,22 @@ public class RT {
 	public static boolean bool(ACell a) {
 		return !((a == null) || (a == CVMBool.FALSE));
 	}
-	
+
 	/**
-	 * Converts any value to a boolean value. A value is considered falsey if
-	 * null, java false or CVMBool.FALSE, truthy otherwise
+	 * Converts any value to a boolean value. A value is considered falsey if null,
+	 * java false or CVMBool.FALSE, truthy otherwise
 	 * 
 	 * @param a Object to convert to boolean value
 	 * @return true if object is truthy, false otherwise
 	 */
 	public static boolean bool(Object a) {
-		if (a==null) return false;
+		if (a == null)
+			return false;
 		if (a instanceof Boolean) {
-			return ((Boolean)a);
+			return ((Boolean) a);
 		}
- 		return !(a==CVMBool.FALSE);
+		return !(a == CVMBool.FALSE);
 	}
-
 
 	/**
 	 * Converts an object to a map entry. Handles MapEntries and length 2 Vectors.
@@ -1441,11 +1483,12 @@ public class RT {
 		Keyword k = Keyword.create(name);
 		return k;
 	}
-	
+
 	/**
 	 * Casts to a Keyword
+	 * 
 	 * @param a
-	 * @return Keyword instance, or null if cast fails
+	 * @return
 	 */
 	public static Keyword ensureKeyword(ACell a) {
 		if (a instanceof Keyword)
@@ -1492,9 +1535,9 @@ public class RT {
 			return (ACountable<E>) a;
 		return null;
 	}
-	
+
 	public static boolean isCountable(ACell val) {
-		return (val==null)||(val instanceof ACountable);
+		return (val == null) || (val instanceof ACountable);
 	}
 
 	/**
@@ -1550,7 +1593,8 @@ public class RT {
 	 * @param coll  Any associative data structure
 	 * @param key   Key to update or add
 	 * @param value Value to associate with key
-	 * @return Updated data structure, or null if implicit cast of key or value to required type fails
+	 * @return Updated data structure, or null if implicit cast of key or value to
+	 *         required type fails
 	 */
 	@SuppressWarnings("unchecked")
 	public static <R extends ACell> ADataStructure<R> assoc(ADataStructure<R> coll, ACell key, ACell value) {
@@ -1590,8 +1634,8 @@ public class RT {
 	}
 
 	/**
-	 * Ensures the argument is an associative data structure instance. A null argument is
-	 * considered an empty map.
+	 * Ensures the argument is an associative data structure instance. A null
+	 * argument is considered an empty map.
 	 * 
 	 * @param o Value to cast
 	 * @return IAssociative instance, or null if conversion is not possible
@@ -1636,7 +1680,7 @@ public class RT {
 			return (AHashMap<K, V>) a;
 		return null;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public static <K extends ABlobLike<?>, V extends ACell> Index<K, V> ensureIndex(ACell a) {
 		if (a instanceof Index)
@@ -1652,17 +1696,18 @@ public class RT {
 	 */
 	public static ABlob ensureBlob(ACell a) {
 		if (a instanceof ABlob) {
-			ABlob b= ((ABlob) a);
-			if (b.getType()!=Types.BLOB) return null; // catch specialised Blobs
+			ABlob b = ((ABlob) a);
+			if (b.getType() != Types.BLOB)
+				return null; // catch specialised Blobs
 			return b;
 		}
 		return null;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	public static <V extends ACell> ABlobLike<V> ensureBlobLike(ACell a) {
 		if (a instanceof ABlobLike) {
-			ABlobLike<V> b= ((ABlobLike<V>) a);
+			ABlobLike<V> b = ((ABlobLike<V>) a);
 			return b;
 		}
 		return null;
@@ -1707,37 +1752,37 @@ public class RT {
 		if (o instanceof Boolean)
 			return (T) CVMBool.create((Boolean) o);
 		if (o instanceof List) {
-			List<?> l=(List<?>)o;
-			AVector<?> v=Vectors.empty(); 
-			for (Object val: l) {
-				v=v.conj(cvm(val));
+			List<?> l = (List<?>) o;
+			AVector<?> v = Vectors.empty();
+			for (Object val : l) {
+				v = v.conj(cvm(val));
 			}
-			return (T)v;
+			return (T) v;
 		}
 		if (o instanceof Map) {
-			Map<?,?> m= (Map<?,?>) o;
-			AMap<ACell,ACell> cm=Maps.empty();
-			for (Map.Entry<?, ?> me: m.entrySet()) {
-				Object k=me.getKey();
-				Object v=me.getValue();
-				ACell cvmk=cvm(k);
-				ACell cvmv=cvm(v);
-				cm=cm.assoc(cvmk, cvmv);
+			Map<?, ?> m = (Map<?, ?>) o;
+			AMap<ACell, ACell> cm = Maps.empty();
+			for (Map.Entry<?, ?> me : m.entrySet()) {
+				Object k = me.getKey();
+				Object v = me.getValue();
+				ACell cvmk = cvm(k);
+				ACell cvmv = cvm(v);
+				cm = cm.assoc(cvmk, cvmv);
 			}
 			return (T) cm;
 		}
-		Class<?> klass=o.getClass();
+		Class<?> klass = o.getClass();
 		if (klass.isArray()) {
-			AVector<?> r=Vectors.empty();
-			int n=Array.getLength(o);
-			for (int i=0; i<n; i++) {
-				Object elem=Array.get(o, i);
-				ACell v=RT.cvm(elem);
-				r=r.conj(v);
+			AVector<?> r = Vectors.empty();
+			int n = Array.getLength(o);
+			for (int i = 0; i < n; i++) {
+				Object elem = Array.get(o, i);
+				ACell v = RT.cvm(elem);
+				r = r.conj(v);
 			}
 			return (T) r;
 		}
-		
+
 		throw new IllegalArgumentException("Can't convert to CVM type with class: " + Utils.getClassName(o));
 	}
 
@@ -1761,23 +1806,23 @@ public class RT {
 			return (T) (Character) ((CVMChar) o).charValue();
 		return (T) o;
 	}
-	
+
 	/**
-	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM types.
+	 * Converts a CVM value to equivalent JSON value as expressed in equivalent JVM
+	 * types.
 	 * 
-	 * Note some special one-way conversions that are required because JSON is not 
-	 * sufficiently expressive for all CVM types:
-	 * - Address becomes a Number (Long type)
-	 * - Lists and Vectors both become an Array (Java List type)
-	 * - Characters become a String
-	 * - Blobs become a hex string representation '0x....'
+	 * Note some special one-way conversions that are required because JSON is not
+	 * sufficiently expressive for all CVM types: - Address becomes a Number (Long
+	 * type) - Lists and Vectors both become an Array (Java List type) - Characters
+	 * become a String - Blobs become a hex string representation '0x....'
 	 * 
 	 * @param o Value to convert to JSON value object
 	 * @return Java Object which represents JSON value
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T> T json(ACell o) {
-		if (o==null) return null;
+		if (o == null)
+			return null;
 		if (o instanceof CVMLong)
 			return (T) (Long) ((CVMLong) o).longValue();
 		if (o instanceof CVMDouble)
@@ -1787,18 +1832,18 @@ public class RT {
 		if (o instanceof CVMChar)
 			return (T) ((CVMChar) o).toString();
 		if (o instanceof Address)
-			return (T) (Long)((Address) o).longValue();
+			return (T) (Long) ((Address) o).longValue();
 		if (o instanceof AMap) {
-			AMap<?,?> m= (AMap<?,?>)o;
-			return (T)jsonMap(m);
+			AMap<?, ?> m = (AMap<?, ?>) o;
+			return (T) jsonMap(m);
 		}
 		if (o instanceof ASequence) {
-			ASequence<?> seq= (ASequence<?>)o;
-			long n=seq.count();
-			ArrayList<Object> list=new ArrayList<>();
-			for (long i=0; i<n; i++) {
-				ACell cvmv=seq.get(i);
-				Object v=json(cvmv);
+			ASequence<?> seq = (ASequence<?>) o;
+			long n = seq.count();
+			ArrayList<Object> list = new ArrayList<>();
+			for (long i = 0; i < n; i++) {
+				ACell cvmv = seq.get(i);
+				Object v = json(cvmv);
 				list.add(v);
 			}
 			return (T) list;
@@ -1806,20 +1851,21 @@ public class RT {
 
 		return (T) o.toString();
 	}
-	
+
 	/**
 	 * Converts a CVM Map to a JSON representation
+	 * 
 	 * @param m Map to convert to JSON representation
 	 * @return Java value which represents JSON object
 	 */
-	public static HashMap<String,Object> jsonMap(AMap<?,?> m) {
-		int n=m.size();
-		HashMap<String,Object> hm=new HashMap<String,Object>(n);
-		for (long i=0; i<n; i++) {
-			MapEntry<?,?> me=m.entryAt(i);
-			ACell k=me.getKey();
-			String sk=jsonKey(k);
-			Object v=json(me.getValue());
+	public static HashMap<String, Object> jsonMap(AMap<?, ?> m) {
+		int n = m.size();
+		HashMap<String, Object> hm = new HashMap<String, Object>(n);
+		for (long i = 0; i < n; i++) {
+			MapEntry<?, ?> me = m.entryAt(i);
+			ACell k = me.getKey();
+			String sk = jsonKey(k);
+			Object v = json(me.getValue());
 			hm.put(sk, v);
 		}
 		return hm;
@@ -1827,15 +1873,17 @@ public class RT {
 
 	/**
 	 * Gets a String from a value suitable for use as a JSON map key
+	 * 
 	 * @param k Value to convert to a JSON key
 	 * @return String usable as JSON key
 	 */
 	public static String jsonKey(ACell k) {
-		if (k instanceof AString) return k.toString();
-		if (k instanceof Keyword) return ((Keyword)k).getName().toString();
+		if (k instanceof AString)
+			return k.toString();
+		if (k instanceof Keyword)
+			return ((Keyword) k).getName().toString();
 		return RT.toString(k);
 	}
-
 
 	/**
 	 * Get the runtime Type of any CVM value
@@ -1855,73 +1903,78 @@ public class RT {
 
 	/**
 	 * Implicitly casts argument to a CVM Character
+	 * 
 	 * @param a Value to cast
 	 * @return CVMChar instance, or null if not implicitly castable
 	 */
 	public static CVMChar ensureChar(ACell a) {
-		if (a instanceof CVMChar) return (CVMChar)a;
-		if (a instanceof CVMLong) return CVMChar.create(((CVMLong)a).longValue());
+		if (a instanceof CVMChar)
+			return (CVMChar) a;
+		if (a instanceof CVMLong)
+			return CVMChar.create(((CVMLong) a).longValue());
 		if (a instanceof AString) {
-			AString s=(AString) a;
-			long n=s.count();
-			if ((n==0)||(n>CVMChar.MAX_UTF_BYTES)) return null;
-			long cv=s.charAt(0);
-			if (cv<0) return null;
-			if (n!=CVMChar.utfLength(cv)) return null;
-			
+			AString s = (AString) a;
+			long n = s.count();
+			if ((n == 0) || (n > CVMChar.MAX_UTF_BYTES))
+				return null;
+			long cv = s.charAt(0);
+			if (cv < 0)
+				return null;
+			if (n != CVMChar.utfLength(cv))
+				return null;
+
 			return CVMChar.create(cv);
 		}
 		return null;
 	}
 
 	/**
-	 * Gets a callable Address from a cell value. Handles regular Addresses and scoped call targets
+	 * Gets a callable Address from a cell value. Handles regular Addresses and
+	 * scoped call targets
+	 * 
 	 * @param a Value to extract Address from
 	 * @return Address of callable target, or null if not a valid call target
 	 */
 	public static Address callableAddress(ACell a) {
-		Address addr=RT.ensureAddress(a);
+		Address addr = RT.ensureAddress(a);
 		if (addr == null) {
 			if (a instanceof AVector) {
-				AVector<?> v=(AVector<?>)a;
-				if (v.count()!=2) return null;
-				addr=RT.ensureAddress(v.get(0));
-			} 
+				AVector<?> v = (AVector<?>) a;
+				if (v.count() != 2)
+					return null;
+				addr = RT.ensureAddress(v.get(0));
+			}
 		}
 		return addr;
 	}
 
 	/**
 	 * Casts to a transaction record, or null if not castable
+	 * 
 	 * @param maybeTx Cell which should be a transaction
 	 * @return Transaction value, or null if not a transaction
 	 */
 	public static ATransaction ensureTransaction(ACell maybeTx) {
-		if (maybeTx instanceof ATransaction) return (ATransaction)maybeTx;
+		if (maybeTx instanceof ATransaction)
+			return (ATransaction) maybeTx;
 		return null;
 	}
 
 	public static boolean printCAD3(BlobBuilder sb, long limit, ACell cell) {
-		sb.append((byte)'#');
-		sb.append((byte)'[');
+		sb.append((byte) '#');
+		sb.append((byte) '[');
 		sb.appendCAD3Hex(Cells.getEncoding(cell));
-		sb.append((byte)']');
+		sb.append((byte) ']');
 		return sb.check(limit);
 	}
 
 	public static long[] toLongArray(AVector<?> v) {
-		int n=v.size();
-		long[] result=new long[n];
-		for (int i=0; i<n; i++) {
-			result[i]=RT.ensureLong(v.get(i)).longValue();
+		int n = v.size();
+		long[] result = new long[n];
+		for (int i = 0; i < n; i++) {
+			result[i] = RT.ensureLong(v.get(i)).longValue();
 		}
 		return result;
 	}
-
-
-
-
-
-
 
 }
