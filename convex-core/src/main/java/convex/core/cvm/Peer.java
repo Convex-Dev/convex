@@ -741,7 +741,7 @@ public class Peer {
 
 	/**
 	 * Gets the genesis state hash for this peer
-	 * @return
+	 * @return Hash of genesis state
 	 */
 	public Hash getGenesisHash() {
 		return getGenesisState().getHash();

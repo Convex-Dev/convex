@@ -118,7 +118,6 @@ public class Connection extends AConnection {
 	 *
 	 * @param channel Byte channel to wrap
 	 * @param receiveAction  Consumer to be called when a Message is received
-	 * @param store          Store to use when receiving messages.
 	 * @param trustedPeerKey Trusted peer account key if this is a trusted
 	 *                       connection, if not then null*
 	 * @return New Connection instance
@@ -138,7 +137,6 @@ public class Connection extends AConnection {
 	 * @param socketAddress   Address to connect to
 	 * @param receiveAction A callback Consumer to be called for any received
 	 *                      messages on this connection
-	 * @param store         Store to use for this Connection
 	 * @return New Connection instance
 	 * @throws IOException      If connection fails because of any IO problem
 	 * @throws TimeoutException If connection cannot be established within an
@@ -155,7 +153,6 @@ public class Connection extends AConnection {
 	 * @param socketAddress    Address to connect to
 	 * @param receiveAction  A callback Consumer to be called for any received
 	 *                       messages on this connection
-	 * @param store          Store to use for this Connection
 	 * @param trustedPeerKey Trusted peer account key if this is a trusted
 	 *                       connection, if not then null
 	 * @return New Connection instance
@@ -174,7 +171,6 @@ public class Connection extends AConnection {
 	 * @param socketAddress    Internet Address to connect to
 	 * @param receiveAction  A callback Consumer to be called for any received
 	 *                       messages on this connection
-	 * @param store          Store to use for this Connection
 	 * @param trustedPeerKey Trusted peer account key if this is a trusted
 	 *                       connection, if not then null
 	 * @param sendBufferSize Size of connection send buffer in bytes

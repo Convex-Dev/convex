@@ -1017,9 +1017,9 @@ public class Format {
 	}
 	
 	/**
-	 * Encode a Vector of cells down to the encodings of each vector element
-	 * @param v
-	 * @return
+	 * Encode a Result down to the encodings of each vector element
+	 * @param result Result containing a Vector value
+	 * @return Multi-cell encoding of Result
 	 */
 	public static Blob encodeDataResult(Result result) {
 		AVector<?> v=RT.ensureVector(result.getValue());

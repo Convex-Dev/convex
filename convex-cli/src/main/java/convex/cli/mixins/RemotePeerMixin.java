@@ -56,7 +56,7 @@ public class RemotePeerMixin extends AMixin {
 
 	/**
 	 * Gets the socket address for the remote peer, or null if not specified in CLI
-	 * @return
+	 * @return Socket address instance, or null if not specified at CLI
 	 */
 	public InetSocketAddress getSpecifiedSource() {
 		if (hostname==null) return null;

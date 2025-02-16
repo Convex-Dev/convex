@@ -440,7 +440,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	/**
 	 * Get the length of the prefix vector, will be 0 if no prefix
-	 * @return
+	 * @return Length of prefix, in number of elements
 	 */
 	public long prefixLength() {
 		return count - items.length;

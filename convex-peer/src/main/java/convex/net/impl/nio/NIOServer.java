@@ -80,8 +80,6 @@ public class NIOServer extends AServer {
 	/**
 	 * Launch NIO Server, binding to a given socket address
 	 * 
-	 * @param bindAddress Address to bind to, or null to bind to all addresses (unspecified)
-	 * @param port Port to use. If 0 or null, a default port will be used, with fallback to a random port
 	 * @throws IOException in case of IO problem
 	 */
 	public void launch() throws IOException {

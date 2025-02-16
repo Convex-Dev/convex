@@ -100,7 +100,7 @@ public class Compiler {
 	 * 
 	 * Updates context with result, juice consumed
 	 * 
-	 * @param expandedForm A fully expanded form expressed as a Syntax Object
+	 * @param form A fully expanded form expressed as a Syntax Object
 	 * @param context
 	 * @return Context with compiled Op as result
 	 */

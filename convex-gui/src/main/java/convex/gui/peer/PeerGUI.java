@@ -91,7 +91,7 @@ public class PeerGUI extends AbstractGUI {
 	 * LAunch a peer, joining an existing network
 	 * @param sa Socket address of source peer to sync with
 	 * @param kp Key pair for new peer
-	 * @return
+	 * @return PeerGUI instance
 	 * @throws InterruptedException
 	 * @throws PeerException
 	 */

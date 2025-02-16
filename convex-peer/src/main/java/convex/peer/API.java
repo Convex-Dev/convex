@@ -234,7 +234,7 @@ public class API {
 	/**
 	 * Converts a status map or value vector to a status map
 	 * @param statusValue
-	 * @return
+	 * @return Map containing status values
 	 */
 	@SuppressWarnings("unchecked")
 	public static AMap<Keyword, ACell> ensureStatusMap(ACell statusValue) {

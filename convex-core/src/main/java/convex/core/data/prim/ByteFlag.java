@@ -33,8 +33,8 @@ public class ByteFlag extends AByteFlag {
 
 	/**
 	 * Creates an extended byte flag for the given value 0-15
-	 * @param value
-	 * @return
+	 * @param value Value to include in byte flag (0-15), only low bits used
+	 * @return Byteflag with given value
 	 */
 	public static ByteFlag create(long value) {
 		int m=(int)(value&0xf);

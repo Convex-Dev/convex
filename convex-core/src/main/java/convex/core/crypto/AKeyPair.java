@@ -316,7 +316,7 @@ public abstract class AKeyPair {
 	/**
 	 * Create a key pair from a hex string seed. Strips whitespace and leading 0x if needed.
 	 * @param seed Hex string containing 32 byte Ed25519 seed
-	 * @return
+	 * @return Key pair instance
 	 */
 	public static AKeyPair create(String seed) {
 		Blob b=Blob.parse(seed);

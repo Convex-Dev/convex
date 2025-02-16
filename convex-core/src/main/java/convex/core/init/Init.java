@@ -388,7 +388,7 @@ public class Init {
 	/**
 	 * Add extra libraries for testing purposes, not part of official genesis
 	 * @param peerKeys
-	 * @return
+	 * @return Test State instance
 	 */
 	public static State createTestState(List<AccountKey> peerKeys) {
 		State s=createState(peerKeys);

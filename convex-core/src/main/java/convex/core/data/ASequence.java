@@ -204,8 +204,8 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	/**
 	 * Checks if an index range is valid for this sequence
 	 * 
-	 * @param start
-	 * @param length
+	 * @param start Start index (Inclusive)
+	 * @param end End index (exclusive)
 	 */
 	protected boolean checkRange(long start, long end) {
 		if (start < 0) return false;

@@ -295,7 +295,7 @@ public class RESTServer implements Closeable {
 	
 	/**
 	 * Gets the base URL to use for external links. May be null
-	 * @return
+	 * @return BAse URL String
 	 */
 	public String getBaseURL() {
 		Object o= server.getConfig().get(Keywords.BASE_URL);

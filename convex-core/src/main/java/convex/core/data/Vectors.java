@@ -173,8 +173,9 @@ public class Vectors {
 
 	/**
 	 * Create a Vector which represents a range of integers from start to end
-	 * @param count
-	 * @return
+	 * @param start Start index (inclusive)
+	 * @param end End index (exclusive)
+	 * @return Vector containing Integer range specified
 	 */
 	public static AVector<CVMLong> range(long start, long end) {
 		throw new TODOException();

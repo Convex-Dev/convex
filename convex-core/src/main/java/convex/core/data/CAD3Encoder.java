@@ -159,7 +159,7 @@ public class CAD3Encoder extends AEncoder<ACell> {
 
 	/**
 	 * Reads a cell value from a Blob of data, allowing for non-embedded branches following the first cell
-	 * @param data Data to decode
+	 * @param enc Data to decode
 	 * @return Cell instance
 	 * @throws BadFormatException If CAD3 encoding format is invalid
 	 */

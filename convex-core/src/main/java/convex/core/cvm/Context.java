@@ -2382,7 +2382,7 @@ public class Context {
 
 	/**
 	 * Gets the most recent log entry, or null if not available.
-	 * @return
+	 * @return Last log entry, or null if no log entries present
 	 */
 	public AVector<ACell> lastLog() {
 		AVector<AVector<ACell>> log=getLog();

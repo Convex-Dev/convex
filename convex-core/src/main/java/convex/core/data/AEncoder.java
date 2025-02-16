@@ -15,7 +15,7 @@ public abstract class AEncoder<T> {
 	/**
 	 * Encodes a value as Blob
 	 * @param a
-	 * @return
+	 * @return Blob encoding in CAD3 format
 	 */
 	public abstract Blob encode(T a);
 	
@@ -27,7 +27,7 @@ public abstract class AEncoder<T> {
 
 	/**
 	 * Reads a value from a Blob of data
-	 * @param data Data to decode
+	 * @param enc Data to decode
 	 * @return Value instance
 	 * @throws BadFormatException If encoding format is invalid
 	 */

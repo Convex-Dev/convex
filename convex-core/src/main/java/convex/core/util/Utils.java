@@ -633,7 +633,7 @@ public class Utils {
 	 * Returns the minimal number of bytes to represent the signed twos complement
 	 * value of a BigInteger
 	 *
-	 * @param x Long value
+	 * @param bi BigInteger value
 	 * @return Number of bytes required for representation, in the range 1-8
 	 *         inclusive
 	 */

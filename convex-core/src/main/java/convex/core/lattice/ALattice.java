@@ -11,7 +11,7 @@ public abstract class ALattice {
 	 * Implementation of merge function
 	 * @param ownValue Own lattice value
 	 * @param otherValue Externally received lattice value
-	 * @return
+	 * @return Merged lattice root cell
 	 */
 	public abstract ACell merge(ACell ownValue, ACell otherValue);
 }

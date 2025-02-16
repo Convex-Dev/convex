@@ -90,8 +90,8 @@ public class Belief extends ARecordGeneric {
 	
 	/**
 	 * Creates a Belief from source data , usually an Index of Peer key -> Signed Orders
-	 * @param source
-	 * @return
+	 * @param source Map containing Orders
+	 * @return Belief constructed from given Order(s), or null if not valid
 	 */
 	@SuppressWarnings("unchecked")
 	public static Belief fromOrders(ACell source) {
@@ -244,7 +244,7 @@ public class Belief extends ARecordGeneric {
 	/**
 	 * Propose a new Block at the end of the current Order
 	 * @param kp Keypair with which to sign Order
-	 * @param signedBlock Signed Block of transactions
+	 * @param signedBlocks Signed Blocks of transactions
 	 * @return Updated Belief with new Order
 	 */
 	@SuppressWarnings("unchecked")

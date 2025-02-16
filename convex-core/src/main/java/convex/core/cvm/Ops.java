@@ -66,8 +66,8 @@ public class Ops {
 
 	/**
 	 * Cast any value to an Op. Returns value as a Constant op if not already an Op
-	 * @param aOp
-	 * @return
+	 * @param a Cell to cast to an Op (null results in a Constant nil op)
+	 * @return Op instance
 	 */
 	@SuppressWarnings("unchecked")
 	public static <T extends ACell> AOp<T> castOp(ACell a) {

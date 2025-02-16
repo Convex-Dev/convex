@@ -22,7 +22,7 @@ public abstract class AConnection {
 	 * @return true if message buffered successfully, false if failed due to full buffer
 	 * @throws IOException If IO error occurs while sending
 	 */
-	public abstract boolean sendMessage(Message m) throws IOException;
+	public abstract boolean sendMessage(Message msg) throws IOException;
 
 	/**
 	 * Returns the remote SocketAddress associated with this connection, or null if

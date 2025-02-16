@@ -3014,8 +3014,7 @@ public class Core {
  	
  	/**
  	 * Read a Core definition from an encoding
- 	 * @param b Blob containing encoding
- 	 * @param pos Position to read Core code function
+ 	 * @param code Code ID index
  	 * @return Singleton cell representing the Core value, or null if not defined
  	 */
 	public static ACell fromCode(long code) throws BadFormatException {

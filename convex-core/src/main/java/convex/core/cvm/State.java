@@ -202,7 +202,6 @@ public class State extends ARecordGeneric {
 	 * 
 	 * @param signedBlock Signed Block to apply
 	 * @return The BlockResult from applying the given Block to this State
-	 * @throws InvalidBlockException 
 	 */
 	public BlockResult applyBlock(SignedData<Block> signedBlock) {
 		Block block=null;
@@ -510,7 +509,7 @@ public class State extends ARecordGeneric {
 	 *
 	 * There are three phases in application of a transaction:
 	 * <ol>
-	 * <li>Preparation for accounting, with {@link #prepareTransaction(ResultContext) prepareTransaction}</li>
+	 * <li>Preparation for accounting, with {@link #prepareTransaction(ResultContext,TransactionContext) prepareTransaction}</li>
 	 * <li>Functional application of the transaction with ATransaction.apply(....)</li>
 	 * <li>Completion of accounting, with completeTransaction</li>
 	 * </ol>
@@ -552,7 +551,7 @@ public class State extends ARecordGeneric {
 	/**
 	 * Apply a transaction in a detached transaction context, mainly for test / query
 	 * @param t Transaction
-	 * @return
+	 * @return ResultContext after transaction is applied
 	 */
 	public ResultContext applyTransaction(ATransaction t) {
 		return applyTransaction(t,TransactionContext.create(this));

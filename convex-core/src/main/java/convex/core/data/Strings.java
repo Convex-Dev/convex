@@ -125,8 +125,8 @@ public class Strings {
 	
 	/**
 	 * Create a canonical CVM String from an object
-	 * @param s Java String to convert.
-	 * @return CVM String instance, or null if input was null
+	 * @param o Java Object to convert.
+	 * @return CVM String instance, or "nil" if input was null
 	 */
 	public static AString create(Object o) {
 		if (o==null) return NIL;

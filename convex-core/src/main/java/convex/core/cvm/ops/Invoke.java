@@ -45,7 +45,7 @@ public class Invoke<T extends ACell> extends AFlatMultiOp<T> {
 	 *  Build an invoke using the given values. Slow, for testing purposes
 	 * @param <T>
 	 * @param vals
-	 * @return
+	 * @return Invoke transaction instance
 	 */
 	public static <T extends ACell> Invoke<T> build(Object... vals) {
 		int n=vals.length;

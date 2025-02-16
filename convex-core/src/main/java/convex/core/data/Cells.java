@@ -86,7 +86,7 @@ public class Cells {
 	/**
 	 * Converts any collection object to an ACell[] array. Elements must be Cells.
 	 *
-	 * @param anyArray Array to convert
+	 * @param any Object representing an array to convert
 	 * @return ACell[] array
 	 */
 	@SuppressWarnings("unchecked")
@@ -134,7 +134,7 @@ public class Cells {
 	 * Gets the number of Branches directly contained in a Cell (will be zero if the
 	 * Cell is not a Ref container)
 	 *
-	 * @param a Cell to check (may be null)
+	 * @param v Cell to check (may be null)
 	 * @return Number of Refs in the object.
 	 */
 	public static int branchCount(ACell v) {

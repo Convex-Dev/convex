@@ -71,7 +71,6 @@ public class SetTree<T extends ACell> extends AHashSet<T> {
 	 * 
 	 * @param <V> Type of elements
 	 * @param elementRefs Array of Refs to elements
-	 * @param shift Hex digit position at which to split children.
 	 * @return New SetTree node
 	 */
 	@SuppressWarnings("unchecked")

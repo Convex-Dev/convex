@@ -1,6 +1,5 @@
 package convex.core.message;
 
-import java.io.IOException;
 import java.util.function.Predicate;
 
 import org.slf4j.Logger;
@@ -154,7 +153,7 @@ public class Message {
 
 	/**
 	 * Get the type of this message. May be UNKOWN if the message cannot be understood / processed
-	 * @return
+	 * @return Type of message
 	 */
 	public MessageType getType() {
 		if (type==null) type=inferType();
@@ -244,7 +243,7 @@ public class Message {
 	
 	/**
 	 * Gets the request ID for this message, assuming it is a request expecting a response
-	 * @return
+	 * @return ID of message (usually an Integer) or null if no ID present
 	 */
 	public ACell getRequestID() {
 		// if (payload==null) throw new IllegalStateException("Attempting to get ID of message before Payload is decoded");
@@ -274,7 +273,7 @@ public class Message {
 	 * 
 	 * This needs to work even if the payload is not yet decoded, for message routing (possibly with a different store)
 	 * 
-	 * @return
+	 * @return ID of Result, or null if no ID present
 	 */
 	public ACell getResultID() {
 		if (payload!=null) {
@@ -372,7 +371,7 @@ public class Message {
 
 	/**
 	 * Return true if there is encoded message data
-	 * @return
+	 * @return True if message data is constructed, false otherwise
 	 */
 	public boolean hasData() {
 		return messageData!=null;
@@ -491,7 +490,6 @@ public class Message {
 	 * Sends a STATUS Request Message on this connection.
 	 *
 	 * @return The ID of the message sent, or -1 if send buffer is full.
-	 * @throws IOException If IO error occurs
 	 */
 	public static Message createStatusRequest(long id) {
 		CVMLong idPayload = CVMLong.create(id);

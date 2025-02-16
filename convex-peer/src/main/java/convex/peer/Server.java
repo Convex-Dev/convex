@@ -832,8 +832,6 @@ public class Server implements Closeable {
 
 	/**
 	 * Shut down the Server, as gracefully as possible.
-	 * @throws TimeoutException If shutdown attempt times out
-	 * @throws IOException  In case of IO Error
 	 */
 	public void shutdown()  {
 		try {
