@@ -242,7 +242,7 @@ public class KeyRingPanel extends JPanel {
 
 	/**
 	 * Save a key to a store, prompting as necessary
-	 * @param parent
+	 * @param parent Parent component for prompting
 	 * @param walletEntry Wallet entry to save
 	 * @return True if saved successfully, false otherwise
 	 */
