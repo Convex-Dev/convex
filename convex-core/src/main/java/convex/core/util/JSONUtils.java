@@ -2,15 +2,22 @@ package convex.core.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import convex.core.cvm.Address;
 import convex.core.data.ACell;
+import convex.core.data.ACollection;
 import convex.core.data.AMap;
 import convex.core.data.ASequence;
 import convex.core.data.AString;
+import convex.core.data.ASymbolic;
+import convex.core.data.Blob;
 import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
+import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
@@ -62,7 +69,7 @@ public class JSONUtils {
 			}
 			return (T) list;
 		}
-	
+
 		return (T) o.toString();
 	}
 
@@ -78,6 +85,21 @@ public class JSONUtils {
 		if (k instanceof Keyword)
 			return ((Keyword) k).getName().toString();
 		return RT.toString(k);
+	}
+	
+	/**
+	 * Gets a String from a value suitable for use as a JSON map key
+	 * 
+	 * @param o Value to convert to a JSON key
+	 * @return String usable as JSON key
+	 */
+	public static String jsonKey(Object o) {
+		if (o instanceof ACell cell)
+			return jsonKey(cell);
+		
+		if (o instanceof String s) return s;
+		
+		throw new IllegalArgumentException("Invalid yupe for JSON key: "+Utils.getClassName(o));
 	}
 
 	/**
@@ -98,30 +120,224 @@ public class JSONUtils {
 		}
 		return hm;
 	}
-	
+
+	/**
+	 * Convert any object to JSON
+	 * 
+	 * @param value Value to convert to JSON, may be Java or CVM structure
+	 * @return JSON String
+	 */
 	public static String toString(Object value) {
 		return toCVMString(value).toString();
 	}
 
-	private static AString toCVMString(Object value) {
-		BlobBuilder bb=new BlobBuilder();
-		appendCVMString(bb,value);
+	/**
+	 * Convert any object to JSON
+	 * 
+	 * @param value Value to convert to JSON, may be Java or CVM structure
+	 * @return CVM String containing valid JSON
+	 */
+	public static AString toCVMString(Object value) {
+		BlobBuilder bb = new BlobBuilder();
+		appendCVMString(bb, value);
 		return Strings.create(bb.toBlob());
 	}
-		
-	private static void appendCVMString(BlobBuilder bb,Object value) {
-		if (value==null) bb.append(Strings.NULL);
-		
-		if (value instanceof List lv) {
-			bb.append('[');
-			int n=lv.size();
-			for (int i=0; i<n; i++) {
-				appendCVMString(bb,lv.get(i));
-				bb.append(' ');
-			}
-			bb.append(']');
+
+	private static void appendCVMString(BlobBuilder bb, Object value) {
+		if (value == null) {
+			bb.append(Strings.NULL);
+			return;
 		}
 		
+		if (value instanceof ACell cell) {
+			appendCVMString(bb,cell);
+			return;
+		}
+		
+		
+		if (value instanceof Map mv) {
+			bb.append('{');
+			int i=0;
+			@SuppressWarnings("unchecked")
+			Iterator<Map.Entry<Object,Object>> it = mv.entrySet().iterator();
+			while (it.hasNext()) {
+			    Entry<Object, Object> me = it.next();
+			    if (i>0) bb.append("\n");
+				appendCVMString(bb, jsonKey(me.getKey()));
+				bb.append(':');
+				bb.append(' ');
+				appendCVMString(bb, me.getValue());
+
+			    i += 1;
+			}
+			
+			bb.append('}');
+			return;
+		}
+		
+		// This catches Java lists
+		if (value instanceof List lv) {
+			bb.append('[');
+			int n = lv.size();
+			for (int i = 0; i < n; i++) {
+				if (i>0) bb.append(' ');
+				appendCVMString(bb, lv.get(i));
+			}
+			bb.append(']');
+			return;
+		}
+		
+			if (value instanceof Boolean bv) {
+				bb.append(bv ? Strings.TRUE : Strings.FALSE);
+				return;
+			}
+	
+			if (value instanceof String cs) {
+				bb.append('\"');
+				appendCVMStringQuoted(bb, cs);
+				bb.append('\"');
+				return;
+			}
+			
+			if (value instanceof Number nv) {
+				if (value instanceof Double dv) {
+					if (Double.isFinite(dv)) {
+						bb.append(nv.toString());
+						return;
+					} else {
+						if (Double.isNaN(dv)) {
+							bb.append(JS_NAN);
+						} else {
+							if (dv<0) {
+								bb.append('-');
+							}
+							bb.append("Infinity");
+						}
+					}
+					return;
+				}
+				
+				bb.append(nv.toString());
+				return;			
+			}
+		
+		throw new IllegalArgumentException("Can't print type as JSON: "+Utils.getClassName(value));
+	}
+	
+	// Specialised writing for CVM types
+	private static void appendCVMString(BlobBuilder bb, ACell value) {
+		if (value == null) {
+			bb.append(Strings.NULL);
+			return;
+		}
+		
+		if (value instanceof AString cs) {
+			bb.append('\"');
+			appendCVMStringQuoted(bb, cs.toString()); // TODO: can be faster
+			bb.append('\"');
+			return;
+		}
+		
+		if (value instanceof ASymbolic cs) {
+			// Print as the symbolic name string
+			appendCVMString(bb, cs.getName()); 
+			return;
+		}
+		
+		// CVM map special treatment
+		if (value instanceof AMap mv) {
+			bb.append('{');
+			long n = mv.size();
+			for (long i = 0; i < n; i++) {
+				if (i>0) bb.append(' ');
+				MapEntry<?,?> me=mv.entryAt(i);
+				appendCVMString(bb, jsonKey(me.getKey()));
+				bb.append(':');
+				bb.append(' ');
+				appendCVMString(bb, me.getValue());
+			}
+			bb.append('}');
+			return;
+		}
+
+		// Maps, Lists and Sets get printed as JSON arrays
+		if (value instanceof ACollection lv) {
+			bb.append('[');
+			long n = lv.count();
+			for (long i = 0; i < n; i++) {
+				if (i>0) bb.append(' ');
+				appendCVMString(bb, lv.get(i));
+			}
+			bb.append(']');
+			return;
+		}
+
+		
+		if (value instanceof CVMLong nv) {
+			appendCVMString(bb,nv.longValue());
+			return;
+		}
+		
+		if (value instanceof CVMDouble nv) {
+			appendCVMString(bb,nv.doubleValue());
+			return;
+		}
+		
+		if (value instanceof CVMBool bv) {
+			bb.append(bv.booleanValue() ? Strings.TRUE : Strings.FALSE);
+			return;
+		}
+	}
+
+
+	private static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {
+		int n = cs.length();
+		for (int i = 0; i < n; i++) {
+			char c = cs.charAt(i);
+			AString rep = getReplacementString(c);
+			if (rep != null) {
+				bb.append(rep);
+			} else {
+				bb.append(c);
+			}
+		}
+	}
+
+	private static final StringShort QUOTED_BACKSLASH = StringShort.create("\\\\");
+	private static final StringShort QUOTED_QUOTES = StringShort.create("\\\"");
+	private static final StringShort QUOTED_NEWLINE = StringShort.create("\\n");
+	private static final StringShort QUOTED_RETURN = StringShort.create("\\r");
+	private static final StringShort QUOTED_TAB = StringShort.create("\\t");
+	
+	private static final StringShort JS_NAN = StringShort.create("NaN");
+	
+	private static final char CONTROL_CHARS_END = 0x001f; // Highest ASCII control character
+
+
+	private static AString getReplacementString(char c) {
+		if (c == '\\') {
+			return QUOTED_BACKSLASH;
+		}
+		if (c > '"') {
+			// anything above this is OK in a JSON String
+			return null;
+		}
+		if (c == '"') {
+			return QUOTED_QUOTES;
+		}
+		if (c > CONTROL_CHARS_END) {
+			return null;
+		}
+		if (c == '\n') {
+			return QUOTED_NEWLINE;
+		}
+		if (c == '\r') {
+			return QUOTED_RETURN;
+		}
+		if (c == '\t') {
+			return QUOTED_TAB;
+		}
+		return StringShort.create(Blob.wrap(new byte[] { '\\', 'u', '0', '0', (byte) Utils.toHexChar((c >> 4) & 0x000f), (byte) Utils.toHexChar(c & 0x000f) }));
 	}
 
 }

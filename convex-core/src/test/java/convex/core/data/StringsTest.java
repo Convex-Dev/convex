@@ -13,6 +13,7 @@ import convex.core.cvm.Symbols;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
 import convex.core.lang.RT;
+import convex.core.util.JSONUtils;
 import convex.test.Samples;
 
 public class StringsTest {
@@ -233,6 +234,9 @@ public class StringsTest {
 		ABlob bs=a.toBlob();
 		AString abs=Strings.create(bs);
 		assertEquals(a,abs);
+		
+		// JSON print
+		JSONUtils.toString(a);
 		
 		// fall back to bloblike tests
 		BlobsTest.doBlobLikeTests(a);
