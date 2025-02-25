@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Properties;
 import java.util.Random;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -1403,10 +1404,25 @@ public class Utils {
 		return 0xFF&(value >> ((ALongBlob.LENGTH - i - 1) * 8));
 	}
 
+	static String version=null;
 	public static String getVersion() {
-		String v= Utils.class.getPackage().getImplementationVersion();
-		if (v==null) v="Unlabelled SNAPSHOT";
-		return v;
+		version = Utils.class.getPackage().getImplementationVersion();
+		
+		if (version==null) try {
+			Properties properties = new Properties();
+			InputStream stream = getResourceAsStream("/convex/core/build.properties");
+			if (stream!=null) {
+				properties.load(stream);
+				version=properties.getProperty("convex.core.version");
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		if (version==null) {
+			return "SNAPSHOT";
+		}
+		return version;
 	}
 
 	public static String timeString() {

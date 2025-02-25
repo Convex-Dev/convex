@@ -4,6 +4,7 @@ import static convex.core.lang.TestState.STATE;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -432,6 +433,10 @@ public class UtilsTest {
 		assertEquals(2,q.poll());
 		assertNull(q.poll());
 		assertTrue(q.isEmpty());
+	}
+	
+	@Test public void testVersion() {
+		assertNotEquals("SNAPSHOT",Utils.getVersion());
 	}
 
 }

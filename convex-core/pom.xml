@@ -6,11 +6,11 @@
 		<artifactId>convex</artifactId>
 		<version>0.8.1-SNAPSHOT</version>
 	</parent>
-	
+
 	<properties>
-	  <antlr.version>4.13.2</antlr.version>
-	  <bc.version>1.79</bc.version>
-	  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<antlr.version>4.13.2</antlr.version>
+		<bc.version>1.79</bc.version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
 
 	<modelVersion>4.0.0</modelVersion>
@@ -51,40 +51,44 @@
 					</execution>
 				</executions>
 				<configuration>
-					<basedir>${project.build.directory}/generated-sources/antlr4/convex/core/lang/reader/antlr</basedir>
+					<basedir>
+						${project.build.directory}/generated-sources/antlr4/convex/core/lang/reader/antlr</basedir>
 					<includes>
 						<include>*.java</include>
 					</includes>
 					<replacements>
 						<replacement>
 							<token>// Generated from convex.+</token>
-							<value>// Generated file. This header modified in convex-core/pom.xml to ensure repeatable builds.</value>
+							<value>// Generated file. This header modified in
+								convex-core/pom.xml to ensure repeatable builds.</value>
 						</replacement>
 					</replacements>
 					<regex>true</regex>
 				</configuration>
 			</plugin>
 			<plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <version>3.6.0</version>
-                <executions>
-                    <execution>
-                        <id>add-source</id>
-                        <phase>generate-sources</phase>
-                        <goals>
-                            <goal>add-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.build.directory}/generated-sources/antlr4/</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-            
-           <!-- This plugin ensures we get a test-jar which is used as a dependency for some other tests. Not needed any more?
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>build-helper-maven-plugin</artifactId>
+				<version>3.6.0</version>
+				<executions>
+					<execution>
+						<id>add-source</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>add-source</goal>
+						</goals>
+						<configuration>
+							<sources>
+								<source>
+									${project.build.directory}/generated-sources/antlr4/</source>
+							</sources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- This plugin ensures we get a test-jar which is used as a
+			dependency for some other tests. Not needed any more?
            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -105,7 +109,10 @@
 			<resource>
 				<directory>src/main/antlr4</directory>
 			</resource>
-
+			<resource>
+				<directory>src/main/resources-filtered</directory>
+				<filtering>true</filtering>
+			</resource>
 		</resources>
 		<testResources>
 			<testResource>
