@@ -29,6 +29,7 @@ import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.util.JSONUtils;
 
 /**
  * Tests for RT functions.
@@ -79,28 +80,28 @@ public class RTTest {
 	
 	@Test
 	public void testJSON() {
-		assertNull(RT.json(null));
+		assertNull(JSONUtils.json(null));
 		
-		assertEquals((Long)13L,RT.json(Address.create(13)));
-		assertEquals("0xcafebabe",RT.json(Blob.fromHex("cafebabe")));
-		assertEquals("0x",RT.json(Blobs.empty()));
-		assertEquals("{}",RT.json(Index.none()).toString());
-		assertEquals("{}",RT.json(Maps.empty()).toString());
-		assertEquals("[1, 2]",RT.json(Vectors.of(1,2)).toString());
-		assertEquals("[1, 2]",RT.json(Lists.of(1,2)).toString());
-		assertEquals("c",RT.json(CVMChar.create('c')));
+		assertEquals((Long)13L,JSONUtils.json(Address.create(13)));
+		assertEquals("0xcafebabe",JSONUtils.json(Blob.fromHex("cafebabe")));
+		assertEquals("0x",JSONUtils.json(Blobs.empty()));
+		assertEquals("{}",JSONUtils.json(Index.none()).toString());
+		assertEquals("{}",JSONUtils.json(Maps.empty()).toString());
+		assertEquals("[1, 2]",JSONUtils.json(Vectors.of(1,2)).toString());
+		assertEquals("[1, 2]",JSONUtils.json(Lists.of(1,2)).toString());
+		assertEquals("c",JSONUtils.json(CVMChar.create('c')));
 
-		assertEquals("foo",RT.json(Symbols.FOO));
-		assertEquals(":foo",RT.json(Keywords.FOO));
+		assertEquals("foo",JSONUtils.json(Symbols.FOO));
+		assertEquals(":foo",JSONUtils.json(Keywords.FOO));
 		
 		// Note keywords get colon removed when used as JSON key
-		assertEquals(":bar",RT.jsonMap(Maps.of(Keywords.FOO, Keywords.BAR)).get("foo"));
+		assertEquals(":bar",JSONUtils.jsonMap(Maps.of(Keywords.FOO, Keywords.BAR)).get("foo"));
 
 		
 		// JSON should convert keys to strings
-		assertEquals(Maps.of("1",2), RT.cvm(RT.json(Maps.of(1,2))));
-		assertEquals(Maps.of("[]",3), RT.cvm(RT.json(Maps.of(Vectors.empty(),3))));
-		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(RT.json(Maps.of(Vectors.of("",3),4))));
+		assertEquals(Maps.of("1",2), RT.cvm(JSONUtils.json(Maps.of(1,2))));
+		assertEquals(Maps.of("[]",3), RT.cvm(JSONUtils.json(Maps.of(Vectors.empty(),3))));
+		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(JSONUtils.json(Maps.of(Vectors.of("",3),4))));
 	}
 	
 	@Test
@@ -125,7 +126,7 @@ public class RTTest {
 		assertEquals(c,RT.cvm(o)); 
 		
 		// c should round trip via JSON back to c, since JSON is a subset of CVM types
-		ACell roundTrip=RT.cvm(RT.json(c));
+		ACell roundTrip=RT.cvm(JSONUtils.json(c));
 		assertEquals(c,roundTrip); 
 		
 		// c should also round trip via JVM equivalent, since we are using JSON subset

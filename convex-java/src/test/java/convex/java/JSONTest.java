@@ -11,6 +11,7 @@ import convex.core.data.ACell;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.lang.RT;
+import convex.core.util.JSONUtils;
 
 public class JSONTest {
 
@@ -58,7 +59,7 @@ public class JSONTest {
 		Object o=JSON.parse(s);
 		ACell c=RT.cvm(v); // c is CVM representation of JSON Object
 		assertEquals(c,RT.cvm(o));
-		assertEquals(c,RT.cvm(RT.json(c)));
+		assertEquals(c,RT.cvm(JSONUtils.json(c)));
 		assertEquals(c,RT.cvm(JSON.parse(JSON.toString(v))));
 		assertEquals(c,RT.cvm(JSON.parse(JSON.toPrettyString(v))));
 	}

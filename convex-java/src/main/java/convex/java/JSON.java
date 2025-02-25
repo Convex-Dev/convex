@@ -15,7 +15,7 @@ import org.json.simple.parser.ParseException;
 
 import convex.core.data.ACell;
 import convex.core.data.ASymbolic;
-import convex.core.lang.RT;
+import convex.core.util.JSONUtils;
 import convex.core.util.Utils;
 
 /**
@@ -120,7 +120,7 @@ public class JSON {
      * @return Java Object representing the value as JSON
      */
     public static Object from(ACell a) {
-    	return RT.json(a);
+    	return JSONUtils.json(a);
     }
     
     /**

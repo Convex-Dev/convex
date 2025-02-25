@@ -2,12 +2,12 @@ package convex.core.cvm.transactions;
 
 import java.util.HashMap;
 
-import convex.core.lang.RT;
+import convex.core.util.JSONUtils;
 
 public class Transactions {
 
 	public static HashMap<String,Object> toJSON(ATransaction tx) {
-		HashMap<String,Object> result= RT.jsonMap(tx);
+		HashMap<String,Object> result= JSONUtils.jsonMap(tx);
 		result.put("type", tx.getClass().getSimpleName());
 		return result;
 	}

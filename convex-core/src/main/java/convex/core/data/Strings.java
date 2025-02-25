@@ -69,9 +69,13 @@ public class Strings {
 
 	public static final StringShort FULL_BUFFER = StringShort.create("Buffer full");
 
+	public static final StringShort NULL = StringShort.create("null");
+
+	
 	public static final Comparator<AString> lengthComparator = (a,b)->{
 		return Long.signum(a.count()-b.count());
 	};
+
 
 
 	/**

@@ -44,6 +44,7 @@ import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
 import convex.core.cvm.Symbols;
+import convex.core.util.JSONUtils;
 import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.restapi.RESTServer;
@@ -423,7 +424,7 @@ public class ChainAPI extends ABaseAPI {
 		Ref<ATransaction> ref = Cells.persist(trans).getRef();
 		HashMap<String, Object> rmap = new HashMap<>();
 		rmap.put("source", srcValue);
-		rmap.put("address", RT.json(addr));
+		rmap.put("address", JSONUtils.json(addr));
 		rmap.put("hash", SignedData.getMessageForRef(ref).toHexString());
 		rmap.put("sequence", sequence);
 		ctx.result(JSON.toPrettyString(rmap));
