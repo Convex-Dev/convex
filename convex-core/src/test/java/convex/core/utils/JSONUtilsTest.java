@@ -53,6 +53,13 @@ public class JSONUtilsTest {
 	}
 	
 	@Test
+	public void testParse() {
+		assertNull(JSONUtils.parse("null"));
+		assertEquals(CVMBool.TRUE,JSONUtils.parse("true"));
+		assertEquals(CVMBool.FALSE,JSONUtils.parse("   false  "));
+	}
+	
+	@Test
 	public void testJSON() {
 		assertNull(JSONUtils.json(null));
 		
