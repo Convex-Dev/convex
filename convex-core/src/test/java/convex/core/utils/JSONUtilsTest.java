@@ -2,6 +2,7 @@ package convex.core.utils;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -57,6 +58,9 @@ public class JSONUtilsTest {
 		assertNull(JSONUtils.parse("null"));
 		assertEquals(CVMBool.TRUE,JSONUtils.parse("true"));
 		assertEquals(CVMBool.FALSE,JSONUtils.parse("   false  "));
+		
+		assertSame(Vectors.empty(),JSONUtils.parse("[]"));
+		assertEquals(Vectors.of(true,null),JSONUtils.parse("[true,null]"));
 	}
 	
 	@Test

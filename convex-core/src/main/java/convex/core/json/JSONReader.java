@@ -9,11 +9,13 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 
 import convex.core.data.ACell;
+import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.exceptions.ParseException;
 import convex.core.json.reader.antlr.JSONBaseListener;
 import convex.core.json.reader.antlr.JSONLexer;
 import convex.core.json.reader.antlr.JSONParser;
+import convex.core.json.reader.antlr.JSONParser.ArrayContext;
 import convex.core.json.reader.antlr.JSONParser.BooleanContext;
 import convex.core.json.reader.antlr.JSONParser.NullContext;
 
@@ -60,6 +62,17 @@ public class JSONReader {
 		public void exitBoolean(BooleanContext ctx) { 
 			boolean value= (ctx.getText()).equals("true");
 			push(CVMBool.create(value));
+		}
+		
+		@Override
+		public void enterArray(ArrayContext ctx) {
+			pushList(); // We add a new ArrayList to the stack to capture values
+		}
+
+		@Override
+		public void exitArray(ArrayContext ctx) {
+			ArrayList<ACell> arr=popList();
+			push(Vectors.create(arr));
 		}
 	}
 	
