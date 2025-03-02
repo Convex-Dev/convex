@@ -10,7 +10,9 @@ import org.antlr.v4.runtime.atn.PredictionMode;
 
 import convex.core.data.ACell;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;
+import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.ParseException;
 import convex.core.json.reader.antlr.JSONBaseListener;
 import convex.core.json.reader.antlr.JSONLexer;
@@ -18,6 +20,7 @@ import convex.core.json.reader.antlr.JSONParser;
 import convex.core.json.reader.antlr.JSONParser.ArrayContext;
 import convex.core.json.reader.antlr.JSONParser.BooleanContext;
 import convex.core.json.reader.antlr.JSONParser.NullContext;
+import convex.core.json.reader.antlr.JSONParser.NumberContext;
 
 public class JSONReader {
 
@@ -73,6 +76,27 @@ public class JSONReader {
 		public void exitArray(ArrayContext ctx) {
 			ArrayList<ACell> arr=popList();
 			push(Vectors.create(arr));
+		}
+		
+		@Override
+		public void exitNumber(NumberContext ctx) {
+			String num=ctx.getText();
+			AInteger intv=AInteger.parse(num);
+			if (intv!=null) {
+				push(intv);
+				return;
+			}
+			
+			try {
+				CVMDouble dv=CVMDouble.parse(num);
+				if (dv!=null) {
+					push(dv);
+					return;
+				}
+			} catch (Exception e) {
+				
+			}
+			throw new ParseException("Can't parse as number: "+num);
 		}
 	}
 	

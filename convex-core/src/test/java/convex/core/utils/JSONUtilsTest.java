@@ -61,6 +61,10 @@ public class JSONUtilsTest {
 		
 		assertSame(Vectors.empty(),JSONUtils.parse("[]"));
 		assertEquals(Vectors.of(true,null),JSONUtils.parse("[true,null]"));
+		
+		assertSame(CVMLong.ONE,JSONUtils.parse("1"));
+		assertEquals(CVMDouble.ONE,JSONUtils.parse("1.0"));
+
 	}
 	
 	@Test
