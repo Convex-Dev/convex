@@ -15,7 +15,7 @@ obj
     ;
 
 pair
-    : STRING ':' value
+    : string ':' value
     ;
 
 array

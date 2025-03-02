@@ -9,6 +9,8 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 
 import convex.core.data.ACell;
+import convex.core.data.Cells;
+import convex.core.data.Maps;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
@@ -22,6 +24,7 @@ import convex.core.json.reader.antlr.JSONParser.ArrayContext;
 import convex.core.json.reader.antlr.JSONParser.BooleanContext;
 import convex.core.json.reader.antlr.JSONParser.NullContext;
 import convex.core.json.reader.antlr.JSONParser.NumberContext;
+import convex.core.json.reader.antlr.JSONParser.ObjContext;
 import convex.core.json.reader.antlr.JSONParser.StringContext;
 
 public class JSONReader {
@@ -106,6 +109,18 @@ public class JSONReader {
 			String text=ctx.getText();
 			String content=text.substring(1, text.length()-1);
 			push(Strings.create(content));
+		}
+		
+		@Override
+		public void enterObj(ObjContext ctx) {
+			pushList(); // We add a new ArrayList to the stack to capture values			
+		}
+		
+		@Override
+		public void exitObj(ObjContext ctx) {
+			ArrayList<ACell> arr=popList();
+			ACell[] kvs=arr.toArray(Cells.EMPTY_ARRAY);
+			push(Maps.create(kvs));
 		}
 	}
 	

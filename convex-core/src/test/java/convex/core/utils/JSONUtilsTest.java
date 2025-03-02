@@ -66,6 +66,11 @@ public class JSONUtilsTest {
 		assertEquals(CVMDouble.ONE,JSONUtils.parse("1.0"));
 
 		assertEquals(Strings.NIL,JSONUtils.parse("\"nil\""));
+
+		assertSame(Maps.empty(),JSONUtils.parse("{}"));
+		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parse("{\"nil\": 1}"));
+		assertEquals(Maps.of(Strings.EMPTY,Vectors.empty()),JSONUtils.parse("{\"\": []}"));
+	
 	}
 	
 	@Test
