@@ -65,6 +65,7 @@ public class JSONUtilsTest {
 		assertSame(CVMLong.ONE,JSONUtils.parse("1"));
 		assertEquals(CVMDouble.ONE,JSONUtils.parse("1.0"));
 
+		assertEquals(Strings.NIL,JSONUtils.parse("\"nil\""));
 	}
 	
 	@Test

@@ -9,6 +9,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 
 import convex.core.data.ACell;
+import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;
@@ -21,6 +22,7 @@ import convex.core.json.reader.antlr.JSONParser.ArrayContext;
 import convex.core.json.reader.antlr.JSONParser.BooleanContext;
 import convex.core.json.reader.antlr.JSONParser.NullContext;
 import convex.core.json.reader.antlr.JSONParser.NumberContext;
+import convex.core.json.reader.antlr.JSONParser.StringContext;
 
 public class JSONReader {
 
@@ -97,6 +99,13 @@ public class JSONReader {
 				
 			}
 			throw new ParseException("Can't parse as number: "+num);
+		}
+		
+		@Override
+		public void exitString(StringContext ctx) {
+			String text=ctx.getText();
+			String content=text.substring(1, text.length()-1);
+			push(Strings.create(content));
 		}
 	}
 	
