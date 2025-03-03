@@ -51,7 +51,7 @@ public class JSONUtilsTest {
 		assertEquals("false",JSONUtils.toString(CVMBool.FALSE));
 		
 		assertEquals("\"\\n\"",JSONUtils.toString("\n"));
-		assertEquals("\"\\\"\"",JSONUtils.toString("\""));
+		assertEquals("\" \\\" \"",JSONUtils.toString(" \" "));
 		
 		assertEquals("\"foo\"",JSONUtils.toString(Symbols.FOO));
 		assertEquals("\"foo\"",JSONUtils.toString(Keywords.FOO));

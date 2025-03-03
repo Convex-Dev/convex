@@ -354,7 +354,7 @@ public class JSONUtils {
 	/**
 	 * Escape a string for inclusion in JSON
 	 * @param content
-	 * @return
+	 * @return CVM String containing JSON escaped content
 	 */
 	public static AString escape(String content) {
 		BlobBuilder bb=new BlobBuilder();
@@ -362,7 +362,14 @@ public class JSONUtils {
 		return Strings.create(bb.toBlob());
 	}
 
-	public static ACell unescape(String content) {
+	
+	/**
+	 * Unescapes JSON string content
+	 * @param content
+	 * @return CVM String containing JSON unescaped content
+	 */
+	public static AString unescape(String content) {
+		// This this works as JSON is subset of Java escaped Strings?
 		String unes=Text.unescapeJava(content);
 		return Strings.create(unes);
 	}
