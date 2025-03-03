@@ -3,6 +3,7 @@ package convex.core.utils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,12 +21,14 @@ import convex.core.data.Index;
 import convex.core.data.Lists;
 import convex.core.data.Maps;
 import convex.core.data.Sets;
+import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
+import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
 import convex.core.util.JSONUtils;
 
@@ -40,13 +43,15 @@ public class JSONUtilsTest {
 	
 		assertEquals("\"nil\"",JSONUtils.toString("nil"));
 
-		assertEquals("[1 2 null]",JSONUtils.toString(Vectors.of(1,2,null)));
+		assertEquals("[1,2,null]",JSONUtils.toString(Vectors.of(1,2,null)));
 
 		assertEquals("true",JSONUtils.toString(true));
 		assertEquals("false",JSONUtils.toString(false));
 		assertEquals("true",JSONUtils.toString(CVMBool.TRUE));
 		assertEquals("false",JSONUtils.toString(CVMBool.FALSE));
 		
+		assertEquals("\"\\n\"",JSONUtils.toString("\n"));
+		assertEquals("\"\\\"\"",JSONUtils.toString("\""));
 		
 		assertEquals("\"foo\"",JSONUtils.toString(Symbols.FOO));
 		assertEquals("\"foo\"",JSONUtils.toString(Keywords.FOO));
@@ -61,6 +66,7 @@ public class JSONUtilsTest {
 		
 		assertSame(Vectors.empty(),JSONUtils.parse("[]"));
 		assertEquals(Vectors.of(true,null),JSONUtils.parse("[true,null]"));
+		assertEquals(Vectors.of(1,2),JSONUtils.parse("[1,2]"));
 		
 		assertSame(CVMLong.ONE,JSONUtils.parse("1"));
 		assertEquals(CVMDouble.ONE,JSONUtils.parse("1.0"));
@@ -71,6 +77,21 @@ public class JSONUtilsTest {
 		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parse("{\"nil\": 1}"));
 		assertEquals(Maps.of(Strings.EMPTY,Vectors.empty()),JSONUtils.parse("{\"\": []}"));
 	
+		// Some errors
+		assertThrows(ParseException.class,()->JSONUtils.parse("[1 2]"));
+		assertThrows(ParseException.class,()->JSONUtils.parse("1,2"));
+		assertThrows(ParseException.class,()->JSONUtils.parse("{"));
+		assertThrows(ParseException.class,()->JSONUtils.parse("3]"));
+
+		// Special cases
+		assertEquals(Strings.create("a\"b"),JSONUtils.parse("\"a\\\"b\""));
+
+	}
+	
+	@Test
+	public void testEscape() {
+		assertEquals("\\n",JSONUtils.escape("\n").toString());
+		assertEquals(StringShort.create(" \\\""),JSONUtils.escape(" \""));
 	}
 	
 	@Test
@@ -131,6 +152,9 @@ public class JSONUtilsTest {
 		String js1=JSONUtils.toString(o);
 		String js2=JSONUtils.toString(c);
 		assertEquals(js1.length(),js2.length()); // should be same length, orders might differ
+		
+		assertEquals(c,JSONUtils.parse(js1),()->"JSON="+js1);
+		assertEquals(c,JSONUtils.parse(js2));
 	}
 	
 }

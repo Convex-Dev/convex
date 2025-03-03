@@ -238,6 +238,9 @@ public class StringsTest {
 		// JSON print
 		JSONUtils.toString(a);
 		
+		// JSON escape / unescape
+		assertEquals(a,JSONUtils.unescape(JSONUtils.escape(js).toString()));
+		
 		// fall back to bloblike tests
 		BlobsTest.doBlobLikeTests(a);
 	}

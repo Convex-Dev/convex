@@ -26,6 +26,7 @@ import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.json.JSONReader;
 import convex.core.lang.RT;
+import convex.core.text.Text;
 
 public class JSONUtils {
 
@@ -100,7 +101,7 @@ public class JSONUtils {
 		
 		if (o instanceof String s) return s;
 		
-		throw new IllegalArgumentException("Invalid yupe for JSON key: "+Utils.getClassName(o));
+		throw new IllegalArgumentException("Invalid type for JSON key: "+Utils.getClassName(o));
 	}
 
 	/**
@@ -126,10 +127,10 @@ public class JSONUtils {
 	 * Convert any object to JSON
 	 * 
 	 * @param value Value to convert to JSON, may be Java or CVM structure
-	 * @return JSON String
+	 * @return Java String containing valid JSON String
 	 */
 	public static String toString(Object value) {
-		return toCVMString(value).toString();
+		return toJSONString(value).toString();
 	}
 	
 	/**
@@ -147,20 +148,20 @@ public class JSONUtils {
 	 * @param value Value to convert to JSON, may be Java or CVM structure
 	 * @return CVM String containing valid JSON
 	 */
-	public static AString toCVMString(Object value) {
+	public static AString toJSONString(Object value) {
 		BlobBuilder bb = new BlobBuilder();
-		appendCVMString(bb, value);
+		appendJSON(bb, value);
 		return Strings.create(bb.toBlob());
 	}
 
-	private static void appendCVMString(BlobBuilder bb, Object value) {
+	private static void appendJSON(BlobBuilder bb, Object value) {
 		if (value == null) {
 			bb.append(Strings.NULL);
 			return;
 		}
 		
 		if (value instanceof ACell cell) {
-			appendCVMString(bb,cell);
+			appendJSON(bb,cell);
 			return;
 		}
 		
@@ -172,11 +173,11 @@ public class JSONUtils {
 			Iterator<Map.Entry<Object,Object>> it = mv.entrySet().iterator();
 			while (it.hasNext()) {
 			    Entry<Object, Object> me = it.next();
-			    if (i>0) bb.append("\n");
-				appendCVMString(bb, jsonKey(me.getKey()));
+			    if (i>0) bb.append(",");
+				appendJSON(bb, jsonKey(me.getKey()));
 				bb.append(':');
 				bb.append(' ');
-				appendCVMString(bb, me.getValue());
+				appendJSON(bb, me.getValue());
 
 			    i += 1;
 			}
@@ -190,52 +191,52 @@ public class JSONUtils {
 			bb.append('[');
 			int n = lv.size();
 			for (int i = 0; i < n; i++) {
-				if (i>0) bb.append(' ');
-				appendCVMString(bb, lv.get(i));
+				if (i>0) bb.append(',');
+				appendJSON(bb, lv.get(i));
 			}
 			bb.append(']');
 			return;
 		}
 		
-			if (value instanceof Boolean bv) {
-				bb.append(bv ? Strings.TRUE : Strings.FALSE);
-				return;
-			}
-	
-			if (value instanceof String cs) {
-				bb.append('\"');
-				appendCVMStringQuoted(bb, cs);
-				bb.append('\"');
+		if (value instanceof Boolean bv) {
+			bb.append(bv ? Strings.TRUE : Strings.FALSE);
+			return;
+		}
+
+		if (value instanceof String cs) {
+			bb.append('\"');
+			appendCVMStringQuoted(bb, cs);
+			bb.append('\"');
+			return;
+		}
+		
+		if (value instanceof Number nv) {
+			if (value instanceof Double dv) {
+				if (Double.isFinite(dv)) {
+					bb.append(nv.toString());
+					return;
+				} else {
+					if (Double.isNaN(dv)) {
+						bb.append(JS_NAN);
+					} else {
+						if (dv<0) {
+							bb.append('-');
+						}
+						bb.append("Infinity");
+					}
+				}
 				return;
 			}
 			
-			if (value instanceof Number nv) {
-				if (value instanceof Double dv) {
-					if (Double.isFinite(dv)) {
-						bb.append(nv.toString());
-						return;
-					} else {
-						if (Double.isNaN(dv)) {
-							bb.append(JS_NAN);
-						} else {
-							if (dv<0) {
-								bb.append('-');
-							}
-							bb.append("Infinity");
-						}
-					}
-					return;
-				}
-				
-				bb.append(nv.toString());
-				return;			
-			}
+			bb.append(nv.toString());
+			return;			
+		}
 		
 		throw new IllegalArgumentException("Can't print type as JSON: "+Utils.getClassName(value));
 	}
 	
 	// Specialised writing for CVM types
-	private static void appendCVMString(BlobBuilder bb, ACell value) {
+	private static void appendJSON(BlobBuilder bb, ACell value) {
 		if (value == null) {
 			bb.append(Strings.NULL);
 			return;
@@ -250,7 +251,7 @@ public class JSONUtils {
 		
 		if (value instanceof ASymbolic cs) {
 			// Print as the symbolic name string
-			appendCVMString(bb, cs.getName()); 
+			appendJSON(bb, cs.getName()); 
 			return;
 		}
 		
@@ -259,12 +260,12 @@ public class JSONUtils {
 			bb.append('{');
 			long n = mv.size();
 			for (long i = 0; i < n; i++) {
-				if (i>0) bb.append(' ');
+				if (i>0) bb.append(',');
 				MapEntry<?,?> me=mv.entryAt(i);
-				appendCVMString(bb, jsonKey(me.getKey()));
+				appendJSON(bb, jsonKey(me.getKey()));
 				bb.append(':');
 				bb.append(' ');
-				appendCVMString(bb, me.getValue());
+				appendJSON(bb, me.getValue());
 			}
 			bb.append('}');
 			return;
@@ -275,8 +276,8 @@ public class JSONUtils {
 			bb.append('[');
 			long n = lv.count();
 			for (long i = 0; i < n; i++) {
-				if (i>0) bb.append(' ');
-				appendCVMString(bb, lv.get(i));
+				if (i>0) bb.append(',');
+				appendJSON(bb, lv.get(i));
 			}
 			bb.append(']');
 			return;
@@ -284,12 +285,12 @@ public class JSONUtils {
 
 		
 		if (value instanceof CVMLong nv) {
-			appendCVMString(bb,nv.longValue());
+			appendJSON(bb,nv.longValue());
 			return;
 		}
 		
 		if (value instanceof CVMDouble nv) {
-			appendCVMString(bb,nv.doubleValue());
+			appendJSON(bb,nv.doubleValue());
 			return;
 		}
 		
@@ -348,6 +349,22 @@ public class JSONUtils {
 			return QUOTED_TAB;
 		}
 		return StringShort.create(Blob.wrap(new byte[] { '\\', 'u', '0', '0', (byte) Utils.toHexChar((c >> 4) & 0x000f), (byte) Utils.toHexChar(c & 0x000f) }));
+	}
+
+	/**
+	 * Escape a string for inclusion in JSON
+	 * @param content
+	 * @return
+	 */
+	public static AString escape(String content) {
+		BlobBuilder bb=new BlobBuilder();
+		appendCVMStringQuoted(bb,content);
+		return Strings.create(bb.toBlob());
+	}
+
+	public static ACell unescape(String content) {
+		String unes=Text.unescapeJava(content);
+		return Strings.create(unes);
 	}
 
 }

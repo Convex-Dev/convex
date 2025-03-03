@@ -11,7 +11,6 @@ import org.antlr.v4.runtime.atn.PredictionMode;
 import convex.core.data.ACell;
 import convex.core.data.Cells;
 import convex.core.data.Maps;
-import convex.core.data.Strings;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;
@@ -26,6 +25,8 @@ import convex.core.json.reader.antlr.JSONParser.NullContext;
 import convex.core.json.reader.antlr.JSONParser.NumberContext;
 import convex.core.json.reader.antlr.JSONParser.ObjContext;
 import convex.core.json.reader.antlr.JSONParser.StringContext;
+import convex.core.lang.reader.ConvexErrorListener;
+import convex.core.util.JSONUtils;
 
 public class JSONReader {
 
@@ -108,7 +109,7 @@ public class JSONReader {
 		public void exitString(StringContext ctx) {
 			String text=ctx.getText();
 			String content=text.substring(1, text.length()-1);
-			push(Strings.create(content));
+			push(JSONUtils.unescape(content));
 		}
 		
 		@Override
@@ -132,11 +133,14 @@ public class JSONReader {
 		return read(CharStreams.fromReader(r));
 	}
 	
+	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
+
+	
 	static JSONParser getParser(CharStream cs, JSONListener listener) {
 		// Create lexer and paser for the CharStream
 		JSONLexer lexer=new JSONLexer(cs);
 		lexer.removeErrorListeners();
-		// lexer.addErrorListener(ERROR_LISTENER);
+		lexer.addErrorListener(ERROR_LISTENER);
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
 		JSONParser parser = new JSONParser(tokens);
 		
@@ -144,7 +148,7 @@ public class JSONReader {
 		parser.setBuildParseTree(false);
 		parser.removeErrorListeners();
 		parser.getInterpreter().setPredictionMode(PredictionMode.SLL); // Seems OK for our grammar?
-		// parser.addErrorListener(ERROR_LISTENER);
+		parser.addErrorListener(ERROR_LISTENER);
 
 		parser.addParseListener(listener);	
 		return parser;
