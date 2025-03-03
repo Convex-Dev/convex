@@ -6,6 +6,7 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 
 import convex.api.Convex;
+import convex.core.util.JSONUtils;
 import convex.gui.components.QRCode;
 import convex.gui.utils.Toolkit;
 import convex.java.JSON;
@@ -25,7 +26,7 @@ public class QRPanel extends JPanel {
 
 		HashMap<String,Object> rec=new HashMap<>();
 		rec.put("address", convex.getAddress().longValue());
-		String data=JSON.toPrettyString(rec);
+		String data=JSONUtils.toString(rec);
 		
 		qrCode=new QRCode(data,400);
 		add(qrCode,"align center");

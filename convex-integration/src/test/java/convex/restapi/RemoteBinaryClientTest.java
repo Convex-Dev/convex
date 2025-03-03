@@ -19,6 +19,7 @@ import convex.core.cvm.Address;
 import convex.core.data.Keyword;
 import convex.core.cvm.Keywords;
 import convex.core.init.Init;
+import convex.core.util.JSONUtils;
 import convex.core.cvm.Symbols;
 import convex.java.Convex;
 import convex.java.JSON;
@@ -103,7 +104,7 @@ public class RemoteBinaryClientTest {
 		
 		// Query *key*
 		res=c.query(Symbols.STAR_KEY.toString());
-		assertEquals(JSON.toString(kp.getAccountKey()),res.get("value"));
+		assertEquals(kp.getAccountKey().toString(),res.get("value"));
 	}
 	
 	@Test 

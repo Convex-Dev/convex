@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import convex.core.cvm.Address;
+import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.ACollection;
 import convex.core.data.AMap;
@@ -294,6 +295,13 @@ public class JSONUtils {
 			return;
 		}
 		
+		if (value instanceof ABlob bv) {
+			bb.append("\"0x");
+			bb.append(bv.toHexString());
+			bb.append('\"');
+			return;
+		}
+		
 		if (value instanceof CVMDouble nv) {
 			appendJSON(bb,nv.doubleValue());
 			return;
@@ -303,6 +311,8 @@ public class JSONUtils {
 			bb.append(bv.booleanValue() ? Strings.TRUE : Strings.FALSE);
 			return;
 		}
+		
+		throw new IllegalArgumentException("Can't print as JSON: "+Utils.getClassName(value));
 	}
 
 

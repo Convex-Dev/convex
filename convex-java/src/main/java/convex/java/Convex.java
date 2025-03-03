@@ -15,6 +15,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.cvm.Address;
 import convex.core.data.Blob;
+import convex.core.util.JSONUtils;
 import convex.core.util.Utils;
 
 /**
@@ -181,7 +182,7 @@ public class Convex {
 		if (keyPair==null) throw new IllegalArgumentException("createAccount requires a non-null valid keyPair");
 		HashMap<String,Object> req=new HashMap<>();
 		req.put("accountKey", keyPair.getAccountKey().toHexString());
-		String json=JSON.toPrettyString(req);
+		String json=JSONUtils.toString(req);
 		Map<String,Object> response= doPost(url+"/api/v1/createAccount",json);
 		Address address=Address.parse(response.get("address"));
 		if (address==null) throw new RuntimeException("Account creation failed: "+response);
@@ -282,7 +283,7 @@ public class Convex {
 		HashMap<String,Object> req=new HashMap<>();
 		req.put("address", address.longValue());
 		req.put("amount", requestedAmount);
-		String json=JSON.toPrettyString(req);
+		String json=JSONUtils.toString(req);
 
 		return doPost(url+"/api/v1/faucet",json);
 	}
@@ -365,7 +366,7 @@ public class Convex {
 		req.put("hash", message.toHexString());
 		req.put("accountKey", getKeyPair().getAccountKey().toHexString());
 		req.put("sig", sd.toHexString());
-		String json=JSON.toPrettyString(req);
+		String json=JSONUtils.toString(req);
 		return doPostAsync(url+"/api/v1/transaction/submit",json);
 	}
 
@@ -383,7 +384,7 @@ public class Convex {
 		HashMap<String,Object> req=new HashMap<>();
 		if (a!=null) req.put("address", a);
 		req.put("source", code);
-		String json=JSON.toPrettyString(req);
+		String json=JSONUtils.toString(req);
 		return json;
 	}
 	
