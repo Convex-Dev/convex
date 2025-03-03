@@ -28,6 +28,11 @@ import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.text.Text;
 
+/**
+ * Static utility class for some standard JSON utility functions
+ * 
+ * Note than JSON is a strict subset of CAD3 data, so we expect to encode all valid JSON perfectly in CAD3 / CVM data structures
+ */
 public class JSONUtils {
 
 	/**
