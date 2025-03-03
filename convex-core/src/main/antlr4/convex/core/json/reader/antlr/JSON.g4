@@ -75,8 +75,6 @@ fragment INT
     | [1-9] [0-9]*
     ;
 
-// no leading zeros
-
 fragment EXP
     // exponent number permits leading 0s (e.g. `1e01`)
     : [Ee] [+-]? [0-9]+
