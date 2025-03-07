@@ -9,7 +9,6 @@ import convex.api.Convex;
 import convex.core.util.JSONUtils;
 import convex.gui.components.QRCode;
 import convex.gui.utils.Toolkit;
-import convex.java.JSON;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")
