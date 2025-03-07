@@ -8,6 +8,7 @@ import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Maps;
+import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 
@@ -36,6 +37,7 @@ public class LatticeTest {
 
 		doLatticeTest(SignedNode.create(MaxNode.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
 
+		doLatticeTest(SetNode.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
 	}
 
 
