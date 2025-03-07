@@ -5,7 +5,7 @@ import convex.core.data.ACell;
 /**
  * Abstract base class for lattice components
  */
-public abstract class ALattice {
+public abstract class ALattice<V extends ACell> {
 
 	/**
 	 * Implementation of merge function
@@ -13,5 +13,11 @@ public abstract class ALattice {
 	 * @param otherValue Externally received lattice value
 	 * @return Merged lattice root cell
 	 */
-	public abstract ACell merge(ACell ownValue, ACell otherValue);
+	public abstract V merge(V ownValue, V otherValue);
+	
+	/**
+	 * Obtains the "zero" value for the lattice
+	 * @return Zero value of the lattice
+	 */
+	public abstract V zero();
 }
