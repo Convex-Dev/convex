@@ -16,8 +16,9 @@ public abstract class ALattice<V extends ACell> {
 	public abstract V merge(V ownValue, V otherValue);
 	
 	/**
-	 * Obtains the "zero" value for the lattice
-	 * @return Zero value of the lattice
+	 * Obtains the "zero" value for the lattice. This may be null, but a non-null zero value is preferred.
+	 * 
+	 * @return Zero value of the lattice. 
 	 */
 	public abstract V zero();
 }

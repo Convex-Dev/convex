@@ -1,10 +1,10 @@
 package convex.core.lattice;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Maps;
@@ -12,6 +12,9 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 
 public class LatticeTest {
+	AKeyPair KP1 = AKeyPair.createSeeded(56756785);
+	AKeyPair KP2 = AKeyPair.createSeeded(756778);
+	
 
 	@Test public void testLatticeAPI() {
 		
@@ -26,10 +29,13 @@ public class LatticeTest {
 	
 	
 	
-	@Test public void testLattices() {
+	@Test public void testLatticeExamples() {
 		doLatticeTest(MaxNode.create(),CVMLong.ONE, CVMLong.MAX_VALUE);
 		
 		doLatticeTest(MapNode.create(MaxNode.create()),Maps.of(1,2,3,4,5,6), Maps.of(1,10,5,0,6,7));
+
+		doLatticeTest(SignedNode.create(MaxNode.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
+
 	}
 
 
@@ -41,7 +47,6 @@ public class LatticeTest {
 	 */
 	private <V extends ACell> void doLatticeTest(ALattice<V> lattice, V value, V value2) {
 		V zero=lattice.zero();
-		assertNotNull(zero);
 		
 		// Merges with zero
 		assertEquals(value,lattice.merge(zero,value));
