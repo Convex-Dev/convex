@@ -46,6 +46,21 @@ public final class Keyword extends ASymbolic {
 	}
 	
 	/**
+	 * Creates a Keyword with the given name
+	 * 
+	 * @param o A object to use as the keyword name (strings
+	 * @return The new Keyword, or null if the name is invalid for a Keyword
+	 */
+	public static Keyword create(Object o) {
+		if (o instanceof Keyword k) return k;
+		if (o instanceof String s) return create(s);
+		if (o instanceof AString s) return create(s);
+		if (o instanceof ASymbolic s) return create(s.getName());
+				
+		return null;
+	}
+	
+	/**
 	 * Creates an interned Keyword. Use only for internal constants, won't get GC'd
 	 * @param name Symbolic name for keyword
 	 * @return Interned Keyword
@@ -202,5 +217,6 @@ public final class Keyword extends ASymbolic {
 		if ((start==0)&&(end==name.length)) return this;
 		return Keyword.create(name.slice(start, end));
 	}
+
 
 }

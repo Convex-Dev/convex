@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 
 import convex.core.crypto.AKeyPair;
+import convex.core.cvm.Keywords;
 import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.Maps;
@@ -29,7 +30,9 @@ public class LatticeTest {
 	}
 	
 	
-	
+	/**
+	 * Tests for example lattices
+	 */
 	@Test public void testLatticeExamples() {
 		doLatticeTest(MaxNode.create(),CVMLong.ONE, CVMLong.MAX_VALUE);
 		
@@ -38,12 +41,15 @@ public class LatticeTest {
 		doLatticeTest(SignedNode.create(MaxNode.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
 
 		doLatticeTest(SetNode.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
+		
+		doLatticeTest(KeyedNode.create("foo",MaxNode.create(),"bar",SetNode.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
+
 	}
 
 
 
 	/**
-	 * GEneraic property tests for any lattice
+	 * Generic property tests for any lattice
 	 * @param maxNode
 	 * @param one
 	 */
