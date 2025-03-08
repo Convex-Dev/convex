@@ -26,6 +26,7 @@ public class MapNode<K extends ACell,V extends ACell> extends ALattice<AHashMap<
 	@Override
 	public AHashMap<K,V> merge(AHashMap<K, V> ownValue, AHashMap<K, V> otherValue) {
 		if (otherValue==null) return ownValue;
+		if (ownValue==null) return otherValue;
 		return ownValue.mergeDifferences(otherValue, mergeFunction);
 	}
 

@@ -57,6 +57,8 @@ public class KeyedNode extends ALattice<AMap<Keyword,?>> {
 			ALattice<ACell> lattice=(ALattice<ACell>) lattices.get(i);
 			Keyword key=keys.get(i);
 			
+			if (!otherValue.containsKey(key)) continue;
+			
 			ACell a=ownValue.get(key);
 			ACell b=otherValue.get(key);
 			

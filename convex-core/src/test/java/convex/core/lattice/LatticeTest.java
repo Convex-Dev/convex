@@ -44,6 +44,7 @@ public class LatticeTest {
 		
 		doLatticeTest(KeyedNode.create("foo",MaxNode.create(),"bar",SetNode.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
 
+		doLatticeTest(CompareNode.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
 	}
 
 
@@ -59,6 +60,11 @@ public class LatticeTest {
 		// Merges with zero
 		assertEquals(value,lattice.merge(zero,value));
 		assertEquals(value,lattice.merge(value,zero));
+
+		// Null merge
+		assertEquals(value,lattice.merge(value,null));
+		assertEquals(value,lattice.merge(null,value));
+
 		
 		assertEquals(value2,lattice.merge(zero,value2));
 		assertEquals(value2,lattice.merge(value2,zero));

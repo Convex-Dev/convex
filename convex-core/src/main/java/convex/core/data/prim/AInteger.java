@@ -89,6 +89,7 @@ public abstract class AInteger extends ANumeric {
 	 * @return Number of bytes
 	 */
 	public abstract int byteLength();
+	
 
 	@Override
 	public ANumeric add(ANumeric b) {
