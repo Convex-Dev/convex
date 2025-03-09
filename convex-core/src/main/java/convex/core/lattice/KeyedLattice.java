@@ -11,17 +11,17 @@ import convex.core.util.Utils;
 /**
  * Lattice implementation that handles a set of keyword-mapped child lattices
  */
-public class KeyedNode extends ALattice<AMap<Keyword,?>> {
+public class KeyedLattice extends ALattice<AMap<Keyword,?>> {
 
 	private final ArrayList<ALattice<?>> lattices;
 	private final ArrayList<Keyword> keys;
 	
-	private KeyedNode(ArrayList<ALattice<?>> lattices, ArrayList<Keyword> keys) {
+	private KeyedLattice(ArrayList<ALattice<?>> lattices, ArrayList<Keyword> keys) {
 		this.lattices=lattices;
 		this.keys=keys;
 	}
 	
-	public static KeyedNode create(Object... keysAndValues) {
+	public static KeyedLattice create(Object... keysAndValues) {
 		int n2=keysAndValues.length;
 		int n=n2/2;
 		
@@ -41,7 +41,7 @@ public class KeyedNode extends ALattice<AMap<Keyword,?>> {
 			keys.add(k);
 		}
 		
-		return new KeyedNode(lattices,keys);
+		return new KeyedLattice(lattices,keys);
 	}
 	
 	@Override

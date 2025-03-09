@@ -5,22 +5,22 @@ import convex.core.data.AHashMap;
 import convex.core.data.Maps;
 import convex.core.util.MergeFunction;
 
-public class MapNode<K extends ACell,V extends ACell> extends ALattice<AHashMap<K,V>> {
+public class MapLattice<K extends ACell,V extends ACell> extends ALattice<AHashMap<K,V>> {
 
 	protected final ALattice<V> valueNode;
 	
 	protected final MergeFunction<V> mergeFunction;
 
-	public MapNode(ALattice<V> valueNode) {
+	public MapLattice(ALattice<V> valueNode) {
 		this.valueNode=valueNode;
 		this.mergeFunction=(a,b)->{
 			return valueNode.merge(a, b);
 		};
 	}
 
-	public static <K extends ACell,V extends ACell> MapNode<K,V> create(ALattice<V> valueNode) {
+	public static <K extends ACell,V extends ACell> MapLattice<K,V> create(ALattice<V> valueNode) {
 		
-		return new MapNode<K,V>(valueNode);
+		return new MapLattice<K,V>(valueNode);
 	}
 
 	@Override

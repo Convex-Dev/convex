@@ -5,13 +5,13 @@ import convex.core.data.ASet;
 import convex.core.data.Sets;
 
 /**
- * Lattice node for set values that grow via set union
+ * Lattice for set values that grow via set union
  * 
  * @param <V> Type of set values
  */
-public class SetNode<V extends ACell> extends ALattice<ASet<V>> {
+public class SetLattice<V extends ACell> extends ALattice<ASet<V>> {
 
-	private static final SetNode<?> INSTANCE = new SetNode<>();
+	private static final SetLattice<?> INSTANCE = new SetLattice<>();
 
 	@Override
 	public ASet<V> merge(ASet<V> ownValue, ASet<V> otherValue) {
@@ -21,8 +21,8 @@ public class SetNode<V extends ACell> extends ALattice<ASet<V>> {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static <V extends ACell> SetNode<V> create() {
-		return (SetNode<V>) INSTANCE;
+	public static <V extends ACell> SetLattice<V> create() {
+		return (SetLattice<V>) INSTANCE;
 	}
 
 	@Override

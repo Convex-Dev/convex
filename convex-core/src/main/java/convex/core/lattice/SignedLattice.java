@@ -12,18 +12,18 @@ import convex.core.util.Utils;
  * 
  * @param <V>
  */
-public class SignedNode<V extends ACell> extends ALattice<SignedData<V>> {
+public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
 	
 	protected final ALattice<V> valueNode;
 	private AKeyPair keyPair;
 
-	private SignedNode(ALattice<V> valueNode) {
+	private SignedLattice(ALattice<V> valueNode) {
 		this.valueNode=valueNode;
 	}
 	
-	public static <V extends ACell> SignedNode<V> create(ALattice<V> childNode) {
-		return new SignedNode<>(childNode);
+	public static <V extends ACell> SignedLattice<V> create(ALattice<V> childNode) {
+		return new SignedLattice<>(childNode);
 	}
 	
 	@Override

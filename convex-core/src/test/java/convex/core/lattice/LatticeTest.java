@@ -20,7 +20,7 @@ public class LatticeTest {
 
 	@Test public void testLatticeAPI() {
 		
-		ALattice<AHashMap<ACell,AInteger>> l=MapNode.create(MaxNode.create());
+		ALattice<AHashMap<ACell,AInteger>> l=MapLattice.create(MaxLattice.create());
 		
 		assertEquals(Maps.empty(), l.merge(Maps.empty(), null));
 		
@@ -34,17 +34,17 @@ public class LatticeTest {
 	 * Tests for example lattices
 	 */
 	@Test public void testLatticeExamples() {
-		doLatticeTest(MaxNode.create(),CVMLong.ONE, CVMLong.MAX_VALUE);
+		doLatticeTest(MaxLattice.create(),CVMLong.ONE, CVMLong.MAX_VALUE);
 		
-		doLatticeTest(MapNode.create(MaxNode.create()),Maps.of(1,2,3,4,5,6), Maps.of(1,10,5,0,6,7));
+		doLatticeTest(MapLattice.create(MaxLattice.create()),Maps.of(1,2,3,4,5,6), Maps.of(1,10,5,0,6,7));
 
-		doLatticeTest(SignedNode.create(MaxNode.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
+		doLatticeTest(SignedLattice.create(MaxLattice.create()),KP1.signData(CVMLong.ONE), KP1.signData(CVMLong.MAX_VALUE));
 
-		doLatticeTest(SetNode.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
+		doLatticeTest(SetLattice.create(),Sets.of(1,2,3,4),Sets.of(3,4,5,6));
 		
-		doLatticeTest(KeyedNode.create("foo",MaxNode.create(),"bar",SetNode.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
+		doLatticeTest(KeyedLattice.create("foo",MaxLattice.create(),"bar",SetLattice.create()),Maps.of(Keywords.FOO,CVMLong.ONE), Maps.of(Keywords.BAR,Sets.of(1,2)));
 
-		doLatticeTest(CompareNode.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
+		doLatticeTest(CompareLattice.create((AInteger a,AInteger b)->a.compareTo(b)),CVMLong.ONE, CVMLong.MAX_VALUE);
 	}
 
 

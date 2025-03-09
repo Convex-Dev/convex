@@ -12,16 +12,16 @@ import convex.core.data.ACell;
  * 
  * @param <V> Type of lattice values
  */
-public class CompareNode<V extends ACell> extends ALattice<V> {
+public class CompareLattice<V extends ACell> extends ALattice<V> {
 
 	private Comparator<V> comparator;
 
-	private CompareNode(Comparator<V> comparator) {
+	private CompareLattice(Comparator<V> comparator) {
 		this.comparator = comparator;
 	}
 	
-	public static <V extends ACell> CompareNode<V> create(Comparator<V> comparator) {
-		return new CompareNode<>(comparator);
+	public static <V extends ACell> CompareLattice<V> create(Comparator<V> comparator) {
+		return new CompareLattice<>(comparator);
 	}
 	
 	@Override

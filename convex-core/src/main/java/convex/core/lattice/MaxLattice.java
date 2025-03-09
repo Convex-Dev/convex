@@ -4,9 +4,12 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.RT;
 
-public class MaxNode extends ALattice<AInteger> {
+/**
+ * Latttice implementing a max function on natural numbers expressed as CVM integers
+ */
+public class MaxLattice extends ALattice<AInteger> {
 
-	private static final MaxNode INSTANCE = new MaxNode();
+	private static final MaxLattice INSTANCE = new MaxLattice();
 
 	@Override
 	public AInteger merge(AInteger ownValue, AInteger otherValue) {
@@ -15,7 +18,7 @@ public class MaxNode extends ALattice<AInteger> {
 		return (AInteger) RT.max(ownValue, otherValue);
 	}
 
-	public static MaxNode create() {
+	public static MaxLattice create() {
 		return INSTANCE;
 	}
 
