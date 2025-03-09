@@ -21,4 +21,12 @@ public abstract class ALattice<V extends ACell> {
 	 * @return Zero value of the lattice. 
 	 */
 	public abstract V zero();
+
+	/**
+	 * Check if a foreign value is legal. Subtypes should check validity as far as any child lattices.
+	 * 
+	 * @param value Value received from foreign source
+	 * @return true if foreign value is an acceptable lattice value
+	 */
+	public abstract boolean checkForeign(V value);
 }

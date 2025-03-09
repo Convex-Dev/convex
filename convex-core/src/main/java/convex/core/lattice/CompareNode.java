@@ -40,4 +40,10 @@ public class CompareNode<V extends ACell> extends ALattice<V> {
 		return null;
 	}
 
+	@Override
+	public boolean checkForeign(V value) {
+		if (value==null) return false;
+		return true;
+	}
+
 }

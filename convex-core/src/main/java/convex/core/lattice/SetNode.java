@@ -30,4 +30,9 @@ public class SetNode<V extends ACell> extends ALattice<ASet<V>> {
 		return Sets.empty();
 	}
 
+	@Override
+	public boolean checkForeign(ASet<V> value) {
+		return (value instanceof ASet);
+	}
+
 }

@@ -34,6 +34,11 @@ public class MapNode<K extends ACell,V extends ACell> extends ALattice<AHashMap<
 	public AHashMap<K, V> zero() {
 		return Maps.empty();
 	}
+
+	@Override
+	public boolean checkForeign(AHashMap<K, V> value) {
+		return (value instanceof AHashMap);
+	}
 	
 
 }

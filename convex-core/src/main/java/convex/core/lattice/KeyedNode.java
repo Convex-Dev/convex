@@ -46,7 +46,10 @@ public class KeyedNode extends ALattice<AMap<Keyword,?>> {
 	
 	@Override
 	public AMap<Keyword, ?> merge(AMap<Keyword, ?> ownValue, AMap<Keyword, ?> otherValue) {
-		if (ownValue==null) return otherValue;
+		if (ownValue==null) {
+			if (checkForeign(otherValue)) return otherValue;
+			return null;
+		}
 		if (otherValue==null) return ownValue;
 
 		AMap<Keyword, ?> result=ownValue;
@@ -75,6 +78,11 @@ public class KeyedNode extends ALattice<AMap<Keyword,?>> {
 	@Override
 	public AMap<Keyword, ?> zero() {
 		return Maps.empty();
+	}
+
+	@Override
+	public boolean checkForeign(AMap<Keyword, ?> value) {
+		return (value instanceof AMap);
 	}
 
 }

@@ -24,4 +24,9 @@ public class MaxNode extends ALattice<AInteger> {
 		return CVMLong.ZERO;
 	}
 
+	@Override
+	public boolean checkForeign(AInteger value) {
+		return (value instanceof AInteger);
+	}
+
 }

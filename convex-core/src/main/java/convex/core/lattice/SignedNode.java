@@ -32,7 +32,7 @@ public class SignedNode<V extends ACell> extends ALattice<SignedData<V>> {
 		
 		// If we don't value a value, use other as long as signature is correct
 		if (ownValue==null) {
-			if (otherValue.checkSignature()) return otherValue;
+			if (checkForeign(otherValue)) return otherValue;
 			return null;
 		}
 		
@@ -42,7 +42,7 @@ public class SignedNode<V extends ACell> extends ALattice<SignedData<V>> {
 		if (Utils.equals(a,b)) return ownValue;
 		
 		// Bail out if other signature is invalid
-		if (!otherValue.checkSignature()) return ownValue;
+		if (!checkForeign(otherValue)) return ownValue;
 		
 		// Perform child lattice merge
 		V m=valueNode.merge(a, b);
@@ -52,6 +52,12 @@ public class SignedNode<V extends ACell> extends ALattice<SignedData<V>> {
 		if (Utils.equals(b, m)) return otherValue;
 		
 		return sign(m);
+	}
+
+	@Override
+	public boolean checkForeign(SignedData<V> otherValue) {
+		if (otherValue==null) return false;
+		return otherValue.checkSignature();
 	}
 
 	private SignedData<V> sign(V m) {
