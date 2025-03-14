@@ -60,7 +60,7 @@
 						<replacement>
 							<token>// Generated from convex.+</token>
 							<value>// Generated file. This header modified in
-								convex-core/pom.xml to ensure repeatable builds.</value>
+								// convex-core/pom.xml to ensure repeatable builds.</value>
 						</replacement>
 					</replacements>
 					<regex>true</regex>
