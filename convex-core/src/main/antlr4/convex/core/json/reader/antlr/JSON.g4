@@ -28,11 +28,11 @@ value
     | number
     | obj
     | array
-    | boolean
-    | null
+    | bool
+    | nil
     ;
 
-boolean
+bool
 	: 'true'
     | 'false';
 
@@ -42,7 +42,7 @@ string
 number
 	: NUMBER;
 	
-null
+nil
 	: 'null';
 
 STRING

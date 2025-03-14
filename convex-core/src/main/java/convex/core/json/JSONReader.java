@@ -20,8 +20,8 @@ import convex.core.json.reader.antlr.JSONBaseListener;
 import convex.core.json.reader.antlr.JSONLexer;
 import convex.core.json.reader.antlr.JSONParser;
 import convex.core.json.reader.antlr.JSONParser.ArrayContext;
-import convex.core.json.reader.antlr.JSONParser.BooleanContext;
-import convex.core.json.reader.antlr.JSONParser.NullContext;
+import convex.core.json.reader.antlr.JSONParser.BoolContext;
+import convex.core.json.reader.antlr.JSONParser.NilContext;
 import convex.core.json.reader.antlr.JSONParser.NumberContext;
 import convex.core.json.reader.antlr.JSONParser.ObjContext;
 import convex.core.json.reader.antlr.JSONParser.StringContext;
@@ -63,12 +63,12 @@ public class JSONReader {
 		}
 		
 		@Override 
-		public void exitNull(NullContext ctx) { 
+		public void exitNil(NilContext ctx) { 
 			push(null);
 		}
 		
 		@Override 
-		public void exitBoolean(BooleanContext ctx) { 
+		public void exitBool(BoolContext ctx) { 
 			boolean value= (ctx.getText()).equals("true");
 			push(CVMBool.create(value));
 		}
