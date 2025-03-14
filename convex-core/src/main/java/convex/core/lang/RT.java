@@ -748,7 +748,7 @@ public class RT {
 	 * 
 	 * @param o     Object to attempt to convert to a Vector.
 	 * @param start start index to slice
-	 * @end end index to slice
+	 * @param  end index to slice
 	 * @return AVector instance, or null if not convertible
 	 */
 	@SuppressWarnings("unchecked")
