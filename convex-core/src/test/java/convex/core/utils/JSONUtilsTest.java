@@ -11,6 +11,7 @@ import java.util.List;
 
 import org.junit.Test;
 
+import convex.core.ErrorCodes;
 import convex.core.cvm.Address;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
@@ -55,6 +56,7 @@ public class JSONUtilsTest {
 		
 		assertEquals("\"foo\"",JSONUtils.toString(Symbols.FOO));
 		assertEquals("\"foo\"",JSONUtils.toString(Keywords.FOO));
+		assertEquals("\"CAST\"",JSONUtils.toString(ErrorCodes.CAST));
 
 	}
 	

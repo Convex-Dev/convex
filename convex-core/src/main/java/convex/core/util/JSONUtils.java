@@ -208,10 +208,18 @@ public class JSONUtils {
 			bb.append(bv ? Strings.TRUE : Strings.FALSE);
 			return;
 		}
-
-		if (value instanceof String cs) {
+		
+		if (value instanceof CharSequence cs) {
 			bb.append('\"');
 			appendCVMStringQuoted(bb, cs);
+			bb.append('\"');
+			return;
+		}
+
+
+		if (value instanceof ASymbolic cs) {
+			bb.append('\"');
+			appendCVMStringQuoted(bb, cs.getName().toString());
 			bb.append('\"');
 			return;
 		}
