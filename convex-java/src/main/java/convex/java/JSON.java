@@ -110,7 +110,7 @@ public class JSON {
      * @throws RuntimeException on failure to create JSON from value
      */
     public static String toString(Object value) {
-       return JSONValue.toJSONString(value);
+       return JSONUtils.toString(value);
     }
     
     /**

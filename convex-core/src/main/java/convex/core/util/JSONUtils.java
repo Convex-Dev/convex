@@ -182,9 +182,7 @@ public class JSONUtils {
 			    if (i>0) bb.append(",");
 				appendJSON(bb, jsonKey(me.getKey()));
 				bb.append(':');
-				bb.append(' ');
 				appendJSON(bb, me.getValue());
-
 			    i += 1;
 			}
 			
@@ -278,7 +276,6 @@ public class JSONUtils {
 				MapEntry<?,?> me=mv.entryAt(i);
 				appendJSON(bb, jsonKey(me.getKey()));
 				bb.append(':');
-				bb.append(' ');
 				appendJSON(bb, me.getValue());
 			}
 			bb.append('}');
