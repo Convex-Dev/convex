@@ -80,6 +80,16 @@ fragment EXP
     : [Ee] [+-]? [0-9]+
     ;
 
+// Multi-line comments (ignored)
+MULTILINE_COMMENT
+	: '/*' .* '*/' -> skip
+	;
+
+// Single-line comments (ignored)
+SINGLELINE_COMMENT
+	: '//' ~[\r\n]* -> skip
+	;
+
 WS
     : [ \t\n\r]+ -> skip
     ;

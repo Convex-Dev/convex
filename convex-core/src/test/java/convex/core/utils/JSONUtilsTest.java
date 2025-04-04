@@ -123,6 +123,18 @@ public class JSONUtilsTest {
 	}
 	
 	@Test
+	public void testJSONComments() {
+		assertEquals(Vectors.of(true,null),JSONUtils.parse("[true, /* \n */ null]"));
+		assertEquals(RT.cvm(12),JSONUtils.parse("12 //foo"));
+		assertEquals(RT.cvm(12),JSONUtils.parse("//foo \n 12"));
+		assertEquals(RT.cvm(12),JSONUtils.parse("//foo /* \n 12"));
+
+		assertThrows(ParseException.class,()->JSONUtils.parse("/* 67")); // comment not closed
+		assertThrows(ParseException.class,()->JSONUtils.parse("//")); // no value
+		
+	}
+	
+	@Test
 	public void testJSONRoundTrips() {
 		
 		doJSONRoundTrip(1L,CVMLong.ONE);
