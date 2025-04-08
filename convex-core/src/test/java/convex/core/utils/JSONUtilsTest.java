@@ -135,6 +135,20 @@ public class JSONUtilsTest {
 	}
 	
 	@Test
+	public void testJSONDoubles() {
+		assertEquals(CVMDouble.POSITIVE_INFINITY,JSONUtils.parse("Infinity"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY,JSONUtils.parse("+Infinity"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parse("-Infinity"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parse(" -Infinity"));
+		assertEquals(CVMDouble.NaN,JSONUtils.parse(" NaN"));
+
+		assertThrows(ParseException.class,()->JSONUtils.parse("- Infinity")); // space between
+		assertThrows(ParseException.class,()->JSONUtils.parse("Inf")); // not a JSON5 value
+		assertThrows(ParseException.class,()->JSONUtils.parse("NAN")); // incorrect ccase
+		
+	}
+	
+	@Test
 	public void testJSONRoundTrips() {
 		
 		doJSONRoundTrip(1L,CVMLong.ONE);

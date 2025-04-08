@@ -38,9 +38,10 @@ bool
 
 string
 	: STRING;
-	
+
+// numbers allow extra IEEE754 values as per JSON5	
 number
-	: NUMBER;
+	: NUMBER | 'NaN' | 'Infinity' | '+Infinity' | '-Infinity';
 	
 nil
 	: 'null';

@@ -1,0 +1,139 @@
+
+   (defn -qc [q]
+	  (cond (int? q) q              ;; base case, quantity should always be an integer
+			(nil? q) 0 
+			(fail :ARGUMENT "Invalid quantity")))
+	
+   ;; Initial token supply
+   (def supply 1000000000000000000)
+
+   (set-holding *caller* supply)
+
+   ;; Map of holder-address -> {offeree-address -> positive integer amount}
+   ;; Must enforce valid positive offers
+   ;;
+   (def offers {})
+
+   ;; Functions of the interface described in the `convex.asset` library
+   (defn accept 
+     ^:callable
+     [sender quantity]
+     (let [sender   (address sender)
+           quantity (-qc quantity)
+           om       (get offers sender) ;; if this is nil then OK, behaves as empty map
+           sendbal  (or (get-holding sender)
+                        0)
+           offer    (get om *caller* 0)]
+         (cond 
+           (< quantity 0)
+           (fail "Can't accept a negative quantity of fungible tokens.")
+
+       (< offer quantity)
+       (fail :STATE "Offer is insufficient")
+
+       (< sendbal quantity)
+       (fail :FUNDS "Sender token balance is insufficient")
+
+           (let [new-offer (- offer
+                              quantity)] 
+             (def offers
+                  (assoc offers
+                         sender
+                         (if (> new-offer
+                                0)
+                           (assoc om
+                                  *caller*
+                                  new-offer)
+                           (dissoc om *caller*))))
+             (set-holding sender
+                          (- sendbal
+                             quantity))
+             (set-holding *caller*
+                          (+ (or (get-holding *caller*)
+                                 0)
+                             quantity))
+             quantity))))
+
+   (defn balance
+     ^{:callable true}
+     [addr]
+     (or (get-holding addr) 0))
+
+   ;; No restrictions on transfer by default.
+   ;;
+   (defn check-transfer
+     ^:callable
+     [_sender _receiver _quantity]
+     nil)
+   
+   (defn decimals 
+	  ^:callable
+     []
+     ~decimals)
+   
+   (defn total-supply 
+	  ^:callable
+     []
+     supply)
+
+   (defn direct-transfer
+     ^{:callable true}
+     [addr amount data]
+     (let [addr   (address addr)
+           amount (-qc amount)
+           bal    (or (get-holding *caller*) 0)
+           tbal   (or (get-holding addr) 0)]
+       
+       ;; Amount must be in valid range.
+       (cond (< amount 0) (fail :ARGUMENT "negative transfer"))
+	   (cond (> amount bal) (fail :FUNDS "insufficent token balance")) 
+	   
+	   ;; Need this in case of self-transfers.
+	   (when (= *caller* addr) 
+		   (log "TR" *caller* addr amount bal bal data)   
+		   (return amount)) 
+	 
+	   
+	   (let [nsb (- bal amount)
+	         nrb (+ tbal amount)]
+	       (log "TR" *caller* addr amount nsb nrb data)
+	           (set-holding *caller* nsb)
+	           (set-holding addr nrb))
+	       ))
+
+   (defn get-offer
+     ^{:callable true}
+     [sender receiver]
+     (get-in offers [sender receiver] 0))
+
+   (defn offer
+     ^{:callable true}
+     [receiver quantity]
+     (let [receiver (address receiver)
+           quantity (-qc quantity)]
+       (if (<= quantity 0)
+    	 (set! offers (dissoc-in offers [*caller* receiver])) ;; dissoc if no positive offer
+         (set! offers (assoc-in offers [*caller* receiver] quantity)))
+       quantity))
+
+   (defn quantity-add
+     ^{:callable true}
+     [a b]
+     (let [a (cond a (int a) 0)
+           b (cond b (int b) 0)]
+       (+ a b)))
+
+   (defn quantity-sub
+     ^{:callable true}
+     [a b]
+     (let [a (cond a (int a) 0)
+           b (cond b (int b) 0)] 
+       (if (> a b)
+         (- a b)
+         0)))
+
+   (defn quantity-subset?
+     ^{:callable true}
+     [a b]
+     (<= (cond a (int a) 0)
+         (cond b (int b) 0)))
