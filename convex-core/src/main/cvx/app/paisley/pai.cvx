@@ -4,8 +4,9 @@
 			(nil? q) 0 
 			(fail :ARGUMENT "Invalid quantity")))
 	
-   ;; Initial token supply
-   (def supply 1000000000000000000)
+   ;; Initial token supply - NEED TO FIX THIS AND/OR ENABLE MINTING
+   ;; For PAITEST: 1 million with 9 decimals
+   (def supply 1000000000000000)
 
    (set-holding *caller* supply)
 
@@ -69,7 +70,7 @@
    (defn decimals 
 	  ^:callable
      []
-     ~decimals)
+     9)
    
    (defn total-supply 
 	  ^:callable

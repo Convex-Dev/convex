@@ -36,10 +36,12 @@ public class PaisleyTest extends ACVMTest  {
 		ctx=exec(ctx,"(def HERO *address*)");
 		ctx=exec(ctx,"(def VILLAIN "+VILLAIN+")");
 		
+		// Depoy an account with a pre-set controller
 		ctx=exec(ctx,"(def pai (deploy '(set-controller *caller*)))");
 		PAI=ctx.getResult();
 		
 		try {
+			// Execute token setup code in PAI account
 			String code=Utils.readResourceAsString("/app/paisley/pai.cvx");
 			ctx=exec(ctx,"(eval-as pai '(do "+code+"))");
 			
@@ -53,5 +55,7 @@ public class PaisleyTest extends ACVMTest  {
 	}
 	
 	@Test public void testPAIToken() {
+		Context c=context();
+		AssetTester.doFungibleTests(c, PAI, c.getAddress());
 	}
 }
