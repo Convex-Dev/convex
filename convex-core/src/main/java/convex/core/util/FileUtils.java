@@ -3,6 +3,7 @@ package convex.core.util;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -38,6 +39,23 @@ public class FileUtils {
 			result = Files.readString(path, StandardCharsets.UTF_8);
 		}
 		return result;
+	}
+	
+	/**
+	 * Loads a String from an input stream assumed to be UTF-8
+	 * @param inputStream Stream to load
+	 * @return String contents of stream
+	 * @throws IOException in case of IO failure
+	 */
+	public static String loadFileAsString(InputStream inputStream) throws IOException {
+		 int bufferSize = 1024;
+		 char[] buffer = new char[bufferSize];
+		 StringBuilder out = new StringBuilder();
+		 java.io.Reader rdr = new java.io.InputStreamReader(inputStream, StandardCharsets.UTF_8);
+		 for (int numRead; (numRead = rdr.read(buffer, 0, buffer.length)) > 0; ) {
+		     out.append(buffer, 0, numRead);
+		 }
+		 return out.toString();
 	}
 	
 	public static Blob loadFileAsBlob(Path file) throws IOException {

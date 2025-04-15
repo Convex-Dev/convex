@@ -1,21 +1,11 @@
 package lab;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
-import convex.core.data.ACell;
-import convex.core.data.AHashMap;
-import convex.core.data.ASet;
-import convex.core.data.AString;
-import convex.core.data.Strings;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
