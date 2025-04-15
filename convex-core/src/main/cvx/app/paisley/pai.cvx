@@ -1,3 +1,4 @@
+'currency.PAI
 
    (defn -qc [q]
 	  (cond (int? q) q              ;; base case, quantity should always be an integer
