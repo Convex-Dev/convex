@@ -20,6 +20,8 @@ import convex.core.data.Vectors;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 
+import static convex.test.Assertions.*;
+
 /**
  * Tests for RT functions.
  * 
@@ -98,6 +100,12 @@ public class RTTest {
 		Keyword k = Keyword.create("test-key");
 		assertSame(k, RT.cvm(k));
 
+	}
+	
+	@Test
+	public void testGetIn() {
+		assertNull(RT.getIn(null, 1));
+		assertCVMEquals(3,RT.getIn(Vectors.of(2,3), 1));
 	}
 
 	@Test

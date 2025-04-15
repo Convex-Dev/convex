@@ -1382,6 +1382,26 @@ public class RT {
 			return null;
 		return coll.get(key);
 	}
+	
+	/**
+	 * Gets an element from a data structure using the given key path.
+	 * 
+	 * @param coll Collection to query
+	 * @param keys  Key to look up in collection
+	 * @return Value from collection with the specified key, or null if not found / invalid path
+	 */
+	public static ACell getIn(ACell coll, Object... keys) {
+		ACell result=coll;
+		for (int i=0; i<keys.length; i++) {
+			if (result instanceof ADataStructure ds) {
+				ACell key=RT.cvm(keys[i]);
+				result=RT.get(ds,key);
+			} else {
+				return null;
+			}
+		}
+		return result;
+	}
 
 	/**
 	 * Gets an element from a data structure using the given key. Returns the
