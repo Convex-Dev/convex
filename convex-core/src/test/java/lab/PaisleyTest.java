@@ -1,5 +1,7 @@
 package lab;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.io.IOException;
 
 import org.junit.jupiter.api.Test;
@@ -59,8 +61,11 @@ public class PaisleyTest extends ACVMTest  {
 		c=exec(c,"(def id (call personal (create)))");
 		CVMLong ID=c.getResult();
 		AVector<?> AID=Vectors.of(PERSONAL,ID);
+		c=exec(c,"(def aid [personal id])");
 		
-		c=exec(c,"(def id (call [personal id] (mint 1000000)))");
+		c=exec(c,"(call aid (mint 1000000))");
+		assertEquals(1000000,evalL(c,"(asset/balance aid)")); // minted quantity
+		assertEquals(0,evalL(c,"(asset/balance aid #0)")); // zero account has no holding
 		
 		AssetTester.doFungibleTests(c, AID, c.getAddress());
 	}
