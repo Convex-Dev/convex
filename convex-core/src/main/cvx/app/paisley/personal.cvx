@@ -1,4 +1,4 @@
-'app.apisley.personal-token
+'app.paisley.personal-token
 
 (call *registry*
       (register {:description ["Paisley Personal Tokens"]

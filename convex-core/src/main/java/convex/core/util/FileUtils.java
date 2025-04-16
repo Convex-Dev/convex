@@ -47,7 +47,7 @@ public class FileUtils {
 	 * @return String contents of stream
 	 * @throws IOException in case of IO failure
 	 */
-	public static String loadFileAsString(InputStream inputStream) throws IOException {
+	public static String loadFileAsString(InputStream inputStream) throws IOException  {
 		 int bufferSize = 1024;
 		 char[] buffer = new char[bufferSize];
 		 StringBuilder out = new StringBuilder();

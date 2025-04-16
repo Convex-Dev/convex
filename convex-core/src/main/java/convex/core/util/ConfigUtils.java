@@ -29,6 +29,12 @@ public class ConfigUtils {
 		return result;
 	}
 	
+	/**
+	 * Reads a JSON5 config file
+	 * @param filename File name / path. ~ is interpreted as user home directory, e.g. '~/.foo/something.json'
+	 * @return Parsed CAD3 config data
+	 * @throws IOException In case of IO error, e.g. FileNotFoundException
+	 */
 	public static ACell readConfigFile(String filename) throws IOException {	
 		File f=FileUtils.getFile(filename);
 		if (!f.exists()) throw new FileNotFoundException("File: "+filename);
