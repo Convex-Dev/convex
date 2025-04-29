@@ -141,7 +141,7 @@ public class JSONUtils {
 	
 	/**
 	 * Parse JSON as a CVM value. Note JSON is a subset of CVM data types, you get Strings instead of Keywords etc.
-	 * @param jsonString
+	 * @param jsonString String containing JSON5 data
 	 * @return Parsed JSON value as a CVM data structure
 	 */
 	public static ACell parse(String jsonString) {

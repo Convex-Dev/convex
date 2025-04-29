@@ -84,6 +84,12 @@ public class JSONUtilsTest {
 		assertThrows(ParseException.class,()->JSONUtils.parse("1,2"));
 		assertThrows(ParseException.class,()->JSONUtils.parse("{"));
 		assertThrows(ParseException.class,()->JSONUtils.parse("3]"));
+		assertThrows(ParseException.class,()->JSONUtils.parse("[,]"));
+		
+		// Trailing commas allowed
+		assertEquals(JSONUtils.parse("[3]"),JSONUtils.parse("[3,]"));
+		assertEquals(JSONUtils.parse("{\"foo\":1}"),JSONUtils.parse("{\"foo\":1,}"));
+
 
 		// Special cases
 		assertEquals(Strings.create("a\"b"),JSONUtils.parse("\"a\\\"b\""));

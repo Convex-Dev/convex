@@ -10,6 +10,9 @@ import convex.core.ErrorCodes;
 import convex.core.Result;
 import convex.core.util.JSONUtils;
 
+/**
+ * Base class for REST client instances 
+ */
 public class ARESTClient {
 
 	
