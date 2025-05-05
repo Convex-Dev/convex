@@ -10,10 +10,13 @@ import org.junit.jupiter.api.Test;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
+import convex.core.cvm.Keywords;
+import convex.core.data.AMap;
 import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
+import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
@@ -89,8 +92,12 @@ public class PaisleyTest extends ACVMTest  {
 	
 	@Test public void testMembersList() {
 		Context c=context();
+		
+		// Check members database is initially empty
 		c=exec(c,"members/members");
 		assertSame(Maps.empty(),c.getResult());
+		assertCVMEquals(0,eval(c,"members/mcount"));
+
 		
 		{
 			// Bad token create (non-member)
@@ -99,7 +106,7 @@ public class PaisleyTest extends ACVMTest  {
 		}
 		
 		// Create a new member
-		c=exec(c,"(def mid (call members (create-member)))");
+		c=exec(c,"(def mid (call members (create-member *address*)))");
 		assertNotError(c);
 		AInteger MID=c.getResult();
 		assertNotNull(eval(c,"(call members (get-metadata "+MID+"))"));
@@ -110,5 +117,13 @@ public class PaisleyTest extends ACVMTest  {
 			assertStateError(ce);
 		}
 
+		// Example using [members-actor id] as a trust monitor 
+		assertEquals(CVMBool.TRUE,eval(c,"(trust/trusted? [members mid] *address*)"));
+		
+		
+		// Example setting and reading metadata
+		c=exec(c,"(call members (update-member mid {:foo 34}))");
+		AMap<?,?> rmd=eval(c,"(call members (get-metadata mid))");
+		assertCVMEquals(34,rmd.get(Keywords.FOO));
 	}
 }

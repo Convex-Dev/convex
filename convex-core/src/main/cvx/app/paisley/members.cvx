@@ -1,5 +1,5 @@
 'app.paisley.members
-;; Deploy with
+;; Deploy with something like:
 ;; (deploy
 ;;   '[(set-controller <governance-controller>
 ;;     (def operator <operator-backend-account>)	
@@ -10,7 +10,7 @@
 
 (import convex.trust :as trust)
 
-;; Governance controller. Use controller if set, otherwise *caller* for testing purposes
+;; Governance controller. Use controller if set, otherwise default to *caller* for testing purposes
 (def governor (or *controller* *caller*))
 
 ;; Members counter
@@ -28,7 +28,7 @@
 
 (defn get-metadata
   ^{:callable true
-    :doc {:description "GEts metadata for a member, or nil if does not exist."
+    :doc {:description "Gets metadata for a member, or nil if does not exist."
           :signature   [{:params []}]}}
           
   ([member-id]
@@ -36,28 +36,56 @@
  
 (defn create-member
   ^{:callable true
-    :doc {:description "Creates a new member account. Must be caller by operator. Returns ID."
-          :signature   [{:params []}]}}
-  ([]
+    :doc {:description "Creates a new member account. Must be caller by operator, providing member Convex account. Returns ID."
+          :signature   [{:params [account]}]}}
+  ([acct]
 	(or (trust/trusted? operator *caller*) (fail :TRUST "Not a membership operator"))
 	(let [id mcount]
 	  (set! mcount (inc id))
-	  (set! members (assoc members id {:created *timestamp*}))
+	  (set! members (assoc members id {:created *timestamp* 
+	                                   :updated *timestamp* 
+	                                   :accounts #{acct}}))
       id)))
+      
+(defn update-member
+  ^{:callable true
+    :doc {:description "Updates a new member account. Must be caller by operator, providing member Convex account. Returns updated metadata."
+          :signature   [{:params [id data]}]}}
+  ([id data]
+	(or (trust/trusted? operator *caller*) (fail :TRUST "Not a membership operator"))
+	(let [md (or (get members id) (fail :STATE "Member ID does not exist"))
+	      new-data (merge md data)
+	      new-data (assoc new-data :updated *timestamp*)]
+	  (set! members (assoc members id new-data)))))
 
 
-;; Create members personal token
+;; Create personal token for a member
 ;; Requires:
 ;;  1. Member ID exists
 ;;  2. Offer of at least 1 CVM
 ;;
 ;; Returns personal token asset ID (new or existing)
 ;; Call with (call @app.paisley.members 1000000000 (create-pt id)
-(defn ^:callable create-pt [member-id]
+(defn create-pt  
+  ^{:callable true
+    :doc {:description "Creates a new personal token for a member. Returns CAD29 Token ID."
+          :signature   [{:params [member-id]}]}}
+  [member-id]
   (accept 1000000000)
   (when-not (get members member-id) (fail :STATE (str "Member does not exist: " member-id)))
   (if-let [ptid (get pts member-id)] (return ptid)) ;; return token if already exists
-  (let [id (call pt-actor (create))
+  (let [id (call pt-actor (create [*address* member id]))
         ptid [pt-actor id]]
     (set! pts (assoc pts member-id ptid))
     ptid))
+    
+    
+;; Member trust monitor implementation
+(defn ^:callable check-trusted? [subject action object]
+  (let [md (get-metadata *scope*)
+        accts (get md :accounts)]
+    (cond 
+      (not md) false
+      (contains-key? accts subject))))
+
+

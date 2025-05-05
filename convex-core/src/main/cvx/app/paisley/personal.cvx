@@ -50,13 +50,15 @@
 
 (defn create
   ^{:callable true
-    :doc {:description "Creates a new token and returns its id. Caller will be controller of token. Returns ID."
+    :doc {:description "Creates a new token and returns its id. Caller will be as specified, or caller if not provided. Returns ID."
           :signature   [{:params []}
-                        {:params [actor]}]}}
+                        {:params [controller]}]}}
   ([]
+    (recur *caller*))
+  ([controller]
 	(let [id counter]
 	  (set! counter (inc id))
-	  (set! tokens (assoc tokens id [*caller* 0]))
+	  (set! tokens (assoc tokens id [controller 0]))
       id)))
 
 ;;; Trust / control SPI
