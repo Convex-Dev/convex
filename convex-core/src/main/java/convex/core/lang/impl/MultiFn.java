@@ -12,7 +12,7 @@ import convex.core.exceptions.InvalidDataException;
 
 /**
  * Function with multiple function bodies of possible varying arities
- * @param <T>
+ * @param <T> Type of return value
  */
 public class MultiFn<T extends ACell> extends AClosure<T> {
 

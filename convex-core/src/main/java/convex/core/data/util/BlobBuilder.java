@@ -174,7 +174,7 @@ public class BlobBuilder {
 	 * Appends a long value as a UTF-8 string. This is common enough that we want an optimised implementation
 	 * to avoid extra String allocations
 	 * 
-	 * @param value
+	 * @param value Long value to append as UTF-8 numeric bytes
 	 */
 	public void appendLongString(long value) {
 		if (value==Long.MIN_VALUE) {

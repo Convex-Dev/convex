@@ -52,11 +52,13 @@ public final class Keyword extends ASymbolic {
 	 * @return The new Keyword, or null if the name is invalid for a Keyword
 	 */
 	public static Keyword create(Object o) {
+		if (o==null) return null;
 		if (o instanceof Keyword k) return k;
 		if (o instanceof String s) return create(s);
-		if (o instanceof AString s) return create(s);
-		if (o instanceof ASymbolic s) return create(s.getName());
-				
+		if (o instanceof ACell cell) {
+			if (cell instanceof AString s) return create(s);
+			if (cell instanceof ASymbolic s) return create(s.getName());
+		}
 		return null;
 	}
 	

@@ -1,5 +1,7 @@
 package convex.core.lang;
 
+import static convex.test.Assertions.assertNotError;
+
 import convex.core.cvm.AOp;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
@@ -12,10 +14,6 @@ import convex.core.init.BaseTest;
 import convex.core.init.Init;
 import convex.core.init.InitTest;
 import convex.core.util.Utils;
-
-import static convex.test.Assertions.*;
-
-import java.io.IOException;
 
 /**
  * Base class for CVM tests that work from a given initial State and Context.

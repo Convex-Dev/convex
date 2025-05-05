@@ -460,15 +460,16 @@ public class State extends ARecordGeneric {
 	 * Applies a signed transaction to the State.
 	 *
 	 * SECURITY: Checks digital signature and correctness of account key
-	 * @param tctx 
+	 * @param signedTx Signed transaction
+	 * @param tctx Transaction context
 	 *
 	 * @return ResultContext containing the result of the transaction
-	 * @throws InvalidBlockException 
+	 * @throws InvalidBlockException If block is invalid (bad transaction)
 	 */
-	public ResultContext applyTransaction(SignedData<ATransaction> t2, TransactionContext tctx) throws InvalidBlockException {
+	public ResultContext applyTransaction(SignedData<ATransaction> signedTx, TransactionContext tctx) throws InvalidBlockException {
 		// Extract transaction
-		ATransaction t=RT.ensureTransaction(t2.getValue());
-		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+t2.getHash());
+		ATransaction t=RT.ensureTransaction(signedTx.getValue());
+		if (t==null) throw new InvalidBlockException("Not a signed transaction: "+signedTx.getHash());
 
 		Address addr=t.getOrigin();
 		tctx.origin=addr;
@@ -493,7 +494,7 @@ public class State extends ARecordGeneric {
 			}
 			
 			// Perform Signature check
-			boolean sigValid=t2.checkSignature(key);
+			boolean sigValid=signedTx.checkSignature(key);
 			if (!sigValid) {
 				ResultContext rc= ResultContext.error(this,ErrorCodes.SIGNATURE, Strings.BAD_SIGNATURE);
 				return rc.withSource(SourceCodes.CVM);

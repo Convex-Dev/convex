@@ -14,7 +14,7 @@ public abstract class AEncoder<T> {
 	
 	/**
 	 * Encodes a value as Blob
-	 * @param a
+	 * @param a Value to encode
 	 * @return Blob encoding in CAD3 format
 	 */
 	public abstract Blob encode(T a);

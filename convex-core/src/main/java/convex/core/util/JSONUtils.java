@@ -373,7 +373,7 @@ public class JSONUtils {
 
 	/**
 	 * Escape a string for inclusion in JSON
-	 * @param content
+	 * @param content String content to escape for JSON
 	 * @return CVM String containing JSON escaped content
 	 */
 	public static AString escape(String content) {
@@ -385,7 +385,7 @@ public class JSONUtils {
 	
 	/**
 	 * Unescapes JSON string content
-	 * @param content
+	 * @param content JSON String content to unescape
 	 * @return CVM String containing JSON unescaped content
 	 */
 	public static AString unescape(String content) {

@@ -445,7 +445,7 @@ public class AccountStatus extends ARecordGeneric {
 
 	/**
 	 * Gets environment entry for a given symbol
-	 * @param sym
+	 * @param sym Symbol to loop up
 	 * @return Environment entry, or null if not defined in this account
 	 */
 	public MapEntry<Symbol, ACell> getEnvironmentEntry(Symbol sym) {

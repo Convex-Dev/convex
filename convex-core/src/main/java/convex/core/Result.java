@@ -73,7 +73,7 @@ public final class Result extends ARecordGeneric {
 	
 	/**
 	 * Build a Result from a vector. WARNING: does not validate values
-	 * @param values
+	 * @param values Vector or values for result record, according to record format
 	 * @return Result instance
 	 */
 	public static Result buildFromVector(AVector<ACell> values) {

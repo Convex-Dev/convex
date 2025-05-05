@@ -48,7 +48,7 @@ public class ExplorerAPI extends ABaseAPI {
 	
 	/**
 	 * Produce a table of states
-	 * @param ctx
+	 * @param ctx Javalin context
 	 */
 	public void showExplorer(Context ctx) {
 		DomContent result=html(
@@ -69,7 +69,7 @@ public class ExplorerAPI extends ABaseAPI {
 	
 	/**
 	 * Produce a table of states
-	 * @param ctx
+	 * @param ctx Javalin context
 	 */
 	public void showStates(Context ctx) {
 		Server s=restServer.getServer();
@@ -109,7 +109,7 @@ public class ExplorerAPI extends ABaseAPI {
 	
 	/**
 	 * Produce a table of blocks
-	 * @param ctx
+	 * @param ctx Javalin context
 	 */
 	public void showBlocks(Context ctx) {
 		Server s=restServer.getServer();

@@ -7,13 +7,11 @@ import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.Lexer;
-import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.TokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
-import org.antlr.v4.runtime.tree.TerminalNode;
 
 import convex.core.cvm.Address;
 import convex.core.cvm.CVMEncoder;
@@ -39,34 +37,27 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.ParseException;
 import convex.core.lang.RT;
+import convex.core.lang.reader.antlr.ConvexBaseListener;
 import convex.core.lang.reader.antlr.ConvexLexer;
-import convex.core.lang.reader.antlr.ConvexListener;
 import convex.core.lang.reader.antlr.ConvexParser;
 import convex.core.lang.reader.antlr.ConvexParser.AddressContext;
 import convex.core.lang.reader.antlr.ConvexParser.AllFormsContext;
-import convex.core.lang.reader.antlr.ConvexParser.AtomContext;
 import convex.core.lang.reader.antlr.ConvexParser.BlobContext;
 import convex.core.lang.reader.antlr.ConvexParser.BoolContext;
 import convex.core.lang.reader.antlr.ConvexParser.Cad3Context;
 import convex.core.lang.reader.antlr.ConvexParser.CharacterContext;
 import convex.core.lang.reader.antlr.ConvexParser.CommentedContext;
-import convex.core.lang.reader.antlr.ConvexParser.DataStructureContext;
 import convex.core.lang.reader.antlr.ConvexParser.DoubleValueContext;
-import convex.core.lang.reader.antlr.ConvexParser.FormContext;
-import convex.core.lang.reader.antlr.ConvexParser.FormsContext;
 import convex.core.lang.reader.antlr.ConvexParser.ImplicitSymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.KeywordContext;
 import convex.core.lang.reader.antlr.ConvexParser.ListContext;
-import convex.core.lang.reader.antlr.ConvexParser.LiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.LongValueContext;
 import convex.core.lang.reader.antlr.ConvexParser.MapContext;
 import convex.core.lang.reader.antlr.ConvexParser.NilContext;
 import convex.core.lang.reader.antlr.ConvexParser.PathSymbolContext;
-import convex.core.lang.reader.antlr.ConvexParser.PrimaryContext;
 import convex.core.lang.reader.antlr.ConvexParser.QuotedContext;
 import convex.core.lang.reader.antlr.ConvexParser.ResolveContext;
 import convex.core.lang.reader.antlr.ConvexParser.SetContext;
-import convex.core.lang.reader.antlr.ConvexParser.SingleFormContext;
 import convex.core.lang.reader.antlr.ConvexParser.SlashSymbolContext;
 import convex.core.lang.reader.antlr.ConvexParser.SpecialLiteralContext;
 import convex.core.lang.reader.antlr.ConvexParser.StringContext;
@@ -80,7 +71,7 @@ import convex.core.util.Utils;
  
 public class AntlrReader {
 	
-	static class CRListener implements ConvexListener {
+	static class CRListener extends ConvexBaseListener {
 		ArrayList<ArrayList<ACell>> stack=new ArrayList<>();
 		protected CVMEncoder encoder;
 		
@@ -95,7 +86,7 @@ public class AntlrReader {
 		
 		/**
 		 * Push a cell into the topmost list on the stack
-		 * @param a
+		 * @param a Value to push on stack
 		 */
 		public void push(ACell a) {
 			ArrayList<ACell> top=stack.getLast();
@@ -120,53 +111,8 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void visitTerminal(TerminalNode node) {
-			// Nothing to do
-		}
-
-		@Override
 		public void visitErrorNode(ErrorNode node) {
 			throw new ParseException(node.getSourceInterval()+" "+node.getText());
-		}
-
-		@Override
-		public void enterEveryRule(ParserRuleContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void exitEveryRule(ParserRuleContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void enterForm(FormContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void exitForm(FormContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void enterForms(FormsContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void exitForms(FormsContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void enterDataStructure(DataStructureContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void exitDataStructure(DataStructureContext ctx) {
-			// Nothing to do
 		}
 
 		@Override
@@ -217,21 +163,6 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterLiteral(LiteralContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void exitLiteral(LiteralContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
-		public void enterLongValue(LongValueContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitLongValue(LongValueContext ctx) {
 			// Just looking at the last token probably most efficient way to get string?
 			String s=ctx.getStop().getText();
@@ -254,28 +185,13 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterNil(NilContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitNil(NilContext ctx) {
 			push(null);
 		}
 
 		@Override
-		public void enterBool(BoolContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitBool(BoolContext ctx) {
 			push(CVMBool.parse(ctx.getStop().getText()));
-		}
-
-		@Override
-		public void enterCharacter(CharacterContext ctx) {
-			// Nothing
 		}
 
 		@Override
@@ -287,11 +203,6 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterKeyword(KeywordContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitKeyword(KeywordContext ctx) {
 			String s=ctx.getStop().getText();
 			Keyword k=Keyword.create(s.substring(1));
@@ -300,21 +211,11 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterSymbol(SymbolContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitSymbol(SymbolContext ctx) {
 			String s=ctx.getStop().getText();
 			Symbol sym=Symbol.create(s);
 			if (sym==null) throw new ParseException("Bad Symbol format: "+s);
 			push( sym);
-		}
-		
-		@Override
-		public void enterImplicitSymbol(ImplicitSymbolContext ctx) {
-			// Nothing to do
 		}
 
 		@Override
@@ -342,22 +243,12 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterTag(TagContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitTag(TagContext ctx) {
 			String s=ctx.getText();
 			s=s.substring(1); // skip leading #
 			Symbol sym=Symbol.create(s);
 			if (sym==null) throw new ParseException("Bad tag: #"+s);
 			push( sym);
-		}
-
-		@Override
-		public void enterAddress(AddressContext ctx) {
-			// Nothing to do
 		}
 
 		@Override
@@ -390,22 +281,11 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterBlob(BlobContext ctx) {
-			// Nothing to do
-			
-		}
-
-		@Override
 		public void exitBlob(BlobContext ctx) {
 			String s=ctx.getStop().getText();
 			Blob b=Blob.fromHex(s.substring(2));
 			if (b==null) throw new ParseException("Invalid Blob syntax: "+s);
 			push(b);
-		}
-		
-		@Override
-		public void enterCad3(Cad3Context ctx) {
-			// nothing to do
 		}
 
 		@Override
@@ -421,22 +301,12 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterQuoted(QuotedContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitQuoted(QuotedContext ctx) {
 			ACell form=pop();
 			String qs=ctx.getStart().getText();
 			Symbol qsym=ReaderUtils.getQuotingSymbol(qs);
 			if (qsym==null) throw new ParseException("Invalid quoting reader macro: "+qs);
 			push(Lists.of(qsym,form));	
-		}
-		
-		@Override
-		public void enterResolve(ResolveContext ctx) {
-			// Nothing to do
 		}
 
 		@Override
@@ -450,11 +320,6 @@ public class AntlrReader {
 		
 
 		@Override
-		public void enterSlashSymbol(SlashSymbolContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitSlashSymbol(SlashSymbolContext ctx) {
 			String s=ctx.getStop().getText();
 			s=s.substring(1); // skip leading /
@@ -464,22 +329,12 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterString(StringContext ctx) {
-			// Nothing to do
-		}
-
-		@Override
 		public void exitString(StringContext ctx) {
 			String s=ctx.getStop().getText();
 			int n=s.length();
 			s=s.substring(1, n-1); // skip surrounding double quotes
 			s=Text.unescapeJava(s);
 			push(Strings.create(s));
-		}
-
-		@Override
-		public void enterSpecialLiteral(SpecialLiteralContext ctx) {
-			// Nothing to do
 		}
 
 		@Override
@@ -527,48 +382,10 @@ public class AntlrReader {
 		}
 
 		@Override
-		public void enterSingleForm(SingleFormContext ctx) {
-			// Nothing	
-		}
-
-		@Override
-		public void exitSingleForm(SingleFormContext ctx) {
-			// Nothing
-		}
-
-		@Override
 		public void enterAllForms(AllFormsContext ctx) {
 			// Add a new list to stack to capture all forms. readAll() will pop this
 			pushList(); 
 		}
-
-		@Override
-		public void exitAllForms(AllFormsContext ctx) {
-			// Nothing	
-		}
-
-		@Override
-		public void enterAtom(AtomContext ctx) {
-			// Nothing	
-		}
-
-		@Override
-		public void exitAtom(AtomContext ctx) {
-			// Nothing	
-		}
-
-		@Override
-		public void enterPrimary(PrimaryContext ctx) {
-			// Nothing
-			
-		}
-
-		@Override
-		public void exitPrimary(PrimaryContext ctx) {
-			// Nothing
-		}
-
-
 	}
 
 	public static ACell read(String s) {

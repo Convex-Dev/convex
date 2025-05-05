@@ -64,7 +64,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	
 	/**
 	 * Remove an element at the specified position in a vector. WARNING: likely to be O(n)
-	 * @param i
+	 * @param i Index position to remove
 	 * @return Shortened Vector, or null if position was invalid
 	 */
 	public abstract AVector<T> dissocAt(long i);

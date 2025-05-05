@@ -255,8 +255,7 @@ public class TransactionTest extends ACVMTest {
 	}
 	
 	/**
-	 * TEsts for transactions that don't get as far as code execution
-	 * @throws InvalidBlockException 
+	 * Tests for transactions that don't get as far as code execution
 	 */
 	@SuppressWarnings("unchecked")
 	@Test public void testBadSignedTransactions() throws InvalidBlockException {

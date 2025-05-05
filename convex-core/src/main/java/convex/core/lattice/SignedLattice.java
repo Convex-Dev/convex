@@ -10,7 +10,7 @@ import convex.core.util.Utils;
  * 
  * Merges that produce new values will fail if no keypair is set.
  * 
- * @param <V>
+ * @param <V> Type of signed lattice value
  */
 public class SignedLattice<V extends ACell> extends ALattice<SignedData<V>> {
 
