@@ -2,14 +2,19 @@
 ;; Deploy with
 ;; (deploy
 ;;   '[(set-controller <governance-controller>
+;;     (def operator <operator-backend-account>)	
 ;;     (def pt-actor <personal-token-actor>)	
 ;;     <insert code here>
 ;;   ])
 ;;     
 
+(import convex.trust :as trust)
 
 ;; Governance controller. Use controller if set, otherwise *caller* for testing purposes
 (def governor (or *controller* *caller*))
+
+;; Members counter
+(def mcount 0)
 
 ;; State for membership list
 ;; format: { ID -> metadata map} 
@@ -20,3 +25,39 @@
 ;; format: { ID -> token}
 (def pts {})
 
+
+(defn get-metadata
+  ^{:callable true
+    :doc {:description "GEts metadata for a member, or nil if does not exist."
+          :signature   [{:params []}]}}
+          
+  ([member-id]
+    (get members member-id)))
+ 
+(defn create-member
+  ^{:callable true
+    :doc {:description "Creates a new member account. Must be caller by operator. Returns ID."
+          :signature   [{:params []}]}}
+  ([]
+	(or (trust/trusted? operator *caller*) (fail :TRUST "Not a membership operator"))
+	(let [id mcount]
+	  (set! mcount (inc id))
+	  (set! members (assoc members id {:created *timestamp*}))
+      id)))
+
+
+;; Create members personal token
+;; Requires:
+;;  1. Member ID exists
+;;  2. Offer of at least 1 CVM
+;;
+;; Returns personal token asset ID (new or existing)
+;; Call with (call @app.paisley.members 1000000000 (create-pt id)
+(defn ^:callable create-pt [member-id]
+  (accept 1000000000)
+  (when-not (get members member-id) (fail :STATE (str "Member does not exist: " member-id)))
+  (if-let [ptid (get pts member-id)] (return ptid)) ;; return token if already exists
+  (let [id (call pt-actor (create))
+        ptid [pt-actor id]]
+    (set! pts (assoc pts member-id ptid))
+    ptid))

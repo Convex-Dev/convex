@@ -1,6 +1,7 @@
 package lab;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
@@ -12,11 +13,13 @@ import convex.core.cvm.Context;
 import convex.core.data.AVector;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
+import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.lib.AssetTester;
+import static convex.test.Assertions.*;
 
 public class PaisleyTest extends ACVMTest  {
 
@@ -57,6 +60,8 @@ public class PaisleyTest extends ACVMTest  {
 		
 		// Execute member setup code in PAI account
 		String memberscode=Utils.readResourceAsString("/app/paisley/members.cvx");
+		ctx=exec(ctx,"(eval-as members '(def pt-actor "+PERSONAL+"))");
+		ctx=exec(ctx,"(eval-as members '(def operator *caller*))"); // use HERO account as operator
 		ctx=exec(ctx,"(eval-as members '(do "+memberscode+"))");
 
 		
@@ -86,5 +91,24 @@ public class PaisleyTest extends ACVMTest  {
 		Context c=context();
 		c=exec(c,"members/members");
 		assertSame(Maps.empty(),c.getResult());
+		
+		{
+			// Bad token create (non-member)
+			Context ce=step("(call members 1000000000 (create-pt -1))");
+			assertStateError(ce);
+		}
+		
+		// Create a new member
+		c=exec(c,"(def mid (call members (create-member)))");
+		assertNotError(c);
+		AInteger MID=c.getResult();
+		assertNotNull(eval(c,"(call members (get-metadata "+MID+"))"));
+		
+		{
+			// Bad token create (insufficient offer)
+			Context ce=step(c,"(call members 999999999 (create-pt "+MID+"))");
+			assertStateError(ce);
+		}
+
 	}
 }
