@@ -1,6 +1,7 @@
 package lab;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.io.IOException;
 
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import convex.core.cvm.Address;
 import convex.core.cvm.Context;
 import convex.core.data.AVector;
+import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.lang.ACVMTest;
@@ -20,6 +22,7 @@ public class PaisleyTest extends ACVMTest  {
 
 	Address PAI;
 	Address PERSONAL;
+	Address MEMBERS;
 	
 	@Override protected Context buildContext(Context ctx) throws IOException {
 		ctx=TestState.CONTEXT.fork();
@@ -43,11 +46,20 @@ public class PaisleyTest extends ACVMTest  {
 		// Deploy an account with a pre-set controller for Personal tokens
 		ctx=exec(ctx,"(def personal (deploy '(set-controller *caller*)))");
 		PERSONAL=ctx.getResult();
-		
+
 		// Execute token setup code in PAI account
 		String pcode=Utils.readResourceAsString("/app/paisley/personal.cvx");
 		ctx=exec(ctx,"(eval-as personal '(do "+pcode+"))");
 
+		// Deploy an account with a pre-set controller for Membership actor
+		ctx=exec(ctx,"(def members (deploy '(set-controller *caller*)))");
+		MEMBERS=ctx.getResult();
+		
+		// Execute member setup code in PAI account
+		String memberscode=Utils.readResourceAsString("/app/paisley/members.cvx");
+		ctx=exec(ctx,"(eval-as members '(do "+memberscode+"))");
+
+		
 		return ctx;
 	}
 	
@@ -68,5 +80,11 @@ public class PaisleyTest extends ACVMTest  {
 		assertEquals(0,evalL(c,"(asset/balance aid #0)")); // zero account has no holding
 		
 		AssetTester.doFungibleTests(c, AID, c.getAddress());
+	}
+	
+	@Test public void testMembersList() {
+		Context c=context();
+		c=exec(c,"members/members");
+		assertSame(Maps.empty(),c.getResult());
 	}
 }

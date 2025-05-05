@@ -1,1 +1,22 @@
 'app.paisley.members
+;; Deploy with
+;; (deploy
+;;   '[(set-controller <governance-controller>
+;;     (def pt-actor <personal-token-actor>)	
+;;     <insert code here>
+;;   ])
+;;     
+
+
+;; Governance controller. Use controller if set, otherwise *caller* for testing purposes
+(def governor (or *controller* *caller*))
+
+;; State for membership list
+;; format: { ID -> metadata map} 
+(def members {})
+
+
+;; State for personal tokens
+;; format: { ID -> token}
+(def pts {})
+
