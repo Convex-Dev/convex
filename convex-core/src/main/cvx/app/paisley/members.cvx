@@ -65,7 +65,7 @@
 ;;  2. Offer of at least 1 CVM
 ;;
 ;; Returns personal token asset ID (new or existing)
-;; Call with (call @app.paisley.members 1000000000 (create-pt id)
+;; Call with (call @app.paisley.members 1000000000 (create-pt id))
 (defn create-pt  
   ^{:callable true
     :doc {:description "Creates a new personal token for a member. Returns CAD29 Token ID."
@@ -74,7 +74,7 @@
   (accept 1000000000)
   (when-not (get members member-id) (fail :STATE (str "Member does not exist: " member-id)))
   (if-let [ptid (get pts member-id)] (return ptid)) ;; return token if already exists
-  (let [id (call pt-actor (create [*address* member id]))
+  (let [id (call pt-actor (create [*address* member-id]))
         ptid [pt-actor id]]
     (set! pts (assoc pts member-id ptid))
     ptid))
