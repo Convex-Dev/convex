@@ -11,31 +11,29 @@ import convex.api.Convex;
 import convex.core.Coin;
 import convex.core.ErrorCodes;
 import convex.core.Result;
-import convex.core.SourceCodes;
 import convex.core.crypto.AKeyPair;
 import convex.core.crypto.ASignature;
 import convex.core.crypto.Ed25519Signature;
+import convex.core.cvm.AccountStatus;
+import convex.core.cvm.Address;
+import convex.core.cvm.Keywords;
+import convex.core.cvm.PeerStatus;
+import convex.core.cvm.Symbols;
+import convex.core.cvm.transactions.ATransaction;
+import convex.core.cvm.transactions.Invoke;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AMap;
-import convex.core.data.AString;
 import convex.core.data.AccountKey;
-import convex.core.cvm.AccountStatus;
-import convex.core.cvm.Address;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.Cells;
 import convex.core.data.Format;
 import convex.core.data.Hash;
 import convex.core.data.Keyword;
-import convex.core.cvm.Keywords;
 import convex.core.data.Lists;
-import convex.core.cvm.PeerStatus;
-import convex.core.cvm.transactions.ATransaction;
-import convex.core.cvm.transactions.Invoke;
 import convex.core.data.Ref;
 import convex.core.data.SignedData;
-import convex.core.data.Strings;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.BadFormatException;
@@ -43,23 +41,25 @@ import convex.core.exceptions.MissingDataException;
 import convex.core.exceptions.ResultException;
 import convex.core.lang.RT;
 import convex.core.lang.Reader;
-import convex.core.cvm.Symbols;
 import convex.core.util.JSONUtils;
 import convex.core.util.Utils;
 import convex.java.JSON;
 import convex.restapi.RESTServer;
-import convex.restapi.model.ResultResponse;
 import convex.restapi.model.CreateAccountRequest;
 import convex.restapi.model.CreateAccountResponse;
 import convex.restapi.model.FaucetRequest;
 import convex.restapi.model.QueryAccountResponse;
 import convex.restapi.model.QueryRequest;
+import convex.restapi.model.ResultResponse;
 import convex.restapi.model.TransactRequest;
 import convex.restapi.model.TransactionPrepareRequest;
 import convex.restapi.model.TransactionPrepareResponse;
 import convex.restapi.model.TransactionSubmitRequest;
 import io.javalin.Javalin;
-import io.javalin.http.*;
+import io.javalin.http.BadRequestResponse;
+import io.javalin.http.Context;
+import io.javalin.http.ForbiddenResponse;
+import io.javalin.http.NotFoundResponse;
 import io.javalin.openapi.HttpMethod;
 import io.javalin.openapi.OpenApi;
 import io.javalin.openapi.OpenApiContent;
@@ -687,58 +687,4 @@ public class ChainAPI extends ABaseAPI {
 		Result r = convex.querySync(form, addr);
 		prepareResult(ctx,r);
 	}
-
-	private void prepareResult(Context ctx, Result r) {
-		if (r.getSource()==null) {
-			r=r.withSource(SourceCodes.SERVER);
-		}
-		
-		int status=statusForResult(r);
-		ctx.status(status);
-		
-		String type = calcResponseContentType(ctx);
-		
-		if (type.equals(ContentTypes.JSON)) {
-			ctx.contentType(ContentTypes.JSON);
-			HashMap<String, Object> resultJSON = r.toJSON();
-			ctx.result(JSON.toPrettyString(resultJSON));
-		} else if (type.equals(ContentTypes.CVX)) {
-			ctx.contentType(ContentTypes.CVX);
-			AString rs=RT.print(r);
-			if (rs==null) {
-				rs=RT.print(Result.error(ErrorCodes.LIMIT, Strings.PRINT_EXCEEDED).withSource(SourceCodes.PEER));
-				ctx.status(403); // Forbidden because of result size
-			}
-			ctx.result(rs.toString());
-		} else if (type.equals(ContentTypes.CVX_RAW)) {
-			ctx.contentType(ContentTypes.CVX_RAW);
-			Blob b=Format.encodeMultiCell(r, true);
-			ctx.result(b.getBytes());
-		} else {
-			ctx.contentType(ContentTypes.TEXT);
-			ctx.status(415); // unsupported media type for "Accept" header
-			ctx.result("Unsupported content type: "+type);
-		}
-	}
-
-	private int statusForResult(Result r) {
-		if (!r.isError()) {
-			return 200;
-		}
-		Keyword source=r.getSource();
-		ACell error=r.getErrorCode();
-		if (SourceCodes.CVM.equals(source)) {
-			return 200;
-		} else if (SourceCodes.CODE.equals(source)) {
-			return 200;
-		} else if (SourceCodes.PEER.equals(source)) {
-			if (ErrorCodes.SIGNATURE.equals(error)) return 403; // Forbidden
-			if (ErrorCodes.FUNDS.equals(error)) return 402; // payment required
-		}
-		if (ErrorCodes.FORMAT.equals(error)) return 400; // bad request
-		if (ErrorCodes.TIMEOUT.equals(error)) return 408; // timeout
-		int status = 422;
-		return status;
-	}
-
 }

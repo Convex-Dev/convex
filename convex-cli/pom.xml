@@ -13,7 +13,7 @@
 	<url>https://convex.world</url>
 
 	<properties>
-		<picocli.version>4.7.6</picocli.version>
+		<picocli.version>4.7.7</picocli.version>
 		<maven.compiler.release>21</maven.compiler.release>
 	</properties>
 

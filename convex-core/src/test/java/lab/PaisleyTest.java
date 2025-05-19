@@ -1,5 +1,8 @@
 package lab;
 
+import static convex.test.Assertions.assertCVMEquals;
+import static convex.test.Assertions.assertNotError;
+import static convex.test.Assertions.assertStateError;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -22,7 +25,6 @@ import convex.core.lang.ACVMTest;
 import convex.core.lang.TestState;
 import convex.core.util.Utils;
 import convex.lib.AssetTester;
-import static convex.test.Assertions.*;
 
 public class PaisleyTest extends ACVMTest  {
 
@@ -76,7 +78,10 @@ public class PaisleyTest extends ACVMTest  {
 		AssetTester.doFungibleTests(c, PAI, c.getAddress());
 	}
 	
-	@Test public void testPersonalToken() {
+	/**
+	 * This test highlights use of a personal token *without* using the members list
+	 */
+	@Test public void testPersonalTokenDetached() {
 		Context c=context();
 		c=exec(c,"(def id (call personal (create)))");
 		CVMLong ID=c.getResult();
@@ -89,6 +94,36 @@ public class PaisleyTest extends ACVMTest  {
 		
 		AssetTester.doFungibleTests(c, AID, c.getAddress());
 	}
+	
+	/**
+	 * This test highlights use of a personal token using the members list
+	 */
+	@Test public void testMemberPersonalToken() {
+		Context c=context();
+		
+		// Create a member Convex account
+		c=exec(c,"(def member-acct (deploy '(set-controller *caller*)))"); 
+		Address memberID=c.getResult();
+		assertNotNull(memberID);
+		
+		// Create a member entry
+		c=exec(c,"(def mid (call members (create-member member-acct)))");
+
+		// Create a member personal token (remembering 1 CVM offer)
+		c=exec(c,"(def aid (call members 1000000000 (create-pt mid)))");
+		AVector<?> AID=c.getResult(); // should be asset ID
+		
+		// user should be able to mint now
+		c=exec(c,"(eval-as member-acct `(call ~aid (mint 1000000)))");
+		
+		// user should be able to transfer to HERO
+		c=exec(c,"(eval-as member-acct `(@convex.asset/transfer ~*address* [~aid 10000]))");
+		
+		// Run generic tests (as HERO who should now have 10000 units)
+		AssetTester.doFungibleTests(c, AID, c.getAddress());
+	}
+	
+	
 	
 	@Test public void testMembersList() {
 		Context c=context();
