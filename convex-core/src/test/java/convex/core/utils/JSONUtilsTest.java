@@ -76,6 +76,7 @@ public class JSONUtilsTest {
 		assertEquals(Strings.NIL,JSONUtils.parse("\"nil\""));
 
 		assertSame(Maps.empty(),JSONUtils.parse("{}"));
+		assertSame(Maps.empty(),JSONUtils.parse("{ /* foo */ } /*bar*/ /*baz*/"));
 		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parse("{\"nil\": 1}"));
 		assertEquals(Maps.of(Strings.EMPTY,Vectors.empty()),JSONUtils.parse("{\"\": []}"));
 	

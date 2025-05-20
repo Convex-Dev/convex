@@ -84,7 +84,7 @@ fragment EXP
 
 // Multi-line comments (ignored)
 MULTILINE_COMMENT
-	: '/*' .* '*/' -> skip
+	: '/*' .*? '*/' -> skip
 	;
 
 // Single-line comments (ignored)
