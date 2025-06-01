@@ -39,7 +39,7 @@ public class WebApp {
 					p("Version: "+Utils.getVersion()),
 					p(a("Explorer").withHref("explorer")),
 
-					p("This is the default web page for a Convex Peer Server running the REST API")
+					p("This is the web page for a Convex Peer Server running the REST API")
 				)
 			);
 		ctx.result(content.render());

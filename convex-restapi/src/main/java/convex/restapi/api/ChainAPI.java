@@ -100,6 +100,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "data/{hash}", 
+			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			tags = { "Data Lattice"},
 			summary = "Get data from the server with the specified hash", 
@@ -131,10 +132,11 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "createAccount", 
+			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			operationId = "createAccount", 
 			tags = { "Account"},
-			summary = "Create a new Convex account. Requires a peer winning to accept faucet requests.", 
+			summary = "Create a new Convex account. Requires a peer willing to accept faucet requests.", 
 			requestBody = @OpenApiRequestBody(
 				description = "Create Account request, must provide an accountKey for the new Account", 
 				content = {@OpenApiContent(
@@ -184,6 +186,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE + "accounts/{address}", 
+			versions="peer-v1",
 			methods = HttpMethod.GET, 
 			operationId = "queryAccount", 
 			tags = { "Account"},
@@ -273,6 +276,7 @@ public class ChainAPI extends ABaseAPI {
 	private static Keyword K_FAUCET=Keyword.create("faucet");
 	
 	@OpenApi(path = ROUTE + "faucet", 
+			versions="peer-v1",
 			methods = HttpMethod.POST, 
 			operationId = "faucetRequest", 
 			tags = { "Account"},
@@ -363,6 +367,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE+"transaction/prepare",
+			versions="peer-v1",
 			methods = HttpMethod.POST,
 			operationId = "transactionPrepare",
 			tags= {"Transactions"},
@@ -433,6 +438,7 @@ public class ChainAPI extends ABaseAPI {
 
 	@SuppressWarnings("unchecked")
 	@OpenApi(path = ROUTE+"transact",
+			versions="peer-v1",
 			methods = HttpMethod.POST,
 			operationId = "transact",
 			tags= {"Transactions"},
@@ -540,6 +546,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE+"transaction/submit",
+			versions="peer-v1",
 			methods = HttpMethod.POST,
 			operationId = "transactionSubmit",
 			tags= {"Transactions"},
@@ -618,6 +625,7 @@ public class ChainAPI extends ABaseAPI {
 	}
 
 	@OpenApi(path = ROUTE+"query",
+		versions="peer-v1",
 		methods = HttpMethod.POST,
 		operationId = "query",
 		tags= {"Transactions"},

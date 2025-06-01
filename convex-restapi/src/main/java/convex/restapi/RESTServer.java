@@ -148,7 +148,7 @@ public class RESTServer implements Closeable {
 	}
 
 	protected void addOpenApiPlugins(JavalinConfig config) {
-		String docsPath="openapi-plugin/openapi-default.json";
+		String docsPath="openapi-plugin/openapi-restapi.json";
 		
 		config.registerPlugin(new OpenApiPlugin(pluginConfig -> {
             pluginConfig
