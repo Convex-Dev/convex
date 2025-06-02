@@ -90,7 +90,7 @@ public abstract class AStore implements Closeable {
 	 */
 	public <T extends ACell> T getRootData() throws IOException {
 		Ref<T> ref=getRootRef();
-		if (ref==null) throw new MissingDataException(this,getRootHash());
+		if (ref==null) return null;
 		return ref.getValue();
 	}
 	
