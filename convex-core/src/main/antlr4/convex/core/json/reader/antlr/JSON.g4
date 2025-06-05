@@ -1,5 +1,7 @@
 /** Adapted from: https://github.com/antlr/grammars-v4/blob/master/json/JSON.g4 */
 
+// See also : https://github.com/antlr/grammars-v4/blob/master/json5/JSON5.g4
+
 // $antlr-format alignTrailingComments true, columnLimit 150, minEmptyLines 1, maxEmptyLinesToKeep 1, reflowComments false, useTab false
 // $antlr-format allowShortRulesOnASingleLine false, allowShortBlocksOnASingleLine true, alignSemicolons hanging, alignColons hanging
 
@@ -15,9 +17,13 @@ obj
     ;
 
 pair
-    : string ':' value
+    : key ':' value
     ;
-
+    
+key
+	: string 
+	;
+	
 // Note single training comma allowed after values
 array
     : '[' value (',' value)* ','? ']'
@@ -79,7 +85,7 @@ fragment INT
 
 fragment EXP
     // exponent number permits leading 0s (e.g. `1e01`)
-    : [Ee] [+-]? [0-9]+
+    : [Ee] [+-]? [0-9]*
     ;
 
 // Multi-line comments (ignored)
@@ -93,6 +99,6 @@ SINGLELINE_COMMENT
 	;
 
 WS
-    : [ \t\n\r]+ -> skip
+    : [ \t\n\r\u00A0\uFEFF\u2003]+ -> skip
     ;
     
