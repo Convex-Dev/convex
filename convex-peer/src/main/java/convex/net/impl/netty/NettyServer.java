@@ -20,7 +20,8 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.MultiThreadIoEventLoopGroup;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
@@ -32,7 +33,7 @@ public class NettyServer extends AServer {
 	
 	protected synchronized static EventLoopGroup getEventLoopGroup() {
 		if (bossGroup!=null) return bossGroup;
-		bossGroup=new NioEventLoopGroup();
+		bossGroup=new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
 		Shutdown.addHook(Shutdown.SERVER,()->{
 			if (bossGroup!=null) {
 				bossGroup.shutdownGracefully();

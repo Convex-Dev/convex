@@ -1403,6 +1403,31 @@ public class RT {
 		}
 		return result;
 	}
+	
+	public static ACell assocIn(ACell a, ACell value, Object... keys) {
+		int n=keys.length;
+		ADataStructure<?>[] ass=new ADataStructure[n];
+		ACell[] ks=new ACell[n];
+		ACell data=a;
+		for (int i = 0; i < n; i++) {
+			ADataStructure<?> struct = RT.ensureAssociative(data);  // nil-> empty map
+			if (struct == null) throw new IllegalArgumentException("Not a data structure at depth: "+i);
+			ass[i]=struct;
+			ACell k=RT.cvm(keys[i]);
+			ks[i]=k;
+			data=struct.get(k);
+		}
+
+		for (int i = n-1; i >=0; i--) {
+			ADataStructure<?> struct=ass[i];
+			ACell k=ks[i];
+			value=RT.assoc(struct, k, value);
+			if (value==null) {
+				throw new IllegalArgumentException("Invalid structure for assocIn at depth "+i);
+			}
+		}
+		return value;
+	}
 
 	/**
 	 * Gets an element from a data structure using the given key. Returns the
@@ -1921,5 +1946,7 @@ public class RT {
 		}
 		return result;
 	}
+
+
 
 }

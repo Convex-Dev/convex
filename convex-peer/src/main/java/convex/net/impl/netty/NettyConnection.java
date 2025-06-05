@@ -19,8 +19,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
@@ -51,7 +51,7 @@ public class NettyConnection extends AConnection {
 		synchronized (NettyConnection.class) {
 			if (workerGroup != null)
 				return workerGroup;
-			workerGroup = new NioEventLoopGroup();
+			workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
 
 			Shutdown.addHook(Shutdown.CONNECTION, () -> {
 				if (workerGroup != null) {

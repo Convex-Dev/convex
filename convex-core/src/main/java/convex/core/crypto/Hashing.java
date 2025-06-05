@@ -6,6 +6,7 @@ import java.security.NoSuchAlgorithmException;
 
 import org.bouncycastle.jcajce.provider.digest.Keccak;
 
+import convex.core.data.ABlobLike;
 import convex.core.data.Hash;
 import convex.core.exceptions.Panic;
 
@@ -152,5 +153,13 @@ public class Hashing {
 			return new Keccak.Digest256();
 		}
 	};
+	
+	public static Hash sha256(ABlobLike<?> data) {
+		return data.toBlob().computeHash(getSHA256Digest());
+	}
+	
+	public static Hash sha3(ABlobLike<?> data) {
+		return data.toBlob().getContentHash();
+	}
 
 }
