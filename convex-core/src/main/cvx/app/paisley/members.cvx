@@ -1,4 +1,6 @@
 'app.paisley.members
+;; This actor implements Paisley membership as a soulbound token 
+;;
 ;; Deploy with something like:
 ;; (deploy
 ;;   '[(set-controller <governance-controller>
@@ -49,7 +51,7 @@
       
 (defn update-member
   ^{:callable true
-    :doc {:description "Updates a new member account. Must be caller by operator, providing member Convex account. Returns updated metadata."
+    :doc {:description "Updates a new member account. Must be called by operator, providing member Convex account. Returns updated metadata."
           :signature   [{:params [id data]}]}}
   ([id data]
 	(or (trust/trusted? operator *caller*) (fail :TRUST "Not a membership operator"))
