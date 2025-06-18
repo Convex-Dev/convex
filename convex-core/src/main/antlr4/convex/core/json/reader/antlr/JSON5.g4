@@ -1,39 +1,57 @@
-/** Taken from "The Definitive ANTLR 4 Reference" by Terence Parr */
+/** Adapted from: https://github.com/antlr/grammars-v4/blob/master/json/JSON.g4 */
 
-// Derived from https://json.org
+// See also : https://github.com/antlr/grammars-v4/blob/master/json5/JSON5.g4
 
 // $antlr-format alignTrailingComments true, columnLimit 150, minEmptyLines 1, maxEmptyLinesToKeep 1, reflowComments false, useTab false
 // $antlr-format allowShortRulesOnASingleLine false, allowShortBlocksOnASingleLine true, alignSemicolons hanging, alignColons hanging
 
-grammar JSON;
+grammar JSON5;
 
 json
     : value EOF
     ;
 
 obj
-    : '{' pair (',' pair)* '}'
+    : '{' pair (',' pair)* ','? '}'
     | '{' '}'
     ;
 
 pair
-    : STRING ':' value
+    : key ':' value
     ;
-
-arr
-    : '[' value (',' value)* ']'
+    
+key
+	: string 
+	;
+	
+// Note single training comma allowed after values
+array
+    : '[' value (',' value)* ','? ']'
     | '[' ']'
     ;
 
 value
-    : STRING
-    | NUMBER
+    : string
+    | number
     | obj
-    | arr
-    | 'true'
-    | 'false'
-    | 'null'
+    | array
+    | bool
+    | nil
     ;
+
+bool
+	: 'true'
+    | 'false';
+
+string
+	: STRING;
+
+// numbers allow extra IEEE754 values as per JSON5	
+number
+	: NUMBER | 'NaN' | 'Infinity' | '+Infinity' | '-Infinity';
+	
+nil
+	: 'null';
 
 STRING
     : '"' (ESC | SAFECODEPOINT)* '"'
@@ -65,13 +83,22 @@ fragment INT
     | [1-9] [0-9]*
     ;
 
-// no leading zeros
-
 fragment EXP
     // exponent number permits leading 0s (e.g. `1e01`)
-    : [Ee] [+-]? [0-9]+
+    : [Ee] [+-]? [0-9]*
     ;
 
+// Multi-line comments (ignored)
+MULTILINE_COMMENT
+	: '/*' .*? '*/' -> skip
+	;
+
+// Single-line comments (ignored)
+SINGLELINE_COMMENT
+	: '//' ~[\r\n]* -> skip
+	;
+
 WS
-    : [ \t\n\r]+ -> skip
+    : [ \t\n\r\u00A0\uFEFF\u2003]+ -> skip
     ;
+    

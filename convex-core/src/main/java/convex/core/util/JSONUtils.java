@@ -25,7 +25,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
-import convex.core.json.JSONReader;
+import convex.core.json.JSON5Reader;
 import convex.core.lang.RT;
 import convex.core.text.Text;
 
@@ -145,7 +145,7 @@ public class JSONUtils {
 	 * @return Parsed JSON value as a CVM data structure
 	 */
 	public static ACell parse(String jsonString) {
-		return JSONReader.read(jsonString);
+		return JSON5Reader.read(jsonString);
 	}
 
 	/**

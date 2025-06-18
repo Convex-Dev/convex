@@ -16,21 +16,16 @@ import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMDouble;
 import convex.core.exceptions.ParseException;
-import convex.core.json.reader.antlr.JSONBaseListener;
-import convex.core.json.reader.antlr.JSONLexer;
-import convex.core.json.reader.antlr.JSONParser;
-import convex.core.json.reader.antlr.JSONParser.ArrayContext;
-import convex.core.json.reader.antlr.JSONParser.BoolContext;
-import convex.core.json.reader.antlr.JSONParser.NilContext;
-import convex.core.json.reader.antlr.JSONParser.NumberContext;
-import convex.core.json.reader.antlr.JSONParser.ObjContext;
-import convex.core.json.reader.antlr.JSONParser.StringContext;
+import convex.core.json.reader.antlr.JSON5BaseListener;
+import convex.core.json.reader.antlr.JSON5Lexer;
+import convex.core.json.reader.antlr.JSON5Parser;
+import convex.core.json.reader.antlr.JSON5Parser.*;
 import convex.core.lang.reader.ConvexErrorListener;
 import convex.core.util.JSONUtils;
 
-public class JSONReader {
+public class JSON5Reader {
 
-	protected static class JSONListener extends JSONBaseListener {
+	protected static class JSONListener extends JSON5BaseListener {
 		ArrayList<ArrayList<ACell>> stack=new ArrayList<>();	
 		
 		public JSONListener() {
@@ -136,13 +131,13 @@ public class JSONReader {
 	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
 
 	
-	static JSONParser getParser(CharStream cs, JSONListener listener) {
+	static JSON5Parser getParser(CharStream cs, JSONListener listener) {
 		// Create lexer and paser for the CharStream
-		JSONLexer lexer=new JSONLexer(cs);
+		JSON5Lexer lexer=new JSON5Lexer(cs);
 		lexer.removeErrorListeners();
 		lexer.addErrorListener(ERROR_LISTENER);
 		CommonTokenStream tokens = new CommonTokenStream(lexer);
-		JSONParser parser = new JSONParser(tokens);
+		JSON5Parser parser = new JSON5Parser(tokens);
 		
 		// We don't need a parse tree, just want to visit everything in our listener
 		parser.setBuildParseTree(false);
@@ -156,7 +151,7 @@ public class JSONReader {
 	
 	static ACell read(CharStream cs) {
 		JSONListener listener=new JSONListener();
-		JSONParser parser=getParser(cs,listener);
+		JSON5Parser parser=getParser(cs,listener);
 		
 		parser.json();
 		
