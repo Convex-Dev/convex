@@ -155,7 +155,7 @@ public class JSONUtils {
 	 * @return Parsed JSON value as a CVM data structure
 	 */
 	public static ACell parse(String jsonString) {
-		return JSON5Reader.read(jsonString);
+		return JSONReader.read(jsonString);
 	}
 
 	/**
