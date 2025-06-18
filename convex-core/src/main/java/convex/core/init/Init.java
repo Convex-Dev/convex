@@ -71,7 +71,7 @@ public class Init {
 	/**
 	 * Number of coins issued at genesis (one million)
 	 */
-	private static final long GENESIS_COINS=1000000*Coin.GOLD;
+	public static final long GENESIS_COINS=1000000*Coin.GOLD;
 
 	public static final AccountKey DEFAULT_GOV_KEY = AccountKey.fromHex("12EF73ee900eD1FE78A188f59bF8CedE467bAA66f5b60368aFAaA3B9521aB94d");
 	public static final AccountKey DEFAULT_GENESIS_KEY = AccountKey.fromHex("c1d3b0104d55ddf7680181a46e93422e49e2ea9298e37794860f1ef1128427f7");
