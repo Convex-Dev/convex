@@ -26,6 +26,7 @@ import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.data.util.BlobBuilder;
 import convex.core.json.JSON5Reader;
+import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.text.Text;
 
@@ -137,6 +138,15 @@ public class JSONUtils {
 	 */
 	public static String toString(Object value) {
 		return toJSONString(value).toString();
+	}
+	
+	/**
+	 * Parse JSON as a CVM value. Note JSON is a subset of CVM data types, you get Strings instead of Keywords etc.
+	 * @param jsonString String containing JSON5 data
+	 * @return Parsed JSON value as a CVM data structure
+	 */
+	public static ACell parseJSON5(String jsonString) {
+		return JSON5Reader.read(jsonString);
 	}
 	
 	/**

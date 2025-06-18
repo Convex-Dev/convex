@@ -17,7 +17,7 @@ obj
     ;
 
 pair
-    : STRING ':' value
+    : string ':' value
     ;
 
 arr
@@ -26,13 +26,25 @@ arr
     ;
 
 value
-    : STRING
-    | NUMBER
+    : string
+    | number
     | obj
     | arr
-    | 'true'
+    | literal
+    ;
+    
+literal
+    : 'true'
     | 'false'
     | 'null'
+    ;
+
+number
+	: NUMBER
+	;
+
+string
+    : STRING
     ;
 
 STRING

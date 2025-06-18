@@ -48,7 +48,7 @@ public class ARESTClient {
 				String rbody=null;
 				try {
 					rbody=response.getBody().getBodyText();
-					return Result.create(null,JSONUtils.parse(rbody));
+					return Result.create(null,JSONUtils.parseJSON5(rbody));
 				} catch (Exception e) {
 					if (rbody==null) rbody="<Body not readable as String>";
 					Result res= Result.error(ErrorCodes.FORMAT,"Can't parse JSON body: " +rbody);

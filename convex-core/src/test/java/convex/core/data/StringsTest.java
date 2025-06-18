@@ -256,7 +256,7 @@ public class StringsTest {
 		assertEquals(a, abs);
 
 		// JSON round trip as String
-		assertEquals(a, JSONUtils.parse(JSONUtils.toString(a)));
+		assertEquals(a, JSONUtils.parseJSON5(JSONUtils.toString(a)));
 
 		// JSON escape / unescape
 		assertEquals(a, JSONUtils.unescape(JSONUtils.escape(js).toString()));

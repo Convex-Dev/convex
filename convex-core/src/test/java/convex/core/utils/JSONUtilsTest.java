@@ -59,43 +59,53 @@ public class JSONUtilsTest {
 		assertEquals("\"CAST\"",JSONUtils.toString(ErrorCodes.CAST));
 
 	}
-	
+
+	@Test
+	public void parseStrict() {
+		assertNull(JSONUtils.parse("  null  "));
+		assertEquals(CVMLong.ONE,JSONUtils.parse("1"));
+		assertEquals(Strings.NULL,JSONUtils.parse("\"null\""));
+		
+		assertThrows(ParseException.class,()->JSONUtils.parse("[1,2,]"));
+		assertThrows(ParseException.class,()->JSONUtils.parse("[1,2] /*bar*/"));
+	}
+
 	@Test
 	public void testParse() {
-		assertNull(JSONUtils.parse("null"));
-		assertEquals(CVMBool.TRUE,JSONUtils.parse("true"));
-		assertEquals(CVMBool.FALSE,JSONUtils.parse("   false  "));
+		assertNull(JSONUtils.parseJSON5("null"));
+		assertEquals(CVMBool.TRUE,JSONUtils.parseJSON5("true"));
+		assertEquals(CVMBool.FALSE,JSONUtils.parseJSON5("   false  "));
 		
-		assertSame(Vectors.empty(),JSONUtils.parse("[]"));
-		assertEquals(Vectors.of(true,null),JSONUtils.parse("[true,null]"));
-		assertEquals(Vectors.of(1,2),JSONUtils.parse("[1,2]"));
+		assertSame(Vectors.empty(),JSONUtils.parseJSON5("[]"));
+		assertEquals(Vectors.of(true,null),JSONUtils.parseJSON5("[true,null]"));
+		assertEquals(Vectors.of(1,2),JSONUtils.parseJSON5("[1,2]"));
 		
-		assertSame(CVMLong.ONE,JSONUtils.parse("1"));
-		assertEquals(CVMDouble.ONE,JSONUtils.parse("1.0"));
+		assertSame(CVMLong.ONE,JSONUtils.parseJSON5("1"));
+		assertEquals(CVMDouble.ONE,JSONUtils.parseJSON5("1.0"));
 
-		assertEquals(Strings.NIL,JSONUtils.parse("\"nil\""));
+		assertEquals(Strings.NIL,JSONUtils.parseJSON5("\"nil\""));
 
-		assertSame(Maps.empty(),JSONUtils.parse("{}"));
-		assertSame(Maps.empty(),JSONUtils.parse("{ /* foo */ } /*bar*/ /*baz*/"));
-		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parse("{\"nil\": 1}"));
-		assertEquals(Maps.of(Strings.EMPTY,Vectors.empty()),JSONUtils.parse("{\"\": []}"));
+		assertSame(Maps.empty(),JSONUtils.parseJSON5("{}"));
+		assertSame(Maps.empty(),JSONUtils.parseJSON5("{ /* foo */ } /*bar*/ /*baz*/"));
+		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parseJSON5("{\"nil\": 1}"));
+		assertEquals(Maps.of(Strings.EMPTY,Vectors.empty()),JSONUtils.parseJSON5("{\"\": []}"));
 	
 		// Some errors
-		assertThrows(ParseException.class,()->JSONUtils.parse("[1 2]"));
-		assertThrows(ParseException.class,()->JSONUtils.parse("1,2"));
-		assertThrows(ParseException.class,()->JSONUtils.parse("{"));
-		assertThrows(ParseException.class,()->JSONUtils.parse("3]"));
-		assertThrows(ParseException.class,()->JSONUtils.parse("[,]"));
-		assertThrows(ParseException.class,()->JSONUtils.parse("{,}"));
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("[1 2]"));
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("1,2"));
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("{"));
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("3]"));
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("[,]"));
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("{,}"));
 		
 		// Trailing commas allowed
-		assertEquals(JSONUtils.parse("[3]"),JSONUtils.parse("[3,]"));
-		assertEquals(JSONUtils.parse("[1, 3]"),JSONUtils.parse("[1,3, ]"));
-		assertEquals(JSONUtils.parse("{\"foo\":1}"),JSONUtils.parse("{\"foo\":1,}"));
+		assertEquals(JSONUtils.parseJSON5("[3]"),JSONUtils.parseJSON5("[3,]"));
+		assertEquals(JSONUtils.parseJSON5("[1, 3]"),JSONUtils.parseJSON5("[1,3, ]"));
+		assertEquals(JSONUtils.parseJSON5("{\"foo\":1}"),JSONUtils.parseJSON5("{\"foo\":1,}"));
 
 
 		// Special cases
-		assertEquals(Strings.create("a\"b"),JSONUtils.parse("\"a\\\"b\""));
+		assertEquals(Strings.create("a\"b"),JSONUtils.parseJSON5("\"a\\\"b\""));
 
 	}
 	
@@ -133,27 +143,27 @@ public class JSONUtilsTest {
 	
 	@Test
 	public void testJSONComments() {
-		assertEquals(Vectors.of(true,null),JSONUtils.parse("[true, /* \n */ null]"));
-		assertEquals(RT.cvm(12),JSONUtils.parse("12 //foo"));
-		assertEquals(RT.cvm(12),JSONUtils.parse("//foo \n 12"));
-		assertEquals(RT.cvm(12),JSONUtils.parse("//foo /* \n 12"));
+		assertEquals(Vectors.of(true,null),JSONUtils.parseJSON5("[true, /* \n */ null]"));
+		assertEquals(RT.cvm(12),JSONUtils.parseJSON5("12 //foo"));
+		assertEquals(RT.cvm(12),JSONUtils.parseJSON5("//foo \n 12"));
+		assertEquals(RT.cvm(12),JSONUtils.parseJSON5("//foo /* \n 12"));
 
-		assertThrows(ParseException.class,()->JSONUtils.parse("/* 67")); // comment not closed
-		assertThrows(ParseException.class,()->JSONUtils.parse("//")); // no value
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("/* 67")); // comment not closed
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("//")); // no value
 		
 	}
 	
 	@Test
 	public void testJSONDoubles() {
-		assertEquals(CVMDouble.POSITIVE_INFINITY,JSONUtils.parse("Infinity"));
-		assertEquals(CVMDouble.POSITIVE_INFINITY,JSONUtils.parse("+Infinity"));
-		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parse("-Infinity"));
-		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parse(" -Infinity"));
-		assertEquals(CVMDouble.NaN,JSONUtils.parse(" NaN"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY,JSONUtils.parseJSON5("Infinity"));
+		assertEquals(CVMDouble.POSITIVE_INFINITY,JSONUtils.parseJSON5("+Infinity"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parseJSON5("-Infinity"));
+		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parseJSON5(" -Infinity"));
+		assertEquals(CVMDouble.NaN,JSONUtils.parseJSON5(" NaN"));
 
-		assertThrows(ParseException.class,()->JSONUtils.parse("- Infinity")); // space between
-		assertThrows(ParseException.class,()->JSONUtils.parse("Inf")); // not a JSON5 value
-		assertThrows(ParseException.class,()->JSONUtils.parse("NAN")); // incorrect ccase
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("- Infinity")); // space between
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("Inf")); // not a JSON5 value
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("NAN")); // incorrect ccase
 		
 	}
 	
@@ -190,6 +200,7 @@ public class JSONUtilsTest {
 		String js2=JSONUtils.toString(c);
 		assertEquals(js1.length(),js2.length()); // should be same length, orders might differ
 		
+		// Written JSON should be parseable as strict JSON
 		assertEquals(c,JSONUtils.parse(js1),()->"JSON="+js1);
 		assertEquals(c,JSONUtils.parse(js2));
 	}
