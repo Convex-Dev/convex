@@ -26,7 +26,6 @@ import convex.core.lang.Reader;
 import convex.core.util.Utils;
 import convex.gui.components.ActionPanel;
 import convex.gui.components.CodeLabel;
-import convex.gui.components.DefaultReceiveAction;
 import convex.gui.components.Toast;
 import convex.gui.models.OracleTableModel;
 import convex.gui.utils.Toolkit;
@@ -145,7 +144,8 @@ public class OraclePanel extends JPanel {
 	}
 
 	private void execute(ACell code) {
-		manager.transact(code).thenAcceptAsync(receiveAction);
+		manager.transact(code);
+		// TODO: show results?
 	}
 
 	private final Consumer<Result> createMarketAction = new Consumer<Result>() {
@@ -173,15 +173,13 @@ public class OraclePanel extends JPanel {
 		@Override
 		public void accept(Result t) {
 			if (t.isError()) {
-				handleError(RT.jvm(t.getID()),t.getErrorCode(),t.getValue());
+				handleError((long) RT.jvm(t.getID()),t.getErrorCode(),t.getValue());
 			} else {
 				handleResult(t.getValue());
 			}
 		}
 
 	};
-
-	private final DefaultReceiveAction receiveAction = new DefaultReceiveAction(scrollPane);
 
 	private void showError(Object code, Object msg) {
 		String resultString = "Error executing transaction: " + code + " "+msg;

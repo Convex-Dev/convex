@@ -20,6 +20,7 @@ import convex.core.data.Keyword;
 import convex.core.data.MapEntry;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -49,23 +50,24 @@ public class JSONUtils {
 	 * @param o Value to convert to JSON value object
 	 * @return Java Object which represents JSON value
 	 */
-	@SuppressWarnings("unchecked")
-	public static <T> T json(ACell o) {
+	public static Object json(ACell o) {
 		if (o == null)
 			return null;
 		if (o instanceof CVMLong)
-			return (T) (Long) ((CVMLong) o).longValue();
+			return ((CVMLong) o).longValue();
+		if (o instanceof CVMBigInteger)
+			return ((CVMBigInteger) o).big();
 		if (o instanceof CVMDouble)
-			return (T) (Double) ((CVMDouble) o).doubleValue();
+			return  ((CVMDouble) o).doubleValue();
 		if (o instanceof CVMBool)
-			return (T) (Boolean) ((CVMBool) o).booleanValue();
+			return  ((CVMBool) o).booleanValue();
 		if (o instanceof CVMChar)
-			return (T) ((CVMChar) o).toString();
+			return  ((CVMChar) o).toString();
 		if (o instanceof Address)
-			return (T) (Long) ((Address) o).longValue();
+			return (Long) ((Address) o).longValue();
 		if (o instanceof AMap) {
 			AMap<?, ?> m = (AMap<?, ?>) o;
-			return (T) JSONUtils.jsonMap(m);
+			return JSONUtils.jsonMap(m);
 		}
 		if (o instanceof ASequence) {
 			ASequence<?> seq = (ASequence<?>) o;
@@ -76,10 +78,10 @@ public class JSONUtils {
 				Object v = json(cvmv);
 				list.add(v);
 			}
-			return (T) list;
+			return list;
 		}
 
-		return (T) o.toString();
+		return o.toString();
 	}
 
 	/**
@@ -131,7 +133,7 @@ public class JSONUtils {
 	}
 
 	/**
-	 * Convert any object to JSON
+	 * Convert any object to a String containing valid JSON
 	 * 
 	 * @param value Value to convert to JSON, may be Java or CVM structure
 	 * @return Java String containing valid JSON String
@@ -319,6 +321,11 @@ public class JSONUtils {
 		
 		if (value instanceof CVMDouble nv) {
 			appendJSON(bb,nv.doubleValue());
+			return;
+		}
+		
+		if (value instanceof CVMBigInteger nv) {
+			bb.append(nv.toString());
 			return;
 		}
 		

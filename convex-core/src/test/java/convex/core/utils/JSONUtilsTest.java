@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +26,7 @@ import convex.core.data.Sets;
 import convex.core.data.StringShort;
 import convex.core.data.Strings;
 import convex.core.data.Vectors;
+import convex.core.data.prim.CVMBigInteger;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
@@ -63,15 +65,17 @@ public class JSONUtilsTest {
 	@Test
 	public void parseStrict() {
 		assertNull(JSONUtils.parse("  null  "));
+		assertEquals(CVMBool.TRUE,JSONUtils.parseJSON5("true"));
 		assertEquals(CVMLong.ONE,JSONUtils.parse("1"));
 		assertEquals(Strings.NULL,JSONUtils.parse("\"null\""));
+
+		assertEquals(Vectors.of(1,Maps.empty()),JSONUtils.parseJSON5("[1,{}]"));
+
 		
-		assertThrows(ParseException.class,()->JSONUtils.parse("[1,2,]"));
-		assertThrows(ParseException.class,()->JSONUtils.parse("[1,2] /*bar*/"));
 	}
 
 	@Test
-	public void testParse() {
+	public void testParseJSON5() {
 		assertNull(JSONUtils.parseJSON5("null"));
 		assertEquals(CVMBool.TRUE,JSONUtils.parseJSON5("true"));
 		assertEquals(CVMBool.FALSE,JSONUtils.parseJSON5("   false  "));
@@ -79,24 +83,25 @@ public class JSONUtilsTest {
 		assertSame(Vectors.empty(),JSONUtils.parseJSON5("[]"));
 		assertEquals(Vectors.of(true,null),JSONUtils.parseJSON5("[true,null]"));
 		assertEquals(Vectors.of(1,2),JSONUtils.parseJSON5("[1,2]"));
+
+		assertEquals(CVMLong.MAX_VALUE,JSONUtils.parseJSON5("9223372036854775807"));
+		assertEquals(CVMBigInteger.MIN_POSITIVE,JSONUtils.parseJSON5("9223372036854775808"));
+
 		
 		assertSame(CVMLong.ONE,JSONUtils.parseJSON5("1"));
 		assertEquals(CVMDouble.ONE,JSONUtils.parseJSON5("1.0"));
+		assertEquals(CVMDouble.create(-200.0),JSONUtils.parseJSON5("-.2e3"));
 
 		assertEquals(Strings.NIL,JSONUtils.parseJSON5("\"nil\""));
 
 		assertSame(Maps.empty(),JSONUtils.parseJSON5("{}"));
 		assertSame(Maps.empty(),JSONUtils.parseJSON5("{ /* foo */ } /*bar*/ /*baz*/"));
 		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parseJSON5("{\"nil\": 1}"));
+		assertEquals(Maps.of(Strings.NIL,1),JSONUtils.parseJSON5("{nil: 1}"));
 		assertEquals(Maps.of(Strings.EMPTY,Vectors.empty()),JSONUtils.parseJSON5("{\"\": []}"));
 	
 		// Some errors
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("[1 2]"));
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("1,2"));
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("{"));
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("3]"));
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("[,]"));
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("{,}"));
+		assertThrows(Exception.class,()->JSONUtils.parseJSON5("{foo:bar}")); // TODO: Why not ParseException?
 		
 		// Trailing commas allowed
 		assertEquals(JSONUtils.parseJSON5("[3]"),JSONUtils.parseJSON5("[3,]"));
@@ -161,10 +166,49 @@ public class JSONUtilsTest {
 		assertEquals(CVMDouble.NEGATIVE_INFINITY,JSONUtils.parseJSON5(" -Infinity"));
 		assertEquals(CVMDouble.NaN,JSONUtils.parseJSON5(" NaN"));
 
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("- Infinity")); // space between
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("Inf")); // not a JSON5 value
-		assertThrows(ParseException.class,()->JSONUtils.parseJSON5("NAN")); // incorrect ccase
 		
+	}
+	
+	/**
+	 * Tests that are valid in JSON5, but not regular JSON
+	 */
+	@Test public void testJSON5Only() {
+		checkJSON5Only("[1,2,]");
+		checkJSON5Only("[1,2] /*bar*/");
+
+	}
+	
+	@Test
+	public void testToString() {
+		assertEquals("-9223372036854775809",JSONUtils.toString(new BigInteger("-9223372036854775809")));
+		assertEquals("-9223372036854775809",JSONUtils.toString(CVMBigInteger.MIN_NEGATIVE));
+		
+	}
+	
+	/**
+	 * Tests for totally invalid JSON
+	 */
+	@Test public void testBadJSON() {
+		checkBadJSON5("[1 2]");
+		checkBadJSON5("1,2");
+		checkBadJSON5("{");
+		checkBadJSON5("3]");
+		checkBadJSON5("[,]");
+		checkBadJSON5("{,}");
+		
+		checkBadJSON5("- Infinity"); // space between
+		checkBadJSON5("Inf"); // not a JSON5 value
+		checkBadJSON5("NAN"); // incorrect ccase
+	}
+	
+	private void checkBadJSON5(String s) {
+		assertThrows(ParseException.class,()->JSONUtils.parseJSON5(s));
+		assertThrows(ParseException.class,()->JSONUtils.parse(s));
+	}
+
+	private void checkJSON5Only(String s) {
+		assertThrows(ParseException.class,()->JSONUtils.parse(s));
+		JSONUtils.parseJSON5(s);
 	}
 	
 	@Test
@@ -177,6 +221,7 @@ public class JSONUtilsTest {
 		doJSONRoundTrip(new ArrayList<Object>(),Vectors.empty());
 		doJSONRoundTrip(List.of(1,2),Vectors.of(1,2));
 		doJSONRoundTrip("hello",Strings.create("hello"));
+		doJSONRoundTrip(new BigInteger("-9223372036854775809"),CVMBigInteger.MIN_NEGATIVE);
 		doJSONRoundTrip("",Strings.EMPTY);
 		doJSONRoundTrip(true,CVMBool.TRUE);
 		
@@ -193,7 +238,7 @@ public class JSONUtilsTest {
 		assertEquals(c,roundTrip); 
 		
 		// c should also round trip via JVM equivalent, since we are using JSON subset
-		ACell roundTrip2=RT.cvm(RT.jvm(c));
+		ACell roundTrip2=RT.cvm((Object) RT.jvm(c));
 		assertEquals(c,roundTrip2); 
 		
 		String js1=JSONUtils.toString(o);

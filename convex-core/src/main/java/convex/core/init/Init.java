@@ -488,8 +488,8 @@ public class Init {
 		String symName = row.get(0).toString();
 		String name = row.get(1).toString();
 		String desc = row.get(2).toString();
-		double usdPrice = RT.jvm(row.get(6)); // Value in USD for currency, e.g. USD=1.0, GBP=1.3
-		long decimals = RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
+		double usdPrice = (Double) RT.jvm(row.get(6)); // Value in USD for currency, e.g. USD=1.0, GBP=1.3
+		long decimals = (Long) RT.jvm(row.get(5)); // Decimals for lowest currency unit, e.g. USD = 2
 		long usdValue=(Long) RT.jvm(row.get(4)); // USD value of liquidity in currency
 		
 		// number of sub-units in currency

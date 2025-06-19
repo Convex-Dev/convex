@@ -13,8 +13,6 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.AccountKey;
 import convex.core.data.Blob;
-import convex.core.data.Cells;
-import convex.core.data.Hash;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.SignedData;
@@ -175,30 +173,6 @@ public class Belief extends ARecordGeneric {
 	public Index<AccountKey, SignedData<Order>> getOrders() {
 		if (orders==null) orders=(Index<AccountKey, SignedData<Order>>) values.get(0);
 		return orders;
-	}
-	
-	@Override 
-	public boolean equals(ACell a) {
-		if (a instanceof Belief) return equals((Belief)a);
-		return super.equals(a);
-	}
-	
-	/**
-	 * Tests if this Belief is equal to another
-	 * @param a Belief to compare with
-	 * @return true if equal, false otherwise
-	 */
-	public boolean equals(Belief a) {
-		if (this == a) return true; // important optimisation for e.g. hashmap equality
-		if (a == null) return false;
-		Hash h=this.cachedHash();
-		if (h!=null) {
-			Hash ha=a.cachedHash();
-			if (ha!=null) return Cells.equals(h, ha);
-		}
-
-		if (!getOrders().equals(a.getOrders())) return false;
-		return true;
 	}
 
 	/**

@@ -1789,26 +1789,24 @@ public class RT {
 			return null;
 		if (o instanceof ACell)
 			return ((T) o);
-		if (o instanceof String)
-			return (T) Strings.create((String) o);
-		if (o instanceof Double)
-			return (T) CVMDouble.create(((Double) o));
-		if (o instanceof Number)
-			return (T) CVMLong.create(((Number) o).longValue());
-		if (o instanceof Character)
-			return (T) CVMChar.create((Character) o);
-		if (o instanceof Boolean)
-			return (T) CVMBool.create((Boolean) o);
-		if (o instanceof List) {
-			List<?> l = (List<?>) o;
+		if (o instanceof String s)
+			return (T) Strings.create(s);
+		if (o instanceof Double d)
+			return (T) CVMDouble.create(d);
+		if (o instanceof Number n)
+			return (T) ANumeric.fromNumber(n);
+		if (o instanceof Character c)
+			return (T) CVMChar.create(c);
+		if (o instanceof Boolean b)
+			return (T) CVMBool.create(b);
+		if (o instanceof List l) {
 			AVector<?> v = Vectors.empty();
 			for (Object val : l) {
 				v = v.conj(cvm(val));
 			}
 			return (T) v;
 		}
-		if (o instanceof Map) {
-			Map<?, ?> m = (Map<?, ?>) o;
+		if (o instanceof Map<?,?> m) {
 			AMap<ACell, ACell> cm = Maps.empty();
 			for (Map.Entry<?, ?> me : m.entrySet()) {
 				Object k = me.getKey();
@@ -1833,6 +1831,8 @@ public class RT {
 
 		throw new IllegalArgumentException("Can't convert to CVM type with class: " + Utils.getClassName(o));
 	}
+	
+
 
 	/**
 	 * Converts a CVM value to equivalent JVM value
@@ -1847,7 +1847,7 @@ public class RT {
 		if (o instanceof CVMLong)
 			return (T) (Long) ((CVMLong) o).longValue();
 		if (o instanceof CVMDouble)
-			return (T) (Double) ((CVMDouble) o).doubleValue();
+			return (T) (Double)  ((CVMDouble) o).doubleValue();
 		if (o instanceof CVMBool)
 			return (T) (Boolean) ((CVMBool) o).booleanValue();
 		if (o instanceof CVMChar)

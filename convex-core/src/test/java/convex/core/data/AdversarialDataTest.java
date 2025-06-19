@@ -173,6 +173,11 @@ public class AdversarialDataTest {
 	}
 	
 	@Test
+	public void testRegressions() throws BadFormatException {
+		invalidTest(Format.read("d401120090"));
+	}
+	
+	@Test
 	public void testDummy() {
 		invalidTest(Cells.DUMMY);
 		// TODO: full validation : invalidTest(Vectors.repeat(Cells.DUMMY, 4096));

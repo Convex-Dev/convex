@@ -87,6 +87,11 @@ public class BigIntegerTest {
 		doBigTest(bi);
 	}
 	
+	@Test public void testEdgeCaseBigInteger() {
+		BigInteger bi =new BigInteger("-9223372036854775809");
+		assertEquals(CVMBigInteger.create(bi),ANumeric.fromNumber(bi));
+	}
+	
 	@Test public void testMemorySize() {
 		int N=1000;
 		byte[] bs=new byte[N];

@@ -108,6 +108,13 @@ public class JSON5Reader {
 		}
 		
 		@Override
+		public void exitIdentifier(IdentifierContext ctx) {
+			String text=ctx.getText();
+			// no need to take substring, should be full identifier name
+			push(JSONUtils.unescape(text));
+		}
+		
+		@Override
 		public void enterObj(ObjContext ctx) {
 			pushList(); // We add a new ArrayList to the stack to capture values			
 		}

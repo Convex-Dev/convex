@@ -22,6 +22,11 @@ pair
     
 key
 	: string 
+	| identifier
+	;
+	
+identifier
+	: IDENTIFIER
 	;
 	
 // Note single training comma allowed after values
@@ -48,7 +53,7 @@ string
 
 // numbers allow extra IEEE754 values as per JSON5	
 number
-	: NUMBER | 'NaN' | 'Infinity' | '+Infinity' | '-Infinity';
+	: NUMBER | NUMERIC_LITERAL | '+Infinity' | '-Infinity';
 	
 nil
 	: 'null';
@@ -74,7 +79,43 @@ fragment SAFECODEPOINT
     ;
 
 NUMBER
-    : '-'? INT ('.' [0-9]+)? EXP?
+    : SYMBOL? INT ('.' [0-9]+)? EXP?
+    | SYMBOL? '.' [0-9]+ EXP?
+    ;
+    
+NUMERIC_LITERAL
+    : SYMBOL? 'Infinity'
+    | 'NaN'
+    ;
+    
+IDENTIFIER
+    : IDENTIFIER_START IDENTIFIER_PART*
+    ;
+
+fragment IDENTIFIER_START
+    : [\p{L}]
+    | '$'
+    | '_'
+    | '\\' UNICODE
+    ;
+
+fragment IDENTIFIER_PART
+    : IDENTIFIER_START
+    | [\p{M}]
+    | [\p{N}]
+    | [\p{Pc}]
+    | '\u200C'
+    | '\u200D'
+    ;
+    
+fragment SYMBOL
+    : '+'
+    | '-'
+    ;
+    
+fragment NEWLINE
+    : '\r\n'
+    | [\r\n\u2028\u2029]
     ;
 
 fragment INT
