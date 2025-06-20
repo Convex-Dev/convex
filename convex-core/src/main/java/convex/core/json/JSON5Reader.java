@@ -1,6 +1,7 @@
 package convex.core.json;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 
 import org.antlr.v4.runtime.CharStream;
@@ -133,6 +134,10 @@ public class JSON5Reader {
 	
 	public static ACell read(java.io.Reader r) throws IOException {
 		return read(CharStreams.fromReader(r));
+	}
+	
+	public static ACell read(InputStream is) throws IOException {
+		return read(CharStreams.fromStream(is));
 	}
 	
 	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();

@@ -1,6 +1,7 @@
 package convex.core.lang;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 import convex.core.cvm.Syntax;
 import convex.core.data.ACell;
@@ -59,6 +60,10 @@ public class Reader {
 		return AntlrReader.read(source);
 	}
 	
+	public static ACell read(InputStream stream) throws IOException {
+		return AntlrReader.read(stream);
+	}
+	
 	/**
 	 * Parses an expression and returns a canonical Cell representing a form
 	 * 
@@ -69,5 +74,7 @@ public class Reader {
 	public static <R extends ACell> R read(String source) {
 		return (R) AntlrReader.read(source);
 	}
+
+
 
 }

@@ -1,6 +1,7 @@
 package convex.core.lang.reader;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 
 import org.antlr.v4.runtime.CharStream;
@@ -387,6 +388,11 @@ public class AntlrReader {
 			pushList(); 
 		}
 	}
+	
+	public static ACell read(InputStream is) throws IOException {
+		return read(CharStreams.fromStream(is));
+	}
+
 
 	public static ACell read(String s) {
 		return read(CharStreams.fromString(s));
