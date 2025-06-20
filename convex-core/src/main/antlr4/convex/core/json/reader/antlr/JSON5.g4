@@ -53,7 +53,7 @@ string
 
 // numbers allow extra IEEE754 values as per JSON5	
 number
-	: NUMBER | NUMERIC_LITERAL | '+Infinity' | '-Infinity';
+	: NUMBER | NUMERIC_LITERAL;
 	
 nil
 	: 'null';
