@@ -1391,7 +1391,8 @@ public class RT {
 	 * @param keys  Key to look up in collection
 	 * @return Value from collection with the specified key, or null if not found / invalid path
 	 */
-	public static ACell getIn(ACell coll, Object... keys) {
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T getIn(ACell coll, Object... keys) {
 		ACell result=coll;
 		for (int i=0; i<keys.length; i++) {
 			if (result instanceof ADataStructure ds) {
@@ -1401,7 +1402,7 @@ public class RT {
 				return null;
 			}
 		}
-		return result;
+		return (T) result;
 	}
 	
 	public static ACell assocIn(ACell a, ACell value, Object... keys) {
