@@ -32,6 +32,7 @@ import convex.core.data.prim.CVMChar;
 import convex.core.data.prim.CVMDouble;
 import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
+import convex.core.json.JSONReader;
 import convex.core.lang.RT;
 import convex.core.util.JSONUtils;
 
@@ -146,6 +147,18 @@ public class JSONUtilsTest {
 		assertEquals(Maps.of("[\"\" 3]",4), RT.cvm(JSONUtils.json(Maps.of(Vectors.of("",3),4))));
 	}
 	
+	@Test 
+	public void testJSONObjects() {
+		assertEquals(Maps.of("1",2), JSONReader.read("{\"1\" : 2}"));
+		assertEquals(CVMLong.ONE,JSONReader.read("1"));
+		assertNull(JSONReader.read("  null"));
+		assertEquals(Strings.COLON,JSONReader.read("\":\""));
+		assertEquals(Vectors.of(1,2),JSONReader.read("[1,2]"));
+		
+		assertThrows(ParseException.class,()->JSONReader.readObject("[]")); // not an object
+
+	}
+	
 	@Test
 	public void testJSONComments() {
 		assertEquals(Vectors.of(true,null),JSONUtils.parseJSON5("[true, /* \n */ null]"));
@@ -248,6 +261,7 @@ public class JSONUtilsTest {
 		// Written JSON should be parseable as strict JSON
 		assertEquals(c,JSONUtils.parse(js1),()->"JSON="+js1);
 		assertEquals(c,JSONUtils.parse(js2));
+		assertEquals(c,JSONReader.read(js2));
 	}
 	
 }

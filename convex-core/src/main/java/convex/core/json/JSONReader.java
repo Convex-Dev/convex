@@ -3,6 +3,7 @@ package convex.core.json;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.NoSuchElementException;
 
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -10,6 +11,8 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 
 import convex.core.data.ACell;
+import convex.core.data.AMap;
+import convex.core.data.AString;
 import convex.core.data.Cells;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
@@ -23,6 +26,7 @@ import convex.core.json.reader.antlr.JSONParser;
 import convex.core.json.reader.antlr.JSONParser.*;
 import convex.core.lang.reader.ConvexErrorListener;
 import convex.core.util.JSONUtils;
+import convex.core.util.Utils;
 
 /**
  * Reader implementation for pure JSON
@@ -42,6 +46,7 @@ public class JSONReader {
 		 */
 		protected void push(ACell a) {
 			ArrayList<ACell> top=stack.getLast();
+			// System.err.println("pushed "+a);
 			top.add(a);
 		}
 		
@@ -49,16 +54,25 @@ public class JSONReader {
 		protected <R extends ACell> R pop() {
 			ArrayList<ACell> top=stack.getLast();
 			ACell cell=top.removeLast();
+			// System.err.println("popped "+cell);
 			return (R) cell;
 		}
 
 		protected void pushList() {
+			// System.err.println(stack);
 			stack.add(new ArrayList<>());
+			// System.err.println("pushed new list to make "+stack);
 		}
 			
 		protected ArrayList<ACell> popList() {
-			ArrayList<ACell> top=stack.removeLast();
-			return top;
+			try {
+				// System.err.println(stack);
+				ArrayList<ACell> top=stack.removeLast();
+				// System.err.println("popped list "+top+ "to make "+stack);
+				return top;
+			} catch (NoSuchElementException e) {
+				throw new ParseException("Fatal parsing error, no elements on stack");
+			}
 		}
 		
 		@Override 
@@ -100,7 +114,7 @@ public class JSONReader {
 					return;
 				}
 			} catch (Exception e) {
-				
+				// fall through to exception
 			}
 			throw new ParseException("Can't parse as number: "+num);
 		}
@@ -136,13 +150,34 @@ public class JSONReader {
 	public static ACell read(InputStream is) throws IOException {
 		return read(CharStreams.fromStream(is));
 	}
-
 	
+	public static AMap<AString,ACell> readObject(String s) {
+		return readObject(CharStreams.fromString(s));
+	}
+	
+	public static AMap<AString,ACell> readObject(java.io.Reader r) throws IOException {
+		return readObject(CharStreams.fromReader(r));
+	}
+	
+	public static AMap<AString,ACell> readObject(InputStream is) throws IOException {
+		return readObject(CharStreams.fromStream(is));
+	}
+
+	@SuppressWarnings("unchecked")
+	private static AMap<AString,ACell> readObject(CharStream fromStream) {
+		ACell a=read(fromStream);
+		if (a instanceof AMap object) {
+			return object;
+		}
+		throw new ParseException("Not a JSON object, got: "+Utils.getClassName(a));
+	}
+
+
 	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
 
 	
 	static JSONParser getParser(CharStream cs, JSONListener listener) {
-		// Create lexer and paser for the CharStream
+		// Create lexer and parser for the CharStream
 		JSONLexer lexer=new JSONLexer(cs);
 		lexer.removeErrorListeners();
 		lexer.addErrorListener(ERROR_LISTENER);
