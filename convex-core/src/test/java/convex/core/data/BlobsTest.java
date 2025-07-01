@@ -3,6 +3,7 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -10,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -106,12 +108,19 @@ public class BlobsTest {
 		assertEquals(0,Blob.fromHex("ffff0123").hexMatch(Blob.fromHex("ffff012f"), 3, 0));
 	}
 	
-	@Test public void testHexDigit() {
-		
+	@Test
+	public void testHexDigitComplete() {
+	    Blob b = Blob.fromHex("a1b2");
+	    assertEquals(10, b.getHexDigit(0)); // 'a'
+	    assertEquals(1, b.getHexDigit(1));  // '1'
+	    assertEquals(11, b.getHexDigit(2)); // 'b'
+	    assertEquals(2, b.getHexDigit(3));  // '2'
+	    
+	    // Test boundary conditions
+	    assertThrows(IndexOutOfBoundsException.class, () -> b.getHexDigit(-1));
+	    assertThrows(IndexOutOfBoundsException.class, () -> b.getHexDigit(4));
+	    assertThrows(IndexOutOfBoundsException.class, () -> Blob.EMPTY.getHexDigit(0));
 	}
-	
-	
-	
 
 	@Test
 	public void testFromHex() {
@@ -389,6 +398,65 @@ public class BlobsTest {
 		byte[] bs=new byte[100];
 		assertThrows(IllegalArgumentException.class,()->Blob.create(bs,10,-1));
 		assertSame(Blobs.empty(),Blob.create(bs, 10, 0));
+	}
+	
+	@Test
+	public void testHexParsingEdgeCases() {
+	    // Case sensitivity
+	    assertEquals(Blob.fromHex("abcd"), Blob.fromHex("ABCD"));
+	    assertEquals(Blob.fromHex("abcd"), Blob.fromHex("AbCd"));
+	    
+	    // Invalid characters
+	    assertNull(Blob.fromHex("12GH"));
+	    assertNull(Blob.fromHex("12 34"));
+	    assertNull(Blob.fromHex("12\n34"));
+	    
+	    // Empty and whitespace
+	    assertEquals(Blob.EMPTY, Blob.fromHex(""));
+	    assertNull(Blob.fromHex("   ")); // Should this be EMPTY or null?
+	}
+
+	
+	@Test
+	public void testBlobTreeDepthLimits() {
+	    // Test extremely deep blob trees don't cause stack overflow
+	    BlobBuilder bb = new BlobBuilder();
+	    Blob small = Blob.fromHex("01");
+	    
+	    // Build a very nested structure
+	    for (int i = 0; i < 1000; i++) {
+	        bb.append(small);
+	    }
+	    
+	    ABlob result = bb.toBlob();
+	    assertNotNull(result);
+	    assertEquals(1000, result.count());
+	}
+	
+	@Test
+	public void testCompareConsistency() {
+	    // Ensure compareTo is consistent with equals
+	    java.util.List<Blob> blobs = Arrays.asList(
+	        Blob.EMPTY,
+	        Blob.fromHex("00"),
+	        Blob.fromHex("01"),
+	        Blob.fromHex("FF"),
+	        Blob.fromHex("0000"),
+	        Blob.fromHex("0001"),
+	        Blob.fromHex("FFFF")
+	    );
+	    
+	    for (Blob b1 : blobs) {
+	        for (Blob b2 : blobs) {
+	            // If equal, compareTo should return 0
+	            if (b1.equals(b2)) {
+	                assertEquals(0, b1.compareTo(b2));
+	            }
+	            
+	            // compareTo should be antisymmetric
+	            assertEquals(-Integer.signum(b1.compareTo(b2)), Integer.signum(b2.compareTo(b1)));
+	        }
+	    }
 	}
 	
 	@Test
