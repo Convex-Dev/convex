@@ -121,7 +121,7 @@ public class JSONReader {
 		
 		@Override
 		public void exitString(StringContext ctx) {
-			String text=ctx.getText();
+			String text=ctx.getStart().getText();
 			String content=text.substring(1, text.length()-1);
 			push(JSONUtils.unescape(content));
 		}

@@ -35,6 +35,18 @@ public abstract class ANumeric extends APrimitive implements Comparable<ANumeric
 	 * @return Signum of the numeric value
 	 */
 	public abstract APrimitive signum();
+	
+	/**
+	 * Returns true if this numeric value is negative. Note zero and NaN are not negative
+	 * @return true if negative
+	 */
+	public abstract boolean isNegative();
+
+	/**
+	 * Returns true if this numeric value is positive. Note zero and NaN are not positive
+	 * @return true if negative
+	 */
+	public abstract boolean isPositive();
 
 
 	/**

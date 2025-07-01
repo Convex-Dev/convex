@@ -453,6 +453,16 @@ public final class CVMLong extends AInteger {
 		return true;
 	}
 
+	@Override
+	public boolean isNegative() {
+		return value<0;
+	}
+
+	@Override
+	public boolean isPositive() {
+		return value>0;
+	}
+
 
 
 }

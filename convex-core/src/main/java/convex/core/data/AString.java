@@ -125,6 +125,11 @@ public abstract class AString extends ABlobLike<CVMChar> {
 		return toBlob().getBytes(dest, destOffset);
 	}
 	
+	/**
+	 * Returns the Java String representing the UTF-8 content of this AString
+	 * 
+	 * NOTE: this is not round-trippable through the CVX Reader, intended for output purposes only.
+	 */
 	@Override 
 	public String toString() {
 		int n=Utils.checkedInt(count());

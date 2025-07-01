@@ -146,6 +146,16 @@ public final class CVMBigInteger extends AInteger {
 		if (data!=null) return CVMLong.forSignum(data.signum());
 		return CVMLong.forSignum(blob.byteAt(0));
 	}
+	
+	@Override
+	public boolean isNegative() {
+		return signum().equals(CVMLong.MINUS_ONE);
+	}
+
+	@Override
+	public boolean isPositive() {
+		return signum().equals(CVMLong.ONE);
+	}
 
 	@Override
 	public int estimatedEncodingSize() {
@@ -429,6 +439,8 @@ public final class CVMBigInteger extends AInteger {
 	public boolean isLong() {
 		return !isCanonical();
 	}
+
+
 
 
 

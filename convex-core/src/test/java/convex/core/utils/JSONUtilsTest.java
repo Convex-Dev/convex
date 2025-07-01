@@ -155,6 +155,8 @@ public class JSONUtilsTest {
 		assertEquals(Strings.COLON,JSONReader.read("\":\""));
 		assertEquals(Vectors.of(1,2),JSONReader.read("[1,2]"));
 		
+		JSONReader.read("{\"a\":[{\"b\":\"c\"},2]}");
+		
 		assertThrows(ParseException.class,()->JSONReader.readObject("[]")); // not an object
 
 	}
