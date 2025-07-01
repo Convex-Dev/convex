@@ -213,6 +213,18 @@ public class BlobBuilder {
 		return this;
 	}
 	
+	public BlobBuilder appendRepeatedByte(byte b, long count) {
+		int spare=spare();
+		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
+		ensureArray(arrayPos()+1);
+		tail[Blob.CHUNK_LENGTH-spare]=b;
+		count+=1;
+		if (spare==1) {
+			completeChunk();
+		}
+		return this;
+	}
+	
 	public void append(byte[] bs) {
 		append(bs,0,bs.length);
 	}

@@ -12,26 +12,25 @@ import convex.core.util.Utils;
 /**
  * General purpose immutable wrapper for byte array data.
  * 
- * Can be encoded fully as a single Cell if 4096 bytes or less, otherwise needs to be
- * structures as a BlobTree.
+ * Can be encoded fully as a single Cell if 4096 bytes or less, otherwise needs
+ * to be structures as a BlobTree.
  * 
- * Encoding format is:
- * - Tag.BLOB tag byte
- * - VLC encoded Blob length in bytes (one or two bytes describing a length in range 0..4096)
- * - Byte data of the given length
+ * Encoding format is: - Tag.BLOB tag byte - VLC encoded Blob length in bytes
+ * (one or two bytes describing a length in range 0..4096) - Byte data of the
+ * given length
  */
 public class Blob extends AArrayBlob {
 	public static final Blob EMPTY = Cells.intern(wrap(Utils.EMPTY_BYTES));
-	public static final Blob SINGLE_ZERO = Cells.intern(wrap(new byte[] {0}));
-	public static final Blob SINGLE_ONE = Cells.intern(wrap(new byte[] {1}));
-	public static final Blob SINGLE_A =wrap(new byte[] {0x41});
+	public static final Blob SINGLE_ZERO = Cells.intern(wrap(new byte[] { 0 }));
+	public static final Blob SINGLE_ONE = Cells.intern(wrap(new byte[] { 1 }));
+	public static final Blob SINGLE_A = wrap(new byte[] { 0x41 });
 
-	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] {Tag.NULL});
-	
+	public static final Blob NULL_ENCODING = Blob.wrap(new byte[] { Tag.NULL });
+
 	public static final int CHUNK_LENGTH = 4096;
-	
-	private static final byte[] EMPTY_CHUNK_BYTES=new byte[CHUNK_LENGTH];
- 	
+
+	private static final byte[] EMPTY_CHUNK_BYTES = new byte[CHUNK_LENGTH];
+
 	public static final Blob EMPTY_CHUNK = Cells.intern(wrap(EMPTY_CHUNK_BYTES));
 
 	private Blob(byte[] bytes, int offset, int length) {
@@ -41,14 +40,15 @@ public class Blob extends AArrayBlob {
 	/**
 	 * Creates a new Blob using a copy of the specified byte range
 	 * 
-	 * @param data Byte array
+	 * @param data   Byte array
 	 * @param offset Start offset in the byte array
 	 * @param length Number of bytes to take from data array
 	 * @return The new Data object
 	 */
 	public static Blob create(byte[] data, int offset, int length) {
 		if (length <= 0) {
-			if (length == 0) return EMPTY;
+			if (length == 0)
+				return EMPTY;
 			throw new IllegalArgumentException(ErrorMessages.negativeLength(length));
 		}
 		byte[] store = Arrays.copyOfRange(data, offset, offset + length);
@@ -64,7 +64,7 @@ public class Blob extends AArrayBlob {
 	public static Blob create(byte[] data) {
 		return create(data, 0, data.length);
 	}
-	
+
 	/**
 	 * Parses String input as a Blob. Converts from hex.
 	 * 
@@ -72,8 +72,9 @@ public class Blob extends AArrayBlob {
 	 * @return Blob with the same byte contents as the given array
 	 */
 	public static Blob parse(String data) {
-		ABlob b=Blobs.parse(data);
-		if (b==null) return null;
+		ABlob b = Blobs.parse(data);
+		if (b == null)
+			return null;
 		return b.toFlatBlob();
 	}
 
@@ -94,21 +95,23 @@ public class Blob extends AArrayBlob {
 	 * directly. Use only if no other references to the byte array are kept which
 	 * might be mutated.
 	 * 
-	 * @param data Byte array
+	 * @param data   Byte array
 	 * @param offset Offset into byte array
 	 * @param length Length of byte array to wrap
 	 * @return Blob wrapping the given byte array segment
 	 */
 	public static Blob wrap(byte[] data, int offset, int length) {
-		if (length < 0) throw new IllegalArgumentException(ErrorMessages.negativeLength(length));
+		if (length < 0)
+			throw new IllegalArgumentException(ErrorMessages.negativeLength(length));
 		if ((offset < 0) || (offset + length > data.length))
-			throw new IndexOutOfBoundsException(ErrorMessages.badRange(offset, offset+length));
-		if (length==0) return Blob.EMPTY;
-		Blob b= new Blob(data, offset, length);
-		
+			throw new IndexOutOfBoundsException(ErrorMessages.badRange(offset, offset + length));
+		if (length == 0)
+			return Blob.EMPTY;
+		Blob b = new Blob(data, offset, length);
+
 		// optimisation to re-use Blob encoding if present
-		if ((offset>=2)&&(length<128)&&(data[offset-1]==(byte)length)&&(data[offset-2]==Tag.BLOB)) {
-			b.attachEncoding(Blob.wrap(data,offset-2,length+2));
+		if ((offset >= 2) && (length < 128) && (data[offset - 1] == (byte) length) && (data[offset - 2] == Tag.BLOB)) {
+			b.attachEncoding(Blob.wrap(data, offset - 2, length + 2));
 		}
 		return b;
 	}
@@ -120,17 +123,17 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public Blob slice(long start, long end) {
-		if (start < 0) return null;
+		if (start < 0) return null; 
 		if (end > this.count) return null;
-		long length=end-start;
-		int size=(int)length;
-		if (size!=length) return null; // int overflow, too big for valid Blob slice!
+		long length = end - start;
+		int size = (int) length;
+		if (size != length) return null; // int overflow, i.e. too big for valid Blob slice!
 		if (length < 0) return null;
 		if (length == 0) return EMPTY;
-		if (length==this.count) return this;
+		if (length == this.count) return this;
 		return Blob.wrap(store, Utils.checkedInt(start + offset), size);
 	}
-	
+
 	@Override
 	public Blob slice(long start) {
 		return slice(start, count());
@@ -138,21 +141,25 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public boolean equals(ABlob a) {
-		if (a==this) return true;
-		if (a instanceof AArrayBlob) return equals((AArrayBlob) a);
-		long n=count();
-		if (a.count()!=n) return false;
-		if (!(a.getType()==Types.BLOB)) return false;
-		if (n<=CHUNK_LENGTH) {
+		if (a == this)
+			return true;
+		if (a instanceof AArrayBlob)
+			return equals((AArrayBlob) a);
+		long n = count();
+		if (a.count() != n)
+			return false;
+		if (!(a.getType() == Types.BLOB))
+			return false;
+		if (n <= CHUNK_LENGTH) {
+			// Fast byte comparison, this is the normal fast path
 			return a.equalsBytes(this.store, this.offset);
 		} else {
-			// this must be a non-canonical Blob
+			// this must be a non-canonical Blob, i.e. bigger than CHUNK_LENGTH
 			// we coerce encoding, since might have hash, and probably needed anyway
+			// Expensive encoding might happen, but at least this gets cached
 			return getEncoding().equals(a.getEncoding());
 		}
 	}
-
-
 
 	/**
 	 * Constructs a Blob object from a hex string
@@ -161,14 +168,16 @@ public class Blob extends AArrayBlob {
 	 * @return Blob with the provided hex value, or null if not a valid blob
 	 */
 	public static Blob fromHex(String hexString) {
-		byte[] bs=Utils.hexToBytes(hexString);
-		if (bs==null) return null;
-		if (bs.length==0) return EMPTY;
+		byte[] bs = Utils.hexToBytes(hexString);
+		if (bs == null)
+			return null;
+		if (bs.length == 0)
+			return EMPTY;
 		return wrap(bs);
 	}
-	
+
 	public static Blob forByte(byte b) {
-		return wrap(new byte[] {b});
+		return wrap(new byte[] { b });
 	}
 
 	/**
@@ -184,34 +193,35 @@ public class Blob extends AArrayBlob {
 		return Blob.wrap(bs);
 	}
 
-
-
 	/**
-	 * Fast read of a Blob from its encoding inside another Blob object.
-	 * Assumes count is correct at start of encoding (pos+1)
+	 * Fast read of a Blob from its encoding inside another Blob object. Assumes
+	 * count is correct at start of encoding (pos+1)
 	 * 
 	 * @param source Source Blob object.
-	 * @param pos Position in source to start reading from (location of tag byte)
-	 * @param count Length in bytes to take from the source Blob
+	 * @param pos    Position in source to start reading from (location of tag byte)
+	 * @param count  Length in bytes to take from the source Blob
 	 * @return Blob read from the source
 	 * @throws BadFormatException If encoding is invalid
 	 */
 	public static Blob read(Blob source, int pos, long count) throws BadFormatException {
-		if (count==0) return EMPTY; // important! Don't want to allocate new empty Blobs or mess with EMPTY encoding
-		if (count>CHUNK_LENGTH) throw new BadFormatException("Trying to read flat blob with count = " +count);
-		
+		if (count == 0)
+			return EMPTY; // important! Don't want to allocate new empty Blobs or mess with EMPTY encoding
+		if (count > CHUNK_LENGTH)
+			throw new BadFormatException("Trying to read flat blob with count = " + count);
+
 		// compute data length, excluding tag and encoded length
 		int headerLength = (1 + Format.getVLQCountLength(count));
-		long start = pos+ headerLength;
-		if (start+count>source.count()) {
+		long start = pos + headerLength;
+		if (start + count > source.count()) {
 			throw new BadFormatException("Insufficient bytes to read Blob required count =" + count);
 		}
 
-		Blob result= source.slice(start , start+count);
-		if (result==null) throw new IllegalArgumentException("Failed to slice Blob source");
-		if (source.byteAtUnchecked(pos)==Tag.BLOB) {
+		Blob result = source.slice(start, start + count);
+		if (result == null)
+			throw new IllegalArgumentException("Failed to slice Blob source");
+		if (source.byteAtUnchecked(pos) == Tag.BLOB) {
 			// Only attach encoding if we were reading a genuine Blob
-			result.attachEncoding(source.slice(pos,pos+(headerLength+count)));
+			result.attachEncoding(source.slice(pos, pos + (headerLength + count)));
 		}
 		return result;
 	}
@@ -222,22 +232,21 @@ public class Blob extends AArrayBlob {
 			// We aren't canonical, so need to encode canonical representation
 			return getCanonical().encodeRaw(bs, pos);
 		} else {
-			pos=super.encodeRaw(bs,pos);
+			pos = super.encodeRaw(bs, pos);
 			return pos;
 		}
 	}
-	
+
 	@Override
 	public int estimatedEncodingSize() {
 		// space for tag, generous VLC length, plus raw data
 		return 1 + Format.MAX_VLQ_LONG_LENGTH + size();
 	}
-	
+
 	/**
 	 * Maximum encoding size for a regular Blob
 	 */
-	public static final int MAX_ENCODING_LENGTH=1+Format.getVLQCountLength(CHUNK_LENGTH)+CHUNK_LENGTH;
-
+	public static final int MAX_ENCODING_LENGTH = 1 + Format.getVLQCountLength(CHUNK_LENGTH) + CHUNK_LENGTH;
 
 	@Override
 	public boolean isCanonical() {
@@ -259,21 +268,22 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public Blob getChunk(long i) {
-		if ((i == 0) && (count <= CHUNK_LENGTH)) return this;
+		if ((i == 0) && (count <= CHUNK_LENGTH))
+			return this;
 		long start = i * CHUNK_LENGTH;
-		long take=Math.min(CHUNK_LENGTH, count - start);
-		return slice(start, start+take);
+		long take = Math.min(CHUNK_LENGTH, count - start);
+		return slice(start, start + take);
 	}
 
 	public void attachContentHash(Hash hash) {
-		if (contentHash==null) contentHash = hash;
+		if (contentHash == null) contentHash = hash;
 	}
 
 	@Override
 	public ABlob toCanonical() {
-		if (isCanonical()) return this;
+		if (isCanonical())
+			return this;
 		return Blobs.toCanonical(this);
 	}
-	
 
 }
