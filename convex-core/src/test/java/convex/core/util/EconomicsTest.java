@@ -9,6 +9,8 @@ import java.text.DecimalFormat;
 
 import org.junit.jupiter.api.Test;
 
+import convex.core.util.Economics;
+
 public class EconomicsTest {
 
 	@Test

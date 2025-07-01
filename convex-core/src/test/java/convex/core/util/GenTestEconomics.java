@@ -10,6 +10,9 @@ import org.junit.runner.RunWith;
 import com.pholser.junit.quickcheck.Property;
 import com.pholser.junit.quickcheck.runner.JUnitQuickcheck;
 
+import convex.core.util.Economics;
+import convex.core.util.Utils;
+
 @RunWith(JUnitQuickcheck.class)
 public class GenTestEconomics {
 

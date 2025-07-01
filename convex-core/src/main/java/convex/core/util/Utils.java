@@ -1324,7 +1324,7 @@ public class Utils {
 	 * @param c Divisor
 	 * @return Result of (a*b)/c
 	 */
-	static long slowMulDiv(long a, long b, long c) {
+	public static long slowMulDiv(long a, long b, long c) {
 		// TODO: we want a faster version of this
 
 		BigInteger result=BigInteger.valueOf(a).multiply(BigInteger.valueOf(b)).divide(BigInteger.valueOf(c));

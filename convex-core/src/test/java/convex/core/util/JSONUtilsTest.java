@@ -1,4 +1,4 @@
-package convex.core.utils;
+package convex.core.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -34,7 +34,6 @@ import convex.core.data.prim.CVMLong;
 import convex.core.exceptions.ParseException;
 import convex.core.json.JSONReader;
 import convex.core.lang.RT;
-import convex.core.util.JSONUtils;
 
 public class JSONUtilsTest {
 
@@ -119,6 +118,11 @@ public class JSONUtilsTest {
 	public void testEscape() {
 		assertEquals("\\n",JSONUtils.escape("\n").toString());
 		assertEquals(StringShort.create(" \\\""),JSONUtils.escape(" \""));
+	}
+	
+	@Test
+	public void testPrettyJSON() {
+		assertEquals("{\n  \"foo\": \"bar\"\n}",JSONUtils.toJSONPretty(Maps.of("foo","bar")).toString());
 	}
 	
 	@Test
@@ -226,6 +230,8 @@ public class JSONUtilsTest {
 		JSONUtils.parseJSON5(s);
 	}
 	
+
+	
 	@Test
 	public void testJSONRoundTrips() {
 		
@@ -259,10 +265,13 @@ public class JSONUtilsTest {
 		String js1=JSONUtils.toString(o);
 		String js2=JSONUtils.toString(c);
 		assertEquals(js1.length(),js2.length()); // should be same length, orders might differ
-		
+
+		String jsp=JSONUtils.toJSONPretty(c).toString();
+
 		// Written JSON should be parseable as strict JSON
 		assertEquals(c,JSONUtils.parse(js1),()->"JSON="+js1);
 		assertEquals(c,JSONUtils.parse(js2));
+		assertEquals(c,JSONUtils.parse(jsp));
 		assertEquals(c,JSONReader.read(js2));
 	}
 	

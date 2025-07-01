@@ -171,6 +171,18 @@ public class JSONUtils {
 		appendJSON(bb, value);
 		return Strings.create(bb.toBlob());
 	}
+	
+	/**
+	 * Convert any object to JSON
+	 * 
+	 * @param value Value to convert to JSON, may be Java or CVM structure
+	 * @return CVM String containing valid JSON
+	 */
+	public static AString toJSONPretty(Object value) {
+		BlobBuilder bb = new BlobBuilder();
+		appendPrettyJSON(bb, RT.cvm(value),0);
+		return Strings.create(bb.toBlob());
+	}
 
 	private static void appendJSON(BlobBuilder bb, Object value) {
 		if (value == null) {
@@ -336,6 +348,80 @@ public class JSONUtils {
 		
 		throw new IllegalArgumentException("Can't print as JSON: "+Utils.getClassName(value));
 	}
+	
+	private static final int INDENT=2;
+	
+    private static BlobBuilder appendPrettyJSON(BlobBuilder sb, ACell o, int indent) {
+        if (o instanceof AMap) {
+            int entryIndent = indent + INDENT;
+            sb.append("{\n");
+            AMap<?, ?> m = ((AMap<?, ?>) o);
+            int size = m.size();
+            int pos = 0;
+            for (int i = 0; i < size; i++) {
+            	MapEntry<?,?> me=m.entryAt(i);
+                AString k = keyValue(me.getKey());
+                appendWhitespaceString(sb, entryIndent);
+                sb.append(toString(k));
+                sb.append(": ");
+                int vIndent = entryIndent + k.size() + 4; // indent for value
+                ACell v = me.getValue();
+                appendPrettyJSON(sb, v, vIndent);
+                pos++;
+                if (pos == size) {
+                    sb.append('\n'); // final entry
+                } else {
+                    sb.append(",\n"); // comma for next entry
+                }
+            }
+            appendWhitespaceString(sb, indent);
+            sb.append("}");
+        } else if (o instanceof ASequence) {
+        	ASequence<?> list = (ASequence<?>) o;
+            int size = list.size();
+            int entryIndent = indent + 1;
+            sb.append("[");
+            for (int i = 0; i < size; i++) {
+                if (i > 0) {
+                    sb.append(",\n");
+                    appendWhitespaceString(sb, entryIndent);
+                }
+                ACell v = list.get(i);
+                appendPrettyJSON(sb, v, entryIndent);
+            }
+            sb.append("]");
+        } else {
+            sb.append(toString(o));
+        }
+        return sb;
+    }
+    
+    /**
+     * Convert any CVM value into a JSON style key
+     * @param key
+     * @return
+     */
+    private static AString keyValue(ACell key) {
+		return RT.str(key);
+	}
+
+	private static final StringShort WHITESPACE=StringShort.create("                                ");
+    private static final long WHITESPACE_LENGTH=WHITESPACE.count();
+    /**
+     * Appends a whitespace string of the specified length.
+     *
+     * @param sb    StringBuilder to append the whitespace characters
+     * @param count Number of whitespace characters
+     * @return Updated StringBuilder
+     */
+    private static BlobBuilder appendWhitespaceString(BlobBuilder sb, long count) {
+        while (count > WHITESPACE_LENGTH) {
+            sb.append(WHITESPACE);
+            count -= WHITESPACE_LENGTH;
+        }
+        sb.append(WHITESPACE.slice(0, count));
+        return sb;
+    }
 
 
 	private static void appendCVMStringQuoted(BlobBuilder bb, CharSequence cs) {

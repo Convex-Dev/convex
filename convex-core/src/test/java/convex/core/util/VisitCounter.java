@@ -1,4 +1,4 @@
-package convex.core.utils;
+package convex.core.util;
 
 import java.util.function.Consumer;
 
