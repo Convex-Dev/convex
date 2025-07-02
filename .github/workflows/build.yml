@@ -30,5 +30,11 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           path: ~/.m2
           restore-keys: ${{ runner.os }}-m2
-      - name: Run tests
-        run: mvn clean test
+      - name: Install and run tests
+        run: mvn clean install
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: convex-jar
+          path: convex-integration/target/convex.jar # Path to the built .jar
+          retention-days: 7 # Optional: Set retention period
