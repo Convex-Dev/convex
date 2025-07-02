@@ -11,7 +11,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.Random;
 
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,7 @@ import convex.test.Samples;
 
 public class BlobsTest {
 	@Test public void testConstants() {
-		assertEquals(4096,Blob.CHUNK_LENGTH);
+		assertEquals(4096,Blob.CHUNK_LENGTH); // verify expected constant value of 4k
 		assertEquals(Blob.CHUNK_LENGTH,1<<Blobs.CHUNK_SHIFT);
 	}
 	
@@ -341,6 +340,20 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testSliceInvalidRanges() {
+	    Blob b = Blob.fromHex("0123456789");
+	    
+	    // start > end
+	    assertNull(b.slice(3, 2));
+	    
+	    // negative length implicitly
+	    assertNull(b.slice(5, 4));
+	    
+	    // valid edge case
+	    assertEquals(Blob.EMPTY, b.slice(3, 3));
+	}
+	
+	@Test
 	public void testBlobAppendSmall() {
 		ABlob src = Blob.fromHex("cafebabedeadbeef");
 		src=src.append(Blob.fromHex("f00d"));
@@ -434,9 +447,24 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testInstanceReuseOptimizations() {
+	    Blob b = Blob.fromHex("0123456789abcdef");
+	    
+	    // Full slice should return same instance
+	    assertSame(b, b.slice(0));
+	    assertSame(b, b.slice(0, b.count()));
+	    
+	    // Empty slices should return empty singleton
+	    assertSame(Blob.EMPTY, b.slice(5, 5));
+	    assertSame(Blob.EMPTY, b.slice(b.count()));
+	    	    
+	
+	}
+	
+	@Test
 	public void testCompareConsistency() {
 	    // Ensure compareTo is consistent with equals
-	    java.util.List<Blob> blobs = Arrays.asList(
+	    Blob[] blobs = new Blob[] {
 	        Blob.EMPTY,
 	        Blob.fromHex("00"),
 	        Blob.fromHex("01"),
@@ -444,18 +472,16 @@ public class BlobsTest {
 	        Blob.fromHex("0000"),
 	        Blob.fromHex("0001"),
 	        Blob.fromHex("FFFF")
-	    );
+	    };
 	    
 	    for (Blob b1 : blobs) {
 	        for (Blob b2 : blobs) {
 	            // If equal, compareTo should return 0
-	            if (b1.equals(b2)) {
-	                assertEquals(0, b1.compareTo(b2));
-	            }
 	            
 	            // compareTo should be antisymmetric
 	            assertEquals(-Integer.signum(b1.compareTo(b2)), Integer.signum(b2.compareTo(b1)));
 	        }
+	        doBlobTests(b1);
 	    }
 	}
 	
