@@ -32,8 +32,8 @@ public class Strings {
 	public static final StringShort BAD_FORMAT = StringShort.create("Bad Message Format!");
 	public static final StringShort SERVER_LOADED = StringShort.create("Trx overload");
 	
-	public static final StringShort COLON = StringShort.create(":");
-	public static final StringShort HEX_PREFIX = StringShort.create("0x");
+	public static final StringShort COLON = StringShort.intern(":");
+	public static final StringShort HEX_PREFIX = StringShort.intern("0x");
 
 	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
 

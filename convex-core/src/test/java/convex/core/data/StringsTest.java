@@ -218,6 +218,7 @@ public class StringsTest {
 		assertSame(s1,s2);
 		AString s3=Strings.intern(s1);
 		assertSame(s1,s3);
+		assertSame(s1.toFlatBlob(),s3.toFlatBlob());
 		
 		assertTrue(s1.getRef().isInternal());
 		
