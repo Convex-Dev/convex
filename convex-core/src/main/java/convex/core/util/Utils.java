@@ -723,7 +723,13 @@ public class Utils {
 		}
 	}
 	
-
+	/**
+	 * Gets a resource as a Stream.
+	 *
+	 * @param path Path to resource, e.g "/actors/token.cvx"
+	 * @return String content of resource file
+	 * @throws IOException If an IO error occurs
+	 */
 	public static InputStream getResourceAsStream(String path) throws IOException {
 		InputStream inputStream = Utils.class.getResourceAsStream(path);
 		if (inputStream == null) throw new IOException("Resource not found: " + path);

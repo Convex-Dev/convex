@@ -1,5 +1,8 @@
 package convex.core.data;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Random;
 
 import org.bouncycastle.util.Arrays;
@@ -67,6 +70,23 @@ public class Blobs {
 	 */
 	public static ABlob fromHex(AString a) {
 		return fromHex(a.toString());
+	}
+	
+	/**
+	 * Reads an InputStream as a canonical Blob.
+	 *
+	 * @param inputStream Stream of data to read as UTF-8 string
+	 * @return Blob content of stream
+	 * @throws IOException 
+	 */
+	public static ABlob fromStream(InputStream inputStream) throws IOException {
+		ABlob result=Blob.EMPTY;
+		while (true) {
+			byte[] bs=inputStream.readNBytes(Blob.CHUNK_LENGTH);
+			if (bs.length==0) break;
+			result=result.append(Blob.wrap(bs));
+		}
+		return result;
 	}
 	
 	/**

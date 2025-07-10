@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Random;
@@ -655,6 +656,22 @@ public class BlobsTest {
 		assertEquals(b,Blobs.parse(hex));
 		assertEquals(b,Blobs.parse(" 0x"+hex+" "));
 		assertEquals(b,Blobs.parse(" "+hex+" "));
+	}
+	
+	@Test
+	public void testBlobFromStream() throws IOException {
+		doBlobStreamTest(Blobs.empty());
+		doBlobStreamTest(Samples.SMALL_BLOB);
+		
+		doBlobStreamTest(Samples.FULL_BLOB);
+		doBlobStreamTest(Samples.FULL_BLOB_PLUS);
+	}
+
+	private void doBlobStreamTest(ABlob b) throws IOException {
+		byte[] bs=b.getBytes();
+		ByteArrayInputStream bis=new ByteArrayInputStream(bs);
+		ABlob r=Blobs.fromStream(bis);
+		assertEquals(b,r);
 	}
 
 	@Test
