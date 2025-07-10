@@ -18,6 +18,12 @@ import convex.core.data.Symbol;
  * Don't use this for anything sent in externally!
  */
 public class StringStore {
+	
+	
+	static HashMap<String,Entry> stringIndex=new HashMap<>();
+	
+	static HashMap<Blob,Entry> blobIndex=new HashMap<>();
+
 
 	public static class Entry {
 		String string=null;
@@ -73,10 +79,6 @@ public class StringStore {
 			return result;
 		}
 	}
-	
-	static HashMap<String,Entry> stringIndex=new HashMap<>();
-	
-	static HashMap<Blob,Entry> blobIndex=new HashMap<>();
 
 	
 	public static Entry get(String string) {

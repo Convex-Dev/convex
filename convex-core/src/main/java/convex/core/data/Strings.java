@@ -24,16 +24,19 @@ public class Strings {
 	
 	public static final Ref<StringShort> EMPTY_REF = EMPTY.getRef();
 	
-	public static final StringShort NIL = StringShort.create("nil");
-	public static final StringShort TRUE = StringShort.create(CVMBool.TRUE_STRING);
-	public static final StringShort FALSE = StringShort.create(CVMBool.FALSE_STRING);
+	public static final StringShort NIL = StringShort.intern("nil");
+	public static final StringShort TRUE = StringShort.intern(CVMBool.TRUE_STRING);
+	public static final StringShort FALSE = StringShort.intern(CVMBool.FALSE_STRING);
+	
+	public static final StringShort SPACE = StringShort.intern(" ");
+	public static final StringShort COLON = StringShort.intern(":");
+	public static final StringShort HEX_PREFIX = StringShort.intern("0x");
+
 	
 	public static final StringShort BAD_SIGNATURE = StringShort.create("Bad Signature!");
 	public static final StringShort BAD_FORMAT = StringShort.create("Bad Message Format!");
 	public static final StringShort SERVER_LOADED = StringShort.create("Trx overload");
 	
-	public static final StringShort COLON = StringShort.intern(":");
-	public static final StringShort HEX_PREFIX = StringShort.intern("0x");
 
 	public static final int MAX_ENCODING_LENGTH = Math.max(StringShort.MAX_ENCODING_LENGTH,StringTree.MAX_ENCODING_LENGTH);
 
@@ -70,7 +73,7 @@ public class Strings {
 
 	public static final StringShort FULL_BUFFER = StringShort.create("Buffer full");
 
-	public static final StringShort NULL = StringShort.create("null");
+	public static final StringShort NULL = StringShort.intern("null");
 
 	
 	public static final Comparator<AString> lengthComparator = (a,b)->{

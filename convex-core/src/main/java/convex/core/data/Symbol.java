@@ -1,7 +1,5 @@
 package convex.core.data;
 
-import java.util.WeakHashMap;
-
 import convex.core.data.impl.StringStore;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
@@ -36,8 +34,6 @@ public final class Symbol extends ASymbolic {
 	public AType getType() {
 		return Types.SYMBOL;
 	}
-	
-	protected static final WeakHashMap<AString,Symbol> cache=new WeakHashMap<>(100);
 
 	/**
 	 * Creates a Symbol with the given name
@@ -61,13 +57,7 @@ public final class Symbol extends ASymbolic {
 		if (!validateName(name)) return null;
 		
 		Symbol sym= new Symbol((StringShort)name);
-		
-		synchronized (cache) {
-			// TODO: figure out if caching Symbols is a net win or not
-			Symbol cached=cache.get(name);
-			if (cached!=null) return cached;
-			cache.put(name,sym);
-		}
+	
 
 		return sym;
 	}
