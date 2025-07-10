@@ -49,7 +49,7 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 		return name;
 	}
 
-	protected static boolean validateName(AString name) {
+	public static boolean validateName(AString name) {
 		if (name == null) return false;
 		long n = name.count();
 		if ((n < 1) || (n > (Constants.MAX_NAME_LENGTH))) {
@@ -115,6 +115,10 @@ public abstract class ASymbolic extends ABlobLike<CVMChar> {
 	@Override
 	public ABlob toBlob() {
 		return name.toBlob();
+	}
+	
+	public Blob toFlatBlob() {
+		return name.toFlatBlob();
 	}
 
 	@Override

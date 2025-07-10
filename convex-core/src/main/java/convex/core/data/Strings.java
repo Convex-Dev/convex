@@ -11,6 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 
 import convex.core.Constants;
+import convex.core.data.impl.StringStore;
 import convex.core.data.prim.CVMBool;
 import convex.core.data.prim.CVMChar;
 import convex.core.data.util.BlobBuilder;
@@ -140,13 +141,13 @@ public class Strings {
 		return create(o.toString());
 	}
 
-	public static <T extends AString> T intern(T value) {
-		return Cells.intern(value);
+	public static StringShort intern(AString value) {
+		return StringStore.intern(value);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public static <T extends AString> T intern(String value) {
-		return (T) intern(create(value));
+		return (T) StringStore.intern(value);
 	}
 	
 	public static AString create(CVMChar c) {

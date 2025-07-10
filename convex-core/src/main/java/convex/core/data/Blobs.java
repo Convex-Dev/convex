@@ -1,6 +1,5 @@
 package convex.core.data;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Random;

@@ -51,6 +51,15 @@ public final class StringShort extends AString {
 		super(length);
 		this.data = Blob.wrap(data, offset, length);
 	}
+	
+	/**
+	 * Creates a StringShort, wrapping a Blob. Warning: might not be valid UTF=8
+	 * @throws IllegalArgumentException if the wrapped Blob is too large for a StringShort
+	 */
+	public static StringShort wrap(Blob b) {
+		if (b.count()>MAX_LENGTH) throw new IllegalArgumentException("Invalid Blob length for StringShort");
+		return new StringShort(b);
+	}
 
 	/**
 	 * Creates a StringShort instance from a regular Java String
@@ -180,6 +189,10 @@ public final class StringShort extends AString {
 
 	@Override
 	public Blob toBlob() {
+		return data;
+	}
+	
+	public Blob toFlatBlob() {
 		return data;
 	}
 

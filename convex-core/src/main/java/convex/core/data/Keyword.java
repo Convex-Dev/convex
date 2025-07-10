@@ -1,6 +1,7 @@
 package convex.core.data;
 
 import convex.core.Constants;
+import convex.core.data.impl.StringStore;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -42,7 +43,25 @@ public final class Keyword extends ASymbolic {
 	 */
 	public static Keyword create(String name) {
 		if (name==null) return null;
+		StringStore.Entry e=StringStore.get(name);
+		if (e!=null) return e.getKeyword();
 		return create(Strings.create(name));
+	}
+	
+	/**
+	 * Creates a Keyword with the given name
+	 * 
+	 * @param name A String to use as the keyword name
+	 * @return The new Keyword, or null if the name is invalid for a Keyword
+	 */
+	public static Keyword create(AString name) {
+		if (name==null) return null;
+		StringStore.Entry e=StringStore.get(name);
+		if (e!=null) return e.getKeyword();
+		if (!validateName(name)) {
+			return null;
+		}
+		return new Keyword((StringShort)name);
 	}
 	
 	/**
@@ -62,13 +81,15 @@ public final class Keyword extends ASymbolic {
 		return null;
 	}
 	
+
+	
 	/**
 	 * Creates an interned Keyword. Use only for internal constants, won't get GC'd
 	 * @param name Symbolic name for keyword
 	 * @return Interned Keyword
 	 */
 	public static Keyword intern(String name) {
-		return Cells.intern(Keyword.create(name));
+		return Cells.intern(Keyword.create(Strings.intern(name)));
 	}
 	
 	/**
@@ -89,19 +110,7 @@ public final class Keyword extends ASymbolic {
 		return new Keyword(rawName);
 	}
 
-	/**
-	 * Creates a Keyword with the given name
-	 * 
-	 * @param name A String to use as the keyword name
-	 * @return The new Keyword, or null if the name is invalid for a Keyword
-	 */
-	public static Keyword create(AString name) {
-		if (name==null) return null;
-		if (!validateName(name)) {
-			return null;
-		}
-		return new Keyword((StringShort)name);
-	}
+
 
 	/**
 	 * Creates a Keyword with the given name, throwing an exception if name is not

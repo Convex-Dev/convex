@@ -2,6 +2,7 @@ package convex.core.data;
 
 import java.util.WeakHashMap;
 
+import convex.core.data.impl.StringStore;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
 import convex.core.data.util.BlobBuilder;
@@ -45,6 +46,8 @@ public final class Symbol extends ASymbolic {
 	 */
 	public static Symbol create(String name) {
 		if (name==null) return null;
+		StringStore.Entry e=StringStore.get(name);
+		if (e!=null) return e.getSymbol();
 		return create(Strings.create(name));
 	}
 
@@ -70,7 +73,12 @@ public final class Symbol extends ASymbolic {
 	}
 	
 	public static Symbol intern(AString name) {
-		Symbol sym=create(name);
+		Symbol sym=create(Strings.intern(name));
+		return Cells.intern(sym);
+	}
+	
+	public static Symbol intern(String name) {
+		Symbol sym=create(Strings.intern(name));
 		return Cells.intern(sym);
 	}
 	

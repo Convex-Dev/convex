@@ -3,11 +3,13 @@ package convex.core.data;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
 import convex.core.Constants;
+import convex.core.ErrorCodes;
 import convex.core.cvm.Keywords;
 import convex.core.cvm.Symbols;
 import convex.core.data.prim.CVMChar;
@@ -208,6 +210,18 @@ public class StringsTest {
 		assertEquals(0xabcdffff, s.intAt(4));
 		assertEquals(0xffffffff, s.intAt(6)); // 0xff beyond end of string
 		assertEquals(0xffffffff, s.intAt(-6)); // 0xff before start of string
+	}
+	
+	@Test public void testIntern() {
+		AString s1=Strings.intern("interned");
+		AString s2=Strings.intern("interned");
+		assertSame(s1,s2);
+		AString s3=Strings.intern(s1);
+		assertSame(s1,s3);
+		
+		assertTrue(s1.getRef().isInternal());
+		
+		assertSame(ErrorCodes.TIMEOUT,Keyword.create("TIMEOUT"));
 	}
 
 	@Test
