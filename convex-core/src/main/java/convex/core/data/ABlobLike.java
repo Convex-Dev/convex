@@ -135,6 +135,17 @@ public abstract class ABlobLike<T extends ACell> extends ACountable<T> implement
 	public String toHexString() {
 		return toHexString(Utils.checkedInt(hexLength()));
 	}
+	
+	/**
+	 * Converts this data object to a lowercase hex string representation
+	 * @return Hex String representation
+	 */
+	public AString toCVMHexString() {
+		BlobBuilder bb=new BlobBuilder();
+		long hl=hexLength();
+		appendHex(bb,hl);
+		return bb.getCVMString();
+	}
 
 	/**
 	 * Append hex string up to the given length in hex digits (a multiple of two)

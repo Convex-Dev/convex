@@ -100,6 +100,11 @@ public class BlobsTest {
 	}
 	
 	@Test
+	public void testHexString() {
+		assertEquals("0123",Blob.fromHex("0123").toCVMHexString().toString());
+	}
+	
+	@Test
 	public void testHexMatchLength() {
 		assertEquals(4,Blob.fromHex("0123").hexMatch(Blob.fromHex("0123"), 0, 4));
 		assertEquals(3,Blob.fromHex("0123").hexMatch(Blob.fromHex("012f"), 0, 4));
