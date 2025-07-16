@@ -1412,7 +1412,7 @@ public class RT {
 		ACell data=a;
 		for (int i = 0; i < n; i++) {
 			ADataStructure<?> struct = RT.ensureAssociative(data);  // nil-> empty map
-			if (struct == null) throw new IllegalArgumentException("Not a data structure at depth: "+i);
+			if (struct == null) throw new IllegalArgumentException("Not a data structure at depth: "+i+" found "+Utils.getClassName(data));
 			ass[i]=struct;
 			ACell k=RT.cvm(keys[i]);
 			ks[i]=k;
