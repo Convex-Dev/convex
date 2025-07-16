@@ -1,0 +1,54 @@
+;; Example of creating a fungible token
+
+;; SETUP
+;; As governance account e.g. #13
+;; This account can be any account but must have some Convex Coins to do the deployments / transfers etc.
+
+(import convex.asset :as asset)
+(import convex.fungible :as fun)
+
+;; The chancellor is the account doing the token creation and minting, i.e. the current *address*
+
+(def CHANCELLOR *address*)
+
+;; TOKEN GENENERATION AND DEPLOYMENT
+;; Create token code
+
+(def CPDC (deploy [(fun/build-token {:supply 0 :decimals 2 }) 
+                   (fun/add-mint {:minter *address* :max-supply 100000000000})
+                   `(set-controller #11)]))
+
+;; This will return a token address like #132
+;; We can verify that the balance is initially zero
+		
+(asset/balance CPDC)
+; => 0
+	
+;; We can verify the number of decimals £1 = 100 pennies i.e. 2 decimal places		
+		
+(fun/decimals CPDC)
+; => 2
+		
+;; we can now mint tokens e.g. £1000 = 100000 pennies (base unit)
+(asset/mint CPDC 100000)
+
+; => 100000
+		
+;; We now have the £1000 owned by the minter
+
+(asset/balance CPDC)
+; => 100000
+
+		
+;; Create accounts for other users
+
+(def PM (create-account 0x7aBC2204d9dA4399865da35D4A8472C0B812aeaa4B485C5B9ee6351bFEBD579F))
+(def HS (create-account 0x7aBC2204d9dA4399865da35D4A8472C0B812aeaa4B485C5B9ee6351bFEBD579F))
+
+;; Give them some Convex coins
+(transfer PM 1000000000)
+(transfer HS 1000000000)
+		
+;; Send some to a friend
+(asset/transfer PM [CPDC 2000])
+(asset/transfer HS [CPDC 2000])
