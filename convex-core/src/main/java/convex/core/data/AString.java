@@ -185,6 +185,15 @@ public abstract class AString extends ABlobLike<CVMChar> {
 	 * @return Specified substring
 	 */
 	public abstract AString slice(long start, long end);
+	
+	/**
+	 * Gets a slice of this string from the start position to the end
+	 * @param start Start index (inclusive)
+	 * @return Specified substring
+	 */
+	public AString slice(long start) {
+		return slice(start,count());
+	}
 
 	/**
 	 * Splits this string by the given character
