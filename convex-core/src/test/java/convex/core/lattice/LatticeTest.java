@@ -12,6 +12,13 @@ import convex.core.data.Maps;
 import convex.core.data.Sets;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.ALattice;
+import convex.lattice.CompareLattice;
+import convex.lattice.KeyedLattice;
+import convex.lattice.MapLattice;
+import convex.lattice.MaxLattice;
+import convex.lattice.SetLattice;
+import convex.lattice.SignedLattice;
 
 public class LatticeTest {
 	AKeyPair KP1 = AKeyPair.createSeeded(56756785);

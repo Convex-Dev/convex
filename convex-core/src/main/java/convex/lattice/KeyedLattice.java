@@ -1,4 +1,4 @@
-package convex.core.lattice;
+package convex.lattice;
 
 import java.util.ArrayList;
 

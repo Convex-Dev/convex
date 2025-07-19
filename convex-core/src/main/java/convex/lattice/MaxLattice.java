@@ -1,4 +1,4 @@
-package convex.core.lattice;
+package convex.lattice;
 
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;

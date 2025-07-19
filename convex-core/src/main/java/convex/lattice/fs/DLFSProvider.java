@@ -1,4 +1,4 @@
-package convex.dlfs;
+package convex.lattice.fs;
 
 import java.io.IOException;
 import java.net.URI;
@@ -24,8 +24,8 @@ import java.util.Map.Entry;
 import java.util.Set;
 
 import convex.core.util.SoftCache;
-import convex.dlfs.impl.DLDirectoryStream;
-import convex.dlfs.impl.DLFSLocal;
+import convex.lattice.fs.impl.DLDirectoryStream;
+import convex.lattice.fs.impl.DLFSLocal;
 
 /**
  * DLFS filesystem provider. Maintains a cache of file systems loaded on the current system.

@@ -1,11 +1,11 @@
-package convex.dlfs;
+package convex.lattice.fs;
 
 import java.nio.file.Path;
 import java.nio.file.ProviderMismatchException;
 
 import convex.core.data.AString;
 import convex.core.data.Strings;
-import convex.dlfs.impl.DLFSLocal;
+import convex.lattice.fs.impl.DLFSLocal;
 
 /**
  * Static API for DLFS

@@ -1,4 +1,4 @@
-package convex.dlfs;
+package convex.lattice.fs;
 
 import java.io.IOException;
 import java.nio.channels.SeekableByteChannel;
@@ -20,8 +20,8 @@ import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.Utils;
-import convex.dlfs.impl.DLDirectoryStream;
-import convex.dlfs.impl.DLFSFileAttributes;
+import convex.lattice.fs.impl.DLDirectoryStream;
+import convex.lattice.fs.impl.DLFSFileAttributes;
 
 /**
  * Base class for Data Lattice FileSystems.

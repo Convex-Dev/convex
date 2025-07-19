@@ -1,4 +1,4 @@
-package convex.dlfs.impl;
+package convex.lattice.fs.impl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -16,9 +16,9 @@ import convex.core.data.ACell;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
-import convex.dlfs.DLFSNode;
-import convex.dlfs.DLFileSystem;
-import convex.dlfs.DLPath;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLPath;
 
 public class DLFileChannel implements SeekableByteChannel {
 

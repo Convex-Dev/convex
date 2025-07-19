@@ -1,4 +1,4 @@
-package convex.dlfs.impl;
+package convex.lattice.fs.impl;
 
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.FileTime;
@@ -6,7 +6,7 @@ import java.nio.file.attribute.FileTime;
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
 import convex.core.data.AVector;
-import convex.dlfs.DLFSNode;
+import convex.lattice.fs.DLFSNode;
 
 public class DLFSFileAttributes implements BasicFileAttributes {
 

@@ -1,4 +1,4 @@
-package convex.dlfs;
+package convex.lattice.fs;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,6 +34,10 @@ import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Blobs;
 import convex.core.data.prim.CVMLong;
+import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLFSProvider;
+import convex.lattice.fs.DLFileSystem;
 
 public class DLFSTest {
 	

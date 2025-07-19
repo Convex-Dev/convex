@@ -14,12 +14,12 @@ import convex.api.Convex;
 import convex.core.cvm.State;
 import convex.core.crypto.AKeyPair;
 import convex.core.exceptions.InvalidDataException;
-import convex.dlfs.DLFileSystem;
 import convex.gui.dlfs.DLFSBrowser;
 import convex.gui.peer.PeerGUI;
 import convex.gui.repl.REPLClient;
 import convex.gui.tools.HackerTools;
 import convex.gui.utils.Toolkit;
+import convex.lattice.fs.DLFileSystem;
 import convex.peer.PeerException;
 import convex.peer.Server;
 

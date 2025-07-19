@@ -16,7 +16,7 @@ import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreePath;
 
-import convex.dlfs.DLFileSystem;
+import convex.lattice.fs.DLFileSystem;
 
 @SuppressWarnings("serial")
 public class DirectoryTree extends JTree {

@@ -8,7 +8,6 @@ import javax.swing.SwingConstants;
 
 import convex.api.Convex;
 import convex.core.crypto.wallet.AWalletEntry;
-import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.components.ConnectPanel;
 import convex.gui.components.Toast;
@@ -19,6 +18,7 @@ import convex.gui.panels.HomePanel;
 import convex.gui.peer.stake.PeerStakePanel;
 import convex.gui.utils.SymbolIcon;
 import convex.gui.utils.Toolkit;
+import convex.lattice.fs.DLFS;
 import net.miginfocom.swing.MigLayout;
 
 @SuppressWarnings("serial")

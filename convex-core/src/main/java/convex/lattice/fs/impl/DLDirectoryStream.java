@@ -1,4 +1,4 @@
-package convex.dlfs.impl;
+package convex.lattice.fs.impl;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -10,8 +10,8 @@ import convex.core.data.ACell;
 import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
-import convex.dlfs.DLFSNode;
-import convex.dlfs.DLPath;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLPath;
 
 public class DLDirectoryStream implements DirectoryStream<Path> {
 

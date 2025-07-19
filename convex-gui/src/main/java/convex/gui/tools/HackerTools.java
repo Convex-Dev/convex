@@ -11,12 +11,12 @@ import javax.swing.JTabbedPane;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import convex.dlfs.DLFS;
 import convex.gui.components.AbstractGUI;
 import convex.gui.dlfs.DLFSPanel;
 import convex.gui.keys.KeyGenPanel;
 import convex.gui.keys.KeyRingPanel;
 import convex.gui.utils.Toolkit;
+import convex.lattice.fs.DLFS;
 import net.miginfocom.swing.MigLayout;
 
 /**

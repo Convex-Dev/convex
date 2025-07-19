@@ -1,4 +1,4 @@
-package convex.dlfs.impl;
+package convex.lattice.fs.impl;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -19,11 +19,11 @@ import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
 import convex.core.data.prim.CVMLong;
-import convex.dlfs.DLFS;
-import convex.dlfs.DLFSNode;
-import convex.dlfs.DLFSProvider;
-import convex.dlfs.DLFileSystem;
-import convex.dlfs.DLPath;
+import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSNode;
+import convex.lattice.fs.DLFSProvider;
+import convex.lattice.fs.DLFileSystem;
+import convex.lattice.fs.DLPath;
 
 /**
  * Local DLFS Drive implementation

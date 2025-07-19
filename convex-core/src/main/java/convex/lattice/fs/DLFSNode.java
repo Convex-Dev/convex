@@ -1,4 +1,4 @@
-package convex.dlfs;
+package convex.lattice.fs;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;

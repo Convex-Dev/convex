@@ -1,4 +1,4 @@
-package convex.dlfs;
+package convex.lattice.fs;
 
 import java.io.IOException;
 import java.net.URI;

@@ -7,10 +7,10 @@ import java.net.URISyntaxException;
 
 import org.junit.jupiter.api.Test;
 
-import convex.dlfs.DLFS;
-import convex.dlfs.DLFSProvider;
-import convex.dlfs.DLFileSystem;
 import convex.gui.GUITest;
+import convex.lattice.fs.DLFS;
+import convex.lattice.fs.DLFSProvider;
+import convex.lattice.fs.DLFileSystem;
 
 public class DLFSGUITest {
 

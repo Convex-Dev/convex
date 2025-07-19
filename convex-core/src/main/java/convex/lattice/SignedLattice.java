@@ -1,4 +1,4 @@
-package convex.core.lattice;
+package convex.lattice;
 
 import convex.core.crypto.AKeyPair;
 import convex.core.data.ACell;
