@@ -1,6 +1,7 @@
 package convex.lattice;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -49,5 +50,15 @@ public class Root<V extends ACell> extends ACursor<V> {
 	@Override
 	public V updateAndGet(UnaryOperator<V> updateFunction) {
 		return value.updateAndGet(updateFunction);
+	}
+
+	@Override
+	public V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction) {
+		return value.getAndAccumulate(x,accumulatorFunction);
+	}
+
+	@Override
+	public V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction) {
+		return value.accumulateAndGet(x,accumulatorFunction);
 	}
 }

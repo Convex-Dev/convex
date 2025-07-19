@@ -30,5 +30,8 @@ public class CursorTest {
 		assertEquals(TWO,root.getAndUpdate(a->a.inc())); // value is now 3
 		assertCVMEquals(4,root.updateAndGet(a->a.inc())); // value is now 4;
 		
+		assertCVMEquals(4,root.getAndAccumulate(CVMLong.ONE,(a,b)->a.add(b))); // value is now 5;
+		assertCVMEquals(7,root.accumulateAndGet(TWO,(a,b)->a.add(b))); // value is now 7;
+
 	}
 }

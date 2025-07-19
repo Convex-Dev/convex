@@ -1,5 +1,6 @@
 package convex.lattice;
 
+import java.util.function.BinaryOperator;
 import java.util.function.UnaryOperator;
 
 import convex.core.data.ACell;
@@ -46,8 +47,11 @@ public abstract class ACursor<V extends ACell> {
 	
 	public abstract V getAndUpdate(UnaryOperator<V> updateFunction);
 	
-	
 	public abstract V updateAndGet(UnaryOperator<V> updateFunction);
+	
+	public abstract V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction);
+	
+	public abstract V accumulateAndGet(V x, BinaryOperator<V> accumulatorFunction);
 	
 	public String toString() {
 		V v=get();
