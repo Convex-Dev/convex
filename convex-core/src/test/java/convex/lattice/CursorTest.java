@@ -33,6 +33,12 @@ public class CursorTest {
 		doIntCursorTest(pc);
 	}
 	
+	@Test public void testDeepPathCursor() {
+		Root<AInteger> root=new Root<>();
+		PathCursor<AInteger> pc=new PathCursor<AInteger>(root,Symbols.FOO, Symbols.BAR);
+		doIntCursorTest(pc);
+	}
+	
 	@Test public void testVectorPathCursor() {
 		Root<AInteger> root=new Root<>();
 		PathCursor<AVector<AInteger>> vpc=new PathCursor<>(root,Symbols.BAR);
