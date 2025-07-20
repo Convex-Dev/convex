@@ -1405,6 +1405,27 @@ public class RT {
 		return (T) result;
 	}
 	
+	/**
+	 * Gets an element from a data structure using the given key path.
+	 * 
+	 * @param coll Collection to query
+	 * @param keys  Key to look up in collection
+	 * @return Value from collection with the specified key, or null if not found / invalid path
+	 */
+	@SuppressWarnings("unchecked")
+	public static <T extends ACell> T getIn(ACell coll, ACell... keys) {
+		ACell result=coll;
+		for (int i=0; i<keys.length; i++) {
+			if (result instanceof ADataStructure ds) {
+				ACell key=keys[i];
+				result=RT.get(ds,key);
+			} else {
+				return null;
+			}
+		}
+		return (T) result;
+	}
+	
 	public static ACell assocIn(ACell a, ACell value, Object... keys) {
 		int n=keys.length;
 		ADataStructure<?>[] ass=new ADataStructure[n];
@@ -1415,6 +1436,31 @@ public class RT {
 			if (struct == null) throw new IllegalArgumentException("Not a data structure at depth: "+i+" found "+Utils.getClassName(data));
 			ass[i]=struct;
 			ACell k=RT.cvm(keys[i]);
+			ks[i]=k;
+			data=struct.get(k);
+		}
+
+		for (int i = n-1; i >=0; i--) {
+			ADataStructure<?> struct=ass[i];
+			ACell k=ks[i];
+			value=RT.assoc(struct, k, value);
+			if (value==null) {
+				throw new IllegalArgumentException("Invalid structure for assocIn at depth "+i);
+			}
+		}
+		return value;
+	}
+	
+	public static ACell assocIn(ACell a, ACell value, ACell... keys) {
+		int n=keys.length;
+		ADataStructure<?>[] ass=new ADataStructure[n];
+		ACell[] ks=new ACell[n];
+		ACell data=a;
+		for (int i = 0; i < n; i++) {
+			ADataStructure<?> struct = RT.ensureAssociative(data);  // nil-> empty map
+			if (struct == null) throw new IllegalArgumentException("Not a data structure at depth: "+i+" found "+Utils.getClassName(data));
+			ass[i]=struct;
+			ACell k=keys[i];
 			ks[i]=k;
 			data=struct.get(k);
 		}

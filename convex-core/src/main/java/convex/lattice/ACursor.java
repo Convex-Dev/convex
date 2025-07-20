@@ -6,6 +6,13 @@ import java.util.function.UnaryOperator;
 import convex.core.data.ACell;
 import convex.core.lang.RT;
 
+/**
+ * A Lattice cursor is a mutable pointer into a CVM data structure.
+ * 
+ * Methods are modelled after java.util.concurrent.atomic.AtomicReference for consistency and logic
+ * 
+ * @param <V>
+ */
 public abstract class ACursor<V extends ACell> {
 
 	/**
@@ -48,6 +55,10 @@ public abstract class ACursor<V extends ACell> {
 	public abstract V getAndUpdate(UnaryOperator<V> updateFunction);
 	
 	public abstract V updateAndGet(UnaryOperator<V> updateFunction);
+	
+	public void update(UnaryOperator<V> updateFunction) {
+		getAndUpdate(updateFunction);
+	}
 	
 	public abstract V getAndAccumulate(V x, BinaryOperator<V> accumulatorFunction);
 	
