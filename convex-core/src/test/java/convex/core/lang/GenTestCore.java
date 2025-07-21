@@ -231,7 +231,7 @@ public class GenTestCore {
 		assertSame(CVMBool.create(a>b),RT.gt(args));
 		assertSame(CVMBool.create(a<=b),RT.le(args));
 		assertSame(CVMBool.create(a>=b),RT.ge(args));
-		assertSame(CVMBool.create(a==b),RT.eq(args));
+		assertSame(CVMBool.create(a.equals(b)),RT.eq(args));
 		// assertEquals(a!=b,RT.ne(args)); // TODO: do we need this?
 	}
 	

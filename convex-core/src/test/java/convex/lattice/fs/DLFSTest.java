@@ -3,6 +3,7 @@ package convex.lattice.fs;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -53,6 +54,7 @@ public class DLFSTest {
 		assertEquals("dlfs:/hello",p1.toUri().toString());
 		
 		Path p2=p1.getFileName();
+		assertNotNull(p2);
 		assertFalse(p2.isAbsolute());
 		assertEquals("hello",p2.toString());
 		

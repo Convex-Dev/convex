@@ -124,7 +124,7 @@ public class ListsTest {
 			assertSame(Lists.empty(), a);
 			
 			 // empty list shouldn't contain anything (including itself)
-			assertEquals(-1,a.indexOf(a));
+			assertEquals(-1,a.indexOf(Lists.empty()));
 			assertEquals(-1,a.lastIndexOf(null));
 		} else {
 			T first = a.get(0);

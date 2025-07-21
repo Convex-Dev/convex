@@ -296,15 +296,15 @@ public class Peer {
 	public ResultContext executeQuery(ACell form, Address address) {
 		State state=getConsensusState();
 
-		if (form instanceof ATransaction) {
-			return executeDetached((ATransaction)form);
+		if (form instanceof ATransaction tx) {
+			return executeDetached(tx);
 		}
 		
 		if (form instanceof SignedData) {
 			SignedData<?> sc=(SignedData<?>)form;
 			ACell val=sc.getValue();
-			if (form instanceof ATransaction) {
-				return executeDetached((ATransaction)val);
+			if (val instanceof ATransaction tx) {
+				return executeDetached(tx);
 			}
 		}
 		

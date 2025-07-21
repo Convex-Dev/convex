@@ -685,7 +685,7 @@ public class Utils {
 	 *                                  int
 	 */
 	public static long toLong(Object v) {
-		if (v instanceof Long) return (Integer) v;
+		if (v instanceof Long l) return l.longValue();
 		if (v instanceof String) {
 			try {
 				return Long.parseLong((String) v);

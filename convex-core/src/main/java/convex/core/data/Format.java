@@ -291,7 +291,7 @@ public class Format {
 	 */
 	public static long readVLQCount(byte[] data, int pos) throws BadFormatException {
 		byte octet = data[pos++];
-		if (octet==0x80) throw new BadFormatException("Superfluous leading zero on VLQ count");
+		if ((octet&0xff)==0x80) throw new BadFormatException("Superfluous leading zero on VLQ count");
 		long result = octet&0x7f;
 		int bits = 7;
 		while (vlqContinuesFrom(octet)) {

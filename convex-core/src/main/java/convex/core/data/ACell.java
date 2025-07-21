@@ -109,8 +109,10 @@ public abstract class ACell extends AObject implements IWriteable, IValidated {
 	@Override
 	public final boolean equals(Object a) {
 		if (a==this) return true; // Fast path, avoids cast
-		if (!(a instanceof ACell)) return false; // Handles null
-		return equals((ACell)a);
+		if (a instanceof ACell cell) {
+			return equals(cell);
+		}
+		return false; // not a cell, so can't be equal
 	}
 	
 	/**

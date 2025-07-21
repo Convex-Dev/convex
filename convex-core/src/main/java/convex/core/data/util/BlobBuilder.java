@@ -218,7 +218,7 @@ public class BlobBuilder {
 		if (spare<1) throw new Panic("BlobBuilder should always have spare bytes but was: "+spare);
 		ensureArray(arrayPos()+1);
 		tail[Blob.CHUNK_LENGTH-spare]=b;
-		count+=1;
+		this.count+=1;
 		if (spare==1) {
 			completeChunk();
 		}

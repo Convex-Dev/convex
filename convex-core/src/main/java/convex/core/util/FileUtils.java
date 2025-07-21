@@ -113,7 +113,7 @@ public class FileUtils {
 	 * @return File representing the given path
 	 */
 	public static File getFile(String path) {
-		if (path!=null && path.startsWith("~")) {
+		if (path.startsWith("~")) {
 			path=System.getProperty("user.home")+path.substring(1);
 			return new File(path);
 		} else {

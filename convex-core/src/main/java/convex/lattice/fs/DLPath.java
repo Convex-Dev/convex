@@ -339,6 +339,11 @@ public final class DLPath implements Path {
 		return equals((DLPath)other);
 	}
 	
+	@Override
+	public int hashCode() {
+		return toString().hashCode();
+	}
+	
 	public boolean equals(DLPath other) {
 		if (this==other) return true;
 		if (!other.fileSystem.equals(this.fileSystem)) return false;

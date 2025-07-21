@@ -15,7 +15,7 @@ public class Failure extends AThrowable {
 	
 	private static final Failure JUICE_FAILURE=new Failure(ErrorCodes.JUICE);
 	
-	protected Failure(Keyword code) {
+	private Failure(Keyword code) {
 		super(code);
 		
 	}
