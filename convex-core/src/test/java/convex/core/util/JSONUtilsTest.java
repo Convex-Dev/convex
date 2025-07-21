@@ -1,10 +1,12 @@
 package convex.core.util;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -230,7 +232,14 @@ public class JSONUtilsTest {
 		JSONUtils.parseJSON5(s);
 	}
 	
-
+	@Test 
+	public void testJSON5Example() throws IOException {
+		String json5=Utils.readString(Utils.getResourceAsStream("/utils/test.json5"));
+		
+		ACell cj=JSONUtils.parseJSON5(json5);
+		assertNotNull(cj);
+		
+	}
 	
 	@Test
 	public void testJSONRoundTrips() {

@@ -10,6 +10,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.atn.PredictionMode;
 
 import convex.core.data.ACell;
+import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
@@ -24,6 +25,9 @@ import convex.core.json.reader.antlr.JSON5Parser.*;
 import convex.core.lang.reader.ConvexErrorListener;
 import convex.core.util.JSONUtils;
 
+/**
+ * A reader implementation that parses JSON5 into CVM data types
+ */
 public class JSON5Reader {
 
 	protected static class JSONListener extends JSON5BaseListener {
@@ -82,10 +86,20 @@ public class JSON5Reader {
 		
 		@Override
 		public void exitNumber(NumberContext ctx) {
-			String num=ctx.getText();
+			String num=ctx.getStart().getText();
+			
+			// fast path is an integer
 			AInteger intv=AInteger.parse(num);
 			if (intv!=null) {
 				push(intv);
+				return;
+			}
+			
+			if (num.startsWith("0x")||num.startsWith("0X")) {
+				push(AInteger.parseHex(num.substring(2)));
+				return;
+			} else if (num.startsWith("-0x")||num.startsWith("-0X")) {
+				push(AInteger.parseHex(num.substring(3)).negate());	
 				return;
 			}
 			

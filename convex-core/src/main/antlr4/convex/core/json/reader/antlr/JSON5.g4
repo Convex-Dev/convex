@@ -59,11 +59,22 @@ nil
 	: 'null';
 
 STRING
-    : '"' (ESC | SAFECODEPOINT)* '"'
+	: '"' DOUBLE_QUOTE_CHAR* '"'
+	| '\'' SINGLE_QUOTE_CHAR* '\''
+	;
+
+fragment DOUBLE_QUOTE_CHAR
+    : ~["\\\r\n]
+    | ESC
+    ;
+
+fragment SINGLE_QUOTE_CHAR
+    : ~['\\\r\n]
+    | ESC
     ;
 
 fragment ESC
-    : '\\' (["\\/bfnrtv0] | UNICODE)
+    : '\\' (['"\\/bfnrtv0] | UNICODE)
     ;
 
 fragment UNICODE
@@ -75,12 +86,13 @@ fragment HEX
     ;
 
 fragment SAFECODEPOINT
-    : ~ ["\\\u0000-\u001F]
+    : ~["\\]
     ;
 
 NUMBER
-    : SYMBOL? INT ('.' [0-9]+)? EXP?
+    : SYMBOL? INT ('.' [0-9]*)? EXP?
     | SYMBOL? '.' [0-9]+ EXP?
+    | SYMBOL? '0' [xX] HEX+
     ;
     
 NUMERIC_LITERAL
@@ -136,7 +148,7 @@ MULTILINE_COMMENT
 
 // Single-line comments (ignored)
 SINGLELINE_COMMENT
-	: '//' ~[\r\n]* -> skip
+	: '//' .*? (NEWLINE | EOF) -> skip
 	;
 
 WS
