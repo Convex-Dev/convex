@@ -260,6 +260,9 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 		return (AVector<T>) VectorLeaf.EMPTY;
 	}
 	
+	/**
+	 * Reverses this Vector, producing a List
+	 */
 	@Override
 	public AList<T> reversed() {
 		return convex.core.data.List.reverse(this);

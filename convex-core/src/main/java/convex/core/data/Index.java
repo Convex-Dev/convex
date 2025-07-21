@@ -949,7 +949,7 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 
 	@Override
 	public <R extends ACell> ADataStructure<R> map(Function<MapEntry<K, V>, R> mapper) {
-		Index result=EMPTY;
+		// Index result=EMPTY;
 		// return result;
 		throw new TODOException();
 	}

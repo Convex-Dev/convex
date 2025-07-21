@@ -58,6 +58,12 @@ public abstract class AList<T extends ACell> extends ASequence<T> {
 		return Lists.empty();
 	}
 	
+	/**
+	 * Reverses this List, producing a Vector
+	 */
+	@Override
+	public abstract AVector<T> reversed();
+	
 	@Override
 	public abstract AList<T> next();
 

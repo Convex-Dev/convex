@@ -49,7 +49,7 @@ public class BlobTree extends ABlob {
 	 * @return New BlobTree instance
 	 */
 	public static BlobTree create(ABlob blob) {
-		if (blob instanceof BlobTree) return (BlobTree) blob; // already a BlobTree
+		if (blob instanceof BlobTree bt) return bt; // already a BlobTree
 
 		long length = blob.count();
 		if (length<=Blob.CHUNK_LENGTH) throw new IllegalArgumentException("Can't make BlobTree for too small length: "+length);
@@ -294,9 +294,8 @@ public class BlobTree extends ABlob {
 	@Override
 	public boolean equalsBytes(ABlob b) {
 		if (b.count()!=count) return false;
-		if (b instanceof BlobTree) {
-			BlobTree bb=(BlobTree) b;
-			return equals(bb);
+		if (b instanceof BlobTree bt) {
+			return equals(bt);
 		}
 		
 		assert (!b.isCanonical()) : "Canonical Blob of this size should be a BlobTree?";

@@ -2,13 +2,11 @@ package convex.lattice.fs;
 
 import convex.core.data.ABlob;
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
 import convex.core.data.Index;
 import convex.core.data.MapEntry;
-import convex.core.data.Maps;
 import convex.core.data.Vectors;
 import convex.core.data.prim.CVMLong;
 import convex.core.util.MergeFunction;
@@ -21,8 +19,8 @@ public class DLFSNode {
 	
 	// node structure contents
 	public static final long NODE_LENGTH = 4;
-	public static final int POS_DIR = 0;
-	public static final int POS_DATA = 1;
+	public static final int POS_DIR = 0; // Directory entries as index of nodes
+	public static final int POS_DATA = 1; // File data as a Blob
 	public static final int POS_METADATA = 2; // arbitrary node metadata
 	public static final int POS_UTIME = 3;
 

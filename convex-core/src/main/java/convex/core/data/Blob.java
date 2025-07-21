@@ -268,8 +268,9 @@ public class Blob extends AArrayBlob {
 
 	@Override
 	public Blob getChunk(long i) {
-		if ((i == 0) && (count <= CHUNK_LENGTH))
-			return this;
+		if ((i == 0) && (count <= CHUNK_LENGTH)) {
+			return this; // this must be the only chunk
+		}
 		long start = i * CHUNK_LENGTH;
 		long take = Math.min(CHUNK_LENGTH, count - start);
 		return slice(start, start + take);

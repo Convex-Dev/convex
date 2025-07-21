@@ -53,24 +53,22 @@ public class JSONUtils {
 	public static Object json(ACell o) {
 		if (o == null)
 			return null;
-		if (o instanceof CVMLong)
-			return ((CVMLong) o).longValue();
-		if (o instanceof CVMBigInteger)
-			return ((CVMBigInteger) o).big();
-		if (o instanceof CVMDouble)
-			return  ((CVMDouble) o).doubleValue();
-		if (o instanceof CVMBool)
-			return  ((CVMBool) o).booleanValue();
-		if (o instanceof CVMChar)
-			return  ((CVMChar) o).toString();
-		if (o instanceof Address)
-			return (Long) ((Address) o).longValue();
-		if (o instanceof AMap) {
-			AMap<?, ?> m = (AMap<?, ?>) o;
+		if (o instanceof CVMLong cvmLong)
+			return cvmLong.longValue();
+		if (o instanceof CVMBigInteger bi)
+			return bi.big();
+		if (o instanceof CVMDouble cd)
+			return  cd.doubleValue();
+		if (o instanceof CVMBool bool)
+			return  bool.booleanValue();
+		if (o instanceof CVMChar c)
+			return  c.toString();
+		if (o instanceof Address a)
+			return (Long) a.longValue();
+		if (o instanceof AMap m) {
 			return JSONUtils.jsonMap(m);
 		}
-		if (o instanceof ASequence) {
-			ASequence<?> seq = (ASequence<?>) o;
+		if (o instanceof ASequence seq) {
 			long n = seq.count();
 			ArrayList<Object> list = new ArrayList<>();
 			for (long i = 0; i < n; i++) {

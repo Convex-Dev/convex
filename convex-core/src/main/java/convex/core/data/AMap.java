@@ -82,7 +82,7 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 	
 	@Override
 	public final boolean containsValue(Object value) {
-		if (value instanceof ACell) return containsValue((ACell)value);
+		if (value instanceof ACell cell) return containsValue(cell);
 		return false;
 	}
 

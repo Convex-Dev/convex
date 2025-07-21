@@ -191,13 +191,11 @@ public class Belief extends ARecordGeneric {
 	@SuppressWarnings("unchecked")
 	public static Collection<SignedData<Order>> extractOrders(ACell payload) {
 		ArrayList<SignedData<Order>> result=new ArrayList<>();
-		if (payload instanceof SignedData) {
-			SignedData<?> sd=(SignedData<?>)payload;
+		if (payload instanceof SignedData sd) {
 			if (sd.getValue() instanceof Order) {
 				result.add((SignedData<Order>) sd);
 			}
-		} else if (payload instanceof Belief) {
-			Belief b=(Belief)payload;
+		} else if (payload instanceof Belief b) {
 			Index<AccountKey, SignedData<Order>> porders = b.getOrders();
 			int n=porders.size();
 			for (int i=0; i<n; i++) {
