@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import convex.core.data.type.AType;
@@ -15,6 +16,7 @@ import convex.core.data.util.BlobBuilder;
 import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.ErrorMessages;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -370,6 +372,26 @@ public abstract class AMap<K extends ACell, V extends ACell> extends ADataStruct
 		accumulateValues(al);
 		return Vectors.create(al);
 	}
+
+	/**
+	 * Merge this map with another map, using the given function for each key that
+	 * is present in either map and has a different value
+	 * 
+	 * The function is passed null for missing values in either map, and must return
+	 * type V.
+	 * 
+	 * If the function returns null, the entry is removed.
+	 * 
+	 * Returns the same map if no changes occurred.
+	 * 
+	 * @param b    Other map to merge with
+	 * @param func Merge function, returning a new value for each key
+	 * @return A merged map, or this map if no changes occurred
+	 */
+	public abstract AMap<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func);
 	
+	// TODO: should be: public abstract <K2, V2> AMap<K2, V2> map(Function<MapEntry<K, V>, MapEntry<K2, V2>> mapper);
+	@Override
+	public abstract <R extends ACell> ADataStructure<R> map(Function<MapEntry<K,V>, R> mapper);
 
 }

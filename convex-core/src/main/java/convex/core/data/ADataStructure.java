@@ -1,5 +1,7 @@
 package convex.core.data;
 
+import java.util.function.Function;
+
 /**
  * Abstract base class for Persistent data structures. Each can be regarded as a
  * countable, immutable collection of elements.
@@ -133,5 +135,14 @@ public abstract class ADataStructure<E extends ACell> extends ACountable<E> {
 		if ((ix>=0)&&(ix<count)) return;
 		throw new IndexOutOfBoundsException((int)ix);
 	}
+	
+	/**
+	 * Maps a function over a collection, applying it to each element in turn.
+	 * 
+	 * @param <R> Type of element in resulting collection
+	 * @param mapper Function to map over collection
+	 * @return Collection after function applied to each element
+	 */
+	public abstract <R extends ACell> ADataStructure<R> map(Function<E, R> mapper);
 
 }

@@ -59,22 +59,15 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 		return (AHashMap<K, V>) super.merge(m);
 	}
 
-	/**
-	 * Merge this map with another map, using the given function for each key that
-	 * is present in either map and has a different value
-	 * 
-	 * The function is passed null for missing values in either map, and must return
-	 * type V.
-	 * 
-	 * If the function returns null, the entry is removed.
-	 * 
-	 * Returns the same map if no changes occurred.
-	 * 
-	 * @param b    Other map to merge with
-	 * @param func Merge function, returning a new value for each key
-	 * @return A merged map, or this map if no changes occurred
-	 */
-	public abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func);
+
+	@Override
+	public AHashMap<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func) {
+		if (b instanceof AHashMap) {
+			return mergeDifferences((AHashMap<K, V>)b,func,0);
+		} else {
+			throw new UnsupportedOperationException("Cannot merge maps for different type");
+		}
+	}
 
 	protected abstract AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift);
 
@@ -117,6 +110,12 @@ public abstract class AHashMap<K extends ACell, V extends ACell> extends AMap<K,
 	 * @return The updated Map, or this Map if no changes
 	 */
 	public abstract AHashMap<K, V> mapEntries(Function<MapEntry<K, V>, MapEntry<K, V>> func);
+	
+	@SuppressWarnings("unchecked")
+	@Override
+	public <R extends ACell> ADataStructure<R> map(Function<MapEntry<K, V>, R> mapper) {
+		return (ADataStructure<R>) mapEntries((Function<MapEntry<K, V>, MapEntry<K, V>>)mapper);
+	}
 
 	/**
 	 * Validates the map checking the prefix of children is consistent for the given shift level

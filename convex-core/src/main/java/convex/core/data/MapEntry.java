@@ -102,7 +102,7 @@ public class MapEntry<K extends ACell, V extends ACell> extends AMapEntry<K, V> 
 	}
 
 	@Override
-	public <R extends ACell> AVector<R> map(Function<? super ACell, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<ACell, R> mapper) {
 		return Vectors.of(mapper.apply(getKey()), mapper.apply(getValue()));
 	}
 

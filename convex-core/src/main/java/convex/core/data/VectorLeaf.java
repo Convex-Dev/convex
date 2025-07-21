@@ -516,7 +516,7 @@ public class VectorLeaf<T extends ACell> extends AVector<T> {
 
 	@SuppressWarnings("unchecked")
 	@Override
-	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<T, R> mapper) {
 		Ref<AVector<R>> newPrefix = (prefix == null) ? null : prefix.getValue().map(mapper).getRef();
 
 		int ilength = items.length;

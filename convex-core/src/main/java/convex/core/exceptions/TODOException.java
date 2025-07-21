@@ -1,7 +1,7 @@
 package convex.core.exceptions;
 
 @SuppressWarnings("serial")
-public class TODOException extends RuntimeException {
+public class TODOException extends UnsupportedOperationException {
 
 	public TODOException(String message) {
 		super("TODO: "+message);

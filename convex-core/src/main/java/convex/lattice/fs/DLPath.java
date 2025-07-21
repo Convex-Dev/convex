@@ -19,7 +19,7 @@ import convex.core.data.StringShort;
 import convex.core.util.Utils;
 
 /**
- * A DLFS Path
+ * A DLFS Path implementation of java.nio.file.Path
  * 
  * Path components are Strings, separated by "/"
  */

@@ -544,11 +544,6 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (results == null) return this; // no change detected
 		return Maps.createWithShift(shift, results);
 	}
-
-	@Override
-	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
-		return mergeDifferences(b,func,0);
-	}
 	
 	@Override
 	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func, int shift) {
@@ -755,5 +750,7 @@ public class MapLeaf<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		if (count==0) return null;
 		return entries[0].getKeyHash();
 	}
+
+
 
 }

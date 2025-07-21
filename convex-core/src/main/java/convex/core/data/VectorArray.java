@@ -153,7 +153,7 @@ public class VectorArray<T extends ACell> extends ASpecialVector<T> {
 	}
 
 	@Override
-	public <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> AVector<R> map(Function<T, R> mapper) {
 		return toVector().map(mapper);
 	}
 

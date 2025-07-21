@@ -6,6 +6,7 @@ import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Blob;
+import convex.core.data.Index;
 import convex.core.data.MapEntry;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
@@ -17,9 +18,16 @@ import convex.core.util.Utils;
  * Static utility class for working with DLFS Node structures
  */
 public class DLFSNode {
+	
+	// node structure contents
+	public static final long NODE_LENGTH = 4;
+	public static final int POS_DIR = 0;
+	public static final int POS_DATA = 1;
+	public static final int POS_METADATA = 2; // arbitrary node metadata
+	public static final int POS_UTIME = 3;
 
-	static final AHashMap<AString,AVector<ACell>> EMPTY_CONTENTS = Maps.empty();
-	static final AHashMap<AString,AVector<ACell>> NIL_CONTENTS = null;
+	static final Index<AString,AVector<ACell>> EMPTY_CONTENTS = Index.none();
+	static final Index<AString,AVector<ACell>> NIL_CONTENTS = null;
 	static final Blob NIL_DATA = null;
 	static final Blob EMPTY_DATA = Blob.EMPTY;
 	static final ACell EMPTY_METADATA = null;
@@ -29,12 +37,7 @@ public class DLFSNode {
 	private static final AVector<ACell> EMPTY_FILE=Vectors.of(NIL_CONTENTS,EMPTY_DATA,EMPTY_METADATA,EMPTY_TIME);
 	private static final AVector<ACell> TOMBSTONE=Vectors.of(NIL_CONTENTS,NIL_DATA,EMPTY_METADATA,EMPTY_TIME);
 	
-	// node structure contents
-	public static final long NODE_LENGTH = 4;
-	public static final int POS_DIR = 0;
-	public static final int POS_DATA = 1;
-	public static final int POS_METADATA = 2;
-	public static final int POS_UTIME = 3;
+
 	
 	public static boolean isDirectory(AVector<ACell> node) {
 		if (node==null) return false;
@@ -58,7 +61,7 @@ public class DLFSNode {
 		int n=path.getNameCount();
 		for (int i=0; i<n; i++) {
 			AString compName=path.getCVMName(i);
-			AHashMap<AString,AVector<ACell>> dir=(AHashMap<AString, AVector<ACell>>) node.get(POS_DIR);
+			Index<AString,AVector<ACell>> dir=(Index<AString, AVector<ACell>>) node.get(POS_DIR);
 			if (dir==null) return null;
 			AVector<ACell> child=dir.get(compName);
 			if (child==null) return null;
@@ -73,9 +76,9 @@ public class DLFSNode {
 	 * @return Map of directory entries, or null if not a directory
 	 */
 	@SuppressWarnings("unchecked")
-	public static AHashMap<AString,AVector<ACell>> getDirectoryEntries(AVector<ACell> dirNode) {
+	public static Index<AString,AVector<ACell>> getDirectoryEntries(AVector<ACell> dirNode) {
 		if ((dirNode==null)||(dirNode.count()<NODE_LENGTH)) return null;
-		return (AHashMap<AString, AVector<ACell>>) dirNode.get(POS_DIR);
+		return (Index<AString, AVector<ACell>>) dirNode.get(POS_DIR);
 	}
 
 	/**
@@ -93,7 +96,7 @@ public class DLFSNode {
 		if (!isDirectory(rootNode)) return null;
 		
 		AString name=path.getCVMName(0);
-		AHashMap<AString, AVector<ACell>> entries = getDirectoryEntries(rootNode);
+		Index<AString, AVector<ACell>> entries = getDirectoryEntries(rootNode);
 		AVector<ACell> childNode=entries.get(name);
 		
 		childNode=updateNode(childNode,path.subpath(1),newNode,utime);
@@ -143,7 +146,7 @@ public class DLFSNode {
 	 * @return Directory entry, return null if not found or node is not a directory
 	 */
 	public static MapEntry<AString, AVector<ACell>> getDirectoryEntry(AVector<ACell> node, AString name) {
-		AHashMap<AString, AVector<ACell>> entries = getDirectoryEntries(node);
+		Index<AString, AVector<ACell>> entries = getDirectoryEntries(node);
 		if (entries==null) return null;
 		MapEntry<AString, AVector<ACell>> entry = entries.getEntry(name);
 		return entry;
@@ -195,8 +198,8 @@ public class DLFSNode {
 		CVMLong timeA=getUTime(a);
 		CVMLong timeB=getUTime(b);
 		
-		AHashMap<AString, AVector<ACell>> contA = getDirectoryEntries(a);
-		AHashMap<AString, AVector<ACell>> contB = getDirectoryEntries(b);
+		Index<AString, AVector<ACell>> contA = getDirectoryEntries(a);
+		Index<AString, AVector<ACell>> contB = getDirectoryEntries(b);
 		
 		// might be equal in all content except timestamp, if so take the most recent value.
 		if (Utils.equals(contA, contB)) {
@@ -207,7 +210,7 @@ public class DLFSNode {
 		
 		if ((contA!=null)&&(contB!=null)) {
 			// we have two directories, so need to merge by entry name
-			AHashMap<AString, AVector<ACell>> mergedEntries=contA.mergeDifferences(contB, new MergeFunction<AVector<ACell>>() {
+			Index<AString, AVector<ACell>> mergedEntries=contA.mergeDifferences(contB, new MergeFunction<AVector<ACell>>() {
 				@Override
 				public AVector<ACell> merge(AVector<ACell> ca, AVector<ACell> cb) {
 					// We know values are different at this point

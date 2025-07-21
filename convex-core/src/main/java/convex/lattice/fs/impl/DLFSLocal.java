@@ -13,11 +13,11 @@ import java.nio.file.attribute.FileAttribute;
 import java.util.Set;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
 import convex.core.data.Cells;
 import convex.core.data.Hash;
+import convex.core.data.Index;
 import convex.core.data.prim.CVMLong;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
@@ -110,7 +110,7 @@ public class DLFSLocal extends DLFileSystem {
 		if (node==null) throw new NoSuchFileException(path.toString());
 		
 		// Check it it empty, if a directory
-		AHashMap<AString, AVector<ACell>> entries = DLFSNode.getDirectoryEntries(node);
+		Index<AString, AVector<ACell>> entries = DLFSNode.getDirectoryEntries(node);
 		if ((entries!=null)&&(!entries.isEmpty())) throw new DirectoryNotEmptyException(path.toString());
 		
 		updateNode(path,DLFSNode.createTombstone(getTimestamp()));

@@ -5,9 +5,9 @@ import java.nio.file.Files;
 import java.util.Iterator;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Index;
 import convex.core.lang.RT;
 import convex.lattice.fs.DLFS;
 import convex.lattice.fs.DLFSNode;
@@ -63,7 +63,7 @@ public class DLAPI extends ABaseAPI {
 			if (Files.isDirectory(p)) {
 				ctx.header("Content-type", "text/plain");
 				AVector<ACell> dir=fs.getNode(p);
-				AHashMap<AString, AVector<ACell>> ents = DLFSNode.getDirectoryEntries(dir);
+				Index<AString, AVector<ACell>> ents = DLFSNode.getDirectoryEntries(dir);
 				ACell[] names=ents.getKeys().toCellArray();
 				StringBuilder sb=new StringBuilder();
 				for (ACell a:names) {

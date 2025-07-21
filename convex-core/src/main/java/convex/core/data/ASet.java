@@ -94,7 +94,7 @@ public abstract class ASet<T extends ACell> extends ACollection<T> implements ja
 	
 	
 	@Override
-	public <R extends ACell> ASet<R> map(Function<? super T, ? extends R> mapper) {
+	public <R extends ACell> ASet<R> map(Function<T, R> mapper) {
 		ASet<R> result=Sets.empty();
 		for (long i=0; i<count; i++) {
 			result=result.conj(mapper.apply(get(i)));

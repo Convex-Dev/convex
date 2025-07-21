@@ -6,12 +6,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 import convex.core.exceptions.BadFormatException;
 import convex.core.exceptions.InvalidDataException;
+import convex.core.exceptions.TODOException;
 import convex.core.lang.RT;
 import convex.core.util.Bits;
+import convex.core.util.MergeFunction;
 import convex.core.util.Utils;
 
 /**
@@ -277,10 +280,10 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 	 * Typically we populate with the key of the first entry added to avoid
 	 * unnecessary blob instances being created.
 	 */
-	private ABlobLike<?> getPrefix() {
-		if (entry!=null) return entry.getKey();
+	private ABlob getPrefix() {
+		if (entry!=null) return entry.getKey().toBlob();
 		int n=children.length;
-		if (n==0) return Blob.EMPTY;
+		if (n==0) return Blob.EMPTY; // this is safe because the only valid Index of length 0
 		return children[0].getValue().getPrefix();
 	}
 
@@ -881,6 +884,74 @@ public final class Index<K extends ABlobLike<?>, V extends ACell> extends AIndex
 			hm.put(key, entry.getValue());
 		}
 		return hm;
+	}
+
+	@Override
+	public Index<K, V> mergeDifferences(AMap<K, V> b, MergeFunction<V> func) {
+		if (b instanceof Index) {
+			return mergeDifferences((Index<K, V>)b,func);
+		} else {
+			throw new UnsupportedOperationException("Cannot merge maps for different type");
+		}
+	}
+	
+	/**
+	 * Merge two indexes with a merge function
+	 * @param b Other index to merge with
+	 * @param func Merge function for Index values
+	 * @return Updated Index (possibly this);
+	 */
+	public Index<K, V> mergeDifferences(Index<K, V> b, MergeFunction<V> func) {
+		// TODO: make this more efficient
+		if (this.equals(b)) return this;
+		Index<K, V> result=this;
+		long na=this.count;
+		long nb=b.count;
+		
+		// Scan keys in other Index for keys not in this
+		for (long i=0; i<nb; i++) {
+			MapEntry<K,V> me=b.entryAt(i);
+			K k=me.getKey();
+			V v=me.getValue();
+			MapEntry<K,V> mea=this.getEntry(k);
+			if (mea!=null) continue;
+			if (!Utils.equals(null,v)) {
+				V nv=func.merge(null,v);
+				if (nv==null) {
+					// key already doewn't exist in this
+				} else {
+					// Add new entry
+					result=result.assoc(k, nv);
+				}
+			}
+		}
+		
+		// Scan keys in this. May remove stuff
+		for (long i=0; i<na; i++) {
+			MapEntry<K,V> me=this.entryAt(i);
+			K k=me.getKey();
+			V v=me.getValue();
+			MapEntry<K,V> meb=b.getEntry(k);
+			V ov=(meb==null)?null:meb.getValue(); // value at same key in other index
+			if (!Utils.equals(v,ov)) {
+				V nv=func.merge(v,ov);
+				if (nv==null) {
+					// remove value
+					result=result.dissoc(k);
+				} else if (!Utils.equals(v, nv)){
+					// update value if any change
+					result=result.assoc(k, nv);
+				}
+			}
+		}
+		return result;
+	}
+
+	@Override
+	public <R extends ACell> ADataStructure<R> map(Function<MapEntry<K, V>, R> mapper) {
+		Index result=EMPTY;
+		// return result;
+		throw new TODOException();
 	}
 
 }

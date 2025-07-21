@@ -670,11 +670,6 @@ public class MapTree<K extends ACell, V extends ACell> extends AHashMap<K, V> {
 		}
 		return result;
 	}
-
-	@Override
-	public AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func) {
-		return mergeDifferences(b, func,0);
-	}
 	
 	@Override
 	protected AHashMap<K, V> mergeDifferences(AHashMap<K, V> b, MergeFunction<V> func,int shift) {

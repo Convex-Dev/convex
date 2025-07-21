@@ -133,11 +133,11 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	public abstract boolean allMatch(Predicate<? super T> pred);
 
 	@Override
-	public abstract <R extends ACell> AVector<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> AVector<R> map(Function<T, R> mapper);
 
 	@Override
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> AVector<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
+	public <R extends ACell> AVector<R> flatMap(Function<T, ASequence<R>> mapper) {
 		ASequence<ASequence<R>> vals = this.map(mapper);
 		AVector<R> result = (AVector<R>) this.empty();
 		for (ASequence<R> seq : vals) {

@@ -7,9 +7,9 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import convex.core.data.ACell;
-import convex.core.data.AHashMap;
 import convex.core.data.AString;
 import convex.core.data.AVector;
+import convex.core.data.Index;
 import convex.lattice.fs.DLFSNode;
 import convex.lattice.fs.DLPath;
 
@@ -31,10 +31,10 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 
 	}
 
-	private AHashMap<AString, AVector<ACell>> dirs;
+	private Index<AString, AVector<ACell>> dirs;
 	private DLPath base;
 
-	public DLDirectoryStream(DLPath base, AHashMap<AString, AVector<ACell>> dirs) {
+	public DLDirectoryStream(DLPath base, Index<AString, AVector<ACell>> dirs) {
 		this.base=base;
 		this.dirs=dirs;
 	}
@@ -51,7 +51,7 @@ public class DLDirectoryStream implements DirectoryStream<Path> {
 	}
 
 	public static DLDirectoryStream create(DLPath base, AVector<ACell> dirNode) {
-		AHashMap<AString, AVector<ACell>> dirs = DLFSNode.getDirectoryEntries(dirNode);
+		Index<AString, AVector<ACell>> dirs = DLFSNode.getDirectoryEntries(dirNode);
 		if (dirs==null) return null;
 		return new DLDirectoryStream(base,dirs);
 	}

@@ -69,7 +69,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public abstract long longLastIndexOf(ACell value);
 
 	@Override
-	public abstract <R extends ACell> ASequence<R> map(Function<? super T, ? extends R> mapper);
+	public abstract <R extends ACell> ASequence<R> map(Function<T, R> mapper);
 
 	@Override
 	public abstract void forEach(Consumer<? super T> action);
@@ -82,7 +82,7 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	public abstract void visitElementRefs(Consumer<Ref<T>> f);
 
 	@SuppressWarnings("unchecked")
-	public <R extends ACell> ASequence<R> flatMap(Function<? super T, ? extends ASequence<R>> mapper) {
+	public <R extends ACell> ASequence<R> flatMap(Function<T, ASequence<R>> mapper) {
 		ASequence<ASequence<R>> vals = this.map(mapper);
 		ASequence<R> result = (ASequence<R>) this.empty();
 		for (ASequence<R> seq : vals) {
