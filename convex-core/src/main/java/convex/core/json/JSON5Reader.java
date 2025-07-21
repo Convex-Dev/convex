@@ -4,13 +4,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 
+import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
 import org.antlr.v4.runtime.atn.PredictionMode;
+import org.antlr.v4.runtime.misc.ParseCancellationException;
 
 import convex.core.data.ACell;
-import convex.core.data.Blob;
 import convex.core.data.Cells;
 import convex.core.data.Maps;
 import convex.core.data.Vectors;
@@ -21,8 +24,13 @@ import convex.core.exceptions.ParseException;
 import convex.core.json.reader.antlr.JSON5BaseListener;
 import convex.core.json.reader.antlr.JSON5Lexer;
 import convex.core.json.reader.antlr.JSON5Parser;
-import convex.core.json.reader.antlr.JSON5Parser.*;
-import convex.core.lang.reader.ConvexErrorListener;
+import convex.core.json.reader.antlr.JSON5Parser.ArrayContext;
+import convex.core.json.reader.antlr.JSON5Parser.BoolContext;
+import convex.core.json.reader.antlr.JSON5Parser.IdentifierContext;
+import convex.core.json.reader.antlr.JSON5Parser.NilContext;
+import convex.core.json.reader.antlr.JSON5Parser.NumberContext;
+import convex.core.json.reader.antlr.JSON5Parser.ObjContext;
+import convex.core.json.reader.antlr.JSON5Parser.StringContext;
 import convex.core.util.JSONUtils;
 
 /**
@@ -86,7 +94,7 @@ public class JSON5Reader {
 		
 		@Override
 		public void exitNumber(NumberContext ctx) {
-			String num=ctx.getStart().getText();
+			String num=ctx.getText();
 			
 			// fast path is an integer
 			AInteger intv=AInteger.parse(num);
@@ -154,8 +162,15 @@ public class JSON5Reader {
 		return read(CharStreams.fromStream(is));
 	}
 	
-	private static final ConvexErrorListener ERROR_LISTENER=new ConvexErrorListener();
-
+	public static class ThrowingErrorListener extends BaseErrorListener {
+		 @Override
+		public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e)
+		   throws ParseCancellationException {
+		       throw new ParseCancellationException("line " + line + ":" + charPositionInLine + " " + msg);
+		 }
+	}
+		 
+	public static final ThrowingErrorListener ERROR_LISTENER = new ThrowingErrorListener();
 	
 	static JSON5Parser getParser(CharStream cs, JSONListener listener) {
 		// Create lexer and paser for the CharStream
@@ -179,7 +194,11 @@ public class JSON5Reader {
 		JSONListener listener=new JSONListener();
 		JSON5Parser parser=getParser(cs,listener);
 		
+		try {
 		parser.json();
+		} catch (ParseCancellationException pe) {
+			throw new ParseException(pe.getMessage(),pe.getCause());
+		}
 		
 		ArrayList<ACell> top=listener.popList();
 		if (top.size()!=1) {

@@ -53,7 +53,7 @@ string
 
 // numbers allow extra IEEE754 values as per JSON5	
 number
-	: NUMBER | NUMERIC_LITERAL;
+	: NUMBER;
 	
 nil
 	: 'null';
@@ -90,13 +90,21 @@ fragment SAFECODEPOINT
     ;
 
 NUMBER
-    : SYMBOL? INT ('.' [0-9]*)? EXP?
-    | SYMBOL? '.' [0-9]+ EXP?
-    | SYMBOL? '0' [xX] HEX+
+	: SYMBOL? (NUMBER_PART | NUMERIC_LITERAL);
+
+fragment SYMBOL
+    : '+'
+    | '-'
+    ; 
+
+fragment NUMBER_PART
+    : INT ('.' [0-9]*)? EXP?
+    | '.' [0-9]+ EXP?
+    | '0' [xX] HEX+
     ;
     
-NUMERIC_LITERAL
-    : SYMBOL? 'Infinity'
+fragment NUMERIC_LITERAL
+    : 'Infinity'
     | 'NaN'
     ;
     
@@ -120,10 +128,7 @@ fragment IDENTIFIER_PART
     | '\u200D'
     ;
     
-fragment SYMBOL
-    : '+'
-    | '-'
-    ;
+
     
 fragment NEWLINE
     : '\r\n'

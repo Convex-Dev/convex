@@ -3,7 +3,6 @@ package convex.core.data.prim;
 import java.math.BigInteger;
 
 import convex.core.data.ABlob;
-import convex.core.data.ACell;
 import convex.core.data.Blob;
 import convex.core.data.type.AType;
 import convex.core.data.type.Types;
