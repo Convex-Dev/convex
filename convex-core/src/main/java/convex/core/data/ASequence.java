@@ -309,5 +309,5 @@ public abstract class ASequence<T extends ACell> extends ACollection<T> implemen
 	 * Reverses a sequence, converting Lists to Vectors and vice versa
 	 * @return Reversed sequence
 	 */
-	public abstract ASequence<T> reverse();
+	public abstract ASequence<T> reversed();
 }

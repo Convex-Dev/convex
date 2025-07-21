@@ -395,7 +395,7 @@ public class List<T extends ACell> extends AList<T> {
 	}
 
 	@Override
-	public AVector<T> reverse() {
+	public AVector<T> reversed() {
 		return data;
 	}
 

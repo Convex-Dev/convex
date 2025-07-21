@@ -261,7 +261,7 @@ public abstract class AVector<T extends ACell> extends ASequence<T> {
 	}
 	
 	@Override
-	public AList<T> reverse() {
+	public AList<T> reversed() {
 		return convex.core.data.List.reverse(this);
 	}
 

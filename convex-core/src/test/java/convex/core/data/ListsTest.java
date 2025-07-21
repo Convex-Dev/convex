@@ -40,7 +40,7 @@ public class ListsTest {
 		assertSame(e,Format.read(expectedEncoding));
 		
 		// Reverse gets back to empty vector
-		assertSame(Vectors.empty(),e.reverse());
+		assertSame(Vectors.empty(),e.reversed());
 		
 		doListTests(e);
 	}

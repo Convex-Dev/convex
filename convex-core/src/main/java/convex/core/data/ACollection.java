@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
+import java.util.SequencedCollection;
 import java.util.function.Function;
 
 import convex.core.data.type.AType;
@@ -25,7 +26,7 @@ import convex.core.util.Utils;
  * 
  * @param <T> Type of elements in this collection
  */
-public abstract class ACollection<T extends ACell> extends ADataStructure<T> implements Collection<T> {
+public abstract class ACollection<T extends ACell> extends ADataStructure<T> implements SequencedCollection<T> {
 
 	protected ACollection(long count) {
 		super(count);
