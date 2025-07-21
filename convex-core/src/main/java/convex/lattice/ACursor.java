@@ -15,11 +15,67 @@ import convex.core.lang.RT;
  */
 public abstract class ACursor<V extends ACell> {
 
+	private final V initialValue;
+	
+	protected ACursor(V value) {
+		this.initialValue=value;
+	}
+	
 	/**
 	 * Gets the value of this cursor
 	 * @return Value at cursor
 	 */
 	public abstract V get();
+	
+	/**
+	 * Gets the value at a specific lattice path within this cursor
+	 * @param path Path into this cursor
+	 * @return Value at cursor
+	 */
+	public V get(ACell... path) {
+		return RT.getIn(get(), path);
+	}
+	
+	/**
+	 * Gets the value at a specific lattice path within this cursor
+	 * @param path Path into this cursor
+	 * @return Value at cursor
+	 */
+	public V get(Object... path) {
+		return RT.getIn(get(), path);
+	}
+	
+	/**
+	 * Sets the value at a specific lattice path within this cursor
+	 * @param newValue New value to set at the given path
+	 * @param path Path into this cursor
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> void set(T newValue, ACell... path) {
+		getAndUpdate(bv->{
+			return (V) RT.assocIn(bv,newValue,path);
+		});
+	}
+	
+	/**
+	 * Sets the value at a specific lattice path within this cursor
+	 * @param newValue New value to set at the given path
+	 * @param path Path into this cursor
+	 */
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> void set(T newValue, Object... path) {
+		getAndUpdate(bv->{
+			return (V) RT.assocIn(bv,newValue,path);
+		});
+	}
+	
+	/**
+	 * Gets the initial value of this cursor
+	 * @return Value of cursor when initialized (possibly null);
+	 */
+	public V getInitialValue() {
+		return initialValue;
+	}
 
 	/**
 	 * Gets the cursor value, and sets it to the new value atomically.
@@ -69,4 +125,24 @@ public abstract class ACursor<V extends ACell> {
 		if (v==null) return "nil";
 		return v.toString();
 	}
+	
+	@SuppressWarnings("unchecked")
+	public <T extends ACell> ACursor<T> path(ACell... path) {
+		if (path.length==0) return (ACursor<T>) this;
+		return PathCursor.create(this,path);
+	}
+	
+	public ACursor<V> detach() {
+		return Root.create(this);
+	}
+ 	
+	public boolean sync(ACursor<V> detached) {
+		V newValue=detached.get();
+		V detachedValue=detached.getInitialValue();
+		
+		boolean updated = compareAndSet(detachedValue,newValue);
+		return updated;
+	}
+
+
 }

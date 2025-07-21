@@ -14,8 +14,13 @@ public class PathCursor<V extends ACell> extends ACursor<V> {
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public PathCursor(ACursor<?> base, ACell... path) {
+		super((V) base.get(path));
 		this.base=(ACursor)base;
 		this.path=path;
+	}
+	
+	public static <T extends ACell, V extends ACell> ACursor<T> create(ACursor<V> base, ACell[] path) {
+		return new PathCursor<>(base,path);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -26,9 +31,7 @@ public class PathCursor<V extends ACell> extends ACursor<V> {
 	
 	@Override
 	public void set(V newValue) {
-		base.getAndUpdate(bv->{
-			return RT.assocIn(bv,newValue,path);
-		});
+		base.set(newValue,path);
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -102,6 +105,8 @@ public class PathCursor<V extends ACell> extends ACursor<V> {
 		});
 		return updated[0];
 	}
+
+
 
 
 

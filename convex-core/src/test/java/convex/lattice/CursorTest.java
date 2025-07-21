@@ -3,6 +3,8 @@ package convex.lattice;
 import static convex.test.Assertions.assertCVMEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -16,6 +18,7 @@ import convex.core.data.AVector;
 import convex.core.data.Index;
 import convex.core.data.Keyword;
 import convex.core.data.Maps;
+import convex.core.data.Symbol;
 import convex.core.data.Vectors;
 import convex.core.data.prim.AInteger;
 import convex.core.data.prim.CVMLong;
@@ -25,11 +28,16 @@ public class CursorTest {
 	@Test public void testRoot() {
 		Root<AInteger> root=new Root<>();
 		doIntCursorTest(root);
+		
+		// Check path constructions from Root
+		assertSame(root,root.path());
+		assertNotSame(root,root.path(Symbols.FOO));
 	}
 	
 	@Test public void testPathCursor() {
 		Root<AInteger> root=new Root<>();
-		PathCursor<AInteger> pc=new PathCursor<AInteger>(root,Symbols.FOO);
+		ACursor<AInteger> pc=root.path(Symbols.FOO);
+		assertTrue(pc instanceof PathCursor);
 		doIntCursorTest(pc);
 	}
 	
@@ -85,6 +93,34 @@ public class CursorTest {
 		assertCVMEquals(7,root.accumulateAndGet(TWO,(a,b)->a.add(b))); // value is now 7;
 
 		assertEquals("7",root.toString());
+	}
+	
+	@Test public void testDetachedPath() {
+		AMap<Symbol,AInteger> INITIAL=Maps.of(Symbols.FOO,1);
+		ACursor<AInteger> root=Cursors.of(INITIAL);
+		ACursor<AInteger> path=root.path(Symbols.FOO);
+		ACursor<AInteger> det=path.detach();
+		
+		// modify detached path
+		assertCVMEquals(1,det.get());
+		det.set(2);
+		assertCVMEquals(1,path.get());
+		
+		// Run tests on detached cursor
+		det.set(null);
+		doIntCursorTest(det);
+		assertEquals(INITIAL,root.get());
+		
+		// Check and sync
+		AInteger NOW=det.get();
+		assertNotEquals(NOW,CVMLong.ONE); // should have changed
+		boolean synced=path.sync(det);
+		assertTrue(synced);
+		
+		// Check update propagated to root
+		AMap<Symbol,AInteger> NEWMAP=Maps.of(Symbols.FOO,NOW);
+		assertEquals(root.get(),NEWMAP);
+		
 	}
 
 }
