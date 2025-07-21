@@ -63,7 +63,7 @@ STRING
     ;
 
 fragment ESC
-    : '\\' (["\\/bfnrt] | UNICODE)
+    : '\\' (["\\/bfnrtv0] | UNICODE)
     ;
 
 fragment UNICODE
